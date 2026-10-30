@@ -187,7 +187,7 @@ func TestDownloadSources(t *testing.T) {
 		name string
 		// httpFirst puts the URL source before GitHub.
 		httpFirst bool
-		gh        dictationtest.Gh
+		gh        func() *dictationtest.Gh
 		// httpStatus makes the URL source answer with it (403: a proxy blocking it).
 		httpStatus int
 		part       []byte
@@ -198,30 +198,35 @@ func TestDownloadSources(t *testing.T) {
 	}{
 		{name: "GitHub first", wantSource: "gh"},
 		{name: "GitHub resumes a partial file", part: body[:1000], wantSource: "gh", wantGhRng: []string{"Range: bytes=1000-"}},
-		{name: "GitHub ignoring the range starts over", part: body[:1000], gh: dictationtest.Gh{IgnoreRange: true}, wantSource: "gh", wantGhRng: []string{"Range: bytes=1000-"}},
-		{name: "no gh falls back", gh: dictationtest.Gh{Missing: true}, wantSource: "http", wantHTTP: []string{""}},
-		{name: "gh logged out falls back", gh: dictationtest.Gh{LoggedOut: true}, wantSource: "http", wantHTTP: []string{""}},
-		{name: "an asset still uploading falls back", gh: dictationtest.Gh{State: "starter"}, wantSource: "http", wantHTTP: []string{""}},
-		{name: "a broken transfer is resumed by the next source", gh: dictationtest.Gh{FailAfter: 1200}, wantSource: "http", wantHTTP: []string{"bytes=1200-"}},
-		{name: "a damaged file is not resumed by the next source", gh: dictationtest.Gh{Body: damaged}, wantSource: "http", wantHTTP: []string{""}},
+		{name: "GitHub ignoring the range starts over", part: body[:1000], gh: func() *dictationtest.Gh { return &dictationtest.Gh{IgnoreRange: true} }, wantSource: "gh", wantGhRng: []string{"Range: bytes=1000-"}},
+		{name: "no gh falls back", gh: func() *dictationtest.Gh { return &dictationtest.Gh{Missing: true} }, wantSource: "http", wantHTTP: []string{""}},
+		{name: "gh logged out falls back", gh: func() *dictationtest.Gh { return &dictationtest.Gh{LoggedOut: true} }, wantSource: "http", wantHTTP: []string{""}},
+		{name: "an asset still uploading falls back", gh: func() *dictationtest.Gh { return &dictationtest.Gh{State: "starter"} }, wantSource: "http", wantHTTP: []string{""}},
+		{name: "a broken transfer is resumed by the next source", gh: func() *dictationtest.Gh { return &dictationtest.Gh{FailAfter: 1200} }, wantSource: "http", wantHTTP: []string{"bytes=1200-"}},
+		{name: "a damaged file is not resumed by the next source", gh: func() *dictationtest.Gh { return &dictationtest.Gh{Body: damaged} }, wantSource: "http", wantHTTP: []string{""}},
 		{name: "a blocked URL falls back to GitHub", httpFirst: true, httpStatus: http.StatusForbidden, wantSource: "gh", wantHTTP: []string{""}},
 		{
-			name: "every source failing names each", gh: dictationtest.Gh{LoggedOut: true}, httpStatus: http.StatusForbidden, wantHTTP: []string{""},
+			name: "every source failing names each", gh: func() *dictationtest.Gh { return &dictationtest.Gh{LoggedOut: true} }, httpStatus: http.StatusForbidden, wantHTTP: []string{""},
 			wantErr: "Download failed:\nGitHub: gh is not logged in (run gh auth login)\n{http}: the server answered 403 Forbidden",
 		},
 		{
-			name: "both damaged", gh: dictationtest.Gh{Body: damaged}, httpStatus: http.StatusForbidden, wantHTTP: []string{""},
+			name: "both damaged", gh: func() *dictationtest.Gh { return &dictationtest.Gh{Body: damaged} }, httpStatus: http.StatusForbidden, wantHTTP: []string{""},
 			wantErr: "Download failed:\nGitHub: the downloaded model is damaged (sha256 mismatch)\n{http}: the server answered 403 Forbidden",
 		},
 		{
-			name: "blocked URL then no release", httpFirst: true, httpStatus: http.StatusForbidden, gh: dictationtest.Gh{Asset: dictation.ReleaseAsset{Repo: "o/r", Tag: "other"}}, wantHTTP: []string{""},
+			name: "blocked URL then no release", httpFirst: true, httpStatus: http.StatusForbidden, gh: func() *dictationtest.Gh {
+				return &dictationtest.Gh{Asset: dictation.ReleaseAsset{Repo: "o/r", Tag: "other"}}
+			}, wantHTTP: []string{""},
 			wantErr: "Download failed:\n{http}: the server answered 403 Forbidden\nGitHub: no release models-test in o/r (or no access to it)",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := newModelServer(t, body)
 			srv.status = tc.httpStatus
-			gh := tc.gh
+			gh := &dictationtest.Gh{}
+			if tc.gh != nil {
+				gh = tc.gh()
+			}
 			if gh.Asset == (dictation.ReleaseAsset{}) {
 				gh.Asset = testAsset
 			}
@@ -234,7 +239,7 @@ func TestDownloadSources(t *testing.T) {
 			if tc.httpFirst {
 				m.Sources = []dictation.Source{hf, {GitHub: &testAsset}}
 			}
-			h := newHarness(t, setup{attended: true, opts: func(o *dictation.Options) { o.Model = m; o.Gh = &gh }})
+			h := newHarness(t, setup{attended: true, opts: func(o *dictation.Options) { o.Model = m; o.Gh = gh }})
 			if tc.part != nil {
 				if err := os.WriteFile(filepath.Join(h.dir, m.Name+".part"), tc.part, 0o600); err != nil {
 					t.Fatal(err)

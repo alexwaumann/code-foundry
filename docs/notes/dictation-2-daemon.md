@@ -31,6 +31,9 @@ oid of the file (`/raw/main/` serves the pointer; `x-linked-etag` on `/resolve/`
 same). Checked on 2026-10-29 by downloading the file with curl and hashing it, and again
 by the store's own download in the end-to-end run. PR 1 pinned the same values.
 
+The same file is mirrored as a pre-release asset on the release repository and downloaded
+from there through gh first, Hugging Face second (docs/notes/dictation-6-model-mirror.md).
+
 Stored at `<home>/dictation/models/` (`paths.DictationModels`). At start the store counts
 the model as present when a file of the pinned size is there: hashing 874 MB on every
 start is too slow, and the download verified it once.
