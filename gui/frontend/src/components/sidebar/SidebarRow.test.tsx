@@ -434,7 +434,8 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
   it("a workspace thread: workspace, then the run-in project with Fresh copy, branch, model; no member list", () => {
     const card = openCard({ projectId: "gp", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/wt/gp/cf-login", createdWorktree: true, branch: "cf/login" });
     expect(ids(card)).toEqual(["tip-name", "tip-workspace", "tip-project", "tip-branch", "tip-model"]);
-    expect(text(card, "tip-workspace")).toBe("login");
+    expect(text(card, "tip-workspace")).toBe("login2 projects");
+    expect(text(card, "tip-workspace-meta")).toBe("2 projects");
     expect(within(card).getByTestId("tip-workspace").querySelector("svg")?.getAttribute("class")).toContain("lucide-layers");
     expect(text(card, "tip-project")).toBe("ghostty-playgroundFresh copy");
     expect(text(card, "tip-project-chip")).toBe("Fresh copy");
@@ -445,12 +446,13 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
   it("an unnamed set: N projects, in place: Project folder", () => {
     const card = openCard({ projectId: "gp", projectIds: ["cf", "gp"], worktreePath: "/src/gp" });
     expect(text(card, "tip-workspace")).toBe("2 projects");
+    expect(within(card).queryByTestId("tip-workspace-meta")).toBeNull();
     expect(text(card, "tip-project-chip")).toBe("Project folder");
   });
 
   it("a thread in its workspace's folder: the workspace, then the folder as the place, no chip", () => {
     const card = openCard({ projectId: "", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/home/.code-foundry/workspaces/w-1", createdWorktree: true, branch: "cf/login" });
-    expect(text(card, "tip-workspace")).toBe("login");
+    expect(text(card, "tip-workspace")).toBe("login2 projects");
     expect(text(card, "tip-project")).toBe("Workspace folder");
     expect(within(card).queryByTestId("tip-project-chip")).toBeNull();
   });

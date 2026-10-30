@@ -126,7 +126,12 @@ export function setLabel(s: Pick<ThreadPlaceInput, "projectId" | "workspaceId" |
   const n = s.projectCount ?? 1;
   if (n <= 1 && !(s.projectId === "" && s.workspaceId !== "")) return null;
   if (s.workspaceId) return workspaces.byId[s.workspaceId]?.name ?? s.workspaceId;
-  return `${String(n)} projects`;
+  return projectsLabel(n);
+}
+
+/** "N projects" ("1 project"): an unnamed set's label, and the card's count beside a named workspace. */
+export function projectsLabel(n: number): string {
+  return `${String(n)} ${n === 1 ? "project" : "projects"}`;
 }
 
 export function threadRowModel(s: ThreadPlaceInput, projects: ProjectLookup, workspaces: WorkspaceLookup): ThreadRowModel {

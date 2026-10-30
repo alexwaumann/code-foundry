@@ -146,7 +146,7 @@ test("2, 7, 8, 14, 15: New thread on this branch in place: heading, Workspace fo
   // 6: its tooltip names the workspace, never its w-<id>, and runs in its folder.
   await page.mouse.move(0, 0);
   await row(page, `s:${id}`).hover();
-  await expect(openTooltip(page).getByTestId("tip-workspace")).toHaveText("shop");
+  await expect(openTooltip(page).getByTestId("tip-workspace")).toContainText("shop");
   await expect(openTooltip(page).getByTestId("tip-project")).toHaveText("Workspace folder");
   await expect(openTooltip(page).getByTestId("tip-project-chip")).toHaveCount(0);
   await page.mouse.move(0, 0);
