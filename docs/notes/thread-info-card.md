@@ -29,6 +29,12 @@ overlay) then `ThreadInfoCard` when open: `w-80`, `py-3 pr-3`, scrolling. The ca
 column, so they stay aligned and narrow together. Ember's chat and the subagent view have
 no card.
 
+The card steps aside while the conversation would be under 480px beside it
+(`cardFits`: the body measured with a ResizeObserver, `lib/useWidth`, the way the panel
+split measures): at the 900px window minimum, or with the side panel open on a 1280px
+window. The toggle stays on and pressed, its tooltip says "Not enough room"
+(`stores/threadInfo` `useCardRoom`), and the card returns when there is room again.
+
 ## Rows (`components/threadinfo`)
 
 * `Row`: icon column, text, right value, then a chevron column every row reserves, so
@@ -58,8 +64,11 @@ no card.
   when it is not the cwd's. **The daemon runs a thread's actions only in its cwd's
   project** (`Snapshot.Resolve`), so another member's action runs as that member's
   worktree run (`{kind: "worktree"}`, as a Projects page row runs it); the cwd's runs for
-  the thread.
-* **Changes** counts what the Worktree tab's Changes heading counts: the checkout's
+  the thread. That run's tab opens in the Projects page's panel, so the card toasts
+  "Running <action> in <project>" with Show, which reveals the run's terminal (else the
+  Projects page).
+* **Changes** shows nothing until every checkout's detail is read (a failed read counts
+  as none), then counts what the Worktree tab's Changes heading counts: the checkout's
   `GetWorktreeDetail` files against the base (commits and uncommitted work), one watched
   detail per git member. A click opens the cwd's **Worktree tab**: Diff tabs are one per
   file, so there is no whole-checkout Diff tab; the Worktree tab's list opens each file's.
@@ -67,19 +76,26 @@ no card.
 * **Git state row** is the cwd checkout's. Conflicts, then diverged (needs an upstream),
   then an operation in progress, push, pull, then rebase once 10+ behind the base. Push and
   Pull run `git.push`/`git.pull` on the cwd; Resolve, Fix and Rebase send their prompt with
-  `thread.send` (the composer's command, without touching its draft). Push, Pull and the
-  Rebase button are disabled while the thread is busy, any subagent runs, or another
-  running thread (not archived or snoozed) has the cwd as its cwd or a recorded checkout.
+  `thread.send` (the composer's command, without touching its draft, holding the composer's
+  failed-prompt notice as its sends do). Push, Pull and the Rebase button are disabled while
+  the thread is busy, any subagent runs, or another thread's model works in the checkout
+  (`otherModelWorksIn`: its cwd or a recorded checkout, and it is mid-turn or has subagents
+  running; a thread whose process is up but idle does not count). Every button and Push or
+  Pull runs once: the row is pending until its send or command settles (`runOnce`, the
+  `rerunning` rule of `stores/actionActions.ts`), and a double click's second click is
+  ignored.
 * **Pull requests**: the thread's linked PRs (which already union Claude's links, created
   children and the worktree branch's PR), each detail watched while the card shows. Closed
   ones and ones whose detail has not loaded are left out. Order: the cwd's project first,
   then members, then other repositories (named by slug); open and draft before merged,
-  newest number first. A PR with requested changes says "changes requested" (the brief's
-  list had no word for it). Stacked: the base is another linked open PR's head.
+  newest number first. The review in the PR tab's words: approved, changes requested,
+  "review requested" only while someone is asked, else "review required" or "no review".
+  Stacked: the base is another linked open PR's head.
 * **Lineage**: subagent runs and the threads this one created (hidden ones too) are the
   same row. Running or waiting ones first, newest first; finished ones under Previous
-  agents. A child's stop square interrupts it; **a subagent's is disabled** ("not supported
-  yet"): no command stops one run. The dots menu's Show hidden threads toggles
+  agents (their time does not tick). A live child's stop square interrupts it: a sibling of
+  the row laid over its value, keyboard-usable (Enter interrupts, it does not open the
+  child). **Subagent rows have no stop square**: no command stops one run. The dots menu's Show hidden threads toggles
   `threads.show_created_threads`; Archive finished is disabled (nothing does it in bulk).
 * **Context**: the hover card's "N cached" is the context while the cache is warm. The
   daemon publishes no per-turn cached figure; a warm cache serves the whole context to the
@@ -87,6 +103,14 @@ no card.
 * **Usage**: the Usage tab's totals (`lib/usage`); Cache write sums the 5m and 1h kinds;
   the hover card lists models by their label (`canonicalModelName`), cost and share.
 * **Finder icon**: lucide has no Finder face; `icons/FinderMark.tsx` draws the sketch's.
+
+## Follow-ups
+
+* **A thread runs actions in any project of its set** (daemon): let `action.run` with a
+  thread owner take an action of another member, run in that member's checkout and owned
+  by the thread. The run then lands in the thread's bottom panel, is recorded against the
+  thread, and the action row's last-run pick works across the set; the card's toast and the
+  worktree-owner path go.
 
 ## Mock
 
@@ -120,6 +144,16 @@ folder without git. `GhWorld.addCardPullRequest` and `setCardDetail` are the fix
 
 * Live data showed what the mock did not: a cost of "<$0.0001" is wider than a 3rem
   column; the usage fold's cost column is `minmax(3rem,auto)`.
+
+## Review fixes (PR #407)
+
+One commit each: sends and git commands run once; the busy rule counts models that work,
+not processes that are up, with no clock in the selector; the card steps aside under 480px
+of conversation; another project's action says where it runs; review wording; Changes
+waits for the details; no stop on subagents and a keyboard-usable one on children;
+submenus scroll like menus; finished rows and the context row do not re-render every tick.
+New cases: `otherModelWorksIn`, `cardFits`, the review words, `runOnce`, and e2e for a
+narrow window, a double-click Fix, an action of another project, and the stop square.
 
 ## Verified
 
