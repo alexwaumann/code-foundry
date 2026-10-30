@@ -186,7 +186,7 @@ func TestRender(t *testing.T) {
 			// memory.* for "Remembering preferences", View for "Showing things in the app".
 			mentioned: []string{"`settings.set <key> <value>`", "`pr.create`", "`project.add <path>`", "`thread.new`",
 				"`memory.show`", "`memory.add <text>`", "`memory.remove <entry>`", "`memory.clear --yes`",
-				"`view.panel.worktree`", "`view.panel.linked-prs`", "`ui.presence`", "`ui.notify`"},
+				"`view.panel.file <path>`", "`view.panel.mcp`", "`ui.presence`", "`ui.notify`"},
 		},
 	} {
 		got := string(files[tt.path])
@@ -240,7 +240,7 @@ func TestRender(t *testing.T) {
 		"open it in your own thread's side panel", "A \"show me\" is asking: just open it", "Add `--focus` only when\nthey ask to be taken there",
 		"`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <number>`", "Do not `ui.notify`",
 		"`code-foundry ui.presence --json` is only for deciding whether to mention", "refused from a thread no window shows",
-		"`code-foundry daemon.capabilities --group\npanel`", "unless a saved preference says not to",
+		"`code-foundry daemon.capabilities --group panel`", "unless a saved preference says not to",
 		"\n## Explain first, then offer\n", "Run it only after the user says yes", "\"Want me to make Fresh copy the\n   default?\"",
 		"Show the command only if they ask for it", "by its Settings page label", "the code-foundry skill"} {
 		if !strings.Contains(helpSkill, want) {

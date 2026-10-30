@@ -823,32 +823,22 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   sandboxed frame served by the daemon's `/preview/<grant>/` route (`internal/preview`,
   `docs/notes/html-preview-interactive.md`), or
   an image; one changed file of a worktree against its base, working tree or branch;
-  opened from the worktree overview's Changes rows, the Diff tab's Open file, and path
+  opened from the Changes tab's rows, the Diff tab's Open file, and path
   chips in Claude's markdown and file tool rows (`docs/notes/file-viewer-4-chips.md`), one
   tab per file; `docs/notes/file-viewer-3-tabs.md`), Pull request, whose menu starts threads about the pull
-  request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Worktree (one worktree's
-  overview as a tab: a thread's own worktree by T or `view.panel.worktree`, a project,
-  worktree or workspace project row on the Projects page by Enter or double-click into the
-  page's own panel; under its facts an "Also in" list of the thread's other checkouts from
-  one `ThreadService.Checkouts` read per visible tab, each opening as its own Worktree tab;
-  `docs/notes/worktree-panel-tab.md`, `docs/notes/workspaces-v2-4-projects-page.md`; the
-  v1 Workspace surface and `view.panel.workspace` are gone) and Linked PRs (the
-  thread's linked pull requests, newest first, each opening as a PR tab; opened by L,
-  `view.panel.linked-prs`, the thread header and the sidebar's PR tag, which shows one
-  pull request's state and number or a count, closed ones left out;
-  `docs/notes/linked-prs.md`, `docs/notes/sidebar-pr-tag.md`), MCP (the thread's MCP servers, one card each
-  with status, error, tools and Reconnect; opened by M and `view.panel.mcp`;
-  `docs/notes/mcp-panel.md`), Agents (the thread's subagent runs, one row each in
-  spawn order with status, activity or report, and stats; opened by A, `view.panel.agents`
-  and the strip above the composer that shows while background runs go on;
-  `docs/notes/agents-2-gui.md`; a depth-1 row, a strip name or an Agent row's Open shows
-  that run read-only in the content pane in the thread's place, the thread staying
-  selected on its one Watch: `thread.agent.open`, back up by Escape or
-  `thread.agent.up`; `docs/notes/subagent-view.md`) and Threads (the thread's lineage from the thread list:
-  the thread whose agent created it, its siblings and the threads created from it; opened
-  by H, `view.panel.threads` and the header's "from …" chip;
-  `docs/notes/agents-3-lineage-gui.md`; the creator resolved by its id under its current
-  name, `docs/notes/lineage-by-id.md`). Every
+  request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Changes (kind `changes`:
+  one worktree's changed files and commits against its base, each file opening its Diff
+  tab; opened from the thread info card's Changes row and per-project sub-rows, and from
+  the Projects page's project and worktree rows into the page's own panel;
+  `docs/notes/thread-header-crumb.md`) and MCP (the thread's MCP servers, one card each
+  with status, error, tools and Reconnect; opened by the card's MCP row and
+  `view.panel.mcp`; `docs/notes/mcp-panel.md`). The Worktree, Workspace, Linked PRs,
+  Usage, Agents and Threads surfaces and their `view.panel.*` verbs are gone: the thread
+  info card shows what they did (`docs/notes/thread-info-card.md`). A depth-1 subagent row
+  or a strip name above the composer (background runs) shows that run read-only in the
+  content pane in the thread's place, the thread staying selected on its one Watch:
+  `thread.agent.open`, back up by Escape or `thread.agent.up`;
+  `docs/notes/subagent-view.md`. Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. The palette lists the commands the daemon does not
   mark `NoPalette` (`Command.no_palette`): queries whose only output is a text toast,

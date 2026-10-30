@@ -113,7 +113,7 @@ var pluginThreadCommands = []string{"thread.flags", "thread.flag.clear"}
 
 // leftOut are commands the guide does not list because it has no room for them (it must
 // stay under 29,000 bytes): pr.checks, which plugins use more than agents,
-// thread.restart, which is the user's (a thread's header offers it when a plugin's
+// thread.restart, which is the user's (a thread's title menu offers it when a plugin's
 // environment changed), and the GUI's thread.new-like ("New thread on this branch":
 // agents use `thread new --like`) and thread.workspace (Save as workspace), and
 // thread.prompts, the user's own prompt history (docs/notes/prompt-history-1-daemon.md),

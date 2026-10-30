@@ -1052,7 +1052,7 @@ func (x *UiIntent_PlayAlertSound) GetVolume() int32 {
 type UiIntent_ShowView struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// The thread whose side panel a panel action ("panel.toggle", "panel.worktree", ...)
+	// The thread whose side panel a panel action ("panel.toggle", "panel.mcp", ...)
 	// applies to, without changing what any window has selected: the thread's panel
 	// changes now if a window shows it, and is that way when the user opens it. Empty:
 	// the action applies to whatever each window has selected. Set by the view.panel.*

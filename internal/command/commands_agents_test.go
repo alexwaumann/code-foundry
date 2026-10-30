@@ -44,7 +44,7 @@ func TestAgentsCommandsAvailability(t *testing.T) {
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {
-		for _, name := range []string{"thread.agents", "view.panel.agents"} {
+		for _, name := range []string{"thread.agents"} {
 			c, _ := reg.Get(name)
 			if got := c.Available(tt.ctx); got != tt.want {
 				t.Errorf("%s %s: available = %v", tt.name, name, got)
@@ -85,20 +85,6 @@ func TestThreadAgentsCommand(t *testing.T) {
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeNotFound {
 		t.Errorf("unknown thread: %v", err)
-	}
-}
-
-func TestViewPanelAgentsEmits(t *testing.T) {
-	reg, _, emit := newAgentsRegistry(t)
-	res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, "view.panel.agents", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Message != "" || res.JSON != (command.EmitResult{Windows: 1, Receivers: 1}) {
-		t.Errorf("result = %+v", res)
-	}
-	if got := emit.Intents(); len(got) != 1 || got[0].GetShowView().GetName() != command.ViewPanelAgents {
-		t.Errorf("intents = %v", got)
 	}
 }
 

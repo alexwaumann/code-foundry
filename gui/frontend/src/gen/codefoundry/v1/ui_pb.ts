@@ -436,7 +436,7 @@ export type UiIntent_ShowView = Message<"codefoundry.v1.UiIntent.ShowView"> & {
   name: string;
 
   /**
-   * The thread whose side panel a panel action ("panel.toggle", "panel.worktree", ...)
+   * The thread whose side panel a panel action ("panel.toggle", "panel.mcp", ...)
    * applies to, without changing what any window has selected: the thread's panel
    * changes now if a window shows it, and is that way when the user opens it. Empty:
    * the action applies to whatever each window has selected. Set by the view.panel.*

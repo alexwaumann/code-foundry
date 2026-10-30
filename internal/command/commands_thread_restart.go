@@ -10,8 +10,9 @@ import (
 
 // thread.restart (docs/notes/plugins-env-restart.md): restart a thread's Claude process
 // with the same conversation, so it picks up what changed outside it, such as a
-// plugin's session environment (Thread.plugin_env_stale, which the thread header shows
-// with a Restart button running this command). Any thread, stale or not. It asks for
+// plugin's session environment (Thread.plugin_env_stale, which the thread info card's
+// project row shows; the thread's title menu then offers Restart Claude, running this
+// command). Any thread, stale or not. It asks for
 // confirmation when the restart cuts something off: a running turn or a pending
 // question (interrupted), background agents or shells (stopped), a report Claude is
 // about to make.

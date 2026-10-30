@@ -18,16 +18,11 @@ import (
 // panelVerbs are every verb that acts on a side panel and follows the thread, with the
 // ShowView name each emits.
 var panelVerbs = map[string]string{
-	"view.panel.toggle":     command.ViewPanelToggle,
-	"view.panel.expand":     command.ViewPanelExpand,
-	"view.panel.new-tab":    command.ViewPanelNewTab,
-	"view.panel.split":      command.ViewPanelSplit,
-	"view.panel.linked-prs": command.ViewPanelLinkedPRs,
-	"view.panel.usage":      command.ViewPanelUsage,
-	"view.panel.threads":    command.ViewPanelThreads,
-	"view.panel.worktree":   command.ViewPanelWorktree,
-	"view.panel.mcp":        command.ViewPanelMcp,
-	"view.panel.agents":     command.ViewPanelAgents,
+	"view.panel.toggle":  command.ViewPanelToggle,
+	"view.panel.expand":  command.ViewPanelExpand,
+	"view.panel.new-tab": command.ViewPanelNewTab,
+	"view.panel.split":   command.ViewPanelSplit,
+	"view.panel.mcp":     command.ViewPanelMcp,
 }
 
 // richThread can show every surface: placed in a workspace and a worktree, with a
@@ -208,14 +203,11 @@ func TestPanelVerbsWithoutAWindow(t *testing.T) {
 	}
 }
 
-// A scoped call reads its thread: an unknown one fails, and a surface refuses a thread
-// it has nothing to show for. Nothing is emitted then.
+// A scoped call reads its thread: an unknown one fails, and nothing is emitted then (the
+// item verbs' refusals are TestPanelFile's and TestPanelDiff's).
 func TestPanelVerbsCheckTheThread(t *testing.T) {
 	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
 	notFound := &commandtest.Thread{Err: connect.NewError(connect.CodeNotFound, errors.New("no thread"))}
-	plain := func() *commandtest.Thread {
-		return &commandtest.Thread{Current: &v1.Thread{ProjectId: "r1", WorktreePath: "/wt"}}
-	}
 	tests := []struct {
 		name   string
 		verb   string
@@ -223,18 +215,8 @@ func TestPanelVerbsCheckTheThread(t *testing.T) {
 		code   connect.Code
 		msg    string
 	}{
-		{name: "unknown thread", verb: "view.panel.usage", thread: notFound, code: connect.CodeNotFound},
+		{name: "unknown thread", verb: "view.panel.mcp", thread: notFound, code: connect.CodeNotFound},
 		{name: "unknown thread with --focus", verb: "view.panel.toggle", thread: notFound, code: connect.CodeNotFound},
-		{name: "worktree surface for a thread in no project", verb: "view.panel.worktree", thread: &commandtest.Thread{Current: &v1.Thread{WorktreePath: "/home"}},
-			code: connect.CodeFailedPrecondition, msg: "runs in no project worktree"},
-		{name: "linked PRs without links", verb: "view.panel.linked-prs", thread: plain(), code: connect.CodeFailedPrecondition,
-			msg: "thread s-aaaaaaaaaaa1 has no linked pull requests yet"},
-		{name: "agents without runs", verb: "view.panel.agents", thread: plain(), code: connect.CodeFailedPrecondition,
-			msg: "thread s-aaaaaaaaaaa1 has no subagent runs yet"},
-		{name: "threads without lineage", verb: "view.panel.threads", thread: plain(), code: connect.CodeFailedPrecondition,
-			msg: "thread s-aaaaaaaaaaa1 has no related threads"},
-		{name: "threads, another thread's child only", verb: "view.panel.threads", code: connect.CodeFailedPrecondition,
-			thread: &commandtest.Thread{Current: &v1.Thread{}, Others: []*v1.Thread{{Id: "s-ddddddddddd4", CreatedBy: "s-eeeeeeeeeee5"}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -248,33 +230,6 @@ func TestPanelVerbsCheckTheThread(t *testing.T) {
 			}
 		})
 	}
-}
-
-// view.panel.threads opens for a thread with lineage either way: a creator, or a child.
-func TestPanelThreadsLineage(t *testing.T) {
-	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
-	for name, th := range map[string]*commandtest.Thread{
-		"created by a thread": {Current: &v1.Thread{CreatedBy: "s-ccccccccccc3"}},
-		"created one":         {Others: []*v1.Thread{{Id: "s-aaaaaaaaaaa1"}, {Id: "s-ddddddddddd4", CreatedBy: "s-aaaaaaaaaaa1"}}},
-	} {
-		t.Run(name, func(t *testing.T) {
-			reg, emit := panelRegistry(t, th)
-			if _, err := reg.Invoke(context.Background(), inThread, "view.panel.threads", nil); err != nil {
-				t.Fatal(err)
-			}
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showView(command.ViewPanelThreads, "s-aaaaaaaaaaa1")})
-		})
-	}
-}
-
-// view.panel.worktree opens for a thread whose primary is its workspace's folder (no
-// project, a workspace): the Worktree tab shows the folder head and the member checkouts.
-func TestPanelWorktreeWorkspaceFolder(t *testing.T) {
-	reg, emit := panelRegistry(t, &commandtest.Thread{Current: &v1.Thread{WorkspaceId: "w-1", WorktreePath: "/Users/me/mono"}})
-	if _, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.worktree", nil); err != nil {
-		t.Fatal(err)
-	}
-	sameIntents(t, emit.Intents(), []*v1.UiIntent{showView(command.ViewPanelWorktree, "s-aaaaaaaaaaa1")})
 }
 
 // The page verbs move every window: from a thread's CLI they refuse while no window
