@@ -133,6 +133,13 @@ test("nine projects in a workspace: Run in menu, other projects' pull requests, 
   // The action last run in this thread was web's: named with its project.
   await expect(c.getByTestId("ti-action")).toContainText("Typecheck");
   await expect(c.getByTestId("ti-action-project")).toHaveText("web");
+  // It runs in web's checkout, not for the thread (its cwd is api): a toast says where, Show goes there.
+  await c.getByTestId("ti-action").click();
+  await expect(page.getByText("Running Typecheck in web")).toBeVisible();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "action.run").map((i) => i.context?.activeView)).toEqual(["projects"]);
+  await page.locator("[data-sonner-toast]").filter({ hasText: "Running Typecheck in web" }).getByRole("button", { name: "Show" }).click();
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+  await row(page, `s:${id}`).click();
 
   // Pull requests over four projects: the cwd's first and unnamed, the others with their project; a stacked one names its base.
   const prs = c.getByTestId("ti-pr");

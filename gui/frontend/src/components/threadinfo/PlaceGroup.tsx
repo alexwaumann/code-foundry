@@ -15,14 +15,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { chooseAction, moreProjects } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
-import { runAction, type ActionOwner } from "@/stores/actionActions";
+import type { ActionOwner } from "@/stores/actionActions";
 import { openActionEditor } from "@/stores/actionDialog";
 import { useAction, useActionsStore } from "@/stores/actions";
 import { bottomKeyOf } from "@/stores/bottomPanel";
 import { newBottomTerminal } from "@/stores/bottomActions";
 import { runCommand } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
-import { useActionPicks, useEditorApps } from "@/stores/threadInfo";
+import { runCardAction, useActionPicks, useEditorApps } from "@/stores/threadInfo";
 import { runThreadIn, threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -191,7 +191,7 @@ function ActionItem({ owner, id }: { owner: (projectId: string) => ActionOwner; 
   if (!action) return null;
   const Icon = ACTION_ICON[action.icon];
   return (
-    <DropdownMenuItem data-testid="ti-action-item" data-action={id} onSelect={() => void runAction(id, owner(action.projectId))}>
+    <DropdownMenuItem data-testid="ti-action-item" data-action={id} onSelect={() => void runCardAction(id, owner(action.projectId))}>
       <Icon aria-hidden />
       <span className="min-w-0 truncate">{action.name}</span>
     </DropdownMenuItem>
@@ -309,7 +309,7 @@ function ActionRow({ threadId }: { threadId: string }) {
           icon={<Play />}
           tall={choice?.showProject}
           chevron={open ? "open" : "closed"}
-          onActivate={action ? () => void runAction(action.id, owner(action.projectId)) : undefined}
+          onActivate={action ? () => void runCardAction(action.id, owner(action.projectId)) : undefined}
           menuOnChevron={Boolean(action)}
           testId="ti-action"
           data-action={action?.id}
