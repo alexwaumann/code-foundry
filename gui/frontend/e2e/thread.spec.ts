@@ -834,13 +834,13 @@ test("a fork shows its parent's conversation, ended by a Forked from note", asyn
   await shot(page, "fork-note");
 });
 
-test("the follow-up placeholder says a message while Claude works is picked up mid-turn; one Interrupt", async ({ page }) => {
+test("the follow-up placeholder says a message while Claude works steers the turn; one Interrupt", async ({ page }) => {
   await openThread(page, "streaming");
   const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
-  await expect(editor).toHaveAttribute("aria-placeholder", "Send a follow-up… Claude picks it up mid-turn");
+  await expect(editor).toHaveAttribute("aria-placeholder", "Steer the agent mid-turn. @ files and threads, / skills and commands");
   await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(1);
   await mockPost("thread/finish");
-  await expect(editor).toHaveAttribute("aria-placeholder", "Send a follow-up…");
+  await expect(editor).toHaveAttribute("aria-placeholder", "Reply or ask anything. @ files and threads, / skills and commands");
   await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(0);
 });
 

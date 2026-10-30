@@ -90,8 +90,8 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
 
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
   await expect(page.getByTestId("composer-input")).toBeFocused();
-  await expect(page.getByTestId("composer-input")).toHaveAttribute("aria-placeholder", "Describe what to build…");
-  await expect(page.getByTestId("composer")).toContainText("Describe what to build…");
+  await expect(page.getByTestId("composer-input")).toHaveAttribute("aria-placeholder", "Ask anything. @ files and threads, / skills and commands");
+  await expect(page.getByTestId("composer")).toContainText("Ask anything. @ files and threads, / skills and commands");
   // A composer has no sidebar row: nothing in the thread list is selected.
   await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(0);
   // Defaults: settings (Sonnet 5 / medium), Auto, a new worktree (pinned above) from the
@@ -224,7 +224,10 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await page.keyboard.type("release");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-base")).toHaveText("From release/v0.3");
+  // A pick in the Work in row hands the keyboard back to the prompt (composer-set-picks.md).
+  await expect(page.getByTestId("composer-input")).toBeFocused();
 
+  await page.getByTestId("composer-base").focus();
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-send")).toBeFocused();
   await page.keyboard.press("Enter");
@@ -266,7 +269,7 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   // out: Project folder works on it) under a search box.
   await expect(options).toHaveText([
     /^Fresh copy\s*Edits land in a new branch with its own worktree\. Multiple threads at a time is safe\.$/,
-    /^Project folder\s*Edits land in ~\/src\/code-foundry directly\. One thread at a time is safest\.$/,
+    /^Project folder\s*Edits land in the project's checkout directly\. One thread at a time is safest\.$/,
     "feat/sidebar",
     "fix/resize",
     "release/v0.3",
@@ -327,7 +330,7 @@ test("an existing worktree or the current checkout shows its branch, read-only a
 
   // An existing branch: the pill is its name, no indicator and no base (the daemon reuses its worktree).
   await worktree.click();
-  await expect(options).toHaveText([/^Fresh copy/, /^Project folder\s*Edits land in ~\/src\/code-foundry/, "feat/sidebar", "fix/resize", "release/v0.3"]);
+  await expect(options).toHaveText([/^Fresh copy/, /^Project folder\s*Edits land in the project's checkout directly/, "feat/sidebar", "fix/resize", "release/v0.3"]);
   await options.filter({ hasText: "feat/sidebar" }).click();
   await expect(worktree).toHaveText("feat/sidebar");
   await expect(worktree).toHaveAccessibleName("Work in: feat/sidebar");
