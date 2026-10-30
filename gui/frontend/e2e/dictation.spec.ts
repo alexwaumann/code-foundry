@@ -52,7 +52,7 @@ test.describe("settings section", () => {
     await expect(section.getByRole("heading", { name: "Dictation" })).toBeVisible();
     await expect(section.getByText("Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it.")).toBeVisible();
     const toggle = section.locator('[data-setting="dictation.enabled"]');
-    await expect(toggle).toContainText("Adds a microphone button to every composer and the ⌘⇧M shortcut. Needs the model below.");
+    await expect(toggle).toContainText("Adds a microphone button to every composer and the ⇧⌘M shortcut. Needs the model below.");
     await expect(toggle.getByTestId("dictation-chip")).toHaveCount(0);
     const model = section.getByTestId("dictation-model-row");
     await expect(model).toContainText("Whisper Large v3 Turbo, English. Downloaded once, kept in");

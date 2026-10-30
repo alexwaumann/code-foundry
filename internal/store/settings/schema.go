@@ -402,7 +402,7 @@ var staticFields = []Field{
 	// (DictationService.Watch): the model, its download, this Mac.
 	{
 		Key: KeyDictationEnabled, Group: GroupDictation, Page: PageGeneral, Section: "dictation", Type: Bool, Title: "Dictation",
-		Description: "Adds a microphone button to every composer and the ⌘⇧M shortcut.",
+		Description: "Adds a microphone button to every composer and the ⇧⌘M shortcut.",
 		Default:     "false",
 		bind:        func(s *Settings) any { return &s.Dictation.Enabled },
 	},
