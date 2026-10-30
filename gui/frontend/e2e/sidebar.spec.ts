@@ -432,6 +432,31 @@ test("thread rows sit 4px apart at both densities, each row's box (and its selec
   await mockPost("settings/external?appearance.density=");
 });
 
+test("a 1px pane-border rule runs edge to edge between the page nav and the thread list, 8px from each", async ({ page }) => {
+  await openApp(page);
+  await expect(row(page, "s:s-2")).toBeVisible();
+  const m = await page.evaluate(() => {
+    const r = (id: string) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect();
+    const [divider, projects, sidebar] = [r("sidebar-divider"), r("nav-projects"), r("sidebar")];
+    const first = document.querySelector('[data-testid="sidebar-main"] [role="option"]')?.getBoundingClientRect();
+    const el = document.querySelector('[data-testid="sidebar-divider"]');
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = "var(--cf-border)";
+    document.body.append(probe);
+    const border = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return {
+      left: divider?.left === sidebar?.left,
+      right: divider?.right === sidebar?.right,
+      height: divider?.height,
+      above: (divider?.top ?? 0) - (projects?.bottom ?? 0),
+      below: (first?.top ?? 0) - (divider?.bottom ?? 0),
+      colour: el ? getComputedStyle(el).backgroundColor === border : false,
+    };
+  });
+  expect(m).toEqual({ left: true, right: true, height: 1, above: 8, below: 8, colour: true });
+});
+
 test("Working section: the header counts threads as they start and stop working, and goes away with the last one", async ({ page }) => {
   await openApp(page);
   await expect(page.getByTestId("working-count")).toHaveText("2");
