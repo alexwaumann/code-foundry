@@ -5,7 +5,7 @@
  * coming back to a page finds it where it was).
  */
 import { create } from "zustand";
-import { projectWorktreeKey, workspaceKey } from "@/lib/projects";
+import { projectWorktreeKey } from "@/lib/projects";
 import { useProjectsStore } from "./projects";
 import { projectPage, useUiStore, workspacePage } from "./ui";
 
@@ -23,10 +23,9 @@ export function revealOnProjectsPage(key: string, timeoutMs = 5000): void {
   }, timeoutMs);
 }
 
-/** Shows a workspace's page (a workspace just added, or picked). */
-export function showWorkspaceCard(workspaceId: string): void {
+/** Shows a workspace's page (a workspace just added, or picked); the keyboard is on the page's list, no row picked. */
+export function showWorkspacePage(workspaceId: string): void {
   useUiStore.getState().select(workspacePage(workspaceId));
-  revealOnProjectsPage(workspaceKey(workspaceId));
 }
 
 /**

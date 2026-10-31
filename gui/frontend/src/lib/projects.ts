@@ -62,7 +62,7 @@ export function projectRef(projects: ProjectsSlice, projectId: string): string {
 export const projectKey = (projectId: string): string => `p:${projectId}`;
 export const projectWorktreeKey = (projectId: string, path: string): string => `pw:${projectId}::${path}`;
 export const workspaceKey = (id: string): string => `ws:${id}`;
-/** A workspace card's member row. */
+/** A member row on a workspace's page. */
 export const memberKey = (workspaceId: string, projectId: string): string => `m:${workspaceId}::${projectId}`;
 
 /**

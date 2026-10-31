@@ -10,7 +10,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// RegisterWorkspaceReveal registers workspace.reveal: the Projects page's workspace cards
+// RegisterWorkspaceReveal registers workspace.reveal: the Projects view's workspace pages
 // show the workspace's folder in Finder (docs/notes/workspaces-v2-4-projects-page.md).
 // worktree.reveal cannot: it only reveals registered worktrees, and a workspace's folder
 // is its root or its managed dir under the config home. reveal may be nil (RevealInFinder),

@@ -217,8 +217,6 @@ interface UiState {
    * `workspace:<id>`): the Projects sidebar row reopens it.
    */
   projectsLast: string;
-  /** Projects view: workspace ids whose member rows are hidden (the workspace page's card). */
-  collapsedWorkspaces: string[];
   /** Ember's chat opens every "Worked for" row (components/ember/EmberPane.tsx "Show work"). */
   emberShowWork: boolean;
   /**
@@ -271,20 +269,6 @@ interface UiState {
    * the last Projects page shown (the index when its project or workspace is gone).
    */
   openProjects: () => void;
-  /** Collapses (true) or expands a workspace on the Projects page; false when it already was. */
-  setWorkspaceCollapsed: (workspaceId: string, collapsed: boolean) => boolean;
-  /** Drops collapsed workspaces that no longer exist (a removal, a snapshot without them). */
-  pruneCollapsedWorkspaces: (exists: (workspaceId: string) => boolean) => void;
-}
-
-/** `ids` with `id` in (collapsed) or out; the same array when nothing changes. */
-function withMember(ids: string[], id: string, member: boolean): string[] {
-  if (ids.includes(id) === member) return ids;
-  return member ? [...ids, id] : ids.filter((x) => x !== id);
-}
-
-function isStringArray(v: unknown): v is string[] {
-  return Array.isArray(v) && v.every((x) => typeof x === "string");
 }
 
 /** The Usage page's ranges in days (UTC days, today inclusive); 30 by default. */
@@ -467,7 +451,6 @@ export const useUiStore = create<UiState>()(
       archivedCollapsed: true,
       snoozedCollapsed: true,
       projectsLast: "",
-      collapsedWorkspaces: [],
       emberShowWork: false,
       threadInfoOpen: false,
 
@@ -562,24 +545,13 @@ export const useUiStore = create<UiState>()(
         const want = onPage ? PROJECTS_INDEX : projectsLocationSelection(s.projectsLast);
         s.select(gone(want) ? PROJECTS_INDEX : want);
       },
-      setWorkspaceCollapsed: (workspaceId, collapsed) => {
-        const prev = get().collapsedWorkspaces;
-        const next = withMember(prev, workspaceId, collapsed);
-        if (next === prev) return false;
-        set({ collapsedWorkspaces: next });
-        return true;
-      },
-      pruneCollapsedWorkspaces: (exists) => {
-        const prev = get().collapsedWorkspaces;
-        const next = prev.filter(exists);
-        if (next.length !== prev.length) set({ collapsedWorkspaces: next });
-      },
     }),
     {
       name: "code-foundry.ui",
       // 2: the global panelWidth moved to per-panel widths in the panel store; drop it.
       // 3: the sidebar is a flat thread list (no collapsible projects or worktrees); drop collapsed.
-      // The Projects index has no collapsible projects: collapsedProjects is ignored (merge).
+      // The Projects index has no collapsible projects and the workspace page no collapsible
+      // card: collapsedProjects and collapsedWorkspaces are ignored (merge).
       version: 3,
       migrate: (persisted) => {
         const { panelWidth: _old, collapsed: _gone, ...rest } = (persisted ?? {}) as Record<string, unknown>;
@@ -606,7 +578,6 @@ export const useUiStore = create<UiState>()(
           archivedCollapsed: bool(p.archivedCollapsed, current.archivedCollapsed),
           snoozedCollapsed: bool(p.snoozedCollapsed, current.snoozedCollapsed),
           projectsLast: typeof p.projectsLast === "string" ? p.projectsLast : current.projectsLast,
-          collapsedWorkspaces: isStringArray(p.collapsedWorkspaces) ? p.collapsedWorkspaces : current.collapsedWorkspaces,
           emberShowWork: bool(p.emberShowWork, current.emberShowWork),
           threadInfoOpen: bool(p.threadInfoOpen, current.threadInfoOpen),
         };
@@ -621,7 +592,6 @@ export const useUiStore = create<UiState>()(
         archivedCollapsed: s.archivedCollapsed,
         snoozedCollapsed: s.snoozedCollapsed,
         projectsLast: s.projectsLast,
-        collapsedWorkspaces: s.collapsedWorkspaces,
         emberShowWork: s.emberShowWork,
         threadInfoOpen: s.threadInfoOpen,
       }),

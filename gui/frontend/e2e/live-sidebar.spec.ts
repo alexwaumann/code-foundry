@@ -89,8 +89,9 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await page.getByTestId("nav-projects").click();
       // Both projects are listed (the home may register more).
       for (const p of [first, second]) await expect(page.getByTestId("project-name").filter({ hasText: new RegExp(`^${p.projectName}$`) })).toHaveCount(1);
+      await page.locator(`[data-nav-key="ws:${ws.workspace.id}"]`).click();
       const block = page.locator(`[data-testid="workspace"][data-workspace="${ws.workspace.id}"]`);
-      await expect(block.getByTestId("workspace-name")).toHaveText(ws.workspace.name);
+      await expect(page.getByTestId("page-name")).toHaveText(ws.workspace.name);
       await expect(block.getByTestId("member-name")).toHaveText([first.projectName, second.projectName].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })));
       await page.waitForTimeout(300);
       await shot(page, "live-projects-page");

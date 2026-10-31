@@ -8,10 +8,8 @@ import {
   instructionsStep,
   instructionsThread,
   membersByName,
-  skillChips,
   workspaceFolder,
   workspaceNameError,
-  workspaceSummary,
 } from "./workspaceCard";
 
 const synthetic = { id: "w-1", name: "shop", rootPath: "", managedDir: "/Users/me/.code-foundry/workspaces/w-1", instructions: "", skills: [] as string[] };
@@ -98,19 +96,6 @@ describe("membersByName", () => {
   });
 });
 
-describe("skillChips", () => {
-  const many = Array.from({ length: 11 }, (_, i) => `s${String(i).padStart(2, "0")}`);
-  it.each<[string, string[], number, number]>([
-    ["none", [], 0, 0],
-    ["exactly the cap: all shown", many.slice(0, 8), 8, 0],
-    ["over the cap: eight, then the rest", many, 8, 3],
-  ])("%s", (_n, skills, shown, rest) => {
-    const c = skillChips(skills);
-    expect([c.shown.length, c.rest.length]).toEqual([shown, rest]);
-    expect([...c.shown, ...c.rest]).toEqual(skills);
-  });
-});
-
 describe("addableProjects", () => {
   const projects = { order: ["api", "notes", "web"], byId: { api: {}, notes: {}, web: {} } };
   it("registered projects that are not members, in the slice's order, plain folders too", () => {
@@ -129,15 +114,5 @@ describe("workspaceNameError", () => {
     ["too long", "x".repeat(101), [], "At most 100 bytes."],
   ])("%s", (_n, name, others, want) => {
     expect(workspaceNameError(name, others)).toBe(want);
-  });
-});
-
-describe("workspaceSummary", () => {
-  it.each<[string[], string[], string]>([
-    [["a"], [], "1 project"],
-    [["a", "b"], ["demo"], "2 projects · 1 skill"],
-    [[], ["x", "y"], "0 projects · 2 skills"],
-  ])("%j %j", (members, skills, want) => {
-    expect(workspaceSummary({ members: members.map((projectId) => ({ projectId, worktreePath: "" })), skills })).toBe(want);
   });
 });

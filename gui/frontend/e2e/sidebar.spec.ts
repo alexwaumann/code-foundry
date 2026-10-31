@@ -214,9 +214,8 @@ test("the Projects view removes a workspace and offers project actions", async (
   const spare = (await mockPost("workspace?name=spare&projects=repo-gp,repo-sk")) as { id: string };
   await openApp(page);
   await openWorkspacePage(page, spare.id);
-  const ws = page.locator('[data-testid="workspace"]').filter({ hasText: "spare" });
-  await ws.getByTestId("workspace-more").click();
-  await page.getByTestId("workspace-remove").click();
+  await page.getByTestId("workspace-page-more").click();
+  await page.getByTestId("workspace-page-remove").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Remove workspace spare?");
   await dialog.getByTestId("confirm-ok").click();

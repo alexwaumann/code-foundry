@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
-import { memberKey, workspaceKey } from "@/lib/projects";
+import { memberKey } from "@/lib/projects";
 import { membersByName } from "@/lib/workspaceCard";
+import { workspaceThreadKey } from "@/lib/workspacePage";
 import { openChangesTab } from "@/stores/changesPanel";
 import { composeInWorkspace } from "@/stores/compose";
 import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
@@ -21,22 +22,38 @@ import { WorkspaceIcon } from "./bits";
 import { usePageScroll } from "./pageHooks";
 import { OverflowMenu } from "./OverflowMenu";
 import { PagePicker, ProjectsCrumb } from "./PagePicker";
-import { WorkspaceCard } from "./WorkspaceCard";
+import { WorkspaceInstructions } from "./WorkspaceInstructions";
+import { WorkspaceNameEditor } from "./WorkspaceNameEditor";
+import { WorkspaceProjects } from "./WorkspaceProjects";
+import { openThread, useWorkspaceThreads } from "./workspaceHooks";
+import { WorkspaceThreads } from "./WorkspaceThreads";
+
+/** The workspace's member ids by project name (lib/workspaceCard.ts membersByName); the stored order is by id. */
+function useMembersByName(workspaceId: string): string[] {
+  const ids = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId)));
+  const names = useProjectsStore(useShallow((s) => ids.map((p) => s.byId[p]?.name ?? "")));
+  return useMemo(() => {
+    const byId = new Map(ids.map((p, i) => [p, names[i] || undefined]));
+    return membersByName(ids, (p) => byId.get(p));
+  }, [ids, names]);
+}
 
 /**
- * A workspace's page. For now its header (crumb, picker, "workspace · N projects", Open in
- * Finder, New thread, Rename… and Remove workspace…) over the existing WorkspaceCard, so
- * the index's Workspaces rows open something; the body's redesign is a later step
- * (docs/notes/projects-redesign-1-index.md).
+ * A workspace's page (docs/notes/projects-redesign-3-workspace-page.md): the header
+ * (crumb › name + picker, "workspace · N projects", Open in Finder, New thread, Rename… and
+ * Remove workspace…), then its Projects (where threads start, Start here, Remove, Add
+ * project), its Threads (one column per member's checkout) and its Instructions and
+ * skills. Keyboard: ↑/↓ walk the member rows (Enter shows the project's main checkout's
+ * changes) and the thread rows (Enter opens the thread).
  */
 export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; pageKey: string }) {
   const loaded = useWorkspacesStore((s) => s.loaded);
   const exists = useWorkspacesStore((s) => s.byId[workspaceId] !== undefined);
   const name = useWorkspacesStore((s) => s.byId[workspaceId]?.name ?? workspaceId);
-  const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId)));
-  const names = useProjectsStore(useShallow((s) => memberIds.map((p) => s.byId[p]?.name ?? "")));
-  const collapsed = useUiStore((s) => s.collapsedWorkspaces.includes(workspaceId));
-  const [renameSeq, setRenameSeq] = useState(0);
+  const rooted = useWorkspacesStore((s) => (s.byId[workspaceId]?.rootPath ?? "") !== "");
+  const members = useMembersByName(workspaceId);
+  const threads = useWorkspaceThreads(workspaceId);
+  const [renaming, setRenaming] = useState(false);
 
   // A workspace removed while its page shows: back to the index. Only once it was there: a
   // page opened for one just added comes before its event (stores/projectsPage.ts).
@@ -46,29 +63,19 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
     if (loaded && seen && !exists) useUiStore.getState().select(PROJECTS_INDEX);
   }, [loaded, seen, exists]);
 
-  const members = useMemo(() => {
-    const byId = new Map(memberIds.map((p, i) => [p, names[i] || undefined]));
-    return membersByName(memberIds, (p) => byId.get(p));
-  }, [memberIds, names]);
   const navItems = useMemo<NavItem[]>(
     () => [
-      {
-        key: workspaceKey(workspaceId),
-        activate: () => { composeInWorkspace(workspaceId); },
-        toggle: (open) => useUiStore.getState().setWorkspaceCollapsed(workspaceId, !open),
-      },
-      ...(collapsed
-        ? []
-        : members.map((projectId) => ({
-            key: memberKey(workspaceId, projectId),
-            // A member: its project's main worktree's changes; an unregistered one opens nothing.
-            activate: () => {
-              const at = mainWorktreePath(useProjectsStore.getState(), projectId);
-              if (at) openChangesTab("current", projectId, at);
-            },
-          }))),
+      ...members.map((projectId) => ({
+        key: memberKey(workspaceId, projectId),
+        // A member: its project's main worktree's changes; an unregistered one opens nothing.
+        activate: () => {
+          const at = mainWorktreePath(useProjectsStore.getState(), projectId);
+          if (at) openChangesTab("current", projectId, at);
+        },
+      })),
+      ...threads.ids.map((id) => ({ key: workspaceThreadKey(workspaceId, id), activate: () => { openThread(id); } })),
     ],
-    [workspaceId, members, collapsed],
+    [workspaceId, members, threads.ids],
   );
   const nav = useNav(navItems);
   const reveal = useProjectsPageStore((s) => s.reveal);
@@ -83,13 +90,32 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
   useEffect(() => {
     rootRef.current?.focus({ preventScroll: true });
   }, []);
-  const n = memberIds.length;
+  const n = members.length;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label={name} data-testid="projects-page" data-page="workspace" data-workspace={workspaceId}>
       <PaneHeader className="gap-2 px-5">
         <ProjectsCrumb />
-        <PagePicker icon={<WorkspaceIcon />} name={name} currentWorkspace={workspaceId} />
+        {renaming ? (
+          <span className="flex min-w-0 shrink-0 items-center gap-2 px-1 [--wails-draggable:no-drag]">
+            <WorkspaceIcon />
+            <WorkspaceNameEditor
+              workspaceId={workspaceId}
+              name={name}
+              onDone={() => {
+                setRenaming(false);
+                // Enter or Escape: the keyboard goes back to the page's list (the field is not inside it).
+                // Leaving the field for something else keeps the focus there.
+                requestAnimationFrame(() => {
+                  const active = document.activeElement;
+                  if (!active || active === document.body) rootRef.current?.focus({ preventScroll: true });
+                });
+              }}
+            />
+          </span>
+        ) : (
+          <PagePicker icon={<WorkspaceIcon />} name={name} currentWorkspace={workspaceId} />
+        )}
         <span className="min-w-0 shrink truncate text-caption text-cf-text-muted" data-testid="workspace-meta">
           workspace · {n} {n === 1 ? "project" : "projects"}
         </span>
@@ -106,7 +132,7 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
             label="More workspace actions"
             testId="workspace-page-more"
             items={[
-              { label: "Rename…", icon: Pencil, testId: "workspace-page-rename", onSelect: () => { setRenameSeq((x) => x + 1); } },
+              { label: "Rename…", icon: Pencil, testId: "workspace-page-rename", onSelect: () => { setRenaming(true); } },
               "separator",
               { label: "Remove workspace…", icon: Trash2, destructive: true, testId: "workspace-page-remove", onSelect: () => void removeWorkspace(workspaceId) },
             ]}
@@ -130,7 +156,13 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
             data-focus-root
             onKeyDown={nav.onKeyDown}
           >
-            {exists && <WorkspaceCard id={workspaceId} collapsed={collapsed} filtering={false} renameSeq={renameSeq} />}
+            {exists && (
+              <div className="flex flex-col gap-6" data-testid="workspace" data-workspace={workspaceId} data-rooted={rooted || undefined}>
+                <WorkspaceProjects workspaceId={workspaceId} members={members} />
+                <WorkspaceThreads workspaceId={workspaceId} members={members} ids={threads.ids} caption={threads.caption} />
+                <WorkspaceInstructions workspaceId={workspaceId} />
+              </div>
+            )}
           </div>
         </NavProvider>
       </div>

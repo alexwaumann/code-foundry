@@ -232,7 +232,7 @@ func TestRender(t *testing.T) {
 		// Workspaces v2 (workspaces-v2-5-skills): the scope beside the app memory, and the
 		// answer path for what a workspace is and where its instructions and skills go.
 		"What holds across a\nworkspace's projects goes in its `CLAUDE.md`", "\n## Workspaces\n",
-		"The Projects page has a card per workspace", "Save as workspace", "`code-foundry workspace new <name>",
+		"The Projects page has a page per workspace", "Save as workspace", "`code-foundry workspace new <name>",
 		"Its folder (`code-foundry workspace list`) holds `CLAUDE.md` and\n`.claude/skills/<name>/SKILL.md`"} {
 		if !strings.Contains(helpSkill, want) {
 			t.Errorf("help SKILL.md lacks %q", want)

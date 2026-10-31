@@ -67,7 +67,7 @@ func TestViewPanelDiffAvailability(t *testing.T) {
 		{name: "thread outside any worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, want: false},
 		{name: "thread in its workspace's folder", ctx: command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w-1", ActiveWorktreePath: "/Users/me/mono", ActiveView: "thread"}, want: false},
 		{name: "thread with a workspace but no cwd", ctx: command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w-1", ActiveView: "thread"}, want: false},
-		{name: "Projects page with a workspace card's context (no thread)", ctx: command.Context{ActiveWorkspaceID: "w-1", ActiveWorktreePath: "/Users/me/mono", ActiveView: "projects"}, want: false},
+		{name: "Projects page with a workspace page's context (no thread)", ctx: command.Context{ActiveWorkspaceID: "w-1", ActiveWorktreePath: "/Users/me/mono", ActiveView: "projects"}, want: false},
 		{name: "thread with a project but no worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveView: "thread"}, want: false},
 		{name: "worktree page", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "worktree"}, want: false},
 		{name: "projects page", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/src", ActiveView: "projects"}, want: false},
