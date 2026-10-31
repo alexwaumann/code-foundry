@@ -115,6 +115,7 @@ export function ProjectDetails({ projectId }: { projectId: string }) {
   const refreshedAt = useProjectsStore((s) => findWorktree(s, projectId, main)?.status.refreshedAtMs ?? null);
   const failed = useProjectsStore((s) => (findWorktree(s, projectId, main)?.status.error ?? "") !== "");
   const worktrees = useProjectsStore(useShallow((s) => (s.byId[projectId]?.worktrees ?? []).filter((w) => !w.isMain).map((w) => w.path)));
+  const managed = useProjectsStore((s) => (s.byId[projectId]?.worktrees ?? []).filter((w) => !w.isMain && w.managed === true).length);
   return (
     <div data-testid="project-details">
       <SectionHeader label="Details" />
@@ -146,7 +147,7 @@ export function ProjectDetails({ projectId }: { projectId: string }) {
         )}
         {git && worktrees.length > 0 && (
           <DetailRow label="Worktrees" testId="details-worktrees">
-            {worktreesDetail(worktrees)}
+            {worktreesDetail(worktrees, managed)}
           </DetailRow>
         )}
         <ActionsRow projectId={projectId} />

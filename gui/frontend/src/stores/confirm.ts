@@ -39,6 +39,26 @@ export function confirmPresenter(command: string): ConfirmPresenter | undefined 
   return presenters.get(command);
 }
 
+const secondStage = new Map<string, ConfirmPresenter>();
+
+/**
+ * Lets a command answer its second-stage confirmation (one with args, e.g. removing a
+ * worktree turned out to delete uncommitted work) in its own dialog: the remove-worktree
+ * dialog already named the files that go, so a yes there answers this one too. The
+ * request carries the original args. Returns the unregister function.
+ */
+export function registerSecondStagePresenter(command: string, p: ConfirmPresenter): () => void {
+  secondStage.set(command, p);
+  return () => {
+    if (secondStage.get(command) === p) secondStage.delete(command);
+  };
+}
+
+/** A command's own second-stage presenter, if one is registered. */
+export function secondStagePresenter(command: string): ConfirmPresenter | undefined {
+  return secondStage.get(command);
+}
+
 interface ConfirmState {
   pending: (ConfirmRequest & { resolve: (yes: boolean) => void }) | null;
 }

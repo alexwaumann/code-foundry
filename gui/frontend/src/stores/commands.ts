@@ -4,7 +4,7 @@ import { confirmationOf, confirmButtonLabel, invokeCommand, listCommands, type C
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
-import { confirmPresenter, requestConfirm } from "./confirm";
+import { confirmPresenter, requestConfirm, secondStagePresenter } from "./confirm";
 import { contextKey, getUiContext } from "./context";
 import { useProjectsStore } from "./projects";
 import { useSubagentViewStore } from "./subagentView";
@@ -88,7 +88,8 @@ const MAX_CONFIRM_STAGES = 3;
  * confirm dialog (or the command's own presenter: confirmPresenter, e.g. the plugin
  * consent dialog) and invokes again with confirmed set when the user agrees. A
  * second-stage confirmation (one with args: deleting a worktree's uncommitted work)
- * asks again and merges its args (force) into the re-invoke; a confirmation's bind args
+ * asks again (the command's secondStagePresenter, else the confirm dialog) and merges its
+ * args (force) into the re-invoke; a confirmation's bind args
  * (the digest of the consent text shown) are merged too. Resolves null when the
  * user declines (or a declined second stage's result: what the command already did);
  * other errors reject. `caller` names who asked for it (a plugin's InvokeCommand
@@ -114,7 +115,7 @@ export async function invokeConfirmed(
       // A second stage applies only to the command invoked (not one plugin.act ran for it).
       if (confirm.args && confirm.command !== name) throw err;
       const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
-      const ask = (confirm.args ? undefined : confirmPresenter(name)) ?? requestConfirm;
+      const ask = (confirm.args ? secondStagePresenter(name) : confirmPresenter(name)) ?? requestConfirm;
       const confirmLabel = confirmButtonLabel(title, confirm.confirmLabel);
       const req = { title, message: confirm.message, confirmLabel, command: name, args: callArgs, ...(caller ? { caller } : {}) };
       const yes = await (opts.around ? opts.around(() => ask(req)) : ask(req));
