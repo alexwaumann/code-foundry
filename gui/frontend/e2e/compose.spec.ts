@@ -143,14 +143,9 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   // The thread's row names its project and the new worktree's branch; it is the newest thread.
   await expect(created.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(created.getByTestId("row-branch")).toHaveText("cf/add-a-dark-mode");
-  // Starting, it sits under Working; once idle it is the newest idle thread: first in its
-  // group, right below the waiting ones.
-  const firstIdle = () =>
-    page
-      .getByTestId("thread-list")
-      .locator('[data-row-key][data-section="idle"]')
-      .evaluateAll((els) => els[0]?.getAttribute("data-row-key"));
-  await expect.poll(firstIdle).toBe(key);
+  // Starting, it sits under Working; once idle it joins the idle threads (sorted by their
+  // last activity, so where among them depends on what else just ran).
+  await expect(created).toHaveAttribute("data-section", "idle", { timeout: 8000 });
 
   // The draft was cleared: a new composer for the project starts empty.
   await compose(page);

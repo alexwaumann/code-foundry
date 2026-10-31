@@ -70,12 +70,13 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
     const wsRow = list.locator(`[data-row-key="s:${wsThread}"]`);
     const projRow = list.locator(`[data-row-key="s:${projThread}"]`);
 
-    await test.step("flat list: both threads, the workspace thread's line 2 names the workspace (no badge), no worktree rows", async () => {
+    await test.step("flat list: both threads, the workspace thread's line 1 has the Layers glyph and its project, no worktree rows", async () => {
       await expect(wsRow).toBeVisible({ timeout: 20_000 });
       await expect(projRow).toBeVisible();
-      // Workspaces v2: no badge; a thread of the workspace's members reads "<workspace> @ <branch>".
-      await expect(page.getByTestId("row-workspace")).toHaveCount(0);
-      await expect(wsRow.getByTestId("row-project")).toHaveText(ws.workspace.name);
+      // A thread of the workspace's members: the Layers glyph and the project it runs in (the workspace's name is on the card).
+      await expect(wsRow.getByTestId("row-workspace")).toHaveCount(1);
+      await expect(projRow.getByTestId("row-workspace")).toHaveCount(0);
+      await expect(wsRow.getByTestId("row-project")).toHaveText(first.projectName);
       await expect(projRow.getByTestId("row-project")).toHaveText(second.projectName);
       await expect(list.locator('[data-row-kind="project"], [data-row-kind="worktree"]')).toHaveCount(0);
       // Both turns end (the unwatched ones then wait under Needs attention, "finished").
@@ -111,7 +112,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await expect(wsRow.getByTestId("row-moving")).toHaveText(`moving to ${second.projectName}…`, { timeout: 5000 });
       await shot(page, "live-sidebar-moving");
       await expect(wsRow.getByTestId("row-moving")).toHaveCount(0, { timeout: 60_000 });
-      // Line 2 may be the finished status now; the place is the daemon's.
+      // Line 3 may be the status's detail now; the place is the daemon's.
       expect(threadInfo(wsThread)).toMatchObject({ projectId: second.projectId, worktreePath: second.worktreePath, workspaceId: ws.workspace.id });
       await page.waitForTimeout(300);
       await shot(page, "live-sidebar-moved");

@@ -1,17 +1,21 @@
-import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CornerDownRight, GitBranch, Hourglass, House, Layers, OctagonX, Pin, Trash2, type LucideIcon } from "lucide-react";
+import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
+import { AlarmClock, Archive, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Chip } from "@/components/thread/Chip";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tip, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agentsLabel } from "@/lib/agents";
-import { useNow } from "@/lib/clock";
+import { useNow, useNowSelect } from "@/lib/clock";
+import { formatElapsed } from "@/lib/elapsed";
 import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
-import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
+import { statusLine, statusText, tipStatusTone, type StatusLineKind, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
+import { statusBadge, statusDetail, statusTimeAt } from "@/lib/statusRegistry";
 import { FRESH_COPY, PROJECT_FOLDER } from "@/lib/compose";
 import { projectKind, type ProjectKind } from "@/lib/projects";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
@@ -19,7 +23,7 @@ import { modelLabel, projectsLabel, threadRowModel, type ThreadPlace, type Works
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useMadeByThread } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
-import { renameThread } from "@/stores/threadActions";
+import { archiveThread, renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -88,7 +92,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
 
 const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
-/** Status text colours: the theme's status tokens (index.css), sky info, amber warning, emerald success, red destructive. */
+/** The hover card's status colours (lib/statusLine tones): amber waiting on the user, red failed, emerald done. */
 const toneClasses: Readonly<Record<StatusTone, string>> = {
   muted: "",
   sky: "text-cf-info-text",
@@ -97,84 +101,214 @@ const toneClasses: Readonly<Record<StatusTone, string>> = {
   red: "text-cf-error-text",
 };
 
-/** Status text with a relative time; only these rows subscribe to the shared 30 s clock. */
-function TimedStatusText({ line }: { line: StatusLine }) {
-  const now = useNow(30_000);
-  return <>{statusText(line, now)}</>;
+/**
+ * Time since `at` (lib/elapsed formatElapsed: "4s", "4m", "1h 4m", "3d"). One shared 1 s
+ * clock (lib/clock) drives every row that shows a time, but a row re-renders only when its
+ * text changes: every second under a minute, then once a minute (elapsedTickMs's cadence).
+ * A slower clock would hand a row a `now` up to a period old.
+ */
+function useElapsed(at: number): string {
+  return useNowSelect(1000, (now) => formatElapsed(at, now));
 }
 
-/**
- * "N agents" (sky, with a bot) while the thread's subagents run (Thread.agents_running,
- * docs/notes/agents-2-gui.md), ahead of the status; nothing otherwise. The sort ignores it.
- */
-function AgentsRunning({ id, more }: { id: string; more: boolean }) {
-  const n = useThreadsStore((st) => st.byId[id]?.agentsRunning ?? 0);
-  if (n <= 0) return null;
+function Elapsed({ at, className }: { at: number; className?: string }) {
+  const text = useElapsed(at);
   return (
-    <>
-      <span className={toneClasses.sky} data-testid="row-agents">
-        <Bot className="mr-0.5 inline size-2.5 align-[-1px]" aria-hidden />
-        {agentsLabel(n)}
-      </span>
-      {more && <span aria-hidden> · </span>}
-    </>
+    <span className={cn("tabular-nums", className)} data-testid="row-time">
+      {text}
+    </span>
   );
 }
 
 /**
- * The thread's second line (lib/statusLine): what it is doing or waiting on, coloured, and
- * "project @ branch" where the status leaves room for it (working, idle): the project it
- * runs in, for a multi-project thread too (its workspace shows on the card); the
- * workspace's name for a thread in its workspace's folder; "No project" alone for a
- * thread without one. A queued "Run in…" move replaces it until the
- * thread's worktree changes.
+ * Line 1's right side (lib/statusRegistry statusBadge): `<icon> <word>` in the kind's tone,
+ * then for working and waiting a plain space and the time since the status changed in the
+ * same tone; for an idle thread only the time since its last activity, muted; for the
+ * attention, error and done kinds nothing after the word (the hover card has the time).
  */
-function ThreadLine({ id }: { id: string }) {
+function RowStatus({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
-  const badge = useThreadsStore((st) => threadBadge(st.byId[id]));
-  const { project, branch, noGit, noProject, movingTo, set, inFolder } = useThreadPlace(id);
-  const status = line.kind !== "place";
+  const at = useThreadsStore((st) => statusTimeAt(line, st.byId[id]));
+  const badge = statusBadge(line);
+  const Icon = badge.icon;
+  if (Icon === null) {
+    return at === null ? null : <Elapsed at={at} className="text-cf-sidebar-muted-foreground" />;
+  }
   return (
-    <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-thread-badge={badge}>
-      {movingTo !== null ? (
-        <span className="flex min-w-0 items-center gap-1 text-cf-warning-text" data-testid="row-moving">
-          <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
-          <span className="truncate">moving to {movingTo}…</span>
-        </span>
-      ) : (
-        <span className="min-w-0 truncate">
-          <AgentsRunning id={id} more={status || showsPlace(line.kind)} />
-          {status && (
-            <span className={toneClasses[statusTones[line.kind]]} data-testid="row-status">
-              {line.kind === "waiting" && <Hourglass className="mr-0.5 inline size-2.5 align-[-1px] text-cf-icon-muted" aria-hidden data-testid="row-waiting" />}
-              {line.kind === "transcriptDeleted" && <Trash2 className="mr-0.5 inline size-2.5 align-[-1px]" aria-hidden data-testid="row-transcript-deleted" />}
-              {line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}
-            </span>
-          )}
-          {showsPlace(line.kind) && (
-            <>
-              {status && <span aria-hidden> · </span>}
-              <span data-testid="row-project" data-no-project={noProject || undefined} data-set={set !== null || undefined}>
-                {inFolder ? set : project}
-              </span>
-              {noProject || (set !== null && !branch) ? null : noGit ? (
-                <>
-                  {" "}
-                  <NoGitBadge className="align-[1px]" tip={false} />
-                </>
-              ) : (
-                <>
-                  {" "}
-                  <span className="opacity-60">@</span>{" "}
-                  <span className="font-mono" data-testid="row-branch">
-                    {branch}
-                  </span>
-                </>
-              )}
-            </>
-          )}
-        </span>
+    <span className={cn("flex min-w-0 items-center gap-[3px] font-medium", badge.toneClass)} data-testid="row-status" data-kind={line.kind}>
+      <Icon className="size-3 shrink-0" aria-hidden data-testid="row-status-icon" />
+      <span className="whitespace-nowrap">
+        <span data-testid="row-status-word">{badge.word}</span>
+        {at !== null && (
+          <>
+            {" "}
+            <Elapsed at={at} />
+          </>
+        )}
+      </span>
+    </span>
+  );
+}
+
+const ACTION_BUTTON =
+  "flex size-5 shrink-0 items-center justify-center rounded-sm bg-cf-sidebar-row-selected text-cf-icon-muted outline-none hover:text-cf-sidebar-foreground focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:text-cf-sidebar-foreground";
+
+/** Keeps a click (and a double click) on a row's own control from reaching the row: no select, no rename. */
+const stop = (e: SyntheticEvent) => {
+  e.stopPropagation();
+};
+
+/**
+ * The row's hover actions, over line 1's status: Snooze (the preset menu, SnoozePresetItems)
+ * and Archive (at once, thread.archive). Shown while the row is hovered, while one of them
+ * has the keyboard, and while the snooze menu is open. They are tab stops only on the
+ * keyboard cursor's row (`cursor`), so Tab leaves the list after one row's actions rather
+ * than walking every row's; the context menu and the palette have the same commands.
+ */
+function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean; onShownChange: (shown: boolean) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const shown = menuOpen || focused;
+  useEffect(() => {
+    onShownChange(shown);
+  }, [shown, onShownChange]);
+  const tab = cursor ? 0 : -1;
+  return (
+    <span
+      className={cn(
+        "pointer-events-none absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-1 opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100",
+        shown && "pointer-events-auto opacity-100",
       )}
+      data-testid="row-actions"
+      data-shown={shown || undefined}
+      onClick={stop}
+      onDoubleClick={stop}
+      onFocus={() => {
+        setFocused(true);
+      }}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
+      }}
+    >
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <Tip label="Snooze thread" side="top" delay={0} data-testid="row-snooze-tip">
+          <DropdownMenuTrigger asChild>
+            <button type="button" tabIndex={tab} aria-label="Snooze thread" className={ACTION_BUTTON} data-testid="row-snooze">
+              <AlarmClock className="size-3.5" aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+        </Tip>
+        <DropdownMenuContent align="start" data-testid="row-snooze-menu" onClick={stop} onDoubleClick={stop}>
+          <SnoozePresetItems id={id} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Tip label="Archive thread" side="top" delay={0} data-testid="row-archive-tip">
+        <button
+          type="button"
+          tabIndex={tab}
+          aria-label="Archive thread"
+          className={ACTION_BUTTON}
+          data-testid="row-archive"
+          onClick={(e) => {
+            e.stopPropagation();
+            void archiveThread(id, true);
+          }}
+        >
+          <Archive className="size-3.5" aria-hidden />
+        </button>
+      </Tip>
+    </span>
+  );
+}
+
+/**
+ * Line 1 (text-caption-sm, muted): where the thread runs and, on the right, its status.
+ * The project it runs in, after a Layers glyph when the thread spans several projects
+ * (its workspace's name is on the hover card; a thread in its workspace's folder, which has
+ * no project, shows the workspace's name); plain "No project" for a thread without one; the pin after it.
+ * On hover the status gives way to the row's actions (RowActions), which keep at least
+ * their own width so they never cover the project name.
+ */
+function LineProject({ id, cursor }: { id: string; cursor: boolean }) {
+  const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
+  const { project, noProject, set, inFolder } = useThreadPlace(id);
+  const [actionsShown, setActionsShown] = useState(false);
+  return (
+    <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-1">
+      <span className="min-w-0 truncate text-cf-sidebar-muted-foreground" data-testid="row-project" data-no-project={noProject || undefined} data-set={set !== null || undefined}>
+        {set !== null && <Layers className="mr-1 inline size-3 align-[-2px] text-cf-icon-muted" aria-label="workspace" data-testid="row-workspace" />}
+        {inFolder ? set : project}
+      </span>
+      {pinned && <Pin className="ml-1 size-3 shrink-0 text-cf-icon-muted" aria-label="pinned" data-testid="row-pinned" />}
+      <span className={cn("relative ml-auto flex shrink-0 items-center justify-end pl-1.5 group-hover/row:min-w-[50px]", actionsShown && "min-w-[50px]")}>
+        <span className={cn("flex min-w-0 items-center group-hover/row:invisible", actionsShown && "invisible")}>
+          <RowStatus id={id} />
+        </span>
+        <RowActions id={id} cursor={cursor} onShownChange={setActionsShown} />
+      </span>
+    </span>
+  );
+}
+
+/** A count on line 3's right: an icon and a number. */
+function Count({ icon: Icon, n, className, label, testId }: { icon: LucideIcon; n: number; className: string; label: string; testId: string }) {
+  if (n <= 0) return null;
+  return (
+    <span className={cn("flex shrink-0 items-center gap-0.5 font-medium tabular-nums", className)} aria-label={label} data-testid={testId}>
+      <Icon className="size-3 shrink-0" aria-hidden />
+      {n}
+    </span>
+  );
+}
+
+/**
+ * Line 3 (text-caption-sm): the status's detail (lib/statusRegistry statusDetail: the tool
+ * a working turn runs, the question, the error…), muted and truncated, or else the branch
+ * (a GitBranch glyph and the name in mono; the No git badge for a project without git;
+ * nothing for a thread without a project, the line keeps its height). A queued "Run in…"
+ * move replaces both until the thread's worktree changes. On the right the background
+ * agents (info tone) and shells (muted) running now, then the linked PR tag.
+ */
+function LineMeta({ id }: { id: string }) {
+  const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
+  const detail = useThreadsStore((st) => statusDetail(line, st.byId[id]));
+  const agents = useThreadsStore((s) => s.byId[id]?.backgroundAgentsRunning ?? 0);
+  const shells = useThreadsStore((s) => s.byId[id]?.backgroundShellsRunning ?? 0);
+  const { branch, noGit, noProject, movingTo } = useThreadPlace(id);
+  let left: ReactNode = null;
+  if (movingTo !== null) {
+    left = (
+      <span className="flex min-w-0 items-center gap-1 text-cf-warning-text" data-testid="row-moving">
+        <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
+        <span className="truncate">moving to {movingTo}…</span>
+      </span>
+    );
+  } else if (detail) {
+    left = (
+      <span className="min-w-0 truncate text-cf-sidebar-muted-foreground" data-testid="row-detail">
+        {detail}
+      </span>
+    );
+  } else if (noGit) {
+    left = <NoGitBadge tip={false} />;
+  } else if (!noProject && branch) {
+    left = (
+      <span className="flex min-w-0 items-center gap-[3px] text-cf-sidebar-muted-foreground">
+        <GitBranch className="size-3 shrink-0" aria-hidden data-testid="row-branch-icon" />
+        <span className="truncate font-mono" data-testid="row-branch">
+          {branch}
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-3">
+      {left}
+      <span className="ml-auto flex shrink-0 items-center gap-2 pl-1.5">
+        <Count icon={Bot} n={agents} className="text-cf-info-text" label={agentsLabel(agents)} testId="row-bg-agents" />
+        <Count icon={SquareTerminal} n={shells} className="text-cf-sidebar-muted-foreground" label={shells === 1 ? "1 shell" : `${String(shells)} shells`} testId="row-bg-shells" />
+        <LinkedPrsBadge id={id} />
+      </span>
     </span>
   );
 }
@@ -191,7 +325,7 @@ function MadeByThreadGlyph({ id }: { id: string }) {
 }
 
 /**
- * The name's look: one role above the row's text (text-body, semibold), so names stand
+ * The name's look: one role above the row's text (text-body, medium), so names stand
  * out from the status line and from each other (docs/notes/sidebar-row-emphasis.md). It
  * keeps the row's colour (text-inherit: the role's own foreground would drop the row's
  * sidebar and selection tokens). The id stands in, muted, while there is no name; a
@@ -205,23 +339,32 @@ function MadeByThreadGlyph({ id }: { id: string }) {
 function nameClass(name: string, provisional: boolean, quiet = false): string {
   return cn(
     "truncate text-body",
-    quiet ? "text-cf-sidebar-muted-foreground" : "font-semibold text-inherit",
+    quiet ? "text-cf-sidebar-muted-foreground" : "font-medium text-inherit",
     (!name || provisional) && "text-cf-sidebar-muted-foreground",
     provisional && "italic",
   );
 }
 
-function ThreadLabel({ id }: { id: string }) {
+/**
+ * A thread row in the inbox layout (docs/notes/sidebar-inbox-3-row.md): three lines with
+ * no gap, filling the row's THREE_LINE_ROW box (rowSizes.ts). Line 1 the project and the
+ * status (LineProject), line 2 the name (text-body, medium; the made-by-thread glyph for a
+ * thread an agent created), line 3 the detail or branch and the counts (LineMeta). The
+ * status kind and the thread badge are on the body as data attributes for tests.
+ */
+function ThreadLabel({ id, cursor }: { id: string; cursor: boolean }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
   // A provisional name, or one being regenerated: muted and italic until the model's title lands.
   const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
-  const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
+  const kind = useThreadsStore((s) => statusLine(s.byId[id]).kind);
+  const badge = useThreadsStore((s) => threadBadge(s.byId[id]));
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
     // Whether Claude runs for the thread never shows: a stopped thread looks like any other.
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5" data-testid="thread-body">
-      <span className="flex min-w-0 items-center gap-1.5">
+    <span className="flex min-w-0 flex-1 flex-col" data-testid="thread-body" data-status-line={kind} data-thread-badge={badge}>
+      <LineProject id={id} cursor={cursor} />
+      <span className="flex h-[22px] min-w-0 items-center gap-1.5">
         {renaming ? (
           <RenameField id={id} name={name} />
         ) : (
@@ -230,17 +373,14 @@ function ThreadLabel({ id }: { id: string }) {
             <span className={nameClass(name, provisional)} data-testid="thread-name" data-provisional={provisional || undefined}>
               {name || id}
             </span>
-            <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
-              <LinkedPrsBadge id={id} />
-              {pinned && <Pin className="size-3 shrink-0 text-cf-icon-muted" aria-label="pinned" data-testid="row-pinned" />}
-            </span>
           </>
         )}
       </span>
-      <ThreadLine id={id} />
+      <LineMeta id={id} />
     </span>
   );
 }
+
 
 /**
  * One line of the thread tooltip: an icon, the text, and on the right an optional muted
@@ -271,23 +411,50 @@ function TipIcon({ icon: Icon }: { icon: LucideIcon }) {
   return <Icon className={TIP_ICON} aria-hidden />;
 }
 
-const tipStatusIcons: Readonly<Record<TipStatusTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX };
+type CardTone = TipStatusTone | "emerald";
+
+const tipStatusIcons: Readonly<Record<CardTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX, emerald: CircleCheck };
+
+/** The kinds whose card status says how long the thread has been so ("for 6m"): Claude's prompts and errors, not a plugin's flag or a deleted transcript. */
+const timedCardKinds: ReadonlySet<StatusLineKind> = new Set<StatusLineKind>(["input", "question", "plan", "snoozeEnded", "error", "interrupted", "crashed"]);
+
+/** "for 6m" (or "6m ago", `ago`) since `at`, muted, on the shared clock while the card is open. */
+function TipElapsed({ at, ago }: { at: number; ago: boolean }) {
+  const text = useElapsed(at);
+  return (
+    <span className="text-cf-text-muted" data-testid="tip-status-time">
+      {ago ? `${text} ago` : `for ${text}`}
+    </span>
+  );
+}
 
 /**
- * The full status text of a thread that needs the user or failed, in the row's line-2 words
- * and colour, wrapped rather than truncated (line 2 usually cuts it off); nothing for other
- * statuses (lib/statusLine `tipStatusTone`). A timed line ticks on the shared clock, only
- * while the tooltip is open (its body is mounted only then).
+ * The full status text of a thread that needs the user or failed, in the hover card's
+ * words and colour, wrapped rather than truncated; then how long it has been so ("· for
+ * 6m"), the time the row no longer shows. A finished turn reads "Finished 6m ago" in
+ * green. Nothing for other statuses (lib/statusLine `tipStatusTone`). The time ticks only
+ * while the card is open (its body is mounted only then).
  */
 function TipStatus({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
-  const tone = tipStatusTone(line.kind);
+  const changedAt = useThreadsStore((st) => st.byId[id]?.statusChangedAtMs ?? null);
+  const tone: CardTone | null = line.kind === "finished" ? "emerald" : tipStatusTone(line.kind);
   if (tone === null) return null;
   const Icon = tipStatusIcons[tone];
+  const finished = line.kind === "finished";
+  const timed = changedAt !== null && (finished || timedCardKinds.has(line.kind));
   return (
     <div className={cn("mb-[3px] flex items-start gap-2 leading-5", toneClasses[tone])} data-testid="tip-status" data-tone={tone}>
       <Icon className="mt-[3px] size-3.5 shrink-0" aria-hidden />
-      <span className="min-w-0 break-words">{line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}</span>
+      <span className="min-w-0 break-words">
+        {statusText({ ...line, at: null }, 0)}
+        {timed && (
+          <>
+            {finished ? " " : " · "}
+            <TipElapsed at={changedAt} ago={finished} />
+          </>
+        )}
+      </span>
     </div>
   );
 }
@@ -550,7 +717,7 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
           useUiStore.getState().setRenaming(row.threadId);
         }}
       >
-        {row.section === "archived" || row.section === "snoozed" ? <SingleLineLabel id={row.threadId} section={row.section} /> : <ThreadLabel id={row.threadId} />}
+        {row.section === "archived" || row.section === "snoozed" ? <SingleLineLabel id={row.threadId} section={row.section} /> : <ThreadLabel id={row.threadId} cursor={cursor} />}
       </div>
     </ThreadTooltip>
   );

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Row, Section } from "@/lib/tree";
 import { ROW_HEIGHTS } from "@/stores/settings";
-import { HEADER_HEIGHT, ROW_GAP, rowSize, SECOND_LINE, THREE_LINE_ROW } from "./rowSizes";
+import { HEADER_HEIGHT, ROW_GAP, rowSize, THREE_LINE_ROW } from "./rowSizes";
 
 const thread = (section: Section): Row => ({ key: `s:${section}`, kind: "thread", section, threadId: section });
 const header: Row = { key: "h:working", kind: "header", section: "working", label: "Working", count: 2, collapsed: false };
@@ -25,12 +25,8 @@ describe("rowSize", () => {
     expect(rowSize(row, ROW_HEIGHTS[density])).toBe(want);
   });
 
-  it("each line keeps a text-body name (22px) and a caption-sm status line (16px + 2px gap) inside the row's padding", () => {
-    for (const h of Object.values(ROW_HEIGHTS)) {
-      const pad = (h - 22) / 2;
-      expect(pad).toBeGreaterThanOrEqual(3);
-      expect(h + SECOND_LINE - (22 + 2 + 16)).toBe(2 * pad);
-    }
+  it("a one-line row keeps a text-body name (22px) inside at least 3px of padding", () => {
+    for (const h of Object.values(ROW_HEIGHTS)) expect((h - 22) / 2).toBeGreaterThanOrEqual(3);
   });
 
   it("a three-line row is two caption-sm lines (16px) and a text-body name (22px) with 3px above and below", () => {

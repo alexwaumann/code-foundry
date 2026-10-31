@@ -1,15 +1,10 @@
 import type { Row } from "@/lib/tree";
 
 /**
- * The thread list's row sizes in layout px (docs/notes/sidebar-row-emphasis.md). A row's
- * first line is ROW_HEIGHTS[density] (stores/settings.ts): the name, a text-body line
- * (22px), with 3px (compact) or 5px (comfortable) above and below it. SECOND_LINE is the
- * two-line row's status line (a 16px text-caption-sm line plus the 2px gap-0.5 above it);
- * the thread rows now size as THREE_LINE_ROW, and it goes once SidebarRow renders three lines.
- */
-export const SECOND_LINE = 18;
-
-/**
+ * The thread list's row sizes in layout px (docs/notes/sidebar-row-emphasis.md). A snoozed
+ * or archived row is one line, ROW_HEIGHTS[density] (stores/settings.ts): the name, a
+ * text-body line (22px), with 3px (compact) or 5px (comfortable) above and below it.
+ *
  * A thread row in the inbox layout (docs/notes/sidebar-inbox-2-libs.md), whatever the
  * density: three lines with no gap between them, a text-caption-sm project and status line
  * (16px), the text-body name (22px) and a text-caption-sm detail or branch line (16px), with

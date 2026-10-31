@@ -22,11 +22,12 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("a row whose line 2 shows a plugin's flag opens the thread and the plugin's surface for it", async ({ page }) => {
+test("a row that shows a plugin's flag opens the thread and the plugin's surface for it", async ({ page }) => {
   await openApp(page);
   await flag("s-3", "hello", "Hello", "attention", "deploy needs approval");
   const s3 = row(page, "s:s-3");
-  await expect(s3.getByTestId("row-status")).toHaveText("Hello: deploy needs approval");
+  await expect(s3.getByTestId("row-status")).toHaveText("Hello");
+  await expect(s3.getByTestId("row-detail")).toHaveText("deploy needs approval");
   await s3.click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.hello.demo");

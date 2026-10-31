@@ -63,11 +63,11 @@ test.describe("lineage", () => {
     await expect(row(page, "s:s-l-e2e").getByTestId("row-created-by")).toBeVisible();
     await expect(row(page, `s:${P}`).getByTestId("row-created-by")).toHaveCount(0);
     await expect(row(page, "s:s-1").getByTestId("row-created-by")).toHaveCount(0);
-    // Before the name, line 2 unchanged.
+    // Before the name, the other lines unchanged.
     const name = await row(page, `s:${C}`).getByTestId("thread-name").boundingBox();
     const glyph = await row(page, `s:${C}`).getByTestId("row-created-by").boundingBox();
     expect((glyph?.x ?? 0) + (glyph?.width ?? 0)).toBeLessThanOrEqual((name?.x ?? 0) + 1);
-    await expect(row(page, `s:${C}`).getByTestId("row-place")).toHaveText(/^Finished /);
+    await expect(row(page, `s:${C}`).getByTestId("row-status")).toHaveText("Done");
     // The archived sibling in the Archived footer.
     await page.getByTestId("archived-header").click();
     await expect(row(page, "s:s-l-spike").getByTestId("row-created-by")).toBeVisible();
@@ -228,7 +228,9 @@ test.describe("hidden children", () => {
     await mockPost("settings/external?threads.show_created_threads=true");
     await expect(row(page, `s:${C}`)).toBeVisible();
     const visited = new Set<string>();
-    for (let i = 0; i < 4; i++) {
+    // Opening a thread can move it within its band (its sort time changes), so the walk's
+    // order shifts as it goes: walk until all four were reached, at most twice round.
+    for (let i = 0; i < 8 && visited.size < 4; i++) {
       const prev = await selectedId();
       await page.keyboard.press("Meta+Shift+a");
       await expect.poll(selectedId).not.toBe(prev);

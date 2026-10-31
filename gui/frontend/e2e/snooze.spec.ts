@@ -76,7 +76,8 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   await expect(s8.getByTestId("row-snooze-icon")).toBeVisible();
   await expect(row(page, "s:s-9").getByTestId("row-snooze-left")).toHaveText("4d");
   // One line (no status line); not dimmed, but quiet: the live rows' size, regular weight.
-  await expect(s8.getByTestId("row-place")).toHaveCount(0);
+  await expect(s8.getByTestId("row-line-1")).toHaveCount(0);
+  await expect(s8.getByTestId("row-actions")).toHaveCount(0);
   await expect(s8.getByTestId("thread-body")).toHaveCSS("opacity", "1");
   await expect(s8.getByTestId("thread-name")).toHaveCSS("font-weight", "400");
   await expect(s8.getByTestId("thread-name")).toHaveCSS("font-size", await row(page, "s:s-2").getByTestId("thread-name").evaluate((el) => getComputedStyle(el).fontSize));
@@ -87,7 +88,8 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   await expect(tip).toBeVisible();
   await expect(tip.getByTestId("tip-name")).toHaveText("Refactor the gh poller");
   await expect(tip.getByText(/Snoozed until/)).toHaveCount(0);
-  await expect(tip.getByTestId("tip-status")).toHaveCount(0);
+  // The status row says how long ago its turn finished, not when it wakes.
+  await expect(tip.getByTestId("tip-status")).toHaveText(/^Finished /);
   await page.mouse.move(900, 400);
 
   // Expanded survives a reload.
@@ -220,11 +222,13 @@ test("Pick a date and time… opens the dialog for the row's thread; Snooze send
   await sub.getByTestId("snooze-pick").click();
   const dialog = page.getByTestId("snooze-dialog");
   await expect(dialog.getByRole("heading")).toHaveText("Snooze “Investigate flaky e2e”");
-  // The 10th of next month at 2:30 PM.
+  // The 10th of the month after the one shown at 2:30 PM. The calendar opens on tomorrow's
+  // month, which on the last day of a month is already the next one.
   const iso = (d: Date) => `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   await dialog.getByTestId("snooze-next-month").click();
-  const target = new Date(now.getFullYear(), now.getMonth() + 1, 10, 14, 30);
+  const target = new Date(tomorrow.getFullYear(), tomorrow.getMonth() + 1, 10, 14, 30);
   await dialog.locator(`[data-day="${iso(target)}"]`).click();
   await dialog.getByTestId("snooze-time").fill("14:30");
   await dialog.getByTestId("snooze-submit").click();
@@ -234,17 +238,18 @@ test("Pick a date and time… opens the dialog for the row's thread; Snooze send
   expect((await lastSnooze())?.context?.activeThreadId).toBe("s-4");
 });
 
-test("a wake brings the thread back needing attention: Snooze ended in amber, counted in the window title; snooze it again from the title menu", async ({ page }) => {
+test("a wake brings the thread back needing attention: Woke in amber, counted in the window title; snooze it again from the title menu", async ({ page }) => {
   await openApp(page);
   await expectAttention(page, 1);
   await mockPost("thread/wake?id=s-8");
   await expect(page.getByTestId("snoozed-count")).toHaveText("1");
-  // Back in the main list, in the attention group (prompts: s-2, then s-8 by creation).
-  await expect.poll(() => mainKeys(page)).toEqual(["s:s-2", "s:s-8", "s:s-6", "s:s-4", "s:s-3"]);
+  // Back in the main list, in the attention group, newest status change first (s-8 just woke, then s-2).
+  await expect.poll(() => mainKeys(page)).toEqual(["s:s-8", "s:s-2", "s:s-6", "s:s-4", "s:s-3"]);
   const s8 = row(page, "s:s-8");
   await expect(s8).toHaveAttribute("data-section", "attention");
-  await expect(s8.getByTestId("row-status")).toHaveText("Snooze ended · just now");
+  await expect(s8.getByTestId("row-status")).toHaveText("Woke");
   await expect(s8.getByTestId("row-status")).toHaveClass(/text-cf-warning-text/);
+  await expect(s8.getByTestId("row-detail")).toHaveText("snooze ended");
   await expectAttention(page, 2);
 
   // Its page: the composer's note says so, in amber.

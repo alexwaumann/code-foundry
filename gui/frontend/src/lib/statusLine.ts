@@ -98,7 +98,10 @@ export function statusLine(
       kind: flag.level === "error" ? "flagError" : "flagAttention",
       detail: `${flag.pluginName}: ${flag.reason}`,
       at: null,
-      flag: { pluginName: flag.pluginName, reason: flag.reason },
+      // The thread's own flag object, not a copy: a selector with useShallow over the line
+      // (SidebarRow, useTagInfo) compares it by reference, and a fresh object each read
+      // would re-render forever.
+      flag,
     };
   if (isWaiting(s)) return { kind: "waiting", detail: "", at: null };
   return badge === "busy" ? { kind: "working", detail: "", at: null } : PLACE;

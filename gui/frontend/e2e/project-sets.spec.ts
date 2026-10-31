@@ -4,7 +4,7 @@ import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, ope
 /**
  * Workspaces v2 in the GUI (docs/notes/workspaces-v2-3-composer.md): the composer's
  * project set (multi-select, chips by id, the primary picker), collision hints, Save as
- * workspace, sidebar line 2 of a multi-project thread, New thread on this branch.
+ * workspace, sidebar line 1 of a multi-project thread, New thread on this branch.
  */
 
 interface ThreadSummary {
@@ -133,7 +133,7 @@ test("Add project multi-selects: chips by id, the primary picker, sent as projec
   });
   const id = await selectedThreadId(page);
   expect((await threads()).find((t) => t.id === id)).toMatchObject({ projectId: "repo-gp", projectIds: ["repo-cf", "repo-gp"], workspaceId: "", createdWorktree: false });
-  // Line 2: the run-in project @ its checkout's branch, never the set's "2 projects" (no workspace badge).
+  // Line 1: the run-in project (after the Layers glyph), never the set's "2 projects"; line 3 its checkout's branch.
   await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
   await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("main");
 });
@@ -283,7 +283,7 @@ test("a workspace row selects its members and the reference; Workspace as the pr
   expect((await threads()).find((t) => t.id === id)).toMatchObject({ projectId: "", workspaceId: "w-000000000001", branch: "cf/ship-the-shop-banner", createdWorktree: true });
   await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("shop");
   await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("cf/ship-the-shop-banner");
-  await expect(row(page, `s:${id}`).getByTestId("row-workspace")).toHaveCount(0);
+  await expect(row(page, `s:${id}`).getByTestId("row-workspace")).toHaveCount(1);
 });
 
 test("the workspace chip's × takes its members with it; Clear empties the set; every × goes to the prompt", async ({ page }) => {
@@ -382,7 +382,7 @@ test("Save as workspace: offered for an unsaved set of two or more, names it and
   expect(await lastInvoked("workspace.new")).toEqual({ name: "parser pair", projects: "repo-cf,repo-gp", primary: "repo-gp" });
   expect(await lastInvoked("thread.workspace")).toEqual({ workspace: "w-000000000001" });
   await expect.poll(async () => (await threads()).find((x) => x.id === t.id)?.workspaceId).toBe("w-000000000001");
-  // Line 2 keeps the run-in project; the workspace's name shows on the card.
+  // Line 1 keeps the run-in project; the workspace's name shows on the card.
   await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
   // Saved: the set matches a workspace now, so the item is gone.
   await page.getByTestId("thread-title").click();
