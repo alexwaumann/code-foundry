@@ -14,7 +14,8 @@ makes the worktree again, at the same path, and resumes the conversation.
   the cwd member) and copied by Fork, which now also copies `BaseRef` and
   `CreatedWorktree` (a fork runs in its parent's worktree, so it inherits what that
   worktree was made for). Meaning: "this thread was created for that branch"; if the
-  agent switched branches inside the worktree, a recreation still uses the recorded one.
+  agent switched branches inside the worktree, a recreation still uses the recorded one
+  (since `docs/notes/recreate-last-head.md`: unless the cleanup recorded another HEAD).
 - **Backfill.** Rows from before 0027 with `created_worktree` and no branch get it from
   the project store snapshot: `startBackfill` (thread store `New`) checks them every tick
   until their project has listed worktrees (its first reconcile after the daemon start;

@@ -191,14 +191,11 @@ derivation survives only as the resolution of an unrecorded member.
   invocation poll) and passed 3 of 3 alone; `HtmlPreview.test.tsx`'s color-scheme case
   failed once in a `make check` and passed 3 of 3 alone; both unrelated.
 
-## Follow-ups (from the review, not built)
+## Follow-ups (from the review)
 
-* After an archive cleanup removes a moved worktree (on Y), the next start makes it again
-  on the created-for branch X, not on Y where the commits were. At least the remade note
-  should name the branch it had; better, remember the last HEAD at cleanup and check that
-  out again.
-* A timeline note when a member made again takes over another linked worktree on the
-  branch.
+* Both built in `docs/notes/recreate-last-head.md`: a cleanup records the removed
+  worktree's HEAD and the next start checks it out again; a timeline note when a member
+  made again takes over another linked worktree on the branch.
 
 ## Tests
 

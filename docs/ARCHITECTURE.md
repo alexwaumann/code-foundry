@@ -471,8 +471,9 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   ahead/behind, the operation in progress) is read from the project snapshot at that
   path, never from the row, so a checkout whose branch moved (`git switch`, a stacked
   branch) is the same checkout (`checkouts.go`, `docs/notes/thread-checkouts.md`).
-  `branch` is the branch a worktree-mode thread was created for, a record: recreate
-  checks it out again, and a checkout on another one is `moved`. Create records the
+  `branch` is the branch a worktree-mode thread was created for, a record: a checkout on
+  another one is `moved`, and recreate checks it out again unless the cleanup that
+  removed the worktree recorded another HEAD (`last_heads`). Create records the
   paths by the creation rule: in worktree mode (`created_worktree`) a git member's
   worktree made for the branch at the project store's `DefaultWorktreePath`, or one that
   exists for it (that path while it has the branch checked out, or a hand-made linked
@@ -581,9 +582,11 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   their prompt past their prompt cache expiry (nothing pending, unfinished, queued or
   running in the background; up at least 5 minutes), disconnect reason "idle"
   (`docs/notes/thread-lifecycle.md`). A start of a thread whose worktree the app made and
-  a cleanup removed makes it again first, on the branch the row records, at the same
-  path, so `--resume` finds the transcript, and the thread's other worktree-mode worktrees too;
-  user checkouts keep the refusal (`recreate.go`, `docs/notes/recreate-worktree.md`).
+  a cleanup removed makes it again first, at the same path, so `--resume` finds the
+  transcript, on the branch it had when removed (recorded by the cleanup, while that
+  branch exists) else the created-for one, and the thread's other worktree-mode worktrees
+  too; user checkouts keep the refusal (`recreate.go`, `docs/notes/recreate-worktree.md`,
+  `docs/notes/recreate-last-head.md`).
   A conversation whose transcript Claude Code deleted (its `cleanupPeriodDays`) cannot
   continue: the start is refused (`ErrTranscriptMissing`, FAILED_PRECONDITION, nothing
   written; Send, Reconnect, Fork and the MCP and slash command queries alike) and
