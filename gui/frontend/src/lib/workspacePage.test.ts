@@ -70,14 +70,19 @@ const status = (o: Partial<GitStatusView> = {}): GitStatusView => ({ upstream: "
 const base: MemberCheckoutInput = { inSet: true, path: "/wt", git: true, known: true, worktree: { isMain: false, status: status() } };
 
 describe("memberCheckoutState", () => {
+  const wt = (o: Partial<GitStatusView>, isMain = false) => ({ worktree: { isMain, status: status(o) } });
   it.each<[string, Partial<MemberCheckoutInput>, string]>([
-    ["clean and pushed", {}, "clean · up to date"],
-    ["files to commit and commits to push", { worktree: { isMain: false, status: status({ modified: 3, untracked: 1, dirty: true, ahead: 2 }) } }, "4 files · 2 to push"],
-    ["behind", { worktree: { isMain: false, status: status({ behind: 1 }) } }, "clean · 1 behind"],
-    ["never pushed", { worktree: { isMain: false, status: status({ upstream: "" }) } }, "clean · not pushed"],
-    ["merged and clean", { worktree: { isMain: false, mergedClean: true, status: status({ upstream: "" }) } }, "clean · merged"],
-    ["merged but dirty again: the files show", { worktree: { isMain: false, mergedClean: true, status: status({ modified: 1, dirty: true }) } }, "1 file · up to date"],
-    ["the main checkout", { worktree: { isMain: true, status: status({ behind: 2 }) } }, "clean · 2 behind"],
+    ["clean and pushed, commits not on the default branch yet", wt({ baseRef: "origin/main", baseAhead: 2 }), "clean · up to date"],
+    ["no default branch to compare with", {}, "clean · up to date"],
+    ["files to commit and commits to push", wt({ modified: 3, untracked: 1, dirty: true, ahead: 2, baseRef: "origin/main", baseAhead: 2 }), "4 files · 2 to push"],
+    ["behind its upstream", wt({ behind: 1, baseRef: "origin/main", baseAhead: 1 }), "clean · 1 behind"],
+    ["committed, never pushed", wt({ upstream: "", baseRef: "origin/main", baseAhead: 3 }), "clean · not pushed"],
+    ["pushed and every commit on the default branch", wt({ baseRef: "origin/main", baseAhead: 0 }), "clean · merged"],
+    ["merged, with files changed since", wt({ modified: 1, dirty: true, baseRef: "origin/main", baseAhead: 0 }), "1 file · merged"],
+    ["a fresh branch: never pushed, nothing committed", wt({ upstream: "", baseRef: "origin/main", baseAhead: 0 }), "clean · no commits yet"],
+    ["a fresh branch with files", wt({ upstream: "", untracked: 2, dirty: true, baseRef: "origin/main", baseAhead: 0 }), "2 files · no commits yet"],
+    ["the main checkout is never merged", wt({ behind: 2, baseRef: "origin/main", baseAhead: 0 }, true), "clean · 2 behind"],
+    ["the main checkout up to date", wt({ baseRef: "origin/main", baseAhead: 0 }, true), "clean · up to date"],
     ["not in the thread's set", { inSet: false }, "not in this thread"],
     ["an unregistered project", { known: false, git: false, worktree: undefined }, "not registered"],
     ["a plain folder", { git: false }, "folder · no git"],

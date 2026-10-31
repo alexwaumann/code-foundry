@@ -4,7 +4,7 @@
  * member's checkout state for a thread. Pure; inputs are the threads and projects slices'
  * shapes.
  */
-import type { WorktreeView } from "@/api/project";
+import type { GitStatusView, WorktreeView } from "@/api/project";
 import { changesCell, isWorking, syncCell, threadActivityMs, type ActivityThread, type ActivityThreads } from "./projects";
 
 /** A thread row's navigation key on a workspace's page. */
@@ -65,14 +65,16 @@ export interface MemberCheckoutInput {
   /** The project is registered. */
   known: boolean;
   /** The project's worktree at the path, when the projects slice has it. */
-  worktree: Pick<WorktreeView, "isMain" | "mergedClean" | "status"> | undefined;
+  worktree: Pick<WorktreeView, "isMain" | "status"> | undefined;
 }
 
 /**
- * A member's cell in a thread's row: "clean · up to date", "4 files · 2 to push",
- * "clean · merged" (the daemon's merged_clean: nothing uncommitted, every commit on the
- * default branch), "not in this thread", "made at the next start" (worktree mode, not made
- * yet), "folder · no git", "not registered".
+ * A member's cell in a thread's row: what is uncommitted, then where the branch stands:
+ * "clean · up to date", "4 files · 2 to push", "clean · merged" (pushed once, nothing to
+ * push and every commit on the default branch), "2 files · no commits yet" (never pushed,
+ * nothing committed: a fresh branch, not a merged one, though the daemon's merged_clean
+ * says so for both), "clean · not pushed"; or "not in this thread", "made at the next
+ * start" (worktree mode, not made yet), "folder · no git", "not registered".
  */
 export function memberCheckoutState(m: MemberCheckoutInput): string {
   if (!m.inSet) return "not in this thread";
@@ -80,6 +82,15 @@ export function memberCheckoutState(m: MemberCheckoutInput): string {
   if (!m.git) return "folder · no git";
   if (!m.path || !m.worktree) return "made at the next start";
   const st = m.worktree.status;
-  if (m.worktree.mergedClean === true && !st.dirty) return "clean · merged";
-  return `${changesCell(st)} · ${syncCell(st)}`;
+  return `${changesCell(st)} · ${branchState(st, m.worktree.isMain)}`;
+}
+
+/** Where a checkout's branch stands against its upstream and the default branch (memberCheckoutState). */
+function branchState(st: GitStatusView, isMain: boolean): string {
+  const onBase = Boolean(st.baseRef) && (st.baseAhead ?? 0) === 0;
+  if (!isMain && onBase && st.ahead === 0) {
+    if (st.upstream) return st.behind > 0 ? syncCell(st) : "merged";
+    return "no commits yet";
+  }
+  return syncCell(st);
 }
