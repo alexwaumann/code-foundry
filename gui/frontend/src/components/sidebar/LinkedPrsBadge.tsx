@@ -1,15 +1,13 @@
 import type { Tone } from "@/components/pr/model";
 import { toneText } from "@/components/pr/tones";
 import { prStateLook } from "@/components/prs/prState";
-import { Tip } from "@/components/ui/tooltip";
 import { threadKey } from "@/lib/tree";
 import { cn } from "@/lib/utils";
-import { pullRequestKey } from "@/stores/gh";
-import { showThreadInfo } from "@/stores/threadInfoOverlay";
+import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { showThreadView } from "@/stores/threadPanelIntent";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { linkedPrTag, linkedPrTagText, linkedPrTip } from "./linkedPrTag";
+import { linkedPrTag } from "./linkedPrTag";
 import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
 
 /** The chip's tint per tone; the text colour is the PR surfaces' (pr/tones `toneText`). */
@@ -31,51 +29,59 @@ function selectThread(id: string): void {
 }
 
 /**
- * Where a click on the tag goes: one pull request opens in the thread's PR panel tab
- * (view.panel.pr's ShowView, scoped to the thread: its repo slug comes from the thread's
- * link, `key` being its pullRequestKey); several show the thread info card, whose pull
- * request rows list them. Either way the thread is selected first, so what opened shows.
+ * Where a click on the tag goes: every counted pull request opens in the thread's PR panel
+ * tab (view.panel.pr's ShowView, scoped to the thread: the repo slug comes from the
+ * thread's own link, `keys` being their pullRequestKeys), the shown one last so its tab is
+ * the active one. The thread is selected first, so what opened shows. Each one's detail is
+ * read once as well (a watch released at once; the entry stays): only the active tab reads
+ * its own, and a closed one must leave the tag, as it did when the card read them all.
  */
-function openLinked(id: string, key: string | null): void {
+function openLinked(id: string, keys: readonly string[]): void {
   selectThread(id);
-  const link = key === null ? undefined : useThreadsStore.getState().byId[id]?.linkedPullRequests.find((l) => pullRequestKey(l.slug, l.number) === key);
-  if (link) showThreadView("panel.pr", id, { slug: link.slug, number: String(link.number) });
-  else showThreadInfo(id);
+  const links = useThreadsStore.getState().byId[id]?.linkedPullRequests ?? [];
+  for (const key of keys) {
+    const link = links.find((l) => pullRequestKey(l.slug, l.number) === key);
+    if (!link) continue;
+    pullRequestDetailResource.watch(key)();
+    showThreadView("panel.pr", id, { slug: link.slug, number: String(link.number) });
+  }
 }
 
 /**
  * The thread's linked pull requests, closed ones left out (linkedPrTag): one shows its
- * state icon and bare number in the state's colour, several "N PRs" in the worst state's;
- * nothing when none is left. The tooltip says what the tag hides (states, the one's title).
+ * state icon and bare number in the state's colour; several show the worst one the same
+ * way and "+N" for the rest. No tooltip of its own, and the row's hover card stays shut
+ * over it (data-quiet): a click is what it is for.
  */
 export function LinkedPrsBadge({ id }: { id: string }) {
   const keys = useLinkKeys(id);
   const facts = useLinkedPrFacts(keys);
   const tag = linkedPrTag(facts);
   if (tag === null) return null;
-  const look = tag.kind === "one" ? prStateLook(tag.state === "draft" ? "open" : tag.state, tag.state === "draft") : null;
+  const look = prStateLook(tag.state === "draft" ? "open" : tag.state === "unknown" ? null : tag.state, tag.state === "draft");
   return (
-    <Tip label={linkedPrTip(facts)} side="right" data-testid="row-linked-prs-tip">
-      {/* The click stops here: the row's own click would also focus the prompt and open a flag's surface. */}
-      <span
-        className={cn("flex shrink-0 cursor-pointer items-center gap-0.5 rounded-sm px-1 text-caption-sm font-medium tabular-nums", toneText[tag.tone], toneTint[tag.tone])}
-        data-testid="row-linked-prs"
-        data-kind={tag.kind}
-        data-state={tag.kind === "one" ? tag.state : undefined}
-        data-tone={tag.tone}
-        onClick={(e) => {
-          e.stopPropagation();
-          // The one counted pull request's key: facts and keys share their order.
-          const one = tag.kind === "one" ? (keys[facts.findIndex((f) => f.state !== "closed")] ?? null) : null;
-          openLinked(id, one);
-        }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-        }}
-      >
-        {look && <look.icon className="size-3 shrink-0" aria-label={look.label} />}
-        {linkedPrTagText(tag)}
-      </span>
-    </Tip>
+    // The click stops here: the row's own click would also focus the prompt and open a flag's surface.
+    <span
+      className={cn("flex shrink-0 cursor-pointer items-center gap-0.5 rounded-sm px-1 text-caption-sm font-medium tabular-nums", toneText[tag.tone], toneTint[tag.tone])}
+      data-testid="row-linked-prs"
+      data-kind={tag.kind}
+      data-state={tag.state}
+      data-tone={tag.tone}
+      data-quiet=""
+      onClick={(e) => {
+        e.stopPropagation();
+        // The counted pull requests' keys (facts and keys share their order), the shown one last.
+        const counted = keys.filter((_, i) => facts[i]?.state !== "closed");
+        const shown = keys[facts.findIndex((f) => f.number === tag.number && f.state !== "closed")];
+        openLinked(id, [...counted.filter((k) => k !== shown), ...(shown === undefined ? [] : [shown])]);
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+      }}
+    >
+      <look.icon className="size-3 shrink-0" aria-label={look.label} />
+      {tag.number}
+      {tag.kind === "many" && <span className="pl-0.5">+{tag.more}</span>}
+    </span>
   );
 }
