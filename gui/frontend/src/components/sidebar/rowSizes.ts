@@ -3,11 +3,20 @@ import type { Row } from "@/lib/tree";
 /**
  * The thread list's row sizes in layout px (docs/notes/sidebar-row-emphasis.md). A row's
  * first line is ROW_HEIGHTS[density] (stores/settings.ts): the name, a text-body line
- * (22px), with 3px (compact) or 5px (comfortable) above and below it. A two-line thread row
- * adds SECOND_LINE, exactly the status line's height (a 16px text-caption-sm line plus the
- * 2px gap-0.5 above it), so it keeps the same padding as a single-line row.
+ * (22px), with 3px (compact) or 5px (comfortable) above and below it. SECOND_LINE is the
+ * two-line row's status line (a 16px text-caption-sm line plus the 2px gap-0.5 above it);
+ * the thread rows now size as THREE_LINE_ROW, and it goes once SidebarRow renders three lines.
  */
 export const SECOND_LINE = 18;
+
+/**
+ * A thread row in the inbox layout (docs/notes/sidebar-inbox-2-libs.md), whatever the
+ * density: three lines with no gap between them, a text-caption-sm project and status line
+ * (16px), the text-body name (22px) and a text-caption-sm detail or branch line (16px), with
+ * 3px above and below. Every thread row but a snoozed or archived one (still one line,
+ * ROW_HEIGHTS[density]) has it.
+ */
+export const THREE_LINE_ROW = 60;
 
 /** A footer header's height (Working, Snoozed, Archived): its 22px button sits on the bottom. */
 export const HEADER_HEIGHT = 26;
@@ -19,8 +28,11 @@ export const HEADER_HEIGHT = 26;
  */
 export const ROW_GAP = 4;
 
-/** A row's height: a footer header's, a one-line snoozed or archived row's, or a two-line thread row's. */
+/**
+ * A row's height: a footer header's, a one-line snoozed or archived row's (`rowHeight`, by
+ * density), or a three-line thread row's (THREE_LINE_ROW; also for a row out of range).
+ */
 export function rowSize(row: Row | undefined, rowHeight: number): number {
   if (row?.kind === "header") return HEADER_HEIGHT;
-  return row?.section === "archived" || row?.section === "snoozed" ? rowHeight : rowHeight + SECOND_LINE;
+  return row?.section === "archived" || row?.section === "snoozed" ? rowHeight : THREE_LINE_ROW;
 }
