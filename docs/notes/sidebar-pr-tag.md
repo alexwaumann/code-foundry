@@ -29,7 +29,7 @@ behaviour was agreed with Alex before the build (2026-10-19).
   number in the neutral tone with the generic pull-request icon. In a count, unknown
   ones never make it green or merged on their own: open or draft ones still decide, and
   a count of merged and unknown ones only is neutral (not "all merged").
-* Superseded by docs/notes/sidebar-pr-tag-plus.md (2026-10-31): several show as the worst one +N, no tooltip, click opens PR tabs.
+* Superseded by docs/notes/sidebar-pr-tag-plus.md (2026-10-31): several show as +N in the worst state, no tooltip, click opens PR tabs.
 * Click unchanged: opens the Linked PRs surface for the thread and goes on to the row,
   which selects it.
 * Tooltip (`Tip`, right side, so it never covers the rows below): one PR says its state

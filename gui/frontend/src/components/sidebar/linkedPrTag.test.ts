@@ -14,11 +14,11 @@ describe("linkedPrTag", () => {
     ["one merged: merged tone", [fact(138, "merged")], { kind: "one", number: 138, state: "merged", tone: "merged" }, "138"],
     ["one unknown: neutral", [fact(9, "unknown")], { kind: "one", number: 9, state: "unknown", tone: "neutral" }, "9"],
     ["closed left out: the one left shows as itself", [fact(131, "closed"), fact(138, "merged")], { kind: "one", number: 138, state: "merged", tone: "merged" }, "138"],
-    ["any draft: the first draft, +N", [fact(1, "open"), fact(2, "draft"), fact(3, "merged"), fact(4, "draft")], { kind: "many", number: 2, state: "draft", more: 3, tone: "draft" }, "2 +3"],
-    ["no draft, any open: the first open, success", [fact(1, "merged"), fact(2, "open"), fact(3, "unknown")], { kind: "many", number: 2, state: "open", more: 2, tone: "success" }, "2 +2"],
-    ["all merged: the first, merged", [fact(1, "merged"), fact(2, "merged")], { kind: "many", number: 1, state: "merged", more: 1, tone: "merged" }, "1 +1"],
-    ["closed not counted", [fact(1, "merged"), fact(2, "closed"), fact(3, "merged")], { kind: "many", number: 1, state: "merged", more: 1, tone: "merged" }, "1 +1"],
-    ["unknown counts; with merged only the first unknown, neutral", [fact(1, "merged"), fact(2, "unknown")], { kind: "many", number: 2, state: "unknown", more: 1, tone: "neutral" }, "2 +1"],
+    ["any draft: draft, +N all of them, the first draft leads", [fact(1, "open"), fact(2, "draft"), fact(3, "merged"), fact(4, "draft")], { kind: "many", lead: 2, state: "draft", count: 4, tone: "draft" }, "+4"],
+    ["no draft, any open: success, the first open leads", [fact(1, "merged"), fact(2, "open"), fact(3, "unknown")], { kind: "many", lead: 2, state: "open", count: 3, tone: "success" }, "+3"],
+    ["all merged: merged", [fact(1, "merged"), fact(2, "merged")], { kind: "many", lead: 1, state: "merged", count: 2, tone: "merged" }, "+2"],
+    ["closed not counted", [fact(1, "merged"), fact(2, "closed"), fact(3, "merged")], { kind: "many", lead: 1, state: "merged", count: 2, tone: "merged" }, "+2"],
+    ["unknown counts; with merged only it is unknown, neutral", [fact(1, "merged"), fact(2, "unknown")], { kind: "many", lead: 2, state: "unknown", count: 2, tone: "neutral" }, "+2"],
   ])("%s", (_name, facts, want, text) => {
     const tag = linkedPrTag(facts);
     expect(tag).toEqual(want);

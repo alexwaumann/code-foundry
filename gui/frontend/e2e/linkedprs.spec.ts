@@ -63,8 +63,9 @@ test("hidden without links; a link brings the sidebar tag, and the header shows 
   await expect(page.getByTestId("pane-linked-prs")).toHaveCount(0);
 
   await link("s-1", 147);
-  // #147 is on no dashboard (unknown), so the open #142 leads: its number and +1 (docs/notes/sidebar-pr-tag-plus.md).
-  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("142+1");
+  // Two: "+2" in the open tone (#147 is on no dashboard, unknown; docs/notes/sidebar-pr-tag-plus.md).
+  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("+2");
+  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-state", "open");
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-tone", "success");
   // Other threads have none.
   await expect(row(page, "s:s-2").getByTestId("row-linked-prs")).toHaveCount(0);
@@ -88,8 +89,8 @@ test("several PRs: the sidebar tag opens each in its thread's panel, the shown o
   await link("s-2", 147, 2 * MIN);
   await openApp(page);
   await row(page, "s:s-1").click();
-  // #12 is open on its dashboard, #147 unknown: #12 leads.
-  await expect(row(page, "s:s-2").getByTestId("row-linked-prs")).toHaveText("12+1");
+  // #12 is open on its dashboard, #147 unknown: "+2" in the open tone, #12 the active tab.
+  await expect(row(page, "s:s-2").getByTestId("row-linked-prs")).toHaveText("+2");
   await row(page, "s:s-2").getByTestId("row-linked-prs").click();
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
@@ -113,7 +114,7 @@ async function linkStates(): Promise<void> {
   await link("s-2", 147, 10 * MIN);
 }
 
-test("the sidebar tag: one PR's state and number, the worst one +N, closed ones left out, no tooltip", async ({ page }) => {
+test("the sidebar tag: one PR's state and number, +N in the worst state, closed ones left out, no tooltip", async ({ page }) => {
   await linkStates();
   await openApp(page);
   const tag = (thread: string) => row(page, `s:${thread}`).getByTestId("row-linked-prs");
@@ -123,8 +124,8 @@ test("the sidebar tag: one PR's state and number, the worst one +N, closed ones 
   await expect(tag("s-3")).toHaveAttribute("data-state", "draft");
   await expect(tag("s-4")).toHaveText("138");
   await expect(tag("s-4")).toHaveAttribute("data-state", "merged");
-  // #131 not read yet: it counts. The draft #145 is the worst, so it is the one shown.
-  await expect(tag("s-5")).toHaveText("145+3");
+  // #131 not read yet: it counts. The draft #145 is the worst: its icon and tone.
+  await expect(tag("s-5")).toHaveText("+4");
   await expect(tag("s-5")).toHaveAttribute("data-state", "draft");
   await expect(tag("s-5")).toHaveAttribute("data-tone", "draft");
   // Hovering the tag shows nothing: no tooltip of its own, and not the row's card.
@@ -138,7 +139,7 @@ test("the sidebar tag: one PR's state and number, the worst one +N, closed ones 
   // The PR tabs on s-5 read #131's detail: closed, so it leaves the count.
   await tag("s-5").click();
   await expect(page.getByTestId("pr-repo-link")).toHaveText(`${CF}#145`);
-  await expect(tag("s-5")).toHaveText("145+2");
+  await expect(tag("s-5")).toHaveText("+3");
 });
 
 test("the thread card lists the linked PRs below the model, newest first, closed ones left out", async ({ page }) => {
@@ -185,7 +186,7 @@ for (const scheme of ["dark", "light"] as const) {
     const tag = (thread: string) => row(page, `s:${thread}`).getByTestId("row-linked-prs");
     // Read #131 (closed) so it leaves s-5's count, then select s-1.
     await tag("s-5").click();
-    await expect(tag("s-5")).toHaveText("145+2");
+    await expect(tag("s-5")).toHaveText("+3");
     await row(page, "s:s-1").click();
     await page.mouse.move(700, 450);
     const sidebar = page.getByTestId("sidebar");

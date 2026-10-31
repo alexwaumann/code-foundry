@@ -7,7 +7,7 @@ import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { showThreadView } from "@/stores/threadPanelIntent";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { linkedPrTag } from "./linkedPrTag";
+import { linkedPrTag, linkedPrTagText } from "./linkedPrTag";
 import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
 
 /** The chip's tint per tone; the text colour is the PR surfaces' (pr/tones `toneText`). */
@@ -49,8 +49,8 @@ function openLinked(id: string, keys: readonly string[]): void {
 
 /**
  * The thread's linked pull requests, closed ones left out (linkedPrTag): one shows its
- * state icon and bare number in the state's colour; several show the worst one the same
- * way and "+N" for the rest. No tooltip of its own, and the row's hover card stays shut
+ * state icon and bare number in the state's colour; several show the worst state's icon and
+ * colour and "+N", N all of them. No tooltip of its own, and the row's hover card stays shut
  * over it (data-quiet): a click is what it is for.
  */
 export function LinkedPrsBadge({ id }: { id: string }) {
@@ -72,7 +72,8 @@ export function LinkedPrsBadge({ id }: { id: string }) {
         e.stopPropagation();
         // The counted pull requests' keys (facts and keys share their order), the shown one last.
         const counted = keys.filter((_, i) => facts[i]?.state !== "closed");
-        const shown = keys[facts.findIndex((f) => f.number === tag.number && f.state !== "closed")];
+        const lead = tag.kind === "one" ? tag.number : tag.lead;
+        const shown = keys[facts.findIndex((f) => f.number === lead && f.state !== "closed")];
         openLinked(id, [...counted.filter((k) => k !== shown), ...(shown === undefined ? [] : [shown])]);
       }}
       onDoubleClick={(e) => {
@@ -80,8 +81,7 @@ export function LinkedPrsBadge({ id }: { id: string }) {
       }}
     >
       <look.icon className="size-3 shrink-0" aria-label={look.label} />
-      {tag.number}
-      {tag.kind === "many" && <span className="pl-0.5">+{tag.more}</span>}
+      {linkedPrTagText(tag)}
     </span>
   );
 }

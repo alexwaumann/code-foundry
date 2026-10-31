@@ -564,11 +564,11 @@ describe("SidebarRow linked PRs tag", () => {
     expect(tag()?.getAttribute("data-tone")).toBe("neutral");
   });
 
-  it("several: the worst one's icon and number, +N for the rest without closed ones", () => {
+  it("several: the worst state's icon and tone, +N all of them without closed ones", () => {
     dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(1, "open"), pr(2, "open", { draft: true })], [pr(3, "merged")]) });
     pullRequestDetailResource.set(pullRequestKey(SLUG, 4), { data: { pullRequest: pr(4, "closed") } as PullRequestDetailView });
     renderRow({ linkedPullRequests: [link(1), link(2), link(3), link(4)] });
-    expect(tag()?.textContent).toBe("2+2");
+    expect(tag()?.textContent).toBe("+3");
     expect(tag()?.getAttribute("data-kind")).toBe("many");
     expect(tag()?.getAttribute("data-state")).toBe("draft");
     expect(tag()?.getAttribute("data-tone")).toBe("draft");
@@ -644,7 +644,7 @@ describe("SidebarRow linked PR tag click", () => {
     pullRequestDetailResource.set(pullRequestKey("o/r", 3), { data: { pullRequest: { repoSlug: "o/r", number: 3, state: "closed", draft: false, title: "", updatedAtMs: 1, partial: false } } as PullRequestDetailView });
     pullRequestDetailResource.set(pullRequestKey("o/r", 1), { data: { pullRequest: { repoSlug: "o/r", number: 1, state: "open", draft: true, title: "", updatedAtMs: 1, partial: false } } as PullRequestDetailView });
     const onActivate = renderWith({ linkedPullRequests: [link("o/r", 1), link("o/r", 2), link("o/r", 3)] });
-    expect(screen.getByTestId("row-linked-prs").textContent).toBe("1+1");
+    expect(screen.getByTestId("row-linked-prs").textContent).toBe("+2");
     fireEvent.click(screen.getByTestId("row-linked-prs"));
     expect(onActivate).not.toHaveBeenCalled();
     expect(showThreadInfo).not.toHaveBeenCalled();
