@@ -1,7 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
-import { placeThread, type ListOptions, type ListThread, type WorktreeRef } from "@/lib/tree";
+import { bandSortTimes, placeThread, type ListOptions, type ListThread, type WorktreeRef } from "@/lib/tree";
 import { PROJECT_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useProjectsStore, type ProjectsData } from "./projects";
@@ -129,9 +129,11 @@ const SEP = "\u0001";
 
 /**
  * One string per thread for the sidebar list: id + pin + group + archive time + snooze
- * end + hidden (name, model, a different dialog and the status line's text don't rebuild
- * the list; a question turning into a finished turn, an idle thread starting work,
- * archiving, snoozing, showing or hiding it and their undoing does, since it moves). In
+ * end + hidden + its band's sort time (lib/tree.ts bandSortTimes: the status change for
+ * attention and done, the last activity for idle). Name, model, a working thread's activity
+ * and the status line's text don't rebuild the list; a question turning into a finished
+ * turn, an idle thread starting work, a new prompt, archiving, snoozing, showing or hiding
+ * it and their undoing do, since it moves. In
  * the store's order. `showCreated` is threads.show_created_threads
  * (useShowCreatedThreads): flipping it rebuilds the list.
  */
@@ -143,18 +145,22 @@ export function useThreadListKeys(showCreated: boolean): string[] {
 export function encodeThreadListKey(id: string, x: ThreadView | undefined, showCreated: boolean): string {
   const ms = (v: number | null | undefined) => (v != null ? String(v) : "");
   const hidden = x !== undefined && !inSidebar(x, showCreated);
-  return [id, x?.pinned ? "1" : "", x ? threadGroup(x) : "idle", ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), hidden ? "1" : ""].join(SEP);
+  const group = x ? threadGroup(x) : "idle";
+  const times = x ? bandSortTimes({ ...x, group }) : { statusChangedAtMs: null, lastActivityAtMs: null };
+  return [id, x?.pinned ? "1" : "", group, ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), hidden ? "1" : "", ms(times.statusChangedAtMs), ms(times.lastActivityAtMs)].join(SEP);
 }
 
 export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
   return keys.map((k) => {
-    const [id = "", pinned = "", group = "", archived = "", snoozed = "", hidden = ""] = k.split(SEP);
+    const [id = "", pinned = "", group = "", archived = "", snoozed = "", hidden = "", statusChanged = "", lastActivity = ""] = k.split(SEP);
     return {
       id,
       pinned: pinned === "1",
       group: isThreadGroup(group) ? group : "idle",
       archivedAtMs: archived === "" ? null : Number(archived),
       snoozedUntilMs: snoozed === "" ? null : Number(snoozed),
+      statusChangedAtMs: statusChanged === "" ? null : Number(statusChanged),
+      lastActivityAtMs: lastActivity === "" ? null : Number(lastActivity),
       ...(hidden === "1" ? { hidden: true } : {}),
     };
   });
@@ -166,7 +172,15 @@ export function getListThreads(showCreated: boolean): ListThread[] {
   return s.order.flatMap((id) => {
     const x = s.byId[id];
     if (!x) return [];
-    const t: ListThread = { id, pinned: x.pinned, group: threadGroup(x), archivedAtMs: x.archivedAtMs, snoozedUntilMs: x.snoozedUntilMs };
+    const t: ListThread = {
+      id,
+      pinned: x.pinned,
+      group: threadGroup(x),
+      archivedAtMs: x.archivedAtMs,
+      snoozedUntilMs: x.snoozedUntilMs,
+      statusChangedAtMs: x.statusChangedAtMs,
+      lastActivityAtMs: x.lastActivityAtMs,
+    };
     return [inSidebar(x, showCreated) ? t : { ...t, hidden: true }];
   });
 }

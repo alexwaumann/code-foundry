@@ -785,8 +785,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   seen (`docs/notes/phase2-integration.md` describes the same rule for the old Attach).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
   Requests and Projects entries, then a flat list of threads and nothing else: pinned
-  threads, then the ones waiting on the user (prompts, then errors), finished turns and
-  idle ones, newest first within each group and with no headers, scrolling on its own;
+  threads (newest created first), then the ones waiting on the user (prompts, then
+  errors) and finished turns (most recent status change first), and idle ones (most
+  recent activity first), with no headers, scrolling on its own;
   pinned under it the collapsible footers Working, Snoozed (single-line rows with the
   time left, soonest wake first) and Archived (single-line rows with their age), each
   counting its threads; each thread row says its status in words on its second line (or
