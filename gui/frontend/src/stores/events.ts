@@ -21,7 +21,6 @@ import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
 import { onSkillEpoch } from "./skill";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { applyThreadSourceEvent, prunePageModals, pruneThreadLogs } from "./thread";
-import { useUiStore } from "./ui";
 import { applyUpdateEvent } from "./update";
 import { applyWorkspaceEvent, useWorkspacesStore } from "./workspaces";
 import { applyProjectEventToDetails } from "./worktreeDetail";
@@ -47,11 +46,6 @@ const handlers: Handlers = {
   },
   workspace: (ev) => {
     useWorkspacesStore.setState((s) => ({ ...applyWorkspaceEvent(s, ev), loaded: true }));
-    // A removed workspace's collapsed mark goes with it (the snapshot is the whole list).
-    if (ev.kind === "removed" || ev.kind === "snapshot") {
-      const { byId } = useWorkspacesStore.getState();
-      useUiStore.getState().pruneCollapsedWorkspaces((id) => id in byId);
-    }
   },
   terminal: (ev) => {
     // A terminal the store did not have (not one the reconnect's List already brought):

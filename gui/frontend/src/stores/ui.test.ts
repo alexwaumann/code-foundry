@@ -168,32 +168,15 @@ describe("ui persistence", () => {
     expect(useUiStore.getState().snoozedCollapsed).toBe(true);
   });
 
-  it("saves and loads the workspace page's collapsed workspaces and the last Projects page; defaults for a bad value", () => {
-    expect(useUiStore.getInitialState().collapsedWorkspaces).toEqual([]);
+  it("saves and loads the last Projects page; ignores a saved collapsedWorkspaces; defaults for a bad value", () => {
     expect(useUiStore.getInitialState().projectsLast).toBe("");
     const opts = useUiStore.persist.getOptions();
     const current = useUiStore.getState();
-    useUiStore.setState({ collapsedWorkspaces: [] });
-    const ui = () => useUiStore.getState();
-    expect(ui().setWorkspaceCollapsed("w-1", true)).toBe(true);
-    expect(ui().setWorkspaceCollapsed("w-2", false)).toBe(false);
-    expect(opts.partialize?.(ui())).toMatchObject({ collapsedWorkspaces: ["w-1"] });
-    expect(opts.merge?.({ collapsedWorkspaces: ["b"], projectsLast: "project:repo-cf" }, current)).toMatchObject({ collapsedWorkspaces: ["b"], projectsLast: "project:repo-cf" });
-    expect(opts.merge?.({ collapsedWorkspaces: [1], projectsLast: 3 }, { ...current, collapsedWorkspaces: [], projectsLast: "" })).toMatchObject({ collapsedWorkspaces: [], projectsLast: "" });
-    useUiStore.setState({ collapsedWorkspaces: [] });
-  });
-
-  it("prunes collapsed workspaces that no longer exist", () => {
-    useUiStore.setState({ collapsedWorkspaces: ["w-1", "w-gone", "w-2"] });
-    const before = useUiStore.getState().collapsedWorkspaces;
-    useUiStore.getState().pruneCollapsedWorkspaces((id) => id !== "w-gone");
-    expect(useUiStore.getState().collapsedWorkspaces).toEqual(["w-1", "w-2"]);
-    // Nothing gone: the same array (no persisted write).
-    const kept = useUiStore.getState().collapsedWorkspaces;
-    useUiStore.getState().pruneCollapsedWorkspaces(() => true);
-    expect(useUiStore.getState().collapsedWorkspaces).toBe(kept);
-    expect(before).not.toBe(kept);
-    useUiStore.setState({ collapsedWorkspaces: [] });
+    expect(opts.partialize?.(current)).not.toHaveProperty("collapsedWorkspaces");
+    const merged = opts.merge?.({ collapsedWorkspaces: ["b"], projectsLast: "project:repo-cf" }, current);
+    expect(merged).toMatchObject({ projectsLast: "project:repo-cf" });
+    expect(merged).not.toHaveProperty("collapsedWorkspaces");
+    expect(opts.merge?.({ projectsLast: 3 }, { ...current, projectsLast: "" })).toMatchObject({ projectsLast: "" });
   });
 });
 
