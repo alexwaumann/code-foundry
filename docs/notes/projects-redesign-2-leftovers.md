@@ -77,3 +77,23 @@ diff, one-yes dirty removal with force, bulk remove, nothing kept, section order
 `sidebar.spec.ts` (the checkout menu's Remove worktree… through the new dialog). Unit:
 `lib/leftovers.test.ts`, `lib/projects.test.ts` (holds by checkout, made-by count),
 `stores/removeWorktree.test.ts` (presenter, second stage, fallback).
+
+## Follow-up: a worktree shows once
+
+A worktree without threads showed twice on the project page: a Checkouts row ("none")
+and a leftover row. The Checkouts table now lists main plus the worktrees a thread that is
+not archived is on (`lib/leftovers.ts checkoutRows`, the leftover rule's complement, used
+by `pageHooks.ts useCheckoutOrder`), so every worktree is in exactly one of the two blocks.
+The Checkouts caption ("main plus N worktrees · M threads working") still counts every
+worktree of the project. Row order is unchanged (working first, then main, then the rest).
+Keyboard navigation follows the table, so leftover rows are not on the ↑/↓ cursor (they
+were not before either: only their table twins were). A Resume that unarchives a thread
+moves the worktree from the leftovers into the table.
+
+Gotcha: `worktree.create` (palette, CLI) emits FocusProject for the new worktree, and the
+page used to put its cursor on that worktree's table row. A fresh worktree has no thread,
+so it is a leftover now: its leftover row takes the reveal instead (scrolled into view,
+the reveal cleared). `app.spec.ts` "required args are prompted inline" checks it. The
+`projects.spec.ts` "a terminal holds one" test starts its terminal through
+CommandService/Invoke, since the merged worktree's row is a clean leftover with no
+terminal action.

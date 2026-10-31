@@ -204,7 +204,7 @@ function CheckoutRow({ projectId, path, columns }: { projectId: string; path: st
 }
 
 /**
- * The project's checkouts as a table: Branch (with a "main" or workspace tag) | Threads |
+ * The project's checkouts a thread is on (and main; pageHooks.ts useCheckoutOrder) as a table: Branch (with a "main" or workspace tag) | Threads |
  * Changes | Sync | Pull request | hover actions. Click or Enter opens the checkout's Changes
  * tab in the page's side panel.
  */

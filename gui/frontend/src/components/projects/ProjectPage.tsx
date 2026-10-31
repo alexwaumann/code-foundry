@@ -121,8 +121,9 @@ function ThreadsBlock({ projectId, main }: { projectId: string; main: string }) 
 /**
  * A project's page: the header (crumb, picker, meta, Refresh, Terminal, New thread, more),
  * a note for a repository without a remote or a folder without git, the Checkouts table
- * (click or Enter opens a checkout's Changes tab in the page's side panel), Worktrees
- * without threads (LeftoverWorktrees), and Details. Below PROJECT_NARROW_BELOW of content
+ * (main and the worktrees a thread is on; click or Enter opens a checkout's Changes tab in
+ * the page's side panel), Worktrees without threads (LeftoverWorktrees, every other
+ * worktree), and Details. Below PROJECT_NARROW_BELOW of content
  * width the Sync column and the slug drop and Terminal and the leftover rows' Remove show
  * their icon only. docs/notes/projects-redesign-1-index.md.
  */
@@ -145,6 +146,8 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   const working = useThreadsStore((s) => projectActivity(s, projectId).working);
   const cleanable = useCleanableCount(projectId);
   const paths = useCheckoutOrder(projectId);
+  // The caption counts every worktree, the ones without threads (their own block) too.
+  const worktreeCount = useProjectsStore((s) => s.byId[projectId]?.worktrees.length ?? 0);
   const git = kind !== "nogit";
 
   // A project removed while its page shows: back to the index. Only once it was there: a
@@ -246,7 +249,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
                 )}
                 {git ? (
                   <div data-testid="project-checkouts">
-                    <SectionHeader label="Checkouts" detail={checkoutsSummary(paths.length, working)} testId="checkouts-title" />
+                    <SectionHeader label="Checkouts" detail={checkoutsSummary(worktreeCount, working)} testId="checkouts-title" />
                     <CheckoutsTable projectId={projectId} paths={paths} columns={{ sync: hasRemote && !narrow, pr: kind === "github", narrow }} />
                   </div>
                 ) : (

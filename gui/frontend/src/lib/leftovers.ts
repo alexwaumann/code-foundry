@@ -17,6 +17,15 @@ export function isLeftover(wt: Pick<WorktreeView, "path" | "isMain">, threads: C
   return !wt.isMain && !threadHolds(threads, wt.path);
 }
 
+/**
+ * The project page's Checkouts table: main plus the worktrees a thread that is not archived
+ * is on, the leftover rule's complement, so a worktree shows once, in the table or in
+ * "Worktrees without threads", never both and never neither.
+ */
+export function checkoutRows<T extends Pick<WorktreeView, "path" | "isMain">>(worktrees: readonly T[], threads: CleanupThreads): T[] {
+  return worktrees.filter((w) => !isLeftover(w, threads));
+}
+
 /** Staged, modified, untracked and conflicted entries: what removing the worktree loses. */
 export function uncommittedCount(st: Pick<GitStatusView, "staged" | "modified" | "untracked" | "conflicted">): number {
   return st.staged + st.modified + st.untracked + (st.conflicted ?? 0);
