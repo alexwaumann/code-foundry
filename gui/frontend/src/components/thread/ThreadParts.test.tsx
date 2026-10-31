@@ -93,6 +93,14 @@ describe("the thread header's crumb", () => {
     expect(screen.getByTestId("thread-title-name").className).toContain("italic");
   });
 
+  it("a name being regenerated is muted and italic, then plain once it lands", () => {
+    show({ naming: true });
+    expect(screen.getByTestId("thread-title-name").className).toContain("italic");
+    cleanup();
+    show({ naming: false });
+    expect(screen.getByTestId("thread-title-name").className).not.toContain("italic");
+  });
+
   it("the title is a menu button with its chevron; Enter opens the thread's menu", () => {
     show({});
     const title = screen.getByTestId("thread-title");

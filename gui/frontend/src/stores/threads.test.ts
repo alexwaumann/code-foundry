@@ -20,6 +20,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     name: id,
     autoNamed: true,
     nameProvisional: false,
+    naming: false,
     model: "opus",
     effort: "high",
     state: "connected",

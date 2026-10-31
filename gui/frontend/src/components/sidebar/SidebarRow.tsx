@@ -214,7 +214,8 @@ function nameClass(name: string, provisional: boolean, quiet = false): string {
 function ThreadLabel({ id }: { id: string }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
-  const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
+  // A provisional name, or one being regenerated: muted and italic until the model's title lands.
+  const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
   const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
@@ -505,7 +506,8 @@ function SnoozeLeft({ id }: { id: string }) {
  */
 function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
-  const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
+  // A provisional name, or one being regenerated: muted and italic until the model's title lands.
+  const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="thread-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
