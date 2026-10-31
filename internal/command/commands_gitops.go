@@ -265,7 +265,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		},
 		Command{
 			Name:        "worktree.reveal",
-			Title:       "Reveal Worktree in Finder",
+			Title:       "Open Worktree in Finder",
 			Description: "Show the worktree folder, or one file of it, in Finder.",
 			Category:    "Worktree",
 			Args:        []ArgSpec{cwdWT, fileArg},

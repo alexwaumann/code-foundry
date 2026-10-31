@@ -17,8 +17,8 @@ export interface PickerOption {
   tag?: string;
   /** The detail wraps instead of being cut to one line (a sentence, not a path). */
   wrap?: boolean;
-  /** An icon before the label (a branch's). */
-  icon?: LucideIcon;
+  /** An icon before the label (a branch's, a project's kind). */
+  icon?: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>;
   /** The label is a name in monospace (a branch). */
   mono?: boolean;
   /**

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Folder, Folders, House, Layers, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Folders, House, Layers, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
+import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { crumbParent, crumbPlace, type CrumbIcon, type CrumbParent } from "@/lib/threadCrumb";
@@ -13,7 +14,8 @@ import { dropdownMenuKit, focusPromptAfterMenu, keepFocusAfterMenu } from "./men
 import { ThreadMenuItems } from "./ThreadMenuItems";
 import { TranscriptDeletedChip } from "./TranscriptDeleted";
 
-const crumbIcons: Readonly<Record<CrumbIcon, LucideIcon>> = { folder: Folder, layers: Layers, folders: Folders, house: House };
+/** The place icons other than one project's (that one is the project's kind icon). */
+const crumbIcons: Readonly<Record<Exclude<CrumbIcon, "folder">, LucideIcon>> = { layers: Layers, folders: Folders, house: House };
 
 /** The fields of a thread the crumb's place reads (shallow-stable: primitives, its project ids joined). */
 function usePlaceInput(id: string) {
@@ -81,11 +83,11 @@ function ThreadCrumb({ id }: { id: string }) {
   const [icon, label] = place.split("\u0000") as [CrumbIcon, string];
   const parent = useThreadsStore(useShallow((s) => crumbParent(s.byId[id] ?? { createdBy: "", createdByName: "", parentId: "" }, s)));
   const crumb = { icon, label, parent };
-  const Icon = crumbIcons[crumb.icon];
+  const Icon = crumb.icon === "folder" ? null : crumbIcons[crumb.icon];
   return (
     <span className="flex min-w-0 shrink items-center gap-1 text-label text-cf-text-muted" data-testid="thread-crumb" data-icon={crumb.icon}>
       <span className="flex min-w-0 items-center gap-1.5 px-1">
-        <Icon className="size-3.5 shrink-0" aria-hidden />
+        {Icon ? <Icon className="size-3.5 shrink-0" aria-hidden /> : <ProjectIcon projectId={input.projectId} className="size-3.5 shrink-0" />}
         <span className="truncate" data-testid="thread-crumb-place">
           {crumb.label}
         </span>

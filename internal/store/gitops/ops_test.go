@@ -184,7 +184,7 @@ func TestRevealOpenURLEditor(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	wantOK(t, mustOp(t)(w.m.Reveal(ctx, OpenOptions{WorktreePath: w.a})), "revealed "+w.a+" in Finder")
+	wantOK(t, mustOp(t)(w.m.Reveal(ctx, OpenOptions{WorktreePath: w.a})), "opened "+w.a+" in Finder")
 	if c := fr.called("open"); len(c) != 1 || !slices.Equal(c[0].Args, []string{"-R", w.a}) {
 		t.Errorf("open -R calls = %+v", c)
 	}
@@ -209,7 +209,7 @@ func TestRevealOpenURLEditor(t *testing.T) {
 	w.m.opts.Root = filepath.Dir(w.a)
 	readme := filepath.Join(w.a, "README")
 	fr.reply = nil
-	wantOK(t, mustOp(t)(w.m.Reveal(ctx, OpenOptions{WorktreePath: w.a, File: "README"})), "revealed "+readme+" in Finder")
+	wantOK(t, mustOp(t)(w.m.Reveal(ctx, OpenOptions{WorktreePath: w.a, File: "README"})), "opened "+readme+" in Finder")
 	if c := fr.called("open"); len(c) == 0 || !slices.Equal(c[len(c)-1].Args, []string{"-R", readme}) {
 		t.Errorf("open -R file calls = %+v", c)
 	}

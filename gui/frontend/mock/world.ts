@@ -3883,7 +3883,7 @@ export class World {
       {
         cmd: {
           name: "workspace.reveal",
-          title: "Reveal Workspace in Finder",
+          title: "Open Workspace in Finder",
           category: "Workspace",
           description: "Show a workspace's folder in Finder: its root when it has one, else its own folder.",
           keybindings: [],
@@ -4416,7 +4416,7 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "composer.history" } } }))}`,
       },
       {
-        cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
+        cmd: { name: "settings.reveal", title: "Open Settings File in Finder", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
         when: always,
         run: () => "revealed settings.toml",
       },

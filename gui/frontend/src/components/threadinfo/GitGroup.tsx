@@ -7,7 +7,7 @@ import {
   CircleCheck,
   CircleX,
   Copy,
-  Diff,
+  FileDiff,
   Download,
   ExternalLink,
   GitBranch,
@@ -436,7 +436,7 @@ function ChangesRow({ threadId }: { threadId: string }) {
   };
   if (dirty.length === 0) {
     return (
-      <Row icon={<Diff />} onActivate={openTab} testId="ti-changes" data-clean="">
+      <Row icon={<FileDiff />} onActivate={openTab} testId="ti-changes" data-clean="">
         <span className="text-cf-text-muted">No changes</span>
       </Row>
     );
@@ -450,7 +450,7 @@ function ChangesRow({ threadId }: { threadId: string }) {
   return (
     <>
       <Row
-        icon={<Diff />}
+        icon={<FileDiff />}
         meta={meta}
         chevron={several ? (open ? "open" : "closed") : "none"}
         onActivate={

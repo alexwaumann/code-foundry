@@ -366,11 +366,11 @@ func (m *Manager) Reveal(ctx context.Context, o OpenOptions) (Op, error) {
 		return Op{}, err
 	}
 	p := cmp.Or(file, t.path)
-	return m.submit(ctx, KindReveal, "Reveal "+filepath.Base(p)+" in Finder", t, false, func(ctx context.Context, x *run) (string, string, error) {
+	return m.submit(ctx, KindReveal, "Open "+filepath.Base(p)+" in Finder", t, false, func(ctx context.Context, x *run) (string, string, error) {
 		if _, err := x.exec(ctx, Cmd{Name: m.opts.Open, Args: []string{"-R", p}}); err != nil {
 			return "", "", err
 		}
-		return "revealed " + p + " in Finder", "", nil
+		return "opened " + p + " in Finder", "", nil
 	})
 }
 

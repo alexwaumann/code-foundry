@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, Folder, FolderGit2, FolderOpen, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { ArrowUp, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, MapPin, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { PROJECT_KIND_ICONS, useProjectKind } from "@/components/icons/projectKind";
+import { projectKind, type ProjectKind } from "@/lib/projects";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { PdfTile } from "./attachmentFaces";
 import { attachLabel, useHostFiles } from "./useHostFiles";
@@ -209,6 +211,12 @@ function useProjectNames(ids: readonly string[]): (id: string) => string {
   return useCallback((id: string) => names[ids.indexOf(id)] ?? id, [ids, names]);
 }
 
+/** Each project's kind (projectKind), for the Run in picker's icons; "git" while unknown. */
+function useProjectKinds(ids: readonly string[]): (id: string) => ProjectKind {
+  const kinds = useProjectsStore(useShallow((s) => ids.map((id) => (s.byId[id] ? projectKind(s.byId[id]).kind : "git"))));
+  return useCallback((id: string) => kinds[ids.indexOf(id)] ?? "git", [ids, kinds]);
+}
+
 /** The chips of a set: one per project by id, by name only (the Work in and Run in pickers say the rest). */
 function setChips(projectIds: readonly string[], removable: boolean): MemberChipModel[] {
   return projectIds.map((projectId) => ({ projectId, removable }));
@@ -412,6 +420,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   const mainPath = worktrees.find((w) => w.isMain)?.path;
   // A project without git runs threads in its folder only: In place, no base.
   const noGitPath = useProjectsStore((s) => noGitCheckout(s.byId[single]));
+  const singleKind = useProjectKind(single);
   // The draft's git projects (the set's, in its order, or the lone project): their branches fill the pickers.
   const gitIds = useProjectsStore(useShallow((s) => (like || home ? [] : set.projectIds.filter((id) => s.byId[id]?.git === true))));
   // A set without a git project (plain folders, or a workspace without projects) runs in place: nothing to make a worktree of.
@@ -430,6 +439,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
         : resolveWorktree(choice ?? defaultWorktree({ setting: workInSetting, mainPath }), worktrees);
   const chosen = !isSet && worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
   const projectNames = useProjectNames(like ? likeSrc.sorted : set.projectIds);
+  const projectKinds = useProjectKinds(like ? likeSrc.sorted : set.projectIds);
   const newWorktrees = home || like || (worktree.kind !== "new" && worktree.kind !== "branch") ? 0 : isSet ? setGit : 1;
   const base = baseChoice ?? "";
   const canSend = !busy && !empty && (text.trim() !== "" || hasAttachments);
@@ -644,7 +654,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
       ? GitBranch
       : FolderGit2
     : noGitPath !== undefined
-      ? Folder
+      ? PROJECT_KIND_ICONS.nogit
       : worktree.kind === "branch"
         ? GitBranch
         : isSet
@@ -654,14 +664,15 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
           : !chosen
             ? GitBranchPlus
             : chosen.isMain
-              ? FolderGit2
+              ? PROJECT_KIND_ICONS[singleKind]
               : GitBranch;
 
   // The primary picker: the workspace's folder (WORKSPACE_FOLDER) first when there is one, then the projects by name.
   const primaryGroups = useMemo<PickerGroup[]>(() => {
     const s = like ? { projectIds: likeSrc.sorted, workspaceId: likeSrc.workspaceId } : set;
-    return [{ heading: "Run in", options: primaryOptions(s, like ? likeSrc.workspaceName : workspaceName, projectNames) }];
-  }, [like, likeSrc.sorted, likeSrc.workspaceId, likeSrc.workspaceName, set, workspaceName, projectNames]);
+    const options = primaryOptions(s, like ? likeSrc.workspaceName : workspaceName, projectNames).map((o) => ({ ...o, icon: o.value === WORKSPACE_PRIMARY ? Layers : PROJECT_KIND_ICONS[projectKinds(o.value)] }));
+    return [{ heading: "Run in", options }];
+  }, [like, likeSrc.sorted, likeSrc.workspaceId, likeSrc.workspaceName, set, workspaceName, projectNames, projectKinds]);
   const showPrimary = (isSet && (set.projectIds.length > 1 || set.workspaceId !== "")) || (like && (likeSrc.sorted.length > 1 || likeSrc.workspaceId !== ""));
   const primaryText = primary === WORKSPACE_PRIMARY ? WORKSPACE_FOLDER : projectNames(primary);
 
@@ -929,7 +940,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
               {showPrimary && (
                 <ComposerPicker
                   label="Run in"
-                  icon={primary === WORKSPACE_PRIMARY ? Layers : FolderOpen}
+                  icon={primary === WORKSPACE_PRIMARY ? Layers : MapPin}
                   text={primaryText}
                   value={primary}
                   groups={primaryGroups}

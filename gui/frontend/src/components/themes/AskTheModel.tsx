@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CornerDownLeft, LoaderCircle, Sparkles } from "lucide-react";
+import { CornerDownLeft, LoaderCircle, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -37,7 +37,7 @@ export function AskTheModel() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="ml-auto text-cf-text-muted" data-testid="themes-ask">
-          <Sparkles aria-hidden />
+          <WandSparkles aria-hidden />
           Ask the model
         </Button>
       </PopoverTrigger>

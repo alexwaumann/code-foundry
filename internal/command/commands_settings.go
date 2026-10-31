@@ -226,7 +226,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		},
 		Command{
 			Name:        "settings.reveal",
-			Title:       "Reveal Settings File",
+			Title:       "Open Settings File in Finder",
 			Description: "Show the settings file in Finder.",
 			Category:    "Settings",
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {

@@ -115,9 +115,9 @@ const specs: Spec[] = [
     fail: () => ({ summary: 'no editor found: set the editor command (for example "code" or "open -a Zed")', output: "no editor found\n" }),
   },
   {
-    name: "worktree.reveal", title: "Reveal Worktree in Finder", category: "Worktree", description: "Show the worktree folder in Finder", keybindings: [], kind: GitOpKind.REVEAL,
-    label: (w) => `Reveal ${base(w?.path ?? "")} in Finder`,
-    ok: (w) => ({ summary: `revealed ${w?.path ?? ""} in Finder`, output: `$ open -R ${w?.path ?? ""}\n` }),
+    name: "worktree.reveal", title: "Open Worktree in Finder", category: "Worktree", description: "Show the worktree folder in Finder", keybindings: [], kind: GitOpKind.REVEAL,
+    label: (w) => `Open ${base(w?.path ?? "")} in Finder`,
+    ok: (w) => ({ summary: `opened ${w?.path ?? ""} in Finder`, output: `$ open -R ${w?.path ?? ""}\n` }),
     fail: () => ({ summary: "open: exit 1", output: "$ open -R\n(exit 1)\n" }),
   },
   {

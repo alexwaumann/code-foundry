@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { Diff } from "lucide-react";
+import { FileDiff } from "lucide-react";
 import { ChangesView } from "@/components/changes/ChangesView";
 import { CHANGES_KIND, CHANGES_TITLE, changesOfTab } from "./changesTarget";
 import type { SurfaceSpec } from "./types";
@@ -14,7 +14,7 @@ import type { SurfaceSpec } from "./types";
 export const changesSurface: SurfaceSpec = {
   kind: CHANGES_KIND,
   title: CHANGES_TITLE,
-  icon: Diff,
+  icon: FileDiff,
   available: () => "hidden",
   render: (tab) => {
     const t = changesOfTab(tab);

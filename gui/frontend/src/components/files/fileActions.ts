@@ -1,4 +1,4 @@
-/** The File and Diff tabs' Open in editor and Reveal in Finder: the worktree commands with a file. */
+/** The File and Diff tabs' Open in editor and Open in Finder: the worktree commands with a file. */
 import { runCommand } from "@/stores/commands";
 import { worktreeContext } from "@/stores/context";
 

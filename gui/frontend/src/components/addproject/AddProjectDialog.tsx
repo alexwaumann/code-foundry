@@ -1,4 +1,4 @@
-import { CloudDownload, FolderOpen, Sparkles, X } from "lucide-react";
+import { CloudDownload, FolderOpen, FolderPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,8 +7,8 @@ import { GitHubTab } from "./GitHubTab";
 import { LocalFolderTab } from "./LocalFolderTab";
 import { NewTab } from "./NewTab";
 
-const tabs: { id: AddProjectTab; label: string; icon: typeof Sparkles }[] = [
-  { id: "new", label: "New", icon: Sparkles },
+const tabs: { id: AddProjectTab; label: string; icon: typeof FolderPlus }[] = [
+  { id: "new", label: "New", icon: FolderPlus },
   { id: "local", label: "Local folder", icon: FolderOpen },
   { id: "github", label: "GitHub", icon: CloudDownload },
 ];

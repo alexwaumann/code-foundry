@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
-import { Check, Copy, FolderSearch, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
+import { Check, Copy, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
+import { FinderMark } from "@/components/icons/FinderMark";
 import { Segmented } from "@/components/usage/Segmented";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
@@ -40,7 +41,7 @@ export function FileHeader({ icon: Icon, name, dir, fullPath, actions, children 
 }
 
 /** One icon button of the header's actions; the label is its tooltip and accessible name. */
-export function HeaderAction({ icon: Icon, label, onClick, testId, pressed }: { icon: LucideIcon; label: string; onClick: () => void; testId?: string; pressed?: boolean }) {
+export function HeaderAction({ icon: Icon, label, onClick, testId, pressed }: { icon: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>; label: string; onClick: () => void; testId?: string; pressed?: boolean }) {
   return (
     <Tip label={label}>
       <Button
@@ -73,7 +74,7 @@ export function CopyPathAction({ path }: { path: string }) {
   );
 }
 
-/** Copy path, Open in editor, Reveal in Finder and Refresh: row one's actions. */
+/** Copy path, Open in editor, Open in Finder and Refresh: row one's actions. */
 export function FileActions({ place, line, onRefresh, extra }: { place: FilePlace; line?: number; onRefresh: () => void; extra?: ReactNode }) {
   return (
     <>
@@ -88,8 +89,8 @@ export function FileActions({ place, line, onRefresh, extra }: { place: FilePlac
         }}
       />
       <HeaderAction
-        icon={FolderSearch}
-        label="Reveal in Finder"
+        icon={FinderMark}
+        label="Open in Finder"
         testId="file-reveal"
         onClick={() => {
           revealInFinder(place);
