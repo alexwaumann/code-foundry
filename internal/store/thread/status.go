@@ -36,8 +36,10 @@ func (s Status) String() string {
 }
 
 // setStatus sets the status and reason, stamping StatusChangedAt with now when either
-// changes. It reports whether anything changed.
+// changes, and drops BusyTool once they no longer allow one (busyToolFor). It reports
+// whether the status or reason changed.
 func (s *Thread) setStatus(st Status, reason string, now time.Time) bool {
+	s.BusyTool = busyToolFor(st, reason, s.BusyTool)
 	if s.Status == st && s.StatusReason == reason {
 		return false
 	}

@@ -82,6 +82,8 @@ type projector struct {
 	// running until the run ends (agentEnded, agents_runner.go). The thread's own
 	// background Bash and Monitor calls too, until their shell ends (bgshells.go).
 	async map[string]bool
+	// busy are the top-level tool calls in flight (busytool.go): Thread.BusyTool.
+	busy busyCalls
 }
 
 type openBlock struct {
@@ -112,6 +114,7 @@ func newProjector(w itemWriter, base runningTotals) *projector {
 func (p *projector) restart(base runningTotals) {
 	p.costs.start(base)
 	p.model, p.partial = "", nil
+	p.busy.clear()
 }
 
 func (p *projector) nextID(prefix string) string {
@@ -146,6 +149,7 @@ func (p *projector) event(ev claudestream.Event) {
 		}})
 	case *claudestream.Result:
 		p.closeOpen()
+		p.busy.clear()
 		t := turnEnd(e)
 		var turnOut int64
 		if e.Usage != nil {
@@ -184,6 +188,7 @@ func (p *projector) stream(e *claudestream.StreamEvent) {
 			it = Item{ID: fmt.Sprintf("%s/%d", msg, se.Index), Kind: KindThinking, Text: cb.Thinking}
 		case "tool_use":
 			it = Item{ID: cb.ID, Kind: KindToolCall, Tool: &ToolCall{ToolUseID: cb.ID, Name: cb.Name, Status: ToolRunning}}
+			p.busy.start(cb.ID, cb.Name, "") // top-level only (event); the input follows
 		default:
 			return
 		}
@@ -278,7 +283,7 @@ func (p *projector) drop(msg string, i int) {
 
 // finish completes a streaming item, with b's final content when given.
 func (p *projector) finish(id string, b *claudestream.Block) {
-	p.w.change(id, func(it *Item) {
+	it, ok := p.w.change(id, func(it *Item) {
 		it.Streaming = false
 		if b == nil {
 			return
@@ -296,6 +301,9 @@ func (p *projector) finish(id string, b *claudestream.Block) {
 			}
 		}
 	})
+	if ok && it.Tool != nil {
+		p.busy.input(id, it.Tool.InputJSON) // final: the frame's, or the streamed JSON
+	}
 }
 
 // closeOpen completes every block still streaming (a turn ended without their stop).
@@ -359,6 +367,9 @@ func (p *projector) assistant(e *claudestream.Assistant) {
 		case KindToolCall:
 			it.ID = b.ID
 			it.Tool = &ToolCall{ToolUseID: b.ID, Name: b.Name, InputJSON: string(b.Input), Status: ToolRunning}
+			if e.ParentToolUseID == "" {
+				p.busy.start(b.ID, b.Name, string(b.Input))
+			}
 		}
 		if kind == KindAssistantText && it.Text == "" {
 			continue
@@ -377,6 +388,7 @@ func (p *projector) user(e *claudestream.User) {
 			continue
 		}
 		results = true
+		p.busy.done(b.ToolUseID)
 		res := ""
 		if len(e.ToolUseResult) > 0 && len(e.ToolUseResult) <= maxResultJSON && len(blocks) == 1 {
 			res = string(e.ToolUseResult)

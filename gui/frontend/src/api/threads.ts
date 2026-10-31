@@ -176,6 +176,13 @@ export interface ThreadView {
    */
   backgroundShellsRunning: number;
   /**
+   * The top-level tool Claude is running now, its name and a short argument ("Bash make
+   * check", "Read src/lib/tree.ts"), the latest started when several run. "" when none
+   * runs, while compacting, and whenever status is not "busy"; a subagent's own calls do
+   * not count (docs/notes/sidebar-inbox-1-busy-tool.md).
+   */
+  busyTool: string;
+  /**
    * Those shells, oldest first, with the TCP ports each one's process group listens on
    * (the daemon probes them; docs/notes/thread-servers.md). [] once the process ended.
    */
@@ -443,6 +450,7 @@ export function toThreadView(s: Thread): ThreadView {
     agentsRunning: s.agentsRunning,
     backgroundAgentsRunning: s.backgroundAgentsRunning,
     backgroundShellsRunning: s.backgroundShellsRunning,
+    busyTool: s.busyTool,
     backgroundShells: s.backgroundShells.map((b) => ({
       taskId: b.taskId,
       description: b.description,

@@ -67,6 +67,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     agentsRunning: 0,
     backgroundAgentsRunning: 0,
     backgroundShellsRunning: 0,
+    busyTool: "",
     backgroundShells: [],
     backgroundWakePending: false,
     retry: null,

@@ -865,8 +865,16 @@ type Thread struct {
 	// process group listens on. Empty once the process ended and after a daemon restart.
 	// Not persisted. See docs/notes/thread-servers.md.
 	BackgroundShells []*BackgroundShell `protobuf:"bytes,72,rep,name=background_shells,json=backgroundShells,proto3" json:"background_shells,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The top-level tool Claude is running right now, its name and a short argument
+	// summary, the target the live tool strip shows for a step: "Bash make check", "Read
+	// src/lib/tree.ts", "Edit internal/api/gh.go" (paths relative to the thread's
+	// directory when inside it). With several in flight, the latest started. Empty when
+	// no tool runs, while compacting, and whenever status is not BUSY; a subagent's own
+	// calls (parent_tool_use_id set) do not count, its Agent call does. Not persisted: a
+	// disconnected thread has none. See docs/notes/sidebar-inbox-1-busy-tool.md.
+	BusyTool      string `protobuf:"bytes,73,opt,name=busy_tool,json=busyTool,proto3" json:"busy_tool,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Thread) Reset() {
@@ -1387,6 +1395,13 @@ func (x *Thread) GetBackgroundShells() []*BackgroundShell {
 		return x.BackgroundShells
 	}
 	return nil
+}
+
+func (x *Thread) GetBusyTool() string {
+	if x != nil {
+		return x.BusyTool
+	}
+	return ""
 }
 
 // BackgroundShell is one of a thread's own background shells while it runs: a Bash call
@@ -6103,7 +6118,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1ccodefoundry/v1/project.proto\"\xff\x17\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1ccodefoundry/v1/project.proto\"\x9c\x18\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -6186,7 +6201,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\fseed_pending\x18C \x01(\bR\vseedPending\x12-\n" +
 	"\x12transcript_missing\x18E \x01(\bR\x11transcriptMissing\x12I\n" +
 	"\x0echeckout_paths\x18F \x03(\v2\".codefoundry.v1.ThreadCheckoutPathR\rcheckoutPaths\x12L\n" +
-	"\x11background_shells\x18H \x03(\v2\x1f.codefoundry.v1.BackgroundShellR\x10backgroundShellsB\b\n" +
+	"\x11background_shells\x18H \x03(\v2\x1f.codefoundry.v1.BackgroundShellR\x10backgroundShells\x12\x1b\n" +
+	"\tbusy_tool\x18I \x01(\tR\bbusyToolB\b\n" +
 	"\x06_depthB\r\n" +
 	"\v_in_sidebarJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xb7\x01\n" +

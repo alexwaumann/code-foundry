@@ -58,7 +58,7 @@ func (d *streamStatus) Status() (Status, string) {
 	case d.budget:
 		return StatusNeedsAttention, ReasonBudgetReached
 	case d.compacting:
-		return StatusBusy, "compacting"
+		return StatusBusy, ReasonCompacting
 	case d.busy:
 		return StatusBusy, "working"
 	case d.wakeLimit:

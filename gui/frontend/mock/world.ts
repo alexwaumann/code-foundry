@@ -113,6 +113,12 @@ interface MockThread {
   statusReason: string;
   /** When status or statusReason last changed. */
   statusChangedAt: Date;
+  /**
+   * Thread.busy_tool: the top-level tool Claude is running now ("Bash make check"); ""
+   * unless busy and not compacting (setStatus drops it), and never sent for a stopped
+   * thread. POST /__mock/thread/status?…&busyTool=… sets it.
+   */
+  busyTool: string;
   createdAt: Date;
   lastActivityAt: Date;
   exitCode: number;
@@ -318,6 +324,14 @@ export function snoozeUntil(args: Record<string, string>, now = Date.now()): Dat
  * connected and busy, or waiting on a permission request or question; "" otherwise.
  * Restarts count the threads this is set for (command.ActiveThread).
  */
+/** s-1's running tool while it is busy (Thread.busy_tool). */
+const S1_BUSY_TOOL = "Bash go test ./internal/...";
+
+/** Thread.busy_tool's rule (internal/store/thread/busytool.go busyToolFor): only while busy and not compacting. */
+function busyToolFor(status: ThreadStatus, reason: string, tool: string): string {
+  return status === ThreadStatus.BUSY && reason !== "compacting" ? tool : "";
+}
+
 function midTurn(s: { state: ThreadState; status: ThreadStatus; statusReason: string }): string {
   if (s.state === ThreadState.STARTING) return "Claude is still working";
   if (s.state !== ThreadState.CONNECTED) return "";
@@ -963,7 +977,7 @@ export class World {
     // Threads in every state, each with a short history (SEEDS).
     this.threads.clear();
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
-    this.addThread({ id: "s-1", projectId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
+    this.addThread({ id: "s-1", projectId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working: Refactor sidebar tree", busyTool: S1_BUSY_TOOL, createdAt: ago(42), usage: sampleUsage() });
     this.addThread({ id: "s-2", projectId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "claude-sonnet-5[1m]", effort: "", status: ThreadStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
     this.addThread({ id: "s-3", projectId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "idle", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
     this.addThread({ id: "s-4", projectId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
@@ -1353,7 +1367,7 @@ export class World {
       { id: "s-k-plan", name: "Plan the settings page", status: A, statusReason: "plan: Claude has written up a plan and is ready to execute. Would you like to proceed?", min: 1 },
       { id: "s-k-finished", name: "Summarize the changelog", status: A, statusReason: "finished", min: 12 },
       { id: "s-k-error", name: "Try the new model", status: A, statusReason: "error: model_not_found", min: 20 },
-      { id: "s-k-busy", name: "Index the docs", status: ThreadStatus.BUSY, statusReason: "running Bash", min: 0.5 },
+      { id: "s-k-busy", name: "Index the docs", status: ThreadStatus.BUSY, statusReason: "running Bash", busyTool: "Bash make check", min: 0.5 },
       { id: "s-k-idle", name: "Review lint rules", status: ThreadStatus.IDLE, statusReason: "at prompt", min: 50 },
       { id: "s-k-interrupted", name: "Migrate the config loader", status: ThreadStatus.ERROR, statusReason: "interrupted", min: 35, state: D, disconnectReason: "daemon stopped" },
       { id: "s-k-asked-before-restart", name: "Choose sidebar density", status: A, statusReason: "question: Which density should the sidebar use?", min: 90, state: D, disconnectReason: "daemon restarted" },
@@ -1910,6 +1924,7 @@ export class World {
       status,
       statusReason: o.statusReason ?? defaultReason(status),
       statusChangedAt: o.statusChangedAt ?? o.lastActivityAt ?? new Date(),
+      busyTool: o.busyTool ?? "",
       createdAt: new Date(),
       lastActivityAt: new Date(),
       exitCode: 0,
@@ -2037,6 +2052,8 @@ export class World {
       state: s.state,
       status: s.status,
       statusReason: s.statusReason,
+      // The daemon's process tracks it: a stopped thread has none.
+      busyTool: s.state === ThreadState.CONNECTED ? s.busyTool : "",
       statusChangedAt: timestampFromDate(s.statusChangedAt),
       createdAt: timestampFromDate(s.createdAt),
       lastActivityAt: timestampFromDate(s.lastActivityAt),
@@ -2257,17 +2274,20 @@ export class World {
     this.publishThread(s);
   }
 
-  setThreadStatus(id: string, status: ThreadStatus, reason?: string): void {
+  /** busyTool: the running tool to show (Thread.busy_tool); kept only while busy and not compacting. Omitted: unchanged (dropped when the status no longer allows one). */
+  setThreadStatus(id: string, status: ThreadStatus, reason?: string, busyTool?: string): void {
     const s = this.thread(id);
     if (s.state === ThreadState.DISCONNECTED) throw new CommandError("unavailable", "thread is disconnected");
     if (status === ThreadStatus.ERROR) throw new CommandError("invalid", "error is set only by a disconnect while busy");
     this.setStatus(s, status, reason);
+    if (busyTool !== undefined) s.busyTool = busyToolFor(s.status, s.statusReason, busyTool);
     s.lastActivityAt = new Date();
     this.publishThread(s);
   }
 
   /** Sets status and reason, stamping statusChangedAt when either changes (Thread.setStatus). */
   private setStatus(s: MockThread, status: ThreadStatus, reason: string = defaultReason(status)): void {
+    s.busyTool = busyToolFor(status, reason, s.busyTool);
     if (s.status === status && s.statusReason === reason) return;
     s.status = status;
     s.statusReason = reason;
@@ -2564,6 +2584,7 @@ export class World {
       // s-1 alternates busy/idle every 4s; attention sticks until input arrives.
       if (s.id === "s-1" && s.state === ThreadState.CONNECTED && s.status !== ThreadStatus.NEEDS_ATTENTION && this.seconds % 4 === 0) {
         this.setStatus(s, s.status === ThreadStatus.BUSY ? ThreadStatus.IDLE : ThreadStatus.BUSY);
+        if (s.status === ThreadStatus.BUSY) s.busyTool = S1_BUSY_TOOL; // back at the same call
         s.lastActivityAt = new Date();
         this.publishThread(s);
       }
