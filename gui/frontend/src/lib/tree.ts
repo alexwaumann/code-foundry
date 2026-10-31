@@ -1,13 +1,14 @@
 /**
- * Sidebar list: a flat list of threads, pinned ones first, then the ones waiting
- * on the user, then finished turns, then idle ones (the main list); then the working ones
+ * Sidebar list: a flat list of threads, pinned ones first (in creation order, newest
+ * first), then the ones waiting on the user, then finished turns (both most recent status
+ * change first), then idle ones (most recent activity first) (the main list); then the working ones
  * under a collapsible Working header, the snoozed ones under a collapsible Snoozed header
  * and the archived ones under a collapsible Archived header (the three footers,
  * buildSections), as rows for virtual lists. No project, worktree or terminal
  * rows: worktrees live on the Projects page, and shells in their owner's bottom panel
  * (stores/bottomPanel.ts). Pure functions over the minimal inputs that affect structure, so
- * the sidebar only rebuilds when membership, order, pin or group changes (not on name or
- * status-text updates). The placement helper (which worktree a thread sits in) is here too;
+ * the sidebar only rebuilds when membership, order, pin, group or a band's sort time changes
+ * (not on name or status-text updates). The placement helper (which worktree a thread sits in) is here too;
  * the command context uses it.
  */
 import type { ThreadGroup } from "./thread";
@@ -37,6 +38,40 @@ export interface ListThread {
    * setting or its override): in no panel, no count, no keyboard order. Absent: shown.
    */
   hidden?: boolean;
+  /**
+   * When its status last changed (epoch ms): the attention and done bands sort by it, most
+   * recent first. Null or absent: unknown (it sorts after the known ones, newest created first).
+   */
+  statusChangedAtMs?: number | null;
+  /** When it last did something (epoch ms): the idle band sorts by it, most recent first. Null or absent as for statusChangedAtMs. */
+  lastActivityAtMs?: number | null;
+}
+
+/**
+ * The sort times that matter for where a thread sits (buildSections): statusChangedAtMs
+ * for an unpinned live thread in the attention or done band, lastActivityAtMs for one in
+ * the idle band, both null otherwise (pinned, working, snoozed and archived threads sort by
+ * other things). The sidebar's list keys (stores/context.ts) carry only these, so a working
+ * thread's activity ticks do not rebuild the list.
+ */
+export function bandSortTimes(
+  t: Pick<ListThread, "pinned" | "group" | "archivedAtMs" | "snoozedUntilMs" | "statusChangedAtMs" | "lastActivityAtMs">,
+): { statusChangedAtMs: number | null; lastActivityAtMs: number | null } {
+  const live = !t.pinned && t.archivedAtMs === null && t.snoozedUntilMs === null;
+  const byStatus = live && (t.group === "prompt" || t.group === "error" || t.group === "done");
+  return {
+    statusChangedAtMs: byStatus ? (t.statusChangedAtMs ?? null) : null,
+    lastActivityAtMs: live && t.group === "idle" ? (t.lastActivityAtMs ?? null) : null,
+  };
+}
+
+/**
+ * `list` (newest created first) sorted by `at`, most recent first; threads without a time
+ * after those with one, in their order. Stable, so equal times keep newest created first.
+ */
+function byRecent(list: readonly ListThread[], at: (t: ListThread) => number | null | undefined): ListThread[] {
+  const known = list.filter((t) => at(t) != null).sort((a, b) => (at(b) ?? 0) - (at(a) ?? 0));
+  return [...known, ...list.filter((t) => at(t) == null)];
 }
 
 /**
@@ -139,12 +174,14 @@ export interface Sections {
 }
 
 /**
- * The sidebar rows by panel. Threads newest first (`threads` comes in creation order, the
- * threads store's order) within each group, so a thread moves only when it changes group.
- * Main: pinned ones (whatever their status); then unpinned ones waiting on the user
- * (prompts, then error and interrupted threads); finished turns; idle ones (idle, unknown;
- * lib/thread threadGroup); all without headers. Working: the working ones (busy or starting)
- * under a Working header that counts them. Snoozed: every snoozed thread (pinned or not,
+ * The sidebar rows by panel (`threads` comes in creation order, the threads store's order).
+ * Main, without headers: pinned ones (whatever their status), newest created first; then
+ * unpinned ones waiting on the user (prompts, then error and interrupted threads, each most
+ * recent statusChangedAtMs first); finished turns (most recent statusChangedAtMs first);
+ * idle ones (idle, unknown; lib/thread threadGroup; most recent lastActivityAtMs first). In
+ * a band, threads without the time sort after those with one, newest created first, as do
+ * equal times. Working: the working ones (busy or starting)
+ * under a Working header that counts them, newest created first. Snoozed: every snoozed thread (pinned or not,
  * whatever its group; it appears nowhere else) under a Snoozed header, soonest wake first.
  * Archived: every archived thread (pinned or not, whatever its group; it appears nowhere
  * else; a thread is never both, but archived wins) under an Archived header, most recently
@@ -155,6 +192,7 @@ export function buildSections(threads: readonly ListThread[], opts: ListOptions 
   const newest = threads.filter((s) => s.hidden !== true).reverse();
   const live = newest.filter((s) => s.archivedAtMs === null && s.snoozedUntilMs === null);
   const unpinned = (...groups: ThreadGroup[]) => groups.flatMap((g) => live.filter((s) => !s.pinned && s.group === g));
+  const byStatus = (...groups: ThreadGroup[]) => groups.flatMap((g) => byRecent(unpinned(g), (s) => s.statusChangedAtMs));
   const rowsOf = (section: Section, list: readonly ListThread[]): Row[] => list.map((s) => ({ key: threadKey(s.id), kind: "thread", section, threadId: s.id }));
   const footer = (section: FooterSection, label: string, list: readonly ListThread[], collapsed: boolean): Row[] =>
     list.length === 0 ? [] : [{ key: headerKey(section), kind: "header", section, label, count: list.length, collapsed }, ...(collapsed ? [] : rowsOf(section, list))];
@@ -165,9 +203,9 @@ export function buildSections(threads: readonly ListThread[], opts: ListOptions 
   return {
     main: [
       ...rowsOf("pinned", live.filter((s) => s.pinned)),
-      ...rowsOf("attention", unpinned("prompt", "error")),
-      ...rowsOf("done", unpinned("done")),
-      ...rowsOf("idle", unpinned("idle")),
+      ...rowsOf("attention", byStatus("prompt", "error")),
+      ...rowsOf("done", byStatus("done")),
+      ...rowsOf("idle", byRecent(unpinned("idle"), (s) => s.lastActivityAtMs)),
     ],
     working: footer("working", "Working", unpinned("working"), opts.workingCollapsed === true),
     snoozed: footer("snoozed", "Snoozed", snoozed, opts.snoozedCollapsed === true),

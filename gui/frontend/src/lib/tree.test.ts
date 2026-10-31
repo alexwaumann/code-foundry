@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { threadGroup } from "./thread";
-import { buildRows, buildSections, rowCache, nextAfter, placeThread, threadKey, threadOrder, type ListThread, type Row } from "./tree";
+import { bandSortTimes, buildRows, buildSections, rowCache, nextAfter, placeThread, threadKey, threadOrder, type ListThread, type Row } from "./tree";
 
 const W = [
   { projectId: "r1", path: "/src/app" },
@@ -88,6 +88,72 @@ describe("buildRows (the flat thread list)", () => {
     const threads = [thread("s1"), thread("s2", { group: "done" }), thread("s3", { group: "working" }), thread("s4", { group: "prompt" }), thread("s5", { group: "error" })];
     expect(threadOrder(threads)).toEqual(["s4", "s5", "s2", "s1", "s3"]);
     expect(threadOrder(threads, { workingCollapsed: true })).toEqual(["s4", "s5", "s2", "s1"]);
+  });
+});
+
+describe("buildSections: the tie-break inside the bands", () => {
+  const main = (threads: readonly ListThread[]) => shape(buildSections(threads).main);
+
+  it("sorts prompts, then errors, each most recent status change first", () => {
+    const rows = main([
+      thread("p1", { group: "prompt", statusChangedAtMs: 30 }),
+      thread("p2", { group: "prompt", statusChangedAtMs: 10 }),
+      thread("e1", { group: "error", statusChangedAtMs: 5 }),
+      thread("e2", { group: "error", statusChangedAtMs: 50 }),
+      thread("p3", { group: "prompt", statusChangedAtMs: 20 }),
+    ]);
+    // An error never rises above a prompt, however recent.
+    expect(rows).toEqual(s("p1", "p3", "p2", "e2", "e1"));
+  });
+
+  it("sorts finished turns by status change and idle threads by last activity, most recent first", () => {
+    const rows = main([
+      thread("d1", { group: "done", statusChangedAtMs: 100, lastActivityAtMs: 1 }),
+      thread("d2", { group: "done", statusChangedAtMs: 50, lastActivityAtMs: 9 }),
+      thread("i1", { group: "idle", statusChangedAtMs: 1, lastActivityAtMs: 300 }),
+      thread("i2", { group: "idle", statusChangedAtMs: 9, lastActivityAtMs: 200 }),
+      thread("i3", { group: "idle", statusChangedAtMs: 5, lastActivityAtMs: 400 }),
+    ]);
+    expect(rows).toEqual(s("d1", "d2", "i3", "i1", "i2"));
+  });
+
+  it("keeps pinned threads newest created first, whatever their times", () => {
+    const rows = main([thread("a", { pinned: true, group: "done", statusChangedAtMs: 900 }), thread("b", { pinned: true, group: "idle", lastActivityAtMs: 1 }), thread("c", { pinned: true, group: "prompt", statusChangedAtMs: 5 })]);
+    expect(rows).toEqual(s("c", "b", "a"));
+  });
+
+  it("puts threads without the time after those with one, newest created first, as for equal times", () => {
+    const rows = main([
+      thread("i1", { group: "idle", lastActivityAtMs: null }),
+      thread("i2", { group: "idle", lastActivityAtMs: 10 }),
+      thread("i3", { group: "idle" }),
+      thread("i4", { group: "idle", lastActivityAtMs: 10 }),
+      thread("i5", { group: "idle", lastActivityAtMs: 5 }),
+      thread("d1", { group: "done" }),
+      thread("d2", { group: "done" }),
+    ]);
+    expect(rows).toEqual(s("d2", "d1", "i4", "i2", "i5", "i3", "i1"));
+  });
+
+  it("leaves Working newest created first", () => {
+    const sec = buildSections([thread("w1", { group: "working", statusChangedAtMs: 99 }), thread("w2", { group: "working", statusChangedAtMs: 1 })]);
+    expect(shape(sec.working)).toEqual(["# Working 2", ...s("w2", "w1")]);
+  });
+});
+
+describe("bandSortTimes (what the sidebar's list keys carry)", () => {
+  it.each<[string, Partial<ListThread>, { statusChangedAtMs: number | null; lastActivityAtMs: number | null }]>([
+    ["prompt", { group: "prompt" }, { statusChangedAtMs: 1, lastActivityAtMs: null }],
+    ["error", { group: "error" }, { statusChangedAtMs: 1, lastActivityAtMs: null }],
+    ["done", { group: "done" }, { statusChangedAtMs: 1, lastActivityAtMs: null }],
+    ["idle", { group: "idle" }, { statusChangedAtMs: null, lastActivityAtMs: 2 }],
+    ["working", { group: "working" }, { statusChangedAtMs: null, lastActivityAtMs: null }],
+    ["pinned", { group: "done", pinned: true }, { statusChangedAtMs: null, lastActivityAtMs: null }],
+    ["archived", { group: "idle", archivedAtMs: 5 }, { statusChangedAtMs: null, lastActivityAtMs: null }],
+    ["snoozed", { group: "prompt", snoozedUntilMs: 5 }, { statusChangedAtMs: null, lastActivityAtMs: null }],
+    ["unknown times", { group: "idle", statusChangedAtMs: undefined, lastActivityAtMs: undefined }, { statusChangedAtMs: null, lastActivityAtMs: null }],
+  ])("%s", (_name, over, want) => {
+    expect(bandSortTimes(thread("x", { statusChangedAtMs: 1, lastActivityAtMs: 2, ...over }))).toEqual(want);
   });
 });
 

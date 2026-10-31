@@ -3,7 +3,7 @@
  * doing or waiting on, in words and a colour, and whether "project @ branch" follows.
  * Pure, over the thread view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
-import type { ThreadView } from "@/api/threads";
+import type { ThreadFlagView, ThreadView } from "@/api/threads";
 import { formatAgo, threadBadge, statusKind, statusNote, topFlag } from "./thread";
 import { isWaiting } from "./waiting";
 
@@ -50,6 +50,11 @@ export interface StatusLine {
   detail: string;
   /** When the status began (epoch ms), for "finished", "interrupted", "crashed" and "snoozeEnded"; null otherwise or when unknown. */
   at: number | null;
+  /**
+   * The plugin flag behind a "flagAttention" or "flagError" line, its name and reason apart
+   * (detail joins them as "<pluginName>: <reason>"); absent for every other kind.
+   */
+  flag?: Pick<ThreadFlagView, "pluginName" | "reason">;
 }
 
 export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
@@ -88,7 +93,13 @@ export function statusLine(
     const line = streamLine(s);
     if (line.kind !== "finished" || !flag) return line;
   }
-  if (flag) return { kind: flag.level === "error" ? "flagError" : "flagAttention", detail: `${flag.pluginName}: ${flag.reason}`, at: null };
+  if (flag)
+    return {
+      kind: flag.level === "error" ? "flagError" : "flagAttention",
+      detail: `${flag.pluginName}: ${flag.reason}`,
+      at: null,
+      flag: { pluginName: flag.pluginName, reason: flag.reason },
+    };
   if (isWaiting(s)) return { kind: "waiting", detail: "", at: null };
   return badge === "busy" ? { kind: "working", detail: "", at: null } : PLACE;
 }
