@@ -35,7 +35,8 @@ The card steps aside while the conversation would be under 480px beside it
 (`cardFits`: the body measured with a ResizeObserver, `lib/useWidth`, the way the panel
 split measures): at the 900px window minimum, or with the side panel open on a 1280px
 window. The toggle stays on and pressed, its tooltip says "Not enough room"
-(`stores/threadInfo` `useCardRoom`), and the card returns when there is room again.
+(`stores/threadInfo` `useCardRoom`), and the card returns when there is room again. Since
+`docs/notes/thread-info-overlay.md` the toggle floats the card over the conversation there.
 
 ## Rows (`components/threadinfo`)
 
