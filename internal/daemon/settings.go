@@ -86,11 +86,12 @@ var errAutoNameOff = fmt.Errorf("%w in settings (threads.auto_name)", thread.Err
 
 // settingsNamer wraps next so threads.auto_name and threads.naming_model apply
 // without a restart: each call reads them and hands the model to next with
-// thread.WithNamingModel.
+// thread.WithNamingModel. A call the user asked for (thread.ExplicitNaming: Regenerate
+// Name) runs with auto-naming off too; only the naming model applies to it.
 func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
 	return func(ctx context.Context, req thread.NamingRequest) (thread.Naming, error) {
 		s := st.Settings().Threads
-		if !s.AutoName {
+		if !s.AutoName && !thread.ExplicitNaming(ctx) {
 			return thread.Naming{}, errAutoNameOff
 		}
 		return next(thread.WithNamingModel(ctx, s.NamingModel), req)

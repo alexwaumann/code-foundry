@@ -156,9 +156,12 @@ type Thread struct {
 	// NameProvisional: Name was derived from the first prompt (provisional.go) and the
 	// namer still replaces it; a rename or the namer's title clears it. Persisted.
 	NameProvisional bool
-	Model           string
-	Effort          string
-	State           State
+	// Naming: a naming call the user asked for is in flight (RegenerateName,
+	// regenerate.go); the GUI shows the name as it shows a provisional one. Not persisted.
+	Naming bool
+	Model  string
+	Effort string
+	State  State
 	// Status and StatusReason follow the stream while connected (stream_status.go).
 	// Persisted: once disconnected they keep what they were when the process ended
 	// (busy becomes StatusError ReasonInterrupted; see disconnectedStatus), across
@@ -560,6 +563,11 @@ type Store interface {
 	Get(ctx context.Context, id string) (Thread, error)
 	// Rename sets a user-chosen name and disables auto-naming.
 	Rename(ctx context.Context, id, name string) (Thread, error)
+	// RegenerateName names the thread again with the naming model from its most recent
+	// turns, replacing any name, and returns it renamed (regenerate.go). It ignores
+	// threads.auto_name. ErrFailedPrecondition for a resident thread, one with no user
+	// message, or one already being renamed.
+	RegenerateName(ctx context.Context, id string) (Thread, error)
 	// Close ends the Claude process gracefully and waits until the thread is
 	// DISCONNECTED (bounded by the store's close timeout plus the kill grace). No
 	// command calls it: archive, snooze and remove close through it.

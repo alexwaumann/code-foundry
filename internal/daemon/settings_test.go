@@ -147,6 +147,13 @@ func TestSettingsNamer(t *testing.T) {
 	if _, err := namer(context.Background(), hi); !errors.Is(err, thread.ErrNamingOff) || calls != 2 {
 		t.Fatalf("namer with auto-naming off: err = %v, calls = %d", err, calls)
 	}
+	// Regenerate Name is the user's own ask: auto-naming off does not stop it, the model still applies.
+	if n, err := namer(thread.WithExplicitNaming(context.Background()), thread.NamingRequest{Conversation: "User: hi"}); err != nil || n.Title != "a-name" || calls != 3 {
+		t.Fatalf("explicit namer with auto-naming off = %+v, %v, calls = %d", n, err, calls)
+	}
+	if got := models[len(models)-1]; got != "claude-4.5-haiku[1m]" {
+		t.Errorf("explicit naming model = %q", got)
+	}
 }
 
 type ttlRecorder struct{ got []time.Duration }

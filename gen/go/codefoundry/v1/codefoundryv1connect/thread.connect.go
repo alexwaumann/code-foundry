@@ -45,6 +45,9 @@ const (
 	ThreadServiceWaitProcedure = "/codefoundry.v1.ThreadService/Wait"
 	// ThreadServiceRenameProcedure is the fully-qualified name of the ThreadService's Rename RPC.
 	ThreadServiceRenameProcedure = "/codefoundry.v1.ThreadService/Rename"
+	// ThreadServiceRegenerateNameProcedure is the fully-qualified name of the ThreadService's
+	// RegenerateName RPC.
+	ThreadServiceRegenerateNameProcedure = "/codefoundry.v1.ThreadService/RegenerateName"
 	// ThreadServiceCloseProcedure is the fully-qualified name of the ThreadService's Close RPC.
 	ThreadServiceCloseProcedure = "/codefoundry.v1.ThreadService/Close"
 	// ThreadServiceReconnectProcedure is the fully-qualified name of the ThreadService's Reconnect RPC.
@@ -168,6 +171,14 @@ type ThreadServiceClient interface {
 	Wait(context.Context, *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the thread.
 	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
+	// RegenerateName names the thread again with the naming model, from its most recent
+	// turns (the last three user messages and the replies around them), replacing any
+	// name, a hand-typed one too. It ignores threads.auto_name; threads.naming_model
+	// applies. Synchronous: it returns the renamed thread once the model answered, bounded
+	// by the naming timeout. While it runs the thread's naming flag is set. FAILED_PRECONDITION
+	// for a resident thread, a thread with no user message yet, or one already being
+	// renamed. See docs/notes/regenerate-thread-name.md.
+	RegenerateName(context.Context, *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error)
 	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
 	// then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
 	// since 2026-10-15: the daemon starts a thread's process when a message is sent
@@ -468,6 +479,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Rename")),
 			connect.WithClientOptions(opts...),
 		),
+		regenerateName: connect.NewClient[v1.RegenerateNameRequest, v1.RegenerateNameResponse](
+			httpClient,
+			baseURL+ThreadServiceRegenerateNameProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("RegenerateName")),
+			connect.WithClientOptions(opts...),
+		),
 		close: connect.NewClient[v1.CloseThreadRequest, v1.CloseThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceCloseProcedure,
@@ -737,6 +754,7 @@ type threadServiceClient struct {
 	get               *connect.Client[v1.GetThreadRequest, v1.GetThreadResponse]
 	wait              *connect.Client[v1.WaitThreadRequest, v1.WaitThreadResponse]
 	rename            *connect.Client[v1.RenameThreadRequest, v1.RenameThreadResponse]
+	regenerateName    *connect.Client[v1.RegenerateNameRequest, v1.RegenerateNameResponse]
 	close             *connect.Client[v1.CloseThreadRequest, v1.CloseThreadResponse]
 	reconnect         *connect.Client[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse]
 	remove            *connect.Client[v1.RemoveThreadRequest, v1.RemoveThreadResponse]
@@ -810,6 +828,11 @@ func (c *threadServiceClient) Wait(ctx context.Context, req *connect.Request[v1.
 // Rename calls codefoundry.v1.ThreadService.Rename.
 func (c *threadServiceClient) Rename(ctx context.Context, req *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error) {
 	return c.rename.CallUnary(ctx, req)
+}
+
+// RegenerateName calls codefoundry.v1.ThreadService.RegenerateName.
+func (c *threadServiceClient) RegenerateName(ctx context.Context, req *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error) {
+	return c.regenerateName.CallUnary(ctx, req)
 }
 
 // Close calls codefoundry.v1.ThreadService.Close.
@@ -1044,6 +1067,14 @@ type ThreadServiceHandler interface {
 	Wait(context.Context, *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the thread.
 	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
+	// RegenerateName names the thread again with the naming model, from its most recent
+	// turns (the last three user messages and the replies around them), replacing any
+	// name, a hand-typed one too. It ignores threads.auto_name; threads.naming_model
+	// applies. Synchronous: it returns the renamed thread once the model answered, bounded
+	// by the naming timeout. While it runs the thread's naming flag is set. FAILED_PRECONDITION
+	// for a resident thread, a thread with no user message yet, or one already being
+	// renamed. See docs/notes/regenerate-thread-name.md.
+	RegenerateName(context.Context, *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error)
 	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
 	// then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
 	// since 2026-10-15: the daemon starts a thread's process when a message is sent
@@ -1340,6 +1371,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Rename")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceRegenerateNameHandler := connect.NewUnaryHandler(
+		ThreadServiceRegenerateNameProcedure,
+		svc.RegenerateName,
+		connect.WithSchema(threadServiceMethods.ByName("RegenerateName")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceCloseHandler := connect.NewUnaryHandler(
 		ThreadServiceCloseProcedure,
 		svc.Close,
@@ -1612,6 +1649,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceWaitHandler.ServeHTTP(w, r)
 		case ThreadServiceRenameProcedure:
 			threadServiceRenameHandler.ServeHTTP(w, r)
+		case ThreadServiceRegenerateNameProcedure:
+			threadServiceRegenerateNameHandler.ServeHTTP(w, r)
 		case ThreadServiceCloseProcedure:
 			threadServiceCloseHandler.ServeHTTP(w, r)
 		case ThreadServiceReconnectProcedure:
@@ -1729,6 +1768,10 @@ func (UnimplementedThreadServiceHandler) Wait(context.Context, *connect.Request[
 
 func (UnimplementedThreadServiceHandler) Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Rename is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) RegenerateName(context.Context, *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.RegenerateName is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Close(context.Context, *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error) {

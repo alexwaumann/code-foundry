@@ -34,6 +34,10 @@ type NamingRequest struct {
 	Name string
 	// Branch asks for a branch too; nil asks for the title only.
 	Branch *BranchRequest
+	// Conversation is the thread's most recent turns (recentTurnsContext) when the user
+	// asked to name it again (RegenerateName): the title names what the thread is doing
+	// now, and Message and Branch are not used.
+	Conversation string
 }
 
 // BranchRequest is what a naming call is asked about a branch.
@@ -150,6 +154,13 @@ const namingPrompt = "Write a short title of 3 to 6 words that names the coding 
 	"no quotes and no markdown. Examples: Fix the login redirect; Add release channel switcher. " +
 	"Reply with only the title.\n\nRequest:\n"
 
+// regenerateNamingPrompt asks for a title from a thread's recent turns; they follow it.
+const regenerateNamingPrompt = "Write a short title of 3 to 6 words that names what the coding thread below is currently working on, " +
+	"judged by its most recent turns. " +
+	"Use sentence case (capitalize only the first word and proper nouns), no trailing period, " +
+	"no quotes and no markdown. Examples: Fix the login redirect; Add release channel switcher. " +
+	"Reply with only the title.\n\nRecent conversation:\n"
+
 // namingTitleRule is how the title is written when a branch is asked for too.
 const namingTitleRule = "Title: a short title of 3 to 6 words that names the coding task, in sentence case " +
 	"(capitalize only the first word and proper nouns), no trailing period, no quotes, no markdown. " +
@@ -158,9 +169,13 @@ const namingTitleRule = "Title: a short title of 3 to 6 words that names the cod
 // namingSlugRule is how a branch slug is written.
 const namingSlugRule = "2 to 5 lowercase English words joined by dashes (letters, digits and dashes only)"
 
-// buildNamingPrompt is the prompt of a naming call: namingPrompt for a title only, else
-// the title and branch rules, the reply format, the context, and the request.
+// buildNamingPrompt is the prompt of a naming call: regenerateNamingPrompt and the
+// conversation when it has one, namingPrompt for a title only, else the title and branch
+// rules, the reply format, the context, and the request.
 func buildNamingPrompt(req NamingRequest) string {
+	if c := strings.TrimSpace(req.Conversation); c != "" {
+		return regenerateNamingPrompt + c
+	}
 	msg := req.Message
 	if len(msg) > maxNamingInput {
 		msg = msg[:maxNamingInput]

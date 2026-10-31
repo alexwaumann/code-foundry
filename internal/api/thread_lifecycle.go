@@ -118,6 +118,15 @@ func (h *Thread) Rename(ctx context.Context, req *connect.Request[v1.RenameThrea
 	return connect.NewResponse(&v1.RenameThreadResponse{Thread: threadToProto(s)}), nil
 }
 
+// RegenerateName names the thread again from its recent turns and returns it renamed.
+func (h *Thread) RegenerateName(ctx context.Context, req *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error) {
+	s, err := h.store.RegenerateName(ctx, req.Msg.GetId())
+	if err != nil {
+		return nil, threadError(err)
+	}
+	return connect.NewResponse(&v1.RegenerateNameResponse{Thread: threadToProto(s)}), nil
+}
+
 // Pin sets or clears the user's pin.
 func (h *Thread) Pin(ctx context.Context, req *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error) {
 	s, err := h.store.Pin(ctx, req.Msg.GetId(), req.Msg.GetPinned())
@@ -262,6 +271,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		Name:                s.Name,
 		AutoNamed:           s.AutoNamed,
 		NameProvisional:     s.NameProvisional,
+		Naming:              s.Naming,
 		Model:               s.Model,
 		Effort:              s.Effort,
 		State:               v1.ThreadState(s.State),
