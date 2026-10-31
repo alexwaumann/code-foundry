@@ -5,7 +5,7 @@ import { errorMessage } from "@/api/stream";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { deleteProject, type CreatedProject } from "./publish";
 import { useProjectsStore } from "./projects";
-import { showWorkspaceCard } from "./projectsPage";
+import { showWorkspacePage } from "./projectsPage";
 import { showProjectOnProjectsPage } from "./projectsPage";
 
 /** The Add Project dialog's tabs, in display order. */
@@ -171,7 +171,7 @@ export function addProjectEscapeBack(): boolean {
  */
 export function showAddedWorkspace(workspaceId: string): void {
   if (useAddProjectStore.getState().stay) return;
-  showWorkspaceCard(workspaceId);
+  showWorkspacePage(workspaceId);
 }
 
 /**

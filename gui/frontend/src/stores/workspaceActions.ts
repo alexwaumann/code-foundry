@@ -1,5 +1,6 @@
 /**
- * Actions behind the Projects page's workspace cards (docs/notes/workspaces-v2-4-projects-page.md).
+ * Actions behind a workspace's page on the Projects view (docs/notes/workspaces-v2-4-projects-page.md,
+ * docs/notes/projects-redesign-3-workspace-page.md).
  * Each is a registry command (workspace.*, thread.new, thread.send) invoked with explicit
  * args and the page's context, so the palette and the CLI reach the same code; opening
  * the instructions file is a File tab (GUI state, like a path chip).

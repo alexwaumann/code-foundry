@@ -24,7 +24,7 @@ export function revealOnProjectsPage(key: string, timeoutMs = 5000): void {
 }
 
 /** Shows a workspace's page (a workspace just added, or picked); the keyboard is on the page's list, no row picked. */
-export function showWorkspaceCard(workspaceId: string): void {
+export function showWorkspacePage(workspaceId: string): void {
   useUiStore.getState().select(workspacePage(workspaceId));
 }
 

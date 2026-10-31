@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectView } from "@/api/project";
 import { finishAddProject, openAddProject, selectAddedProject, showAddedWorkspace, useAddProjectStore } from "./addProject";
 import { useProjectsStore } from "./projects";
-import { showProjectOnProjectsPage, showWorkspaceCard } from "./projectsPage";
+import { showProjectOnProjectsPage, showWorkspacePage } from "./projectsPage";
 
-vi.mock("./projectsPage", () => ({ showWorkspaceCard: vi.fn(), showProjectOnProjectsPage: vi.fn(() => true) }));
+vi.mock("./projectsPage", () => ({ showWorkspacePage: vi.fn(), showProjectOnProjectsPage: vi.fn(() => true) }));
 
 const project = (id: string): ProjectView => ({ id, path: `/Users/dev/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] });
 
@@ -60,13 +60,13 @@ describe("what the Add Project dialog shows once a project is added", () => {
     await Promise.resolve();
     finishAddProject();
     showAddedWorkspace("w-1");
-    expect(showWorkspaceCard).toHaveBeenCalledWith("w-1");
-    vi.mocked(showWorkspaceCard).mockClear();
+    expect(showWorkspacePage).toHaveBeenCalledWith("w-1");
+    vi.mocked(showWorkspacePage).mockClear();
     openAddProject("local", { stay: true });
     await Promise.resolve();
     finishAddProject();
     showAddedWorkspace("w-2");
-    expect(showWorkspaceCard).not.toHaveBeenCalled();
+    expect(showWorkspacePage).not.toHaveBeenCalled();
   });
 
   it("the next open from the app shows what it adds again", async () => {

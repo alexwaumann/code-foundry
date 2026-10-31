@@ -805,11 +805,12 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   page, the Projects view: an index of projects and workspaces by last activity that
   drills into a project's page (its checkouts table and details) or a workspace's page,
   each its own selection with its own side panel, the sidebar row reopening the last one
-  (`docs/notes/projects-redesign-1-index.md`); a workspace's page shows its card (its
-  name edited in place, root, projects with where new threads start, add and remove, its
-  instructions file opening as a File tab, its skills, Edit instructions starting or
-  steering a thread in the workspace's folder, Reveal in Finder, Remove; a New workspace
-  dialog: `docs/notes/workspaces-v2-4-projects-page.md`), or the composer: a project set
+  (`docs/notes/projects-redesign-1-index.md`); a workspace's page: its projects with
+  where new threads start (Start here, Remove, Add project), its threads with each
+  member's checkout for the thread's branch, its instructions file (View as a File tab,
+  Write/Edit instructions starting or steering a thread in the workspace's folder), skills
+  and folder, Open in Finder, Rename (in place) and Remove; a New workspace dialog:
+  `docs/notes/workspaces-v2-4-projects-page.md`, `docs/notes/projects-redesign-3-workspace-page.md`), or the composer: a project set
   picked in the heading (a workspace row selects its members and the reference, projects
   toggle), chips by project id, Work in, a Runs in picker for the primary (a project or
   the workspace's folder), collision hints under the chips, and "New thread on this

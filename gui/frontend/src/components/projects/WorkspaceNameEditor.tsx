@@ -6,7 +6,7 @@ import { renameWorkspace } from "@/stores/workspaceActions";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 /**
- * A workspace card's name, edited in place: Enter (or leaving the field) renames
+ * A workspace's name on its page's header, edited in place (the header's Rename…): Enter (or leaving the field) renames
  * (workspace.rename, once), Escape keeps the stored name. Until the user types, the field
  * follows the stored name (a rename from elsewhere shows up, and an untouched field never
  * renames); once they have typed, Enter commits theirs (last write wins). Names are unique
