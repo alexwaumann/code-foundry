@@ -127,7 +127,8 @@ for (const scheme of schemes) {
 
 test("Allow answers at once; the sidebar and the window title stop asking", async ({ page }) => {
   await openThread(page, "permission");
-  await expect(row(page, "s:s-r1")).toContainText("Needs input · Bash git push");
+  await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Permission");
+  await expect(row(page, "s:s-r1").getByTestId("row-detail")).toContainText("Bash git push");
   // s-2 (its seeded Bash permission) and this thread need the user.
   await expectAttention(page, 2);
   await composer(page).getByTestId("thread-permission-allow").click();
@@ -191,7 +192,7 @@ test("parallel requests stack oldest first; each is answerable; an Edit shows it
   await expect(edit).toContainText("Allow for session switches the thread to Accept edits.");
   await expect(edit.getByTestId("thread-permission-hint")).toHaveText("Accept edits asks for files outside the project");
   await expect(push).toContainText("git push --force-with-lease");
-  await expect(row(page, "s:s-r1")).toContainText("Needs input · Edit poller.go");
+  await expect(row(page, "s:s-r1").getByTestId("row-detail")).toHaveText("Edit poller.go");
 
   const diff = edit.getByTestId("thread-permission-diff");
   await expect(diff).toContainText("+1");
@@ -202,7 +203,7 @@ test("parallel requests stack oldest first; each is answerable; an Edit shows it
   await push.getByTestId("thread-permission-allow").click();
   await expect(prompts).toHaveAttribute("data-count", "1");
   await expect.poll(responds).toEqual(["respond s-r1 allow req-push"]);
-  await expect(row(page, "s:s-r1")).toContainText("Needs input · Edit poller.go");
+  await expect(row(page, "s:s-r1").getByTestId("row-detail")).toHaveText("Edit poller.go");
   // Then the older by key from the editor.
   await editor(page).click();
   await page.keyboard.press("1");

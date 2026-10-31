@@ -382,7 +382,8 @@ for (const scheme of ["dark", "light"] as const) {
   test.describe(scheme, () => {
     test("a pending permission docks into the composer; the timeline keeps an amber row", async ({ page }) => {
       await openThread(page, "permission", scheme);
-      await expect(row(page, "s:s-r1")).toContainText("Needs input · Bash git push");
+      await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Permission");
+      await expect(row(page, "s:s-r1").getByTestId("row-detail")).toContainText("Bash git push");
       const waiting = pane(page).locator('[data-waiting="true"]');
       await expect(waiting).toContainText("Run git push --force-with-lease origin cf/pr-badge-stale");
       await expect(waiting.getByTestId("thread-waiting")).toHaveText("waiting for you");
@@ -587,7 +588,7 @@ test("headers: the daemon's turn cost and model; a turn without them shows neith
 
 test("a pending question docks with its pager", async ({ page }) => {
   await openThread(page, "question");
-  await expect(row(page, "s:s-r1")).toContainText("Asked a question");
+  await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Question");
   await expect(pane(page).getByTestId("thread-question-row")).toContainText("Asking 2 questions");
   const q = page.getByTestId("thread-composer").getByTestId("thread-question");
   await expect(q).toContainText("Claude has 2 questions");

@@ -127,11 +127,13 @@ test("needs-attention: window title and cmd+shift+a", async ({ page }) => {
   await expectAttention(page, 2);
   await expect(badge(page, "s-1")).toHaveAttribute("data-thread-badge", "attention");
 
-  // Both sit on top, newest first: s-2 (40 min old) before s-1 (42 min); wraps around.
-  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 2)).toEqual(["s:s-2", "s:s-1"]);
+  // Both sit on top, newest status change first: s-1 (asked just now) before s-2; wraps around.
+  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 2)).toEqual(["s:s-1", "s:s-2"]);
   await page.keyboard.press("Meta+Shift+a");
-  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Meta+Shift+a"); // from inside the focused prompt
+  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Meta+Shift+a");
   await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Meta+Shift+a");
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
@@ -178,6 +180,10 @@ test("new thread: a checkout's + on its project page opens the composer with tha
 
 test("rename inline: double-click commits via thread.rename, cmd+r from the prompt, Escape cancels", async ({ page }) => {
   await openApp(page);
+  // Open it first: opening can move the row within its band, which would leave a
+  // double click's second press on another row.
+  await row(page, "s:s-3").click();
+  await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
   await row(page, "s:s-3").dblclick();
   const input = page.getByTestId("rename-input");
   await expect(input).toBeFocused();

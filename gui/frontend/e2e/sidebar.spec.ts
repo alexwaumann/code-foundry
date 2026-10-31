@@ -108,7 +108,8 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   // A single-project thread: its project.
   const s1 = row(page, "s:s-1");
   await expect(s1.getByTestId("row-project")).toHaveText("code-foundry");
-  await expect(s1.getByTestId("row-branch")).toHaveText("main");
+  // Working on a tool: line 3 is the tool, not the branch.
+  await expect(s1.getByTestId("row-detail")).toHaveText(/^Bash go test/);
   await expect(s1.getByTestId("row-workspace")).toHaveCount(0);
 
   // Keyboard: ↓ moves; Enter selects.
@@ -260,15 +261,15 @@ test("status kinds: each thread's second line says its status in words and colou
     .toEqual([
       "s:s-k-plan",
       "s:s-k-approval",
+      "s:s-2",
       "s:s-k-question",
       "s:s-k-error",
-      "s:s-2",
       "s:s-k-asked-before-restart",
       "s:s-k-interrupted",
       "s:s-k-finished",
-      "s:s-k-idle",
       "s:s-6",
       "s:s-4",
+      "s:s-k-idle",
       "s:s-3",
       "# Working 3",
       "s:s-5",
@@ -283,15 +284,15 @@ test("status kinds: each thread's second line says its status in words and colou
   expect(sections).toEqual([
     "s:s-k-plan attention",
     "s:s-k-approval attention",
+    "s:s-2 attention",
     "s:s-k-question attention",
     "s:s-k-error attention",
-    "s:s-2 attention",
     "s:s-k-asked-before-restart attention",
     "s:s-k-interrupted attention",
     "s:s-k-finished done",
-    "s:s-k-idle idle",
     "s:s-6 idle",
     "s:s-4 idle",
+    "s:s-k-idle idle",
     "s:s-3 idle",
     "s:s-5 working",
     "s:s-k-busy working",
@@ -376,14 +377,15 @@ test("Working section: a header with the count collapses and expands its rows, p
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Meta+5");
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-  // Arrows and End skip the hidden rows too: s-3 is the last row ↓ and End reach.
+  // Arrows and End skip the hidden rows too: End reaches the main list's last row and ↓ stays
+  // there. Read the last row after the click: opening a thread can move it within the idle band.
   await row(page, "s:s-3").click();
   await list(page).focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-3");
-  await page.keyboard.press("Home");
+  const lastMain = async () => `row-${(await rowKeys(page)).filter((k) => k.startsWith("s:")).at(-1) ?? ""}`;
   await page.keyboard.press("End");
-  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-3");
+  await expect(list(page)).toHaveAttribute("aria-activedescendant", await lastMain());
+  await page.keyboard.press("ArrowDown");
+  await expect(list(page)).toHaveAttribute("aria-activedescendant", await lastMain());
 
   // The collapsed state survives a reload.
   await page.reload();
@@ -392,10 +394,10 @@ test("Working section: a header with the count collapses and expands its rows, p
   await expect(row(page, "s:s-1")).toHaveCount(0);
   expect(await page.evaluate(() => (JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as { state?: { workingCollapsed?: boolean } }).state?.workingCollapsed)).toBe(true);
 
-  // Expanding brings the rows back, and cmd+5 is the starting thread again.
+  // Expanding brings the rows back (s-3, opened above, may have moved within the idle band), and cmd+5 is the starting thread again.
   await page.getByTestId("working-header").click();
   await expect(page.getByTestId("working-header")).toHaveAttribute("aria-expanded", "true");
-  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k === "h:snoozed" ? "# Snoozed 2" : k === "h:archived" ? "# Archived 1" : k)));
+  await expect.poll(async () => (await rowKeys(page)).slice(4)).toEqual(["# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "# Archived 1"]);
   await page.keyboard.press("Meta+5");
   await expect(row(page, "s:s-5")).toHaveAttribute("aria-selected", "true");
 
@@ -420,22 +422,23 @@ test("thread rows sit 4px apart at both densities, each row's box (and its selec
     expect(keys).toHaveLength(2);
     return gaps(keys[0] ?? "", keys[1] ?? "");
   };
-  for (const [density, two, one] of [
-    ["comfortable", 50, 32],
-    ["compact", 46, 28],
+  // Thread rows are three lines (THREE_LINE_ROW, 60px) at both densities; snoozed rows one line by density.
+  for (const [density, three, one] of [
+    ["comfortable", 60, 32],
+    ["compact", 60, 28],
   ] as const) {
     await mockPost(`settings/external?appearance.density=${density}`);
     await expect(page.locator("html")).toHaveAttribute("data-density", density);
-    // Main list and the Working footer: two-line rows; Snoozed: one-line rows.
-    await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: two, gap: 4 });
-    expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: two, gap: 4 });
+    // Main list and the Working footer: three-line rows; Snoozed: one-line rows.
+    await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: three, gap: 4 });
+    expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: three, gap: 4 });
     expect(await snoozed()).toEqual({ height: one, gap: 4 });
   }
   // The selection background is the row's own box: the gap under it stays the sidebar's.
   await row(page, "s:s-2").click();
   await expect(row(page, "s:s-2")).toHaveClass(/bg-cf-sidebar-row-selected/);
   const parent = await row(page, "s:s-2").evaluate((e) => (e.parentElement ? e.parentElement.getBoundingClientRect().height : 0));
-  expect(parent).toBe(46);
+  expect(parent).toBe(60);
   await mockPost("settings/external?appearance.density=");
 });
 
