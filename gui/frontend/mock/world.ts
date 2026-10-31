@@ -403,7 +403,11 @@ interface MockWorktree {
     operation?: string;
     operationStep?: number;
     operationTotal?: number;
+    /** The last status read failed (POST /__mock/worktree/refresh-error). */
+    error?: string;
   };
+  /** The last status read was this long ago (ms); absent: now. */
+  refreshedAgoMs?: number;
 }
 
 interface MockProject {
@@ -3163,10 +3167,28 @@ export class World {
     return false;
   }
 
+  /**
+   * The worktree's last status read failed with `error` `agoMs` ago (POST
+   * /__mock/worktree/refresh-error); an empty error clears it (read now).
+   */
+  setRefreshError(path: string, error: string, agoMs: number): boolean {
+    for (const project of this.projects.values()) {
+      const w = project.worktrees.find((x) => x.path === path);
+      if (!w) continue;
+      w.status = { ...w.status, error };
+      if (error) w.refreshedAgoMs = agoMs;
+      else delete w.refreshedAgoMs;
+      this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
+      return true;
+    }
+    return false;
+  }
+
   // ---- Project API -----------------------------------------------------------------
 
   worktreeMsg(projectId: string, w: MockWorktree): WorktreeInit {
-    return { projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
+    const at = new Date(Date.now() - (w.refreshedAgoMs ?? 0));
+    return { projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), status: { ...w.status, refreshedAt: timestampFromDate(at) } };
   }
 
   projectMsg(r: MockProject): ProjectInit {

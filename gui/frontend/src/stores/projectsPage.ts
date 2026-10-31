@@ -1,16 +1,16 @@
 /**
- * A row the Projects page should move its keyboard cursor to once the row exists: the
- * cursor highlights the row and scrolls it into view (NavRow), the page's own way of
- * pointing at something. Set after Add as workspace, whose card arrives on the event
- * stream after the command answers; dropped after timeoutMs if the row never shows.
+ * The Projects view's own state outside the UI store: a row a page should move its
+ * keyboard cursor to once the row exists (the cursor highlights the row and scrolls it
+ * into view, NavRow), and each page's scroll position (in memory only, by panel key, so
+ * coming back to a page finds it where it was).
  */
 import { create } from "zustand";
-import { projectKey, projectWorktreeKey, workspaceKey } from "@/lib/projects";
-import { mainWorktreePath, useProjectsStore } from "./projects";
-import { useUiStore } from "./ui";
+import { projectWorktreeKey, workspaceKey } from "@/lib/projects";
+import { useProjectsStore } from "./projects";
+import { projectPage, useUiStore, workspacePage } from "./ui";
 
 interface ProjectsPageState {
-  /** The row's nav key (lib/projects.ts workspaceKey, projectKey, …), or null. */
+  /** The row's nav key (lib/projects.ts workspaceKey, projectKey, projectWorktreeKey), or null. */
   reveal: string | null;
 }
 
@@ -23,29 +23,37 @@ export function revealOnProjectsPage(key: string, timeoutMs = 5000): void {
   }, timeoutMs);
 }
 
-/**
- * Shows a workspace's card: the Projects page, its cursor on the card (scrolled into
- * view) once the card is there. A workspace just added.
- */
+/** Shows a workspace's page (a workspace just added, or picked). */
 export function showWorkspaceCard(workspaceId: string): void {
-  useUiStore.getState().select({ kind: "view", name: "projects" });
+  useUiStore.getState().select(workspacePage(workspaceId));
   revealOnProjectsPage(workspaceKey(workspaceId));
 }
 
 /**
- * Shows a project from anywhere (ui.focus.project, a project just added): the Projects
- * page, its cursor on the project's row, or on the worktree's row for a path other than
- * the main one. False for an unknown project.
+ * Shows a project from anywhere (ui.focus.project, a project just added): its page, the
+ * cursor on the worktree's checkout row for a path given. False for an unknown project.
  */
 export function showProjectOnProjectsPage(projectId: string, path = ""): boolean {
   const projects = useProjectsStore.getState();
   if (!projects.byId[projectId]) return false;
-  useUiStore.getState().select({ kind: "view", name: "projects" });
-  revealOnProjectsPage(path && path !== mainWorktreePath(projects, projectId) ? projectWorktreeKey(projectId, path) : projectKey(projectId));
+  useUiStore.getState().select(projectPage(projectId));
+  if (path) revealOnProjectsPage(projectWorktreeKey(projectId, path));
   return true;
 }
 
 /** Drops the pending row if it is still `key` (the page moved its cursor there, or it never showed). */
 export function clearProjectsPageReveal(key: string): void {
   useProjectsPageStore.setState((s) => (s.reveal === key ? { reveal: null } : s));
+}
+
+/** Each page's scroll offset by its panel key; not persisted (a reload starts at the top). */
+const scrollTops = new Map<string, number>();
+
+export function savedScrollTop(key: string): number {
+  return scrollTops.get(key) ?? 0;
+}
+
+export function saveScrollTop(key: string, top: number): void {
+  if (top > 0) scrollTops.set(key, top);
+  else scrollTops.delete(key);
 }

@@ -1,19 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
-  cleanableTitle,
-  collapsedProjectSummary,
+  actionsDetail,
+  changesCell,
+  checkoutsSummary,
+  checkoutThreads,
   filterProjects,
+  indexCaption,
   isCleanable,
-  memberKey,
-  pageItems,
-  projectKey,
+  projectActivity,
   projectKind,
   projectNextStep,
   projectsModel,
-  projectWorktreeKey,
   projectRef,
-  workspaceKey,
-  worktreeThreadCount,
+  projectStatusSentence,
+  refreshedText,
+  remoteDetail,
+  sortByActivity,
+  sortCheckouts,
+  syncCell,
+  threadActivityMs,
+  threadsCell,
+  workspaceActivity,
+  workspaceContents,
+  workspaceStatusSentence,
+  workspaceWorkingBranches,
+  worktreesDetail,
+  type ActivityThread,
+  type ActivityThreads,
+  type CheckoutSortRow,
   type ProjectKind,
   type ProjectNextStep,
   type ProjectsModel,
@@ -64,41 +78,6 @@ describe("projectsModel", () => {
   });
   it("a workspace the slice does not know is left out", () => {
     expect(projectsModel(projects, { order: ["w-1", "w-gone"], byId: workspaces.byId }).workspaces).toEqual(["w-1"]);
-  });
-  it("pageItems: projects and their worktrees, then workspace cards and their members by id", () => {
-    const keys = pageItems(projectsModel(projects, workspaces), workspaces).map((i) => i.key);
-    expect(keys).toEqual([
-      projectKey("api"),
-      projectWorktreeKey("api", "/src/api"),
-      projectWorktreeKey("api", "/wt/api/cf-login"),
-      projectKey("dot"),
-      projectWorktreeKey("dot", "/src/dot"),
-      projectKey("web"),
-      projectWorktreeKey("web", "/src/web"),
-      projectWorktreeKey("web", "/wt/web/feat"),
-      projectWorktreeKey("web", "/wt/web/cf-login"),
-      workspaceKey("w-1"),
-      memberKey("w-1", "api"),
-      memberKey("w-1", "web"),
-    ]);
-  });
-  it("pageItems: members by project name, as the card shows them (case-insensitive), the stored order by id", () => {
-    const names: Record<string, string> = { api: "zeta", web: "Alpha" };
-    const keys = pageItems(projectsModel(projects, workspaces), workspaces, undefined, (id) => names[id]).filter((i) => i.kind === "member").map((i) => i.key);
-    expect(keys).toEqual([memberKey("w-1", "web"), memberKey("w-1", "api")]);
-  });
-  it("pageItems: a collapsed project or workspace keeps its header row only", () => {
-    const keys = pageItems(projectsModel(projects, workspaces), workspaces, { projects: new Set(["web", "api"]), workspaces: new Set(["w-1"]) }).map((i) => i.key);
-    expect(keys).toEqual([projectKey("api"), projectKey("dot"), projectWorktreeKey("dot", "/src/dot"), projectKey("web"), workspaceKey("w-1")]);
-  });
-});
-
-describe("collapsed summaries", () => {
-  it.each<[string, { worktrees: string[] }, string]>([
-    ["one worktree", { worktrees: ["/a"] }, "1 worktree"],
-    ["several", { worktrees: ["/a", "/b", "/c"] }, "3 worktrees"],
-  ])("project: %s", (_name, p, want) => {
-    expect(collapsedProjectSummary(p)).toBe(want);
   });
 });
 
@@ -187,31 +166,6 @@ describe("projectNextStep (the header's Publish / Initialize git gate)", () => {
   });
 });
 
-describe("worktreeThreadCount", () => {
-  // Every thread on exactly the worktree, whether or not Claude runs for it; archived ones are put away.
-  const threads = {
-    order: ["a", "b", "c", "d", "e", "f", "g"],
-    byId: {
-      a: { worktreePath: "/src/web", archivedAtMs: null },
-      b: { worktreePath: "/src/web", archivedAtMs: null },
-      c: { worktreePath: "/src/web", archivedAtMs: null },
-      d: { worktreePath: "/wt/web/feat", archivedAtMs: null },
-      e: { worktreePath: "/src/web/sub", archivedAtMs: null },
-      f: { worktreePath: "/wt/web/feat", archivedAtMs: 5 },
-      g: { worktreePath: "/src/web", archivedAtMs: 9 },
-    },
-  };
-  it.each<[string, number]>([
-    ["/src/web", 3],
-    ["/wt/web/feat", 1],
-    ["/src/web/sub", 1],
-    ["/src/api", 0],
-    ["", 0],
-  ])("%s: %i", (path, want) => {
-    expect(worktreeThreadCount(threads, path)).toBe(want);
-  });
-});
-
 describe("isCleanable", () => {
   const WT = "/wt/cf-a";
   const none = { order: [], byId: {} };
@@ -241,8 +195,189 @@ describe("isCleanable", () => {
       expect(isCleanable(c.wt, c.threads ?? none, c.terminals ?? none)).toBe(c.want);
     });
   }
-  it("names the base in its tooltip", () => {
-    expect(cleanableTitle("origin/main")).toBe("Clean: no changes, its work is in origin/main, no thread or terminal on it");
-    expect(cleanableTitle("")).toContain("origin/<default>");
+});
+
+const NOW = 1_800_000_000_000;
+const thread = (o: Partial<ActivityThread>): ActivityThread => ({
+  projectId: "",
+  projectIds: [],
+  workspaceId: "",
+  archivedAtMs: null,
+  state: "disconnected",
+  status: "idle",
+  statusChangedAtMs: null,
+  createdAtMs: null,
+  lastActivityAtMs: null,
+  branch: "",
+  worktreePath: "",
+  checkoutPaths: [],
+  ...o,
+});
+const slice = (ts: Record<string, ActivityThread>): ActivityThreads => ({ order: Object.keys(ts), byId: ts });
+const working = { state: "connected", status: "busy" } as const;
+
+describe("threadActivityMs", () => {
+  it.each<[string, Partial<ActivityThread>, number | null]>([
+    ["nothing known", {}, null],
+    ["the creation alone", { createdAtMs: 5 }, 5],
+    ["the latest of status change, activity and creation", { createdAtMs: 5, statusChangedAtMs: 9, lastActivityAtMs: 7 }, 9],
+  ])("%s", (_name, o, want) => {
+    expect(threadActivityMs(thread(o))).toBe(want);
+  });
+});
+
+describe("projectActivity and workspaceActivity", () => {
+  const ts = slice({
+    a: thread({ projectId: "cf", projectIds: ["cf"], ...working, statusChangedAtMs: NOW - 60_000 }),
+    b: thread({ projectId: "gp", projectIds: ["cf", "gp"], workspaceId: "w-1", ...working, branch: "cf/platform", createdAtMs: NOW - 10_000 }),
+    c: thread({ projectId: "cf", projectIds: ["cf"], ...working, archivedAtMs: NOW, statusChangedAtMs: NOW }),
+    d: thread({ projectId: "cf", projectIds: ["cf"], state: "starting", status: "idle", createdAtMs: NOW - 120_000 }),
+    e: thread({ projectId: "dot", projectIds: ["dot"], status: "attention", state: "connected", lastActivityAtMs: NOW - 5 }),
+  });
+  it("counts the working threads whose set has the project; archived ones only for the age", () => {
+    expect(projectActivity(ts, "cf")).toEqual({ working: 3, lastMs: NOW });
+    expect(projectActivity(ts, "gp")).toEqual({ working: 1, lastMs: NOW - 10_000 });
+    expect(projectActivity(ts, "dot")).toEqual({ working: 0, lastMs: NOW - 5 });
+    expect(projectActivity(ts, "none")).toEqual({ working: 0, lastMs: null });
+  });
+  it("a workspace's threads are the ones referencing it; working branches distinct", () => {
+    expect(workspaceActivity(ts, "w-1")).toEqual({ working: 1, lastMs: NOW - 10_000 });
+    expect(workspaceWorkingBranches(ts, "w-1")).toEqual(["cf/platform"]);
+  });
+});
+
+describe("sortByActivity (the index's order)", () => {
+  const last: Record<string, number | null> = { cf: NOW, gp: NOW - 1000, dot: NOW - 1000, sk: null, wr: null, Ab: null };
+  const names: Record<string, string> = { cf: "code-foundry", gp: "ghostty", dot: "dotfiles", sk: "sketches", wr: "writing", Ab: "alpha" };
+  it("most recent first; ties and projects with no threads by name", () => {
+    expect(sortByActivity(["wr", "sk", "dot", "Ab", "gp", "cf"], (id) => last[id] ?? null, (id) => names[id] ?? id)).toEqual(["cf", "dot", "gp", "Ab", "sk", "wr"]);
+  });
+});
+
+describe("status sentences", () => {
+  it.each<[string, { working: number; checkouts: number; git: boolean }, string]>([
+    ["working with worktrees", { working: 4, checkouts: 6, git: true }, "4 threads working · 6 checkouts"],
+    ["one thread on main only", { working: 1, checkouts: 1, git: true }, "1 thread working · main only"],
+    ["idle with main only", { working: 0, checkouts: 1, git: true }, "idle · main only"],
+    ["idle with two checkouts", { working: 0, checkouts: 2, git: true }, "idle · 2 checkouts"],
+    ["no git: no checkouts to count", { working: 0, checkouts: 1, git: false }, "idle"],
+    ["no git, working", { working: 2, checkouts: 1, git: false }, "2 threads working"],
+  ])("project: %s", (_name, a, want) => {
+    expect(projectStatusSentence(a)).toBe(want);
+  });
+  it.each<[string, number, string[], string]>([
+    ["idle", 0, [], "idle"],
+    ["one branch", 1, ["cf/platform"], "1 thread working on cf/platform"],
+    ["two threads on one branch", 2, ["cf/platform"], "2 threads working on cf/platform"],
+    ["several branches", 2, ["a", "b"], "2 threads working"],
+  ])("workspace: %s", (_name, n, branches, want) => {
+    expect(workspaceStatusSentence(n, branches)).toBe(want);
+  });
+  it("workspace contents", () => {
+    expect(workspaceContents({ skills: ["a", "b"] })).toBe("no instructions · 2 skills");
+    expect(workspaceContents({ instructions: "/x/w-1/CLAUDE.md", skills: [] })).toBe("CLAUDE.md · no skills");
+    expect(workspaceContents({ instructions: "AGENTS.md", skills: ["a"] })).toBe("AGENTS.md · 1 skill");
+  });
+});
+
+describe("indexCaption", () => {
+  it.each<[string, { git?: boolean; githubSlug: string; remotes: string[]; path: string }, string]>([
+    ["GitHub: the slug", { githubSlug: "o/r", remotes: ["origin"], path: "/x" }, "o/r"],
+    ["another remote", { githubSlug: "", remotes: ["origin"], path: "/x" }, "origin · not GitHub"],
+    ["no remote", { git: true, githubSlug: "", remotes: [], path: "/x" }, "local only"],
+    ["no git: the path", { git: false, githubSlug: "", remotes: [], path: "/tmp/writing" }, "/tmp/writing · no git"],
+  ])("%s", (_name, r, want) => {
+    expect(indexCaption(r)).toBe(want);
+  });
+});
+
+describe("checkout cells", () => {
+  it.each<[number, number, string]>([
+    [0, 0, "none"],
+    [2, 0, "2 working"],
+    [0, 2, "2 idle"],
+    [1, 1, "1 working · 1 idle"],
+  ])("threads %i working %i idle", (w, i, want) => {
+    expect(threadsCell(w, i)).toBe(want);
+  });
+  it.each<[string, { staged: number; modified: number; untracked: number; conflicted?: number; dirty: boolean }, string]>([
+    ["clean", { staged: 0, modified: 0, untracked: 0, dirty: false }, "clean"],
+    ["one file", { staged: 0, modified: 1, untracked: 0, dirty: true }, "1 file"],
+    ["every kind counts", { staged: 1, modified: 2, untracked: 1, conflicted: 1, dirty: true }, "5 files"],
+    ["dirty without counts", { staged: 0, modified: 0, untracked: 0, dirty: true }, "changed"],
+  ])("changes: %s", (_name, st, want) => {
+    expect(changesCell(st)).toBe(want);
+  });
+  it.each<[string, { upstream: string; ahead: number; behind: number }, string]>([
+    ["up to date", { upstream: "origin/x", ahead: 0, behind: 0 }, "up to date"],
+    ["to push", { upstream: "origin/x", ahead: 2, behind: 0 }, "2 to push"],
+    ["behind", { upstream: "origin/x", ahead: 0, behind: 1 }, "1 behind"],
+    ["both", { upstream: "origin/x", ahead: 2, behind: 1 }, "2 to push · 1 behind"],
+    ["no upstream", { upstream: "", ahead: 0, behind: 0 }, "not pushed"],
+  ])("sync: %s", (_name, st, want) => {
+    expect(syncCell(st)).toBe(want);
+  });
+  it("checkoutThreads: own cwd or a set member's checkout, archived left out, the first workspace", () => {
+    const ts = slice({
+      a: thread({ worktreePath: "/wt/a", ...working, lastActivityAtMs: 3 }),
+      b: thread({ worktreePath: "/src/gp", checkoutPaths: [{ projectId: "cf", path: "/wt/a" }], workspaceId: "w-1", lastActivityAtMs: 9 }),
+      c: thread({ worktreePath: "/wt/a", archivedAtMs: 1, lastActivityAtMs: 99 }),
+    });
+    expect(checkoutThreads(ts, "/wt/a")).toEqual({ working: 1, idle: 1, lastMs: 9, workspaceId: "w-1" });
+    expect(checkoutThreads(ts, "/wt/none")).toEqual({ working: 0, idle: 0, lastMs: null, workspaceId: "" });
+  });
+});
+
+describe("sortCheckouts", () => {
+  const row = (path: string, o: Partial<CheckoutSortRow> = {}): CheckoutSortRow => ({ path, isMain: false, branch: path, working: 0, lastMs: null, ...o });
+  it("working first (most recent first), then main, then the rest by activity, none last, then branch", () => {
+    const rows = [
+      row("chore/deps"),
+      row("fix/resize", { lastMs: 5 }),
+      row("main", { isMain: true, lastMs: 1 }),
+      row("cf/platform", { working: 1, lastMs: 2 }),
+      row("feat/sidebar", { working: 2, lastMs: 8 }),
+      row("a-later", { lastMs: 7 }),
+      row("b-none"),
+    ];
+    expect(sortCheckouts(rows).map((r) => r.path)).toEqual(["feat/sidebar", "cf/platform", "main", "a-later", "fix/resize", "b-none", "chore/deps"]);
+  });
+  it("a working main sorts with the working ones", () => {
+    expect(sortCheckouts([row("x", { working: 1, lastMs: 9 }), row("main", { isMain: true, working: 1, lastMs: 1 })]).map((r) => r.path)).toEqual(["x", "main"]);
+  });
+});
+
+describe("details and summaries", () => {
+  it("checkoutsSummary", () => {
+    expect(checkoutsSummary(6, 2)).toBe("main plus 5 worktrees · 2 threads working");
+    expect(checkoutsSummary(2, 0)).toBe("main plus 1 worktree");
+    expect(checkoutsSummary(1, 1)).toBe("main only · 1 thread working");
+    expect(checkoutsSummary(1, 0)).toBe("main only");
+  });
+  it.each<[string, number | null, number, boolean, string]>([
+    ["just now", NOW - 5_000, NOW, false, "refreshed just now"],
+    ["minutes", NOW - 14 * 60_000, NOW, false, "refreshed 14m ago"],
+    ["hours", NOW - 3 * 3_600_000, NOW, false, "refreshed 3h ago"],
+    ["days", NOW - 3 * 86_400_000, NOW, false, "refreshed 3d ago"],
+    ["never", null, NOW, false, "not refreshed yet"],
+    ["failed", NOW - 14 * 60_000, NOW, true, "refresh failed 14m ago"],
+  ])("refreshedText: %s", (_name, at, now, failed, want) => {
+    expect(refreshedText(at, now, failed)).toBe(want);
+  });
+  it("remoteDetail", () => {
+    expect(remoteDetail({ githubSlug: "o/r", remotes: ["origin"] })).toBe("origin · github.com/o/r");
+    expect(remoteDetail({ githubSlug: "", remotes: ["origin"] })).toBe("origin · pull requests need GitHub");
+    expect(remoteDetail({ githubSlug: "", remotes: [] })).toBe("");
+  });
+  it("worktreesDetail: the folder they share and the count", () => {
+    expect(worktreesDetail(["/tmp/x.worktrees/a", "/tmp/x.worktrees/b"])).toBe("/tmp/x.worktrees · 2");
+    expect(worktreesDetail(["/tmp/wt/cf/a", "/tmp/wt/gp/b"])).toBe("/tmp/wt · 2");
+    expect(worktreesDetail(["/a/x", "/b/y"])).toBe("2");
+    expect(worktreesDetail([])).toBe("");
+  });
+  it("actionsDetail", () => {
+    expect(actionsDetail(0)).toBe("none");
+    expect(actionsDetail(1)).toBe("1 project action");
+    expect(actionsDetail(2)).toBe("2 project actions");
   });
 });

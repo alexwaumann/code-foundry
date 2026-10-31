@@ -37,10 +37,14 @@ export interface BottomEntry {
 
 export const emptyBottom: BottomEntry = { open: false };
 
-/** Bottom panel key for a selection: a thread or the Projects page; null for anything else. */
+/**
+ * Bottom panel key for a selection: a thread or the Projects view (its index and every
+ * project or workspace page share one: the worktree shells it owns); null for anything else.
+ */
 export function bottomKeyOf(sel: Selection): string | null {
   const key = keyOf(sel);
-  return key !== null && (key.startsWith(THREAD_PREFIX) || key === PROJECTS_KEY) ? key : null;
+  if (key === PROJECTS_KEY || key?.startsWith(`${PROJECTS_KEY}:`)) return PROJECTS_KEY;
+  return key !== null && key.startsWith(THREAD_PREFIX) ? key : null;
 }
 
 /** The thread id of a `thread:<id>` key, else null. */

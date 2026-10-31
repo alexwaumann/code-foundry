@@ -22,8 +22,49 @@ export type Selection =
    * for "New thread on this branch" (that thread's set; projectId its primary).
    */
   | { kind: "compose"; projectId: string; workspaceId?: string; noProject?: boolean; likeThreadId?: string }
-  /** A top-level page that is not a sidebar row (see components/prs). */
-  | { kind: "view"; name: string };
+  /**
+   * A top-level page that is not a sidebar row (see components/prs). The Projects pages
+   * (`name` "projects") are the index without an id, a project's page with `projectId`,
+   * a workspace's page with `workspaceId` (components/projects/ProjectsPage.tsx); each has
+   * its own side panel (stores/panel.ts keyOf).
+   */
+  | { kind: "view"; name: string; projectId?: string; workspaceId?: string };
+
+/** The Projects index (every project and workspace as a row). */
+export const PROJECTS_INDEX: Extract<Selection, { kind: "view" }> = { kind: "view", name: "projects" };
+
+/** A project's page on the Projects view. */
+export function projectPage(projectId: string): Extract<Selection, { kind: "view" }> {
+  return { kind: "view", name: "projects", projectId };
+}
+
+/** A workspace's page on the Projects view. */
+export function workspacePage(workspaceId: string): Extract<Selection, { kind: "view" }> {
+  return { kind: "view", name: "projects", workspaceId };
+}
+
+/** The selection is one of the Projects pages: the index, a project's or a workspace's. */
+export function isProjectsView(sel: Selection): sel is Extract<Selection, { kind: "view" }> {
+  return sel.kind === "view" && sel.name === "projects";
+}
+
+/**
+ * Where the Projects sidebar row goes back to: "" for the index, `project:<id>` or
+ * `workspace:<id>` for a page (UiState.projectsLast).
+ */
+export function projectsLocation(sel: Selection): string | null {
+  if (!isProjectsView(sel)) return null;
+  if (sel.projectId) return `project:${sel.projectId}`;
+  if (sel.workspaceId) return `workspace:${sel.workspaceId}`;
+  return "";
+}
+
+/** The selection a stored projectsLast names (the index for "" or anything unknown). */
+export function projectsLocationSelection(loc: string): Extract<Selection, { kind: "view" }> {
+  if (loc.startsWith("project:") && loc.length > 8) return projectPage(loc.slice(8));
+  if (loc.startsWith("workspace:") && loc.length > 10) return workspacePage(loc.slice(10));
+  return PROJECTS_INDEX;
+}
 
 /** Top-level page names (UiIntent.ShowView); unknown names are ignored. */
 export const viewNames: readonly string[] = ["pullrequests", "projects", "ember"];
@@ -171,9 +212,12 @@ interface UiState {
   archivedCollapsed: boolean;
   /** The sidebar's Snoozed section is collapsed (its threads hidden; the header counts them). Collapsed by default. */
   snoozedCollapsed: boolean;
-  /** Projects page: project ids whose worktree rows are hidden (the header counts them). */
-  collapsedProjects: string[];
-  /** Projects page: workspace ids whose member rows are hidden. */
+  /**
+   * The last Projects page shown (projectsLocation: "" the index, `project:<id>`,
+   * `workspace:<id>`): the Projects sidebar row reopens it.
+   */
+  projectsLast: string;
+  /** Projects view: workspace ids whose member rows are hidden (the workspace page's card). */
   collapsedWorkspaces: string[];
   /** Ember's chat opens every "Worked for" row (components/ember/EmberPane.tsx "Show work"). */
   emberShowWork: boolean;
@@ -222,8 +266,11 @@ interface UiState {
   setEmberShowWork: (on: boolean) => void;
   /** view.thread-info: shows or hides the thread info card; returns the new state. */
   toggleThreadInfo: () => boolean;
-  /** Collapses (true) or expands a project on the Projects page; false when it already was. */
-  setProjectCollapsed: (projectId: string, collapsed: boolean) => boolean;
+  /**
+   * The Projects sidebar row: on a project's or workspace's page, the index; anywhere else,
+   * the last Projects page shown (the index when its project or workspace is gone).
+   */
+  openProjects: () => void;
   /** Collapses (true) or expands a workspace on the Projects page; false when it already was. */
   setWorkspaceCollapsed: (workspaceId: string, collapsed: boolean) => boolean;
   /** Drops collapsed workspaces that no longer exist (a removal, a snapshot without them). */
@@ -310,13 +357,14 @@ export function sameSelection(a: Selection, b: Selection): boolean {
     case "compose":
       return a.projectId === (b as typeof a).projectId && a.workspaceId === (b as typeof a).workspaceId && Boolean(a.noProject) === Boolean((b as typeof a).noProject) && a.likeThreadId === (b as typeof a).likeThreadId;
     case "view":
-      return a.name === (b as typeof a).name;
+      return a.name === (b as typeof a).name && (a.projectId ?? "") === ((b as typeof a).projectId ?? "") && (a.workspaceId ?? "") === ((b as typeof a).workspaceId ?? "");
   }
 }
 
 /**
  * Whether a remembered selection can no longer be shown: a removed thread (an archived one
- * still exists), or a composer whose project or workspace was removed. Unknown before the
+ * still exists), a composer whose project or workspace was removed, or the page of a
+ * removed project or workspace. Unknown before the
  * store holding it has loaded.
  */
 function gone(sel: Selection): boolean {
@@ -337,6 +385,17 @@ function gone(sel: Selection): boolean {
       if (sel.noProject) return false;
       const projects = useProjectsStore.getState();
       return projects.loaded && !(sel.projectId in projects.byId);
+    }
+    case "view": {
+      if (sel.projectId) {
+        const projects = useProjectsStore.getState();
+        return projects.loaded && !(sel.projectId in projects.byId);
+      }
+      if (sel.workspaceId) {
+        const workspaces = useWorkspacesStore.getState();
+        return workspaces.loaded && !(sel.workspaceId in workspaces.byId);
+      }
+      return false;
     }
     default:
       return false;
@@ -370,9 +429,11 @@ export function pruneHistory(history: readonly Selection[], index: number, isGon
  * and forward move the index themselves and do not push.
  */
 function selectionUpdate(s: UiState, sel: Selection, opts: { focusPrompt?: boolean; push: boolean }): Partial<UiState> {
+  const loc = projectsLocation(sel);
   const next: Partial<UiState> = {
     selection: sameSelection(s.selection, sel) ? s.selection : sel,
     promptFocusSeq: opts.focusPrompt && sel.kind === "thread" ? s.promptFocusSeq + 1 : s.promptFocusSeq,
+    ...(loc !== null && loc !== s.projectsLast ? { projectsLast: loc } : null),
   };
   const current = s.history[s.historyIndex];
   if (!opts.push || (current && sameSelection(current, sel))) return next;
@@ -405,7 +466,7 @@ export const useUiStore = create<UiState>()(
       workingCollapsed: false,
       archivedCollapsed: true,
       snoozedCollapsed: true,
-      collapsedProjects: [],
+      projectsLast: "",
       collapsedWorkspaces: [],
       emberShowWork: false,
       threadInfoOpen: false,
@@ -494,12 +555,12 @@ export const useUiStore = create<UiState>()(
         set({ threadInfoOpen: open });
         return open;
       },
-      setProjectCollapsed: (projectId, collapsed) => {
-        const prev = get().collapsedProjects;
-        const next = withMember(prev, projectId, collapsed);
-        if (next === prev) return false;
-        set({ collapsedProjects: next });
-        return true;
+      openProjects: () => {
+        const s = get();
+        const sel = s.selection;
+        const onPage = isProjectsView(sel) && Boolean(sel.projectId || sel.workspaceId);
+        const want = onPage ? PROJECTS_INDEX : projectsLocationSelection(s.projectsLast);
+        s.select(gone(want) ? PROJECTS_INDEX : want);
       },
       setWorkspaceCollapsed: (workspaceId, collapsed) => {
         const prev = get().collapsedWorkspaces;
@@ -518,6 +579,7 @@ export const useUiStore = create<UiState>()(
       name: "code-foundry.ui",
       // 2: the global panelWidth moved to per-panel widths in the panel store; drop it.
       // 3: the sidebar is a flat thread list (no collapsible projects or worktrees); drop collapsed.
+      // The Projects index has no collapsible projects: collapsedProjects is ignored (merge).
       version: 3,
       migrate: (persisted) => {
         const { panelWidth: _old, collapsed: _gone, ...rest } = (persisted ?? {}) as Record<string, unknown>;
@@ -543,7 +605,7 @@ export const useUiStore = create<UiState>()(
           workingCollapsed: bool(p.workingCollapsed, current.workingCollapsed),
           archivedCollapsed: bool(p.archivedCollapsed, current.archivedCollapsed),
           snoozedCollapsed: bool(p.snoozedCollapsed, current.snoozedCollapsed),
-          collapsedProjects: isStringArray(p.collapsedProjects) ? p.collapsedProjects : current.collapsedProjects,
+          projectsLast: typeof p.projectsLast === "string" ? p.projectsLast : current.projectsLast,
           collapsedWorkspaces: isStringArray(p.collapsedWorkspaces) ? p.collapsedWorkspaces : current.collapsedWorkspaces,
           emberShowWork: bool(p.emberShowWork, current.emberShowWork),
           threadInfoOpen: bool(p.threadInfoOpen, current.threadInfoOpen),
@@ -558,7 +620,7 @@ export const useUiStore = create<UiState>()(
         workingCollapsed: s.workingCollapsed,
         archivedCollapsed: s.archivedCollapsed,
         snoozedCollapsed: s.snoozedCollapsed,
-        collapsedProjects: s.collapsedProjects,
+        projectsLast: s.projectsLast,
         collapsedWorkspaces: s.collapsedWorkspaces,
         emberShowWork: s.emberShowWork,
         threadInfoOpen: s.threadInfoOpen,

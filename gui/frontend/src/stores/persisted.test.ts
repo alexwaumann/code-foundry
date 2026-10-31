@@ -43,12 +43,12 @@ const stores: Persisted[] = [
     name: "code-foundry.ui",
     version: 3,
     rehydrate: () => useUiStore.persist.rehydrate(),
-    fields: ["sidebarVisible", "sidebarWidth", "fontSize", "zoom", "usageRange", "workingCollapsed", "archivedCollapsed", "snoozedCollapsed", "collapsedProjects", "collapsedWorkspaces", "emberShowWork", "selection"],
+    fields: ["sidebarVisible", "sidebarWidth", "fontSize", "zoom", "usageRange", "workingCollapsed", "archivedCollapsed", "snoozedCollapsed", "projectsLast", "collapsedWorkspaces", "emberShowWork", "selection"],
     use: () => {
       const s = useUiStore.getState();
       for (const n of [s.sidebarWidth, s.fontSize, s.zoom]) expect(Number.isFinite(n)).toBe(true);
       expect(typeof s.sidebarVisible).toBe("boolean");
-      expect(s.collapsedProjects).toBeInstanceOf(Array);
+      expect(typeof s.projectsLast).toBe("string");
       expect(s.selection).toEqual(HOME);
     },
   },

@@ -87,7 +87,7 @@ import { useProjectsStore } from "@/stores/projects";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
 import { useThreadsStore } from "@/stores/threads";
-import { HOME, useUiStore } from "@/stores/ui";
+import { HOME, projectPage, useUiStore, workspacePage } from "@/stores/ui";
 import { loadWelcomePage, prefillWelcome, useWelcome, useWelcomeStore } from "@/stores/welcome";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
@@ -752,11 +752,11 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
                 if (dictation.onEscape()) return true;
                 if (!isDraftEmpty(getDraft(draftKey))) return false;
                 // Back where the composer came from: the thread for a like draft, the
-                // Projects page for a project (the worktree overview is a panel tab there,
-                // not a page); HOME (this composer on No project) when it has no project at all.
+                // workspace's or project's page; HOME (this composer on No project) when it
+                // has no project at all.
                 const ui = useUiStore.getState();
                 if (target.kind === "like") ui.select({ kind: "thread", id: target.threadId });
-                else ui.select(primaryProject || set.workspaceId ? { kind: "view", name: "projects" } : HOME);
+                else ui.select(set.workspaceId ? workspacePage(set.workspaceId) : primaryProject ? projectPage(primaryProject) : HOME);
                 return true;
               }}
               onPasteFiles={attach}

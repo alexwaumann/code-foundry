@@ -64,6 +64,9 @@ describe("keyOf", () => {
     ["composer", { kind: "compose", projectId: "r-1" }, "compose:r-1"],
     ["workspace composer", { kind: "compose", projectId: "r-1", workspaceId: "w-1" }, "compose:ws:w-1"],
     ["view", { kind: "view", name: "pullrequests" }, "view:pullrequests"],
+    ["the Projects index", { kind: "view", name: "projects" }, "view:projects"],
+    ["a project's page has its own", { kind: "view", name: "projects", projectId: "repo-cf" }, "view:projects:project:repo-cf"],
+    ["a workspace's page has its own", { kind: "view", name: "projects", workspaceId: "w-1" }, "view:projects:workspace:w-1"],
   ];
   it.each(cases)("%s", (_name, sel, want) => {
     expect(keyOf(sel)).toBe(want);
