@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, composeProject, DEFAULT_ORDER, emit, expectAttention, holdThreads, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, composeProject, DEFAULT_ORDER, emit, expectAttention, holdThreads, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, openWorkspacePage, resetMock, row } from "./fixtures";
 
 /** Where the mock (like the daemon) puts a project's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
@@ -210,10 +210,10 @@ test("Run in… is absent for a project thread and offered in the palette for a 
   await expect(row(page, `s:${driver}`).getByTestId("row-moving")).toBeVisible();
 });
 
-test("the Projects page removes a workspace and offers project actions", async ({ page }) => {
-  await mockPost("workspace?name=spare&projects=repo-gp,repo-sk");
+test("the Projects view removes a workspace and offers project actions", async ({ page }) => {
+  const spare = (await mockPost("workspace?name=spare&projects=repo-gp,repo-sk")) as { id: string };
   await openApp(page);
-  await openProjects(page);
+  await openWorkspacePage(page, spare.id);
   const ws = page.locator('[data-testid="workspace"]').filter({ hasText: "spare" });
   await ws.getByTestId("workspace-more").click();
   await page.getByTestId("workspace-remove").click();
@@ -224,13 +224,16 @@ test("the Projects page removes a workspace and offers project actions", async (
   expect((await lastInvocation("workspace.remove"))?.args).toEqual({ workspace: "spare" });
 
   // New thread from a project row opens its composer.
-  const gp = page.locator('[data-testid="project"][data-project="repo-gp"]');
+  await openProjects(page);
+  const gp = page.locator('[data-nav-key="p:repo-gp"]');
+  await gp.hover();
   await gp.getByTestId("project-new-thread").click();
   await expect(page.getByTestId("composer-heading")).toContainText("ghostty-playground");
 
   // Remove a worktree (project.worktree.remove with that worktree's context, confirmed).
-  await openProjects(page);
+  await openProjectPage(page, "repo-cf");
   const fix = page.locator(`[data-nav-key="pw:repo-cf::${CF}.worktrees/fix-resize"]`);
+  await fix.hover();
   await fix.getByTestId("worktree-more").click();
   await page.getByTestId("worktree-remove").click();
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
@@ -239,6 +242,7 @@ test("the Projects page removes a workspace and offers project actions", async (
   expect(rm?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: `${CF}.worktrees/fix-resize`, activeView: "projects" });
   // The main worktree has no remove action.
   const main = page.locator(`[data-nav-key="pw:repo-cf::${CF}"]`);
+  await main.hover();
   await expect(main.getByTestId("worktree-new-terminal")).toBeVisible();
   await main.getByTestId("worktree-more").click();
   await expect(page.getByTestId("worktree-more-menu")).toBeVisible();

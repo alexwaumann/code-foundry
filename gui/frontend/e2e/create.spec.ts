@@ -209,10 +209,10 @@ test("cancelling after a refused publish deletes the new project; Keep it local 
   expect((await projectCalls()).filter((c) => c.startsWith("delete"))).toEqual(["delete repo-taken"]);
 });
 
-test("the Projects page row's Publish to GitHub opens the publish dialog for sketches", async ({ page }) => {
+test("the Projects index row's Publish to GitHub opens the publish dialog for sketches", async ({ page }) => {
   await openApp(page);
   await openProjects(page);
-  await page.locator('[data-nav-key="p:repo-sk"]').getByTestId("project-publish").click();
+  await page.locator('[data-nav-key="p:repo-sk"]').getByTestId("index-publish").click();
   const pub = page.getByTestId("publish-dialog");
   await expect(pub).toBeVisible();
   await expect(pub).toHaveAttribute("data-project", "repo-sk");
@@ -234,7 +234,7 @@ test("the Projects page row's Publish to GitHub opens the publish dialog for ske
   await page.getByTestId("publish-submit").click();
   await expect(pub).toHaveCount(0);
   // Published: origin on GitHub, so the row no longer offers it.
-  await expect(page.locator('[data-nav-key="p:repo-sk"]').getByTestId("project-publish")).toHaveCount(0);
+  await expect(page.locator('[data-nav-key="p:repo-sk"]').getByTestId("index-publish")).toHaveCount(0);
   expect((await lastInvocation("project.github.publish"))?.args).toEqual({ project: "repo-sk", owner: "acme", name: "sketchbook", visibility: "private" });
 });
 

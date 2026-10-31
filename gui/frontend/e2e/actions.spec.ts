@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, mockUrl, openApp, openProjects, openTooltip, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, openProjectPage, openTooltip, resetMock, row } from "./fixtures";
 
 // Actions (docs/notes/actions-2-gui.md): the Projects page row's actions menu (the thread
 // header's Play menu is gone, docs/notes/thread-header-crumb.md), the thread info card's
@@ -35,7 +35,8 @@ async function selectThread(page: Page, id: string): Promise<void> {
 
 async function openMenu(page: Page, project = "repo-cf"): Promise<void> {
   await openApp(page);
-  await openProjects(page);
+  await openProjectPage(page, project);
+  await trigger(page, project).hover();
   await trigger(page, project).click();
   await expect(menu(page)).toBeVisible();
 }
@@ -68,7 +69,7 @@ async function runFromMenu(page: Page, name: string): Promise<string> {
   return (await tab.getAttribute("data-tab-id")) ?? "";
 }
 
-test("the Projects page row's menu: the project's actions, a pencil on the highlighted row, Escape through its tooltip", async ({ page }) => {
+test("a project page row's actions menu: the project's actions, a pencil on the highlighted row, Escape through its tooltip", async ({ page }) => {
   await openMenu(page);
   await expect(menu(page).getByTestId("actions-project")).toHaveText("code-foundry");
   await expect(items(page)).toHaveText(NAMES);
@@ -129,11 +130,12 @@ test("the card's action menu lists the project's actions and runs one in the thr
   expect(await page.locator("[data-sonner-toast]").count()).toBe(1);
 });
 
-test("a project without actions: the empty state and New action…", async ({ page }) => {
-  await openMenu(page, "repo-gp");
-  await expect(menu(page).getByTestId("actions-empty")).toHaveText("No actions for ghostty-playground yet");
-  await expect(items(page)).toHaveCount(0);
-  await menu(page).getByTestId("action-new").click();
+test("a project without actions: no row menu for them; Details says none and adds one", async ({ page }) => {
+  await openApp(page);
+  await openProjectPage(page, "repo-gp");
+  await expect(page.getByTestId("worktree-actions-menu")).toHaveCount(0);
+  await expect(page.getByTestId("details-actions")).toContainText(/none\s*·\s*Add an action/);
+  await page.getByTestId("details-add-action").click();
   await expect(dialog(page)).toBeVisible();
   await expect(dialog(page)).toHaveAttribute("data-mode", "new");
   await expect(dialog(page)).toContainText("Saved for every thread in ghostty-playground.");
@@ -320,9 +322,9 @@ test("an action an agent ran shows up as a tab of its thread's panel", async ({ 
   await expect(page.getByTestId("action-echo")).toHaveText("$ make check");
 });
 
-test("the Projects page: a worktree row runs an action for that worktree; the project menu adds one", async ({ page }) => {
+test("a project page: a checkout row runs an action for that worktree; the project menu adds one", async ({ page }) => {
   await openApp(page);
-  await openProjects(page);
+  await openProjectPage(page, "repo-cf");
   const wtRow = page.locator(`[data-testid="project-worktree"][data-path="${CF}"]`).locator("xpath=..");
   await wtRow.hover();
   await wtRow.getByTestId("worktree-actions-menu").click();
@@ -335,8 +337,8 @@ test("the Projects page: a worktree row runs an action for that worktree; the pr
   await expect(bottom(page).locator('[data-kind="action"]')).toHaveText("Build");
   await expect(page.getByTestId("action-echo")).toHaveText("$ make build");
 
-  const project = page.locator('[data-testid="project"][data-project="repo-gp"]');
-  await project.getByTestId("project-more").click();
+  await openProjectPage(page, "repo-gp");
+  await page.getByTestId("project-more").click();
   await page.getByTestId("project-new-action").click();
   await expect(dialog(page)).toHaveAttribute("data-mode", "new");
   await expect(dialog(page)).toContainText("Saved for every thread in ghostty-playground. Runs in the worktree's checkout");
