@@ -5,8 +5,9 @@ import { appPath, CF, invocations, mockPost, openApp, openProjectPage, openProje
  * The Projects view (docs/notes/projects-redesign-1-index.md): the index (rows by last
  * activity, status sentences, pills, setup links, filter, keyboard), a project's page
  * (header, picker, checkouts table, kind variants, details, narrow layout), the workspace
- * page's header, and navigation (a selection and a side panel per page, the sidebar row
- * reopening the last page). The mock's projects: code-foundry (repo-cf) and
+ * page's header, navigation (a selection and a side panel per page, the sidebar row
+ * reopening the last page), and a project's Worktrees without threads with the remove
+ * confirm (docs/notes/projects-redesign-2-leftovers.md). The mock's projects: code-foundry (repo-cf) and
  * ghostty-playground (repo-gp) on GitHub, dotfiles (repo-dot, a remote that is not
  * GitHub), sketches (repo-sk, git without a remote) and writing (repo-wr, no git).
  */
@@ -23,6 +24,11 @@ const indexIds = (page: Page) => page.locator('[data-testid="index-project"]').e
 const FEAT = `${CF}.worktrees/feat-sidebar`;
 const FIX = `${CF}.worktrees/fix-resize`;
 const MERGED = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-usage-polish";
+// POST /__mock/leftovers: three leftovers (and MERGED with clean=1).
+const SPIKE = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-perf-spike";
+const COPY = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy";
+const SHADERS = `${CF}-shaders`;
+const leftover = (page: Page, path: string) => page.locator(`[data-testid="leftover-row"][data-path="${path}"]`);
 
 async function lastInvocation(name: string) {
   await expect.poll(async () => (await invocations()).filter((i) => i.name === name).length).toBeGreaterThan(0);
@@ -269,8 +275,10 @@ test("a project's page: header, the checkouts table by activity, a row opens its
   await expect(page.getByTestId("details-remote")).toContainText("origin · github.com/alexwaumann/code-foundry");
   await expect(page.getByTestId("details-worktrees")).toContainText("~/src/code-foundry.worktrees · 1"); // fix/resize was removed above
   await expect(page.getByText("Show in sidebar")).toHaveCount(0);
-  // The slot PR 3 fills sits between Checkouts and Details.
-  await expect(page.getByTestId("leftover-worktrees-slot")).toHaveCount(1);
+  // Worktrees without threads sits between Checkouts and Details; threads hold both worktrees here.
+  const sections = await page.getByTestId("projects-list").evaluate((el) => [...el.children].map((c) => c.getAttribute("data-testid")));
+  expect(sections).toEqual(["project-checkouts", "leftover-worktrees", "project-details"]);
+  await expect(page.getByTestId("leftover-empty")).toBeVisible();
 });
 
 test("the picker: projects by activity, then workspaces, then Add project…; picking switches the page", async ({ page }) => {
@@ -495,4 +503,140 @@ test("the workspace page reached by its row, and the workspace header's actions"
   expect(await page.getByTestId("projects-page").getAttribute("data-workspace")).toBe(ws.id);
   await page.getByTestId("projects-crumb").click();
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
+});
+
+test("Worktrees without threads: a row per leftover with why it stayed; Show diff, Resume, New thread; the three cleanable counts agree", async ({ page }) => {
+  await mockPost("leftovers?project=repo-cf&clean=1");
+  await openApp(page);
+  await openProjects(page);
+  await expect(row(page, "repo-cf").getByTestId("index-tidy")).toHaveText("1 worktree to tidy");
+  await row(page, "repo-cf").click();
+  await page.getByTestId("project-more").click();
+  await expect(page.getByTestId("project-cleanup-count")).toHaveText("1");
+  await closeMenu(page, "project-more");
+
+  await expect(page.getByTestId("leftover-title")).toHaveText(/Worktrees without threads\s*· 4 kept/);
+  await expect(page.getByTestId("leftover-remove-clean")).toHaveText("Remove the 1 that is clean");
+  // Threads hold feat/sidebar and fix/resize: not leftovers.
+  await expect(page.getByTestId("leftover-row")).toHaveCount(4);
+  await expect(leftover(page, FEAT)).toHaveCount(0);
+  const rows: [string, string, string, boolean][] = [
+    [SPIKE, "cf/perf-spike", "3 commits not on main · last thread archived 12d ago", true],
+    [COPY, "cf/old-copy", "4 uncommitted files · merged otherwise · last thread archived 3w ago", true],
+    [SHADERS, "exp/shaders", "made outside Code Foundry · clean · merged", false],
+    [MERGED, "cf/usage-polish", "clean · merged", false],
+  ];
+  for (const [path, branch, reason, work] of rows) {
+    const r = leftover(page, path);
+    await expect(r.getByTestId("leftover-branch")).toHaveText(branch);
+    await expect(r.getByTestId("leftover-reason")).toHaveText(reason);
+    // Holding work: Show diff and Resume; clean: New thread. Remove… on every row.
+    await expect(r.getByTestId("leftover-show-diff")).toHaveCount(work ? 1 : 0);
+    await expect(r.getByTestId("leftover-resume")).toHaveCount(work ? 1 : 0);
+    await expect(r.getByTestId("leftover-new-thread")).toHaveCount(work ? 0 : 1);
+    await expect(r.getByTestId("leftover-remove")).toHaveText("Remove…");
+    if (work) await expect(r).toHaveAttribute("data-work", "true");
+    else await expect(r).not.toHaveAttribute("data-work");
+  }
+  await expect(page.getByTestId("leftover-footer")).toHaveText(
+    "Worktrees made for a thread go on their own once its last thread is archived and the work is on main. These stayed because they still hold something.",
+  );
+  // Details counts the worktrees Code Foundry made.
+  await expect(page.getByTestId("details-worktrees")).toContainText("6, 3 made by Code Foundry");
+
+  // Show diff: the worktree's Changes tab in this page's panel; narrow, Remove shows its icon only.
+  await leftover(page, COPY).getByTestId("leftover-show-diff").click();
+  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", COPY);
+  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-narrow", "true");
+  await expect(leftover(page, COPY).getByTestId("leftover-remove")).toHaveText("");
+  await expect(leftover(page, COPY).getByTestId("leftover-remove")).toHaveAttribute("aria-label", "Remove worktree…");
+  await page.getByTestId("side-panel").getByTestId("panel-toggle").click();
+
+  // New thread on a clean one: the composer in that checkout.
+  await leftover(page, MERGED).getByTestId("leftover-new-thread").click();
+  await expect(page.getByTestId("composer-heading")).toContainText("code-foundry");
+  await expect(page.getByTestId("composer-worktree")).toContainText("cf/usage-polish");
+
+  // Resume with an archived thread there: it is unarchived and shown, so the worktree is no leftover.
+  await openProjectPage(page, "repo-cf");
+  await leftover(page, SPIKE).getByTestId("leftover-resume").click();
+  const archive = await lastInvocation("thread.archive");
+  expect(archive?.args).toMatchObject({ archived: "false" });
+  expect(archive?.context).toMatchObject({ activeThreadId: "s-lo-spike" });
+  await expect(page.getByTestId("thread-header").getByTestId("thread-title")).toHaveText("Profile the renderer");
+  await openProjectPage(page, "repo-cf");
+  await expect(leftover(page, SPIKE)).toHaveCount(0);
+  await expect(page.getByTestId("leftover-title")).toContainText("3 kept");
+
+  // Resume with no archived thread there: the composer in that checkout.
+  await mockPost(`worktree/dirty?path=${encodeURIComponent(SHADERS)}&modified=2`);
+  await expect(leftover(page, SHADERS).getByTestId("leftover-reason")).toHaveText("made outside Code Foundry · 2 uncommitted files · merged otherwise");
+  await leftover(page, SHADERS).getByTestId("leftover-resume").click();
+  await expect(page.getByTestId("composer-worktree")).toContainText("exp/shaders");
+});
+
+test("Remove…: the confirm names what goes and what stays; with uncommitted files it warns and lists them, and one yes removes", async ({ page }) => {
+  await mockPost("leftovers?project=repo-cf");
+  await openApp(page);
+  await openProjectPage(page, "repo-cf");
+  await expect(page.getByTestId("leftover-remove-clean")).toHaveCount(0);
+
+  // Dirty: the warning, the first three files and how many more; Show diff closes it and opens the Changes tab.
+  await leftover(page, COPY).getByTestId("leftover-remove").click();
+  const dialog = page.getByTestId("remove-worktree-dialog");
+  await expect(page.getByTestId("remove-worktree-title")).toHaveText("Remove the worktree on cf/old-copy?");
+  await expect(page.getByTestId("remove-worktree-body")).toHaveText("~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy goes. The branch cf/old-copy stays.");
+  await expect(page.getByTestId("remove-worktree-loss-count")).toHaveText("4 uncommitted files are lost.");
+  await expect(page.getByTestId("remove-worktree-loss-files")).toHaveText("gui/frontend/src/lib/tree.ts, docs/notes/sidebar.md, scratch.txt and 1 more · Show diff");
+  await page.getByTestId("remove-worktree-show-diff").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", COPY);
+  await expect(leftover(page, COPY)).toHaveCount(1);
+
+  // Cancel keeps it.
+  await leftover(page, SPIKE).getByTestId("leftover-remove").click();
+  await expect(page.getByTestId("remove-worktree-loss")).toHaveCount(0);
+  await page.getByTestId("remove-worktree-cancel").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(leftover(page, SPIKE)).toHaveCount(1);
+
+  // One yes removes the dirty one: the daemon's second question (force) is answered by it.
+  await leftover(page, COPY).getByTestId("leftover-remove").click();
+  await page.getByTestId("remove-worktree-ok").click();
+  await expect(leftover(page, COPY)).toHaveCount(0);
+  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
+  const removes = (await invocations()).filter((i) => i.name === "project.worktree.remove");
+  expect(removes.at(-1)?.args).toEqual({ path: COPY, force: "true" });
+  expect(removes.at(-1)?.confirmed).toBe(true);
+
+  // Clean: no warning, no force.
+  await leftover(page, SHADERS).getByTestId("leftover-remove").click();
+  await expect(page.getByTestId("remove-worktree-title")).toHaveText("Remove the worktree on exp/shaders?");
+  await expect(page.getByTestId("remove-worktree-loss")).toHaveCount(0);
+  await page.getByTestId("remove-worktree-ok").click();
+  await expect(leftover(page, SHADERS)).toHaveCount(0);
+  expect((await lastInvocation("project.worktree.remove"))?.args).toEqual({ path: SHADERS });
+  await expect(page.getByTestId("leftover-title")).toContainText("1 kept");
+});
+
+test("Remove the N that are clean runs the cleanup after its confirm; with nothing kept the section says so", async ({ page }) => {
+  await mockPost("leftovers?project=repo-cf&clean=1");
+  await openApp(page);
+  await openProjectPage(page, "repo-cf");
+  await page.getByTestId("leftover-remove-clean").click();
+  await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
+  await expect(leftover(page, MERGED)).toHaveCount(0);
+  expect((await lastInvocation("project.worktree.cleanup"))?.args).toEqual({ project: "repo-cf" });
+  await expect(page.getByTestId("leftover-remove-clean")).toHaveCount(0);
+  // Only the cleanable one goes: the others still hold something (or were made outside the app).
+  await expect(page.getByTestId("leftover-row")).toHaveCount(3);
+  await openProjects(page);
+  await expect(page.getByTestId("index-tidy")).toHaveCount(0);
+
+  // ghostty-playground: nothing kept.
+  await openProjectPage(page, "repo-gp");
+  await expect(page.getByTestId("leftover-title")).toHaveText("Worktrees without threads");
+  await expect(page.getByTestId("leftover-empty")).toHaveText("Nothing kept. Worktrees made for a thread go on their own once its last thread is archived and the work is on main.");
+  await expect(page.getByTestId("leftover-footer")).toHaveCount(0);
+  await expect(page.getByTestId("leftover-remove-clean")).toHaveCount(0);
 });
