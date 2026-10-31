@@ -86,7 +86,9 @@ type runner struct {
 	reason, pubReason string
 	// ask, pubAsk: the request id the reason describes (Thread.PendingRequestID).
 	ask, pubAsk string
-	debounce    *time.Timer
+	// tool, pubTool: the running tool call's line (Thread.BusyTool, busytool.go).
+	tool, pubTool string
+	debounce      *time.Timer
 
 	activity, pubActivity, savedActivity time.Time
 
@@ -340,11 +342,11 @@ func (r *runner) rescan(s Thread, cid, path string, limit int64) {
 		"took", time.Since(start).Round(time.Millisecond).String())
 }
 
-// checkStatus schedules a debounced publish when the status changed.
+// checkStatus schedules a debounced publish when the status or the running tool
+// changed.
 func (r *runner) checkStatus() {
-	r.status, r.reason = r.st.sd.Status()
-	r.ask = r.st.sd.asking()
-	if (r.status != r.pubStatus || r.reason != r.pubReason || r.ask != r.pubAsk) && r.debounce == nil {
+	r.readStatus()
+	if (r.status != r.pubStatus || r.reason != r.pubReason || r.ask != r.pubAsk || r.tool != r.pubTool) && r.debounce == nil {
 		r.debounce = time.NewTimer(r.m.opts.StatusDebounce)
 	}
 }
@@ -353,19 +355,32 @@ func (r *runner) checkStatus() {
 // (debounced, a handful per turn) is what lets a thread that is waiting on the user
 // still say so after the daemon dies without a clean shutdown. A new request that
 // reads like the one before it (the same reason) is a change too: PendingRequestID.
+// The running tool alone (BusyTool, a few per turn) is published without a save: it is
+// not persisted.
 func (r *runner) publishStatus() {
-	r.status, r.reason = r.st.sd.Status()
-	r.ask = r.st.sd.asking()
+	r.readStatus()
 	if r.status == r.pubStatus && r.reason == r.pubReason && r.ask == r.pubAsk {
+		if r.tool != r.pubTool {
+			r.pubTool = r.tool
+			r.m.update(r.id, false, func(rec *record) { rec.s.BusyTool = busyToolFor(rec.s.Status, rec.s.StatusReason, r.tool) })
+		}
 		return
 	}
-	r.pubStatus, r.pubReason, r.pubAsk, r.pubActivity = r.status, r.reason, r.ask, r.activity
+	r.pubStatus, r.pubReason, r.pubAsk, r.pubTool, r.pubActivity = r.status, r.reason, r.ask, r.tool, r.activity
 	now := r.m.opts.Now()
 	r.m.update(r.id, true, func(rec *record) {
 		rec.s.setStatus(r.status, r.reason, now)
 		rec.s.PendingRequestID = r.ask
+		rec.s.BusyTool = r.tool
 		rec.s.LastActivityAt = r.activity
 	})
+}
+
+// readStatus reads the status, its request and the running tool from the stream.
+func (r *runner) readStatus() {
+	r.status, r.reason = r.st.sd.Status()
+	r.ask = r.st.sd.asking()
+	r.tool = busyToolFor(r.status, r.reason, r.st.proj.busy.line(r.cwd))
 }
 
 // finish detaches the runner, applying the final state. Every disconnect of a live
@@ -411,6 +426,7 @@ func (r *runner) finish(fn func(*Thread)) {
 		s.BackgroundShellsRunning, s.BackgroundShells = 0, nil
 		s.WakePending = false
 		s.PendingRequestID = "" // its requests ended with it
+		s.BusyTool = ""         // and its tool calls
 		if s.ReseedPending {
 			// The reseed's stop (or any end meanwhile): the next start is fresh (reseed.go).
 			s.ReseedPending = false

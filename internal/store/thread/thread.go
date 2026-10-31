@@ -254,6 +254,10 @@ type Thread struct {
 	// a 429, a 529, a 5xx, a connection error) and nil once any other frame follows or
 	// the process ends. Not persisted. See docs/notes/api-retry-note.md.
 	Retry *APIRetry
+	// BusyTool is the top-level tool Claude is running now, "<tool> <argument>" ("Bash
+	// make check"; busytool.go), the latest started when several run; "" unless Status
+	// is busy and not compacting (setStatus clears it). Not persisted.
+	BusyTool string
 	// BackgroundShellsRunning counts the thread's own background shells running now
 	// (bgshells.go): Bash calls with run_in_background and Monitor calls. 0 once the
 	// process ended. Not persisted.
