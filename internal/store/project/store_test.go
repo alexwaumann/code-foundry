@@ -341,6 +341,28 @@ func TestCreateWorktreeBranchResolution(t *testing.T) {
 	}
 }
 
+// An explicit Path puts the worktree there instead of the branch's default path (a
+// removed checkout made again on another branch than its path's); it must be inside the
+// worktrees root.
+func TestCreateWorktreeAtPath(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	ctx := context.Background()
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	git(t, f.project, "branch", "moved")
+	at := h.store.DefaultWorktreePath(r.ID, "made-for")
+	w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "moved", Path: at})
+	if err != nil || w.Branch != "moved" || !samePath(w.Path, at) || !w.Managed {
+		t.Fatalf("at a path: %+v, %v (want %s)", w, err, at)
+	}
+	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "x", BaseRef: "HEAD", Path: t.TempDir()}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("outside the worktrees root: %v", err)
+	}
+}
+
 // A new branch tracks its base only when the base is origin/<the branch itself>.
 func TestCreateWorktreeUpstream(t *testing.T) {
 	f := newFixture(t)
