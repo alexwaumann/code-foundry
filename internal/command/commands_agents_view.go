@@ -67,7 +67,7 @@ func agentViewCommands(b AgentsBackend, e Emitter) []Command {
 				"The run: its id from thread agents --json, or its start.",
 			Category: "Thread",
 			// A verb that drives the GUI with a run id the palette cannot pick: the GUI opens
-			// runs from their Agent rows, the strip above the composer and the Agents tab.
+			// runs from their Agent rows, the strip above the composer and the thread info card.
 			NoKeybinding: true,
 			Args: []ArgSpec{
 				{Name: "run", Type: String, Required: true, Positional: true, Description: "Agent run id (or its start)"},

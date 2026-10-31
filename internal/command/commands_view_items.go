@@ -225,7 +225,7 @@ func (d ViewDeps) prCheck(ctx context.Context, t *v1.Thread, a Args) (map[string
 	case 1:
 		slug = linked[0]
 	default:
-		return nil, InvalidArg("number", "thread %s links #%d in %d repositories (%s); open it from the Linked PRs tab", t.GetId(), n, len(linked), strings.Join(linked, ", "))
+		return nil, InvalidArg("number", "thread %s links #%d in %d repositories (%s); open it from the thread info card's pull request rows", t.GetId(), n, len(linked), strings.Join(linked, ", "))
 	}
 	res, err := d.PullRequests.GetPullRequest(ctx, connect.NewRequest(&v1.GetPullRequestRequest{RepoSlug: slug, Number: int32(n)}))
 	switch {
