@@ -19,8 +19,8 @@ const thread = (o: Partial<ThreadView>) =>
 beforeEach(() => {
   useProjectsStore.setState({
     byId: {
-      cf: { id: "cf", name: "code-foundry", git: true, worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }] },
-      notes: { id: "notes", name: "writing", git: false, worktrees: [{ path: "/src/notes", branch: "", head: "", isMain: true }] },
+      cf: { id: "cf", name: "code-foundry", git: true, githubSlug: "", remotes: [], worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }] },
+      notes: { id: "notes", name: "writing", git: false, githubSlug: "", remotes: [], worktrees: [{ path: "/src/notes", branch: "", head: "", isMain: true }] },
     } as never,
     order: ["cf", "notes"],
   });
@@ -387,9 +387,9 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     dashboardResource.store.setState({ entries: {} });
     useProjectsStore.setState({
       byId: {
-        cf: { id: "cf", name: "code-foundry", git: true, worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }, { path: "/wt/cf/feat-x", branch: "feat/x", head: "b", isMain: false }] },
-        gp: { id: "gp", name: "ghostty-playground", git: true, worktrees: [{ path: "/src/gp", branch: "main", head: "c", isMain: true }, { path: "/wt/gp/cf-login", branch: "cf/login", head: "d", isMain: false }] },
-        notes: { id: "notes", name: "writing", git: false, worktrees: [{ path: "/src/notes", branch: "", head: "", isMain: true }] },
+        cf: { id: "cf", name: "code-foundry", git: true, githubSlug: "", remotes: [], worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }, { path: "/wt/cf/feat-x", branch: "feat/x", head: "b", isMain: false }] },
+        gp: { id: "gp", name: "ghostty-playground", git: true, githubSlug: "", remotes: [], worktrees: [{ path: "/src/gp", branch: "main", head: "c", isMain: true }, { path: "/wt/gp/cf-login", branch: "cf/login", head: "d", isMain: false }] },
+        notes: { id: "notes", name: "writing", git: false, githubSlug: "", remotes: [], worktrees: [{ path: "/src/notes", branch: "", head: "", isMain: true }] },
       } as never,
       order: ["cf", "gp", "notes"],
     });
@@ -493,8 +493,8 @@ describe("SidebarRow line 2 of a multi-project thread: the run-in project only",
   beforeEach(() => {
     useProjectsStore.setState({
       byId: {
-        cf: { id: "cf", name: "code-foundry", git: true, worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }] },
-        gp: { id: "gp", name: "ghostty-playground", git: true, worktrees: [{ path: "/wt/gp/cf-login", branch: "cf/login", head: "d", isMain: false }] },
+        cf: { id: "cf", name: "code-foundry", git: true, githubSlug: "", remotes: [], worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }] },
+        gp: { id: "gp", name: "ghostty-playground", git: true, githubSlug: "", remotes: [], worktrees: [{ path: "/wt/gp/cf-login", branch: "cf/login", head: "d", isMain: false }] },
       } as never,
       order: ["cf", "gp"],
     });

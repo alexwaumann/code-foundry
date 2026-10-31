@@ -1,5 +1,6 @@
 import { useRef } from "react";
-import { ChevronRight, Folder, FolderGit2, FolderOpen } from "lucide-react";
+import { ChevronRight, FolderOpen } from "lucide-react";
+import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
 import { CommandGroup, CommandItem } from "@/components/ui/command";
 import { Tip } from "@/components/ui/tooltip";
 import type { PathListingState } from "./usePathListing";
@@ -76,7 +77,7 @@ export function PathSuggestions({
                 else onPick(e.name);
               }}
             >
-              {e.isGit ? <FolderGit2 className="text-cf-warning-text" aria-label="git repository" /> : <Folder />}
+              {e.isGit ? <ProjectKindIcon kind="git" aria-hidden={false} aria-label="git repository" /> : <ProjectKindIcon kind="nogit" />}
               <span className="truncate font-mono">{e.name}</span>
               {e.registered && <span className="ml-auto shrink-0 text-caption">already added</span>}
               {onOpen && (

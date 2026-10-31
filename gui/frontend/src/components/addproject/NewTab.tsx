@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { CloudUpload, Loader2, Sparkles } from "lucide-react";
+import { CloudUpload, FolderPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { errorMessage } from "@/api/stream";
 import { PublishPicker } from "@/components/publish/PublishPicker";
@@ -106,7 +106,7 @@ export function NewTab({ active }: { active: boolean }) {
   const nameMessage = createError ?? (touched || name !== "" ? nameError : null);
   const label = busy === "create" ? "Creating…" : busy === "publish" ? "Publishing…" : created ? (publish ? "Publish" : "Done") : publish ? "Create and publish" : "Create project";
   // Done (a created project kept as it is) has no icon; the others say what they do.
-  const icon = busy ? <Loader2 className="animate-spin" aria-hidden /> : created && !publish ? null : publish ? <CloudUpload aria-hidden /> : <Sparkles aria-hidden />;
+  const icon = busy ? <Loader2 className="animate-spin" aria-hidden /> : created && !publish ? null : publish ? <CloudUpload aria-hidden /> : <FolderPlus aria-hidden />;
   return (
     <form
       className="flex flex-col gap-3"

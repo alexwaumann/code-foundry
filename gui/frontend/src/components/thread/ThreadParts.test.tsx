@@ -12,7 +12,7 @@ import { ThreadTitle } from "./ThreadParts";
 
 const thread = (id: string, o: Partial<ThreadView> = {}) =>
   ({ id, name: `Thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], pendingWorktreePath: "", createdBy: "", createdByName: "", parentId: "", checkoutPaths: [], flags: [], ...o }) as ThreadView;
-const PROJECT = (id: string) => ({ id, name: id, git: true, worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
+const PROJECT = (id: string) => ({ id, name: id, git: true, githubSlug: "", remotes: [], worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
 
 function show(o: Partial<ThreadView>, others: ThreadView[] = []): void {
   const all = [thread("s-1", o), ...others];

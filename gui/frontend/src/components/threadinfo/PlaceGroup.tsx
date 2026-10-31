@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Check, CircleAlert, Code, FolderOpen, Layers, OctagonX, Play, Plug, Plus, Save, SquareTerminal, X } from "lucide-react";
+import { Check, CircleAlert, Code, Layers, OctagonX, Play, Plug, Plus, Save, SquareTerminal, Unlink } from "lucide-react";
 import { FinderMark } from "@/components/icons/FinderMark";
+import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { ACTION_ICON } from "@/components/actions/actionIcons";
 import {
   DropdownMenu,
@@ -124,7 +125,7 @@ function RunInItem({
             onRemove(projectId);
           }}
         >
-          <X className="size-3" aria-hidden />
+          <Unlink className="size-3" aria-hidden />
         </button>
       )}
     </DropdownMenuItem>
@@ -251,7 +252,7 @@ function ProjectRow({ threadId }: { threadId: string }) {
       <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         {withNotes(
           <DropdownMenuTrigger asChild>
-            <Row icon={<FolderOpen />} meta={meta} chevron={open || picking ? "open" : "closed"} testId="ti-project">
+            <Row icon={<ProjectIcon projectId={cwdProjectId} />} meta={meta} chevron={open || picking ? "open" : "closed"} testId="ti-project">
               {label}
             </Row>
           </DropdownMenuTrigger>,

@@ -100,7 +100,7 @@ test("invoking a command sends the current context", async ({ page }) => {
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
   await page.keyboard.press("Meta+k");
-  await page.keyboard.type("reveal settings");
+  await page.keyboard.type("open settings file");
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("settings.reveal");
   expect((await invocations()).at(-1)?.context).toEqual({

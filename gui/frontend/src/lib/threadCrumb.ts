@@ -6,7 +6,7 @@
 import type { ThreadView } from "@/api/threads";
 import { isNoProject, NO_PROJECT, threadRowModel, type ProjectLookup, type WorkspaceLookup } from "./threadRow";
 
-/** The place segment's icon: a project's folder, a named workspace's layers, an unnamed set's folders, home. */
+/** The place segment's icon: one project (its kind icon), a named workspace's layers, an unnamed set's folders, home. */
 export type CrumbIcon = "folder" | "layers" | "folders" | "house";
 
 export interface CrumbParent {

@@ -1,4 +1,5 @@
-import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, ArrowRightLeft, Eye, EyeOff, FlagOff, FolderGit2, GitBranchPlus, Layers, Pencil, Pin, PinOff, RotateCw } from "lucide-react";
+import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, ArrowRightLeft, Eye, EyeOff, FlagOff, GitBranchPlus, Layers, Pencil, Pin, PinOff, RotateCw } from "lucide-react";
+import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
@@ -26,7 +27,7 @@ function MemberItem({ kit, threadId, projectId, path, current, queued }: { kit: 
         void runThreadIn(threadId, projectId);
       }}
     >
-      <FolderGit2 className="text-cf-info-text/90" />
+      <ProjectIcon projectId={projectId} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate">{name}</span>
         {branch && <span className="truncate font-mono text-caption">{branch}</span>}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { Bell, FileText, GitBranch, Keyboard, Palette, Search, Settings2, SlidersHorizontal, TriangleAlert, Wrench, X, type LucideIcon } from "lucide-react";
+import { Bell, GitBranch, Keyboard, Palette, Search, Settings2, SlidersHorizontal, TriangleAlert, Wrench, X, type LucideIcon } from "lucide-react";
+import { FinderMark } from "@/components/icons/FinderMark";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
 import { FlameNavIcon } from "@/components/ember/Flame";
 import { Button } from "@/components/ui/button";
@@ -235,7 +236,7 @@ export function SettingsPage() {
           </span>
         </Tip>
         <Button variant="outline" size="xs" onClick={() => void runCommand("settings.reveal")} data-testid="reveal-settings">
-          <FileText /> Reveal settings file
+          <FinderMark /> Open settings file in Finder
         </Button>
         <Button variant="ghost" size="icon-xs" aria-label="Close settings" onClick={closeSettings}>
           <X />

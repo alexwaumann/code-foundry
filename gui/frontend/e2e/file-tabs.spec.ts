@@ -244,7 +244,7 @@ test("a PDF shows its pages; a 1.5 MB image comes back whole; an image or PDF ov
   const bigImage = file(page).getByTestId("file-image-too-large");
   await expect(bigImage).toContainText("Image · 47.7 MB · too large to show");
   await expect(bigImage.getByRole("button", { name: "Open in editor" })).toBeVisible();
-  await expect(bigImage.getByRole("button", { name: "Reveal in Finder" })).toBeVisible();
+  await expect(bigImage.getByRole("button", { name: "Open in Finder" })).toBeVisible();
   await expect(file(page).getByTestId("file-image")).toHaveCount(0);
   await expect(file(page).getByTestId("file-truncated")).toHaveCount(0);
 
@@ -252,7 +252,7 @@ test("a PDF shows its pages; a 1.5 MB image comes back whole; an image or PDF ov
   const bigPdf = file(page).getByTestId("file-pdf-too-large");
   await expect(bigPdf).toContainText("PDF · 47.7 MB · too large to show");
   await expect(bigPdf.getByRole("button", { name: "Open in editor" })).toBeVisible();
-  await expect(bigPdf.getByRole("button", { name: "Reveal in Finder" })).toBeVisible();
+  await expect(bigPdf.getByRole("button", { name: "Open in Finder" })).toBeVisible();
   await expect(file(page).getByTestId("file-meta")).toHaveText("47.7 MB · PDF");
   await expect(file(page).getByTestId("file-pdf")).toHaveCount(0);
   await expect(file(page).getByTestId("file-truncated")).toHaveCount(0);

@@ -1,7 +1,8 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CornerDownRight, Folder, FolderGit2, GitBranch, Hourglass, House, Layers, OctagonX, Pin, Trash2, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CornerDownRight, GitBranch, Hourglass, House, Layers, OctagonX, Pin, Trash2, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
+import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Chip } from "@/components/thread/Chip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,6 +13,7 @@ import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { FRESH_COPY, PROJECT_FOLDER } from "@/lib/compose";
+import { projectKind, type ProjectKind } from "@/lib/projects";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
 import { modelLabel, projectsLabel, threadRowModel, type ThreadPlace, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
@@ -262,8 +264,10 @@ function TipRow({ icon, chip, meta, children, testId }: { icon: ReactNode; chip?
   );
 }
 
+const TIP_ICON = "size-3.5 shrink-0 text-cf-icon-muted";
+
 function TipIcon({ icon: Icon }: { icon: LucideIcon }) {
-  return <Icon className="size-3.5 shrink-0 text-cf-icon-muted" aria-hidden />;
+  return <Icon className={TIP_ICON} aria-hidden />;
 }
 
 const tipStatusIcons: Readonly<Record<TipStatusTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX };
@@ -343,7 +347,9 @@ function ThreadTipBody({ id }: { id: string }) {
   const m = useProjectsStore(
     useShallow((st) => {
       const r = threadRowModel(where, st, wsName ? { byId: { [where.workspaceId]: { name: wsName } } } : NO_WORKSPACES);
-      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, place: r.place, set: r.set, inFolder: !r.noProject && where.projectId === "" && where.workspaceId !== "" };
+      const p = st.byId[where.projectId];
+      const kind: ProjectKind = p ? projectKind(p).kind : r.noGit ? "nogit" : "git";
+      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, place: r.place, set: r.set, inFolder: !r.noProject && where.projectId === "" && where.workspaceId !== "", kind };
     }),
   );
   return (
@@ -362,7 +368,7 @@ function ThreadTipBody({ id }: { id: string }) {
         </TipRow>
       )}
       <TipRow
-        icon={<TipIcon icon={m.noProject ? House : m.inFolder ? Layers : m.noGit ? Folder : FolderGit2} />}
+        icon={m.noProject ? <TipIcon icon={House} /> : m.inFolder ? <TipIcon icon={Layers} /> : <ProjectKindIcon kind={m.kind} className={TIP_ICON} />}
         chip={m.noGit ? "no git" : m.place === null ? null : placeWords[m.place]}
         testId="tip-project"
       >

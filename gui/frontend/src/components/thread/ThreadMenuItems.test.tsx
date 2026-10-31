@@ -52,7 +52,7 @@ function setThread(o: Partial<ThreadView>, others: ThreadView[] = []): void {
   useThreadsStore.setState({ byId: Object.fromEntries(all.map((t) => [t.id, t])), order: all.map((t) => t.id) });
 }
 
-const PROJECT = (id: string) => ({ id, name: id, git: true, worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
+const PROJECT = (id: string) => ({ id, name: id, git: true, githubSlug: "", remotes: [], worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
 
 beforeEach(() => {
   useCommandsStore.setState({ commands: [cmd("thread.snooze"), cmd("thread.archive"), cmd("thread.pin"), cmd("thread.sidebar"), cmd("thread.restart"), cmd("thread.flag.clear")] });

@@ -107,7 +107,7 @@ describe("FileTab", () => {
     const state = await screen.findByTestId("file-pdf-too-large");
     expect(state.textContent).toContain("PDF · 48.0 MB · too large to show");
     expect(within(state).getByRole("button", { name: "Open in editor" })).toBeTruthy();
-    expect(within(state).getByRole("button", { name: "Reveal in Finder" })).toBeTruthy();
+    expect(within(state).getByRole("button", { name: "Open in Finder" })).toBeTruthy();
     expect(screen.getByTestId("file-meta").textContent).toBe("48.0 MB · PDF");
     expect(screen.queryByTestId("file-truncated")).toBeNull();
     expect(loadPdf).not.toHaveBeenCalled();
