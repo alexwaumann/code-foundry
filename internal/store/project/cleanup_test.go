@@ -109,6 +109,35 @@ func TestCleanupVerdict(t *testing.T) {
 	}
 }
 
+func TestWorktreeLanded(t *testing.T) {
+	base := Status{BaseRef: "origin/main"}
+	with := func(f func(*Status)) Worktree {
+		st := base
+		f(&st)
+		return Worktree{Path: "/wt/a", Branch: "cf/a", Status: st}
+	}
+	tests := []struct {
+		name string
+		w    Worktree
+		want bool
+	}{
+		{"in the base", with(func(*Status) {}), true},
+		{"behind the base is still landed", with(func(s *Status) { s.BaseBehind = 4 }), true},
+		{"dirty but its commits are in", with(func(s *Status) { s.Modified, s.Dirty = 2, true }), true},
+		{"commits not in the base", with(func(s *Status) { s.BaseAhead = 3 }), false},
+		{"a rebased or squash-merged copy landed", with(func(s *Status) { s.BaseAhead, s.BaseMerged = 3, true }), true},
+		{"no base ref", with(func(s *Status) { s.BaseRef = "" }), false},
+		{"status read failed", with(func(s *Status) { s.Error = "boom" }), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.w.Landed(); got != tt.want {
+				t.Errorf("Landed = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // A worktree whose threads are all archived or removed is not kept for being new: no
 // one is about to commit in it. Every other rule still holds.
 func TestCleanupVerdictAbandoned(t *testing.T) {

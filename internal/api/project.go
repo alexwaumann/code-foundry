@@ -290,9 +290,11 @@ func projectToProto(r project.Project) *v1.Project {
 }
 
 func worktreeToProto(w project.Worktree) *v1.Worktree {
+	removable, reason := project.CleanupVerdict(w, time.Now())
 	return &v1.Worktree{
 		ProjectId: w.ProjectID, Path: w.Path, Branch: w.Branch, Head: w.Head,
-		IsMain: w.IsMain, Detached: w.Detached, Status: gitStatusToProto(w.Status), MergedClean: w.MergedClean(time.Now()),
+		IsMain: w.IsMain, Detached: w.Detached, Status: gitStatusToProto(w.Status), MergedClean: removable,
+		Managed: w.Managed, Landed: w.Landed(), CleanupReason: reason,
 	}
 }
 
