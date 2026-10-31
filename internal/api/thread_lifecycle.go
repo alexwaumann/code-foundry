@@ -310,6 +310,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	p.BackgroundShellsRunning = int32(s.BackgroundShellsRunning)
 	p.BackgroundShells = backgroundShellsToProto(s.BackgroundShells) // thread_shell.go
 	p.BackgroundWakePending = s.WakePending
+	p.BusyTool = s.BusyTool // the running tool call, "" unless busy (busytool.go)
 	p.ContextTokens, p.ContextRereadUsd = s.ContextTokens, contextRereadUSD(s)
 	p.ContextWindow = model.ContextWindow(s.Model)
 	if !s.CacheExpiresAt.IsZero() {
