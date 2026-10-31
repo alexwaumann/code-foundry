@@ -3,7 +3,7 @@ import { toneText } from "@/components/pr/tones";
 import { prStateLook } from "@/components/prs/prState";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useUiStore } from "@/stores/ui";
+import { showThreadInfo } from "@/stores/threadInfoOverlay";
 import { linkedPrTag, linkedPrTagText, linkedPrTip } from "./linkedPrTag";
 import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
 
@@ -39,7 +39,7 @@ export function LinkedPrsBadge({ id }: { id: string }) {
         data-state={tag.kind === "one" ? tag.state : undefined}
         data-tone={tag.tone}
         onClick={() => {
-          useUiStore.setState({ threadInfoOpen: true });
+          showThreadInfo(id);
         }}
       >
         {look && <look.icon className="size-3 shrink-0" aria-label={look.label} />}

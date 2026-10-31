@@ -25,6 +25,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
+import { installInputModality } from "@/lib/inputModality";
 import { startMenuCommands } from "@/keys/menu";
 import { startThemePublish, syncDocumentScheme, useColorScheme } from "@/lib/theme";
 import { startThemeReports } from "@/lib/themeReports";
@@ -79,6 +80,8 @@ function startApp(): () => void {
     startHealthPolling(2000),
     startEventSync(),
     startCommandSync(),
+    // Before the key handler, so a chord's command sees its own key as the last input.
+    installInputModality(),
     installKeybindings(),
     startViewSync(),
     startArchiveCleanup(),

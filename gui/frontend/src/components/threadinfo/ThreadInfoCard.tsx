@@ -1,4 +1,5 @@
 import type { RefObject, WheelEvent } from "react";
+import { cn } from "@/lib/utils";
 import { ContextGroup } from "./ContextGroup";
 import { GitGroup } from "./GitGroup";
 import { LineageGroup } from "./LineageGroup";
@@ -20,7 +21,8 @@ const LINE_PX = 16;
  * at the pane's edge, in the card's gutter. The column takes no pointer events of its own,
  * so a wheel beside or under the card reaches the conversation; one over the card scrolls
  * the card while it is taller than the pane, and is handed to the conversation otherwise
- * (`scrollerRef`: the body the timeline scrolls in).
+ * (`scrollerRef`: the body the timeline scrolls in). Without room beside the conversation
+ * the same content floats over it instead (ThreadInfoOverlay), which scrolls only itself.
  */
 export function ThreadInfoCard({ threadId, scrollerRef }: { threadId: string; scrollerRef?: RefObject<HTMLElement | null> }) {
   const forward = (e: WheelEvent<HTMLElement>) => {
@@ -43,14 +45,21 @@ export function ThreadInfoCard({ threadId, scrollerRef }: { threadId: string; sc
       data-testid="thread-info"
       onWheel={forward}
     >
-      <div className="pointer-events-auto flex flex-none flex-col rounded-lg border bg-cf-sidebar py-1" data-testid="thread-info-card">
-        <PlaceGroup threadId={threadId} />
-        <GitGroup threadId={threadId} />
-        <ShellsGroup threadId={threadId} />
-        <LineageGroup threadId={threadId} />
-        <McpGroup threadId={threadId} />
-        <ContextGroup threadId={threadId} />
-      </div>
+      <ThreadInfoContent threadId={threadId} className="pointer-events-auto rounded-lg border bg-cf-sidebar" />
     </aside>
+  );
+}
+
+/** The card's groups, in the inline column's box or the overlay's. */
+export function ThreadInfoContent({ threadId, className }: { threadId: string; className?: string }) {
+  return (
+    <div className={cn("flex flex-none flex-col py-1", className)} data-testid="thread-info-card">
+      <PlaceGroup threadId={threadId} />
+      <GitGroup threadId={threadId} />
+      <ShellsGroup threadId={threadId} />
+      <LineageGroup threadId={threadId} />
+      <McpGroup threadId={threadId} />
+      <ContextGroup threadId={threadId} />
+    </div>
   );
 }

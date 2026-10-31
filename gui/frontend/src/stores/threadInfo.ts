@@ -79,16 +79,6 @@ export function useActionPicks(threadId: string, memberIds: readonly string[]): 
   return { withActions, picks };
 }
 
-/**
- * Whether the thread body on screen has room for the card (lib/threadInfo cardFits), as
- * ThreadPane measures it; the header toggle says "Not enough room" while it has none.
- */
-export const useCardRoom = create<{ room: boolean }>()(() => ({ room: true }));
-
-export function setCardRoom(room: boolean): void {
-  if (useCardRoom.getState().room !== room) useCardRoom.setState({ room });
-}
-
 /** Whether another thread's model is working in the checkout at `path` (lib/threadInfo otherModelWorksIn). */
 export function useCheckoutShared(threadId: string, path: string): boolean {
   return useThreadsStore((s) => otherModelWorksIn(s, threadId, path));

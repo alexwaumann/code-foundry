@@ -6,11 +6,12 @@ import { ThreadTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { ThreadInfoCard } from "@/components/threadinfo/ThreadInfoCard";
+import { ThreadInfoOverlay } from "@/components/threadinfo/ThreadInfoOverlay";
 import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
 import { forgetTurnView, startThreadWatch } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
-import { setCardRoom } from "@/stores/threadInfo";
+import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
 import { cardFits } from "@/lib/threadInfo";
 import { useWidth } from "@/lib/useWidth";
@@ -84,15 +85,20 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   const infoOpen = useUiStore((s) => s.threadInfoOpen);
-  // The card shows only while the conversation keeps CONVERSATION_MIN beside it; the toggle stays on.
+  // The card shows inline only while the conversation keeps CONVERSATION_MIN beside it; else the toggle floats it (ThreadInfoOverlay).
   const [rowRef, rowWidth] = useWidth(1280);
   const infoFits = cardFits(rowWidth);
   useEffect(() => {
     setCardRoom(infoFits);
   }, [infoFits]);
+  // Another thread hides the overlay (unless it was shown for that one: the sidebar's linked PRs tag).
+  useEffect(() => {
+    if (useCardRoom.getState().overlayFor !== threadId) hideThreadInfoOverlay();
+  }, [threadId]);
   useEffect(
     () => () => {
       setCardRoom(true);
+      hideThreadInfoOverlay();
     },
     [],
   );
@@ -137,6 +143,8 @@ function ThreadBody({ threadId }: { threadId: string }) {
           </div>
           {/* The thread info card (view.thread-info), over the column's right: the column's own messages, chips and page modal keep clear of it. */}
           {infoOpen && infoFits && <ThreadInfoCard threadId={threadId} scrollerRef={bodyRef} />}
+          {/* Without room, the card floats over the conversation instead: no --ti-inset, the conversation does not reflow under it. */}
+          {!infoFits && <ThreadInfoOverlay threadId={threadId} />}
         </div>
       </section>
     </ThreadContext.Provider>
