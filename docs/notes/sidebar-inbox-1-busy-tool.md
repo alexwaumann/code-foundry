@@ -53,3 +53,9 @@ the thread log, which only a visible thread view streams).
 - `firstString` walks the JSON with a token decoder: a Go map would make "the first
   string argument" random.
 - "compacting" now has a constant, `ReasonCompacting`, used by stream_status.go too.
+- Exercised against a real daemon (scratch CODE_FOUNDRY_HOME, Sonnet 5.5, no project):
+  `thread get --json` read `busyTool: Bash python3 -c "import time; time.sleep(12)"`
+  for the whole call and nothing once the turn ended. Claude Code itself blocks a
+  foreground `sleep N && …` and the model re-runs it with run_in_background: that launch
+  correctly shows nothing after its immediate result, so a test of the field wants a
+  slow command that is not `sleep`.
