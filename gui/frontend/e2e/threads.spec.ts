@@ -21,7 +21,7 @@ test("thread rows render with status badges, above the terminals no thread owns;
   await expect(badge(page, "s-4")).toHaveAttribute("data-thread-badge", "idle");
   await expect(badge(page, "s-5")).toHaveAttribute("data-thread-badge", "busy");
   await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "working");
-  await expect(row(page, "s:s-5").getByTestId("row-status")).toHaveText("Working");
+  await expect(row(page, "s:s-5").getByTestId("row-status")).toHaveText(/^Working \d+[smhd]/);
   await expect(badge(page, "s-6")).toHaveAttribute("data-thread-badge", "idle");
   // Only threads have rows (and the Working, Snoozed and Archived headers): their terminals show
   // through them, shells in bottom panels.
@@ -88,13 +88,15 @@ test("a stopped thread keeps its status: busy ends interrupted, attention persis
   await openApp(page);
   await mockPost("thread/stop?id=s-1&reason=crashed&code=1&status=busy");
   await expect(badge(page, "s-1")).toHaveAttribute("data-thread-badge", "error");
-  await expect(row(page, "s:s-1").getByTestId("row-status")).toHaveText("Interrupted while working · just now");
+  await expect(row(page, "s:s-1").getByTestId("row-status")).toHaveText("Interrupted");
+  await expect(row(page, "s:s-1").getByTestId("row-detail")).toHaveText("resend to continue");
   await mockPost("thread/stop?id=s-2&reason=daemon%20stopped&code=0");
   await expect(badge(page, "s-2")).toHaveAttribute("data-thread-badge", "attention");
   // Still waiting on the user: counted, still on top, still saying so (not dimmed).
   await expectAttention(page, 1);
   await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 1)).toEqual(["s:s-2"]);
-  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveText("Needs input · Bash zig build -Doptimize=ReleaseFast");
+  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveText("Permission");
+  await expect(row(page, "s:s-2").getByTestId("row-detail")).toHaveText("Bash zig build -Doptimize=ReleaseFast");
   await expect(row(page, "s:s-2").getByTestId("thread-body")).toHaveCSS("opacity", "1");
 });
 

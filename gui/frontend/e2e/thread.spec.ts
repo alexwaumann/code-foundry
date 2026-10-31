@@ -795,7 +795,8 @@ test("the thread.* commands are offered for a thread, not for a page", async ({ 
 test("a claude that did not start: its error in the timeline, the composer, and the next message starts it", async ({ page }) => {
   await openThread(page, "crashed");
   await expect(pane(page).getByTestId("thread-error")).toHaveText("Claude did not start: exit code 1: error: unknown option '--bogus'");
-  await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Error · did not start");
+  await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Error");
+  await expect(row(page, "s:s-r1").getByTestId("row-detail")).toHaveText("did not start");
   await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
   const composer = page.getByTestId("thread-composer");
   await expect(composer).toBeVisible();

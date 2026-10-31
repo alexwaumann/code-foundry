@@ -39,21 +39,22 @@ test("the strip shows only background runs and goes when they end; the sidebar c
   await expect(strip(page)).toHaveAttribute("data-kind", "agents");
   // The nested foreground run is not named; the two background ones are, with their activity.
   await expect(strip(page).getByTestId("agents-strip-runs")).toHaveText("PR 1: daemon task frames · Running go test ./internal/store/...PR 2: Agents surface in the panel · Editing AgentsSurface.tsx");
-  await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveText("3 agents");
+  // The row counts the background agents only (line 3, a bot and the number).
+  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveText("2");
 
   await expect(strip(page).getByTestId("agents-strip-open")).toHaveCount(0);
 
   await mockPost("thread/agent-end?run=a1");
   await expect(strip(page).getByTestId("agents-strip-count")).toHaveText("1 agent running in the background");
   await expect(strip(page).getByTestId("agents-strip-runs")).toHaveText("PR 2: Agents surface in the panel · Editing AgentsSurface.tsx");
-  await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveText("2 agents");
+  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveText("1");
 
   // The last background run ends: the strip goes, though a shell and the nested foreground run run on.
   await mockPost("thread/agent-end?run=a2&status=failed");
   await expect(strip(page)).toHaveCount(0);
-  await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveText("1 agent");
+  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveCount(0);
   await mockPost("thread/agent-end?run=a1b");
-  await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveCount(0);
+  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveCount(0);
 });
 
 test("background shells only: no strip (the card's Shells group has them), the calls run until their shell ends", async ({ page }) => {
@@ -61,7 +62,8 @@ test("background shells only: no strip (the card's Shells group has them), the c
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await expect(strip(page)).toHaveCount(0);
   // No agents: the sidebar says nothing about them.
-  await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveCount(0);
+  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveCount(0);
+  await expect(row(page, "s:s-r1").getByTestId("row-bg-shells")).toBeVisible();
 
   await unfoldTurn(page);
   const bash = page.locator('[data-tool="Bash"]').filter({ hasText: "make gui-e2e" });

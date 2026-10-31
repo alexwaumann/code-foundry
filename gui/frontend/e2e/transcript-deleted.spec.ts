@@ -11,13 +11,13 @@ test.beforeEach(async () => {
   await mockPost("thread/transcript?id=s-3");
 });
 
-test("line 2, header and composer say it cannot continue; nothing can be sent", async ({ page }) => {
+test("the row, header and composer say it cannot continue; nothing can be sent", async ({ page }) => {
   await openApp(page);
   const r = row(page, "s:s-3");
-  const place = r.getByTestId("row-place");
-  await expect(place).toHaveAttribute("data-status-line", "transcriptDeleted");
-  await expect(r.getByTestId("row-status")).toHaveText("Transcript deleted");
-  await expect(r.getByTestId("row-transcript-deleted")).toBeVisible();
+  await expect(r.getByTestId("thread-body")).toHaveAttribute("data-status-line", "transcriptDeleted");
+  await expect(r.getByTestId("row-status")).toHaveText("Error");
+  await expect(r.getByTestId("row-status")).toHaveClass(/text-cf-error-text/);
+  await expect(r.getByTestId("row-detail")).toHaveText("transcript deleted");
 
   await r.click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");

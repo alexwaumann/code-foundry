@@ -75,7 +75,20 @@ test("hidden without links; a link brings the sidebar tag, and the header shows 
   await expect(row(page, "s:s-2").getByTestId("row-linked-prs")).toHaveCount(0);
 });
 
-test("the sidebar tag shows the card for its thread and selects it", async ({ page }) => {
+test("one PR: the sidebar tag opens it in that thread's panel and selects the thread", async ({ page }) => {
+  await link("s-2", 142);
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  await row(page, "s:s-2").getByTestId("row-linked-prs").click();
+  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
+  await expect(page.getByTestId("pr-surface")).toBeVisible();
+  await expect(page.getByTestId("pr-repo-link")).toHaveText(`${CF}#142`);
+  // The row's own click did not run: the prompt does not take the keyboard.
+  await expect(page.getByTestId("thread-composer").locator("textarea, [contenteditable=true]").first()).not.toBeFocused();
+});
+
+test("several PRs: the sidebar tag shows the card for its thread and selects it", async ({ page }) => {
   await link("s-2", 12, 10 * MIN, "alexwaumann/ghostty-playground");
   await link("s-2", 147, 2 * MIN);
   await openApp(page);

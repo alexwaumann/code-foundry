@@ -86,7 +86,7 @@ test("the window starts on the No project composer; the menu pane marks the curr
   await expect(page.getByTestId("palette")).toHaveCount(0);
 });
 
-test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, a workspace thread's run-in project on line 2 (no badge), no project or worktree rows", async ({ page }) => {
+test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, a workspace thread's run-in project on line 1, no project or worktree rows", async ({ page }) => {
   const driver = await workspaceWithThread();
   await openApp(page);
   await expect(row(page, `s:${driver}`)).toBeVisible();
@@ -97,12 +97,12 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   await expect(list(page).locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
   await expect(list(page)).toHaveAttribute("aria-label", "Threads");
 
-  // A thread of a workspace's projects: the project it runs in and the branch, like a single-project row; no badge.
+  // A thread of a workspace's projects: the Layers glyph and the project it runs in (the workspace's name only on the card), the branch on line 3.
   const d = row(page, `s:${driver}`);
   await expect(d.getByTestId("thread-name")).toHaveText("driver");
   await expect(d.getByTestId("row-project")).toHaveText("ghostty-playground");
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
-  await expect(d.getByTestId("row-workspace")).toHaveCount(0);
+  await expect(d.getByTestId("row-workspace")).toHaveCount(1);
   // No model on the row any more.
   await expect(d).not.toContainText("Haiku");
   // A single-project thread: its project.
@@ -173,7 +173,7 @@ test("Run in… from the context menu moves a workspace thread; the row shows th
   // Queued until the thread is idle at its prompt (the mock: ~2s), then the row's worktree changes.
   await expect(d.getByTestId("row-moving")).toHaveText("moving to code-foundry…");
   await expect(d.getByTestId("row-moving")).toHaveCount(0, { timeout: 8000 });
-  // Line 2 names the project it runs in now.
+  // Line 1 names the project it runs in now.
   await expect(d.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
   expect(await thread(driver)).toMatchObject({ projectId: "repo-cf", worktreePath: CF_LOGIN, pendingWorktreePath: "" });
@@ -298,34 +298,42 @@ test("status kinds: each thread's second line says its status in words and colou
     "s:s-1 working",
   ]);
 
-  const want: [string, string, string, RegExp][] = [
-    ["s-k-approval", "input", "Needs input · Bash", /text-cf-warning-text/],
-    ["s-k-question", "question", "Asked a question", /text-cf-warning-text/],
-    ["s-k-plan", "plan", "Plan ready for review", /text-cf-warning-text/],
-    ["s-k-finished", "finished", "Finished 12 min ago", /text-cf-success-text/],
-    ["s-k-error", "error", "Error · model_not_found", /text-cf-error-text/],
-    ["s-k-busy", "working", "Working", /text-cf-info-text/],
-    ["s-k-interrupted", "interrupted", "Interrupted while working · 35 min ago", /text-cf-error-text/],
-    ["s-k-asked-before-restart", "question", "Asked a question", /text-cf-warning-text/],
+  // Line 1: the status's icon and word in its tone (a time after it for working only); line 3: its detail, else the branch.
+  const want: [string, string, RegExp, RegExp, string | null][] = [
+    ["s-k-approval", "input", /^Permission$/, /text-cf-warning-text/, "Bash"],
+    ["s-k-question", "question", /^Question$/, /text-cf-warning-text/, "Which color do you prefer?"],
+    ["s-k-plan", "plan", /^Plan$/, /text-cf-warning-text/, "ready for review"],
+    ["s-k-finished", "finished", /^Done$/, /text-cf-success-text/, null],
+    ["s-k-error", "error", /^Error$/, /text-cf-error-text/, "model_not_found"],
+    ["s-k-busy", "working", /^Working \d+s$|^Working \d+m$/, /text-cf-info-text/, "Bash make check"],
+    ["s-k-interrupted", "interrupted", /^Interrupted$/, /text-cf-error-text/, "resend to continue"],
+    ["s-k-asked-before-restart", "question", /^Question$/, /text-cf-warning-text/, "Which density should the sidebar use?"],
   ];
-  for (const [id, kind, text, tone] of want) {
+  for (const [id, kind, text, tone, detail] of want) {
     const r = row(page, `s:${id}`);
-    await expect(r.getByTestId("row-place"), id).toHaveAttribute("data-status-line", kind);
+    await expect(r.getByTestId("thread-body"), id).toHaveAttribute("data-status-line", kind);
     await expect(r.getByTestId("row-status"), id).toHaveText(text);
     await expect(r.getByTestId("row-status"), id).toHaveClass(tone);
+    await expect(r.getByTestId("row-status-icon"), id).toBeVisible();
+    if (detail === null) await expect(r.getByTestId("row-branch"), id).toHaveText("main");
+    else await expect(r.getByTestId("row-detail"), id).toHaveText(detail);
   }
-  // Working and idle rows say where they run; prompts and finished turns do not.
-  await expect(row(page, "s:s-k-busy").getByTestId("row-place")).toHaveText("Working · code-foundry @ main");
+  // Every row names its project on line 1.
+  await expect(row(page, "s:s-k-question").getByTestId("row-project")).toHaveText("code-foundry");
+  // Idle: no icon or word, the time since the last activity, muted; the branch on line 3.
   const idle = row(page, "s:s-k-idle");
-  await expect(idle.getByTestId("row-place")).toHaveAttribute("data-status-line", "place");
+  await expect(idle.getByTestId("thread-body")).toHaveAttribute("data-status-line", "place");
   await expect(idle.getByTestId("row-status")).toHaveCount(0);
-  await expect(idle.getByTestId("row-place")).toHaveText("code-foundry @ main");
-  await expect(row(page, "s:s-k-question").getByTestId("row-project")).toHaveCount(0);
+  await expect(idle.getByTestId("row-time")).toHaveText(/^\d+(s|m|h( \d+m)?|d)$/);
+  await expect(idle.getByTestId("row-time")).toHaveClass(/text-cf-sidebar-muted-foreground/);
+  await expect(idle.getByTestId("row-branch")).toHaveText("main");
+  // Attention, error and done rows show no time.
+  for (const id of ["s-k-approval", "s-k-finished", "s-k-interrupted"]) await expect(row(page, `s:${id}`).getByTestId("row-time"), id).toHaveCount(0);
+  // Three lines in the 60px box.
+  expect(Math.round((await idle.boundingBox())?.height ?? 0)).toBe(60);
   await expect(row(page, "s:s-k-approval").getByTestId("thread-name")).not.toHaveClass(/text-cf-warning-text/);
   // No row is dimmed (whether Claude runs never shows); the name is never coloured by status.
   for (const id of ["s-k-interrupted", "s-k-asked-before-restart", "s-k-approval", "s-k-finished", "s-k-busy", "s-k-idle"]) await expect(row(page, `s:${id}`).getByTestId("thread-body"), id).toHaveCSS("opacity", "1");
-  // No status icon in thread rows.
-  await expect(list(page).locator('[data-row-kind="thread"] [role="img"]')).toHaveCount(0);
 
   // cmd+1 is the top row; cmd+shift+a visits the waiting threads in this order.
   await list(page).focus();
@@ -550,7 +558,7 @@ test("hovering a thread row shows its tooltip: name, project with where it runs,
   await expect(page.getByTestId("row-menu")).toHaveCount(0);
 });
 
-test("a multi-project thread's card: workspace (or N projects), the run-in project with where it runs, branch, model; line 2 the run-in only", async ({ page }) => {
+test("a multi-project thread's card: workspace (or N projects), the run-in project with where it runs, branch, model; line 1 the run-in only", async ({ page }) => {
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   const ws = (await mockPost("workspace-thread?workspace=login&project=repo-gp&name=Login%20flow&status=idle")) as { id: string };
   const set = (await mockPost("multi-thread?projects=repo-cf,repo-gp&project=repo-gp&branch=feat/x&name=Unsaved%20set")) as { id: string };
@@ -564,9 +572,11 @@ test("a multi-project thread's card: workspace (or N projects), the run-in proje
     return tip.locator("> div").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
   };
 
-  await expect(row(page, `s:${ws.id}`).getByTestId("row-place")).toHaveText("ghostty-playground @ cf/login");
-  await expect(row(page, `s:${set.id}`).getByTestId("row-place")).toHaveText("ghostty-playground @ feat/x");
-  // A thread in its workspace's folder: the folder is the place, named by the workspace.
+  await expect(row(page, `s:${ws.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
+  await expect(row(page, `s:${ws.id}`).getByTestId("row-branch")).toHaveText("cf/login");
+  await expect(row(page, `s:${set.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
+  await expect(row(page, `s:${set.id}`).getByTestId("row-branch")).toHaveText("feat/x");
+  // A thread in its workspace's folder: no project, so the workspace's name.
   await expect(row(page, `s:${folder.id}`).getByTestId("row-project")).toHaveText("login");
 
   expect(await card(ws.id)).toEqual(["tip-name", "tip-workspace", "tip-project", "tip-branch", "tip-model"]);
@@ -591,36 +601,36 @@ test("a multi-project thread's card: workspace (or N projects), the run-in proje
   await page.mouse.move(0, 0);
 });
 
-test("the tooltip shows the full status, wrapped, under the name for threads that need input or failed; not for finished, working or idle", async ({ page }) => {
+test("the tooltip shows the full status, wrapped, under the name for threads that need input or failed, with how long; a finished turn says how long ago; not for working or idle", async ({ page }) => {
   await mockPost("status-kinds");
   const long = "Do you want to create hello.txt in the scratch repository and then run the whole test suite?";
   await mockPost(`thread/status?id=s-k-approval&status=attention&reason=${encodeURIComponent(`permission: ${long}`)}`);
   await openApp(page);
   const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
 
-  // The permission prompt: line 2 cuts it off, the tooltip has all of it, wrapped, in amber.
+  // The permission prompt: line 3 cuts it off, the tooltip has all of it, wrapped, in amber.
   const approval = row(page, "s:s-k-approval");
-  await expect(approval.getByTestId("row-status")).toHaveText(`Needs input · ${long}`);
+  await expect(approval.getByTestId("row-detail")).toHaveText(long);
   await approval.hover();
   await expect(tip).toHaveAttribute("data-thread-id", "s-k-approval");
   const status = tip.getByTestId("tip-status");
-  await expect(status).toHaveText(`Needs input · ${long}`);
+  await expect(status).toHaveText(new RegExp(`^Needs input · ${long.replace("?", "\\?")} · for \\d+s$`));
   await expect(status).toHaveAttribute("data-tone", "amber");
   await expect(status).toHaveClass(/text-cf-warning-text/);
-  const line2 = await approval.getByTestId("row-place").locator("span.truncate").evaluate((el) => el.scrollWidth > el.clientWidth);
-  expect(line2).toBe(true);
+  const line3 = await approval.getByTestId("row-detail").evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(line3).toBe(true);
   // Wrapped over several lines inside the 260px tooltip, between the name and the project.
   expect(Math.round((await tip.boundingBox())?.width ?? 0)).toBe(260);
   const [name, st, project] = [await tip.getByTestId("tip-name").boundingBox(), await status.boundingBox(), await tip.getByTestId("tip-project").boundingBox()];
   expect(st && st.height >= 40).toBe(true);
   expect(name && st && project && name.y < st.y && st.y + st.height <= project.y).toBe(true);
 
-  // The other prompts, the Claude error and the interrupted thread: same words and colour as line 2.
+  // The other prompts, the Claude error and the interrupted thread, with how long they have been so.
   const shown: [string, string, "amber" | "red"][] = [
-    ["s-k-question", "Asked a question", "amber"],
-    ["s-k-plan", "Plan ready for review", "amber"],
-    ["s-k-error", "Error · model_not_found", "red"],
-    ["s-k-interrupted", "Interrupted while working · 35 min ago", "red"],
+    ["s-k-question", "Asked a question · for 6m", "amber"],
+    ["s-k-plan", "Plan ready for review · for 1m", "amber"],
+    ["s-k-error", "Error · model_not_found · for 20m", "red"],
+    ["s-k-interrupted", "Interrupted while working · for 35m", "red"],
   ];
   for (const [id, text, tone] of shown) {
     await row(page, `s:${id}`).hover();
@@ -630,8 +640,14 @@ test("the tooltip shows the full status, wrapped, under the name for threads tha
     await expect(tip.getByTestId("tip-status"), id).toHaveClass(tone === "amber" ? /text-cf-warning-text/ : /text-cf-error-text/);
   }
 
-  // Finished, working and idle threads: no status row; the rest of the tooltip is unchanged.
-  for (const id of ["s-k-finished", "s-k-busy", "s-k-idle"]) {
+  // A finished turn: how long ago, green.
+  await row(page, "s:s-k-finished").hover();
+  await expect(tip).toHaveAttribute("data-thread-id", "s-k-finished");
+  await expect(tip.getByTestId("tip-status")).toHaveText("Finished 12m ago");
+  await expect(tip.getByTestId("tip-status")).toHaveAttribute("data-tone", "emerald");
+
+  // Working and idle threads: no status row; the rest of the tooltip is unchanged.
+  for (const id of ["s-k-busy", "s-k-idle"]) {
     await row(page, `s:${id}`).hover();
     await expect(tip, id).toHaveAttribute("data-thread-id", id);
     await expect(tip.getByTestId("tip-project"), id).toBeVisible();
