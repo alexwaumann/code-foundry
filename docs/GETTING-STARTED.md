@@ -61,8 +61,8 @@ a question, a permission, a plan to approve. Click it, answer, and it carries on
 window title and the badge on the Dock icon count what is waiting.
 
 When a thread's agent starts threads of its own, they belong to that thread: they stay
-out of the sidebar and the Dock badge, and its **Threads** tab in the side panel lists
-them. Hover one there and click **Show in sidebar** to take it over, or turn on
+out of the sidebar and the Dock badge, and its thread info card lists them. Click one
+there and choose **Show in sidebar** from its title menu to take it over, or turn on
 Settings › Threads › **Show threads created by other threads** to list them all.
 
 Tell any thread how you like things done ("keep your answers short", "always open pull
@@ -76,9 +76,11 @@ left it.
 
 ### Review and ship
 
-The side panel (<kbd>⇧⌘E</kbd>) shows more about the selected thread: its copy of the
-project (changes, commits and files), its pull requests, the agents it started and
-what it cost. The bottom panel (<kbd>⌘J</kbd>) is a terminal in the thread's folder.
+The thread info card (<kbd>⇧⌘I</kbd>) beside the conversation shows more about the
+selected thread: its projects and branch, what changed, its pull requests, the agents and
+threads it started, its MCP servers and what it cost. Its **Changes** row opens the side
+panel (<kbd>⇧⌘E</kbd>) on the changed files and commits. Or ask the thread: "what changed?",
+"what did this cost?". The bottom panel (<kbd>⌘J</kbd>) is a terminal in the thread's folder.
 
 When the work is done, ask the agent to commit and open a pull request, or use
 **Create Pull Request** from the command palette. The side panel follows its checks

@@ -138,7 +138,10 @@ func TestRender(t *testing.T) {
 		// 83 for the three lines the theme fuzz showed models missing (theme-fuzz-daemon): the
 		// verbs, the contrast floors and how to lower contrast, --replace and the scheme.
 		// 84 for the first-run row (welcome-page): it routes to the pages skill's welcome.md.
-		{skills.Entry, "false", 400, 84},
+		// 85, and a description up to 420, for the thread row (orch-removed-panels-check):
+		// with the Usage, Worktree, Agents, Threads and Linked PRs tabs gone, asking is the
+		// path, and models read uncommitted work as all that changed and found no PR verb.
+		{skills.Entry, "false", 420, 85},
 		// Its routing and the app's description moved to the entry skill (control-4);
 		// the cap came down from 120 with them. 109 for the workspaces answer path
 		// (workspaces-v2-5-skills): what a workspace is, its card, where its files go.
@@ -297,6 +300,11 @@ func TestRender(t *testing.T) {
 		"Never tell the user skill or command names: say what you will do, not which command",
 		"`code-foundry memory add <text>`", "`code-foundry usage.show`", "`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`",
 		"`.html` file", "`code-foundry pr.create`, `code-foundry project.github.publish`", "Add `--focus` only when the user asks",
+		// The removed side panel tabs' questions (orch-removed-panels-check): what changed
+		// counts the branch's commits, children and linked PRs have their reads.
+		"| About this thread: what changed", "the branch's commits since its base", "not uncommitted work alone",
+		"`thread list --created-by $CODE_FOUNDRY_THREAD`", "`thread mcp` (your session's start list goes stale)",
+		"`thread get --json`'s `linkedPullRequests` (absent: none)",
 		"default `threads.default_worktree`", "The app replaces /model, /effort",
 		// The setting is the composer's; where thread new puts a thread is the model's call
 		// (thread-new-base-origin).
@@ -327,9 +335,14 @@ func TestRender(t *testing.T) {
 			t.Errorf("entry SKILL.md lacks %q", want)
 		}
 	}
+	// The removed tabs' panel verbs (thread-header-crumb) are not offered: a model ran
+	// view.panel.usage from this line and got an unknown command.
+	if strings.Contains(entry, "`usage`, `worktree`, `threads`") {
+		t.Error("entry SKILL.md still names the removed usage, worktree and threads panels")
+	}
 	// Its description names the words of the prompts that loaded no skill.
 	entryDesc := frontmatter(t, skills.Entry+"/SKILL.md", files[skills.Entry+"/SKILL.md"])["description"]
-	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR", "reminder", "what's running", "their work"} {
+	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree's changes or PRs", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR", "reminder", "what's running", "their work"} {
 		if !strings.Contains(entryDesc, w) {
 			t.Errorf("entry SKILL.md's description lacks %q", w)
 		}

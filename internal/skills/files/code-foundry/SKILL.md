@@ -1,6 +1,6 @@
 ---
 name: code-foundry
-description: "Start here for anything about Code Foundry, the app this thread runs in. Use when the user asks what you can do, what's running, their work, version, model, effort, usage, cost, worktrees, settings, plugins; asks to see or make a file, diff, page, HTML, chart or theme, a mockup or recolour the app; states a preference to remember; wants a skill, a PR or a reminder; or before acting in the app."
+description: "Start here for anything about Code Foundry, the app this thread runs in. Use when the user asks what you can do, what's running, their work, this worktree's changes or PRs, version, model, effort, usage, cost, settings, plugins; asks to see or make a file, diff, page, HTML, chart or theme, a mockup or recolour the app; states a preference to remember; wants a skill, a PR or a reminder; or before acting in the app."
 user-invocable: false
 ---
 
@@ -28,7 +28,8 @@ Never tell the user skill or command names: say what you will do, not which comm
 | How to do something, a setting or keybinding | the code-foundry-help skill |
 | A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences"); one for a set of projects or one repo, or a skill for them: "Scopes" below |
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
-| To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` (also `usage`, `worktree`, `threads`, `mcp`): your own side panel. Add `--focus` only when the user asks to be taken there |
+| About this thread: what changed, its branch, checkouts, subagents, child threads, MCP servers, linked PRs | What changed is the branch's commits since its base (`baseRef` in `thread get --json`, else origin's default branch) plus uncommitted work, not uncommitted work alone; `code-foundry thread checkouts`; `thread agents`; `thread list --created-by $CODE_FOUNDRY_THREAD` (`thread get` names your creator); `thread mcp` (your session's start list goes stale); linked PRs are `thread get --json`'s `linkedPullRequests` (absent: none) |
+| To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`, `view.panel.mcp`: your own side panel. Add `--focus` only when the user asks to be taken there |
 | A page, chart, form, board, dashboard, mockup of a product, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown; `--panel` also opens it beside the thread) and can read and change the app |
 | What's running or going on, their work | "running" here means this app's threads, actions and terminals, never the Mac's processes (no `ps`, no killing): `code-foundry thread list`, `action runs`, `terminal list`; a board of it: the code-foundry-pages skill |
 | The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
