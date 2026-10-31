@@ -87,3 +87,11 @@ doing now. Regenerate name asks the naming model again, from the most recent tur
   cases in `commands_thread_lifecycle_test.go`.
 - GUI: ThreadMenuItems order/resident/disabled cases, SidebarRow and ThreadParts naming
   styling, e2e "Regenerate name in the row menu…" in `e2e/threads.spec.ts`.
+- End to end, daemon + CLI on a scratch `CODE_FOUNDRY_HOME`: with the real `claude` the
+  naming call failed (the account could not use the pinned 1M models): the CLI printed the
+  error, the name stayed, `naming` was off. With `advanced.claude_path` pointed at a stub
+  that logs its prompt and `threads.auto_name = false`: `thread regenerate-name` printed
+  `renamed thread Go context and cancellation (<id>)`, `thread get --json` showed
+  `autoNamed: true` and no provisional or naming flag, the stub got the
+  `Recent conversation:\nUser: …` prompt, a hand-typed rename was replaced by the next
+  regenerate, and a thread with no message got "nothing to name yet".
