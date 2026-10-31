@@ -1,25 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Folder, FolderGit2 } from "lucide-react";
-import { GithubMark } from "@/components/icons/GithubMark";
-import { checkoutThreads, projectKind, sortCheckouts, type ProjectKind } from "@/lib/projects";
+import { checkoutThreads, sortCheckouts } from "@/lib/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { savedScrollTop, saveScrollTop } from "@/stores/projectsPage";
 import { useProjectsStore } from "@/stores/projects";
-
-/** The Projects view's kind icons (docs/notes/projects-redesign-1-index.md, the icon table). */
-export const KIND_ICON: Record<ProjectKind, { Icon: React.ComponentType<{ className?: string }>; className: string }> = {
-  github: { Icon: GithubMark, className: "text-cf-info-text" },
-  git: { Icon: FolderGit2, className: "text-cf-text-muted" },
-  nogit: { Icon: Folder, className: "text-cf-text-muted" },
-};
-
-const UNKNOWN_PROJECT = { githubSlug: "", remotes: [] };
-
-/** A project's kind (subscribes to that string only). */
-export function useProjectKind(projectId: string): ProjectKind {
-  return useProjectsStore((s) => projectKind(s.byId[projectId] ?? UNKNOWN_PROJECT).kind);
-}
 
 /**
  * The page's scroll box: starts at the offset it had when the page (its panel key) was

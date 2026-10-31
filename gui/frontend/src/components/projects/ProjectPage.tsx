@@ -20,7 +20,8 @@ import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projects
 import { useThreadsStore } from "@/stores/threads";
 import { PROJECTS_INDEX, useUiStore } from "@/stores/ui";
 import { KindIcon, Pill, SectionHeader } from "./bits";
-import { useCheckoutOrder, useProjectKind, usePageScroll } from "./pageHooks";
+import { useCheckoutOrder, usePageScroll } from "./pageHooks";
+import { useProjectKind } from "@/components/icons/projectKind";
 import { CheckoutsTable } from "./CheckoutsTable";
 import { projectMenu } from "./menus";
 import { OverflowMenu } from "./OverflowMenu";

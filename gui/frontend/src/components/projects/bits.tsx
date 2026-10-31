@@ -1,13 +1,12 @@
 import { Layers } from "lucide-react";
 import type { ProjectKind } from "@/lib/projects";
 import { cn } from "@/lib/utils";
-import { KIND_ICON } from "./pageHooks";
+import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
 
 export function KindIcon({ kind, className }: { kind: ProjectKind; className?: string }) {
-  const { Icon, className: tint } = KIND_ICON[kind];
   return (
     <span className="flex shrink-0" data-testid="project-kind-icon" data-kind={kind}>
-      <Icon className={cn("size-4", tint, className)} />
+      <ProjectKindIcon kind={kind} className={cn("size-4 text-cf-text-muted", className)} />
     </span>
   );
 }

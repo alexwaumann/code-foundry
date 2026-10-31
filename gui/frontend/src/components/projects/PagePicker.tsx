@@ -8,7 +8,7 @@ import { useProjectsStore } from "@/stores/projects";
 import { projectPage, PROJECTS_INDEX, useUiStore, workspacePage } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { KindIcon, WorkspaceIcon } from "./bits";
-import { useProjectKind } from "./pageHooks";
+import { useProjectKind } from "@/components/icons/projectKind";
 import { useProjectLastMs, useProjectOrder, useWorkspaceLastMs, useWorkspaceOrder } from "./useOrder";
 
 /** "Projects ›": the crumb back to the index (muted; a click goes there). */
