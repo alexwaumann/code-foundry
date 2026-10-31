@@ -56,6 +56,8 @@ export interface ThreadView {
   autoNamed: boolean;
   /** name is provisional: the daemon took it from the first prompt; the naming model's title replaces it. Shown muted and italic. */
   nameProvisional: boolean;
+  /** A naming call the user asked for (thread.regenerate-name) is in flight: the name shows muted and italic, as a provisional one, until it lands. Not persisted. */
+  naming: boolean;
   model: string;
   effort: string;
   state: ThreadStateView;
@@ -412,6 +414,7 @@ export function toThreadView(s: Thread): ThreadView {
     name: s.name,
     autoNamed: s.autoNamed,
     nameProvisional: s.nameProvisional,
+    naming: s.naming,
     model: s.model,
     effort: s.effort,
     state: stateMap[s.state],

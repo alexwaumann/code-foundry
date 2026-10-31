@@ -98,6 +98,7 @@ describe("SidebarRow provisional name", () => {
     ["provisional: the name, muted and italic", { name: "fix the login redirect", nameProvisional: true }, "fix the login redirect", true, true],
     ["the naming model's title: plain", { name: "Fix the login redirect", nameProvisional: false }, "Fix the login redirect", false, false],
     ["unnamed: the id, muted, not italic", { name: "", nameProvisional: false }, "s-1", true, false],
+    ["being regenerated: the name, muted and italic", { name: "Fix the login redirect", nameProvisional: false, naming: true }, "Fix the login redirect", true, true],
   ])("%s", (_name, o, text, muted, italic) => {
     renderRow(o);
     const el = screen.getByTestId("thread-name");

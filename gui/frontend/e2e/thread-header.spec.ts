@@ -61,7 +61,7 @@ test("the title menu: the sidebar row's items; Pin pins the thread", async ({ pa
   await title.click();
   await expect(title).toHaveAttribute("aria-expanded", "true");
   const menu = page.getByTestId("thread-title-menu");
-  await expect(menu.getByRole("menuitem")).toHaveText(["Rename", "Pin", "Snooze", "New thread on this branch", "Archive"]);
+  await expect(menu.getByRole("menuitem")).toHaveText(["Rename", "Regenerate name", "Pin", "Snooze", "New thread on this branch", "Archive"]);
   await menu.getByTestId("menu-pin").click();
   await expect(menu).toHaveCount(0);
   // The keyboard goes to the prompt, as the header's old Pin button left it.
@@ -79,7 +79,7 @@ test("the title menu: the sidebar row's items; Pin pins the thread", async ({ pa
   // The sidebar row's context menu starts with the same items.
   await row(page, `s:${id}`).click({ button: "right" });
   await expect(page.getByTestId("row-menu").getByRole("menuitem").first()).toHaveText("Rename");
-  await expect(page.getByTestId("row-menu").getByRole("menuitem")).toHaveText(["Rename", "Unpin", "Snooze", "New thread on this branch", "Archive", "New terminal here", "Fork", "Remove…"]);
+  await expect(page.getByTestId("row-menu").getByRole("menuitem")).toHaveText(["Rename", "Regenerate name", "Unpin", "Snooze", "New thread on this branch", "Archive", "New terminal here", "Fork", "Remove…"]);
 });
 
 test("the side panel's + lists none of the removed surfaces", async ({ page }) => {

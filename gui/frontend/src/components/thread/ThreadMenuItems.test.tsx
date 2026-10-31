@@ -7,7 +7,8 @@ const pinThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const archiveThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const snoozeThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const setThreadSidebar = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), pinThread, archiveThread, snoozeThread, setThreadSidebar }));
+const regenerateThreadName = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), pinThread, archiveThread, snoozeThread, setThreadSidebar, regenerateThreadName }));
 const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
 const openSnoozeDialog = vi.hoisted(() => vi.fn());
@@ -89,9 +90,9 @@ function entries(menu: HTMLElement): string[] {
 }
 
 describe("ThreadMenuItems: one list for the sidebar row and the title menu", () => {
-  it("in order: Rename, Pin, Snooze; New thread on this branch, Save as workspace, Run in, Hide from sidebar; Archive", () => {
+  it("in order: Rename, Regenerate name, Pin, Snooze; New thread on this branch, Save as workspace, Run in, Hide from sidebar; Archive", () => {
     setThread({ projectIds: ["web", "api"], createdBy: "s-0", inSidebar: true }, [thread({ id: "s-0", name: "Parent" })]);
-    const want = ["Rename", "Pin", "Snooze", "—", "New thread on this branch", "Save as workspace", "Run in…", "Hide from sidebar", "—", "Archive"];
+    const want = ["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Save as workspace", "Run in…", "Hide from sidebar", "—", "Archive"];
     expect(entries(openTitleMenu())).toEqual(want);
     cleanup();
     // The row adds what only it offers after the shared list.
@@ -100,12 +101,12 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
 
   it("a one-project thread of the user's: no Save as workspace, Run in or sidebar item", () => {
     setThread({});
-    expect(entries(openTitleMenu())).toEqual(["Rename", "Pin", "Snooze", "—", "New thread on this branch", "—", "Archive"]);
+    expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "—", "Archive"]);
   });
 
   it("a thread without a project: no second group", () => {
     setThread({ projectId: "", projectIds: [], worktreePath: "/Users/me" });
-    expect(entries(openTitleMenu())).toEqual(["Rename", "Pin", "Snooze", "—", "Archive"]);
+    expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "Archive"]);
   });
 
   it("a hidden child: Show in sidebar, which shows it", () => {
@@ -138,12 +139,23 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     const flag = (plugin: string): ThreadView["flags"][number] => ({ plugin, pluginName: plugin, level: "attention", reason: "deploy needs approval", setAtMs: 1, untilSeen: false });
     setThread({ pluginEnvStale: true, flags: [flag("hello"), flag("gh-actions")] });
     const menu = openTitleMenu();
-    expect(entries(menu)).toEqual(["Rename", "Pin", "Snooze", "—", "New thread on this branch", "Restart Claude", "Clear flags", "—", "Archive"]);
+    expect(entries(menu)).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Restart Claude", "Clear flags", "—", "Archive"]);
     fireEvent.click(within(menu).getByTestId("menu-clear-flags"));
     expect(runCommand).toHaveBeenCalledWith("thread.flag.clear", { id: "s-1" }, expect.objectContaining({ activeThreadId: "s-1" }));
     cleanup();
     setThread({ flags: [flag("hello")] });
     expect(within(openTitleMenu()).getByTestId("menu-clear-flags").textContent).toBe("Clear flag");
+  });
+
+  it("no Regenerate name for a resident thread; disabled while a naming call runs", () => {
+    setThread({ resident: "ember" });
+    expect(within(openTitleMenu()).queryByTestId("menu-regenerate-name")).toBeNull();
+    cleanup();
+    setThread({ naming: true });
+    const item = within(openTitleMenu()).getByTestId("menu-regenerate-name");
+    expect(item.getAttribute("data-disabled")).not.toBeNull();
+    fireEvent.click(item);
+    expect(regenerateThreadName).not.toHaveBeenCalled();
   });
 
   it("no Clear flag where the daemon does not list thread.flag.clear", () => {
@@ -170,6 +182,9 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
       }],
     ["Save as workspace", { projectIds: ["web", "api"] }, "menu-save-workspace", () => {
         expect(openSaveWorkspace).toHaveBeenCalledWith("s-1");
+      }],
+    ["Regenerate name", {}, "menu-regenerate-name", () => {
+        expect(regenerateThreadName).toHaveBeenCalledWith("s-1");
       }],
   ])("%s runs its command for the thread", (label, o, testId, check) => {
     setThread(o);

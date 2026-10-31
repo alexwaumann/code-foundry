@@ -1,4 +1,4 @@
-import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, ArrowRightLeft, Eye, EyeOff, FlagOff, GitBranchPlus, Layers, Pencil, Pin, PinOff, RotateCw } from "lucide-react";
+import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, ArrowRightLeft, Eye, EyeOff, FlagOff, GitBranchPlus, Layers, Pencil, Pin, PinOff, RotateCw, Sparkles } from "lucide-react";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
@@ -9,7 +9,7 @@ import { composeLike } from "@/stores/compose";
 import { useSidebarShown } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
 import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace";
-import { archiveThread, pinThread, runThreadIn, setThreadSidebar, snoozeThread, threadContext, THREAD_COMMANDS } from "@/stores/threadActions";
+import { archiveThread, pinThread, regenerateThreadName, runThreadIn, setThreadSidebar, snoozeThread, threadContext, THREAD_COMMANDS } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { markInPlace, type MenuKit } from "./menuKit";
@@ -86,7 +86,8 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
 /**
  * A thread's menu items, one list for the sidebar row's context menu (RowMenu) and the
  * thread header's title menu (ThreadTitleMenu), each item a registry command (or the inline
- * rename that commits one): Rename, Pin, Snooze ▸ (and Unsnooze while snoozed); New
+ * rename that commits one): Rename, Regenerate name (not for a resident thread; disabled while
+ * a naming call runs), Pin, Snooze ▸ (and Unsnooze while snoozed); New
  * thread on this branch, Save as workspace, Run in ▸, Hide or Show in sidebar (a thread
  * another created, while thread.sidebar is listed), Restart Claude (while a plugin's
  * environment changed since Claude started: thread.restart), Clear flag(s) (while plugins
@@ -96,6 +97,9 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
 export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const noProject = useNoProjectThread(id);
   const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
+  // A resident thread (Ember) keeps its name; one naming call at a time.
+  const resident = useThreadsStore((s) => (s.byId[id]?.resident ?? "") !== "");
+  const naming = useThreadsStore((s) => s.byId[id]?.naming ?? false);
   const archived = useThreadsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
   const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
   const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
@@ -122,6 +126,19 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
         <Pencil />
         Rename
       </kit.Item>
+      {!resident && (
+        <kit.Item
+          data-testid="menu-regenerate-name"
+          disabled={naming}
+          onSelect={() => {
+            markInPlace(kit, id);
+            void regenerateThreadName(id);
+          }}
+        >
+          <Sparkles />
+          Regenerate name
+        </kit.Item>
+      )}
       <kit.Item
         data-testid="menu-pin"
         onSelect={() => {

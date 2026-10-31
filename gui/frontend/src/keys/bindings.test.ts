@@ -34,6 +34,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     name: id,
     autoNamed: false,
     nameProvisional: false,
+    naming: false,
     model: "",
     effort: "",
     state: "connected",

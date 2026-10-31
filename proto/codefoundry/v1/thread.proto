@@ -32,6 +32,14 @@ service ThreadService {
   rpc Wait(WaitThreadRequest) returns (WaitThreadResponse) {}
   // Rename sets a user-chosen name and disables auto-naming for the thread.
   rpc Rename(RenameThreadRequest) returns (RenameThreadResponse) {}
+  // RegenerateName names the thread again with the naming model, from its most recent
+  // turns (the last three user messages and the replies around them), replacing any
+  // name, a hand-typed one too. It ignores threads.auto_name; threads.naming_model
+  // applies. Synchronous: it returns the renamed thread once the model answered, bounded
+  // by the naming timeout. While it runs the thread's naming flag is set. FAILED_PRECONDITION
+  // for a resident thread, a thread with no user message yet, or one already being
+  // renamed. See docs/notes/regenerate-thread-name.md.
+  rpc RegenerateName(RegenerateNameRequest) returns (RegenerateNameResponse) {}
   // Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
   // then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
   // since 2026-10-15: the daemon starts a thread's process when a message is sent

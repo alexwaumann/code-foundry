@@ -377,6 +377,10 @@ message Thread {
   // calls (parent_tool_use_id set) do not count, its Agent call does. Not persisted: a
   // disconnected thread has none. See docs/notes/sidebar-inbox-1-busy-tool.md.
   string busy_tool = 73;
+  // A naming call is in flight for the thread now (RegenerateName): the GUI shows the
+  // current name muted and italic, as a provisional one, until it lands or fails. Not
+  // persisted.
+  bool naming = 74;
 }
 
 // BackgroundShell is one of a thread's own background shells while it runs: a Bash call
@@ -916,6 +920,14 @@ message RenameThreadRequest {
 }
 
 message RenameThreadResponse {
+  Thread thread = 1;
+}
+
+message RegenerateNameRequest {
+  string id = 1;
+}
+
+message RegenerateNameResponse {
   Thread thread = 1;
 }
 

@@ -183,6 +183,18 @@ func (s *Thread) Rename(_ context.Context, r *connect.Request[v1.RenameThreadReq
 	return connect.NewResponse(&v1.RenameThreadResponse{Thread: &v1.Thread{Id: r.Msg.GetId(), Name: r.Msg.GetName()}}), nil
 }
 
+// RegenerateName records the request and answers with the thread named
+// RegeneratedName, as the naming model would.
+func (s *Thread) RegenerateName(_ context.Context, r *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&v1.RegenerateNameResponse{Thread: &v1.Thread{Id: r.Msg.GetId(), Name: RegeneratedName, AutoNamed: true}}), nil
+}
+
+// RegeneratedName is the name the fake's RegenerateName answers with.
+const RegeneratedName = "Regenerated name"
+
 // Remove records the request; it fails for an id in FailIDs.
 func (s *Thread) Remove(_ context.Context, r *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {

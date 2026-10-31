@@ -196,6 +196,22 @@ test("rename inline: double-click commits via thread.rename, cmd+r from the prom
   expect((await invocations()).length).toBe(before);
 });
 
+test("Regenerate name in the row menu runs thread.regenerate-name; the name is muted while it runs, then replaced", async ({ page }) => {
+  await openApp(page);
+  const name = row(page, "s:s-3").getByTestId("thread-name");
+  const before = await name.textContent();
+  await row(page, "s:s-3").click({ button: "right" });
+  await page.getByTestId("row-menu").getByTestId("menu-regenerate-name").click();
+  // The mock's "naming model" takes REGENERATE_NAME_MS: the old name shows muted and italic meanwhile.
+  await expect(name).toHaveAttribute("data-provisional", "true");
+  await expect(name).toHaveText(before ?? "");
+  await expect(name).toHaveText("Regenerated thread name");
+  await expect(name).not.toHaveAttribute("data-provisional");
+  const last = (await invocations()).at(-1);
+  expect(last).toMatchObject({ name: "thread.regenerate-name", args: { id: "s-3" } });
+  expect(last?.context?.activeThreadId).toBe("s-3");
+});
+
 test("FocusThread intent selects the thread", async ({ page }) => {
   await openApp(page);
   await expect.poll(async () => ((await mockPost("thread/focus?id=s-3")) as { delivered: number }).delivered).toBeGreaterThan(0);

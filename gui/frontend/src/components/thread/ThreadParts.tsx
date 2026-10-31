@@ -114,8 +114,9 @@ const STALE_TIP = "Plugin environment changed · Restart Claude from this menu";
  */
 function ThreadTitleMenu({ id }: { id: string }) {
   const name = useThreadsStore((s) => s.byId[id]?.name || id);
-  // The daemon's cut of the first prompt until the naming model's title lands: muted and italic, as in the sidebar.
-  const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
+  // The daemon's cut of the first prompt until the naming model's title lands, or a name being
+  // regenerated (thread.regenerate-name): muted and italic, as in the sidebar.
+  const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
   // With the card off nothing else says it: a warning dot on the chevron, and the menu has Restart Claude.
   const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
   const [open, setOpen] = useState(false);

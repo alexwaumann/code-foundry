@@ -215,6 +215,8 @@ interface MockThread {
   resident: string;
   /** Thread.epoch: its session count, 1 until a reseed. */
   epoch: number;
+  /** Thread.naming: thread.regenerate-name's call is in flight. Unset otherwise. */
+  naming?: boolean;
   /**
    * Thread.plugin_env_change while plugin_env_stale (POST /__mock/thread/envstale): a plugin's
    * session environment changed since the running process started; "" when current.
@@ -487,6 +489,9 @@ const enc = new TextEncoder();
 
 /** How long a new shell takes to print its prompt before terminal.new --run types into it. */
 const RUN_PROMPT_MS = 150;
+/** thread.regenerate-name: how long "the naming model" takes, and the title it gives. */
+export const REGENERATE_NAME_MS = 400;
+export const REGENERATED_NAME = "Regenerated thread name";
 
 /**
  * terminal.new --run's value as typed keys, like the daemon for a shell without bracketed
@@ -2047,6 +2052,7 @@ export class World {
       worktreePath: s.worktreePath,
       name: s.name,
       autoNamed: s.autoNamed,
+      naming: s.naming ?? false,
       model: s.model,
       effort: s.effort,
       state: s.state,
@@ -3732,6 +3738,25 @@ export class World {
           s.autoNamed = false;
           this.publishThread(s);
           return "";
+        },
+      },
+      {
+        cmd: { name: "thread.regenerate-name", title: "Regenerate Thread Name", category: "Thread", description: "Name the thread again from its most recent turns.", keybindings: [], args: [] },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        // The daemon's shape: naming on while "the model" works, then the title, AutoNamed and naming off.
+        run: async (ctx) => {
+          const s = activeThread(ctx);
+          if (!s) throw new CommandError("unavailable", "no active thread");
+          if (s.resident) throw new CommandError("unavailable", "a resident thread keeps its name");
+          if (s.naming) throw new CommandError("unavailable", "the thread's name is already being regenerated");
+          s.naming = true;
+          this.publishThread(s);
+          await new Promise((r) => setTimeout(r, REGENERATE_NAME_MS));
+          s.name = REGENERATED_NAME;
+          s.autoNamed = true;
+          s.naming = false;
+          this.publishThread(s);
+          return { message: `renamed thread ${s.name} (${s.id})`, resultJson: "" };
         },
       },
       {

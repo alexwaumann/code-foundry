@@ -133,7 +133,7 @@ func threadLabel(s *v1.Thread) string {
 	return s.GetId()
 }
 
-// RegisterThreadLifecycle registers thread.new, thread.focus, thread.rename,
+// RegisterThreadLifecycle registers thread.new, thread.focus, thread.rename, thread.regenerate-name,
 // thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive,
 // thread.snooze and thread.sidebar, and the metadata, flags and restart commands. There is no close or reconnect: a message starts a stopped thread and
 // the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
@@ -309,6 +309,21 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			When:        hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Rename(ctx, connect.NewRequest(&v1.RenameThreadRequest{Id: a.String("id"), Name: a.String("name")}))
+				if err != nil {
+					return Result{}, err
+				}
+				return Result{Message: "renamed thread " + threadLabel(res.Msg.GetThread()), JSON: res.Msg.GetThread()}, nil
+			},
+		},
+		Command{
+			Name:        "thread.regenerate-name",
+			Title:       "Regenerate Thread Name",
+			Description: "Name the thread again from its most recent turns.",
+			Category:    "Thread",
+			Args:        []ArgSpec{idArg},
+			When:        hasThread,
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				res, err := b.RegenerateName(ctx, connect.NewRequest(&v1.RegenerateNameRequest{Id: a.String("id")}))
 				if err != nil {
 					return Result{}, err
 				}

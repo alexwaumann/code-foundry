@@ -108,8 +108,8 @@ test("the row menu's Snooze submenu: presets with their times; 1 hour snoozes wi
   const { menu, sub } = await openSnoozeSub(page, "s:s-3");
   // After Pin; Archive later, after the thread's other items.
   const items = await menu.locator("[role=menuitem]").evaluateAll((els) => els.map((e) => e.textContent.trim()));
-  expect(items.slice(0, 3)).toEqual(["Rename", "Pin", "Snooze"]);
-  expect(items.indexOf("Archive")).toBeGreaterThan(2);
+  expect(items.slice(0, 4)).toEqual(["Rename", "Regenerate name", "Pin", "Snooze"]);
+  expect(items.indexOf("Archive")).toBeGreaterThan(3);
   await expect(menu.getByTestId("menu-unsnooze")).toHaveCount(0);
   const presets = sub.getByTestId("snooze-preset");
   await expect(presets).toHaveCount(4);

@@ -35,6 +35,7 @@ export const THREAD_COMMANDS = {
   newLike: "thread.new-like",
   setWorkspace: "thread.workspace",
   rename: "thread.rename",
+  regenerateName: "thread.regenerate-name",
   remove: "thread.remove",
   fork: "thread.fork",
   pin: "thread.pin",
@@ -64,6 +65,15 @@ export function renameArgName(): string {
 
 export function renameThread(id: string, name: string): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.rename, { [renameArgName()]: name }, threadContext(id));
+}
+
+/**
+ * thread.regenerate-name: the naming model titles the thread from its most recent turns,
+ * replacing its name. The daemon answers once the model did; meanwhile the thread's
+ * `naming` flag shows the name muted. A failure keeps the name and toasts.
+ */
+export function regenerateThreadName(id: string): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.regenerateName, { id }, threadContext(id));
 }
 
 export function removeThread(id: string): Promise<boolean> {
