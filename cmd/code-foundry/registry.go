@@ -61,14 +61,8 @@ func (cl *cli) env(key string) string {
 	return strings.TrimSpace(cl.getenv(key))
 }
 
-// threadEnv is --context-thread's default: $CODE_FOUNDRY_THREAD, else, for one release,
-// its old name $CODE_FOUNDRY_SESSION (paths.EnvThreadLegacy).
-func (cl *cli) threadEnv() string {
-	if id := cl.env(paths.EnvThread); id != "" {
-		return id
-	}
-	return cl.env(paths.EnvThreadLegacy)
-}
+// threadEnv is --context-thread's default: $CODE_FOUNDRY_THREAD.
+func (cl *cli) threadEnv() string { return cl.env(paths.EnvThread) }
 
 func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {
 	wt, err := cl.absPath(cf.worktree)

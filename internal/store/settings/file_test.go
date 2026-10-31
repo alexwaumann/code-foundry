@@ -46,46 +46,6 @@ func TestDecode(t *testing.T) {
 	}
 }
 
-// Files written before threads were renamed from sessions: [sessions] and the session.*
-// keybindings read as [threads] and thread.*. Files written before projects were renamed
-// from repos: [repos] and the repo.* keybindings read as [projects] and project.*.
-func TestDecodeLegacyNames(t *testing.T) {
-	tests := []struct {
-		name string
-		in   string
-		want map[string]string
-	}{
-		{name: "[sessions] is [threads]", in: "[sessions]\nauto_name = false\ndefault_effort = \"max\"\n",
-			want: map[string]string{"threads.auto_name": "false", "threads.default_effort": "max"}},
-		{name: "quoted session.* keybindings are thread.*", in: "[keybindings]\n\"session.new\" = \"cmd+shift+n\"\n\"session.rename\" = \"none\"\n",
-			want: map[string]string{"keybindings.thread.new": "cmd+shift+n", "keybindings.thread.rename": "none"}},
-		{name: "unquoted session.* keybindings are thread.*", in: "[keybindings]\nsession.new = \"cmd+j\"\nproject.worktree.new = \"cmd+alt+n\"\n",
-			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.project.worktree.new": "cmd+alt+n"}},
-		{name: "[repos] is [projects]", in: "[repos]\nfetch_interval_seconds = 60\n",
-			want: map[string]string{"projects.fetch_interval_seconds": "60"}},
-		{name: "repo.* keybindings are project.*", in: "[keybindings]\n\"repo.worktree.new\" = \"cmd+alt+n\"\nrepo.refresh = \"none\"\n\"ui.focus.repo\" = \"cmd+5\"\n\"workspace.add-repo\" = \"cmd+6\"\n\"workspace.remove-repo\" = \"cmd+7\"\n",
-			want: map[string]string{"keybindings.project.worktree.new": "cmd+alt+n", "keybindings.project.refresh": "none", "keybindings.ui.focus.project": "cmd+5",
-				"keybindings.workspace.add-project": "cmd+6", "keybindings.workspace.remove-project": "cmd+7"}},
-		{name: "[projects] wins over [repos]", in: "[repos]\nfetch_interval_seconds = 60\n[projects]\nfetch_interval_seconds = 0\n",
-			want: map[string]string{"projects.fetch_interval_seconds": "0"}},
-		{name: "repository-like keybindings are left alone", in: "[keybindings]\n\"repository.x\" = \"cmd+8\"\n",
-			want: map[string]string{"keybindings.repository.x": "cmd+8"}},
-		{name: "the new name wins when both are set", in: "[sessions]\nauto_name = false\nfont_size = 9\n[threads]\nauto_name = true\n[keybindings]\n\"session.new\" = \"cmd+1\"\n\"thread.new\" = \"cmd+2\"\n",
-			want: map[string]string{"threads.auto_name": "true", "threads.font_size": "9", "keybindings.thread.new": "cmd+2"}},
-		{name: "other groups and keybindings are left alone", in: "[appearance]\ntheme = \"dark\"\n[keybindings]\n\"sessionx.new\" = \"cmd+3\"\n\"terminal.new\" = \"cmd+t\"\n",
-			want: map[string]string{"appearance.theme": "dark", "keybindings.sessionx.new": "cmd+3", "keybindings.terminal.new": "cmd+t"}},
-		{name: "a top-level sessions key is not a table", in: "sessions = \"x\"\n", want: map[string]string{"sessions": "x"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := decode([]byte(tt.in))
-			if err != nil || !maps.Equal(got, tt.want) {
-				t.Fatalf("decode = %v, %v; want %v", got, err, tt.want)
-			}
-		})
-	}
-}
-
 // Retired settings read silently: no "unknown setting" issue, and the next save (render
 // of the accepted values) leaves them out of the file.
 func TestDecodeRetiredKeys(t *testing.T) {
@@ -96,10 +56,6 @@ func TestDecodeRetiredKeys(t *testing.T) {
 	}{
 		{name: "projects.worktree_dir is dropped", in: "[projects]\nfetch_interval_seconds = 60\nworktree_dir = \"~/tmp/x\"\n",
 			want: map[string]string{"projects.fetch_interval_seconds": "60"}},
-		{name: "legacy repos.worktree_dir is dropped", in: "[repos]\nworktree_dir = \"~/wt/{repo}\"\n",
-			want: map[string]string{}},
-		{name: "both names are dropped", in: "[repos]\nworktree_dir = \"~/a\"\n[projects]\nworktree_dir = \"~/b\"\n",
-			want: map[string]string{}},
 		{name: "worktree_dir in another table is not retired", in: "[gitops]\nworktree_dir = \"~/c\"\n",
 			want: map[string]string{"gitops.worktree_dir": "~/c"}},
 	}
@@ -208,7 +164,7 @@ func TestRead(t *testing.T) {
 // its own values, and reports no issues.
 func TestOlderFileGetsNotificationDefaults(t *testing.T) {
 	path := filepath.Join(t.TempDir(), FileName)
-	old := "[sessions]\nauto_name = false\n\n[appearance]\ntheme = \"dark\"\n"
+	old := "[threads]\nauto_name = false\n\n[appearance]\ntheme = \"dark\"\n"
 	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
 		t.Fatal(err)
 	}

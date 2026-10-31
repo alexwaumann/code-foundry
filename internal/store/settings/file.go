@@ -65,8 +65,7 @@ func ThemeSlots(path string) []string {
 // decode parses a settings file into raw string-encoded values keyed by settings key.
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
 // found by Field.parse. Under [keybindings], unquoted dotted keys (thread.new = ...)
-// parse as nested tables and are flattened back. Names from before threads were renamed
-// from threads are read as the new ones (renameLegacyKeys).
+// parse as nested tables and are flattened back.
 func decode(data []byte) (map[string]string, error) {
 	var doc map[string]any
 	if _, err := toml.Decode(string(data), &doc); err != nil {
@@ -81,7 +80,6 @@ func decode(data []byte) (map[string]string, error) {
 		}
 		flatten(raw, group, tbl, group == GroupKeybindings)
 	}
-	renameLegacyKeys(raw)
 	dropRetiredKeys(raw)
 	return raw, nil
 }
@@ -89,51 +87,15 @@ func decode(data []byte) (map[string]string, error) {
 // retiredKeys are settings that no longer exist; a file that still sets one reads
 // without an "unknown setting" issue, and the next save leaves it out.
 // projects.worktree_dir went when the app took over where worktrees go (always
-// <config home>/worktrees/<owner>/<repo>/<branch>); repos.worktree_dir is its name from
-// before the repo -> project rename (renameLegacyKeys maps it to the new one first, but
-// it is listed so the retirement does not depend on that order).
+// <config home>/worktrees/<owner>/<repo>/<branch>).
 var retiredKeys = []string{
 	GroupProjects + ".worktree_dir",
-	"repos.worktree_dir",
 }
 
 // dropRetiredKeys deletes raw's retiredKeys.
 func dropRetiredKeys(raw map[string]string) {
 	for _, k := range retiredKeys {
 		delete(raw, k)
-	}
-}
-
-// legacyPrefixes are key prefixes from before threads were renamed from sessions (the
-// [sessions] table, keybindings of the session.* commands) and projects from repos (the
-// [repos] table, keybindings of the repo.* commands, ui.focus.repo and the workspace
-// add-repo / remove-repo commands), and what they are now.
-var legacyPrefixes = []struct{ old, new string }{
-	{"sessions.", GroupThreads + "."},
-	{GroupKeybindings + ".session.", GroupKeybindings + ".thread."},
-	{"repos.", GroupProjects + "."},
-	{GroupKeybindings + ".repo.", GroupKeybindings + ".project."},
-	{GroupKeybindings + ".ui.focus.repo", GroupKeybindings + ".ui.focus.project"},
-	{GroupKeybindings + ".workspace.add-repo", GroupKeybindings + ".workspace.add-project"},
-	{GroupKeybindings + ".workspace.remove-repo", GroupKeybindings + ".workspace.remove-project"},
-}
-
-// renameLegacyKeys rewrites raw's legacy keys to the current names, so a settings file
-// written before the rename keeps working; the next save writes the new names. A key
-// set under both names keeps the new name's value.
-func renameLegacyKeys(raw map[string]string) {
-	for key, v := range raw {
-		for _, p := range legacyPrefixes {
-			rest, ok := strings.CutPrefix(key, p.old)
-			if !ok {
-				continue
-			}
-			delete(raw, key)
-			if _, set := raw[p.new+rest]; !set {
-				raw[p.new+rest] = v
-			}
-			break
-		}
 	}
 }
 

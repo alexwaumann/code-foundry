@@ -550,8 +550,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   and the model inside it, in `<config home>/memory/`: one markdown file per entry (its
   provenance in frontmatter: created, the thread that added it and its name then) and an
   index, `MEMORY.md`, written and never read (at most 40 entries, 4 KiB injected), written
-  only by the daemon through `memory.*`. The old single `memory.md` is imported once at
-  start. Every spawn reads the entries (`Options.Memory`) and, when there are any, appends
+  only by the daemon through `memory.*`. Every spawn reads the entries (`Options.Memory`) and, when there are any, appends
   them under one heading after the `ThreadPrompt` line and a workspace's instructions, before a thread's
   own append (`docs/notes/control-3-app-memory.md`, `docs/notes/memory-dir.md`).
 * **Spawn extras** (`spawnextras.go`): what plugins contribute to every spawn through the

@@ -434,6 +434,9 @@ func TestParseEntry(t *testing.T) {
 		{"quoted", "---\nthread_name: \"a \\\"b\\\"\"\n---\nA", parsed{text: "A", threadNm: `a "b"`}},
 		{"offset time", "---\ncreated: 2026-10-22T16:03:11+02:00\n---\nA", parsed{text: "A", created: t0}},
 		{"invalid UTF-8", "A\xff B", parsed{text: "A B"}},
+		{"headings and comments", "# Preferences\n<!-- one -->\nA <!-- inline --> B\n<!--\nhidden\n-->\nC\n", parsed{text: "A B C"}},
+		{"an open comment runs to the end", "A\n<!-- B\nC\n", parsed{text: "A"}},
+		{"a hashtag is text", "#tag A", parsed{text: "#tag A"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := parseEntry(tt.file); got != tt.want {
@@ -764,130 +767,6 @@ func TestSnapshotPublishes(t *testing.T) {
 	}
 	if snap := next(); snap == nil || len(snap.Entries) != 0 || snap.Entries == nil {
 		t.Errorf("after Clear: %+v", snap)
-	}
-}
-
-func TestImport(t *testing.T) {
-	mtime := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
-	tooLong := strings.Repeat("w", MaxEntryChars+20)
-	for _, tt := range []struct {
-		name     string
-		legacy   *string // nil: no legacy file
-		existing []string
-		want     []string
-		res      Imported
-	}{
-		{name: "no file", want: nil, res: Imported{}},
-		{name: "entries in order", legacy: ptr("- Zebra first\n- apple second\n- Mango third.\n"),
-			want: []string{"Zebra first", "apple second", "Mango third"}, res: Imported{Entries: 3}},
-		{name: "an empty file", legacy: ptr(""), want: nil, res: Imported{}},
-		{name: "hand edits", legacy: ptr("# Preferences\r\n\r\n<!-- a comment -->\r\nhand written\r\n-   spaced   out  \r\n- Hand Written\r\n"),
-			want: []string{"hand written", "spaced out"}, res: Imported{Entries: 2}},
-		{name: "malformed lines", legacy: ptr("---\n- ok\n***\n- |---|\n-\n- also ok\n"),
-			want: []string{"ok", "also ok"}, res: Imported{Entries: 2, Skipped: 4}},
-		{name: "star and plus bullets", legacy: ptr("* Use tabs\n+ Keep answers short\n*\n+\n- 🚀\n"),
-			want: []string{"Use tabs", "Keep answers short"}, res: Imported{Entries: 2, Skipped: 3}},
-		{name: "invalid UTF-8", legacy: ptr("- caf\xff\xfee\n"), want: []string{"cafe"}, res: Imported{Entries: 1}},
-		{name: "past the caps is kept", legacy: ptr("- " + tooLong + "\n- short\n"), want: []string{tooLong, "short"}, res: Imported{Entries: 2}},
-		{name: "cut short and run again", legacy: ptr("- one\n- two\n- three\n"), existing: []string{"one", "TWO"},
-			want: []string{"one", "TWO", "three"}, res: Imported{Entries: 1, Existing: 2}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			home := t.TempDir()
-			dir, legacy := filepath.Join(home, "memory"), filepath.Join(home, "memory.md")
-			s := New(Options{Dir: dir, Legacy: legacy, Log: slog.New(slog.DiscardHandler), Now: func() time.Time { return mtime.Add(-time.Hour) }}) // before the import, as a cut-short one
-			add(t, s, tt.existing...)
-			if tt.legacy != nil {
-				write(t, legacy, *tt.legacy)
-				if err := os.Chtimes(legacy, mtime, mtime); err != nil {
-					t.Fatal(err)
-				}
-				tt.res.Renamed = legacy + ImportedSuffix
-			}
-			res, err := s.Import()
-			if err != nil || res != tt.res {
-				t.Fatalf("Import = %+v, %v; want %+v", res, err, tt.res)
-			}
-			got, err := s.Entries()
-			if err != nil {
-				t.Fatal(err)
-			}
-			var gotTexts []string
-			for _, e := range got {
-				gotTexts = append(gotTexts, e.Text)
-				if slices.Contains(tt.existing, e.Text) {
-					continue
-				}
-				if e.ThreadID != "" || e.Created.Before(mtime) || e.Created.After(mtime.Add(time.Second)) {
-					t.Errorf("imported %+v: want no thread, created at the file's mtime", e)
-				}
-			}
-			if !slices.Equal(gotTexts, tt.want) {
-				t.Errorf("entries = %q, want %q", gotTexts, tt.want)
-			}
-			if tt.legacy == nil {
-				if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) && tt.existing == nil {
-					t.Errorf("no legacy file made the directory: %v", err)
-				}
-				return
-			}
-			if _, err := os.Stat(legacy); !errors.Is(err, os.ErrNotExist) {
-				t.Errorf("legacy file still there: %v", err)
-			}
-			if got := read(t, legacy+ImportedSuffix); got != *tt.legacy {
-				t.Errorf("renamed file = %q", got)
-			}
-			if idx := read(t, filepath.Join(dir, IndexFile)); strings.Count(idx, "\n") != len(tt.want) {
-				t.Errorf("index = %q", idx)
-			}
-			// A second start finds nothing to import.
-			if res, err := s.Import(); err != nil || res != (Imported{}) {
-				t.Errorf("second Import = %+v, %v", res, err)
-			}
-		})
-	}
-	t.Run("a directory in the way", func(t *testing.T) {
-		home := t.TempDir()
-		legacy := filepath.Join(home, "memory.md")
-		if err := os.Mkdir(legacy, 0o700); err != nil {
-			t.Fatal(err)
-		}
-		s := New(Options{Dir: filepath.Join(home, "memory"), Legacy: legacy, Log: slog.New(slog.DiscardHandler)})
-		if _, err := s.Import(); err == nil || !strings.Contains(err.Error(), "not a regular file") {
-			t.Errorf("Import = %v", err)
-		}
-	})
-}
-
-func ptr(s string) *string { return &s }
-
-func TestParse(t *testing.T) {
-	for _, tt := range []struct {
-		name, file      string
-		want, malformed []string
-	}{
-		{"empty", "", nil, nil},
-		{"entries", "- a\n- b\n", []string{"a", "b"}, nil},
-		{"blank lines and spaces", "\n  - a  \n\n-   b\n", []string{"a", "b"}, nil},
-		{"a line without a dash", "- a\nhand written\n", []string{"a", "hand written"}, nil},
-		{"a lone dash is malformed", "-\n- a\n", []string{"a"}, []string{"-"}},
-		{"star and plus bullets", "* a\n+ b\n*emphasis* kept\n", []string{"a", "b", "*emphasis* kept"}, nil},
-		{"bullets and punctuation alone", "*\n +\n---\n- ***\n|---|\n- a\n", []string{"a"}, []string{"*", "+", "---", "- ***", "|---|"}},
-		{"an emoji alone", "- 🚀\n- ship it 🚀\n", []string{"ship it 🚀"}, []string{"- 🚀"}},
-		{"no trailing newline", "- a", []string{"a"}, nil},
-		{"CRLF", "- a\r\n- b\r\n", []string{"a", "b"}, nil},
-		{"headings", "# Preferences\n## Git\n- a\n#hashtag kept\n", []string{"a", "#hashtag kept"}, nil},
-		{"comments", "<!-- one -->\n- a <!-- inline --> b\n<!--\n- hidden\n-->\n- c\n", []string{"a b", "c"}, nil},
-		{"an open comment runs to the end", "- a\n<!-- - b\n- c\n", []string{"a"}, nil},
-		{"normalised", "-   Always   open\tPRs as drafts.\n", []string{"Always open PRs as drafts"}, nil},
-		{"repeats count once", "- Use tabs\n- use tabs.\n* b\n", []string{"Use tabs", "b"}, nil},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			got, bad := Parse(tt.file)
-			if !slices.Equal(got, tt.want) || !slices.Equal(bad, tt.malformed) {
-				t.Errorf("Parse(%q) = %q, %q; want %q, %q", tt.file, got, bad, tt.want, tt.malformed)
-			}
-		})
 	}
 }
 
