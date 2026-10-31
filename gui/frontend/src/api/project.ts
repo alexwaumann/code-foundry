@@ -52,6 +52,12 @@ export interface WorktreeView {
    * isCleanable). Absent counts as false.
    */
   mergedClean?: boolean;
+  /** Code Foundry made it (recorded when made); only these can be cleaned up. Absent counts as false. */
+  managed?: boolean;
+  /** HEAD's work is in status.baseRef (no commits ahead, or a rebased or squash-merged copy landed). Absent counts as false. */
+  landed?: boolean;
+  /** The daemon's cleanup reason: why the git half keeps it ("3 commits not in origin/main", "rebase in progress", …) or why it may go. */
+  cleanupReason?: string;
 }
 
 export interface ProjectView {
@@ -130,7 +136,7 @@ export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
 }
 
 export function toWorktreeView(w: Worktree): WorktreeView {
-  return { projectId: w.projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status), mergedClean: w.mergedClean };
+  return { projectId: w.projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status), mergedClean: w.mergedClean, managed: w.managed, landed: w.landed, cleanupReason: w.cleanupReason };
 }
 
 export function toProjectView(r: Project): ProjectView {

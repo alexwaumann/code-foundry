@@ -142,7 +142,8 @@ function inside(p: string, root: string): boolean {
 
 export interface CleanupThreads {
   order: readonly string[];
-  byId: Readonly<Record<string, Pick<ThreadView, "archivedAtMs" | "worktreePath"> | undefined>>;
+  /** checkoutPaths absent counts as none (a fixture with only the cwd). */
+  byId: Readonly<Record<string, (Pick<ThreadView, "archivedAtMs" | "worktreePath"> & { checkoutPaths?: ThreadView["checkoutPaths"] }) | undefined>>;
 }
 
 export interface CleanupTerminals {
@@ -151,14 +152,15 @@ export interface CleanupTerminals {
 }
 
 /**
- * A thread is on the worktree (its cwd is the worktree or inside it), whatever its state;
- * archived ones are put away: the daemon's cleanup guard (cleanupHold over
- * worktreeThreads) counts exactly those.
+ * A thread is on the worktree (its cwd, or one of its checkouts in a multi-project set, is
+ * the worktree or inside it), whatever its state; archived ones are put away: the
+ * daemon's cleanup guard (cleanupHold over checkoutThreads) counts exactly those. It is
+ * also the leftover rule's "a thread has it" (lib/leftovers.ts).
  */
 export function threadHolds(threads: CleanupThreads, path: string): boolean {
   return threads.order.some((id) => {
     const s = threads.byId[id];
-    return s !== undefined && s.archivedAtMs === null && inside(s.worktreePath, path);
+    return s !== undefined && s.archivedAtMs === null && (inside(s.worktreePath, path) || (s.checkoutPaths ?? []).some((c) => inside(c.path, path)));
   });
 }
 
@@ -411,18 +413,21 @@ export function remoteDetail(r: Pick<ProjectView, "githubSlug" | "remotes">): st
 }
 
 /**
- * Details' Worktrees row: the folder they share (tildified) and how many, "~/x.worktrees · 5";
- * just the count when they share none; "" with none.
+ * Details' Worktrees row: the folder they share (tildified), how many, and how many Code
+ * Foundry made: "~/x.worktrees · 5, 3 made by Code Foundry", "… · 1 made by Code Foundry"
+ * when it made them all, "… · 2" when none; just the count part when they share no folder;
+ * "" with none.
  */
-export function worktreesDetail(paths: readonly string[]): string {
+export function worktreesDetail(paths: readonly string[], managed = 0): string {
   if (paths.length === 0) return "";
+  const made = managed <= 0 ? "" : managed >= paths.length ? " made by Code Foundry" : `, ${String(managed)} made by Code Foundry`;
+  const count = `${String(paths.length)}${made}`;
   const parents = paths.map((p) => p.slice(0, Math.max(0, p.lastIndexOf("/"))));
   let common = parents[0] ?? "";
   for (const p of parents) {
     while (common && p !== common && !p.startsWith(`${common}/`)) common = common.slice(0, Math.max(0, common.lastIndexOf("/")));
   }
-  const n = String(paths.length);
-  return common && common !== "/" ? `${tildify(common)} · ${n}` : n;
+  return common && common !== "/" ? `${tildify(common)} · ${count}` : count;
 }
 
 /** Details' Actions row's count: "none", "1 project action", "2 project actions". */

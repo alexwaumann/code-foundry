@@ -408,6 +408,10 @@ interface MockWorktree {
   };
   /** The last status read was this long ago (ms); absent: now. */
   refreshedAgoMs?: number;
+  /** Made by the app (the daemon records it); absent: by path, under ~/.code-foundry/worktrees. */
+  managed?: boolean;
+  /** Its commits landed in baseRef as a rebased or squash-merged copy (the daemon's BaseMerged). */
+  baseMerged?: boolean;
 }
 
 interface MockProject {
@@ -449,6 +453,8 @@ export class ConfirmNeeded extends Error {
     readonly title: string,
     message: string,
     readonly confirmLabel = "",
+    /** A second stage's args (ConfirmationRequired.args: force), merged into the re-invoke. */
+    readonly args: Record<string, string> = {},
   ) {
     super(message);
   }
@@ -529,7 +535,29 @@ const WORKTREE_ROOT = `${HOME}/.code-foundry/worktrees`;
 
 /** Made by the app: strictly inside its worktrees directory (the daemon's Worktree.Managed). */
 function managed(w: MockWorktree): boolean {
-  return w.path.startsWith(`${WORKTREE_ROOT}/`);
+  return w.managed ?? w.path.startsWith(`${WORKTREE_ROOT}/`);
+}
+
+/** The daemon's Worktree.Landed: HEAD's work is in baseRef (no commits ahead, or a landed copy); false without a baseRef or after a failed read. */
+function landed(w: MockWorktree): boolean {
+  const st = w.status;
+  return Boolean(st.baseRef) && !st.error && ((st.baseAhead ?? 0) === 0 || w.baseMerged === true);
+}
+
+/** The daemon's CleanupVerdict reason (simplified like mergedClean): why it is kept, or why it may go. */
+function verdictReason(w: MockWorktree): string {
+  const st = w.status;
+  if (w.isMain) return "main worktree";
+  if (!managed(w)) return "not a Code Foundry worktree";
+  if (w.detached || !w.branch) return "detached HEAD";
+  if (st.error) return `git status failed: ${st.error}`;
+  if (st.operation) return `${st.operation} in progress`;
+  if (st.dirty || st.staged + st.modified + st.untracked + (st.conflicted ?? 0) > 0) return "uncommitted changes";
+  if (!st.baseRef) return "no remote default branch to compare with";
+  const ahead = st.baseAhead ?? 0;
+  if (ahead > 0 && w.baseMerged) return `a rebased or squash-merged copy is in ${st.baseRef}`;
+  if (ahead > 0) return `${String(ahead)} ${ahead === 1 ? "commit" : "commits"} not in ${st.baseRef}`;
+  return removedReason(w);
 }
 
 /** Why the daemon's cleanup may remove w (the only reason the mock models). */
@@ -543,7 +571,7 @@ function removedReason(w: MockWorktree): string {
  */
 function mergedClean(w: MockWorktree): boolean {
   const st = w.status;
-  return !w.isMain && managed(w) && !w.detached && w.branch !== "" && !st.dirty && st.staged + st.modified + st.untracked === 0 && Boolean(st.baseRef) && (st.baseAhead ?? 0) === 0;
+  return !w.isMain && managed(w) && !w.detached && w.branch !== "" && !st.dirty && !st.error && !st.operation && st.staged + st.modified + st.untracked === 0 && Boolean(st.baseRef) && ((st.baseAhead ?? 0) === 0 || w.baseMerged === true);
 }
 
 function initialProjects(): MockProject[] {
@@ -1041,6 +1069,55 @@ export class World {
     return w;
   }
 
+  /**
+   * Scenario: "Worktrees without threads" on a project's page. Three leftovers, as the
+   * daemon leaves them: cf/perf-spike (made by the app, 3 commits not in origin/main, its
+   * thread archived 12 days ago), cf/old-copy (made by the app, 4 uncommitted files, its
+   * commits landed, its thread archived 3 weeks ago) and exp/shaders (made outside the app,
+   * clean, merged). `withClean`: also cf/usage-polish, made by the app, clean and merged with no
+   * thread (what project.worktree.cleanup removes). POST /__mock/leftovers. Idempotent.
+   */
+  addLeftovers(projectRef: string, withClean: boolean): string[] {
+    const project = this.projectRef(projectRef);
+    requireGit(project, "leftover worktrees");
+    const root = `${WORKTREE_ROOT}/${project.githubSlug || `_local/${project.name}`}`;
+    const base = `origin/${project.defaultBranch || "main"}`;
+    const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000);
+    const add = (w: MockWorktree) => {
+      if (project.worktrees.some((x) => x.path === w.path)) return;
+      project.worktrees.push(w);
+      this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
+    };
+    const spike = `${root}/cf-perf-spike`;
+    const copy = `${root}/cf-old-copy`;
+    const shaders = `${project.path}-shaders`;
+    add({ path: spike, branch: "cf/perf-spike", head: "5p1ke000", isMain: false, managed: true, status: clean({ upstream: "origin/cf/perf-spike", baseRef: base, baseAhead: 3, baseBehind: 9 }) });
+    add({ path: copy, branch: "cf/old-copy", head: "01dc0b1e", isMain: false, managed: true, status: clean({ upstream: "", modified: 2, untracked: 2, dirty: true, baseRef: base, baseAhead: 0, baseBehind: 30 }) });
+    add({ path: shaders, branch: "exp/shaders", head: "5had3r50", isMain: false, managed: false, status: clean({ upstream: "", baseRef: base, baseAhead: 0, baseBehind: 4 }) });
+    const out = [spike, copy, shaders];
+    if (withClean) {
+      const polish = `${root}/cf-usage-polish`;
+      add({ path: polish, branch: "cf/usage-polish", head: "9011sh00", isMain: false, managed: true, status: clean({ upstream: "", baseRef: base }) });
+      out.push(polish);
+    }
+    const archived: [string, string, string, number][] = [
+      ["s-lo-spike", "Profile the renderer", spike, 12],
+      ["s-lo-copy", "Copy the old settings page", copy, 21],
+    ];
+    for (const [id, name, worktreePath, days] of archived) {
+      if (this.threads.has(id)) continue;
+      const t = this.addThread({ id, projectId: project.id, worktreePath, name, model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.IDLE, statusReason: "finished", statusChangedAt: daysAgo(days), createdAt: daysAgo(days + 2), lastActivityAt: daysAgo(days), archivedAt: daysAgo(days) });
+      this.publishThread(t);
+    }
+    this.gh.setCardDetail(project.id, copy, [
+      { path: "gui/frontend/src/lib/tree.ts", added: 12, deleted: 4, uncommitted: true },
+      { path: "docs/notes/sidebar.md", added: 3, deleted: 1, uncommitted: true },
+      { path: "scratch.txt", added: 3, deleted: 0, uncommitted: true },
+      { path: "notes/todo.md", added: 4, deleted: 0, uncommitted: true },
+    ]);
+    return out;
+  }
+
   /** Why the daemon's cleanupHold keeps a worktree: a thread on it, a running terminal, a workspace; "" for nothing. */
   private cleanupHold(path: string): string {
     const thread = this.threadsIn([path])[0];
@@ -1064,7 +1141,7 @@ export class World {
     if (path && candidates.length === 0) throw new CommandError("notfound", `worktree ${path} in project ${project.name}`);
     const out: { removed: MockWorktree[]; skipped: { w: MockWorktree; reason: string }[] } = { removed: [], skipped: [] };
     for (const w of candidates) {
-      const reason = !mergedClean(w) ? (w.isMain ? "main worktree" : !managed(w) ? "not a Code Foundry worktree" : w.status.dirty ? "uncommitted changes" : !w.status.baseRef ? "no remote default branch to compare with" : `${String(w.status.baseAhead ?? 0)} commits not in ${w.status.baseRef}`) : this.cleanupHold(w.path);
+      const reason = !mergedClean(w) ? verdictReason(w) : this.cleanupHold(w.path);
       if (reason) {
         out.skipped.push({ w, reason });
         continue;
@@ -3188,7 +3265,7 @@ export class World {
 
   worktreeMsg(projectId: string, w: MockWorktree): WorktreeInit {
     const at = new Date(Date.now() - (w.refreshedAgoMs ?? 0));
-    return { projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), status: { ...w.status, refreshedAt: timestampFromDate(at) } };
+    return { projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), managed: managed(w), landed: landed(w), cleanupReason: verdictReason(w), status: { ...w.status, refreshedAt: timestampFromDate(at) } };
   }
 
   projectMsg(r: MockProject): ProjectInit {
@@ -4278,7 +4355,19 @@ export class World {
         run: (ctx, args) => {
           const w = this.worktreeOf(ctx);
           if (!w) throw new CommandError("unavailable", "no active worktree");
-          if (w.wt.status.dirty && args.force !== "true") throw new CommandError("unavailable", "worktree has local changes; use force");
+          // Like the daemon: git refusing for uncommitted work becomes a second-stage
+          // confirmation carrying force. (Holds are not modelled here.)
+          const st = w.wt.status;
+          if ((st.dirty || st.staged + st.modified + st.untracked > 0) && args.force !== "true") {
+            const n = st.staged + st.modified + st.untracked + (st.conflicted ?? 0);
+            throw new ConfirmNeeded(
+              "project.worktree.remove",
+              "Delete uncommitted work?",
+              `The worktree of ${w.wt.branch || w.wt.path} at ${w.wt.path} has uncommitted work: ${String(n)} ${n === 1 ? "file" : "files"}.\n\nRemoving the worktree deletes that work for good. Delete it?`,
+              "",
+              { force: "true" },
+            );
+          }
           this.dropWorktree(w.wt.path);
           return `Removed worktree ${w.wt.branch}`;
         },

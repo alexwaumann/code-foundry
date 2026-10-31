@@ -274,8 +274,11 @@ Services (v1):
   each removed or kept worktree comes with its reason, which the confirmation lists;
   `force` also removes those kept only for uncommitted changes, which are marked so
   the command can ask first; a removal refused for uncommitted changes, here or in
-  RemoveWorktree, carries an `UncommittedWork` detail;
-  `docs/notes/projects-polish-3.md`, `docs/notes/cleanup-eligibility.md`),
+  RemoveWorktree, carries an `UncommittedWork` detail; each worktree also carries `managed`,
+  `landed` and its `cleanup_reason`, which the Projects page's "Worktrees without threads"
+  reads instead of re-deriving git rules;
+  `docs/notes/projects-polish-3.md`, `docs/notes/cleanup-eligibility.md`,
+  `docs/notes/projects-redesign-2-leftovers.md`),
   ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;
   `docs/notes/add-project-2-nogit.md`), SearchGitHub and LookupGitHub (GraphQL through

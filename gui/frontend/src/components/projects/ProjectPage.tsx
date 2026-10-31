@@ -23,6 +23,7 @@ import { KindIcon, Pill, SectionHeader } from "./bits";
 import { useCheckoutOrder, usePageScroll } from "./pageHooks";
 import { useProjectKind } from "@/components/icons/projectKind";
 import { CheckoutsTable } from "./CheckoutsTable";
+import { LeftoverWorktrees } from "./LeftoverWorktrees";
 import { projectMenu } from "./menus";
 import { OverflowMenu } from "./OverflowMenu";
 import { ProjectsCrumb, PagePicker } from "./PagePicker";
@@ -85,15 +86,6 @@ function KindNote({ icon, children, action }: { icon: React.ReactNode; children:
   );
 }
 
-/**
- * Where PR 3's "Worktrees without threads" section goes (worktrees that are not main and
- * no non-archived thread has as a checkout, with why they stayed and Remove/Resume).
- * Nothing yet: a boundary so that section adds a file and edits one line here.
- */
-function LeftoverWorktreesSlot({ projectId }: { projectId: string }) {
-  return <div hidden data-testid="leftover-worktrees-slot" data-project={projectId} />;
-}
-
 /** A folder without git: no checkouts, so its threads in a sentence and the two ways to start one. */
 function ThreadsBlock({ projectId, main }: { projectId: string; main: string }) {
   const working = useThreadsStore((s) => projectActivity(s, projectId).working);
@@ -129,9 +121,10 @@ function ThreadsBlock({ projectId, main }: { projectId: string; main: string }) 
 /**
  * A project's page: the header (crumb, picker, meta, Refresh, Terminal, New thread, more),
  * a note for a repository without a remote or a folder without git, the Checkouts table
- * (click or Enter opens a checkout's Changes tab in the page's side panel), PR 3's slot,
- * and Details. Below PROJECT_NARROW_BELOW of content width the Sync column and the slug
- * drop and Terminal shows its icon only. docs/notes/projects-redesign-1-index.md.
+ * (click or Enter opens a checkout's Changes tab in the page's side panel), Worktrees
+ * without threads (LeftoverWorktrees), and Details. Below PROJECT_NARROW_BELOW of content
+ * width the Sync column and the slug drop and Terminal and the leftover rows' Remove show
+ * their icon only. docs/notes/projects-redesign-1-index.md.
  */
 export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey: string }) {
   const loaded = useProjectsStore((s) => s.loaded);
@@ -259,8 +252,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
                 ) : (
                   <ThreadsBlock projectId={projectId} main={main} />
                 )}
-                {/* PR 3: "Worktrees without threads" mounts here, between Checkouts and Details. */}
-                {git && <LeftoverWorktreesSlot projectId={projectId} />}
+                {git && <LeftoverWorktrees projectId={projectId} narrow={narrow} />}
                 <ProjectDetails projectId={projectId} />
               </>
             )}

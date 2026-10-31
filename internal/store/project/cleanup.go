@@ -128,6 +128,15 @@ func (w Worktree) MergedClean(now time.Time) bool {
 	return ok
 }
 
+// Landed reports whether HEAD's work is in Status.BaseRef: HEAD is reachable from it
+// (BaseAhead 0) or its commits landed as a rebased or squash-merged copy (BaseMerged).
+// False without a BaseRef or after a failed status read. Uncommitted changes do not
+// count: a dirty worktree can be landed. Pure.
+func (w Worktree) Landed() bool {
+	st := w.Status
+	return st.BaseRef != "" && st.Error == "" && (st.BaseAhead == 0 || st.BaseMerged)
+}
+
 // CleanupOptions configures Cleanup.
 type CleanupOptions struct {
 	ProjectID string

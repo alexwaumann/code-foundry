@@ -7,6 +7,7 @@ import { PaneError } from "@/components/error/fallbacks";
 import { ActionDialog } from "@/components/actions/ActionDialog";
 import { ActionRunDialog } from "@/components/actions/ActionRunDialog";
 import { NewWorkspaceDialog } from "@/components/projects/NewWorkspaceDialog";
+import { RemoveWorktreeDialog } from "@/components/projects/RemoveWorktreeDialog";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { SaveWorkspaceDialog } from "@/components/thread/SaveWorkspaceDialog";
 import { SnoozeDialog } from "@/components/snooze/SnoozeDialog";
@@ -234,6 +235,7 @@ export function App() {
         <CommandPalette />
         <HelpOverlay />
         <ConfirmDialog />
+        <RemoveWorktreeDialog />
         <ConsentDialog />
         <UpdateDialog />
         <AddProjectDialog />

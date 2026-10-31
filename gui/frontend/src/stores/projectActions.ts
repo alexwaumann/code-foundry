@@ -7,9 +7,11 @@ import { startCommandNamed } from "@/keys/bindings";
 import { openAddProject } from "./addProject";
 import { newWorktreeTerminal } from "./bottomActions";
 import { runCommand, runCommandForResult } from "./commands";
+import { composeIn } from "./compose";
 import { projectContext, worktreeContext } from "./context";
 import { openPublishDialog } from "./publish";
 import { mainWorktreePath, useProjectsStore } from "./projects";
+import { archiveThread } from "./threadActions";
 import { useUiStore } from "./ui";
 
 /** terminal.new in the worktree; the shell opens (focused) in the Projects page's bottom panel. */
@@ -17,9 +19,26 @@ export function newTerminalIn(projectId: string, path: string): Promise<boolean>
   return newWorktreeTerminal(projectId, path);
 }
 
-/** project.worktree.remove (the daemon asks for confirmation, then again, naming the work, before deleting uncommitted changes). */
+/**
+ * project.worktree.remove, confirmed in the remove-worktree dialog (stores/removeWorktree.ts:
+ * the path that goes, the branch that stays, the uncommitted files that are lost). The path
+ * is passed as an arg so the dialog knows the worktree.
+ */
 export function removeWorktree(projectId: string, path: string): Promise<boolean> {
-  return runCommand("project.worktree.remove", {}, worktreeContext(projectId, path));
+  return runCommand("project.worktree.remove", { path }, worktreeContext(projectId, path));
+}
+
+/**
+ * A leftover worktree's Resume: the newest archived thread that worked there, unarchived
+ * (thread.archive) and shown with its prompt focused; with none, the composer in that
+ * checkout.
+ */
+export async function resumeWorktree(projectId: string, path: string, archivedThreadId: string | null): Promise<void> {
+  if (archivedThreadId === null) {
+    composeIn(projectId, path);
+    return;
+  }
+  if (await archiveThread(archivedThreadId, false)) useUiStore.getState().select({ kind: "thread", id: archivedThreadId }, { focusPrompt: true });
 }
 
 /**

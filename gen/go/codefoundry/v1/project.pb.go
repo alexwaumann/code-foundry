@@ -383,7 +383,20 @@ type Worktree struct {
 	// landed there. Whether a live thread, a running terminal or a workspace holds it is
 	// not part of this flag (the project store does not know them); CleanupWorktrees
 	// checks those too.
-	MergedClean   bool `protobuf:"varint,8,opt,name=merged_clean,json=mergedClean,proto3" json:"merged_clean,omitempty"`
+	MergedClean bool `protobuf:"varint,8,opt,name=merged_clean,json=mergedClean,proto3" json:"merged_clean,omitempty"`
+	// Code Foundry made this worktree (it recorded it when it made it). Only these can be
+	// cleaned up; a `git worktree add` by hand or by another tool is never managed, even
+	// under the app's worktrees directory.
+	Managed bool `protobuf:"varint,9,opt,name=managed,proto3" json:"managed,omitempty"`
+	// HEAD's work is in status.base_ref: base_ahead 0, or a rebased or squash-merged copy
+	// of its commits landed there. False when base_ref is empty or the status read failed.
+	// Says nothing about uncommitted changes.
+	Landed bool `protobuf:"varint,10,opt,name=landed,proto3" json:"landed,omitempty"`
+	// The git half's reason, as cleanup reports it: why the worktree is kept ("main
+	// worktree", "not a Code Foundry worktree", "uncommitted changes", "3 commits not in
+	// origin/main", "rebase in progress", …) or, when merged_clean, why it may go ("branch
+	// is in origin/main").
+	CleanupReason string `protobuf:"bytes,11,opt,name=cleanup_reason,json=cleanupReason,proto3" json:"cleanup_reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -472,6 +485,27 @@ func (x *Worktree) GetMergedClean() bool {
 		return x.MergedClean
 	}
 	return false
+}
+
+func (x *Worktree) GetManaged() bool {
+	if x != nil {
+		return x.Managed
+	}
+	return false
+}
+
+func (x *Worktree) GetLanded() bool {
+	if x != nil {
+		return x.Landed
+	}
+	return false
+}
+
+func (x *Worktree) GetCleanupReason() string {
+	if x != nil {
+		return x.CleanupReason
+	}
+	return ""
 }
 
 type GitStatus struct {
@@ -4256,7 +4290,7 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\x05error\x18\b \x01(\tR\x05error\x12\x18\n" +
 	"\aremotes\x18\t \x03(\tR\aremotes\x12\x10\n" +
 	"\x03git\x18\n" +
-	" \x01(\bR\x03git\"\xf4\x01\n" +
+	" \x01(\bR\x03git\"\xcd\x02\n" +
 	"\bWorktree\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +
@@ -4266,7 +4300,11 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\ais_main\x18\x05 \x01(\bR\x06isMain\x121\n" +
 	"\x06status\x18\x06 \x01(\v2\x19.codefoundry.v1.GitStatusR\x06status\x12\x1a\n" +
 	"\bdetached\x18\a \x01(\bR\bdetached\x12!\n" +
-	"\fmerged_clean\x18\b \x01(\bR\vmergedClean\"\xfb\x03\n" +
+	"\fmerged_clean\x18\b \x01(\bR\vmergedClean\x12\x18\n" +
+	"\amanaged\x18\t \x01(\bR\amanaged\x12\x16\n" +
+	"\x06landed\x18\n" +
+	" \x01(\bR\x06landed\x12%\n" +
+	"\x0ecleanup_reason\x18\v \x01(\tR\rcleanupReason\"\xfb\x03\n" +
 	"\tGitStatus\x12\x1a\n" +
 	"\bupstream\x18\x01 \x01(\tR\bupstream\x12\x14\n" +
 	"\x05ahead\x18\x02 \x01(\x05R\x05ahead\x12\x16\n" +

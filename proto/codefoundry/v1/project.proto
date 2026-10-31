@@ -149,6 +149,19 @@ message Worktree {
   // not part of this flag (the project store does not know them); CleanupWorktrees
   // checks those too.
   bool merged_clean = 8;
+  // Code Foundry made this worktree (it recorded it when it made it). Only these can be
+  // cleaned up; a `git worktree add` by hand or by another tool is never managed, even
+  // under the app's worktrees directory.
+  bool managed = 9;
+  // HEAD's work is in status.base_ref: base_ahead 0, or a rebased or squash-merged copy
+  // of its commits landed there. False when base_ref is empty or the status read failed.
+  // Says nothing about uncommitted changes.
+  bool landed = 10;
+  // The git half's reason, as cleanup reports it: why the worktree is kept ("main
+  // worktree", "not a Code Foundry worktree", "uncommitted changes", "3 commits not in
+  // origin/main", "rebase in progress", …) or, when merged_clean, why it may go ("branch
+  // is in origin/main").
+  string cleanup_reason = 11;
 }
 
 message GitStatus {
