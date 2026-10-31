@@ -36,6 +36,9 @@ type archiveCleaner struct {
 	checkouts func(thread.Thread) []thread.Checkout
 	threads   func() *thread.Snapshot
 	terminals func() []terminal.Terminal
+	// remember records a worktree's HEAD for its threads right before it goes
+	// (beforeRemoval); nil: nothing.
+	remember func(project.Worktree)
 	// pathLocks serialize cleanups of one worktree path (cleanOne): path -> *sync.Mutex.
 	pathLocks sync.Map
 	wg        sync.WaitGroup
@@ -93,7 +96,11 @@ func (c *archiveCleaner) cleanOne(ctx context.Context, cause, by, id, projectID,
 		Hold: func(w project.Worktree) string {
 			return cleanupHold(w.Path, checkoutThreads(c.threads(), c.checkouts), c.terminals())
 		},
-		Removing: logLeftovers(c.log),
+		Removing: beforeRemoval(c.log, func(w project.Worktree) {
+			if c.remember != nil {
+				c.remember(w)
+			}
+		}),
 	})
 	switch {
 	case errors.Is(err, project.ErrNotFound):

@@ -145,8 +145,14 @@ type Thread struct {
 	// 0049, filled at daemon start by fillCheckouts). Persisted (threads.checkouts).
 	// Copy on write.
 	CheckoutPaths map[string]string
-	Name          string
-	AutoNamed     bool
+	// LastHeads is the branch each worktree-mode checkout had checked out when a cleanup
+	// removed it, by project id (RememberHead; its HEAD is read live otherwise, and the
+	// project snapshot forgets it with the worktree). A start that makes the checkout
+	// again checks that branch out when it still exists, then drops the entry
+	// (recreate.go). nil: nothing recorded. Persisted (threads.last_heads). Copy on write.
+	LastHeads map[string]string
+	Name      string
+	AutoNamed bool
 	// NameProvisional: Name was derived from the first prompt (provisional.go) and the
 	// namer still replaces it; a rename or the namer's title clears it. Persisted.
 	NameProvisional bool

@@ -865,8 +865,8 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		// The fork runs in the parent's checkouts, so it inherits what the worktree was made
 		// for: a cleanup that removes it is undone when either resumes (recreate.go).
 		BaseRef: parent.BaseRef, CreatedWorktree: parent.CreatedWorktree, Branch: parent.Branch,
-		CheckoutPaths: maps.Clone(parent.CheckoutPaths),
-		Name:          name, AutoNamed: autoNamed,
+		CheckoutPaths: maps.Clone(parent.CheckoutPaths), LastHeads: maps.Clone(parent.LastHeads),
+		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
 		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID, Epoch: 1,
 		// The fork resumes the parent's conversation, system prompt and all (memory.go).

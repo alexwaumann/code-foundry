@@ -198,6 +198,11 @@ type CreateWorktreeOptions struct {
 	// Branch to check out. If neither a local branch nor origin/<Branch> exists (or
 	// BaseRef is set and the local branch does not exist), it is created from BaseRef.
 	Branch string
+	// Path is where the worktree goes; empty is the default path for the project and
+	// Branch (DefaultWorktreePath). It must be inside the worktrees root: the thread
+	// store passes a removed checkout's own path to make it again on another branch than
+	// the one its path was made for (docs/notes/recreate-last-head.md).
+	Path string
 	// BaseRef to branch from. Empty is the default branch; BaseFromOrigin says which
 	// copy of it, and of a base typed as a bare branch name, per repository.
 	BaseRef string

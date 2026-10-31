@@ -231,6 +231,7 @@ func WithoutMember(s Thread, projectID, name string) (Thread, error) {
 		delete(paths, projectID)
 		s.CheckoutPaths = paths
 	}
+	s.LastHeads = withoutHead(s.LastHeads, projectID)
 	s.WorkspaceID = ""
 	return s, nil
 }

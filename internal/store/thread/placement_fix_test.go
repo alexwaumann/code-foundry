@@ -210,6 +210,11 @@ func TestRemadeNote(t *testing.T) {
 			{projectID: "r1", projectName: "web", path: "/wt/web/feat-x"},
 			{projectID: "r2", projectName: "api", path: "/wt/api/feat-x", newBranch: true, startPoint: "origin/main"}},
 			want: []string{"another project of this thread was removed and has been recreated from branch feat/x (/wt/web/feat-x)", "project api (/wt/api/feat-x)"}},
+		{name: "made again on its last head", made: []madeWorktree{
+			{projectID: "r1", projectName: "web", path: "/wt/web/feat-x", branch: "feat/y"},
+			{projectID: "r2", projectName: "api", path: "/wt/api/feat-x", branch: "feat/x"}},
+			want: []string{"has been recreated from branch feat/y, where this thread had moved from feat/x (/wt/web/feat-x).",
+				"has been recreated from branch feat/x (/wt/api/feat-x)."}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

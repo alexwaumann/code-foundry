@@ -64,7 +64,7 @@ func TestArchiveCleanup(t *testing.T) {
 			}
 			pf.Put(project.Project{ID: "web", Name: "web", Git: true, Path: "/src/web", Worktrees: []project.Worktree{
 				{ProjectID: "web", Path: "/src/web", IsMain: true, Branch: "main", Status: clean},
-				{ProjectID: "web", Path: webWT, Branch: "feat/x", Managed: true, Status: clean},
+				{ProjectID: "web", Path: webWT, Branch: "feat/y", Managed: true, Status: clean}, // moved
 			}})
 			pf.Put(project.Project{ID: "api", Name: "api", Git: true, Path: "/src/api", Worktrees: []project.Worktree{
 				{ProjectID: "api", Path: "/src/api", IsMain: true, Branch: "main", Status: clean},
@@ -75,9 +75,11 @@ func TestArchiveCleanup(t *testing.T) {
 			if tt.term {
 				terms = []terminal.Terminal{{ID: "t1", State: terminal.StateRunning, Cwd: webWT}}
 			}
+			var remembered []string // the threads' last heads, recorded right before each removal
 			c := &archiveCleaner{
 				log: slog.New(slog.NewTextHandler(io.Discard, nil)), projects: pf, checkouts: checkouts,
 				threads: func() *thread.Snapshot { return snap }, terminals: func() []terminal.Terminal { return terms },
+				remember: func(w project.Worktree) { remembered = append(remembered, w.Path+" "+w.Branch) },
 			}
 			c.ctx, c.cancel = context.WithCancel(context.Background())
 			c.archived(archived)
@@ -91,6 +93,14 @@ func TestArchiveCleanup(t *testing.T) {
 			slices.Sort(removed)
 			if !slices.Equal(removed, tt.wantRemoved) {
 				t.Errorf("removed %q, want %q", removed, tt.wantRemoved)
+			}
+			var wantHeads []string
+			for _, p := range tt.wantRemoved {
+				wantHeads = append(wantHeads, p+" "+map[string]string{webWT: "feat/y", apiWT: "feat/x"}[p])
+			}
+			slices.Sort(remembered)
+			if !slices.Equal(remembered, wantHeads) {
+				t.Errorf("heads remembered %q, want %q", remembered, wantHeads)
 			}
 		})
 	}

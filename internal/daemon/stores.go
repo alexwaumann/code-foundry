@@ -250,6 +250,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		checkouts: func(t thread.Thread) []thread.Checkout { return s.thread.CheckoutsOf(t) },
 		threads:   func() *thread.Snapshot { return s.thread.Snapshot() },
 		terminals: func() []terminal.Terminal { return s.terminal.List(context.Background()) },
+		remember:  func(w project.Worktree) { s.thread.RememberHead(w) },
 	}
 	s.archived.ctx, s.archived.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	threadLog := log.With("store", "thread")
