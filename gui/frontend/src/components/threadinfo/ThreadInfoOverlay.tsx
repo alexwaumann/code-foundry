@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { hideThreadInfoOverlay, useCardRoom } from "@/stores/threadInfo";
+import { hideThreadInfoOverlay, useCardRoom } from "@/stores/threadInfoOverlay";
 import { ThreadInfoContent } from "./ThreadInfoCard";
 
 /** The header's toggle (ThreadInfoToggle), which focus returns to and whose press is not "outside". */

@@ -11,7 +11,7 @@ import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
 import { forgetTurnView, startThreadWatch } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
-import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfo";
+import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
 import { cardFits } from "@/lib/threadInfo";
 import { useWidth } from "@/lib/useWidth";

@@ -2,7 +2,7 @@ import { SquareChartGantt } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { useThreadCtx } from "@/components/thread/context";
 import { cn } from "@/lib/utils";
-import { useCardRoom } from "@/stores/threadInfo";
+import { useCardRoom } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
 
 /**

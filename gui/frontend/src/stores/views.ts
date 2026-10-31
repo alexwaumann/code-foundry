@@ -17,7 +17,7 @@ import { openMcpSurface } from "./mcpPanel";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
-import { toggleThreadInfo } from "./threadInfo";
+import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
 import { presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";

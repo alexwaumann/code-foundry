@@ -3,7 +3,7 @@ import { toneText } from "@/components/pr/tones";
 import { prStateLook } from "@/components/prs/prState";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { showThreadInfo } from "@/stores/threadInfo";
+import { showThreadInfo } from "@/stores/threadInfoOverlay";
 import { linkedPrTag, linkedPrTagText, linkedPrTip } from "./linkedPrTag";
 import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
 

@@ -18,7 +18,7 @@ import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
 import { toggleThreadSidebar } from "@/stores/threadActions";
-import { toggleThreadInfo } from "@/stores/threadInfo";
+import { toggleThreadInfo } from "@/stores/threadInfoOverlay";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
 import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
