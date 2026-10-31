@@ -130,8 +130,11 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect(last?.args).toEqual({ branch: "feat/palette" });
   expect(last?.context?.activeWorktreePath).toBe(`${CF}.worktrees/feat-sidebar`);
   // The command emits FocusProject for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>:
-  // the Projects page shows it, its cursor on the worktree's row.
-  await expectProjectRevealed(page, "code-foundry", "feat/palette");
+  // the project's page shows it. No thread is on it yet, so it is in Worktrees without threads, not the table.
+  await expectProjectRevealed(page, "code-foundry");
+  const made = page.locator('[data-testid="leftover-row"]').filter({ hasText: "feat/palette" });
+  await expect(made).toBeInViewport();
+  await expect(page.locator('[data-testid="project-worktree"]').filter({ hasText: "feat/palette" })).toHaveCount(0);
 
   // Enum args list their values, the default highlighted.
   await page.keyboard.press("Meta+k");

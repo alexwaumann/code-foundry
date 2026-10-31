@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorktreeView } from "@/api/project";
-import { holdsWork, isLeftover, lastArchivedOn, leftoverReason, lossFiles, lossLine, removeCleanLabel, uncommittedCount, type ArchivedThreads, type ReasonInput } from "./leftovers";
+import { checkoutRows, holdsWork, isLeftover, lastArchivedOn, leftoverReason, lossFiles, lossLine, removeCleanLabel, uncommittedCount, type ArchivedThreads, type ReasonInput } from "./leftovers";
 
 const NOW = Date.UTC(2026, 9, 31, 12);
 const DAY = 86_400_000;
@@ -43,6 +43,33 @@ describe("isLeftover", () => {
       expect(isLeftover(c.w, c.threads)).toBe(c.want);
     });
   }
+});
+
+describe("checkoutRows", () => {
+  const main = { path: "/r", isMain: true };
+  const held = { path: "/wt/held", isMain: false };
+  const inSet = { path: "/wt/set", isMain: false };
+  const archived = { path: "/wt/archived", isMain: false };
+  const bare = { path: "/wt/bare", isMain: false };
+  const all = [main, held, inSet, archived, bare];
+  const threads: Parameters<typeof checkoutRows>[1] = {
+    order: ["a", "b", "c"],
+    byId: {
+      a: { archivedAtMs: null, worktreePath: "/wt/held/src" },
+      b: { archivedAtMs: null, worktreePath: "/elsewhere", checkoutPaths: [{ projectId: "p", path: "/wt/set" }] },
+      c: { archivedAtMs: 5, worktreePath: "/wt/archived" },
+    },
+  };
+  it("keeps main and the worktrees a thread is on, in their order", () => {
+    expect(checkoutRows(all, threads)).toEqual([main, held, inSet]);
+  });
+  it("is the leftovers' complement: every worktree is in exactly one", () => {
+    const table = new Set(checkoutRows(all, threads).map((w) => w.path));
+    for (const w of all) expect(table.has(w.path)).toBe(!isLeftover(w, threads));
+  });
+  it("main only without threads", () => {
+    expect(checkoutRows(all, { order: [], byId: {} })).toEqual([main]);
+  });
 });
 
 describe("holdsWork", () => {

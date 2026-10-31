@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, CF, invocations, mockPost, openApp, openProjectPage, openProjects, openWorkspacePage, resetMock } from "./fixtures";
+import { MOCK_TOKEN } from "../playwright.config";
+import { appPath, CF, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, openWorkspacePage, resetMock } from "./fixtures";
 
 /**
  * The Projects view (docs/notes/projects-redesign-1-index.md): the index (rows by last
@@ -468,10 +469,17 @@ test("worktrees to tidy: the index pill and the project menu count the cleanable
   await expect(page.getByTestId("project-cleanup-count")).toHaveText("1");
   await closeMenu(page, "project-more");
 
-  // A terminal open in it holds it.
-  await checkoutRow(page, "repo-cf", MERGED).hover();
-  await checkoutRow(page, "repo-cf", MERGED).getByTestId("worktree-new-terminal").click();
-  await page.getByTestId("projects-list").focus();
+  // A terminal open in it holds it (started as the CLI would: without threads the worktree
+  // is in its own block, not the table, and its clean row offers no terminal).
+  await expect(leftover(page, MERGED)).toHaveCount(1);
+  await expect(checkout(page, MERGED)).toHaveCount(0);
+  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
+    body: JSON.stringify({ name: "terminal.new", args: {}, context: { activeProjectId: "repo-cf", activeWorktreePath: MERGED } }),
+  });
+  expect(res.ok).toBe(true);
+  await expect(leftover(page, MERGED).getByTestId("leftover-reason")).toContainText("a terminal is open in it");
   await page.getByTestId("project-more").click();
   await expect(page.getByTestId("project-cleanup-count")).toHaveText("0");
   await closeMenu(page, "project-more");
@@ -520,6 +528,11 @@ test("Worktrees without threads: a row per leftover with why it stayed; Show dif
   // Threads hold feat/sidebar and fix/resize: not leftovers.
   await expect(page.getByTestId("leftover-row")).toHaveCount(4);
   await expect(leftover(page, FEAT)).toHaveCount(0);
+  // A worktree shows once: the table keeps main and the two held ones, the caption counts all seven.
+  await expect(page.getByTestId("checkouts-title")).toContainText("main plus 6 worktrees · 2 threads working");
+  await expect(page.getByTestId("project-worktree")).toHaveCount(3);
+  for (const path of [CF, FEAT, FIX]) await expect(checkout(page, path)).toHaveCount(1);
+  for (const path of [SPIKE, COPY, SHADERS, MERGED]) await expect(checkout(page, path)).toHaveCount(0);
   const rows: [string, string, string, boolean][] = [
     [SPIKE, "cf/perf-spike", "3 commits not on main · last thread archived 12d ago", true],
     [COPY, "cf/old-copy", "4 uncommitted files · merged otherwise · last thread archived 3w ago", true],
@@ -567,6 +580,9 @@ test("Worktrees without threads: a row per leftover with why it stayed; Show dif
   await openProjectPage(page, "repo-cf");
   await expect(leftover(page, SPIKE)).toHaveCount(0);
   await expect(page.getByTestId("leftover-title")).toContainText("3 kept");
+  // ... and moves to the table.
+  await expect(checkout(page, SPIKE)).toHaveCount(1);
+  await expect(page.getByTestId("project-worktree")).toHaveCount(4);
 
   // Resume with no archived thread there: the composer in that checkout.
   await mockPost(`worktree/dirty?path=${encodeURIComponent(SHADERS)}&modified=2`);

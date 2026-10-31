@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { checkoutRows } from "@/lib/leftovers";
 import { checkoutThreads, sortCheckouts } from "@/lib/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { savedScrollTop, saveScrollTop } from "@/stores/projectsPage";
@@ -29,9 +30,17 @@ export function usePageScroll(key: string, given?: React.RefObject<HTMLDivElemen
   return ref;
 }
 
-/** The checkouts in the table's order (lib/projects.ts sortCheckouts); rebuilds on membership, working counts and activity only. */
+/**
+ * The Checkouts table's rows in its order (lib/projects.ts sortCheckouts): main plus the
+ * worktrees a thread is on (lib/leftovers.ts checkoutRows; the rest are in "Worktrees
+ * without threads"). Rebuilds on membership, working counts and activity only.
+ */
 export function useCheckoutOrder(projectId: string): string[] {
-  const rows = useProjectsStore(useShallow((s) => (s.byId[projectId]?.worktrees ?? []).map((w) => `${w.path}\u0001${w.isMain ? "1" : ""}\u0001${w.branch}`)));
+  const all = useProjectsStore(useShallow((s) => (s.byId[projectId]?.worktrees ?? []).map((w) => `${w.path}\u0001${w.isMain ? "1" : ""}\u0001${w.branch}`)));
+  const rows = useThreadsStore(useShallow((s) => checkoutRows(all.map((r) => {
+    const [path = "", main = ""] = r.split("\u0001");
+    return { path, isMain: main === "1", r };
+  }), s).map((w) => w.r)));
   const paths = useMemo(() => rows.map((r) => r.split("\u0001")[0] ?? ""), [rows]);
   const activity = useThreadsStore(useShallow((s) => paths.map((p) => {
     const t = checkoutThreads(s, p);

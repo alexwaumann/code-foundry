@@ -1,15 +1,17 @@
+import { useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArchiveRestore, Broom, FileDiff, SquarePen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { holdsWork, isLeftover, lastArchivedOn, leftoverReason, removeCleanLabel } from "@/lib/leftovers";
-import { terminalHolds } from "@/lib/projects";
+import { projectWorktreeKey, terminalHolds } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { openChangesTab } from "@/stores/changesPanel";
 import { composeIn } from "@/stores/compose";
 import { cleanupMergedWorktrees, removeWorktree, resumeWorktree } from "@/stores/projectActions";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
+import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useThreadsStore } from "@/stores/threads";
 import { SectionHeader } from "./bits";
@@ -39,12 +41,22 @@ function LeftoverRow({ projectId, path, narrow }: { projectId: string; path: str
   const archivedAtMs = useThreadsStore((s) => lastArchivedOn(s, path)?.archivedAtMs ?? null);
   const terminal = useTerminalsStore((s) => terminalHolds(s, path));
   const now = useNow(60_000);
+  // A worktree shown from elsewhere (ui.focus.project after worktree.create) has no thread
+  // yet, so it is here rather than in the table: scroll to it in place of the table's cursor.
+  const key = projectWorktreeKey(projectId, path);
+  const revealed = useProjectsPageStore((s) => s.reveal === key);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!revealed) return;
+    ref.current?.scrollIntoView({ block: "nearest" });
+    clearProjectsPageReveal(key);
+  }, [revealed, key]);
   if (!wt) return null;
   const work = holdsWork(wt);
   const reason = leftoverReason(wt, { defaultBranch, archivedAtMs, terminal, now });
   const branch = wt.branch || path.slice(path.lastIndexOf("/") + 1);
   return (
-    <div className="flex min-h-12 items-center gap-3 border-b px-4 py-2" data-testid="leftover-row" data-path={path} data-work={work || undefined}>
+    <div ref={ref} className="flex min-h-12 items-center gap-3 border-b px-4 py-2" data-testid="leftover-row" data-path={path} data-work={work || undefined}>
       <span className={cn("size-1.5 shrink-0 rounded-full", work ? "bg-cf-warning" : "bg-cf-border-strong")} data-testid="leftover-dot" aria-hidden />
       <span className="shrink-0 text-code" data-testid="leftover-branch">
         {branch}
