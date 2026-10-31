@@ -43,7 +43,7 @@ import { getUiContext, projectsShellPlace, worktreeContext } from "./context";
 import { expandPanel, getPanel } from "./panel";
 import { hidePluginTerminalTab } from "./pluginTerminals";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
-import { useUiStore } from "./ui";
+import { isProjectsView, PROJECTS_INDEX, useUiStore } from "./ui";
 import { bottomCanShow, toggleBottomCommand, useViewsStore, visibleBottomKey } from "./views";
 
 /**
@@ -331,7 +331,9 @@ export function revealShell(id: string): boolean {
   const key = ownerKeyOf(t);
   if (key === null) return false;
   const thread = threadOfKey(key);
-  useUiStore.getState().select(thread !== null ? { kind: "thread", id: thread } : { kind: "view", name: "projects" });
+  // A worktree's shell shows under any Projects page (they share one bottom panel): stay on the one shown.
+  const ui = useUiStore.getState();
+  ui.select(thread !== null ? { kind: "thread", id: thread } : isProjectsView(ui.selection) ? ui.selection : PROJECTS_INDEX);
   uncoverBottom(key);
   updateBottom(key, (e) => openOn(e, id));
   focusBottom();

@@ -162,7 +162,7 @@ describe("Escape with nothing typed (docs/notes/remove-dashboard.md)", () => {
   };
 
   it.each<[string, () => void, unknown]>([
-    ["a project's composer goes to the Projects page", () => render(<Composer projectId="web" />), { kind: "view", name: "projects" }],
+    ["a project's composer goes to the project's page", () => render(<Composer projectId="web" />), { kind: "view", name: "projects", projectId: "web" }],
     ["the No project composer stays home", () => render(<Composer projectId="" noProject />), HOME],
   ])("%s", (_name, mount, want) => {
     useUiStore.setState({ selection: { kind: "thread", id: "elsewhere" } });

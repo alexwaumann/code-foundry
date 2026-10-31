@@ -1,15 +1,16 @@
 /**
- * The Projects page's view models: every registered project with its worktrees (all of
- * them: a workspace has no worktrees since workspaces v2, so a thread's checkouts show
- * under their projects), and every workspace as a card (lib/workspaceCard.ts). Pure;
- * inputs are the projects and workspaces slices' shapes.
+ * The Projects view's models (components/projects, docs/notes/projects-redesign-1-index.md):
+ * the index's rows (projects and workspaces by last activity, each with a status
+ * sentence), a project page's checkouts (cells and order) and details. Pure; inputs are
+ * the projects, threads and workspaces slices' shapes.
  */
-import { isRemoteless, type ProjectView, type WorktreeView } from "@/api/project";
+import { isRemoteless, type GitStatusView, type ProjectView, type WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import type { WorkspaceView } from "@/api/workspace";
 import { tildify } from "./path";
-import { membersByName } from "./workspaceCard";
+import { threadBadge } from "./thread";
+import { compareByName } from "./workspaceCard";
 
 export interface ProjectsSlice {
   /** `git` false: a project without git (a plain folder); absent counts as git. */
@@ -63,48 +64,6 @@ export const projectWorktreeKey = (projectId: string, path: string): string => `
 export const workspaceKey = (id: string): string => `ws:${id}`;
 /** A workspace card's member row. */
 export const memberKey = (workspaceId: string, projectId: string): string => `m:${workspaceId}::${projectId}`;
-
-export type PageItem =
-  | { key: string; kind: "project"; projectId: string }
-  | { key: string; kind: "worktree"; projectId: string; path: string }
-  | { key: string; kind: "workspace"; workspaceId: string }
-  | { key: string; kind: "member"; workspaceId: string; projectId: string };
-
-/** Projects and workspaces whose rows are hidden (the UI store's persisted sets; empty while filtering). */
-export interface Collapsed {
-  projects: ReadonlySet<string>;
-  workspaces: ReadonlySet<string>;
-}
-
-export const NONE_COLLAPSED: Collapsed = { projects: new Set(), workspaces: new Set() };
-
-/**
- * Every navigable row of the page in display order: projects and their worktrees, then
- * workspace cards and their members (by project name, as the card shows them: nameOf;
- * without it, or for an unregistered member, by id). A collapsed project or workspace
- * keeps its header row only.
- */
-export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces, collapsed: Collapsed = NONE_COLLAPSED, nameOf: (projectId: string) => string | undefined = () => undefined): PageItem[] {
-  const out: PageItem[] = [];
-  for (const p of model.projects) {
-    out.push({ key: projectKey(p.projectId), kind: "project", projectId: p.projectId });
-    if (collapsed.projects.has(p.projectId)) continue;
-    for (const path of p.worktrees) out.push({ key: projectWorktreeKey(p.projectId, path), kind: "worktree", projectId: p.projectId, path });
-  }
-  for (const id of model.workspaces) {
-    out.push({ key: workspaceKey(id), kind: "workspace", workspaceId: id });
-    if (collapsed.workspaces.has(id)) continue;
-    const members = membersByName((workspaces.byId[id]?.members ?? []).map((m) => m.projectId), nameOf);
-    for (const projectId of members) out.push({ key: memberKey(id, projectId), kind: "member", workspaceId: id, projectId });
-  }
-  return out;
-}
-
-/** What a collapsed project header says about its hidden rows: "3 worktrees". */
-export function collapsedProjectSummary(p: Pick<ProjectModel, "worktrees">): string {
-  const n = p.worktrees.length;
-  return `${String(n)} ${n === 1 ? "worktree" : "worktrees"}`;
-}
 
 /**
  * What kind of project it is, as the Projects page's header shows it: a GitHub
@@ -175,20 +134,6 @@ export function projectNextStep(r: Pick<ProjectView, "git" | "remotes" | "worktr
 /** A project's git status counts as stale (amber) in its header's freshness after this. */
 export const PROJECT_STALE_MS = 10 * 60_000;
 
-/**
- * How many threads are on exactly this worktree (a row's thread count): every thread whose
- * cwd it is, whether or not Claude runs for it, except archived ones (put away).
- */
-export function worktreeThreadCount(threads: { order: readonly string[]; byId: Readonly<Record<string, Pick<ThreadView, "worktreePath" | "archivedAtMs"> | undefined>> }, path: string): number {
-  if (!path) return 0;
-  let n = 0;
-  for (const id of threads.order) {
-    const s = threads.byId[id];
-    if (s?.worktreePath === path && s.archivedAtMs === null) n++;
-  }
-  return n;
-}
-
 /** p is root or inside it (snapshot paths: cleaned, symlinks resolved). */
 function inside(p: string, root: string): boolean {
   if (!p || !root) return false;
@@ -237,7 +182,253 @@ export function isCleanable(wt: Pick<WorktreeView, "path" | "mergedClean"> | und
   return !threadHolds(threads, wt.path) && !terminalHolds(terminals, wt.path);
 }
 
-/** The "in main" tag's tooltip. */
-export function cleanableTitle(baseRef: string | undefined): string {
-  return `Clean: no changes, its work is in ${baseRef || "origin/<default>"}, no thread or terminal on it`;
+
+/** The thread fields the Projects view reads. */
+export type ActivityThread = Pick<
+  ThreadView,
+  "projectId" | "projectIds" | "workspaceId" | "archivedAtMs" | "state" | "status" | "statusChangedAtMs" | "createdAtMs" | "lastActivityAtMs" | "branch" | "worktreePath" | "checkoutPaths"
+>;
+
+export interface ActivityThreads {
+  order: readonly string[];
+  byId: Readonly<Record<string, ActivityThread | undefined>>;
 }
+
+/** A thread's last sign of life: its latest status change, activity or creation; null when none is known. */
+export function threadActivityMs(t: Pick<ActivityThread, "statusChangedAtMs" | "createdAtMs" | "lastActivityAtMs">): number | null {
+  const ms = [t.statusChangedAtMs, t.lastActivityAtMs, t.createdAtMs].filter((x): x is number => x !== null);
+  return ms.length === 0 ? null : Math.max(...ms);
+}
+
+/** The thread is working: not archived and its row shows busy (a turn running, or Claude starting). */
+export function isWorking(t: Pick<ActivityThread, "archivedAtMs" | "state" | "status">): boolean {
+  return t.archivedAtMs === null && threadBadge(t) === "busy";
+}
+
+/** The project is in the thread's set (its primary or another member). */
+export function threadInProject(t: Pick<ActivityThread, "projectId" | "projectIds">, projectId: string): boolean {
+  return t.projectId === projectId || t.projectIds.includes(projectId);
+}
+
+export interface Activity {
+  /** Threads working now. */
+  working: number;
+  /** The latest activity of any of its threads, archived ones included; null with none. */
+  lastMs: number | null;
+}
+
+function activityOf(threads: ActivityThreads, match: (t: ActivityThread) => boolean): Activity {
+  let working = 0;
+  let lastMs: number | null = null;
+  for (const id of threads.order) {
+    const t = threads.byId[id];
+    if (!t || !match(t)) continue;
+    if (isWorking(t)) working++;
+    const at = threadActivityMs(t);
+    if (at !== null && (lastMs === null || at > lastMs)) lastMs = at;
+  }
+  return { working, lastMs };
+}
+
+/** A project's activity: over every thread whose set has it. */
+export function projectActivity(threads: ActivityThreads, projectId: string): Activity {
+  return activityOf(threads, (t) => threadInProject(t, projectId));
+}
+
+/** A workspace's activity: over every thread that references it. */
+export function workspaceActivity(threads: ActivityThreads, workspaceId: string): Activity {
+  return activityOf(threads, (t) => t.workspaceId === workspaceId);
+}
+
+/** The branches the workspace's working threads are on, distinct, in thread order. */
+export function workspaceWorkingBranches(threads: ActivityThreads, workspaceId: string): string[] {
+  const out: string[] = [];
+  for (const id of threads.order) {
+    const t = threads.byId[id];
+    if (t?.workspaceId === workspaceId && isWorking(t) && t.branch && !out.includes(t.branch)) out.push(t.branch);
+  }
+  return out;
+}
+
+/**
+ * The index's order: by last activity, most recent first; rows with none known last, by
+ * name (case-insensitive, then id). No grouping.
+ */
+export function sortByActivity(ids: readonly string[], lastMs: (id: string) => number | null, name: (id: string) => string): string[] {
+  return [...ids].sort((a, b) => {
+    const la = lastMs(a);
+    const lb = lastMs(b);
+    if (la !== null && lb !== null && la !== lb) return lb - la;
+    if (la !== null && lb === null) return -1;
+    if (la === null && lb !== null) return 1;
+    return compareByName(name(a), a, name(b), b);
+  });
+}
+
+const plural = (n: number, one: string, many = `${one}s`): string => `${String(n)} ${n === 1 ? one : many}`;
+
+/**
+ * An index row's status sentence: "4 threads working · 6 checkouts", "idle · main only";
+ * a folder without git has no checkouts to count ("1 thread working", "idle").
+ */
+export function projectStatusSentence(a: { working: number; checkouts: number; git: boolean }): string {
+  const head = a.working > 0 ? `${plural(a.working, "thread")} working` : "idle";
+  if (!a.git) return head;
+  return `${head} · ${a.checkouts <= 1 ? "main only" : plural(a.checkouts, "checkout")}`;
+}
+
+/** A workspace row's status: "1 thread working on cf/platform", "2 threads working", "idle". */
+export function workspaceStatusSentence(working: number, branches: readonly string[]): string {
+  if (working === 0) return "idle";
+  const head = `${plural(working, "thread")} working`;
+  return branches.length === 1 ? `${head} on ${branches[0] ?? ""}` : head;
+}
+
+/** A workspace row's right-hand caption: "no instructions · 2 skills", "CLAUDE.md · no skills". */
+export function workspaceContents(ws: { instructions?: string; skills?: readonly string[] }): string {
+  const file = ws.instructions ? (ws.instructions.split("/").pop() ?? ws.instructions) : "no instructions";
+  const n = ws.skills?.length ?? 0;
+  return `${file} · ${n === 0 ? "no skills" : plural(n, "skill")}`;
+}
+
+/** The index's pills: "2 PRs", "1 worktree to tidy". */
+export const prCountLabel = (n: number): string => plural(n, "PR");
+export const tidyLabel = (n: number): string => `${plural(n, "worktree")} to tidy`;
+
+/**
+ * An index row's caption under the name: the GitHub slug, "<remote> · not GitHub",
+ * "local only", or "<path> · no git".
+ */
+export function indexCaption(r: Pick<ProjectView, "githubSlug" | "remotes" | "path"> & { git?: boolean }): string {
+  if (r.git === false) return `${tildify(r.path)} · no git`;
+  if (r.githubSlug) return r.githubSlug;
+  const remote = r.remotes[0];
+  return remote === undefined ? "local only" : `${remote} · not GitHub`;
+}
+
+/** A checkout's Threads cell: "2 working", "1 working · 1 idle", "2 idle", "none". */
+export function threadsCell(working: number, idle: number): string {
+  if (working === 0 && idle === 0) return "none";
+  if (idle === 0) return `${String(working)} working`;
+  if (working === 0) return `${String(idle)} idle`;
+  return `${String(working)} working · ${String(idle)} idle`;
+}
+
+/** A checkout's Changes cell: "5 files", "1 file", "clean" (conflicted entries count). */
+export function changesCell(st: Pick<GitStatusView, "staged" | "modified" | "untracked" | "conflicted" | "dirty">): string {
+  const n = st.staged + st.modified + st.untracked + (st.conflicted ?? 0);
+  if (n === 0) return st.dirty ? "changed" : "clean";
+  return plural(n, "file");
+}
+
+/** A checkout's Sync cell against its upstream: "2 to push", "1 behind", both, "up to date", or "not pushed" without one. */
+export function syncCell(st: Pick<GitStatusView, "upstream" | "ahead" | "behind">): string {
+  if (!st.upstream) return "not pushed";
+  const parts: string[] = [];
+  if (st.ahead > 0) parts.push(`${String(st.ahead)} to push`);
+  if (st.behind > 0) parts.push(`${String(st.behind)} behind`);
+  return parts.length === 0 ? "up to date" : parts.join(" · ");
+}
+
+/** The thread is on the checkout: its own cwd, or one of its set's checkouts (a multi-project thread's member). */
+export function threadOnCheckout(t: Pick<ActivityThread, "worktreePath" | "checkoutPaths">, path: string): boolean {
+  return t.worktreePath === path || t.checkoutPaths.some((c) => c.path === path);
+}
+
+export interface CheckoutThreads {
+  working: number;
+  idle: number;
+  lastMs: number | null;
+  /** The workspace a thread on it references (the first found), "" for none. */
+  workspaceId: string;
+}
+
+/** Who is on a checkout: its non-archived threads, working or not, their latest activity and a workspace. */
+export function checkoutThreads(threads: ActivityThreads, path: string): CheckoutThreads {
+  const out: CheckoutThreads = { working: 0, idle: 0, lastMs: null, workspaceId: "" };
+  for (const id of threads.order) {
+    const t = threads.byId[id];
+    if (!t || t.archivedAtMs !== null || !threadOnCheckout(t, path)) continue;
+    if (isWorking(t)) out.working++;
+    else out.idle++;
+    if (!out.workspaceId && t.workspaceId) out.workspaceId = t.workspaceId;
+    const at = threadActivityMs(t);
+    if (at !== null && (out.lastMs === null || at > out.lastMs)) out.lastMs = at;
+  }
+  return out;
+}
+
+export interface CheckoutSortRow {
+  path: string;
+  isMain: boolean;
+  branch: string;
+  working: number;
+  lastMs: number | null;
+}
+
+/**
+ * The Checkouts table's order: checkouts with a working thread first (most recent
+ * first), then main, then the rest by activity (most recent first, none last), then branch.
+ */
+export function sortCheckouts<T extends CheckoutSortRow>(rows: readonly T[]): T[] {
+  const rank = (r: CheckoutSortRow) => (r.working > 0 ? 0 : r.isMain ? 1 : 2);
+  return [...rows].sort((a, b) => {
+    const d = rank(a) - rank(b);
+    if (d !== 0) return d;
+    if (a.lastMs !== b.lastMs) {
+      if (a.lastMs === null) return 1;
+      if (b.lastMs === null) return -1;
+      return b.lastMs - a.lastMs;
+    }
+    return a.branch.localeCompare(b.branch) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  });
+}
+
+/** The Checkouts title's detail: "main plus 5 worktrees · 2 threads working", "main only". */
+export function checkoutsSummary(worktrees: number, working: number): string {
+  const head = worktrees <= 1 ? "main only" : `main plus ${plural(worktrees - 1, "worktree")}`;
+  return working > 0 ? `${head} · ${plural(working, "thread")} working` : head;
+}
+
+/** "refreshed just now", "refreshed 14m ago", "not refreshed yet"; "refresh failed 14m ago" with an error. */
+export function refreshedText(at: number | null, now: number, failed = false): string {
+  const verb = failed ? "refresh failed" : "refreshed";
+  if (at === null) return failed ? "refresh failed" : "not refreshed yet";
+  const s = Math.max(0, Math.floor((now - at) / 1000));
+  if (s < 60) return `${verb} just now`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${verb} ${String(m)}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${verb} ${String(h)}h ago`;
+  return `${verb} ${String(Math.floor(h / 24))}d ago`;
+}
+
+/** Details' Remote row: "origin · github.com/o/r", "origin · pull requests need GitHub"; "" without a remote. */
+export function remoteDetail(r: Pick<ProjectView, "githubSlug" | "remotes">): string {
+  const remote = r.remotes[0];
+  if (remote === undefined) return "";
+  return r.githubSlug ? `${remote} · github.com/${r.githubSlug}` : `${remote} · pull requests need GitHub`;
+}
+
+/**
+ * Details' Worktrees row: the folder they share (tildified) and how many, "~/x.worktrees · 5";
+ * just the count when they share none; "" with none.
+ */
+export function worktreesDetail(paths: readonly string[]): string {
+  if (paths.length === 0) return "";
+  const parents = paths.map((p) => p.slice(0, Math.max(0, p.lastIndexOf("/"))));
+  let common = parents[0] ?? "";
+  for (const p of parents) {
+    while (common && p !== common && !p.startsWith(`${common}/`)) common = common.slice(0, Math.max(0, common.lastIndexOf("/")));
+  }
+  const n = String(paths.length);
+  return common && common !== "/" ? `${tildify(common)} · ${n}` : n;
+}
+
+/** Details' Actions row's count: "none", "1 project action", "2 project actions". */
+export function actionsDetail(n: number): string {
+  return n === 0 ? "none" : plural(n, "project action");
+}
+
+/** The narrow layout of a project page (Sync and the slug drop, Terminal shows its icon only) below this content width. */
+export const PROJECT_NARROW_BELOW = 840;

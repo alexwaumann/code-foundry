@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { FileText, Folder, FolderGit2, FolderOpen, Layers, Pencil, Plus, SquarePen, Star, Trash2, X } from "lucide-react";
+import { FileText, Folder, Layers, MapPin, Pencil, Plus, SquarePen, Trash2, Unlink } from "lucide-react";
+import { FinderMark } from "@/components/icons/FinderMark";
 import { ComposerPicker, type PickerGroup } from "@/components/compose/ComposerPicker";
-import { GithubMark } from "@/components/icons/GithubMark";
+import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
+import { useProjectKind } from "@/components/icons/projectKind";
 import { RowList } from "@/components/prs/RowList";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
-import { memberKey, projectKind, workspaceKey, type ProjectKind } from "@/lib/projects";
+import { memberKey, workspaceKey } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { addableProjects, instructionsName, membersByName, PRIMARY_WORKSPACE, skillChips, workspaceSummary } from "@/lib/workspaceCard";
 import { composeInWorkspace } from "@/stores/compose";
@@ -26,13 +28,11 @@ import {
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { CollapseToggle } from "./CollapseToggle";
 import { OverflowMenu } from "./OverflowMenu";
-import { RowAction } from "./WorktreeState";
+import { RowAction } from "./RowAction";
 import { WorkspaceNameEditor } from "./WorkspaceNameEditor";
 
 export const MEMBER_ROW_HEIGHT = 32;
 
-const KIND_ICON: Record<ProjectKind, React.ComponentType<{ className?: string }>> = { github: GithubMark, git: FolderGit2, nogit: Folder };
-const UNKNOWN_PROJECT = { githubSlug: "", remotes: [] };
 
 /** The mark on where new threads in the workspace start (its default primary). */
 function StartsHere() {
@@ -57,7 +57,7 @@ function MakeDefault({ workspaceId, primary, isDefault }: { workspaceId: string;
   if (isDefault) return <span className="size-6 shrink-0" aria-hidden />;
   return (
     <RowAction label="Start new threads here" testId="member-make-default" onClick={() => void setWorkspacePrimary(workspaceId, primary)}>
-      <Star />
+      <MapPin />
     </RowAction>
   );
 }
@@ -104,13 +104,12 @@ function useMembersByName(workspaceId: string): string[] {
 function MemberRow({ workspaceId, projectId }: { workspaceId: string; projectId: string }) {
   const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
   const known = useProjectsStore((s) => s.byId[projectId] !== undefined);
-  const kind = useProjectsStore((s) => projectKind(s.byId[projectId] ?? UNKNOWN_PROJECT).kind);
+  const kind = useProjectKind(projectId);
   const isDefault = useWorkspacesStore((s) => s.byId[workspaceId]?.defaultPrimary === projectId);
-  const Icon = KIND_ICON[kind];
   return (
     <NavRow navKey={memberKey(workspaceId, projectId)} className="group/m flex h-full items-center gap-2 rounded-md pr-2 pl-6 text-body">
       <span className="flex min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-project={projectId} data-default={isDefault || undefined} data-unregistered={!known || undefined}>
-        <Icon className={cn("size-3.5 shrink-0", kind === "github" ? "text-cf-info-text/90" : "text-cf-text-muted")} />
+        <ProjectKindIcon kind={kind} className="size-3.5 shrink-0 text-cf-text-muted" />
         <span className="min-w-0 truncate font-medium" data-testid="member-name">
           {name}
         </span>
@@ -120,7 +119,7 @@ function MemberRow({ workspaceId, projectId }: { workspaceId: string; projectId:
       <RowActions>
         <MakeDefault workspaceId={workspaceId} primary={projectId} isDefault={isDefault} />
         <RowAction label={`Remove ${name} from the workspace`} destructive testId="member-remove" onClick={() => void removeWorkspaceProject(workspaceId, projectId)}>
-          <X />
+          <Unlink />
         </RowAction>
       </RowActions>
     </NavRow>
@@ -243,7 +242,7 @@ function SkillsLine({ workspaceId }: { workspaceId: string }) {
  * in the workspace's folder does the editing: panels read, the agent acts), Reveal in
  * Finder and Remove. Collapses like a project.
  */
-export function WorkspaceCard({ id, collapsed, filtering }: { id: string; collapsed: boolean; filtering: boolean }) {
+export function WorkspaceCard({ id, collapsed, filtering, renameSeq = 0 }: { id: string; collapsed: boolean; filtering: boolean; renameSeq?: number }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const root = useWorkspacesStore((s) => s.byId[id]?.rootPath ?? "");
   const rootMissing = useWorkspacesStore((s) => s.byId[id]?.rootMissing === true);
@@ -253,6 +252,12 @@ export function WorkspaceCard({ id, collapsed, filtering }: { id: string; collap
   });
   const members = useMembersByName(id);
   const [renaming, setRenaming] = useState(false);
+  // The workspace page header's Rename… asks for the in-place editor (each press a new number).
+  const [seenRename, setSeenRename] = useState(renameSeq);
+  if (renameSeq !== seenRename) {
+    setSeenRename(renameSeq);
+    setRenaming(true);
+  }
   return (
     <section className="group/card rounded-lg border" data-testid="workspace" data-workspace={id} data-rooted={root ? true : undefined} data-collapsed={collapsed}>
       <NavRow navKey={workspaceKey(id)} className={cn("group/ws flex h-9 items-center gap-2 rounded-lg px-2", !collapsed && "rounded-b-none border-b")}>
@@ -311,8 +316,8 @@ export function WorkspaceCard({ id, collapsed, filtering }: { id: string; collap
           <RowAction label="New thread in this workspace" testId="workspace-new-thread" onClick={() => { composeInWorkspace(id); }}>
             <SquarePen />
           </RowAction>
-          <RowAction label="Reveal in Finder" testId="workspace-reveal" onClick={() => void revealWorkspace(id)}>
-            <FolderOpen />
+          <RowAction label="Open in Finder" testId="workspace-reveal" onClick={() => void revealWorkspace(id)}>
+            <FinderMark />
           </RowAction>
           <OverflowMenu
             label="More workspace actions"

@@ -134,29 +134,61 @@ export async function openAddProjectDialog(page: Page): Promise<void> {
   await expect(page.getByTestId("add-project-dialog")).toBeVisible();
 }
 
-/** Shows the Projects page from its sidebar entry. */
+/**
+ * Shows the Projects index from its sidebar entry. The entry reopens the last Projects
+ * page shown; from a project's or workspace's page a second click goes to the index.
+ */
 export async function openProjects(page: Page): Promise<void> {
   await page.getByTestId("nav-projects").click();
   await expect(page.getByTestId("projects-page")).toBeVisible();
+  if ((await page.getByTestId("projects-page").getAttribute("data-page")) !== "index") await page.getByTestId("nav-projects").click();
+  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
+}
+
+/** Shows a project's page: the index, then its row. */
+export async function openProjectPage(page: Page, projectId: string): Promise<void> {
+  await openProjects(page);
+  await page.locator(`[data-nav-key="p:${projectId}"]`).click();
+  await expect(page.locator(`[data-testid="projects-page"][data-page="project"][data-project="${projectId}"]`)).toBeVisible();
+}
+
+/** Shows a workspace's page: the index, then its row. */
+export async function openWorkspacePage(page: Page, workspaceId: string): Promise<void> {
+  await openProjects(page);
+  await page.locator(`[data-nav-key="ws:${workspaceId}"]`).click();
+  await expect(page.locator(`[data-testid="projects-page"][data-page="workspace"][data-workspace="${workspaceId}"]`)).toBeVisible();
 }
 
 /**
- * Shows a worktree's Changes tab: the Projects page with the worktree's tab in the page's
- * side panel, by double-clicking its row (a project's worktree row, or a workspace
- * member row when `workspaceId` is given). The page stays selected: the palette has no
- * worktree context here; tests that need one select a thread in the worktree.
+ * Shows a worktree's Changes tab: its project's page with the worktree's tab in the page's
+ * side panel, by clicking its checkout row (or, with `workspaceId`, the workspace's page and
+ * the project's member row). The page stays selected: the palette has no worktree context
+ * here; tests that need one select a thread in the worktree.
  */
 export async function selectWorktree(page: Page, projectId: string, path: string, workspaceId?: string): Promise<void> {
-  await openProjects(page);
-  const key = workspaceId ? `m:${workspaceId}::${projectId}` : `pw:${projectId}::${path}`;
-  await page.locator(`[data-nav-key="${key}"]`).dblclick();
+  if (workspaceId) {
+    await openWorkspacePage(page, workspaceId);
+    await page.locator(`[data-nav-key="m:${workspaceId}::${projectId}"]`).dblclick();
+  } else {
+    await openProjectPage(page, projectId);
+    await page.locator(`[data-nav-key="pw:${projectId}::${path}"]`).click();
+  }
   await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", path);
 }
 
-/** Shows a project's main worktree's Changes tab in the Projects page's side panel by double-clicking the project row. */
+/**
+ * Shows a project's main checkout's Changes tab in its page's side panel: its main row, or
+ * for a folder without git (no checkouts table) the tab opened directly.
+ */
 export async function selectProject(page: Page, projectId: string): Promise<void> {
-  await openProjects(page);
-  await page.locator(`[data-nav-key="p:${projectId}"]`).dblclick();
+  await openProjectPage(page, projectId);
+  const main = page.locator('[data-testid="project-worktree"][data-main]');
+  if ((await main.count()) > 0) await main.click();
+  else {
+    await page.evaluate(
+      `Promise.all([import("/src/stores/changesPanel.ts"), import("/src/stores/projects.ts")]).then(([c, p]) => c.openChangesTab("current", ${JSON.stringify(projectId)}, p.mainWorktreePath(p.useProjectsStore.getState(), ${JSON.stringify(projectId)})))`,
+    );
+  }
   await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-project", projectId);
 }
 
@@ -288,13 +320,12 @@ export async function dragSelect(page: Page, within: Locator, text: string): Pro
 }
 
 /**
- * The Projects page shows with its cursor on a project's row (or, for `worktreeBranch`,
- * on that worktree's row): where a project just added or ui.focus.project lands
+ * A project's page shows (and, for `worktreeBranch`, its cursor is on that checkout's
+ * row): where a project just added or ui.focus.project lands
  * (stores/projectsPage.ts showProjectOnProjectsPage).
  */
 export async function expectProjectRevealed(page: Page, name: string, worktreeBranch?: string): Promise<void> {
-  await expect(page.getByTestId("projects-page")).toBeVisible();
-  const prefix = worktreeBranch ? "pw:" : "p:";
-  const cursor = page.locator(`[data-nav-key^="${prefix}"][aria-selected="true"]`);
-  await expect(cursor).toContainText(worktreeBranch ?? name);
+  await expect(page.locator('[data-testid="projects-page"][data-page="project"]')).toBeVisible();
+  await expect(page.getByTestId("page-name")).toHaveText(name);
+  if (worktreeBranch) await expect(page.locator('[data-nav-key^="pw:"][aria-selected="true"]')).toContainText(worktreeBranch);
 }

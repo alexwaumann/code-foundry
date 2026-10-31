@@ -78,6 +78,8 @@
  *   POST /__mock/thread-new?delay=700            (how long thread.new takes to make a worktree)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
  *   POST /__mock/worktree/dirty?path=…&modified=2   (the worktree has modified files; 0: clean)
+ *   POST /__mock/worktree/refresh-error?path=…&error=could%20not%20reach%20origin&ago=840000
+ *                                                 (its last status read failed that long ago; no error: clears)
  *   POST /__mock/worktree/operation?path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go]
  *                                                 (a git operation stops in that worktree: status
  *                                                 operation fields, U files lead its detail; no op ends it)
@@ -1160,6 +1162,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/worktree/dirty": {
       // path=…&modified=2 (0: clean).
       const ok = world.setDirty(q.get("path") ?? "", Number(q.get("modified") ?? "0"));
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
+    case "POST /__mock/worktree/refresh-error": {
+      // path=…&error=could not reach origin&ago=840000 (ms); no error: it clears.
+      const ok = world.setRefreshError(q.get("path") ?? "", q.get("error") ?? "", Number(q.get("ago") ?? "0"));
       json(res, ok ? 200 : 404, { ok });
       break;
     }

@@ -48,6 +48,8 @@ describe("bottomKeyOf", () => {
   const cases: [string, Selection, string | null][] = [
     ["a thread", { kind: "thread", id: "s1" }, "thread:s1"],
     ["the Projects page", { kind: "view", name: "projects" }, "view:projects"],
+    ["a project's page shares the Projects view's", { kind: "view", name: "projects", projectId: "repo-cf" }, "view:projects"],
+    ["a workspace's page too", { kind: "view", name: "projects", workspaceId: "w-1" }, "view:projects"],
     ["HOME (the No project composer)", HOME, null],
     ["nothing", { kind: "none" }, null],
     ["the Pull Requests page", { kind: "view", name: "pullrequests" }, null],

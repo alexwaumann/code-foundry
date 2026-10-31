@@ -1,19 +1,8 @@
 import { useShallow } from "zustand/react/shallow";
 import { terminalHolds, threadHolds } from "@/lib/projects";
-import { findWorktree, useProjectsStore } from "@/stores/projects";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useTerminalsStore } from "@/stores/terminals";
-
-/**
- * Whether project.worktree.cleanup would remove this worktree now (lib/projects.ts
- * isCleanable). Each store is asked one boolean, and only once git says merged and clean.
- */
-export function useCleanable(projectId: string, path: string): boolean {
-  const merged = useProjectsStore((s) => findWorktree(s, projectId, path)?.mergedClean ?? false);
-  const thread = useThreadsStore((s) => merged && threadHolds(s, path));
-  const terminal = useTerminalsStore((s) => merged && terminalHolds(s, path));
-  return merged && !thread && !terminal;
-}
 
 /** How many of the project's worktrees project.worktree.cleanup would remove now. */
 export function useCleanableCount(projectId: string): number {

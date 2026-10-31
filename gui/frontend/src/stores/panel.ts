@@ -101,8 +101,9 @@ export function keyOf(sel: Selection): string | null {
       return null;
     case "thread":
       return `thread:${sel.id}`;
+    // A project's or workspace's page has its own panel beside the Projects index's.
     case "view":
-      return `view:${sel.name}`;
+      return sel.projectId ? `view:${sel.name}:project:${sel.projectId}` : sel.workspaceId ? `view:${sel.name}:workspace:${sel.workspaceId}` : `view:${sel.name}`;
     case "compose":
       return sel.workspaceId ? `compose:ws:${sel.workspaceId}` : sel.noProject ? "compose:home:" : `compose:${sel.projectId}`;
   }

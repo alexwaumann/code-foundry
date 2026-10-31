@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, openStreams, resetMock, row, threadPrompt, writes } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, openStreams, resetMock, row, threadPrompt, writes } from "./fixtures";
 
 // The bottom terminal panel (docs/notes/bottom-panel-2-gui.md, bottom-panel-autoshell.md).
 // Mock seeds: t-s1-shell is thread s-1's shell, t-top a shell of the feat/sidebar worktree
@@ -310,7 +310,8 @@ test("the Projects page's panel lists the worktree shells; its + starts one in t
   await expect(tabs(page).nth(1)).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("projects-page")).toBeVisible();
 
-  // A worktree row's New terminal here lands in the same panel.
+  // A checkout row's New terminal here, on another project's page, lands in the same panel.
+  await openProjectPage(page, "repo-dot");
   const dot = page.locator(`[data-nav-key="pw:repo-dot::/Users/dev/dotfiles"]`);
   await dot.hover();
   await dot.getByTestId("worktree-new-terminal").click();

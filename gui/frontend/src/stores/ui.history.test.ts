@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
-import { HOME, HISTORY_MAX, pruneHistory, useUiStore, type Selection } from "./ui";
+import { HOME, HISTORY_MAX, projectPage, PROJECTS_INDEX as projectsIndex, pruneHistory, useUiStore, workspacePage, type Selection } from "./ui";
 import { historyCommand, showView, useViewsStore } from "./views";
 import { useWorkspacesStore } from "./workspaces";
 
@@ -222,5 +222,54 @@ describe("view.back and view.forward", () => {
     useViewsStore.setState({ settingsOpen: true });
     expect(historyCommand(1)).toBe(true);
     expect(useUiStore.getState().selection).toEqual(thread("a"));
+  });
+});
+
+describe("Projects pages", () => {
+  beforeEach(() => {
+    threadsExist("a");
+    useProjectsStore.setState({ loaded: true, byId: { "repo-cf": { id: "repo-cf" } as never, "repo-gp": { id: "repo-gp" } as never }, order: ["repo-cf", "repo-gp"] });
+    useWorkspacesStore.setState({ loaded: true, byId: { "w-1": { id: "w-1" } as never }, order: ["w-1"] });
+    useUiStore.setState({ selection: HOME, history: [HOME], historyIndex: 0, projectsLast: "" });
+  });
+
+  it("each page is its own history entry; back and forward walk them", () => {
+    const ui = useUiStore.getState();
+    ui.select(projectsIndex);
+    ui.select(projectPage("repo-cf"));
+    ui.select(workspacePage("w-1"));
+    expect(useUiStore.getState().history).toEqual([HOME, projectsIndex, projectPage("repo-cf"), workspacePage("w-1")]);
+    expect(useUiStore.getState().back()).toBe(true);
+    expect(useUiStore.getState().selection).toEqual(projectPage("repo-cf"));
+    expect(useUiStore.getState().back()).toBe(true);
+    expect(useUiStore.getState().selection).toEqual(projectsIndex);
+  });
+
+  it("the sidebar row reopens the last Projects page, and goes to the index from a page", () => {
+    const ui = () => useUiStore.getState();
+    ui().openProjects();
+    expect(ui().selection).toEqual(projectsIndex);
+    ui().select(projectPage("repo-gp"));
+    expect(ui().projectsLast).toBe("project:repo-gp");
+    ui().select(thread("a"));
+    ui().openProjects();
+    expect(ui().selection).toEqual(projectPage("repo-gp"));
+    ui().openProjects();
+    expect(ui().selection).toEqual(projectsIndex);
+    expect(ui().projectsLast).toBe("");
+    ui().select(workspacePage("w-1"));
+    ui().select(thread("a"));
+    ui().openProjects();
+    expect(ui().selection).toEqual(workspacePage("w-1"));
+  });
+
+  it("a removed project's page is gone: the row opens the index, history skips it", () => {
+    const ui = () => useUiStore.getState();
+    ui().select(projectPage("repo-gp"));
+    ui().select(thread("a"));
+    useProjectsStore.setState({ byId: { "repo-cf": { id: "repo-cf" } as never }, order: ["repo-cf"] });
+    expect(pruneHistory(ui().history, ui().historyIndex).history).toEqual([HOME, thread("a")]);
+    ui().openProjects();
+    expect(ui().selection).toEqual(projectsIndex);
   });
 });
