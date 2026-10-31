@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorktreeView } from "@/api/project";
-import { holdsWork, isLeftover, lastArchivedOn, leftoverReason, lossFiles, lossLine, removeCleanLabel, uncommittedCount, type ArchivedThreads } from "./leftovers";
+import { holdsWork, isLeftover, lastArchivedOn, leftoverReason, lossFiles, lossLine, removeCleanLabel, uncommittedCount, type ArchivedThreads, type ReasonInput } from "./leftovers";
 
 const NOW = Date.UTC(2026, 9, 31, 12);
 const DAY = 86_400_000;
@@ -20,10 +20,10 @@ function wt(over: Partial<WorktreeView> = {}, status: Partial<WorktreeView["stat
     cleanupReason: "branch is in origin/main",
     ...over,
     status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, conflicted: 0, dirty: false, refreshedAtMs: NOW, baseRef: "origin/main", baseAhead: 0, baseBehind: 0, error: "", ...status },
-  } as WorktreeView;
+  };
 }
 
-const input = { defaultBranch: "main", archivedAtMs: null, terminal: false, now: NOW };
+const input: ReasonInput = { defaultBranch: "main", archivedAtMs: null, terminal: false, now: NOW };
 
 describe("isLeftover", () => {
   type Threads = Parameters<typeof isLeftover>[1];

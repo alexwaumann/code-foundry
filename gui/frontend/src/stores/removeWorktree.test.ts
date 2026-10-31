@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfirmationView } from "@/api/command";
-import type { ProjectView, WorktreeView } from "@/api/project";
+import type { WorktreeView } from "@/api/project";
 import { useConfirmStore } from "./confirm";
 import { useProjectsStore } from "./projects";
 
@@ -28,7 +28,7 @@ const ok = { message: `removed worktree ${W}`, resultJson: "" };
 function seed(untracked: number) {
   const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked, conflicted: 0, dirty: untracked > 0, refreshedAtMs: 1, baseRef: "origin/main", baseAhead: 0, baseBehind: 0, error: "" };
   const wt = (path: string, isMain: boolean) => ({ projectId: "p1", path, branch: isMain ? "main" : "cf/a", head: "c", detached: false, isMain, status }) as WorktreeView;
-  const project = { id: "p1", path: P, name: "app", defaultBranch: "main", githubSlug: "", remotes: ["origin"], git: true, worktrees: [wt(P, true), wt(W, false)] } as unknown as ProjectView;
+  const project = { id: "p1", path: P, name: "app", defaultBranch: "main", githubSlug: "", remotes: ["origin"], git: true, worktrees: [wt(P, true), wt(W, false)] };
   useProjectsStore.setState({ byId: { p1: project }, order: ["p1"] });
 }
 
