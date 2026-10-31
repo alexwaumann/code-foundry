@@ -20,9 +20,6 @@ export function cardFits(bodyWidth: number): boolean {
   return bodyWidth - CARD_WIDTH >= CONVERSATION_MIN;
 }
 
-/** The toggle's tooltip while the card is on but has no room. */
-export const NO_ROOM_REASON = "Not enough room";
-
 /** The git state row: at most one, in this priority (gitStateRow). */
 export type GitStateRow =
   | { kind: "conflicts"; files: number }

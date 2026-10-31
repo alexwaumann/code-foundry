@@ -17,6 +17,7 @@ import { openMcpSurface } from "./mcpPanel";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
+import { toggleThreadInfo } from "./threadInfo";
 import { presentPromptHistory } from "./historyComposers";
 import { presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";
@@ -186,8 +187,8 @@ export function showView(name: string): boolean {
       jumpToNeighbour(1);
       return true;
     case "thread-info":
-      // view.thread-info: the thread info card beside every thread in this window.
-      useUiStore.getState().toggleThreadInfo();
+      // view.thread-info: the thread info card beside every thread in this window (its overlay on a narrow pane).
+      toggleThreadInfo();
       return true;
     case "composer.history":
       // composer.history: the focused composer's Previous prompts, else the palette's.

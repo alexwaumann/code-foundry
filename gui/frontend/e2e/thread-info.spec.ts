@@ -238,18 +238,97 @@ test("a child thread: its parent row leads the lineage and goes to the parent", 
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-ti-1");
 });
 
-test("a narrow pane: the card steps aside, the toggle stays on and says why, and the card returns with room", async ({ page }) => {
+const overlay = (page: Page) => page.getByTestId("thread-info-overlay");
+
+test("a narrow pane: the card steps aside, the toggle floats it over the conversation, and the inline card returns with room", async ({ page }) => {
   await openWithCard(page, "single");
   await page.setViewportSize({ width: 900, height: 800 });
   await expect(page.getByTestId("thread-info")).toHaveCount(0);
-  await expect(toggle(page)).toHaveAttribute("aria-pressed", "true");
-  await expectTooltip(page, toggle(page), "Not enough room");
+  // Not shown by itself: the toggle reads off, though the inline card's preference stays on.
+  await expect(overlay(page)).toHaveCount(0);
+  await expect(toggle(page)).toHaveAttribute("aria-pressed", "false");
+  await expectTooltip(page, toggle(page), "Toggle Thread Info");
   // The conversation keeps its width: the whole thread body.
   const body = await page.getByTestId("thread-pane-body").boundingBox();
   expect(body?.width ?? 0).toBeLessThan(800);
+
+  await toggle(page).click();
+  await expect(overlay(page)).toBeVisible();
+  await expect(overlay(page)).toHaveAttribute("aria-label", "Thread info");
+  await expect(toggle(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(card(page).getByTestId("ti-project")).toContainText("code-foundry");
+  // Over the conversation, which does not reflow: the body is as wide, the box 12px in from its top right.
+  const after = await page.getByTestId("thread-pane-body").boundingBox();
+  expect(after?.width).toBe(body?.width);
+  const box = await overlay(page).boundingBox();
+  expect(Math.round((after?.x ?? 0) + (after?.width ?? 0) - (box?.x ?? 0) - (box?.width ?? 0))).toBe(12);
+  expect(Math.round((box?.y ?? 0) - (after?.y ?? 0))).toBe(12);
+  expect(box?.width).toBe(308);
+
+  // A menu inside works over it, and its Escape closes the menu only.
+  await card(page).getByTestId("ti-project").click();
+  await expect(page.getByTestId("ti-add-project")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("ti-add-project")).toHaveCount(0);
+  await expect(overlay(page)).toBeVisible();
+  // A press inside keeps it (a fold), a second toggle hides it.
+  await card(page).getByTestId("ti-usage").click();
+  await expect(card(page).getByTestId("ti-usage-detail")).toBeVisible();
+  await toggle(page).click();
+  await expect(overlay(page)).toHaveCount(0);
+  await expect(toggle(page)).toHaveAttribute("aria-pressed", "false");
+
+  // With room the inline card takes its place: hiding never cleared the preference.
+  await toggle(page).click();
+  await expect(overlay(page)).toBeVisible();
   await page.setViewportSize({ width: 1280, height: 800 });
-  await expect(card(page)).toBeVisible();
-  await expectTooltip(page, toggle(page), "Toggle Thread Info");
+  await expect(page.getByTestId("thread-info")).toBeVisible();
+  await expect(overlay(page)).toHaveCount(0);
+  await expect(toggle(page)).toHaveAttribute("aria-pressed", "true");
+  // Narrow again: it does not come back by itself.
+  await page.setViewportSize({ width: 900, height: 800 });
+  await expect(overlay(page)).toHaveCount(0);
+});
+
+test("the overlay: off at narrow turns the card on, Escape and a press outside hide it, the chord focuses it", async ({ page }) => {
+  const { id } = (await mockPost("thread-info?scenario=single")) as { id: string };
+  await page.setViewportSize({ width: 900, height: 800 });
+  await openApp(page);
+  await row(page, `s:${id}`).click();
+  await expect(toggle(page)).toHaveAttribute("aria-pressed", "false");
+  // The chord shows it focused; Escape hides it and gives focus to the toggle.
+  await page.getByTestId("thread-pane").focus();
+  await page.keyboard.press("Meta+Shift+i");
+  await expect(overlay(page)).toBeVisible();
+  await expect(overlay(page)).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(overlay(page)).toHaveCount(0);
+  await expect(toggle(page)).toBeFocused();
+  // Hidden, not off: with room the inline card shows.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.getByTestId("thread-info")).toBeVisible();
+  await page.setViewportSize({ width: 900, height: 800 });
+
+  // A click does not move focus; a press outside (the conversation) hides it.
+  await toggle(page).click();
+  await expect(overlay(page)).toBeVisible();
+  await expect(overlay(page)).not.toBeFocused();
+  await page.getByTestId("thread-pane-body").click({ position: { x: 40, y: 200 } });
+  await expect(overlay(page)).toHaveCount(0);
+
+  // Escape in the composer's prompt is the prompt's (focused without a press, which is outside).
+  await toggle(page).click();
+  await expect(overlay(page)).toBeVisible();
+  await page.locator("[data-chord-yield] [contenteditable]").first().focus();
+  await page.keyboard.press("Escape");
+  await expect(overlay(page)).toBeVisible();
+
+  // Another thread hides it.
+  await row(page, "s:s-1").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
+  await expect(overlay(page)).toHaveCount(0);
+  await row(page, `s:${id}`).click();
+  await expect(overlay(page)).toHaveCount(0);
 });
 
 test("a folder without git: no git group", async ({ page }) => {

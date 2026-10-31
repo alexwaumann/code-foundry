@@ -1,6 +1,7 @@
 import type { CommandView, UiContextView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
 import { sidebarAnchor } from "@/lib/inSidebar";
+import { lastInputWasKeyboard } from "@/lib/inputModality";
 import { canNewLike, canRunElsewhere } from "@/lib/threadRow";
 import { nextAfter, threadOrder } from "@/lib/tree";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
@@ -17,6 +18,7 @@ import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
 import { toggleThreadSidebar } from "@/stores/threadActions";
+import { toggleThreadInfo } from "@/stores/threadInfo";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
 import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -336,9 +338,10 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     toggleBottomFromHere();
     return true;
   },
-  // Window-local: this window's thread info card (the CLI's reaches every window through ShowView).
+  // Window-local: this window's thread info card, or its overlay on a narrow pane, focused
+  // when a key started it (the CLI's reaches every window through ShowView).
   "view.thread-info": () => {
-    useUiStore.getState().toggleThreadInfo();
+    toggleThreadInfo(lastInputWasKeyboard());
     return true;
   },
   // Not a presentation: terminal.new still runs as usual (false). Started here (cmd+t,
