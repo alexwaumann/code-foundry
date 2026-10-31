@@ -60,13 +60,13 @@ describe("buildRows (the flat thread list)", () => {
 
   // A thread waiting on its child threads (lib/waiting) sorts with the idle ones, below
   // finished turns and above Working: its group is threadGroup's.
-  it("sorts a thread waiting on its child threads with the idle ones", () => {
+  it("sorts a thread waiting on its child threads under Working, with them", () => {
     const waiting = threadGroup({ state: "connected", status: "idle", statusReason: "waiting on 2 child threads" });
     const done = threadGroup({ state: "connected", status: "attention", statusReason: "finished" });
     const child = threadGroup({ state: "connected", status: "busy", statusReason: "working" });
     const rows = buildRows([thread("lead", { group: waiting }), thread("child", { group: child }), thread("other", { group: done }), thread("idle")]);
-    expect(shape(rows)).toEqual([...s("other"), ...s("idle", "lead"), "# Working 1", ...s("child")]);
-    expect(rows.map((r) => r.section)).toEqual(["done", "idle", "idle", "working", "working"]);
+    expect(shape(rows)).toEqual([...s("other"), ...s("idle"), "# Working 2", ...s("child", "lead")]);
+    expect(rows.map((r) => r.section)).toEqual(["done", "idle", "working", "working", "working"]);
   });
 
   it("collapsed: the Working header stays with its count, its rows are gone", () => {

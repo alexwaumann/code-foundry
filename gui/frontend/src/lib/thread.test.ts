@@ -72,9 +72,9 @@ describe("threadGroup (the sidebar group of an unpinned thread)", () => {
     ["disconnected", "busy", "", "idle"],
     ["disconnected", "idle", "", "idle"],
     ["connected", "idle", "at prompt", "idle"],
-    // Waiting on its child threads (lib/waiting): idle, never done or prompt.
-    ["connected", "idle", "waiting on 2 child threads", "idle"],
-    ["disconnected", "idle", "waiting", "idle"],
+    // Waiting on its child threads (lib/waiting): under Working, never done or prompt.
+    ["connected", "idle", "waiting on 2 child threads", "working"],
+    ["disconnected", "idle", "waiting", "working"],
     ["connected", "unknown", "", "idle"],
     ["unknown", "unknown", "", "idle"],
   ])("%s %s %j", (state, status, statusReason, group) => {
