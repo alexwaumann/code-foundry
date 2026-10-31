@@ -799,7 +799,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   ancestor: `docs/notes/hidden-children-2-gui.md`; nothing in the GUI shows whether a thread's
   Claude runs: its composer always sends, starting looks like working, a stopped thread
   reads as its status: `docs/notes/hide-connection-state.md`), content (a thread's conversation, the Pull Requests
-  page, the Projects page with each project's worktrees and a card per workspace (its
+  page, the Projects view: an index of projects and workspaces by last activity that
+  drills into a project's page (its checkouts table and details) or a workspace's page,
+  each its own selection with its own side panel, the sidebar row reopening the last one
+  (`docs/notes/projects-redesign-1-index.md`); a workspace's page shows its card (its
   name edited in place, root, projects with where new threads start, add and remove, its
   instructions file opening as a File tab, its skills, Edit instructions starting or
   steering a thread in the workspace's folder, Reveal in Finder, Remove; a New workspace
@@ -831,7 +834,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Changes (kind `changes`:
   one worktree's changed files and commits against its base, each file opening its Diff
   tab; opened from the thread info card's Changes row and per-project sub-rows, and from
-  the Projects page's project and worktree rows into the page's own panel;
+  a project page's checkout rows into the page's own panel;
   `docs/notes/thread-header-crumb.md`) and MCP (the thread's MCP servers, one card each
   with status, error, tools and Reconnect; opened by the card's MCP row and
   `view.panel.mcp`; `docs/notes/mcp-panel.md`). The Worktree, Workspace, Linked PRs,
