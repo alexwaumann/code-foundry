@@ -75,9 +75,12 @@ test("a folder of repos asks how to add it; Add as workspace is the default", as
   const ws = (await listWorkspaces()).find((w) => w.name === "product");
   expect(ws).toMatchObject({ rootPath: "/Users/dev/product", defaultPrimary: "workspace", members: ids });
 
-  // The Projects page shows it.
-  await expect(page.getByTestId("projects-page")).toBeVisible();
-  await expect(page.locator(`[data-testid="workspace"][data-workspace="${ws?.id ?? ""}"]`).getByTestId("workspace-name")).toHaveText("product");
+  // Its page shows it: rooted, its folder starts threads, the three projects.
+  await expect(page.locator(`[data-testid="projects-page"][data-page="workspace"][data-workspace="${ws?.id ?? ""}"]`)).toBeVisible();
+  await expect(page.getByTestId("page-name")).toHaveText("product");
+  await expect(page.getByTestId("workspace")).toHaveAttribute("data-rooted", "true");
+  await expect(page.getByTestId("workspace-folder")).toHaveAttribute("data-default", "true");
+  await expect(page.getByTestId("member-name")).toHaveText(["api", "docs-site", "web"]);
 
   // Again: the projects are reused and the name is taken, so "product 2".
   await askAbout(page, "product/");
@@ -151,7 +154,7 @@ test("Escape on the two choices goes back to the path as typed; Escape again clo
   expect(await listWorkspaces()).toEqual([]);
 });
 
-test("after Add as workspace the new card is the Projects page's cursor row, scrolled into view", async ({ page }) => {
+test("after Add as workspace its page shows, the keyboard on it, whatever the index holds", async ({ page }) => {
   // Enough workspaces before it that it would sit below the fold.
   for (const name of ["a1", "a2", "a3", "a4", "a5", "a6"]) await mockPost(`workspace?name=${name}&projects=repo-cf,repo-gp,repo-dot`);
   await page.setViewportSize({ width: 1100, height: 640 });
@@ -160,7 +163,10 @@ test("after Add as workspace the new card is the Projects page's cursor row, scr
   await page.getByTestId("add-project-as-workspace").click();
   await expect(dialog(page)).toHaveCount(0);
   const ws = (await listWorkspaces()).find((w) => w.name === "product");
-  const header = page.locator(`[data-nav-key="ws:${ws?.id ?? ""}"]`);
-  await expect(header).toHaveAttribute("aria-selected", "true");
-  await expect(header).toBeInViewport();
+  await expect(page.locator(`[data-testid="projects-page"][data-page="workspace"][data-workspace="${ws?.id ?? ""}"]`)).toBeVisible();
+  await expect(page.getByTestId("page-name")).toHaveText("product");
+  await expect(page.getByTestId("projects-list")).toBeFocused();
+  // Back on the index, its row is there with the others.
+  await page.getByTestId("projects-crumb").click();
+  await expect(page.locator(`[data-nav-key="ws:${ws?.id ?? ""}"]`)).toBeVisible();
 });

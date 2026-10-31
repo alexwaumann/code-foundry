@@ -129,7 +129,7 @@ test("the index's Workspaces rows: members, status, contents; a click opens the 
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "workspace");
   await expect(page.getByTestId("page-name")).toHaveText("platform");
   await expect(page.getByTestId("workspace-meta")).toHaveText("workspace · 2 projects");
-  // The existing card is the body for now.
+  // Its body (e2e/workspace-page.spec.ts covers it).
   await expect(page.locator(`[data-testid="workspace"][data-workspace="${ws.id}"]`)).toBeVisible();
   await page.getByTestId("workspace-page-reveal").click();
   expect((await lastInvocation("workspace.reveal"))?.args).toEqual({ workspace: ws.id });
