@@ -241,12 +241,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
-	s.memory = memory.New(memory.Options{Dir: p.Memory(), Legacy: p.LegacyMemory(), Bus: s.bus, Log: log.With("store", "memory")})
-	// The single memory.md before the directory goes into it once (docs/notes/memory-dir.md);
-	// a failure leaves the file for the next start and the daemon runs on.
-	if _, err := s.memory.Import(); err != nil {
-		log.Warn("memory: the single memory file was not imported; it stays for the next start", "err", err)
-	}
+	s.memory = memory.New(memory.Options{Dir: p.Memory(), Bus: s.bus, Log: log.With("store", "memory")})
 	s.memory.Load()
 	// Hand edits reach the Settings page within a moment (docs/notes/memory-fixes-2.md).
 	s.memory.Watch(ctx)

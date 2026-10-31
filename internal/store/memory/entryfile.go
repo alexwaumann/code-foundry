@@ -12,8 +12,8 @@ const IndexFile = "MEMORY.md"
 
 // CreatedLayout is created as written (frontmatter, the memory.* commands' JSON): RFC
 // 3339 in UTC to the millisecond. The entries are ordered by it, and seconds would put
-// two adds in one second (a model saving two preferences in one command, every line of
-// an import) in file-name order.
+// two adds in one second (a model saving two preferences in one command) in file-name
+// order.
 const CreatedLayout = "2006-01-02T15:04:05.000Z07:00"
 
 // maxSlug caps an entry file's name before ".md" and a de-duplicating suffix.

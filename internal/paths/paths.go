@@ -42,12 +42,6 @@ const (
 // thread's agent lands in that thread's bottom panel.
 const EnvThread = "CODE_FOUNDRY_THREAD"
 
-// EnvThreadLegacy is EnvThread's name before threads were renamed from sessions. The CLI
-// still reads it when EnvThread is unset, for one release, so a process started with the
-// old name keeps its default --context-thread; the daemon sets only EnvThread and scrubs
-// both. Remove it after the next stable release.
-const EnvThreadLegacy = "CODE_FOUNDRY_SESSION"
-
 // EnvPages is the directory a thread's claude writes the pages it shows in (Pages/<id>),
 // set in every Claude process the daemon spawns for a thread.
 const EnvPages = "CODE_FOUNDRY_PAGES"
@@ -204,11 +198,6 @@ func (p Paths) Workspaces() string { return filepath.Join(p.home, "workspaces") 
 // DictationModels holds the dictation model (internal/store/dictation): downloaded once
 // on request, kept until the user removes it.
 func (p Paths) DictationModels() string { return filepath.Join(p.home, "dictation", "models") }
-
-// LegacyMemory is the single memory file before the directory, one "- <text>" line per
-// entry. The daemon imports it into Memory at start and renames it to
-// memory.md.imported.
-func (p Paths) LegacyMemory() string { return filepath.Join(p.home, "memory.md") }
 
 // WindowBackground is the GUI host's own state: the window colour of each scheme, so the
 // window opens in the last theme's colour before the page (and the daemon's settings)

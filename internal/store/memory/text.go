@@ -8,7 +8,7 @@ import (
 )
 
 // NoLetter is why a text with no letter or digit is not an entry: Clean refuses it with
-// these words and Import skips such a line with them in its WARN, so the two agree.
+// these words and a hand-edited entry file without one is skipped with them in its WARN.
 const NoLetter = "an entry needs at least one letter or digit"
 
 // Clean checks that text can be an entry and normalises it (Normalize): one line, not
@@ -37,7 +37,7 @@ func WellFormed(text string) bool {
 	return strings.ContainsFunc(text, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) })
 }
 
-// TooLong reports an entry past MaxEntryChars: only an import or a hand edit makes one
+// TooLong reports an entry past MaxEntryChars: only a hand edit makes one
 // (Clean refuses it), and threads do not get it (Injected).
 func TooLong(text string) bool { return utf8.RuneCountInString(text) > MaxEntryChars }
 
@@ -60,28 +60,6 @@ func Normalize(text string) string {
 		text = strings.TrimSuffix(text, ".")
 	}
 	return strings.TrimSpace(text)
-}
-
-// Parse reads the entries of a file of "- <text>" lines (the single memory.md before
-// the directory, legacy.go), edited by hand or not: CRLF line ends, blank lines,
-// markdown headings and <!-- --> comments are skipped; every other line is an entry,
-// normalised (Normalize). An entry repeated (any case) counts once. malformed are the
-// lines (trimmed) that are not one: no letter or digit in them (WellFormed, so a bullet
-// alone too).
-func Parse(file string) (entries, malformed []string) {
-	seen := map[string]bool{}
-	for _, line := range lines(file) {
-		t := Normalize(line)
-		if !WellFormed(t) {
-			malformed = append(malformed, strings.TrimSpace(line))
-			continue
-		}
-		if k := strings.ToLower(t); !seen[k] {
-			seen[k] = true
-			entries = append(entries, t)
-		}
-	}
-	return entries, malformed
 }
 
 // lines are file's lines with line ends unified, invalid UTF-8, <!-- --> comments,

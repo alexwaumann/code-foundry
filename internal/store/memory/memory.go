@@ -12,7 +12,7 @@
 // text, each entry at most MaxEntryChars characters. The daemon owns it: the memory.*
 // commands write it through Store, one temporary file and a rename per entry. Files
 // edited or added by hand are read leniently (parseEntry) and capped for the prompt
-// (Injected). The single memory.md before the directory is imported once (Import).
+// (Injected).
 //
 // Every read and write leaves a Snapshot; one that differs from the last is published
 // on the bus as an Event. Watch reads again on every change to the directory, so a hand
@@ -73,7 +73,7 @@ type Entry struct {
 	ThreadName string `json:"-"`
 	// Injected: threads get it. LeftOut says why not when they do not: it is longer
 	// than MaxEntryChars, or past MaxEntries or MaxBytes (LeftOut* constants). Only a
-	// directory edited by hand or an import holds such an entry.
+	// directory edited by hand holds such an entry.
 	Injected bool   `json:"-"`
 	LeftOut  string `json:"-"`
 }
@@ -127,9 +127,6 @@ func (*Snapshot) isMemoryEvent() {}
 type Options struct {
 	// Dir is the memory directory (paths.Memory).
 	Dir string
-	// Legacy is the single file before the directory (paths.LegacyMemory); Import
-	// reads it. Empty: nothing to import.
-	Legacy string
 	// Bus receives an Event per changed snapshot; nil publishes nothing.
 	Bus *bus.Bus
 	// Log nil is slog.Default().
@@ -199,7 +196,7 @@ func (s *Store) Texts() ([]string, error) {
 
 // Injected are the entries a thread's prompt carries, read now (Entry.Injected): the
 // entries no longer than MaxEntryChars, cut to the first MaxEntries that fit MaxBytes
-// rendered. Only a directory edited by hand or an import holds more; what is left out is
+// rendered. Only a directory edited by hand holds more; what is left out is
 // logged. The thread store calls it at every spawn.
 func (s *Store) Injected() ([]string, error) {
 	items, err := s.read()
