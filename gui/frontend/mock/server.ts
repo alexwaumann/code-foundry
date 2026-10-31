@@ -18,7 +18,8 @@
  *        mock/create.ts (publishing private to octo-org, or a repository named "taken", fails like gh)
  *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>", "delete <id>")
  *   POST /__mock/thread/attention?id=s-1
- *   POST /__mock/thread/status?id=s-1&status=busy|idle|attention[&reason=question: Which color?]
+ *   POST /__mock/thread/status?id=s-1&status=busy|idle|attention[&reason=question: Which color?][&busyTool=Bash make check]
+ *        (busyTool: Thread.busy_tool, kept only while busy and not compacting; "" clears it)
  *   POST /__mock/thread/stop?id=s-1&reason=crashed&code=139[&status=busy|idle|attention]   (the process ends: a crash, or reason=idle for the idle stop)
  *        (status: what it was doing at that moment; busy ends as ERROR "interrupted", other
  *        statuses persist, like the daemon)
@@ -985,7 +986,7 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
       case "status": {
         const status = statusNames[q.get("status") ?? ""];
         if (status === undefined) throw new CommandError("invalid", "status must be busy, idle or attention");
-        world.setThreadStatus(id, status, q.get("reason") ?? undefined);
+        world.setThreadStatus(id, status, q.get("reason") ?? undefined, q.get("busyTool") ?? undefined);
         break;
       }
       case "stop": {
