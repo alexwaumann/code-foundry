@@ -4,7 +4,13 @@ import type { DashboardView, PullRequestDetailView, PullRequestView } from "@/ap
 import type { ThreadView } from "@/api/threads";
 
 const renameThread = vi.hoisted(() => vi.fn<(id: string, name: string) => Promise<boolean>>(() => Promise.resolve(true)));
-vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), renameThread }));
+const archiveThread = vi.hoisted(() => vi.fn<(id: string, archived: boolean) => Promise<boolean>>(() => Promise.resolve(true)));
+const snoozeThread = vi.hoisted(() => vi.fn<(id: string, untilMs: number | null) => Promise<boolean>>(() => Promise.resolve(true)));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), renameThread, archiveThread, snoozeThread }));
+const showThreadView = vi.hoisted(() => vi.fn<(name: string, threadId: string, params?: Record<string, string>) => boolean>(() => true));
+vi.mock("@/stores/threadPanelIntent", () => ({ showThreadView }));
+const showThreadInfo = vi.hoisted(() => vi.fn<(threadId: string, focus?: boolean) => void>());
+vi.mock("@/stores/threadInfoOverlay", async (orig) => ({ ...(await orig<typeof import("@/stores/threadInfoOverlay")>()), showThreadInfo }));
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DASHBOARD_KEY, dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useProjectsStore } from "@/stores/projects";
@@ -14,7 +20,7 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 import { SidebarRow } from "./SidebarRow";
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "t", projectId: "cf", worktreePath: "/src/cf", workspaceId: "", projectIds: ["cf"], branch: "", createdWorktree: false, pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
+  ({ id: "s-1", name: "t", projectId: "cf", worktreePath: "/src/cf", workspaceId: "", projectIds: ["cf"], branch: "", createdWorktree: false, pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, lastActivityAtMs: null, flags: [], agentsRunning: 0, backgroundAgentsRunning: 0, backgroundShellsRunning: 0, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
 
 beforeEach(() => {
   useProjectsStore.setState({
@@ -35,21 +41,192 @@ function renderRow(o: Partial<ThreadView>): HTMLElement {
       <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
     </TooltipProvider>,
   );
-  return screen.getByTestId("row-place");
+  return screen.getByTestId("thread-body");
 }
 
-describe("SidebarRow line 2", () => {
-  it.each([
-    ["idle: project @ branch", {}, "code-foundry @ main"],
-    ["working: the status, then the place", { status: "busy" as const }, "Working · code-foundry @ main"],
-    ["starting reads as working", { state: "starting" as const }, "Working · code-foundry @ main"],
-    ["stopped at its prompt: the place, like idle", { state: "disconnected" as const }, "code-foundry @ main"],
-    ["no git: the project and the No git badge, no @", { projectId: "notes", worktreePath: "/src/notes" }, "writing No git"],
-    ["a question: no place", { status: "attention" as const, statusReason: "question: Which one?" }, "Asked a question"],
-    ["no project: No project alone, no branch", { projectId: "", worktreePath: "/Users/dev" }, "No project"],
-    ["no project, working", { projectId: "", worktreePath: "/Users/dev", status: "busy" as const }, "Working · No project"],
+const NOW = Date.now();
+const MIN = 60_000;
+const flag = (level: "attention" | "error", reason: string, pluginName = "Lint") => ({ plugin: pluginName.toLowerCase(), pluginName, level, reason, setAtMs: null, untilSeen: false });
+const line1 = () => screen.getByTestId("row-line-1");
+const line3 = () => screen.getByTestId("row-line-3");
+
+describe("SidebarRow three lines", () => {
+  it("project and status, then the name, then the detail or branch, in the 60px box", () => {
+    renderRow({ name: "Pick a palette", status: "attention", statusReason: "question: Which color?" });
+    const body = screen.getByTestId("thread-body");
+    expect(Array.from(body.children).map((c) => c.getAttribute("data-testid") ?? "name")).toEqual(["row-line-1", "name", "row-line-3"]);
+    expect(body.className.split(" ")).not.toContain("gap-0.5");
+    expect(line1().className.split(" ")).toEqual(expect.arrayContaining(["h-4", "text-caption-sm"]));
+    expect(line3().className.split(" ")).toEqual(expect.arrayContaining(["h-4", "text-caption-sm"]));
+    expect(screen.getByTestId("thread-name").parentElement?.className).toContain("h-[22px]");
+    expect(line1().textContent).toBe("code-foundryQuestion");
+    expect(line3().textContent).toBe("Which color?");
+  });
+
+  it.each<[string, Partial<ThreadView>, string, string, string, string]>([
+    ["permission", { status: "attention", statusReason: "permission: Bash zig build test" }, "input", "lucide-shield-question-mark", "Permission", "text-cf-warning-text"],
+    ["question", { status: "attention", statusReason: "question: Which one?" }, "question", "lucide-circle-question-mark", "Question", "text-cf-warning-text"],
+    ["plan", { status: "attention", statusReason: "plan: Claude has written up a plan" }, "plan", "lucide-clipboard-check", "Plan", "text-cf-warning-text"],
+    ["attention flag: the plugin's name", { flags: [flag("attention", "3 warnings")] }, "flagAttention", "lucide-flag", "Lint", "text-cf-warning-text"],
+    ["error flag", { flags: [flag("error", "tests red", "Test Watcher")] }, "flagError", "lucide-flag", "Test Watcher", "text-cf-error-text"],
+    ["snooze ended", { state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: NOW - 2 * MIN }, "snoozeEnded", "lucide-bell-ring", "Woke", "text-cf-warning-text"],
+    ["error", { status: "attention", statusReason: "error: model_not_found" }, "error", "lucide-circle-alert", "Error", "text-cf-error-text"],
+    ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted", statusChangedAtMs: NOW - MIN }, "interrupted", "lucide-unplug", "Interrupted", "text-cf-error-text"],
+    ["crashed", { state: "disconnected", status: "error", statusReason: "crashed", statusChangedAtMs: NOW - MIN }, "crashed", "lucide-triangle-alert", "Crashed", "text-cf-error-text"],
+    ["transcript deleted", { state: "disconnected", transcriptMissing: true }, "transcriptDeleted", "lucide-circle-alert", "Error", "text-cf-error-text"],
+    ["done", { status: "attention", statusReason: "finished", statusChangedAtMs: NOW - 12 * MIN }, "finished", "lucide-circle-check", "Done", "text-cf-success-text"],
+    ["working", { status: "busy", statusChangedAtMs: NOW - 4 * MIN }, "working", "lucide-circle-dashed", "Working", "text-cf-info-text"],
+    ["waiting", { status: "idle", statusReason: "waiting on 2 child threads", statusChangedAtMs: NOW - 5 * MIN }, "waiting", "lucide-circle-dashed", "Waiting", "text-cf-sidebar-muted-foreground"],
+  ])("%s: its icon and word in its tone", (_name, o, kind, icon, word, tone) => {
+    renderRow(o);
+    expect(screen.getByTestId("thread-body").getAttribute("data-status-line")).toBe(kind);
+    const status = screen.getByTestId("row-status");
+    expect(status.getAttribute("data-kind")).toBe(kind);
+    expect(status.className.split(" ")).toEqual(expect.arrayContaining([tone, "font-medium"]));
+    expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain(icon);
+    expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain("size-3");
+    expect(screen.getByTestId("row-status-word").textContent).toBe(word);
+  });
+
+  it("idle: no icon or word, the time since the last activity, muted", () => {
+    renderRow({ status: "idle", lastActivityAtMs: NOW - 9 * MIN });
+    expect(screen.queryByTestId("row-status")).toBeNull();
+    const time = screen.getByTestId("row-time");
+    expect(time.textContent).toBe("9m");
+    expect(time.className.split(" ")).toEqual(expect.arrayContaining(["text-cf-sidebar-muted-foreground", "tabular-nums"]));
+    expect(line1().textContent).toBe("code-foundry9m");
+    expect(screen.getByTestId("thread-body").getAttribute("data-status-line")).toBe("place");
+  });
+
+  it("idle without a known activity: nothing on the right", () => {
+    renderRow({ status: "idle", lastActivityAtMs: null });
+    expect(line1().textContent).toBe("code-foundry");
+  });
+
+  it.each<[string, Partial<ThreadView>, string]>([
+    ["working: the word, a space, the time since the status changed", { status: "busy", statusChangedAtMs: NOW - (60 + 4) * MIN }, "Working 1h 4m"],
+    ["waiting: the same", { status: "idle", statusReason: "waiting on 1 child thread", statusChangedAtMs: NOW - 5 * MIN }, "Waiting 5m"],
+    ["under a minute: seconds", { status: "busy", statusChangedAtMs: NOW - 4_000 }, "Working 4s"],
   ])("%s", (_name, o, text) => {
-    expect(renderRow(o).textContent).toBe(text);
+    renderRow(o);
+    expect(screen.getByTestId("row-status").textContent).toBe(text);
+    // Same tone as the word: the time inherits the status span's colour.
+    expect(screen.getByTestId("row-time").className).not.toContain("text-cf-sidebar-muted-foreground");
+  });
+
+  it.each<[string, Partial<ThreadView>]>([
+    ["question", { status: "attention", statusReason: "question: Which one?", statusChangedAtMs: NOW - 6 * MIN }],
+    ["done", { status: "attention", statusReason: "finished", statusChangedAtMs: NOW - 6 * MIN }],
+    ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted", statusChangedAtMs: NOW - 6 * MIN }],
+  ])("%s: no time on the row", (_name, o) => {
+    renderRow(o);
+    expect(screen.queryByTestId("row-time")).toBeNull();
+  });
+
+  it("the working time ticks every second under a minute on the shared clock", () => {
+    vi.useFakeTimers();
+    try {
+      renderRow({ status: "busy", statusChangedAtMs: Date.now() - 4_000 });
+      expect(screen.getByTestId("row-time").textContent).toBe("4s");
+      act(() => {
+        vi.advanceTimersByTime(3_000);
+      });
+      expect(screen.getByTestId("row-time").textContent).toBe("7s");
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(screen.getByTestId("row-time").textContent).toBe("1m");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("SidebarRow line 1: the project", () => {
+  it("the project, muted, no icon", () => {
+    renderRow({});
+    const p = screen.getByTestId("row-project");
+    expect(p.textContent).toBe("code-foundry");
+    expect(p.className).toContain("text-cf-sidebar-muted-foreground");
+    expect(p.querySelector("svg")).toBeNull();
+  });
+
+  it("no project: plain No project text, no icon", () => {
+    renderRow({ projectId: "", projectIds: [], worktreePath: "/Users/dev" });
+    const p = screen.getByTestId("row-project");
+    expect(p.textContent).toBe("No project");
+    expect(p.getAttribute("data-no-project")).toBe("true");
+    expect(p.querySelector("svg")).toBeNull();
+  });
+
+  it("pinned: the pin glyph right after the project", () => {
+    renderRow({ pinned: true });
+    expect(screen.getByTestId("row-project").nextElementSibling?.getAttribute("data-testid")).toBe("row-pinned");
+  });
+
+  it("not pinned: no pin", () => {
+    renderRow({});
+    expect(screen.queryByTestId("row-pinned")).toBeNull();
+  });
+});
+
+describe("SidebarRow line 3: detail or branch", () => {
+  it.each<[string, Partial<ThreadView>, string]>([
+    ["working on a tool: the tool", { status: "busy", busyTool: "Bash make check" }, "Bash make check"],
+    ["compacting", { status: "busy", statusReason: "compacting" }, "compacting"],
+    ["a question: its text", { status: "attention", statusReason: "question: Which one?" }, "Which one?"],
+    ["a permission: the tool", { status: "attention", statusReason: "permission: Bash zig build" }, "Bash zig build"],
+    ["a plan", { status: "attention", statusReason: "plan: Claude has written up a plan" }, "ready for review"],
+    ["a flag: its reason", { flags: [flag("attention", "3 warnings in main.go")] }, "3 warnings in main.go"],
+    ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted" }, "resend to continue"],
+    ["waiting", { status: "idle", statusReason: "waiting on 2 child threads" }, "2 child threads"],
+  ])("%s: the detail, muted and truncated, no branch", (_name, o, text) => {
+    renderRow(o);
+    const d = screen.getByTestId("row-detail");
+    expect(d.textContent).toBe(text);
+    expect(d.className.split(" ")).toEqual(expect.arrayContaining(["truncate", "text-cf-sidebar-muted-foreground"]));
+    expect(screen.queryByTestId("row-branch")).toBeNull();
+  });
+
+  it.each<[string, Partial<ThreadView>]>([
+    ["idle", {}],
+    ["done", { status: "attention", statusReason: "finished" }],
+    ["working with no tool yet", { status: "busy" }],
+  ])("%s: the branch glyph and the branch in mono", (_name, o) => {
+    renderRow(o);
+    expect(screen.queryByTestId("row-detail")).toBeNull();
+    expect(screen.getByTestId("row-branch").textContent).toBe("main");
+    expect(screen.getByTestId("row-branch").className).toContain("font-mono");
+    expect(screen.getByTestId("row-branch-icon").getAttribute("class")).toContain("lucide-git-branch");
+    expect(line3().textContent).toBe("main");
+  });
+
+  it("no project: an empty line that keeps its height", () => {
+    renderRow({ projectId: "", projectIds: [], worktreePath: "/Users/dev" });
+    expect(line3().textContent).toBe("");
+    expect(line3().className).toContain("h-4");
+  });
+
+  it("no git: the No git badge instead of a branch", () => {
+    renderRow({ projectId: "notes", projectIds: ["notes"], worktreePath: "/src/notes" });
+    expect(screen.queryByTestId("row-branch")).toBeNull();
+    expect(line3().textContent).toBe("No git");
+  });
+
+  it("background agents (info, a bot) and shells (muted, a terminal), only when running", () => {
+    renderRow({ backgroundAgentsRunning: 3, backgroundShellsRunning: 1 });
+    const a = screen.getByTestId("row-bg-agents");
+    expect(a.textContent).toBe("3");
+    expect(a.className).toContain("text-cf-info-text");
+    expect(a.querySelector("svg")?.getAttribute("class")).toContain("lucide-bot");
+    const sh = screen.getByTestId("row-bg-shells");
+    expect(sh.textContent).toBe("1");
+    expect(sh.className).toContain("text-cf-sidebar-muted-foreground");
+    expect(sh.querySelector("svg")?.getAttribute("class")).toContain("lucide-square-terminal");
+    cleanup();
+    renderRow({ agentsRunning: 2, backgroundAgentsRunning: 0, backgroundShellsRunning: 0 });
+    expect(screen.queryByTestId("row-bg-agents")).toBeNull();
+    expect(screen.queryByTestId("row-bg-shells")).toBeNull();
   });
 
   it("a stopped thread looks like any other: not dimmed, no offline mark", () => {
@@ -57,39 +234,96 @@ describe("SidebarRow line 2", () => {
     const body = screen.getByTestId("thread-body");
     expect(body.className).not.toContain("opacity-50");
     expect(body.getAttribute("data-offline")).toBeNull();
-    expect(screen.getByTestId("row-place").getAttribute("data-thread-badge")).toBe("idle");
-  });
-
-  it("transcript deleted: red with a trash icon, then the place (docs/notes/transcript-deleted.md)", () => {
-    expect(renderRow({ state: "disconnected", transcriptMissing: true }).textContent).toBe("Transcript deleted · code-foundry @ main");
-    expect(screen.getByTestId("row-place").getAttribute("data-status-line")).toBe("transcriptDeleted");
-    expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
-    expect(screen.getByTestId("row-transcript-deleted").getAttribute("class")).toContain("lucide-trash-2");
-  });
-
-  it("the @ is muted and the branch mono", () => {
-    renderRow({});
-    expect(screen.getByText("@").className).toContain("opacity-60");
-    expect(screen.getByTestId("row-branch").className).toContain("font-mono");
+    expect(body.getAttribute("data-thread-badge")).toBe("idle");
   });
 });
 
-describe("SidebarRow running agents", () => {
-  it.each([
-    ["idle: N agents, then the place", { agentsRunning: 3 }, "3 agents · code-foundry @ main"],
-    ["one", { agentsRunning: 1 }, "1 agent · code-foundry @ main"],
-    ["working: before the status", { agentsRunning: 2, status: "busy" as const }, "2 agents · Working · code-foundry @ main"],
-    ["a question: before it, no place", { agentsRunning: 1, status: "attention" as const, statusReason: "question: Which one?" }, "1 agent · Asked a question"],
-    ["none: nothing", { agentsRunning: 0 }, "code-foundry @ main"],
-  ])("%s", (_name, o, text) => {
-    expect(renderRow(o).textContent).toBe(text);
+describe("SidebarRow hover actions", () => {
+  it("Snooze and Archive buttons, 20px, rounded-sm, labelled, over the status", () => {
+    renderRow({ status: "attention", statusReason: "question: Which one?" });
+    const actions = screen.getByTestId("row-actions");
+    expect(actions.className.split(" ")).toEqual(expect.arrayContaining(["opacity-0", "group-hover/row:opacity-100"]));
+    for (const [id, label, icon] of [
+      ["row-snooze", "Snooze thread", "lucide-alarm-clock"],
+      ["row-archive", "Archive thread", "lucide-archive"],
+    ] as const) {
+      const b = screen.getByTestId(id);
+      expect(b.tagName).toBe("BUTTON");
+      expect(b.getAttribute("aria-label")).toBe(label);
+      expect(b.className.split(" ")).toEqual(expect.arrayContaining(["size-5", "rounded-sm", "text-cf-icon-muted", "bg-cf-sidebar-row-selected"]));
+      expect(b.querySelector("svg")?.getAttribute("class")).toContain(icon);
+    }
+    expect(screen.getByTestId("row-status").parentElement?.className).toContain("group-hover/row:invisible");
   });
 
-  it("is sky with a bot icon", () => {
-    renderRow({ agentsRunning: 2 });
-    const el = screen.getByTestId("row-agents");
-    expect(el.className).toContain("text-cf-info-text");
-    expect(el.querySelector("svg")).not.toBeNull();
+  it("tab stops only on the cursor's row", () => {
+    renderRow({});
+    expect(screen.getByTestId("row-archive").tabIndex).toBe(-1);
+    cleanup();
+    useThreadsStore.setState({ byId: { "s-1": thread({}) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor onActivate={() => undefined} />
+      </TooltipProvider>,
+    );
+    expect(screen.getByTestId("row-archive").tabIndex).toBe(0);
+    expect(screen.getByTestId("row-snooze").tabIndex).toBe(0);
+  });
+
+  it.each([
+    ["row-snooze", "Snooze thread"],
+    ["row-archive", "Archive thread"],
+  ])("%s: its tooltip opens at once, above", async (id, label) => {
+    renderRow({});
+    fireEvent.focus(screen.getByTestId(id));
+    const tip = await screen.findAllByText(label, { selector: "[data-testid$=-tip] *, [data-testid$=-tip]" });
+    expect(tip.length).toBeGreaterThan(0);
+    expect(screen.getByTestId(`${id}-tip`).getAttribute("data-side")).toBe("top");
+  });
+
+  it("Archive archives at once and does not select the row", () => {
+    archiveThread.mockClear();
+    const onActivate = vi.fn();
+    useThreadsStore.setState({ byId: { "s-1": thread({}) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor={false} onActivate={onActivate} />
+      </TooltipProvider>,
+    );
+    fireEvent.click(screen.getByTestId("row-archive"));
+    expect(archiveThread).toHaveBeenCalledWith("s-1", true);
+    expect(onActivate).not.toHaveBeenCalled();
+  });
+
+  it("Snooze opens the preset menu without selecting the row; a preset snoozes", () => {
+    snoozeThread.mockClear();
+    const onActivate = vi.fn();
+    useThreadsStore.setState({ byId: { "s-1": thread({}) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor={false} onActivate={onActivate} />
+      </TooltipProvider>,
+    );
+    const trigger = screen.getByTestId("row-snooze");
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(trigger);
+    expect(onActivate).not.toHaveBeenCalled();
+    const presets = screen.getAllByTestId("snooze-preset");
+    expect(presets.map((p) => p.getAttribute("data-preset"))).toEqual(["1h", "3h", "tomorrow", "next-week"]);
+    expect(screen.getByTestId("row-actions").getAttribute("data-shown")).toBe("true");
+    fireEvent.click(presets[0] as HTMLElement);
+    expect(snoozeThread).toHaveBeenCalledWith("s-1", expect.any(Number));
+    expect(onActivate).not.toHaveBeenCalled();
+  });
+
+  it("a snoozed or archived row has no hover actions", () => {
+    useThreadsStore.setState({ byId: { "s-1": thread({ snoozedUntilMs: Date.now() + MIN }) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "snoozed", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+      </TooltipProvider>,
+    );
+    expect(screen.queryByTestId("row-actions")).toBeNull();
   });
 });
 
@@ -106,10 +340,10 @@ describe("SidebarRow provisional name", () => {
     expect(el.className.includes("text-cf-sidebar-muted-foreground")).toBe(muted);
     expect(el.className.includes("italic")).toBe(italic);
     expect(el.getAttribute("data-provisional")).toBe(italic ? "true" : null);
-    // One role above the row's text-body-sm, semibold; a named thread keeps the row's colour.
+    // One role above the row's text-body-sm, medium; a named thread keeps the row's colour.
     const cls = el.className.split(" ");
     expect(cls).toContain("text-body");
-    expect(cls).toContain("font-semibold");
+    expect(cls).toContain("font-medium");
     expect(cls).not.toContain("text-body-sm");
     expect(cls.includes("text-inherit")).toBe(!muted);
   });
@@ -154,7 +388,8 @@ describe("SidebarRow archived", () => {
   it("one line: the name and the age of the archive, no status line, not dimmed", () => {
     const row = renderArchived({ name: "Old work", archivedAtMs: Date.now() - 3 * 3_600_000 - 60_000 });
     expect(row.textContent).toBe("Old work3h");
-    expect(screen.queryByTestId("row-place")).toBeNull();
+    expect(screen.queryByTestId("row-line-1")).toBeNull();
+    expect(screen.queryByTestId("row-actions")).toBeNull();
     expect(screen.getByTestId("row-archived-age").className).toContain("tabular-nums");
     expect(screen.getByTestId("thread-body").className).not.toContain("opacity-50");
   });
@@ -163,7 +398,7 @@ describe("SidebarRow archived", () => {
     renderArchived({ name: "Old work", archivedAtMs: Date.now() });
     const cls = screen.getByTestId("thread-name").className.split(" ");
     expect(cls).toEqual(expect.arrayContaining(["text-body", "text-cf-sidebar-muted-foreground"]));
-    expect(cls).not.toContain("font-semibold");
+    expect(cls).not.toContain("font-medium");
     expect(cls).not.toContain("text-inherit");
     expect(screen.getByTestId("row-archived-age").className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "text-cf-sidebar-muted-foreground"]));
     expect(screen.getByTestId("row-archived-age").querySelector("svg")).toBeNull();
@@ -173,7 +408,7 @@ describe("SidebarRow archived", () => {
     renderArchived({ name: "fix the login redirect", nameProvisional: true, archivedAtMs: Date.now() });
     const cls = screen.getByTestId("thread-name").className.split(" ");
     expect(cls).toEqual(expect.arrayContaining(["text-body", "text-cf-sidebar-muted-foreground", "italic"]));
-    expect(cls).not.toContain("font-semibold");
+    expect(cls).not.toContain("font-medium");
   });
 
   it("an unnamed thread shows its id, muted", () => {
@@ -205,7 +440,8 @@ describe("SidebarRow snoozed", () => {
     const row = renderSnoozed({ name: "Later work", snoozedUntilMs: Date.now() + left });
     expect(row.textContent).toBe(`Later work${want}`);
     expect(row.getAttribute("data-section")).toBe("snoozed");
-    expect(screen.queryByTestId("row-place")).toBeNull();
+    expect(screen.queryByTestId("row-line-1")).toBeNull();
+    expect(screen.queryByTestId("row-actions")).toBeNull();
     expect(screen.getByTestId("row-snooze-left").className).toContain("tabular-nums");
     expect(screen.getByTestId("row-snooze-left").className).toContain("text-caption-sm");
     expect(screen.getByTestId("thread-body").className).not.toContain("opacity-50");
@@ -216,7 +452,7 @@ describe("SidebarRow snoozed", () => {
     renderSnoozed({ name: "Later work", snoozedUntilMs: Date.now() + 2 * 3_600_000 + 60_000 });
     const name = screen.getByTestId("thread-name").className.split(" ");
     expect(name).toEqual(expect.arrayContaining(["text-body", "text-cf-sidebar-muted-foreground"]));
-    expect(name).not.toContain("font-semibold");
+    expect(name).not.toContain("font-medium");
     const left = screen.getByTestId("row-snooze-left");
     expect(left.className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "text-cf-sidebar-muted-foreground", "gap-1"]));
     const icon = screen.getByTestId("row-snooze-icon");
@@ -231,15 +467,6 @@ describe("SidebarRow snoozed", () => {
     expect(screen.getByTestId("thread-name").textContent).toBe("s-1");
     expect(screen.getByTestId("thread-name").className).toContain("text-cf-sidebar-muted-foreground");
     expect(screen.getByTestId("row-snooze-left").textContent).toBe("1h");
-  });
-});
-
-describe("SidebarRow line 2 after a snooze", () => {
-  it("a woken thread reads Snooze ended with how long ago, amber, without the place", () => {
-    renderRow({ state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() - 2 * 60_000 });
-    expect(screen.getByTestId("row-place").textContent).toBe("Snooze ended · 2 min ago");
-    expect(screen.getByTestId("row-status").className).toContain("text-cf-warning-text");
-    expect(screen.getByTestId("row-place").getAttribute("data-status-line")).toBe("snoozeEnded");
   });
 });
 
@@ -266,13 +493,13 @@ describe("SidebarRow footer headers", () => {
 describe("SidebarRow created by a thread", () => {
   const glyph = () => screen.queryByTestId("row-created-by");
 
-  it("a muted ↳ before the name of an agent's thread; line 2 unchanged", () => {
+  it("a muted ↳ before the name of an agent's thread; the other lines unchanged", () => {
     renderRow({ name: "Child", createdBy: "s-p", createdByName: "Parent" });
     const g = glyph();
     expect(g).not.toBeNull();
     expect(g?.getAttribute("class")).toContain("text-cf-icon-muted");
     expect(g?.nextElementSibling?.getAttribute("data-testid")).toBe("thread-name");
-    expect(screen.getByTestId("row-place").textContent).toBe("code-foundry @ main");
+    expect(screen.getByTestId("row-branch").textContent).toBe("main");
   });
 
   it("nothing for the user's thread", () => {
@@ -288,17 +515,6 @@ describe("SidebarRow created by a thread", () => {
       </TooltipProvider>,
     );
     expect(glyph()?.nextElementSibling?.textContent).toBe("Old child");
-  });
-});
-
-describe("SidebarRow waiting on its child threads", () => {
-  it("reads Waiting after a muted hourglass, then the place; idle-like, not amber or emerald", () => {
-    renderRow({ status: "idle", statusReason: "waiting on 2 child threads" });
-    expect(screen.getByTestId("row-place").textContent).toBe("Waiting · code-foundry @ main");
-    expect(screen.getByTestId("row-place").getAttribute("data-status-line")).toBe("waiting");
-    expect(screen.getByTestId("row-place").getAttribute("data-thread-badge")).toBe("idle");
-    expect(screen.getByTestId("row-status").className).toBe("");
-    expect(screen.getByTestId("row-waiting").getAttribute("class")).toContain("text-cf-icon-muted");
   });
 });
 
@@ -372,6 +588,57 @@ describe("SidebarRow linked PRs tag", () => {
       dashboardResource.set(DASHBOARD_KEY, { data: dashboard([], [pr(142, "merged", { updatedAtMs: 2 })]) });
     });
     expect(tag()?.getAttribute("data-state")).toBe("merged");
+  });
+});
+
+describe("SidebarRow linked PR tag click", () => {
+  const link = (slug: string, number: number) => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt: null });
+
+  beforeEach(() => {
+    pullRequestDetailResource.store.setState({ entries: {} });
+    dashboardResource.store.setState({ entries: {} });
+    showThreadView.mockClear();
+    showThreadInfo.mockClear();
+  });
+
+  function renderWith(o: Partial<ThreadView>, selected: { kind: "none" } | { kind: "thread"; id: string } = { kind: "none" }) {
+    useUiStore.setState({ selection: selected as never });
+    const onActivate = vi.fn();
+    useThreadsStore.setState({ byId: { "s-1": thread(o) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor={false} onActivate={onActivate} />
+      </TooltipProvider>,
+    );
+    return onActivate;
+  }
+
+  it("one PR: selects the thread and opens the PR in its panel (the link's slug), not the row's click", () => {
+    const onActivate = renderWith({ linkedPullRequests: [link("Owner/Repo", 142)] });
+    fireEvent.click(screen.getByTestId("row-linked-prs"));
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
+    expect(useUiStore.getState().cursorKey).toBe("s:s-1");
+    expect(showThreadView).toHaveBeenCalledWith("panel.pr", "s-1", { slug: "Owner/Repo", number: "142" });
+    expect(showThreadInfo).not.toHaveBeenCalled();
+  });
+
+  it("several: the thread info card", () => {
+    const onActivate = renderWith({ linkedPullRequests: [link("o/r", 1), link("o/r", 2)] });
+    fireEvent.click(screen.getByTestId("row-linked-prs"));
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(showThreadInfo).toHaveBeenCalledWith("s-1");
+    expect(showThreadView).not.toHaveBeenCalled();
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
+  });
+
+  it("one PR of an already selected thread: the selection stays as it is", () => {
+    const select = vi.spyOn(useUiStore.getState(), "select");
+    renderWith({ linkedPullRequests: [link("o/r", 7)] }, { kind: "thread", id: "s-1" });
+    fireEvent.click(screen.getByTestId("row-linked-prs"));
+    expect(select).not.toHaveBeenCalled();
+    expect(showThreadView).toHaveBeenCalledWith("panel.pr", "s-1", { slug: "o/r", number: "7" });
+    select.mockRestore();
   });
 });
 
@@ -490,7 +757,47 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
   });
 });
 
-describe("SidebarRow line 2 of a multi-project thread: the run-in project only", () => {
+describe("SidebarRow card status time", () => {
+  function openCard(o: Partial<ThreadView>): HTMLElement {
+    vi.useFakeTimers();
+    try {
+      renderRow(o);
+      fireEvent.pointerMove(screen.getByRole("option"), { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    return screen.getAllByTestId("thread-tooltip")[0] as HTMLElement;
+  }
+
+  it.each<[string, Partial<ThreadView>, string, string]>([
+    ["a question: for 6m", { status: "attention", statusReason: "question: Which one?" }, "Asked a question · for 6m", "amber"],
+    ["an error: for 6m", { status: "attention", statusReason: "error: model_not_found" }, "Error · model_not_found · for 6m", "red"],
+    ["interrupted: for 6m", { state: "disconnected", status: "error", statusReason: "interrupted" }, "Interrupted while working · for 6m", "red"],
+    ["done: 6m ago, green", { status: "attention", statusReason: "finished" }, "Finished 6m ago", "emerald"],
+  ])("%s", (_name, o, text, tone) => {
+    const card = openCard({ ...o, statusChangedAtMs: Date.now() - 6 * MIN - 5_000 });
+    const st = within(card).getByTestId("tip-status");
+    expect(st.textContent).toBe(text);
+    expect(st.getAttribute("data-tone")).toBe(tone);
+    expect(within(card).getByTestId("tip-status-time").className).toContain("text-cf-text-muted");
+  });
+
+  it("a flag: its reason, no time", () => {
+    const card = openCard({ flags: [flag("attention", "3 warnings")], statusChangedAtMs: Date.now() - 6 * MIN });
+    expect(within(card).getByTestId("tip-status").textContent).toBe("Lint: 3 warnings");
+  });
+
+  it("working and idle: no status row; model stays", () => {
+    const card = openCard({ status: "busy", statusChangedAtMs: Date.now() - 6 * MIN });
+    expect(within(card).queryByTestId("tip-status")).toBeNull();
+    expect(within(card).getByTestId("tip-model")).toBeTruthy();
+  });
+});
+
+describe("SidebarRow line 1 of a multi-project thread: the run-in project only", () => {
   beforeEach(() => {
     useProjectsStore.setState({
       byId: {
@@ -503,10 +810,18 @@ describe("SidebarRow line 2 of a multi-project thread: the run-in project only",
   });
 
   it.each([
-    ["a workspace thread", { projectId: "gp", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/wt/gp/cf-login", createdWorktree: true, branch: "cf/login" }, "ghostty-playground @ cf/login"],
-    ["an unnamed set", { projectId: "cf", projectIds: ["cf", "gp"], worktreePath: "/src/cf" }, "code-foundry @ main"],
-    ["a thread in its workspace's folder: the workspace, the place", { projectId: "", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/home/.code-foundry/workspaces/w-1", createdWorktree: true, branch: "cf/login" }, "login @ cf/login"],
-  ])("%s", (_name, o, want) => {
-    expect(renderRow(o).textContent).toBe(want);
+    ["a workspace thread", { projectId: "gp", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/wt/gp/cf-login", createdWorktree: true, branch: "cf/login" }, "ghostty-playground", "cf/login"],
+    ["an unnamed set", { projectId: "cf", projectIds: ["cf", "gp"], worktreePath: "/src/cf" }, "code-foundry", "main"],
+    ["a thread in its workspace's folder: no project, so the workspace's name", { projectId: "", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/home/.code-foundry/workspaces/w-1", createdWorktree: true, branch: "cf/login" }, "login", "cf/login"],
+  ])("%s: the Layers glyph, then the project", (_name, o, project, branch) => {
+    renderRow(o);
+    expect(screen.getByTestId("row-project").textContent).toBe(project);
+    expect(screen.getByTestId("row-workspace").getAttribute("class")).toContain("lucide-layers");
+    expect(screen.getByTestId("row-branch").textContent).toBe(branch);
+  });
+
+  it("a single-project thread: no Layers glyph", () => {
+    renderRow({});
+    expect(screen.queryByTestId("row-workspace")).toBeNull();
   });
 });
