@@ -221,6 +221,9 @@ func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions
 	}
 	slug := cmp.Or(r.GitHubSlug, "_local/"+r.Name)
 	path := filepath.Join(f.WorktreeRoot, filepath.FromSlash(slug), strings.ReplaceAll(o.Branch, "/", "-"))
+	if o.Path != "" {
+		path = filepath.Clean(o.Path)
+	}
 	w := project.Worktree{ProjectID: r.ID, Path: path, Branch: o.Branch}
 	r.Worktrees = append(slices.Clone(r.Worktrees), w)
 	w.StartPoint = o.BaseRef // the real store's resolution is not modelled

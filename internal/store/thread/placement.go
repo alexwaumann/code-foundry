@@ -277,6 +277,8 @@ type placedThread struct {
 // madeWorktree is a member worktree a Create or a start made.
 type madeWorktree struct {
 	projectID, projectName, path string
+	// branch is the branch it was made on.
+	branch string
 	// newBranch: the branch did not exist; a rollback deletes it too.
 	newBranch bool
 	// startPoint is project.Worktree.StartPoint.
@@ -751,8 +753,7 @@ func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, b
 	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: branch, Fetch: true, BaseFromOrigin: fromOrigin}
 	newBranch := fresh
 	if !fresh {
-		local := m.opts.RefExists(ctx, r.Path, "refs/heads/"+branch)
-		remote := !local && (m.opts.RefExists(ctx, r.Path, "refs/remotes/origin/"+branch) || m.opts.FetchBranch(ctx, r.Path, branch))
+		local, remote := m.findBranch(ctx, r.Path, branch)
 		newBranch = !local && !remote
 	}
 	if newBranch {
@@ -768,7 +769,7 @@ func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, b
 		}
 	}
 	m.log.Info("member worktree made", "project", r.ID, "branch", branch, "path", wt.Path, "new_branch", newBranch, "start_point", wt.StartPoint)
-	return madeWorktree{projectID: r.ID, projectName: r.Name, path: filepath.Clean(wt.Path), newBranch: newBranch, startPoint: wt.StartPoint, worktree: wt}, true, nil
+	return madeWorktree{projectID: r.ID, projectName: r.Name, path: filepath.Clean(wt.Path), branch: branch, newBranch: newBranch, startPoint: wt.StartPoint, worktree: wt}, true, nil
 }
 
 // rollback removes worktrees a failed Create made, with the branches it made for them.
@@ -839,22 +840,51 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 	if len(todo) > 0 {
 		m.update(s.ID, false, func(*record) {}) // STARTING now: the fetches may take seconds
 		m.log.Info("member worktrees of thread are gone; making them again", "thread", s.ID, "projects", len(todo), "branch", s.Branch)
-		var err error
-		if made, err = m.makeWorktrees(ctx, todo, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin()); err != nil {
-			return nil, nil, err
-		}
+		// A member a cleanup removed on another branch goes back on it, at its path, while
+		// that branch exists (recreate.go); the rest on the thread's branch, in parallel.
+		var rest []project.Project
 		for _, r := range todo {
+			was, _ := s.CheckoutPath(r.ID)
+			mw, path, ok, err := m.remakeOnHead(ctx, s, r, was)
+			switch {
+			case err != nil:
+				m.rollback(ctx, made)
+				return nil, nil, projectError("recreate worktree "+s.LastHeads[r.ID]+" in "+r.Name, err)
+			case !ok:
+				rest = append(rest, r)
+				continue
+			case mw.path != "":
+				made = append(made, mw)
+			case was != "" && !samePath(was, path):
+				notes = append(notes, takeoverNote(cmp.Or(r.Name, r.ID), was, path, s.LastHeads[r.ID]))
+			}
+			found[r.ID] = path
+		}
+		if len(rest) > 0 {
+			onBranch, err := m.makeWorktrees(ctx, rest, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin())
+			if err != nil {
+				m.rollback(ctx, made)
+				return nil, nil, err
+			}
+			made = append(made, onBranch...)
+		}
+		for _, r := range rest {
 			path := ""
+			was, _ := s.CheckoutPath(r.ID)
 			if i := slices.IndexFunc(made, func(w madeWorktree) bool { return w.projectID == r.ID }); i >= 0 {
 				path = made[i].path
 			} else if wt, ok := m.memberWorktree(r, s.Branch); ok {
-				path = wt.Path // another start made it meanwhile
+				path = wt.Path // another linked worktree has the branch, or another start made it meanwhile
+				if was != "" && !samePath(was, path) {
+					notes = append(notes, takeoverNote(cmp.Or(r.Name, r.ID), was, path, s.Branch))
+				}
 			}
-			if was, _ := s.CheckoutPath(r.ID); path != "" && was != "" && !samePath(was, path) {
+			if path != "" && was != "" && !samePath(was, path) {
 				m.log.Info("member worktree made again at another path", "thread", s.ID, "project", r.ID, "was", was, "now", path)
 			}
 			found[r.ID] = path
 		}
+		slices.SortFunc(made, func(a, b madeWorktree) int { return strings.Compare(a.projectID, b.projectID) })
 	}
 	for i := range made {
 		if made[i].newBranch && made[i].startPoint == "" {
@@ -869,6 +899,7 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 			for id, path := range found {
 				if path != "" {
 					r.s = r.s.withCheckout(id, path)
+					r.s.LastHeads = withoutHead(r.s.LastHeads, id) // HEAD is live again
 				}
 			}
 			if r.s.ProjectID != "" {
@@ -877,6 +908,45 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 		})
 	}
 	return made, notes, nil
+}
+
+// remakeOnHead makes s's missing worktree-mode checkout of r again on its last HEAD
+// (Thread.LastHeads), at was, its recorded path (that branch's default path is
+// elsewhere), when that branch exists locally or on origin (recreate.go's rule). ok is
+// false when there is none to go back to (none recorded, the created-for branch, gone, or
+// checked out in r's main checkout): the caller makes it on the thread's branch, as
+// before. When another linked worktree has the branch checked out (memberWorktree) the
+// thread takes it over instead: path is that one and mw is zero, since git keeps one
+// worktree per branch.
+func (m *Manager) remakeOnHead(ctx context.Context, s Thread, r project.Project, was string) (mw madeWorktree, path string, ok bool, err error) {
+	last := m.lastHead(s, r)
+	if last == "" {
+		return madeWorktree{}, "", false, nil
+	}
+	unlock := m.lockWorktree(r.ID, last)
+	defer unlock()
+	if wt, ok := m.memberWorktree(r, last); ok {
+		m.log.Info("another worktree has the last branch of a removed member; the thread takes it over", "thread", s.ID, "project", r.ID, "branch", last, "path", wt.Path)
+		return madeWorktree{}, wt.Path, true, nil
+	}
+	if local, remote := m.findBranch(ctx, r.Path, last); !local && !remote {
+		m.log.Info("last branch of a removed member is gone; making it on the thread's branch", "thread", s.ID, "project", r.ID, "last_head", last, "branch", s.Branch)
+		return madeWorktree{}, "", false, nil
+	}
+	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
+		ProjectID: r.ID, Branch: last, Path: was, Fetch: true, BaseFromOrigin: m.opts.BaseFromOrigin(),
+	})
+	if err != nil {
+		return madeWorktree{}, "", false, err
+	}
+	if !m.opts.DisablePreTrust {
+		if _, err := trustWorktree(m.opts.Paths.Config, wt.Path); err != nil {
+			m.log.Warn("pre-trust worktree failed", "project", r.ID, "path", wt.Path, "err", err)
+		}
+	}
+	m.log.Info("member worktree made again on its last branch", "thread", s.ID, "project", r.ID, "branch", last, "path", wt.Path)
+	path = filepath.Clean(wt.Path)
+	return madeWorktree{projectID: r.ID, projectName: r.Name, path: path, branch: last, startPoint: wt.StartPoint, worktree: wt}, path, true, nil
 }
 
 // fallbackNote is the timeline line for a member whose recorded checkout is gone and

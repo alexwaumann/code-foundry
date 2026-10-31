@@ -186,7 +186,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		WithCleanupHold(func(w project.Worktree) string {
 			return cleanupHold(w.Path, checkoutThreads(st.thread.Snapshot(), st.thread.CheckoutsOf), st.terminal.List(context.Background()))
 		}).
-		WithCleanupAbandoned(abandonedBy(st.thread), logLeftovers(log)).
+		WithCleanupAbandoned(abandonedBy(st.thread), beforeRemoval(log, st.thread.RememberHead)).
 		WithBaseFromOrigin(baseFromOrigin(st.settings)).
 		WithBeforeUnregister(st.archived.unregistering)
 	terminalAPI := api.NewTerminal(st.terminal)

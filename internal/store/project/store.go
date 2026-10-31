@@ -626,6 +626,12 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		slug = parseGitHubSlug(string(trimNL(out)))
 	}
 	path := filepath.Clean(defaultWorktreePath(g.wtRoot, g.worktreeDirKey(m, slug), opts.Branch))
+	if opts.Path != "" {
+		if !InsideRoot(opts.Path, g.wtRoot) {
+			return Worktree{}, fmt.Errorf("%w: worktree path %s is outside %s", ErrInvalidArgument, opts.Path, g.wtRoot)
+		}
+		path = filepath.Clean(opts.Path)
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, worktreeTimeout)
 	defer cancel()

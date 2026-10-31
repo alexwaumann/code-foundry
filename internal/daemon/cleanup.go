@@ -22,7 +22,20 @@ func abandonedBy(threads *thread.Manager) func(project.Worktree) bool {
 	}
 }
 
-// logLeftovers is project.CleanupOptions.Removing: it logs the processes still
+// beforeRemoval is project.CleanupOptions.Removing: the branch the worktree has checked
+// out is recorded for the threads whose checkout it is (thread.Manager.RememberHead,
+// so a start makes it again on that branch; docs/notes/recreate-last-head.md), then
+// logLeftovers. remember is a func so the archive cleaner, built before the thread store,
+// can pass one that reads it later.
+func beforeRemoval(log *slog.Logger, remember func(project.Worktree)) func(context.Context, project.Worktree) {
+	logged := logLeftovers(log)
+	return func(ctx context.Context, w project.Worktree) {
+		remember(w)
+		logged(ctx, w)
+	}
+}
+
+// logLeftovers logs the processes still
 // running in a worktree cleanup is about to remove (archive and remove stop what a
 // thread left; anything else, a user's own server, is only named).
 func logLeftovers(log *slog.Logger) func(context.Context, project.Worktree) {
