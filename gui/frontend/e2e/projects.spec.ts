@@ -253,8 +253,8 @@ test("a project's page: header, the checkouts table by activity, a row opens its
   await checkoutRow(page, "repo-cf", FIX).hover();
   await checkoutRow(page, "repo-cf", FIX).getByTestId("worktree-more").click();
   await page.getByTestId("worktree-remove").click();
-  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
-  await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("remove-worktree-title")).toHaveText("Remove the worktree on fix/resize?");
+  await page.getByTestId("remove-worktree-ok").click();
   expect((await lastInvocation("project.worktree.remove"))?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: FIX });
 
   // The header's menu: no New worktree.

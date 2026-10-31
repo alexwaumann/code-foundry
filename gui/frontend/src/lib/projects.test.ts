@@ -189,6 +189,18 @@ describe("isCleanable", () => {
     { name: "a running shell it owns", wt: merged, terminals: term("running", "/elsewhere", WT), want: false },
     { name: "a running terminal inside it", wt: merged, terminals: term("running", `${WT}/src`), want: false },
     { name: "an exited shell does not hold", wt: merged, terminals: term("exited", WT, WT), want: true },
+    {
+      name: "another thread's checkout (a multi-project set's member) holds it, as the daemon's checkoutThreads",
+      wt: merged,
+      threads: { order: ["s"], byId: { s: { archivedAtMs: null, worktreePath: "/elsewhere", checkoutPaths: [{ projectId: "p", path: WT }] } } },
+      want: false,
+    },
+    {
+      name: "an archived thread's checkout does not",
+      wt: merged,
+      threads: { order: ["s"], byId: { s: { archivedAtMs: 5, worktreePath: "/elsewhere", checkoutPaths: [{ projectId: "p", path: WT }] } } },
+      want: true,
+    },
   ];
   for (const c of cases) {
     it(c.name, () => {
@@ -374,6 +386,13 @@ describe("details and summaries", () => {
     expect(worktreesDetail(["/tmp/wt/cf/a", "/tmp/wt/gp/b"])).toBe("/tmp/wt · 2");
     expect(worktreesDetail(["/a/x", "/b/y"])).toBe("2");
     expect(worktreesDetail([])).toBe("");
+  });
+  it("worktreesDetail: how many Code Foundry made", () => {
+    const two = ["/tmp/x.worktrees/a", "/tmp/x.worktrees/b"];
+    expect(worktreesDetail(two, 1)).toBe("/tmp/x.worktrees · 2, 1 made by Code Foundry");
+    expect(worktreesDetail(two, 2)).toBe("/tmp/x.worktrees · 2 made by Code Foundry");
+    expect(worktreesDetail(two, 0)).toBe("/tmp/x.worktrees · 2");
+    expect(worktreesDetail(["/a/x", "/b/y"], 1)).toBe("2, 1 made by Code Foundry");
   });
   it("actionsDetail", () => {
     expect(actionsDetail(0)).toBe("none");

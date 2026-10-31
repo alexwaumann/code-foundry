@@ -83,10 +83,11 @@ export interface ReasonInput {
 /**
  * Why the worktree stayed, in plain words, parts joined by " · ":
  * "made outside Code Foundry" (managed false), then the work ("3 commits not on main",
- * "4 uncommitted files" or "clean", "merged" or "merged otherwise" when its commits are in
- * the default branch); a failed status read, an operation in progress or a detached HEAD
- * reads as the daemon's cleanup reason, and no remote default branch says so;
- * then "a terminal is open in it" and "last thread archived 12d ago".
+ * "4 uncommitted files", or "clean" when neither; "merged", or "merged otherwise" beside
+ * uncommitted files, when its commits are in the default branch); a failed status read,
+ * an operation in progress or a detached HEAD reads as the daemon's cleanup reason, and no
+ * remote default branch says so; then "a terminal is open in it" and "last thread
+ * archived 12d ago".
  */
 export function leftoverReason(wt: Pick<WorktreeView, "status" | "detached" | "managed" | "landed" | "cleanupReason">, o: ReasonInput): string {
   const st = wt.status;
@@ -101,11 +102,14 @@ export function leftoverReason(wt: Pick<WorktreeView, "status" | "detached" | "m
   if (stuck) parts.push(wt.managed === true && wt.cleanupReason ? wt.cleanupReason : st.error ? "git status failed" : st.operation ? `${st.operation} in progress` : "detached HEAD");
   else if (!baseRef) parts.push("no remote default branch to compare with");
   const n = uncommittedCount(st);
-  if (!stuck && baseRef && wt.landed !== true && ahead > 0) {
+  const unlanded = !stuck && baseRef !== "" && wt.landed !== true && ahead > 0;
+  if (unlanded) {
     const base = o.defaultBranch || baseRef.replace(/^[^/]+\//, "");
     parts.push(`${plural(ahead, "commit")} not on ${base}`);
   }
-  parts.push(n > 0 ? plural(n, "uncommitted file") : "clean");
+  // "clean" only when nothing else is said about its work.
+  if (n > 0) parts.push(plural(n, "uncommitted file"));
+  else if (!unlanded) parts.push("clean");
   if (wt.landed === true) parts.push(n > 0 ? "merged otherwise" : "merged");
   if (o.terminal) parts.push("a terminal is open in it");
   if (o.archivedAtMs !== null) parts.push(`last thread archived ${agoText(o.archivedAtMs, o.now)}`);

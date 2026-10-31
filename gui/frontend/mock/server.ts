@@ -86,6 +86,10 @@
  *   POST /__mock/worktree/merged?project=repo-cf&branch=cf/usage-polish[&path=…]   (a clean worktree whose
  *                                                 work is in origin/main: merged_clean, so project.worktree.cleanup removes
  *                                                 it; a path outside ~/.code-foundry/worktrees is never merged_clean)
+ *   POST /__mock/leftovers?project=repo-cf[&clean=1]   ("Worktrees without threads": cf/perf-spike with 3 commits
+ *                                                 not in origin/main, cf/old-copy with 4 uncommitted files (merged
+ *                                                 otherwise), each with an archived thread, and exp/shaders made outside
+ *                                                 the app; clean=1 adds cf/usage-polish, clean and merged: World.addLeftovers)
  *   POST /__mock/workspace?name=login&projects=repo-cf,repo-gp[&root=…&primary=…&instructions=CLAUDE.md&skills=a,b]
  *                                                 (a workspace: a saved project set; nothing on disk changes)
  *   POST /__mock/workspace-files?workspace=login[&instructions=AGENTS.md&skills=a,b&rootMissing=1]
@@ -296,7 +300,7 @@ function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
   if (err instanceof ConfirmNeeded) {
     return new ConnectError(err.message, Code.FailedPrecondition, undefined, [
-      { desc: ConfirmationRequiredSchema, value: { command: err.command, title: err.title, message: err.message, confirmLabel: err.confirmLabel } },
+      { desc: ConfirmationRequiredSchema, value: { command: err.command, title: err.title, message: err.message, confirmLabel: err.confirmLabel, args: err.args } },
     ]);
   }
   if (err instanceof SettingsValidation) {
@@ -1177,6 +1181,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, ok ? 200 : 404, { ok });
       break;
     }
+    case "POST /__mock/leftovers":
+      try {
+        json(res, 200, { paths: world.addLeftovers(q.get("project") ?? "repo-cf", q.get("clean") === "1") });
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/worktree/merged":
       try {
         const w = world.addMergedWorktree(q.get("project") ?? "", q.get("branch") ?? "", q.get("path") ?? "");

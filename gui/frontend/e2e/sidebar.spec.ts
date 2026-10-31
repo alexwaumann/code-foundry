@@ -236,7 +236,7 @@ test("the Projects view removes a workspace and offers project actions", async (
   await fix.hover();
   await fix.getByTestId("worktree-more").click();
   await page.getByTestId("worktree-remove").click();
-  await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
+  await page.getByTestId("remove-worktree-dialog").getByTestId("remove-worktree-ok").click();
   await expect(fix).toHaveCount(0);
   const rm = (await invocations()).filter((i) => i.name === "project.worktree.remove").at(-1);
   expect(rm?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: `${CF}.worktrees/fix-resize`, activeView: "projects" });
