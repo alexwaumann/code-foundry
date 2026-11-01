@@ -95,7 +95,7 @@ interface Column {
 
 // Flexible tracks with a floor, like the Pull Requests page's tables; the two tables share
 // them so their columns line up while all show.
-const TRACK = { name: "minmax(7rem,1.2fr)", activity: "minmax(8rem,1.4fr)", third: "minmax(9rem,1fr)", fourth: "minmax(9rem,1.2fr)", updated: "3rem" };
+const TRACK = { name: "minmax(7rem,1.2fr)", activity: "minmax(8rem,1.4fr)", third: "minmax(9rem,1fr)", fourth: "minmax(9rem,1.2fr)", updated: "4.5rem" };
 
 function projectColumns(c: IndexColumns): Column[] {
   return [
