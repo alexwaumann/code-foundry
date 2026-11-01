@@ -100,10 +100,6 @@ async function expectParent(page: Page): Promise<void> {
   await expect(threadPrompt(page)).toBeVisible();
 }
 
-/**
- * CommandService.Invoke as the CLI calls it: no window (no active view), the thread its
- * --id names as the context's thread. Expects it to succeed or fail.
- */
 test.beforeEach(async () => {
   await resetMock();
 });
