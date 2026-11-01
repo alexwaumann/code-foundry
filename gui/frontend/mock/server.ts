@@ -612,9 +612,11 @@ function routes(router: ConnectRouter): void {
   });
 
   // GitOpsService: the GUI runs git operations through the git.*/worktree.* commands
-  // (mock/gitops.ts); only the editor app list is a direct read.
+  // (mock/gitops.ts); only the editor app list and the app icons are direct reads.
   router.service(GitOpsService, {
     listEditorApps: () => ({ apps: EDITOR_APPS }),
+    // No real app artwork in the mock: every icon is absent, so views show their fallbacks.
+    listAppIcons: () => ({ icons: [] }),
   });
 
   router.service(UpdateService, {

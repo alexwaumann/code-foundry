@@ -5,6 +5,7 @@ package gitopstest
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +37,8 @@ type Fake struct {
 	Calls []string
 	// Apps is what EditorApps returns.
 	Apps []gitops.EditorApp
+	// Icons maps a bundle id to the PNG AppIcons returns for it; other ids are absent.
+	Icons map[string][]byte
 }
 
 var _ gitops.Store = (*Fake)(nil)
@@ -146,6 +149,21 @@ func (f *Fake) EditorApps(_ context.Context, refresh bool) []gitops.EditorApp {
 	}
 	f.Calls = append(f.Calls, call)
 	return append([]gitops.EditorApp(nil), f.Apps...)
+}
+
+// AppIcons implements gitops.Store: the requested ids Icons has. It records
+// "AppIcons <id>,<id>".
+func (f *Fake) AppIcons(_ context.Context, bundleIDs []string) map[string][]byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, "AppIcons "+strings.Join(bundleIDs, ","))
+	out := map[string][]byte{}
+	for _, id := range bundleIDs {
+		if png, ok := f.Icons[id]; ok {
+			out[id] = png
+		}
+	}
+	return out
 }
 
 // Reveal implements gitops.Store. It records "Reveal <worktree>", plus " <file>" with

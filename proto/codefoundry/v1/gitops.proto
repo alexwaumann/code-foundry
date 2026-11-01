@@ -38,6 +38,12 @@ service GitOpsService {
   // "Open in" menu offers. Detected on first use and cached; a settings change or
   // refresh detects again.
   rpc ListEditorApps(ListEditorAppsRequest) returns (ListEditorAppsResponse) {}
+  // ListAppIcons returns the icons of Finder (com.apple.finder) and the installed
+  // editor apps (EditorApp.bundle_id), read at runtime from the installed bundles (the
+  // Info.plist's CFBundleIconFile, rasterised with sips) and cached until the editors are
+  // detected again. Nothing is shipped: an unknown id, or an app whose icon cannot be
+  // read (an asset-catalog-only bundle), is simply absent from the response.
+  rpc ListAppIcons(ListAppIconsRequest) returns (ListAppIconsResponse) {}
   // Reveal shows the worktree (or file in it) in Finder (`open -R`).
   rpc Reveal(RevealRequest) returns (RevealResponse) {}
   // OpenUrl opens an http(s) URL in the default browser.
@@ -185,6 +191,23 @@ message EditorApp {
   string bundle_id = 2;
   // The .app found.
   string path = 3;
+}
+
+message ListAppIconsRequest {
+  // Bundle ids: com.apple.finder and EditorApp.bundle_id values.
+  repeated string bundle_ids = 1;
+}
+
+message ListAppIconsResponse {
+  // One per requested id that has an icon, in request order; missing icons are absent.
+  repeated AppIcon icons = 1;
+}
+
+// AppIcon is an installed app's icon.
+message AppIcon {
+  string bundle_id = 1;
+  // A 64x64 PNG.
+  bytes png = 2;
 }
 
 message OpenEditorResponse {

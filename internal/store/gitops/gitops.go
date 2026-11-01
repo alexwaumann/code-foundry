@@ -182,6 +182,10 @@ type Store interface {
 	// EditorApps lists the known editors installed as app bundles (cached; refresh
 	// detects again).
 	EditorApps(ctx context.Context, refresh bool) []EditorApp
+	// AppIcons returns the icons of Finder (FinderBundleID) and the detected editors by
+	// bundle id, as AppIconSize PNGs read from the installed bundles. An unknown id, or an
+	// app whose icon cannot be read, is absent.
+	AppIcons(ctx context.Context, bundleIDs []string) map[string][]byte
 	Reveal(ctx context.Context, o OpenOptions) (Op, error)
 	OpenURL(ctx context.Context, url string) (Op, error)
 	// GitHubSlug returns the GitHub "owner/name" of the registered project containing

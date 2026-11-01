@@ -106,6 +106,22 @@ func (h *GitOps) ListEditorApps(ctx context.Context, req *connect.Request[v1.Lis
 	return connect.NewResponse(out), nil
 }
 
+// ListAppIcons implements GitOpsServiceHandler: the icons the store has, in request
+// order, each id once.
+func (h *GitOps) ListAppIcons(ctx context.Context, req *connect.Request[v1.ListAppIconsRequest]) (*connect.Response[v1.ListAppIconsResponse], error) {
+	ids := req.Msg.GetBundleIds()
+	icons := h.store.AppIcons(ctx, ids)
+	out := &v1.ListAppIconsResponse{}
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if png := icons[id]; len(png) > 0 && !seen[id] {
+			seen[id] = true
+			out.Icons = append(out.Icons, &v1.AppIcon{BundleId: id, Png: png})
+		}
+	}
+	return connect.NewResponse(out), nil
+}
+
 // Reveal implements GitOpsServiceHandler.
 func (h *GitOps) Reveal(ctx context.Context, req *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error) {
 	op, err := h.store.Reveal(ctx, gitops.OpenOptions{WorktreePath: req.Msg.GetWorktreePath(), File: req.Msg.GetFile()})

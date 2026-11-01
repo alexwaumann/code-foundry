@@ -3,7 +3,6 @@ import { useShallow } from "zustand/react/shallow";
 import {
   Check,
   CircleAlert,
-  Code,
   Layers,
   LoaderCircle,
   OctagonX,
@@ -11,10 +10,11 @@ import {
   Plug,
   Plus,
   Save,
+  SquareArrowOutUpRight,
   SquareTerminal,
   Unlink,
 } from "lucide-react";
-import { FinderMark } from "@/components/icons/FinderMark";
+import { AppIcon, FinderIcon } from "@/components/icons/AppIcon";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { ACTION_ICON } from "@/components/actions/actionIcons";
 import {
@@ -474,7 +474,7 @@ function OpenInRow({ threadId }: { threadId: string }) {
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Row
-          icon={<FinderMark />}
+          icon={<FinderIcon />}
           chevron={open ? "open" : "closed"}
           onActivate={reveal}
           menuOnChevron
@@ -485,7 +485,7 @@ function OpenInRow({ threadId }: { threadId: string }) {
       </DropdownMenuTrigger>
       <RowMenu testId="ti-open-in-menu">
         <DropdownMenuItem onSelect={reveal} data-testid="ti-open-finder">
-          <FinderMark aria-hidden />
+          <FinderIcon aria-hidden />
           Finder
         </DropdownMenuItem>
         {editors.map((a) => (
@@ -501,7 +501,7 @@ function OpenInRow({ threadId }: { threadId: string }) {
               )
             }
           >
-            <Code aria-hidden />
+            <AppIcon bundleId={a.bundleId} fallback={SquareArrowOutUpRight} />
             {a.name}
           </DropdownMenuItem>
         ))}

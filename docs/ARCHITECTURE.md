@@ -302,7 +302,9 @@ Services (v1):
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
   Reveal, OpenUrl, List, Watch. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
-  the git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url commands.
+  the git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url commands, plus
+  two direct reads: ListEditorApps and ListAppIcons (Finder's and the editors' icons,
+  read from the installed bundles; `docs/notes/app-icons.md`).
 * `CommandService` — List(context) → available commands with their arg schemas; Invoke.
   A command that asks first fails Invoke with a `ConfirmationRequired` detail; clients ask
   and invoke again with `confirmed`. A confirmed command may ask a second time with

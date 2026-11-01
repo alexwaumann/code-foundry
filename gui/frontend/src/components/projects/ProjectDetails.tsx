@@ -2,7 +2,7 @@ import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 import { Copy, Pencil, Plus } from "lucide-react";
 import { ACTION_ICON } from "@/components/actions/actionIcons";
-import { FinderMark } from "@/components/icons/FinderMark";
+import { FinderIcon } from "@/components/icons/AppIcon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { copyText } from "@/lib/clipboard";
 import { useNow } from "@/lib/clock";
@@ -124,7 +124,7 @@ export function ProjectDetails({ projectId }: { projectId: string }) {
           <span>{tildify(path)}</span>
           <Dot />
           <LinkButton testId="details-reveal" onClick={() => void runCommand("worktree.reveal", { worktree: main }, worktreeContext(projectId, main))}>
-            <FinderMark aria-hidden />
+            <FinderIcon aria-hidden />
             Open in Finder
           </LinkButton>
           <Dot />

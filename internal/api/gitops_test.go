@@ -189,3 +189,40 @@ func TestGitOpEnumsMatchProto(t *testing.T) {
 		}
 	}
 }
+
+func TestGitOpsListAppIcons(t *testing.T) {
+	finder, code := []byte("\x89PNG finder"), []byte("\x89PNG code")
+	tests := []struct {
+		name string
+		ids  []string
+		want []string // bundle ids returned, in order
+	}{
+		{name: "nothing asked"},
+		{name: "request order, missing icons absent", ids: []string{"com.microsoft.VSCode", "dev.zed.Zed", "com.apple.finder"}, want: []string{"com.microsoft.VSCode", "com.apple.finder"}},
+		{name: "an id asked twice comes back once", ids: []string{"com.apple.finder", "com.apple.finder"}, want: []string{"com.apple.finder"}},
+		{name: "an empty icon is no icon", ids: []string{"com.example.empty"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c, _ := newGitOpsFixture(t)
+			fake.Icons = map[string][]byte{"com.apple.finder": finder, "com.microsoft.VSCode": code, "com.example.empty": {}}
+			res, err := c.ListAppIcons(context.Background(), connect.NewRequest(&v1.ListAppIconsRequest{BundleIds: tt.ids}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, ic := range res.Msg.GetIcons() {
+				got = append(got, ic.GetBundleId())
+				if want := fake.Icons[ic.GetBundleId()]; string(ic.GetPng()) != string(want) {
+					t.Errorf("%s png = %q, want %q", ic.GetBundleId(), ic.GetPng(), want)
+				}
+			}
+			if strings.Join(got, ",") != strings.Join(tt.want, ",") {
+				t.Errorf("icons = %v, want %v", got, tt.want)
+			}
+			if want := "AppIcons " + strings.Join(tt.ids, ","); len(fake.Calls) != 1 || fake.Calls[0] != want {
+				t.Errorf("calls = %q, want %q", fake.Calls, want)
+			}
+		})
+	}
+}

@@ -70,6 +70,7 @@ type Options struct {
 
 	editorEnv *editorEnv // tests
 	appEnv    *appEnv    // tests
+	iconEnv   *iconEnv   // tests
 }
 
 // Manager is the daemon's Store.
@@ -88,6 +89,7 @@ type Manager struct {
 	snap     atomic.Pointer[Snapshot]
 	bg       sync.WaitGroup // post-op refreshes
 	apps     editorApps     // EditorApps' cache
+	icons    appIcons       // AppIcons' cache
 }
 
 var _ Store = (*Manager)(nil)

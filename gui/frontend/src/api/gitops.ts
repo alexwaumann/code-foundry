@@ -106,6 +106,27 @@ export function toEditorAppView(a: EditorApp): EditorAppView {
   return { name: a.name, bundleId: a.bundleId, path: a.path };
 }
 
+/** Finder's bundle id: ListAppIcons always knows it. */
+export const FINDER_BUNDLE_ID = "com.apple.finder";
+
+/** A PNG's bytes as a data URL. */
+export function pngDataUrl(png: Uint8Array): string {
+  let bin = "";
+  // Chunked: String.fromCharCode takes its bytes as arguments.
+  for (let i = 0; i < png.length; i += 0x8000) bin += String.fromCharCode(...png.subarray(i, i + 0x8000));
+  return `data:image/png;base64,${btoa(bin)}`;
+}
+
+/**
+ * GitOpsService.ListAppIcons: Finder's and the installed editors' icons, read by the daemon
+ * from the app bundles, as bundle id → PNG data URL. An id without an icon is absent.
+ */
+export async function listAppIcons(bundleIds: readonly string[], conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<Map<string, string>> {
+  const c = await conn.client(GitOpsService);
+  const res = await c.listAppIcons({ bundleIds: [...bundleIds] }, { signal });
+  return new Map(res.icons.filter((i) => i.png.length > 0).map((i) => [i.bundleId, pngDataUrl(i.png)]));
+}
+
 /** GitOpsService.ListEditorApps: the installed editor apps, in the daemon's order (cached there; refresh detects again). */
 export async function listEditorApps(refresh = false, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<EditorAppView[]> {
   const c = await conn.client(GitOpsService);

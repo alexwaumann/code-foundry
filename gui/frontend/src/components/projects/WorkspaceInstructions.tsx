@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { FileText, Folder, Sparkles } from "lucide-react";
-import { FinderMark } from "@/components/icons/FinderMark";
+import { FinderIcon } from "@/components/icons/AppIcon";
 import { Tip } from "@/components/ui/tooltip";
 import { tildify } from "@/lib/path";
 import { threadLabel } from "@/lib/prompt";
@@ -132,7 +132,7 @@ function FolderInfoRow({ workspaceId }: { workspaceId: string }) {
       <span data-testid="workspace-folder-kind">{root ? "its root" : "kept by the app"}</span>
       <Dot />
       <LinkButton testId="workspace-folder-reveal" onClick={() => void revealWorkspace(workspaceId)}>
-        <FinderMark />
+        <FinderIcon />
         Open in Finder
       </LinkButton>
     </InfoRow>

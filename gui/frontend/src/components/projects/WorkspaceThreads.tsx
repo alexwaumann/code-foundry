@@ -1,7 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 import { ChevronRight, Copy, FileDiff } from "lucide-react";
-import { FinderMark } from "@/components/icons/FinderMark";
+import { FinderIcon } from "@/components/icons/AppIcon";
 import { RowList } from "@/components/prs/RowList";
 import { copyText } from "@/lib/clipboard";
 import { NavRow } from "@/lib/NavRow";
@@ -83,7 +83,7 @@ function RowMenu({ threadId, members }: { threadId: string; members: readonly st
   items.push(
     {
       label: "Open in Finder",
-      icon: FinderMark,
+      icon: FinderIcon,
       testId: "thread-menu-reveal",
       // The thread's own folder: its primary's checkout, else the workspace's folder.
       onSelect: () => {

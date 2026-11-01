@@ -251,7 +251,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Editor Apps",
-			Description:  "List the editors installed as apps (VS Code, Cursor, Zed, Windsurf, Sublime Text, JetBrains IDEs, Xcode) that `worktree open editor --app` opens with.",
+			Description:  "List the editors installed as apps (VS Code, Cursor, Zed, Devin, Sublime Text, JetBrains IDEs, Xcode) that `worktree open editor --app` opens with.",
 			Category:     "Worktree",
 			NoKeybinding: true,
 			Args:         []ArgSpec{{Name: "refresh", Type: Bool, Description: "Look for installed apps again instead of using the list found earlier"}},
