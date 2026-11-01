@@ -180,7 +180,10 @@ export function TimelineList<R extends ListRow>({
    * (`position: sticky`) that takes no height and no pointer events of its own: it never
    * moves, and a wheel over what it draws chains to the list natively (the thread info
    * card, docs/notes/thread-info-wheel-native.md). The box carries `--timeline-h`, the
-   * list's client height, for what it draws to fit in.
+   * list's client height, for what it draws to fit in, and `--timeline-sb`, the width its
+   * scrollbar takes (0 while the list does not scroll: WebKit's `scrollbar-gutter: stable`
+   * reserves nothing for a custom scrollbar), so what it draws over the list's right
+   * padding can keep a fixed distance from the pane's edge.
    */
   pinnedLayer?: ReactNode;
 }) {
@@ -343,8 +346,9 @@ export function TimelineList<R extends ListRow>({
       ro.disconnect();
     };
   }, [toBottom, restoreHeld, noteScroll]);
-  // The pinned layer's box knows the list's height (--timeline-h), set on the element so a
-  // resize re-renders nothing.
+  // The pinned layer's box knows the list's height (--timeline-h) and its scrollbar's width
+  // (--timeline-sb), set on the element so a resize re-renders nothing. The scrollbar
+  // appearing narrows the content box, so the observer sees it.
   const pinnedLayerShown = pinnedLayer != null;
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -352,6 +356,7 @@ export function TimelineList<R extends ListRow>({
     if (!pinnedLayerShown || !el || !box) return;
     const measure = () => {
       box.style.setProperty("--timeline-h", `${String(el.clientHeight)}px`);
+      box.style.setProperty("--timeline-sb", `${String(el.offsetWidth - el.clientWidth)}px`);
     };
     measure();
     const ro = new ResizeObserver(measure);

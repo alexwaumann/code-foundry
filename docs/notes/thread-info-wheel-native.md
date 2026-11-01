@@ -29,18 +29,21 @@ around one.
   `pointer-events: none`, `z-10`. It takes no height and never moves, so the rows'
   offsets (the virtualizer's `paddingStart`, every measurement) are as before.
 * **A wheel over the card is the browser's.** The aside (`thread-info`) is absolute at
-  the box's top right, `-right-(--ti-inset)`: over the scroller's right padding, 320px
-  wide (`--ti-card` less `--ti-gutter`), `py-3`, so the card sits exactly where it was
-  (12px from the pane's top and from its right edge, the scrollbar to its right). The
+  the box's top right, over the scroller's right padding, 320px wide (`--ti-card` less
+  `--ti-gutter`), `py-3`, so the card sits exactly where it was (12px from the pane's top
+  and from its right edge, the scrollbar to its right, and 12px right of the dock). Its
+  `right` is `--ti-gutter - --ti-inset - --timeline-sb`: see the gutter gotcha below. The
   aside stays `pointer-events-none` and the card `pointer-events-auto`, so the 12px
   strips above and below the card pass through as before. The aside is
   `max-h-(--timeline-h)` and `overflow-y-auto` with its scrollbar hidden: a card taller
   than the pane scrolls itself, and at its end a new gesture chains to the list (macOS
   latches a gesture to the scroller it started in; acceptable). A card shorter than the
   pane cannot scroll, so the wheel goes straight to the list by native chaining.
-* **`--timeline-h`**: the list's client height, set by TimelineList on the pinned box from
-  a ResizeObserver on the scroller (written to the element's style, so a resize renders
-  nothing). The box is inside the scroller, so the aside cannot size from the body any
+* **`--timeline-h` and `--timeline-sb`**: the list's client height and its scrollbar's
+  width (`offsetWidth - clientWidth`), set by TimelineList on the pinned box from a
+  ResizeObserver on the scroller (written to the element's style, so a resize renders
+  nothing; the scrollbar appearing narrows the content box, so the observer fires). The
+  box is inside the scroller, so the aside cannot size or place itself from the body any
   more.
 * **Input**: the scroller's `onWheel` is now reached by wheels over the card through the
   DOM, so `markInput` counts them as the reader's input and the list unpins on a wheel up
@@ -88,9 +91,22 @@ pane) is untouched and still scrolls only itself.
 
 ## Gotchas
 
-* Children of a scroller cannot paint over its scrollbar: the aside has to end at the
-  padding box (`-right-(--ti-inset)` from the content box), not at the body's edge as the
-  old aside did with `pr-3`. The card's box is the same either way.
+* Children of a scroller cannot paint over its scrollbar: the aside has to end inside the
+  padding box, not at the body's edge as the old aside did with `pr-3`.
+* **The padding box moves with the scrollbar.** `scrollbar-gutter: stable` reserves no
+  room for a custom `::-webkit-scrollbar` in WebKit: `offsetWidth - clientWidth` is 0
+  while the list does not scroll and 12 once it does. Placed from the padding box alone
+  (the first cut, `-right-(--ti-inset)`), a card over a conversation too short to scroll
+  sat at the pane's edge (0px gutter, 24px from the dock) and jumped 12px left when the
+  scrollbar came. Review caught it; `--timeline-sb` takes the scrollbar out, so the card
+  is 12px from the edge and from the dock either way. The dock and the rows' column are
+  placed from the body and from `--ti-inset`, so they never moved.
+* **A wheel that scrolls a tall card itself still counts as input to the list**: the
+  card is in the scroller's DOM, so `markInput` runs. It only widens the 400 ms window in
+  which a scroll of the list counts as the reader's; while pinned the list follows the
+  bottom anyway (a follow lands at the bottom, which pins). Telling "the card took this
+  wheel" apart needs a walk up from the target checking each box's scroll room, more than
+  the case is worth, so it is left as is.
 * The pinned box must stack over the rows (`z-10`): a sticky element paints before the
   later `.col`'s positioned rows otherwise.
 * Pass `undefined`, not `false`, for no layer: TimelineList decides by `!= null`.
@@ -102,7 +118,11 @@ pane) is untouched and still scrolls only itself.
   wheel under the card, a wheel over a short card unpins and stays up with Jump to bottom
   left of the card and returns on a wheel down, a tall card scrolls itself and not the
   list, a page's Expand leaves the card uncovered and usable.
-* New in it, on the mock's new `long` state (forty turns, `mock/thread.ts`): twelve
+* New in it: a conversation too short to scroll (scenario `single`) has no scrollbar and
+  the card 12px from the pane's edge and 12px right of the dock; a shorter window makes it
+  scroll, the scrollbar appears and the card does not move (fails on the first cut with
+  0 and 24). The long geometry case also checks the dock's 12px.
+* On the mock's new `long` state (forty turns, `mock/thread.ts`): twelve
   120px wheels over the card at a trackpad's pace move the list over 1000px up, and
   `elementsFromPoint` finds a mounted row under the list's top and bottom edges; the same
   after more wheels up and eight back down (short of the bottom). A wheel over the card's

@@ -645,6 +645,9 @@ test("the card lays over the conversation: the list and composer keep clear, the
   expect(log.x + log.width).toBeLessThanOrEqual(c.x);
   const composer = await box(page.getByTestId("composer-input"));
   expect(composer.x + composer.width).toBeLessThanOrEqual(c.x);
+  // The dock (the composer's column) ends 12px left of the card.
+  const dock = await box(page.locator('[data-testid="thread-pane-body"] .dock'));
+  expect(Math.abs(dock.x + dock.width + 12 - c.x)).toBeLessThan(1);
   // The card is shorter than the pane: a wheel under it reaches the list.
   expect(c.y + c.height + 100).toBeLessThan(body.y + body.height);
   const top = () => timeline.evaluate((el) => el.scrollTop);
@@ -652,6 +655,26 @@ test("the card lays over the conversation: the list and composer keep clear, the
   await wheelAt(page, c.x + c.width / 2, c.y + c.height + 60, -150);
   await expect.poll(top).toBeLessThan(before - 200);
   await expect(page.getByTestId("thread-jump-bottom")).toHaveAttribute("data-shown", "true");
+});
+
+test("a conversation too short to scroll: no scrollbar, and the card keeps 12px from the pane's edge and from the dock, as when it scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await openWithCard(page, "single");
+  const timeline = page.getByTestId("thread-timeline");
+  // Nothing to scroll: WebKit gives a custom scrollbar no room then, whatever scrollbar-gutter says.
+  expect(await timeline.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
+  expect(await timeline.evaluate((el) => (el as HTMLElement).offsetWidth - el.clientWidth)).toBe(0);
+  const gaps = async () => {
+    const [body, c, dock] = await Promise.all([box(page.getByTestId("thread-pane-body")), box(card(page)), box(page.locator('[data-testid="thread-pane-body"] .dock'))]);
+    return { edge: Math.round(body.x + body.width - (c.x + c.width)), dock: Math.round(c.x - (dock.x + dock.width)) };
+  };
+  expect(await gaps()).toEqual({ edge: 12, dock: 12 });
+  // The list grows taller than the pane (a shorter window): the scrollbar appears and the card does not move.
+  const before = await box(card(page));
+  await page.setViewportSize({ width: 1300, height: 420 });
+  await expect.poll(() => timeline.evaluate((el) => (el as HTMLElement).offsetWidth - el.clientWidth)).toBe(12);
+  expect(await gaps()).toEqual({ edge: 12, dock: 12 });
+  expect((await box(card(page))).x).toBe(before.x);
 });
 
 test("a wheel over a card shorter than the pane scrolls the conversation, which stays up", async ({ page }) => {
