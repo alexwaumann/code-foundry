@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { mockUrl, openApp, resetMock } from "./fixtures";
 
 /**
  * The Pull request surface's Code tab against the mock's three-file diff (mock/prDiff.ts):
@@ -110,34 +110,5 @@ test("the Code tab lists the files and renders the diff; split, file rows scroll
   }
 });
 
-test("the file list folds; the diff is read again when the head moves and on refresh", async ({ page }) => {
-  await openCode(page, 145);
-  await expect(page.getByTestId("pr-code-file")).toHaveCount(3);
-  await page.getByTestId("pr-code-files-toggle").click();
-  await expect(page.getByTestId("pr-code-files")).toHaveCount(0);
-  await page.getByTestId("pr-code-files-toggle").click();
-  await expect(page.getByTestId("pr-code-file")).toHaveCount(3);
-
-  const reads = (await ghCalls()).GetPullRequestDiff ?? 0;
-  await mockPost(`gh/pr-push?repo=${SLUG}&number=145&sha=${"c0de".padEnd(40, "0")}`);
-  await expect.poll(async () => (await ghCalls()).GetPullRequestDiff).toBe(reads + 1);
-
-  await page.getByTestId("pr-code-refresh").click();
-  await expect.poll(async () => (await ghCalls())["GetPullRequestDiff refresh"]).toBe(1);
-  await expect(page.getByTestId("pr-code-file")).toHaveCount(3);
-});
-
-test("a diff GitHub refuses as too large shows its message and the way to GitHub", async ({ page }) => {
-  await openCode(page, 140);
-  const notice = page.getByTestId("pr-code-too-large");
-  await expect(notice).toContainText("exceeded the maximum number of files");
-  await expect(page.getByTestId("pr-code-diff")).toHaveCount(0);
-  await notice.getByTestId("pr-code-too-large-open").click();
-  await expect
-    .poll(async () => {
-      const res = await fetch(`${mockUrl}/__mock/invocations`);
-      const all = (await res.json()) as { name: string; args: Record<string, string> }[];
-      return all.filter((i) => i.name === "view.open.url").at(-1)?.args.url;
-    })
-    .toBe(`https://github.com/${SLUG}/pull/140/files`);
-});
+// "the file list folds; the diff is read again when the head moves and on refresh" and "a diff GitHub
+// refuses as too large shows its message and the way to GitHub": src/components/pr/PrCode.test.tsx.
