@@ -67,6 +67,13 @@ service ProjectService {
   // <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
   // FailedPrecondition when the project is already a git repository.
   rpc InitGit(InitGitRequest) returns (InitGitResponse) {}
+  // Rename sets a project's display name (registration names it after its folder).
+  // Nothing on disk changes: the folder, worktree paths and branches stay. The name is
+  // trimmed and NFC-normalised; InvalidArgument for an empty one, one over 100 bytes or
+  // with a control character or "/", "workspace" (the primary keyword) or another
+  // project's id; FailedPrecondition when another project has the name (any case), as
+  // project refs resolve a name only when exactly one project has it.
+  rpc Rename(RenameProjectRequest) returns (RenameProjectResponse) {}
   // SearchGitHub searches github.com repositories with GitHub's search syntax and
   // returns the first 20 matches, best match first. The Add Project dialog sends it on
   // Enter, never per keystroke. InvalidArgument for an empty query.
@@ -390,6 +397,15 @@ message InitGitRequest {
 }
 
 message InitGitResponse {
+  Project project = 1;
+}
+
+message RenameProjectRequest {
+  string id = 1;
+  string name = 2;
+}
+
+message RenameProjectResponse {
   Project project = 1;
 }
 

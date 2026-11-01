@@ -304,6 +304,9 @@ type Store interface {
 	// and an empty "chore: initial commit") and refreshes it, returning the git project.
 	// ErrFailedPrecondition when it already is one.
 	InitGit(ctx context.Context, id string) (Project, error)
+	// Rename sets a project's display name (CheckName's rules) and publishes it. Nothing
+	// on disk changes. Renaming to the current name is a no-op.
+	Rename(ctx context.Context, id, name string) (Project, error)
 	// SetLiveWorktrees replaces the set of worktree paths that have a live thread (not
 	// archived, not snoozed). A project with one of them is polled and fetched on the
 	// live tier (activity.go); one that turns live is fetched now if its last fetch is

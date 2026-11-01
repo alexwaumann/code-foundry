@@ -83,8 +83,8 @@ type Options struct {
 	Now func() time.Time
 }
 
-// projectMeta is a project's metadata slot, written only by Register and the project's
-// reconcile job.
+// projectMeta is a project's metadata slot, written only by Register, the project's
+// reconcile job, and Rename (the name alone; rename.go).
 type projectMeta struct {
 	ID            string
 	Path          string
@@ -162,6 +162,8 @@ type Git struct {
 	// pubMu serializes snapshot rebuild + store + publish so events are ordered and
 	// each one reflects the snapshot current when it was published.
 	pubMu sync.Mutex
+	// renameMu serializes Rename's check of the other projects' names and its write.
+	renameMu sync.Mutex
 
 	fs      *fsWatcher
 	sched   *scheduler
@@ -1074,7 +1076,8 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	if next.Error == "" && next.Git {
 		stale = g.staleMadeLocked(id, seen, listedAt)
 	}
-	metaChanged := !next.equal(prev)
+	next.Name = renamedLocked(st, prev)
+	metaChanged := !next.equal(st.meta.Load())
 	if metaChanged {
 		st.meta.Store(&next)
 	}

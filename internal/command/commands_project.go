@@ -27,6 +27,7 @@ type ProjectBackend interface {
 	Refresh(context.Context, *connect.Request[v1.RefreshProjectRequest]) (*connect.Response[v1.RefreshProjectResponse], error)
 	List(context.Context, *connect.Request[v1.ListProjectsRequest]) (*connect.Response[v1.ListProjectsResponse], error)
 	InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error)
+	Rename(context.Context, *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error)
 }
 
 var (
@@ -63,7 +64,7 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 }
 
 // RegisterProject registers project.list, project.unregister, project.worktree.new, project.worktree.remove,
-// project.branch.delete, project.refresh and project.git.init. Adding a project is project.add
+// project.branch.delete, project.refresh, project.git.init and project.rename. Adding a project is project.add
 // (commands_project_add.go).
 func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
@@ -223,5 +224,6 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 		},
 		gitInitCommand(b, projectArg, notGit),
 		branchDeleteCommand(b, notGit),
+		renameCommand(b, projectArg),
 	)
 }

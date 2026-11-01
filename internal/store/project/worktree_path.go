@@ -12,10 +12,11 @@ import (
 // Where a new worktree goes, and what may stand in its way (fuzz findings git 3, 4).
 
 // worktreeKey is a project's directory under the worktree root: its GitHub slug, else
-// _local/<name> (defaultWorktreePath).
-func worktreeKey(slug, name string) string {
+// _local/<its folder's name> (defaultWorktreePath). The folder, not the project's name:
+// a rename (rename.go) must not move where its worktrees go.
+func worktreeKey(slug, mainPath string) string {
 	if slug == "" {
-		return localOwner + "/" + name
+		return localOwner + "/" + filepath.Base(mainPath)
 	}
 	return slug
 }
@@ -27,12 +28,12 @@ func worktreeKey(slug, name string) string {
 // directory, so its paths (a thread's recreate compares with them) never change.
 // slug is m's, read by the caller (m.GitHubSlug is empty until its first reconcile).
 func (g *Git) worktreeDirKey(m *projectMeta, slug string) string {
-	key := worktreeKey(slug, m.Name)
+	key := worktreeKey(slug, m.Path)
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	for _, st := range g.projects {
 		o := st.meta.Load()
-		if o.ID == m.ID || !o.Git || !strings.EqualFold(worktreeKey(o.GitHubSlug, o.Name), key) {
+		if o.ID == m.ID || !o.Git || !strings.EqualFold(worktreeKey(o.GitHubSlug, o.Path), key) {
 			continue
 		}
 		if o.RegisteredAt.Before(m.RegisteredAt) || (o.RegisteredAt.Equal(m.RegisteredAt) && o.ID < m.ID) {
