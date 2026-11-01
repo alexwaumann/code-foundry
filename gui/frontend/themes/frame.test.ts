@@ -9,7 +9,7 @@ import { frameCss, frameDefaultsJson, radii, typeRoles } from "./frame.ts";
 const indexCss = fs.readFileSync(PATHS.indexCss, "utf8");
 
 describe("frame stylesheet", () => {
-  // `pnpm run themes` regenerates both; a changed role, radius, alias or default theme fails here.
+  // `bun run themes` regenerates both; a changed role, radius, alias or default theme fails here.
   it("internal/theme/frame.css and frame-defaults.json match the generator", () => {
     expect(fs.readFileSync(PATHS.frameCss, "utf8")).toBe(frameCss(indexCss));
     expect(fs.readFileSync(PATHS.frameDefaults, "utf8")).toBe(frameDefaultsJson(buildCatalog(readInputs())));

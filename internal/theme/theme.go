@@ -2,7 +2,7 @@
 // (ids, names, schemes, the default of each scheme, and each theme's file), enough to
 // validate and list the appearance.theme_dark and appearance.theme_light settings, print
 // a theme and copy one. catalog.json is generated with the GUI's own catalog by
-// gui/frontend/themes/convert.ts (`pnpm run themes`) and committed; its drift test covers
+// gui/frontend/themes/convert.ts (`bun run themes`) and committed; its drift test covers
 // this copy too. Never edit it by hand. The user's own themes are files in the themes
 // directory (store/usertheme, file.go); a Set is both (set.go). The colours are resolved
 // only in the GUI (docs/notes/theme-slots-1-engine.md); the daemon keeps the GUI's

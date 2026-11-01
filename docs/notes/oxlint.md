@@ -1,6 +1,6 @@
 # Frontend lint: ESLint replaced by oxlint
 
-`pnpm run lint` in `gui/frontend` is now `oxlint --type-aware --deny-warnings`, configured by
+`bun run lint` in `gui/frontend` is now `oxlint --type-aware --deny-warnings`, configured by
 `.oxlintrc.json`. ESLint, typescript-eslint and the two React plugins are gone from
 `package.json`.
 
@@ -55,7 +55,7 @@ oxlint's implementations are stricter in five places ESLint let pass. Each got a
   does not fall back to a global one and fails fast with a clear message if it is missing.
 * `--deny-warnings` is the `--max-warnings 0` equivalent. The two `react/*` rules ESLint shipped as
   warnings (`exhaustive-deps`, `incompatible-library`) stay warnings and still fail the run.
-* `pnpm dlx oxlint` cannot find tsgolint and `pnpm dlx` eats `-p`; run the installed binaries.
+* A one-off `oxlint` from a package runner cannot find tsgolint; run the installed binaries.
 
 ## Not done here
 

@@ -1,8 +1,8 @@
 /**
  * Mock code-foundry daemon for frontend development and e2e tests.
  *
- *   pnpm run mock            # http://127.0.0.1:7788, token "dev-mock-token"
- *   MOCK_PORT=7799 MOCK_TOKEN=secret pnpm run mock
+ *   bun run mock            # http://127.0.0.1:7788, token "dev-mock-token"
+ *   MOCK_PORT=7799 MOCK_TOKEN=secret bun run mock
  *
  * Serves Health, Terminal, Project, Filesystem, Thread, Command, Ui, Action and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and

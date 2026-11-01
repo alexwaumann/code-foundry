@@ -56,15 +56,18 @@ jobs:
 
       - uses: ./.github/actions/setup-go-ghostty
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 12.8.1
+          bun-version: 1.4.4
 
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: gui/frontend/pnpm-lock.yaml
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('gui/frontend/bun.lock') }}
 
       # wails3 builds the GUI bundle. Built with the module's toolchain (go1.26), which
       # setup-go put on PATH via the go.mod toolchain directive.

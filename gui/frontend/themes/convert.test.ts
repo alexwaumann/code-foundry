@@ -10,7 +10,7 @@ import { buildCatalog, catalogJson, ghosttyBase, goCatalogJson, parseGhostty, PA
 const inputs = readInputs();
 
 describe("generated files", () => {
-  // `pnpm run themes` regenerates both; a hand edit or a changed input fails here.
+  // `bun run themes` regenerates both; a hand edit or a changed input fails here.
   it("catalog.json and the daemon's catalog match the converter's output", () => {
     const catalog = buildCatalog(inputs);
     expect(fs.readFileSync(PATHS.catalog, "utf8")).toBe(catalogJson(catalog));

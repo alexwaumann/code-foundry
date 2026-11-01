@@ -3,7 +3,7 @@
  * id, hex, the scheme against the surface, override names), then every contrast pair of
  * src/themes/contrastPairs.ts on the resolved slots. A file may hold one theme or an array.
  *
- *   pnpm run themes:check path/to/theme.json [more.json …]
+ *   bun run themes:check path/to/theme.json [more.json …]
  *
  * Exits 1 when a file is refused or a pair falls short. A file is read as a user theme (the
  * daemon's rules: `source` optional, `from` and `created_by` checked); nothing is installed.
@@ -36,7 +36,7 @@ export function checkThemeJson(json: unknown): { ok: boolean; lines: string[] } 
 function main(): void {
   const files = process.argv.slice(2);
   if (files.length === 0) {
-    console.error("usage: pnpm run themes:check <theme.json> [...]");
+    console.error("usage: bun run themes:check <theme.json> [...]");
     process.exit(2);
   }
   let ok = true;
