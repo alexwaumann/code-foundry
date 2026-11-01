@@ -22,7 +22,7 @@ async function openThread(page: Page, state: State, scheme: "dark" | "light" = "
   await row(page, "s:s-r1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await expect(page.getByTestId("thread-timeline").locator("[data-row-type]").first()).toBeVisible();
-  await leaveSidebar(page, page.getByTestId("thread-pane"));
+  await leaveSidebar(page, editor(page));
 }
 
 async function calls(): Promise<string[]> {
