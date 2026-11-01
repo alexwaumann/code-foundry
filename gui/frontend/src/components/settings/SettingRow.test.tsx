@@ -8,6 +8,7 @@ const save = vi.hoisted(() => ({ fn: vi.fn(() => Promise.resolve({ ok: true as c
 vi.mock("@/stores/settings", async (orig) => ({ ...(await orig<typeof import("@/stores/settings")>()), saveSettings: save.fn }));
 
 const { SettingRow } = await import("./SettingRow");
+const { BrowseThemesRow } = await import("./LinkRow");
 const { useSettingsStore } = await import("@/stores/settings");
 const { useViewsStore } = await import("@/stores/views");
 const { useThemePickerStore } = await import("@/stores/themePicker");
@@ -106,6 +107,8 @@ describe("SettingRow editors", () => {
     useViewsStore.setState({ settingsOpen: true, themesOpen: false });
     render(<SettingRow field={dark} />);
     const trigger = screen.getByRole("combobox", { name: "Dark theme" });
+    // The name whole: no " (default)" beside the Choose… button.
+    expect(trigger.textContent).toBe("GitHub Dark");
     fireEvent.keyDown(trigger, { key: "Enter" });
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["GitHub Dark", "Dracula"]);
     fireEvent.click(screen.getByRole("option", { name: "Dracula" }));
@@ -113,6 +116,15 @@ describe("SettingRow editors", () => {
     fireEvent.click(screen.getByTestId("choose-theme-dark"));
     expect(useViewsStore.getState()).toMatchObject({ themesOpen: true, settingsOpen: false });
     expect(useThemePickerStore.getState().slot).toBe("dark");
+    useViewsStore.setState({ themesOpen: false });
+  });
+
+  it("Browse themes opens the Themes page on the scheme in use, coming back to Settings", () => {
+    useViewsStore.setState({ settingsOpen: true, themesOpen: false });
+    render(<BrowseThemesRow />);
+    fireEvent.click(screen.getByTestId("settings-themes-link"));
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: true, settingsOpen: false });
+    expect(useThemePickerStore.getState()).toMatchObject({ slot: "dark", returnTo: "settings" });
     useViewsStore.setState({ themesOpen: false });
   });
 });

@@ -435,6 +435,14 @@ describe("the list", { timeout: 30_000 }, () => {
     await waitFor(() => {
       expect(updateSettings).toHaveBeenCalledWith({ "appearance.theme": "light" });
     });
+    // The saved preference arrives back as a snapshot: the slot in use follows.
+    act(() => {
+      setThemePreference("light");
+      useSettingsStore.setState((st) => ({ snapshot: { values: { ...st.snapshot?.values, "appearance.theme": "light" }, path: "", revision: (st.snapshot?.revision ?? 0) + 1, loadError: "", issues: [], restartPending: [] } }));
+    });
+    expect(screen.getByTestId("themes-slot-light").textContent).toContain("in use");
+    expect(screen.getByTestId("themes-slot-dark").textContent).not.toContain("in use");
+    expect(screen.getByTestId("themes-scheme-note").textContent).toBe("Always light, showing GitHub Light");
   });
 });
 
