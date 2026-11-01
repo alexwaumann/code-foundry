@@ -12,7 +12,7 @@ import { LineageGroup } from "./LineageGroup";
  */
 
 const thread = (id: string, o: Partial<ThreadView> = {}) =>
-  ({ id, name: id, state: "connected", status: "idle", statusReason: "", createdBy: "", inSidebar: null, archivedAtMs: null, snoozedUntilMs: null, flags: [], backgroundAgentsRunning: 0, createdAtMs: null, ...o }) as unknown as ThreadView;
+  ({ id, name: id, state: "connected", status: "idle", statusReason: "", createdBy: "", archivedAtMs: null, snoozedUntilMs: null, flags: [], backgroundAgentsRunning: 0, createdAtMs: null, ...o }) as unknown as ThreadView;
 
 function put(threads: ThreadView[]): void {
   useThreadsStore.setState({ byId: Object.fromEntries(threads.map((t) => [t.id, t])), order: threads.map((t) => t.id) });
@@ -62,8 +62,8 @@ describe("LineageGroup's label", () => {
   it("hidden children count: one working, one asking; a waiting one stays live", () => {
     put([
       thread("parent"),
-      thread("e2e", { createdBy: "parent", status: "busy", inSidebar: false }),
-      thread("cookie", { createdBy: "parent", status: "attention", statusReason: "permission: Bash rm -rf cookies", inSidebar: false }),
+      thread("e2e", { createdBy: "parent", status: "busy" }),
+      thread("cookie", { createdBy: "parent", status: "attention", statusReason: "permission: Bash rm -rf cookies" }),
       thread("old", { createdBy: "parent", status: "attention", statusReason: "error: overloaded" }),
       thread("gone", { createdBy: "parent", status: "busy", archivedAtMs: 1 }),
     ]);
