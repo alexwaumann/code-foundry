@@ -214,6 +214,16 @@ export function row(page: Page, key: string) {
   return page.locator(`[data-row-key="${key}"]`);
 }
 
+/**
+ * Moves the pointer onto `target` and waits for the sidebar row's hover card to close. After a
+ * row click the card outlives the pointer for a moment, and while it is up it takes the first
+ * Escape (Tip's Escape rule), so a test about Escape in the pane would race it.
+ */
+export async function leaveSidebar(page: Page, target: Locator): Promise<void> {
+  await target.hover();
+  await expect(page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])')).toHaveCount(0);
+}
+
 /** How many threads need the user, as the window title says ("Code Foundry (2)"); Ember is not counted there. */
 export async function expectAttention(page: Page, count: number): Promise<void> {
   await expect(page).toHaveTitle(count > 0 ? `Code Foundry (${String(count)})` : "Code Foundry");

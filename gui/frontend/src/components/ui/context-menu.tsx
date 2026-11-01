@@ -2,6 +2,7 @@ import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 import { ChevronRightIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { itemLeaveWhileClosing } from "@/components/ui/menuItemLeave"
 import { useZoomFactor, zoomPx } from "@/lib/zoom"
 
 const contentClass =
@@ -28,8 +29,8 @@ function ContextMenuContent({ className, alignOffset, collisionPadding, ...props
   )
 }
 
-function ContextMenuItem({ className, variant = "default", ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Item> & { variant?: "default" | "destructive" }) {
-  return <ContextMenuPrimitive.Item data-slot="context-menu-item" data-variant={variant} className={cn(itemClass, className)} {...props} />
+function ContextMenuItem({ className, variant = "default", onPointerLeave, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Item> & { variant?: "default" | "destructive" }) {
+  return <ContextMenuPrimitive.Item data-slot="context-menu-item" data-variant={variant} className={cn(itemClass, className)} onPointerLeave={itemLeaveWhileClosing(onPointerLeave)} {...props} />
 }
 
 function ContextMenuSub({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Sub>) {

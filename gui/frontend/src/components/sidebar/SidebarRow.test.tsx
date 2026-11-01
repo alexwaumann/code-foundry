@@ -108,10 +108,17 @@ describe("SidebarRow three lines", () => {
     ["waiting: the same", { status: "idle", statusReason: "waiting on 1 child thread", statusChangedAtMs: NOW - 5 * MIN }, "Waiting 5m"],
     ["under a minute: seconds", { status: "busy", statusChangedAtMs: NOW - 4_000 }, "Working 4s"],
   ])("%s", (_name, o, text) => {
-    renderRow(o);
-    expect(screen.getByTestId("row-status").textContent).toBe(text);
-    // Same tone as the word: the time inherits the status span's colour.
-    expect(screen.getByTestId("row-time").className).not.toContain("text-cf-sidebar-muted-foreground");
+    // The clock held at NOW: under load a real second passes between loading the file and
+    // rendering, and the seconds case read "5s".
+    vi.useFakeTimers({ now: NOW });
+    try {
+      renderRow(o);
+      expect(screen.getByTestId("row-status").textContent).toBe(text);
+      // Same tone as the word: the time inherits the status span's colour.
+      expect(screen.getByTestId("row-time").className).not.toContain("text-cf-sidebar-muted-foreground");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each<[string, Partial<ThreadView>]>([

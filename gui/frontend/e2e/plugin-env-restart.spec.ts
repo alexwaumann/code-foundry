@@ -28,6 +28,9 @@ test("an idle stale thread: the card's project row says so; Restart Claude resta
   let menu = await titleMenu(page);
   await expect(menu.getByTestId("menu-restart")).toHaveCount(0);
   await page.keyboard.press("Escape");
+  // Let the menu finish closing: a click on the title while it still animates out (focus
+  // inside it) does not reopen it.
+  await expect(menu).toHaveCount(0);
 
   const dot = page.getByTestId("thread-header").getByTestId("thread-title-stale");
   await expect(dot).toHaveCount(0);
