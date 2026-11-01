@@ -85,6 +85,12 @@ Shortened to their browser part:
 * plugins: Settings → Plugins opening a surface across routes; the layout strips' geometry and
   CSS; the runs tab's focus, pane height and wide geometry.
 
+The 16 shortened tests took 57 s in the audit's rows and 26 s in the final run. The rows were
+measured on the dev server before #467 and the final run is on the bundled build, so part of
+that drop is #467's.
+
+The final run of every touched spec (2 workers): 89 passed, 4 skipped (SHOTS), 91 s.
+
 Kept:
 
 * bridge "the lightbox's copy of a page has its thread's bridge": the lightbox frame's own
