@@ -83,20 +83,24 @@ test("Save as workspace: the name takes the keyboard as the menu closes", async 
   await expect(page.getByTestId("save-workspace-name")).toBeFocused();
 });
 
-// The like composer's read-only set, mode, banner, primary and thread.new-like: ComposerSets.test.tsx.
-// Here the palette's entry, the prompt's focus and Escape back to the thread (the keymap).
-test("New thread on this branch from the palette takes the prompt; Escape goes back to the thread", async ({ page }) => {
+// The like composer's read-only set, mode, banner, primary and thread.new-like, the title and row
+// menus' items: ComposerSets.test.tsx. Here Escape back to the thread and the palette's entry taking the prompt.
+test("New thread on this branch: Escape goes back to the thread; from the palette it takes the prompt", async ({ page }) => {
   const t = (await mockPost("set-thread?projects=repo-cf&name=Solo")) as ThreadSummary;
   await openApp(page);
   await row(page, `s:${t.id}`).click();
+  await page.getByTestId("thread-title").click();
+  await page.getByTestId("menu-new-like").click();
+  await expect(page.getByTestId("composer")).toHaveAttribute("data-like", t.id);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("composer")).toHaveCount(0);
+  await expect(row(page, `s:${t.id}`)).toHaveAttribute("aria-selected", "true");
+
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("New thread on this branch");
   await page.getByTestId("palette").getByRole("option", { name: /New thread on this branch/ }).first().click();
   await expect(page.getByTestId("composer")).toHaveAttribute("data-like", t.id);
   await expect(page.getByTestId("composer-input")).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("composer")).toHaveCount(0);
-  await expect(row(page, `s:${t.id}`)).toHaveAttribute("aria-selected", "true");
 });
 
 /** SHOTS=<dir>: the PR's screenshots, WebKit, 1440x900, dark and light. */
