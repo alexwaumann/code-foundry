@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { componentValues, resolveSlots, type ThemeFile } from "../src/themes/slots";
-import { mockUrl, openApp, resetMock } from "./fixtures";
+import { openApp, resetMock } from "./fixtures";
 
 // The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). The mock starts on the
 // defaults: scheme system (the browser is dark, playwright.config), GitHub Dark and Light.
@@ -21,11 +21,6 @@ const themesFor = (scheme: "dark" | "light") => catalog.filter((t) => t.scheme =
 test.beforeEach(async () => {
   await resetMock();
 });
-
-async function raw(key: string): Promise<string | undefined> {
-  const res = await fetch(`${mockUrl}/__mock/settings`);
-  return ((await res.json()) as { raw: Record<string, string> }).raw[key];
-}
 
 const page$ = (page: Page) => page.getByTestId("themes-page");
 const scope = (page: Page) => page.getByTestId("theme-scope");

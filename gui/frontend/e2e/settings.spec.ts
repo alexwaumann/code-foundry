@@ -46,13 +46,6 @@ function listbox(page: Page) {
   return page.locator('[data-slot="select-content"]');
 }
 
-/** Picks an enum setting's option by its label. */
-async function pick(page: Page, key: string, label: string) {
-  await select(page, key).click();
-  await listbox(page).getByRole("option", { name: label, exact: true }).click();
-  await expect(listbox(page)).toHaveCount(0);
-}
-
 /** Shows a page of the settings page from its left nav. */
 async function goTo(page: Page, id: string) {
   await page.getByTestId(`settings-nav-${id}`).click();

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockUrl, openApp, resetMock } from "./fixtures";
+import { openApp, resetMock } from "./fixtures";
 
 // The user's own themes on the Themes page (docs/notes/user-themes.md). The mock seeds three
 // (mock/userThemes.ts): Ocean Dusk (dark, from Catppuccin Mocha, by thread s-1), Mocha,
@@ -10,12 +10,6 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-async function raw(key: string): Promise<string | undefined> {
-  const res = await fetch(`${mockUrl}/__mock/settings`);
-  return ((await res.json()) as { raw: Record<string, string> }).raw[key];
-}
-
-const yours = (page: Page) => page.getByTestId("themes-yours");
 const option = (page: Page, name: string) => page.getByTestId("themes-list").getByRole("option", { name, exact: true });
 
 async function openThemes(page: Page, slot: "dark" | "light" = "dark") {

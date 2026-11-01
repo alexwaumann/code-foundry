@@ -11,7 +11,6 @@ test.beforeEach(async () => {
 
 const option = (page: Page, name: string) => page.getByTestId("themes-list").getByRole("option", { name, exact: true });
 const inspector = (page: Page) => page.getByTestId("theme-inspector");
-const focusedTestId = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.tagName ?? "");
 
 async function openThemes(page: Page) {
   await openApp(page);
