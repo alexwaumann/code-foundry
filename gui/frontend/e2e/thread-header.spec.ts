@@ -79,7 +79,7 @@ test("the title menu: the sidebar row's items; Pin pins the thread", async ({ pa
   // The sidebar row's context menu starts with the same items.
   await row(page, `s:${id}`).click({ button: "right" });
   await expect(page.getByTestId("row-menu").getByRole("menuitem").first()).toHaveText("Rename");
-  await expect(page.getByTestId("row-menu").getByRole("menuitem")).toHaveText(["Rename", "Regenerate name", "Unpin", "Snooze", "New thread on this branch", "Archive", "New terminal here", "Fork", "Remove…"]);
+  await expect(page.getByTestId("row-menu").getByRole("menuitem")).toHaveText(["Rename", "Regenerate name", "Unpin", "Snooze", "New thread on this branch", "Archive", "New terminal here", "Fork", "Remove"]);
 });
 
 test("the side panel's + lists none of the removed surfaces", async ({ page }) => {

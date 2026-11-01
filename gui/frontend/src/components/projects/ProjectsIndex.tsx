@@ -38,17 +38,24 @@ import { openAddProject, type AddProjectTab } from "@/stores/addProject";
 import { branchKey, branchPullRequestsResource, openUrl, repoActivityResource } from "@/stores/gh";
 import { addProject, initGitIn, publishProject } from "@/stores/projectActions";
 import { useProjectsStore } from "@/stores/projects";
+import { endProjectRename, useProjectRenameStore } from "@/stores/projectRename";
 import { useResource } from "@/stores/resource";
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
 import { projectPage, useUiStore, workspacePage } from "@/stores/ui";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { endWorkspaceRename, useWorkspaceRenameStore } from "@/stores/workspaceRename";
 import { KindIcon, Pill, StatusDot, WorkspaceIcon } from "./bits";
 import { usePageScroll } from "./pageHooks";
 import { useProjectKind } from "@/components/icons/projectKind";
+import { projectMenu, workspaceMenu } from "./menus";
+import { ProjectNameEditor } from "./ProjectNameEditor";
+import { RowContextMenu } from "./RowContextMenu";
 import { useCleanableCount } from "./useCleanable";
 import { useProjectLastMs, useProjectOrder, useWorkspaceLastMs, useWorkspaceOrder } from "./useOrder";
+import { useWorkspaceTerminal } from "./workspaceHooks";
+import { WorkspaceNameEditor } from "./WorkspaceNameEditor";
 
 const SEP = "\u0001";
 
@@ -209,68 +216,78 @@ function ProjectRow({ id, columns, cols }: { id: string; columns: IndexColumns; 
   const last = useProjectLastMs(id);
   const prs = useOpenPullRequests(id);
   const tidy = useCleanableCount(id);
+  const hasRemote = useProjectsStore((s) => (s.byId[id]?.remotes.length ?? 0) > 0);
+  const renaming = useProjectRenameStore((s) => s.renamingProjectId === id);
+  // The row going (the index left, filtered out) closes its editor (the field's blur has renamed by then).
+  useEffect(() => () => { endProjectRename(id); }, [id]);
   const sentence = projectStatusSentence({ working, checkouts, git: kind !== "nogit" });
   return (
-    <NavRow navKey={projectKey(id)} activateOnClick className={ROW}>
-      <span className={ROW_INNER} style={{ gridTemplateColumns: cols }} data-testid="index-project" data-project={id} data-kind={kind}>
-        <span className="flex min-w-0 items-center gap-3">
-          <KindIcon kind={kind} />
-          <span className="truncate font-medium" data-testid="project-name">
-            {name}
+    <RowContextMenu navKey={projectKey(id)} testId="project-row-menu" items={() => projectMenu(id, { kind, step, cleanup: kind !== "nogit" && hasRemote ? tidy : null })}>
+      <NavRow navKey={projectKey(id)} activateOnClick className={ROW}>
+        <span className={ROW_INNER} style={{ gridTemplateColumns: cols }} data-testid="index-project" data-project={id} data-kind={kind}>
+          <span className="flex min-w-0 items-center gap-3">
+            <KindIcon kind={kind} />
+            {renaming ? (
+              <ProjectNameEditor projectId={id} name={name} onDone={() => { endProjectRename(id); }} />
+            ) : (
+              <span className="truncate font-medium" data-testid="project-name">
+                {name}
+              </span>
+            )}
           </span>
-        </span>
-        {columns.activity && (
-          <span className="flex min-w-0 items-center gap-2 text-body-sm text-cf-text-secondary" data-testid="project-status">
-            <StatusDot live={working > 0} />
-            <span className="truncate">{sentence}</span>
+          {columns.activity && (
+            <span className="flex min-w-0 items-center gap-2 text-body-sm text-cf-text-secondary" data-testid="project-status">
+              <StatusDot live={working > 0} />
+              <span className="truncate">{sentence}</span>
+            </span>
+          )}
+          {columns.branch && <DefaultBranch projectId={id} />}
+          <span className="flex min-w-0 items-center gap-1.5 overflow-hidden" data-testid="index-look">
+            {prs > 0 && (
+              <Pill tone="success" data-testid="index-prs">
+                <GitPullRequest aria-hidden />
+                {prCountLabel(prs)}
+              </Pill>
+            )}
+            {tidy > 0 && (
+              <Pill tone="warning" data-testid="index-tidy">
+                <Broom aria-hidden />
+                {tidyLabel(tidy)}
+              </Pill>
+            )}
+            {step === "publish" && (
+              <button
+                type="button"
+                tabIndex={-1}
+                className="shrink-0 truncate text-caption text-cf-link hover:underline"
+                data-testid="index-publish"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  publishProject(id);
+                }}
+              >
+                Publish to GitHub
+              </button>
+            )}
+            {step === "init" && (
+              <button
+                type="button"
+                tabIndex={-1}
+                className="shrink-0 truncate text-caption text-cf-link hover:underline"
+                data-testid="index-init-git"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void initGitIn(id);
+                }}
+              >
+                Initialize git
+              </button>
+            )}
           </span>
-        )}
-        {columns.branch && <DefaultBranch projectId={id} />}
-        <span className="flex min-w-0 items-center gap-1.5 overflow-hidden" data-testid="index-look">
-          {prs > 0 && (
-            <Pill tone="success" data-testid="index-prs">
-              <GitPullRequest aria-hidden />
-              {prCountLabel(prs)}
-            </Pill>
-          )}
-          {tidy > 0 && (
-            <Pill tone="warning" data-testid="index-tidy">
-              <Broom aria-hidden />
-              {tidyLabel(tidy)}
-            </Pill>
-          )}
-          {step === "publish" && (
-            <button
-              type="button"
-              tabIndex={-1}
-              className="shrink-0 truncate text-caption text-cf-link hover:underline"
-              data-testid="index-publish"
-              onClick={(e) => {
-                e.stopPropagation();
-                publishProject(id);
-              }}
-            >
-              Publish to GitHub
-            </button>
-          )}
-          {step === "init" && (
-            <button
-              type="button"
-              tabIndex={-1}
-              className="shrink-0 truncate text-caption text-cf-link hover:underline"
-              data-testid="index-init-git"
-              onClick={(e) => {
-                e.stopPropagation();
-                void initGitIn(id);
-              }}
-            >
-              Initialize git
-            </button>
-          )}
+          {columns.updated && <AgeCell ms={last} />}
         </span>
-        {columns.updated && <AgeCell ms={last} />}
-      </span>
-    </NavRow>
+      </NavRow>
+    </RowContextMenu>
   );
 }
 
@@ -285,32 +302,41 @@ function WorkspaceRow({ id, columns, cols }: { id: string; columns: IndexColumns
   const working = useThreadsStore((s) => workspaceActivity(s, id).working);
   const branches = useThreadsStore(useShallow((s) => workspaceWorkingBranches(s, id)));
   const last = useWorkspaceLastMs(id);
+  const terminal = useWorkspaceTerminal(id);
+  const renaming = useWorkspaceRenameStore((s) => s.renamingWorkspaceId === id);
+  useEffect(() => () => { endWorkspaceRename(id); }, [id]);
   return (
-    <NavRow navKey={workspaceKey(id)} activateOnClick className={ROW}>
-      <span className={ROW_INNER} style={{ gridTemplateColumns: cols }} data-testid="index-workspace" data-workspace={id}>
-        <span className="flex min-w-0 items-center gap-3">
-          <WorkspaceIcon />
-          <span className="truncate font-medium" data-testid="workspace-name">
-            {name}
+    <RowContextMenu navKey={workspaceKey(id)} testId="workspace-row-menu" items={() => workspaceMenu(id, { folder: terminal })}>
+      <NavRow navKey={workspaceKey(id)} activateOnClick className={ROW}>
+        <span className={ROW_INNER} style={{ gridTemplateColumns: cols }} data-testid="index-workspace" data-workspace={id}>
+          <span className="flex min-w-0 items-center gap-3">
+            <WorkspaceIcon />
+            {renaming ? (
+              <WorkspaceNameEditor workspaceId={id} name={name} onDone={() => { endWorkspaceRename(id); }} />
+            ) : (
+              <span className="truncate font-medium" data-testid="workspace-name">
+                {name}
+              </span>
+            )}
           </span>
+          {columns.activity && (
+            <span className="flex min-w-0 items-center gap-2 text-body-sm text-cf-text-secondary" data-testid="workspace-status">
+              <StatusDot live={working > 0} />
+              <span className="truncate">{workspaceStatusSentence(working, branches)}</span>
+            </span>
+          )}
+          <span className="truncate text-body-sm text-cf-text-secondary" data-testid="workspace-projects">
+            {[...members].sort((a, b) => a.localeCompare(b)).join(" + ")}
+          </span>
+          {columns.branch && (
+            <span className="truncate text-caption text-cf-text-muted" data-testid="workspace-contents">
+              {contents}
+            </span>
+          )}
+          {columns.updated && <AgeCell ms={last} />}
         </span>
-        {columns.activity && (
-          <span className="flex min-w-0 items-center gap-2 text-body-sm text-cf-text-secondary" data-testid="workspace-status">
-            <StatusDot live={working > 0} />
-            <span className="truncate">{workspaceStatusSentence(working, branches)}</span>
-          </span>
-        )}
-        <span className="truncate text-body-sm text-cf-text-secondary" data-testid="workspace-projects">
-          {[...members].sort((a, b) => a.localeCompare(b)).join(" + ")}
-        </span>
-        {columns.branch && (
-          <span className="truncate text-caption text-cf-text-muted" data-testid="workspace-contents">
-            {contents}
-          </span>
-        )}
-        {columns.updated && <AgeCell ms={last} />}
-      </span>
-    </NavRow>
+      </NavRow>
+    </RowContextMenu>
   );
 }
 

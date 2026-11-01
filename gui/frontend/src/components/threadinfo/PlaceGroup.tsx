@@ -9,9 +9,7 @@ import {
   Play,
   Plug,
   Plus,
-  Save,
   SquareArrowOutUpRight,
-  SquareTerminal,
   Unlink,
 } from "lucide-react";
 import { AppIcon, FinderIcon } from "@/components/icons/AppIcon";
@@ -399,7 +397,6 @@ function ProjectRow({ threadId }: { threadId: string }) {
               });
             }}
           >
-            <Plus aria-hidden />
             Add project
           </DropdownMenuItem>
           {!named && members.length > 1 && matching && (
@@ -410,7 +407,6 @@ function ProjectRow({ threadId }: { threadId: string }) {
                 void followWorkspace(threadId, matching.id);
               }}
             >
-              <Layers aria-hidden />
               <span className="truncate">Use workspace {matching.name}</span>
             </DropdownMenuItem>
           )}
@@ -422,7 +418,6 @@ function ProjectRow({ threadId }: { threadId: string }) {
                 openSaveWorkspace(threadId);
               }}
             >
-              <Save aria-hidden />
               Save as workspace
             </DropdownMenuItem>
           )}
@@ -508,7 +503,6 @@ function OpenInRow({ threadId }: { threadId: string }) {
           if (key !== null) void newBottomTerminal(key);
         }}
       >
-        <SquareTerminal aria-hidden />
         Terminal
       </DropdownMenuItem>
     </RowMore>
@@ -557,7 +551,6 @@ function AddActionItems({ members }: { members: readonly string[] }) {
           openActionEditor({ mode: "new", projectId: only, from: "thread" });
         }}
       >
-        <Plus aria-hidden />
         Add action
       </DropdownMenuItem>
     );
@@ -568,7 +561,6 @@ function AddActionItems({ members }: { members: readonly string[] }) {
         data-testid="ti-add-action"
         className="text-caption text-cf-text"
       >
-        <Plus aria-hidden />
         Add action
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent data-testid="ti-add-action-projects">

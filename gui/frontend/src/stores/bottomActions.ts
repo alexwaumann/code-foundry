@@ -253,9 +253,12 @@ export function newThreadTerminal(threadId: string, cwd?: string): Promise<boole
   return startShell(getUiContext({ kind: "thread", id: threadId }), cwd ? { cwd } : {});
 }
 
-/** terminal.new in a worktree from the Projects page (its rows): the shell lands in the page's panel. */
-export function newWorktreeTerminal(projectId: string, path: string): Promise<boolean> {
-  return startShell(worktreeContext(projectId, path));
+/**
+ * terminal.new in a worktree from the Projects page (its rows): the shell lands in the page's panel. With `cwd`
+ * it starts there instead (a workspace's folder), still owned by the worktree.
+ */
+export function newWorktreeTerminal(projectId: string, path: string, cwd?: string): Promise<boolean> {
+  return startShell(worktreeContext(projectId, path), cwd ? { cwd } : {});
 }
 
 /**

@@ -8,15 +8,17 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import type { UiContextView } from "@/api/command";
+import type { WorkspaceView } from "@/api/workspace";
 import { createdThreadId } from "@/lib/compose";
 import { threadLabel } from "@/lib/prompt";
 import { editInstructionsPrompt, instructionsStep, PRIMARY_WORKSPACE, workspaceFolder } from "@/lib/workspaceCard";
 import { projectRef } from "@/lib/projects";
+import { newWorktreeTerminal } from "./bottomActions";
 import { runCommand, runCommandForResult } from "./commands";
 import { emptyContext } from "./context";
 import { openFileInPanel } from "./filePanel";
 import { togglePanel } from "./panel";
-import { useProjectsStore } from "./projects";
+import { mainWorktreePath, useProjectsStore, type ProjectsData } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
@@ -63,6 +65,25 @@ export function removeWorkspace(workspaceId: string): Promise<boolean> {
 /** workspace.reveal: its root, else its own folder, in Finder. */
 export function revealWorkspace(workspaceId: string): Promise<boolean> {
   return runCommand("workspace.reveal", { workspace: workspaceId }, workspaceContext(workspaceId));
+}
+
+/**
+ * Where a workspace's New terminal starts and who owns the shell: its folder (workspaceFolder), owned by the
+ * first registered member's main checkout (a shell belongs to a thread or a worktree, and the folder is
+ * neither), so it lands in the Projects page's panel. Null without a folder or a registered member.
+ */
+export function workspaceTerminalPlace(ws: WorkspaceView | undefined, projects: ProjectsData): { projectId: string; path: string; cwd: string } | null {
+  const cwd = ws ? workspaceFolder(ws) : "";
+  const owner = ws?.members.find((m) => projects.byId[m.projectId] !== undefined)?.projectId;
+  if (!cwd || owner === undefined) return null;
+  const path = mainWorktreePath(projects, owner);
+  return path ? { projectId: owner, path, cwd } : null;
+}
+
+/** terminal.new in the workspace's folder (workspaceTerminalPlace); false when it has no place for one. */
+export async function newWorkspaceTerminal(workspaceId: string): Promise<boolean> {
+  const place = workspaceTerminalPlace(useWorkspacesStore.getState().byId[workspaceId], useProjectsStore.getState());
+  return place ? newWorktreeTerminal(place.projectId, place.path, place.cwd) : false;
 }
 
 /** The instructions file as a File tab in the page's side panel (shown, not focused, like the page's worktree rows). */

@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { SquareKanban, Settings2 } from "lucide-react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { emberStatusWords } from "@/lib/ember";
 import type { StatusTone } from "@/lib/statusLine";
@@ -155,11 +154,9 @@ function EmberRowShown({ threadId }: { threadId: string }) {
             openEmberBoard();
           }}
         >
-          <SquareKanban />
           Open board
         </ContextMenuItem>
         <ContextMenuItem onSelect={openEmberSettings}>
-          <Settings2 />
           Settings
         </ContextMenuItem>
       </ContextMenuContent>

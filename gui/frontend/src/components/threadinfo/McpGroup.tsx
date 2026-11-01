@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Plug, RefreshCw } from "lucide-react";
+import { Plug } from "lucide-react";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { mcpCounts } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
@@ -72,11 +72,9 @@ export function McpGroup({ threadId }: { threadId: string }) {
             }}
             data-testid="ti-mcp-open-panel"
           >
-            <Plug aria-hidden />
             Open MCP panel
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void refreshMcp(threadId)} data-testid="ti-mcp-refresh">
-            <RefreshCw aria-hidden />
             Refresh
           </DropdownMenuItem>
           {failed.length > 0 && <DropdownMenuSeparator />}

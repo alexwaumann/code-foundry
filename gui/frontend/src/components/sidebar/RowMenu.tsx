@@ -1,4 +1,3 @@
-import { GitFork, SquareTerminal, Trash2 } from "lucide-react";
 import { ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { contextMenuKit, keepFocusAfterMenu } from "@/components/thread/menuKit";
 import { ThreadMenuItems } from "@/components/thread/ThreadMenuItems";
@@ -28,7 +27,6 @@ export function RowMenu({ id }: { id: string }) {
           void newThreadTerminal(id);
         }}
       >
-        <SquareTerminal />
         New terminal here
       </ContextMenuItem>
       <ContextMenuItem
@@ -39,7 +37,6 @@ export function RowMenu({ id }: { id: string }) {
           void forkThread(id);
         }}
       >
-        <GitFork />
         Fork
       </ContextMenuItem>
       <ContextMenuItem
@@ -48,8 +45,7 @@ export function RowMenu({ id }: { id: string }) {
           void removeThread(id);
         }}
       >
-        <Trash2 />
-        Remove…
+        Remove
       </ContextMenuItem>
     </ContextMenuContent>
   );

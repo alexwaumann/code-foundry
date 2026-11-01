@@ -10,8 +10,8 @@ import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 import { Item } from "./PrMenu";
 import { disabledVerdicts, reviewVisible, VERDICT_SPECS, VERDICTS, YOUR_REVIEW_SPECS, yourReview, type Verdict } from "./review";
-import { verdictIcons, yourReviewIcon } from "./reviewIcons";
-import { toneBadge, toneText } from "./tones";
+import { yourReviewIcon } from "./reviewIcons";
+import { toneBadge } from "./tones";
 
 
 /**
@@ -91,7 +91,6 @@ export function ReviewButton({ prRef, detail, onChoose }: { prRef: PrRef; detail
         <DropdownMenuLabel>Review #{prRef.number}</DropdownMenuLabel>
         {VERDICTS.map((v) => {
           const spec = VERDICT_SPECS[v];
-          const VIcon = verdictIcons[v].icon;
           const reason = disabled[v];
           const item = (
             <DropdownMenuItem
@@ -103,7 +102,7 @@ export function ReviewButton({ prRef, detail, onChoose }: { prRef: PrRef; detail
                 onChoose(v);
               }}
             >
-              <Item icon={<VIcon className={spec.tone === "neutral" ? undefined : toneText[spec.tone]} aria-hidden />} title={spec.title} hint={spec.hint} />
+              <Item title={spec.title} hint={spec.hint} />
             </DropdownMenuItem>
           );
           // Disabled: the reason hangs on a span around it (a disabled item gets no pointer events).

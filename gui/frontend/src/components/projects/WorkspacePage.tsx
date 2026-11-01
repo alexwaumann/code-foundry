@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Pencil, SquarePen, Trash2 } from "lucide-react";
+import { SquarePen } from "lucide-react";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { FinderIcon } from "@/components/icons/AppIcon";
 import { PanelToggle } from "@/components/panel/PanelToggle";
@@ -16,16 +16,18 @@ import { composeInWorkspace } from "@/stores/compose";
 import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { PROJECTS_INDEX, useUiStore } from "@/stores/ui";
-import { removeWorkspace, revealWorkspace } from "@/stores/workspaceActions";
+import { revealWorkspace } from "@/stores/workspaceActions";
+import { endWorkspaceRename, useWorkspaceRenameStore } from "@/stores/workspaceRename";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { WorkspaceIcon } from "./bits";
 import { usePageScroll } from "./pageHooks";
+import { workspaceMenu } from "./menus";
 import { OverflowMenu } from "./OverflowMenu";
 import { PagePicker, ProjectsCrumb } from "./PagePicker";
 import { WorkspaceInstructions } from "./WorkspaceInstructions";
 import { WorkspaceNameEditor } from "./WorkspaceNameEditor";
 import { WorkspaceProjects } from "./WorkspaceProjects";
-import { openThread, useWorkspaceThreads } from "./workspaceHooks";
+import { openThread, useWorkspaceTerminal, useWorkspaceThreads } from "./workspaceHooks";
 import { WorkspaceThreads } from "./WorkspaceThreads";
 
 /** The workspace's member ids by project name (lib/workspaceCard.ts membersByName); the stored order is by id. */
@@ -40,8 +42,8 @@ function useMembersByName(workspaceId: string): string[] {
 
 /**
  * A workspace's page (docs/notes/projects-redesign-3-workspace-page.md): the header
- * (crumb › name + picker, "workspace · N projects", Open in Finder, New thread, Rename… and
- * Remove workspace…), then its Projects (where threads start, Start here, Remove, Add
+ * (crumb › name + picker, "workspace · N projects", Open in Finder, New thread, and its ⋯: the index
+ * row's context menu, components/projects/menus.ts workspaceMenu), then its Projects (where threads start, Start here, Remove, Add
  * project), its Threads (one column per member's checkout) and its Instructions and
  * skills. Keyboard: ↑/↓ walk the member rows (Enter shows the project's main checkout's
  * changes) and the thread rows (Enter opens the thread).
@@ -53,7 +55,10 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
   const rooted = useWorkspacesStore((s) => (s.byId[workspaceId]?.rootPath ?? "") !== "");
   const members = useMembersByName(workspaceId);
   const threads = useWorkspaceThreads(workspaceId);
-  const [renaming, setRenaming] = useState(false);
+  const renaming = useWorkspaceRenameStore((s) => s.renamingWorkspaceId === workspaceId);
+  // Leaving the page closes its editor (the field's blur has renamed by then).
+  useEffect(() => () => { endWorkspaceRename(workspaceId); }, [workspaceId]);
+  const terminal = useWorkspaceTerminal(workspaceId);
 
   // A workspace removed while its page shows: back to the index. Only once it was there: a
   // page opened for one just added comes before its event (stores/projectsPage.ts).
@@ -103,7 +108,7 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
               workspaceId={workspaceId}
               name={name}
               onDone={() => {
-                setRenaming(false);
+                endWorkspaceRename(workspaceId);
                 // Enter or Escape: the keyboard goes back to the page's list (the field is not inside it).
                 // Leaving the field for something else keeps the focus there.
                 requestAnimationFrame(() => {
@@ -128,15 +133,7 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
             <SquarePen />
             New thread
           </Button>
-          <OverflowMenu
-            label="More workspace actions"
-            testId="workspace-page-more"
-            items={[
-              { label: "Rename…", icon: Pencil, testId: "workspace-page-rename", onSelect: () => { setRenaming(true); } },
-              "separator",
-              { label: "Remove workspace…", icon: Trash2, destructive: true, testId: "workspace-page-remove", onSelect: () => void removeWorkspace(workspaceId) },
-            ]}
-          />
+          <OverflowMenu label="More workspace actions" testId="workspace-page-more" items={workspaceMenu(workspaceId, { folder: terminal })} />
         </span>
         <span className="-mr-2 flex shrink-0 items-center">
           <BottomToggle />

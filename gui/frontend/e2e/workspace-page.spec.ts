@@ -243,8 +243,8 @@ test("rename from the header's menu: in place, Enter renames, Escape keeps, a ta
   await openWorkspacePage(page, shop);
   const input = page.getByTestId("workspace-name-input");
   await page.getByTestId("workspace-page-more").click();
-  expect(await menuItems(page, "workspace-page-more")).toEqual(["Rename…", "Remove workspace…"]);
-  await page.getByTestId("workspace-page-rename").click();
+  expect(await menuItems(page, "workspace-page-more")).toEqual(["New thread", "New terminal", "Open in Finder", "Rename", "Add project", "Remove workspace"]);
+  await page.getByTestId("workspace-menu-rename").click();
   await expect(input).toBeFocused();
   await input.fill("MONO");
   await expect(page.getByTestId("workspace-name-error")).toHaveText("A workspace named “MONO” exists.");
@@ -255,7 +255,7 @@ test("rename from the header's menu: in place, Enter renames, Escape keeps, a ta
   expect((await invocations()).filter((i) => i.name === "workspace.rename")).toHaveLength(0);
 
   await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-page-rename").click();
+  await page.getByTestId("workspace-menu-rename").click();
   await input.fill("store");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("page-name")).toHaveText("store");
@@ -268,27 +268,27 @@ test("rename from the header's menu: in place, Enter renames, Escape keeps, a ta
 
   // Leaving the field renames, once.
   await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-page-rename").click();
+  await page.getByTestId("workspace-menu-rename").click();
   await input.fill("shop");
   await page.getByTestId("workspace-meta").click();
   await expect(page.getByTestId("page-name")).toHaveText("shop");
   expect((await invocations()).filter((i) => i.name === "workspace.rename").map((i) => i.args.name)).toEqual(["store", "shop"]);
 });
 
-test("Remove workspace… asks first: a synthetic workspace's instructions and skills go, a rooted one's root stays; then the index", async ({ page }) => {
+test("Remove workspace asks first: a synthetic workspace's instructions and skills go, a rooted one's root stays; then the index", async ({ page }) => {
   const { shop, mono } = await twoWorkspaces();
   await openApp(page);
   const dialog = page.getByTestId("confirm-dialog");
   await openWorkspacePage(page, mono);
   await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-page-remove").click();
+  await page.getByTestId("workspace-menu-remove").click();
   await expect(dialog).toContainText("Remove workspace mono? Its root folder /Users/dev/mono and everything in it stay");
   await page.keyboard.press("Escape");
   await expect(body(page, mono)).toBeVisible();
 
   await openWorkspacePage(page, shop);
   await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-page-remove").click();
+  await page.getByTestId("workspace-menu-remove").click();
   await expect(dialog).toContainText("Remove workspace shop? Its instructions and skills are deleted too.");
   await dialog.getByTestId("confirm-ok").click();
   // Its page goes: back to the index.

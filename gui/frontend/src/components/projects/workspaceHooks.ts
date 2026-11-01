@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import { workspaceThreads, workspaceThreadsCaption } from "@/lib/workspacePage";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
+import { workspaceTerminalPlace } from "@/stores/workspaceActions";
+import { useWorkspacesStore } from "@/stores/workspaces";
 
 /** Opens the thread (its own pane). */
 export function openThread(id: string): void {
@@ -18,4 +21,10 @@ export function useWorkspaceThreads(workspaceId: string): { ids: string[]; capti
     const [caption = "", ids = ""] = key.split("\u0001");
     return { caption, ids: ids === "" ? [] : ids.split("\u0002") };
   }, [key]);
+}
+
+/** Whether the workspace's New terminal shows: a folder and a registered member to own the shell (workspaceTerminalPlace). */
+export function useWorkspaceTerminal(workspaceId: string): boolean {
+  const ws = useWorkspacesStore((s) => s.byId[workspaceId]);
+  return useProjectsStore((s) => workspaceTerminalPlace(ws, s) !== null);
 }

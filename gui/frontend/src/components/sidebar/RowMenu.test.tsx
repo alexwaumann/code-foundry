@@ -49,7 +49,8 @@ describe("RowMenu: Hide from sidebar (docs/notes/hidden-children-2-gui.md)", () 
     const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
     expect(items.indexOf("Hide from sidebar")).toBe(items.indexOf("Archive") - 1);
     const item = screen.getByTestId("menu-sidebar-hide");
-    expect(item.querySelector("svg")?.getAttribute("class")).toContain("lucide-eye-off");
+    // Text only, like every menu item (docs/notes/projects-table-2-context-menus.md).
+    expect(item.querySelector("svg")).toBeNull();
     fireEvent.click(item);
     expect(setThreadSidebar).toHaveBeenCalledWith("s-1", false);
   });

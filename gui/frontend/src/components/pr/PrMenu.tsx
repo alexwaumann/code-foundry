@@ -1,4 +1,4 @@
-import { ArrowUpRight, BookOpen, Ellipsis, Hammer, Link2, Loader2, MessageCircleQuestion, RefreshCw, Undo2 } from "lucide-react";
+import { Ellipsis, Loader2 } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -13,15 +13,18 @@ import { startingKey, startPrThread, usePrThreadsStore, type PrThreadKind } from
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { COPY_LINK_CHORD, POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 
-/** A menu item's body: icon, title, and a one-line hint under it (the Review menu shares it). */
-export function Item({ icon, title, hint, children }: { icon: ReactNode; title: string; hint?: ReactNode; children?: ReactNode }) {
+/**
+ * A menu item's body: its title and a one-line hint under it (the Review menu shares it). Text only, like
+ * every menu; a spinner at the right while `busy`.
+ */
+export function Item({ title, hint, busy, children }: { title: string; hint?: ReactNode; busy?: boolean; children?: ReactNode }) {
   return (
     <>
-      {icon}
       <span className="flex min-w-0 flex-1 flex-col">
         <span>{title}</span>
         {hint && <span className="text-caption">{hint}</span>}
       </span>
+      {busy && <Loader2 className="animate-spin" aria-hidden data-testid="pr-menu-busy" />}
       {children}
     </>
   );
@@ -141,7 +144,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
             void refreshPullRequest(prRef);
           }}
         >
-          <Item icon={busy ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />} title="Refresh" hint={<RefreshHint fetchedAtMs={detail.fetchedAtMs} lastError={detail.lastError} busy={busy} />} />
+          <Item title="Refresh" hint={<RefreshHint fetchedAtMs={detail.fetchedAtMs} lastError={detail.lastError} busy={busy} />} />
         </DropdownMenuItem>
         <DropdownMenuItem
           data-testid="pr-menu-ask"
@@ -150,7 +153,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
             onAsk();
           }}
         >
-          <Item icon={<MessageCircleQuestion aria-hidden />} title="Ask a question" hint="Starts a thread that knows which pull request you mean." />
+          <Item title="Ask a question" hint="Starts a thread that knows which pull request you mean." />
         </DropdownMenuItem>
         <DropdownMenuItem
           data-testid="pr-menu-explain"
@@ -162,7 +165,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
             start("explain");
           }}
         >
-          <Item icon={explaining ? <Loader2 className="animate-spin" aria-hidden /> : <BookOpen aria-hidden />} title="Explain this PR" hint="A walk through the diff and what to read closely." />
+          <Item busy={explaining} title="Explain this PR" hint="A walk through the diff and what to read closely." />
         </DropdownMenuItem>
         <DropdownMenuItem
           data-testid="pr-menu-fix"
@@ -173,14 +176,14 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
             start("fix");
           }}
         >
-          <Item icon={fixing ? <Loader2 className="animate-spin" aria-hidden /> : <Hammer aria-hidden />} title="Fix findings in a thread" />
+          <Item busy={fixing} title="Fix findings in a thread" />
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem data-testid="pr-menu-open" onSelect={() => void openUrl(url)}>
-          <Item icon={<ArrowUpRight aria-hidden />} title="Open on GitHub" />
+          <Item title="Open on GitHub" />
         </DropdownMenuItem>
         <DropdownMenuItem data-testid="pr-menu-copy" onSelect={() => void copyPullRequestLink(prRef, url)}>
-          <Item icon={<Link2 aria-hidden />} title="Copy link">
+          <Item title="Copy link">
             <DropdownMenuShortcut>{formatChord(COPY_LINK_CHORD)}</DropdownMenuShortcut>
           </Item>
         </DropdownMenuItem>
@@ -188,7 +191,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem data-testid="pr-menu-revert" onSelect={() => void revertPullRequest(prRef, panelKey)}>
-              <Item icon={<Undo2 aria-hidden />} title="Revert changes" hint={`Opens a pull request that reverses #${String(prRef.number)}.`} />
+              <Item title="Revert changes" hint={`Opens a pull request that reverses #${String(prRef.number)}.`} />
             </DropdownMenuItem>
           </>
         )}

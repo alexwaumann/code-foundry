@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FolderPlus } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { shortAge } from "@/components/prs/format";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNow } from "@/lib/clock";
@@ -132,8 +132,7 @@ function PickerContent({ currentProject, currentWorkspace }: { currentProject: s
           addProject();
         }}
       >
-        <FolderPlus />
-        Add project…
+        Add project
       </DropdownMenuItem>
     </DropdownMenuContent>
   );

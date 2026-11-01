@@ -1,7 +1,6 @@
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
-import { ChevronRight, Copy, FileDiff } from "lucide-react";
-import { FinderIcon } from "@/components/icons/AppIcon";
+import { ChevronRight } from "lucide-react";
 import { RowList } from "@/components/prs/RowList";
 import { copyText } from "@/lib/clipboard";
 import { NavRow } from "@/lib/NavRow";
@@ -77,13 +76,12 @@ function RowMenu({ threadId, members }: { threadId: string; members: readonly st
     const path = checkouts[i] ?? "";
     const name = names[i] ?? "";
     if (!path || !name) return;
-    items.push({ label: `Show changes in ${name}`, icon: FileDiff, testId: "thread-menu-changes", onSelect: () => { openChangesTab("current", p, path); } });
+    items.push({ label: `Show changes in ${name}`, testId: "thread-menu-changes", onSelect: () => { openChangesTab("current", p, path); } });
   });
   if (items.length > 0) items.push("separator");
   items.push(
     {
       label: "Open in Finder",
-      icon: FinderIcon,
       testId: "thread-menu-reveal",
       // The thread's own folder: its primary's checkout, else the workspace's folder.
       onSelect: () => {
@@ -91,7 +89,7 @@ function RowMenu({ threadId, members }: { threadId: string; members: readonly st
         else if (workspaceId) void revealWorkspace(workspaceId);
       },
     },
-    { label: "Copy path", icon: Copy, testId: "thread-menu-copy-path", disabled: !cwd, onSelect: () => void copyPath(cwd) },
+    { label: "Copy path", testId: "thread-menu-copy-path", disabled: !cwd, onSelect: () => void copyPath(cwd) },
   );
   return <OverflowMenu label="More actions" testId="thread-more" items={items} />;
 }

@@ -6,10 +6,8 @@ import {
   ArrowUp,
   CircleCheck,
   CircleX,
-  Copy,
   FileDiff,
   Download,
-  ExternalLink,
   GitBranch,
   GitMerge,
   GitPullRequest,
@@ -190,11 +188,9 @@ function PrRowView({ row }: { row: PrRow }) {
       trailing={
         <RowMore label="Pull request options" testId="ti-pr-more" menuTestId="ti-pr-menu">
           <DropdownMenuItem onSelect={() => void openUrl(row.url)} data-testid="ti-pr-github">
-            <ExternalLink aria-hidden />
             Open on GitHub
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void copyPullRequestLink(ref, row.url)} data-testid="ti-pr-copy">
-            <Copy aria-hidden />
             Copy URL
           </DropdownMenuItem>
         </RowMore>

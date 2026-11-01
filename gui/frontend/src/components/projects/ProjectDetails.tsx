@@ -1,6 +1,6 @@
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
-import { Copy, Pencil, Plus } from "lucide-react";
+import { Copy } from "lucide-react";
 import { ACTION_ICON } from "@/components/actions/actionIcons";
 import { FinderIcon } from "@/components/icons/AppIcon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -41,7 +41,6 @@ function EditActionItem({ id, projectId }: { id: string; projectId: string }) {
     >
       <Icon aria-hidden />
       <span className="min-w-0 flex-1 truncate">{action.name}</span>
-      <Pencil className="text-cf-text-muted" aria-hidden />
     </DropdownMenuItem>
   );
 }
@@ -70,8 +69,7 @@ function ActionsRow({ projectId }: { projectId: string }) {
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem data-testid="details-new-action" onSelect={() => { openActionEditor({ mode: "new", projectId, from: "projects" }); }}>
-              <Plus aria-hidden />
-              New action…
+              New action
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

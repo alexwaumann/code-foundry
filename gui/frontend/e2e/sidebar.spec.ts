@@ -154,7 +154,7 @@ test("pin from the context menu moves a thread to the top; unpin moves it back",
   await expect(row(page, "s:s-3")).toHaveAttribute("data-section", "idle");
 });
 
-test("Run in… from the context menu moves a workspace thread; the row shows the queued move", async ({ page }) => {
+test("Run in from the context menu moves a workspace thread; the row shows the queued move", async ({ page }) => {
   const driver = await workspaceWithThread();
   await openApp(page);
   const d = row(page, `s:${driver}`);
@@ -180,7 +180,7 @@ test("Run in… from the context menu moves a workspace thread; the row shows th
   expect(await thread(driver)).toMatchObject({ projectId: "repo-cf", worktreePath: CF_LOGIN, pendingWorktreePath: "" });
 });
 
-test("Run in… is absent for a project thread and offered in the palette for a workspace thread", async ({ page }) => {
+test("Run in is absent for a project thread and offered in the palette for a workspace thread", async ({ page }) => {
   const driver = await workspaceWithThread();
   await openApp(page);
   // Project thread: no menu entry, and the daemon lists the command as unavailable.

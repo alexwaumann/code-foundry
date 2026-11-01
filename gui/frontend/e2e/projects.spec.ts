@@ -132,8 +132,8 @@ test("the index's Workspaces rows: name, status, projects, contents; a click ope
   await page.getByTestId("workspace-page-reveal").click();
   expect((await lastInvocation("workspace.reveal"))?.args).toEqual({ workspace: ws.id });
   await page.getByTestId("workspace-page-more").click();
-  expect(await menuItems(page, "workspace-page-more")).toEqual(["Rename…", "Remove workspace…"]);
-  await page.getByTestId("workspace-page-rename").click();
+  expect(await menuItems(page, "workspace-page-more")).toEqual(["New thread", "New terminal", "Open in Finder", "Rename", "Add project", "Remove workspace"]);
+  await page.getByTestId("workspace-menu-rename").click();
   await expect(page.getByTestId("workspace-name-input")).toBeFocused();
   await page.keyboard.press("Escape");
   await page.getByTestId("workspace-page-new-thread").click();
@@ -325,7 +325,7 @@ test("a project's page: header, the checkouts table by activity, a row opens its
   await closeMenu(page, "worktree-more");
   await checkoutRow(page, "repo-cf", FEAT).hover();
   await checkoutRow(page, "repo-cf", FEAT).getByTestId("worktree-more").click();
-  expect(await menuItems(page, "worktree-more")).toEqual(["New thread here", "New terminal here", "Show changes", "Open pull request #142", "Open in Finder", "Copy path", "Remove worktree…"]);
+  expect(await menuItems(page, "worktree-more")).toEqual(["New thread here", "New terminal here", "Show changes", "Open pull request #142", "Open in Finder", "Copy path", "Remove worktree"]);
   await page.getByTestId("worktree-reveal").click();
   const reveal = await lastInvocation("worktree.reveal");
   expect(reveal?.args).toEqual({ worktree: FEAT });
@@ -338,7 +338,7 @@ test("a project's page: header, the checkouts table by activity, a row opens its
 
   // The header's menu: no New worktree.
   await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Rename", "Clean up merged worktrees 0", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Clean up merged worktrees 0", "Remove project"]);
   await closeMenu(page, "project-more");
 
   // Details.
@@ -354,7 +354,7 @@ test("a project's page: header, the checkouts table by activity, a row opens its
   await expect(page.getByTestId("leftover-empty")).toBeVisible();
 });
 
-test("the picker: projects by activity, then workspaces, then Add project…; picking switches the page", async ({ page }) => {
+test("the picker: projects by activity, then workspaces, then Add project; picking switches the page", async ({ page }) => {
   const ws = (await mockPost("workspace?name=platform&projects=repo-cf,repo-gp")) as { id: string };
   await openApp(page);
   await openProjects(page);
@@ -366,7 +366,7 @@ test("the picker: projects by activity, then workspaces, then Add project…; pi
   expect(await menu.getByTestId("page-picker-project").evaluateAll((els) => els.map((e) => e.getAttribute("data-project")))).toEqual(order);
   await expect(menu.locator('[data-current="true"]')).toHaveAttribute("data-project", "repo-cf");
   await expect(menu.getByTestId("page-picker-workspace")).toHaveText(/platform/);
-  await expect(menu.getByTestId("page-picker-add-project")).toHaveText("Add project…");
+  await expect(menu.getByTestId("page-picker-add-project")).toHaveText("Add project");
   await menu.locator('[data-project="repo-dot"]').click();
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-dot");
   await expect(page.getByTestId("projects-list")).toBeFocused();
@@ -391,7 +391,7 @@ test("kind variants: no remote (note, no Sync or PR), another remote (no PR), no
   await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-project", "repo-sk");
   await page.keyboard.press("Escape");
   await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Rename", "Publish to GitHub", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Publish to GitHub", "Remove project"]);
   await closeMenu(page, "project-more");
 
   await openProjectPage(page, "repo-dot");
@@ -565,7 +565,7 @@ test("Clean up merged worktrees removes them after a confirm and the index's pil
   await openApp(page);
   await openProjectPage(page, "repo-cf");
   await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Rename", "Clean up merged worktrees 2", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Clean up merged worktrees 2", "Remove project"]);
   await page.getByTestId("project-cleanup").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Fetch, then remove 2 worktrees");

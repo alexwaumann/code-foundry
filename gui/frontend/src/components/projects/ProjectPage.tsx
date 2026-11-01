@@ -19,7 +19,7 @@ import { findWorktree, mainWorktreePath, useProjectsStore } from "@/stores/proje
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
 import { PROJECTS_INDEX, useUiStore } from "@/stores/ui";
-import { endProjectRename, startProjectRename, useProjectRenameStore } from "@/stores/projectRename";
+import { endProjectRename, useProjectRenameStore } from "@/stores/projectRename";
 import { KindIcon, Pill, SectionHeader } from "./bits";
 import { useCheckoutOrder, usePageScroll } from "./pageHooks";
 import { useProjectKind } from "@/components/icons/projectKind";
@@ -223,7 +223,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
             <SquarePen />
             New thread
           </Button>
-          <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(projectId, kind, step, git && hasRemote ? cleanable : null, () => { startProjectRename(projectId); })} />
+          <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(projectId, { kind, step, cleanup: git && hasRemote ? cleanable : null }, { newAction: true })} />
         </span>
         <span className="-mr-2 flex shrink-0 items-center">
           <BottomToggle />

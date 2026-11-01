@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { addableProjects, PRIMARY_WORKSPACE } from "@/lib/workspaceCard";
 import { useProjectsStore } from "@/stores/projects";
 import { addWorkspaceProject, removeWorkspaceProject, setWorkspacePrimary } from "@/stores/workspaceActions";
+import { closeWorkspaceAddProject, openWorkspaceAddProject, useWorkspaceAddProjectStore } from "@/stores/workspaceAddProject";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { KindIcon, Pill, SectionHeader } from "./bits";
 
@@ -141,8 +142,12 @@ function MemberRow({ workspaceId, projectId, first }: { workspaceId: string; pro
   );
 }
 
-/** "Add project": the registered projects that are not members yet (workspace.add-project). */
+/**
+ * "Add project": the registered projects that are not members yet (workspace.add-project). Its list is open
+ * while stores/workspaceAddProject.ts says so, so a menu's Add project (the index row's, the page's ⋯) opens it.
+ */
 function AddMember({ workspaceId }: { workspaceId: string }) {
+  const open = useWorkspaceAddProjectStore((s) => s.addingTo === workspaceId);
   const members = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId)));
   const addable = useProjectsStore(useShallow((s) => addableProjects(members, s)));
   const names = useProjectsStore(useShallow((s) => addable.map((id) => s.byId[id]?.name ?? id)));
@@ -160,6 +165,11 @@ function AddMember({ workspaceId }: { workspaceId: string }) {
       status={addable.length === 0 ? <p className="text-caption">Every project is in it.</p> : undefined}
       className="font-normal text-cf-text-secondary"
       data-testid="workspace-add-member"
+      open={open}
+      onOpenChange={(o) => {
+        if (o) openWorkspaceAddProject(workspaceId);
+        else closeWorkspaceAddProject();
+      }}
       onChange={(projectId) => {
         setAdding(names[addable.indexOf(projectId)] ?? projectId);
         void addWorkspaceProject(workspaceId, projectId).finally(() => {

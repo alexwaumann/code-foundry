@@ -1,4 +1,4 @@
-import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, ArrowRightLeft, Eye, EyeOff, FlagOff, GitBranchPlus, Layers, Pencil, Pin, PinOff, RotateCw, Sparkles } from "lucide-react";
+import { Layers } from "lucide-react";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
@@ -38,7 +38,7 @@ function MemberItem({ kit, threadId, projectId, path, current, queued }: { kit: 
 }
 
 /**
- * "Run in…" for a thread with somewhere else to run (canRunElsewhere): its workspace folder
+ * "Run in" for a thread with somewhere else to run (canRunElsewhere): its workspace folder
  * and its projects' checkouts, the current one disabled. Picking one invokes
  * thread.run-in; the row shows the queued move until it happens.
  */
@@ -53,8 +53,7 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
   return (
     <kit.Sub>
       <kit.SubTrigger data-testid="menu-run-in">
-        <ArrowRightLeft />
-        Run in…
+        Run in
       </kit.SubTrigger>
       <kit.SubContent data-testid="menu-run-in-members">
         {workspaceId && (
@@ -123,7 +122,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
           beginRename(id);
         }}
       >
-        <Pencil />
         Rename
       </kit.Item>
       {!resident && (
@@ -135,7 +133,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
             void regenerateThreadName(id);
           }}
         >
-          <Sparkles />
           Regenerate name
         </kit.Item>
       )}
@@ -146,12 +143,10 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
           void pinThread(id, !pinned);
         }}
       >
-        {pinned ? <PinOff /> : <Pin />}
         {pinned ? "Unpin" : "Pin"}
       </kit.Item>
       <kit.Sub>
         <kit.SubTrigger data-testid="menu-snooze">
-          <AlarmClock />
           Snooze
         </kit.SubTrigger>
         <kit.SubContent data-testid="menu-snooze-presets">
@@ -173,7 +168,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
           void snoozeThread(id, null);
           }}
         >
-          <AlarmClockOff />
           Unsnooze
         </kit.Item>
       )}
@@ -185,7 +179,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
             composeLike(id);
           }}
         >
-          <GitBranchPlus />
           New thread on this branch
         </kit.Item>
       )}
@@ -196,7 +189,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
             openSaveWorkspace(id);
           }}
         >
-          <Layers />
           Save as workspace
         </kit.Item>
       )}
@@ -208,7 +200,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
             void setThreadSidebar(id, !shown);
           }}
         >
-          {shown ? <EyeOff /> : <Eye />}
           {shown ? "Hide from sidebar" : "Show in sidebar"}
         </kit.Item>
       )}
@@ -219,7 +210,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
             void runCommand("thread.restart", {}, threadContext(id));
           }}
         >
-          <RotateCw />
           Restart Claude
         </kit.Item>
       )}
@@ -230,7 +220,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
             void runCommand("thread.flag.clear", { id }, threadContext(id));
           }}
         >
-          <FlagOff />
           {flags === 1 ? "Clear flag" : "Clear flags"}
         </kit.Item>
       )}
@@ -242,7 +231,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
           void archiveThread(id, !archived);
         }}
       >
-        {archived ? <ArchiveRestore /> : <Archive />}
         {archived ? "Unarchive" : "Archive"}
       </kit.Item>
     </>
