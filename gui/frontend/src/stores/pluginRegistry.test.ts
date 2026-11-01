@@ -6,7 +6,7 @@ const m = vi.hoisted(() => ({ browse: vi.fn(), runCommand: vi.fn(), runCommandFo
 vi.mock("@/api/plugin", async (orig) => ({ ...(await orig<typeof import("@/api/plugin")>()), browsePlugins: m.browse }));
 vi.mock("./commands", () => ({ runCommand: m.runCommand, runCommandForResult: m.runCommandForResult }));
 
-const { applyInstallProgress, dismissInstallFailure, failedProgress, installPlugin, uninstallPlugin, usePluginRegistryStore } = await import("./pluginRegistry");
+const { applyInstallProgress, dismissInstallFailure, failedProgress, installPlugin, onInstallProgress, onRegistryEpoch, uninstallPlugin, usePluginRegistryStore } = await import("./pluginRegistry");
 
 beforeEach(() => {
   for (const f of Object.values(m)) f.mockReset();
@@ -122,5 +122,33 @@ describe("uninstallPlugin", () => {
   it("from anywhere else (the palette), the generic confirm asks", () => {
     void ask("false");
     expect(useConfirmStore.getState().pending?.message).toBe("Uninstall?");
+  });
+});
+
+describe("the daemon's plugin events", () => {
+  it("an install step lands under its row", () => {
+    onInstallProgress({ ref: "gh-actions", name: "gh-actions", version: "0.1.0", phase: "downloading", message: "", bytes: 2_621_440 });
+    expect(usePluginRegistryStore.getState().progress["gh-actions"]).toMatchObject({ phase: "downloading", bytes: 2_621_440 });
+    onInstallProgress({ ref: "gh-actions", name: "gh-actions", version: "0.1.0", phase: "done", message: "", bytes: 0 });
+    expect(usePluginRegistryStore.getState().progress).toEqual({});
+  });
+
+  it("a new registry epoch re-reads Browse once it has been read (a registry setting changed)", () => {
+    vi.useFakeTimers();
+    try {
+      usePluginRegistryStore.setState({ browse: null, epoch: 0 });
+      onRegistryEpoch(1);
+      vi.advanceTimersByTime(200);
+      expect(m.browse).not.toHaveBeenCalled();
+
+      usePluginRegistryStore.setState({ browse: { entries: [], registries: [], platform: "darwin/arm64" } });
+      onRegistryEpoch(2);
+      onRegistryEpoch(2);
+      vi.advanceTimersByTime(200);
+      expect(m.browse).toHaveBeenCalledTimes(1);
+      expect(usePluginRegistryStore.getState().epoch).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
