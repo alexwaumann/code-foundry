@@ -136,10 +136,10 @@ function IndexTable({ columns, testId, children }: { columns: readonly Column[];
 }
 
 /** A section's title, its row count, a muted hint and its Add button at the right. */
-function SectionTitle({ title, count, hint, action }: { title: string; count: number; hint?: string; action: React.ReactNode }) {
+function SectionTitle({ heading, count, hint, action }: { heading: string; count: number; hint?: string; action: React.ReactNode }) {
   return (
     <div className="mb-2 flex min-h-7 items-center gap-2">
-      <h2 className="shrink-0 text-title">{title}</h2>
+      <h2 className="shrink-0 text-title">{heading}</h2>
       <span className="shrink-0 text-caption text-cf-text-muted tabular-nums" data-testid="index-section-count">
         ({count})
       </span>
@@ -507,7 +507,7 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
                 {projects.length > 0 && (
                   <section data-testid="projects-section">
                     <SectionTitle
-                      title="Projects"
+                      heading="Projects"
                       count={projects.length}
                       action={
                         <Button type="button" variant="outline" size="sm" className="h-7" data-testid="projects-register" onClick={() => { addProject(); }}>
@@ -526,7 +526,7 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
                 {(workspaces.length > 0 || (!filtering && wsOrder.length === 0)) && (
                   <section data-testid="workspaces-section">
                     <SectionTitle
-                      title="Workspaces"
+                      heading="Workspaces"
                       count={workspaces.length}
                       hint="sets of projects threads start in together"
                       action={
