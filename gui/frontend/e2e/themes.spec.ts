@@ -83,40 +83,9 @@ test("a previewed theme paints the gallery, not the window; Apply paints the win
   await expect(page.getByTestId("themes-pair-hint")).toHaveCount(0);
 });
 
-test("Escape discards the preview and closes; the next visit starts from the applied theme", async ({ page }) => {
-  await openFromSettings(page, "dark");
-  await option(page, "Gruvbox Dark").click();
-  await expect(scope(page)).toHaveAttribute("data-theme", "gruvbox-dark");
-  await page.keyboard.press("Escape");
-  await expect(page$(page)).toHaveCount(0);
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
-  expect(await raw("appearance.theme_dark")).toBeUndefined();
-  await page.getByTestId("choose-theme-dark").click();
-  await expect(scope(page)).toHaveAttribute("data-theme", "github-dark");
-});
+// Escape discarding the preview and the next visit starting from the applied theme: src/components/themes/ThemesPage.test.tsx ("Escape drops the preview and goes back to Settings…").
 
-test("after Apply, the companion theme is suggested for the other slot, and one click uses it", async ({ page }) => {
-  await openFromSettings(page, "dark");
-  await option(page, "Gruvbox Dark").click();
-  await page.getByTestId("themes-apply").click();
-  const hint = page.getByTestId("themes-pair-hint");
-  await expect(hint).toContainText("Gruvbox Light is this theme’s light companion. Use it for light?");
-  // Suggest only: the light slot is untouched until the button.
-  expect(await raw("appearance.theme_light")).toBeUndefined();
-  await page.getByTestId("themes-pair-accept").click();
-  await expect.poll(() => raw("appearance.theme_light")).toBe("gruvbox-light");
-  await expect(hint).toHaveCount(0);
-  await expect(html(page)).toHaveAttribute("data-theme", "gruvbox-dark");
-
-  // Applying GitHub Dark back: GitHub Light is not the light slot any more, so it is suggested; dismissed, it goes.
-  await option(page, "GitHub Dark").click();
-  await page.getByTestId("themes-apply").click();
-  await expect(hint).toContainText("GitHub Light");
-  await page.getByRole("button", { name: "Dismiss suggestion" }).click();
-  await expect(hint).toHaveCount(0);
-  expect(await raw("appearance.theme_light")).toBe("gruvbox-light");
-});
+// The companion suggested after Apply, accepted or dismissed: src/components/themes/ThemesPage.test.tsx ("previewing paints the gallery's scope…; a companion is suggested, accepted or dismissed").
 
 test("the keyboard: arrows preview, Enter applies, / searches, Escape clears then closes", async ({ page }) => {
   await openFromPalette(page);
