@@ -283,11 +283,11 @@ export function cacheMinutesLeft(expiresAtMs: number | null, now: number): numbe
 }
 
 /**
- * The context row's muted suffix: "cache 41m" while the prompt cache is warm; "" before the
+ * The context row's muted suffix: "cached for 41m" while the prompt cache is warm; "" before the
  * first result and once it has expired (the composer's ColdCacheNote says so).
  */
 export function cacheSuffix(minutesLeft: number | null): string {
-  return minutesLeft !== null && minutesLeft > 0 ? `cache ${String(minutesLeft)}m` : "";
+  return minutesLeft !== null && minutesLeft > 0 ? `cached for ${String(minutesLeft)}m` : "";
 }
 
 /**

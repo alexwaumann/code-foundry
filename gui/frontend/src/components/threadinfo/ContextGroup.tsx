@@ -13,11 +13,12 @@ import { Group, HOVER_CARD, Row } from "./Row";
 const NONE: readonly UsageBucketView[] = [];
 
 /**
- * Context: how full the context window is (a 56px bar and the percentage; neither when the
- * window is unknown) and, while the prompt cache is warm, how long it stays so. No click;
- * the hover card gives the tokens and, warm, the cache's expiry and what re-reading the
- * context costs after it. An expired cache is the composer's ColdCacheNote to say: the row
- * and the card say nothing of it.
+ * Context: "Context", the warm cache's minutes beside it ("cached for 41m"), a bar that
+ * fills the rest of the row, and the tokens of the window ("221K of 1M"); neither the bar
+ * nor the tokens when the window is unknown. No click; the hover card gives the share of
+ * the window and, warm, the cache's expiry and what re-reading the context costs after it.
+ * An expired cache is the composer's ColdCacheNote to say: the row and the card say
+ * nothing of it.
  */
 function ContextRow({ threadId }: { threadId: string }) {
   const tokens = useThreadsStore((s) => s.byId[threadId]?.contextTokens ?? 0);
@@ -31,7 +32,7 @@ function ContextRow({ threadId }: { threadId: string }) {
   const warm = minutes !== null && minutes > 0;
   const card = (
     <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>
-      <div>{window > 0 ? `${fmtTok(tokens)} of ${fmtTok(window)} tokens used` : `${fmtTok(tokens)} tokens used`}</div>
+      <div>{pct !== null ? `${String(pct)}% of context window used` : `${fmtTok(tokens)} tokens used`}</div>
       {warm && <div>Cache expires in {String(minutes)} min</div>}
       {warm && reread > 0 && <div>{cardUsd(reread)} to re-read it after that</div>}
     </div>
@@ -41,27 +42,32 @@ function ContextRow({ threadId }: { threadId: string }) {
       <Row
         hoverable
         meta={
-          (suffix || pct !== null) && (
-            <>
-              {suffix && (
-                <span className="text-cf-text-muted" data-testid="ti-context-cache">
-                  {suffix}
-                </span>
-              )}
-              {pct !== null && (
-                <>
-                  <span className="inline-block h-1 w-14 overflow-hidden rounded-full bg-cf-border" aria-hidden>
-                    <span className="block h-full bg-cf-text-muted" style={{ width: `${String(pct)}%` }} />
-                  </span>
-                  <span data-testid="ti-context-pct">{pct}%</span>
-                </>
-              )}
-            </>
+          pct !== null && (
+            <span className="text-cf-text-muted" data-testid="ti-context-tokens">
+              {fmtTok(tokens)} of {fmtTok(window)}
+            </span>
           )
         }
         testId="ti-context"
       >
-        Context
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 truncate" data-testid="ti-context-label">
+            Context
+            {suffix && (
+              <>
+                {" "}
+                <span className="text-cf-text-muted" data-testid="ti-context-cache">
+                  {suffix}
+                </span>
+              </>
+            )}
+          </span>
+          {pct !== null && (
+            <span className="h-1 min-w-6 flex-1 overflow-hidden rounded-full bg-cf-text/12" aria-hidden data-testid="ti-context-bar">
+              <span className="block h-full bg-cf-text-muted" style={{ width: `${String(pct)}%` }} />
+            </span>
+          )}
+        </span>
       </Row>
     </Tip>
   );
