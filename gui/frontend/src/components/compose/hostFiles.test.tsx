@@ -6,8 +6,10 @@ import type { ProjectView } from "@/api/project";
 import { getDraft, updateDraft, useComposeStore } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { lastInvocation, resetDaemon } from "@/test/daemonFakes";
 import { Composer } from "./Composer";
 
+vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 // No daemon: refs and skills never load (the composer shows them loading).
 vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), listRefs: () => new Promise(() => undefined) }));
 vi.mock("@/api/filesystem", async (orig) => ({ ...(await orig<typeof import("@/api/filesystem")>()), listSkills: () => new Promise(() => undefined) }));
@@ -101,6 +103,33 @@ describe("native drops on the composer", () => {
     await waitFor(() => {
       expect(getDraft("web").text).toBe(`/src/web/notes.txt "/Users/me/my dir" ![shot one.png](cf-attachment://${a?.id ?? ""}) `);
     });
+  });
+
+  it("images and PDFs staged by path and attached; the send reuses the staged paths in the draft's order (compose.spec.ts)", async () => {
+    resetDaemon();
+    render(<Composer projectId="web" />);
+    const card = screen.getByTestId("composer-card");
+    drop(["/Users/me/shot.png", "/Users/me/my notes.txt", "/Users/me/spec.pdf", "/Users/me/src"], dropId(card));
+    await waitFor(() => {
+      expect(getDraft("web").attachments.map((a) => [a.file.name, a.kind])).toEqual([
+        ["shot.png", "image"],
+        ["spec.pdf", "pdf"],
+      ]);
+    });
+    await waitFor(() => {
+      expect(getDraft("web").text).toMatch(/^"\/Users\/me\/my notes\.txt" \/Users\/me\/src !\[shot\.png\]\(cf-attachment:\/\/a\d+\) !\[spec\.pdf\]\(cf-attachment:\/\/a\d+\) $/);
+    });
+    expect([...staged].sort()).toEqual(["/Users/me/shot.png", "/Users/me/spec.pdf"]);
+    const paths = getDraft("web").attachments.map((a) => a.stagedPath);
+    act(() => {
+      updateDraft("web", { text: `Compare ${getDraft("web").text}` });
+    });
+    fireEvent.click(screen.getByTestId("composer-send"));
+    await waitFor(() => {
+      expect(lastInvocation("thread.new")?.args.attachments).toBe(paths.join(","));
+    });
+    // Staged once, at the drop.
+    expect(staged).toHaveLength(2);
   });
 
   it("only the composer whose id the drop names takes it", async () => {
