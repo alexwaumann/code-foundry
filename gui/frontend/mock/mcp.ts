@@ -111,6 +111,16 @@ export function ageMcp(threads: McpThreads, id: string, agoSeconds: number): voi
   threads.setMcp(id, { ...cur, checkedAt: timestampFromDate(new Date(Date.now() - agoSeconds * 1000)) });
 }
 
+/**
+ * POST /__mock/thread/mcp-servers: the thread's servers become the named ones of the
+ * sketch's six (mcpServers), at its last check's time (the fixture's when it has none),
+ * published like a new answer, so a tab of the panel can be emptied.
+ */
+export function keepMcpServers(threads: McpThreads, id: string, names: readonly string[]): void {
+  const cur = threads.mcpOf(id) ?? mcpFixture();
+  threads.setMcp(id, { ...cur, servers: mcpServers().filter((s) => names.includes(s.name ?? "")) });
+}
+
 /** McpReconnect: the new status and Claude's refusal ("" when it went through). */
 export async function reconnectMcp(threads: McpThreads, id: string, server: string): Promise<{ status: McpStatusInit; error: string }> {
   // The daemon starts Claude for a stopped thread; its last status outlives the process.

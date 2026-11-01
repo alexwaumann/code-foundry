@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { McpServerView, McpStatusView } from "@/api/mcp";
-import { canReconnect, checkedAgo, checkedLine, claudeRunning, connectedSummary, MCP_STALE_AFTER_MS, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpStaleInput } from "./mcp";
+import type { McpServerStatusView, McpServerView, McpStatusView } from "@/api/mcp";
+import { bucketCounts, canReconnect, checkedAgo, checkedLine, claudeRunning, connectedSummary, MCP_BUCKET_EMPTY, MCP_BUCKET_LABEL, MCP_BUCKETS, MCP_STALE_AFTER_MS, mcpBucket, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpBucket, type McpStaleInput } from "./mcp";
 
 const NOW = 1_800_000_000_000;
 
@@ -144,5 +144,37 @@ describe("shareMcp", () => {
     expect(sameServer(a, { ...a })).toBe(true);
     expect(sameServer(a, { ...a, version: "2" })).toBe(false);
     expect(sameServer(a, { ...a, tools: [{ name: "t", description: "", readOnly: false, destructive: false, openWorld: false }] })).toBe(false);
+  });
+});
+
+describe("mcpBucket", () => {
+  it.each<[McpServerStatusView, McpBucket]>([
+    ["connected", "connected"],
+    ["pending", "connected"],
+    ["failed", "failed"],
+    ["needs-auth", "failed"],
+    ["unknown", "failed"],
+    ["disabled", "disabled"],
+  ])("%s → %s", (st, want) => {
+    expect(mcpBucket(st)).toBe(want);
+  });
+
+  it("lists the tabs in order, each labelled with an empty line", () => {
+    expect(MCP_BUCKETS).toEqual(["connected", "failed", "disabled"]);
+    expect(MCP_BUCKETS.map((b) => MCP_BUCKET_LABEL[b])).toEqual(["Connected", "Failed", "Disabled"]);
+    expect(MCP_BUCKETS.map((b) => MCP_BUCKET_EMPTY[b])).toEqual(["No connected servers.", "No failed servers. Nothing needs a login.", "No disabled servers."]);
+  });
+});
+
+describe("bucketCounts", () => {
+  const s = (status: McpServerStatusView) => server(status, { status });
+  it.each<[string, McpServerView[], Record<McpBucket, number>]>([
+    ["none", [], { connected: 0, failed: 0, disabled: 0 }],
+    ["the sketch's six", [s("connected"), s("connected"), s("needs-auth"), s("failed"), s("pending"), s("disabled")], { connected: 3, failed: 2, disabled: 1 }],
+    ["all connected", [s("connected"), s("connected")], { connected: 2, failed: 0, disabled: 0 }],
+    ["unknown counts as failed", [s("unknown")], { connected: 0, failed: 1, disabled: 0 }],
+    ["only disabled", [s("disabled"), s("disabled")], { connected: 0, failed: 0, disabled: 2 }],
+  ])("%s", (_name, servers, want) => {
+    expect(bucketCounts(servers)).toEqual(want);
   });
 });

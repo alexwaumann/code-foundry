@@ -12,7 +12,7 @@ import { useShallow } from "zustand/react/shallow";
 import { getMcpStatus, type McpServerView, type McpStatusView } from "@/api/mcp";
 import { errorMessage } from "@/api/stream";
 import { useNowSelect } from "@/lib/clock";
-import { claudeRunning, mcpStale } from "@/lib/mcp";
+import { bucketCounts, claudeRunning, mcpBucket, mcpStale, type McpBucket } from "@/lib/mcp";
 import { runCommandForResult } from "./commands";
 import { threadContext } from "./threadActions";
 import { useThreadStore } from "./thread";
@@ -41,18 +41,33 @@ export function useMcpServerNames(threadId: string): readonly string[] {
   return useThreadStore(useShallow((s) => s.logs[threadId]?.mcp?.servers.map((x) => x.name) ?? NO_NAMES));
 }
 
+/** The names of the servers one tab lists (lib/mcp mcpBucket), in Claude's order. */
+export function useMcpBucketNames(threadId: string, bucket: McpBucket): readonly string[] {
+  return useThreadStore(useShallow((s) => s.logs[threadId]?.mcp?.servers.filter((x) => mcpBucket(x.status) === bucket).map((x) => x.name) ?? NO_NAMES));
+}
+
+/** How many servers each tab lists; null without a status. */
+export function useMcpBucketCounts(threadId: string): Record<McpBucket, number> | null {
+  return useThreadStore(
+    useShallow((s) => {
+      const m = s.logs[threadId]?.mcp;
+      return m ? bucketCounts(m.servers) : null;
+    }),
+  );
+}
+
 /** One server (narrow: a check keeps unchanged servers by identity, lib/mcp shareMcp). */
 export function useMcpServer(threadId: string, name: string): McpServerView | undefined {
   return useThreadStore((s) => s.logs[threadId]?.mcp?.servers.find((x) => x.name === name));
 }
 
-/** The header's figures: when and why checked, how many connected of how many. */
-export function useMcpHeader(threadId: string): { checkedAtMs: number | null; trigger: McpStatusView["trigger"]; server: string; connected: number; total: number } | null {
+/** The header's figures: when and why checked. */
+export function useMcpHeader(threadId: string): { checkedAtMs: number | null; trigger: McpStatusView["trigger"]; server: string } | null {
   return useThreadStore(
     useShallow((s) => {
       const m = s.logs[threadId]?.mcp;
       if (!m) return null;
-      return { checkedAtMs: m.checkedAtMs, trigger: m.trigger, server: m.server, connected: m.servers.filter((x) => x.status === "connected").length, total: m.servers.length };
+      return { checkedAtMs: m.checkedAtMs, trigger: m.trigger, server: m.server };
     }),
   );
 }
