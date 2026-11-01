@@ -6,6 +6,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { agentName, fmtElapsed } from "@/lib/agents";
 import { useNowSelect } from "@/lib/clock";
 import { childIds, lineageStatus } from "@/lib/lineage";
+import { canonicalModelName } from "@/lib/models";
 import {
   agentRowState,
   childRowState,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
 import { useCreator, useLiveCount } from "@/stores/lineage";
-import { saveSettings, useShowCreatedThreads } from "@/stores/settings";
+import { saveSettings, useModelChoices, useShowCreatedThreads } from "@/stores/settings";
 import { openAgentRun } from "@/stores/subagentActions";
 import { useThreadStore } from "@/stores/thread";
 import { interruptThread } from "@/stores/threadActions";
@@ -93,7 +94,9 @@ function useChildRows(threadId: string): readonly string[] {
  * A live child thread swaps its elapsed time for a stop square on hover (or while the
  * square has the keyboard), which interrupts it. The square is the row's sibling, laid
  * over the value column, not a button inside the row's own: Enter on it interrupts, it
- * does not open. Subagent runs have none (nothing stops one run).
+ * does not open. Subagent runs have none (nothing stops one run). The hover card opens at
+ * once (delay 0) like the sidebar's, and names the model as the app does (canonicalModelName):
+ * a run that asked for none used its thread's model, as the subagent view says.
  */
 function LineageItem({ threadId, row, sub = false }: { threadId: string; row: LineageRow; sub?: boolean }) {
   // A finished row's time is fixed: only a live one ticks.
@@ -102,6 +105,10 @@ function LineageItem({ threadId, row, sub = false }: { threadId: string; row: Li
   const ms = lineageElapsedMs(row, now);
   const elapsed = ms === null ? "" : fmtElapsed(ms);
   const stoppable = row.kind === "thread" && live;
+  const choices = useModelChoices();
+  const threadModel = useThreadsStore((s) => (row.kind === "agent" ? (s.byId[threadId]?.model ?? "") : ""));
+  const modelId = row.model || threadModel;
+  const model = modelId ? canonicalModelName(choices, modelId) : "";
   const open = () => {
     if (row.kind === "agent") void openAgentRun(threadId, row.id);
     else useUiStore.getState().select({ kind: "thread", id: row.id }, { focusPrompt: true });
@@ -110,7 +117,11 @@ function LineageItem({ threadId, row, sub = false }: { threadId: string; row: Li
     <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>
       <div className="font-medium">{row.name}</div>
       {row.type && <div className={cn(row.kind === "thread" && "text-code")}>{row.type}</div>}
-      {(row.model || row.effort) && <div className="text-cf-text-muted">{[row.model, row.effort].filter(Boolean).join(" · ")}</div>}
+      {(model || row.effort) && (
+        <div className="text-cf-text-muted" data-testid="ti-lineage-model">
+          {[model, row.effort].filter(Boolean).join(" · ")}
+        </div>
+      )}
       <div className="flex gap-3">
         <span className={DOT[row.state]}>{lineageStateWords[row.state]}</span>
         {elapsed && <span className="ml-auto text-cf-text-muted tabular-nums">{elapsed}</span>}
@@ -119,7 +130,7 @@ function LineageItem({ threadId, row, sub = false }: { threadId: string; row: Li
   );
   return (
     <div className="group/li relative flex flex-col">
-      <Tip label={card} side="left">
+      <Tip label={card} side="left" delay={0}>
         <Row
           sub={sub}
           icon={<Dot state={row.state} />}

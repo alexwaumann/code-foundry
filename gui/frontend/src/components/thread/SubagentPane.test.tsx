@@ -127,7 +127,7 @@ describe("SubagentPane", () => {
     expect(screen.queryByTestId("thread-title")).toBeNull();
     expect([...tid("pane-actions").querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["panel-toggle"]);
     expect(tid("subagent-lineage-parent").textContent).toBe("Agents panel");
-    expect(tid("subagent-lineage-meta").textContent).toBe("background · general-purpose · opus · high · launched by turn 1's Agent call, 4 min ago");
+    expect(tid("subagent-lineage-meta").textContent).toBe("background · general-purpose · Opus · high · launched by turn 1's Agent call, 4 min ago");
     expect(tid("subagent-lineage-back").textContent).toBe("Back to Agents panel");
     expect(tid("thread-user-label").textContent).toBe("Prompt from Agents panel");
     expect(tid("subagent-prompt").textContent).toContain(PROMPT);
@@ -139,7 +139,7 @@ describe("SubagentPane", () => {
     expect(nested?.querySelector('[data-testid="thread-agent-open"]')).toBeNull();
     expect(nested?.querySelector('[data-testid="thread-tool"]')?.tagName).toBe("DIV");
     expect(nested?.querySelectorAll("[data-tool]")).toHaveLength(0);
-    expect(tid("subagent-footer").textContent).toMatch(/^Working for 4m 1\ds·23 tools·48\.2K tokens·opus$/);
+    expect(tid("subagent-footer").textContent).toMatch(/^Working for 4m 1\ds·23 tools·48\.2K tokens·Opus$/);
     expect(tid("subagent-plate-text").textContent).toBe("Read-only. A subagent takes its instructions from its parent thread. To steer it, send a follow-up to Agents panel.");
     expect(tid("subagent-plate-chord").textContent).toBe("esc");
     expect(screen.queryByTestId("subagent-report")).toBeNull();
@@ -149,7 +149,7 @@ describe("SubagentPane", () => {
     setLog([run("a1", { status: "done", durationMs: 38_000, toolUses: 4, totalTokens: 6_100, endedAtMs: NOW - 5 * 60_000, summary: "Added the task frames." }), NESTED], ITEMS);
     const { unmount } = show();
     expect(tid("subagent-status").textContent).toBe("Done · 5 min ago");
-    expect(tid("subagent-footer").textContent).toBe("Worked for 38s·4 tools·6.1K tokens·opus");
+    expect(tid("subagent-footer").textContent).toBe("Worked for 38s·4 tools·6.1K tokens·Opus");
     expect(tid("subagent-report").textContent).toBe("Report handed back to Agents panelAdded the task frames.");
     expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent finished and handed its report to Agents panel.");
     unmount();

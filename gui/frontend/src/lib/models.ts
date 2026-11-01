@@ -33,18 +33,26 @@ export function modelName(choices: readonly Choice[], model: string): string {
 }
 
 const CANONICAL = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(?:\[[^\]]*\])?$/;
+/** A bare family alias, as the Agent tool takes one ("haiku", "opus"). */
+const ALIAS = /^[a-z]+$/;
+
+/** A family's label: the registry's for that alias, else the alias capitalised. */
+function familyLabel(choices: readonly Choice[], family: string): string {
+  return choices.find((c) => c.value === family)?.label ?? family.charAt(0).toUpperCase() + family.slice(1);
+}
 
 /**
  * The name of a model as Claude reports it (a turn's replies: "claude-haiku-5-5",
  * "claude-opus-4-8[1m]"): the registry's label for that id, else the registry's label for
- * its family alias with the version read from the id ("Haiku" + "5.5"), else the id itself.
+ * its family alias with the version read from the id ("Haiku" + "5.5"), a bare alias as a
+ * subagent run asks for one ("haiku") capitalised, else the id itself.
  */
 export function canonicalModelName(choices: readonly Choice[], id: string): string {
   const known = choices.find((c) => c.value === id);
   if (known) return known.label;
+  if (ALIAS.test(id)) return familyLabel(choices, id);
   const m = CANONICAL.exec(id);
   if (!m) return id;
   const [, family = "", major = "", minor] = m;
-  const label = choices.find((c) => c.value === family)?.label ?? family.charAt(0).toUpperCase() + family.slice(1);
-  return `${label} ${major}${minor ? `.${minor}` : ""}`;
+  return `${familyLabel(choices, family)} ${major}${minor ? `.${minor}` : ""}`;
 }
