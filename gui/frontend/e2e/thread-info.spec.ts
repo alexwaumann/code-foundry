@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { expectTooltip, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * The thread info card (docs/notes/thread-info-card.md) over the mock's
@@ -81,7 +81,7 @@ test("one project: place, branch, pull requests, changes, shells, lineage, MCP, 
   await c.getByTestId("ti-previous").click();
   await expect(c.locator('[data-testid="ti-lineage-row"][data-id="s-ti-k3"]')).toHaveAttribute("data-state", "done");
 
-  await expect(c.getByTestId("ti-mcp")).toContainText("2 connected");
+  await expect(c.getByTestId("ti-mcp").locator("> span").nth(1)).toHaveText("2 connected");
   // Context: the row says only "Context"; its value column holds the warm cache's minutes, then the bar and share.
   await expect(c.getByTestId("ti-context").locator("> span").nth(0)).toHaveText("Context");
   await expect(c.getByTestId("ti-context-meta")).toHaveText(/^cache 41m\s*22%$/);
@@ -504,4 +504,68 @@ test("a page's Expand covers the conversation, not the card beside it", async ({
   await expect(page.getByTestId("thread-html-lightbox")).toBeVisible();
   await page.getByTestId("thread-html-close").click();
   await expect(lightbox).toHaveCount(0);
+});
+
+test("the MCP row: connected count on the left, attention counts in the value column; the value and chevron open the menu, the rest opens the tab", async ({ page }) => {
+  // s-r1 carries the MCP sketch's six servers (mock/mcp.ts): two connected, linear needs a login, playwright failed.
+  await mockPost("thread?state=idle");
+  await openApp(page);
+  await row(page, "s:s-r1").click();
+  await toggle(page).click();
+  const c = card(page);
+  const mcp = c.getByTestId("ti-mcp");
+  await expect(mcp.locator("> span").nth(1)).toHaveText("2 connected");
+  await expect(mcp.locator("> span").nth(1).locator("span")).toHaveClass(/text-cf-text-muted/);
+  await expect(c.getByTestId("ti-mcp-meta")).toHaveText(/^1 needs login\s*1 failed$/);
+  await expect(c.getByTestId("ti-mcp-needs-login")).toHaveClass(/text-cf-warning-text/);
+  await expect(c.getByTestId("ti-mcp-failed")).toHaveClass(/text-cf-error-text/);
+  // The value lines up with the other rows' values (its right edge, the same chevron column).
+  const right = async (testId: string) => {
+    const b = await c.getByTestId(testId).boundingBox();
+    return (b?.x ?? 0) + (b?.width ?? 0);
+  };
+  expect(Math.abs((await right("ti-mcp-meta")) - (await right("ti-usage-meta")))).toBeLessThan(1);
+  // One trigger zone: the value and the chevron, tinted together on hover.
+  const zone = c.getByTestId("ti-mcp-menu-zone");
+  await expect(zone.getByTestId("ti-mcp-meta")).toHaveCount(1);
+  await expect(zone.getByTestId("ti-mcp-chevron")).toHaveCount(1);
+  const bg = () => zone.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await page.mouse.move(0, 0);
+  const resting = await bg();
+  await c.getByTestId("ti-mcp-failed").hover();
+  await expect.poll(bg).not.toBe(resting);
+
+  // A press on the value opens the menu, not the tab.
+  await c.getByTestId("ti-mcp-needs-login").click();
+  const menu = page.getByTestId("ti-mcp-menu");
+  await expect(menu).toBeVisible();
+  await expect(c.getByTestId("ti-mcp-chevron")).toHaveAttribute("data-open", "");
+  await expect(page.getByTestId("mcp-surface")).toHaveCount(0);
+  // Reconnect is offered for the failed server only (a login cannot be done headlessly).
+  await expect(menu.getByTestId("ti-mcp-reconnect")).toHaveCount(1);
+  await expect(menu.getByTestId("ti-mcp-reconnect")).toHaveText("Reconnect playwright");
+  await menu.getByTestId("ti-mcp-reconnect").click();
+  await expect(menu).toHaveCount(0);
+  await expect
+    .poll(async () => ((await (await fetch(`${mockUrl}/__mock/thread/calls`)).json()) as string[]).includes("mcp-reconnect s-r1 playwright"))
+    .toBe(true);
+  await expect(c.getByTestId("ti-mcp-meta")).toHaveText("1 needs login");
+  await expect(c.getByTestId("ti-mcp-failed")).toHaveCount(0);
+  await expect(mcp.locator("> span").nth(1)).toHaveText("3 connected");
+
+  // The chevron opens the menu too; ArrowDown from the focused row as well.
+  await c.getByTestId("ti-mcp-chevron").click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await mcp.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+
+  // A press on the text opens the MCP tab.
+  await mcp.locator("> span").nth(1).click();
+  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "mcp");
+  await expect(menu).toHaveCount(0);
 });
