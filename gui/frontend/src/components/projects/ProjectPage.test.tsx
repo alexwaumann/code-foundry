@@ -9,7 +9,7 @@ const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { RemoveWorktreeDialog } = await import("./RemoveWorktreeDialog");
 const { ProjectsPage } = await import("./ProjectsPage");
 const { confirmFirst, daemon, invocationsOf, lastInvocation, needsConfirm, resetDaemon } = await import("@/test/daemonFakes");
-const { addLeftovers, addTerminal, addThreads, addWorktrees, removeWorktrees, CF, COPY, FEAT, FIX, MERGED, SHADERS, SPIKE, menuEntries, seedWorld, status, texts, thread, updateProject, worktree } = await import("@/test/projectsWorld");
+const { addLeftovers, addTerminal, addThreads, addWorktrees, fakeGitInit, panelActive, removeWorktrees, resetPanels, CF, COPY, FEAT, FIX, MERGED, SHADERS, SPIKE, menuEntries, seedWorld, status, texts, thread, updateProject, worktree } = await import("@/test/projectsWorld");
 const { projectPage, useUiStore } = await import("@/stores/ui");
 const { usePublishDialogStore } = await import("@/stores/publish");
 const { useComposeStore } = await import("@/stores/compose");
@@ -18,9 +18,10 @@ const { useProjectsStore } = await import("@/stores/projects");
 /**
  * A project's page (docs/notes/projects-redesign-1-index.md) and its Worktrees without threads
  * with the remove confirm (docs/notes/projects-redesign-2-leftovers.md), against the mock's world
- * (src/test/projectsWorld.ts). e2e/projects.spec.ts keeps what needs the browser or the daemon:
- * the narrow layout (real width), the Changes tab a row opens in the page's side panel, scroll
- * memory, and what the daemon changes after a command (git init, a removal, a CLI terminal).
+ * (src/test/projectsWorld.ts). What the daemon changes after a command (git init, a removal) is a
+ * fake handler changing the store, and a tab a row opens is read off the panel store (panelActive).
+ * e2e/projects.spec.ts keeps what needs the browser: the narrow layout (real width), the Changes tab
+ * drawn in the page's side panel, scroll memory, and a CLI terminal and Resume over the stream.
  */
 
 const page = () => screen.getByTestId("projects-page");
@@ -67,6 +68,8 @@ function fakeRemove() {
     if (!inv.confirmed) throw needsConfirm({ command: inv.name, title: "Remove Worktree", message: `Remove worktree ${inv.args.path ?? ""}? This deletes files on disk.` });
     const w = useProjectsStore.getState().byId["repo-cf"]?.worktrees.find((x) => x.path === inv.args.path);
     if (w?.status.dirty && inv.args.force !== "true") throw needsConfirm({ command: inv.name, title: "Delete Uncommitted Work", message: "uncommitted work", args: { force: "true" } });
+    // The daemon's worktreeRemoved event.
+    removeWorktrees("repo-cf", inv.args.path ?? "");
     return { message: "", resultJson: "" };
   });
 }
@@ -86,9 +89,13 @@ function toIndex() {
   fireEvent.click(screen.getByTestId("projects-crumb"));
 }
 
+/** The project page's own side panel (its key), as e2e reads it off the rendered panel. */
+const pagePanel = (projectId = "repo-cf") => panelActive(`view:projects:project:${projectId}`);
+
 beforeEach(() => {
   resetDaemon();
   seedWorld();
+  resetPanels();
   usePublishDialogStore.setState({ open: false, projectId: "" });
   useComposeStore.setState({ drafts: {} });
 });
@@ -132,6 +139,23 @@ describe("a project's page", () => {
     // Worktrees without threads sits between Checkouts and Details; threads hold both worktrees here.
     expect([...list().children].map((c) => c.getAttribute("data-testid"))).toEqual(["project-checkouts", "leftover-worktrees", "project-details"]);
     expect(screen.getByTestId("leftover-empty")).toBeTruthy();
+
+    // A click opens the checkout's Changes tab in this page's own panel, shown.
+    fireEvent.click(checkoutRow(FIX));
+    expect(pagePanel()).toEqual({ open: true, kind: "changes", title: "Changes · code-foundry · fix/resize", params: { project: "repo-cf", path: FIX } });
+    expect(page().getAttribute("data-project")).toBe("repo-cf");
+  });
+
+  it("the project page's list has the keyboard: End then Enter opens the last checkout's Changes tab", async () => {
+    renderPage("repo-cf");
+    await settle();
+    expect(document.activeElement).toBe(list());
+    fireEvent.keyDown(list(), { key: "End" });
+    fireEvent.keyDown(list(), { key: "Enter" });
+    const last = document.querySelector('[data-nav-key][aria-selected="true"]')?.getAttribute("data-nav-key") ?? "";
+    expect(last.startsWith("pw:repo-cf::")).toBe(true);
+    expect(pagePanel()?.kind).toBe("changes");
+    expect(pagePanel()?.params.path).toBe(last.slice("pw:repo-cf::".length));
   });
 
   it("a checkout row's menu: main has no Remove; Open in Finder reveals it; Remove worktree asks in its dialog, then removes", async () => {
@@ -154,6 +178,9 @@ describe("a project's page", () => {
     const removes = invocationsOf("project.worktree.remove");
     expect(removes.map((i) => i.confirmed)).toEqual([false, true]);
     expect(removes.at(-1)?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: FIX });
+    // Once the daemon removed it: gone from the table and from Details' count.
+    expect(checkout(FIX)).toBeNull();
+    expect(screen.getByTestId("details-worktrees").textContent).toContain("~/src/code-foundry.worktrees · 1");
   });
 
   it("the header's menu has no New worktree; New thread and Terminal start in the project", async () => {
@@ -171,6 +198,7 @@ describe("a project's page", () => {
   });
 
   it("kind variants: no remote (note, Publish, no Sync or PR), another remote (no PR), no git (note, Threads, no table)", async () => {
+    fakeGitInit();
     const r = renderPage("repo-sk");
     await settle();
     expect(screen.getByTestId("project-meta").textContent).toBe("local only · no remote");
@@ -197,6 +225,8 @@ describe("a project's page", () => {
 
     renderPage("repo-wr");
     await settle();
+    expect(page().getAttribute("data-kind")).toBe("nogit");
+    expect(screen.queryByTestId("worktree-branch")).toBeNull();
     expect(screen.getByTestId("project-meta").textContent).toBe("~/Documents/writing");
     expect(screen.getByTestId("project-note").textContent).toContain("A plain folder, not a git repository.");
     expect(screen.queryByTestId("checkouts-table")).toBeNull();
@@ -209,6 +239,23 @@ describe("a project's page", () => {
     const init = lastInvocation("project.git.init");
     expect(init?.args).toEqual({ project: "repo-wr" });
     expect(init?.context).toMatchObject({ activeProjectId: "repo-wr", activeView: "projects" });
+    // Once the daemon made it a git repository without a remote: its checkout on main and the Publish note.
+    expect(page().getAttribute("data-kind")).toBe("git");
+    expect(screen.getByTestId("checkouts-table")).toBeTruthy();
+    expect(texts(document, "worktree-branch")).toEqual(["main"]);
+    expect(screen.getByTestId("project-note").textContent).toContain("no remote");
+  });
+
+  it("a project without git: the header menu's Initialize git runs project.git.init on it; then it is a git repository on main", async () => {
+    fakeGitInit();
+    renderPage("repo-wr");
+    await settle();
+    const menu = openDropdown(screen.getByTestId("project-more"), "project-more-menu");
+    expect(menuEntries(menu)).toContain("Initialize git");
+    await pick(menu, "project-menu-init-git");
+    expect(lastInvocation("project.git.init")?.context).toMatchObject({ activeProjectId: "repo-wr" });
+    expect(page().getAttribute("data-kind")).toBe("git");
+    expect(texts(document, "worktree-branch")).toEqual(["main"]);
   });
 
   it("Refresh fetches (with a remote) then refreshes, disabled and spinning meanwhile; without a remote only refreshes", async () => {
@@ -340,6 +387,11 @@ describe("Worktrees without threads", () => {
     // Uncommitted files on a leftover show in its reason.
     updateProject("repo-cf", (p) => ({ ...p, worktrees: p.worktrees.map((w) => (w.path === SHADERS ? { ...w, status: status({ upstream: "", baseRef: "origin/main", modified: 2, dirty: true }) } : w)) }));
     expect(inEl(leftover(SHADERS), "leftover-reason")?.textContent).toBe("made outside Code Foundry · 2 uncommitted files · merged otherwise");
+
+    // Show diff: the worktree's Changes tab in this page's panel (the narrow layout it makes is e2e's).
+    fireEvent.click(inEl(leftover(COPY), "leftover-show-diff") as HTMLElement);
+    expect(pagePanel()).toMatchObject({ open: true, kind: "changes", params: { project: "repo-cf", path: COPY } });
+    expect(page().getAttribute("data-project")).toBe("repo-cf");
   });
 
   it("New thread on a clean one and Resume without an archived thread open the composer in that checkout; Resume with one unarchives and shows it", async () => {
@@ -390,6 +442,9 @@ describe("Worktrees without threads", () => {
     await settle();
     expect(screen.queryByTestId("remove-worktree-dialog")).toBeNull();
     expect(invocationsOf("project.worktree.remove").map((i) => i.confirmed)).toEqual([false]);
+    // ... and opens the worktree's Changes tab in this page's panel; the leftover stays.
+    expect(pagePanel()).toMatchObject({ open: true, kind: "changes", params: { project: "repo-cf", path: COPY } });
+    expect(leftover(COPY)).not.toBeNull();
 
     // Cancel keeps it.
     fireEvent.click(inEl(leftover(SPIKE), "leftover-remove") as HTMLElement);
@@ -408,6 +463,8 @@ describe("Worktrees without threads", () => {
     const last = lastInvocation("project.worktree.remove");
     expect(last?.args).toEqual({ path: COPY, force: "true" });
     expect(last?.confirmed).toBe(true);
+    // The daemon's removal: its row goes.
+    expect(leftover(COPY)).toBeNull();
 
     // Clean: no warning, no force.
     fireEvent.click(inEl(leftover(SHADERS), "leftover-remove") as HTMLElement);
@@ -416,6 +473,9 @@ describe("Worktrees without threads", () => {
     fireEvent.click(screen.getByTestId("remove-worktree-ok"));
     await settle();
     expect(lastInvocation("project.worktree.remove")?.args).toEqual({ path: SHADERS });
+    expect(leftover(SHADERS)).toBeNull();
+    expect(leftover(SPIKE)).not.toBeNull();
+    expect(screen.getByTestId("leftover-title").textContent).toContain("1 kept");
   });
 
   it("Remove the N that are clean runs the cleanup after its confirm; with nothing kept the section says so", async () => {

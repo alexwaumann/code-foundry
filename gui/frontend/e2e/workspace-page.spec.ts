@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, mockUrl, openApp, openProjectPage, openWorkspacePage, resetMock } from "./fixtures";
+import { mockPost, openApp, openWorkspacePage, resetMock } from "./fixtures";
 
 /**
  * A workspace's page on the Projects view (docs/notes/projects-redesign-3-workspace-page.md):
@@ -15,18 +15,6 @@ test.beforeEach(async () => {
 
 const body = (page: Page, id: string) => page.locator(`[data-testid="workspace"][data-workspace="${id}"]`);
 const member = (page: Page, id: string, projectId: string) => body(page, id).locator(`[data-nav-key="m:${id}::${projectId}"]`);
-const threadRow = (page: Page, id: string, threadId: string) => body(page, id).locator(`[data-nav-key="wt:${id}::${threadId}"]`);
-
-async function lastInvocation(name: string) {
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === name).length).toBeGreaterThan(0);
-  return (await invocations()).filter((i) => i.name === name).at(-1);
-}
-
-async function menuItems(page: Page, testId: string): Promise<string[]> {
-  const menu = page.getByTestId(`${testId}-menu`);
-  await expect(menu).toBeVisible();
-  return (await menu.getByRole("menuitem").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
-}
 
 async function twoWorkspaces(): Promise<{ shop: string; mono: string }> {
   const shop = (await mockPost("workspace?name=shop&projects=repo-gp,repo-cf")) as { id: string };
@@ -36,171 +24,35 @@ async function twoWorkspaces(): Promise<{ shop: string; mono: string }> {
 
 // A synthetic workspace (the index rows, its projects by name with where threads start, no folder row, the instructions rows, what a thread writes showing up, Browse marketplace): src/components/projects/WorkspacePage.test.tsx ("a synthetic workspace: …", "a synthetic workspace without either…") and ProjectsIndex.test.tsx; the Settings nav's current page is SettingsPage.test.tsx's.
 
-test("a rooted workspace: its folder row (the root, where threads start, marked missing when moved), the root's instructions open as a File tab", async ({ page }) => {
+// A rooted workspace's folder row, its root marked missing, its instructions and skills, and View opening
+// the root's CLAUDE.md as a File tab in the page's own panel: src/components/projects/WorkspacePage.test.tsx.
+// Left: that tab drawn in the page's side panel.
+test("a rooted workspace: View opens the root's instructions as a File tab in the page's own panel", async ({ page }) => {
   const { mono } = await twoWorkspaces();
   await openApp(page);
   await openWorkspacePage(page, mono);
-  const m = body(page, mono);
-  await expect(m).toHaveAttribute("data-rooted", "true");
-  const folder = m.getByTestId("workspace-folder");
-  await expect(folder).toHaveAttribute("data-default", "true");
-  await expect(folder).toContainText("Workspace folder");
-  await expect(folder.getByTestId("workspace-default")).toHaveText("starts here");
-  await expect(folder.getByTestId("workspace-root")).toHaveText("~/mono");
-  await expect(m.getByTestId("member-caption")).toHaveText(["origin · not GitHub"]);
-  await expect(m.getByTestId("workspace-instructions")).toHaveAttribute("data-file", "/Users/dev/mono/CLAUDE.md");
-  await expect(m.getByTestId("workspace-instructions-path")).toHaveText("~/mono/CLAUDE.md");
-  await expect(m.getByTestId("workspace-skills-list")).toHaveText("demo, release");
-  await expect(m.getByTestId("workspace-folder-path")).toHaveText("~/mono");
-  await expect(m.getByTestId("workspace-folder-kind")).toHaveText("its root");
-
-  await m.getByTestId("workspace-instructions-open").click();
+  await body(page, mono).getByTestId("workspace-instructions-open").click();
   const panel = page.getByTestId("side-panel");
-  // The workspace's page has its own panel.
   await expect(panel).toHaveAttribute("data-panel-key", `view:projects:workspace:${mono}`);
   await expect(panel.getByRole("tab", { selected: true })).toHaveText("CLAUDE.md");
-
-  // A root that moved is marked missing (workspace set-root repairs it).
-  await expect(m.getByTestId("workspace-root-missing")).toHaveCount(0);
-  await mockPost(`workspace-files?workspace=${mono}&rootMissing=1`);
-  await expect(m.getByTestId("workspace-root-missing")).toHaveText("missing");
-  await expect(m.getByTestId("workspace-root")).toHaveAttribute("data-missing", "true");
 });
 
-test("Start here: a project, or a rooted workspace's folder; the row that starts threads has no Start here", async ({ page }) => {
+// Start here on a project and on a rooted workspace's folder, its args and the pill moving: WorkspacePage.test.tsx. Left: the hover-only CSS.
+test("a member's actions (Start here) are hidden at rest and shown on hover", async ({ page }) => {
   const { shop } = await twoWorkspaces();
-  const rooted = (await mockPost("workspace?name=rooted&projects=repo-cf&root=/Users/dev/rooted&primary=repo-cf")) as { id: string };
   await openApp(page);
   await openWorkspacePage(page, shop);
   const cf = member(page, shop, "repo-cf");
-  const gp = member(page, shop, "repo-gp");
-  await expect(gp.getByTestId("member-make-default")).toHaveCount(0);
-  // Hidden at rest, shown on hover.
   await expect(cf.getByTestId("member-actions")).toHaveCSS("opacity", "0");
   await cf.hover();
   await expect(cf.getByTestId("member-actions")).toHaveCSS("opacity", "1");
   await expect(cf.getByTestId("member-make-default")).toHaveText("Start here");
-  await cf.getByTestId("member-make-default").click();
-  expect((await lastInvocation("workspace.set-primary"))?.args).toEqual({ primary: "repo-cf", workspace: shop });
-  await expect(body(page, shop).locator('[data-testid="workspace-member"][data-default]')).toHaveAttribute("data-project", "repo-cf");
-  await expect(cf.getByTestId("member-make-default")).toHaveCount(0);
-
-  await openWorkspacePage(page, rooted.id);
-  const folder = body(page, rooted.id).getByTestId("workspace-folder");
-  await expect(folder).not.toHaveAttribute("data-default");
-  await folder.hover();
-  await folder.getByTestId("member-make-default").click();
-  expect((await lastInvocation("workspace.set-primary"))?.args).toEqual({ primary: "workspace", workspace: rooted.id });
-  await expect(folder).toHaveAttribute("data-default", "true");
-  await expect(body(page, rooted.id).locator('[data-testid="workspace-member"][data-default]')).toHaveCount(0);
 });
 
 // Add project and Remove, Open in Finder, rename, Remove workspace, New workspace, Edit instructions' steer and toast, a project named “workspace”, members by name and the keyboard: unit-tested in src/components/projects/WorkspacePage.test.tsx.
 
-test("the Threads table: one column per member with its checkout, working first, archived only counted; a click opens the thread; the row menu", async ({ page }) => {
-  const ws = (await mockPost("workspace?name=platform&projects=repo-cf,repo-gp,repo-wr&primary=repo-cf")) as { id: string };
-  const idle = (await mockPost(`workspace-thread?workspace=${ws.id}&name=helper&status=idle`)) as { id: string; worktreePath: string };
-  const driver = (await mockPost(`workspace-thread?workspace=${ws.id}&name=driver&status=busy`)) as { id: string; worktreePath: string };
-  await mockPost(`thread/hold?id=${driver.id}&id=${idle.id}`);
-  const gone = (await mockPost(`workspace-thread?workspace=${ws.id}&name=old`)) as { id: string };
-  await mockPost(`thread/archive?id=${gone.id}`);
-  // The threads share the branch cf/platform, so the same worktrees; ghostty-playground's has two files changed.
-  const gpPath = "/Users/dev/.code-foundry/worktrees/alexwaumann/ghostty-playground/cf-platform";
-  await mockPost(`worktree/dirty?path=${encodeURIComponent(gpPath)}&modified=2`);
-  await openApp(page);
-  await openWorkspacePage(page, ws.id);
-  const b = body(page, ws.id);
-  await expect(b.getByTestId("workspace-threads-title")).toHaveText(/Threads\s*· 1 working · 1 idle · 1 archived/);
-  await expect(b.getByTestId("threads-head")).toHaveText(/Branch\s*Thread\s*code-foundry\s*ghostty-playground\s*writing/);
-  // Working first; the archived one is not listed.
-  await expect(b.getByTestId("workspace-thread")).toHaveCount(2);
-  await expect(b.getByTestId("thread-name-status")).toHaveText([/driver\s*·\s*working/, /helper\s*·\s*idle/]);
-  const d = threadRow(page, ws.id, driver.id);
-  await expect(d.getByTestId("thread-branch")).toHaveText("cf/platform");
-  await expect(d.locator('[data-live="true"]')).toHaveCount(1);
-  await expect(d.getByTestId("thread-member-state")).toHaveText(["clean · no commits yet", "2 files · no commits yet", "folder · no git"]);
-
-  // A project added to the workspace later is not in the thread's set.
-  await b.getByTestId("workspace-add-member").click();
-  await page.getByTestId("workspace-add-member-list").getByRole("option", { name: "dotfiles" }).click();
-  await expect(d.locator('[data-testid="thread-member-state"][data-project="repo-dot"]')).toHaveText("not in this thread");
-  await expect(b.getByTestId("threads-col-member")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "writing"]);
-
-  // The row menu: each git member's changes, Finder, the path.
-  await d.hover();
-  await d.getByTestId("thread-more").click();
-  expect(await menuItems(page, "thread-more")).toEqual(["Show changes in code-foundry", "Show changes in ghostty-playground", "Open in Finder", "Copy path"]);
-  await page.getByTestId("thread-more-menu").getByText("Show changes in ghostty-playground").click();
-  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", gpPath);
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "workspace");
-  await d.hover();
-  await d.getByTestId("thread-more").click();
-  await page.getByTestId("thread-menu-reveal").click();
-  const reveal = await lastInvocation("worktree.reveal");
-  expect(reveal?.args).toEqual({ worktree: driver.worktreePath });
-  expect(reveal?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: driver.worktreePath });
-
-  // Its chevron opens the thread; so do a click and Enter on the row.
-  await d.hover();
-  await expectTooltip(page, d.getByTestId("thread-open"), "Open thread");
-  await d.getByTestId("thread-open").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", driver.id);
-  await openWorkspacePage(page, ws.id);
-  await threadRow(page, ws.id, idle.id).click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", idle.id);
-});
-
-test("Write instructions starts a thread in the workspace's folder, then Edit instructions steers it", async ({ page }) => {
-  const { mono } = await twoWorkspaces();
-  await mockPost(`workspace-files?workspace=${mono}&instructions=`);
-  await openApp(page);
-  await openWorkspacePage(page, mono);
-  const m = body(page, mono);
-  await expect(m.getByTestId("workspace-instructions-reach")).toHaveText("(starts a thread)");
-  await m.getByTestId("workspace-edit-instructions").click();
-  const started = await lastInvocation("thread.new");
-  expect(started?.args).toMatchObject({ workspace: mono, project: "workspace", "new-worktree": "false" });
-  expect(started?.context).toMatchObject({ activeView: "compose", activeWorkspaceId: mono });
-  expect(started?.args.prompt).toContain("/Users/dev/mono/CLAUDE.md");
-  // The daemon focuses the new thread: it runs in the root.
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-
-  // Again while that thread is still on its first turn: it is only shown, nothing is sent or started.
-  const id = (await page.getByTestId("thread-pane").getAttribute("data-thread-id")) ?? "";
-  expect(id).not.toBe("");
-  await openWorkspacePage(page, mono);
-  await expect(m.getByTestId("workspace-instructions-reach")).toHaveText(/^\(sends to /);
-  await m.getByTestId("workspace-edit-instructions").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", id);
-  expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(0);
-  expect((await invocations()).filter((i) => i.name === "thread.new")).toHaveLength(1);
-
-  // Once it is up and idle: the thread in the workspace's folder is steered, not a second one started.
-  await expect.poll(async () => ((await (await fetch(`${mockUrl}/__mock/threads`)).json()) as { id: string; state: string }[]).find((x) => x.id === id)?.state).toBe("CONNECTED");
-  await mockPost(`thread/status?id=${id}&status=idle`);
-  await openWorkspacePage(page, mono);
-  await m.getByTestId("workspace-edit-instructions").click();
-  const sent = await lastInvocation("thread.send");
-  expect(sent?.args.text).toContain("/Users/dev/mono/CLAUDE.md");
-  expect((await invocations()).filter((i) => i.name === "thread.new")).toHaveLength(1);
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-});
-
-test("an unregistered member reads “not registered” and opens nothing; a registered one shows its main checkout's changes", async ({ page }) => {
-  const ws = (await mockPost("workspace?name=sk&projects=repo-sk,repo-cf")) as { id: string };
-  await openApp(page);
-  await openProjectPage(page, "repo-sk");
-  await page.getByTestId("project-more").click();
-  await page.getByTestId("project-unregister").click();
-  await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
-  await expect(page.locator('[data-nav-key="p:repo-sk"]')).toHaveCount(0);
-  await openWorkspacePage(page, ws.id);
-  const sk = member(page, ws.id, "repo-sk");
-  await expect(sk.getByTestId("workspace-member")).toHaveAttribute("data-unregistered", "true");
-  await expect(sk).toContainText("not registered");
-  await sk.dblclick();
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("side-panel").getByRole("tab", { name: /repo-sk/ })).toHaveCount(0);
-  await member(page, ws.id, "repo-cf").dblclick();
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry");
-});
+// The Threads table (columns, order, member states, the row menu with Show changes opening the page's
+// panel, the chevron's tooltip, a click and Enter opening the thread), Write instructions (start, show
+// while on its first turn, steer once idle) and an unregistered member opening nothing (a registered
+// one its Changes tab): WorkspacePage.test.tsx. The daemon's focus intent selecting a new thread is
+// src/stores/intents.test.ts's; a Changes tab drawn in a page's panel is e2e/projects.spec.ts's.

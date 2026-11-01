@@ -306,7 +306,10 @@ test("dragging the divider sets the persisted ratio, within each group's minimum
   expect((await entry(page)).ratio).toBe(kept);
 });
 
-test("each group has its own + and picker; cmd+alt+\\ moves between groups; cmd+w on an empty group collapses the split", async ({ page }) => {
+// A one-tab split starting on the new group's list (focused), cmd+w there collapsing it, a tab from elsewhere landing in
+// the focused group, each group's + and Escape: src/components/panel/SidePanel.split.test.tsx. Left here: the chords
+// through the keymap and real focus moving between the groups.
+test("cmd+\\ splits a one-tab panel onto a focused list; cmd+alt+\\ moves between groups; cmd+w on an empty group collapses the split", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+Shift+e");
@@ -315,49 +318,20 @@ test("each group has its own + and picker; cmd+alt+\\ moves between groups; cmd+
   await expect(page.getByTestId("worktree-changes")).toBeVisible();
   await panel(page).click({ position: { x: 200, y: 300 } });
 
-  // One tab: the split keeps it, and the new second group starts on its surface list, focused.
   await page.keyboard.press("Meta+Backslash");
   await expect(split(page)).toHaveAttribute("data-split", "true");
-  await expect(tabsOf(page, 0)).toHaveText(["Changes"]);
-  await expect(tabsOf(page, 1)).toHaveCount(0);
   await expect(group(page, 1)).toHaveAttribute("data-picking", "true");
   await expect(group(page, 1)).toHaveAttribute("data-focused", "true");
-  await expect(group(page, 0)).not.toHaveAttribute("data-picking");
-  await expect(group(page, 1).getByTestId("panel-new-tab")).toHaveAttribute("aria-pressed", "true");
-  await expect(group(page, 1).getByTestId("panel-empty")).toBeVisible();
-
-  // cmd+w there collapses the split, back to the one group.
+  // cmd+w there collapses the split; the keyboard stays in the panel.
   await page.keyboard.press("Meta+w");
   await expect(split(page)).not.toHaveAttribute("data-split");
-  await expect(panel(page).getByRole("tab")).toHaveText(["Changes"]);
   await expect.poll(() => region(page)).toBe("panel");
 
-  // Again, and a tab opened from elsewhere (a path chip's File tab) lands in the focused (second) group.
+  // Again, with a File tab in the second group.
   await page.keyboard.press("Meta+Backslash");
   await expect(group(page, 1)).toHaveAttribute("data-picking", "true");
   await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: `${CF}/README.md` })}))`);
   await expect(tabsOf(page, 1)).toHaveText(["README.md"]);
-  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
-  await expect(tabsOf(page, 0)).toHaveText(["Changes"]);
-  await expect(group(page, 1)).not.toHaveAttribute("data-picking");
-
-  // The first group's "+": that group picks (and takes focus); the second is untouched; Escape goes back.
-  await group(page, 0).getByTestId("panel-new-tab").click();
-  await expect(group(page, 0)).toHaveAttribute("data-picking", "true");
-  await expect(group(page, 0)).toHaveAttribute("data-focused", "true");
-  await expect(group(page, 1)).not.toHaveAttribute("data-picking");
-  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
-  await page.keyboard.press("Escape");
-  await expect(group(page, 0)).not.toHaveAttribute("data-picking");
-  await expect(group(page, 0).getByTestId("panel-body")).toHaveAttribute("data-surface", "changes");
-
-  // The second group's "+", then Escape: back to its tab.
-  await group(page, 1).getByTestId("panel-new-tab").click();
-  await expect(group(page, 1)).toHaveAttribute("data-picking", "true");
-  await expect(group(page, 1)).toHaveAttribute("data-focused", "true");
-  await page.keyboard.press("Escape");
-  await expect(group(page, 1)).not.toHaveAttribute("data-picking");
-  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
 
   // A click in a group's body (its padding: a row would open its diff) focuses that group.
   await group(page, 0).getByTestId("panel-body").click({ position: { x: 4, y: 4 } });

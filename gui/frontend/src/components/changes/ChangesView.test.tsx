@@ -75,6 +75,14 @@ describe("ChangesView", () => {
     expect(openDiffInPanel).toHaveBeenCalledWith("current", expect.objectContaining({ project: "web", worktree: P, path: "a.ts", scope: "working" }));
   });
 
+  it("a committed change opens on the branch, a rename with its old path (e2e/file-tabs.spec.ts)", async () => {
+    world();
+    detail([file("docs/notes/sidebar.md", { status: "R", oldPath: "docs/sidebar.md" })], []);
+    await show();
+    fireEvent.click(screen.getByTestId("changes-surface").querySelector('[data-nav-key="f:docs/notes/sidebar.md"]') as HTMLElement);
+    expect(openDiffInPanel).toHaveBeenCalledWith("current", { project: "web", worktree: P, path: "docs/notes/sidebar.md", oldPath: "docs/sidebar.md", scope: "branch" });
+  });
+
   it("caps the changes at ten rows and scrolls; a truncated list says so", async () => {
     world();
     detail(
@@ -126,5 +134,22 @@ describe("ChangesView", () => {
     world({ worktrees: [] });
     await show();
     expect(screen.getByTestId("changes-missing")).toBeTruthy();
+  });
+
+  it("a project without git lists nothing; once git init made it a repository, the lists take over", async () => {
+    world({ git: false });
+    detail([], []);
+    await show();
+    expect(screen.getByTestId("changes-nogit").textContent).toContain("Not a git repository");
+    expect(screen.queryByTestId("worktree-changes")).toBeNull();
+    expect(screen.queryByTestId("worktree-commits")).toBeNull();
+    // The daemon's project event after project.git.init.
+    await act(async () => {
+      world({ git: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("changes-nogit")).toBeNull();
+    expect(screen.getByTestId("worktree-changes")).toBeTruthy();
   });
 });

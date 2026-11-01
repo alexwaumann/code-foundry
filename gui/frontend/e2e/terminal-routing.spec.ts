@@ -12,10 +12,6 @@ async function lastNew() {
   return (await invocations()).filter((i) => i.name === "terminal.new").at(-1);
 }
 
-async function shellLabels(page: Page, id: string): Promise<Record<string, string>> {
-  return page.evaluate(`__cfModule("/src/stores/terminals.ts").then((m) => m.useTerminalsStore.getState().byId[${JSON.stringify(id)}]?.labels ?? {})`);
-}
-
 async function noTerminalRows(page: Page): Promise<void> {
   await expect(page.getByTestId("thread-list").locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
 }
@@ -24,27 +20,9 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("a thread row's New terminal here: the thread owns the shell, in its bottom panel", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  // s-2 is not selected: its panel opens on the shell, the selection stays.
-  await row(page, "s:s-2").click({ button: "right" });
-  await page.getByTestId("row-menu").getByText("New terminal here").click();
-  expect((await lastNew())?.context).toMatchObject({ activeThreadId: "s-2", activeView: "thread" });
-  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
-  await noTerminalRows(page);
-  await row(page, "s:s-2").click();
-  await expect(bottom(page).getByRole("tab")).toHaveCount(1);
-  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  const id = (await host(page).getAttribute("data-terminal-id")) ?? "";
-  expect(await shellLabels(page, id)).toMatchObject({ kind: "shell", thread: "s-2" });
-
-  // s-1 has t-s1-shell already: a second tab.
-  await row(page, "s:s-1").click({ button: "right" });
-  await page.getByTestId("row-menu").getByText("New terminal here").click();
-  await row(page, "s:s-1").click();
-  await expect(bottom(page).getByRole("tab")).toHaveCount(2);
-});
+// A thread row's New terminal here (the thread owns the shell, in its panel; the selection stays):
+// src/components/bottom/BottomPanel.test.tsx. The sidebar's rows are threads only (it has no terminal
+// row kind), which the tests below still check after their chords.
 
 test("cmd+t on a thread starts its shell in the bottom panel, with the keyboard in it", async ({ page }) => {
   await openApp(page);
@@ -74,17 +52,8 @@ test("cmd+t from a Projects-page shell starts another in its worktree", async ({
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
 });
 
-test("a project page's Terminal: the Projects page's bottom panel", async ({ page }) => {
-  await openApp(page);
-  await openProjectPage(page, "repo-cf");
-  await page.getByTestId("project-terminal").click();
-  expect((await lastNew())?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: CF, activeThreadId: "" });
-  // t-top (feat/sidebar) and the new one (main).
-  await expect(bottom(page).getByRole("tab")).toHaveText(["feat-sidebar", "code-foundry"]);
-  await expect(bottom(page).getByRole("tab").nth(1)).toHaveAttribute("aria-selected", "true");
-  await noTerminalRows(page);
-  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
-});
+// A project page's Terminal (terminal.new in its main worktree, a tab of the Projects page's panel):
+// src/components/projects/ProjectPage.test.tsx and src/components/bottom/BottomPanel.test.tsx.
 
 /** SHOTS=<dir>: the notes' screenshots (docs/notes/bottom-panel-3-routing/), WebKit, 1440x900 at 2x. */
 test.describe("screenshots", () => {

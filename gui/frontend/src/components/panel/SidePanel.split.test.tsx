@@ -2,9 +2,9 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import { useCommandsStore } from "@/stores/commands";
-import { getPanel, makeTab, usePanelStore, type PanelEntry } from "@/stores/panel";
+import { getPanel, makeTab, openSurface, usePanelStore, type PanelEntry } from "@/stores/panel";
 import { PANEL_SIDE_BY_SIDE_MIN, useUiStore } from "@/stores/ui";
-import { useViewsStore } from "@/stores/views";
+import { splitPanelCommand, useViewsStore } from "@/stores/views";
 import { SidePanel } from "./SidePanel";
 
 const KEY = "thread:a";
@@ -192,6 +192,49 @@ describe("a split side panel", () => {
     expect(getPanel(KEY).groups).toEqual([{ tabs: [files, usage], activeTabId: files.id }]);
     expect(split().hasAttribute("data-split")).toBe(false);
     expect(useUiStore.getState().panelFocusSeq).toBeGreaterThan(0);
+  });
+
+  // From e2e/panel-split.spec.ts (what is left there: the chords through the keymap and real focus).
+  it("a one-tab panel split: the new group picks, focused; cmd+w there collapses; a tab from elsewhere lands in the focused group; each group's + picks in it", () => {
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [files], activeTabId: files.id }] } } });
+    render(<SidePanel />);
+    const aside = screen.getByTestId("side-panel");
+    const titlesOf = (g: 0 | 1) => [...(group(g)?.querySelectorAll('[role="tab"]') ?? [])].map((t) => t.textContent);
+    const split1 = () => {
+      act(() => {
+        splitPanelCommand();
+      });
+      expect(split().getAttribute("data-split")).toBe("true");
+      expect(titlesOf(0)).toEqual(["Files"]);
+      expect(titlesOf(1)).toEqual([]);
+      expect(group(1)?.getAttribute("data-picking")).toBe("true");
+      expect(group(1)?.getAttribute("data-focused")).toBe("true");
+      expect(group(0)?.hasAttribute("data-picking")).toBe(false);
+      expect(group(1)?.querySelector('[data-testid="panel-new-tab"]')?.getAttribute("aria-pressed")).toBe("true");
+      expect(group(1)?.querySelector('[data-testid="panel-empty"]')).not.toBeNull();
+    };
+    split1();
+    fireEvent.keyDown(aside, { key: "w", code: "KeyW", metaKey: true });
+    expect(split().hasAttribute("data-split")).toBe(false);
+    expect(titlesOf(0)).toEqual(["Files"]);
+
+    split1();
+    act(() => {
+      openSurface("current", usage);
+    });
+    expect(titlesOf(1)).toEqual(["Usage"]);
+    expect(titlesOf(0)).toEqual(["Files"]);
+    expect(group(1)?.hasAttribute("data-picking")).toBe(false);
+
+    // The first group's +: that group picks and takes focus; the second is untouched; Escape goes back.
+    fireEvent.click(group(0)?.querySelector('[data-testid="panel-new-tab"]') ?? document.body);
+    expect(group(0)?.getAttribute("data-picking")).toBe("true");
+    expect(group(0)?.getAttribute("data-focused")).toBe("true");
+    expect(group(1)?.hasAttribute("data-picking")).toBe(false);
+    expect(getPanel(KEY).groups[1]?.activeTabId).toBe(usage.id);
+    fireEvent.keyDown(aside, { key: "Escape", code: "Escape" });
+    expect(group(0)?.hasAttribute("data-picking")).toBe(false);
+    expect(getPanel(KEY).groups[0]?.activeTabId).toBe(files.id);
   });
 
   describe("the divider", () => {

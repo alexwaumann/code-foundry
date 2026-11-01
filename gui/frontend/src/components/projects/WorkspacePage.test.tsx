@@ -10,7 +10,8 @@ const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { NewWorkspaceDialog } = await import("./NewWorkspaceDialog");
 const { ProjectsPage } = await import("./ProjectsPage");
 const { confirmFirst, daemon, invocationsOf, lastInvocation, refuse, resetDaemon } = await import("@/test/daemonFakes");
-const { addThreads, addWorkspace, addWorktrees, menuEntries, removeProject, seedWorld, status, texts, thread, updateProject, updateWorkspace, worktree } = await import("@/test/projectsWorld");
+const { addThreads, addWorkspace, addWorktrees, menuEntries, panelActive, removeProject, resetPanels, seedWorld, status, texts, thread, updateProject, updateWorkspace, worktree } = await import("@/test/projectsWorld");
+const { tooltipText } = await import("@/test/tooltip");
 const { useUiStore, workspacePage } = await import("@/stores/ui");
 const { openNewWorkspaceDialog, resetInstructionsPresses, useNewWorkspaceDialogStore } = await import("@/stores/workspaceActions");
 const { useWorkspaceAddProjectStore } = await import("@/stores/workspaceAddProject");
@@ -20,9 +21,9 @@ const { useProjectsStore } = await import("@/stores/projects");
 
 /**
  * A workspace's page (docs/notes/projects-redesign-3-workspace-page.md) and the New workspace
- * dialog, against the mock's world (src/test/projectsWorld.ts). e2e/workspace-page.spec.ts keeps
- * the hover-only actions (CSS), the File and Changes tabs the page's panel opens, and what the
- * daemon changes after a command.
+ * dialog, against the mock's world (src/test/projectsWorld.ts). The tabs the page's panel opens are
+ * read off the panel store (panelActive); e2e/workspace-page.spec.ts keeps the hover-only actions
+ * (CSS), a File tab drawn in the page's panel, and the files the daemon re-reads after a turn.
  */
 
 const body = (id: string) => document.querySelector<HTMLElement>(`[data-testid="workspace"][data-workspace="${id}"]`) as HTMLElement;
@@ -101,9 +102,13 @@ function workspaceThread(workspaceId: string, id: string, o: { name: string; sta
   return t;
 }
 
+/** The workspace page's own side panel (its key), as e2e reads it off the rendered panel. */
+const pagePanel = (workspaceId: string) => panelActive(`view:projects:workspace:${workspaceId}`);
+
 beforeEach(() => {
   resetDaemon();
   seedWorld();
+  resetPanels();
   resetInstructionsPresses();
   useWorkspaceAddProjectStore.setState({ addingTo: null });
   useNewWorkspaceDialogStore.setState({ open: false });
@@ -359,6 +364,14 @@ describe("the workspace's Projects card", () => {
     const sk = member(ws.id, "repo-sk");
     expect(by(sk, "workspace-member").getAttribute("data-unregistered")).toBe("true");
     expect(sk.textContent).toContain("not registered");
+    // It opens nothing, by a double click or Enter; a registered one shows its main checkout's changes.
+    fireEvent.click(sk);
+    fireEvent.doubleClick(sk);
+    expect(sk.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(list(), { key: "Enter" });
+    expect(pagePanel(ws.id)).toBeNull();
+    fireEvent.doubleClick(member(ws.id, "repo-cf"));
+    expect(pagePanel(ws.id)).toMatchObject({ open: true, kind: "changes", title: "Changes · code-foundry", params: { project: "repo-cf" } });
   });
 });
 
@@ -391,14 +404,20 @@ describe("the workspace's Threads table", () => {
     expect(texts(b, "threads-col-member")).toEqual(["code-foundry", "dotfiles", "ghostty-playground", "writing"]);
 
     // The row menu: each git member's changes, Finder, the path.
-    const menu = openDropdown(by(d, "thread-more"), "thread-more-menu");
+    let menu = openDropdown(by(d, "thread-more"), "thread-more-menu");
     expect(menuEntries(menu)).toEqual(["Show changes in code-foundry", "Show changes in ghostty-playground", "Open in Finder", "Copy path"]);
+    fireEvent.click(within(menu).getByText("Show changes in ghostty-playground"));
+    await settle();
+    expect(pagePanel(ws.id)).toMatchObject({ open: true, kind: "changes", params: { project: "repo-gp", path: gpPath } });
+    expect(page().getAttribute("data-page")).toBe("workspace");
+    menu = openDropdown(by(d, "thread-more"), "thread-more-menu");
     await pick(menu, "thread-menu-reveal");
     const reveal = lastInvocation("worktree.reveal");
     expect(reveal?.args).toEqual({ worktree: driver.worktreePath });
     expect(reveal?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: driver.worktreePath });
 
     // Its chevron opens the thread; so does a click on the row.
+    expect(tooltipText(by(d, "thread-open"))).toBe("Open thread");
     fireEvent.click(by(d, "thread-open"));
     expect(selection()).toEqual({ kind: "thread", id: driver.id });
     act(() => {
@@ -479,6 +498,11 @@ describe("the workspace's Instructions and skills", () => {
     expect(by(m, "workspace-skills-list").textContent).toBe("demo, release");
     expect(by(m, "workspace-folder-path").textContent).toBe("~/mono");
     expect(by(m, "workspace-folder-kind").textContent).toBe("its root");
+
+    // View: the root's instructions as a File tab in the workspace page's own panel.
+    fireEvent.click(by(m, "workspace-instructions-open"));
+    expect(pagePanel(mono)).toMatchObject({ open: true, title: "CLAUDE.md" });
+    expect(pagePanel(mono)?.params.path).toBe("/Users/dev/mono/CLAUDE.md");
   });
 
   it("Write instructions starts a thread in the workspace's folder; while it is on its first turn a press only shows it; idle, a press steers it", async () => {

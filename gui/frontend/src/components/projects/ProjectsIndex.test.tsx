@@ -8,7 +8,7 @@ vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import(
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { ProjectsPage } = await import("./ProjectsPage");
 const { confirmFirst, daemon, invocationsOf, lastInvocation, resetDaemon } = await import("@/test/daemonFakes");
-const { addLeftovers, addThreads, addWorkspace, CF, MERGED, menuEntries, removeProject, removeWorkspace, seedWorld, texts, thread, updateProject, updateWorkspace } = await import("@/test/projectsWorld");
+const { addLeftovers, addThreads, addWorkspace, CF, fakeGitInit, MERGED, menuEntries, removeProject, removeWorkspace, seedWorld, texts, thread, updateProject, updateWorkspace } = await import("@/test/projectsWorld");
 const { useUiStore } = await import("@/stores/ui");
 const { useAddProjectStore } = await import("@/stores/addProject");
 const { usePublishDialogStore } = await import("@/stores/publish");
@@ -19,7 +19,7 @@ const { useWorkspaceAddProjectStore } = await import("@/stores/workspaceAddProje
  * The Projects index (docs/notes/projects-redesign-1-index.md, docs/notes/projects-table-1-index.md,
  * docs/notes/projects-table-2-context-menus.md) against the mock's world (src/test/projectsWorld.ts).
  * What only a browser shows stays in e2e/projects.spec.ts: the columns narrowing with the width, and
- * changes that arrive from the daemon (git init, a CLI terminal).
+ * a CLI terminal holding a worktree. Initialize git's result is a fake handler (fakeGitInit).
  */
 
 const row = (key: string) => document.querySelector<HTMLElement>(`[data-nav-key="${key}"]`);
@@ -134,6 +134,7 @@ describe("the index's project rows", () => {
   });
 
   it("the setup links act without opening the page; a click opens the project's page", async () => {
+    fakeGitInit();
     renderIndex();
     await settle();
     fireEvent.click(inRow(projectRow("repo-sk"), "index-publish") as HTMLElement);
@@ -143,6 +144,11 @@ describe("the index's project rows", () => {
     await settle();
     expect(lastInvocation("project.git.init")?.args).toEqual({ project: "repo-wr" });
     expect(page().getAttribute("data-page")).toBe("index");
+    // Once the daemon says so, the folder is a git repository without a remote: Publish, not Initialize git.
+    expect(inRow(projectRow("repo-wr"), "index-project")?.getAttribute("data-kind")).toBe("git");
+    expect(inRow(projectRow("repo-wr"), "project-kind-icon")?.getAttribute("data-kind")).toBe("git");
+    expect(inRow(projectRow("repo-wr"), "index-init-git")).toBeNull();
+    expect(inRow(projectRow("repo-wr"), "index-publish")?.textContent).toBe("Publish to GitHub");
 
     fireEvent.click(projectRow("repo-gp"));
     expect(page().getAttribute("data-project")).toBe("repo-gp");

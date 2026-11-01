@@ -12,6 +12,7 @@ import type { TerminalView } from "@/api/terminal";
 import type { ThreadView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
 import { useConfirmStore } from "@/stores/confirm";
+import { activeTab, usePanelStore } from "@/stores/panel";
 import { branchPullRequestsResource, repoActivityResource } from "@/stores/gh";
 import { useProjectsStore } from "@/stores/projects";
 import { useRemoveWorktreeStore } from "@/stores/removeWorktree";
@@ -312,4 +313,37 @@ export function menuEntries(menu: HTMLElement, separators = false): string[] {
             .join(" ")
             .replace(/\s+/g, " "),
     );
+}
+
+/**
+ * A page's (or thread's) side panel by its key ("view:projects:project:repo-cf"): whether it
+ * is open and its active tab's kind, title and params; null when it has no active tab. What
+ * the e2e tests read off the rendered side panel.
+ */
+export function panelActive(key: string): { open: boolean; kind: string; title: string; params: Readonly<Record<string, string>> } | null {
+  const e = usePanelStore.getState().byKey[key];
+  const t = e ? activeTab(e) : null;
+  return e && t ? { open: e.open, kind: t.kind, title: t.title, params: t.params } : null;
+}
+
+/** Forgets every side panel (call in beforeEach when a test opens tabs). */
+export function resetPanels(): void {
+  usePanelStore.setState({ byKey: {} });
+}
+
+/**
+ * The daemon's project.git.init (mock/world.ts initGit): the plain folder becomes a git
+ * repository on main without a remote, its folder the main worktree. Registers it as the
+ * command's handler: the project event arrives in the store before the command answers.
+ */
+export function fakeGitInit(): void {
+  daemon.handlers.set("project.git.init", (inv) => {
+    updateProject(inv.args.project ?? "", (p) => ({
+      ...p,
+      git: true,
+      defaultBranch: "main",
+      worktrees: p.worktrees.map((w) => (w.isMain ? { ...w, branch: "main", head: "1a1t1a10", status: status({ upstream: "", baseRef: "", untracked: 3, dirty: true }) } : w)),
+    }));
+    return { message: "", resultJson: "" };
+  });
 }

@@ -274,47 +274,22 @@ test("cmd+w in the focused empty panel is handled and hides the panel", async ({
   await expect.poll(() => region(page)).toBe("content");
 });
 
-test("tabs: cmd+w activates the neighbour, the × and middle click close, the last close hides", async ({ page }) => {
+// cmd+w activating the neighbour, the × and middle click, the last close hiding and handing focus back:
+// src/components/panel/SidePanel.test.tsx ("closing tabs"). Left here: the computed drag regions.
+test("the header drags the window from the strip's empty space, never from a tab or its ×", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
-  await injectTab(page, "diff", "Diff");
-  await injectTab(page, "pullrequest", "#12", { number: "12" });
-  await injectTab(page, "pullrequest", "#13", { number: "13" });
-  const tabs = panel(page).getByRole("tab");
-  await expect(tabs).toHaveText(["Files", "Diff", "#12", "#13"]);
-  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "pullrequest?number=13");
-  // The header drags the window from the strip's empty space, never from a tab or its ×.
+  await expect(panel(page).getByRole("tab")).toHaveText(["Files"]);
   const dragOf = (sel: string) => panel(page).locator(sel).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim());
   expect(await dragOf('[data-testid="panel-tabs"]')).toBe("drag");
   expect(await dragOf("[data-tab-id]")).toBe("no-drag");
   expect(await dragOf('[aria-label="Close Files"]')).toBe("no-drag");
-
-  // cmd+w closes the active (last) tab; its left neighbour becomes active.
-  await tabs.filter({ hasText: "Diff" }).click();
-  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "diff");
-  await page.keyboard.press("Meta+w");
-  await expect(tabs).toHaveText(["Files", "#12", "#13"]);
-  // The right neighbour wins when there is one.
-  await expect(tabs.filter({ hasText: "#12" })).toHaveAttribute("aria-selected", "true");
-  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "pullrequest?number=12");
-
-  // The × on a tab closes it.
-  await panel(page).getByRole("button", { name: "Close #13" }).click({ force: true });
-  await expect(tabs).toHaveText(["Files", "#12"]);
-  // Middle click closes too.
-  await tabs.filter({ hasText: "Files" }).click({ button: "middle" });
-  await expect(tabs).toHaveText(["#12"]);
-  await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
-
-  // Closing the last tab hides the panel and hands focus back to the thread.
-  await tabs.first().click();
-  await page.keyboard.press("Meta+w");
-  await expect(panel(page)).toHaveCount(0);
-  await expect.poll(() => region(page)).toBe("content");
 });
 
+// The roving tab stop and arrows moving focus without activating: src/components/panel/SidePanel.test.tsx
+// ("closing tabs"). Left here: the browser's own keys on the tab buttons (Enter, Space, Tab).
 test("tabs are keyboard reachable: arrows move, Enter activates, Tab reaches the ×", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
@@ -322,16 +297,9 @@ test("tabs are keyboard reachable: arrows move, Enter activates, Tab reaches the
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
   const tabs = panel(page).getByRole("tab");
-  await expect(panel(page).getByRole("tablist")).toBeVisible();
-  // Only the active tab is in the tab order.
-  await expect(tabs.filter({ hasText: "Diff" })).toHaveAttribute("tabindex", "0");
-  await expect(tabs.filter({ hasText: "Files" })).toHaveAttribute("tabindex", "-1");
-
   await tabs.filter({ hasText: "Diff" }).focus();
   await page.keyboard.press("ArrowLeft");
   await expect(tabs.filter({ hasText: "Files" })).toBeFocused();
-  // Moving focus does not activate; Enter does.
-  await expect(tabs.filter({ hasText: "Diff" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Enter");
   await expect(tabs.filter({ hasText: "Files" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowRight");
@@ -577,7 +545,10 @@ test("view.panel.expand from the palette and the CLI; focus follows the hidden t
   await expect.poll(() => region(page)).toBe("panel");
 });
 
-test("the + after the last tab shows the surface list without adding a tab; picking, Escape and cmd+w leave it", async ({ page }) => {
+// The list, its heading, no tab added, no daemon call, focus to the panel, Escape, picking an open surface and cmd+w
+// going back (default prevented): src/components/panel/SidePanel.test.tsx ("the new-tab button and picking",
+// "closing tabs"). Left here: a real cmd+w while picking reaches nothing else (no tab closes, the window keeps it).
+test("cmd+w while picking from the + only goes back, handled", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
   await recordCmdW(page);
@@ -585,44 +556,23 @@ test("the + after the last tab shows the surface list without adding a tab; pick
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
   const tabs = panel(page).getByRole("tab");
-  const body = panel(page).getByTestId("panel-body");
-  const empty = panel(page).getByTestId("panel-empty");
-  const plus = panel(page).getByTestId("panel-tabs").getByTestId("panel-new-tab");
   await expect(tabs).toHaveText(["Files", "Diff"]);
-
-  // Picking: the list shows, no tab is added, the panel has focus.
-  await plus.click();
+  await panel(page).getByTestId("panel-tabs").getByTestId("panel-new-tab").click();
   await expect(panel(page)).toHaveAttribute("data-picking", "true");
-  await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
-  await expect(body).toHaveCount(0);
-  await expect(tabs).toHaveText(["Files", "Diff"]);
   await expect.poll(() => region(page)).toBe("panel");
-  // The + runs the registry command through its local presenter: no daemon call.
-  expect((await invocations()).map((i) => i.name)).not.toContain("view.panel.new-tab");
-
-  // Escape goes back to the tab that was active.
-  await page.keyboard.press("Escape");
-  await expect(panel(page)).not.toHaveAttribute("data-picking");
-  await expect(body).toHaveAttribute("data-tab-id", "diff");
-
-  // Picking a surface activates its tab (File brings back the panel's File tab).
-  await plus.click();
-  await empty.locator('[data-surface="files"]').click();
-  await expect(tabs).toHaveText(["Files", "Diff"]);
-  await expect(body).toHaveAttribute("data-surface", "files");
-  await expect(panel(page)).not.toHaveAttribute("data-picking");
-
-  // cmd+w goes back too (handled), instead of closing a tab or hiding the panel.
-  await plus.click();
   await page.keyboard.press("Meta+w");
-  await expect(body).toHaveAttribute("data-surface", "files");
+  await expect(panel(page)).not.toHaveAttribute("data-picking");
+  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "diff");
   await expect(tabs).toHaveText(["Files", "Diff"]);
   await expect.poll(() => cmdW(page)).toEqual([true]);
 });
 
 // Closing the tab picking came from keeps picking, and picking persists: unit-tested in src/components/panel/SidePanel.test.tsx and src/stores/panel.test.ts.
 
-test("view.panel.new-tab from the palette and the CLI shows a hidden panel picking", async ({ page }) => {
+// ShowView "panel.new-tab" (the CLI) showing a hidden panel picking, and the palette's return target moving to the
+// panel: src/stores/intents.test.ts ("showView panel.new-tab"); Escape going back: SidePanel.test.tsx. Left here:
+// the palette closing and handing the keyboard to the panel.
+test("view.panel.new-tab from the palette shows a hidden panel picking, with the keyboard", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
@@ -638,18 +588,6 @@ test("view.panel.new-tab from the palette and the CLI shows a hidden panel picki
   await expect(page.getByTestId("palette")).toHaveCount(0);
   await expect(panel(page)).toHaveAttribute("data-picking", "true");
   await expect.poll(() => region(page)).toBe("panel");
-  await page.keyboard.press("Escape");
-  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "files");
-
-  // The CLI: CommandService.Invoke emits ShowView "panel.new-tab" to every window.
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name: "view.panel.new-tab" }),
-  });
-  expect(res.ok).toBe(true);
-  await expect(panel(page)).toHaveAttribute("data-picking", "true");
-  expect((await invocations()).map((i) => i.name)).toContain("view.panel.new-tab");
 });
 
 /**
