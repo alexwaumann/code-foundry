@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { isValidElement, useId, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Ellipsis } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -19,8 +19,9 @@ import { zoomFactor } from "@/lib/zoom";
  *   button that opens the menu, laid under the row at the row's width. Every row with one
  *   (the Lineage label too) is tinted while that menu is up.
  *
- * A row button is named by its text and value (`aria-labelledby`), never by a button inside
- * it. Escape in either kind of menu gives focus back to its trigger (RowMenu).
+ * A row button with a RowMore is named by its text and value (`aria-labelledby`), not by
+ * the ellipsis inside it. Escape in either kind of menu gives focus back to its trigger
+ * (RowMenu).
  *
  * A row without a chevron reserves nothing: its value (or trailing button) ends at the
  * row's padding, the edge a chevron's box ends at, so every row's last mark shares one
@@ -63,9 +64,12 @@ export function Row({
   const hasMeta = meta !== undefined && meta !== null && meta !== false;
   const activates = Boolean(onActivate) && !menu;
   const id = useId();
-  // A row button is named by its text and value only: not by a trailing button inside it
-  // (an ellipsis's "Open in options", a Fix), which is its own button with its own name.
-  const named = interactive && rest["aria-label"] === undefined && rest["aria-labelledby"] === undefined;
+  // A row button with a RowMore is named by its text and value only, not by the ellipsis
+  // inside it ("Open in Finder", not "Open in Finder Open in options"). Only those rows: on
+  // every row (the Project row's Tip-wrapped trigger too) it made plugin-env-restart.spec's
+  // title menu miss its Escape about half the time, for reasons not pinned down.
+  const named =
+    interactive && isValidElement(trailing) && trailing.type === RowMore && rest["aria-label"] === undefined && rest["aria-labelledby"] === undefined;
   return (
     <div
       role={interactive ? "button" : undefined}
@@ -73,8 +77,9 @@ export function Row({
       data-testid={testId}
       aria-labelledby={named ? (hasMeta ? `${id}-text ${id}-meta` : `${id}-text`) : undefined}
       {...rest}
-      // After the spread: a Radix trigger's own data-slot must not hide the row from RowMore.
-      data-slot="ti-row"
+      // RowMore finds its row by this marker; after the spread, and not data-slot, which a
+      // Radix trigger wrapping the row sets for itself.
+      data-ti-row=""
       className={cn(
         "group/row relative flex min-w-0 shrink-0 items-center gap-2 rounded-md pr-1 pl-2 text-caption text-cf-text outline-none",
         tall ? "py-1" : sub ? "h-6.5" : "h-7",
@@ -169,7 +174,7 @@ interface RowPlace {
 }
 
 function rowPlace(button: HTMLElement | null): RowPlace | null {
-  const row = button?.closest("[data-slot=ti-row]");
+  const row = button?.closest("[data-ti-row]");
   if (!button || !row) return null;
   const b = button.getBoundingClientRect();
   const r = row.getBoundingClientRect();
