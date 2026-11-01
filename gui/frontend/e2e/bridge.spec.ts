@@ -71,22 +71,17 @@ test("cf:run reads and mutates in the thread's context; the daemon's errors come
   }
 });
 
-test("a verb that asks opens the app's confirm dialog: no is declined, yes runs it confirmed", async ({ page }) => {
+// A verb that asks: no declined, yes run confirmed, the page's title as the caller: src/stores/bridgeHost.test.ts
+// ("asks before a verb that wants it…") and src/components/confirm/ConfirmDialog.test.tsx (the caller line); the
+// real gesture through a frame is "the panel copy names the page…" below. This keeps the dialog's screenshot.
+test("SHOTS: a verb that asks opens the app's confirm dialog", async ({ page }) => {
+  test.skip(!shots, "SHOTS=<dir> only");
   await openBridgeThread(page);
   await doc(page).locator("#archive").click();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toBeVisible();
-  // The page's title, as shown with it (view.inline --title / the page's <title>).
   await expect(dialog.getByTestId("confirm-caller")).toContainText("Bridge check, a page in");
-  if (shots) await page.screenshot({ path: `${shots}/bridge-confirm.png` });
+  await page.screenshot({ path: `${shots}/bridge-confirm.png` });
   await dialog.getByTestId("confirm-cancel").click();
-  await expect(dialog).toHaveCount(0);
-  await expect(doc(page).locator("#archive-out")).toHaveText(/^declined: /);
-  expect((await invocations()).filter((i) => i.name === "thread.archive").map((i) => i.confirmed)).toEqual([false]);
-  await doc(page).locator("#archive").click();
-  await expect(dialog).toBeVisible();
-  await dialog.getByTestId("confirm-ok").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.archive").map((i) => i.confirmed)).toEqual([false, false, true]);
 });
 
 test("a subscription delivers the snapshot, then every change; closing the card lets go of everything", async ({ page }) => {
@@ -108,24 +103,7 @@ test("a subscription delivers the snapshot, then every change; closing the card 
   expect((await bridgeCounters(page)).posts).toBe(posts);
 });
 
-test("a call waiting on the app's confirm dialog, open or queued, does not time out", async ({ page }) => {
-  await openBridgeThread(page);
-  const restarts = async () => (await invocations()).filter((i) => i.name === "thread.restart").map((i) => i.confirmed);
-  // One click, two questions, each call with a 1 s timeout.
-  await doc(page).locator("#twice").click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toBeVisible();
-  await page.waitForTimeout(1500);
-  await dialog.getByTestId("confirm-ok").click();
-  await expect.poll(restarts).toEqual([false, false, true]);
-  // The second waited behind the first for longer than its timeout, then opens.
-  await expect(dialog).toBeVisible();
-  await page.waitForTimeout(1500);
-  await expect(doc(page).locator("#twice-out")).toHaveText("");
-  await dialog.getByTestId("confirm-ok").click();
-  await expect(doc(page).locator("#twice-out")).toHaveText("1 ok, 2 ok");
-  expect(await restarts()).toEqual([false, false, true, true]);
-});
+// A call waiting on the app's confirm dialog, open or queued, not timing out: src/lib/cfBridgeScript.test.ts ("stops a run's clock while the app asks the user…", "settles a run that was waiting on the user…") and src/stores/bridgeHost.test.ts ("tells the page a call waits on the user, open or queued…", "asks one question at a time per frame").
 
 test("a page that goes while its question is open takes the question with it, and the command never runs", async ({ page }) => {
   await openBridgeThread(page);
@@ -142,11 +120,7 @@ test("a page that goes while its question is open takes the question with it, an
   expect((await invocations()).filter((i) => i.name === "thread.archive").map((i) => i.confirmed)).toEqual([false]);
 });
 
-test("cf.on with a source that is not one throws in the page", async ({ page }) => {
-  await openBridgeThread(page);
-  await doc(page).locator("#typo").click();
-  await expect(doc(page).locator("#error-out")).toHaveText(/^invalid: cf\.on: no source threads; the sources are thread-list, thread, /);
-});
+// cf.on with a source that is not one throwing: src/lib/cfBridgeScript.test.ts ("throws at once for a source that is not one…").
 
 test("storage is the daemon's: a fresh browser profile reads what the page stored", async ({ page, browser }) => {
   await openBridgeThread(page);
@@ -180,48 +154,11 @@ test("storage survives a reload; a theme switch reaches the page without one", a
   await expect(doc(page).locator("#visits")).toHaveText("2");
 });
 
-test("a File tab on a page its thread did not show gets a bridge that refuses calls", async ({ page }) => {
-  await page.setViewportSize({ width: 1300, height: 900 });
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  const target = JSON.stringify({ project: "repo-cf", base: CF, path: "docs/bridge.html" });
-  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
-  const inner = page.frameLocator('[data-testid="file-html-frame"]');
-  await expect(inner.locator("body")).toHaveAttribute("data-ready", "1");
-  await expect(inner.locator("#thread")).toHaveText("no thread");
-  await expect(inner.locator("body")).toHaveAttribute("data-readonly", "0");
-  await expect(inner.locator("body")).toHaveAttribute("data-sources", "");
-  await inner.locator("#notify").click();
-  await expect(inner.locator("#notify-out")).toHaveText("unavailable: this page is not shown in a thread");
-  expect((await invocations()).some((i) => i.name === "ui.notify")).toBe(false);
-});
+// A File tab on a page its thread did not show gets a bridge that refuses calls: src/components/files/usePageThread.test.tsx ("a file the thread never showed"), src/stores/bridgeHost.test.ts ("refuses every call without a thread"), src/lib/bridge.test.ts ("ready without a thread offers nothing"); the opaque frame in a browser is "a File tab page with no thread is opaque" below.
 
-test("the File tab of a page its thread showed has that thread's bridge", async ({ page }) => {
-  await openBridgeThread(page);
-  await card(page).getByTestId("thread-html-panel").click();
-  const inner = page.frameLocator('[data-testid="file-html-frame"]');
-  await expect(inner.locator("body")).toHaveAttribute("data-ready", "1");
-  await expect(inner.locator("#thread")).not.toHaveText("no thread");
-  await inner.locator("#notify").click();
-  await expect(inner.locator("#notify-out")).toHaveText("ok");
-});
+// The File tab of a page its thread showed having that thread's bridge: "the panel copy names the page…" below drives a call through it; src/components/files/usePageThread.test.tsx ("a thread's own page").
 
-test("a page starts a thread without moving the view: its handler runs, the new thread is its thread's child (no sidebar row)", async ({ page }) => {
-  await openBridgeThread(page);
-  await doc(page).locator("#start").click();
-  await expect(doc(page).locator("#start-out")).toHaveText(/^started 1: created thread /);
-  // The page's own success handling ran: the box is empty, so a second click cannot repeat it.
-  await expect(doc(page).locator("#task")).toHaveValue("");
-  const call = (await invocations()).find((i) => i.name === "thread.new");
-  // No project (the thread's placement), created by the page's thread, focus off by the host.
-  expect(call?.args).toEqual({ prompt: "Reply with OK only.", "created-by": "s-r1", focus: "false" });
-  await expect(card(page)).toBeVisible();
-  await expect(row(page, "s:s-r1")).toHaveAttribute("aria-selected", "true");
-  // Its creator exists, so it is out of the sidebar (docs/notes/no-sidebar-override-1-gui.md).
-  const id = /s-new-\d+/.exec(String(await doc(page).locator("#start-out").textContent()))?.[0] ?? "";
-  expect(id).not.toBe("");
-  await expect(row(page, `s:${id}`)).toHaveCount(0);
-});
+// A page starting a thread without moving the view, as its thread's child: src/stores/bridgeHost.test.ts (thread.new with created-by and focus=false), src/lib/inSidebar.test.ts (a child of a present creator is out of the sidebar).
 
 test("a page's errors show on its strip; Ask Claude puts them in the thread's composer, not sent", async ({ page }) => {
   await openBridgeThread(page);
