@@ -224,16 +224,7 @@ test("Escape goes back to the parent, the thread still selected, its one Watch k
   expect(watches()).toBe(before);
 });
 
-test("the header's back button and crumb, the note's and the plate's Back each go up", async ({ page }) => {
-  await openThread(page);
-  await unfoldTurn(page);
-  for (const back of ["subagent-back", "subagent-crumb-parent", "subagent-lineage-back", "subagent-plate-back"]) {
-    await openFromRow(page, "PR 1: daemon task frames");
-    await expectViewing(page, "a1", "PR 1: daemon task frames");
-    await page.getByTestId(back).click();
-    await expectParent(page);
-  }
-});
+// The back buttons and the crumb going up: unit-tested in src/components/thread/SubagentPane.test.tsx
 
 test("a strip name opens its background run; the done Explore opened from the card shows its report once", async ({ page }) => {
   await openThread(page);
@@ -318,18 +309,7 @@ test("the failed run opened from its note shows its error; another run failing w
   await expectViewing(page, "a2", "PR 2: Agents surface in the panel");
 });
 
-test("switching to another thread drops the view; coming back shows the thread", async ({ page }) => {
-  await openThread(page);
-  await unfoldTurn(page);
-  await openFromRow(page, "PR 1: daemon task frames");
-  await expectViewing(page, "a1", "PR 1: daemon task frames");
-  await row(page, "s:s-2").click();
-  await expect(threadPane(page)).toHaveAttribute("data-thread-id", "s-2");
-  await expect(view(page)).toHaveCount(0);
-  await row(page, "s:s-r1").click();
-  await expect(threadPane(page)).toHaveAttribute("data-thread-id", "s-r1");
-  await expect(view(page)).toHaveCount(0);
-});
+// Selecting another thread drops the view: unit-tested in src/stores/subagentView.test.ts
 
 test("thread.agent.open from the CLI selects the thread and shows the run; the palette does not list it; thread.agent.up goes back", async ({ page }) => {
   await mockPost("thread?state=agents");
