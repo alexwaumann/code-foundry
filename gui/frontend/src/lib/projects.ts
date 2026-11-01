@@ -4,6 +4,7 @@
  * sentence), a project page's checkouts (cells and order) and details. Pure; inputs are
  * the projects, threads and workspaces slices' shapes.
  */
+import type { CheckRollupView, DefaultBranchView } from "@/api/gh";
 import { isRemoteless, type GitStatusView, type ProjectView, type WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
@@ -298,10 +299,10 @@ export const prCountLabel = (n: number): string => plural(n, "PR");
 export const tidyLabel = (n: number): string => `${plural(n, "worktree")} to tidy`;
 
 /**
- * An index row's caption under the name: the GitHub slug, "<remote> · not GitHub",
+ * A workspace member's caption under its name: the GitHub slug, "<remote> · not GitHub",
  * "local only", or "<path> · no git".
  */
-export function indexCaption(r: Pick<ProjectView, "githubSlug" | "remotes" | "path"> & { git?: boolean }): string {
+export function memberCaption(r: Pick<ProjectView, "githubSlug" | "remotes" | "path"> & { git?: boolean }): string {
   if (r.git === false) return `${tildify(r.path)} · no git`;
   if (r.githubSlug) return r.githubSlug;
   const remote = r.remotes[0];
@@ -437,3 +438,36 @@ export function actionsDetail(n: number): string {
 
 /** The narrow layout of a project page (Sync and the slug drop, Terminal shows its icon only) below this content width. */
 export const PROJECT_NARROW_BELOW = 840;
+
+/** The Projects index's optional columns (Project and Needs a look always show). */
+export interface IndexColumns {
+  activity: boolean;
+  updated: boolean;
+  /** Default branch; a workspace's Contents. */
+  branch: boolean;
+}
+
+/** The content widths the index drops its columns below: Activity first, then Updated, then Default branch. */
+export const INDEX_DROP_BELOW = { activity: PROJECT_NARROW_BELOW, updated: 700, branch: 600 } as const;
+
+/** The index's columns at a content width (the scroll box's, which the side panel takes from). */
+export function indexColumns(width: number): IndexColumns {
+  return { activity: width >= INDEX_DROP_BELOW.activity, updated: width >= INDEX_DROP_BELOW.updated, branch: width >= INDEX_DROP_BELOW.branch };
+}
+
+/** An index row's Default branch cell; null shows "—". */
+export interface DefaultBranchCell {
+  branch: string;
+  rollup: CheckRollupView;
+  /** The first failed check's link (what a click on the checks opens); "" for none. */
+  failingUrl: string;
+}
+
+/**
+ * A project's Default branch cell from its repository activity: none for a project not on
+ * GitHub, before the activity arrives, or while the daemon has only an error for it.
+ */
+export function defaultBranchCell(githubSlug: string, d: DefaultBranchView | null | undefined): DefaultBranchCell | null {
+  if (!githubSlug || !d || d.fetchedAtMs === null) return null;
+  return { branch: d.branch, rollup: d.rollup, failingUrl: d.failing.find((c) => c.url !== "")?.url ?? "" };
+}

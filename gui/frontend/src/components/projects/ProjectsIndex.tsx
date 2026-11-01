@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Broom, ChevronRight, FolderOpen, FolderPlus, Folders, GitPullRequest, Layers, Search, SquarePen, SquareTerminal } from "lucide-react";
+import { Broom, FolderOpen, FolderPlus, Folders, GitPullRequest, Layers, Search } from "lucide-react";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { shortAge } from "@/components/prs/format";
+import { ChecksBadge } from "@/components/prs/PrBits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNow } from "@/lib/clock";
+import { useWidth } from "@/lib/useWidth";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import {
+  defaultBranchCell,
   filterProjects,
-  indexCaption,
+  indexColumns,
   prCountLabel,
   projectActivity,
   projectKey,
@@ -26,15 +29,16 @@ import {
   workspaceKey,
   workspaceStatusSentence,
   workspaceWorkingBranches,
+  type IndexColumns,
   type ProjectsSearch,
 } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { startCommandNamed } from "@/keys/bindings";
 import { openAddProject, type AddProjectTab } from "@/stores/addProject";
-import { composeIn } from "@/stores/compose";
-import { branchKey, branchPullRequestsResource } from "@/stores/gh";
-import { addProject, initGitIn, newTerminalIn, publishProject } from "@/stores/projectActions";
-import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
+import { branchKey, branchPullRequestsResource, openUrl, repoActivityResource } from "@/stores/gh";
+import { addProject, initGitIn, publishProject } from "@/stores/projectActions";
+import { useProjectsStore } from "@/stores/projects";
+import { useResource } from "@/stores/resource";
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
 import { projectPage, useUiStore, workspacePage } from "@/stores/ui";
@@ -43,11 +47,8 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 import { KindIcon, Pill, StatusDot, WorkspaceIcon } from "./bits";
 import { usePageScroll } from "./pageHooks";
 import { useProjectKind } from "@/components/icons/projectKind";
-import { projectMenu } from "./menus";
-import { OverflowMenu } from "./OverflowMenu";
 import { useCleanableCount } from "./useCleanable";
 import { useProjectLastMs, useProjectOrder, useWorkspaceLastMs, useWorkspaceOrder } from "./useOrder";
-import { RowAction } from "./RowAction";
 
 const SEP = "\u0001";
 
@@ -79,120 +80,201 @@ function useOpenPullRequests(projectId: string): number {
 function AgeCell({ ms }: { ms: number | null }) {
   const now = useNow(30_000);
   return (
-    <span className="w-10 shrink-0 text-right text-caption text-cf-text-muted tabular-nums" data-testid="index-age">
+    <span className="truncate text-right text-caption text-cf-text-muted tabular-nums" data-testid="index-age">
       {ms === null ? "" : shortAge(ms, now)}
     </span>
   );
 }
 
-/** The row's hover actions (hidden at rest, shown on hover, the cursor row and while a menu is open). */
-function HoverActions({ children }: { children: React.ReactNode }) {
+/** A table column: its header and grid track. */
+interface Column {
+  label: string;
+  track: string;
+  right?: boolean;
+}
+
+// Flexible tracks with a floor, like the Pull Requests page's tables; the two tables share
+// them so their columns line up while all show.
+const TRACK = { name: "minmax(7rem,1.2fr)", activity: "minmax(8rem,1.4fr)", third: "minmax(9rem,1fr)", fourth: "minmax(9rem,1.2fr)", updated: "4.5rem" };
+
+function projectColumns(c: IndexColumns): Column[] {
+  return [
+    { label: "Project", track: TRACK.name },
+    c.activity && { label: "Activity", track: TRACK.activity },
+    c.branch && { label: "Default branch", track: TRACK.third },
+    { label: "Needs a look", track: TRACK.fourth },
+    c.updated && { label: "Updated", track: TRACK.updated, right: true },
+  ].filter((x): x is Column => x !== false);
+}
+
+function workspaceColumns(c: IndexColumns): Column[] {
+  return [
+    { label: "Workspace", track: TRACK.name },
+    c.activity && { label: "Activity", track: TRACK.activity },
+    { label: "Projects", track: TRACK.third },
+    c.branch && { label: "Contents", track: TRACK.fourth },
+    c.updated && { label: "Updated", track: TRACK.updated, right: true },
+  ].filter((x): x is Column => x !== false);
+}
+
+const template = (cols: readonly Column[]): string => cols.map((c) => c.track).join(" ");
+
+/** A bordered table: the overline header row, then the rows. */
+function IndexTable({ columns, testId, children }: { columns: readonly Column[]; testId: string; children: React.ReactNode }) {
   return (
-    <span
-      className="flex w-21 shrink-0 items-center justify-end opacity-0 transition-opacity group-hover/row:opacity-100 group-aria-selected/row:opacity-100 has-[[aria-expanded=true]]:opacity-100"
-      data-testid="index-row-actions"
-    >
-      {children}
+    <div className="rounded-lg border" data-testid={testId}>
+      <div className="grid gap-3 border-b px-2 py-1 text-overline" style={{ gridTemplateColumns: template(columns) }} data-testid="index-columns">
+        {columns.map((c) => (
+          <span key={c.label} className={cn("truncate", c.right && "text-right")}>
+            {c.label}
+          </span>
+        ))}
+      </div>
+      <div className="p-0.5">{children}</div>
+    </div>
+  );
+}
+
+/** A section's title, its row count, a muted hint and its Add button at the right. */
+function SectionTitle({ heading, count, hint, action }: { heading: string; count: number; hint?: string; action: React.ReactNode }) {
+  return (
+    <div className="mb-2 flex min-h-7 items-center gap-2">
+      <h2 className="shrink-0 text-title">{heading}</h2>
+      <span className="shrink-0 text-caption text-cf-text-muted tabular-nums" data-testid="index-section-count">
+        ({count})
+      </span>
+      {hint && <span className="min-w-0 truncate text-caption text-cf-text-muted">· {hint}</span>}
+      <span className="ml-auto flex shrink-0 items-center [--wails-draggable:no-drag]">{action}</span>
+    </div>
+  );
+}
+
+/** The NavRow (cursor, hover); its inner span is the row's grid. */
+const ROW = "h-9 rounded-md";
+const ROW_INNER = "grid h-full items-center gap-3 px-2 text-body";
+
+/**
+ * The project's default branch and its checks (the daemon polls every tracked GitHub
+ * repository's), watched while the row shows. A click on failing checks opens the first
+ * failed one; "—" off GitHub and until the status arrives.
+ */
+function DefaultBranch({ projectId }: { projectId: string }) {
+  const slug = useProjectsStore((s) => s.byId[projectId]?.githubSlug.toLowerCase() ?? "");
+  const entry = useResource(repoActivityResource, slug === "" ? null : slug);
+  const cell = defaultBranchCell(slug, entry?.data?.defaultBranch);
+  if (!cell) {
+    return (
+      <span className="text-body-sm text-cf-text-muted" data-testid="index-default-branch">
+        —
+      </span>
+    );
+  }
+  const url = cell.failingUrl;
+  return (
+    <span className="flex min-w-0 items-center gap-2" data-testid="index-default-branch">
+      <span className="min-w-0 shrink truncate font-mono text-caption text-cf-text-muted" data-testid="index-default-branch-name">
+        {cell.branch}
+      </span>
+      {url ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          className="flex min-w-0 shrink-0 hover:underline"
+          data-testid="index-checks"
+          onClick={(e) => {
+            e.stopPropagation();
+            void openUrl(url);
+          }}
+        >
+          <ChecksBadge checks={cell.rollup} />
+        </button>
+      ) : (
+        <span className="flex min-w-0 shrink-0" data-testid="index-checks">
+          <ChecksBadge checks={cell.rollup} />
+        </span>
+      )}
     </span>
   );
 }
 
-/** The NavRow (cursor, hover); its inner span lays the row out. */
-const ROW = "group/row rounded-none border-b border-cf-divider last:border-b-0";
-const ROW_INNER = "flex min-h-13 w-full items-center gap-3 px-3.5";
-
-function ProjectRow({ id }: { id: string }) {
+function ProjectRow({ id, columns, cols }: { id: string; columns: IndexColumns; cols: string }) {
   const name = useProjectsStore((s) => s.byId[id]?.name ?? id);
-  const caption = useProjectsStore((s) => {
-    const r = s.byId[id];
-    return r ? indexCaption(r) : "";
-  });
   const kind = useProjectKind(id);
   const checkouts = useProjectsStore((s) => s.byId[id]?.worktrees.length ?? 0);
   const step = useProjectsStore((s) => {
     const r = s.byId[id];
     return r ? projectNextStep(r) : null;
   });
-  const hasRemote = useProjectsStore((s) => (s.byId[id]?.remotes.length ?? 0) > 0);
   const working = useThreadsStore((s) => projectActivity(s, id).working);
   const last = useProjectLastMs(id);
   const prs = useOpenPullRequests(id);
   const tidy = useCleanableCount(id);
   const sentence = projectStatusSentence({ working, checkouts, git: kind !== "nogit" });
-  const cleanup = kind !== "nogit" && hasRemote ? tidy : null;
   return (
     <NavRow navKey={projectKey(id)} activateOnClick className={ROW}>
-      <span className={ROW_INNER} data-testid="index-project" data-project={id} data-kind={kind}>
-        <KindIcon kind={kind} />
-        <span className="flex w-64 min-w-0 shrink-0 flex-col">
-          <span className="truncate text-body font-medium" data-testid="project-name">
+      <span className={ROW_INNER} style={{ gridTemplateColumns: cols }} data-testid="index-project" data-project={id} data-kind={kind}>
+        <span className="flex min-w-0 items-center gap-3">
+          <KindIcon kind={kind} />
+          <span className="truncate font-medium" data-testid="project-name">
             {name}
           </span>
-          <span className="truncate text-caption text-cf-text-muted" data-testid="project-caption">
-            {caption}
+        </span>
+        {columns.activity && (
+          <span className="flex min-w-0 items-center gap-2 text-body-sm text-cf-text-secondary" data-testid="project-status">
+            <StatusDot live={working > 0} />
+            <span className="truncate">{sentence}</span>
           </span>
+        )}
+        {columns.branch && <DefaultBranch projectId={id} />}
+        <span className="flex min-w-0 items-center gap-1.5 overflow-hidden" data-testid="index-look">
+          {prs > 0 && (
+            <Pill tone="success" data-testid="index-prs">
+              <GitPullRequest aria-hidden />
+              {prCountLabel(prs)}
+            </Pill>
+          )}
+          {tidy > 0 && (
+            <Pill tone="warning" data-testid="index-tidy">
+              <Broom aria-hidden />
+              {tidyLabel(tidy)}
+            </Pill>
+          )}
+          {step === "publish" && (
+            <button
+              type="button"
+              tabIndex={-1}
+              className="shrink-0 truncate text-caption text-cf-link hover:underline"
+              data-testid="index-publish"
+              onClick={(e) => {
+                e.stopPropagation();
+                publishProject(id);
+              }}
+            >
+              Publish to GitHub
+            </button>
+          )}
+          {step === "init" && (
+            <button
+              type="button"
+              tabIndex={-1}
+              className="shrink-0 truncate text-caption text-cf-link hover:underline"
+              data-testid="index-init-git"
+              onClick={(e) => {
+                e.stopPropagation();
+                void initGitIn(id);
+              }}
+            >
+              Initialize git
+            </button>
+          )}
         </span>
-        <span className="flex min-w-0 flex-1 items-center gap-2 text-body-sm text-cf-text-secondary" data-testid="project-status">
-          <StatusDot live={working > 0} />
-          <span className="truncate">{sentence}</span>
-        </span>
-        {prs > 0 && (
-          <Pill tone="success" data-testid="index-prs">
-            <GitPullRequest aria-hidden />
-            {prCountLabel(prs)}
-          </Pill>
-        )}
-        {tidy > 0 && (
-          <Pill tone="warning" data-testid="index-tidy">
-            <Broom aria-hidden />
-            {tidyLabel(tidy)}
-          </Pill>
-        )}
-        {step === "publish" && (
-          <button
-            type="button"
-            tabIndex={-1}
-            className="shrink-0 text-caption text-cf-link hover:underline"
-            data-testid="index-publish"
-            onClick={(e) => {
-              e.stopPropagation();
-              publishProject(id);
-            }}
-          >
-            Publish to GitHub…
-          </button>
-        )}
-        {step === "init" && (
-          <button
-            type="button"
-            tabIndex={-1}
-            className="shrink-0 text-caption text-cf-link hover:underline"
-            data-testid="index-init-git"
-            onClick={(e) => {
-              e.stopPropagation();
-              void initGitIn(id);
-            }}
-          >
-            Initialize git
-          </button>
-        )}
-        <AgeCell ms={last} />
-        <HoverActions>
-          <RowAction label="New thread" testId="project-new-thread" onClick={() => { composeIn(id); }}>
-            <SquarePen />
-          </RowAction>
-          <RowAction label="New terminal" testId="project-new-terminal" onClick={() => void newTerminalIn(id, mainWorktreePath(useProjectsStore.getState(), id))}>
-            <SquareTerminal />
-          </RowAction>
-          <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(id, kind, step, cleanup)} />
-        </HoverActions>
-        <ChevronRight className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
+        {columns.updated && <AgeCell ms={last} />}
       </span>
     </NavRow>
   );
 }
 
-function WorkspaceRow({ id }: { id: string }) {
+function WorkspaceRow({ id, columns, cols }: { id: string; columns: IndexColumns; cols: string }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.projectId)));
   const members = useProjectsStore(useShallow((s) => memberIds.map((p) => s.byId[p]?.name ?? p)));
@@ -205,26 +287,28 @@ function WorkspaceRow({ id }: { id: string }) {
   const last = useWorkspaceLastMs(id);
   return (
     <NavRow navKey={workspaceKey(id)} activateOnClick className={ROW}>
-      <span className={ROW_INNER} data-testid="index-workspace" data-workspace={id}>
-        <WorkspaceIcon />
-        <span className="flex w-64 min-w-0 shrink-0 flex-col">
-          <span className="truncate text-body font-medium" data-testid="workspace-name">
+      <span className={ROW_INNER} style={{ gridTemplateColumns: cols }} data-testid="index-workspace" data-workspace={id}>
+        <span className="flex min-w-0 items-center gap-3">
+          <WorkspaceIcon />
+          <span className="truncate font-medium" data-testid="workspace-name">
             {name}
           </span>
-          <span className="truncate text-caption text-cf-text-muted" data-testid="workspace-caption">
-            {[...members].sort((a, b) => a.localeCompare(b)).join(" + ")}
+        </span>
+        {columns.activity && (
+          <span className="flex min-w-0 items-center gap-2 text-body-sm text-cf-text-secondary" data-testid="workspace-status">
+            <StatusDot live={working > 0} />
+            <span className="truncate">{workspaceStatusSentence(working, branches)}</span>
           </span>
+        )}
+        <span className="truncate text-body-sm text-cf-text-secondary" data-testid="workspace-projects">
+          {[...members].sort((a, b) => a.localeCompare(b)).join(" + ")}
         </span>
-        <span className="flex min-w-0 flex-1 items-center gap-2 text-body-sm text-cf-text-secondary" data-testid="workspace-status">
-          <StatusDot live={working > 0} />
-          <span className="truncate">{workspaceStatusSentence(working, branches)}</span>
-        </span>
-        <span className="shrink-0 text-caption text-cf-text-muted" data-testid="workspace-contents">
-          {contents}
-        </span>
-        <AgeCell ms={last} />
-        <span className="w-21 shrink-0" aria-hidden />
-        <ChevronRight className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
+        {columns.branch && (
+          <span className="truncate text-caption text-cf-text-muted" data-testid="workspace-contents">
+            {contents}
+          </span>
+        )}
+        {columns.updated && <AgeCell ms={last} />}
       </span>
     </NavRow>
   );
@@ -301,11 +385,12 @@ function EmptyIndex() {
 }
 
 /**
- * The Projects index: one row per project, by last activity (lib/projects.ts
- * sortByActivity), with its status sentence, what needs a look (open pull requests,
- * worktrees to tidy), its setup step, age, and hover actions; then the workspaces the same
- * way. Click or Enter opens a row's page; ↑/↓ move; / goes to the filter, Escape there
- * clears it and comes back. docs/notes/projects-redesign-1-index.md.
+ * The Projects index: a table of projects by last activity (lib/projects.ts
+ * sortByActivity) with their status sentence, default branch checks, what needs a look
+ * (open pull requests, worktrees to tidy, the setup step) and age; then the workspaces the
+ * same way. Columns drop as the content narrows (lib/projects.ts indexColumns). Click or
+ * Enter opens a row's page; ↑/↓ move; / goes to the filter, Escape there clears it and
+ * comes back. docs/notes/projects-redesign-1-index.md, docs/notes/projects-table-1-index.md.
  */
 export function ProjectsIndex({ pageKey }: { pageKey: string }) {
   const order = useProjectOrder();
@@ -337,7 +422,15 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
   const loaded = useProjectsStore((s) => s.loaded);
   const rootRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
-  const scrollRef = usePageScroll(pageKey);
+  // The content pane's width (the side panel takes from it): the scroll box's.
+  const [widthRef, width] = useWidth(1200);
+  const scrollRef = usePageScroll(pageKey, widthRef);
+  const { activity, updated, branch } = indexColumns(width);
+  const columns = useMemo<IndexColumns>(() => ({ activity, updated, branch }), [activity, updated, branch]);
+  const projectCols = useMemo(() => projectColumns(columns), [columns]);
+  const workspaceCols = useMemo(() => workspaceColumns(columns), [columns]);
+  const projectTemplate = template(projectCols);
+  const workspaceTemplate = template(workspaceCols);
   useEffect(() => {
     rootRef.current?.focus({ preventScroll: true });
   }, []);
@@ -376,22 +469,12 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
             </Kbd>
           )}
         </div>
-        <span className="ml-auto flex shrink-0 items-center gap-1.5 [--wails-draggable:no-drag]">
-          <Button type="button" variant="ghost" size="sm" className="h-7 text-cf-text-secondary" data-testid="projects-new-workspace" onClick={() => { openNewWorkspaceDialog(); }}>
-            <Layers />
-            New workspace
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="h-7" data-testid="projects-register" onClick={() => { addProject(); }}>
-            <FolderPlus />
-            Add project
-          </Button>
-        </span>
-        <span className="-mr-2 flex shrink-0 items-center">
+        <span className="-mr-2 ml-auto flex shrink-0 items-center">
           <BottomToggle />
           <PanelToggle />
         </span>
       </PaneHeader>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-5" data-testid="projects-scroll">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-testid="projects-scroll">
         <NavProvider value={nav.ctx}>
           <div
             ref={rootRef}
@@ -399,7 +482,7 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
             role="listbox"
             aria-label="Projects and workspaces"
             aria-activedescendant={nav.activeDescendant}
-            className="mx-auto flex max-w-5xl flex-col gap-6 outline-none"
+            className="mx-auto flex max-w-6xl flex-col gap-6 outline-none"
             data-testid="projects-list"
             data-focus-root
             onKeyDown={(e) => {
@@ -422,30 +505,49 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
             ) : (
               <>
                 {projects.length > 0 && (
-                  <div className="overflow-hidden rounded-lg border bg-cf-surface" data-testid="projects-section">
-                    {projects.map((id) => (
-                      <ProjectRow key={id} id={id} />
-                    ))}
-                  </div>
+                  <section data-testid="projects-section">
+                    <SectionTitle
+                      heading="Projects"
+                      count={projects.length}
+                      action={
+                        <Button type="button" variant="outline" size="sm" className="h-7" data-testid="projects-register" onClick={() => { addProject(); }}>
+                          <FolderPlus />
+                          Add project
+                        </Button>
+                      }
+                    />
+                    <IndexTable columns={projectCols} testId="projects-table">
+                      {projects.map((id) => (
+                        <ProjectRow key={id} id={id} columns={columns} cols={projectTemplate} />
+                      ))}
+                    </IndexTable>
+                  </section>
                 )}
                 {(workspaces.length > 0 || (!filtering && wsOrder.length === 0)) && (
-                  <div data-testid="workspaces-section">
-                    <div className={cn("mb-2 flex items-center gap-2")}>
-                      <span className="text-overline text-cf-text-muted">Workspaces</span>
-                      <span className="text-caption text-cf-text-muted">· sets of projects threads start in together</span>
-                    </div>
+                  <section data-testid="workspaces-section">
+                    <SectionTitle
+                      heading="Workspaces"
+                      count={workspaces.length}
+                      hint="sets of projects threads start in together"
+                      action={
+                        <Button type="button" variant="outline" size="sm" className="h-7" data-testid="projects-new-workspace" onClick={() => { openNewWorkspaceDialog(); }}>
+                          <Layers />
+                          Add workspace
+                        </Button>
+                      }
+                    />
                     {workspaces.length > 0 ? (
-                      <div className="overflow-hidden rounded-lg border bg-cf-surface">
+                      <IndexTable columns={workspaceCols} testId="workspaces-table">
                         {workspaces.map((id) => (
-                          <WorkspaceRow key={id} id={id} />
+                          <WorkspaceRow key={id} id={id} columns={columns} cols={workspaceTemplate} />
                         ))}
-                      </div>
+                      </IndexTable>
                     ) : (
                       <p className="text-body-sm text-cf-text-muted" data-testid="workspaces-empty">
-                        None yet: New workspace, or <span className="font-mono">code-foundry workspace new</span>.
+                        None yet: Add workspace, or <span className="font-mono">code-foundry workspace new</span>.
                       </p>
                     )}
-                  </div>
+                  </section>
                 )}
               </>
             )}

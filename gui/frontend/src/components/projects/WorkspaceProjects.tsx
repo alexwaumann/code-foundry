@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
-import { indexCaption, memberKey } from "@/lib/projects";
+import { memberCaption, memberKey } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { addableProjects, PRIMARY_WORKSPACE } from "@/lib/workspaceCard";
 import { useProjectsStore } from "@/stores/projects";
@@ -113,7 +113,7 @@ function MemberRow({ workspaceId, projectId, first }: { workspaceId: string; pro
   const known = useProjectsStore((s) => s.byId[projectId] !== undefined);
   const caption = useProjectsStore((s) => {
     const p = s.byId[projectId];
-    return p ? indexCaption(p) : "";
+    return p ? memberCaption(p) : "";
   });
   const kind = useProjectKind(projectId);
   const isDefault = useWorkspacesStore((s) => s.byId[workspaceId]?.defaultPrimary === projectId);

@@ -24,10 +24,11 @@ async function compose(page: Page, n: number): Promise<void> {
 test("a project without git: its page says so, its Changes tab, then Initialize git", async ({ page }) => {
   await openApp(page);
   await openProjects(page);
-  // The index row: its folder and "no git", no checkouts to count.
+  // The index row: the folder icon, no checkouts to count, Initialize git to do.
   const indexRow = page.locator('[data-nav-key="p:repo-wr"]');
   await expect(indexRow.getByTestId("index-project")).toHaveAttribute("data-kind", "nogit");
-  await expect(indexRow.getByTestId("project-caption")).toHaveText("~/Documents/writing · no git");
+  await expect(indexRow.getByTestId("project-status")).toHaveText("idle");
+  await expect(indexRow.getByTestId("index-init-git")).toBeVisible();
   // Its page: the note, no branch, status or pull request.
   await openProjectPage(page, "repo-wr");
   const pageEl = page.getByTestId("projects-page");
@@ -51,7 +52,9 @@ test("a project without git: its page says so, its Changes tab, then Initialize 
   await expect(pageEl).toHaveAttribute("data-kind", "git");
   await expect(page.getByTestId("worktree-branch")).toHaveText("main");
   await openProjects(page);
-  await expect(indexRow.getByTestId("project-caption")).toHaveText("local only");
+  await expect(indexRow.getByTestId("index-project")).toHaveAttribute("data-kind", "git");
+  await expect(indexRow.getByTestId("index-init-git")).toHaveCount(0);
+  await expect(indexRow.getByTestId("index-publish")).toHaveText("Publish to GitHub");
 });
 
 test("the composer in a project without git offers only its current checkout; the thread's row says No git", async ({ page }) => {

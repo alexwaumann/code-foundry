@@ -148,7 +148,8 @@ export async function openProjects(page: Page): Promise<void> {
 /** Shows a project's page: the index, then its row. */
 export async function openProjectPage(page: Page, projectId: string): Promise<void> {
   await openProjects(page);
-  await page.locator(`[data-nav-key="p:${projectId}"]`).click();
+  // The name: the middle of the row may be its failing checks, which open their page instead.
+  await page.locator(`[data-nav-key="p:${projectId}"]`).getByTestId("project-name").click();
   await expect(page.locator(`[data-testid="projects-page"][data-page="project"][data-project="${projectId}"]`)).toBeVisible();
 }
 
