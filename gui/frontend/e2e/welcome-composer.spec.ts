@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockPost, openAddProjectDialog, projectAt, resetMock } from "./fixtures";
+import { appPath, mockPost, resetMock } from "./fixtures";
 
 // The first-run welcome on the home composer (docs/notes/welcome-composer.md): with zero
 // projects the No project composer greets and prefills, never sends, the tutorial prompt
@@ -26,18 +26,6 @@ async function openWelcome(page: Page): Promise<void> {
 
 // Zero projects: the Welcome heading and the prefilled prompt, not sent; Enter sending it as a No project
 // thread's first message: unit-tested in src/components/compose/Composer.test.tsx.
-
-/** Adds ~/src/new-app through the Local folder tab, then steps back to home (cmd+[). */
-async function addFirstProject(page: Page): Promise<void> {
-  await openAddProjectDialog(page);
-  await page.getByTestId("add-project-local-input").fill("src/new-app");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("add-project-dialog")).toHaveCount(0);
-  expect(await projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app" });
-  await page.getByTestId("sidebar-menu").click({ position: { x: 4, y: 4 } });
-  await page.keyboard.press("Meta+BracketLeft");
-  await expect(page.getByTestId("composer")).toBeVisible();
-}
 
 // The first project reverting the heading and clearing an untouched prompt: src/components/compose/Composer.test.tsx ("the first project clears an untouched prefill, and the heading reverts"); the editor showing the draft is the next test.
 

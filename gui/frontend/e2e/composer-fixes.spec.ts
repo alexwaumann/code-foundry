@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, mockPost, openApp, resetMock, row } from "./fixtures";
+import { composeProject, openApp, resetMock } from "./fixtures";
 
 /**
  * Workspaces v2, fuzz round D fixes for the composer and sidebar
@@ -8,14 +8,6 @@ import { composeProject, mockPost, openApp, resetMock, row } from "./fixtures";
  * Save as workspace in a workspace folder, the like headings and labels, a like draft whose
  * thread is removed, the menus' and palette's rules, deduped hints, the header chip.
  */
-
-interface ThreadSummary {
-  id: string;
-  name: string;
-  projectId: string;
-  projectIds: string[];
-  workspaceId: string;
-}
 
 async function composeIn(page: Page, n: number): Promise<void> {
   await composeProject(page, n);
