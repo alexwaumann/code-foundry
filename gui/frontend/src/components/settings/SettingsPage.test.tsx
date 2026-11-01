@@ -410,6 +410,16 @@ describe("search", () => {
     expect(body().dataset.page).toBe("advanced");
   });
 
+  it("“skills registries” finds Skills › Registries, counted on the nav, which opens the page", () => {
+    open();
+    fireEvent.change(search(), { target: { value: "skills registries" } });
+    expect(screen.getAllByTestId("settings-section-hit").map((h) => h.textContent)).toEqual(["Skills › RegistriesThe marketplaces Claude Code knows about, and refreshing them."]);
+    expect(within(nav("skills")).getByTestId("settings-nav-count").textContent).toBe("1");
+    fireEvent.click(screen.getByTestId("settings-section-hit"));
+    expect(body().dataset.page).toBe("skills");
+    expect(document.querySelector('[data-section="registries"]')).not.toBeNull();
+  });
+
   it.each(["remembered", "forget", "preferences", "standing"])("“%s” finds Memory › Remembered, which opens the page", (word) => {
     open();
     fireEvent.change(search(), { target: { value: word } });

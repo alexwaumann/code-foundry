@@ -11,7 +11,8 @@ const relaunchApp = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/api/app", async (orig) => ({ ...(await orig<typeof import("@/api/app")>()), relaunchApp }));
 
 const { useCommandsStore } = await import("./commands");
-const { runUpdateAction, useUpdateStore } = await import("./update");
+const { applyUpdateEvent, runUpdateAction, useUpdateStore } = await import("./update");
+const { presentCommand } = await import("@/keys/bindings");
 
 function cmd(name: string): CommandView {
   return { name } as CommandView;
@@ -91,5 +92,49 @@ describe("runUpdateAction('download')", () => {
     await expect(runUpdateAction("download")).resolves.toBe(true);
     expect(calls().map((c) => c[0])).toEqual(["app.update"]);
     expect(useUpdateStore.getState()).toMatchObject({ pending: null, error: null, restarting: null });
+  });
+});
+
+// The palette's two update entries (e2e update.spec.ts used to run them through cmd+k).
+describe("the update commands' presenters", () => {
+  beforeEach(() => {
+    useUpdateStore.setState({ dialogOpen: false });
+  });
+
+  it("app.update.check opens the dialog and checks", async () => {
+    expect(presentCommand("app.update.check")).toBe(true);
+    expect(useUpdateStore.getState().dialogOpen).toBe(true);
+    await vi.waitFor(() => {
+      expect(useUpdateStore.getState().pending).toBeNull();
+    });
+    expect(calls().map((c) => c[0])).toEqual(["app.update.check"]);
+  });
+
+  it("app.update opens the dialog and downloads", async () => {
+    expect(presentCommand("app.update")).toBe(true);
+    expect(useUpdateStore.getState().dialogOpen).toBe(true);
+    await vi.waitFor(() => {
+      expect(useUpdateStore.getState().pending).toBeNull();
+    });
+    expect(calls().map((c) => c[0])).toEqual(["app.update"]);
+  });
+});
+
+describe("applyUpdateEvent", () => {
+  const st = (state: UpdateStatusView["state"], targetVersion: string) => ({ state, targetVersion }) as UpdateStatusView;
+
+  // The daemon titles app.update ("Download v0.2.0") and app.restart ("Install v0.2.0 and
+  // Restart") from the state (internal/command/commands_update_test.go); the palette re-lists.
+  it("re-lists the commands when the state or the target changes, not on a repeat", () => {
+    useUpdateStore.setState({ status: st("idle", "") });
+    applyUpdateEvent({ kind: "status", status: st("available", "v0.2.0") });
+    expect(useUpdateStore.getState().status?.state).toBe("available");
+    expect(listCommands).toHaveBeenCalledTimes(1);
+    applyUpdateEvent({ kind: "status", status: st("available", "v0.2.0") });
+    expect(listCommands).toHaveBeenCalledTimes(1);
+    applyUpdateEvent({ kind: "status", status: st("available", "v0.3.0") });
+    expect(listCommands).toHaveBeenCalledTimes(2);
+    applyUpdateEvent({ kind: "status", status: st("downloaded", "v0.3.0") });
+    expect(listCommands).toHaveBeenCalledTimes(3);
   });
 });
