@@ -99,6 +99,10 @@ describe("the backdrop row", () => {
     expect(thumbs.map((t) => t.dataset.name)).toEqual([A, B]);
     expect(thumbs.map((t) => t.dataset.selected)).toEqual(["true", undefined]);
     expect(screen.getByRole("button", { name: "Show image 1 (1920×1080)" }).getAttribute("aria-pressed")).toBe("true");
+    // Thumbnails are the daemon's bytes as object URLs.
+    await waitFor(() => {
+      expect(thumbs.map((t) => t.querySelector("img")?.getAttribute("src"))).toEqual(["blob:x", "blob:x"]);
+    });
   });
 
   it("marks none while the backdrop is forest", async () => {
@@ -257,6 +261,19 @@ describe("the backdrop row", () => {
     });
     expect(shown()).toBe("forest");
     expect(save.fn).not.toHaveBeenCalled();
+  });
+
+  it("removing the shown one of two shows Forest, the other unmarked", async () => {
+    daemon.removeBackdrop.mockImplementation((name) => {
+      daemon.images = daemon.images.filter((b) => b.name !== name);
+      return Promise.resolve();
+    });
+    await renderRow();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove image 1" }));
+    await waitFor(() => {
+      expect(screen.getAllByTestId("backdrop-thumb").map((t) => [t.dataset.name, t.dataset.selected])).toEqual([[B, undefined]]);
+    });
+    expect(shown()).toBe("forest");
   });
 
   it("removing another image keeps the shown one", async () => {

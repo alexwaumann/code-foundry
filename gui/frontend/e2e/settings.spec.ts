@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -69,10 +69,6 @@ async function goTo(page: Page, id: string) {
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", id);
 }
 
-function searchbox(page: Page) {
-  return page.getByRole("searchbox", { name: "Search settings" });
-}
-
 test("cmd+, opens settings on General; the nav switches pages, one at a time", async ({ page }) => {
   const settings = await openSettings(page);
   const nav = settings.getByRole("navigation", { name: "Settings pages" });
@@ -139,15 +135,7 @@ test("cmd+, opens settings on General; the nav switches pages, one at a time", a
   await expect(settings).toHaveCount(0);
 });
 
-test("model and effort share a row with the model's description under them", async ({ page }) => {
-  const settings = await openSettings(page);
-  const pair = settings.locator('[data-setting-row="model"]');
-  await expect(pair.locator("[data-setting]")).toHaveCount(2);
-  await expect(pair.locator("[data-setting]").first()).toHaveAttribute("data-setting", "threads.default_model");
-  await expect(pair.locator("[data-setting]").nth(1)).toHaveAttribute("data-setting", "threads.default_effort");
-  await expect(pair).toContainText("The default for new threads.");
-  await expect(pair).not.toContainText("The default effort for new threads");
-});
+// Model and effort sharing a row: unit-tested in src/components/settings/SettingsPage.test.tsx.
 
 test("a dependent row is indented under its toggle and dims while it is off; across sections it says why", async ({ page }) => {
   await openSettings(page);
@@ -176,98 +164,9 @@ test("a dependent row is indented under its toggle and dims while it is off; acr
   await expect(volume).not.toHaveAttribute("data-dimmed");
 });
 
-test("Keybindings: Bound only folds unbound commands, its count and choice persist", async ({ page }) => {
-  const settings = await openSettings(page);
-  await goTo(page, "keybindings");
-  const bound = page.getByTestId("settings-bound-only");
-  await expect(bound).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByTestId("settings-page-description")).toContainText(/\d+ of \d+ commands have a shortcut\./);
-  const [, have, total] = /(\d+) of (\d+) commands/.exec((await page.getByTestId("settings-page-description").textContent()) ?? "") ?? [];
-  // Every bound command shows as a row, and nothing else does.
-  await expect(settings.locator("[data-setting]")).toHaveCount(Number(have));
+// Keybindings' Bound only (the buckets, the tooltip, the persisted choice): unit-tested in src/components/settings/SettingsPage.test.tsx.
 
-  // Thread: its bound commands, then "N more unbound", which opens the rest in place.
-  const thread = settings.locator('[data-testid="settings-section"][data-section="thread"]');
-  await expect(thread.locator('[data-setting="keybindings.thread.new"]')).toBeVisible();
-  await expect(thread.locator('[data-setting="keybindings.thread.archive"]')).toHaveCount(0);
-  const more = page.getByTestId("keybindings-more-thread");
-  await expect(more).toContainText("more unbound");
-  await more.click();
-  await expect(more).toHaveAttribute("aria-expanded", "true");
-  await expect(thread.locator('[data-setting="keybindings.thread.archive"]')).toBeVisible();
-  await expect(thread.locator('[data-setting="keybindings.thread.archive"]').getByRole("button", { name: /shortcut/ })).toHaveText("Add shortcut");
-
-  // Categories with nothing bound share one card, each collapsed.
-  const empty = page.getByTestId("keybindings-unbound-card");
-  await expect(settings.getByRole("heading", { name: "No shortcuts yet" })).toBeVisible();
-  const project = page.getByTestId("keybindings-category-project");
-  await expect(project).toContainText("Project");
-  await expect(project).toContainText(/\d+ unbound/);
-  await expect(empty.locator("[data-setting]")).toHaveCount(0);
-  await project.click();
-  await expect(empty.locator("[data-setting]").first()).toBeVisible();
-
-  // The title's tooltip has the description and the command name.
-  await thread.locator('[data-setting="keybindings.thread.new"] span.truncate').hover();
-  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText("thread.new");
-
-  // Off: every command, every category its own card. The choice survives a reload.
-  await bound.click();
-  await expect(bound).toHaveAttribute("aria-checked", "false");
-  await expect(settings.locator("[data-setting]")).toHaveCount(Number(total));
-  await expect(page.getByTestId("keybindings-unbound-card")).toHaveCount(0);
-  await page.reload();
-  await page.keyboard.press("Meta+Comma");
-  await goTo(page, "keybindings");
-  await expect(page.getByTestId("settings-bound-only")).toHaveAttribute("aria-checked", "false");
-});
-
-test("search lists matches from every page with their page and section; Esc clears, then closes", async ({ page }) => {
-  const settings = await openSettings(page);
-  await expect(searchbox(page)).toBeFocused();
-  await searchbox(page).fill("interval");
-  const results = page.getByTestId("settings-results");
-  await expect(page.getByTestId("settings-result-count")).toHaveText("2 results for “interval” in every page");
-  await expect(results.locator("[data-setting]")).toHaveCount(2);
-  await expect(results.getByTestId("setting-crumb")).toHaveText(["Source control › GitHub", "Source control › Projects"]);
-  // The key shows, the words marked.
-  await expect(setting(page, "github.poll_interval_seconds").getByTestId("setting-key")).toHaveText("github.poll_interval_seconds");
-  await expect(setting(page, "github.poll_interval_seconds").getByTestId("setting-key").locator("mark")).toHaveText("interval");
-  // The nav counts matches per page and marks none current.
-  await expect(page.getByTestId("settings-nav-source").getByTestId("settings-nav-count")).toHaveText("2");
-  await expect(page.getByTestId("settings-nav-general").getByTestId("settings-nav-count")).toHaveText("0");
-  await expect(settings.locator('[aria-current="page"]')).toHaveCount(0);
-  // Same editors: a result saves like its row on its page.
-  const poll = setting(page, "github.poll_interval_seconds").getByRole("spinbutton");
-  await poll.fill("120");
-  await poll.press("Enter");
-  await expect.poll(async () => (await mockSettings()).raw["github.poll_interval_seconds"]).toBe("120");
-
-  // Keybindings and fields from any page: "font" finds Appearance's terminal font.
-  await searchbox(page).fill("font");
-  await expect(setting(page, "appearance.font_size")).toBeVisible();
-  await expect(setting(page, "appearance.font_family")).toBeVisible();
-  await expect(setting(page, "threads.auto_name")).toHaveCount(0);
-  await searchbox(page).fill("new terminal");
-  await expect(setting(page, "keybindings.terminal.new").getByTestId("setting-crumb")).toHaveText("Keybindings › Terminal");
-  await searchbox(page).fill("zzzz");
-  await expect(results).toContainText("No settings match “zzzz”.");
-
-  // Esc clears and goes back to the page; Esc again closes settings.
-  await searchbox(page).focus();
-  await page.keyboard.press("Escape");
-  await expect(searchbox(page)).toHaveValue("");
-  await expect(settings.getByRole("heading", { name: "General", level: 2 })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(settings).toHaveCount(0);
-
-  // A nav item while searching clears the search and shows that page.
-  await page.keyboard.press("Meta+Comma");
-  await searchbox(page).fill("interval");
-  await page.getByTestId("settings-nav-advanced").click();
-  await expect(searchbox(page)).toHaveValue("");
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "advanced");
-});
+// The search (results, crumbs, nav counts, Escape, nav while searching): unit-tested in src/components/settings/SettingsPage.test.tsx.
 
 test("the dark and light theme rows offer their scheme's themes and apply live", async ({ page }) => {
   await openSettings(page, "appearance");
@@ -342,69 +241,11 @@ test("an enum select works from the keyboard", async ({ page }) => {
   await expect(page.getByTestId("settings-page")).toBeVisible();
 });
 
-test("a text setting reverts on Escape and commits on Enter", async ({ page }) => {
-  await openSettings(page, "appearance");
-  const size = setting(page, "appearance.font_size").getByRole("spinbutton");
-  await size.fill("15");
-  await size.press("Escape");
-  await expect(size).toHaveValue("13");
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  expect((await mockSettings()).raw["appearance.font_size"]).toBeUndefined();
-  await size.fill("15");
-  await size.press("Enter");
-  await expect.poll(async () => (await mockSettings()).raw["appearance.font_size"]).toBe("15");
-});
+// A number reverting on Escape and committing on Enter: unit-tested in src/components/settings/SettingsPage.test.tsx.
 
-test("the backdrop row's gallery shows, selects and removes images; Add image… needs the app", async ({ page }) => {
-  const first = (await mockPost("backdrops/import?path=/Users/me/Pictures/sea.png")) as { name: string };
-  await mockPost("backdrops/import?path=/Users/me/Pictures/dunes.jpg");
-  await openSettings(page, "appearance");
-  const row = setting(page, "appearance.backdrop");
-  const thumbs = row.getByTestId("backdrop-thumb");
-  // The last import is the one shown; the file key has no row of its own.
-  await expect(thumbs).toHaveCount(2);
-  await expect(thumbs.nth(1)).toHaveAttribute("data-selected", "true");
-  await expect(select(page, "appearance.backdrop")).toHaveAttribute("data-value", "custom");
-  await expect(setting(page, "appearance.backdrop_file")).toHaveCount(0);
-  await expect(thumbs.nth(0).locator("img")).toHaveAttribute("src", /^blob:/);
+// The backdrop gallery: unit-tested in src/components/settings/BackdropEditor.test.tsx.
 
-  await row.getByRole("button", { name: /^Show image 1/ }).click();
-  await expect(thumbs.nth(0)).toHaveAttribute("data-selected", "true");
-  await expect.poll(async () => (await mockSettings()).raw["appearance.backdrop_file"]).toBe(first.name);
-
-  // Removing the shown one falls back to the forest.
-  await thumbs.nth(0).hover();
-  await row.getByRole("button", { name: "Remove image 1" }).click();
-  await expect(thumbs).toHaveCount(1);
-  await expect(select(page, "appearance.backdrop")).toHaveAttribute("data-value", "forest");
-  await expect(thumbs.nth(0)).not.toHaveAttribute("data-selected", "true");
-
-  // Removing the last one takes Custom out of the list.
-  await thumbs.nth(0).hover();
-  await row.getByRole("button", { name: "Remove image 1" }).click();
-  await expect(row.getByTestId("backdrop-gallery")).toHaveCount(0);
-  await select(page, "appearance.backdrop").click();
-  await expect(page.getByRole("option")).toHaveText(["Forest (default)", "None"]);
-  await page.keyboard.press("Escape");
-
-  // No host in a browser: no open panel.
-  await expect(row.getByTestId("backdrop-add")).toBeDisabled();
-});
-
-test("appearance.thread_width sets data-thread-width on <html>, live", async ({ page }) => {
-  await openSettings(page, "appearance");
-  const html = page.locator("html");
-  await expect(html).toHaveAttribute("data-thread-width", "comfortable");
-  await expect(select(page, "appearance.thread_width")).toHaveAttribute("data-value", "comfortable");
-  await pick(page, "appearance.thread_width", "Full");
-  await expect.poll(async () => (await mockSettings()).raw["appearance.thread_width"]).toBe("full");
-  await expect(html).toHaveAttribute("data-thread-width", "full");
-  await pick(page, "appearance.thread_width", "Compact");
-  await expect(html).toHaveAttribute("data-thread-width", "compact");
-  // A hand edit back to the default.
-  await mockPost("settings/external?appearance.thread_width=");
-  await expect(html).toHaveAttribute("data-thread-width", "comfortable");
-});
+// appearance.thread_width on html[data-thread-width]: unit-tested in src/stores/settings.test.ts.
 
 test("a keybinding override rejects a reserved chord and applies a valid one", async ({ page }) => {
   await openSettings(page, "keybindings");
@@ -459,11 +300,7 @@ test("hand edits to the file update the open page and the terminal font", async 
   await expect.poll(async () => (await mockSettings()).raw["appearance.zoom"]).toBeUndefined();
 });
 
-test("reveal settings file runs settings.reveal", async ({ page }) => {
-  await openSettings(page);
-  await page.getByTestId("reveal-settings").click();
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("settings.reveal");
-});
+// Open settings file in Finder: unit-tested in src/components/settings/SettingsPage.test.tsx.
 
 test("cmd+/ opens the help overlay; its shortcuts tab lists commands and app chords", async ({ page }) => {
   await openApp(page);
@@ -487,42 +324,6 @@ test("cmd+/ opens the help overlay; its shortcuts tab lists commands and app cho
   await expect(help).toHaveCount(0);
 });
 
-test("ShowView intents from the daemon open settings and help", async ({ page }) => {
-  await openApp(page);
-  expect(await emit({ showView: { name: "settings" } })).toBe(1);
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  // A selection change (the sidebar's next-thread chord or its CLI verb; the backdrop covers
-  // the sidebar itself) leaves the sheet.
-  expect(await emit({ showView: { name: "thread.next" } })).toBe(1);
-  await expect(page.getByTestId("settings-page")).toHaveCount(0);
-  await expect(page.getByTestId("thread-header")).toBeVisible();
-  await emit({ showView: { name: "help" } });
-  await expect(page.getByTestId("help-overlay")).toBeVisible();
-});
+// ShowView settings, thread.next and help: unit-tested in src/stores/intents.test.ts.
 
-test("destructive commands ask first; cancel keeps, confirm runs", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  // The thread row's menu: Remove (thread.remove).
-  const remove = async () => {
-    await row(page, "s:s-3").click({ button: "right" });
-    await page.getByTestId("row-menu").getByText("Remove", { exact: true }).click();
-  };
-  await remove();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Remove thread s-3?");
-  // s-3 is in a checkout, not a worktree Code Foundry made: no worktree sentence.
-  await expect(dialog).not.toContainText("worktrees are removed");
-  await dialog.getByTestId("confirm-cancel").click();
-  await expect(dialog).toHaveCount(0);
-  await expect(row(page, "s:s-3")).toBeVisible();
-  let calls = (await invocations()).filter((i) => i.name === "thread.remove");
-  expect(calls.map((c) => (c as { confirmed?: boolean }).confirmed)).toEqual([false]);
-
-  await remove();
-  await expect(dialog).toBeVisible();
-  await dialog.getByTestId("confirm-ok").click();
-  await expect(row(page, "s:s-3")).toHaveCount(0);
-  calls = (await invocations()).filter((i) => i.name === "thread.remove");
-  expect(calls.map((c) => (c as { confirmed?: boolean }).confirmed)).toEqual([false, false, true]);
-});
+// Remove in the row menu and the confirm dialog: unit-tested in src/components/sidebar/RowMenu.test.tsx and src/components/confirm/ConfirmDialog.test.tsx.

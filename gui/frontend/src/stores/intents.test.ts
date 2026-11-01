@@ -284,3 +284,24 @@ describe("notify", () => {
     expect(toastInfo).toHaveBeenCalledWith("t", want);
   });
 });
+
+describe("showView from the daemon", () => {
+  it("settings opens the sheet, thread.next selects the next thread and closes it, help opens the overlay", async () => {
+    const { startViewSync, useViewsStore } = await import("./views");
+    const full = (id: string) => ({ ...thread(id), name: id, status: "idle", statusReason: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", inSidebar: null, flags: [], createdAtMs: 1, lastActivityAtMs: null }) as unknown as ThreadView;
+    useThreadsStore.setState({ byId: { s1: full("s1"), s2: full("s2") }, order: ["s1", "s2"] });
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
+    const stop = startViewSync();
+    try {
+      applyIntent({ kind: "showView", name: "settings" });
+      expect(useViewsStore.getState().settingsOpen).toBe(true);
+      applyIntent({ kind: "showView", name: "thread.next" });
+      expect(useUiStore.getState().selection.kind).toBe("thread");
+      expect(useViewsStore.getState().settingsOpen).toBe(false);
+      applyIntent({ kind: "showView", name: "help" });
+      expect(useViewsStore.getState().helpOpen).toBe(true);
+    } finally {
+      stop();
+    }
+  });
+});
