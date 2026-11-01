@@ -2,7 +2,6 @@
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDraft, updateDraft } from "@/stores/compose";
-import { useUiStore } from "@/stores/ui";
 import { daemon, lastInvocation, refuse } from "@/test/daemonFakes";
 import { CF, updateProject } from "@/test/projectsWorld";
 import { composeIn, openPicker, optionTexts, pickOption, promptValue, SelectedComposer, seedComposer, send, settle } from "@/test/composerWorld";
@@ -53,6 +52,23 @@ describe("a project's composer (compose.spec.ts)", () => {
     });
     // The draft was cleared.
     expect(getDraft("repo-cf").text).toBe("");
+  });
+
+  it("the polish: the name in semibold, the Claude mark in its orange, a neutral send until there is text, the folder's detail (composer-polish.spec.ts)", async () => {
+    composeIn("repo-cf");
+    render(<SelectedComposer />);
+    await settle();
+    expect(screen.getByTestId("composer-input").getAttribute("aria-placeholder")).toBe("Ask anything. @ files and threads, / skills and commands");
+    expect(screen.getByTestId("composer-project-name").className).toContain("font-semibold");
+    expect(screen.getByTestId("composer-model").querySelector("svg")?.getAttribute("style")).toContain("color: rgb(217, 119, 87)");
+    const sendButton = screen.getByTestId("composer-send");
+    expect(sendButton).toHaveProperty("disabled", true);
+    // The disabled look is a neutral grey (SEND_DISABLED), not the faded accent.
+    expect(sendButton.className).toContain("disabled:bg-cf-surface-sunken");
+    type("repo-cf", "Hello");
+    expect(sendButton).toHaveProperty("disabled", false);
+    const list = await openPicker("composer-worktree");
+    expect(optionTexts(list).find((o) => o.startsWith("Project folder"))).toBe("Project folderEdits land in the project's checkout directly. One thread at a time is safest.");
   });
 
   it("while starting: Creating worktree… and the prompt disabled", async () => {

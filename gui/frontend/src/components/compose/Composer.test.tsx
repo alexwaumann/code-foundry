@@ -10,8 +10,10 @@ import { useThreadsStore } from "@/stores/threads";
 import { HOME, useUiStore } from "@/stores/ui";
 import { HOME_DRAFT, startWelcomeSync, useWelcomeStore, welcomePrompt } from "@/stores/welcome";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { daemon, invocationsOf, resetDaemon } from "@/test/daemonFakes";
 import { Composer } from "./Composer";
 
+vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 // No daemon: refs and skills never load (the composer shows them loading).
 vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), listRefs: () => new Promise(() => undefined) }));
 vi.mock("@/api/filesystem", async (orig) => ({ ...(await orig<typeof import("@/api/filesystem")>()), listSkills: () => new Promise(() => undefined) }));
@@ -121,6 +123,25 @@ describe("the first-run welcome (docs/notes/welcome-composer.md)", () => {
     await mountHome();
     expect(heading()).toBe(wantHeading);
     expect(homeText()).toBe(wantText);
+  });
+
+  it("prefilled, not sent; Enter sends it as a No project thread's first message (welcome-composer.spec.ts)", async () => {
+    resetDaemon();
+    daemon.handlers.set("thread.new", () => ({ message: "", resultJson: JSON.stringify({ id: "s-new-1" }) }));
+    noProjects();
+    useUiStore.setState({ selection: HOME });
+    await mountHome();
+    expect(screen.getByTestId("composer-prompt").getAttribute("data-value")).toBe(welcomePrompt(PAGE));
+    expect(invocationsOf("thread.new")).toEqual([]);
+    fireEvent.keyDown(screen.getByTestId("composer-input"), { key: "Enter" });
+    await act(async () => {
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+    });
+    const created = invocationsOf("thread.new");
+    expect(created).toHaveLength(1);
+    expect(created[0]?.args).toMatchObject({ "no-project": "true", prompt: welcomePrompt(PAGE) });
+    expect(created[0]?.args).not.toHaveProperty("project");
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-new-1" });
   });
 
   it("keeps the project switcher out of the welcome heading", async () => {

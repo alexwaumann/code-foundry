@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
+import { composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
 
 /** A 1x1 transparent PNG. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
@@ -7,11 +7,6 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 test.beforeEach(async () => {
   await resetMock();
 });
-
-async function threadCount(): Promise<number> {
-  const res = await fetch(`${mockUrl}/__mock/threads`);
-  return ((await res.json()) as unknown[]).length;
-}
 
 async function staged(): Promise<{ path: string; name: string; mimeType: string; size: number; pages: number }[]> {
   const res = await fetch(`${mockUrl}/__mock/attachments`);

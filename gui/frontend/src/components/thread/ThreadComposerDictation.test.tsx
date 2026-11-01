@@ -130,3 +130,14 @@ describe("the thread composer's dictation", () => {
     expect(fakeDictation.calls[1]).toMatch(/^start thread:s-3@/);
   });
 });
+
+describe("the thread composer's placeholders (composer-polish.spec.ts)", () => {
+  it("idle: reply or ask, Send off in an empty prompt; busy: steer the agent", async () => {
+    await mount(dictationSnap());
+    expect(screen.getByTestId("composer-input").getAttribute("aria-placeholder")).toBe("Reply or ask anything. @ files and threads, / skills and commands");
+    expect(screen.getByTestId("thread-send")).toHaveProperty("disabled", true);
+    cleanup();
+    render(<ThreadComposer threadId="s-3" pending={[]} busy />);
+    expect(screen.getByTestId("composer-input").getAttribute("aria-placeholder")).toBe("Steer the agent mid-turn. @ files and threads, / skills and commands");
+  });
+});
