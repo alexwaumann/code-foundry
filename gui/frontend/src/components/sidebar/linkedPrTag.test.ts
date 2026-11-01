@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestView } from "@/api/gh";
-import { findLinkedPr, fresher, linkedPrCardRows, linkedPrState, linkedPrTag, linkedPrTagText, linkedPrTip, type LinkedPrFact, type LinkedPrState } from "./linkedPrTag";
+import { findLinkedPr, fresher, linkedPrCardRows, linkedPrState, linkedPrTag, linkedPrTagText, type LinkedPrFact, type LinkedPrState } from "./linkedPrTag";
 
 const fact = (number: number, state: LinkedPrState, title = ""): LinkedPrFact => ({ number, state, title });
 const pr = (o: Partial<PullRequestView>) => ({ repoSlug: "o/r", number: 1, state: "open", draft: false, title: "", updatedAtMs: null, partial: false, ...o }) as PullRequestView;
@@ -14,32 +14,15 @@ describe("linkedPrTag", () => {
     ["one merged: merged tone", [fact(138, "merged")], { kind: "one", number: 138, state: "merged", tone: "merged" }, "138"],
     ["one unknown: neutral", [fact(9, "unknown")], { kind: "one", number: 9, state: "unknown", tone: "neutral" }, "9"],
     ["closed left out: the one left shows as itself", [fact(131, "closed"), fact(138, "merged")], { kind: "one", number: 138, state: "merged", tone: "merged" }, "138"],
-    ["any draft: draft", [fact(1, "open"), fact(2, "draft"), fact(3, "merged")], { kind: "many", count: 3, tone: "draft" }, "3 PRs"],
-    ["no draft, any open: success", [fact(1, "merged"), fact(2, "open"), fact(3, "unknown")], { kind: "many", count: 3, tone: "success" }, "3 PRs"],
-    ["all merged: merged", [fact(1, "merged"), fact(2, "merged")], { kind: "many", count: 2, tone: "merged" }, "2 PRs"],
-    ["closed not counted", [fact(1, "merged"), fact(2, "closed"), fact(3, "merged")], { kind: "many", count: 2, tone: "merged" }, "2 PRs"],
-    ["unknown counts; with merged only it is neutral", [fact(1, "merged"), fact(2, "unknown")], { kind: "many", count: 2, tone: "neutral" }, "2 PRs"],
+    ["any draft: draft, +N all of them, the first draft leads", [fact(1, "open"), fact(2, "draft"), fact(3, "merged"), fact(4, "draft")], { kind: "many", lead: 2, state: "draft", count: 4, tone: "draft" }, "+4"],
+    ["no draft, any open: success, the first open leads", [fact(1, "merged"), fact(2, "open"), fact(3, "unknown")], { kind: "many", lead: 2, state: "open", count: 3, tone: "success" }, "+3"],
+    ["all merged: merged", [fact(1, "merged"), fact(2, "merged")], { kind: "many", lead: 1, state: "merged", count: 2, tone: "merged" }, "+2"],
+    ["closed not counted", [fact(1, "merged"), fact(2, "closed"), fact(3, "merged")], { kind: "many", lead: 1, state: "merged", count: 2, tone: "merged" }, "+2"],
+    ["unknown counts; with merged only it is unknown, neutral", [fact(1, "merged"), fact(2, "unknown")], { kind: "many", lead: 2, state: "unknown", count: 2, tone: "neutral" }, "+2"],
   ])("%s", (_name, facts, want, text) => {
     const tag = linkedPrTag(facts);
     expect(tag).toEqual(want);
     expect(tag === null ? "" : linkedPrTagText(tag)).toBe(text);
-  });
-});
-
-describe("linkedPrTip", () => {
-  it.each<[string, LinkedPrFact[], string]>([
-    ["one: state and title", [fact(142, "open", "Fix thing")], "Open · Fix thing"],
-    ["one without a title: its number", [fact(9, "unknown")], "State unknown · #9"],
-    ["one left after closed ones", [fact(1, "closed", "Old"), fact(2, "draft", "New")], "Draft · New"],
-    ["several: numbers and states, closed left out", [fact(3, "open"), fact(2, "closed"), fact(1, "merged")], "#3 · Open\n#1 · Merged"],
-    [
-      "more than five: five, then +N more",
-      [1, 2, 3, 4, 5, 6, 7].map((n) => fact(n, "merged")),
-      "#1 · Merged\n#2 · Merged\n#3 · Merged\n#4 · Merged\n#5 · Merged\n+2 more",
-    ],
-    ["all closed: nothing", [fact(1, "closed")], ""],
-  ])("%s", (_name, facts, want) => {
-    expect(linkedPrTip(facts)).toBe(want);
   });
 });
 

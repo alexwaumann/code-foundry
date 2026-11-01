@@ -557,11 +557,16 @@ function ThreadTipBody({ id }: { id: string }) {
 }
 
 /**
- * A thread row's hover tooltip (the app root's TooltipProvider sets the 500 ms delay). Pointer
- * only: the rows are not focusable (the list uses aria-activedescendant), so keyboard
- * navigation never opens it; a click or right-click closes it. Not while renaming, and not
- * over a badge with a tooltip of its own.
+ * A thread row's hover card, open at once (delayDuration 0, not the app root's 500 ms).
+ * Pointer only: the rows are not focusable (the list uses aria-activedescendant), so
+ * keyboard navigation never opens it; a click or right-click closes it. Not while
+ * renaming, and not over a badge with a tooltip of its own (data-tip) or one that wants
+ * none (data-quiet, the linked PR tag).
  */
+/** Elements inside a row over which the hover card does not open: a Tip's trigger, the linked PR tag. */
+const QUIET = "[data-tip], [data-quiet]";
+const QUIET_HOVERED = "[data-tip]:hover, [data-quiet]:hover";
+
 function ThreadTooltip({ id, children }: { id: string; children: ReactElement }) {
   const enabled = useContext(RowTooltipsEnabled);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
@@ -573,16 +578,21 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
     <Tooltip
       open={open && allowed}
       onOpenChange={(o) => {
-        // Not over a badge with its own tooltip (Tip, the linked-PRs tag): that one says it.
-        setOpen(o && allowed && !ref.current?.querySelector("[data-tip]:hover"));
+        // Not over a badge with its own tooltip (Tip) or one that wants none (the linked PR tag).
+        setOpen(o && allowed && !ref.current?.querySelector(QUIET_HOVERED));
       }}
       disableHoverableContent
+      delayDuration={0}
     >
       <TooltipTrigger
         asChild
         ref={ref}
         onPointerOver={(e) => {
-          if (e.target instanceof Element && e.target.closest("[data-tip]")) setOpen(false);
+          if (!(e.target instanceof Element)) return;
+          if (e.target.closest(QUIET)) setOpen(false);
+          // Back off a quiet element onto the row: Radix opens on a pointer move only once per
+          // visit of the trigger, and that one was refused over the tag; open it here.
+          else if (allowed && e.relatedTarget instanceof Element && e.relatedTarget.closest(QUIET) && ref.current?.contains(e.relatedTarget)) setOpen(true);
         }}
       >
         {children}
