@@ -63,6 +63,8 @@ describe("formatChord", () => {
     ["ctrl+alt+enter", "⌃⌥↵"],
     ["cmd+arrowup", "⌘↑"],
     ["f12", "F12"],
+    // Back to Parent Thread's chord in the palette.
+    ["escape", "Esc"],
     ["garbage+x", "garbage+x"],
   ])("%s -> %s", (input, want) => {
     expect(formatChord(input)).toBe(want);
