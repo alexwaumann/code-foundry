@@ -336,6 +336,20 @@ describe("the list", { timeout: 30_000 }, () => {
     expect(screen.queryByTestId("themes-pair-hint")).toBeNull();
   });
 
+  it("a user theme previews and applies like a curated one; the slot then names it", async () => {
+    open();
+    fireEvent.click(option("Ocean Dusk"));
+    expect(scope().dataset.theme).toBe("ocean-dusk");
+    expect(themeSlots().dark).toBe("github-dark");
+    fireEvent.click(screen.getByTestId("themes-apply"));
+    await waitFor(() => {
+      expect(option("Ocean Dusk").dataset.current).toBe("true");
+    });
+    expect(calls("theme.set-dark").map((c) => c[1])).toEqual([{ theme: "ocean-dusk" }]);
+    expect(themeSlots().dark).toBe("ocean-dusk");
+    expect(screen.getByTestId("themes-slot-dark").textContent).toContain("Ocean Dusk");
+  });
+
   it("the keyboard: the list has it on open; arrows preview, Enter applies, / searches, Escape clears then closes", async () => {
     open();
     const list = screen.getByTestId("themes-list");
@@ -449,6 +463,8 @@ describe("the list", { timeout: 30_000 }, () => {
 describe("Customise and Delete", { timeout: 30_000 }, () => {
   it("Customise copies into Yours, previews the copy and opens the editor on it; again, the unsaved copy goes first", async () => {
     open();
+    // A curated theme has no Delete.
+    expect(within(option("Dracula")).queryByRole("button", { name: "Delete Dracula" })).toBeNull();
     fireEvent.click(within(option("Dracula")).getByRole("button", { name: "Customise Dracula" }));
     await waitFor(() => {
       expect(names("themes-yours")).toEqual(["Dracula copy", "Mocha, warmer", "Ocean Dusk"]);
