@@ -99,8 +99,8 @@ exits 2 with "unknown setting".
 
 ## Verification
 
-`make go-check` green on this branch alone (the frontend still reads the removed fields
-until PR 1 lands; `make check` runs after rebasing onto it). End to end with
+`make check` green after rebasing onto main with PR 1 (#460) in it (before that the
+frontend still read the removed fields, so only `make go-check` passed). End to end with
 `CODE_FOUNDRY_HOME=/tmp/nso2`, `advanced.claude_path` set to `cmd/fakeclaude`: main's
 binary with `show_created_threads = true` in the file made a parent with a `--sidebar`
 child, a `--sidebar=false` child and a plain one, and a child whose creator it removed
