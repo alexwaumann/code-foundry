@@ -7,7 +7,8 @@ import { getDraft, updateDraft } from "@/stores/compose";
 import { threadDraftKey } from "@/stores/threadActions";
 import { useSettingsStore } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
-import { composeIn, SelectedComposer, seedComposer, settle } from "@/test/composerWorld";
+import { composeIn, seedComposer, settle } from "@/test/composerWorld";
+import { SelectedComposer } from "@/test/SelectedComposer";
 import { addThreads, CF, thread } from "@/test/projectsWorld";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));

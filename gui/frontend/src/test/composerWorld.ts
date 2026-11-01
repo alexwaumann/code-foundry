@@ -1,13 +1,12 @@
 /**
  * The new-thread composer over the mock's world (src/test/projectsWorld.ts): the settings
- * the mock starts with (Sonnet 5 at medium, its model registry), the composer the
- * selection shows (App.tsx's Content, keyed the same way), and helpers for its pickers.
+ * the mock starts with (Sonnet 5 at medium, its model registry) and helpers for its
+ * pickers. src/test/SelectedComposer.tsx renders the composer the selection shows.
  * Pair with src/test/daemonFakes.ts (thread.new and the other commands) and
  * src/test/composerFakes.ts (ListRefs, ListSkills, StageAttachment).
  */
 import { act, fireEvent, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
-import { Composer } from "@/components/compose/Composer";
 import { useComposeStore } from "@/stores/compose";
 import { useSettingsStore } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -69,22 +68,6 @@ export function composeIn(projectId: string): void {
   act(() => {
     useUiStore.getState().select({ kind: "compose", projectId });
   });
-}
-
-/** What App.tsx's Content shows for the selection: the composer it keys, else the thread's id. */
-export function SelectedComposer() {
-  const sel = useUiStore((s) => s.selection);
-  if (sel.kind === "thread") return <div data-testid="selected-thread">{sel.id}</div>;
-  if (sel.kind !== "compose") return <div data-testid="selected-view">{sel.kind === "view" ? sel.name : sel.kind}</div>;
-  return (
-    <Composer
-      key={sel.likeThreadId ? `like:${sel.likeThreadId}` : sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.projectId}
-      projectId={sel.projectId}
-      workspaceId={sel.workspaceId}
-      noProject={sel.noProject}
-      likeThreadId={sel.likeThreadId}
-    />
-  );
 }
 
 /** Lets promises and effects settle (refs and skills arriving, a send's await chain). */

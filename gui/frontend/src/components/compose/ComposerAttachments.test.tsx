@@ -6,7 +6,8 @@ import { tagToken } from "@/lib/prompt";
 import { getDraft, updateDraft } from "@/stores/compose";
 import { useConfirmStore } from "@/stores/confirm";
 import { composerDaemon } from "@/test/composerFakes";
-import { composeIn, SelectedComposer, seedComposer, send, settle } from "@/test/composerWorld";
+import { composeIn, seedComposer, send, settle } from "@/test/composerWorld";
+import { SelectedComposer } from "@/test/SelectedComposer";
 import { lastInvocation } from "@/test/daemonFakes";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));

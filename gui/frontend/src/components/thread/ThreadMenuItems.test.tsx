@@ -108,7 +108,7 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
   });
 
   it("a thread in its workspace's folder: New thread on this branch, no Save as workspace; the same set outside the folder is offered it (composer-fixes.spec.ts)", () => {
-    useWorkspacesStore.setState({ byId: { "w-docs": { id: "w-docs", name: "docs", branch: "", members: [{ projectId: "web", worktreePath: "" }, { projectId: "api", worktreePath: "" }], createdAtMs: null } } as never, order: ["w-docs"] });
+    useWorkspacesStore.setState({ byId: { "w-docs": { id: "w-docs", name: "docs", branch: "", members: [{ projectId: "web", worktreePath: "" }, { projectId: "api", worktreePath: "" }], createdAtMs: null } }, order: ["w-docs"] });
     const set = ["web", "api", "notes"];
     setThread({ projectId: "", projectIds: set, workspaceId: "w-docs" });
     const items = (menu: HTMLElement) => [...menu.querySelectorAll('[data-testid="menu-new-like"], [data-testid="menu-save-workspace"]')].map((e) => e.textContent);
@@ -123,7 +123,7 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     ["a workspace without projects, in its folder: New thread on this branch only (nowhere else to run)", { projectId: "", projectIds: [], workspaceId: "w-zero" }, true, false],
     ["two projects: both", { projectIds: ["web", "api"] }, true, true],
   ])("the row menu's New thread on this branch and Run in: %s (composer-fixes.spec.ts)", (_name, o, newLike, runIn) => {
-    useWorkspacesStore.setState({ byId: { "w-zero": { id: "w-zero", name: "zero", branch: "", members: [], createdAtMs: null } } as never, order: ["w-zero"] });
+    useWorkspacesStore.setState({ byId: { "w-zero": { id: "w-zero", name: "zero", branch: "", members: [], createdAtMs: null } }, order: ["w-zero"] });
     setThread(o);
     const menu = openRowMenu();
     expect(within(menu).queryAllByTestId("menu-new-like")).toHaveLength(newLike ? 1 : 0);

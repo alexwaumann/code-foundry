@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDraft, updateDraft } from "@/stores/compose";
 import { daemon, lastInvocation, refuse } from "@/test/daemonFakes";
 import { CF, updateProject } from "@/test/projectsWorld";
-import { composeIn, openPicker, optionTexts, pickOption, promptValue, SelectedComposer, seedComposer, send, settle } from "@/test/composerWorld";
+import { composeIn, openPicker, optionTexts, pickOption, promptValue, seedComposer, send, settle } from "@/test/composerWorld";
+import { SelectedComposer } from "@/test/SelectedComposer";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), ...(await import("@/test/composerFakes")).projectFakes }));

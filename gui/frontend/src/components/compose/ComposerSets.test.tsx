@@ -9,7 +9,8 @@ import { answerConfirm, useConfirmStore } from "@/stores/confirm";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { composeIn, openPicker, optionTexts, pickOption, promptValue, SelectedComposer, seedComposer, send, settle } from "@/test/composerWorld";
+import { composeIn, openPicker, optionTexts, pickOption, promptValue, seedComposer, send, settle } from "@/test/composerWorld";
+import { SelectedComposer } from "@/test/SelectedComposer";
 import { daemon, invocationsOf, lastInvocation } from "@/test/daemonFakes";
 import { addThreads, CF, GP, SK, thread, WR } from "@/test/projectsWorld";
 import { hoverTooltipText, tooltipText } from "@/test/tooltip";
@@ -32,7 +33,6 @@ function setWorkspaces(...ws: WorkspaceView[]): void {
 
 const heading = () => screen.getByTestId("composer-heading").textContent;
 const chips = () => screen.queryAllByTestId("composer-member");
-const chipNames = () => chips().map((c) => c.querySelector('[data-testid="composer-member-body"]')?.textContent);
 
 /** Opens the heading's switcher and returns its list. */
 async function openSwitcher(): Promise<HTMLElement> {
@@ -155,8 +155,8 @@ describe("a picked workspace's set (composer-fixes.spec.ts 1, 1b, 4)", () => {
     act(() => {
       useUiStore.getState().select({ kind: "thread", id: "s-1" });
     });
-    await act(async () => {
-      await storeComposeIn("repo-cf");
+    act(() => {
+      storeComposeIn("repo-cf");
     });
     expect(heading()).toBe("What should we build in code-foundry?");
     expect(screen.queryByTestId("composer-workspace")).toBeNull();
@@ -166,8 +166,8 @@ describe("a picked workspace's set (composer-fixes.spec.ts 1, 1b, 4)", () => {
     act(() => {
       useUiStore.getState().select({ kind: "thread", id: "s-1" });
     });
-    await act(async () => {
-      await storeComposeIn("repo-cf");
+    act(() => {
+      storeComposeIn("repo-cf");
     });
     expect(heading()).toBe("What should we build in shop?");
     expect(promptValue()).toBe("Keep this");
