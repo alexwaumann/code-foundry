@@ -385,6 +385,108 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await page.keyboard.press("Escape");
 });
 
+test("the action menu: a gear on the highlighted item opens its editor, the item hovers as two blocks", async ({ page }) => {
+  await openWithCard(page, "single");
+  const c = card(page);
+  await c.getByTestId("ti-action-more").click();
+  const menu = page.getByTestId("ti-action-menu");
+  await expect(menu).toBeVisible();
+  const items = menu.getByTestId("ti-action-item");
+  await expect(items).toHaveCount(6);
+  const item = (name: string) => items.filter({ hasText: name });
+  const gear = (name: string) => item(name).getByTestId("ti-action-gear");
+  const opacities = () => items.evaluateAll((els) => els.map((el) => getComputedStyle(el.querySelector("[data-action-gear]") ?? el).opacity));
+  // A gear in every item (nothing moves), Add action without one.
+  await expect(menu.getByTestId("ti-action-gear")).toHaveCount(6);
+  await expect(menu.getByTestId("ti-add-action").getByTestId("ti-action-gear")).toHaveCount(0);
+  await expect(gear("Test")).toHaveAttribute("aria-label", "Edit action");
+
+  // The docs/notes/thread-info-action-menu-gear.md geometry: the gear's ::after is the
+  // item's last 32px at its full height, the item's ::before ends 34px short (the seam);
+  // the 16px glyph sits on the item's right padding line, centred in its block.
+  const testItem = item("Test");
+  // After the menu's open animation (it scales the content).
+  await menu.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+  const [ib, gb] = await Promise.all([box(testItem), box(gear("Test"))]);
+  const geo = await gear("Test").evaluate((el) => {
+    const a = getComputedStyle(el, "::after");
+    const b = getComputedStyle(el.closest("[role=menuitem]") ?? el, "::before");
+    return { w: a.width, h: a.height, right: a.right, top: a.top, gap: b.right, left: b.left };
+  });
+  expect(geo).toEqual({ w: "32px", h: `${String(ib.height)}px`, right: "0px", top: "0px", gap: "34px", left: "0px" });
+  expect([gb.width, gb.height]).toEqual([16, 16]);
+  expect(Math.round(ib.x + ib.width - (gb.x + gb.width))).toBe(8);
+
+  const blocks = await splitBlocks(page);
+  const lit = (name: string) => Promise.all([pseudoBg(item(name), "::before"), pseudoBg(gear(name), "::after"), ownBg(item(name))]);
+  // The text under the pointer: left bright, gear dim; the gear shows on that item only.
+  await testItem.hover({ position: { x: 30, y: 10 } });
+  await expect(testItem).toHaveAttribute("data-highlighted", "");
+  await expect.poll(() => lit("Test")).toEqual([blocks.full, blocks.half, blocks.none]);
+  await expect.poll(opacities).toEqual(["0", "1", "0", "0", "0", "0"]);
+  expect(await lit("Dev")).toEqual([blocks.none, blocks.none, blocks.none]);
+  // The gear under the pointer: flipped, the glyph full colour.
+  await gear("Test").hover();
+  await expect.poll(() => lit("Test")).toEqual([blocks.half, blocks.full, blocks.none]);
+  await expect.poll(() => gear("Test").evaluate((el) => getComputedStyle(el).color)).toBe(blocks.text);
+
+  // Keyboard: ArrowDown highlights the next item and shows its gear (left bright, gear dim);
+  // ArrowRight focuses the gear (flipped), ArrowLeft gives focus back.
+  await page.mouse.move(0, 0);
+  await testItem.focus();
+  await page.keyboard.press("ArrowDown");
+  const check = item("Check");
+  await expect(check).toBeFocused();
+  await expect.poll(opacities).toEqual(["0", "0", "1", "0", "0", "0"]);
+  await expect.poll(() => lit("Check")).toEqual([blocks.full, blocks.half, blocks.none]);
+  await page.keyboard.press("ArrowRight");
+  await expect(gear("Check")).toBeFocused();
+  await expect.poll(() => lit("Check")).toEqual([blocks.half, blocks.full, blocks.none]);
+  await expect.poll(opacities).toEqual(["0", "0", "1", "0", "0", "0"]);
+  await page.keyboard.press("ArrowLeft");
+  await expect(check).toBeFocused();
+  await expect.poll(() => lit("Check")).toEqual([blocks.full, blocks.half, blocks.none]);
+  // ArrowDown from the gear moves on as from its item.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
+  await expect(item("Build")).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(check).toBeFocused();
+
+  // A gear click opens the editor for that action and runs nothing.
+  const runs = async () => (await invocations()).filter((i) => i.name === "action.run").length;
+  await gear("Test").hover();
+  await gear("Test").click();
+  await expect(menu).toHaveCount(0);
+  const dialog = page.getByTestId("action-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("data-mode", "edit");
+  await expect(dialog.getByTestId("action-name")).toHaveValue("Test");
+  await page.waitForTimeout(300);
+  expect(await runs()).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+
+  // Enter on a focused gear: the same, for its action.
+  await c.getByTestId("ti-action-more").click();
+  await expect(menu).toBeVisible();
+  await item("Build").hover({ position: { x: 30, y: 10 } });
+  await page.keyboard.press("ArrowRight");
+  await expect(gear("Build")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(dialog.getByTestId("action-name")).toHaveValue("Build");
+  expect(await runs()).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+
+  // The item's text still runs it.
+  await c.getByTestId("ti-action-more").click();
+  await item("Check").click({ position: { x: 30, y: 10 } });
+  await expect(menu).toHaveCount(0);
+  await expect.poll(runs).toBe(1);
+  await expect(dialog).toHaveCount(0);
+});
+
 /** Sets the page zoom (stores/ui setZoom), as zoom-popovers.spec.ts does. */
 async function setZoom(page: Page, percent: number): Promise<void> {
   await page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(percent)}))`);

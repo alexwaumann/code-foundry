@@ -57,6 +57,7 @@ import { removeThreadProject, useAddingProject } from "@/stores/threadProjects";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { AddProjectPicker } from "./AddProjectPicker";
+import { GearMenuItem } from "./GearMenuItem";
 import { Group, HOVER_CARD, Row, RowMenu, RowMore, SubLine } from "./Row";
 import { useMembers } from "./useMembers";
 
@@ -519,20 +520,24 @@ function OpenInRow({ threadId }: { threadId: string }) {
   );
 }
 
-/** A menu item that runs an action for the thread. */
+/** A menu item that runs an action for the thread; its gear (on the highlighted item) opens the action's editor. */
 function ActionItem({ threadId, id }: { threadId: string; id: string }) {
   const action = useAction(id);
   if (!action) return null;
   const Icon = ACTION_ICON[action.icon];
   return (
-    <DropdownMenuItem
+    <GearMenuItem
       data-testid="ti-action-item"
       data-action={id}
-      onSelect={() => void runCardAction(id, threadId)}
+      gearLabel="Edit action"
+      onRun={() => void runCardAction(id, threadId)}
+      onGear={() => {
+        openActionEditor({ mode: "edit", actionId: id, projectId: action.projectId, from: "thread" });
+      }}
     >
       <Icon aria-hidden />
       <span className="min-w-0 truncate">{action.name}</span>
-    </DropdownMenuItem>
+    </GearMenuItem>
   );
 }
 
