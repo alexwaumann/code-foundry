@@ -1,14 +1,15 @@
-import { useRef } from "react";
+import { useRef, type ComponentType, type ReactNode } from "react";
 import { Ellipsis } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 
-/** One item of a row's overflow menu; "separator" draws a line. */
+/**
+ * One item of a Projects page menu (a header's or row's ⋯, a row's context menu); "separator" draws a line.
+ * Text only: menus have no icons and no trailing "…" (docs/notes/projects-table-2-context-menus.md).
+ */
 export type OverflowItem =
   | {
       label: string;
-      /** Left out by items in the app-wide menu style (no icons). */
-      icon?: React.ComponentType<{ className?: string }>;
       onSelect: () => void;
       destructive?: boolean;
       testId: string;
@@ -17,6 +18,40 @@ export type OverflowItem =
       disabled?: boolean;
     }
   | "separator";
+
+/** The item and separator parts of a dropdown or a context menu (their props differ; the items need only these). */
+export interface MenuParts {
+  Item: ComponentType<{ variant?: "default" | "destructive"; disabled?: boolean; onSelect?: (e: Event) => void; "data-testid"?: string; children?: ReactNode }>;
+  Separator: ComponentType;
+}
+
+/** The items of a menu: each records its action in `onPick` (run once the menu has closed); the badge at the right. */
+export function MenuItems({ items, parts: { Item, Separator }, onPick }: { items: readonly OverflowItem[]; parts: MenuParts; onPick: (run: () => void) => void }) {
+  return items.map((it, i) =>
+    it === "separator" ? (
+      <Separator key={`sep-${String(i)}`} />
+    ) : (
+      <Item
+        key={it.testId}
+        variant={it.destructive ? "destructive" : "default"}
+        data-testid={it.testId}
+        disabled={it.disabled}
+        onSelect={() => {
+          onPick(it.onSelect);
+        }}
+      >
+        {it.label}
+        {it.badge !== undefined && (
+          <span className="ml-auto pl-4 text-caption tabular-nums" data-testid={`${it.testId}-count`}>
+            {it.badge}
+          </span>
+        )}
+      </Item>
+    ),
+  );
+}
+
+const DROPDOWN_PARTS: MenuParts = { Item: DropdownMenuItem, Separator: DropdownMenuSeparator };
 
 /**
  * The "More" (…) action of a Projects page row or header: a dropdown of the row's less
@@ -78,29 +113,13 @@ export function OverflowMenu({ label, items, testId }: { label: string; items: r
           run?.();
         }}
       >
-        {items.map((it, i) =>
-          it === "separator" ? (
-            <DropdownMenuSeparator key={`sep-${String(i)}`} />
-          ) : (
-            <DropdownMenuItem
-              key={it.testId}
-              variant={it.destructive ? "destructive" : "default"}
-              data-testid={it.testId}
-              disabled={it.disabled}
-              onSelect={() => {
-                picked.current = it.onSelect;
-              }}
-            >
-              {it.icon && <it.icon className={it.destructive ? "text-cf-error-text" : undefined} />}
-              {it.label}
-              {it.badge !== undefined && (
-                <span className="ml-auto pl-4 text-caption tabular-nums" data-testid={`${it.testId}-count`}>
-                  {it.badge}
-                </span>
-              )}
-            </DropdownMenuItem>
-          ),
-        )}
+        <MenuItems
+          items={items}
+          parts={DROPDOWN_PARTS}
+          onPick={(run) => {
+            picked.current = run;
+          }}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

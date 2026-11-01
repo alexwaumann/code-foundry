@@ -252,7 +252,7 @@ test("archiving, snoozing or removing the selected thread selects home (the No p
   await row(page, "s:s-4").click();
   await expect(pane).toHaveAttribute("data-thread-id", "s-4");
   menu = await openMenu(page, "s:s-4");
-  await menu.getByText("Remove…").click();
+  await menu.getByText("Remove", { exact: true }).click();
   await expect(page.getByTestId("confirm-dialog")).toBeVisible();
   await page.getByTestId("confirm-ok").click();
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");

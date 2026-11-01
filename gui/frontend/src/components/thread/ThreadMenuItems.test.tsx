@@ -92,11 +92,11 @@ function entries(menu: HTMLElement): string[] {
 describe("ThreadMenuItems: one list for the sidebar row and the title menu", () => {
   it("in order: Rename, Regenerate name, Pin, Snooze; New thread on this branch, Save as workspace, Run in, Hide from sidebar; Archive", () => {
     setThread({ projectIds: ["web", "api"], createdBy: "s-0", inSidebar: true }, [thread({ id: "s-0", name: "Parent" })]);
-    const want = ["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Save as workspace", "Run in…", "Hide from sidebar", "—", "Archive"];
+    const want = ["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Save as workspace", "Run in", "Hide from sidebar", "—", "Archive"];
     expect(entries(openTitleMenu())).toEqual(want);
     cleanup();
     // The row adds what only it offers after the shared list.
-    expect(entries(openRowMenu())).toEqual([...want, "—", "New terminal here", "Fork", "Remove…"]);
+    expect(entries(openRowMenu())).toEqual([...want, "—", "New terminal here", "Fork", "Remove"]);
   });
 
   it("a one-project thread of the user's: no Save as workspace, Run in or sidebar item", () => {
@@ -194,7 +194,7 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     check();
   });
 
-  it("Snooze ▸ lists the presets with their times; a preset snoozes; Pick a date and time… opens the dialog", () => {
+  it("Snooze ▸ lists the presets with their times; a preset snoozes; Pick a date and time opens the dialog", () => {
     setThread({});
     const menu = openTitleMenu();
     fireEvent.keyDown(within(menu).getByTestId("menu-snooze"), { key: "ArrowRight" });

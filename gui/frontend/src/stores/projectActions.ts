@@ -58,6 +58,12 @@ export function cleanupMergedWorktrees(projectId: string): Promise<boolean> {
   return runCommand("project.worktree.cleanup", { project: projectId }, projectContext(projectId));
 }
 
+/** worktree.reveal on the project's main checkout (a folder without git: the folder). */
+export function revealProject(projectId: string): Promise<boolean> {
+  const main = mainWorktreePath(useProjectsStore.getState(), projectId);
+  return runCommand("worktree.reveal", { worktree: main }, worktreeContext(projectId, main));
+}
+
 /** project.unregister (confirmed). */
 export function unregisterProject(projectId: string): Promise<boolean> {
   return runCommand("project.unregister", {}, projectContext(projectId));

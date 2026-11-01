@@ -503,10 +503,10 @@ test("ShowView intents from the daemon open settings and help", async ({ page })
 test("destructive commands ask first; cancel keeps, confirm runs", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click();
-  // The thread row's menu: Remove… (thread.remove).
+  // The thread row's menu: Remove (thread.remove).
   const remove = async () => {
     await row(page, "s:s-3").click({ button: "right" });
-    await page.getByTestId("row-menu").getByText("Remove…").click();
+    await page.getByTestId("row-menu").getByText("Remove", { exact: true }).click();
   };
   await remove();
   const dialog = page.getByTestId("confirm-dialog");

@@ -1,8 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
-import { Copy, FileDiff, GitPullRequest, Layers, SquarePen, SquareTerminal, Trash2 } from "lucide-react";
+import { FileDiff, Layers, SquarePen, SquareTerminal } from "lucide-react";
 import { ActionsMenu } from "@/components/actions/ActionsMenu";
-import { FinderIcon } from "@/components/icons/AppIcon";
 import { ChecksBadge, PrStateIcon } from "@/components/prs/PrBits";
 import { Tip } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
@@ -100,20 +99,20 @@ async function copyPath(path: string): Promise<void> {
   }
 }
 
-/** The row's menu: what the hover actions do, its pull request, Finder and the path, then Remove worktree… (not on main). */
+/** The row's menu: what the hover actions do, its pull request, Finder and the path, then Remove worktree (not on main). */
 function rowMenu(projectId: string, path: string, isMain: boolean, pr: { slug: string; number: number } | null): OverflowItem[] {
   const items: OverflowItem[] = [
-    { label: "New thread here", icon: SquarePen, testId: "worktree-menu-new-thread", onSelect: () => { composeIn(projectId, path); } },
-    { label: "New terminal here", icon: SquareTerminal, testId: "worktree-menu-new-terminal", onSelect: () => void newTerminalIn(projectId, path) },
-    { label: "Show changes", icon: FileDiff, testId: "changes-show-panel", onSelect: () => { openChangesTab("current", projectId, path); } },
+    { label: "New thread here", testId: "worktree-menu-new-thread", onSelect: () => { composeIn(projectId, path); } },
+    { label: "New terminal here", testId: "worktree-menu-new-terminal", onSelect: () => void newTerminalIn(projectId, path) },
+    { label: "Show changes", testId: "changes-show-panel", onSelect: () => { openChangesTab("current", projectId, path); } },
   ];
-  if (pr) items.push({ label: `Open pull request #${String(pr.number)}`, icon: GitPullRequest, testId: "worktree-open-pr", onSelect: () => { openPullRequestInPanel(pr); } });
+  if (pr) items.push({ label: `Open pull request #${String(pr.number)}`, testId: "worktree-open-pr", onSelect: () => { openPullRequestInPanel(pr); } });
   items.push(
     "separator",
-    { label: "Open in Finder", icon: FinderIcon, testId: "worktree-reveal", onSelect: () => { revealCheckout(projectId, path); } },
-    { label: "Copy path", icon: Copy, testId: "worktree-copy-path", onSelect: () => void copyPath(path) },
+    { label: "Open in Finder", testId: "worktree-reveal", onSelect: () => { revealCheckout(projectId, path); } },
+    { label: "Copy path", testId: "worktree-copy-path", onSelect: () => void copyPath(path) },
   );
-  if (!isMain) items.push("separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(projectId, path) });
+  if (!isMain) items.push("separator", { label: "Remove worktree", destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(projectId, path) });
   return items;
 }
 

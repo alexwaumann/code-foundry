@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { Pencil, Play, Plus } from "lucide-react";
+import { Pencil, Play } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { runAction, type ActionOwner } from "@/stores/actionActions";
@@ -171,8 +171,7 @@ export function ActionsMenu({ projectId, owner, from, testId }: { projectId: str
           </>
         )}
         <DropdownMenuItem data-testid="action-new" onSelect={onNew}>
-          <Plus aria-hidden />
-          New action…
+          New action
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

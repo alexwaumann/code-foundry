@@ -122,7 +122,7 @@ test("the row menu's Snooze submenu: presets with their times; 1 hour snoozes wi
   await expect(presets.nth(2).getByTestId("snooze-preset-time")).toHaveText(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat) 9:00 AM$/);
   await expect(presets.nth(3)).toContainText("Next week");
   await expect(presets.nth(3).getByTestId("snooze-preset-time")).toHaveText(/^(Mon 9:00 AM|[A-Z][a-z]{2} \d{1,2}, 9:00 AM)$/);
-  await expect(sub.getByTestId("snooze-pick")).toHaveText("Pick a date and time…");
+  await expect(sub.getByTestId("snooze-pick")).toHaveText("Pick a date and time");
 
   const before = Date.now();
   await presets.nth(0).click();
@@ -215,7 +215,7 @@ test("snoozing a working thread from the title menu asks first; it then drops it
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
 });
 
-test("Pick a date and time… opens the dialog for the row's thread; Snooze sends the picked local time", async ({ page }) => {
+test("Pick a date and time opens the dialog for the row's thread; Snooze sends the picked local time", async ({ page }) => {
   // The calendar, the time field and refusing a past time: SnoozeDialog.test.tsx.
   await openApp(page);
   const { sub } = await openSnoozeSub(page, "s:s-4");

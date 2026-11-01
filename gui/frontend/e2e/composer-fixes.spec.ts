@@ -291,7 +291,7 @@ test("9: a like draft whose thread is removed becomes a plain draft with the tex
   await expect(page.getByTestId("composer-worktree")).toHaveText("Project folders");
 });
 
-test("10: New thread on this branch and Run in… only where they apply, in the menus and the palette", async ({ page }) => {
+test("10: New thread on this branch and Run in only where they apply, in the menus and the palette", async ({ page }) => {
   await mockPost("workspace?name=zero&root=/Users/dev/zero");
   const inZero = (await mockPost("set-thread?projects=&project=workspace&workspace=zero&name=Zero")) as ThreadSummary;
   const two = (await mockPost("set-thread?projects=repo-cf,repo-gp&name=Two")) as ThreadSummary;
@@ -319,7 +319,7 @@ test("10: New thread on this branch and Run in… only where they apply, in the 
   await expect(opts.filter({ hasText: "Run Thread In" })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  // Two projects: both, the Run in… item labelled for the folder only with a workspace.
+  // Two projects: both, the Run in item labelled for the folder only with a workspace.
   await row(page, `s:${two.id}`).click();
   opts = await openPaletteFor(page, "Run Thread In");
   await expect(opts.filter({ hasText: "Run Thread In" })).toHaveCount(1);

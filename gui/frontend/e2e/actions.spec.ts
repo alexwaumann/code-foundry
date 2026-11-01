@@ -73,7 +73,7 @@ test("a project page row's actions menu: the project's actions, a pencil on the 
   await openMenu(page);
   await expect(menu(page).getByTestId("actions-project")).toHaveText("code-foundry");
   await expect(items(page)).toHaveText(NAMES);
-  await expect(menu(page).getByTestId("action-new")).toHaveText("New action…");
+  await expect(menu(page).getByTestId("action-new")).toHaveText("New action");
 
   // The pencil shows on the highlighted row only.
   const pencil = (name: string) => item(page, name).getByTestId("action-edit");
