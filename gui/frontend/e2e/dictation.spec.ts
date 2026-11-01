@@ -1,10 +1,12 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Dictation in the GUI (docs/notes/dictation-4-gui.md) against the mock's DictationService
- * (mock/dictation.ts): the settings section's states, the composers' mic, pill and
- * landing, Escape and Send, and ⌘⇧M. A mock session plays levels and two phrases 1 s apart.
+ * (mock/dictation.ts), for what needs the browser: the settings search scrolling to the
+ * section, the mic's place, phrases landing in the real editor, Escape in it, switching
+ * composers across routes, and ⌘⇧M. The rest is unit-tested (see the pointers below).
+ * A mock session plays levels and two phrases 1 s apart.
  */
 
 test.beforeEach(async () => {
@@ -53,6 +55,10 @@ test.describe("settings section", () => {
 });
 
 test.describe("composer", () => {
+  // Listening… in the placeholder, Send while listening (flush, then send), Loading model…, the
+  // engine's failure, the microphone-denied line and a session held elsewhere: unit-tested in
+  // src/components/thread/ThreadComposerDictation.test.tsx; the PR review composer's mic in
+  // src/components/pr/PrReviewComposer.test.tsx.
   test("no mic while dictation is off or has no model", async ({ page }) => {
     const card = await openThread(page);
     await expect(card.getByTestId("thread-attach")).toBeVisible();
@@ -95,14 +101,6 @@ test.describe("composer", () => {
     expect((await dictation()).calls.at(-1)).toMatch(/^stop dict-\d+ false$/);
   });
 
-  test("the placeholder says Listening… in an empty prompt", async ({ page }) => {
-    await mockPost("dictation?state=ready");
-    await mockPost("dictation/script?phrases=&gap=1000");
-    const card = await openThread(page);
-    await card.getByTestId("dictation-mic").click();
-    await expect(card.getByTestId("composer-input")).toHaveAttribute("aria-placeholder", "Listening…");
-  });
-
   test("Escape in the prompt stops; auto-stop and disabling return to idle", async ({ page }) => {
     await mockPost("dictation?state=ready");
     await mockPost("dictation/script?phrases=&gap=1000");
@@ -124,51 +122,6 @@ test.describe("composer", () => {
     await mockPost("settings/external?dictation.enabled=false");
     await expect(card.getByTestId("dictation-pill")).toHaveCount(0);
     await expect(card.getByTestId("dictation-mic")).toHaveCount(0);
-  });
-
-  test("Send while listening stops with flush, waits for the last phrase, then sends", async ({ page }) => {
-    await mockPost("dictation?state=ready");
-    await mockPost("dictation/script?phrases=&flush=Ship it.");
-    const card = await openThread(page);
-    await card.getByTestId("composer-input").click();
-    await card.getByTestId("dictation-mic").click();
-    await expect(card.getByTestId("dictation-pill")).toBeVisible();
-    // Empty prompt: Send is on while listening (the flush may bring text).
-    await card.getByTestId("thread-send").click();
-    await expect(card.getByTestId("dictation-mic")).toBeVisible();
-    await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.send").map((i) => i.args.text)).toEqual(["Ship it."]);
-    expect((await dictation()).calls.at(-1)).toMatch(/^stop dict-\d+ true$/);
-  });
-
-  test("a model that unloaded: Loading model… first, then listening", async ({ page }) => {
-    await mockPost("dictation?state=unloaded");
-    await mockPost("dictation/script?loadMs=1200");
-    const card = await openThread(page);
-    await card.getByTestId("dictation-mic").click();
-    await expect(card.getByTestId("dictation-loading")).toHaveText("Loading model…");
-    await expect(card.getByTestId("dictation-pill")).toBeVisible({ timeout: 4_000 });
-  });
-
-  test("the engine's failure: the mic is disabled with the failure in its tooltip", async ({ page }) => {
-    await mockPost("dictation?state=error");
-    const card = await openThread(page);
-    const mic = card.getByTestId("dictation-mic");
-    await expect(mic).toBeDisabled();
-    await expect(mic).toHaveAttribute("aria-label", /Dictation failed: the engine exited 3 times/);
-  });
-
-  test("microphone denied: the line under the composer that pressed, with the System Settings link", async ({ page }) => {
-    await mockPost("dictation?state=ready");
-    await mockPost("dictation/script?phrases=");
-    const card = await openThread(page);
-    await card.getByTestId("dictation-mic").click();
-    await expect(card.getByTestId("dictation-pill")).toBeVisible();
-    // The host reports macOS refused: the session ends and the composer says why.
-    await mockPost("dictation?denied=true");
-    await expect(card.getByTestId("dictation-mic")).toBeVisible();
-    const note = card.getByTestId("dictation-denied");
-    await expect(note).toHaveText("Code Foundry can't use the microphone. Allow it in System Settings → Privacy & Security → Microphone, then try again.");
-    await expect(note.getByTestId("dictation-denied-link")).toBeVisible();
   });
 
   test("one composer at a time: leaving the dictating composer stops it, and another composer starts its own", async ({ page }) => {
@@ -194,18 +147,6 @@ test.describe("composer", () => {
     expect(d.calls.filter((c) => c.startsWith("stop "))).toHaveLength(1);
   });
 
-  test("a session held elsewhere (the CLI) gives way to this composer", async ({ page }) => {
-    await mockPost("dictation?state=listening");
-    await mockPost("dictation/script?phrases=");
-    const card = await openThread(page);
-    await expect(card.getByTestId("dictation-mic")).toBeVisible();
-    await card.getByTestId("dictation-mic").click();
-    await expect(card.getByTestId("dictation-pill")).toBeVisible();
-    const d = await dictation();
-    expect(d.calls[0]).toMatch(/^stop dict-\d+ true$/);
-    expect(d.session?.clientId).toMatch(/^thread:s-3@/);
-  });
-
   test("⌘⇧M toggles the focused composer, else the content pane's", async ({ page }) => {
     await mockPost("dictation?state=ready");
     await mockPost("dictation/script?phrases=");
@@ -222,26 +163,4 @@ test.describe("composer", () => {
     await page.keyboard.press("Meta+Shift+m");
     await expect(card.getByTestId("dictation-pill")).toBeVisible();
   });
-});
-
-test("the PR review composer has the mic: a phrase lands in its text, Escape stops before it cancels", async ({ page }) => {
-  await mockPost("dictation?state=ready");
-  await mockPost("dictation/script?phrases=Looks good to me.&gap=300");
-  await openApp(page);
-  await page.getByTestId("nav-pullrequests").click();
-  await page.getByTestId("prs-review").locator("[data-nav-key]").filter({ hasText: "#139" }).click();
-  await page.getByTestId("pr-review-button").click();
-  await page.getByTestId("pr-review-comment").click();
-  const composer = page.getByTestId("pr-review-composer");
-  const input = page.getByTestId("pr-review-input");
-  await expect(page.getByTestId("pr-review-menu")).toHaveCount(0);
-  await input.click();
-  await page.keyboard.type("Read it.");
-  await composer.getByTestId("dictation-mic").click();
-  await expect(composer.getByTestId("dictation-pill")).toBeVisible();
-  await expect(input).toHaveValue("Read it. Looks good to me.");
-  await page.keyboard.press("Escape");
-  await expect(composer.getByTestId("dictation-mic")).toBeVisible();
-  // The composer stays: the first Escape only stopped dictating.
-  await expect(composer).toBeVisible();
 });

@@ -37,4 +37,13 @@ describe("ReviewButton", () => {
     expect(screen.queryByTestId("pr-review-menu")).toBeNull();
     expect(screen.getByTestId("pr-review-button").getAttribute("aria-expanded")).toBe("false");
   });
+
+  it("choosing a verdict hands it on and shuts the menu", () => {
+    const onChoose = vi.fn();
+    render(<ReviewButton prRef={REF} detail={detail} onChoose={onChoose} />);
+    press(screen.getByTestId("pr-review-button"));
+    fireEvent.click(screen.getByTestId("pr-review-comment"));
+    expect(onChoose).toHaveBeenCalledExactlyOnceWith("comment");
+    expect(screen.queryByTestId("pr-review-menu")).toBeNull();
+  });
 });
