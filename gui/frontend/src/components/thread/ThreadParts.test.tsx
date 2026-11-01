@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
@@ -52,6 +52,34 @@ describe("the thread header's crumb", () => {
     expect(parent.textContent).toBe("Auth rollout plan");
     fireEvent.click(parent);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-0" });
+  });
+
+  it("a child's crumb reads place, creator, title in that order; the user's own thread has no parent segment", () => {
+    show({ createdBy: "s-0" }, [thread("s-0", { name: "Fix login redirect" })]);
+    const [place, parent, title] = ["thread-crumb-place", "thread-crumb-parent", "thread-title-name"].map((id) => screen.getByTestId(id));
+    expect(place?.compareDocumentPosition(parent as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(parent?.compareDocumentPosition(title as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    fireEvent.click(parent as HTMLElement);
+    cleanup();
+    show({}, [thread("s-0")]);
+    expect(screen.queryByTestId("thread-crumb-parent")).toBeNull();
+  });
+
+  it("a removed creator's segment says Thread removed on hover, and a click on it goes nowhere", () => {
+    show({ createdBy: "s-gone", createdByName: "Add retry to login redirect (old)" });
+    const removed = screen.getByTestId("thread-crumb-parent");
+    vi.useFakeTimers();
+    try {
+      fireEvent.pointerMove(removed, { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(screen.getByRole("tooltip").textContent).toBe("Thread removed");
+    fireEvent.click(removed);
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
   });
 
   it("the parent follows a rename, and a removed creator is plain text", () => {

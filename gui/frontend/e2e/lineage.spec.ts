@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectAttention, expectTooltip, mockPost, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Thread lineage in the GUI (docs/notes/agents-3-lineage-gui.md) over the mock's
@@ -23,8 +23,6 @@ const C = "s-l-child";
 const CHILDREN = [C, "s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-logs", "s-l-metrics"];
 const ALL = [...CHILDREN, "s-l-grand"];
 const header = (page: Page) => page.getByTestId("thread-header");
-/** The crumb's parent segment (docs/notes/thread-header-crumb.md). */
-const parent = (page: Page) => header(page).getByTestId("thread-crumb-parent");
 const card = (page: Page) => page.getByTestId("thread-info-card");
 /** A thread's row in the thread info card's lineage group (finished ones under Previous). */
 const lineageRow = (page: Page, id: string) => card(page).locator(`[data-testid="ti-lineage-row"][data-id="${id}"]`);
@@ -56,109 +54,22 @@ test.beforeEach(async () => {
 });
 
 test.describe("lineage", () => {
-  test("sidebar: children are out while their creator exists; once it is gone they join with a muted ↳, the tooltip naming the removed creator", async ({ page }) => {
-    await openApp(page);
-    await page.getByTestId("archived-header").click();
-    await expect(row(page, `s:${P}`)).toBeVisible();
-    for (const id of ALL) await expect(row(page, `s:${id}`)).toHaveCount(0);
-
-    // The creator goes alone: its children are orphans, in the sidebar; C's child stays C's.
-    await mockPost(`thread/forget?id=${P}`);
-    await expect(row(page, `s:${P}`)).toHaveCount(0);
-    for (const id of CHILDREN) await expect(row(page, `s:${id}`)).toHaveCount(1);
-    await expect(row(page, "s:s-l-grand")).toHaveCount(0);
-    await expect(row(page, "s:s-l-e2e")).toHaveAttribute("data-section", "working");
-    await expect(row(page, "s:s-l-spike")).toHaveAttribute("data-section", "archived");
-    // The ↳ glyph before the name, in the footers too; none on the user's own threads.
-    await expect(row(page, `s:${C}`).getByTestId("row-created-by")).toBeVisible();
-    await expect(row(page, "s:s-l-e2e").getByTestId("row-created-by")).toBeVisible();
-    await expect(row(page, "s:s-l-spike").getByTestId("row-created-by")).toBeVisible();
-    await expect(row(page, "s:s-1").getByTestId("row-created-by")).toHaveCount(0);
-    const name = await row(page, `s:${C}`).getByTestId("thread-name").boundingBox();
-    const glyph = await row(page, `s:${C}`).getByTestId("row-created-by").boundingBox();
-    expect((glyph?.x ?? 0) + (glyph?.width ?? 0)).toBeLessThanOrEqual((name?.x ?? 0) + 1);
-    await expect(row(page, `s:${C}`).getByTestId("row-status")).toHaveText("Done");
-
-    // The row tooltip: "Created by <recorded name> (removed)" under the status.
-    const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
-    await row(page, "s:s-l-cookie").hover();
-    await expect(tip).toHaveAttribute("data-thread-id", "s-l-cookie");
-    await expect(tip.getByTestId("tip-created-by")).toHaveText("Created by Fix login redirect (removed)");
-    await expect(tip.getByTestId("tip-created-by")).toHaveAttribute("data-removed", "true");
-    expect(await tip.locator("> div").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")))).toEqual(["tip-name", "tip-status", "tip-created-by", "tip-project", "tip-branch", "tip-model"]);
-    await row(page, "s:s-1").hover();
-    await expect(tip).toHaveAttribute("data-thread-id", "s-1");
-    await expect(tip.getByTestId("tip-created-by")).toHaveCount(0);
-  });
-
-  test("header: the crumb names the creator, which opens; the timeline opens with the Created by note", async ({ page }) => {
-    await openApp(page);
-    await open(page, P);
-    await openFromCard(page, C, "Add retry to login redirect");
-    await expect(parent(page)).toHaveText("Fix login redirect");
-    // Place, creator, title in that order.
-    const place = await header(page).getByTestId("thread-crumb-place").boundingBox();
-    const p = await parent(page).boundingBox();
-    const title = await header(page).getByTestId("thread-title").boundingBox();
-    expect((place?.x ?? 0) < (p?.x ?? 0) && (p?.x ?? 0) < (title?.x ?? 0)).toBe(true);
-
-    // The note: one muted line at the top, the creator a link, the brief, the age.
-    const note = page.getByTestId("thread-created-by-note");
-    await expect(note).toBeVisible();
-    await expect(note).toContainText("Created by");
-    await expect(note.getByTestId("thread-created-by-note-link")).toHaveText("Fix login redirect");
-    await expect(note.getByTestId("thread-created-by-note-brief")).toHaveText("brief: Add retry to the login redirect, keep the PR small");
-    await expect(note.getByTestId("thread-created-by-note-age")).toHaveText("18 min ago");
-    await expect(page.getByTestId("thread-note")).toHaveCount(0);
-
-    // The crumb's creator opens it; the user's own thread has no parent segment.
-    await parent(page).click();
-    await expect(header(page).getByTestId("thread-title")).toHaveText("Fix login redirect");
-    await expect(parent(page)).toHaveCount(0);
-    // So does the note's link.
-    await openFromCard(page, C, "Add retry to login redirect");
-    await note.getByTestId("thread-created-by-note-link").click();
-    await expect(header(page).getByTestId("thread-title")).toHaveText("Fix login redirect");
-  });
+  // Children out of the sidebar while their creator exists, in it with ↳ once it is gone, the
+  // card's "Created by … (removed)" line: src/lib/inSidebar.test.ts, src/lib/tree.test.ts,
+  // src/components/sidebar/SidebarRow.test.tsx ("SidebarRow created by a thread", "an orphan's card").
+  // The crumb naming and opening the creator, its order, the Created by note:
+  // src/components/thread/ThreadParts.test.tsx, src/components/thread/lineageRows.test.tsx, and the
+  // card's lineage row opening the child: src/components/threadinfo/ThreadInfoCard.test.tsx.
 
   // Timeline: a wake message as a collapsed Woken by note that expands to its payload and collapses again, its link selecting the thread: src/components/thread/lineageRows.test.tsx ("a wake message: …").
 
-  test("header: a removed creator leaves an inert crumb segment saying so, with the recorded name; the orphan joins the sidebar", async ({ page }) => {
-    await openApp(page);
-    await open(page, P);
-    await openFromCard(page, C, "Add retry to login redirect");
-    await openFromCard(page, "s-l-grand", "Write retry backoff tests");
-    await expect(parent(page)).toHaveText("Add retry to login redirect");
-    await expect(parent(page)).not.toHaveAttribute("data-removed", "true");
-    // Hidden, so P's row (its nearest shown ancestor) is the highlighted one.
-    await expect(row(page, "s:s-l-grand")).toHaveCount(0);
-    await expect(row(page, `s:${P}`)).toHaveAttribute("aria-selected", "true");
-    await mockPost(`thread/forget?id=${C}`);
-    // Gone from the list: the name the thread recorded when it was created.
-    await expect(parent(page)).toHaveAttribute("data-removed", "true");
-    await expect(parent(page)).toHaveText("Add retry to login redirect (old)");
-    // Its creator gone, the thread is the user's: its own row, highlighted.
-    await expect(row(page, "s:s-l-grand")).toHaveAttribute("aria-selected", "true");
-    await expect(row(page, `s:${P}`)).not.toHaveAttribute("aria-selected", "true");
-    await expectTooltip(page, parent(page), "Thread removed");
-    await parent(page).click();
-    await expect(header(page).getByTestId("thread-title")).toHaveText("Write retry backoff tests");
-    await expect(page.getByTestId("thread-created-by-note-link")).toHaveCount(0);
-    await expect(page.getByTestId("thread-created-by-note-name")).toHaveText("Add retry to login redirect (old)");
-  });
+  // A removed creator's inert crumb segment, its recorded name and "Thread removed", the anchor
+  // moving to the orphan: ThreadParts.test.tsx, lineageRows.test.tsx, inSidebar.test.ts (sidebarAnchor).
 });
 
 test.describe("child threads", () => {
-  test("are not in the attention count while their creator exists; orphaned, the waiting ones count", async ({ page }) => {
-    await openApp(page);
-    await expect(row(page, `s:${P}`)).toBeVisible();
-    // C's finished turn, s-l-cookie's permission prompt and s-l-allow's API error are not counted.
-    const before = Number(/\((\d+)\)/.exec(await page.title())?.[1] ?? "0");
-    // P (working, not counted) goes alone: the three waiting children are the user's now.
-    await mockPost(`thread/forget?id=${P}`);
-    await expect(row(page, `s:${C}`)).toBeVisible();
-    await expectAttention(page, before + 3);
-  });
+  // Not in the attention count while their creator exists, counted once orphaned:
+  // src/stores/threads.test.ts ("attentionIds leaves out a child thread").
 
   test("cmd+shift+a and cmd+1..9 walk the shown rows only", async ({ page }) => {
     await openApp(page);
@@ -190,52 +101,19 @@ test.describe("child threads", () => {
     expect([...visited].sort()).toEqual(["s-2", C, "s-l-allow", "s-l-cookie"].sort());
   });
 
-  test("a child open (from the card): its creator's row is highlighted and arrows move from it; no menu shows or hides it", async ({ page }) => {
+  // No Show hidden in the lineage menu (LineageGroup.test.tsx), no sidebar items in the title or row
+  // menus (ThreadMenuItems.test.tsx, RowMenu.test.tsx), the anchor (inSidebar.test.ts sidebarAnchor).
+  test("a child open (from the card): arrows in the sidebar start from its creator's highlighted row", async ({ page }) => {
     await openApp(page);
     await open(page, P);
-    // The lineage group: no eye, no "hidden" word, no Show hidden threads.
-    await openCard(page);
-    await expect(lineageRow(page, C)).toBeVisible();
-    await expect(card(page).getByText("hidden", { exact: true })).toHaveCount(0);
-    await card(page).getByTestId("ti-lineage-menu-trigger").click();
-    await expect(page.getByTestId("ti-lineage-menu")).toBeVisible();
-    await expect(page.getByTestId("ti-show-hidden")).toHaveCount(0);
-    await page.keyboard.press("Escape");
-
     await openFromCard(page, C, "Add retry to login redirect");
-    await expect(row(page, `s:${C}`)).toHaveCount(0);
     await expect(row(page, `s:${P}`)).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(1);
-
-    // A grandchild (from C's own card): still its nearest shown ancestor, P.
-    await openFromCard(page, "s-l-grand", "Write retry backoff tests");
-    await expect(row(page, `s:${P}`)).toHaveAttribute("aria-selected", "true");
-
-    // Arrow keys start from the highlighted row.
     const keys = await sidebarKeys(page);
     const next = keys[keys.indexOf(`s:${P}`) + 1];
     const list = page.getByTestId("thread-list");
     await list.focus();
     await page.keyboard.press("ArrowDown");
     await expect(list).toHaveAttribute("aria-activedescendant", `row-${String(next)}`);
-
-    // The title menu has no Show / Hide in sidebar, on the child or on the user's own thread.
-    const title = header(page).getByTestId("thread-title");
-    const menu = page.getByTestId("thread-title-menu");
-    for (const id of ["s-l-grand", P]) {
-      if (id === P) await open(page, P);
-      await title.click();
-      await expect(menu.getByTestId("menu-archive")).toBeVisible();
-      await expect(menu).not.toContainText("sidebar");
-      await page.keyboard.press("Escape");
-      await expect(menu).toHaveCount(0);
-    }
-    // Nor the row menu of an orphan.
-    await mockPost(`thread/forget?id=${P}`);
-    await row(page, `s:${C}`).click({ button: "right" });
-    const rowMenu = page.getByTestId("row-menu");
-    await expect(rowMenu.getByTestId("menu-archive")).toBeVisible();
-    await expect(rowMenu).not.toContainText("sidebar");
   });
 
   // A thread an agent creates not taking the view: src/lib/inSidebar.test.ts (threadFocus "a new created thread") and src/stores/intents.test.ts ("a new child (its creator exists)").

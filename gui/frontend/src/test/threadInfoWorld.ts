@@ -250,7 +250,7 @@ export function seedWs9(): string {
         const id = `repo-${n}`;
         const main = `${HOME}/src/${n}`;
         const st = n === "api" ? status({ upstream: `origin/${branch}`, ahead: 3, behind: 1, baseAhead: 4 }) : n === "web" ? status({ upstream: `origin/${branch}`, ahead: 1, baseAhead: 1 }) : n === "mobile" ? status({ operation: "rebase", operationStep: 3, operationTotal: 7 }) : status();
-        byId[id] = { id, path: main, name: n, defaultBranch: "main", githubSlug: `acme/${n}`, remotes: ["origin"], git: true, worktrees: [worktree(id, main, "main", { isMain: true }), worktree(id, wsPath(n), n === "auth-lib" ? "cf/auth-tokens-2" : branch, { status: st })] } as never;
+        byId[id] = { id, path: main, name: n, defaultBranch: "main", githubSlug: `acme/${n}`, remotes: ["origin"], git: true, worktrees: [worktree(id, main, "main", { isMain: true }), worktree(id, wsPath(n), n === "auth-lib" ? "cf/auth-tokens-2" : branch, { status: st })] };
       }
       return { byId, order: Object.keys(byId).sort((a, b) => (byId[a]?.name ?? "").localeCompare(byId[b]?.name ?? "")) };
     });

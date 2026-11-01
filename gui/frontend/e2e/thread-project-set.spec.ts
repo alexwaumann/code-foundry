@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { composeProject, expectTooltip, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { expect, test } from "@playwright/test";
+import { composeProject, expectTooltip, mockPost, openApp, resetMock } from "./fixtures";
 
 /**
  * A thread's project set on the fly (docs/notes/thread-project-set.md), from the thread
@@ -14,26 +14,6 @@ import { composeProject, expectTooltip, invocations, mockPost, openApp, resetMoc
 const HOME = "/Users/dev";
 /** Where the mock (the daemon's DefaultWorktreePath) puts a project's worktree for a branch. */
 const worktreeOf = (slug: string, branch: string) => `${HOME}/.code-foundry/worktrees/${slug}/${branch.replaceAll("/", "-")}`;
-
-const card = (page: Page) => page.getByTestId("thread-info-card");
-const crumb = (page: Page) => page.getByTestId("thread-header").getByTestId("thread-crumb");
-const menu = (page: Page) => page.getByTestId("ti-project-menu");
-const runIn = (page: Page, project: string) => menu(page).locator(`[data-testid="ti-runin-item"][data-project="${project}"]`);
-
-/** A worktree-mode thread on feat/x over `projects` (worktrees made), in workspace login when given; the card open. */
-async function openMulti(page: Page, projects: string, primary: string, workspace = ""): Promise<string> {
-  const { id } = (await mockPost(`multi-thread?projects=${projects}&project=${primary}&branch=feat/x&name=multi${workspace ? `&workspace=${workspace}` : ""}`)) as { id: string };
-  await openApp(page);
-  await row(page, `s:${id}`).click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", id);
-  await page.getByTestId("thread-info-toggle").click();
-  await expect(card(page)).toBeVisible();
-  return id;
-}
-
-async function calls(name: string) {
-  return (await invocations()).filter((i) => i.name === name).map((i) => [i.args, i.context?.activeThreadId]);
-}
 
 test.beforeEach(async () => {
   await resetMock();

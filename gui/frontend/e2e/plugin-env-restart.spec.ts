@@ -18,41 +18,9 @@ const titleMenu = async (page: Page) => {
   return page.getByTestId("thread-title-menu");
 };
 
-test("an idle stale thread: the card's project row says so; Restart Claude restarts at once and the note goes", async ({ page }) => {
-  await openApp(page);
-  await mockPost("thread/status?id=s-1&status=idle");
-  await row(page, "s:s-1").click();
-  await page.getByTestId("thread-info-toggle").click();
-  const project = page.getByTestId("thread-info-card").getByTestId("ti-project");
-  await expect(project.getByTestId("ti-project-mark")).toHaveCount(0);
-  let menu = await titleMenu(page);
-  await expect(menu.getByTestId("menu-restart")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  // Let the menu finish closing: a click on the title while it still animates out (focus
-  // inside it) does not reopen it.
-  await expect(menu).toHaveCount(0);
-
-  const dot = page.getByTestId("thread-header").getByTestId("thread-title-stale");
-  await expect(dot).toHaveCount(0);
-  await stale("s-1", "Hello removed CF_HELLO");
-  await expect(project.getByTestId("ti-project-mark")).toBeVisible();
-  // With the card off or on, the title's chevron carries a warning dot.
-  await expect(dot).toBeVisible();
-  await project.hover();
-  const notes = page.getByTestId("ti-project-notes");
-  await expect(notes.getByTestId("ti-project-env-stale")).toHaveText(
-    /^Plugin environment changed\s*Hello removed CF_HELLO\.\s*Claude is still running with the old environment\. Restart Claude restarts the Claude process with the new one; the conversation continues\.$/,
-  );
-  await page.mouse.move(0, 0);
-
-  menu = await titleMenu(page);
-  await menu.getByTestId("menu-restart").click();
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  await expect(project.getByTestId("ti-project-mark")).toHaveCount(0);
-  await expect(dot).toHaveCount(0);
-  await expect(page.getByTestId("thread-pane").getByText("Restarted Claude")).toBeVisible();
-  const calls = (await invocations()).filter((i) => i.name === "thread.restart");
-  expect(calls.map((i) => [i.context?.activeThreadId, i.confirmed ?? false])).toEqual([["s-1", false]]);
-});
+// An idle stale thread: the card's mark and note arriving and going (src/components/threadinfo/PlaceGroup.test.tsx),
+// the title's warning dot (src/components/thread/ThreadParts.test.tsx), Restart Claude only while stale and
+// running thread.restart (src/components/thread/ThreadMenuItems.test.tsx). That an idle thread restarts
+// without asking is the daemon's rule: internal/command/commands_thread_restart_test.go TestThreadRestart.
 
 // Restarting a working thread asking first (the conversation continues, the turn interrupted): the daemon's, internal/command/commands_thread_restart_test.go (TestThreadRestart "a working thread asks", "…restarts once confirmed"); the title menu's Restart Claude is src/components/thread/ThreadMenuItems.test.tsx's, the confirm src/components/confirm/ConfirmDialog.test.tsx's.

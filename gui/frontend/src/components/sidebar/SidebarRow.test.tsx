@@ -88,6 +88,26 @@ describe("SidebarRow three lines", () => {
     expect(screen.getByTestId("row-status-word").textContent).toBe(word);
   });
 
+  it("a plugin's flag arriving over the stream: its name on line 1 in amber, its reason on line 3; an error turns it red; cleared, the status goes", () => {
+    renderRow({});
+    expect(screen.queryByTestId("row-status")).toBeNull();
+    const set = (flags: ThreadView["flags"]) => {
+      act(() => {
+        useThreadsStore.setState((s) => ({ byId: { "s-1": { ...(s.byId["s-1"] as ThreadView), flags } } }));
+      });
+    };
+    set([flag("attention", "deploy needs approval", "GitHub Actions")]);
+    expect(screen.getByTestId("row-status-word").textContent).toBe("GitHub Actions");
+    expect(screen.getByTestId("row-status").className).toContain("text-cf-warning-text");
+    expect(screen.getByTestId("row-detail").textContent).toBe("deploy needs approval");
+    set([flag("error", "tests failed", "Test Watcher")]);
+    expect(screen.getByTestId("row-status-word").textContent).toBe("Test Watcher");
+    expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
+    expect(screen.getByTestId("row-detail").textContent).toBe("tests failed");
+    set([]);
+    expect(screen.queryByTestId("row-status")).toBeNull();
+  });
+
   it("idle: no icon or word, the time since the last activity, muted", () => {
     renderRow({ status: "idle", lastActivityAtMs: NOW - 9 * MIN });
     expect(screen.queryByTestId("row-status")).toBeNull();
@@ -923,6 +943,16 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     const card = openCard({ linkedPullRequests: [1, 2, 3, 4, 5, 6, 7].map((n) => link(n, n)) });
     expect(within(card).getAllByTestId("tip-pr")).toHaveLength(5);
     expect(text(card, "tip-prs-more")).toBe("+2 more");
+  });
+
+  it("an orphan's card: Created by its recorded name (removed), muted, under the status; none for the user's thread", () => {
+    const card = openCard({ name: "Allow cookies", status: "attention", statusReason: "permission: Bash rm -rf cookies", createdBy: "s-gone", createdByName: "Fix login redirect" });
+    const by = within(card).getByTestId("tip-created-by");
+    expect(by.textContent).toBe("Created by Fix login redirect (removed)");
+    expect(by.dataset.removed).toBe("true");
+    expect(ids(card)).toEqual(["tip-name", "tip-status", "tip-created-by", "tip-project", "tip-branch", "tip-model"]);
+    cleanup();
+    expect(within(openCard({ name: "Mine" })).queryByTestId("tip-created-by")).toBeNull();
   });
 });
 

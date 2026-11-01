@@ -372,7 +372,9 @@ describe("ThreadInfoCard: other scenarios", () => {
       expect(stops()).toEqual([`${id} bd9r3t6w1`]);
     });
     // The shell leaves the thread (the daemon's update): its row goes.
-    const left = (task: string) => updateThread(id, { backgroundShells: (useThreadsStore.getState().byId[id]?.backgroundShells ?? []).filter((s) => s.taskId !== task) });
+    const left = (task: string) => {
+      updateThread(id, { backgroundShells: (useThreadsStore.getState().byId[id]?.backgroundShells ?? []).filter((s) => s.taskId !== task) });
+    };
     left("bd9r3t6w1");
     expect(servers()).toHaveLength(1);
     fireEvent.keyDown(stop("bk4v8n2p7"), { key: "Enter" });
