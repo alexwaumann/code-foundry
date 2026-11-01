@@ -23,7 +23,7 @@ import (
 func asChildLinks(links []LinkedPullRequest, via string) []LinkedPullRequest {
 	out := make([]LinkedPullRequest, len(links))
 	for i, l := range links {
-		l.Source, l.ViaThreadID = LinkChild, via
+		l.Source, l.ViaThreadID, l.Head = LinkChild, via, ""
 		out[i] = l
 	}
 	return out

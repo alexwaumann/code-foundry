@@ -29,18 +29,24 @@ func branchPR(repo string, n int, head string) gh.PullRequest {
 	return p
 }
 
-// branchProjects: p-api (o/api, worktrees main, cf/x, a detached one), p-web
-// (O/Web: mixed case, worktrees main and cf/x), p-local (no GitHub slug, cf/x).
+// branchProjects: p-api (o/api, default branch trunk, worktrees main, cf/x, a detached
+// one), p-web (O/Web: mixed case, default branch trunk, worktrees main and cf/x),
+// p-local (no GitHub slug, cf/x). The default branch is not main so that main's pull
+// requests still link; TestBranchLinksFor's default-branch cases use p-def.
 func branchProjects() *project.Snapshot {
 	return &project.Snapshot{Projects: []project.Project{
-		{ID: "p-api", GitHubSlug: "o/api", Path: "/api", Git: true, Worktrees: []project.Worktree{
+		{ID: "p-api", GitHubSlug: "o/api", DefaultBranch: "trunk", Path: "/api", Git: true, Worktrees: []project.Worktree{
 			{ProjectID: "p-api", Path: "/api", Branch: "main", IsMain: true},
 			{ProjectID: "p-api", Path: "/wt/api-x", Branch: "cf/x"},
 			{ProjectID: "p-api", Path: "/wt/api-det", Detached: true},
 		}},
-		{ID: "p-web", GitHubSlug: "O/Web", Path: "/web", Git: true, Worktrees: []project.Worktree{
+		{ID: "p-web", GitHubSlug: "O/Web", DefaultBranch: "trunk", Path: "/web", Git: true, Worktrees: []project.Worktree{
 			{ProjectID: "p-web", Path: "/web", Branch: "main", IsMain: true},
 			{ProjectID: "p-web", Path: "/wt/web-x", Branch: "cf/x"},
+		}},
+		{ID: "p-def", GitHubSlug: "o/def", DefaultBranch: "main", Path: "/def", Git: true, Worktrees: []project.Worktree{
+			{ProjectID: "p-def", Path: "/def", Branch: "main", IsMain: true},
+			{ProjectID: "p-def", Path: "/wt/def-x", Branch: "cf/x"},
 		}},
 		{ID: "p-local", Path: "/local", Git: true, Worktrees: []project.Worktree{
 			{ProjectID: "p-local", Path: "/local", Branch: "cf/x", IsMain: true},
@@ -163,6 +169,19 @@ func TestBranchLinksFor(t *testing.T) {
 				{ID: "t2", ProjectID: "p-api", WorktreePath: "/wt/api-x", LinkedPullRequests: []thread.LinkedPullRequest{link("o/api", 1), link("o/api", 2)}}},
 			prs:  []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/api", 2, "cf/x")},
 			want: []string{"t1: o/api#2@2"}},
+		{name: "the default branch's pull requests are not linked",
+			threads: []thread.Thread{
+				{ID: "t1", ProjectID: "p-def", WorktreePath: "/def", CreatedAt: branchT0},
+				{ID: "t2", ProjectID: "p-def", WorktreePath: "/wt/def-x", CreatedAt: branchT0.Add(time.Minute)}},
+			prs:  []gh.PullRequest{branchPR("o/def", 1, "main"), branchPR("o/def", 2, "cf/x")},
+			want: []string{"t2: o/def#2@2"}},
+		{name: "the default branch: also not as a gone worktree's recorded branch",
+			threads: []thread.Thread{{ID: "t", ProjectID: "p-def", WorktreePath: "/wt/removed", Branch: "main"}},
+			prs:     []gh.PullRequest{branchPR("o/def", 1, "main")}},
+		{name: "default branch not known yet (not reconciled): nothing for the project",
+			threads:  []thread.Thread{{ID: "t", ProjectID: "p-def", WorktreePath: "/wt/def-x"}},
+			prs:      []gh.PullRequest{branchPR("o/def", 2, "cf/x")},
+			projects: func(s *project.Snapshot) { s.Projects[2].DefaultBranch = "" }},
 		{name: "fork pull requests, placeholders and links without a url are left out; no creation time: now",
 			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", WorktreePath: "/api"}},
 			prs: func() []gh.PullRequest {
@@ -228,6 +247,36 @@ func (f *fakeBranchLinker) LinkBranchPullRequests(id string, links []thread.Link
 		bus.Publish[thread.Event](f.bus, thread.Updated{Thread: updated})
 	}
 	return added
+}
+
+// SettleBranchLinks records "settle id -#n +#m@head" and applies it to the thread only
+// (no copies up the chain in the fake).
+func (f *fakeBranchLinker) SettleBranchLinks(id string, heads map[string]string, drop []string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	call := "settle " + id
+	removed := 0
+	for i := range f.threads {
+		if f.threads[i].ID != id {
+			continue
+		}
+		var kept []thread.LinkedPullRequest
+		for _, l := range f.threads[i].LinkedPullRequests {
+			switch {
+			case slices.Contains(drop, l.URL):
+				call += fmt.Sprintf(" -#%d", l.Number)
+				removed++
+				continue
+			case heads[l.URL] != "":
+				l.Head = heads[l.URL]
+				call += fmt.Sprintf(" +#%d@%s", l.Number, l.Head)
+			}
+			kept = append(kept, l)
+		}
+		f.threads[i].LinkedPullRequests = kept
+	}
+	f.calls = append(f.calls, call)
+	return removed
 }
 
 func (f *fakeBranchLinker) add(th thread.Thread) {
