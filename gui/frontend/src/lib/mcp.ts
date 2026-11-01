@@ -51,6 +51,64 @@ export function connectedSummary(servers: readonly Pick<McpServerView, "status">
   return `${String(n)} of ${String(servers.length)} connected`;
 }
 
+/**
+ * The panel's tabs (docs/notes/mcp-panel-tabs.md), always all three in this order:
+ * Connected (connecting included), Failed (needs login and an unknown status included:
+ * neither is up), Disabled.
+ */
+export type McpBucket = "connected" | "failed" | "disabled";
+
+export const MCP_BUCKETS: readonly McpBucket[] = ["connected", "failed", "disabled"];
+
+export const MCP_BUCKET_LABEL: Readonly<Record<McpBucket, string>> = { connected: "Connected", failed: "Failed", disabled: "Disabled" };
+
+/** A tab's empty state. */
+export const MCP_BUCKET_EMPTY: Readonly<Record<McpBucket, string>> = {
+  connected: "No connected servers.",
+  failed: "No failed servers. Nothing needs a login.",
+  disabled: "No disabled servers.",
+};
+
+/** What settles the check: a server still connecting, a refresh or a reconnect in flight. */
+export interface McpSettlingInput {
+  /** Any server's status is pending (a freshly started Claude reports cached servers so first, binary-read-cap-and-mcp-settle §B). */
+  pending: boolean;
+  refreshing: boolean;
+  reconnecting: boolean;
+}
+
+/** The line under an empty tab while the check still settles, in place of the tab's own. */
+export const MCP_SETTLING_LINE = "Checking MCP servers…";
+
+/**
+ * An empty tab's line (MCP_BUCKET_EMPTY), or MCP_SETTLING_LINE while a check settles: a
+ * refresh or reconnect on a stopped thread first reports every server as connecting, so
+ * the Failed tab empties for a few seconds; saying nothing failed then would be false.
+ */
+export function bucketEmptyLine(bucket: McpBucket, s: McpSettlingInput): string {
+  return s.pending || s.refreshing || s.reconnecting ? MCP_SETTLING_LINE : MCP_BUCKET_EMPTY[bucket];
+}
+
+/** The tab a server's status lists it under. */
+export function mcpBucket(status: McpServerStatusView): McpBucket {
+  switch (status) {
+    case "connected":
+    case "pending":
+      return "connected";
+    case "disabled":
+      return "disabled";
+    default:
+      return "failed";
+  }
+}
+
+/** How many servers each tab lists. */
+export function bucketCounts(servers: readonly Pick<McpServerView, "status">[]): Record<McpBucket, number> {
+  const out: Record<McpBucket, number> = { connected: 0, failed: 0, disabled: 0 };
+  for (const s of servers) out[mcpBucket(s.status)]++;
+  return out;
+}
+
 /** "just now", "12s ago", "3 min ago", "2 h ago", "4 d ago"; "" for an unknown time. */
 export function checkedAgo(ms: number | null, now: number): string {
   if (ms === null) return "";

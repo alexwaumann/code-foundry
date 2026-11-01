@@ -8,6 +8,9 @@ Update 2026-10-18 (`binary-read-cap-and-mcp-settle.md`): a refresh or reconnect 
 starts Claude settles like a turn's check (the same polling), and an empty first answer
 shows the cached servers as connecting instead of "0 of 0 connected".
 
+Update 2026-10-31 (`mcp-panel-tabs.md`): the cards sit under Connected / Failed / Disabled
+tabs with their counts; the header's "N of M connected" is gone.
+
 Status: built on branch `t3code/mcp-panel` (follow-ups §2, `rendered-threads-followups.md`;
 design: `docs/sketches/mcp-panel/`, variant B). `make check` and `make gui-e2e` green; the
 daemon side exercised end to end with an isolated home and haiku (below). Mock screenshots

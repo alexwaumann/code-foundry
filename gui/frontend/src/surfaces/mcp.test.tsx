@@ -16,6 +16,7 @@ const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
+const { setMcpTab, useMcpTabsStore } = await import("@/stores/mcpTabs");
 const { mcpPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
 const thread = (id: string, state = "connected") =>
@@ -54,6 +55,12 @@ function setMcp(id: string, mcp: McpStatusView | null): void {
 const cards = () => screen.getAllByTestId("mcp-card");
 const card = (name: string) => cards().find((c) => c.getAttribute("data-server") === name) as HTMLElement;
 const within = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="${id}"]`);
+const tabCounts = () => screen.getAllByTestId("mcp-tab").map((t) => [t.getAttribute("data-bucket"), t.getAttribute("data-state"), t.querySelector('[data-testid="mcp-tab-count"]')?.textContent]);
+/** Picks a tab the way a click does (Radix activates on mousedown). */
+const pick = (bucket: string) => {
+  const t = screen.getAllByTestId("mcp-tab").find((x) => x.getAttribute("data-bucket") === bucket) as HTMLElement;
+  fireEvent.mouseDown(t, { button: 0 });
+};
 const row = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surface="mcp"]') ?? null;
 
 beforeEach(() => {
@@ -63,6 +70,7 @@ beforeEach(() => {
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
+  useMcpTabsStore.setState({ byKey: {} });
   // Stamped per test: a check time taken when the module loaded drifts past 12s under load.
   checkedAtMs = Date.now() - 12_000;
   setMcp("s-r", { ...STATUS, checkedAtMs });
@@ -86,31 +94,81 @@ describe("MCP surface", () => {
     expect(mcpPanelCommand()).toBe(false);
   });
 
-  it("shows the header and one card per server in every state", () => {
+  it("shows the header and the servers in Connected / Failed / Disabled tabs, Connected first", () => {
     render(<SidePanel />);
     act(() => {
       mcpPanelCommand();
     });
     expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBe("mcp");
-    expect(screen.getByTestId("mcp-count").textContent).toBe("1 of 5 connected");
+    expect(screen.queryByTestId("mcp-count")).toBeNull();
     expect(screen.getByTestId("mcp-checked").textContent).toBe("Checked 12s ago, at the start of the last turn");
-    expect(cards().map((c) => [c.getAttribute("data-server"), c.getAttribute("data-status"), within(c, "mcp-pill")?.textContent])).toEqual([
+    // Connecting counts as connected; needs login as failed.
+    expect(tabCounts()).toEqual([
+      ["connected", "active", "2"],
+      ["failed", "inactive", "2"],
+      ["disabled", "inactive", "1"],
+    ]);
+    const failedCount = screen.getAllByTestId("mcp-tab-count")[1] as HTMLElement;
+    expect(failedCount.className).toContain("text-cf-error-text");
+    expect(screen.getAllByTestId("mcp-tab-count")[0]?.className).toContain("text-cf-text-muted");
+    const shown = () => cards().map((c) => [c.getAttribute("data-server"), c.getAttribute("data-status"), within(c, "mcp-pill")?.textContent]);
+    expect(shown()).toEqual([
       ["github", "connected", "Connected"],
-      ["linear", "needs-auth", "Needs login"],
-      ["playwright", "failed", "Failed"],
       ["filesystem", "pending", "Connecting…"],
-      ["sentry", "disabled", "Disabled"],
     ]);
     expect(within(card("github"), "mcp-meta")?.textContent).toBe("user·stdio·2 tools");
     expect(within(card("github"), "mcp-version")?.textContent).toBe("v1.12.0");
+    // Reconnect everywhere but connecting and disabled.
+    expect(cards().map((c) => within(c, "mcp-reconnect") !== null)).toEqual([true, false]);
+    expect(within(card("github"), "mcp-reconnect")?.className).toContain("border-transparent");
+
+    pick("failed");
+    expect(useMcpTabsStore.getState().byKey["thread:s-r"]).toBe("failed");
+    expect(shown()).toEqual([
+      ["linear", "needs-auth", "Needs login"],
+      ["playwright", "failed", "Failed"],
+    ]);
     expect(within(card("playwright"), "mcp-error")?.textContent).toBe("spawn npx ENOENT");
     expect(within(card("linear"), "mcp-login-hint")?.textContent).toBe("Needs login · run claude in a shell and use /mcp, then reconnect");
-    // Reconnect everywhere but connecting and disabled; amber on the ones that need you.
-    expect(cards().map((c) => within(c, "mcp-reconnect") !== null)).toEqual([true, true, true, false, false]);
+    // Amber on the ones that need you.
     expect(within(card("playwright"), "mcp-reconnect")?.className).toContain("border-cf-warning/40");
-    expect(within(card("github"), "mcp-reconnect")?.className).toContain("border-transparent");
     expect(card("playwright").className).toContain("border-cf-error/35");
     expect(card("linear").className).toContain("border-cf-warning/35");
+
+    pick("disabled");
+    expect(shown()).toEqual([["sentry", "disabled", "Disabled"]]);
+    expect(within(card("sentry"), "mcp-reconnect")).toBeNull();
+  });
+
+  it("an empty tab says so; a quiet Failed count is muted", () => {
+    setMcp("s-r", { ...STATUS, checkedAtMs, servers: STATUS.servers.filter((x) => x.name === "github") });
+    render(<SidePanel />);
+    act(() => {
+      mcpPanelCommand();
+    });
+    expect(tabCounts().map((t) => t[2])).toEqual(["1", "0", "0"]);
+    expect(screen.getAllByTestId("mcp-tab-count")[1]?.className).toContain("text-cf-text-muted");
+    for (const [bucket, line] of [
+      ["failed", "No failed servers. Nothing needs a login."],
+      ["disabled", "No disabled servers."],
+    ] as const) {
+      pick(bucket);
+      expect(screen.queryAllByTestId("mcp-card")).toHaveLength(0);
+      expect(screen.getByTestId("mcp-tab-empty").textContent).toBe(line);
+    }
+    setMcp("s-r", { ...STATUS, checkedAtMs, servers: STATUS.servers.filter((x) => x.name === "sentry") });
+    pick("connected");
+    expect(screen.getByTestId("mcp-tab-empty").textContent).toBe("No connected servers.");
+  });
+
+  it("no tabs without servers", () => {
+    setMcp("s-r", { ...STATUS, checkedAtMs, servers: [] });
+    render(<SidePanel />);
+    act(() => {
+      mcpPanelCommand();
+    });
+    expect(screen.getByTestId("mcp-none").textContent).toBe("Claude has no MCP servers in this thread.");
+    expect(screen.queryByTestId("mcp-tabs")).toBeNull();
   });
 
   it("expands a server's tools with their hint icons", () => {
@@ -136,6 +194,7 @@ describe("MCP surface", () => {
     act(() => {
       showView("panel.mcp");
     });
+    setMcpTab("thread:s-r", "failed");
     render(<SidePanel />);
     fireEvent.click(within(card("playwright"), "mcp-reconnect") as HTMLElement);
     expect(commands.run).toHaveBeenCalledWith("thread.mcp-reconnect", { id: "s-r", server: "playwright" }, expect.objectContaining({ quiet: true }));
@@ -147,6 +206,9 @@ describe("MCP surface", () => {
       finish({ message: "reconnected playwright: connected", resultJson: "{}" });
       await Promise.resolve();
     });
+    // Connected now: it left the Failed tab for the Connected one.
+    expect(cards().map((c) => c.getAttribute("data-server"))).toEqual(["linear"]);
+    pick("connected");
     expect(card("playwright").getAttribute("data-status")).toBe("connected");
     expect(screen.getByTestId("mcp-checked").textContent).toBe("Checked 12s ago, after reconnecting playwright");
     expect(toast.error).not.toHaveBeenCalled();
@@ -157,6 +219,7 @@ describe("MCP surface", () => {
     act(() => {
       showView("panel.mcp");
     });
+    setMcpTab("thread:s-r", "failed");
     render(<SidePanel />);
     await act(async () => {
       fireEvent.click(within(card("linear"), "mcp-reconnect") as HTMLElement);
@@ -206,6 +269,7 @@ describe("MCP surface", () => {
     act(() => {
       showView("panel.mcp");
     });
+    setMcpTab("thread:s-off", "failed");
     render(<SidePanel />);
     expect(screen.getByTestId<HTMLButtonElement>("mcp-refresh").disabled).toBe(false);
     const reconnect = within(card("linear"), "mcp-reconnect") as HTMLButtonElement;

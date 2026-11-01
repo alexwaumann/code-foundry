@@ -58,7 +58,8 @@
  *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts) |
  *        /__mock/thread/agent-end?run=a1[&status=failed] (a subagent run of state=agents ends: mock/agents.ts) |
  *        /__mock/thread/shell-end[?status=failed] (the oldest background shell of state=agents|shells ends: mock/shells.ts) |
- *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts)
+ *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts) |
+ *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/terminal/new?delay=700&fail=reason   (terminal.new takes that long; its next run
@@ -260,7 +261,7 @@ import { createProject, deleteProject, listPublishOwners, projectCalls, publishP
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage, utcDay } from "./usage";
-import { ageMcp, reconnectMcp, refreshMcp } from "./mcp";
+import { ageMcp, keepMcpServers, reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
 import { pageStorageOf, resetPageStorage, setPageStorage } from "./pageStorage";
 import { listPrompts } from "./prompts";
@@ -1340,6 +1341,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       // id=s-r1&ago=<seconds>: the thread's last MCP check that long ago (mock/mcp.ts ageMcp).
       try {
         ageMcp(world.logs, q.get("id") ?? "s-r1", Number(q.get("ago") ?? "720"));
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/thread/mcp-servers":
+      // id=s-r1&keep=a,b: the thread's MCP servers become those of the fixture's six (mock/mcp.ts keepMcpServers).
+      try {
+        keepMcpServers(world.logs, q.get("id") ?? "s-r1", (q.get("keep") ?? "").split(",").filter((n) => n !== ""));
         json(res, 200, { ok: true });
       } catch (err) {
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });

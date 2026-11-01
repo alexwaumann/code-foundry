@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Clock, Eye, Globe, LoaderCircle, Pencil, Plug, RefreshCw, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { McpServerStatusView, McpToolView } from "@/api/mcp";
+import { usePanelKey } from "@/components/panel/panelKeyContext";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import {
   canReconnect,
   checkedLine,
   claudeRunning,
+  bucketEmptyLine,
+  MCP_BUCKET_LABEL,
+  MCP_BUCKETS,
   MCP_LOGIN_HINT,
   MCP_STATUS_LABEL,
   metaParts,
@@ -16,10 +21,12 @@ import {
   TOOL_HINT_LABEL,
   toolCount,
   toolHints,
+  type McpBucket,
   type ToolHint,
 } from "@/lib/mcp";
 import { cn } from "@/lib/utils";
-import { ensureMcpStatus, reconnectMcp, refreshMcp, useMcpHeader, useMcpReconnecting, useMcpRefreshing, useMcpServer, useMcpServerNames, useMcpStale, useMcpStatus } from "@/stores/mcp";
+import { ensureMcpStatus, reconnectMcp, refreshMcp, useMcpBucketCounts, useMcpBucketNames, useMcpHeader, useMcpReconnecting, useMcpRefreshing, useMcpServer, useMcpServerNames, useMcpSettling, useMcpStale, useMcpStatus } from "@/stores/mcp";
+import { setMcpTab, useMcpTab } from "@/stores/mcpTabs";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
@@ -79,11 +86,6 @@ function Header({ threadId, stale }: { threadId: string; stale: boolean }) {
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
         <Plug className="size-4 shrink-0 text-cf-warning-text" aria-hidden />
         <span className="min-w-0 truncate">MCP servers</span>
-        {h && (
-          <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="mcp-count">
-            {h.connected} of {h.total} connected
-          </span>
-        )}
       </h2>
       <span className={cn("flex min-h-6 min-w-0 items-center gap-1.5 text-caption", stale && "text-cf-warning-text")} data-testid="mcp-checked-line">
         <Clock className="size-3.5 shrink-0" aria-hidden />
@@ -271,11 +273,62 @@ function Message({ testId, children }: { testId: string; children: string }) {
 }
 
 /**
+ * The tabs under the header (docs/notes/mcp-panel-tabs.md): Connected, Failed, Disabled,
+ * always all three, each with its count; the Failed count turns red when any server failed.
+ */
+function BucketTabs({ threadId, value, onChange }: { threadId: string; value: McpBucket; onChange: (b: McpBucket) => void }) {
+  const counts = useMcpBucketCounts(threadId);
+  return (
+    <Tabs
+      value={value}
+      onValueChange={(v) => {
+        onChange(v as McpBucket);
+      }}
+      className="px-3 pt-2.5 @max-[340px]:px-2"
+    >
+      <TabsList className="h-6 w-full rounded-md p-0.5" aria-label="MCP servers by status" data-testid="mcp-tabs">
+        {MCP_BUCKETS.map((b) => {
+          const n = counts?.[b] ?? 0;
+          return (
+            <TabsTrigger key={b} value={b} className="rounded-sm px-2 py-0 text-caption" data-testid="mcp-tab" data-bucket={b}>
+              {MCP_BUCKET_LABEL[b]}{" "}
+              <span className={cn("tabular-nums", b === "failed" && n > 0 ? "text-cf-error-text" : "text-cf-text-muted")} data-testid="mcp-tab-count">
+                {n}
+              </span>
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
+  );
+}
+
+/** The active tab's cards in Claude's order, or its empty line (while a check settles, that it is checking). */
+function BucketCards({ threadId, bucket, stale }: { threadId: string; bucket: McpBucket; stale: boolean }) {
+  const names = useMcpBucketNames(threadId, bucket);
+  if (names.length === 0) return <EmptyTab threadId={threadId} bucket={bucket} />;
+  return (
+    <div className="flex min-w-0 flex-col gap-2 px-3 py-2.5 @max-[340px]:px-2" data-testid="mcp-cards" data-bucket={bucket}>
+      {names.map((n) => (
+        <ServerCard key={n} threadId={threadId} name={n} stale={stale} />
+      ))}
+    </div>
+  );
+}
+
+/** An empty tab's line: its own, or "Checking MCP servers…" while a server connects or a refresh or reconnect runs. */
+function EmptyTab({ threadId, bucket }: { threadId: string; bucket: McpBucket }) {
+  const settling = useMcpSettling(threadId);
+  return <Message testId="mcp-tab-empty">{bucketEmptyLine(bucket, settling)}</Message>;
+}
+
+/**
  * The side panel's MCP surface (docs/sketches/mcp-panel variant B, docs/notes/mcp-panel.md):
  * the selected thread's MCP servers as Claude last reported them, one card each
  * (name, version, status pill; scope · transport · tools; the error or the login hint;
- * Reconnect and the tools disclosure), under a header with the connected count, when the
- * servers were checked, and a refresh button; stale (Claude not running, or the check
+ * Reconnect and the tools disclosure), split into Connected / Failed / Disabled tabs with
+ * their counts (the choice kept per panel while the MCP tab stays open, stores/mcpTabs.ts),
+ * under a header with when the servers were checked and a refresh button; stale (Claude not running, or the check
  * 10 min old) the header turns amber, the pills go muted and dashed, and Refresh is the
  * primary button. Refresh and Reconnect work whether or not
  * Claude runs for the thread (the daemon starts it for them); its last status outlives
@@ -291,6 +344,8 @@ export function McpSurface() {
   const stale = useMcpStale(threadId);
   const status = useMcpStatus(threadId);
   const names = useMcpServerNames(threadId);
+  const panelKey = usePanelKey();
+  const bucket = useMcpTab(panelKey);
   const missing = status === null;
   useEffect(() => {
     if (known && missing) ensureMcpStatus(threadId);
@@ -308,11 +363,16 @@ export function McpSurface() {
       ) : names.length === 0 ? (
         <Message testId="mcp-none">Claude has no MCP servers in this thread.</Message>
       ) : (
-        <div className="flex min-w-0 flex-col gap-2 px-3 py-2.5 @max-[340px]:px-2" data-testid="mcp-cards">
-          {names.map((n) => (
-            <ServerCard key={n} threadId={threadId} name={n} stale={stale} />
-          ))}
-        </div>
+        <>
+          <BucketTabs
+            threadId={threadId}
+            value={bucket}
+            onChange={(b) => {
+              setMcpTab(panelKey, b);
+            }}
+          />
+          <BucketCards threadId={threadId} bucket={bucket} stale={stale} />
+        </>
       )}
     </div>
   );
