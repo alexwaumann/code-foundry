@@ -338,7 +338,7 @@ test("a project's page: header, the checkouts table by activity, a row opens its
 
   // The header's menu: no New worktree.
   await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Clean up merged worktrees 0", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Rename", "Clean up merged worktrees 0", "Remove project"]);
   await closeMenu(page, "project-more");
 
   // Details.
@@ -391,7 +391,7 @@ test("kind variants: no remote (note, no Sync or PR), another remote (no PR), no
   await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-project", "repo-sk");
   await page.keyboard.press("Escape");
   await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Publish to GitHub", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Rename", "Publish to GitHub", "Remove project"]);
   await closeMenu(page, "project-more");
 
   await openProjectPage(page, "repo-dot");
@@ -565,7 +565,7 @@ test("Clean up merged worktrees removes them after a confirm and the index's pil
   await openApp(page);
   await openProjectPage(page, "repo-cf");
   await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Clean up merged worktrees 2", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Rename", "Clean up merged worktrees 2", "Remove project"]);
   await page.getByTestId("project-cleanup").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Fetch, then remove 2 worktrees");

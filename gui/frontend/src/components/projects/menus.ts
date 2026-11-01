@@ -5,13 +5,15 @@ import { cleanupMergedWorktrees, initGitIn, publishProject, unregisterProject } 
 import type { OverflowItem } from "./OverflowMenu";
 
 /**
- * A project's overflow (the index row's and the project page header's): New action…,
+ * The project page header's overflow: New action…,
+ * Rename (when `rename` is given: the page shows the name editor; no icon, no ellipsis),
  * Clean up merged worktrees (git with a remote, `cleanup` the count; disabled at 0), its
  * setup step, then Remove project. No New worktree: worktrees are made by threads and
  * agents (project.worktree.new stays for the CLI and the palette).
  */
-export function projectMenu(projectId: string, kind: ProjectKind, step: ProjectNextStep, cleanup: number | null): OverflowItem[] {
+export function projectMenu(projectId: string, kind: ProjectKind, step: ProjectNextStep, cleanup: number | null, rename?: () => void): OverflowItem[] {
   const items: OverflowItem[] = [{ label: "New action…", icon: Play, testId: "project-new-action", onSelect: () => { openActionEditor({ mode: "new", projectId, from: "projects" }); } }];
+  if (rename) items.push({ label: "Rename", testId: "project-menu-rename", onSelect: rename });
   if (kind !== "nogit" && cleanup !== null) {
     items.push({ label: "Clean up merged worktrees", icon: Broom, testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(projectId) });
   }

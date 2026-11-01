@@ -22,8 +22,7 @@ project's name was its folder's basename, set at registration and never changed.
   picker while `stores/projectRename.ts` `renamingProjectId` is the page's project.
   `startProjectRename(id)` opens it from anywhere; PR 2's index-row Rename calls it and
   renders the same editor in the row. The page's ⋯ menu has Rename (no icon, no ellipsis)
-  after New action…. `projectMenu` adds it only when given a `rename` callback, so the
-  index row's menu (PR 1's file) has no Rename that would do nothing there.
+  after New action… (`projectMenu` adds it when given a `rename` callback).
 - Mock: `mock/projectRename.ts` (the command and the RPC, with the same rules);
   `e2e/project-rename.spec.ts`.
 

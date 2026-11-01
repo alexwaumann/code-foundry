@@ -19,6 +19,7 @@ import { findWorktree, mainWorktreePath, useProjectsStore } from "@/stores/proje
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
 import { PROJECTS_INDEX, useUiStore } from "@/stores/ui";
+import { endProjectRename, startProjectRename, useProjectRenameStore } from "@/stores/projectRename";
 import { KindIcon, Pill, SectionHeader } from "./bits";
 import { useCheckoutOrder, usePageScroll } from "./pageHooks";
 import { useProjectKind } from "@/components/icons/projectKind";
@@ -28,6 +29,7 @@ import { projectMenu } from "./menus";
 import { OverflowMenu } from "./OverflowMenu";
 import { ProjectsCrumb, PagePicker } from "./PagePicker";
 import { ProjectDetails } from "./ProjectDetails";
+import { ProjectNameEditor } from "./ProjectNameEditor";
 import { useCleanableCount } from "./useCleanable";
 
 
@@ -149,6 +151,9 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   // The caption counts every worktree, the ones without threads (their own block) too.
   const worktreeCount = useProjectsStore((s) => s.byId[projectId]?.worktrees.length ?? 0);
   const git = kind !== "nogit";
+  const renaming = useProjectRenameStore((s) => s.renamingProjectId === projectId);
+  // Leaving the page closes its editor (the field's blur has renamed by then).
+  useEffect(() => () => { endProjectRename(projectId); }, [projectId]);
 
   // A project removed while its page shows: back to the index. Only once it was there: a
   // page opened for one just added comes before its event (stores/projectsPage.ts).
@@ -180,7 +185,26 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label={name} data-testid="projects-page" data-page="project" data-project={projectId} data-kind={kind} data-narrow={narrow || undefined}>
       <PaneHeader className="gap-2 px-5">
         <ProjectsCrumb />
-        <PagePicker icon={<KindIcon kind={kind} />} name={name} currentProject={projectId} />
+        {renaming ? (
+          <span className="flex min-w-0 shrink-0 items-center gap-2 px-1 [--wails-draggable:no-drag]">
+            <KindIcon kind={kind} />
+            <ProjectNameEditor
+              projectId={projectId}
+              name={name}
+              onDone={() => {
+                endProjectRename(projectId);
+                // Enter or Escape: the keyboard goes back to the page's list (the field is not inside it).
+                // Leaving the field for something else keeps the focus there.
+                requestAnimationFrame(() => {
+                  const active = document.activeElement;
+                  if (!active || active === document.body) rootRef.current?.focus({ preventScroll: true });
+                });
+              }}
+            />
+          </span>
+        ) : (
+          <PagePicker icon={<KindIcon kind={kind} />} name={name} currentProject={projectId} />
+        )}
         {!narrow && meta && (
           <span className="min-w-0 shrink truncate text-caption text-cf-text-muted" data-testid="project-meta">
             {meta}
@@ -199,7 +223,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
             <SquarePen />
             New thread
           </Button>
-          <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(projectId, kind, step, git && hasRemote ? cleanable : null)} />
+          <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(projectId, kind, step, git && hasRemote ? cleanable : null, () => { startProjectRename(projectId); })} />
         </span>
         <span className="-mr-2 flex shrink-0 items-center">
           <BottomToggle />
