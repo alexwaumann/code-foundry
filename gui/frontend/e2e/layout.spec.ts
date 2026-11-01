@@ -88,8 +88,8 @@ for (const scheme of ["dark", "light"] as const) {
 test("the app name fits whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
   await openApp(page);
   const title = page.getByTestId("sidebar-app-name");
-  const setWidth = (w: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
-  const setZoom = (z: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
+  const setWidth = (w: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
+  const setZoom = (z: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
   const fits = () => title.evaluate((el) => el.scrollWidth <= el.clientWidth);
   await setWidth(220);
   await expect.poll(async () => (await box(page, "sidebar")).width).toBe(220);

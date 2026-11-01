@@ -100,7 +100,7 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   await page.getByTestId("thread-header").getByTestId("bottom-toggle").click();
   await expect(page.getByTestId("bottom-panel")).toBeVisible();
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
   await expect(page.getByTestId("side-panel")).toBeVisible();
 
   // The title menu's Archive: the mock, like the daemon, asks while Claude is working.
@@ -119,7 +119,7 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   expect(
-    await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`),
+    await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`),
   ).toEqual({ open: false, groups: [{ tabs: [], activeTabId: null }] });
   // Opened again from the Archived section: its composer, and neither panel comes back.
   await page.getByTestId("archived-header").click();
@@ -137,7 +137,7 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
 
   // Archived from the CLI (another client): the same panel reset.
   await row(page, "s:s-2").click();
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
   await expect(page.getByTestId("side-panel")).toBeVisible();
   await mockPost("thread/archive?id=s-2");
   await expect(page.getByTestId("archived-count")).toHaveText("3");

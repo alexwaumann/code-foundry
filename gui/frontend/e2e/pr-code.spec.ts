@@ -53,7 +53,7 @@ async function openCode(page: Page, number: number): Promise<void> {
   // The Pull Requests page is a selection whose panel can hold a pull request.
   await page.getByTestId("nav-pullrequests").click();
   await expect(page.getByTestId("prs-list")).toBeFocused();
-  await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(number)} }))`);
+  await page.evaluate(`__cfModule("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(number)} }))`);
   await expect(page.getByTestId("pr-surface")).toBeVisible();
   await page.getByTestId("pr-tab-code").click();
 }

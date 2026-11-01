@@ -13,7 +13,7 @@ test.beforeEach(async () => {
 });
 
 async function setZoom(page: Page, percent: number): Promise<void> {
-  await page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(percent)}))`);
+  await page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(percent)}))`);
   await expect(page.locator("html")).toHaveAttribute("data-zoom", String(percent));
 }
 

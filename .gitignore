@@ -3,6 +3,7 @@
 /gui/bin/
 /gui/.task/
 /gui/frontend/dist/
+/gui/frontend/dist-e2e/
 /dist/
 
 # Dependencies

@@ -34,7 +34,7 @@ test("Explain this PR starts a real thread with the explain prompt", async ({ pa
   await openProject();
   await expect(page.getByTestId("changes-surface")).toBeVisible();
   // Through the app's own store module, as a pull request row would.
-  await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(NUMBER)} }))`);
+  await page.evaluate(`__cfModule("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(NUMBER)} }))`);
   await expect(page.getByTestId("pr-title")).toBeVisible({ timeout: 60_000 });
 
   await page.getByTestId("pr-menu-button").click();

@@ -6,6 +6,11 @@ import { ErrorBoundary } from "./components/error/ErrorBoundary";
 import { AppError } from "./components/error/fallbacks";
 import { loadBundledFont } from "./terminal/fonts";
 
+if (import.meta.env.DEV) {
+  // e2e specs reach the app's stores through this (src/devModules.ts); loaded on first use.
+  window.__cfModule = (path) => import("./devModules").then((m) => m.devModule(path));
+}
+
 const root = document.getElementById("root");
 if (!root) throw new Error("missing #root");
 // xterm measures cells when a terminal opens, so let the bundled font load first. Bounded

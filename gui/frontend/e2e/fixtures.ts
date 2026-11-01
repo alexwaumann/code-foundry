@@ -187,7 +187,7 @@ export async function selectProject(page: Page, projectId: string): Promise<void
   if ((await main.count()) > 0) await main.click();
   else {
     await page.evaluate(
-      `Promise.all([import("/src/stores/changesPanel.ts"), import("/src/stores/projects.ts")]).then(([c, p]) => c.openChangesTab("current", ${JSON.stringify(projectId)}, p.mainWorktreePath(p.useProjectsStore.getState(), ${JSON.stringify(projectId)})))`,
+      `Promise.all([__cfModule("/src/stores/changesPanel.ts"), __cfModule("/src/stores/projects.ts")]).then(([c, p]) => c.openChangesTab("current", ${JSON.stringify(projectId)}, p.mainWorktreePath(p.useProjectsStore.getState(), ${JSON.stringify(projectId)})))`,
     );
   }
   await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-project", projectId);
@@ -199,7 +199,7 @@ export async function selectProject(page: Page, projectId: string): Promise<void
  * the panel's tabs start from it. The panel shows, unfocused.
  */
 export async function openThreadChanges(page: Page): Promise<void> {
-  const path = await page.evaluate(`Promise.all([import("/src/stores/changesPanel.ts"), import("/src/stores/threads.ts"), import("/src/stores/ui.ts")]).then(([c, t, u]) => {
+  const path = await page.evaluate(`Promise.all([__cfModule("/src/stores/changesPanel.ts"), __cfModule("/src/stores/threads.ts"), __cfModule("/src/stores/ui.ts")]).then(([c, t, u]) => {
     const sel = u.useUiStore.getState().selection;
     const th = sel.kind === "thread" ? t.useThreadsStore.getState().byId[sel.id] : undefined;
     if (!th) return "";
@@ -215,13 +215,14 @@ export function row(page: Page, key: string) {
 }
 
 /**
- * Moves the pointer onto `target` and waits for the sidebar row's hover card to close. After a
+ * Moves the pointer onto `target` and waits for the sidebar row's hover card to go. After a
  * row click the card outlives the pointer for a moment, and while it is up it takes the first
- * Escape (Tip's Escape rule), so a test about Escape in the pane would race it.
+ * Escape (Tip's Escape rule), so a test about Escape in the pane would race it. It is waited
+ * out of the DOM, not only closed: fading out, it still lies over the pane and takes a wheel.
  */
 export async function leaveSidebar(page: Page, target: Locator): Promise<void> {
   await target.hover();
-  await expect(page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])')).toHaveCount(0);
+  await expect(page.getByTestId("thread-tooltip")).toHaveCount(0);
 }
 
 /** How many threads need the user, as the window title says ("Code Foundry (2)"); Ember is not counted there. */

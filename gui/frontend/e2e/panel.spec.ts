@@ -31,12 +31,12 @@ function region(page: Page) {
  */
 async function injectTab(page: Page, kind: string, title: string, params: Record<string, string> = {}): Promise<void> {
   const args = [kind, title, params].map((a) => JSON.stringify(a)).join(", ");
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab(${args})))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab(${args})))`);
 }
 
 /** Sets the sidebar width through the app's own ui store (as dragging its handle would). */
 async function setSidebarWidth(page: Page, w: number): Promise<void> {
-  await page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
+  await page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
 }
 
 /** Records, for every cmd+w keydown, whether something called preventDefault on it. */

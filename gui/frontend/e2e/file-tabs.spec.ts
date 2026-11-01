@@ -34,7 +34,7 @@ async function worktreeTab(page: Page, threadId: string): Promise<void> {
 /** Opens a File tab in the current panel the way path chips will (stores/filePanel.ts). */
 async function openFile(page: Page, path: string, line?: number): Promise<void> {
   const target = JSON.stringify({ project: "repo-cf", base: CF, path, ...(line ? { line } : {}) });
-  await page.evaluate(`import("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
 }
 
 const changeRow = (page: Page, path: string) => page.locator(`[data-nav-key="f:${path}"]`);
