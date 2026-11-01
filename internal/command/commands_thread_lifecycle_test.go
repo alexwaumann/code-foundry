@@ -355,3 +355,30 @@ func TestThreadFocusUnknown(t *testing.T) {
 		}
 	}
 }
+
+// The commands about one thread are offered with a thread selected (or from the CLI with its
+// id) and not on a page or another view with none: the palette leaves them out there.
+func TestThreadLifecycleAvailability(t *testing.T) {
+	reg, _, _ := newLifecycleRegistry(t)
+	tests := []struct {
+		name string
+		ctx  command.Context
+		want bool
+	}{
+		{"cli", command.Context{ActiveThreadID: "s1"}, true},
+		{"gui thread", command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, true},
+		{"page", command.Context{ActiveView: "page"}, false},
+		{"projects", command.Context{ActiveView: "projects"}, false},
+	}
+	for _, tt := range tests {
+		for _, name := range []string{"thread.focus", "thread.rename", "thread.regenerate-name", "thread.fork"} {
+			c, ok := reg.Get(name)
+			if !ok {
+				t.Fatalf("%s not registered", name)
+			}
+			if got := c.Available(tt.ctx); got != tt.want {
+				t.Errorf("%s %s: available = %v, want %v", tt.name, name, got, tt.want)
+			}
+		}
+	}
+}
