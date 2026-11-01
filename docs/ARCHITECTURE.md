@@ -647,13 +647,12 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   lists (dashboards and branch lists, no new polling) and pushes them to the thread
   store as `branch` links (`docs/notes/linked-prs-branch.md`).
 * **Hidden children** (`sidebar.go`): a thread another thread created is its creator's to
-  manage and is not shown in the sidebar unless the `threads.show_created_threads`
-  setting (live, `SetShowCreatedThreads`) or its own persisted override
-  (`Thread.in_sidebar`: `SetSidebar`, `thread new --sidebar`) shows it; `InSidebar` is
-  the one rule, which the GUI reimplements. Archiving a thread first archives the hidden
-  threads below it, through hidden ones only (`ArchiveCascade`, the `descendants-of`
-  walk), and `ThreadFilter.archive_cascade_of` lists them for the command's
-  confirmation (`docs/notes/hidden-children-1-daemon.md`).
+  manage and is not shown in the sidebar while its creator exists (removed, not
+  archived, shows it); nothing overrides that, and nothing is stored: `InSidebar` is the
+  one rule, which the GUI derives from the thread list. Archiving or removing a thread
+  first takes every thread below it along (`ArchiveCascade`, the `descendants-of` walk),
+  and `ThreadFilter.archive_cascade_of` lists them for the command's confirmation
+  (`docs/notes/hidden-children-1-daemon.md`, `docs/notes/no-sidebar-override-2-daemon.md`).
 * **Token usage** is a pure fold over assistant records (each request once), per
   (model, tier, speed, UTC day), summed over the thread's sources: every transcript it
   used (`/clear` starts a new one) and every subagent run under them, followed from the

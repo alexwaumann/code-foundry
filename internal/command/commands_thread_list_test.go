@@ -28,8 +28,6 @@ func TestThreadList(t *testing.T) {
 		CreatedBy: "s-7754a478e649", CreatedByName: "Fix the login"}
 	renamed := proto.CloneOf(busy)
 	renamed.Name = "Fix the login, again"
-	shown, hidden := proto.CloneOf(child), proto.CloneOf(child)
-	shown.InSidebar, hidden.InSidebar = proto.Bool(true), proto.Bool(false)
 	home := &v1.Thread{Id: "s-000000000001", Name: "notes", Status: v1.ThreadStatus_THREAD_STATUS_ERROR, StatusReason: "interrupted",
 		WorktreePath: "/Users/me", CreatedAt: ago(72 * time.Hour), ArchivedAt: ago(time.Hour)}
 	inWorkspace := &v1.Thread{Id: "s-00000000000b", ProjectIds: []string{"r1"}, WorkspaceId: "w-000000000001", WorktreePath: "/cf/workspaces/w-000000000001"}
@@ -58,14 +56,6 @@ func TestThreadList(t *testing.T) {
 			wantLines: []string{
 				"s-7754a478e649  busy                  Fix the login (you)  app@cf/fix  5m",
 				"s-867564981c98  attention (finished)  (unnamed)            app@main    3h  ↳ Fix the login",
-			}},
-		// A sidebar override is marked; unset (the setting decides) is not.
-		{name: "sidebar overrides", threads: []*v1.Thread{busy, shown, hidden},
-			wantFilter: &v1.ThreadFilter{Limit: 50},
-			wantLines: []string{
-				"s-7754a478e649  busy",
-				"s-867564981c98  attention (finished)  (unnamed)      app@main    3h  [in sidebar]  ↳ Fix the login",
-				"s-867564981c98  attention (finished)  (unnamed)      app@main    3h  [hidden]  ↳ Fix the login",
 			}},
 		// Residents are asked for with --resident, and marked.
 		{name: "residents", args: map[string]string{"resident": "true"}, threads: []*v1.Thread{

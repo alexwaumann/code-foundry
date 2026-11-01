@@ -156,14 +156,17 @@ func (s *Store) projectSeeds() []ProjectSeed {
 		return nil
 	}
 	threads := s.opts.Threads.Snapshot()
-	showCreated := s.opts.Config().ShowCreatedThreads
+	var exists func(id string) bool // the sidebar's rule (thread.Thread.InSidebar)
+	if threads != nil {
+		exists = thread.Known(threads.Threads)
+	}
 	out := make([]ProjectSeed, 0, len(ps.Projects))
 	for _, p := range ps.Projects {
 		seed := ProjectSeed{ID: p.ID, Name: p.Name, Path: p.Path, DefaultBranch: p.DefaultBranch, Git: p.Git, GitHubSlug: p.GitHubSlug}
 		var list []thread.Thread
 		if threads != nil {
 			for _, t := range threads.Threads {
-				if t.ProjectID == p.ID && t.ArchivedAt.IsZero() && t.Kind == thread.KindNormal && t.Owner == "" && t.InSidebar(showCreated) {
+				if t.ProjectID == p.ID && t.ArchivedAt.IsZero() && t.Kind == thread.KindNormal && t.Owner == "" && t.InSidebar(exists) {
 					list = append(list, t)
 				}
 			}

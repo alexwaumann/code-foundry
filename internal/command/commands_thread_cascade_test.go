@@ -13,74 +13,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
-func TestThreadSidebarCommands(t *testing.T) {
-	auto := v1.PermissionMode_PERMISSION_MODE_AUTO
-	yes, no := true, false
-	tests := []struct {
-		name     string
-		cmd      string
-		ctx      command.Context
-		args     map[string]string
-		current  *v1.Thread
-		wantErr  error
-		wantMsg  string
-		wantReqs []proto.Message
-	}{
-		{name: "show the context thread", cmd: "thread.sidebar", ctx: command.Context{ActiveThreadID: "s-c"},
-			args: map[string]string{"shown": "true"}, current: &v1.Thread{Name: "child", CreatedBy: "s-p"},
-			wantMsg:  "thread child (s-c) shown in the sidebar",
-			wantReqs: []proto.Message{&v1.SetThreadSidebarRequest{Id: "s-c", Shown: true}}},
-		{name: "hide a thread by id", cmd: "thread.sidebar", args: map[string]string{"id": "s-c", "shown": "false"},
-			current:  &v1.Thread{CreatedBy: "s-p"},
-			wantMsg:  "thread s-c hidden from the sidebar",
-			wantReqs: []proto.Message{&v1.SetThreadSidebarRequest{Id: "s-c"}}},
-		{name: "shown is required", cmd: "thread.sidebar", args: map[string]string{"id": "s-c"}, wantErr: command.ErrInvalidArgs},
-		{name: "shown must be a bool", cmd: "thread.sidebar", args: map[string]string{"id": "s-c", "shown": "maybe"}, wantErr: command.ErrInvalidArgs},
-
-		{name: "new --sidebar with a creator", cmd: "thread.new",
-			args:     map[string]string{"project": "r1", "created-by": "s-p", "sidebar": "true"},
-			wantMsg:  "created thread s1 in ; shown in the sidebar",
-			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, CreatedBy: "s-p", InSidebar: &yes}}},
-		{name: "new --sidebar=false hides it whatever the setting", cmd: "thread.new",
-			args:     map[string]string{"project": "r1", "created-by": "s-p", "sidebar": "false"},
-			wantMsg:  "created thread s1 in ; hidden from the sidebar",
-			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, CreatedBy: "s-p", InSidebar: &no}}},
-		{name: "new without --sidebar leaves it unset", cmd: "thread.new",
-			args:     map[string]string{"project": "r1", "created-by": "s-p"},
-			wantMsg:  "created thread s1 in ",
-			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, CreatedBy: "s-p"}}},
-		{name: "new --sidebar without a creator", cmd: "thread.new", args: map[string]string{"project": "r1", "sidebar": "true"},
-			wantErr: command.ErrInvalidArgs},
-		{name: "new --sidebar with an empty creator", cmd: "thread.new", args: map[string]string{"project": "r1", "created-by": " ", "sidebar": "true"},
-			wantErr: command.ErrInvalidArgs},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reg, b, _ := newLifecycleRegistry(t)
-			b.Current = tt.current
-			res, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args)
-			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("err = %v, want %v", err, tt.wantErr)
-				}
-				if len(b.Requests()) != 0 {
-					t.Errorf("requests = %v, want none", b.Requests())
-				}
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if res.Message != tt.wantMsg {
-				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
-			}
-			if got := b.Requests(); !slices.EqualFunc(got, tt.wantReqs, proto.Equal) {
-				t.Errorf("requests = %v, want %v", got, tt.wantReqs)
-			}
-		})
-	}
-}
-
 // TestThreadArchiveHiddenChildren is thread.archive's confirm matrix with the hidden
 // threads the daemon archives along (ThreadFilter.archive_cascade_of).
 func TestThreadArchiveHiddenChildren(t *testing.T) {
@@ -98,8 +30,8 @@ func TestThreadArchiveHiddenChildren(t *testing.T) {
 	stoppedKid := kid("k8", v1.ThreadState_THREAD_STATE_DISCONNECTED, v1.ThreadStatus_THREAD_STATUS_ERROR, "interrupted")
 	idleRoot := &v1.Thread{Name: "lead", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE, StatusReason: "at prompt"}
 	busyRoot := &v1.Thread{Name: "lead", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
-	const keep1 = "To keep it, ask lead to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first."
-	const keepN = "To keep one, ask lead to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first."
+	const keep1 = "To keep its work, fork it first (code-foundry thread fork --id <id>)."
+	const keepN = "To keep the work of one, fork it first (code-foundry thread fork --id <id>)."
 
 	tests := []struct {
 		name    string
@@ -130,8 +62,7 @@ func TestThreadArchiveHiddenChildren(t *testing.T) {
 		{name: "ids: a working child of one asks", args: map[string]string{"ids": "s5,s6"},
 			others:  []*v1.Thread{{Id: "s5", Name: "lead", State: connected}, {Id: "s6", State: connected}},
 			cascade: map[string][]*v1.Thread{"s6": {busyKid}},
-			wantAsk: "Archive 2 threads? 1 hidden child thread is still working; archiving ends its turn and archives it too. " +
-				"To keep it, ask its creator to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first."},
+			wantAsk: "Archive 2 threads? 1 hidden child thread is still working; archiving ends its turn and archives it too. " + keep1},
 		{name: "ids: a child listed itself is counted as a listed thread", args: map[string]string{"ids": "s5,k1"},
 			others:  []*v1.Thread{{Id: "s5", State: connected}, busyKid},
 			cascade: map[string][]*v1.Thread{"s5": {busyKid}},
@@ -182,6 +113,8 @@ func TestThreadRemoveHiddenChildren(t *testing.T) {
 	idleKid := &v1.Thread{Id: "k3", CreatedBy: "s5", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE}
 	busyGrand := &v1.Thread{Id: "g1", CreatedBy: "k3", State: connected, Status: busy}
 	const plain = "Remove thread s5? Claude stops if it runs, and the thread is forgotten."
+	const keep1 = "To keep its work, fork it first (code-foundry thread fork --id <id>)."
+	const keepN = "To keep the work of one, fork it first (code-foundry thread fork --id <id>)."
 	tests := []struct {
 		name    string
 		args    map[string]string
@@ -190,17 +123,17 @@ func TestThreadRemoveHiddenChildren(t *testing.T) {
 	}{
 		{name: "no hidden children", wantAsk: plain},
 		{name: "one idle child", cascade: map[string][]*v1.Thread{"s5": {idleKid}},
-			wantAsk: plain + " 1 hidden child thread below it is removed too. To keep it, show it in the sidebar first."},
+			wantAsk: plain + " 1 hidden child thread below it is removed too. " + keep1},
 		{name: "idle child and a working grandchild", cascade: map[string][]*v1.Thread{"s5": {idleKid, busyGrand}},
-			wantAsk: plain + " 2 hidden child threads below it are (1 still working) removed too. To keep one, show it in the sidebar first."},
+			wantAsk: plain + " 2 hidden child threads below it are (1 still working) removed too. " + keepN},
 		{name: "one working child", cascade: map[string][]*v1.Thread{"s5": {busyKid}},
-			wantAsk: plain + " 1 hidden child thread below it is still working, and is removed too. To keep it, show it in the sidebar first."},
+			wantAsk: plain + " 1 hidden child thread below it is still working, and is removed too. " + keep1},
 		{name: "two working children", cascade: map[string][]*v1.Thread{"s5": {busyKid, askingKid}},
-			wantAsk: plain + " 2 hidden child threads below it are still working, and are removed too. To keep one, show it in the sidebar first."},
+			wantAsk: plain + " 2 hidden child threads below it are still working, and are removed too. " + keepN},
 		{name: "ids: a listed child is not counted", args: map[string]string{"ids": "s5,k1"},
 			cascade: map[string][]*v1.Thread{"s5": {busyKid, askingKid}},
 			wantAsk: "Remove 2 threads? Claude stops in each that runs, and they are forgotten: s5, k1. " +
-				"1 hidden child thread below it is still working, and is removed too. To keep it, show it in the sidebar first."},
+				"1 hidden child thread below it is still working, and is removed too. " + keep1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

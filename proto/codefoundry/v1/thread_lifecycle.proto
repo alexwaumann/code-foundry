@@ -256,6 +256,15 @@ message Thread {
   // The thread whose agent created this one (thread.new run from that thread's Claude:
   // the CLI sends $CODE_FOUNDRY_THREAD); empty when the user made it. Set once at
   // Create; Fork does not set it. The creator may since have been removed.
+  //
+  // The sidebar rule (the daemon's thread.Thread.InSidebar; the GUI derives it from the
+  // thread list): a thread is in the GUI's sidebar iff created_by is empty or no thread
+  // with that id exists (it was removed; an archived creator still exists). Nothing
+  // overrides it. A thread with an existing creator is its creator's: it stays out of
+  // the sidebar and the Dock badge, is listed in its creator's thread info card (its
+  // lineage group), and is archived and removed with its creator
+  // (ThreadService.Archive, Remove). To take its work over the user forks it. See
+  // docs/notes/no-sidebar-override-2-daemon.md.
   string created_by = 43;
   // The creator's display name (its id when it had none) when this thread was created,
   // kept verbatim when the creator is renamed, archived or removed.
@@ -321,22 +330,10 @@ message Thread {
   // How far below ThreadFilter.descendants_of the thread is (0: that thread, 1: a
   // thread it created); set by a List with that filter only.
   optional int32 depth = 61;
-  // Whether a thread another thread created (created_by set) is shown in the GUI's
-  // sidebar: the per-thread override of the threads.show_created_threads setting
-  // (ThreadService.SetSidebar, thread.sidebar, thread.new --sidebar). Unset follows the
-  // setting; always unset on a thread the user created. Persisted.
-  //
-  // Effective visibility, the one rule (the daemon's thread.Thread.InSidebar; the GUI
-  // reimplements it from created_by, in_sidebar and the setting):
-  //   created_by empty  -> shown (the user's own thread);
-  //   in_sidebar set    -> in_sidebar;
-  //   otherwise         -> threads.show_created_threads (default false: hidden).
-  // A shown thread is the user's to manage; a hidden one its creator's: it stays out of
-  // the sidebar and the Dock badge, is listed in its creator's thread info card (its
-  // lineage group), and is
-  // archived with its creator (ThreadService.Archive). See
-  // docs/notes/hidden-children-1-daemon.md.
-  optional bool in_sidebar = 62;
+  // 62 was in_sidebar, the per-thread sidebar override, until 2026-11-01 (the rule on
+  // created_by replaced it; docs/notes/no-sidebar-override-2-daemon.md).
+  reserved 62;
+  reserved "in_sidebar";
   // What kind of thread it is. RESIDENT: the daemon's own long-lived agent thread
   // (resident_name names it; one per name), made by the daemon only. A resident thread has
   // no project or worktree (it runs in its own directory), is never auto-named, and
@@ -611,10 +608,9 @@ message CreateThreadRequest {
   // key is waited for. Persisted (a removed thread forgets its key). See
   // docs/notes/agents-5-cli.md.
   string request_id = 20;
-  // Thread.in_sidebar at creation: show (true) or hide (false) the new thread in the
-  // sidebar whatever the threads.show_created_threads setting says. Only with
-  // created_by (INVALID_ARGUMENT otherwise). Unset follows the setting.
-  optional bool in_sidebar = 21;
+  // 21 was in_sidebar (Thread.in_sidebar at creation) until 2026-11-01.
+  reserved 21;
+  reserved "in_sidebar";
   // model (effort) was filled from the user's settings, not chosen: the CLI's thread.new
   // without --model (--effort) sets it. A thread Ember (or a thread below it) creates then
   // runs on Ember's worker model (effort) instead, as with an empty one
@@ -787,9 +783,8 @@ message ThreadFilter {
   // none), but a removed thread's children are still below its creator.
   string descendants_of = 12;
   // Only the threads that archiving this thread (by id) archives with it
-  // (ThreadService.Archive): the threads below it that are not shown in the sidebar
-  // (Thread.in_sidebar's rule), reached through hidden threads only (a shown thread and
-  // everything below it is left out), at most 8 levels down, in tree order with
+  // (ThreadService.Archive): every thread below it (created by it, by those, and so on;
+  // all hidden by Thread.created_by's rule), at most 8 levels down, in tree order with
   // Thread.depth set. The thread itself is not listed. Archived ones are left out unless
   // include_archived or all; the other fields still apply. Not with descendants_of
   // (INVALID_ARGUMENT).
@@ -1127,16 +1122,6 @@ message ArchiveThreadRequest {
 }
 
 message ArchiveThreadResponse {
-  Thread thread = 1;
-}
-
-message SetThreadSidebarRequest {
-  string id = 1;
-  // Show (true) or hide (false) the thread in the sidebar (Thread.in_sidebar).
-  bool shown = 2;
-}
-
-message SetThreadSidebarResponse {
   Thread thread = 1;
 }
 

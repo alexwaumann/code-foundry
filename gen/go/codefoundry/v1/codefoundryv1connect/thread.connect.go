@@ -71,9 +71,6 @@ const (
 	ThreadServicePinProcedure = "/codefoundry.v1.ThreadService/Pin"
 	// ThreadServiceArchiveProcedure is the fully-qualified name of the ThreadService's Archive RPC.
 	ThreadServiceArchiveProcedure = "/codefoundry.v1.ThreadService/Archive"
-	// ThreadServiceSetSidebarProcedure is the fully-qualified name of the ThreadService's SetSidebar
-	// RPC.
-	ThreadServiceSetSidebarProcedure = "/codefoundry.v1.ThreadService/SetSidebar"
 	// ThreadServiceSetWorkspaceProcedure is the fully-qualified name of the ThreadService's
 	// SetWorkspace RPC.
 	ThreadServiceSetWorkspaceProcedure = "/codefoundry.v1.ThreadService/SetWorkspace"
@@ -190,11 +187,11 @@ type ThreadServiceClient interface {
 	// Kept for compatibility.
 	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
 	// Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
-	// the same way and first, every thread below it that is not shown in the sidebar
-	// (Thread.in_sidebar), through hidden threads only, archived ones included: a shown
-	// thread and everything below it stays (ThreadFilter.archive_cascade_of lists them,
-	// with include_archived). A thread of those that fails is skipped, shown in the
-	// sidebar and named in the error, which then comes after the thread itself was removed.
+	// the same way and first, every thread below it (ThreadFilter.archive_cascade_of lists
+	// them, with include_archived), archived ones included. A thread of those that fails
+	// is skipped and named in the error, which then comes after the thread itself was
+	// removed; with its creator gone it is shown in the sidebar (Thread.created_by's
+	// rule).
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
 	// RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
 	// becomes the primary. A live thread gets set_cwd once it is idle
@@ -236,17 +233,11 @@ type ThreadServiceClient interface {
 	// it and records archived_at (kept when it is already archived). Unarchiving only
 	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
 	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
-	// Archiving also archives, the same way and first, every thread below it that is not
-	// shown in the sidebar (Thread.in_sidebar), through hidden threads only: a shown
-	// thread and everything below it stays (ThreadFilter.archive_cascade_of lists them).
-	// A thread of those that fails is skipped and named in the error, which then comes
-	// after the thread itself was archived. Unarchiving does not cascade.
+	// Archiving also archives, the same way and first, every thread below it (created by
+	// it, by those, and so on: ThreadFilter.archive_cascade_of lists them). A thread of
+	// those that fails is skipped and named in the error, which then comes after the
+	// thread itself was archived. Unarchiving does not cascade.
 	Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error)
-	// SetSidebar shows or hides a thread another thread created in the GUI's sidebar
-	// (Thread.in_sidebar), overriding the threads.show_created_threads setting for it:
-	// shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
-	// thread the user created (always shown). Persisted; any state.
-	SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error)
 	// SetWorkspace sets or clears a thread's workspace reference (Thread.workspace_id:
 	// the workspace whose instructions and skills reach the thread); workspace is an id or
 	// a name, "" clears it. The project set does not change. Persisted; any state; it
@@ -546,12 +537,6 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Archive")),
 			connect.WithClientOptions(opts...),
 		),
-		setSidebar: connect.NewClient[v1.SetThreadSidebarRequest, v1.SetThreadSidebarResponse](
-			httpClient,
-			baseURL+ThreadServiceSetSidebarProcedure,
-			connect.WithSchema(threadServiceMethods.ByName("SetSidebar")),
-			connect.WithClientOptions(opts...),
-		),
 		setWorkspace: connect.NewClient[v1.SetThreadWorkspaceRequest, v1.SetThreadWorkspaceResponse](
 			httpClient,
 			baseURL+ThreadServiceSetWorkspaceProcedure,
@@ -766,7 +751,6 @@ type threadServiceClient struct {
 	checkPlacement    *connect.Client[v1.CheckPlacementRequest, v1.CheckPlacementResponse]
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
 	archive           *connect.Client[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse]
-	setSidebar        *connect.Client[v1.SetThreadSidebarRequest, v1.SetThreadSidebarResponse]
 	setWorkspace      *connect.Client[v1.SetThreadWorkspaceRequest, v1.SetThreadWorkspaceResponse]
 	snooze            *connect.Client[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse]
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
@@ -884,11 +868,6 @@ func (c *threadServiceClient) Pin(ctx context.Context, req *connect.Request[v1.P
 // Archive calls codefoundry.v1.ThreadService.Archive.
 func (c *threadServiceClient) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
 	return c.archive.CallUnary(ctx, req)
-}
-
-// SetSidebar calls codefoundry.v1.ThreadService.SetSidebar.
-func (c *threadServiceClient) SetSidebar(ctx context.Context, req *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error) {
-	return c.setSidebar.CallUnary(ctx, req)
 }
 
 // SetWorkspace calls codefoundry.v1.ThreadService.SetWorkspace.
@@ -1087,11 +1066,11 @@ type ThreadServiceHandler interface {
 	// Kept for compatibility.
 	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
 	// Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
-	// the same way and first, every thread below it that is not shown in the sidebar
-	// (Thread.in_sidebar), through hidden threads only, archived ones included: a shown
-	// thread and everything below it stays (ThreadFilter.archive_cascade_of lists them,
-	// with include_archived). A thread of those that fails is skipped, shown in the
-	// sidebar and named in the error, which then comes after the thread itself was removed.
+	// the same way and first, every thread below it (ThreadFilter.archive_cascade_of lists
+	// them, with include_archived), archived ones included. A thread of those that fails
+	// is skipped and named in the error, which then comes after the thread itself was
+	// removed; with its creator gone it is shown in the sidebar (Thread.created_by's
+	// rule).
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
 	// RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
 	// becomes the primary. A live thread gets set_cwd once it is idle
@@ -1133,17 +1112,11 @@ type ThreadServiceHandler interface {
 	// it and records archived_at (kept when it is already archived). Unarchiving only
 	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
 	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
-	// Archiving also archives, the same way and first, every thread below it that is not
-	// shown in the sidebar (Thread.in_sidebar), through hidden threads only: a shown
-	// thread and everything below it stays (ThreadFilter.archive_cascade_of lists them).
-	// A thread of those that fails is skipped and named in the error, which then comes
-	// after the thread itself was archived. Unarchiving does not cascade.
+	// Archiving also archives, the same way and first, every thread below it (created by
+	// it, by those, and so on: ThreadFilter.archive_cascade_of lists them). A thread of
+	// those that fails is skipped and named in the error, which then comes after the
+	// thread itself was archived. Unarchiving does not cascade.
 	Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error)
-	// SetSidebar shows or hides a thread another thread created in the GUI's sidebar
-	// (Thread.in_sidebar), overriding the threads.show_created_threads setting for it:
-	// shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
-	// thread the user created (always shown). Persisted; any state.
-	SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error)
 	// SetWorkspace sets or clears a thread's workspace reference (Thread.workspace_id:
 	// the workspace whose instructions and skills reach the thread); workspace is an id or
 	// a name, "" clears it. The project set does not change. Persisted; any state; it
@@ -1439,12 +1412,6 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Archive")),
 		connect.WithHandlerOptions(opts...),
 	)
-	threadServiceSetSidebarHandler := connect.NewUnaryHandler(
-		ThreadServiceSetSidebarProcedure,
-		svc.SetSidebar,
-		connect.WithSchema(threadServiceMethods.ByName("SetSidebar")),
-		connect.WithHandlerOptions(opts...),
-	)
 	threadServiceSetWorkspaceHandler := connect.NewUnaryHandler(
 		ThreadServiceSetWorkspaceProcedure,
 		svc.SetWorkspace,
@@ -1673,8 +1640,6 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServicePinHandler.ServeHTTP(w, r)
 		case ThreadServiceArchiveProcedure:
 			threadServiceArchiveHandler.ServeHTTP(w, r)
-		case ThreadServiceSetSidebarProcedure:
-			threadServiceSetSidebarHandler.ServeHTTP(w, r)
 		case ThreadServiceSetWorkspaceProcedure:
 			threadServiceSetWorkspaceHandler.ServeHTTP(w, r)
 		case ThreadServiceSnoozeProcedure:
@@ -1814,10 +1779,6 @@ func (UnimplementedThreadServiceHandler) Pin(context.Context, *connect.Request[v
 
 func (UnimplementedThreadServiceHandler) Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Archive is not implemented"))
-}
-
-func (UnimplementedThreadServiceHandler) SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetSidebar is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) SetWorkspace(context.Context, *connect.Request[v1.SetThreadWorkspaceRequest]) (*connect.Response[v1.SetThreadWorkspaceResponse], error) {

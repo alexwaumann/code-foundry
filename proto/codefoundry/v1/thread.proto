@@ -51,11 +51,11 @@ service ThreadService {
   // Kept for compatibility.
   rpc Reconnect(ReconnectThreadRequest) returns (ReconnectThreadResponse) {}
   // Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
-  // the same way and first, every thread below it that is not shown in the sidebar
-  // (Thread.in_sidebar), through hidden threads only, archived ones included: a shown
-  // thread and everything below it stays (ThreadFilter.archive_cascade_of lists them,
-  // with include_archived). A thread of those that fails is skipped, shown in the
-  // sidebar and named in the error, which then comes after the thread itself was removed.
+  // the same way and first, every thread below it (ThreadFilter.archive_cascade_of lists
+  // them, with include_archived), archived ones included. A thread of those that fails
+  // is skipped and named in the error, which then comes after the thread itself was
+  // removed; with its creator gone it is shown in the sidebar (Thread.created_by's
+  // rule).
   rpc Remove(RemoveThreadRequest) returns (RemoveThreadResponse) {}
   // RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
   // becomes the primary. A live thread gets set_cwd once it is idle
@@ -97,17 +97,11 @@ service ThreadService {
   // it and records archived_at (kept when it is already archived). Unarchiving only
   // clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
   // Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
-  // Archiving also archives, the same way and first, every thread below it that is not
-  // shown in the sidebar (Thread.in_sidebar), through hidden threads only: a shown
-  // thread and everything below it stays (ThreadFilter.archive_cascade_of lists them).
-  // A thread of those that fails is skipped and named in the error, which then comes
-  // after the thread itself was archived. Unarchiving does not cascade.
+  // Archiving also archives, the same way and first, every thread below it (created by
+  // it, by those, and so on: ThreadFilter.archive_cascade_of lists them). A thread of
+  // those that fails is skipped and named in the error, which then comes after the
+  // thread itself was archived. Unarchiving does not cascade.
   rpc Archive(ArchiveThreadRequest) returns (ArchiveThreadResponse) {}
-  // SetSidebar shows or hides a thread another thread created in the GUI's sidebar
-  // (Thread.in_sidebar), overriding the threads.show_created_threads setting for it:
-  // shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
-  // thread the user created (always shown). Persisted; any state.
-  rpc SetSidebar(SetThreadSidebarRequest) returns (SetThreadSidebarResponse) {}
   // SetWorkspace sets or clears a thread's workspace reference (Thread.workspace_id:
   // the workspace whose instructions and skills reach the thread); workspace is an id or
   // a name, "" clears it. The project set does not change. Persisted; any state; it

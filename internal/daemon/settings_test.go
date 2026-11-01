@@ -187,36 +187,6 @@ func TestApplyCacheTTL(t *testing.T) {
 	}
 }
 
-type showCreatedRecorder struct{ got []bool }
-
-func (r *showCreatedRecorder) SetShowCreatedThreads(v bool) { r.got = append(r.got, v) }
-
-func TestApplyShowCreatedThreads(t *testing.T) {
-	tests := []struct {
-		name   string
-		update string
-		want   []bool
-	}{
-		{name: "off at once by default", want: []bool{false}},
-		{name: "turning it on applies live", update: "true", want: []bool{false, true}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			st := openSettings(t)
-			rec := &showCreatedRecorder{}
-			applyShowCreatedThreads(st, rec)
-			if tt.update != "" {
-				if _, err := st.Update(context.Background(), map[string]string{settings.KeyShowCreatedThreads: tt.update}); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if !slices.Equal(rec.got, tt.want) {
-				t.Errorf("SetShowCreatedThreads calls = %v, want %v", rec.got, tt.want)
-			}
-		})
-	}
-}
-
 type channelRecorder struct{ got []update.Channel }
 
 func (r *channelRecorder) SetChannel(ch update.Channel) { r.got = append(r.got, ch) }

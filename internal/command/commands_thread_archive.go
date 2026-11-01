@@ -127,7 +127,7 @@ func archiveOneConfirm(ctx context.Context, b ThreadBackend, s *v1.Thread) strin
 		parts = append(parts, why+"; archiving "+ends+".")
 	}
 	if kids := hiddenWorking(ctx, b, []string{s.GetId()}); len(kids) > 0 {
-		parts = append(parts, hiddenWorkingText(len(kids), threadNameOrID(s)))
+		parts = append(parts, hiddenWorkingText(len(kids)))
 	}
 	if len(parts) == 0 {
 		return ""

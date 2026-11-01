@@ -116,21 +116,21 @@ func (m *Manager) promptThreads(snap *Snapshot, q PromptQuery) (map[string]Threa
 		if err != nil {
 			return nil, err
 		}
-		show := m.showCreatedThreads()
+		exists := Known(snap.Threads)
 		for _, t := range snap.Threads {
 			if t.ID == anchor.ID && t.Owner == "" {
 				out[t.ID] = t // its own composer: shown or not
 				continue
 			}
-			if promptListed(t, show) && sharesProject(t.ProjectIDs, set) {
+			if promptListed(t, exists) && sharesProject(t.ProjectIDs, set) {
 				out[t.ID] = t
 			}
 		}
 		return out, nil
 	case PromptScopeAll:
-		show := m.showCreatedThreads()
+		exists := Known(snap.Threads)
 		for _, t := range snap.Threads {
-			if promptListed(t, show) {
+			if promptListed(t, exists) {
 				out[t.ID] = t
 			}
 		}
@@ -173,8 +173,8 @@ func (m *Manager) promptProjectSet(snap *Snapshot, q PromptQuery) ([]string, Thr
 
 // promptListed reports whether PROJECT and ALL read t: not a plugin's, and in the
 // sidebar (a hidden child's prompts are its creator's).
-func promptListed(t Thread, showCreated bool) bool {
-	return t.Owner == "" && t.InSidebar(showCreated)
+func promptListed(t Thread, exists func(id string) bool) bool {
+	return t.Owner == "" && t.InSidebar(exists)
 }
 
 // sharesProject reports whether a thread's project set intersects set; an empty set

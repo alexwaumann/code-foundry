@@ -16,6 +16,16 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
+// optionalBool copies an optional bool (a fresh pointer: the proto's is shared by its
+// message).
+func optionalBool(b *bool) *bool {
+	if b == nil {
+		return nil
+	}
+	v := *b
+	return &v
+}
+
 // Create spawns claude in a worktree.
 func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
 	m := req.Msg
@@ -23,8 +33,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		ProjectID: m.GetProjectId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: thread.PermissionMode(m.GetPermissionMode()),
 		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), NoProject: m.GetNoProject(),
-		CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(), BudgetUSD: m.GetBudgetUsd(),
-		Notify: m.GetNotify(), InSidebar: optionalBool(m.InSidebar),
+		CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(), BudgetUSD: m.GetBudgetUsd(), Notify: m.GetNotify(),
 		ModelDefaulted: m.GetModelDefaulted(), EffortDefaulted: m.GetEffortDefaulted(),
 		SystemPromptAppend: m.GetSystemPromptAppend(),
 		ProjectIDs:         m.GetProjectIds(), Like: m.GetLikeThreadId(), NewBranch: m.GetNewBranch(), CheckoutMode: m.GetCheckoutMode(),
@@ -329,9 +338,8 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	if r := s.Retry; r != nil {
 		p.Retry = &v1.ApiRetry{Attempt: int32(r.Attempt), MaxRetries: int32(r.MaxRetries), RetryAt: timestamppb.New(r.RetryAt), ErrorStatus: int32(r.Status), Error: r.Error}
 	}
-	metadataToProto(s, p)                         // thread_metadata.go
-	p.InSidebar = optionalBool(s.SidebarOverride) // thread_sidebar.go
-	p.Flags = flagsToProto(s.Flags)               // thread_flags.go
+	metadataToProto(s, p)           // thread_metadata.go
+	p.Flags = flagsToProto(s.Flags) // thread_flags.go
 	p.Owner = s.Owner
 	p.PluginEnvStale, p.PluginEnvChange = s.PluginEnvStale, s.PluginEnvChange // thread_restart.go
 	p.TranscriptMissing = s.TranscriptMissing                                 // the store's transcriptmissing.go

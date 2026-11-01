@@ -244,9 +244,6 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 		if m := residentMark(s); m != "" { // commands_thread_reseed.go
 			marks = append(marks, m)
 		}
-		if s.InSidebar != nil { // an override; unset follows the setting (commands_thread_sidebar.go)
-			marks = append(marks, map[bool]string{true: "in sidebar", false: "hidden"}[s.GetInSidebar()])
-		}
 		if len(marks) > 0 {
 			line += "  [" + strings.Join(marks, ", ") + "]"
 		}

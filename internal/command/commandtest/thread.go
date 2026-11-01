@@ -79,7 +79,7 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 		Id: "s1", ProjectId: m.GetProjectId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), State: v1.ThreadState_THREAD_STATE_STARTING, PermissionMode: m.GetPermissionMode(),
 		WorkspaceId: m.GetWorkspaceId(), CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(),
-		BudgetUsd: m.GetBudgetUsd(), InSidebar: m.InSidebar,
+		BudgetUsd: m.GetBudgetUsd(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		out.WorktreePath, out.CreatedWorktree, out.BaseRef, out.Branch = "/worktrees/s1", true, nw.GetBaseRef(), nw.GetBranch()

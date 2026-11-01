@@ -322,9 +322,6 @@ type Manager struct {
 	retired []UsageBucket
 	// cacheTTL is the prompt cache lifetime (SetCacheTTL); guarded by mu.
 	cacheTTL time.Duration
-	// showCreated is the threads.show_created_threads setting (SetShowCreatedThreads;
-	// sidebar.go); guarded by mu.
-	showCreated bool
 
 	// threads are the threads' item logs loaded so far (items.go).
 	tmu     sync.Mutex
@@ -423,10 +420,6 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	m.servers = newServerWatch(m, opts.ServerProbe)
-	// Threads whose creator was removed are the user's now (orphans.go).
-	if err := adoptLoadedOrphans(ctx, m, rows); err != nil {
-		return nil, err
-	}
 	var lost []string
 	reported := map[string]bool{}
 	transcripts := &transcriptIndex{paths: opts.Paths} // transcriptmissing.go
@@ -679,9 +672,6 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err != nil {
 		return Thread{}, err
 	}
-	if err := checkSidebarOverride(creatorID, o.InSidebar); err != nil {
-		return Thread{}, err
-	}
 	id, err := newThreadID()
 	if err != nil {
 		return Thread{}, err
@@ -695,9 +685,6 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		CreatedBy: creatorID, CreatedByName: creatorName, Brief: brief, Labels: labels, BudgetUSD: o.BudgetUSD,
 		Owner: owner, SpawnEnv: slices.Clone(o.Env), SpawnAddDirs: slices.Clone(o.AddDirs), Epoch: 1,
 		SystemPromptAppend: appendPrompt.prompt,
-	}
-	if o.InSidebar != nil {
-		s.SidebarOverride = sidebarOverride(*o.InSidebar)
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
@@ -1173,15 +1160,15 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 // get a CondRemoved wake (subscriptions_removed.go). When it fails the thread stays, no
 // longer Removing.
 //
-// Removing first removes, the same way, the hidden threads below it (ArchiveCascade with
-// the threads.show_created_threads setting, as Archive does): the thread's own process is
+// Removing first removes, the same way, the threads below it (ArchiveCascade, as Archive
+// does): the thread's own process is
 // closed first, so it creates no more; then each pass takes the hidden threads below it
 // that are not being removed yet, in tree order, their closes beginning together, until a
 // pass finds none (one created below it while the others were being removed is caught by
 // the next pass); then the thread itself. A hidden archived thread below it goes too:
 // nothing would lead to it once the thread is gone. One that fails is skipped (logged,
-// and named in the *CascadeError returned once the thread itself was removed), and is
-// shown in the sidebar like any other child whose creator is gone (orphans.go).
+// and named in the *CascadeError returned once the thread itself was removed); once its
+// creator is gone it is shown in the sidebar (Thread.InSidebar), nothing stored.
 func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := m.refuseResident(id, "removed"); err != nil {
 		return err
@@ -1205,8 +1192,7 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 		if len(targets) == 0 {
 			break
 		}
-		// They are all marked first: a child's removal then adopts no grandchild that
-		// goes in the same pass (orphanToAdopt). Their closes begin together.
+		// They are all marked first, then their closes begin together.
 		for _, t := range targets {
 			tried[t.ID] = true
 			_ = m.setRemoving(t.ID, true) // gone meanwhile: removeOne says so
@@ -1218,7 +1204,7 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 			if err := m.removeOne(ctx, t.ID); err != nil {
 				m.log.Warn("remove a hidden thread with the thread above it", "thread", t.ID, "root", id, "err", err)
 				failed = append(failed, CascadeFailure{ID: t.ID, Err: err})
-				_ = m.setRemoving(t.ID, false) // the root's removal adopts it
+				_ = m.setRemoving(t.ID, false) // shown once its creator is gone
 				continue
 			}
 			cascaded++
@@ -1246,7 +1232,7 @@ const removeCascadePasses = 4
 // now (ArchiveCascade): not being removed, not in skip. Archived ones included.
 func (m *Manager) removeCascadeTargets(id string, skip map[string]bool) []Thread {
 	var out []Thread
-	for _, t := range ArchiveCascade(m.Snapshot().Threads, id, m.showCreatedThreads()) {
+	for _, t := range ArchiveCascade(m.Snapshot().Threads, id) {
 		if !t.Removing && !skip[t.ID] {
 			out = append(out, t)
 		}
@@ -1257,7 +1243,8 @@ func (m *Manager) removeCascadeTargets(id string, skip map[string]bool) []Thread
 // removeOne is Remove for one thread, marked Removing already (setRemoving): it closes
 // it, kills and removes its shells, stops its strays and its TMPDIR, then, under m.mu,
 // retires its usage, deletes its row and leaves its tombstone. Its children not being
-// removed are shown in the sidebar (adoptOrphansLocked). A start meanwhile fails it.
+// removed are shown in the sidebar from then on (Thread.InSidebar). A start meanwhile
+// fails it.
 func (m *Manager) removeOne(ctx context.Context, id string) error {
 	if err := m.Close(ctx, id); err != nil {
 		return err
@@ -1282,9 +1269,6 @@ func (m *Manager) removeOne(ctx context.Context, id string) error {
 	if err := retireThread(ctx, m.opts.DB, id, rec.s.Usage); err != nil {
 		return err
 	}
-	// Its hidden children not going with it would be out of reach: they are the user's
-	// now (orphans.go).
-	m.adoptOrphansLocked(id)
 	delete(m.recs, id)
 	m.tmu.Lock()
 	delete(m.threads, id)

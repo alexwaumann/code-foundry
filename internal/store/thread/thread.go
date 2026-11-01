@@ -279,15 +279,10 @@ type Thread struct {
 	Removing bool
 	// CreatedBy is the thread whose agent created this one (CreateOptions.CreatedBy);
 	// empty when the user did. CreatedByName is that thread's name (its id when unnamed)
-	// at creation, kept verbatim. Persisted (metadata.go).
+	// at creation, kept verbatim. Persisted (metadata.go). A thread with a CreatedBy is
+	// not in the sidebar while that thread exists (sidebar.go, InSidebar).
 	CreatedBy     string
 	CreatedByName string
-	// SidebarOverride shows (true) or hides (false) a thread with a CreatedBy in the
-	// sidebar whatever the threads.show_created_threads setting says; nil follows it,
-	// and is always nil on the user's own threads (sidebar.go, InSidebar). Set by
-	// CreateOptions.InSidebar and Store.SetSidebar. Persisted (in_sidebar). Copy on
-	// write: replaced, never written through.
-	SidebarOverride *bool
 	// Depth is how far below ListOptions.DescendantsOf the thread is (0: that thread),
 	// set on List's answer with that option only; never in a snapshot.
 	Depth int
@@ -512,9 +507,6 @@ type CreateOptions struct {
 	// Owner makes the thread someone else's than the user's ("plugin:<name>"; owner.go):
 	// hidden from the user's lists. Exclusive with CreatedBy.
 	Owner string
-	// InSidebar is Thread.SidebarOverride at creation (nil: follow the setting). Only
-	// with CreatedBy (ErrInvalidArgument otherwise).
-	InSidebar *bool
 	// Cwd, with NoProject, is where claude runs instead of Options.Home: an existing
 	// directory inside it (owner.go).
 	Cwd string
@@ -576,10 +568,10 @@ type Store interface {
 	// prompt. No command calls it: a message starts a stopped thread (Send).
 	Reconnect(ctx context.Context, id string) (Thread, error)
 	// Remove closes the thread if needed and forgets it. Removing also removes, first
-	// and the same way, the threads below it that are not shown in the sidebar, through
-	// hidden threads only (ArchiveCascade, as Archive does), archived ones included; one
-	// that fails is skipped and shown in the sidebar, and the thread is still removed but
-	// the error (a *CascadeError) names the failures.
+	// and the same way, the threads below it (ArchiveCascade, as Archive does), archived
+	// ones included; one that fails is skipped (shown in the sidebar once its creator is
+	// gone), and the thread is still removed but the error (a *CascadeError) names the
+	// failures.
 	Remove(ctx context.Context, id string) error
 	// RunIn moves a thread to another of its checkouts (another member becomes the
 	// primary): set_cwd once the live thread is idle at its prompt (the row's cwd changes
@@ -607,14 +599,11 @@ type Store interface {
 	// removes its shells, unpins and unsnoozes it and sets ArchivedAt (kept when already set). With
 	// archived false it only clears ArchivedAt; the thread stays disconnected.
 	//
-	// Archiving also archives, first and the same way, the threads below it that are
-	// not shown in the sidebar, through hidden threads only (ArchiveCascade); one that
-	// fails is skipped, and the thread is still archived but the error (a
-	// *CascadeError) names the failures. Unarchiving does not cascade.
+	// Archiving also archives, first and the same way, the threads below it (created by
+	// it, by those, and so on: ArchiveCascade); one that fails is skipped, and the
+	// thread is still archived but the error (a *CascadeError) names the failures.
+	// Unarchiving does not cascade.
 	Archive(ctx context.Context, id string, archived bool) (Thread, error)
-	// SetSidebar shows or hides a thread another thread created in the sidebar
-	// (Thread.SidebarOverride); ErrInvalidArgument for the user's own thread. Any state.
-	SetSidebar(ctx context.Context, id string, shown bool) (Thread, error)
 	// SetWorkspace sets the thread's workspace reference (Thread.WorkspaceID) to the
 	// workspace ref names (an id or a name), or clears it for "". The project set stays.
 	// ErrNotFound for an unknown workspace; ErrFailedPrecondition to clear or change it

@@ -10,7 +10,7 @@ user-invocable: false
 
 You run inside Code Foundry, an app that runs Claude Code threads in git worktrees and
 drives them with the `code-foundry` CLI. The user sees their threads in its sidebar; the
-ones you create stay out of it unless you hand them over.
+ones you create stay out of it: they are yours to answer.
 
 ## Thread or subagent
 
@@ -89,8 +89,8 @@ ones you create stay out of it unless you hand them over.
    report (the user may steer it; archiving deletes your wakes on it): `code-foundry thread
    archive --ids <id1>,<id2>`; a lead and its team: `--descendants-of <lead>
    --include-root`. Exit 2 means a thread is still working and would be stopped: ask the
-   user before adding `--yes`. It takes hidden threads below along (shown ones stay:
-   `reference/sidebar.md`) and removes clean worktrees no other thread uses, never a branch.
+   user before adding `--yes`. It takes every thread below along
+   (`reference/sidebar.md`) and removes clean worktrees no other thread uses, never a branch.
 
 ## Leads (children that orchestrate)
 
@@ -134,5 +134,5 @@ To discard a child's work: `reference/patterns.md` §7.
 - `reference/patterns.md`: §0 the child's prompt; examples (a wait, fanning out, a sibling's
   branch, several projects, review, CI); §5 supervised; §6 budget; §7 discarding; §8 batch check.
 - `reference/wakes.md`: reading a wake and its turn. `reference/leads.md`: leads.
-  `reference/sidebar.md`: which threads the user sees, handover, what archiving takes.
+  `reference/sidebar.md`: which threads the user sees, forking, what archiving takes.
 

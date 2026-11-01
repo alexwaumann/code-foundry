@@ -298,7 +298,6 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	applyCacheTTL(s.settings, s.thread)
-	applyShowCreatedThreads(s.settings, s.thread)
 	// After thread and project: Ember's resident thread is made (when it is on) and its
 	// hooks set before anything can start it (ember.go).
 	if s.ember, err = openEmber(ctx, log.With("store", "ember"), p, s.db, s.bus, s.settings, s.thread, s.project, claude); err != nil {

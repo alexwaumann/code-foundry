@@ -203,7 +203,6 @@ const (
 	KeyAutoName             = "threads.auto_name"
 	KeyNamingModel          = "threads.naming_model"
 	KeyCacheTTL             = "threads.cache_ttl_seconds"
-	KeyShowCreatedThreads   = "threads.show_created_threads"
 	KeyCloseGrace           = "threads.close_grace_seconds"
 	KeyScrollback           = "threads.scrollback_lines"
 	KeyGhPollInterval       = "github.poll_interval_seconds"
@@ -361,16 +360,6 @@ var staticFields = []Field{
 		EnumLabels:  []string{"A fresh copy of the project", "The project folder itself"},
 		Default:     WorktreeCurrent,
 		bind:        func(s *Settings) any { return &s.Threads.DefaultWorktree },
-	},
-	{
-		// Read by the thread store (the archive cascade; docs/notes/hidden-children-1-daemon.md)
-		// and the GUI (the sidebar, the Dock badge).
-		Key: KeyShowCreatedThreads, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool,
-		Title: "Show threads created by other threads",
-		Description: "When off, threads an agent creates stay out of the sidebar and the Dock badge and are archived with their creator. " +
-			"They still appear in the creator's thread info card, in its lineage group.",
-		Default: "false",
-		bind:    func(s *Settings) any { return &s.Threads.ShowCreatedThreads },
 	},
 	{
 		Key: KeyAutoName, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool, Title: "Name threads automatically",
