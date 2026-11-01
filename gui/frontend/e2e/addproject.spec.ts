@@ -1,10 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectProjectRevealed, invocations, listProjects, mockUrl, openAddProjectDialog, openApp, openProjects, projectAt, resetMock } from "./fixtures";
+import { invocations, listProjects, openAddProjectDialog, openApp, openProjects, projectAt, resetMock } from "./fixtures";
 
-// The Add Project dialog (project.add): its entry points, the tab order, the Local folder
-// tab (ProjectService.Register with path completion; completion itself is e2e/paths.spec.ts),
-// and the GitHub tab (lookup, search, clone with streamed progress) against the mock's
-// GitHub (mock/clone.ts).
+// The Add Project dialog (project.add): its entry points (the palette, New thread's project
+// picker, the Projects page) and the Local folder tab's mouse and hover behaviour. The tabs'
+// logic is unit-tested in src/components/addproject/AddProjectDialog.test.tsx; completion
+// itself is e2e/paths.spec.ts.
 
 test.beforeEach(async () => {
   await resetMock();
@@ -12,28 +12,12 @@ test.beforeEach(async () => {
 
 const dialog = (page: Page) => page.getByTestId("add-project-dialog");
 
-/** The mock's SearchGitHub / LookupGitHub / Clone calls, in order. */
-async function githubCalls(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/github/calls`);
-  return (await res.json()) as string[];
-}
-
 async function openFromPalette(page: Page, command: string): Promise<void> {
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await expect(palette).toBeVisible();
   await palette.locator(`[data-command="${command}"]`).click();
   await expect(palette).toHaveCount(0);
-}
-
-async function openGitHub(page: Page) {
-  await openApp(page);
-  await openAddProjectDialog(page);
-  await page.getByTestId("add-project-tab-github").click();
-  await expect(dialog(page)).toHaveAttribute("data-tab", "github");
-  const input = page.getByTestId("add-project-github-input");
-  await expect(input).toBeFocused();
-  return input;
 }
 
 test("every entry point opens the dialog", async ({ page }) => {
@@ -89,30 +73,6 @@ test("every entry point opens the dialog", async ({ page }) => {
   expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
 });
 
-test("Local folder: Tab completes, Enter adds, and the new project opens", async ({ page }) => {
-  await openApp(page);
-  await openAddProjectDialog(page);
-  const input = page.getByTestId("add-project-local-input");
-  await expect(input).toBeFocused();
-
-  // Nothing typed yet: Enter asks for a path and the dialog stays.
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("add-project-local-message")).toContainText("Type a folder path");
-  await expect(dialog(page)).toBeVisible();
-
-  await input.fill("src/ne");
-  await expect(page.getByTestId("path-entry")).toHaveCount(1);
-  await page.keyboard.press("Tab");
-  await expect(input).toHaveValue("src/new-app/");
-  await expect(page.getByTestId("path-entry").first()).toHaveAttribute("data-entry-name", "api");
-  await page.keyboard.press("Enter");
-  await expect(dialog(page)).toHaveCount(0);
-  // ProjectService.Register, not a command: "~" expanded, the trailing slash dropped.
-  expect(await projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
-  expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
-  await expectProjectRevealed(page, "new-app");
-});
-
 test("Local folder: a click opens a folder; only Enter and the button add", async ({ page }) => {
   await openApp(page);
   const before = (await listProjects()).length;
@@ -162,154 +122,4 @@ test("Local folder: a click opens a folder; only Enter and the button add", asyn
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
   expect(await projectAt("/Users/dev/src/Website")).toMatchObject({ name: "Website", git: true });
-});
-
-test("Local folder: after a click, Enter adds the typed path, and so does the button", async ({ page }) => {
-  await openApp(page);
-  await openAddProjectDialog(page);
-  const input = page.getByTestId("add-project-local-input");
-  const entry = (name: string) => page.getByTestId("path-entry").and(page.locator(`[data-entry-name="${name}"]`));
-
-  // Enter with nothing highlighted: the typed path, not a folder in its listing.
-  await entry("Documents").click();
-  await expect(input).toHaveValue("Documents/");
-  await expect(entry("Projects")).toBeVisible();
-  await expect(page.locator('[data-testid="path-entry"][data-selected="true"]')).toHaveCount(0);
-  await page.keyboard.press("Enter");
-  await expect(dialog(page)).toHaveCount(0);
-  expect(await projectAt("/Users/dev/Documents")).toMatchObject({ name: "Documents", git: false });
-  expect(await projectAt("/Users/dev/Documents/Projects")).toBeUndefined();
-
-  // The button adds the typed path.
-  await openAddProjectDialog(page);
-  await entry("src").click();
-  await entry("Notebook").click();
-  await expect(input).toHaveAttribute("data-path", "~/src/Notebook/");
-  await expect(dialog(page)).toBeVisible();
-  await page.getByTestId("add-project-local-submit").click();
-  await expect(dialog(page)).toHaveCount(0);
-  expect(await projectAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
-});
-
-test("Local folder: a plain folder has no git, and a folder inside a project opens that project", async ({ page }) => {
-  await openApp(page);
-  const before = (await listProjects()).length;
-  await openAddProjectDialog(page);
-  const input = page.getByTestId("add-project-local-input");
-  await input.fill("src/Notebook");
-  await page.keyboard.press("Enter");
-  await expect(dialog(page)).toHaveCount(0);
-  expect(await projectAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
-
-  // A folder that does not exist is refused in place.
-  await openAddProjectDialog(page);
-  await input.fill("src/nope");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("add-project-local-message")).toContainText("/Users/dev/src/nope: no such file or directory");
-
-  // Inside an added repository: that repository, not a new project.
-  await input.fill("src/code-foundry/src");
-  await page.keyboard.press("Enter");
-  await expect(dialog(page)).toHaveCount(0);
-  expect((await listProjects()).length).toBe(before + 1);
-});
-
-test("GitHub: Enter looks up owner/repo and URLs; bad input is refused without a request", async ({ page }) => {
-  const input = await openGitHub(page);
-
-  // Typing sends nothing.
-  await input.pressSequentially("alexwaumann/dotfiles");
-  await expect(page.getByTestId("add-project-github-go")).toHaveText("Look up");
-  await expect(page.getByTestId("add-project-github-selected")).toHaveCount(0);
-  expect(await githubCalls()).toEqual([]);
-  await page.keyboard.press("Enter");
-  const card = page.getByTestId("add-project-github-selected");
-  await expect(card).toHaveAttribute("data-slug", "alexwaumann/dotfiles");
-  expect(await githubCalls()).toEqual(["lookup alexwaumann/dotfiles"]);
-  await expect(card.getByTestId("add-project-clone-dest")).toHaveText("~/.code-foundry/projects/alexwaumann/dotfiles");
-  await expect(card.getByTestId("add-project-clone")).toBeEnabled();
-  await expect(card.getByTestId("add-project-github-back")).toHaveCount(0);
-
-  // A URL in any case comes back in GitHub's spelling.
-  await input.fill("https://github.com/OCTO-ORG/hello-world.git");
-  await page.keyboard.press("Enter");
-  await expect(card).toHaveAttribute("data-slug", "octo-org/Hello-World");
-
-  await input.fill("octo-org/nope");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("add-project-github-message")).toHaveText("No repository octo-org/nope on GitHub, or you cannot see it.");
-
-  for (const [text, msg] of [
-    ["git@github.com:alexwaumann/dotfiles.git", "SSH URLs are not supported"],
-    ["https://gitlab.com/a/b", "Only github.com repositories are supported"],
-  ] as const) {
-    await input.fill(text);
-    await page.keyboard.press("Enter");
-    await expect(page.getByTestId("add-project-github-error")).toContainText(msg);
-  }
-  expect(await githubCalls()).toEqual(["lookup alexwaumann/dotfiles", "lookup OCTO-ORG/hello-world", "lookup octo-org/nope"]);
-});
-
-test("GitHub: search, pick a result, clone with progress, and open the new project", async ({ page }) => {
-  const input = await openGitHub(page);
-  await input.fill("octo");
-  await expect(page.getByTestId("add-project-github-go")).toHaveText("Search");
-  await page.keyboard.press("Enter");
-  await expect.poll(githubCalls).toEqual(["search octo"]);
-  const results = page.getByTestId("add-project-github-results").getByTestId("add-project-github-result");
-  await expect(results).toHaveCount(4);
-  await expect(results.and(page.locator('[data-slug="octo-org/legacy-api"]'))).toContainText("archived");
-  await expect(results.and(page.locator('[data-slug="octo-org/already-here"]'))).toContainText("already cloned");
-
-  // A result's card, and back to the list.
-  await results.and(page.locator('[data-slug="octo-org/legacy-api"]')).click();
-  await expect(page.getByTestId("add-project-github-selected")).toHaveAttribute("data-slug", "octo-org/legacy-api");
-  await page.getByTestId("add-project-github-back").click();
-  await expect(results).toHaveCount(4);
-
-  await results.and(page.locator('[data-slug="octo-org/Hello-World"]')).click();
-  const card = page.getByTestId("add-project-github-selected");
-  await expect(card.getByTestId("add-project-clone-dest")).toHaveText("~/.code-foundry/projects/octo-org/Hello-World");
-  await card.getByTestId("add-project-clone").click();
-  await expect(card.getByTestId("add-project-clone")).toHaveText("Cloning…");
-  // A new lookup would cancel the clone: the input is locked while it runs.
-  await expect(page.getByTestId("add-project-github-input")).toBeDisabled();
-  await expect(card.getByTestId("add-project-clone-line").first()).toHaveText("Cloning into '/Users/dev/.code-foundry/projects/octo-org/Hello-World'...");
-  await expect(dialog(page)).toHaveCount(0);
-  await expectProjectRevealed(page, "Hello-World");
-
-  // Cloned once: the next lookup says so and offers the existing folder.
-  await openAddProjectDialog(page);
-  await page.getByTestId("add-project-tab-github").click();
-  await page.getByTestId("add-project-github-input").fill("octo-org/hello-world");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("add-project-clone-exists")).toBeVisible();
-  await expect(page.getByTestId("add-project-clone")).toHaveCount(0);
-  await expect(page.getByTestId("add-project-add-existing")).toBeVisible();
-});
-
-test("GitHub: a failed clone shows its progress and gh's error, and can be retried", async ({ page }) => {
-  const input = await openGitHub(page);
-  await input.fill("octo-org/fail");
-  await page.keyboard.press("Enter");
-  const card = page.getByTestId("add-project-github-selected");
-  await card.getByTestId("add-project-clone").click();
-  await expect(card.getByTestId("add-project-clone-error")).toContainText("fatal: early EOF");
-  const lines = card.getByTestId("add-project-clone-progress").getByTestId("add-project-clone-line");
-  await expect(lines).toHaveText(["Cloning into '/Users/dev/.code-foundry/projects/octo-org/fail'...", "remote: Enumerating objects: 128, done.", "Receiving objects:  46% (59/128)"]);
-  await expect(lines.last()).toHaveAttribute("data-transient", "true");
-  await expect(card.getByTestId("add-project-clone")).toHaveText("Retry clone");
-  await expect(page.getByTestId("add-project-github-input")).toBeEnabled();
-  await expect(dialog(page)).toBeVisible();
-});
-
-test("GitHub: an existing destination is added as a folder instead", async ({ page }) => {
-  const input = await openGitHub(page);
-  await input.fill("octo-org/already-here");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("add-project-clone-exists")).toBeVisible();
-  await page.getByTestId("add-project-add-existing").click();
-  await expect(dialog(page)).toHaveCount(0);
-  expect(await projectAt("/Users/dev/.code-foundry/projects/octo-org/already-here")).toMatchObject({ name: "already-here", git: true });
-  await expectProjectRevealed(page, "already-here");
 });

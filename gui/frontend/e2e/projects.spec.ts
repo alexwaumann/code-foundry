@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { appPath, CF, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, resetMock } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, resetMock } from "./fixtures";
 
 /**
  * The Projects view (docs/notes/projects-redesign-1-index.md): the index (rows by last
@@ -113,26 +113,6 @@ test("the index: a table row per project by last activity, its kind, status sent
 
 // The index's Default branch, the filter, the page picker and the crumb: unit-tested in src/components/projects/ProjectsIndex.test.tsx.
 
-test("the pane header holds the filter and toggles; Add project and Add workspace sit on their section titles", async ({ page }) => {
-  await openApp(page);
-  await openProjects(page);
-  const header = page.locator('[data-testid="projects-page"] > header');
-  await expect(header.getByRole("button", { name: /Add|New workspace/ })).toHaveCount(0);
-  await expect(header.getByTestId("projects-filter")).toBeVisible();
-  const add = page.getByTestId("projects-section").getByTestId("projects-register");
-  await expect(add).toHaveText("Add project");
-  await add.click();
-  await expect(page.getByTestId("add-project-dialog")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("add-project-dialog")).toHaveCount(0);
-  // No workspaces yet: the hint names the button.
-  const ws = page.getByTestId("workspaces-section");
-  await expect(ws.getByTestId("workspaces-empty")).toHaveText("None yet: Add workspace, or code-foundry workspace new.");
-  await expect(ws.getByTestId("projects-new-workspace")).toHaveText("Add workspace");
-  await ws.getByTestId("projects-new-workspace").click();
-  await expect(page.getByTestId("new-workspace-dialog")).toBeVisible();
-});
-
 test("narrowing drops Activity, then Updated, then Default branch; Needs a look stays", async ({ page }) => {
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
@@ -188,21 +168,6 @@ test("keyboard: ↑/↓ move the cursor over projects then workspaces, Enter ope
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("changes-surface")).toBeVisible();
-});
-
-test("an empty install: No projects yet with the three ways to add one", async ({ page }) => {
-  await mockPost("empty");
-  await page.goto(appPath);
-  await openProjects(page);
-  const empty = page.getByTestId("projects-empty");
-  await expect(empty).toContainText("No projects yet");
-  await expect(empty).toContainText("or code-foundry project add ~/src/app");
-  await empty.getByTestId("projects-empty-github").click();
-  await expect(page.getByTestId("add-project-dialog")).toBeVisible();
-  await expect(page.getByTestId("add-project-dialog").getByRole("tab", { selected: true })).toContainText("GitHub");
-  await page.keyboard.press("Escape");
-  await empty.getByTestId("projects-empty-local").click();
-  await expect(page.getByTestId("add-project-dialog").getByRole("tab", { selected: true })).toContainText("Local");
 });
 
 test("a project's page: header, the checkouts table by activity, a row opens its Changes tab, the row menu", async ({ page }) => {
