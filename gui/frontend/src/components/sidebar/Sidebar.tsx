@@ -140,7 +140,7 @@ interface PanelRowsProps {
  */
 function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo, maxHeight, paddingStart, paddingEnd, testId, children }: PanelRowsProps) {
   const ref = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
+  // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => ref.current,

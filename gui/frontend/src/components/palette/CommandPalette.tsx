@@ -126,7 +126,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
   // A pre-selected command with nothing to ask runs straight away (outside render).
   useEffect(() => {
     if (autoRun) invoke(autoRun, {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [autoRun]);
 
   useEffect(() => {
@@ -143,7 +143,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
     return () => {
       cancelAnimationFrame(raf);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [fresh, available, prompt]);
 
   const submit = (raw: string) => {

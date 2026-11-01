@@ -502,7 +502,7 @@ export const REGENERATED_NAME = "Regenerated thread name";
 function runKeys(run: string): string {
   const s = run.replace(/\r\n/g, "\n").replace(/[\n\t ]+$/, "");
   if (s.trim() === "") return "";
-  // eslint-disable-next-line no-control-regex
+  // oxlint-disable-next-line no-control-regex
   if (/[\x00-\x08\x0b-\x1f\x7f]/.test(s)) throw new CommandError("invalid", "run: the command has a control character");
   return `${s.replace(/\n/g, "\r")}\r`;
 }
@@ -2742,7 +2742,7 @@ export class World {
       return;
     }
     // Shell-ish line discipline: echo, backspace, enter, ^C. Escape sequences ignored.
-    // eslint-disable-next-line no-control-regex
+    // oxlint-disable-next-line no-control-regex
     const plain = text.replace(/\x1b\[20[01]~/g, "").replace(/\x1b(\[[0-9;?]*[ -/]*[@-~]|O.)/g, "");
     let out = "";
     for (const ch of plain) {

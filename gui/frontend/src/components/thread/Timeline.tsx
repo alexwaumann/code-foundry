@@ -191,7 +191,7 @@ export function TimelineList<R extends ListRow>({
       if (!pinned.current) deferTurnFolds(threadId, ids);
     });
   }, [threadId, turns]);
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
+  // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const v = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,

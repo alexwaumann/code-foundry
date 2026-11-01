@@ -22,7 +22,7 @@ export async function copyText(text: string): Promise<void> {
   ta.select();
   try {
     // Deprecated but still the only synchronous copy path in non-secure WKWebView pages.
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    // oxlint-disable-next-line typescript/no-deprecated
     document.execCommand("copy");
   } finally {
     ta.remove();

@@ -115,7 +115,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
     if (!watching) return;
     return startSurfaceWatch(watchKey, { plugin, surface, context: uiContext });
     // uiContext follows ctxKey.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [watching, watchKey, plugin, surface, ctxKey]);
 
   // The view's tab title names the tab in the strip.

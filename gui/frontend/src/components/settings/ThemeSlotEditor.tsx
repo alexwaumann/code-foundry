@@ -9,6 +9,7 @@ import { EnumEditor } from "./editors";
  * page comes back here. No " (default)" after a name: it would not fit beside the button.
  */
 function slotEditor(slot: "dark" | "light"): SettingEditor {
+  // oxlint-disable-next-line react/only-export-components -- a factory for the two slot editors, not a hot-reloaded component file
   return function ThemeSlotEditor(props: EditorProps) {
     return (
       <div className="flex items-center gap-1.5">

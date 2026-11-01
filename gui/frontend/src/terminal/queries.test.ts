@@ -11,7 +11,9 @@ beforeAll(() => {
       onchange: null,
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
+      // oxlint-disable-next-line typescript/no-deprecated -- the fake implements the whole MediaQueryList interface
       addListener: () => undefined,
+      // oxlint-disable-next-line typescript/no-deprecated
       removeListener: () => undefined,
       dispatchEvent: () => false,
     }) as MediaQueryList;

@@ -44,6 +44,7 @@ export function UsagePage() {
   const setRange = useUiStore((s) => s.setUsageRange);
   const [mode, setMode] = useState<ChartMode>("tokens");
   const all = useAllUsage();
+  // oxlint-disable-next-line react/purity -- today moves while the page stays open; recomputing per render is the point
   const today = new Date().toISOString().slice(0, 10);
   const data = useMemo(() => {
     const days = utcDays(Date.parse(`${today}T12:00:00Z`), range);

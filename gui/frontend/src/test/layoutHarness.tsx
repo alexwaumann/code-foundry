@@ -6,7 +6,7 @@
  * element `geo.width` (or its data-key's box) and the scroll area and fill boxes a height,
  * and a ResizeObserver stub that counts what it observes (a leak check) and fires on resize().
  */
-/* eslint-disable react-refresh/only-export-components -- a test harness, never hot-reloaded */
+/* oxlint-disable react/only-export-components -- a test harness, never hot-reloaded */
 import { act } from "@testing-library/react";
 import { useMemo } from "react";
 import { vi } from "vitest";

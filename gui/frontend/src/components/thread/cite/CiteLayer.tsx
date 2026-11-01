@@ -161,7 +161,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
       document.removeEventListener("mouseup", onUp);
       document.removeEventListener("selectionchange", onSelection);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- close reads refs and the thread's draft key only (both fixed for this layer).
+    // oxlint-disable-next-line react/exhaustive-deps -- close reads refs and the thread's draft key only (both fixed for this layer).
   }, [threadId, paneRef]);
 
   // A composer chip asks to edit its comment: go to the quote, then open the popover there
