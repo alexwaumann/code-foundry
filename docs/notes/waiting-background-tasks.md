@@ -86,3 +86,14 @@ the report.
   fixtures through a real runner: waiting on 1 shell / 1 subagent, waiting while the
   report is due, finished at the report's end, never finished before),
   `TestWaitingOnBackgroundWorkNoReport`, and the CLI's `TestThreadStatusWordWaiting`.
+* Live, isolated daemon (`CODE_FOUNDRY_HOME=/tmp/cf-waiting-bg`, this branch's build), a
+  scratch repository under home, a Sonnet 5.5 medium thread told to run
+  `sleep 45; echo done` with run_in_background and end its turn. `thread list` every
+  0.5 s: 20:09:46 `busy`; 20:09:47 `waiting (on 1 shell)` (the API: IDLE `waiting on 1
+  shell`, background_shells_running 1) for 44 s, never `attention`; 20:10:31 the daemon
+  logged "background shell ended" and "expecting Claude to wake", and the row read
+  `waiting`; 20:10:32 `busy` (Claude's own report turn); 20:10:33 `attention
+  (finished)` ("background wake over: Claude's turn ended"). The timeline: the launch,
+  "Started the 45-second background sleep.", turn end, "The 45-second sleep finished
+  and printed "done".", turn end. The subagent path was checked with the agents fixture
+  through a real runner, not live.
