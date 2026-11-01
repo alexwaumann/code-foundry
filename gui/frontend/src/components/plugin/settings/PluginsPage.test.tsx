@@ -111,7 +111,7 @@ const PLUGINS: PluginView[] = [
 
 const HELLO_ENV: PluginEnvironmentView = { plugin: "hello", env: ["CF_HELLO"], pathPrepend: [], addDirs: [], projects: [], noProject: true, issues: [], updatedAtMs: null };
 
-const page: SettingPageView = { id: "plugins", title: "Plugins", description: "", sections: [] } as unknown as SettingPageView;
+const page: SettingPageView = { id: "plugins", title: "Plugins", description: "", sections: [] };
 const schema = { groups: [], pages: [], fields: [] } as unknown as SettingsSchemaView;
 
 const installed = (name: string): HTMLElement => {

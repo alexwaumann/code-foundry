@@ -117,10 +117,9 @@ describe("BrowseSection: registries", () => {
     setBrowse({ entries: [], registries: [] });
     // jsdom has no scrollIntoView (focusSetting brings the row into view first).
     const scroll = vi.fn();
-    const had = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = scroll;
     onTestFinished(() => {
-      Element.prototype.scrollIntoView = had;
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
     });
     render(
       <>
