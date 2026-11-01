@@ -47,7 +47,7 @@ const waiting: Activity = { state: "connected", status: "attention", statusReaso
 const finished: Activity = { state: "connected", status: "attention", statusReason: "finished" };
 const idle: Activity = { state: "connected", status: "idle", statusReason: "" };
 // Stopped while waiting on a permission: its prompt went with the process.
-const stoppedWaiting: Activity = { state: "stopped", status: "attention", statusReason: "permission:Bash" };
+const stoppedWaiting: Activity = { state: "disconnected", status: "attention", statusReason: "permission:Bash" };
 
 function thread(id: string, name: string, a: Activity): ThreadView {
   return { id, name, ...a, backgroundAgentsRunning: 0, backgroundShellsRunning: 0, backgroundWakePending: false } as ThreadView;
