@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, composeProject, DEFAULT_ORDER, emit, expectAttention, holdThreads, invocations, mockPost, mockUrl, openApp, openProjectPage, openWorkspacePage, resetMock, row } from "./fixtures";
+import { composeProject, DEFAULT_ORDER, emit, expectAttention, holdThreads, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /** Where the mock (like the daemon) puts a project's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
@@ -211,42 +211,7 @@ test("Run in is absent for a project thread and offered in the palette for a wor
   await expect(row(page, `s:${driver}`).getByTestId("row-moving")).toBeVisible();
 });
 
-test("the Projects view removes a workspace and offers project actions", async ({ page }) => {
-  const spare = (await mockPost("workspace?name=spare&projects=repo-gp,repo-sk")) as { id: string };
-  await openApp(page);
-  await openWorkspacePage(page, spare.id);
-  await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-menu-remove").click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Remove workspace spare?");
-  await dialog.getByTestId("confirm-ok").click();
-  await expect(page.locator('[data-testid="workspace"]')).toHaveCount(0);
-  expect((await lastInvocation("workspace.remove"))?.args).toEqual({ workspace: "spare" });
-
-  // New thread from a project's page opens its composer.
-  await openProjectPage(page, "repo-gp");
-  await page.getByTestId("project-new-thread").click();
-  await expect(page.getByTestId("composer-heading")).toContainText("ghostty-playground");
-
-  // Remove a worktree (project.worktree.remove with that worktree's context, confirmed).
-  await openProjectPage(page, "repo-cf");
-  const fix = page.locator(`[data-nav-key="pw:repo-cf::${CF}.worktrees/fix-resize"]`);
-  await fix.hover();
-  await fix.getByTestId("worktree-more").click();
-  await page.getByTestId("worktree-remove").click();
-  await page.getByTestId("remove-worktree-dialog").getByTestId("remove-worktree-ok").click();
-  await expect(fix).toHaveCount(0);
-  const rm = (await invocations()).filter((i) => i.name === "project.worktree.remove").at(-1);
-  expect(rm?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: `${CF}.worktrees/fix-resize`, activeView: "projects" });
-  // The main worktree has no remove action.
-  const main = page.locator(`[data-nav-key="pw:repo-cf::${CF}"]`);
-  await main.hover();
-  await expect(main.getByTestId("worktree-new-terminal")).toBeVisible();
-  await main.getByTestId("worktree-more").click();
-  await expect(page.getByTestId("worktree-more-menu")).toBeVisible();
-  await expect(page.getByTestId("worktree-remove")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-});
+// The Projects view removing a workspace, New thread from a project's page, Remove worktree with its context, no Remove on the main checkout: src/components/projects/WorkspacePage.test.tsx ("Remove workspace asks first…") and ProjectPage.test.tsx ("a checkout row's menu…", "the header's menu…"); the hover-shown terminal button is projects.spec.ts's.
 
 test("status kinds: each thread's second line says its status in words and colour; waiting threads first, prompts above errors above finished, working last", async ({ page }) => {
   await mockPost("status-kinds");
@@ -559,48 +524,7 @@ test("hovering a thread row shows its tooltip: name, project with where it runs,
   await expect(page.getByTestId("row-menu")).toHaveCount(0);
 });
 
-test("a multi-project thread's card: workspace (or N projects), the run-in project with where it runs, branch, model; line 1 the run-in only", async ({ page }) => {
-  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
-  const ws = (await mockPost("workspace-thread?workspace=login&project=repo-gp&name=Login%20flow&status=idle")) as { id: string };
-  const set = (await mockPost("multi-thread?projects=repo-cf,repo-gp&project=repo-gp&branch=feat/x&name=Unsaved%20set")) as { id: string };
-  const folder = (await mockPost("workspace-thread?workspace=login&project=workspace&name=In%20the%20folder")) as { id: string };
-  await openApp(page);
-  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
-  const card = async (id: string) => {
-    await page.mouse.move(0, 0);
-    await row(page, `s:${id}`).getByTestId("thread-name").hover();
-    await expect(tip).toHaveAttribute("data-thread-id", id);
-    return tip.locator("> div").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
-  };
-
-  await expect(row(page, `s:${ws.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
-  await expect(row(page, `s:${ws.id}`).getByTestId("row-branch")).toHaveText("cf/login");
-  await expect(row(page, `s:${set.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
-  await expect(row(page, `s:${set.id}`).getByTestId("row-branch")).toHaveText("feat/x");
-  // A thread in its workspace's folder: no project, so the workspace's name.
-  await expect(row(page, `s:${folder.id}`).getByTestId("row-project")).toHaveText("login");
-
-  expect(await card(ws.id)).toEqual(["tip-name", "tip-workspace", "tip-project", "tip-branch", "tip-model"]);
-  await expect(tip.getByTestId("tip-workspace")).toHaveText("login2 projects");
-  await expect(tip.getByTestId("tip-workspace-meta")).toHaveText("2 projects");
-  await expect(tip.getByTestId("tip-project")).toHaveText("ghostty-playgroundFresh copy");
-  await expect(tip.getByTestId("tip-project-meta")).toHaveText("Fresh copy");
-  await expect(tip.getByTestId("tip-branch")).toHaveText("cf/login");
-  await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
-  await expect(tip.getByTestId("tip-set")).toHaveCount(0);
-
-  await card(set.id);
-  await expect(tip.getByTestId("tip-workspace")).toHaveText("2 projects");
-  await expect(tip.getByTestId("tip-workspace-meta")).toHaveCount(0);
-  await expect(tip.getByTestId("tip-project-meta")).toHaveText("Fresh copy");
-  await expect(tip.getByTestId("tip-branch")).toHaveText("feat/x");
-
-  await card(folder.id);
-  await expect(tip.getByTestId("tip-workspace")).toHaveText("login2 projects");
-  await expect(tip.getByTestId("tip-project")).toHaveText("Workspace folder");
-  await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
-  await page.mouse.move(0, 0);
-});
+// A multi-project thread's card (workspace or N projects, the run-in project and where it runs, branch, model) and line 1: src/components/sidebar/SidebarRow.test.tsx ("a workspace thread…", "an unnamed set…", "a thread in its workspace's folder…", "line 1 of a multi-project thread").
 
 test("the tooltip shows the full status, wrapped, under the name for threads that need input or failed, with how long; a finished turn says how long ago; not for working or idle", async ({ page }) => {
   await mockPost("status-kinds");
