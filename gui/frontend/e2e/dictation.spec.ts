@@ -35,94 +35,9 @@ function prompt(card: Locator): Locator {
   return card.getByTestId("composer-prompt");
 }
 
-async function openSettingsSection(page: Page): Promise<Locator> {
-  await page.keyboard.press("Meta+Comma");
-  const settings = page.getByTestId("settings-page");
-  await expect(settings).toBeVisible();
-  const section = settings.locator('[data-section="dictation"]');
-  await section.scrollIntoViewIfNeeded();
-  return section;
-}
-
 test.describe("settings section", () => {
-  test("off without the model: Needs the model, Download starts it and dictation turns on when it finishes", async ({ page }) => {
-    await mockPost("dictation?state=off");
-    await openApp(page);
-    const section = await openSettingsSection(page);
-    await expect(section.getByRole("heading", { name: "Dictation" })).toBeVisible();
-    await expect(section.getByText("Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it.")).toBeVisible();
-    const toggle = section.locator('[data-setting="dictation.enabled"]');
-    await expect(toggle).toContainText("Adds a microphone button to every composer and the ⇧⌘M shortcut. Needs the model below.");
-    await expect(toggle.getByTestId("dictation-chip")).toHaveCount(0);
-    const model = section.getByTestId("dictation-model-row");
-    await expect(model).toContainText("Whisper Large v3 Turbo, English. Downloaded once, kept in");
-    await expect(model.getByTestId("dictation-mac")).toHaveText("This Mac: Apple M4 Pro · 48 GB");
-    await expect(model.getByTestId("dictation-m1")).toHaveCount(0);
-    await model.getByTestId("dictation-download-button").click();
-    await expect(model.getByTestId("dictation-progress")).toBeVisible();
-    await expect(model).toContainText("Downloading. Dictation turns on when it finishes.");
-    // The mock finishes in about 1.5 s and turns the setting on, like the daemon.
-    await expect(model.getByTestId("dictation-size")).toHaveText("874 MB on disk", { timeout: 5_000 });
-    await expect(toggle.getByRole("switch")).toBeChecked();
-    await expect(toggle.getByTestId("dictation-chip")).toHaveText("Ready");
-    await expect(toggle).not.toContainText("Needs the model below.");
-  });
-
-  test("the switch without the model downloads instead of turning on", async ({ page }) => {
-    await mockPost("dictation?state=off");
-    await openApp(page);
-    const section = await openSettingsSection(page);
-    await section.locator('[data-setting="dictation.enabled"]').getByRole("switch").click();
-    await expect(section.getByTestId("dictation-download")).toBeVisible();
-    expect((await dictation()).calls).toContain("download");
-  });
-
-  test("a failed download says so once, a line per source", async ({ page }) => {
-    await mockPost("dictation?state=download-failed");
-    await openApp(page);
-    const section = await openSettingsSection(page);
-    const error = section.getByTestId("dictation-download-error");
-    await expect(error).toBeVisible();
-    expect((await error.innerText()).split("\n")).toEqual([
-      "Download failed:",
-      "GitHub: gh is not logged in (run gh auth login)",
-      "huggingface.co: the server answered 403 Forbidden",
-    ]);
-  });
-
-  test("downloading: progress, speed and Cancel", async ({ page }) => {
-    await mockPost("dictation?state=downloading");
-    await openApp(page);
-    const section = await openSettingsSection(page);
-    await expect(section.getByTestId("dictation-progress")).toHaveText("557 MB of 874 MB · 11 MB/s");
-    await section.getByTestId("dictation-cancel").click();
-    await expect(section.getByTestId("dictation-download-button")).toHaveText("Download · 0.9 GB");
-    expect((await dictation()).calls).toContain("cancel");
-  });
-
-  test("on an M1: the chip, the warning, unloaded, the engine's failure, Remove confirms", async ({ page }) => {
-    await mockPost("dictation?state=ready&m1=true");
-    await openApp(page);
-    const section = await openSettingsSection(page);
-    const chip = section.getByTestId("dictation-chip");
-    await expect(chip).toHaveText("Ready");
-    await expect(section.getByTestId("dictation-mac")).toHaveText("This Mac: Apple M1 Pro · 16 GB");
-    await expect(section.getByTestId("dictation-m1")).toHaveText(
-      "On an M1 each phrase takes a few seconds to appear, and the model uses about 1.2 GB while loaded. Newer M-series chips are much quicker.",
-    );
-    await mockPost("dictation?state=unloaded&m1=true");
-    await expect(chip).toHaveText("Unloaded · reloads when you return");
-    await mockPost("dictation?state=error&m1=true");
-    await expect(chip).toHaveText("the engine exited 3 times in a row: signal: killed");
-    await expect(chip).toHaveAttribute("data-state", "error");
-    await mockPost("dictation?state=ready");
-    await section.getByTestId("dictation-remove").click();
-    await expect(page.getByTestId("confirm-dialog")).toContainText("Remove the dictation model?");
-    await page.getByTestId("confirm-ok").click();
-    await expect(section.getByTestId("dictation-download-button")).toBeVisible();
-    expect((await dictation()).calls).toContain("remove");
-  });
-
+  // The section's states (download, cancel, failure, progress, chip, M1 warning, Remove): unit-tested in src/components/settings/DictationSettings.test.tsx.
+  // The keybinding listed: unit-tested in src/components/settings/KeybindingsPage.test.tsx.
   test("the search finds the section, by its switch and by its model", async ({ page }) => {
     await openApp(page);
     await page.keyboard.press("Meta+Comma");
@@ -134,17 +49,6 @@ test.describe("settings section", () => {
     await expect(hit).toContainText("General › Dictation");
     await hit.click();
     await expect(page.getByTestId("dictation-model-row")).toBeInViewport();
-  });
-
-  test("the keybinding is listed", async ({ page }) => {
-    await mockPost("dictation?state=ready");
-    await openApp(page);
-    await page.keyboard.press("Meta+Comma");
-    await page.getByTestId("settings-nav-keybindings").click();
-    const kb = page.locator('[data-setting="keybindings.dictation.toggle"]');
-    await kb.scrollIntoViewIfNeeded();
-    await expect(kb).toContainText("Dictate");
-    await expect(kb.getByRole("button", { name: /shortcut/ })).toHaveText("⇧⌘M");
   });
 });
 
