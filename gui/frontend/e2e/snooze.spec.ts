@@ -33,24 +33,6 @@ function box(page: Page, testId: string) {
   });
 }
 
-async function openMenu(page: Page, key: string) {
-  await row(page, key).click({ button: "right" });
-  const menu = page.getByTestId("row-menu");
-  await expect(menu).toBeVisible();
-  return menu;
-}
-
-/** The row menu's Snooze submenu, open. */
-async function openSnoozeSub(page: Page, key: string) {
-  const menu = await openMenu(page, key);
-  await menu.getByTestId("menu-snooze").click();
-  const sub = page.getByTestId("menu-snooze-presets");
-  await expect(sub).toBeVisible();
-  return { menu, sub };
-}
-
-const lastSnooze = async () => (await invocations()).filter((i) => i.name === "thread.snooze").at(-1);
-
 test("Snoozed section: collapsed by default between Working and Archived; expanded, single-line rows with the time left, soonest first", async ({ page }) => {
   await openApp(page);
   const header = page.getByTestId("snoozed-header");
@@ -105,49 +87,10 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   await expectAttention(page, 2);
 });
 
-test("the row menu's Snooze submenu: presets with their times; 1 hour snoozes without asking; Unsnooze brings it back", async ({ page }) => {
-  await openApp(page);
-  const { menu, sub } = await openSnoozeSub(page, "s:s-3");
-  // After Pin; Archive later, after the thread's other items.
-  const items = await menu.locator("[role=menuitem]").evaluateAll((els) => els.map((e) => e.textContent.trim()));
-  expect(items.slice(0, 4)).toEqual(["Rename", "Regenerate name", "Pin", "Snooze"]);
-  expect(items.indexOf("Archive")).toBeGreaterThan(3);
-  await expect(menu.getByTestId("menu-unsnooze")).toHaveCount(0);
-  const presets = sub.getByTestId("snooze-preset");
-  await expect(presets).toHaveCount(4);
-  expect(await presets.evaluateAll((els) => els.map((e) => e.getAttribute("data-preset")))).toEqual(["1h", "3h", "tomorrow", "next-week"]);
-  await expect(presets.nth(0)).toContainText("1 hour");
-  await expect(presets.nth(0).getByTestId("snooze-preset-time")).toHaveText(/^((Sun|Mon|Tue|Wed|Thu|Fri|Sat) )?\d{1,2}:\d\d [AP]M$/);
-  await expect(presets.nth(2)).toContainText("Tomorrow");
-  await expect(presets.nth(2).getByTestId("snooze-preset-time")).toHaveText(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat) 9:00 AM$/);
-  await expect(presets.nth(3)).toContainText("Next week");
-  await expect(presets.nth(3).getByTestId("snooze-preset-time")).toHaveText(/^(Mon 9:00 AM|[A-Z][a-z]{2} \d{1,2}, 9:00 AM)$/);
-  await expect(sub.getByTestId("snooze-pick")).toHaveText("Pick a date and time");
-
-  const before = Date.now();
-  await presets.nth(0).click();
-  await expect(page.getByTestId("snoozed-count")).toHaveText("3");
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  await expect.poll(() => mainKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4"]);
-  const inv = await lastSnooze();
-  expect(inv?.context?.activeThreadId).toBe("s-3");
-  const until = Date.parse(inv?.args.until ?? "");
-  expect(until - before).toBeGreaterThan(3_600_000 - 10_000);
-  expect(until - before).toBeLessThan(3_600_000 + 10_000);
-  // Soonest first: s-3 (1 h) before s-8 (2.5 h).
-  await page.getByTestId("snoozed-header").click();
-  await expect.poll(() => rowKeys(page)).toContain("s:s-3");
-  expect((await rowKeys(page)).slice(-5)).toEqual(["# Snoozed 3", "s:s-3", "s:s-8", "s:s-9", "# Archived 1"]);
-  await expect(row(page, "s:s-3").getByTestId("row-snooze-left")).toHaveText(/^(59m|1h)$/);
-
-  // A snoozed thread's menu also has Unsnooze.
-  const again = await openMenu(page, "s:s-3");
-  await expect(again.getByTestId("menu-snooze")).toBeVisible();
-  await again.getByTestId("menu-unsnooze").click();
-  await expect(page.getByTestId("snoozed-count")).toHaveText("2");
-  await expect(row(page, "s:s-3")).toHaveAttribute("data-section", "idle");
-  expect((await lastSnooze())?.args).toEqual({ clear: "true" });
-});
+// The Snooze submenu's presets and times, a preset's thread.snooze, Unsnooze, and the Snoozed section's order
+// and countdown: unit-tested in src/components/thread/ThreadMenuItems.test.tsx, src/lib/snooze.test.ts,
+// src/stores/threadActions.test.ts, src/lib/tree.test.ts and src/components/sidebar/SidebarRow.test.tsx (the
+// daemon asks only mid-turn: internal/command/commands_thread_snooze_test.go).
 
 test("snoozing a working thread from the title menu asks first; it then drops its panels, and its page says until when", async ({ page }) => {
   await openApp(page);
@@ -215,28 +158,8 @@ test("snoozing a working thread from the title menu asks first; it then drops it
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
 });
 
-test("Pick a date and time opens the dialog for the row's thread; Snooze sends the picked local time", async ({ page }) => {
-  // The calendar, the time field and refusing a past time: SnoozeDialog.test.tsx.
-  await openApp(page);
-  const { sub } = await openSnoozeSub(page, "s:s-4");
-  await sub.getByTestId("snooze-pick").click();
-  const dialog = page.getByTestId("snooze-dialog");
-  await expect(dialog.getByRole("heading")).toHaveText("Snooze “Investigate flaky e2e”");
-  // The 10th of the month after the one shown at 2:30 PM. The calendar opens on tomorrow's
-  // month, which on the last day of a month is already the next one.
-  const iso = (d: Date) => `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const now = new Date();
-  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  await dialog.getByTestId("snooze-next-month").click();
-  const target = new Date(tomorrow.getFullYear(), tomorrow.getMonth() + 1, 10, 14, 30);
-  await dialog.locator(`[data-day="${iso(target)}"]`).click();
-  await dialog.getByTestId("snooze-time").fill("14:30");
-  await dialog.getByTestId("snooze-submit").click();
-  await expect(dialog).toHaveCount(0);
-  await expect(page.getByTestId("snoozed-count")).toHaveText("3");
-  expect(Date.parse((await lastSnooze())?.args.until ?? "")).toBe(target.getTime());
-  expect((await lastSnooze())?.context?.activeThreadId).toBe("s-4");
-});
+// Pick a date and time: the dialog for the row's thread and the local time it sends, unit-tested in
+// src/components/snooze/SnoozeDialog.test.tsx and src/components/thread/ThreadMenuItems.test.tsx.
 
 test("a wake brings the thread back needing attention: Woke in amber, counted in the window title; snooze it again from the title menu", async ({ page }) => {
   await openApp(page);
