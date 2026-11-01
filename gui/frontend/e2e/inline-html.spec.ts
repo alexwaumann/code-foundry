@@ -14,7 +14,6 @@ test.beforeEach(async () => {
 
 const items = (page: Page) => page.getByTestId("thread-html");
 const hello = (page: Page) => items(page).filter({ hasText: "hello.html" });
-const gone = (page: Page) => items(page).filter({ hasText: "gone.html" });
 
 const shots = process.env.SHOTS;
 async function shot(page: Page, name: string): Promise<void> {
@@ -62,17 +61,8 @@ test("an inline page renders in its card, follows cf:resize, and its frame runs 
   await shot(page, "inline-html-live");
 });
 
-test("source swaps the frame for the file's code, and back", async ({ page }) => {
-  await openHtmlThread(page);
-  const card = hello(page).getByTestId("thread-html-card");
-  await card.getByTestId("thread-html-source-toggle").click();
-  await expect(card.getByTestId("thread-html-frame")).toHaveCount(0);
-  await expect(card.getByTestId("thread-html-source").locator('[data-line="1"]').first()).toBeVisible();
-  await expect(card.getByTestId("thread-html-source-toggle")).toHaveAttribute("aria-pressed", "true");
-  await card.getByTestId("thread-html-source-toggle").click();
-  await expect(card.getByTestId("thread-html-source")).toHaveCount(0);
-  await expect(card.getByTestId("thread-html-frame")).toBeVisible();
-});
+// Source swapping the frame for the file's code and back: unit-tested in
+// src/components/thread/InlineHtml.test.tsx (the code view's lines: e2e/file-tabs.spec.ts).
 
 test("expand shows the page over the thread pane's body only; the sidebar and side panel stay usable; Close has focus; Esc closes it", async ({ page }) => {
   await openHtmlThread(page);
@@ -139,38 +129,23 @@ test("expand shows the page over the thread pane's body only; the sidebar and si
   await expect(page.getByTestId("thread-html-lightbox")).toHaveCount(0);
 });
 
-test("the open page is kept per thread: the sidebar works while it is up, and it is up again on return", async ({ page }) => {
+// The open page kept per pane (its source mode, Close focused, the card left without a frame) and
+// forgotten once closed: unit-tested in src/components/thread/InlineHtml.test.tsx. Left here: the
+// sidebar working while the modal is up, and the modal's frame loading the page again on return.
+test("the open page is kept per thread: the sidebar works while it is up, and its page loads again on return", async ({ page }) => {
   await openHtmlThread(page);
   await hello(page).getByTestId("thread-html-card").getByTestId("thread-html-expand").click();
   const box = page.getByTestId("thread-html-lightbox");
   await expect(box).toBeVisible();
-  await box.getByTestId("thread-html-source-toggle").click();
-  await expect(box.getByTestId("thread-html-source")).toBeVisible();
   // The sidebar is outside the modal: another thread opens, with no modal of its own.
   await page.getByTestId("thread-list").locator('[data-row-key^="s:"]:not([data-row-key="s:s-r1"])').first().click();
   await expect(items(page)).toHaveCount(0);
   await expect(box).toHaveCount(0);
   await shot(page, "inline-html-away");
-  // Back: the same page is up again, as it was (its source showing), and the card has no frame.
   await row(page, "s:s-r1").click();
   await expect(box).toBeVisible();
-  await expect(box.getByTestId("thread-html-path")).toHaveText("docs/hello.html");
-  await expect(box.getByTestId("thread-html-source")).toBeVisible();
-  await expect(box.getByTestId("thread-html-close")).toBeFocused();
-  await box.getByTestId("thread-html-source-toggle").click();
   await expect(box.frameLocator('[data-testid="thread-html-lightbox-frame"]').locator("#hello")).toHaveText("Hello");
-  // The modal's frame is the file's one: the card has none.
-  await expect(hello(page).getByTestId("thread-html-covered")).toBeVisible();
-  await expect(page.getByTestId("thread-html-frame")).toHaveCount(0);
   await shot(page, "inline-html-back");
-  // Closing forgets it: away and back, no modal.
-  await page.keyboard.press("Escape");
-  await expect(box).toHaveCount(0);
-  await page.getByTestId("thread-list").locator('[data-row-key^="s:"]:not([data-row-key="s:s-r1"])').first().click();
-  await expect(items(page)).toHaveCount(0);
-  await row(page, "s:s-r1").click();
-  await expect(items(page)).toHaveCount(2);
-  await expect(box).toHaveCount(0);
 });
 
 /** The html-idle state: three pages shown after a finished turn, outside any (mock/thread.ts). */
@@ -220,57 +195,16 @@ test("a page's prefers-color-scheme is the app's scheme, not the system's", asyn
   await page.emulateMedia({ colorScheme: null });
 });
 
-test("a page that cannot be rendered says so, never a blank box", async ({ page }) => {
-  await openHtmlThread(page);
-  const card = gone(page).getByTestId("thread-html-card");
-  await expect(gone(page).getByTestId("thread-html-row")).toContainText("An older page");
-  await expect(card.getByTestId("thread-html-failed")).toContainText("Could not render this page.");
-  await expect(card.getByTestId("thread-html-failed")).toContainText("does not exist");
-  await expect(card.getByTestId("thread-html-frame")).toHaveCount(0);
-  await expect(card.getByTestId("thread-html-source")).toContainText("The source cannot be read either");
-});
+// A page that cannot be rendered saying so, open in side panel (the thread's own panel; the tab's
+// title: src/stores/filePanel.test.ts), and the turn's fold never touching a page (only its row
+// closes and opens the card; leaving the thread forgets that): unit-tested in
+// src/components/thread/InlineHtml.test.tsx and rows.test.tsx.
 
-test("open in side panel opens the file in the thread's own panel", async ({ page }) => {
+/** SHOTS=<dir>: a finished turn's cards, open under its fold. */
+test("the folded turn's open cards (screenshot)", async ({ page }) => {
+  test.skip(!shots, "SHOTS=<dir> only");
   await openHtmlThread(page);
-  await hello(page).getByTestId("thread-html-panel").click();
-  await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel-key", "thread:s-r1");
-  await expect(page.getByTestId("panel-tabs").getByRole("tab", { selected: true })).toHaveText("hello.html");
-});
-
-test("the turn's fold never touches a page: only its row closes and opens the card", async ({ page }) => {
-  await openHtmlThread(page);
-  await expect(page.getByTestId("thread-html-frame")).toHaveCount(1);
-  const header = page.locator('[data-testid="thread-turn-header"]');
-  const r = hello(page).getByTestId("thread-html-row");
-  // The turn ends while the reader watches: it folds by default, both cards stay open.
   await mockPost("thread/finish");
-  await expect(page.locator('[data-testid="thread-turn-header"][data-folded]')).toHaveCount(1);
-  await expect(items(page)).toHaveCount(2);
-  await expect(page.getByTestId("thread-html-card")).toHaveCount(2);
-  await expect(hello(page).getByTestId("thread-html-frame")).toBeVisible();
-  // Unfold, then fold the turn: the cards stay open, and no row says "folded".
-  await header.getByRole("button", { name: "Show this turn's work" }).click();
-  await expect(page.getByTestId("thread-html-card")).toHaveCount(2);
-  await header.getByRole("button", { name: "Hide this turn's work" }).click();
-  await expect(page.getByTestId("thread-html-card")).toHaveCount(2);
-  await expect(r).toHaveAttribute("aria-expanded", "true");
-  await expect(r).not.toContainText("folded");
-  // The row closes it, and the turn's fold does not open it again.
-  await r.click();
-  await expect(hello(page).getByTestId("thread-html-card")).toHaveCount(0);
-  await header.getByRole("button", { name: "Show this turn's work" }).click();
-  await expect(hello(page).getByTestId("thread-html-card")).toHaveCount(0);
-  await header.getByRole("button", { name: "Hide this turn's work" }).click();
-  await expect(hello(page).getByTestId("thread-html-card")).toHaveCount(0);
-  await r.click();
-  await expect(hello(page).getByTestId("thread-html-frame")).toBeVisible();
-  await r.click();
-  await expect(hello(page).getByTestId("thread-html-card")).toHaveCount(0);
-  // Leaving the thread forgets the choice: on return the folded turn's cards are open.
-  await page.getByTestId("thread-list").locator('[data-row-key^="s:"]:not([data-row-key="s:s-r1"])').first().click();
-  await expect(items(page)).toHaveCount(0);
-  await row(page, "s:s-r1").click();
-  await expect(items(page)).toHaveCount(2);
   await expect(page.locator('[data-testid="thread-turn-header"][data-folded]')).toHaveCount(1);
   await expect(page.getByTestId("thread-html-card")).toHaveCount(2);
   await shot(page, "folded-open");

@@ -12,13 +12,9 @@ import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./
  * (thread.agent.up) go back up.
  */
 
-const PARENT = "Agents panel";
-const PR1_PROMPT = "Implement PR 1: the daemon side of the agents panel.";
-const EXPLORE_REPORT = "LinkedPrs in HeaderActions.tsx renders a CommandButton with a count when there are 2+ PRs";
 
 const view = (page: Page) => page.getByTestId("subagent-pane");
 const threadPane = (page: Page) => page.getByTestId("thread-pane");
-const card = (page: Page) => page.getByTestId("thread-info-card");
 const agentCall = (page: Page, name: string) => threadPane(page).locator('[data-tool="Agent"]').filter({ hasText: name }).first();
 
 /**
@@ -73,16 +69,6 @@ async function openFromRow(page: Page, name: string): Promise<void> {
   await open.click();
 }
 
-/** Opens one of the thread's runs from the thread info card's agent rows (finished ones under Previous). */
-async function openFromCard(page: Page, runId: string): Promise<void> {
-  if ((await page.getByTestId("thread-info-toggle").getAttribute("aria-pressed")) !== "true") await page.getByTestId("thread-info-toggle").click();
-  await expect(card(page)).toBeVisible();
-  const runRow = card(page).locator(`[data-testid="ti-lineage-row"][data-kind="agent"][data-id="${runId}"]`);
-  const previous = card(page).getByTestId("ti-previous");
-  if ((await runRow.count()) === 0 && (await previous.count()) > 0) await previous.click();
-  await runRow.click();
-}
-
 /** The view shows this run of s-r1, and the sidebar still has s-r1 selected. */
 async function expectViewing(page: Page, runId: string, name: string): Promise<void> {
   await expect(view(page)).toHaveAttribute("data-run-id", runId);
@@ -104,69 +90,18 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("Open › on a running Agent row shows the run read-only: header, lineage, prompt, its own rows, footer, plate", async ({ page }) => {
+// The run's view (header, crumb, Read-only, live status, lineage, prompt, its own rows, the
+// nested run not openable, footer, plate, no composer or strip): unit-tested in
+// src/components/thread/SubagentPane.test.tsx and agentOpen.test.tsx. Left here: the parent's
+// Agent row's hover-only Open, through thread.agent.open to the view.
+test("Open › on a running Agent row (shown on hover) opens the run read-only", async ({ page }) => {
   await openThread(page);
   await unfoldTurn(page);
   await openFromRow(page, "PR 1: daemon task frames");
   await expectViewing(page, "a1", "PR 1: daemon task frames");
   expect((await invocations()).filter((i) => i.name === "thread.agent.open").map((i) => i.args)).toEqual([{ id: "s-r1", run: "a1" }]);
-
-  // Header: back, the crumb (parent › run), Read-only, the live status, the panel toggle only.
-  const header = page.getByTestId("subagent-header");
-  await expect(header.getByTestId("subagent-back")).toBeVisible();
-  await expect(header.getByTestId("subagent-crumb-parent")).toHaveText(PARENT);
-  await expect(header.getByTestId("subagent-readonly")).toHaveText("Read-only");
-  await expect(header.getByTestId("subagent-status")).toHaveAttribute("data-status", "running");
-  await expect(header.getByTestId("subagent-status")).toHaveText(/^Running · 4m \d\ds$/);
-  // No thread actions: a subagent has no connection, snooze, archive or bottom panel.
-  await expect(header.getByTestId("pane-actions").getByRole("button")).toHaveCount(1);
-  await expect(header.getByTestId("panel-toggle")).toBeVisible();
-  await expect(header.getByTestId("bottom-toggle")).toHaveCount(0);
-  await expect(header.locator('[data-command-button="thread.archive"], [data-command-button="thread.snooze"]')).toHaveCount(0);
-
-  // The lineage note and the prompt the parent gave it.
-  const lineage = view(page).getByTestId("subagent-lineage");
-  await expect(lineage).toContainText(`Subagent of${PARENT}`);
-  await expect(lineage.getByTestId("subagent-lineage-meta")).toHaveText(/^background · general-purpose · Opus · high · launched by turn 1's Agent call, 4 min ago$/);
-  await expect(lineage.getByTestId("subagent-lineage-back")).toHaveText(`Back to ${PARENT}`);
-  const prompt = view(page).getByTestId("subagent-prompt");
-  await expect(prompt.getByTestId("thread-user-label")).toHaveText(`Prompt from ${PARENT}`);
-  await expect(prompt).toContainText(PR1_PROMPT);
-
-  // Its own rows (parent = its Agent call) in order, nothing of the parent's or of the other runs'.
-  await expect(view(page).getByRole("button", { name: /^Thought for 6s/ })).toBeVisible();
-  await expect(view(page).getByRole("button", { name: /^Read 1 file, searched code once/ })).toBeVisible();
-  const tools = view(page).locator("[data-tool]");
-  expect(await tools.evaluateAll((els) => els.map((e) => e.getAttribute("data-tool")))).toEqual(["Agent", "Edit", "Write", "Bash"]);
-  await expect(view(page).locator('[data-tool="Bash"]')).toHaveAttribute("data-status", "running");
-  await expect(view(page).locator('[data-tool="Agent"]')).toHaveAttribute("data-status", "running");
-  const text = view(page).getByTestId("thread-text");
-  await expect(text).toHaveCount(1);
-  await expect(text).toContainText("Tests for the frame parser pass");
-  await expect(text).toHaveAttribute("data-streaming", "true");
-  await expect(view(page)).not.toContainText("Both PRs are building in the background");
-  await expect(view(page)).not.toContainText("make gui-build");
-  // The nested Agent call shows its run's chips, but nothing opens it and it has no children.
-  const nested = view(page).locator('[data-tool="Agent"]');
-  await expect(nested).toContainText("Review usage_runs changes");
-  await expect(view(page).getByTestId("thread-agent-open")).toHaveCount(0);
-  await nested.getByTestId("thread-tool").first().hover();
-  await expect(nested.getByTestId("thread-agent-open")).toHaveCount(0);
-  // One line: while it runs there is nothing to open.
-  await expect(nested.getByTestId("thread-tool").first()).not.toHaveAttribute("aria-expanded");
-  await nested.getByTestId("thread-tool").first().click();
-  await expect(nested.locator("[data-tool]")).toHaveCount(0);
-
-  // The footer, no report yet, and the plate where the composer would be.
-  const footer = view(page).getByTestId("subagent-footer");
-  await expect(footer).toHaveAttribute("data-status", "running");
-  await expect(footer).toHaveText(/^Working for 4m \d\ds·23 tools·48\.2K tokens·Opus$/);
-  await expect(view(page).getByTestId("subagent-report")).toHaveCount(0);
-  await expect(page.getByTestId("subagent-plate-text")).toHaveText(`Read-only. A subagent takes its instructions from its parent thread. To steer it, send a follow-up to ${PARENT}.`);
-  await expect(page.getByTestId("subagent-plate-back")).toContainText(`Back to ${PARENT}`);
-  await expect(page.getByTestId("subagent-plate-chord")).toHaveText("esc");
+  await expect(page.getByTestId("subagent-readonly")).toHaveText("Read-only");
   await expect(page.getByTestId("thread-composer")).toHaveCount(0);
-  await expect(page.getByTestId("agents-strip")).toHaveCount(0);
 });
 
 test("Escape goes back to the parent, the thread still selected, its one Watch kept and no reload", async ({ page }) => {
@@ -212,37 +147,18 @@ test("Escape goes back to the parent, the thread still selected, its one Watch k
 
 // The back buttons and the crumb going up: unit-tested in src/components/thread/SubagentPane.test.tsx
 
-test("a strip name opens its background run; the done Explore opened from the card shows its report once", async ({ page }) => {
-  await openThread(page);
-  const name = page.getByTestId("agents-strip").getByTestId("agents-strip-name");
-  await expect(name).toHaveText(["PR 1: daemon task frames", "PR 2: Agents surface in the panel"]);
-  // The line is one ellipsised line: the first name is the one in view at this width.
-  await name.first().click();
-  await expectViewing(page, "a1", "PR 1: daemon task frames");
-  await expect(page.getByTestId("subagent-prompt")).toContainText(PR1_PROMPT);
-  await page.keyboard.press("Escape");
-  await expectParent(page);
-
-  await openFromCard(page, "a0");
-  await expectViewing(page, "a0", "Find the header chip pattern");
-  await expect(page.getByTestId("subagent-status")).toHaveText("Done · 5 min ago");
-  await expect(page.getByTestId("subagent-lineage-meta")).toHaveText(/^foreground · Explore · Haiku · launched by turn 1's Agent call, [56] min ago$/);
-  await expect(view(page).getByRole("button", { name: /^Read 1 file, searched code once HeaderActions.tsx/ })).toBeVisible();
-  await expect(view(page).locator("[data-tool]")).toHaveCount(0);
-  await expect(page.getByTestId("subagent-footer")).toHaveAttribute("data-status", "done");
-  await expect(page.getByTestId("subagent-footer")).toHaveText("Worked for 12s·6 tools·9.4K tokens·Haiku");
-  // Its report is its last text: shown once, as the text, no separate block.
-  await expect(view(page).getByTestId("thread-text")).toContainText(EXPLORE_REPORT);
-  await expect(view(page).getByTestId("subagent-report")).toHaveCount(0);
-  await expect(page.getByTestId("subagent-plate-text")).toHaveText(`Read-only. This agent finished and handed its report to ${PARENT}.`);
-});
+// A strip name opening its run (agentOpen.test.tsx), the card's agent rows opening theirs, the
+// finished under Previous agents (src/components/threadinfo/LineageAgents.test.tsx), and the done
+// Explore's view (done status, lineage, its group, its report once): SubagentPane.test.tsx.
 
 // The run ending while viewed (done in place, its report, no handback row): unit-tested in
 // src/components/thread/SubagentPane.test.tsx and src/lib/subagentView.test.ts.
 
-test("the failed run opened from its note shows its error; another run failing while viewed turns red in place", async ({ page }) => {
+// The failed run's view (its Bash rows, the error, the plate) and another run failing while
+// viewed: unit-tested in src/components/thread/SubagentPane.test.tsx. Left here: the note's Open,
+// shown on hover only.
+test("the failed run's note has an Open on hover that opens the run", async ({ page }) => {
   await openThread(page);
-  // The failed run's note is in the folded turn; its Open shows on hover.
   const note = page.getByTestId("thread-agent-note");
   const open = note.getByTestId("thread-agent-note-open");
   await expect(open).toBeHidden();
@@ -250,26 +166,6 @@ test("the failed run opened from its note shows its error; another run failing w
   await open.click();
   await expectViewing(page, "a3", "Screenshot the panel in Wails");
   await expect(page.getByTestId("subagent-status")).toHaveAttribute("data-status", "failed");
-  await expect(page.getByTestId("subagent-status")).toHaveText("Failed · 3 min ago");
-  const bash = view(page).locator('[data-tool="Bash"]');
-  await expect(bash).toHaveCount(2);
-  await expect(bash.nth(1)).toHaveAttribute("data-status", "error");
-  const footer = page.getByTestId("subagent-footer");
-  await expect(footer).toHaveAttribute("data-status", "failed");
-  await expect(footer).toContainText("Stopped: process exited with code 1");
-  await expect(page.getByTestId("subagent-report")).toHaveCount(0);
-  await expect(page.getByTestId("subagent-plate-text")).toHaveText(`Read-only. This agent failed. Its parent ${PARENT} was told.`);
-  await page.keyboard.press("Escape");
-  await expectParent(page);
-
-  await openFromCard(page, "a2");
-  await expectViewing(page, "a2", "PR 2: Agents surface in the panel");
-  await mockPost("thread/agent-end?run=a2&status=failed");
-  await expect(page.getByTestId("subagent-status")).toHaveAttribute("data-status", "failed");
-  await expect(footer).toHaveAttribute("data-status", "failed");
-  await expect(footer).toContainText("Stopped: the agent was killed");
-  await expect(page.getByTestId("subagent-plate-text")).toHaveText(`Read-only. This agent failed. Its parent ${PARENT} was told.`);
-  await expectViewing(page, "a2", "PR 2: Agents surface in the panel");
 });
 
 // Selecting another thread drops the view: unit-tested in src/stores/subagentView.test.ts

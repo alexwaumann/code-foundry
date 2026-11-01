@@ -91,6 +91,16 @@ export function useCommandSource(trigger: EditorTrigger | null, commands: readon
 }
 
 /**
+ * A thread composer's "/": the running process's own list (what "/name" runs), the disk scan
+ * while there is none (not running yet, or a daemon that predates the list).
+ */
+export function useSlashSource(trigger: EditorTrigger | null, commands: readonly SlashCommandView[], sourcesKey: string, members: readonly string[]): CompletionSource {
+  const skillSource = useSkillSource(trigger, sourcesKey, members);
+  const commandSource = useCommandSource(trigger, commands, sourcesKey, members);
+  return commands.length > 0 ? commandSource : skillSource;
+}
+
+/**
  * Files after "@" (stores/files.ts): asks for the trigger's query whenever it changes
  * (debounced there; nothing while the card is only navigated), and offers the latest
  * answer grouped by project, the primary first, with headings when the draft has more than

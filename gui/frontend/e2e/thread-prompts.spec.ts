@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectAttention, invocations, leaveSidebar, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { invocations, leaveSidebar, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -46,102 +46,41 @@ async function shot(page: Page, name: string): Promise<void> {
 
 const composer = (page: Page) => page.getByTestId("thread-composer");
 const editor = (page: Page) => composer(page).locator('[contenteditable="true"]');
-const lastText = (page: Page) => page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last();
-
-/**
- * Waits for the running turn to end (it folds under its header), then opens it again.
- * `headers` is how many the thread has once it ended: the final text streams in before
- * the turn_end, so until then the last header is an earlier turn's (also folded).
- */
-async function unfoldLatest(page: Page, headers: number): Promise<void> {
-  await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])')).toHaveCount(headers);
-  const header = page.locator('[data-testid="thread-turn-header"]:not([data-live])').nth(headers - 1);
-  await expect(header).toHaveAttribute("data-folded", "true");
-  await header.getByRole("button", { name: "Show this turn's work" }).click();
-  await expect(header).not.toHaveAttribute("data-folded", "true");
-}
 
 async function editorFocused(page: Page): Promise<boolean> {
   return page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
 }
 
-const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
+// The permission panel, deny with a reason, the question panel (Other, a multi-select) and Allow
+// answering at once: unit-tested in src/components/thread/PendingPrompt.test.tsx. What the
+// thread does after the answer (Claude's reply, the denied or ran row) is the mock's script;
+// the sidebar's Permission line and the window title's count: SidebarRow.test.tsx, threads.test.ts.
 
-for (const scheme of schemes) {
-  test.describe(scheme, () => {
-    test("the permission panel and deny with a reason", async ({ page }) => {
-      await openThread(page, "permission", scheme);
-      const prompt = composer(page).getByTestId("thread-permission");
-      await expect(prompt).toContainText("Allow Claude to run this command?");
-      // The mode hint (the thread runs accept-edits); the CLI's reason says the same, so once.
-      await expect(prompt.getByTestId("thread-permission-hint")).toHaveText("Accept edits asks before commands");
-      await expect(prompt.getByTestId("thread-permission-why")).toHaveCount(0);
-      await expect(prompt.locator("kbd")).toHaveText(["1", "2", "3"]);
-      await shot(page, `permission-${scheme}`);
+/** SHOTS=<dir>: the docked panels in both schemes. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`panel screenshots (${scheme})`, async ({ page }) => {
+    test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
+    await openThread(page, "permission", scheme);
+    const prompt = composer(page).getByTestId("thread-permission");
+    await expect(prompt).toContainText("Allow Claude to run this command?");
+    await shot(page, `permission-${scheme}`);
+    await prompt.getByTestId("thread-permission-deny").click();
+    await expect(prompt.getByTestId("thread-deny-reason")).toBeFocused();
+    await prompt.getByTestId("thread-deny-reason").fill("Use the staging branch instead");
+    await shot(page, `deny-reason-${scheme}`);
 
-      await prompt.getByTestId("thread-permission-deny").click();
-      const reason = prompt.getByTestId("thread-deny-reason");
-      await expect(reason).toBeFocused();
-      await reason.fill("Use the staging branch instead");
-      await shot(page, `deny-reason-${scheme}`);
-      await page.keyboard.press("Enter");
-      await expect.poll(responds).toEqual(["respond s-r1 deny req-push message=Use the staging branch instead"]);
-      await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
-      await expect(lastText(page)).toContainText("You said: Use the staging branch instead");
-      await unfoldLatest(page, 2);
-      await expect(page.getByTestId("thread-pane").locator('[data-tool="Bash"]').last()).toContainText("denied");
-    });
+    await openThread(page, "question", scheme);
+    const q = composer(page).getByTestId("thread-question");
+    await q.getByRole("radio").nth(0).click();
+    await shot(page, `question-${scheme}`);
 
-    test("the question panel: single-select with Other, then a multi-select", async ({ page }) => {
-      await openThread(page, "question", scheme);
-      const q = composer(page).getByTestId("thread-question");
-      await q.getByRole("radio").nth(0).click();
-      await shot(page, `question-${scheme}`);
-      await q.getByTestId("thread-question-next").click();
-      await expect(q).toContainText("2 of 2");
-      await q.getByLabel("Other answer").fill("Only the title");
-      await expect(q.getByTestId("thread-question-other")).toHaveAttribute("aria-checked", "true");
-      await page.keyboard.press("Enter");
-      await expect.poll(responds).toHaveLength(1);
-      const sent = (await invocations()).find((i) => i.name === "thread.respond");
-      expect(sent?.args).toMatchObject({ id: "s-r1", decision: "allow", request: "req-push-q" });
-      expect(JSON.parse(sent?.args.answer ?? "{}")).toEqual({
-        "The branch was rebased onto main, so a plain push will be rejected. How should I push?": "Force with lease (Recommended)",
-        "Should I also update the PR description?": "Only the title",
-      });
-      await expect(lastText(page)).toContainText("Thanks: Force with lease (Recommended); Only the title.");
-
-      await openThread(page, "multi", scheme);
-      const m = composer(page).getByTestId("thread-question");
-      await expect(m.getByRole("checkbox")).toHaveCount(4);
-      await m.getByRole("checkbox").nth(0).click();
-      await m.getByRole("checkbox").nth(2).click();
-      await expect(m.getByRole("checkbox").nth(0)).toHaveAttribute("aria-checked", "true");
-      await shot(page, `question-multi-${scheme}`);
-      await m.getByTestId("thread-question-next").click();
-      await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.respond").length).toBe(2);
-      const multi = (await invocations()).filter((i) => i.name === "thread.respond")[1];
-      expect(JSON.parse(multi?.args.answer ?? "{}")).toEqual({ "Which checks should I run before pushing?": "go test ./..., staticcheck" });
-    });
+    await openThread(page, "multi", scheme);
+    const m = composer(page).getByTestId("thread-question");
+    await m.getByRole("checkbox").nth(0).click();
+    await m.getByRole("checkbox").nth(2).click();
+    await shot(page, `question-multi-${scheme}`);
   });
 }
-
-test("Allow answers at once; the sidebar and the window title stop asking", async ({ page }) => {
-  await openThread(page, "permission");
-  await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Permission");
-  await expect(row(page, "s:s-r1").getByTestId("row-detail")).toContainText("Bash git push");
-  // s-2 (its seeded Bash permission) and this thread need the user.
-  await expectAttention(page, 2);
-  await composer(page).getByTestId("thread-permission-allow").click();
-  await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
-  await expect.poll(responds).toEqual(["respond s-r1 allow req-push"]);
-  await expectAttention(page, 1);
-  await expect(row(page, "s:s-r1")).not.toContainText("Needs input");
-  await expect(lastText(page)).toContainText("Pushed. PR #63 now has the fix.");
-  await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])').last()).toBeVisible();
-  await unfoldLatest(page, 2);
-  await expect(page.getByTestId("thread-pane").locator('[data-tool="Bash"]').last()).toContainText("Ran git push");
-});
 
 test("keyboard: an empty editor's digits answer, a typed message keeps them, Escape hands focus back", async ({ page }) => {
   await openThread(page, "permission");
@@ -175,64 +114,32 @@ test("keyboard: an empty editor's digits answer, a typed message keeps them, Esc
 
 // A failed answer bringing the prompt back with an error toast: src/stores/threadActions.test.ts ("a failed answer brings the prompt back once…"), src/stores/openRequests.test.ts and src/stores/commands.test.ts (the failure toast).
 
-test("parallel requests stack oldest first; each is answerable; an Edit shows its change", async ({ page }) => {
-  await openThread(page, "parallel");
-  const prompts = composer(page).getByTestId("thread-prompts");
-  await expect(prompts).toHaveAttribute("data-count", "2");
-  const edit = prompts.getByTestId("thread-permission").nth(0);
-  const push = prompts.getByTestId("thread-permission").nth(1);
-  await expect(edit).toContainText("Allow Claude to edit internal/store/pr/poller.go?");
-  await expect(edit).toContainText("Allow for session switches the thread to Accept edits.");
-  await expect(edit.getByTestId("thread-permission-hint")).toHaveText("Accept edits asks for files outside the project");
-  await expect(push).toContainText("git push --force-with-lease");
-  await expect(row(page, "s:s-r1").getByTestId("row-detail")).toHaveText("Edit poller.go");
+// Parallel requests stacked oldest first, each answerable (the older by key from the editor), an
+// Edit's change: unit-tested in src/components/thread/PendingPrompt.test.tsx.
 
-  const diff = edit.getByTestId("thread-permission-diff");
-  await expect(diff).toContainText("+1");
-  await diff.getByRole("button", { name: /Show the change/ }).click();
-  await expect(diff.getByTestId("thread-diff").locator('[data-code] [data-line][data-line-type="change-addition"]')).toContainText("!force");
-
-  // The newer one first, by click: the older stays.
-  await push.getByTestId("thread-permission-allow").click();
-  await expect(prompts).toHaveAttribute("data-count", "1");
-  await expect.poll(responds).toEqual(["respond s-r1 allow req-push"]);
-  await expect(row(page, "s:s-r1").getByTestId("row-detail")).toHaveText("Edit poller.go");
-  // Then the older by key from the editor.
-  await editor(page).click();
-  await page.keyboard.press("1");
-  await expect.poll(responds).toEqual(["respond s-r1 allow req-push", "respond s-r1 allow req-edit"]);
-  await expect(composer(page).getByTestId("thread-prompts")).toHaveCount(0);
-  await expect(lastText(page)).toContainText("Done: Edit ran.");
-});
-
-test("a subagent's request names the agent that asked", async ({ page }) => {
+// The agent's label and answering: unit-tested in src/components/thread/PendingPrompt.test.tsx.
+// Left here: the tooltip only when the label is cut short (scrollWidth, a real layout).
+test("a subagent's label cut short by a narrow prompt has a tooltip", async ({ page }) => {
   // The compact thread width keeps the prompt's header narrow enough to cut the label short.
   await mockPost("settings/external?appearance.thread_width=compact");
   await openThread(page, "subagent");
-  const prompt = composer(page).getByTestId("thread-permission");
-  await expect(prompt).toContainText("CHANGELOG.md");
-  // Its Agent call's subagent type and description, not a bare "subagent".
-  const chip = prompt.getByTestId("thread-asking-agent");
+  const chip = composer(page).getByTestId("thread-permission").getByTestId("thread-asking-agent");
   await expect(chip).toHaveText("general-purpose · Write the changelog entry");
-  // A tooltip only when the label is cut short (the prompt's header is narrow here).
   expect(await chip.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   await chip.hover();
   await expect(openTooltip(page)).toHaveText("general-purpose · Write the changelog entry");
   await shot(page, "subagent-dark");
   await page.mouse.move(0, 0);
   await expect(openTooltip(page)).toHaveCount(0);
-  await prompt.getByTestId("thread-permission-allow").click();
-  await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
-  await expect.poll(responds).toEqual(["respond s-r1 allow req-sub"]);
 });
 
-test("question keyboard: digits pick, Enter moves on and submits, Escape skips", async ({ page }) => {
+// The keys' logic (Enter with nothing picked, digits, Enter moving on and submitting) and Escape
+// skipping a focused question: unit-tested in src/components/thread/PendingPrompt.test.tsx.
+// Left here: the keys reaching the prompt from the real editor.
+test("question keyboard from the editor: digits pick, Enter moves on and submits", async ({ page }) => {
   await openThread(page, "question");
   const q = composer(page).getByTestId("thread-question");
   await editor(page).click();
-  // Nothing picked: Enter does nothing yet.
-  await page.keyboard.press("Enter");
-  await expect(q).toContainText("1 of 2");
   await page.keyboard.press("2");
   await expect(q.getByRole("radio").nth(1)).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Enter");
@@ -242,15 +149,6 @@ test("question keyboard: digits pick, Enter moves on and submits, Escape skips",
   await expect.poll(responds).toHaveLength(1);
   const sent = (await invocations()).find((i) => i.name === "thread.respond");
   expect(Object.values(JSON.parse(sent?.args.answer ?? "{}") as Record<string, string>)).toEqual(["Push to a new branch", "Yes"]);
-
-  await openThread(page, "question");
-  // The fresh question, not the one answered above: an Escape before it lands goes nowhere.
-  await expect(q).toContainText("1 of 2");
-  await q.focus();
-  await expect(q).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect.poll(async () => (await responds()).at(-1)).toBe("respond s-r1 deny req-push-q");
-  await expect(lastText(page)).toContainText("No problem, I'll leave those for later.");
 });
 
 test("Escape never interrupts a running turn (editor or timeline); the Interrupt button does", async ({ page }) => {
@@ -274,33 +172,12 @@ test("Escape never interrupts a running turn (editor or timeline); the Interrupt
   await expect(page.getByText("interrupted thread s-r1")).toHaveCount(0);
 });
 
-test("an effort change while busy waits for the turn; when idle it applies at once", async ({ page }) => {
-  await openThread(page, "streaming");
-  await composer(page).getByTestId("thread-effort").click();
-  await page.getByRole("option", { name: "Max" }).click();
-  await expect.poll(calls).toContain("set-effort s-r1 max");
-  await expect(composer(page).getByTestId("thread-effort")).toContainText("Max");
-  await expect(composer(page).getByTestId("thread-effort-pending")).toHaveText("Effort changes to Max after this turn");
-  await mockPost("thread/finish?id=s-r1");
-  await expect(composer(page).getByTestId("thread-effort-pending")).toHaveCount(0);
-  await expect(page.getByTestId("thread-pane")).toContainText("Set effort to max");
+// An effort change while busy waits for the turn, when idle it applies at once: unit-tested in
+// src/components/thread/ThreadComposer.test.tsx (the "Set effort to" note is the daemon's).
 
-  await composer(page).getByTestId("thread-effort").click();
-  await page.getByRole("option", { name: "Low" }).click();
-  await expect(page.getByTestId("thread-pane")).toContainText("Set effort to low");
-  await expect(composer(page).getByTestId("thread-effort-pending")).toHaveCount(0);
-});
-
-test("answering a request Claude withdrew meanwhile: a plain notice, no error, the prompt stays gone", async ({ page }) => {
-  await openThread(page, "permission");
-  await mockPost("thread/fail-respond?withdrawn=1");
-  await composer(page).getByTestId("thread-permission-allow").click();
-  await expect(page.getByText("Claude no longer needs that answer")).toBeVisible();
-  await expect(page.getByText("Answer Thread Request failed")).toHaveCount(0);
-  await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
-  // The timeline's row no longer waits either.
-  await expect(page.getByTestId("thread-pane").getByTestId("thread-waiting")).toHaveCount(0);
-});
+// Answering a request Claude withdrew (a plain notice, no error, the prompt stays gone):
+// unit-tested in src/components/thread/PendingPrompt.test.tsx; its timeline row stops waiting
+// when the daemon resolves the request (rows.test.tsx, "a tool waiting for permission").
 
 test("fields keep their keys: the Other field and the deny reason take digits and Escape; an open reason ignores 1 and 2", async ({ page }) => {
   await openThread(page, "question");
@@ -337,23 +214,5 @@ test("fields keep their keys: the Other field and the deny reason take digits an
   await expect.poll(async () => (await responds()).slice(1)).toEqual(["respond s-r1 deny req-push message=2 tests fail"]);
 });
 
-test("a question's pages and picks survive the timeline streaming meanwhile", async ({ page }) => {
-  await openThread(page, "question");
-  const q = composer(page).getByTestId("thread-question");
-  await q.getByRole("radio").nth(1).click();
-  await q.getByTestId("thread-question-next").click();
-  await expect(q).toContainText("2 of 2");
-  await q.getByRole("radio").nth(0).click();
-  await mockPost("thread/stream?text=" + encodeURIComponent("Meanwhile, the subagent "));
-  for (const part of ["found ", "two ", "more ", "call sites."]) await mockPost(`thread/delta?text=${encodeURIComponent(part)}`);
-  await expect(page.getByTestId("thread-pane")).toContainText("Meanwhile, the subagent found two more call sites.");
-  await expect(q).toContainText("2 of 2");
-  await expect(q.getByRole("radio").nth(0)).toHaveAttribute("aria-checked", "true");
-  await q.getByTestId("thread-question-back").click();
-  await expect(q.getByRole("radio").nth(1)).toHaveAttribute("aria-checked", "true");
-  await q.getByTestId("thread-question-next").click();
-  await q.getByTestId("thread-question-next").click();
-  await expect.poll(responds).toHaveLength(1);
-  const sent = (await invocations()).find((i) => i.name === "thread.respond");
-  expect(Object.values(JSON.parse(sent?.args.answer ?? "{}") as Record<string, string>)).toEqual(["Push to a new branch", "Yes"]);
-});
+// A question's pages and picks surviving the timeline streaming meanwhile: unit-tested in
+// src/components/thread/PendingPrompt.test.tsx.

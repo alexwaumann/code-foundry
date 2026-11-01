@@ -88,8 +88,6 @@ async function stubClipboard(page: Page): Promise<void> {
   });
 }
 
-const lastCopied = (page: Page) => page.evaluate(() => (window as unknown as { __cfClipboard: string[] }).__cfClipboard.at(-1) ?? "");
-
 const pane = (page: Page) => page.getByTestId("thread-pane");
 /** Finished turns' headers (the running turn's live header is "thread-working" inside it). */
 const headers = (page: Page) => page.locator('[data-testid="thread-turn-header"]:not([data-live])');
@@ -98,108 +96,47 @@ const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as 
 
 for (const scheme of schemes) {
   test.describe(scheme, () => {
-    test("the timeline: user tags, folded earlier turn, work rows, diff, subagent, markdown", async ({ page }) => {
+    // The rows themselves (the first message's tags, turn 1 folded with its header, the explore
+    // groups, thinking, the question asked, the Write, the failing run, a Grep's matches, the
+    // Edit's +6 and Copy diff, the subagent's one line and report, the answer's table and Go
+    // highlighting, folding again): unit-tested in src/components/thread/timeline.test.tsx.
+    // Left here: the virtual list reached by the user's wheel, @pierre/diffs' shadow root and the
+    // table's computed header.
+    test("the timeline: an earlier turn unfolded above the viewport, its Edit's diff, the answer's table", async ({ page }) => {
       await openThread(page, "permission", scheme);
-      // The first message's tags, drawn from the composer text the item carries: a lone
-      // "/tmp" in the prose stays text.
-      const bubble = await reveal(page, page.getByTestId("thread-user"));
-      await expect(bubble.locator('[data-tag-kind="image"]')).toContainText("pr-badge-stale.png");
-      await expect(bubble.locator('[data-tag-kind="image"] img')).toBeVisible();
-      await expect(bubble.locator('[data-tag-kind="file"]')).toHaveText("poller.go");
-      await expect(bubble.locator('[data-tag-kind="skill"]')).toHaveText("/tdd");
-      await expect(bubble).toContainText("with /tdd. Keep the fingerprint check-count based in /tmp.");
-
-      // Turn 1 is finished and not the latest: folded to its message, header and texts.
       const first = headers(page).first();
       await expect(first).toHaveAttribute("data-folded", "true");
-      await expect(first).toContainText("Worked for 4m 08s");
-      await expect(first).toContainText("9 steps");
-      await expect(pane(page).getByTestId("thread-group")).toHaveCount(0);
-      await expect(pane(page).locator('[data-testid="thread-text"][data-final]').first()).toContainText("Fixed: stale badge after a force-push");
-      // The latest turn is open.
-      await expect(headers(page)).toHaveCount(1);
-      await expect(pane(page).locator('[data-tool="Bash"]').first()).toContainText("go test ./...");
-
       // Above the viewport (the list sits at the bottom): the user scrolls up to it.
       await wheelUpTo(page, first);
       await first.locator("button.fold").click();
       await expect(first).not.toHaveAttribute("data-folded", "true");
-      const groups = pane(page).getByTestId("thread-group");
-      await reveal(page, groups);
-      await expect(groups.first()).toContainText("Read 3 files, searched code 2 times");
-      await expect(groups.nth(1)).toContainText("Read 2 files, searched code once");
-      await expect(pane(page).getByTestId("thread-thinking").first()).toContainText("Thought for 9s");
-      await expect(pane(page).getByTestId("thread-question-row")).toContainText("Head SHA in the fingerprint");
-      await expect(pane(page).locator('[data-tool="Write"]')).toContainText("Created fingerprint_test.go");
-      await expect(pane(page).locator('[data-tool="Bash"]').first()).toContainText("exit 1");
-
-      // Expanding a group shows its members; a Grep shows its matches.
-      await groups.nth(1).click();
-      await pane(page).locator('[data-tool="Grep"]').getByTestId("thread-tool").click();
-      await expect(pane(page).getByTestId("thread-matches")).toContainText("internal/store/pr/model.go");
-      await expect(pane(page).getByTestId("thread-matches").locator("mark").first()).toHaveText(/HeadRefOid/i);
-
-      // The failing test run: command, output, failure lines.
-      await pane(page).locator('[data-tool="Bash"]').first().getByTestId("thread-tool").click();
-      await expect(pane(page).getByTestId("thread-bash").first()).toContainText("--- FAIL: TestFingerprintChangesOnForcePush");
 
       // The Edit: an inline unified diff from the result's structuredPatch.
       const edit = await reveal(page, pane(page).locator('[data-tool="Edit"]'));
-      await expect(edit).toContainText("+6");
       await edit.getByTestId("thread-tool").click();
-      const diff = edit.getByTestId("thread-diff");
       // @pierre/diffs renders in an open shadow root; Playwright's CSS locators pierce it.
-      const code = diff.locator("[data-code]");
+      const code = edit.getByTestId("thread-diff").locator("[data-code]");
       await expect(code.locator('[data-line][data-line-type="change-addition"]')).toHaveCount(6);
       await expect(code.locator('[data-line][data-line-type="change-deletion"]')).toHaveCount(1);
       await expect(code).toContainText("HeadRefOid");
-      // Copy diff shows a check and "Copied" for a moment (useCopied).
-      await stubClipboard(page);
-      const copyDiff = diff.getByTestId("thread-diff-copy");
-      await expect(copyDiff).toHaveAttribute("aria-label", "Copy diff");
-      await copyDiff.click();
-      await expect(copyDiff).toHaveAttribute("aria-label", "Copied");
-      expect(await lastCopied(page)).toContain("HeadRefOid");
-      await expect(copyDiff).toHaveAttribute("aria-label", "Copy diff", { timeout: 3000 });
 
-      // The subagent: one line; open, only its report (its own rows stay out of the thread).
-      const agent = await reveal(page, pane(page).locator('[data-tool="Agent"]'));
-      await expect(agent).toContainText("Review the fingerprint change");
-      await expect(agent).toContainText("4 tools · 41s");
-      await expect(agent.getByTestId("thread-tool").first()).toHaveAttribute("aria-expanded", "false");
-      await agent.getByTestId("thread-tool").first().click();
-      await expect(agent.getByTestId("thread-agent-report")).toContainText("Looks right.");
-      await expect(agent.locator("[data-tool]")).toHaveCount(0);
-      await expect(agent).not.toContainText("Read 2 files, searched code once");
-      await expect(agent).not.toContainText("go vet ./internal/store/pr/...");
-
-      // The final answer's markdown: GFM table, highlighted Go in the bundled mono.
+      // The final answer's GFM table: framed, its header filled.
       const answer = await reveal(page, pane(page).locator('[data-testid="thread-text"][data-final]'));
-      await expect(answer.locator("table tr")).toHaveCount(4);
-      // Framed, its header filled.
       expect(await answer.locator(".cf-table th").first().evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
-      await expect(answer.locator('pre[data-lang="go"] .hljs-keyword').first()).toHaveText("func");
       await shot(page, `thread-timeline-${scheme}`);
-
-      // The header folds it again.
-      await reveal(page, first);
-      await first.locator("button.fold").click();
-      await expect(first).toHaveAttribute("data-folded", "true");
-      await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
     });
 
-    test("streaming: a caret while the answer grows under the live header, which becomes the finished one in place", async ({ page }) => {
+    // The live header heading the turn's work, the answer growing under it, the header turning
+    // into the folded finished one in place, the answer's Copy and Copied: unit-tested in
+    // src/components/thread/timeline.test.tsx, rows.test.tsx and src/lib/threadTimeline.test.ts.
+    // Left here: the caret (::after), following the bottom while it streams, and the Copy
+    // button's hover-only opacity (held while Copied).
+    test("streaming: a caret while the answer grows, the view following it; the answer's Copy shows on hover", async ({ page }) => {
       await openThread(page, "streaming", scheme);
       const streaming = pane(page).locator('[data-testid="thread-text"][data-streaming]');
       await expect(streaming).toContainText("ReviewState: pr.Revi");
       const caret = await streaming.locator(".cf-streaming pre code").evaluate((el) => getComputedStyle(el, "::after").content);
       expect(caret).toBe('""');
-      const live = pane(page).locator('[data-testid="thread-turn-header"][data-live]');
-      await expect(live.getByTestId("thread-working")).toHaveText(/^Working·\d+ steps·\d/);
-      await expect(headers(page)).toHaveCount(0);
-      // Live, the header heads the turn's work: under its message, above the rows.
-      const liveRow = live.locator("xpath=ancestor::*[@data-index][1]");
-      await expect(liveRow.locator("xpath=preceding-sibling::*[1]")).toHaveAttribute("data-row-type", "user");
       await shot(page, `thread-streaming-${scheme}`);
 
       await mockPost("thread/delta?text=" + encodeURIComponent("ewDecision,\n"));
@@ -207,28 +144,19 @@ for (const scheme of schemes) {
       // The view follows the bottom while it streams.
       await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
 
-      const element = await live.elementHandle();
       await mockPost("thread/finish");
-      await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toHaveCount(0);
-      await expect(page.getByTestId("thread-working")).toHaveCount(0);
       await expect(headers(page)).toHaveCount(1);
-      await expect(headers(page)).toHaveAttribute("data-folded", "true");
-      // The same element: the line changed in place, nothing remounted.
-      expect(await element.evaluate((el) => el.isConnected && el.getAttribute("data-folded"))).toBe("true");
       const answer = pane(page).locator('[data-testid="thread-text"][data-final]').last();
-      await expect(answer).toContainText("I have not pushed.");
-      // The answer copies from a button shown while it is hovered; the header has none.
-      await expect(headers(page).getByRole("button", { name: "Copy answer" })).toHaveCount(0);
+      // The answer copies from a button shown while it is hovered.
       const copy = answer.getByRole("button", { name: "Copy answer" });
       await expect(copy).toHaveCSS("opacity", "0");
       await answer.hover();
       await expect(copy).toHaveCSS("opacity", "1");
-      // A copy flips it to a check and "Copied", shown even once the pointer leaves.
+      // A copy flips it to "Copied", shown even once the pointer leaves.
       await stubClipboard(page);
       await copy.click();
       const copied = answer.getByTestId("thread-copy-answer");
       await expect(copied).toHaveAttribute("aria-label", "Copied");
-      expect(await lastCopied(page)).toContain("I have not pushed.");
       await page.mouse.move(0, 0);
       await expect(copied).toHaveCSS("opacity", "1");
       await expect(copied).toHaveAttribute("aria-label", "Copy answer", { timeout: 3000 });
@@ -377,37 +305,22 @@ for (const scheme of schemes) {
   });
 }
 
-// The waiting row's amber is a theme colour: checked in both schemes.
+// The waiting row's text, the docked prompt's texts and buttons, the one Interrupt and the
+// sidebar's Permission line: unit-tested in src/components/thread/timeline.test.tsx,
+// PendingPrompt.test.tsx, ThreadComposer.test.tsx and src/components/sidebar/SidebarRow.test.tsx.
+// Left here, in both schemes: the waiting word's amber (a theme colour) and the prompt's place.
 for (const scheme of ["dark", "light"] as const) {
   test.describe(scheme, () => {
-    test("a pending permission docks into the composer; the timeline keeps an amber row", async ({ page }) => {
+    test("a pending permission docks above the editor; the timeline's waiting word is amber", async ({ page }) => {
       await openThread(page, "permission", scheme);
-      await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Permission");
-      await expect(row(page, "s:s-r1").getByTestId("row-detail")).toContainText("Bash git push");
       const waiting = pane(page).locator('[data-waiting="true"]');
-      await expect(waiting).toContainText("Run git push --force-with-lease origin cf/pr-badge-stale");
-      await expect(waiting.getByTestId("thread-waiting")).toHaveText("waiting for you");
       const color = await waiting.getByTestId("thread-waiting").evaluate((el) => getComputedStyle(el).color);
       expect(color).not.toBe(await waiting.locator(".lbl").evaluate((el) => getComputedStyle(el).color));
-
       const composer = page.getByTestId("thread-composer");
-      const prompt = composer.getByTestId("thread-permission");
-      await expect(prompt).toContainText("Allow Claude to run this command?");
-      await expect(prompt).toContainText("git push --force-with-lease origin cf/pr-badge-stale");
-      await expect(prompt).toContainText("Allow for session adds Bash(git push:*)");
-      await expect(prompt.getByTestId("thread-permission-allow")).toBeVisible();
-      await expect(prompt.getByTestId("thread-permission-allow-session")).toBeVisible();
-      await expect(prompt.getByTestId("thread-permission-deny")).toBeVisible();
-      // One Interrupt: the composer's.
-      await expect(page.getByText("Interrupt", { exact: true })).toHaveCount(1);
-      await expect(composer.getByTestId("thread-interrupt")).toBeVisible();
-      // The prompt sits above the editor, inside the card.
-      const promptBox = await prompt.boundingBox();
+      const promptBox = await composer.getByTestId("thread-permission").boundingBox();
       const editorBox = await composer.getByTestId("composer-prompt").boundingBox();
       expect(promptBox && editorBox && promptBox.y + promptBox.height <= editorBox.y + 1).toBe(true);
       await shot(page, `thread-permission-${scheme}`);
-
-      // Answering: e2e/thread-prompts.spec.ts.
     });
   });
 }
@@ -464,43 +377,26 @@ test("reading deep into an open tool row when the turn ends: the row stays open 
   await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
 });
 
-test("leaving a thread forgets how it was folded: back on it, every finished turn is folded and its rows closed", async ({ page }) => {
+// Leaving a thread forgetting how it was folded (every finished turn folded, the rows the reader
+// opened closed): unit-tested in src/components/thread/timeline.test.tsx. Left here: back on
+// it, the list is pinned at the bottom again.
+test("leaving a thread scrolled up: back on it, the list is pinned at the bottom with the turn folded", async ({ page }) => {
   await openThread(page, "streaming");
   const timeline = page.getByTestId("thread-timeline");
-  // Scrolled up into the running turn (the user's wheel, so the list unpins even when the
-  // Edit row is already on screen), the user opens its Edit row; the turn ends (open).
+  await leaveSidebar(page, timeline);
   const box = await timeline.boundingBox();
   await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
-  await page.mouse.wheel(0, -200);
-  // The Edit is in the running turn's strip: expanded first.
-  await wheelUpTo(page, pane(page).getByTestId("thread-strip-row"));
-  await pane(page).getByTestId("thread-strip-row").click();
-  await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
+  await page.mouse.wheel(0, -400);
   await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
-  const editButton = () => pane(page).locator('[data-tool="Edit"]').getByTestId("thread-tool");
-  await editButton().click();
-  await expect(editButton()).toHaveAttribute("aria-expanded", "true");
   await mockPost("thread/finish");
   await expect(page.getByTestId("thread-working")).toHaveCount(0);
-  await expect(editButton()).toHaveAttribute("aria-expanded", "true");
 
   await row(page, "s:s-2").click();
   await expect(pane(page)).toHaveAttribute("data-thread-id", "s-2");
   await row(page, "s:s-r1").click();
   await expect(pane(page)).toHaveAttribute("data-thread-id", "s-r1");
-  // Back at the bottom with the turn folded.
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");
-  const header = headers(page).last();
-  await expect(header).toContainText(/·\$0\.04·Opus 4\.8/);
-  await expect(header).toHaveAttribute("data-folded", "true");
-  await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
-  // Unfolded again, the Edit row the user had opened is closed. The folded turn keeps its
-  // texts, so its header sits above the viewport: the user's wheel brings it in.
-  await wheelUpTo(page, header);
-  await header.locator("button.fold").click();
-  await expect(header).not.toHaveAttribute("data-folded", "true");
-  await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
-  await expect(editButton()).toHaveAttribute("aria-expanded", "false");
+  await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
 });
 
 // The live tool strip (one row per run of work in the running turn, "N steps", expanding in
@@ -549,50 +445,15 @@ test("a click on a header folds or unfolds its turn without moving the header on
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");
 });
 
-test("headers: the daemon's turn cost and model; a turn without them shows neither", async ({ page }) => {
-  await openThread(page, "idle");
-  // Turn 2 ran in a new process whose total passed the old one's: the difference of the
-  // totals would say $0.38; the daemon's turn cost says $1.50, and Sonnet 5 answered.
-  await expect(headers(page).last()).toContainText(/·\$1\.50·Sonnet 5$/);
-  // Turn 1 has neither (an older daemon, or a cost the daemon could not tell): no guess
-  // from the running total, no model from the thread's current one.
-  const first = await reveal(page, headers(page));
-  await expect(first).toContainText(/steps$/);
-  await expect(first).not.toContainText("$");
-  await expect(first).not.toContainText("Opus");
-});
+// Headers with the daemon's turn cost and model (none for a turn without them), a pending
+// question docked with its pager (and its timeline row), a follow-up taking a PDF sent as
+// [PDF: …]: unit-tested in src/components/thread/timeline.test.tsx, PendingPrompt.test.tsx and
+// ThreadComposer.test.tsx (the composer's own PDF flow: e2e/compose.spec.ts).
 
-test("a pending question docks with its pager", async ({ page }) => {
-  await openThread(page, "question");
-  await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Question");
-  await expect(pane(page).getByTestId("thread-question-row")).toContainText("Asking 2 questions");
-  const q = page.getByTestId("thread-composer").getByTestId("thread-question");
-  await expect(q).toContainText("Claude has 2 questions");
-  await expect(q).toContainText("1 of 2");
-  // Three options and Other.
-  await expect(q.getByRole("radio")).toHaveCount(4);
-  await q.getByRole("radio").nth(1).click();
-  await expect(q.getByRole("radio").nth(1)).toHaveAttribute("aria-checked", "true");
-  await q.getByTestId("thread-question-next").click();
-  await expect(q).toContainText("2 of 2");
-  await expect(q).toContainText("Should I also update the PR description?");
-});
-
-test("a follow-up takes a PDF: a tile, a chip with its pages, sent as [PDF: …]", async ({ page }) => {
-  await openThread(page, "idle");
-  const composer = page.getByTestId("thread-composer");
-  const editor = composer.locator('[contenteditable="true"]');
-  await editor.click();
-  await page.keyboard.type("Check");
-  await expect(composer.getByTestId("thread-attach")).toHaveAttribute("aria-label", "Attach images or PDFs");
-  await composer.getByTestId("thread-file-input").setInputFiles([{ name: "spec.pdf", mimeType: "application/pdf", buffer: testPdf(3) }]);
-  await expect(composer.getByTestId("attachment")).toHaveAttribute("data-pages", "3");
-  await expect(composer.getByTestId("prompt-chip")).toHaveAttribute("aria-label", "PDF attachment, spec.pdf, 3 pages");
-  await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.send")?.args.text ?? "").toMatch(/^Check \[PDF: spec\.pdf; ref=\S+-3p\.pdf\]$/);
-});
-
-test("a first message's PDFs: an inline chip with its pages, an unreferenced PDF tile, both open the paged preview", async ({ page }) => {
+// The bubble's PDF chip (its pages and thumbnail), the unreferenced tile, the preview's name,
+// size and pages: unit-tested in src/components/thread/UserBubble.test.tsx. Left here: pdf.js
+// drawing the sent PDFs' thumbnails and pages, a page drawn as it scrolls into view.
+test("a first message's PDFs: pdf.js draws the chip's and the tile's thumbnails and the preview's pages", async ({ page }) => {
   await openApp(page);
   await composeProject(page);
   const input = page.getByTestId("composer-file-input");
@@ -607,23 +468,13 @@ test("a first message's PDFs: an inline chip with its pages, an unreferenced PDF
   const bubble = page.getByTestId("thread-user").first();
   await expect(bubble).toContainText("Summarize", { timeout: 8000 });
   const chip = bubble.locator('[data-tag-kind="pdf"]');
-  await expect(chip).toHaveAttribute("aria-label", "PDF spec.pdf, 2 pages");
-  await expect(chip).toContainText("2 pages");
   await expect(chip.locator("img")).toHaveAttribute("src", /^data:image\/png;base64,/);
-  // The unreferenced PDF is the one tile above the bubble, its first page over a "PDF" strip.
   const tiles = bubble.getByRole("list", { name: "Attached files" }).getByTestId("thread-attachment");
-  await expect(tiles).toHaveCount(1);
-  await expect(tiles.first()).toHaveAttribute("data-kind", "pdf");
-  await expect(tiles.first()).toHaveAttribute("data-pages", "1");
-  await expect(tiles.first()).toContainText("PDF");
   await expect(tiles.first().locator("img")).toHaveAttribute("src", /^data:image\/png;base64,/);
 
-  // The chip opens the preview: name, size and pages, a drawn canvas per page.
+  // The chip's preview: a drawn canvas per page.
   const preview = page.getByTestId("thread-attachment-preview");
   await chip.click();
-  await expect(preview).toHaveAttribute("data-kind", "pdf");
-  await expect(page.getByTestId("thread-attachment-preview-name")).toHaveText("spec.pdf");
-  await expect(page.getByTestId("thread-attachment-preview-size")).toHaveText("1 KB · 2 pages");
   const pages = preview.getByTestId("pdf-page");
   await expect(pages).toHaveCount(2);
   await expect(pages.locator("canvas")).toHaveCount(2);
@@ -634,13 +485,10 @@ test("a first message's PDFs: an inline chip with its pages, an unreferenced PDF
   await page.keyboard.press("Escape");
   await expect(preview).toHaveCount(0);
 
-  // So does the tile.
+  // So does the tile's.
   await tiles.first().getByRole("button").click();
-  await expect(page.getByTestId("thread-attachment-preview-size")).toHaveText("1 KB · 1 page");
   await expect(preview.getByTestId("pdf-page")).toHaveCount(1);
   await expect(preview.getByTestId("pdf-page").first()).toHaveAttribute("data-rendered", "true");
-  await page.getByTestId("thread-attachment-preview-close").click();
-  await expect(preview).toHaveCount(0);
 });
 
 test("a follow-up goes through thread.send with the composer's tags projected; the reply streams in", async ({ page }) => {
@@ -743,54 +591,25 @@ test("only the visible thread holds a Watch; a page holds none", async ({ page }
   expect((await openStreams())["TerminalService/Attach"] ?? 0).toBe(0);
 });
 
-test("the thread.* commands are offered for a thread, not for a page", async ({ page }) => {
-  await openThread(page, "idle");
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Interrupt Thread");
-  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toBeVisible();
-  for (const title of ["Set Thread Model", "Fork Thread", "Set Thread Effort"]) {
-    await page.getByTestId("palette").getByRole("combobox").fill(title);
-    await expect(page.getByRole("option", { name: new RegExp(title) })).toBeVisible();
-  }
-  await page.keyboard.press("Escape");
-  // Every thread has them: the seeded s-3 too, stopped.
-  await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Set Thread Effort");
-  await expect(page.getByRole("option", { name: /Set Thread Effort/ })).toBeVisible();
-  await page.keyboard.press("Escape");
-  // A page has none of them.
-  await page.getByTestId("nav-projects").click();
-  await expect(page.getByTestId("projects-page")).toBeVisible();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Thread");
-  await expect(page.getByRole("option", { name: /New Thread/ })).toBeVisible();
-  for (const title of ["Interrupt Thread", "Fork Thread", "Set Thread Effort", "Set Thread Model"]) {
-    await expect(page.getByRole("option", { name: new RegExp(title) })).toHaveCount(0);
-  }
-});
+// The thread.* commands offered for a thread, not for a page: the daemon's availability rule
+// (internal/command/commands_thread_test.go TestThreadCommandsAvailability); the GUI's part,
+// the selection's context and the palette leaving out what is not available:
+// src/stores/context.test.ts and src/keys/bindings.test.ts (inPalette).
 
-test("a claude that did not start: its error in the timeline, the composer, and the next message starts it", async ({ page }) => {
+// A claude that did not start (its error row, the sidebar's Error and "did not start", the live
+// header with no starting word once a message goes, the error kept): unit-tested in
+// src/components/thread/timeline.test.tsx and src/components/sidebar/SidebarRow.test.tsx; the
+// restart on the next message is the daemon's.
+test("a claude that did not start (screenshots)", async ({ page }) => {
+  test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
   await openThread(page, "crashed");
-  await expect(pane(page).getByTestId("thread-error")).toHaveText("Claude did not start: exit code 1: error: unknown option '--bogus'");
-  await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Error");
-  await expect(row(page, "s:s-r1").getByTestId("row-detail")).toHaveText("did not start");
-  await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
-  const composer = page.getByTestId("thread-composer");
-  await expect(composer).toBeVisible();
+  await expect(pane(page).getByTestId("thread-error")).toBeVisible();
   await shot(page, "crashed");
-  await composer.getByTestId("composer-input").click();
+  await page.getByTestId("thread-composer").getByTestId("composer-input").click();
   await page.keyboard.type("Try again");
   await page.keyboard.press("Enter");
-  // While Claude starts the timeline shows the same live header as a turn, no "starting" word.
-  const working = page.getByTestId("thread-working");
-  await expect(working).toContainText("Working");
-  await expect(pane(page)).not.toContainText(/Starting Claude|starting…/);
+  await expect(page.getByTestId("thread-working")).toContainText("Working");
   await shot(page, "starting");
-  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.", { timeout: 10_000 });
-  await expect(working).toHaveCount(0, { timeout: 5000 });
-  await expect(pane(page).getByTestId("thread-error")).toBeVisible();
 });
 
 test("a fork shows its parent's conversation, ended by a Forked from note", async ({ page }) => {
@@ -813,35 +632,17 @@ test("a fork shows its parent's conversation, ended by a Forked from note", asyn
   await shot(page, "fork-note");
 });
 
-test("the follow-up placeholder says a message while Claude works steers the turn; one Interrupt", async ({ page }) => {
+// The follow-up placeholder by whether Claude works, with the one Interrupt; a message sent
+// mid-turn going through thread.send and showing as a steer inside the running turn (one
+// header when it ends): unit-tested in src/components/thread/ThreadComposer.test.tsx,
+// rows.test.tsx and src/lib/threadTimeline.test.ts.
+test("a steer (screenshot)", async ({ page }) => {
+  test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
   await openThread(page, "streaming");
-  const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
-  await expect(editor).toHaveAttribute("aria-placeholder", "Steer the agent mid-turn. @ files and threads, / skills and commands");
-  await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(1);
-  await mockPost("thread/finish");
-  await expect(editor).toHaveAttribute("aria-placeholder", "Reply or ask anything. @ files and threads, / skills and commands");
-  await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(0);
-});
-
-test("a message sent mid-turn is a steer: it stays inside the running turn, which ends with one header", async ({ page }) => {
-  await openThread(page, "streaming");
-  const before = await headers(page).count();
-  const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
-  await editor.click();
+  await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
   await page.keyboard.type("Also say hi when you are done");
   await page.keyboard.press("Enter");
-  await expect.poll(calls).toContain("send s-r1 Also say hi when you are done");
-  // A smaller bubble inside the turn, not a new turn's message.
-  const steer = pane(page).getByTestId("thread-steer");
-  await expect(steer).toContainText("Also say hi when you are done");
-  await expect(steer.getByTestId("thread-steer-caption")).toHaveText(/^sent mid-turn · \d/);
-  await expect(pane(page).getByTestId("thread-user").filter({ hasText: "Also say hi" })).toHaveCount(0);
-  // Claude answers it in the same turn: one header more, the turn folds, the steer stays.
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
-  await expect(headers(page)).toHaveCount(before + 1);
-  await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
-  await expect(steer).toBeVisible();
-  await expect(headers(page).last()).toContainText("steps");
-  await expect(pane(page).getByTestId("thread-user").filter({ hasText: "Also say hi" })).toHaveCount(0);
+  await expect(pane(page).getByTestId("thread-steer")).toBeVisible();
   await shot(page, "steer");
 });

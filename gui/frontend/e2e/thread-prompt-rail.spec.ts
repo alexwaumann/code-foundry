@@ -79,36 +79,22 @@ test("the idle thread's two prompts get a rail in the left gutter, clear of the 
   expect(bar?.height).toBe(2);
 });
 
-test("a thread with one prompt has no rail", async ({ page }) => {
-  await openThread(page, "streaming");
-  await expect(page.getByTestId("thread-user")).toHaveCount(1);
-  await expect(rail(page)).toHaveCount(0);
-});
-
-test("hovering a tick shows its prompt clamped to two lines, tags as labels, and when it was sent", async ({ page }) => {
+// One prompt, no rail; a tick's tooltip text (the image left out, tags as labels, when it was
+// sent, n of m): unit-tested in src/components/thread/PromptRail.test.tsx. Left here: the clamp,
+// the width cap and the side, which need a layout.
+test("a tick's tooltip is two lines at most, within the 260px cap, to the tick's right", async ({ page }) => {
   await openThread(page, "idle");
   await page.mouse.move(0, 0);
   await ticks(page).nth(0).hover();
   const tip = openTooltip(page);
   await expect(tip).toBeVisible();
-  // The image is left out; the file and skill tags read as their labels.
-  await expect(tip).toContainText("The PR badge in the sidebar stays green after a force-push, see Look at poller.go and fix it with /tdd. Keep");
-  await expect(tip).toContainText(/\d{1,2}:\d{2}.* · 1 of 2$/);
   const clamp = tip.locator(".line-clamp-2");
-  // Two lines of the body text at most, and the tooltip within the app's 260px cap.
   const lines = await clamp.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
   expect(lines).toBe(2);
   expect((await tip.boundingBox())?.width ?? 0).toBeLessThanOrEqual(260);
-  // To the tick's right.
   const tickBox = await ticks(page).nth(0).boundingBox();
   const tipBox = await tip.boundingBox();
   expect(tipBox?.x ?? 0).toBeGreaterThan((tickBox?.x ?? 0) + (tickBox?.width ?? 0));
-
-  await page.mouse.move(0, 0);
-  await expect(tip).toHaveCount(0);
-  await ticks(page).nth(1).hover();
-  await expect(openTooltip(page)).toContainText("Looks good. Run the full suite, then push the branch.");
-  await expect(openTooltip(page)).toContainText(" · 2 of 2");
 });
 
 test("clicking a tick scrolls its prompt near the top and leaves the focus where it was", async ({ page }) => {
@@ -161,28 +147,26 @@ test("a tick is reachable by keyboard and jumps on Enter", async ({ page }) => {
   await expect(ticks(page).nth(0)).toBeFocused();
 });
 
+// Ticks added as prompts arrive (labels, n of m, the newest in view): unit-tested in
+// src/components/thread/PromptRail.test.tsx. Left here: one real send, after which the list is
+// pinned at its end and the new tick is the one in view.
 const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
 
 for (const scheme of schemes) {
-  test(`sent prompts add ticks (${scheme})`, async ({ page }) => {
+  test(`a sent prompt adds a tick, in view (${scheme})`, async ({ page }) => {
     await openThread(page, "idle", scheme);
-    const prompts = ["Also check the poller's interval: the note says 30 s, but settings say 20. Which one is right?", "Use the setting. Update the note too.", "Ship it."];
-    for (const [i, text] of prompts.entries()) {
-      await threadPrompt(page).click();
-      await page.keyboard.type(text);
-      await page.keyboard.press("Enter");
-      await expect(ticks(page)).toHaveCount(3 + i);
-      // The mock's scripted reply ends its turn before the next prompt.
-      await expect(page.getByTestId("thread-timeline").getByText("Got it: I'll take a look now.")).toHaveCount(i + 1, { timeout: 5000 });
-      await expect(page.getByTestId("thread-timeline").locator('[data-row-type="header"]').last()).not.toContainText("Working");
+    await threadPrompt(page).click();
+    await page.keyboard.type("Also check the poller's interval: the note says 30 s, but settings say 20. Which one is right?");
+    await page.keyboard.press("Enter");
+    await expect(ticks(page)).toHaveCount(3);
+    await expect(page.getByTestId("thread-timeline").getByText("Got it: I'll take a look now.")).toHaveCount(1, { timeout: 5000 });
+    await expect.poll(() => inView(page)).toBe("001");
+    if (process.env.SHOTS) {
+      await page.mouse.move(0, 0);
+      await ticks(page).nth(2).hover();
+      await expect(openTooltip(page)).toContainText(" · 3 of 3");
+      await page.waitForTimeout(250);
+      await shot(page, `prompt-rail-${scheme}`);
     }
-    await expect(ticks(page)).toHaveCount(5);
-    await expect(ticks(page).nth(2)).toHaveAttribute("aria-label", /^Prompt 3 of 5: Also check the poller's interval/);
-    await expect.poll(() => inView(page)).toBe("00001");
-    await page.mouse.move(0, 0);
-    await ticks(page).nth(2).hover();
-    await expect(openTooltip(page)).toContainText(" · 3 of 5");
-    await page.waitForTimeout(250);
-    await shot(page, `prompt-rail-${scheme}`);
   });
 }
