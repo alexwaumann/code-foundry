@@ -263,3 +263,56 @@ describe("ThreadPane", () => {
     expect(getViewing()).toBeNull();
   });
 });
+
+// The mock's a0 and a3 (mock/agents.ts) as e2e/subagent-view.spec.ts opened them.
+describe("SubagentPane: the mock's done Explore and failed run", () => {
+  const EXPLORE_REPORT = "LinkedPrs in HeaderActions.tsx renders a CommandButton with a count when there are 2+ PRs";
+
+  it("a done foreground Explore: done status, lineage, its explore group, its report shown once as its last text, no report block", () => {
+    const a0 = run("a0", { toolUseId: "toolu_a0", description: "Find the header chip pattern", agentType: "Explore", model: "haiku", effort: "", background: false, status: "done", toolUses: 6, totalTokens: 9_400, durationMs: 12_000, summary: EXPLORE_REPORT, startedAtMs: NOW - 330_000, endedAtMs: NOW - 318_000 });
+    const explore = tool("toolu_a0", "", { name: "Agent", inputJson: JSON.stringify({ description: "Find the header chip pattern", subagent_type: "Explore", model: "haiku", prompt: "How are the header chips done?" }) });
+    setLog(
+      [a0],
+      [
+        user,
+        explore,
+        tool("g0", "toolu_a0", { name: "Grep", inputJson: JSON.stringify({ pattern: "LinkedPrs|CommandButton", path: "/w/gui/frontend/src" }), output: "HeaderActions.tsx", resultJson: JSON.stringify({ mode: "files_with_matches", numFiles: 3 }) }),
+        tool("r0", "toolu_a0", { name: "Read", inputJson: JSON.stringify({ file_path: "/w/gui/frontend/src/components/thread/HeaderActions.tsx" }), resultJson: JSON.stringify({ type: "text", file: { numLines: 112, startLine: 1, totalLines: 112 } }) }),
+        text("x0", "toolu_a0", EXPLORE_REPORT),
+      ],
+    );
+    show("a0");
+    expect(tid("subagent-name").textContent).toBe("Find the header chip pattern");
+    expect(tid("subagent-status").textContent).toBe("Done · 5 min ago");
+    expect(tid("subagent-lineage-meta").textContent).toMatch(/^foreground · Explore · Haiku · launched by turn 1's Agent call, [56] min ago$/);
+    expect(screen.getByTestId("thread-group").textContent).toBe("Read 1 file, searched code onceHeaderActions.tsx");
+    expect(tid("subagent-pane").querySelectorAll("[data-tool]")).toHaveLength(0);
+    expect(tid("subagent-footer").getAttribute("data-status")).toBe("done");
+    expect(tid("subagent-footer").textContent).toBe("Worked for 12s·6 tools·9.4K tokens·Haiku");
+    expect(screen.getAllByTestId("thread-text").map((t) => t.textContent).join("")).toContain(EXPLORE_REPORT);
+    expect(screen.queryByTestId("subagent-report")).toBeNull();
+    expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent finished and handed its report to Agents panel.");
+  });
+
+  it("a failed run: its two Bash rows, the last one failed; the error in the footer, no report", () => {
+    const a3 = run("a3", { toolUseId: "toolu_a3", description: "Screenshot the panel in Wails", agentType: "claude", model: "", background: true, status: "failed", error: "Stopped: process exited with code 1", toolUses: 9, totalTokens: 12_000, durationMs: 63_000, startedAtMs: NOW - 246_000, endedAtMs: NOW - 183_000 });
+    setLog(
+      [a3],
+      [
+        user,
+        tool("toolu_a3", "", { name: "Agent", status: "error", isError: true, inputJson: JSON.stringify({ description: "Screenshot the panel in Wails", run_in_background: true, prompt: "Screenshot it." }) }),
+        tool("b1", "toolu_a3", { inputJson: JSON.stringify({ command: "make gui-build" }), output: "built bin/Code Foundry" }),
+        tool("b2", "toolu_a3", { inputJson: JSON.stringify({ command: "open -a 'Code Foundry'" }), status: "error", isError: true, output: "LSOpenURLsWithRole() failed with error -10810 for the application Code Foundry." }),
+      ],
+    );
+    show("a3");
+    expect(tid("subagent-status").getAttribute("data-status")).toBe("failed");
+    expect(tid("subagent-status").textContent).toBe("Failed · 3 min ago");
+    const bash = [...tid("subagent-pane").querySelectorAll('[data-tool="Bash"]')];
+    expect(bash).toHaveLength(2);
+    expect(bash[1]?.getAttribute("data-status")).toBe("error");
+    expect(tid("subagent-footer").getAttribute("data-status")).toBe("failed");
+    expect(tid("subagent-footer").textContent).toContain("Stopped: process exited with code 1");
+    expect(screen.queryByTestId("subagent-report")).toBeNull();
+  });
+});

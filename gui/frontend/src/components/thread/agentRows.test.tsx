@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView } from "@/api/thread";
@@ -217,5 +217,112 @@ describe("agent notes", () => {
     const el = show([note("n1", "Forked from Fix the badge")], []);
     expect(q(el, "thread-agent-note")).toBeNull();
     expect(q(el, "thread-note")?.textContent).toBe("Forked from Fix the badge");
+  });
+});
+
+/**
+ * The mock's "agents" s-r1 (mock/agents.ts) as its Watch brings it, then a run ending over the
+ * stream: the folded finished turn with its background Agent calls and the failed run's note.
+ */
+describe("background runs in a finished turn", () => {
+  const REPORT = "Added task frame handling to the thread store with 14 table tests; make check is green.";
+  const bg = (id: string, description: string, o: Partial<Extract<ThreadItemView, { kind: "tool" }>> = {}) =>
+    agentCall(id, { inputJson: JSON.stringify({ description, subagent_type: "general-purpose", run_in_background: true }), ...o });
+  const turn: ThreadItemView[] = [
+    { ...user, text: "Build the agents panel" },
+    bg("t1", "PR 1: daemon task frames"),
+    { ...bg("t2", "PR 2: Agents surface in the panel"), ordinal: 3 },
+    { ...bg("t3", "Screenshot the panel in Wails", { status: "error", isError: true, output: "Stopped: process exited with code 1" }), ordinal: 4 },
+    { ...base, id: "a", ordinal: 5, kind: "text", text: "Both PRs are building in the background." },
+    { ...base, id: "e", ordinal: 6, kind: "turnEnd", subtype: "success", isError: false, interrupted: false, stopReason: "end_turn", terminalReason: "", durationMs: 48_000, numTurns: 4, costUsd: 0.12, turnCostUsd: 0.12, model: "claude-opus-4-8", inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, errors: [] },
+    { ...base, id: "n3", ordinal: 7, kind: "note", text: "Agent failed · Screenshot the panel in Wails · Stopped: process exited with code 1", createdBy: "", createdAtMs: NOW - 3 * 60_000 },
+  ];
+  const runs = [
+    run("a1", { toolUseId: "t1", description: "PR 1: daemon task frames", background: true, activity: "Running go test ./internal/store/..." }),
+    run("a2", { toolUseId: "t2", description: "PR 2: Agents surface in the panel", background: true }),
+    run("a3", { toolUseId: "t3", description: "Screenshot the panel in Wails", background: true, status: "failed", error: "Stopped: process exited with code 1", endedAtMs: NOW - 3 * 60_000, noteItemId: "n3" }),
+  ];
+
+  function Rows({ items }: { items: ThreadItemView[] }) {
+    const folds = useThreadStore((s) => s.folds.s);
+    const rows = buildRows(buildTurns(items.map((it) => decodeTimelineKey(timelineKey(structOf(it))))), { fold: (k) => folds?.[k], working: false });
+    return (
+      <div className="cf-thread">
+        <ThreadContext.Provider value={{ threadId: "s", cwd: "/w" }}>
+          {rows.map((r) => (
+            <TimelineRowView key={r.key} row={r} />
+          ))}
+        </ThreadContext.Provider>
+      </div>
+    );
+  }
+  const put = (items: ThreadItemView[], agents: AgentRunView[]) => {
+    useThreadStore.setState({ logs: { s: { seq: 1, byId: Object.fromEntries(items.map((it) => [it.id, it])), order: items.map((it) => it.id), pending: [], mcp: null, commands: [], agents } } });
+  };
+  const call = (el: HTMLElement, name: string) => [...el.querySelectorAll<HTMLElement>('[data-tool="Agent"]')].find((e) => e.textContent.includes(name)) as HTMLElement;
+
+  it("folded, the failed run's note shows; unfolded, the runs' chips; one ending turns its row done, opening to its report only, and a finished note follows", () => {
+    put(turn, runs);
+    const view = render(<Rows items={turn} />);
+    const el = view.container;
+    const notes = () => [...el.querySelectorAll<HTMLElement>('[data-testid="thread-agent-note"]')];
+    expect(notes()).toHaveLength(1);
+    expect(notes()[0]?.getAttribute("data-failed")).toBe("true");
+    expect(q(notes()[0] as HTMLElement, "thread-agent-note-name")?.textContent).toBe("Screenshot the panel in Wails");
+    expect(q(notes()[0] as HTMLElement, "thread-agent-note-summary")?.textContent).toBe("Stopped: process exited with code 1");
+    expect(notes()[0]?.textContent).toContain("Agent failed");
+    expect(q(el, "thread-note")).toBeNull();
+
+    fireEvent.click(el.querySelector('[data-testid="thread-turn-header"] button.fold') as HTMLElement);
+    expect([...el.querySelectorAll('[data-tool="Agent"]')].filter((a) => q(a as HTMLElement, "thread-agent-bg"))).toHaveLength(3);
+    const pr1 = () => call(el, "PR 1: daemon task frames");
+    expect(pr1().getAttribute("data-status")).toBe("running");
+    expect(q(pr1(), "thread-agent-activity")?.textContent).toBe("Running go test ./internal/store/...");
+    const shot = call(el, "Screenshot the panel in Wails");
+    expect(q(shot, "thread-agent-failed")?.textContent).toBe("failed");
+    expect(q(shot, "thread-agent-bg")?.textContent).toBe("background");
+
+    // PR 1 ends (the daemon's call update, run and note).
+    const ended = [
+      ...turn.map((it) => (it.id === "t1" && it.kind === "tool" ? { ...it, status: "done" as const, output: REPORT } : it)),
+      { ...base, id: "n1", ordinal: 8, kind: "note" as const, text: `Agent finished · PR 1: daemon task frames · ${REPORT}`, createdBy: "" },
+    ];
+    act(() => {
+      put(ended, runs.map((r) => (r.id === "a1" ? { ...r, status: "done" as const, summary: REPORT, endedAtMs: NOW, noteItemId: "n1" } : r)));
+    });
+    view.rerender(<Rows items={ended} />);
+    expect(pr1().getAttribute("data-status")).toBe("done");
+    expect(q(pr1(), "thread-agent-activity")).toBeNull();
+    const row = q(pr1(), "thread-tool") as HTMLElement;
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(row);
+    expect(q(pr1(), "thread-agent-report")?.textContent).toBe(REPORT);
+    expect(pr1().querySelectorAll("[data-tool]")).toHaveLength(0);
+    expect(notes()).toHaveLength(2);
+    const done = notes()[1] as HTMLElement;
+    expect(done.getAttribute("data-failed")).toBeNull();
+    expect(q(done, "thread-agent-note-name")?.textContent).toBe("PR 1: daemon task frames");
+    expect(q(done, "thread-agent-note-summary")?.textContent).toBe(REPORT);
+    expect(done.textContent).toContain("just now");
+  });
+
+  it("a background shell's call runs while its item says so and is done once the daemon ends it, in a finished turn", () => {
+    const shell = (id: string, name: string, input: object, status: "running" | "done") => ({ ...base, id, ordinal: 2, kind: "tool" as const, toolUseId: id, name, inputJson: JSON.stringify(input), status, output: "", isError: false, resultJson: "" });
+    const items = (b: "running" | "done", m: "running" | "done"): ThreadItemView[] => [
+      user,
+      shell("b", "Bash", { command: "make gui-e2e", run_in_background: true }, b),
+      { ...shell("m", "Monitor", { command: "tail -f log" }, m), ordinal: 3 },
+      { ...turn[5], ordinal: 4 } as ThreadItemView,
+    ];
+    put(items("running", "running"), []);
+    useThreadStore.setState({ folds: { s: { u: false } } });
+    const view = render(<Rows items={items("running", "running")} />);
+    const status = (name: string) => view.container.querySelector(`[data-tool="${name}"]`)?.getAttribute("data-status");
+    expect([status("Bash"), status("Monitor")]).toEqual(["running", "running"]);
+    act(() => {
+      put(items("done", "running"), []);
+    });
+    view.rerender(<Rows items={items("done", "running")} />);
+    expect([status("Bash"), status("Monitor")]).toEqual(["done", "running"]);
   });
 });
