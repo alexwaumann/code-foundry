@@ -33,9 +33,9 @@ What the page does, so you can answer questions about it:
   project and keeps none: new threads use the project.
 - **Step 3** unlocks once a project exists. Run the demo sends one sentence naming the project
   (name and id) and asking you to start three read-only threads on it
-  (`thread.new --project <id> --prompt … --notify --sidebar=false`; created-by is you by
-  default). The page's own board lists your children live and reads their state (working,
-  finished, needs permission, asked a question), so: NO sidebar rows, NO board or page of your
+  (`thread.new --project <id> --prompt … --notify`; created-by is you by default, so they
+  stay out of the sidebar). The page's own board lists your children live and reads their
+  state (working, finished, needs permission, asked a question), so: NO board or page of your
   own, no edits, and one line back when the three are started. When they wake you, one line
   each is enough; the user reads their results on the board by clicking a row.
 - The to-do bubble asks for a page that keeps everything the user does on it between visits:

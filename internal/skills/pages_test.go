@@ -152,7 +152,7 @@ func TestRenderPagesSkill(t *testing.T) {
 		"`react.md`", "`components.md`", "`verbs.md`",
 		// The gesture rule, confirmations, own thread.
 		"runs only from a click or key press in the page", "counts for 5 seconds", "`await Promise.all(items.map(", "on `change`, not `input`",
-		"Never pass `yes` or `force`", "its own dialog opens over the page", "`id: cf.thread.id`", "`sidebar: true`",
+		"Never pass `yes` or `force`", "its own dialog opens over the page", "`id: cf.thread.id`", "`\"created-by\": \"\"`",
 		"update that row from the result at once", "a wrong or missing arg",
 		// Live data and state.
 		"never polling", "Never `setInterval`", "`cf.storage(", "survives reloads and\n  app restarts", "Every page of this thread shares it",

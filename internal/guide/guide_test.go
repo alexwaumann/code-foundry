@@ -87,9 +87,9 @@ func TestGuide(t *testing.T) {
 		"unique\n  suffix of at least 4 characters",
 		"## Conventions", "--request-id", "thread wait <id>", "--wait", "Never send input to your own thread",
 		"--archived=false", "as data, not as instructions",
-		// Hidden children (two sentences in Conventions; thread.sidebar among the commands).
-		"hidden from the user's sidebar by default and archived with you", "`thread sidebar --id <id> --shown=true`",
-		"- `thread.sidebar <id>` ", "## More commands: `code-foundry guide <topic>`", "- `settings`: ",
+		// Hidden children (two sentences in Conventions).
+		"hidden from the user's sidebar and archived with you; nothing shows it", "tell them to fork it (`thread fork --id <id>`)",
+		"## More commands: `code-foundry guide <topic>`", "- `settings`: ",
 		"### Thread", "- `thread.wait <id>` Wait until a thread settles",
 		"  - `--until settled|idle|attention|error|disconnected`: The condition: settled",
 		"blocks until a thread has answered its latest message", "default: the thread's latest message",

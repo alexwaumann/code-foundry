@@ -130,7 +130,7 @@ A single number that follows the app needs no React: plain DOM and the theme's c
 ## A form that creates threads
 
 One `thread.new` per line, all started in the submit handler. The threads are this
-thread's children; `sidebar: true` shows them in the user's sidebar. A `request-id` per
+thread's children, out of the user's sidebar (its thread info card lists them). A `request-id` per
 line makes a second submit of the same line start nothing: it resolves with the thread
 made the first time, which is a success, not an error.
 
@@ -166,7 +166,7 @@ made the first time, which is a success, not an error.
     const lines = tasks.value.split("\n").map((s) => s.trim()).filter(Boolean);
     // Every call starts here, inside the submit: an await between them would lose the gesture.
     const results = await Promise.allSettled(lines.map((line) =>
-      cf.run("thread.new", { prompt: line, sidebar: true, "request-id": "spawner-" + key(line) })));
+      cf.run("thread.new", { prompt: line, "request-id": "spawner-" + key(line) })));
     const out = document.getElementById("done");
     results.forEach((r, i) => {
       const li = document.createElement("li");

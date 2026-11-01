@@ -13,7 +13,7 @@ Args by name, values after them in plain text; `code-foundry help <verb>` has th
 | `thread.archive` (asks when busy) | `id`; `archived` false unarchives |
 | `thread.snooze` | `id`, `until` 1h, 3h, tomorrow, next-week, mon…sun or a date; or `clear` true |
 | `thread.pin`, `thread.send` | `id`; `pinned` true or false; `text` the message |
-| `thread.new` | `prompt`, `name`, `project` id, `new-worktree` true, `sidebar` true |
+| `thread.new` | `prompt`, `name`, `project` id, `new-worktree` true, `created-by` "" for a thread of the user's own |
 | `settings.get` (read), `settings.set` | `key`; `value` as a string |
 | `usage.show` (read) | `thread` an id, or `all` true |
 | `composer.stage` | `text` goes in the composer for the user to send (never sent); `thread` defaults to this one |

@@ -75,12 +75,6 @@ send --id <child> "the app restarted; continue"` once. Subscriptions survive a r
 do not subscribe again. `thread reports --created-by $CODE_FOUNDRY_THREAD --all` shows
 what had been reported before the stop.
 
-## A child you handed over
-
-`thread sidebar --shown=true` does not end your `--notify` subscription on it: run
-`code-foundry thread unsubscribe --thread <child>` (`reference/sidebar.md`), or every
-steer the user sends it wakes you, and its wakes are not yours to act on.
-
 ## Plugin wake sources
 
 When a plugin names a wake source (`code-foundry thread subscribe --plugin

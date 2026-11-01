@@ -108,8 +108,8 @@ React and `@cf/icons` still work; keep `/cf/bridge.js`, it sizes the card.
 - **On success** update that row from the result at once in your own words: never print `text`.
 - **This thread**: pass `id` (`id: cf.thread.id` for the page's own: without one, archive, remove and snooze
   refuse it). Leave `cf.thread.id` out of lists of threads to act on: archiving it closes the page.
-- **Threads a page starts** (`thread.new`) are hidden children: pass `sidebar: true` when the user will want
-  them, a `prompt`, and a `request-id` per row: a second click then resolves with the same thread, a success.
+- **Threads a page starts** (`thread.new`) are this thread's hidden children (`"created-by": ""` and a `project` id: the user's own,
+  in their sidebar); pass a `prompt`, and a `request-id` per row: a second click then resolves with the same thread, a success.
 - **Errors**: `cf.run` rejects with an `Error` whose `code` is one of {{cf.bridgeErrors}}.
   Catch every call and show `e.message` where it happened (that row, that button):
   - `gesture`: called outside a click or key press: move the call into the handler.
