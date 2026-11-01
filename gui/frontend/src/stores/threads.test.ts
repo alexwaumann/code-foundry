@@ -187,6 +187,23 @@ describe("thread reducers", () => {
     expect(attentionIds(d)).toEqual(["a", "b", "g"]);
   });
 
+  it("attentionIds leaves out a child thread while its creator exists; orphaned, a waiting one counts (docs/notes/no-sidebar-override-1-gui.md)", () => {
+    const d = replaceThreads(emptyThreads, [
+      thread("p", { status: "busy" }),
+      thread("done", { status: "attention", statusReason: "finished", createdBy: "p" }),
+      thread("ask", { status: "attention", statusReason: "permission: Bash rm -rf cookies", createdBy: "p" }),
+      thread("err", { status: "attention", statusReason: "error: overloaded", createdBy: "p" }),
+      thread("work", { status: "busy", createdBy: "p" }),
+      thread("mine", { status: "attention" }),
+    ]);
+    expect(attentionIds(d)).toEqual(["mine"]);
+    expect(windowTitle(attentionIds(d).length)).toBe("Code Foundry (1)");
+    // The creator goes alone (thread/forget): the three waiting children are the user's now.
+    const orphaned = applyThreadListEvent(d, { kind: "removed", id: "p" });
+    expect([...attentionIds(orphaned)].sort()).toEqual(["ask", "done", "err", "mine"]);
+    expect(windowTitle(attentionIds(orphaned).length)).toBe("Code Foundry (4)");
+  });
+
   it("running counts starting threads, never a stopped busy one", () => {
     const d = replaceThreads(emptyThreads, [
       thread("busy1", { status: "busy", createdAtMs: 1 }),

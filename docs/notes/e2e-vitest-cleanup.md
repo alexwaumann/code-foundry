@@ -68,7 +68,7 @@ New files:
   replacing it; a failed search's empty text.
 * `components/palette/pathCompletion.test.tsx`: "Folders (first 200)" for a bounded listing;
   the git and already-added marks.
-* `components/plugin/PluginSurface.test.tsx`: the surface's watch opens with the panel's
+* `components/plugin/PluginSurface.watch.test.tsx`: the surface's watch opens with the panel's
   thread as its context (an act carries it: pluginAct.test.ts).
 * `components/thread/activity.test.ts`: `timelineStrips` on while working or waiting mid-turn,
   off 2 s after the turn and for a stopped thread (the ThreadPane wiring the strip e2e covered).

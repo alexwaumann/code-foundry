@@ -58,6 +58,14 @@ describe("SidePanel", () => {
     }
   });
 
+  it("an empty panel's + lists File, Diff and Pull request with their letters, none of the removed surfaces", () => {
+    render(<SidePanel />);
+    const empty = screen.getByTestId("panel-empty");
+    const entries = [...empty.querySelectorAll<HTMLElement>("[data-surface]")].filter((e) => !(e.dataset.surface ?? "").startsWith("plugin."));
+    expect(entries.map((e) => e.textContent)).toEqual(["FileF", "DiffD", "Pull requestP"]);
+    for (const gone of ["usage", "linkedprs", "threads", "agents", "worktree", "mcp", "changes"]) expect(empty.querySelector(`[data-surface="${gone}"]`)).toBeNull();
+  });
+
   it("mounts each tab's body fresh, even for two tabs of one kind", () => {
     // State captured at mount: a reused component would keep showing the first tab's id.
     function Probe({ id }: { id: string }) {

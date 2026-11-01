@@ -191,40 +191,8 @@ test("a tabs node with eight long titles at the panel's width scrolls its strip,
   expect((await acts()).some((a) => a.includes(" t0 "))).toBe(true);
 });
 
-test("runs: select and Back thrash with slow acts and coalesced views ends consistent, nothing stuck pending", async ({ page }) => {
-  const errors = watchErrors(page);
-  await openDemo(page);
-  await tab(page, "run-list").click();
-  await expect(tab(page, "run-list")).toHaveAttribute("aria-selected", "true");
-  await control("__actdelay:120");
-  await control("__viewdelay:100");
-  const md = surface(page).locator('[data-testid="plugin-master-detail"][data-key="runs-md"]');
-  const runRow = (n: number) => md.locator(`[data-testid="plugin-row"][data-key="runs-run-${String(n)}"]`);
-  const seen = new Set<string>();
-  const observe = async () => {
-    seen.add((await md.getAttribute("data-showing")) ?? "");
-  };
-  for (const n of [5, 3, 1, 4]) {
-    await runRow(n).click();
-    await observe();
-    await md.getByTestId("plugin-md-back").click();
-  }
-  await runRow(2).click();
-  // Sample the narrow state while the act and the coalesced view land.
-  const trail: string[] = [];
-  for (let i = 0; i < 30; i++) {
-    trail.push(`${(await md.getAttribute("data-showing")) ?? ""}:${(await md.getAttribute("data-selected")) ?? ""}`);
-    await page.waitForTimeout(10);
-  }
-  test.info().annotations.push({ type: "md-trail", description: trail.join(" ") });
-  await expect(md).toHaveAttribute("data-selected", "runs-run-2");
-  await expect(md).toHaveAttribute("data-showing", "detail");
-  await expect(md.locator('[data-testid="plugin-md-content"][data-pending]')).toHaveCount(0);
-  expect(errors).toEqual([]);
-  // The flash: after the act answered and before the view came, the old selection (or the list) showed again.
-  expect(trail.filter((t) => t !== "detail:runs-run-2"), `md-3 flash: ${trail.join(" ")}`).toEqual([]);
-});
-
+// Select and Back thrash with slow acts and coalesced views, ending on the last row with nothing pending
+// and no flash: unit-tested in src/components/plugin/layoutprobe.test.tsx (md-thrash, md-3).
 // A refused choice after a later one leaves the later one's detail: unit-tested in src/components/plugin/layoutprobe.test.tsx (md-1)
 
 test("tab switching mid-act and resize thrash end on the plugin's tab with its drafts", async ({ page }) => {

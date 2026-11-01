@@ -113,6 +113,39 @@ describe("master-detail: the optimistic choice", () => {
     expect(document.activeElement?.getAttribute("data-testid")).toBe("plugin-md-back");
   });
 
+  it("md-thrash: select and Back over three rows with every act in flight, then a fourth; acts and coalesced views land late and out of step; it ends on the last row, nothing pending, no flash (narrow)", async () => {
+    geo.width = 360;
+    mount(view(md({ selected: "" })));
+    for (const k of ["r1", "r3", "r1"]) {
+      fireEvent.click(row(k) as HTMLElement);
+      fireEvent.click(screen.getByTestId("plugin-md-back"));
+    }
+    fireEvent.click(row("r2") as HTMLElement);
+    // Back sends nothing: one act per choice.
+    expect(acts.calls.map((c) => c.key)).toEqual(["r1", "r3", "r1", "r2"]);
+    const trail: string[] = [];
+    const sample = () => trail.push(`${root()?.dataset.showing ?? ""}:${root()?.dataset.selected ?? ""}`);
+    sample();
+    await settle(true); // r1 answered
+    sample();
+    pushView(view(md({ selected: "r1" }))); // its view, coalesced late
+    sample();
+    await settle(true); // r3
+    await settle(true); // r1 again
+    sample();
+    pushView(view(md({ selected: "r3" }))); // an older view still on its way
+    sample();
+    await settle(true); // r2 answered before its view
+    sample();
+    pushView(view(md({ selected: "r2" })));
+    sample();
+    expect(trail.filter((t) => t !== "detail:r2")).toEqual([]);
+    expect(root()?.dataset.selected).toBe("r2");
+    expect(root()?.dataset.showing).toBe("detail");
+    expect(document.querySelector('[data-testid="plugin-md-content"][data-pending]')).toBeNull();
+    expect(acts.settle).toHaveLength(0);
+  });
+
   it("tabs-1: a node tab's act answering before the next view keeps the clicked tab active until the view comes", async () => {
     mount(view({ key: "tb", tabs: { items: [{ key: "ta", label: "A" }, { key: "tbb", label: "B" }], active: "ta", children: [{ key: "a-text", text: { content: "tab A" } }] } }));
     fireEvent.click(document.querySelector('[data-testid="plugin-node-tab"][data-key="tbb"]') as HTMLElement);

@@ -160,10 +160,11 @@ test("storage survives a reload; a theme switch reaches the page without one", a
 
 // A page starting a thread without moving the view, as its thread's child: src/stores/bridgeHost.test.ts (thread.new with created-by and focus=false), src/lib/inSidebar.test.ts (a child of a present creator is out of the sidebar).
 
-test("a page's errors show on its strip; Ask Claude puts them in the thread's composer, not sent", async ({ page }) => {
+// The badge's count, the popover's rows (latest first, "2×"), Ask Claude's text and nothing sent:
+// src/components/files/PageErrors.test.tsx; which answers count: src/stores/bridgeHost.test.ts.
+test("a page's errors show on its strip; Ask Claude's text lands in the thread's prompt; a reload of the page clears them", async ({ page }) => {
   await openBridgeThread(page);
   const badge = card(page).getByTestId("page-errors");
-  await expect(badge).toHaveCount(0);
   await doc(page).locator("#misspelt").click();
   await expect(doc(page).locator("#error-out")).toHaveText(/^invalid: .*unknown argument "archivd"/);
   await doc(page).locator("#misspelt").click();
@@ -171,9 +172,7 @@ test("a page's errors show on its strip; Ask Claude puts them in the thread's co
   await expect(badge).toHaveText("3");
   await badge.click();
   const pop = page.getByTestId("page-errors-popover");
-  await expect(pop.getByTestId("page-error")).toHaveCount(2);
-  await expect(pop.getByTestId("page-error").first()).toContainText("no.such.verb");
-  await expect(pop.getByTestId("page-error").last()).toContainText("2×");
+  await expect(pop).toBeVisible();
   if (shots) {
     for (const scheme of ["dark", "light"] as const) {
       await page.emulateMedia({ colorScheme: scheme });
@@ -185,8 +184,6 @@ test("a page's errors show on its strip; Ask Claude puts them in the thread's co
   await pop.getByTestId("page-errors-ask").click();
   const prompt = page.getByTestId("thread-composer").getByTestId("composer-prompt");
   await expect(prompt).toHaveAttribute("data-value", /^The page Bridge check \(.*bridge\.html\) got these errors from Code Foundry/);
-  await expect(prompt).toHaveAttribute("data-value", /thread\.list: invalid: .*archivd.* \(2 times\)/);
-  expect((await invocations()).some((i) => i.name === "thread.send")).toBe(false);
   // A reload of the page clears them.
   const pageRow = page.getByTestId("thread-html").filter({ hasText: "bridge.html" }).getByTestId("thread-html-row");
   await pageRow.click();
@@ -312,6 +309,8 @@ test("a run id already in flight is refused, and a page's cancel or reload abort
   ]);
 });
 
+// Kept: the lightbox frame's own bridge answering (its #thread and a notify round trip) is the
+// real iframe's; HtmlFrame.test.tsx has the nonce per frame.
 test("the lightbox's copy of a page has its thread's bridge, under a nonce of its own", async ({ page }) => {
   await openBridgeThread(page);
   const cardNonce = await doc(page).locator("body").evaluate(NONCE);
@@ -423,24 +422,17 @@ test("a card that shrinks under the pointer keeps its top; without the pointer t
 const mockFetchList = async (): Promise<{ url: string; method: string; headers: Record<string, string>; aborted: boolean }[]> =>
   (await fetch(`${mockUrl}/__mock/fetches`)).json() as Promise<{ url: string; method: string; headers: Record<string, string>; aborted: boolean }[]>;
 
-test("cf.fetch goes through the daemon: the upstream's answer, a 401 as a response, loopback refused invalid; a timeout aborts it", async ({ page }) => {
+// cf.fetch's answers (any status a response, errors by host, the strip's count of a refusal):
+// src/stores/bridgeHost.test.ts and src/lib/cfBridgeScript.test.ts; the loopback refusal is the
+// daemon's (internal/proxyfetch/proxyfetch_test.go). Here the page's timeout reaching the daemon.
+test("cf.fetch: a page's timeout aborts the daemon's request", async ({ page }) => {
   await openBridgeThread(page);
-  const out = doc(page).locator("#fetch-out");
-  await doc(page).locator("#fetch").click();
-  await expect(out).toHaveText("200 3 issues");
-  await expect(out).toHaveClass(/ok/);
-  await doc(page).locator("#fetch-token").click();
-  await expect(out).toHaveText("401 bad token");
-  const sent = await mockFetchList();
-  expect(sent.map((f) => [f.url, f.method, f.headers.Authorization])).toEqual([
-    ["https://upstream.test/issues", "GET", "Bearer good"],
-    ["https://upstream.test/issues", "GET", "Bearer bad"],
-  ]);
-  await doc(page).locator("#fetch-local").click();
-  await expect(out).toHaveText(/^invalid: 127\.0\.0\.1 is a loopback address/);
-  // The strip counts the refusal, by host; a 401 is no error.
-  await expect(card(page).getByTestId("page-errors")).toHaveText("1");
   if (shots) {
+    const out = doc(page).locator("#fetch-out");
+    await doc(page).locator("#fetch").click();
+    await expect(out).toHaveText("200 3 issues");
+    await doc(page).locator("#fetch-local").click();
+    await expect(card(page).getByTestId("page-errors")).toHaveText("1");
     for (const scheme of ["dark", "light"] as const) {
       await page.emulateMedia({ colorScheme: scheme });
       await page.waitForTimeout(400);

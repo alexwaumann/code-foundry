@@ -54,7 +54,7 @@ test("the Assistant tab shows the plugin's thread inline with its composer; it i
   await expect(thread.getByTestId("thread-timeline")).toContainText("and once more");
 });
 
-// Ask the main thread acting with the panel's context: src/components/plugin/PluginSurface.test.tsx (the watch opens with the panel's thread) and src/stores/pluginAct.test.ts (an act carries its watch's context); what the hello plugin does with it is the mock's.
+// Ask the main thread acting with the panel's context: src/components/plugin/PluginSurface.watch.test.tsx (the watch opens with the panel's thread) and src/stores/pluginAct.test.ts (an act carries its watch's context); what the hello plugin does with it is the mock's.
 
 test("the Shell tab attaches the plugin's terminal; Open in bottom panel moves it to a bottom tab", async ({ page }) => {
   await openDemoTab(page, "shell");
