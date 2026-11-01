@@ -18,14 +18,6 @@ function rowKeys(page: Page): Promise<string[]> {
     .evaluateAll((els) => els.map((e) => (e.getAttribute("data-row-kind") === "header" ? `# ${e.textContent}` : (e.getAttribute("data-row-key") ?? ""))));
 }
 
-/** Rows of the main list (not the footers), keys in order. */
-function mainKeys(page: Page): Promise<string[]> {
-  return page
-    .getByTestId("sidebar-main")
-    .locator("[data-row-key]")
-    .evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key") ?? ""));
-}
-
 function box(page: Page, testId: string) {
   return page.getByTestId(testId).evaluate((el) => {
     const r = el.getBoundingClientRect();
@@ -97,32 +89,9 @@ test("Archived section: collapsed by default with its count; expanded, single-li
   await expect(row(page, "s:s-7")).toHaveCount(0);
 });
 
-test("Archive from the row menu moves a thread to Archived and out of the main list; Unarchive brings it back, idle", async ({ page }) => {
-  await openApp(page);
-  // s-3: an idle thread (stopped). Archiving it asks nothing.
-  let menu = await openMenu(page, "s:s-3");
-  await expect(menu.getByTestId("menu-archive")).toHaveText("Archive");
-  await menu.getByTestId("menu-archive").click();
-  await expect(page.getByTestId("archived-count")).toHaveText("2");
-  await expect.poll(() => mainKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4"]);
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  const inv = (await invocations()).filter((i) => i.name === "thread.archive").at(-1);
-  expect(inv?.args).toEqual({ archived: "true" });
-  expect(inv?.context?.activeThreadId).toBe("s-3");
-
-  // Most recently archived first.
-  await page.getByTestId("archived-header").click();
-  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "# Archived 2", "s:s-3", "s:s-7"]);
-  await expect(row(page, "s:s-3").getByTestId("row-archived-age")).toHaveText("0m");
-
-  menu = await openMenu(page, "s:s-3");
-  await expect(menu.getByTestId("menu-archive")).toHaveText("Unarchive");
-  await menu.getByTestId("menu-archive").click();
-  await expect(page.getByTestId("archived-count")).toHaveText("1");
-  await expect(row(page, "s:s-3")).toHaveAttribute("data-section", "idle");
-  await expect.poll(() => mainKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3"]);
-  expect((await invocations()).filter((i) => i.name === "thread.archive").at(-1)?.args).toEqual({ archived: "false" });
-});
+// Archive and Unarchive in the row menu, their thread.archive, and the Archived section's order and age:
+// unit-tested in src/components/thread/ThreadMenuItems.test.tsx, src/stores/threadActions.test.ts,
+// src/lib/tree.test.ts and src/components/sidebar/SidebarRow.test.tsx (the daemon asks only mid-turn).
 
 test("archiving a working thread asks first (the daemon's confirmation); it then drops its side panel and bottom panel", async ({ page }) => {
   await openApp(page);

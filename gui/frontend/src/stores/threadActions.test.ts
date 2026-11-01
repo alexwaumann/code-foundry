@@ -8,7 +8,7 @@ vi.mock("./context", () => ({ getUiContext: (target: { id: string }) => ({ activ
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-const { respondThread, snoozeThread, THREAD_COMMANDS, toggleThreadSidebar } = await import("./threadActions");
+const { archiveThread, respondThread, snoozeThread, THREAD_COMMANDS, toggleThreadSidebar } = await import("./threadActions");
 const { useThreadStore } = await import("./thread");
 const { useThreadsStore } = await import("./threads");
 const { useSettingsStore } = await import("./settings");
@@ -41,6 +41,17 @@ describe("snoozeThread", () => {
   it("null unsnoozes with clear", async () => {
     await snoozeThread("s2", null);
     expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { clear: "true" }, { activeThreadId: "s2" });
+  });
+});
+
+describe("archiveThread", () => {
+  it.each([
+    ["archives", true, "true"],
+    ["unarchives", false, "false"],
+  ] as const)("%s in the thread's context", async (_, archived, arg) => {
+    expect(await archiveThread("s3", archived)).toBe(true);
+    expect(commands.runCommand).toHaveBeenCalledWith("thread.archive", { archived: arg }, { activeThreadId: "s3" });
+    expect(THREAD_COMMANDS.archive).toBe("thread.archive");
   });
 });
 
