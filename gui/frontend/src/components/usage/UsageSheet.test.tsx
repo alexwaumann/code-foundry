@@ -104,7 +104,7 @@ describe("UsageSheet", () => {
     expect(screen.getByTestId("usage-page-chart").getAttribute("data-mode")).toBe("cost");
     expect(screen.getByTestId("usage-page-tooltip").textContent).toBe("Oct 10claude-opus-5-5$1.25claude-fable-5-1$3.00Total$4.25");
     expect(screen.getByTestId("usage-page-mode-cost").getAttribute("aria-pressed")).toBe("true");
-    expect(axis().some((t) => t?.startsWith("$"))).toBe(true);
+    expect(axis().some((t) => t.startsWith("$"))).toBe(true);
     fireEvent.mouseLeave(day);
     expect(screen.queryByTestId("usage-page-tooltip")).toBeNull();
   });
