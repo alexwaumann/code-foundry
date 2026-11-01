@@ -224,3 +224,17 @@ describe("a local-only repository (compose.spec.ts)", () => {
     expect(lastInvocation("thread.new")?.args).toMatchObject({ project: "repo-sk", "new-worktree": "true", base: "experiment/shaders" });
   });
 });
+
+describe("thread tags (composer-threads.spec.ts)", () => {
+  it("the send projects a thread tag for the daemon and keeps the tag as the composer prompt", async () => {
+    seedComposer();
+    composeIn("repo-cf");
+    render(<SelectedComposer />);
+    await settle();
+    type("repo-cf", "[Fix resize race](cf-thread://s-3) hit the same bug");
+    await send();
+    const args = lastInvocation("thread.new")?.args;
+    expect(args?.prompt).toBe('[Thread "Fix resize race" (id s-3)] hit the same bug');
+    expect(args?.["composer-prompt"]).toBe("[Fix resize race](cf-thread://s-3) hit the same bug");
+  });
+});

@@ -109,3 +109,17 @@ describe("UserBubble", () => {
     });
   });
 });
+
+describe("UserBubble: a thread tag (composer-threads.spec.ts)", () => {
+  it("draws the thread's current name; its tooltip says the project, then what it is doing", async () => {
+    const { seedWorld } = await import("@/test/projectsWorld");
+    const { hoverTooltipText } = await import("@/test/tooltip");
+    seedWorld();
+    render(<UserBubble text='[Thread "Fix resize race" (id s-3)] has the same race' composerText="[An old name](cf-thread://s-3) has the same race" attachments={[]} createdAtMs={null} />);
+    const chip = screen.getByTestId("thread-user").querySelector<HTMLElement>('[data-tag-kind="thread"]');
+    if (!chip) throw new Error("no thread chip");
+    expect(chip.textContent).toBe("Fix resize race");
+    expect(chip.getAttribute("data-thread")).toBe("s-3");
+    expect((await hoverTooltipText(chip)).replace(/\s+/g, " ")).toBe("code-foundry Idle");
+  });
+});
