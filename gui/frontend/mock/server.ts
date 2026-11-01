@@ -985,7 +985,7 @@ const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idl
 const flagLevels: Record<string, ThreadFlagLevel | null> = { attention: ThreadFlagLevel.ATTENTION, error: ThreadFlagLevel.ERROR, none: null };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale|transcript}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript}?id=…[&status=…][&reason=…&code=…].
  * transcript: [&missing=false] (Claude Code deleted the thread's transcript: stopped, held and flagged).
  * flag: &plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1] (a plugin's thread/setFlag).
  */
@@ -1021,7 +1021,9 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         break;
       case "forget":
         world.forgetThread(id);
-        break;
+        // Gone: no summary to answer with.
+        json(res, 200, { forgotten: id });
+        return;
       case "snooze":
         world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
         break;
@@ -1103,7 +1105,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale|transcript)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;
