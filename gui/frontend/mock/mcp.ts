@@ -118,7 +118,7 @@ export function ageMcp(threads: McpThreads, id: string, agoSeconds: number): voi
  */
 export function keepMcpServers(threads: McpThreads, id: string, names: readonly string[]): void {
   const cur = threads.mcpOf(id) ?? mcpFixture();
-  threads.setMcp(id, { ...cur, servers: mcpServers().filter((s) => names.includes(s.name ?? "")) });
+  threads.setMcp(id, { checkedAt: cur.checkedAt, trigger: cur.trigger, server: cur.server, servers: mcpServers().filter((s) => names.includes(s.name ?? "")) });
 }
 
 /** McpReconnect: the new status and Claude's refusal ("" when it went through). */
