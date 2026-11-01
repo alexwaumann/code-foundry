@@ -455,6 +455,13 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 				return nil, err
 			}
 		}
+		// Archived or snoozed again after a wake, before Archive and Snooze cleared
+		// the "snooze ended" status (snooze.go).
+		if (!s.ArchivedAt.IsZero() || !s.SnoozedUntil.IsZero()) && clearSnoozeEnded(&s, opts.Now()) {
+			if err := saveThread(ctx, opts.DB, s); err != nil {
+				return nil, err
+			}
+		}
 		s.CacheExpiresAt = cacheExpiry(s.LastResultAt, opts.CacheTTL)
 		s.Flags = flags[s.ID]
 		s.TranscriptMissing = transcripts.gone(s) // every thread is stopped here

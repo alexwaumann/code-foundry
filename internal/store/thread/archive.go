@@ -135,7 +135,8 @@ func (e *CascadeError) Unwrap() error { return ErrFailedPrecondition }
 // It forgets the thread's wake subscriptions and the wakes about it first
 // (unwatchForArchive), closes the thread like Close (a no-op when it is disconnected),
 // kills and removes its shells and stops what it left running in its worktree like
-// Remove, then, under m.mu, unpins and unsnoozes it and stamps
+// Remove, then, under m.mu, unpins and unsnoozes it, clears a "snooze ended" status
+// (clearSnoozeEnded), and stamps
 // ArchivedAt unless it already has one (a second archive keeps the first time). A turn
 // the close cut off leaves the thread idle ReasonArchived instead of error
 // ReasonInterrupted. A Reconnect that wins the race between the close and that last
@@ -211,7 +212,8 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 	// failure, so it reads idle "archived" rather than error "interrupted".
 	stopped := !wasInterrupted && archivedStatus(&rec.s, m.opts.Now())
 	unsnoozed := m.unsnoozeLocked(rec) // archive and snooze are exclusive
-	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned && !unsnoozed && !stopped {
+	woke := clearSnoozeEnded(&rec.s, m.opts.Now())
+	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned && !unsnoozed && !stopped && !woke {
 		return rec.s, false, nil
 	}
 	newly := rec.s.ArchivedAt.IsZero()

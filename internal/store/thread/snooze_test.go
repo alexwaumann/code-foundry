@@ -354,3 +354,76 @@ func TestSnoozeWakesAtStartup(t *testing.T) {
 		t.Errorf("after the startup check = %+v, %v; want disconnected, woken at %v", got, err, woke)
 	}
 }
+
+// wokenThread is a snoozed thread whose snooze ended: disconnected, needs attention
+// "snooze ended".
+func (e *env) wokenThread(clk *testClock) Thread {
+	e.t.Helper()
+	s := e.snoozed()
+	clk.advance(time.Hour + time.Second)
+	return e.waitFor(s.ID, "wake", func(s Thread) bool { return s.StatusReason == ReasonSnoozeEnded })
+}
+
+func TestSnoozeEndedClearedBy(t *testing.T) {
+	tests := []struct {
+		name string
+		put  func(e *env, clk *testClock, id string) (Thread, error)
+	}{
+		{name: "snooze", put: func(e *env, clk *testClock, id string) (Thread, error) {
+			return e.m.Snooze(e.ctx(), id, clk.Now().Add(time.Hour))
+		}},
+		{name: "archive", put: func(e *env, _ *testClock, id string) (Thread, error) {
+			return e.m.Archive(e.ctx(), id, true)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clk := newTestClock()
+			e := newEnv(t, clk.opts())
+			s := e.wokenThread(clk)
+			got, err := tt.put(e, clk, s.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Status != StatusIdle || got.StatusReason != "at prompt" {
+				t.Errorf("after %s = %s %q; want idle %q", tt.name, got.Status, got.StatusReason, "at prompt")
+			}
+			// Persisted.
+			e.restart(clk.opts(time.Hour))
+			if got, _ := e.m.Get(e.ctx(), s.ID); got.StatusReason == ReasonSnoozeEnded {
+				t.Errorf("after restart = %s %q; want the cleared status", got.Status, got.StatusReason)
+			}
+		})
+	}
+}
+
+// Rows archived or snoozed again before Archive and Snooze cleared "snooze ended" are
+// settled at startup; a woken thread left in the list keeps it.
+func TestSnoozeEndedSettledAtStartup(t *testing.T) {
+	clk := newTestClock()
+	e := newEnv(t, clk.opts())
+	listed := e.wokenThread(clk)
+	stale := []func(*Thread){
+		func(s *Thread) { s.ArchivedAt = clk.Now() },
+		func(s *Thread) { s.SnoozedUntil = clk.Now().Add(time.Hour).Truncate(time.Millisecond) },
+	}
+	var ids []string
+	for _, put := range stale {
+		s := e.wokenThread(clk)
+		put(&s)
+		if err := saveThread(e.ctx(), e.m.opts.DB, s); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, s.ID)
+	}
+	e.restart(clk.opts(time.Hour))
+	for _, id := range ids {
+		got, err := e.m.Get(e.ctx(), id)
+		if err != nil || got.Status != StatusIdle || got.StatusReason != "at prompt" {
+			t.Errorf("%s after restart = %s %q, %v; want idle %q", id, got.Status, got.StatusReason, err, "at prompt")
+		}
+	}
+	if got, _ := e.m.Get(e.ctx(), listed.ID); got.StatusReason != ReasonSnoozeEnded {
+		t.Errorf("listed thread after restart = %s %q; want %q kept", got.Status, got.StatusReason, ReasonSnoozeEnded)
+	}
+}

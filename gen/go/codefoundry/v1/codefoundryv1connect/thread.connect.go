@@ -261,7 +261,8 @@ type ThreadServiceClient interface {
 	// replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
 	// time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
 	// still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
-	// wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+	// wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
+	// before then only clears snoozed_until. Reconnect, Pin
 	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
 	// Label adds and removes a thread's labels (clear first, then remove, then add) and
@@ -1157,7 +1158,8 @@ type ThreadServiceHandler interface {
 	// replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
 	// time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
 	// still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
-	// wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+	// wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
+	// before then only clears snoozed_until. Reconnect, Pin
 	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
 	// Label adds and removes a thread's labels (clear first, then remove, then add) and

@@ -63,6 +63,7 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 	}
 	rec.s.SnoozedUntil = until
 	rec.s.Pinned = false
+	clearSnoozeEnded(&rec.s, m.opts.Now()) // a re-snooze: the last wake is old news
 	m.unarchiveLocked(rec)
 	m.commitLocked(rec, true)
 	m.log.Info("snoozed thread", "thread", id, "until", until)
@@ -78,6 +79,17 @@ func (m *Manager) unsnoozeLocked(rec *record) bool {
 	}
 	rec.s.SnoozedUntil = time.Time{}
 	return true
+}
+
+// clearSnoozeEnded turns a woken thread's "snooze ended" attention into idle at its
+// prompt, and reports whether it did. Snooze and Archive call it (the user put the
+// thread away again, so the wake no longer needs them), and New for rows archived or
+// snoozed before they did.
+func clearSnoozeEnded(s *Thread, now time.Time) bool {
+	if s.Status != StatusNeedsAttention || s.StatusReason != ReasonSnoozeEnded {
+		return false
+	}
+	return s.setStatus(StatusIdle, "at prompt", now)
 }
 
 // wakeSnoozed wakes every thread whose SnoozedUntil is not after Options.Now: it

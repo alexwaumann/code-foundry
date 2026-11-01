@@ -3249,7 +3249,8 @@ export const ThreadService: GenService<{
    * replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
    * time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
    * still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
-   * wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+   * wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
+   * before then only clears snoozed_until. Reconnect, Pin
    * (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
    *
    * @generated from rpc codefoundry.v1.ThreadService.Snooze
