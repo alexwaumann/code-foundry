@@ -25,9 +25,11 @@ A second full run turned up two more.
   lost it to the body. The dialog's overlay appears under the pointer, so the pointer "leaves"
   the menu item while the menu is still fading out. Radix's onItemLeave then focuses the closing
   menu's content, which unmounts. The shared `DropdownMenuItem` and `ContextMenuItem` now call
-  preventDefault on that pointerleave while their menu's `data-state` is closed
-  (`components/ui/menuItemLeave.ts`, unit-tested). That covers every menu item that opens a
-  dialog, and Snooze › Pick a date too.
+  preventDefault on that pointerleave while their menu's `data-state` is closed and a dialog is
+  up (`components/ui/menuItemLeave.ts`, unit-tested). That covers every menu item that opens a
+  dialog, Snooze › Pick a date included. Without the dialog condition, pr-panel "the menu
+  reopened right after Ask stays open" broke: a menu reopened mid-fade gets its focus from that
+  same pointerleave, and without it the next Escape also closed the Ask composer.
 * thread-prompts, "question keyboard": an Escape sent right after the reload, before the fresh
   question landed, went nowhere. The test now waits for "1 of 2" and for focus. Its
   `openThread` also uses the new `leaveSidebar` fixture (pointer off the row, hover card
