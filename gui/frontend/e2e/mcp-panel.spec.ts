@@ -17,7 +17,7 @@ const mcpTab = (page: Page, bucket: string) => surface(page).locator(`[data-test
 
 /** The tabs as shown: label + count, which one is selected, and the shown cards' servers. */
 async function expectTabs(page: Page, counts: [number, number, number], active: "connected" | "failed" | "disabled", servers: string[]): Promise<void> {
-  await expect(surface(page).getByTestId("mcp-tab")).toHaveText([`Connected${String(counts[0])}`, `Failed${String(counts[1])}`, `Disabled${String(counts[2])}`]);
+  await expect(surface(page).getByTestId("mcp-tab")).toHaveText([`Connected ${String(counts[0])}`, `Failed ${String(counts[1])}`, `Disabled ${String(counts[2])}`]);
   await expect(mcpTab(page, active)).toHaveAttribute("aria-selected", "true");
   await expect(surface(page).getByTestId("mcp-card")).toHaveCount(servers.length);
   if (servers.length > 0) expect(await surface(page).getByTestId("mcp-card").evaluateAll((els) => els.map((e) => e.getAttribute("data-server")))).toEqual(servers);

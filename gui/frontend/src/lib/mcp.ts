@@ -69,6 +69,26 @@ export const MCP_BUCKET_EMPTY: Readonly<Record<McpBucket, string>> = {
   disabled: "No disabled servers.",
 };
 
+/** What settles the check: a server still connecting, a refresh or a reconnect in flight. */
+export interface McpSettlingInput {
+  /** Any server's status is pending (a freshly started Claude reports cached servers so first, binary-read-cap-and-mcp-settle §B). */
+  pending: boolean;
+  refreshing: boolean;
+  reconnecting: boolean;
+}
+
+/** The line under an empty tab while the check still settles, in place of the tab's own. */
+export const MCP_SETTLING_LINE = "Checking MCP servers…";
+
+/**
+ * An empty tab's line (MCP_BUCKET_EMPTY), or MCP_SETTLING_LINE while a check settles: a
+ * refresh or reconnect on a stopped thread first reports every server as connecting, so
+ * the Failed tab empties for a few seconds; saying nothing failed then would be false.
+ */
+export function bucketEmptyLine(bucket: McpBucket, s: McpSettlingInput): string {
+  return s.pending || s.refreshing || s.reconnecting ? MCP_SETTLING_LINE : MCP_BUCKET_EMPTY[bucket];
+}
+
 /** The tab a server's status lists it under. */
 export function mcpBucket(status: McpServerStatusView): McpBucket {
   switch (status) {

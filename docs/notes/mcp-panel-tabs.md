@@ -34,7 +34,12 @@ keeps it. Not persisted: a reload starts on Connected.
 
 * A server moves tabs as its status changes: reconnecting a failed server shows
   Connecting… in the Failed tab (the card's own reconnecting state, not its status), then
-  it leaves for Connected once the answer arrives. No auto-switch of the tab.
+  it leaves for Connected once the answer arrives. No auto-switch of the tab. On a stopped
+  thread a refresh or reconnect first reports every cached server as connecting
+  (binary-read-cap-and-mcp-settle §B), so Failed empties for a few seconds: its line then
+  reads "Checking MCP servers…" (`bucketEmptyLine`), never "No failed servers".
+* The tab's accessible name has a space between label and count ("Failed 2"): flex gap
+  alone would read as "Failed2".
 * The e2e helpers that counted six cards now count per tab; `expectStale` checks only the
   shown pills.
 * Mock: `POST /__mock/thread/mcp-servers?id=s-r1&keep=a,b` sets the thread's servers to

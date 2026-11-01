@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { McpServerStatusView, McpServerView, McpStatusView } from "@/api/mcp";
-import { bucketCounts, canReconnect, checkedAgo, checkedLine, claudeRunning, connectedSummary, MCP_BUCKET_EMPTY, MCP_BUCKET_LABEL, MCP_BUCKETS, MCP_STALE_AFTER_MS, mcpBucket, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpBucket, type McpStaleInput } from "./mcp";
+import { bucketCounts, bucketEmptyLine, canReconnect, checkedAgo, checkedLine, claudeRunning, connectedSummary, MCP_BUCKET_EMPTY, MCP_BUCKET_LABEL, MCP_BUCKETS, MCP_SETTLING_LINE, MCP_STALE_AFTER_MS, mcpBucket, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpBucket, type McpStaleInput } from "./mcp";
 
 const NOW = 1_800_000_000_000;
 
@@ -163,6 +163,18 @@ describe("mcpBucket", () => {
     expect(MCP_BUCKETS).toEqual(["connected", "failed", "disabled"]);
     expect(MCP_BUCKETS.map((b) => MCP_BUCKET_LABEL[b])).toEqual(["Connected", "Failed", "Disabled"]);
     expect(MCP_BUCKETS.map((b) => MCP_BUCKET_EMPTY[b])).toEqual(["No connected servers.", "No failed servers. Nothing needs a login.", "No disabled servers."]);
+  });
+});
+
+describe("bucketEmptyLine", () => {
+  const settled = { pending: false, refreshing: false, reconnecting: false };
+  it.each<[string, McpBucket, Partial<typeof settled>, string]>([
+    ["settled: the tab's own line", "failed", {}, MCP_BUCKET_EMPTY.failed],
+    ["a server still connecting", "failed", { pending: true }, MCP_SETTLING_LINE],
+    ["a refresh in flight", "connected", { refreshing: true }, MCP_SETTLING_LINE],
+    ["a reconnect in flight", "disabled", { reconnecting: true }, MCP_SETTLING_LINE],
+  ])("%s", (_, bucket, over, want) => {
+    expect(bucketEmptyLine(bucket, { ...settled, ...over })).toBe(want);
   });
 });
 

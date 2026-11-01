@@ -10,7 +10,7 @@ import {
   canReconnect,
   checkedLine,
   claudeRunning,
-  MCP_BUCKET_EMPTY,
+  bucketEmptyLine,
   MCP_BUCKET_LABEL,
   MCP_BUCKETS,
   MCP_LOGIN_HINT,
@@ -25,7 +25,7 @@ import {
   type ToolHint,
 } from "@/lib/mcp";
 import { cn } from "@/lib/utils";
-import { ensureMcpStatus, reconnectMcp, refreshMcp, useMcpBucketCounts, useMcpBucketNames, useMcpHeader, useMcpReconnecting, useMcpRefreshing, useMcpServer, useMcpServerNames, useMcpStale, useMcpStatus } from "@/stores/mcp";
+import { ensureMcpStatus, reconnectMcp, refreshMcp, useMcpBucketCounts, useMcpBucketNames, useMcpHeader, useMcpReconnecting, useMcpRefreshing, useMcpServer, useMcpServerNames, useMcpSettling, useMcpStale, useMcpStatus } from "@/stores/mcp";
 import { setMcpTab, useMcpTab } from "@/stores/mcpTabs";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -291,7 +291,7 @@ function BucketTabs({ threadId, value, onChange }: { threadId: string; value: Mc
           const n = counts?.[b] ?? 0;
           return (
             <TabsTrigger key={b} value={b} className="rounded-sm px-2 py-0 text-caption" data-testid="mcp-tab" data-bucket={b}>
-              {MCP_BUCKET_LABEL[b]}
+              {MCP_BUCKET_LABEL[b]}{" "}
               <span className={cn("tabular-nums", b === "failed" && n > 0 ? "text-cf-error-text" : "text-cf-text-muted")} data-testid="mcp-tab-count">
                 {n}
               </span>
@@ -303,10 +303,10 @@ function BucketTabs({ threadId, value, onChange }: { threadId: string; value: Mc
   );
 }
 
-/** The active tab's cards in Claude's order, or its empty line. */
+/** The active tab's cards in Claude's order, or its empty line (while a check settles, that it is checking). */
 function BucketCards({ threadId, bucket, stale }: { threadId: string; bucket: McpBucket; stale: boolean }) {
   const names = useMcpBucketNames(threadId, bucket);
-  if (names.length === 0) return <Message testId="mcp-tab-empty">{MCP_BUCKET_EMPTY[bucket]}</Message>;
+  if (names.length === 0) return <EmptyTab threadId={threadId} bucket={bucket} />;
   return (
     <div className="flex min-w-0 flex-col gap-2 px-3 py-2.5 @max-[340px]:px-2" data-testid="mcp-cards" data-bucket={bucket}>
       {names.map((n) => (
@@ -314,6 +314,12 @@ function BucketCards({ threadId, bucket, stale }: { threadId: string; bucket: Mc
       ))}
     </div>
   );
+}
+
+/** An empty tab's line: its own, or "Checking MCP servers…" while a server connects or a refresh or reconnect runs. */
+function EmptyTab({ threadId, bucket }: { threadId: string; bucket: McpBucket }) {
+  const settling = useMcpSettling(threadId);
+  return <Message testId="mcp-tab-empty">{bucketEmptyLine(bucket, settling)}</Message>;
 }
 
 /**

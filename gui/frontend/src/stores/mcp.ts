@@ -12,7 +12,7 @@ import { useShallow } from "zustand/react/shallow";
 import { getMcpStatus, type McpServerView, type McpStatusView } from "@/api/mcp";
 import { errorMessage } from "@/api/stream";
 import { useNowSelect } from "@/lib/clock";
-import { bucketCounts, claudeRunning, mcpBucket, mcpStale, type McpBucket } from "@/lib/mcp";
+import { bucketCounts, claudeRunning, mcpBucket, mcpStale, type McpBucket, type McpSettlingInput } from "@/lib/mcp";
 import { runCommandForResult } from "./commands";
 import { threadContext } from "./threadActions";
 import { useThreadStore } from "./thread";
@@ -78,6 +78,14 @@ export function useMcpReconnecting(threadId: string, name: string): boolean {
 
 export function useMcpRefreshing(threadId: string): boolean {
   return useMcpStore((s) => s.refreshing[threadId] === true);
+}
+
+/** Whether the thread's check still settles (lib/mcp bucketEmptyLine): a pending server, a refresh or a reconnect in flight. */
+export function useMcpSettling(threadId: string): McpSettlingInput {
+  const pending = useThreadStore((s) => s.logs[threadId]?.mcp?.servers.some((x) => x.status === "pending") ?? false);
+  const refreshing = useMcpRefreshing(threadId);
+  const reconnecting = useMcpStore((s) => Object.keys(s.reconnecting[threadId] ?? {}).length > 0);
+  return { pending, refreshing, reconnecting };
 }
 
 /** How often the stale state re-reads the clock: it flips at most this late after the check turns 10 min old. */
