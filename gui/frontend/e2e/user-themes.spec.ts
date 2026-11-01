@@ -81,27 +81,7 @@ test("Customise copies a theme into Yours, previews the copy and edits it", asyn
   await expect(yours(page).getByTestId("theme-name")).toHaveText(["Dracula copy", "Dracula copy 2", "Mocha, warmer", "Ocean Dusk"]);
 });
 
-test("Delete asks first; deleting the theme in use moves the slot to the theme it came from", async ({ page }) => {
-  await mockPost("settings/external?appearance.theme_dark=ocean-dusk");
-  await openThemes(page);
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "ocean-dusk");
-  const ocean = option(page, "Ocean Dusk");
-  await ocean.hover();
-  await ocean.getByRole("button", { name: "Delete Ocean Dusk" }).click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Delete the theme Ocean Dusk? Its file in the themes directory is removed. It is your dark theme; the dark theme becomes Catppuccin Mocha.");
-  await expect(page.getByTestId("confirm-ok")).toHaveText("Delete");
-  await page.getByTestId("confirm-cancel").click();
-  await expect(ocean).toBeVisible();
-
-  await ocean.hover();
-  await ocean.getByRole("button", { name: "Delete Ocean Dusk" }).click();
-  await page.getByTestId("confirm-ok").click();
-  await expect(ocean).toHaveCount(0);
-  await expect(yours(page).getByTestId("theme-name")).toHaveText(["Mocha, warmer"]);
-  await expect.poll(() => raw("appearance.theme_dark")).toBe("catppuccin-mocha");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "catppuccin-mocha");
-});
+// Delete asking first and the slot falling back to the theme's origin: the daemon's (internal/command/commands_theme_test.go, "delete the theme in use"); the row's Delete is src/components/themes/ThemesPage.test.tsx, the confirm's text and label src/components/confirm/ConfirmDialog.test.tsx, a slot change on html src/stores/settings.test.ts.
 
 // A file that did not load and its Delete: unit-tested in src/components/themes/ThemesPage.test.tsx (its question: internal/command).
 
