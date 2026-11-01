@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { themeById, type ThemeFile } from "@/themes";
-import { themeUndoState, type ThemeLookup, type ThemeUndoTarget } from "./themeCards";
+
+const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve({ message: "", resultJson: "{}" })));
+vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult }));
+const toastInfo = vi.hoisted(() => vi.fn());
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { info: toastInfo, success: vi.fn(), error: vi.fn() }) }));
+
+const { themeUndoState, undoFromLink } = await import("./themeCards");
+const { useSettingsStore } = await import("./settings");
+type ThemeLookup = import("./themeCards").ThemeLookup;
+type ThemeUndoTarget = import("./themeCards").ThemeUndoTarget;
 
 // The one Undo rule (docs/notes/theme-fuzz-daemon.md, model 4-6): what the slot showed just
 // before the save, offered only while the slot still shows the card's colours.
@@ -44,5 +53,34 @@ describe("themeUndoState", () => {
 
   it("a toast (no file) follows the slot only", () => {
     expect(themeUndoState(other, null, "ocean", lookup({ ocean: { file: warmer, version: "v3" }, nord })).kind).toBe("undo");
+  });
+});
+
+// The toast's Undo ("Ocean Dusk applied to dark": the daemon's notify, internal/command
+// commands_theme_card_test.go; its buttons and the skip over the Themes page: intents.test.ts).
+describe("undoFromLink (the toast's Undo)", () => {
+  function slot(id: string): void {
+    useSettingsStore.setState({ snapshot: { values: { "appearance.theme_dark": id }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
+  }
+  afterEach(() => {
+    vi.clearAllMocks();
+    useSettingsStore.setState({ snapshot: null });
+  });
+
+  it("while the slot shows the theme: puts the slot back on the previous one", () => {
+    slot("dracula");
+    undoFromLink("dark:dracula:github-dark");
+    expect(runCommandForResult).toHaveBeenCalledWith("theme.set-dark", { theme: "github-dark" }, { quiet: true });
+    expect(toastInfo).not.toHaveBeenCalled();
+  });
+
+  it("once the slot moved on: a note, no change; already back: says so", () => {
+    slot("nord");
+    undoFromLink("dark:dracula:github-dark");
+    expect(toastInfo).toHaveBeenLastCalledWith("Nothing to undo: the dark theme has changed since");
+    slot("github-dark");
+    undoFromLink("dark:dracula:github-dark");
+    expect(toastInfo).toHaveBeenLastCalledWith("The dark theme is GitHub Dark again");
+    expect(runCommandForResult).not.toHaveBeenCalled();
   });
 });
