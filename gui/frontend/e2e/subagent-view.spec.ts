@@ -141,7 +141,7 @@ test("Open › on a running Agent row shows the run read-only: header, lineage, 
   // The lineage note and the prompt the parent gave it.
   const lineage = view(page).getByTestId("subagent-lineage");
   await expect(lineage).toContainText(`Subagent of${PARENT}`);
-  await expect(lineage.getByTestId("subagent-lineage-meta")).toHaveText(/^background · general-purpose · opus · high · launched by turn 1's Agent call, 4 min ago$/);
+  await expect(lineage.getByTestId("subagent-lineage-meta")).toHaveText(/^background · general-purpose · Opus · high · launched by turn 1's Agent call, 4 min ago$/);
   await expect(lineage.getByTestId("subagent-lineage-back")).toHaveText(`Back to ${PARENT}`);
   const prompt = view(page).getByTestId("subagent-prompt");
   await expect(prompt.getByTestId("thread-user-label")).toHaveText(`Prompt from ${PARENT}`);
@@ -174,7 +174,7 @@ test("Open › on a running Agent row shows the run read-only: header, lineage, 
   // The footer, no report yet, and the plate where the composer would be.
   const footer = view(page).getByTestId("subagent-footer");
   await expect(footer).toHaveAttribute("data-status", "running");
-  await expect(footer).toHaveText(/^Working for 4m \d\ds·23 tools·48\.2K tokens·opus$/);
+  await expect(footer).toHaveText(/^Working for 4m \d\ds·23 tools·48\.2K tokens·Opus$/);
   await expect(view(page).getByTestId("subagent-report")).toHaveCount(0);
   await expect(page.getByTestId("subagent-plate-text")).toHaveText(`Read-only. A subagent takes its instructions from its parent thread. To steer it, send a follow-up to ${PARENT}.`);
   await expect(page.getByTestId("subagent-plate-back")).toContainText(`Back to ${PARENT}`);
@@ -240,11 +240,11 @@ test("a strip name opens its background run; the done Explore opened from the ca
   await openFromCard(page, "a0");
   await expectViewing(page, "a0", "Find the header chip pattern");
   await expect(page.getByTestId("subagent-status")).toHaveText("Done · 5 min ago");
-  await expect(page.getByTestId("subagent-lineage-meta")).toHaveText(/^foreground · Explore · haiku · launched by turn 1's Agent call, [56] min ago$/);
+  await expect(page.getByTestId("subagent-lineage-meta")).toHaveText(/^foreground · Explore · Haiku · launched by turn 1's Agent call, [56] min ago$/);
   await expect(view(page).getByRole("button", { name: /^Read 1 file, searched code once HeaderActions.tsx/ })).toBeVisible();
   await expect(view(page).locator("[data-tool]")).toHaveCount(0);
   await expect(page.getByTestId("subagent-footer")).toHaveAttribute("data-status", "done");
-  await expect(page.getByTestId("subagent-footer")).toHaveText("Worked for 12s·6 tools·9.4K tokens·haiku");
+  await expect(page.getByTestId("subagent-footer")).toHaveText("Worked for 12s·6 tools·9.4K tokens·Haiku");
   // Its report is its last text: shown once, as the text, no separate block.
   await expect(view(page).getByTestId("thread-text")).toContainText(EXPLORE_REPORT);
   await expect(view(page).getByTestId("subagent-report")).toHaveCount(0);
@@ -263,7 +263,7 @@ test("the run ending while viewed turns the view done in place, with the report 
   await expectViewing(page, "a1", "PR 1: daemon task frames");
   const footer = page.getByTestId("subagent-footer");
   await expect(footer).toHaveAttribute("data-status", "done");
-  await expect(footer).toHaveText(/^Worked for 4m \d\ds·23 tools·48\.2K tokens·opus$/);
+  await expect(footer).toHaveText(/^Worked for 4m \d\ds·23 tools·48\.2K tokens·Opus$/);
   // Its running test and its streaming reply stop with it.
   await expect(view(page).locator('[data-tool="Bash"]')).toHaveAttribute("data-status", "done");
   await expect(view(page).getByTestId("thread-text")).not.toHaveAttribute("data-streaming", "true");
