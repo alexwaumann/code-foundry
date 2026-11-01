@@ -151,7 +151,8 @@ export function seedWorld(opts: { empty?: boolean } = {}): void {
   const ts = opts.empty ? [] : threads();
   for (const r of [repoActivityResource, branchPullRequestsResource, worktreeDetailResource]) r.store.setState({ entries: {} });
   if (!opts.empty) seedGitHub();
-  useProjectsStore.setState({ byId: Object.fromEntries(ps.map((p) => [p.id, p])), order: ps.map((p) => p.id).sort(), loaded: true });
+  const byId = Object.fromEntries(ps.map((p) => [p.id, p]));
+  useProjectsStore.setState({ byId, order: byName(byId), loaded: true });
   useThreadsStore.setState({ byId: Object.fromEntries(ts.map((t) => [t.id, t])), order: ts.map((t) => t.id), loaded: true });
   useWorkspacesStore.setState({ byId: {}, order: [], loaded: true });
   useTerminalsStore.setState({ byId: {}, order: [], loaded: true });
@@ -160,12 +161,21 @@ export function seedWorld(opts: { empty?: boolean } = {}): void {
   useUiStore.getState().select(PROJECTS_INDEX);
 }
 
+/** Project ids by name, as the projects store orders them. */
+function byName(byId: Readonly<Record<string, ProjectView>>): string[] {
+  return Object.values(byId)
+    .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+    .map((p) => p.id);
+}
+
 /** Updates one project in place (a project event). */
 export function updateProject(id: string, f: (p: ProjectView) => ProjectView): void {
   act(() => {
     useProjectsStore.setState((s) => {
       const p = s.byId[id];
-      return p ? { byId: { ...s.byId, [id]: f(p) } } : {};
+      if (!p) return {};
+      const byId = { ...s.byId, [id]: f(p) };
+      return { byId, order: byName(byId) };
     });
   });
 }
@@ -220,6 +230,20 @@ export function addWorkspace(name: string, members: string[], o: { root?: string
     });
   });
   return w;
+}
+
+export function removeWorkspace(id: string): void {
+  act(() => {
+    useWorkspacesStore.setState((s) => {
+      const { [id]: _gone, ...byId } = s.byId;
+      return { byId, order: s.order.filter((x) => x !== id) };
+    });
+  });
+}
+
+/** Removes worktrees of a project (the daemon's worktreeRemoved). */
+export function removeWorktrees(projectId: string, ...paths: string[]): void {
+  updateProject(projectId, (p) => ({ ...p, worktrees: p.worktrees.filter((w) => !paths.includes(w.path)) }));
 }
 
 export function updateWorkspace(id: string, f: (w: WorkspaceView) => WorkspaceView): void {

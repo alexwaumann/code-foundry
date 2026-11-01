@@ -9,7 +9,7 @@ const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { RemoveWorktreeDialog } = await import("./RemoveWorktreeDialog");
 const { ProjectsPage } = await import("./ProjectsPage");
 const { confirmFirst, daemon, invocationsOf, lastInvocation, needsConfirm, resetDaemon } = await import("@/test/daemonFakes");
-const { addLeftovers, addTerminal, addThreads, addWorktrees, CF, COPY, FEAT, FIX, MERGED, SHADERS, SPIKE, menuEntries, seedWorld, status, texts, thread, updateProject, worktree } = await import("@/test/projectsWorld");
+const { addLeftovers, addTerminal, addThreads, addWorktrees, removeWorktrees, CF, COPY, FEAT, FIX, MERGED, SHADERS, SPIKE, menuEntries, seedWorld, status, texts, thread, updateProject, worktree } = await import("@/test/projectsWorld");
 const { projectPage, useUiStore } = await import("@/stores/ui");
 const { usePublishDialogStore } = await import("@/stores/publish");
 const { useComposeStore } = await import("@/stores/compose");
@@ -69,6 +69,21 @@ function fakeRemove() {
     if (w?.status.dirty && inv.args.force !== "true") throw needsConfirm({ command: inv.name, title: "Delete Uncommitted Work", message: "uncommitted work", args: { force: "true" } });
     return { message: "", resultJson: "" };
   });
+}
+
+/** The daemon's project.worktree.cleanup once confirmed: removes the merged, clean worktrees no thread is on. */
+function fakeCleanup(message: string) {
+  confirmFirst("project.worktree.cleanup", message, (inv) => {
+    const p = useProjectsStore.getState().byId[inv.args.project ?? ""];
+    const gone = (p?.worktrees ?? []).filter((w) => w.mergedClean === true && !w.isMain).map((w) => w.path);
+    removeWorktrees(inv.args.project ?? "", ...gone);
+    return { message: "", resultJson: "" };
+  });
+}
+
+/** The Projects index (the crumb), to read its pills. */
+function toIndex() {
+  fireEvent.click(screen.getByTestId("projects-crumb"));
 }
 
 beforeEach(() => {
@@ -261,7 +276,7 @@ describe("Clean up merged worktrees", () => {
       worktree("repo-cf", MERGED, "cf/usage-polish", { managed: true, landed: true, mergedClean: true }),
       worktree("repo-cf", `${MERGED}-docs`, "cf/old-docs", { managed: true, landed: true, mergedClean: true }),
     );
-    confirmFirst("project.worktree.cleanup", "Fetch, then remove 2 worktrees whose branches are merged: cf/usage-polish, cf/old-docs?");
+    fakeCleanup("Fetch, then remove 2 worktrees whose branches are merged: cf/usage-polish, cf/old-docs?");
     renderPage("repo-cf");
     await settle();
     const menu = openDropdown(screen.getByTestId("project-more"), "project-more-menu");
@@ -273,6 +288,10 @@ describe("Clean up merged worktrees", () => {
     await settle();
     expect(invocationsOf("project.worktree.cleanup").map((i) => i.confirmed)).toEqual([false, true]);
     expect(lastInvocation("project.worktree.cleanup")?.args).toEqual({ project: "repo-cf" });
+    expect(texts(document, "worktree-branch")).toHaveLength(3);
+    toIndex();
+    await settle();
+    expect(screen.queryByTestId("index-tidy")).toBeNull();
   });
 });
 
@@ -401,7 +420,7 @@ describe("Worktrees without threads", () => {
 
   it("Remove the N that are clean runs the cleanup after its confirm; with nothing kept the section says so", async () => {
     addLeftovers(true);
-    confirmFirst("project.worktree.cleanup", "Fetch, then remove 1 worktree whose branch is merged: cf/usage-polish?");
+    fakeCleanup("Fetch, then remove 1 worktree whose branch is merged: cf/usage-polish?");
     const r = renderPage("repo-cf");
     await settle();
     fireEvent.click(screen.getByTestId("leftover-remove-clean"));
@@ -409,6 +428,13 @@ describe("Worktrees without threads", () => {
     await settle();
     expect(lastInvocation("project.worktree.cleanup")?.args).toEqual({ project: "repo-cf" });
     expect(lastInvocation("project.worktree.cleanup")?.confirmed).toBe(true);
+    expect(leftover(MERGED)).toBeNull();
+    expect(screen.queryByTestId("leftover-remove-clean")).toBeNull();
+    // Only the cleanable one goes: the others still hold something (or were made outside the app).
+    expect(screen.getAllByTestId("leftover-row")).toHaveLength(3);
+    toIndex();
+    await settle();
+    expect(screen.queryByTestId("index-tidy")).toBeNull();
     r.unmount();
 
     // ghostty-playground: nothing kept.
@@ -422,7 +448,11 @@ describe("Worktrees without threads", () => {
 });
 
 describe("renaming a project from its page", () => {
-  it("refused names stay in the field, Escape keeps, Enter renames and gives the list the keyboard", async () => {
+  it("refused names stay in the field, Escape keeps, Enter renames everywhere and gives the list the keyboard", async () => {
+    daemon.handlers.set("project.rename", (inv) => {
+      updateProject(inv.args.project ?? "", (p) => ({ ...p, name: inv.args.name ?? p.name }));
+      return { message: "", resultJson: "" };
+    });
     renderPage("repo-cf");
     await settle();
     const input = () => screen.getByTestId<HTMLInputElement>("project-name-input");
@@ -452,6 +482,10 @@ describe("renaming a project from its page", () => {
     expect(done).toHaveLength(1);
     expect(done[0]?.args).toEqual({ project: "repo-cf", name: "foundry" });
     expect(done[0]?.context).toMatchObject({ activeProjectId: "repo-cf" });
+    expect(screen.getByTestId("page-name").textContent).toBe("foundry");
+    // The index has the new name too.
+    toIndex();
+    expect(document.querySelector('[data-nav-key="p:repo-cf"]')?.textContent).toContain("foundry");
   });
 
   it("a rename from elsewhere shows on the open page", () => {

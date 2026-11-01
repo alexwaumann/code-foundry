@@ -144,32 +144,7 @@ test("Start here: a project, or a rooted workspace's folder; the row that starts
   await expect(body(page, rooted.id).locator('[data-testid="workspace-member"][data-default]')).toHaveCount(0);
 });
 
-test("Add project lists the registered projects not in it; Remove takes one out without asking", async ({ page }) => {
-  const { shop } = await twoWorkspaces();
-  await openApp(page);
-  await openWorkspacePage(page, shop);
-  const s = body(page, shop);
-  await s.getByTestId("workspace-add-member").click();
-  const list = page.getByTestId("workspace-add-member-list");
-  // Plain folders can be members too.
-  await expect(list.getByRole("option")).toHaveText(["dotfiles", "sketches", "writing"]);
-  await list.getByRole("option", { name: "writing" }).click();
-  expect((await lastInvocation("workspace.add-project"))?.args).toEqual({ project: "repo-wr", workspace: shop });
-  await expect(s.getByTestId("member-name")).toHaveText(["code-foundry", "ghostty-playground", "writing"]);
-  await expect(page.getByTestId("workspace-meta")).toHaveText("workspace · 3 projects");
-
-  // Removing the project that starts threads moves that to the folder: a synthetic
-  // workspace's folder row then shows, so where threads start is always on the page.
-  const gp = member(page, shop, "repo-gp");
-  await gp.hover();
-  await expect(gp.getByTestId("member-remove")).toHaveText("Remove");
-  await gp.getByTestId("member-remove").click();
-  expect((await lastInvocation("workspace.remove-project"))?.args).toEqual({ project: "repo-gp", workspace: shop });
-  await expect(s.getByTestId("member-name")).toHaveText(["code-foundry", "writing"]);
-  await expect(s.getByTestId("workspace-folder")).toHaveAttribute("data-default", "true");
-  await expect(s.getByTestId("workspace-folder")).toContainText("kept by the app");
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-});
+// Add project and Remove, Open in Finder, rename, Remove workspace, New workspace, Edit instructions' steer and toast, a project named “workspace”, members by name and the keyboard: unit-tested in src/components/projects/WorkspacePage.test.tsx.
 
 test("the Threads table: one column per member with its checkout, working first, archived only counted; a click opens the thread; the row menu", async ({ page }) => {
   const ws = (await mockPost("workspace?name=platform&projects=repo-cf,repo-gp,repo-wr&primary=repo-cf")) as { id: string };
@@ -224,130 +199,6 @@ test("the Threads table: one column per member with its checkout, working first,
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", idle.id);
 });
 
-test("a thread whose primary is the workspace's folder: Open in Finder shows the folder", async ({ page }) => {
-  const { mono } = await twoWorkspaces();
-  const t = (await mockPost(`workspace-thread?workspace=${mono}&project=workspace&name=docs&status=idle`)) as { id: string };
-  await openApp(page);
-  await openWorkspacePage(page, mono);
-  const r = threadRow(page, mono, t.id);
-  await expect(r.getByTestId("thread-member-state")).toHaveText(["clean · no commits yet"]);
-  await r.hover();
-  await r.getByTestId("thread-more").click();
-  await page.getByTestId("thread-menu-reveal").click();
-  expect((await lastInvocation("workspace.reveal"))?.args).toEqual({ workspace: mono });
-});
-
-test("rename from the header's menu: in place, Enter renames, Escape keeps, a taken name is refused, leaving the field renames", async ({ page }) => {
-  const { shop } = await twoWorkspaces();
-  await openApp(page);
-  await openWorkspacePage(page, shop);
-  const input = page.getByTestId("workspace-name-input");
-  await page.getByTestId("workspace-page-more").click();
-  expect(await menuItems(page, "workspace-page-more")).toEqual(["New thread", "New terminal", "Open in Finder", "Rename", "Add project", "Remove workspace"]);
-  await page.getByTestId("workspace-menu-rename").click();
-  await expect(input).toBeFocused();
-  await input.fill("MONO");
-  await expect(page.getByTestId("workspace-name-error")).toHaveText("A workspace named “MONO” exists.");
-  await page.keyboard.press("Enter");
-  await expect(input).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("page-name")).toHaveText("shop");
-  expect((await invocations()).filter((i) => i.name === "workspace.rename")).toHaveLength(0);
-
-  await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-menu-rename").click();
-  await input.fill("store");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("page-name")).toHaveText("store");
-  const inv = await lastInvocation("workspace.rename");
-  expect(inv?.args).toEqual({ name: "store", workspace: shop });
-  expect(inv?.context).toMatchObject({ activeView: "projects", activeWorkspaceId: shop });
-  // The page's list has the keyboard back, and Enter renamed once (the blur that follows does not again).
-  await expect(page.getByTestId("projects-list")).toBeFocused();
-  expect((await invocations()).filter((i) => i.name === "workspace.rename")).toHaveLength(1);
-
-  // Leaving the field renames, once.
-  await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-menu-rename").click();
-  await input.fill("shop");
-  await page.getByTestId("workspace-meta").click();
-  await expect(page.getByTestId("page-name")).toHaveText("shop");
-  expect((await invocations()).filter((i) => i.name === "workspace.rename").map((i) => i.args.name)).toEqual(["store", "shop"]);
-});
-
-test("Remove workspace asks first: a synthetic workspace's instructions and skills go, a rooted one's root stays; then the index", async ({ page }) => {
-  const { shop, mono } = await twoWorkspaces();
-  await openApp(page);
-  const dialog = page.getByTestId("confirm-dialog");
-  await openWorkspacePage(page, mono);
-  await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-menu-remove").click();
-  await expect(dialog).toContainText("Remove workspace mono? Its root folder /Users/dev/mono and everything in it stay");
-  await page.keyboard.press("Escape");
-  await expect(body(page, mono)).toBeVisible();
-
-  await openWorkspacePage(page, shop);
-  await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-menu-remove").click();
-  await expect(dialog).toContainText("Remove workspace shop? Its instructions and skills are deleted too.");
-  await dialog.getByTestId("confirm-ok").click();
-  // Its page goes: back to the index.
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
-  const removed = (await invocations()).filter((i) => i.name === "workspace.remove");
-  expect(removed.map((i) => i.confirmed)).toEqual([false, false, true]);
-  expect(removed.at(-1)?.args).toEqual({ workspace: "shop" });
-  // Its projects stay.
-  await expect(page.getByTestId("index-project")).toHaveCount(5);
-});
-
-test("Open in Finder (header and Folder row) is workspace.reveal; New thread opens the composer in the workspace", async ({ page }) => {
-  const { mono } = await twoWorkspaces();
-  await openApp(page);
-  await openWorkspacePage(page, mono);
-  await page.getByTestId("workspace-page-reveal").click();
-  expect((await lastInvocation("workspace.reveal"))?.args).toEqual({ workspace: mono });
-  await body(page, mono).getByTestId("workspace-folder-reveal").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "workspace.reveal").length).toBe(2);
-  expect((await lastInvocation("workspace.reveal"))?.args).toEqual({ workspace: mono });
-  await page.getByTestId("workspace-page-new-thread").click();
-  await expect(page.getByTestId("composer")).toBeVisible();
-});
-
-test("New workspace: a name and its projects, then workspace.new, then its page from the index", async ({ page }) => {
-  await openApp(page);
-  await openProjects(page);
-  await expect(page.getByTestId("workspaces-empty")).toBeVisible();
-  await page.getByTestId("projects-new-workspace").click();
-  const dialog = page.getByTestId("new-workspace-dialog");
-  await expect(dialog.getByTestId("new-workspace-name")).toBeFocused();
-  const submit = dialog.getByTestId("new-workspace-submit");
-  await expect(submit).toBeDisabled();
-  await page.keyboard.type("workspace");
-  await expect(dialog.getByTestId("new-workspace-name-error")).toHaveText("“workspace” is reserved.");
-  await dialog.getByTestId("new-workspace-name").fill("payments");
-  await expect(submit).toBeDisabled(); // no project yet
-  await dialog.locator('[data-project="repo-gp"]').getByRole("checkbox").click();
-  await dialog.locator('[data-project="repo-dot"]').getByRole("checkbox").click();
-  await submit.click();
-  await expect(dialog).toHaveCount(0);
-  const inv = await lastInvocation("workspace.new");
-  // The page's order (by name): dotfiles first, so it is the default primary.
-  expect(inv?.args).toEqual({ name: "payments", projects: "dotfiles,ghostty-playground" });
-  const created = page.getByTestId("index-workspace");
-  await expect(created.getByTestId("workspace-name")).toHaveText("payments");
-  await created.click();
-  await expect(page.getByTestId("page-name")).toHaveText("payments");
-  const c = page.getByTestId("workspace");
-  await expect(c.getByTestId("member-name")).toHaveText(["dotfiles", "ghostty-playground"]);
-  await expect(c.locator('[data-testid="workspace-member"][data-default]')).toHaveAttribute("data-project", "repo-dot");
-
-  // A taken name, whatever its case, is caught before the daemon is asked.
-  await page.getByTestId("projects-crumb").click();
-  await page.getByTestId("projects-new-workspace").click();
-  await dialog.getByTestId("new-workspace-name").fill("Payments");
-  await expect(dialog.getByTestId("new-workspace-name-error")).toHaveText("A workspace named “Payments” exists.");
-});
-
 test("Write instructions starts a thread in the workspace's folder, then Edit instructions steers it", async ({ page }) => {
   const { mono } = await twoWorkspaces();
   await mockPost(`workspace-files?workspace=${mono}&instructions=`);
@@ -384,54 +235,6 @@ test("Write instructions starts a thread in the workspace's folder, then Edit in
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 });
 
-test("Edit instructions steers once: the toast names the thread (no CLI text); while it works a press only shows it", async ({ page }) => {
-  const { mono } = await twoWorkspaces();
-  const t = (await mockPost(`workspace-thread?workspace=${mono}&project=workspace&name=driver&status=busy`)) as { id: string };
-  await openApp(page);
-  await openWorkspacePage(page, mono);
-  const edit = body(page, mono).getByTestId("workspace-edit-instructions");
-  await expect(body(page, mono).getByTestId("workspace-instructions-reach")).toHaveText("(sends to driver)");
-  await edit.click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", t.id);
-  const toasts = page.locator("[data-sonner-toast]");
-  await expect(toasts.filter({ hasText: "Sent to driver" })).toHaveCount(1);
-  await expect(toasts.filter({ hasText: "wait with" })).toHaveCount(0);
-  expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(1);
-
-  // Still working on it: shown again, not sent again.
-  await openWorkspacePage(page, mono);
-  await edit.click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", t.id);
-  expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(1);
-
-  // Done: the next press steers again.
-  await mockPost(`thread/status?id=${t.id}&status=idle`);
-  await openWorkspacePage(page, mono);
-  await edit.click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.send").length).toBe(2);
-  expect((await invocations()).filter((i) => i.name === "thread.new")).toHaveLength(0);
-});
-
-test("a project named “workspace”: Start here and Remove go by its id, not the workspace's folder", async ({ page }) => {
-  await mockPost("project/rename?id=repo-dot&name=workspace");
-  const { mono } = await twoWorkspaces();
-  await openApp(page);
-  await openWorkspacePage(page, mono);
-  const m = body(page, mono);
-  await expect(m.getByTestId("workspace-folder")).toHaveAttribute("data-default", "true");
-  const dot = member(page, mono, "repo-dot");
-  await expect(dot.getByTestId("member-name")).toHaveText("workspace");
-  await dot.hover();
-  await dot.getByTestId("member-make-default").click();
-  expect((await lastInvocation("workspace.set-primary"))?.args).toEqual({ primary: "repo-dot", workspace: mono });
-  await expect(m.locator('[data-testid="workspace-member"][data-default]')).toHaveAttribute("data-project", "repo-dot");
-  await expect(m.getByTestId("workspace-folder")).not.toHaveAttribute("data-default");
-  await dot.hover();
-  await dot.getByTestId("member-remove").click();
-  expect((await lastInvocation("workspace.remove-project"))?.args).toEqual({ project: "repo-dot", workspace: mono });
-  await expect(m.getByTestId("workspace-member")).toHaveCount(0);
-});
-
 test("an unregistered member reads “not registered” and opens nothing; a registered one shows its main checkout's changes", async ({ page }) => {
   const ws = (await mockPost("workspace?name=sk&projects=repo-sk,repo-cf")) as { id: string };
   await openApp(page);
@@ -449,30 +252,4 @@ test("an unregistered member reads “not registered” and opens nothing; a reg
   await expect(page.getByTestId("side-panel").getByRole("tab", { name: /repo-sk/ })).toHaveCount(0);
   await member(page, ws.id, "repo-cf").dblclick();
   await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry");
-});
-
-test("members show by name, not by id, and the keyboard walks them then the threads", async ({ page }) => {
-  // repo-cf sorts first by id; as "Zebra" it goes last by name.
-  await mockPost("project/rename?id=repo-cf&name=Zebra");
-  const ws = (await mockPost("workspace?name=zoo&projects=repo-cf,repo-gp,repo-dot&primary=repo-gp")) as { id: string };
-  const t = (await mockPost(`workspace-thread?workspace=${ws.id}&name=zt&status=idle`)) as { id: string };
-  await openApp(page);
-  await openWorkspacePage(page, ws.id);
-  await expect(body(page, ws.id).getByTestId("member-name")).toHaveText(["dotfiles", "ghostty-playground", "Zebra"]);
-  await expect(body(page, ws.id).getByTestId("threads-col-member")).toHaveText(["dotfiles", "ghostty-playground", "Zebra"]);
-  await expect(page.getByTestId("projects-list")).toBeFocused();
-  const cursor = page.locator('[aria-selected="true"][data-nav-key]');
-  await page.keyboard.press("ArrowDown");
-  await expect(cursor).toHaveAttribute("data-nav-key", `m:${ws.id}::repo-dot`);
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await expect(cursor).toHaveAttribute("data-nav-key", `wt:${ws.id}::${t.id}`);
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", t.id);
-
-  await openProjects(page);
-  await page.getByTestId("projects-new-workspace").click();
-  await expect(page.getByTestId("new-workspace-project").locator("label")).toHaveText(["dotfiles", "ghostty-playground", "sketches", "writing", "Zebra"]);
-  await page.keyboard.press("Escape");
 });

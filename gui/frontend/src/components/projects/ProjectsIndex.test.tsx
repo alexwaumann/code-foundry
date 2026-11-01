@@ -7,8 +7,8 @@ vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import(
 
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { ProjectsPage } = await import("./ProjectsPage");
-const { confirmFirst, invocationsOf, lastInvocation, resetDaemon } = await import("@/test/daemonFakes");
-const { addLeftovers, addThreads, addWorkspace, CF, MERGED, menuEntries, removeProject, seedWorld, texts, thread } = await import("@/test/projectsWorld");
+const { confirmFirst, daemon, invocationsOf, lastInvocation, resetDaemon } = await import("@/test/daemonFakes");
+const { addLeftovers, addThreads, addWorkspace, CF, MERGED, menuEntries, removeProject, removeWorkspace, seedWorld, texts, thread, updateProject, updateWorkspace } = await import("@/test/projectsWorld");
 const { useUiStore } = await import("@/stores/ui");
 const { useAddProjectStore } = await import("@/stores/addProject");
 const { usePublishDialogStore } = await import("@/stores/publish");
@@ -386,6 +386,10 @@ describe("a project row's context menu", () => {
   });
 
   it("Rename edits the name in place: a taken name is refused, Escape keeps, Enter renames and the list gets the keyboard back", async () => {
+    daemon.handlers.set("project.rename", (inv) => {
+      updateProject(inv.args.project ?? "", (p) => ({ ...p, name: inv.args.name ?? p.name }));
+      return { message: "", resultJson: "" };
+    });
     renderIndex();
     await settle();
     await pick(openRowMenu(projectRow("repo-gp"), "project-row-menu"), "project-menu-rename");
@@ -405,13 +409,17 @@ describe("a project row's context menu", () => {
     fireEvent.change(input(), { target: { value: "playground" } });
     fireEvent.keyDown(input(), { key: "Enter" });
     await settle();
+    expect(inRow(projectRow("repo-gp"), "project-name")?.textContent).toBe("playground");
     expect(document.activeElement).toBe(list());
     expect(page().getAttribute("data-page")).toBe("index");
     expect(invocationsOf("project.rename").map((i) => i.args)).toEqual([{ project: "repo-gp", name: "playground" }]);
   });
 
-  it("Remove project asks first: Escape keeps it, a yes invokes it confirmed", async () => {
-    confirmFirst("project.unregister", "Stop tracking project repo-wr?");
+  it("Remove project asks first: Escape keeps it, a yes removes it", async () => {
+    confirmFirst("project.unregister", "Stop tracking project repo-wr?", (inv) => {
+      removeProject(inv.context.activeProjectId);
+      return { message: "", resultJson: "" };
+    });
     renderIndex();
     await settle();
     await pick(openRowMenu(projectRow("repo-wr"), "project-row-menu"), "project-unregister");
@@ -420,12 +428,14 @@ describe("a project row's context menu", () => {
     fireEvent.keyDown(dialog, { key: "Escape" });
     await settle();
     expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    expect(projectRow("repo-wr")).not.toBeNull();
 
     await pick(openRowMenu(projectRow("repo-wr"), "project-row-menu"), "project-unregister");
     fireEvent.click(within(await screen.findByTestId("confirm-dialog")).getByTestId("confirm-ok"));
     await settle();
     expect(invocationsOf("project.unregister").map((i) => i.confirmed)).toEqual([false, false, true]);
     expect(lastInvocation("project.unregister")?.context).toMatchObject({ activeProjectId: "repo-wr" });
+    expect(row("p:repo-wr")).toBeNull();
   });
 
   it("the cleanup count follows the cleanable worktrees", async () => {
@@ -441,10 +451,17 @@ describe("a project row's context menu", () => {
 describe("a workspace row's context menu", () => {
   it("its items, text only; New terminal in the workspace's folder; Rename in place; Add project on its page; Remove asks first", async () => {
     const shop = addWorkspace("shop", ["repo-gp", "repo-cf"]);
-    confirmFirst("workspace.remove", "Remove workspace shop? Its instructions and skills are deleted too.");
+    daemon.handlers.set("workspace.rename", (inv) => {
+      updateWorkspace(shop.id, (w) => ({ ...w, name: inv.args.name ?? w.name }));
+      return { message: "", resultJson: "" };
+    });
+    confirmFirst("workspace.remove", "Remove workspace store? Its instructions and skills are deleted too.", () => {
+      removeWorkspace(shop.id);
+      return { message: "", resultJson: "" };
+    });
     renderIndex();
     await settle();
-    let menu = openRowMenu(wsRow(shop.id), "workspace-row-menu");
+    const menu = openRowMenu(wsRow(shop.id), "workspace-row-menu");
     expect(menuEntries(menu, true)).toEqual(["New thread", "New terminal", "Open in Finder", "—", "Rename", "Add project", "—", "Remove workspace"]);
     expect(menu.querySelectorAll("svg")).toHaveLength(0);
     expect(within(menu).getByTestId("workspace-menu-remove").getAttribute("data-variant")).toBe("destructive");
@@ -463,21 +480,24 @@ describe("a workspace row's context menu", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     await settle();
     expect(lastInvocation("workspace.rename")?.args).toEqual({ name: "store", workspace: shop.id });
+    expect(inRow(wsRow(shop.id), "workspace-name")?.textContent).toBe("store");
     expect(page().getAttribute("data-page")).toBe("index");
+
+    // Add project: the workspace's page with its Add project list open.
+    await pick(openRowMenu(wsRow(shop.id), "workspace-row-menu"), "workspace-menu-add-project");
+    expect(page().getAttribute("data-page")).toBe("workspace");
+    expect(page().getAttribute("data-workspace")).toBe(shop.id);
+    expect(useWorkspaceAddProjectStore.getState().addingTo).toBe(shop.id);
+    fireEvent.click(screen.getByTestId("projects-crumb"));
 
     // Remove workspace asks first.
     await pick(openRowMenu(wsRow(shop.id), "workspace-row-menu"), "workspace-menu-remove");
     const dialog = await screen.findByTestId("confirm-dialog");
-    expect(dialog.textContent).toContain("Remove workspace shop?");
+    expect(dialog.textContent).toContain("Remove workspace store?");
     fireEvent.click(within(dialog).getByTestId("confirm-ok"));
     await settle();
     expect(invocationsOf("workspace.remove").map((i) => i.confirmed)).toEqual([false, true]);
-
-    // Add project: the workspace's page with its Add project list open.
-    menu = openRowMenu(wsRow(shop.id), "workspace-row-menu");
-    await pick(menu, "workspace-menu-add-project");
-    expect(page().getAttribute("data-page")).toBe("workspace");
-    expect(useWorkspaceAddProjectStore.getState().addingTo).toBe(shop.id);
+    expect(row(`ws:${shop.id}`)).toBeNull();
   });
 
   it("a workspace with no registered member has no New terminal (nothing to own the shell)", async () => {

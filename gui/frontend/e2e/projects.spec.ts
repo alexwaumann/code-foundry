@@ -111,35 +111,6 @@ test("the index: a table row per project by last activity, its kind, status sent
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-gp");
 });
 
-test("the index's Workspaces rows: name, status, projects, contents; a click opens the workspace's page", async ({ page }) => {
-  const ws = (await mockPost("workspace?name=platform&projects=repo-cf,repo-gp&skills=a,b")) as { id: string };
-  await mockPost(`workspace-thread?workspace=${ws.id}&project=repo-gp&name=driver&status=busy&branch=cf/platform`);
-  await openApp(page);
-  await openProjects(page);
-  const r = wsRow(page, ws.id);
-  await expect(r.getByTestId("workspace-name")).toHaveText("platform");
-  await expect(page.getByTestId("workspaces-table").getByTestId("index-columns").locator("span")).toHaveText(["Workspace", "Activity", "Projects", "Contents", "Updated"]);
-  await expect(page.getByTestId("workspaces-section").getByTestId("index-section-count")).toHaveText("(1)");
-  await expect(r.getByTestId("workspace-projects")).toHaveText("code-foundry + ghostty-playground");
-  await expect(r.getByTestId("workspace-status")).toHaveText(/^1 thread working/);
-  await expect(r.getByTestId("workspace-contents")).toHaveText("no instructions · 2 skills");
-  await r.click();
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "workspace");
-  await expect(page.getByTestId("page-name")).toHaveText("platform");
-  await expect(page.getByTestId("workspace-meta")).toHaveText("workspace · 2 projects");
-  // Its body (e2e/workspace-page.spec.ts covers it).
-  await expect(page.locator(`[data-testid="workspace"][data-workspace="${ws.id}"]`)).toBeVisible();
-  await page.getByTestId("workspace-page-reveal").click();
-  expect((await lastInvocation("workspace.reveal"))?.args).toEqual({ workspace: ws.id });
-  await page.getByTestId("workspace-page-more").click();
-  expect(await menuItems(page, "workspace-page-more")).toEqual(["New thread", "New terminal", "Open in Finder", "Rename", "Add project", "Remove workspace"]);
-  await page.getByTestId("workspace-menu-rename").click();
-  await expect(page.getByTestId("workspace-name-input")).toBeFocused();
-  await page.keyboard.press("Escape");
-  await page.getByTestId("workspace-page-new-thread").click();
-  await expect(page.getByTestId("composer")).toBeVisible();
-});
-
 // The index's Default branch, the filter, the page picker and the crumb: unit-tested in src/components/projects/ProjectsIndex.test.tsx.
 
 test("the pane header holds the filter and toggles; Add project and Add workspace sit on their section titles", async ({ page }) => {
@@ -482,22 +453,7 @@ test("worktrees to tidy: the index pill and the project menu count the cleanable
   await expect(page.getByTestId("index-tidy")).toHaveCount(0);
 });
 
-test("Clean up merged worktrees removes them after a confirm and the index's pill goes", async ({ page }) => {
-  await mockPost("worktree/merged?project=repo-cf&branch=cf/usage-polish");
-  await mockPost("worktree/merged?project=repo-cf&branch=cf/old-docs");
-  await openApp(page);
-  await openProjectPage(page, "repo-cf");
-  await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Clean up merged worktrees 2", "Remove project"]);
-  await page.getByTestId("project-cleanup").click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Fetch, then remove 2 worktrees");
-  await dialog.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("worktree-branch")).toHaveCount(3);
-  expect((await lastInvocation("project.worktree.cleanup"))?.args).toEqual({ project: "repo-cf" });
-  await openProjects(page);
-  await expect(page.getByTestId("index-tidy")).toHaveCount(0);
-});
+// Clean up merged worktrees and Remove the N that are clean (confirm, cleanup, the pill going): unit-tested in src/components/projects/ProjectPage.test.tsx.
 
 test("Worktrees without threads: a row per leftover with why it stayed; Show diff, Resume, New thread; the three cleanable counts agree", async ({ page }) => {
   await mockPost("leftovers?project=repo-cf&clean=1");
@@ -619,26 +575,4 @@ test("Remove…: the confirm names what goes and what stays; with uncommitted fi
   await expect(leftover(page, SHADERS)).toHaveCount(0);
   expect((await lastInvocation("project.worktree.remove"))?.args).toEqual({ path: SHADERS });
   await expect(page.getByTestId("leftover-title")).toContainText("1 kept");
-});
-
-test("Remove the N that are clean runs the cleanup after its confirm; with nothing kept the section says so", async ({ page }) => {
-  await mockPost("leftovers?project=repo-cf&clean=1");
-  await openApp(page);
-  await openProjectPage(page, "repo-cf");
-  await page.getByTestId("leftover-remove-clean").click();
-  await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
-  await expect(leftover(page, MERGED)).toHaveCount(0);
-  expect((await lastInvocation("project.worktree.cleanup"))?.args).toEqual({ project: "repo-cf" });
-  await expect(page.getByTestId("leftover-remove-clean")).toHaveCount(0);
-  // Only the cleanable one goes: the others still hold something (or were made outside the app).
-  await expect(page.getByTestId("leftover-row")).toHaveCount(3);
-  await openProjects(page);
-  await expect(page.getByTestId("index-tidy")).toHaveCount(0);
-
-  // ghostty-playground: nothing kept.
-  await openProjectPage(page, "repo-gp");
-  await expect(page.getByTestId("leftover-title")).toHaveText("Worktrees without threads");
-  await expect(page.getByTestId("leftover-empty")).toHaveText("Nothing kept. Worktrees made for a thread go on their own once its last thread is archived and the work is on main.");
-  await expect(page.getByTestId("leftover-footer")).toHaveCount(0);
-  await expect(page.getByTestId("leftover-remove-clean")).toHaveCount(0);
 });
