@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Pencil, SquarePen, Trash2 } from "lucide-react";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
-import { FinderMark } from "@/components/icons/FinderMark";
+import { FinderIcon } from "@/components/icons/AppIcon";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
@@ -121,7 +121,7 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-2 [--wails-draggable:no-drag]">
           <Button type="button" variant="outline" size="sm" className="h-7" data-testid="workspace-page-reveal" onClick={() => void revealWorkspace(workspaceId)}>
-            <FinderMark />
+            <FinderIcon />
             Open in Finder
           </Button>
           <Button type="button" size="sm" className="h-7" data-testid="workspace-page-new-thread" onClick={() => { composeInWorkspace(workspaceId); }}>

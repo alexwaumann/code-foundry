@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { FileImage, FileQuestion, FileText, FileX, Folder, SquareArrowOutUpRight, TriangleAlert, type LucideIcon } from "lucide-react";
 import { readFile, type FileReadView } from "@/api/files";
-import { FinderMark } from "@/components/icons/FinderMark";
+import { FinderIcon } from "@/components/icons/AppIcon";
 import { ago } from "@/components/pr/model";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/lib/clock";
@@ -187,7 +187,7 @@ function FileBody({
         revealInFinder(place);
       }}
     >
-      <FinderMark aria-hidden />
+      <FinderIcon aria-hidden />
       Open in Finder
     </Button>
   );

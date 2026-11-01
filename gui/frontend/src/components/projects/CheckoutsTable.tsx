@@ -2,7 +2,7 @@ import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 import { Copy, FileDiff, GitPullRequest, Layers, SquarePen, SquareTerminal, Trash2 } from "lucide-react";
 import { ActionsMenu } from "@/components/actions/ActionsMenu";
-import { FinderMark } from "@/components/icons/FinderMark";
+import { FinderIcon } from "@/components/icons/AppIcon";
 import { ChecksBadge, PrStateIcon } from "@/components/prs/PrBits";
 import { Tip } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
@@ -110,7 +110,7 @@ function rowMenu(projectId: string, path: string, isMain: boolean, pr: { slug: s
   if (pr) items.push({ label: `Open pull request #${String(pr.number)}`, icon: GitPullRequest, testId: "worktree-open-pr", onSelect: () => { openPullRequestInPanel(pr); } });
   items.push(
     "separator",
-    { label: "Open in Finder", icon: FinderMark, testId: "worktree-reveal", onSelect: () => { revealCheckout(projectId, path); } },
+    { label: "Open in Finder", icon: FinderIcon, testId: "worktree-reveal", onSelect: () => { revealCheckout(projectId, path); } },
     { label: "Copy path", icon: Copy, testId: "worktree-copy-path", onSelect: () => void copyPath(path) },
   );
   if (!isMain) items.push("separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(projectId, path) });
