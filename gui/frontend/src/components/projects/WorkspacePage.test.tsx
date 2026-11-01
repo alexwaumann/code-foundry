@@ -310,7 +310,7 @@ describe("the workspace's Projects card", () => {
     await settle();
     expect(lastInvocation("workspace.remove-project")?.args).toEqual({ project: "repo-gp", workspace: shop });
     expect(screen.queryByTestId("confirm-dialog")).toBeNull();
-    // The project that started threads gone, the folder does: a synthetic workspace's folder row then shows.
+    // Once the folder starts threads (the mock's fallback; the daemon picks the first member left), a synthetic workspace's folder row shows.
     updateWorkspace(shop, (w) => ({ ...w, members: w.members.filter((m) => m.projectId !== "repo-gp"), defaultPrimary: "workspace" }));
     expect(texts(body(shop), "member-name")).toEqual(["code-foundry", "writing"]);
     expect(by(body(shop), "workspace-folder").getAttribute("data-default")).toBe("true");

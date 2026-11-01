@@ -149,7 +149,9 @@ export function seedWorld(opts: { empty?: boolean } = {}): void {
   if (typeof Element.prototype.scrollIntoView !== "function") Element.prototype.scrollIntoView = () => undefined;
   const ps = opts.empty ? [] : projects();
   const ts = opts.empty ? [] : threads();
-  for (const r of [repoActivityResource, branchPullRequestsResource, worktreeDetailResource]) r.store.setState({ entries: {} });
+  repoActivityResource.store.setState({ entries: {} });
+  branchPullRequestsResource.store.setState({ entries: {} });
+  worktreeDetailResource.store.setState({ entries: {} });
   if (!opts.empty) seedGitHub();
   const byId = Object.fromEntries(ps.map((p) => [p.id, p]));
   useProjectsStore.setState({ byId, order: byName(byId), loaded: true });

@@ -54,7 +54,7 @@ const abs = (p: string) => (p.startsWith("~") ? `${HOME}${p.slice(1)}` : p).repl
 function node(path: string): Dir | undefined {
   const rel = abs(path).slice(HOME.length).split("/").filter(Boolean);
   let d: Dir | undefined = tree;
-  for (const part of rel) d = d.children?.[part];
+  for (const part of rel) d = d?.children?.[part];
   return d;
 }
 
