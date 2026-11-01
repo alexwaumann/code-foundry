@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { emit, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The MCP side panel surface (docs/notes/mcp-panel.md, docs/sketches/mcp-panel variant B)
@@ -40,11 +40,6 @@ async function expectMcpTab(page: Page): Promise<void> {
 async function openFromCard(page: Page): Promise<void> {
   await page.getByTestId("thread-info-card").getByTestId("ti-mcp").click();
   await page.getByTestId("ti-mcp-open-panel").click();
-}
-
-async function threadCalls(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/thread/calls`);
-  return (await res.json()) as string[];
 }
 
 test.beforeEach(async () => {
@@ -149,69 +144,9 @@ test("the card's row and the command open it, not M or the + list; tools expand 
 // Reconnect (Connecting…, then Connected in its tab, the check's words), a refused reconnect's toast, and
 // Refresh: unit-tested in src/surfaces/mcp.test.tsx.
 
-test("a stopped thread keeps its last status; Refresh and Reconnect are enabled and work (the daemon starts Claude)", async ({ page }) => {
-  await mockPost("thread?state=stopped");
-  await openApp(page);
-  await row(page, "s:s-r1").click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expectMcpTab(page);
-  await expect(surface(page)).not.toContainText(/not running|Reconnect it/);
-  await expectTabs(page, [3, 2, 1], "connected", ["t3-code", "github", "filesystem"]);
-  await expect(surface(page).getByTestId("mcp-refresh")).toBeEnabled();
-  await mcpTab(page, "failed").click();
-  const pw = card(page, "playwright");
-  await expect(pw.getByTestId("mcp-reconnect")).toBeEnabled();
-  await pw.getByTestId("mcp-reconnect").click();
-  await expectTabs(page, [4, 1, 1], "failed", ["linear"]);
-  await mcpTab(page, "connected").click();
-  await expect(pw).toHaveAttribute("data-status", "connected");
-  expect(await threadCalls()).toContain("mcp-reconnect s-r1 playwright");
-  await surface(page).getByTestId("mcp-refresh").click();
-  // The mock answers without starting Claude (the daemon starts it), so the thread stays
-  // stopped and the fresh check still reads stale (docs/notes/panel-polish.md).
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Last check (just now|\d+s ago) · may be out of date$/);
-  // Stale at once, however recent the check.
-  await expectStale(page, true);
-  expect(await threadCalls()).toContain("mcp s-r1 refresh");
-});
+// A stopped thread (last status kept, Refresh and Reconnect enabled): src/surfaces/mcp.test.tsx ("a stopped thread keeps its last status…", staleness "Claude not running").
 
-/** The stale state (docs/notes/panel-polish.md): amber header line, muted dashed pills, Refresh as the primary button. */
-async function expectStale(page: Page, on: boolean): Promise<void> {
-  const header = surface(page).getByTestId("mcp-header");
-  if (on) await expect(header).toHaveAttribute("data-stale", "true");
-  else await expect(header).not.toHaveAttribute("data-stale");
-  const line = surface(page).getByTestId("mcp-checked-line");
-  if (on) await expect(line).toHaveClass(/text-cf-warning-text/);
-  else await expect(line).not.toHaveClass(/text-cf-warning-text/);
-  const dashed = await surface(page)
-    .getByTestId("mcp-pill")
-    .evaluateAll((els) => els.map((e) => getComputedStyle(e).borderStyle === "dashed" && getComputedStyle(e).borderTopWidth !== "0px"));
-  expect(dashed.length).toBeGreaterThan(0);
-  expect(dashed).toEqual(dashed.map(() => on));
-  const refresh = surface(page).getByTestId("mcp-refresh");
-  if (on) {
-    await expect(refresh).toHaveAttribute("data-cta", "");
-    await expect(refresh).toHaveText("Refresh");
-  } else {
-    await expect(refresh).not.toHaveAttribute("data-cta");
-    await expect(refresh).toHaveText("");
-  }
-}
-
-test("a check 10 min old goes stale: amber line, dashed pills, Refresh as the call to action; a refresh clears it", async ({ page }) => {
-  await openThread(page);
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expectMcpTab(page);
-  await expectStale(page, false);
-  await mockPost("thread/mcp-age?id=s-r1&ago=720");
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText("Last check 12 min ago · may be out of date");
-  await expectStale(page, true);
-  await surface(page).getByTestId("mcp-refresh").click();
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked (just now|\d+s ago)$/);
-  await expectStale(page, false);
-  expect(await threadCalls()).toContain("mcp s-r1 refresh");
-});
+// A check 10 min old going stale (amber line, dashed pills, Refresh as the call to action) and a refresh clearing it: src/surfaces/mcp.test.tsx ("MCP surface staleness").
 
 // A thread Claude never reported for: unit-tested in src/surfaces/mcp.test.tsx.
 
