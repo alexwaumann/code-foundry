@@ -146,6 +146,29 @@ test("the card's row and the command open it, not M or the + list; tools expand 
 
 // A stopped thread (last status kept, Refresh and Reconnect enabled): src/surfaces/mcp.test.tsx ("a stopped thread keeps its last status…", staleness "Claude not running").
 
+/** The stale state (docs/notes/panel-polish.md): amber header line, muted dashed pills, Refresh as the primary button. */
+async function expectStale(page: Page, on: boolean): Promise<void> {
+  const header = surface(page).getByTestId("mcp-header");
+  if (on) await expect(header).toHaveAttribute("data-stale", "true");
+  else await expect(header).not.toHaveAttribute("data-stale");
+  const line = surface(page).getByTestId("mcp-checked-line");
+  if (on) await expect(line).toHaveClass(/text-cf-warning-text/);
+  else await expect(line).not.toHaveClass(/text-cf-warning-text/);
+  const dashed = await surface(page)
+    .getByTestId("mcp-pill")
+    .evaluateAll((els) => els.map((e) => getComputedStyle(e).borderStyle === "dashed" && getComputedStyle(e).borderTopWidth !== "0px"));
+  expect(dashed.length).toBeGreaterThan(0);
+  expect(dashed).toEqual(dashed.map(() => on));
+  const refresh = surface(page).getByTestId("mcp-refresh");
+  if (on) {
+    await expect(refresh).toHaveAttribute("data-cta", "");
+    await expect(refresh).toHaveText("Refresh");
+  } else {
+    await expect(refresh).not.toHaveAttribute("data-cta");
+    await expect(refresh).toHaveText("");
+  }
+}
+
 // A check 10 min old going stale (amber line, dashed pills, Refresh as the call to action) and a refresh clearing it: src/surfaces/mcp.test.tsx ("MCP surface staleness").
 
 // A thread Claude never reported for: unit-tested in src/surfaces/mcp.test.tsx.

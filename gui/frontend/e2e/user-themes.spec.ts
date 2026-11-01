@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { mockUrl, openApp, resetMock } from "./fixtures";
 
 // The user's own themes on the Themes page (docs/notes/user-themes.md). The mock seeds three
 // (mock/userThemes.ts): Ocean Dusk (dark, from Catppuccin Mocha, by thread s-1), Mocha,

@@ -29,13 +29,6 @@ function scrollState(page: Page, testId: string) {
   return page.getByTestId(testId).evaluate((el) => ({ top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight }));
 }
 
-async function openMenu(page: Page, key: string) {
-  await row(page, key).click({ button: "right" });
-  const menu = page.getByTestId("row-menu");
-  await expect(menu).toBeVisible();
-  return menu;
-}
-
 test("Archived section: collapsed by default with its count; expanded, single-line rows with the archive age; hidden with no archived thread", async ({ page }) => {
   await openApp(page);
   const header = page.getByTestId("archived-header");

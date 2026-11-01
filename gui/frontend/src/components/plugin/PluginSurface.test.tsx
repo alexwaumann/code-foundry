@@ -40,6 +40,9 @@ describe("PluginSurface", () => {
   it("watches its surface with the panel's context: the thread it shows", () => {
     render(<PluginSurface tab={makeTab("plugin.hello.demo", "Hello Demo")} />);
     expect(startSurfaceWatch).toHaveBeenCalledTimes(1);
-    expect(startSurfaceWatch).toHaveBeenCalledWith(expect.any(String), { plugin: "hello", surface: "demo", context: expect.objectContaining({ activeThreadId: "s-3" }) });
+    const [watchKey, ref] = startSurfaceWatch.mock.calls[0] as unknown as [string, { plugin: string; surface: string; context: { activeThreadId: string } }];
+    expect(watchKey).not.toBe("");
+    expect(ref).toMatchObject({ plugin: "hello", surface: "demo" });
+    expect(ref.context.activeThreadId).toBe("s-3");
   });
 });

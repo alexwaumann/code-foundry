@@ -80,7 +80,7 @@ test("SHOTS: a verb that asks opens the app's confirm dialog", async ({ page }) 
   await doc(page).locator("#archive").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog.getByTestId("confirm-caller")).toContainText("Bridge check, a page in");
-  await page.screenshot({ path: `${shots}/bridge-confirm.png` });
+  await page.screenshot({ path: `${String(shots)}/bridge-confirm.png` });
   await dialog.getByTestId("confirm-cancel").click();
 });
 

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The plugin GUI gaps (docs/notes/plugins-11-gui-gaps.md): a flagged row opens the
