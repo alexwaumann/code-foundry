@@ -645,6 +645,9 @@ test("the card lays over the conversation: the list and composer keep clear, the
   expect(log.x + log.width).toBeLessThanOrEqual(c.x);
   const composer = await box(page.getByTestId("composer-input"));
   expect(composer.x + composer.width).toBeLessThanOrEqual(c.x);
+  // The dock (the composer's column) ends 12px left of the card.
+  const dock = await box(page.locator('[data-testid="thread-pane-body"] .dock'));
+  expect(Math.abs(dock.x + dock.width + 12 - c.x)).toBeLessThan(1);
   // The card is shorter than the pane: a wheel under it reaches the list.
   expect(c.y + c.height + 100).toBeLessThan(body.y + body.height);
   const top = () => timeline.evaluate((el) => el.scrollTop);
@@ -652,6 +655,26 @@ test("the card lays over the conversation: the list and composer keep clear, the
   await wheelAt(page, c.x + c.width / 2, c.y + c.height + 60, -150);
   await expect.poll(top).toBeLessThan(before - 200);
   await expect(page.getByTestId("thread-jump-bottom")).toHaveAttribute("data-shown", "true");
+});
+
+test("a conversation too short to scroll: no scrollbar, and the card keeps 12px from the pane's edge and from the dock, as when it scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await openWithCard(page, "single");
+  const timeline = page.getByTestId("thread-timeline");
+  // Nothing to scroll: WebKit gives a custom scrollbar no room then, whatever scrollbar-gutter says.
+  expect(await timeline.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
+  expect(await timeline.evaluate((el) => (el as HTMLElement).offsetWidth - el.clientWidth)).toBe(0);
+  const gaps = async () => {
+    const [body, c, dock] = await Promise.all([box(page.getByTestId("thread-pane-body")), box(card(page)), box(page.locator('[data-testid="thread-pane-body"] .dock'))]);
+    return { edge: Math.round(body.x + body.width - (c.x + c.width)), dock: Math.round(c.x - (dock.x + dock.width)) };
+  };
+  expect(await gaps()).toEqual({ edge: 12, dock: 12 });
+  // The list grows taller than the pane (a shorter window): the scrollbar appears and the card does not move.
+  const before = await box(card(page));
+  await page.setViewportSize({ width: 1300, height: 420 });
+  await expect.poll(() => timeline.evaluate((el) => (el as HTMLElement).offsetWidth - el.clientWidth)).toBe(12);
+  expect(await gaps()).toEqual({ edge: 12, dock: 12 });
+  expect((await box(card(page))).x).toBe(before.x);
 });
 
 test("a wheel over a card shorter than the pane scrolls the conversation, which stays up", async ({ page }) => {
@@ -688,6 +711,73 @@ test("a card taller than the pane scrolls itself under the wheel", async ({ page
   await wheelAt(page, a.x + a.width / 2, a.y + a.height / 2, 100);
   await expect.poll(() => aside.evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
   expect(await timeline.evaluate((el) => el.scrollTop)).toBe(tlTop);
+});
+
+/** A long conversation of forty turns (the mock's long state, s-r1), most rows unmounted, with the card shown over its right, at the bottom. */
+async function openVeryLongWithCard(page: Page): Promise<void> {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await mockPost("thread?state=long");
+  await openApp(page);
+  await row(page, "s:s-r1").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-r1");
+  await toggle(page).click();
+  await expect(card(page)).toBeVisible();
+  await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
+}
+
+/** Whether a mounted row of the list is under the list's top and bottom edges (a few px in), probed with elementsFromPoint in the rows' column (the composer floats over the bottom one). */
+async function edgesCovered(page: Page): Promise<{ top: boolean; bottom: boolean; scrollTop: number }> {
+  return page.getByTestId("thread-timeline").evaluate(async (el) => {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const box = el.getBoundingClientRect();
+    const log = el.querySelector('[role="log"]')?.getBoundingClientRect();
+    const x = log ? log.left + log.width / 2 : box.left + box.width / 3;
+    const rowAt = (y: number) => document.elementsFromPoint(x, y).some((e) => el.contains(e) && e.closest("[data-index]") !== null);
+    return { top: rowAt(box.top + 2), bottom: rowAt(box.bottom - 2), scrollTop: el.scrollTop };
+  });
+}
+
+test("a wheel over the card leaves no gap: the rows under the list's top and bottom edges are mounted, scrolling up and down", async ({ page }) => {
+  await openVeryLongWithCard(page);
+  const timeline = page.getByTestId("thread-timeline");
+  const c = await box(card(page));
+  const t = await box(timeline);
+  expect(c.y + c.height + 100).toBeLessThan(t.y + t.height);
+  const total = await timeline.evaluate((el) => el.scrollHeight);
+  // Far more than the pane, and most rows unmounted: the virtualizer has to mount what the wheel brings in.
+  expect(total).toBeGreaterThan(t.height * 5);
+  const before = await timeline.evaluate((el) => el.scrollTop);
+  // Toward older content, at a trackpad's pace.
+  await wheelAt(page, c.x + c.width / 2, c.y + c.height / 2, -120, 12);
+  const up = await edgesCovered(page);
+  expect(up.scrollTop).toBeLessThan(before - 1000);
+  expect(up).toMatchObject({ top: true, bottom: true });
+  await expect(page.getByTestId("thread-jump-bottom")).toHaveAttribute("data-shown", "true");
+  // Further up, then toward newer content, short of the bottom.
+  await wheelAt(page, c.x + c.width / 2, c.y + c.height / 2, -120, 12);
+  const higher = await timeline.evaluate((el) => el.scrollTop);
+  await wheelAt(page, c.x + c.width / 2, c.y + c.height / 2, 120, 8);
+  const down = await edgesCovered(page);
+  expect(down.scrollTop).toBeGreaterThan(higher + 500);
+  expect(down.scrollTop).toBeLessThan(before - 300);
+  expect(down).toMatchObject({ top: true, bottom: true });
+  await expect(timeline).not.toHaveAttribute("data-at-bottom");
+});
+
+test("a wheel over a menu of the card leaves the conversation where it is", async ({ page }) => {
+  await openVeryLongWithCard(page);
+  const timeline = page.getByTestId("thread-timeline");
+  const before = await timeline.evaluate((el) => el.scrollTop);
+  await card(page).getByTestId("ti-project").click();
+  const menu = page.getByTestId("ti-project-menu");
+  await expect(menu).toBeVisible();
+  const m = await box(menu);
+  await wheelAt(page, m.x + m.width / 2, m.y + m.height / 2, -150);
+  await page.waitForTimeout(300);
+  expect(await timeline.evaluate((el) => el.scrollTop)).toBe(before);
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
 });
 
 test("a page's Expand covers the conversation, not the card beside it", async ({ page }) => {

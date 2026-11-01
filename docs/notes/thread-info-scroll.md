@@ -5,6 +5,10 @@ Status: done on branch `cf/thread-info-scroll` (one PR, GUI only). Follows
 wheel over that column (beside or under the card) did nothing, and the conversation's
 scrollbar sat left of the card instead of at the pane's edge.
 
+Superseded for the wheel: since `docs/notes/thread-info-wheel-native.md` the card is
+inside the timeline's scroller and a wheel over it chains to the list natively; the
+forwarding below (and its gotchas) is gone.
+
 ## Behaviour
 
 * The card lays over the right of the thread body (`absolute inset-y-0 right-0`,
@@ -20,7 +24,7 @@ scrollbar sat left of the card instead of at the pane's edge.
 * The dock's `right` is `calc(var(--ti-inset) + var(--ti-gutter))`: the composer centres in
   the same space and its gradient does not cover the scrollbar. "Jump to bottom" centres on
   that space too.
-* Wheels: the card's column (`aside`) is `pointer-events-none`, the card
+* Wheels (superseded, see thread-info-wheel-native.md): the card's column (`aside`) is `pointer-events-none`, the card
   `pointer-events-auto`, so a wheel beside or under the card hits the list. Over the card,
   the column scrolls while the card is taller than the pane (its own scrollbar hidden);
   otherwise `onWheel` hands it to the timeline: a synthetic `wheel` event on the scroller

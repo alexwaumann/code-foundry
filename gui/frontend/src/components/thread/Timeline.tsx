@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type SyntheticEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/lib/threadTimeline";
@@ -10,6 +10,7 @@ import { HoldTopContext, KeepRowContext } from "./context";
 import { PromptRail } from "./PromptRail";
 import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
+import { cn } from "@/lib/utils";
 
 /** Within this many px of the bottom the list follows new content. */
 const PIN_SLACK = 48;
@@ -21,6 +22,15 @@ const HOLD_MS = 400;
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 /** A page's frame under the pointer (an inline page card's): its wheel never reaches the list (lib/scrollIntent.ts). */
 const HOVERED_FRAME = "iframe:hover";
+
+/**
+ * Whether an event happened in the list's own DOM. React bubbles events from portals (a
+ * row's or the thread info card's menu or hover card) through the list: those scroll
+ * themselves, not the list, and are no input to it.
+ */
+function inList(e: SyntheticEvent<HTMLElement>): boolean {
+  return e.target instanceof Node && e.currentTarget.contains(e.target);
+}
 
 /** A first guess of a row's height before it is measured. */
 function estimate(r: { type: string; later?: string } | undefined): number {
@@ -85,6 +95,7 @@ export function Timeline({
   bottomInset,
   inset,
   rail = false,
+  pinnedLayer,
 }: {
   threadId: string;
   working: boolean;
@@ -93,13 +104,15 @@ export function Timeline({
   inset?: number;
   /** The prompt rail in the left gutter (PromptRail): the content pane's thread only, not the inline view. */
   rail?: boolean;
+  /** A layer inside the scroller, pinned to its top (TimelineList's pinnedLayer): the thread info card. */
+  pinnedLayer?: ReactNode;
 }) {
   const rows = useRows(threadId, working, strips);
   const overlay = useCallback(
     (o: TimelineOverlay<TimelineRow>) => <PromptRail threadId={threadId} list={o.list} rows={o.rows} bottomInset={o.bottomInset} />,
     [threadId],
   );
-  return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns inset={inset} overlay={rail ? overlay : undefined} />;
+  return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns inset={inset} overlay={rail ? overlay : undefined} pinnedLayer={pinnedLayer} />;
 }
 
 function renderTimelineRow(row: TimelineRow) {
@@ -146,6 +159,7 @@ export function TimelineList<R extends ListRow>({
   unfold,
   inset = 40,
   overlay,
+  pinnedLayer,
 }: {
   threadId: string;
   rows: readonly R[];
@@ -161,9 +175,21 @@ export function TimelineList<R extends ListRow>({
   inset?: number | undefined;
   /** A layer over the list, outside the scroller (the thread's prompt rail in the left gutter). */
   overlay?: ((o: TimelineOverlay<R>) => ReactNode) | undefined;
+  /**
+   * A layer inside the scroller, before the rows, in a box pinned to the list's top
+   * (`position: sticky`) that takes no height and no pointer events of its own: it never
+   * moves, and a wheel over what it draws chains to the list natively (the thread info
+   * card, docs/notes/thread-info-wheel-native.md). The box carries `--timeline-h`, the
+   * list's client height, for what it draws to fit in, and `--timeline-sb`, the width its
+   * scrollbar takes (0 while the list does not scroll: WebKit's `scrollbar-gutter: stable`
+   * reserves nothing for a custom scrollbar), so what it draws over the list's right
+   * padding can keep a fixed distance from the pane's edge.
+   */
+  pinnedLayer?: ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+  const pinnedRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   /** When the user last gave scroll input (wheel, touch, key); Infinity while a pointer is down on the list (its scrollbar). */
   const userInput = useRef(-Infinity);
@@ -320,6 +346,25 @@ export function TimelineList<R extends ListRow>({
       ro.disconnect();
     };
   }, [toBottom, restoreHeld, noteScroll]);
+  // The pinned layer's box knows the list's height (--timeline-h) and its scrollbar's width
+  // (--timeline-sb), set on the element so a resize re-renders nothing. The scrollbar
+  // appearing narrows the content box, so the observer sees it.
+  const pinnedLayerShown = pinnedLayer != null;
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const box = pinnedRef.current;
+    if (!pinnedLayerShown || !el || !box) return;
+    const measure = () => {
+      box.style.setProperty("--timeline-h", `${String(el.clientHeight)}px`);
+      box.style.setProperty("--timeline-sb", `${String(el.offsetWidth - el.clientWidth)}px`);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, [pinnedLayerShown]);
   // Away from the bottom, the row at the top of the viewport (and how far it starts above
   // the viewport's top) is the anchor a change of rows keeps in place.
   const anchor = useRef<{ index: number; offset: number; rows: readonly R[] } | null>(null);
@@ -392,15 +437,20 @@ export function TimelineList<R extends ListRow>({
       <HoldTopContext.Provider value={holdTop}>
         <div
           ref={scrollRef}
-          className="scroller min-h-0 flex-1 overflow-y-auto"
+          className={cn("scroller min-h-0 flex-1 overflow-y-auto", pinnedLayerShown && "overflow-x-hidden")}
           data-testid="thread-timeline"
           data-at-bottom={atBottom || undefined}
-          onWheel={markInput}
-          onTouchMove={markInput}
-          onKeyDown={(e) => {
-            if (SCROLL_KEYS.has(e.key)) markInput();
+          onWheel={(e) => {
+            if (inList(e)) markInput();
           }}
-          onPointerDown={() => {
+          onTouchMove={(e) => {
+            if (inList(e)) markInput();
+          }}
+          onKeyDown={(e) => {
+            if (inList(e) && SCROLL_KEYS.has(e.key)) markInput();
+          }}
+          onPointerDown={(e) => {
+            if (!inList(e)) return;
             userInput.current = Infinity;
             const up = () => {
               userInput.current = performance.now();
@@ -434,6 +484,11 @@ export function TimelineList<R extends ListRow>({
             noteScroll();
           }}
         >
+          {pinnedLayerShown && (
+            <div ref={pinnedRef} className="pointer-events-none sticky top-0 z-10 h-0 overflow-visible" data-testid="thread-timeline-pinned">
+              {pinnedLayer}
+            </div>
+          )}
           <div ref={innerRef} className="col" role="log" aria-label="Conversation" style={{ position: "relative", height: v.getTotalSize() }}>
             {v.getVirtualItems().map((vi) => {
               const row = rows[vi.index];
