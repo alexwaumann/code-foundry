@@ -41,7 +41,7 @@ const stores: Persisted[] = [
   },
   {
     name: "code-foundry.ui",
-    version: 3,
+    version: 4,
     rehydrate: () => useUiStore.persist.rehydrate(),
     fields: ["sidebarVisible", "sidebarWidth", "fontSize", "zoom", "usageRange", "workingCollapsed", "archivedCollapsed", "snoozedCollapsed", "projectsLast", "emberShowWork", "selection"],
     use: () => {

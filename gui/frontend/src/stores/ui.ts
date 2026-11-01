@@ -94,7 +94,7 @@ export type PalettePage = "commands" | "projects" | "runin" | "prompts";
 export const SIDEBAR_MIN = 220;
 export const SIDEBAR_MAX = 520;
 /** The initial width, and what double-clicking the resize handle restores. */
-export const SIDEBAR_DEFAULT = 280;
+export const SIDEBAR_DEFAULT = 220;
 /** Side panel width bounds; the upper bound depends on the window and sidebar (panelMax). */
 export const PANEL_MIN = 280;
 export const PANEL_MAX_FRACTION = 0.6;
@@ -552,9 +552,12 @@ export const useUiStore = create<UiState>()(
       // 3: the sidebar is a flat thread list (no collapsible projects or worktrees); drop collapsed.
       // The Projects index has no collapsible projects and the workspace page no collapsible
       // card: collapsedProjects and collapsedWorkspaces are ignored (merge).
-      version: 3,
-      migrate: (persisted) => {
-        const { panelWidth: _old, collapsed: _gone, ...rest } = (persisted ?? {}) as Record<string, unknown>;
+      // 4: the default sidebar width fell from 280 to 220; drop the saved width once so every
+      // window starts at the new default, and keep widths dragged after that.
+      version: 4,
+      migrate: (persisted, version) => {
+        const { panelWidth: _old, collapsed: _gone, ...rest } = persistedRecord(persisted);
+        if (version < 4) delete rest.sidebarWidth;
         return rest as Partial<UiState> as UiState;
       },
       // Only the persisted fields, each checked (stores/persisted.ts): a store another build

@@ -39,8 +39,8 @@ describe("expandedPanelWidth", () => {
   const cases: [string, number, number, number][] = [
     ["the row beside the sidebar less the panel's two margins", 1400, SIDEBAR_DEFAULT, 1400 - SIDEBAR_DEFAULT - 2 * SHELL_GAP],
     ["sidebar hidden", 900, 0, 876],
-    ["900px window, default sidebar: stacks a split", 900, SIDEBAR_DEFAULT, 596],
-    ["800px window, default sidebar", 800, SIDEBAR_DEFAULT, 496],
+    ["900px window, default sidebar: stacks a split", 900, SIDEBAR_DEFAULT, 656],
+    ["800px window, default sidebar", 800, SIDEBAR_DEFAULT, 556],
     ["never negative", 200, SIDEBAR_MAX, 0],
   ];
   it.each(cases)("%s", (_name, windowWidth, sidebar, want) => {
@@ -70,12 +70,24 @@ describe("window width", () => {
 });
 
 describe("ui persistence", () => {
-  it("migrating drops the old global panelWidth and the tree's collapsed rows, and keeps the rest", async () => {
+  it("migrating drops the old global panelWidth, the tree's collapsed rows and the pre-220 sidebar width, and keeps the rest", async () => {
     const migrate = useUiStore.persist.getOptions().migrate;
-    expect(useUiStore.persist.getOptions().version).toBe(3);
+    expect(useUiStore.persist.getOptions().version).toBe(4);
     const v1 = { sidebarVisible: false, sidebarWidth: 300, panelWidth: 600, fontSize: 14, collapsed: { a: true } };
-    expect(await migrate?.(v1, 1)).toEqual({ sidebarVisible: false, sidebarWidth: 300, fontSize: 14 });
-    expect(await migrate?.({ sidebarWidth: 280, collapsed: {} }, 2)).toEqual({ sidebarWidth: 280 });
+    expect(await migrate?.(v1, 1)).toEqual({ sidebarVisible: false, fontSize: 14 });
+    expect(await migrate?.({ sidebarWidth: 280, collapsed: {} }, 2)).toEqual({});
+    expect(await migrate?.({ sidebarWidth: 360, fontSize: 15 }, 3)).toEqual({ fontSize: 15 });
+    expect(await migrate?.(null, 3)).toEqual({});
+  });
+
+  it("a v3 store loads at the new default width; a width saved after that is kept", async () => {
+    localStorage.setItem("code-foundry.ui", JSON.stringify({ state: { sidebarWidth: 360, fontSize: 15 }, version: 3 }));
+    await useUiStore.persist.rehydrate();
+    expect(useUiStore.getState()).toMatchObject({ sidebarWidth: SIDEBAR_DEFAULT, fontSize: 15 });
+    useUiStore.getState().setSidebarWidth(410);
+    await useUiStore.persist.rehydrate();
+    expect(useUiStore.getState().sidebarWidth).toBe(410);
+    localStorage.clear();
   });
 
   const widths: [string, unknown, number][] = [
