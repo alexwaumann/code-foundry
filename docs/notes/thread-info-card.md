@@ -45,7 +45,9 @@ window. The toggle stays on and pressed, its tooltip says "Not enough room"
   that row's menu is up or its fold is open. A row may click (`onActivate`), be a menu
   trigger (Radix `asChild`; it takes the trigger's props and ref), or both
   (`menuOnChevron`: only the chevron opens the menu, a press elsewhere clicks). Hover cards
-  are `Tip` with rich content, side left, `max-w-65` (260px).
+  are `Tip` with rich content, side left, `max-w-65` (260px). (Superseded by
+  `docs/notes/thread-info-row-menus.md`: no reserved column, the chevron only on
+  disclosures, an ellipsis on split rows.)
 * `RowMenu`: a `DropdownMenuContent` as wide as its row
   (`--radix-dropdown-menu-trigger-width`), which is the card less 6px a side; items in
   `text-caption`. `DropdownMenuSub*` were added to `ui/dropdown-menu.tsx` (shadcn's) for
