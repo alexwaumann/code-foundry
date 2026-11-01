@@ -50,14 +50,17 @@ func TestDecode(t *testing.T) {
 // of the accepted values) leaves them out of the file.
 func TestDecodeRetiredKeys(t *testing.T) {
 	tests := []struct {
-		name string
-		in   string
-		want map[string]string
+		name    string
+		in      string
+		want    map[string]string
+		retired string // the key that must be neither reported nor rendered
 	}{
 		{name: "projects.worktree_dir is dropped", in: "[projects]\nfetch_interval_seconds = 60\nworktree_dir = \"~/tmp/x\"\n",
-			want: map[string]string{"projects.fetch_interval_seconds": "60"}},
+			want: map[string]string{"projects.fetch_interval_seconds": "60"}, retired: "projects.worktree_dir"},
 		{name: "worktree_dir in another table is not retired", in: "[gitops]\nworktree_dir = \"~/c\"\n",
-			want: map[string]string{"gitops.worktree_dir": "~/c"}},
+			want: map[string]string{"gitops.worktree_dir": "~/c"}, retired: "projects.worktree_dir"},
+		{name: "threads.show_created_threads is dropped", in: "[threads]\nauto_name = false\nshow_created_threads = true\n",
+			want: map[string]string{"threads.auto_name": "false"}, retired: "threads.show_created_threads"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -67,12 +70,13 @@ func TestDecodeRetiredKeys(t *testing.T) {
 			}
 			r := resolve(raw, testCmds)
 			for _, is := range r.issues {
-				if strings.Contains(is.Key, "worktree_dir") && strings.HasPrefix(is.Key, GroupProjects) {
+				if is.Key == tt.retired {
 					t.Errorf("retired key reported: %+v", is)
 				}
 			}
-			if strings.Contains(string(render(r.accepted, nil)), "worktree_dir") {
-				t.Errorf("rendered file still has worktree_dir")
+			_, field, _ := strings.Cut(tt.retired, ".")
+			if out := string(render(r.accepted, nil)); strings.Contains(out, field) {
+				t.Errorf("rendered file still has %s:\n%s", tt.retired, out)
 			}
 		})
 	}

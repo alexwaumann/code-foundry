@@ -28,7 +28,6 @@ func emberConfig(s settings.Settings) ember.Config {
 		Enabled: s.Ember.Enabled, Model: s.Ember.Model, Effort: s.Ember.Effort,
 		WorkerModels: settings.SplitList(s.Ember.WorkerModels), WorkerEffort: s.Ember.WorkerEffort,
 		EpochContextTokens: s.Ember.EpochContextTokens, EpochMaxHours: s.Ember.EpochMaxHours,
-		ShowCreatedThreads: s.Threads.ShowCreatedThreads,
 	}
 }
 

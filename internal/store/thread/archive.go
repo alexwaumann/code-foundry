@@ -9,8 +9,8 @@ import (
 
 // Archive archives or unarchives a thread (docs/notes/archive-threads-1-daemon.md).
 //
-// Archiving first archives the hidden threads below it (ArchiveCascade with the
-// threads.show_created_threads setting; docs/notes/hidden-children-1-daemon.md): their
+// Archiving first archives the threads below it (ArchiveCascade: every live thread its
+// creator chain leads to; docs/notes/no-sidebar-override-2-daemon.md): their
 // closes begin together, then each is archived in tree order, past one that fails
 // (logged, and named in the *CascadeError returned with the thread); then the thread
 // itself, then any hidden thread created below it meanwhile (its creator was still
@@ -89,7 +89,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 // archived, not being removed, not in skip.
 func (m *Manager) cascadeTargets(id string, skip map[string]bool) []Thread {
 	var out []Thread
-	for _, t := range ArchiveCascade(m.Snapshot().Threads, id, m.showCreatedThreads()) {
+	for _, t := range ArchiveCascade(m.Snapshot().Threads, id) {
 		if t.ArchivedAt.IsZero() && !t.Removing && !skip[t.ID] {
 			out = append(out, t)
 		}

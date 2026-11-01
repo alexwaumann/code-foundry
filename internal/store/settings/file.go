@@ -87,9 +87,12 @@ func decode(data []byte) (map[string]string, error) {
 // retiredKeys are settings that no longer exist; a file that still sets one reads
 // without an "unknown setting" issue, and the next save leaves it out.
 // projects.worktree_dir went when the app took over where worktrees go (always
-// <config home>/worktrees/<owner>/<repo>/<branch>).
+// <config home>/worktrees/<owner>/<repo>/<branch>). threads.show_created_threads went
+// when a thread another thread created was never in the sidebar any more
+// (docs/notes/no-sidebar-override-2-daemon.md).
 var retiredKeys = []string{
 	GroupProjects + ".worktree_dir",
+	GroupThreads + ".show_created_threads",
 }
 
 // dropRetiredKeys deletes raw's retiredKeys.

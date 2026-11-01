@@ -113,9 +113,8 @@ func listSome(items []string) string {
 // removeConfirm is thread.remove's confirmation: of the one thread, or of several
 // given ids; "" without a target (Run says what is missing). When one of them has
 // worktrees Code Foundry made (madeWorktrees), it says the daemon removes the clean ones
-// (docs/notes/remove-cleans-worktrees.md). It names the hidden child threads of the
-// removed ones still working (orphanedWorking): they keep running and the daemon shows
-// them in the sidebar.
+// (docs/notes/remove-cleans-worktrees.md). It names the hidden child threads below the
+// removed ones, which go too (removedAlong), and how many of them are still working.
 func removeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	ids, err := targetThreads(a)
 	var ask string
@@ -201,9 +200,9 @@ func removedAlongText(hidden, working int) string {
 	default:
 		what += fmt.Sprintf(" (%d still working)", working)
 	}
-	keep := "To keep one, show it in the sidebar first."
+	keep := "To keep the work of one, " + forkToKeep
 	if hidden == 1 {
-		keep = "To keep it, show it in the sidebar first."
+		keep = "To keep its work, " + forkToKeep
 	}
 	return what + " removed too. " + keep
 }
@@ -275,7 +274,7 @@ func archiveManyConfirm(ctx context.Context, b ThreadBackend, ids []string, a Ar
 		if msg == "" {
 			msg = fmt.Sprintf("Archive %d threads?", len(ids))
 		}
-		msg += " " + hiddenWorkingText(len(kids), "")
+		msg += " " + hiddenWorkingText(len(kids))
 	}
 	return msg
 }

@@ -70,9 +70,6 @@ type Threads struct {
 	AutoName        bool
 	NamingModel     string // default model.NamingDefault; the effort is always low
 	CacheTTLSeconds int    // the API's prompt cache lifetime; default 3600
-	// ShowCreatedThreads shows threads other threads created in the sidebar; off
-	// (default), only those with Thread.SidebarOverride true are (thread.InSidebar).
-	ShowCreatedThreads bool
 	CloseGraceSeconds  int
 	ScrollbackLines    int
 }

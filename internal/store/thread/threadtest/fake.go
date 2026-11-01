@@ -25,10 +25,6 @@ type Fake struct {
 	Now func() time.Time
 	// Err, when set, is returned by every mutating method.
 	Err error
-	// ShowCreated is the threads.show_created_threads setting List's ArchiveCascadeOf
-	// applies. Archive does not cascade in the fake.
-	ShowCreated bool
-
 	mu      sync.Mutex
 	next    int
 	staged  int
@@ -245,9 +241,6 @@ func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Threa
 	if err := f.createMetadata(&s, o, &call); err != nil {
 		return thread.Thread{}, err
 	}
-	if err := createSidebar(&s, o, &call); err != nil {
-		return thread.Thread{}, err
-	}
 	if o.Notify {
 		if s.CreatedBy == "" {
 			return thread.Thread{}, fmt.Errorf("%w: notify needs created-by", thread.ErrInvalidArgument)
@@ -389,7 +382,7 @@ func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Thread, er
 
 // Archive records "Archive <id> <archived>". Archiving disconnects a live thread
 // (reason "closed"), unpins and unsnoozes it and sets ArchivedAt to Now unless already
-// set; unarchiving clears ArchivedAt only. No shells are involved.
+// set; unarchiving clears ArchivedAt only. No shells are involved, and nothing cascades.
 func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thread, error) {
 	return f.mutate(fmt.Sprintf("Archive %s %t", id, archived), id, func(s *thread.Thread) error {
 		if !archived {
@@ -545,9 +538,6 @@ func (f *Fake) List(_ context.Context, o thread.ListOptions) ([]thread.Thread, e
 	removed := make([]thread.RemovedThread, 0, len(f.removed))
 	for _, r := range f.removed {
 		removed = append(removed, r)
-	}
-	if o.ArchiveCascadeOf != "" {
-		o.ShowCreated = f.ShowCreated
 	}
 	f.mu.Unlock()
 	return thread.FilterLineage(f.Snapshot().Threads, removed, o), nil

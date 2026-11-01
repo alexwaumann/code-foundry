@@ -52,9 +52,6 @@ type Config struct {
 	WorkerEffort string
 	// EpochContextTokens and EpochMaxHours are the epoch limits.
 	EpochContextTokens, EpochMaxHours int
-	// ShowCreatedThreads is threads.show_created_threads: which threads PROJECTS.md
-	// lists.
-	ShowCreatedThreads bool
 }
 
 // Projects is the project store as PROJECTS.md reads it.

@@ -53,13 +53,9 @@ type ListOptions struct {
 	// the line between a root and the threads below them.
 	DescendantsOf string
 	// ArchiveCascadeOf: only the threads that archiving this thread takes with it
-	// (ArchiveCascade with ShowCreated: the hidden threads below it, through hidden
-	// ones only), in tree order with Thread.Depth set; not the thread itself. Not with
-	// DescendantsOf (Store.List: ErrInvalidArgument).
+	// (ArchiveCascade: the live threads below it), in tree order with Thread.Depth set;
+	// not the thread itself. Not with DescendantsOf (Store.List: ErrInvalidArgument).
 	ArchiveCascadeOf string
-	// ShowCreated is the threads.show_created_threads setting ArchiveCascadeOf applies;
-	// Store.List sets it from the store's.
-	ShowCreated bool
 	// IncludeResident keeps resident threads (resident.go); without it (and without All)
 	// they are left out.
 	IncludeResident bool
@@ -88,7 +84,7 @@ func FilterLineage(threads []Thread, removed []RemovedThread, o ListOptions) []T
 			pos[e.ID], depth[e.ID] = i, e.Depth
 		}
 	case o.ArchiveCascadeOf != "":
-		sub := ArchiveCascade(threads, o.ArchiveCascadeOf, o.ShowCreated)
+		sub := ArchiveCascade(threads, o.ArchiveCascadeOf)
 		pos, depth = make(map[string]int, len(sub)), make(map[string]int, len(sub))
 		for i, t := range sub {
 			pos[t.ID], depth[t.ID] = i, t.Depth
@@ -162,11 +158,8 @@ func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
 	if err != nil {
 		return nil, err
 	}
-	if o.ArchiveCascadeOf != "" {
-		if o.DescendantsOf != "" {
-			return nil, fmt.Errorf("%w: descendants_of and archive_cascade_of are exclusive", ErrInvalidArgument)
-		}
-		o.ShowCreated = m.showCreatedThreads()
+	if o.ArchiveCascadeOf != "" && o.DescendantsOf != "" {
+		return nil, fmt.Errorf("%w: descendants_of and archive_cascade_of are exclusive", ErrInvalidArgument)
 	}
 	var removed []RemovedThread
 	if o.DescendantsOf != "" {

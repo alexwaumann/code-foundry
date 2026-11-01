@@ -66,8 +66,6 @@ type ThreadBackend interface {
 	RestartBackend
 	// ShellBackend backs thread.shell.stop (commands_thread_shell.go).
 	ShellBackend
-	// SidebarBackend backs thread.sidebar (commands_thread_sidebar.go).
-	SidebarBackend
 	// WorkspaceRefBackend backs thread.workspace (commands_thread_workspace.go).
 	WorkspaceRefBackend
 	// ProjectSetBackend backs thread.project.add and thread.project.remove
