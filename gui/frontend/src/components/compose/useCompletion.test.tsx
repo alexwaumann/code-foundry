@@ -48,6 +48,7 @@ function setup(trigger: EditorTrigger, source: CompletionSource) {
   let trig = trigger;
   function Harness({ src, at }: { src: CompletionSource; at: EditorTrigger }) {
     const editorRef = useRef({ insertTag, insertText } as unknown as PromptEditorHandle) as RefObject<PromptEditorHandle | null>;
+    // oxlint-disable-next-line react/immutability -- the harness hands the hook result out to the test
     out.current = useCompletion(at, () => undefined, src, editorRef);
     return null;
   }

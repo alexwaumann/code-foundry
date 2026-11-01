@@ -99,7 +99,7 @@ function UndoButton({ undo, saved }: { undo: ThemeUndoTarget; saved: UserThemeFi
   useUserThemes();
   const history = useThemesStore((s) => s.history[undo.id]);
   const [busy, setBusy] = useState(false);
-  const state = useMemo(() => themeUndoState(undo, saved, slot), [undo, saved, slot, history]); // eslint-disable-line react-hooks/exhaustive-deps -- history: the lookup reads it
+  const state = useMemo(() => themeUndoState(undo, saved, slot), [undo, saved, slot, history]); // oxlint-disable-line react/exhaustive-deps -- history: the lookup reads it
   if (state.kind === "none" || state.kind === "hidden") return null;
   const undone = state.kind === "undone";
   return (

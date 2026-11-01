@@ -87,7 +87,7 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
     observe() {}
   }
   // The script under test, as a page would run it, with these globals.
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  // oxlint-disable-next-line typescript/no-implied-eval
   const run = new Function("window", "navigator", "document", "localStorage", "ResizeObserver", "location", SRC) as (...globals: unknown[]) => void;
   run(win, nav, doc, localStorage, ResizeObserver, { hash: opts.hash ?? `#cf=${N}` });
   const cf = win.cf as Cf;

@@ -13,7 +13,7 @@ function setSystem(light: boolean) {
 
 function run() {
   // The script as the page runs it: jsdom does not execute inline scripts it is handed.
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call
+  // oxlint-disable-next-line typescript/no-implied-eval, typescript/no-unsafe-call
   new Function(inline)();
   return { theme: root.dataset.theme, dark: root.classList.contains("dark"), scheme: root.style.colorScheme };
 }

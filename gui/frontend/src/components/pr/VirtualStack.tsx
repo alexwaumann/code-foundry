@@ -72,7 +72,7 @@ function PlainItems<T>({ items, itemKey, render, className, testId, reveal }: Vi
     const i = items.findIndex((it) => itemKey(it) === reveal.key);
     reveal.done(i < 0 ? null : ((listRef.current?.children[i] as HTMLElement | undefined) ?? null));
     // A new reveal only: the items are read as they are then.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [reveal]);
   return (
     <div ref={listRef} className={className} data-testid={testId} data-virtual="false">
@@ -118,7 +118,7 @@ function VirtualItems<T>({ items, itemKey, render, estimate, className, testId, 
     };
   }, [provided]);
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
+  // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const v = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollEl,
@@ -167,7 +167,7 @@ function VirtualItems<T>({ items, itemKey, render, estimate, className, testId, 
       cancelAnimationFrame(late);
     };
     // A new reveal only: the items are read as they are then.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [reveal]);
 
   // The revealed item, in the commit that draws it.

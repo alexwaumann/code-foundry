@@ -38,7 +38,7 @@ export function RowList<T>({ rows, rowKey, render, rowHeight, maxHeight = 520, c
 function VirtualRows<T>({ rows, rowKey, render, rowHeight, maxHeight, testId }: Required<Omit<RowListProps<T>, "testId" | "capped">> & { testId?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cursor = useNavCursor();
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
+  // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const v = useVirtualizer({ count: rows.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowHeight, overscan: 12 });
   useEffect(() => {
     if (cursor === null) return;

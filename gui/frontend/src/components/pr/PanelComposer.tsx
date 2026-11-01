@@ -163,7 +163,7 @@ export function PanelComposer({
         altKey: e.altKey,
         isComposing: e.nativeEvent.isComposing,
         // Deprecated, but the only sign of WebKit's IME-confirming Enter (keys.ts).
-        // eslint-disable-next-line @typescript-eslint/no-deprecated
+        // oxlint-disable-next-line typescript/no-deprecated
         keyCode: e.nativeEvent.keyCode,
       },
       submitKey,

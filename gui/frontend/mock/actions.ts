@@ -256,7 +256,7 @@ export function setupScript(code: number): Script {
   };
 }
 
-// eslint-disable-next-line no-control-regex
+// oxlint-disable-next-line no-control-regex
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 
 const ICONS: readonly { name: string; icon: ActionIcon }[] = [
@@ -273,7 +273,7 @@ function cleanName(raw: string): string {
   const name = raw.trim();
   if (!name) throw new CommandError("invalid", "invalid argument: an action needs a name");
   if (Array.from(name).length > MAX_NAME) throw new CommandError("invalid", `invalid argument: an action name has at most ${String(MAX_NAME)} characters`);
-  // eslint-disable-next-line no-control-regex
+  // oxlint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f]/.test(name)) throw new CommandError("invalid", "invalid argument: an action name is one line without control characters");
   return name;
 }
