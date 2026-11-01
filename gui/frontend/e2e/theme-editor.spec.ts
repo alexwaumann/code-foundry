@@ -30,7 +30,6 @@ async function mockTheme(id: string): Promise<MockTheme | undefined> {
 }
 
 const option = (page: Page, name: string) => page.getByTestId("themes-list").getByRole("option", { name, exact: true });
-const scope = (page: Page) => page.getByTestId("theme-scope").first();
 const inspector = (page: Page) => page.getByTestId("theme-inspector");
 const scopeVar = (page: Page, name: string) => page.getByTestId("themes-page").locator('[data-testid="theme-scope"]').last().evaluate((el, n) => (el as HTMLElement).style.getPropertyValue(n), name);
 
@@ -144,44 +143,6 @@ test("edit, pin, go stale, drill in, save and apply, revert", async ({ page }) =
   await expect(page.getByTestId("themes-revert")).toBeDisabled();
 });
 
-test("Customise opens the editor on the copy; leaving with changes asks first", async ({ page }) => {
-  await openThemes(page);
-  const dracula = option(page, "Dracula");
-  await dracula.hover();
-  await dracula.getByRole("button", { name: "Customise Dracula" }).click();
-  await expect(page.getByTestId("themes-editing-name")).toHaveText("Dracula copy");
-  await expect(scope(page)).toHaveAttribute("data-theme", "dracula-copy");
-  await setBase(page, "accent", "#ff79c6");
-  // Another row: the editor would drop the change, so it asks.
-  await option(page, "Nord").getByTestId("theme-name").click();
-  await expect(page.getByTestId("confirm-dialog")).toContainText("Dracula copy has changes that are not saved.");
-  await page.getByTestId("confirm-cancel").click();
-  await expect(inspector(page)).toBeVisible();
-  // Closing the page asks too; Discard leaves.
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
-  await page.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("themes-page")).toHaveCount(0);
-  // Nothing was written, and the copy Customise made, never saved, is gone again.
-  await expect.poll(() => mockTheme("dracula-copy")).toBeUndefined();
-});
+// Customise opening the editor on the copy, and leaving with changes: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
-test("a contrast failure shows its ratio and Fix pins a value that reads", async ({ page }) => {
-  await editOceanDusk(page);
-  await page.getByTestId("editor-filter").fill("message-surface");
-  await page.getByTestId("editor-slot-message-surface").click();
-  // The bubble's tint at full strength in the text colour: the bubble's text cannot read on it.
-  await page.getByTestId("colour-hex").fill("#d7e3eaff");
-  await page.getByTestId("colour-hex").press("Enter");
-  await expect(page.getByTestId("editor-pairs").locator("[data-pass=false]").first()).toBeVisible();
-  await page.getByTestId("editor-back").click();
-  await page.getByTestId("editor-filter").fill("message");
-  await expect(page.getByTestId("editor-slot-message-foreground").getByTestId("slot-contrast")).toHaveText(/^1\.\d+:1$/);
-  await expect(page.getByTestId("editor-group-thread")).toContainText("1 contrast");
-  await page.getByTestId("themes-save").click();
-  const dialog = page.getByTestId("theme-save-dialog");
-  await expect(dialog.getByTestId("theme-save-contrast")).toContainText("message-foreground on message-surface");
-  await dialog.getByTestId("theme-save-fix").click();
-  await expect(dialog.getByTestId("theme-save-contrast")).toHaveCount(0);
-  await expect(page.getByTestId("editor-slot-message-foreground")).toHaveAttribute("data-pinned", "true");
-});
+// A contrast failure and Fix: unit-tested in src/components/themes/ThemesPage.test.tsx.

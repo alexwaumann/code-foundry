@@ -52,21 +52,7 @@ async function openFromPalette(page: Page) {
   await expect(page$(page)).toBeVisible();
 }
 
-test("Choose… in Settings opens the page on that slot, listing only its scheme's themes", async ({ page }) => {
-  await openFromSettings(page, "light");
-  await expect(page.getByTestId("themes-curated").getByTestId("theme-name")).toHaveText(themesFor("light").map((t) => t.name));
-  await expect(option(page, "GitHub Light")).toHaveAttribute("data-current", "true");
-  await page.getByTestId("themes-slot-dark").click();
-  await expect(page.getByTestId("themes-curated").getByTestId("theme-name")).toHaveText(themesFor("dark").map((t) => t.name));
-  // The dark slot is the one in use (the browser is dark): the badge and the sentence say so.
-  await expect(page.getByTestId("themes-slot-dark")).toContainText("in use");
-  await expect(page.getByTestId("themes-slot-light")).not.toContainText("in use");
-  await expect(page.getByTestId("themes-scheme-note")).toHaveText("Follows macOS: dark now, showing GitHub Dark");
-  // The close button goes back to Settings, where it came from.
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await expect(page$(page)).toHaveCount(0);
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-});
+// Choose… opening the page on its slot, the scheme's themes, the in-use badge, back to Settings: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
 test("a previewed theme paints the gallery, not the window; Apply paints the window and saves the slot", async ({ page }) => {
   await openFromSettings(page, "dark");

@@ -43,7 +43,7 @@ export const ThemeCardRow = memo(function ThemeCardRow({ id }: { id: string }) {
   return <ThemeCard file={item.theme} applied={item.applied} undo={undo} />;
 });
 
-function ThemeCard({ file, applied, undo }: { file: UserThemeFile; applied: boolean; undo: ThemeUndoTarget }) {
+export function ThemeCard({ file, applied, undo }: { file: UserThemeFile; applied: boolean; undo: ThemeUndoTarget }) {
   // The file as saved, resolved once: its slots paint the chip, its report the footer.
   const theme = useMemo<Theme>(() => themeOf(file), [file]);
   const issues = useMemo(() => contrastReport(file, theme.slots).length, [file, theme]);

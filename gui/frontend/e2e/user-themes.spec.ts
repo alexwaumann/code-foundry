@@ -20,7 +20,6 @@ async function mockThemes(): Promise<{ themes: { id: string }[]; calls: string[]
 }
 
 const yours = (page: Page) => page.getByTestId("themes-yours");
-const curated = (page: Page) => page.getByTestId("themes-curated");
 const option = (page: Page, name: string) => page.getByTestId("themes-list").getByRole("option", { name, exact: true });
 const scope = (page: Page) => page.getByTestId("theme-scope");
 
@@ -32,26 +31,7 @@ async function openThemes(page: Page, slot: "dark" | "light" = "dark") {
   await expect(page.getByTestId("themes-page")).toBeVisible();
 }
 
-test("Yours lists the scheme's own themes above the curated ones, with where each came from", async ({ page }) => {
-  await openThemes(page);
-  await expect(yours(page).getByTestId("theme-name")).toHaveText(["Mocha, warmer", "Ocean Dusk"]);
-  await expect(yours(page)).toContainText("Yours · 2");
-  await expect(curated(page)).toContainText("Curated · 15");
-  await expect(option(page, "Ocean Dusk").getByTestId("theme-origin")).toHaveText("from Catppuccin Mocha · by a thread");
-  await expect(option(page, "Mocha, warmer").getByTestId("theme-origin")).toHaveText("from Catppuccin Mocha");
-  await expect(curated(page).getByTestId("theme-origin")).toHaveCount(0);
-  await expect(page.getByTestId("themes-issues")).toContainText('draft.json did not load: base.accent: "#5fb3" is not #rrggbb');
-  await expect(page.getByRole("searchbox", { name: "Search themes" })).toHaveAttribute("placeholder", "Search 17 dark themes");
-  // The light slot has its own.
-  await page.getByTestId("themes-slot-light").click();
-  await expect(yours(page).getByTestId("theme-name")).toHaveText(["Latte, softer"]);
-  // A search that none of yours match hides the section.
-  await page.getByTestId("themes-slot-dark").click();
-  await page.getByRole("searchbox", { name: "Search themes" }).fill("nord");
-  await expect(yours(page)).toHaveCount(0);
-  await page.getByRole("searchbox", { name: "Search themes" }).fill("ocean");
-  await expect(page.getByTestId("themes-list").getByTestId("theme-name")).toHaveText(["Ocean Dusk"]);
-});
+// Yours above Curated, each theme's origin, the files that did not load and the search: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
 test("a user theme previews and applies like a curated one", async ({ page }) => {
   await openThemes(page);
@@ -123,29 +103,6 @@ test("Delete asks first; deleting the theme in use moves the slot to the theme i
   await expect(page.locator("html")).toHaveAttribute("data-theme", "catppuccin-mocha");
 });
 
-// docs/notes/theme-fuzz-daemon.md (files 6): a file that did not load can be deleted from
-// its line, which shows all of its reason on hover.
-test("a file that did not load has Delete, which asks first", async ({ page }) => {
-  await openThemes(page);
-  const issue = page.getByTestId("themes-issue");
-  await expect(issue).toHaveCount(1);
-  await issue.getByTestId("themes-issue-delete").click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText('Delete the file draft.json from the themes directory? It did not load: base.accent: "#5fb3" is not #rrggbb.');
-  await page.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("themes-issues")).toHaveCount(0);
-  await expect.poll(async () => ((await (await fetch(`${mockUrl}/__mock/themes`)).json()) as { calls: string[] }).calls).toContain("theme.delete draft.json");
-});
+// A file that did not load and its Delete: unit-tested in src/components/themes/ThemesPage.test.tsx (its question: internal/command).
 
-test("a theme written by hand arrives live; with none, Yours says how to make one", async ({ page }) => {
-  await mockPost("themes?set=empty");
-  await openThemes(page);
-  await expect(yours(page)).toContainText("Yours · 0");
-  await expect(yours(page)).toContainText("Customise a theme to make one of your own.");
-  await mockPost("themes?set=seed");
-  await expect(yours(page).getByTestId("theme-name")).toHaveText(["Mocha, warmer", "Ocean Dusk"]);
-  // The settings' Dark theme select lists them too, first.
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await page.locator('[data-setting="appearance.theme_dark"] [data-slot="select-trigger"]').click();
-  await expect(page.locator('[data-slot="select-content"]').getByRole("option").first()).toHaveText("Mocha, warmer");
-});
+// A theme arriving live, the empty Yours line and the schema reload for the slot selects: unit-tested in src/components/themes/ThemesPage.test.tsx.
