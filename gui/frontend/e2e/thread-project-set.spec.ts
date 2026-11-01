@@ -69,6 +69,8 @@ test("Add project: one pick adds and closes the list, the thread leaves its work
   await card(page).getByTestId("ti-project").click();
   await menu(page).getByTestId("ti-add-project").click();
   await list.getByRole("option").first().click();
+  // Closed before the next click: a click on the row while the list still animates out does not open its menu.
+  await expect(list).toHaveCount(0);
   await expect.poll(async () => (await calls("thread.project.add")).length).toBe(3);
   await card(page).getByTestId("ti-project").click();
   await menu(page).getByTestId("ti-add-project").click();
