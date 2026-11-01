@@ -50,12 +50,7 @@ async function addFirstProject(page: Page): Promise<void> {
   await expect(page.getByTestId("composer")).toBeVisible();
 }
 
-test("the first project: the heading reverts and an untouched prompt is cleared", async ({ page }) => {
-  await openWelcome(page);
-  await addFirstProject(page);
-  await expect(heading(page)).toHaveText("What should we build with No project?");
-  await expect(prompt(page)).toHaveAttribute("data-value", "");
-});
+// The first project reverting the heading and clearing an untouched prompt: src/components/compose/Composer.test.tsx ("the first project clears an untouched prefill, and the heading reverts"); the editor showing the draft is the next test.
 
 test("the first project: a prompt the user edited stays", async ({ page }) => {
   await openWelcome(page);

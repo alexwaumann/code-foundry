@@ -26,31 +26,7 @@ test("a row that shows a plugin's flag opens the thread and the plugin's surface
   await expect(page.getByTestId("plugin-surface")).toHaveAttribute("data-phase", "live");
 });
 
-test("the thread info card's project row carries the flags in their colour, in its hover card; the title menu clears them", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.getByTestId("thread-info-toggle").click();
-  const project = page.getByTestId("thread-info-card").getByTestId("ti-project");
-  await expect(project.getByTestId("ti-project-mark")).toHaveCount(0);
-  await flag("s-3", "hello", "Hello", "error", "build failed");
-  // The header has no flag chip (docs/notes/thread-header-crumb.md).
-  await expect(page.getByTestId("thread-flag")).toHaveCount(0);
-  await expect(project.getByTestId("ti-project-mark")).toHaveClass(/text-cf-error-text/);
-  await project.hover();
-  const flagged = page.getByTestId("ti-project-notes").getByTestId("ti-project-flag");
-  await expect(flagged).toHaveText("Hello: build failed");
-  await expect(flagged).toHaveAttribute("data-level", "error");
-  await expect(flagged).toHaveClass(/text-cf-error-text/);
-
-  // The title menu clears it: the mark, the row's status and the attention go.
-  await page.mouse.move(0, 0);
-  await page.getByTestId("thread-header").getByTestId("thread-title").click();
-  await page.getByTestId("thread-title-menu").getByTestId("menu-clear-flags").click();
-  await expect(project.getByTestId("ti-project-mark")).toHaveCount(0);
-  await expect(row(page, "s:s-3").getByTestId("row-status")).toHaveCount(0);
-  const calls = await invocations();
-  expect(calls.filter((c) => c.name === "thread.flag.clear").map((c) => c.args)).toEqual([{ id: "s-3" }]);
-});
+// The info card's project row carrying a flag in its colour (and its hover card), and the title menu's Clear flags: src/components/threadinfo/PlaceGroup.test.tsx ("a plugin's flag marks the row…") and src/components/thread/ThreadMenuItems.test.tsx (thread.flag.clear); a flag's row status is SidebarRow.test.tsx's.
 
 // Settings → Plugins' secrets list, a failed install's line and the daemon's plugin folders:
 // unit-tested in src/components/plugin/settings/{PluginsPage,BrowseSection}.test.tsx and
