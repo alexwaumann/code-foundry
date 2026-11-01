@@ -268,6 +268,13 @@ describe("the usage page", () => {
     expect(views()).toEqual(want);
   });
 
+  it("themes (theme.pick, the Themes body of the settings sheet) over usage", () => {
+    useViewsStore.setState({ usageOpen: true, themesOpen: false });
+    showView("themes");
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: true, settingsOpen: false, usageOpen: false });
+    useViewsStore.setState({ themesOpen: false });
+  });
+
   it("closeUsage closes it and refocuses the selection's terminal", () => {
     useViewsStore.setState({ usageOpen: true });
     closeUsage();

@@ -99,16 +99,10 @@ test("the chart button toggles it; Escape, the backdrop and the × close it, and
   await expect(threadPrompt(page)).toBeFocused();
 });
 
-test("the range and measure controls work inside the sheet, which stays open", async ({ page }) => {
+// The range and measure controls: src/components/usage/UsageSheet.test.tsx.
+test("a tooltip's Escape is its own; the next one closes the sheet", async ({ page }) => {
   await openApp(page);
   await openUsage(page);
-  await page.getByTestId("usage-page-range-7").click();
-  await expect(page.getByTestId("usage-page-range-7")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("usage-page-day")).toHaveCount(7);
-  await page.getByTestId("usage-page-mode-cost").click();
-  await expect(page.getByTestId("usage-page-chart")).toHaveAttribute("data-mode", "cost");
-  await expect(sheet(page)).toBeVisible();
-  // A tooltip's Escape is its own; the next one closes the sheet.
   await page.getByTestId("usage-page-close").hover();
   await expect(openTooltip(page)).toHaveText("Close (Esc)");
   await page.keyboard.press("Escape");
@@ -134,31 +128,16 @@ test("Escape in the palette or help over the sheet leaves it open", async ({ pag
   await expect(sheet(page)).toBeVisible();
 });
 
-test("Settings and Usage are exclusive: one sheet, one backdrop", async ({ page }) => {
+// The status buttons' pressed state: src/components/sidebar/SidebarStatus.test.tsx; the CLI's view.usage
+// and theme.pick replacing the other sheet: src/stores/views.test.ts ("the usage page").
+test("cmd+, from the usage sheet: the settings sheet replaces it, one dialog and one backdrop", async ({ page }) => {
   await openApp(page);
   await openUsage(page);
-  // cmd+, from the usage sheet: the settings sheet replaces it.
   await page.keyboard.press("Meta+Comma");
   await expect(page.getByTestId("settings-page")).toBeVisible();
   await expect(sheet(page)).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(1);
-  await expect(page.getByTestId("status-settings")).toHaveAttribute("aria-pressed", "true");
-  await expect(chartButton(page)).toHaveAttribute("aria-pressed", "false");
-
-  // The CLI's view.usage replaces Settings.
-  expect(await emit({ showView: { name: "usage" } })).toBe(1);
-  await expect(usagePage(page)).toBeVisible();
-  await expect(page.getByTestId("settings-page")).toHaveCount(0);
-  await expect(page.getByRole("dialog")).toHaveCount(1);
-  await expect(page.getByTestId("status-settings")).toHaveAttribute("aria-pressed", "false");
-  await expect(chartButton(page)).toHaveAttribute("aria-pressed", "true");
-
-  // theme.pick (the Themes body of the settings sheet) replaces it too.
-  expect(await emit({ showView: { name: "themes" } })).toBe(1);
-  await expect(page.getByTestId("themes-page")).toBeVisible();
-  await expect(sheet(page)).toHaveCount(0);
-  await expect(page.getByRole("dialog")).toHaveCount(1);
 });
 
 test("the side and bottom panels stay laid out under it", async ({ page }) => {
