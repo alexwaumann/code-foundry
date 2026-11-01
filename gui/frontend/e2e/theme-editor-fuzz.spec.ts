@@ -86,67 +86,11 @@ test("2: with the side panel open on a thread, the Themes page still fits at 900
   expect((save?.x ?? 0) + (save?.width ?? 0)).toBeLessThanOrEqual(900);
 });
 
-test("3: Escape with edits asks and the question stays; clean, it leaves the editor, then the page", async ({ page }) => {
-  await editOceanDusk(page);
-  await setBase(page, "accent", "#ff00ff");
-  await page.getByTestId("themes-list").focus();
-  await page.keyboard.press("Escape");
-  const confirm = page.getByTestId("confirm-dialog");
-  await expect(confirm).toContainText("Ocean Dusk has changes that are not saved.");
-  await page.waitForTimeout(300);
-  await expect(confirm).toBeVisible();
-  await page.getByTestId("confirm-cancel").click();
-  await expect(inspector(page)).toBeVisible();
-  // A second Escape on the open confirm cancels it, and only it.
-  await page.getByTestId("themes-list").focus();
-  await page.keyboard.press("Escape");
-  await expect(confirm).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(confirm).toHaveCount(0);
-  await expect(inspector(page)).toBeVisible();
-
-  await page.getByTestId("themes-revert").click();
-  await page.keyboard.press("Escape");
-  await expect(inspector(page)).toHaveCount(0);
-  await expect(page.getByTestId("themes-preview-bar")).toBeVisible();
-  // The list has the keyboard again: the arrows preview.
-  expect(await focusedTestId(page)).toBe("themes-list");
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("themes-page")).toHaveCount(0);
-});
+// 3: Escape with edits asks and the question stays; clean, it leaves the editor (the list keeps the keyboard), then the page: src/components/themes/ThemesPage.test.tsx ("Escape with edits asks…").
 
 // 4: an unfixable pair: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
-test("5: a light surface on a dark theme is refused in the editor, not by Save", async ({ page }) => {
-  await editOceanDusk(page);
-  await setBase(page, "surface", "#f0f0f0");
-  const line = inspector(page).getByTestId("editor-refusal");
-  await expect(line).toContainText("A dark theme needs a dark surface (OKLab lightness at most 0.45); #f0f0f0 is 0.9");
-  await expect(inspector(page).getByTestId("editor-base-surface")).toHaveAttribute("data-problem", "true");
-  await page.getByTestId("themes-save").click();
-  const dialog = page.getByTestId("theme-save-dialog");
-  await expect(dialog.getByTestId("theme-save-refusal")).toContainText("A dark theme needs a dark surface");
-  await expect(dialog).not.toContainText("You can save anyway");
-  await expect(dialog.getByTestId("theme-save-contrast")).toHaveCount(0);
-  await expect(dialog.getByTestId("theme-save-submit")).toBeDisabled();
-  // A name the daemon refuses holds Save the same way.
-  await page.keyboard.press("Escape");
-  await setBase(page, "surface", "#16232f");
-  await page.getByTestId("themes-save").click();
-  await dialog.getByTestId("theme-save-name").fill("Ocean\tDusk");
-  await expect(dialog.getByTestId("theme-save-refusal")).toHaveText("Cannot save: name: no control or format characters");
-  await expect(dialog.getByTestId("theme-save-submit")).toBeDisabled();
-  // A name another of yours has, and one past 80 characters, say so (nothing is cut).
-  await dialog.getByTestId("theme-save-name").fill("Mocha, warmer");
-  await expect(dialog.getByTestId("theme-save-name-hint")).toHaveText("Another of your themes is called this.");
-  await expect(dialog.getByTestId("theme-save-submit")).toBeEnabled();
-  await dialog.getByTestId("theme-save-name").fill("x".repeat(90));
-  await expect(dialog.getByTestId("theme-save-name-hint")).toHaveText("90/80");
-  await expect(dialog.getByTestId("theme-save-submit")).toBeDisabled();
-  // Closing the modal hands the keyboard back to Save….
-  await page.getByRole("button", { name: "Cancel" }).click();
-  expect(await focusedTestId(page)).toBe("themes-save");
-});
+// 5: a light surface on a dark theme refused in the editor, the save modal's refusals and hints, Cancel handing the keyboard back to Save: src/components/themes/ThemesPage.test.tsx ("a light surface on a dark theme is refused…"); the name rule is theme.save's (internal/command).
 
 // 6: Ask the model over unsaved edits: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
