@@ -128,7 +128,7 @@ test("a workspace row's menu: its items, Rename in place, Add project on its pag
   await workspaceMenu(page).getByTestId("workspace-menu-new-terminal").click();
   const term = await lastInvocation("terminal.new");
   expect(term?.args.cwd).toBe(`/Users/dev/.code-foundry/workspaces/${shop.id}`);
-  expect(term?.context.activeWorktreePath).toBeTruthy();
+  expect(term?.context?.activeWorktreePath).toBeTruthy();
 
   // Rename in place.
   await wsRow(page, shop.id).click({ button: "right" });
