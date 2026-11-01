@@ -103,6 +103,41 @@ describe("ActionDialog", () => {
     expect(saveAction).toHaveBeenCalledWith({ projectId: "web", actionId: "a-1" }, { name: "Test", command: "go test", icon: "lint", onWorktreeCreate: false });
   });
 
+  // e2e/actions.spec.ts's icon tiles test, whose dialog opened from the Projects page.
+  it("a new action's icon starts on Play; arrows wrap at the ends, End goes to the last, a click picks", async () => {
+    useActionDialogStore.setState({ editor: { mode: "new", projectId: "web", from: "projects" }, seq: 3 });
+    render(<ActionDialog />);
+    const tile = (icon: string) => document.querySelector<HTMLElement>(`[data-testid="action-icon"][data-icon="${icon}"]`) as HTMLElement;
+    const checked = () => document.querySelector('[data-testid="action-icon"][aria-checked="true"]')?.getAttribute("data-icon");
+    const press = async (key: string) => {
+      fireEvent.keyDown(document.activeElement as HTMLElement, { key });
+      // Radix's roving focus moves on a timer.
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+    };
+    expect(checked()).toBe("play");
+    act(() => {
+      tile("play").focus();
+    });
+    await press("ArrowRight");
+    expect(document.activeElement).toBe(tile("test"));
+    expect(checked()).toBe("test");
+    await press("ArrowRight");
+    expect(checked()).toBe("lint");
+    await press("ArrowLeft");
+    expect(checked()).toBe("test");
+    // End focuses the last tile; ArrowRight from there wraps to the first.
+    await press("End");
+    expect(document.activeElement).toBe(tile("debug"));
+    await press("ArrowRight");
+    expect(checked()).toBe("play");
+    await press("ArrowLeft");
+    expect(checked()).toBe("debug");
+    fireEvent.click(tile("build"));
+    expect(checked()).toBe("build");
+  });
+
   it("Cmd+Enter does not save while the delete confirm is open", () => {
     render(<ActionDialog />);
     fireEvent.click(screen.getByTestId("action-delete"));

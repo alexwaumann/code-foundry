@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CF, emit, expectProjectRevealed, expectTerminalText, invocations, mockPost, openApp, openStreams, resetMock, row, writes } from "./fixtures";
+import { CF, emit, expectProjectRevealed, expectTerminalText, invocations, openApp, openStreams, resetMock, row, writes } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -35,40 +35,18 @@ test("keystrokes are written to the attached terminal in order", async ({ page }
   expect(sent).toBe("echo hi\r");
 });
 
-test("a shell that exits shows the exit overlay until the reaper removes it", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await page.keyboard.press("Meta+j");
-  const host = page.getByTestId("bottom-terminal-host");
-  await expect(host).toHaveAttribute("data-attach-phase", "live");
-  // Exited but not reaped yet (keep=1): the overlay says how, the tab is struck through.
-  await mockPost("terminal/exit?id=t-s1-shell&code=1&keep=1");
-  await expect(page.getByTestId("bottom-panel").getByTestId("exit-overlay")).toContainText("Process exited with code 1");
-  await expect(page.locator('[data-tab-id="t-s1-shell"]')).toHaveAttribute("data-exited", "true");
-});
+// A shell that exits: the exit overlay and the struck-through tab until the reaper removes it:
+// src/components/bottom/BottomPanel.test.tsx (on the real TerminalHost, its Attach scripted).
 
-test("palette opens with cmd+k and lists only commands available in context", async ({ page }) => {
+// What the palette lists for its context (thread.new by its picker, terminal ones with a shell, no
+// NoPalette verb) and the rows' chords: src/components/palette/CommandPalette.commands.test.tsx.
+test("cmd+shift+p reaches the app from a focused shell, and the palette lists for that shell", async ({ page }) => {
   await openApp(page);
-  await page.keyboard.press("Meta+k");
-  const palette = page.getByTestId("palette");
-  // thread.new is unavailable with nothing selected, but its project picker supplies the project.
-  await expect(palette.locator('[data-command="thread.new"]')).toBeVisible();
-  // A terminal belongs to a thread or a worktree: the No project composer offers none.
-  await expect(palette.locator('[data-command="terminal.new"]')).toHaveCount(0);
-  await expect(palette.locator('[data-command="terminal.kill"]')).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(palette).toHaveCount(0);
-
-  // With a thread's shell focused, cmd+shift+p still reaches the app (global chord).
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+j");
   await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
   await page.keyboard.press("Meta+Shift+p");
-  await expect(palette.locator('[data-command="terminal.kill"]')).toBeVisible();
-  await expect(palette.locator('[data-command="thread.new"]')).toBeVisible();
-  await expect(palette.locator('[data-command="terminal.remove"]')).toHaveCount(0);
-  // Keybindings are shown.
-  await expect(palette.locator('[data-command="thread.new"]')).toContainText("⌘N");
+  await expect(page.getByTestId("palette").locator('[data-command="terminal.kill"]')).toBeVisible();
 });
 
 test("invoking a command sends the current context", async ({ page }) => {
@@ -113,38 +91,22 @@ test("invoking a command sends the current context", async ({ page }) => {
   });
 });
 
-test("required args are prompted inline before invoking", async ({ page }) => {
+// The arg prompt, the args and context sent, and an enum's values: CommandPalette.commands.test.tsx.
+test("worktree.create from the palette reveals the new worktree on its project's page", async ({ page }) => {
   await openApp(page);
-  // A thread on feat/sidebar: worktree.create takes its project from the selection.
   await row(page, "s:s-4").click();
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("create worktree");
   await page.keyboard.press("Enter");
-  const palette = page.getByTestId("palette");
-  await expect(palette).toHaveAttribute("data-mode", "args");
+  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "args");
   await page.keyboard.type("feat/palette");
   await page.keyboard.press("Enter");
-  await expect(palette).toHaveCount(0);
-  const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("worktree.create");
-  expect(last?.args).toEqual({ branch: "feat/palette" });
-  expect(last?.context?.activeWorktreePath).toBe(`${CF}.worktrees/feat-sidebar`);
   // The command emits FocusProject for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>:
   // the project's page shows it. No thread is on it yet, so it is in Worktrees without threads, not the table.
   await expectProjectRevealed(page, "code-foundry");
   const made = page.locator('[data-testid="leftover-row"]').filter({ hasText: "feat/palette" });
   await expect(made).toBeInViewport();
   await expect(page.locator('[data-testid="project-worktree"]').filter({ hasText: "feat/palette" })).toHaveCount(0);
-
-  // Enum args list their values, the default highlighted.
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("set dark theme");
-  await page.keyboard.press("Enter");
-  await expect(palette.getByRole("option", { name: /^nord/ })).toBeVisible();
-  await palette.getByRole("option", { name: /^catppuccin-mocha/ }).click();
-  await expect(palette).toHaveCount(0);
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("theme.set-dark");
-  expect((await invocations()).at(-1)?.args).toEqual({ theme: "catppuccin-mocha" });
 });
 
 // An unknown id's expiry toast is src/stores/intents.test.ts (it waits out the pending-focus window).
@@ -162,14 +124,7 @@ test("FocusTerminal intent: a shell shows in its owner's bottom panel", async ({
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
 });
 
-test("OpenPalette and Notify intents", async ({ page }) => {
-  await openApp(page);
-  await expect.poll(() => emit({ notify: { level: "LEVEL_WARNING", title: "Disk almost full", body: "3% left" } })).toBeGreaterThan(0);
-  await expect(page.getByText("Disk almost full")).toBeVisible();
-  await emit({ openPalette: { query: "refresh" } });
-  await expect(page.getByRole("combobox")).toHaveValue("refresh");
-  await expect(page.getByTestId("palette").locator('[data-command="project.refresh"]')).toBeVisible();
-});
+// The OpenPalette and Notify intents: CommandPalette.commands.test.tsx.
 
 test("WebGL context loss falls back to the DOM renderer", async ({ page, browserName }) => {
   await openApp(page);
