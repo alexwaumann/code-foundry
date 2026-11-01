@@ -79,6 +79,33 @@ describe("UsageSheet", () => {
     expect(screen.getByTestId("usage-page-summary").textContent).toBe("1 token · 1 request · 1 thread");
   });
 
+  it("the cache savings and the model rows follow the range; the legend keeps the slots' order with Other last", () => {
+    setUsage({
+      a: [
+        bucket({ model: "claude-haiku-5-5", costUsd: 1, cacheRead: 1, cacheSavingsUsd: 1 }),
+        bucket({ model: "claude-sonnet-5-5", costUsd: 1, cacheRead: 1, cacheSavingsUsd: 1 }),
+        bucket({ model: "claude-fable-5-1", costUsd: 1, cacheRead: 1, cacheSavingsUsd: 1 }),
+        bucket({ costUsd: 5, cacheRead: 1, cacheSavingsUsd: 1 }),
+        bucket({ model: "claude-opus-4-8", costUsd: 1, cacheRead: 1, cacheSavingsUsd: 2, day: "2026-09-28" }),
+        bucket({ costUsd: 1, cacheRead: 1, cacheSavingsUsd: 4, day: "2026-08-01" }),
+      ],
+    });
+    render(<UsageSheet />);
+    const legend = () => [...screen.getByTestId("usage-page-legend").querySelectorAll("[data-series]")].map((e) => e.textContent);
+    const savings = () => screen.getByTestId("usage-page-cache-savings").textContent;
+    expect(legend()).toEqual(["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5-5", "claude-haiku-5-5", "Other"]);
+    expect(rows()[0]).toBe("claude-opus-5-5");
+    expect(rows()).toContain("claude-opus-4-8");
+    expect(savings()).toBe("Cache savings$6.00");
+    fireEvent.click(screen.getByTestId("usage-page-range-90"));
+    expect(savings()).toBe("Cache savings$10.00");
+    // claude-opus-4-8 is 12 days old: out of a week.
+    fireEvent.click(screen.getByTestId("usage-page-range-7"));
+    expect(savings()).toBe("Cache savings$4.00");
+    expect(rows()).not.toContain("claude-opus-4-8");
+    expect(screen.getAllByTestId("usage-page-day")).toHaveLength(7);
+  });
+
   it("says so when the range has no usage", () => {
     setUsage({ a: [bucket({ day: "2026-01-01", costUsd: 3, cacheRead: 9 })] });
     render(<UsageSheet />);

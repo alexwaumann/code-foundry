@@ -41,88 +41,51 @@ async function openThemes(page: Page) {
   await expect(page.getByTestId("themes-page")).toBeVisible();
 }
 
-test("the theme card shows the saved theme; Undo puts the slot back and turns into Undone; Edit opens the editor", async ({ page }) => {
+// The card's name, origin, applied badge, nine swatches, summary, Undo → Undone (theme.set-dark) and
+// Edit (theme.edit): src/components/thread/ThemeCard.test.tsx.
+test("the theme card's canvas swatch paints the file's colour; the window follows the slot, and Undo", async ({ page }) => {
   await page.setViewportSize({ width: 1300, height: 900 });
   await mockPost("thread?state=theme");
   await openApp(page);
   await row(page, "s:s-r1").click();
   await expect(card(page)).toBeVisible();
-  await expect(card(page).getByTestId("thread-theme-name")).toHaveText("Ocean Dusk");
-  await expect(card(page)).toContainText("dark · from Catppuccin Mocha");
-  await expect(card(page).getByTestId("thread-theme-applied")).toHaveText("applied");
-  await expect(card(page).getByTestId("thread-theme-swatches").locator("span")).toHaveCount(9);
   // The canvas swatch is the file's canvas, not the window's.
   await expect(card(page).getByTestId("thread-theme-swatches").locator("span").first()).toHaveCSS("background-color", "rgb(11, 20, 28)");
-  await expect(card(page).getByTestId("thread-theme-summary")).toHaveText(/^1 pinned · (contrast ok|\d+ contrast issues?)$/);
-  // The card stays when its turn is folded (every finished turn is).
   await expect(page.locator("html")).toHaveAttribute("data-theme", "ocean-dusk");
   await shot(page, "theme-card", () => page.getByTestId("thread-pane"));
-
-  const undo = card(page).getByTestId("thread-theme-undo");
-  await expect(undo).toHaveText("Undo");
-  await undo.click();
-  await expect.poll(() => raw("appearance.theme_dark")).toBe("catppuccin-mocha");
-  await expect(undo).toHaveText("Undone");
-  await expect(undo).toBeDisabled();
-  await expect(invocations()).resolves.toContainEqual(expect.objectContaining({ name: "theme.set-dark", args: { theme: "catppuccin-mocha" } }));
-
-  await card(page).getByTestId("thread-theme-edit").click();
-  await expect(page.getByTestId("theme-inspector")).toBeVisible();
-  await expect(page.getByTestId("themes-editing-name")).toHaveText("Ocean Dusk");
+  await card(page).getByTestId("thread-theme-undo").click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "catppuccin-mocha");
 });
 
-test("a theme a thread applies shows a toast with Edit and Undo, except over the Themes page", async ({ page }) => {
+// The toast's Edit and Undo, and no toast over the Themes page: src/stores/intents.test.ts ("notify");
+// its Undo: src/stores/notifyLinks.test.ts and src/stores/themeCards.test.ts (undoFromLink); no toast for
+// a save not applied: the daemon's (internal/command/commands_theme_card_test.go).
+test("screenshot: the toast a thread's applied theme shows", async ({ page }) => {
+  test.skip(!shots, "SHOTS=<dir> only");
   await page.setViewportSize({ width: 1300, height: 900 });
   await openApp(page);
   await row(page, "s:s-1").click();
   await mockPost("themes/card?thread=s-1&theme=ocean-dusk&apply=true");
   const toast = toastOf(page, "Ocean Dusk applied to dark");
   await expect(toast).toBeVisible();
-  await expect(toast.getByRole("button")).toHaveText(["Edit", "Undo"]);
-  await expect.poll(() => raw("appearance.theme_dark")).toBe("ocean-dusk");
   await shot(page, "theme-toast", () => toast);
-  await toast.getByRole("button", { name: "Undo" }).click();
-  await expect.poll(() => raw("appearance.theme_dark")).toBe("github-dark");
-  await expect(toast).toHaveCount(0);
-
-  // The thread got its card (s-1 is the selected thread).
-  await expect(card(page)).toHaveCount(1);
-  await expect(card(page).getByTestId("thread-theme-undo")).toHaveText("Undone");
-
-  // Over the Themes page, which shows the change already: no toast.
-  await openThemes(page);
-  await mockPost("themes/card?thread=s-1&theme=ocean-dusk&apply=true");
-  await expect.poll(() => raw("appearance.theme_dark")).toBe("ocean-dusk");
-  await page.waitForTimeout(400);
-  await expect(toastOf(page, "Ocean Dusk applied to dark")).toHaveCount(0);
-
-  // A save the slot does not show (not applied) toasts nothing either, anywhere.
-  await page.keyboard.press("Escape");
-  await mockPost("themes/card?thread=s-1&theme=latte-softer");
-  await page.waitForTimeout(400);
-  await expect(toastOf(page, "Latte, softer")).toHaveCount(0);
 });
 
-test("Ask the model starts a no-project thread with the description and opens it", async ({ page }) => {
+// theme.ask's args and context, the placeholder and the disabled Send: src/components/themes/ThemesPage.test.tsx ("Ask the model").
+test("Ask the model: the popover's field takes the keyboard; Enter opens the new thread", async ({ page }) => {
   await page.setViewportSize({ width: 1300, height: 900 });
   await openApp(page);
   await openThemes(page);
   await page.getByTestId("themes-ask").click();
   const pop = page.getByTestId("themes-ask-popover");
-  await expect(pop).toBeVisible();
   const input = pop.getByTestId("themes-ask-input");
   await expect(input).toBeFocused();
-  await expect(input).toHaveAttribute("placeholder", "Describe a theme… warm dark, teal accent, quieter sidebar");
-  await expect(pop.getByTestId("themes-ask-send")).toBeDisabled();
-  await input.fill("a dark theme that feels like a tide pool at night, teal accent, quieter sidebar than Mocha");
+  await page.keyboard.type("a dark theme that feels like a tide pool at night, teal accent, quieter sidebar than Mocha");
   await shot(page, "theme-ask", () => page.getByTestId("themes-page"));
-  await input.press("Enter");
+  await page.keyboard.press("Enter");
   await expect(pop).toHaveCount(0);
   await expect(page.getByTestId("themes-page")).toHaveCount(0);
   await expect(page.getByTestId("thread-pane")).toBeVisible();
-  const ask = (await invocations()).find((i) => i.name === "theme.ask");
-  expect(ask?.args).toEqual({ description: "a dark theme that feels like a tide pool at night, teal accent, quieter sidebar than Mocha" });
-  expect(ask?.context?.activeView).toBe("themes");
 });
 
 // The save modal's Also make a light pair: unit-tested in src/components/themes/ThemesPage.test.tsx.

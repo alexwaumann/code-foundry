@@ -39,48 +39,17 @@ async function expectChip(page: Page, kind: string, label: string, cta: string |
   else await expect(indicator(page).getByTestId("update-indicator-cta")).toHaveText(cta);
 }
 
-test("up to date: no chip; the dialog is the only state with a ×", async ({ page }) => {
+// Up to date (Check Again, Checked just now, the repo, × as the only close): src/components/update/UpdateDialog.test.tsx.
+test("up to date: no chip, and the update source rides the one events stream", async ({ page }) => {
   await openApp(page);
   await expect(page.getByTestId("daemon-status")).toBeVisible();
   await expect(indicator(page)).toHaveCount(0);
-  // The update source rides the one events stream.
   expect((await openStreams())["UpdateService/Watch"]).toBeUndefined();
-
-  await paletteRun(page, "app.update.check");
-  const d = dialog(page);
-  await expect(d).toHaveAttribute("data-variant", "upToDate");
-  await expect(d.getByTestId("update-state")).toHaveText("You’re up to date");
-  await expect(d).toContainText("Code Foundry v0.1.0 is the latest version.");
-  await expect(d.getByTestId("update-check")).toHaveText("Check Again");
-  await expect(d.getByTestId("update-meta")).toContainText("Checked just now");
-  await expect(d.getByTestId("update-meta")).toContainText("github.com/alexwaumann/code-foundry");
-  await expect(d.getByTestId("update-later")).toHaveCount(0);
-  await d.getByTestId("update-close").click();
-  await expect(d).toHaveCount(0);
 });
 
-test("Check for Updates finds a release; the chip and the palette offer it", async ({ page }) => {
-  await openApp(page);
-  await mockPost("update/latest?version=v0.2.0");
-  await paletteRun(page, "app.update.check");
-
-  const d = dialog(page);
-  await expect(d).toHaveAttribute("data-variant", "available");
-  await expect(d.getByTestId("update-state")).toHaveText("Code Foundry v0.2.0 is available");
-  await expect(d).toContainText("You’re on v0.1.0. Downloading happens in the background and changes nothing until you restart.");
-  await expect(d.getByTestId("update-download")).toHaveText("Download v0.2.0");
-  await expect(d.getByTestId("update-notes")).toHaveText("Release notes");
-  await expect(d.getByTestId("update-later")).toHaveText("Later");
-  await expect(d.getByTestId("update-close")).toHaveCount(0);
-  await expectChip(page, "available", "v0.2.0 available", "Download");
-  expect((await invocations()).at(-1)?.name).toBe("app.update.check");
-
-  // Later closes; the palette entry carries the version.
-  await d.getByTestId("update-later").click();
-  await expect(d).toHaveCount(0);
-  await page.keyboard.press("Meta+k");
-  await expect(page.getByTestId("palette").locator('[data-command="app.update"]')).toContainText("Download v0.2.0");
-});
+// Check for Updates finding a release (the dialog, the chip, Later): src/components/update/UpdateDialog.test.tsx;
+// the palette's app.update.check opening the dialog and the re-list on a new state: src/stores/update.test.ts;
+// the "Download v0.2.0" title is the daemon's (internal/command/commands_update_test.go).
 
 // Downloading, the busy-thread list (live), Install and Restart Now: unit-tested in src/components/update/UpdateDialog.test.tsx.
 
@@ -133,14 +102,8 @@ test("available → Download → downloading → downloaded → Install and Rest
 
 // Installed with a thread stopped while waiting (not cut off): unit-tested in src/components/update/UpdateDialog.test.tsx.
 
-test("app.update from the palette opens the dialog and downloads", async ({ page }) => {
-  await openApp(page);
-  await mockPost("update/state?state=available&version=v0.3.0");
-  await expectChip(page, "available", "v0.3.0 available", "Download");
-  await paletteRun(page, "app.update");
-  await expect(dialog(page)).toHaveAttribute("data-state-name", /downloading|downloaded/);
-  expect((await invocations()).at(-1)?.name).toBe("app.update");
-});
+// app.update from the palette opening the dialog and downloading: src/stores/update.test.ts; its chip:
+// src/components/update/UpdateDialog.test.tsx.
 
 // daemon.restart asking first: its message is the daemon's (internal/command/commands_update_test.go TestDaemonRestart); the confirm flow is src/stores/commands.test.ts and src/components/confirm/ConfirmDialog.test.tsx.
 

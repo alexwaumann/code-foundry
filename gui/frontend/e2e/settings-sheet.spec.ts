@@ -108,16 +108,11 @@ test("the gear opens the sheet on General with the search focused; Escape, the b
   await expect(sheet(page)).toHaveCount(0);
 });
 
-test("a link to a settings page opens the sheet there", async ({ page }) => {
+// A notify link opening the sheet on its page: src/stores/intents.test.ts ("notify"); the nav's
+// aria-current: src/components/settings/SettingsPage.test.tsx.
+test("a toast's link button works over the open sheet: its click is not a backdrop click", async ({ page }) => {
   await openApp(page);
-  expect(await emit({ notify: { level: "LEVEL_INFO", title: "Remembered", body: "", link: "settings:memory", linkLabel: "Open Memory" } })).toBe(1);
-  await page.getByRole("button", { name: "Open Memory" }).click();
-  await expect(sheet(page)).toBeVisible();
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "memory");
-  await expect(page.getByTestId("settings-nav-memory")).toHaveAttribute("aria-current", "page");
-
-  // A toast's button works over the open sheet, and a click on it is not a backdrop click.
-  await page.getByTestId("settings-nav-general").click();
+  await openSettings(page);
   expect(await emit({ notify: { level: "LEVEL_INFO", title: "Remembered again", body: "", link: "settings:memory", linkLabel: "Show Memory" } })).toBe(1);
   await page.getByRole("button", { name: "Show Memory" }).click();
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "memory");
@@ -165,60 +160,24 @@ test("Escape in a nested dialog, a select, the palette or the key recorder leave
   await expect(sheet(page)).toHaveCount(0);
 });
 
-test("Themes opens inside the sheet and goes back to Appearance; theme.pick alone closes it", async ({ page }) => {
+// One dialog, the ×, the crumb and Escape back to Appearance, theme.pick from outside (Escape closes,
+// the crumb leads to Appearance): src/components/themes/ThemesPage.test.tsx ("in the settings sheet…",
+// "theme.pick from outside Settings…"); the gear pressed: src/components/sidebar/SidebarStatus.test.tsx.
+test("Themes opens in the same sheet rect with the list focused; Escape hands the search the keyboard; the backdrop closes it", async ({ page }) => {
   await openApp(page);
   await openSettings(page);
   await page.getByTestId("settings-nav-appearance").click();
   const before = await rect(page);
   await page.getByTestId("choose-theme-dark").click();
-  // The same sheet, now showing Themes: no second dialog, no page in the content pane.
   await expect(sheet(page).getByTestId("themes-page")).toBeVisible();
-  await expect(sheet(page)).toHaveAttribute("data-body", "themes");
-  await expect(page.locator('[role="dialog"]')).toHaveCount(1);
-  await expect(settingsPage(page)).toHaveCount(0);
   expect(await rect(page)).toEqual(before);
-  await expect(page.getByTestId("status-settings")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("themes-list")).toBeFocused();
-
-  // Escape goes back to Settings on Appearance, inside the sheet.
   await page.keyboard.press("Escape");
-  await expect(themesPage(page)).toHaveCount(0);
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
   await expect(page.getByRole("searchbox", { name: "Search settings" })).toBeFocused();
-
-  // So does its ×.
-  await page.getByTestId("choose-theme-light").click();
-  await expect(themesPage(page)).toBeVisible();
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
-
-  // And the Settings crumb in its header (Settings › Themes).
-  await page.getByTestId("choose-theme-dark").click();
-  await expect(themesPage(page)).toBeVisible();
-  await expect(page.getByTestId("themes-crumbs")).toHaveText(/Settings.*Themes/);
-  await page.getByTestId("themes-crumb-settings").click();
-  await expect(themesPage(page)).toHaveCount(0);
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
-
-  // The backdrop closes the whole sheet, Themes or not.
   await page.getByTestId("choose-theme-dark").click();
   await expect(themesPage(page)).toBeVisible();
   await clickBackdrop(page);
-  await expect(sheet(page)).toHaveCount(0);
-
-  // theme.pick from outside Settings: Escape closes the sheet.
-  expect(await emit({ showView: { name: "themes" } })).toBe(1);
-  await expect(sheet(page).getByTestId("themes-page")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(sheet(page)).toHaveCount(0);
-
-  // theme.pick from outside Settings: the crumb still leads to Settings → Appearance.
-  expect(await emit({ showView: { name: "themes" } })).toBe(1);
-  await expect(sheet(page).getByTestId("themes-page")).toBeVisible();
-  await page.getByTestId("themes-crumb-settings").click();
-  await expect(themesPage(page)).toHaveCount(0);
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
-  await page.keyboard.press("Escape");
   await expect(sheet(page)).toHaveCount(0);
 });
 
@@ -244,14 +203,9 @@ test("the theme editor: Save… stacks a dialog over the sheet; Escape there clo
   await expect(page.getByTestId("theme-save-dialog")).toHaveCount(0);
   await expect(page.getByTestId("theme-inspector")).toBeVisible();
 
-  // Closing Themes with changes asks over the sheet; Escape on the confirm keeps everything.
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await expect(page.getByTestId("confirm-dialog")).toContainText("Ocean Dusk has changes that are not saved.");
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  await expect(page.getByTestId("theme-inspector")).toBeVisible();
-
-  // The backdrop asks too; Discard closes the whole sheet.
+  // Closing Themes with changes asks, and Escape on the confirm cancels only it:
+  // src/components/themes/ThemesPage.test.tsx ("the editor").
+  // The backdrop asks over the sheet; Discard closes the whole sheet.
   await clickBackdrop(page);
   await expect(page.getByTestId("confirm-dialog")).toBeVisible();
   await expect(sheet(page)).toBeVisible();

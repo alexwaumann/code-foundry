@@ -104,7 +104,7 @@ function useProjectRoots(): readonly string[] {
  * writes belong to whichever project it talks about, so only an absolute path under a
  * project's checkout is a chip (opening in that project); any other stays plain code.
  */
-function EmberPathPlace({ children }: { children: ReactNode }) {
+export function EmberPathPlace({ children }: { children: ReactNode }) {
   const keys = useProjectRoots();
   const resolve = useMemo(() => {
     const roots: ProjectRoot[] = keys.map((k) => ({ project: k.slice(0, k.indexOf(" ")), path: k.slice(k.indexOf(" ") + 1) }));

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, openApp, resetMock } from "./fixtures";
+import { openApp, resetMock } from "./fixtures";
 
 /**
  * The Usage page (view.usage), in its sheet, over the mock's usage buckets
@@ -26,16 +26,6 @@ async function openUsage(page: Page) {
   await expect(page.getByTestId("usage-sheet")).toHaveCSS("opacity", "1");
 }
 
-async function cacheSavings(page: Page): Promise<number> {
-  const t = (await page.getByTestId("usage-page-cache-savings").textContent()) ?? "";
-  return Number(t.replace(/^Cache savings/, "").replace(/[$,]/g, ""));
-}
-
-async function total(page: Page): Promise<number> {
-  const t = (await page.getByTestId("usage-page-total").textContent()) ?? "";
-  return Number(t.replace(/[$,]/g, ""));
-}
-
 /** Clicks where the chart button is: under the open sheet that hits the backdrop over it. */
 async function clickButtonSpot(page: Page) {
   const box = await button(page).boundingBox();
@@ -43,78 +33,27 @@ async function clickButtonSpot(page: Page) {
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 }
 
-test("the status-row button toggles the sheet; a selection closes it; the CLI only shows it", async ({ page }) => {
+// The buttons' order, aria-pressed and the toggle: src/components/sidebar/SidebarStatus.test.tsx; a
+// selection change closing it and the CLI's view.usage only showing: src/stores/views.test.ts ("the usage page").
+test("under the open sheet a click on the status-row button lands on the backdrop, so it stays a toggle", async ({ page }) => {
   await openApp(page);
-  // Right of the palette button.
-  const order = await page.getByTestId("sidebar-status").locator("[data-command-button]").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
-  expect(order.slice(0, 2)).toEqual(["status-palette", "status-usage"]);
-  await expect(button(page)).toHaveAttribute("aria-pressed", "false");
-
   await button(page).click();
   await expect(page_(page)).toBeVisible();
-  await expect(button(page)).toHaveAttribute("aria-pressed", "true");
-  // Under the backdrop: a click there closes the sheet, so the button stays a toggle.
   await clickButtonSpot(page);
   await expect(page_(page)).toHaveCount(0);
   await expect(button(page)).toHaveAttribute("aria-pressed", "false");
-
-  // A selection change (the sidebar is under the backdrop: the keyboard, the palette or the CLI) closes it.
-  await button(page).click();
-  await expect(page_(page)).toBeVisible();
-  expect(await emit({ showView: { name: "thread.next" } })).toBe(1);
-  await expect(page_(page)).toHaveCount(0);
-
-  // The CLI's view.usage (UiIntent.ShowView "usage") only shows: the open sheet stays.
-  expect(await emit({ showView: { name: "usage" } })).toBe(1);
-  await expect(page_(page)).toBeVisible();
-  expect(await emit({ showView: { name: "usage" } })).toBe(1);
-  await expect(page_(page)).toBeVisible();
-  await clickButtonSpot(page);
-  await expect(page_(page)).toHaveCount(0);
-  // Closing, Escape and the settings sheet: usage-sheet.spec.ts.
 });
 
-test("range control filters by day and persists; the table lists unpriced and Other models by id", async ({ page }) => {
+// The range control (day slots, totals, cache savings, rows going out of range, persisting), the
+// unpriced row, Other by id and the legend: src/components/usage/UsageSheet.test.tsx; usageRange
+// persisted: src/stores/persisted.test.ts.
+test("the bucket strip ends with Cache savings, right-aligned at the strip's edge", async ({ page }) => {
   await openUsage(page);
-  await expect(page.getByTestId("usage-page-range-30")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("usage-page-day")).toHaveCount(30);
-  const t30 = await total(page);
-  expect(t30).toBeGreaterThan(0);
-
-  // The bucket strip ends with Cache savings, right-aligned at the strip's edge.
   const savings = page.getByTestId("usage-page-cache-savings");
   await expect(savings).toContainText(/^Cache savings\$[\d,]+\.\d{2}$/);
-  const s30 = await cacheSavings(page);
-  expect(s30).toBeGreaterThan(0);
   const strip = await page.getByTestId("usage-page-buckets").boundingBox();
   const cell = await savings.boundingBox();
   expect(Math.round((strip?.x ?? 0) + (strip?.width ?? 0) - ((cell?.x ?? 0) + (cell?.width ?? 0)))).toBe(0);
-
-  const unpriced = page.locator('[data-testid="usage-page-model-row"][data-model="claude-opus-5"]');
-  await expect(unpriced.getByTestId("usage-page-unpriced")).toBeVisible();
-  await expect(unpriced.locator("td").nth(3)).toHaveText("—");
-  await expect(page.locator('[data-testid="usage-page-model-row"][data-model="claude-opus-4-8"]')).toBeVisible();
-  await expect(page.getByTestId("usage-page-legend").locator("[data-series]")).toHaveText(["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5-5", "claude-haiku-5-5", "Other"]);
-  // Sorted by cost.
-  await expect(page.getByTestId("usage-page-model-row").first()).toHaveAttribute("data-model", "claude-opus-5-5");
-
-  await page.getByTestId("usage-page-range-90").click();
-  await expect(page.getByTestId("usage-page-day")).toHaveCount(90);
-  expect(await total(page)).toBeGreaterThan(t30);
-  // The retired opus 33 and 60 days ago saved on cache reads too.
-  expect(await cacheSavings(page)).toBeGreaterThan(s30);
-
-  await page.getByTestId("usage-page-range-7").click();
-  await expect(page.getByTestId("usage-page-day")).toHaveCount(7);
-  expect(await total(page)).toBeLessThan(t30);
-  // claude-opus-4-8 is 12 days old: out of a week.
-  await expect(page.locator('[data-testid="usage-page-model-row"][data-model="claude-opus-4-8"]')).toHaveCount(0);
-
-  await page.reload();
-  await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
-  await button(page).click();
-  await expect(page.getByTestId("usage-page-range-7")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("usage-page-day")).toHaveCount(7);
 });
 
 // Tokens / Cost, the axis and a day's tooltip: unit-tested in src/components/usage/UsageSheet.test.tsx.

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockPost, openApp, resetMock, row } from "./fixtures";
+import { openApp, resetMock, row } from "./fixtures";
 
 // The window's home is the new-thread composer on No project, its project picker closed
 // (docs/notes/remove-dashboard.md): where the window opens, and where it goes when its
@@ -18,21 +18,11 @@ async function expectHome(page: Page, heading = "What should we build with No pr
   await expect(page.getByTestId("composer-project-list")).toHaveCount(0);
 }
 
-test("no projects: the No project composer, as the welcome; New thread's picker offers Add a project", async ({ page }) => {
-  await mockPost("empty");
-  await page.goto(appPath);
-  // The first-run welcome (e2e/welcome-composer.spec.ts).
-  await expectHome(page, "Welcome to Code Foundry");
-  // The sidebar's thread list is simply empty: no placeholder text.
-  await expect(page.getByTestId("thread-list")).toHaveText("");
-  await expect(page.getByTestId("thread-list-empty")).toHaveCount(0);
-  await expect(page.getByTestId("backdrop")).toHaveCount(1);
-
-  await page.getByTestId("sidebar-new-thread").click();
-  const palette = page.getByTestId("palette");
-  await expect(palette).toHaveAttribute("data-mode", "projects");
-  await expect(page.getByTestId("picker-add-project")).toBeVisible();
-});
+// No projects: the welcome heading (src/components/compose/Composer.test.tsx), the thread list simply
+// empty (src/components/sidebar/Sidebar.test.tsx "empty once loaded"), New thread opening the project
+// picker (src/keys/bindings.test.ts "thread.new's chord opens the project picker") with Add a project
+// pinned and highlighted (src/components/compose/ProjectPicker.test.tsx "with no projects yet"). The
+// composer renders the one <Backdrop /> (src/components/backdrop/Backdrop.test.tsx).
 
 test("with projects: the window opens on the No project composer, picker closed and nothing typed", async ({ page }) => {
   await openApp(page);

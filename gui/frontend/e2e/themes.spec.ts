@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { componentValues, resolveSlots, type ThemeFile } from "../src/themes/slots";
-import { emit, mockUrl, openApp, resetMock } from "./fixtures";
+import { openApp, resetMock } from "./fixtures";
 
 // The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). The mock starts on the
 // defaults: scheme system (the browser is dark, playwright.config), GitHub Dark and Light.
@@ -21,11 +21,6 @@ const themesFor = (scheme: "dark" | "light") => catalog.filter((t) => t.scheme =
 test.beforeEach(async () => {
   await resetMock();
 });
-
-async function raw(key: string): Promise<string | undefined> {
-  const res = await fetch(`${mockUrl}/__mock/settings`);
-  return ((await res.json()) as { raw: Record<string, string> }).raw[key];
-}
 
 const page$ = (page: Page) => page.getByTestId("themes-page");
 const scope = (page: Page) => page.getByTestId("theme-scope");
@@ -54,68 +49,38 @@ async function openFromPalette(page: Page) {
 
 // Choose… opening the page on its slot, the scheme's themes, the in-use badge, back to Settings: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
-test("a previewed theme paints the gallery, not the window; Apply paints the window and saves the slot", async ({ page }) => {
+// The preview's name, Back to current, Apply disabled until a preview, the row marked current, the
+// saved slot, no companion for Dracula: src/components/themes/ThemesPage.test.tsx ("previewing paints…").
+test("a previewed theme paints the gallery, not the window; Apply paints the window", async ({ page }) => {
   await openFromSettings(page, "dark");
-  await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
-  await expect(page.getByTestId("themes-apply")).toBeDisabled();
-
   await option(page, "Dracula").click();
   await expect(scope(page)).toHaveAttribute("data-theme", "dracula");
-  await expect(page.getByTestId("themes-previewed-name")).toHaveText("Dracula");
   // The gallery's pane is Dracula's; the window keeps GitHub Dark's.
   const pane = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--pane").trim());
   expect(await pane('[data-testid="gallery-thread"]')).toBe(themeById.get("dracula")?.vars["--pane"]);
   expect(await pane("html")).toBe(themeById.get("github-dark")?.vars["--pane"]);
   await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
-  expect(await raw("appearance.theme_dark")).toBeUndefined();
-
-  // Back to current, then preview again and apply.
-  await page.getByTestId("themes-reset").click();
-  await expect(scope(page)).toHaveAttribute("data-theme", "github-dark");
-  await expect(page.getByTestId("themes-apply")).toBeDisabled();
-  await option(page, "Dracula").click();
   await page.getByTestId("themes-apply").click();
-  await expect.poll(() => raw("appearance.theme_dark")).toBe("dracula");
   await expect(html(page)).toHaveAttribute("data-theme", "dracula");
-  await expect(option(page, "Dracula")).toHaveAttribute("data-current", "true");
-  await expect(page.getByTestId("themes-apply")).toBeDisabled();
-  // Dracula has no light companion: no suggestion.
-  await expect(page.getByTestId("themes-pair-hint")).toHaveCount(0);
+  expect(await pane("html")).toBe(themeById.get("dracula")?.vars["--pane"]);
 });
 
 // Escape discarding the preview and the next visit starting from the applied theme: src/components/themes/ThemesPage.test.tsx ("Escape drops the preview and goes back to Settings…").
 
 // The companion suggested after Apply, accepted or dismissed: src/components/themes/ThemesPage.test.tsx ("previewing paints the gallery's scope…; a companion is suggested, accepted or dismissed").
 
-test("the keyboard: arrows preview, Enter applies, / searches, Escape clears then closes", async ({ page }) => {
+// Arrows previewing, Enter applying, / searching, Escape clearing then closing:
+// src/components/themes/ThemesPage.test.tsx ("the keyboard…").
+test("opened from the palette the list has the keyboard: real arrows preview and Enter applies to the window", async ({ page }) => {
   await openFromPalette(page);
-  await expect(page.getByTestId("themes-slot-dark")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("themes-list")).toBeFocused();
   const dark = themesFor("dark");
   await page.keyboard.press("ArrowDown");
   await expect(scope(page)).toHaveAttribute("data-theme", dark[1]?.id ?? "");
-  await page.keyboard.press("ArrowDown");
-  await expect(scope(page)).toHaveAttribute("data-theme", dark[2]?.id ?? "");
-  await page.keyboard.press("ArrowUp");
-  await expect(scope(page)).toHaveAttribute("data-theme", dark[1]?.id ?? "");
   await page.keyboard.press("Enter");
-  await expect.poll(() => raw("appearance.theme_dark")).toBe(dark[1]?.id);
   await expect(html(page)).toHaveAttribute("data-theme", dark[1]?.id ?? "");
-
   await page.keyboard.press("/");
-  const search = page.getByRole("searchbox", { name: "Search themes" });
-  await expect(search).toBeFocused();
-  await page.keyboard.type("nord");
-  await expect(page.getByTestId("themes-list").getByTestId("theme-name")).toHaveText(["Nord"]);
-  await page.keyboard.press("ArrowDown");
-  await expect(scope(page)).toHaveAttribute("data-theme", "nord");
-  await page.keyboard.press("Escape");
-  await expect(search).toHaveValue("");
-  await expect(page$(page)).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page$(page)).toHaveCount(0);
-  // Not applied: the window keeps the theme Enter applied.
-  await expect(html(page)).toHaveAttribute("data-theme", dark[1]?.id ?? "");
+  await expect(page.getByRole("searchbox", { name: "Search themes" })).toBeFocused();
 });
 
 test("a light preview inside the dark window renders with the light rules", async ({ page }) => {
@@ -138,37 +103,16 @@ test("a light preview inside the dark window renders with the light rules", asyn
   expect(await input.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
 });
 
-test("the scheme control writes appearance.theme and the slot in use follows", async ({ page }) => {
+// The saved appearance.theme, the "in use" badge and the scheme note: src/components/themes/ThemesPage.test.tsx
+// ("the scheme control saves appearance.theme").
+test("the scheme control: Light paints the window light; System follows the browser's dark", async ({ page }) => {
   await openFromPalette(page);
   await page.getByTestId("themes-scheme").getByRole("radio", { name: "Light" }).click();
-  await expect.poll(() => raw("appearance.theme")).toBe("light");
   await expect(html(page)).toHaveAttribute("data-theme", "github-light");
-  await expect(page.getByTestId("themes-slot-light")).toContainText("in use");
-  await expect(page.getByTestId("themes-scheme-note")).toHaveText("Always light, showing GitHub Light");
   await page.getByTestId("themes-scheme").getByRole("radio", { name: "System" }).click();
-  await expect.poll(() => raw("appearance.theme")).toBe("system");
   await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
 });
 
-test("theme pick from the CLI (ShowView themes.light) opens the page on that slot; Settings' Browse themes row opens it too", async ({ page }) => {
-  await openApp(page);
-  await expect.poll(() => emit({ showView: { name: "themes.light" } })).toBeGreaterThan(0);
-  await expect(page$(page)).toBeVisible();
-  await expect(page.getByTestId("themes-slot-light")).toHaveAttribute("aria-pressed", "true");
-  // Opened from nowhere, closing returns to the selection, not Settings.
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await expect(page$(page)).toHaveCount(0);
-  await expect(page.getByTestId("settings-page")).toHaveCount(0);
-
-  await page.keyboard.press("Meta+Comma");
-  await page.getByTestId("settings-nav-appearance").click();
-  // The slot selects name the theme whole: no " (default)" beside the Choose… button.
-  for (const [key, name] of [["appearance.theme_dark", "GitHub Dark"], ["appearance.theme_light", "GitHub Light"]] as const)
-    await expect(page.locator(`[data-setting="${key}"] [data-slot="select-trigger"]`)).toHaveText(name);
-  await page.getByTestId("settings-themes-link").click();
-  await expect(page$(page)).toBeVisible();
-  await expect(page.getByTestId("themes-slot-dark")).toHaveAttribute("aria-pressed", "true");
-  // Closing goes back to Settings on Appearance, where it came from.
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
-});
+// ShowView themes.light opening the page on the light slot, closing from nowhere not going to
+// Settings: src/stores/themePicker.test.ts; the slot selects without " (default)" and Browse themes
+// opening on the slot in use and coming back to Settings: src/components/settings/SettingRow.test.tsx.

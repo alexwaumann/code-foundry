@@ -11,7 +11,6 @@ test.beforeEach(async () => {
 
 const option = (page: Page, name: string) => page.getByTestId("themes-list").getByRole("option", { name, exact: true });
 const inspector = (page: Page) => page.getByTestId("theme-inspector");
-const focusedTestId = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.tagName ?? "");
 
 async function openThemes(page: Page) {
   await openApp(page);
@@ -96,28 +95,8 @@ test("2: with the side panel open on a thread, the Themes page still fits at 900
 
 // 7: a double-click on Customise, and its copy closed unsaved: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
-test("8, 9: focus follows the views; the list's arrows stay in the editor", async ({ page }) => {
-  await editOceanDusk(page);
-  // A new editor puts the keyboard on its first row; ↑↓ walk the rows.
-  expect(await focusedTestId(page)).toBe("editor-base-canvas");
-  await page.keyboard.press("ArrowDown");
-  expect(await focusedTestId(page)).toBe("editor-base-surface");
-  // Enter opens the colour's view on its hex field; Escape comes back to the row.
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("base-view")).toHaveAttribute("data-base", "surface");
-  expect(await focusedTestId(page)).toBe("colour-hex");
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("editor-slots")).toBeVisible();
-  expect(await focusedTestId(page)).toBe("editor-base-surface");
-  // ↓ from the filter reaches the slots.
-  await page.getByTestId("editor-filter").fill("sidebar-row");
-  await page.getByTestId("editor-filter").press("ArrowDown");
-  expect(await focusedTestId(page)).toMatch(/^editor-slot-sidebar-row/);
-  // The theme list's arrows no longer leave the editor; its footer says what Escape does.
-  await page.getByTestId("themes-list").focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(inspector(page)).toBeVisible();
-});
+// 8, 9: focus following the views (the first row, arrows, the hex field and back, ↓ from the filter)
+// and the list's arrows staying in the editor: src/components/themes/ThemesPage.test.tsx ("the editor").
 
 // 10, 11: the hex, L and hue fields: unit-tested in src/components/themes/ThemesPage.test.tsx.
 

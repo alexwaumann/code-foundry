@@ -349,6 +349,40 @@ describe("Keybindings", () => {
     localStorage.clear();
   });
 
+  it("the recorder refuses a reserved chord inline, shows the daemon's refusal, saves a valid one; Escape cancels a recording, then closes", async () => {
+    open("keybindings");
+    const recorder = () => within(row("keybindings.thread.new")).getByRole("button", { name: /shortcut/ });
+    const error = () => within(row("keybindings.thread.new")).queryByTestId("setting-error")?.textContent;
+    fireEvent.click(recorder());
+    expect(recorder().dataset.recording).toBe("true");
+    fireEvent.keyDown(recorder(), { key: "k", code: "KeyK", metaKey: true });
+    expect(error()).toBe("cmd+k is reserved by the app");
+    expect(save.fn).not.toHaveBeenCalled();
+
+    // A collision is the daemon's refusal (internal/store/settings): shown under the row.
+    save.fn.mockImplementationOnce(() => Promise.resolve({ ok: false, error: "invalid settings", issues: { "keybindings.thread.new": "cmd+t is already bound to terminal.new" } } as never));
+    fireEvent.click(recorder());
+    fireEvent.keyDown(recorder(), { key: "t", code: "KeyT", metaKey: true });
+    await waitFor(() => {
+      expect(error()).toContain("already bound to terminal.new");
+    });
+
+    fireEvent.click(recorder());
+    fireEvent.keyDown(recorder(), { key: "Y", code: "KeyY", metaKey: true, shiftKey: true });
+    await waitFor(() => {
+      expect(recorder().textContent).toBe("⇧⌘Y");
+    });
+    expect(save.fn).toHaveBeenLastCalledWith({ "keybindings.thread.new": "cmd+shift+y" });
+
+    // Escape while recording is the recorder's cancel; on the idle recorder it closes the sheet.
+    fireEvent.click(recorder());
+    fireEvent.keyDown(recorder(), { key: "Escape", code: "Escape" });
+    expect(recorder().dataset.recording).toBeUndefined();
+    expect(useViewsStore.getState().settingsOpen).toBe(true);
+    fireEvent.keyDown(recorder(), { key: "Escape", code: "Escape" });
+    expect(useViewsStore.getState().settingsOpen).toBe(false);
+  });
+
   it("a command's title has its description and command name in a tooltip", async () => {
     open("keybindings");
     const title = row("keybindings.thread.new").querySelector("span.truncate");
@@ -408,6 +442,16 @@ describe("search", () => {
     fireEvent.click(nav("advanced"));
     expect(search().value).toBe("");
     expect(body().dataset.page).toBe("advanced");
+  });
+
+  it("“skills registries” finds Skills › Registries, counted on the nav, which opens the page", () => {
+    open();
+    fireEvent.change(search(), { target: { value: "skills registries" } });
+    expect(screen.getAllByTestId("settings-section-hit").map((h) => h.textContent)).toEqual(["Skills › RegistriesThe marketplaces Claude Code knows about, and refreshing them."]);
+    expect(within(nav("skills")).getByTestId("settings-nav-count").textContent).toBe("1");
+    fireEvent.click(screen.getByTestId("settings-section-hit"));
+    expect(body().dataset.page).toBe("skills");
+    expect(document.querySelector('[data-section="registries"]')).not.toBeNull();
   });
 
   it.each(["remembered", "forget", "preferences", "standing"])("“%s” finds Memory › Remembered, which opens the page", (word) => {

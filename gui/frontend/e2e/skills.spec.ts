@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { invocations, openApp, resetMock, row } from "./fixtures";
+import { expect, test } from "@playwright/test";
+import { openApp, resetMock } from "./fixtures";
 
 /**
  * Settings → Skills (docs/notes/skills-4-gui.md) against the mock's ai-marketplace
@@ -7,18 +7,6 @@ import { invocations, openApp, resetMock, row } from "./fixtures";
  * plugins, pr-review (enabled), sql-helper (disabled), jira-sync (needs setup),
  * incident-postmortem (an update) and the local my-notes.
  */
-
-/** Settings → Skills; with `thread`, that thread selected first (skill.setup's owner). */
-async function openSkills(page: Page, thread?: string): Promise<void> {
-  await openApp(page);
-  if (thread) await row(page, thread).click();
-  await page.keyboard.press("Meta+Comma");
-  await page.getByTestId("settings-nav-skills").click();
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "skills");
-  await expect(installed(page, "pr-review")).toBeVisible();
-}
-
-const installed = (page: Page, name: string, kind = "skill") => page.locator(`[data-testid="skill-installed-row"][data-name="${name}"][data-kind="${kind}"]`);
 
 test.beforeEach(async () => {
   await resetMock();
@@ -29,22 +17,16 @@ test.beforeEach(async () => {
 // src/components/skill/settings/SkillsPage.test.tsx (the search's ranking and filters in
 // internal/store/skill/marketplace/search_test.go).
 
-test("Run setup with a thread selected runs skill.setup and reveals its bottom panel", async ({ page }) => {
-  await openSkills(page, "s:s-3");
-  const setup = installed(page, "jira-sync").getByTestId("skill-setup");
-  await expect(setup).toBeEnabled();
-  await setup.click();
-  // The panel is the thread's: Settings closes for it.
-  await expect(page.getByTestId("settings-page")).toHaveCount(0);
-  await expect.poll(async () => (await invocations()).some((c) => c.name === "skill.setup" && c.args.name === "jira-sync")).toBe(true);
-});
+// Run setup with a thread selected: the button runs skill.setup with reveal
+// (src/components/skill/settings/SkillsPage.test.tsx), which runs it in the thread's context
+// and reveals the terminal (src/stores/skill.test.ts); a revealed shell closes Settings
+// (src/stores/bottomActions.test.ts "revealShell").
 
-test("the settings search finds the Skills page's sections and opens the page there", async ({ page }) => {
+// The hit's text and the nav's count: src/components/settings/SettingsPage.test.tsx (search).
+test("the settings search's Skills › Registries hit scrolls that section into view", async ({ page }) => {
   await openApp(page);
   await page.keyboard.press("Meta+Comma");
   await page.getByRole("searchbox", { name: "Search settings" }).fill("skills registries");
-  await expect(page.getByTestId("settings-section-hit")).toHaveText(["Skills › RegistriesThe marketplaces Claude Code knows about, and refreshing them."]);
-  await expect(page.getByTestId("settings-nav-skills").getByTestId("settings-nav-count")).toHaveText("1");
   await page.getByTestId("settings-section-hit").click();
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "skills");
   await expect(page.locator('[data-section="registries"]')).toBeInViewport();

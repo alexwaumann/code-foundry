@@ -99,7 +99,7 @@ function SnoozeEnded({ at }: { at: number | null }) {
  * Unsnooze (a message unsnoozes too); a thread the daemon woke says "Snooze ended · <ago>"
  * (the header's Snooze button snoozes again). Nothing otherwise.
  */
-function SnoozeNote({ threadId }: { threadId: string }) {
+export function SnoozeNote({ threadId }: { threadId: string }) {
   const snoozedUntil = useThreadsStore((s) => s.byId[threadId]?.snoozedUntilMs ?? null);
   const wokeAt = useThreadsStore((s) => {
     const l = statusLine(s.byId[threadId]);

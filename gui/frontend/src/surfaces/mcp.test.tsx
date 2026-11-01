@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/api/mcp", async (orig) => ({ ...(await orig<typeof import("@/api/mcp")>()), getMcpStatus: api.get }));
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
+const { McpGroup } = await import("@/components/threadinfo/McpGroup");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
@@ -121,6 +122,8 @@ describe("MCP surface", () => {
     // Reconnect everywhere but connecting and disabled.
     expect(cards().map((c) => within(c, "mcp-reconnect") !== null)).toEqual([true, false]);
     expect(within(card("github"), "mcp-reconnect")?.className).toContain("border-transparent");
+    // Tools only where connected with tools.
+    expect(cards().map((c) => within(c, "mcp-tools-toggle") !== null)).toEqual([true, false]);
 
     pick("failed");
     expect(useMcpTabsStore.getState().byKey["thread:s-r"]).toBe("failed");
@@ -134,10 +137,12 @@ describe("MCP surface", () => {
     expect(within(card("playwright"), "mcp-reconnect")?.className).toContain("border-cf-warning/40");
     expect(card("playwright").className).toContain("border-cf-error/35");
     expect(card("linear").className).toContain("border-cf-warning/35");
+    expect(cards().map((c) => within(c, "mcp-tools-toggle") !== null)).toEqual([false, false]);
 
     pick("disabled");
     expect(shown()).toEqual([["sentry", "disabled", "Disabled"]]);
     expect(within(card("sentry"), "mcp-reconnect")).toBeNull();
+    expect(within(card("sentry"), "mcp-tools-toggle")).toBeNull();
   });
 
   it("an empty tab says so; a quiet Failed count is muted", () => {
@@ -186,6 +191,41 @@ describe("MCP surface", () => {
     const hints = (t: Element) => [...t.querySelectorAll('[data-testid="mcp-hint"]')].map((h) => h.getAttribute("aria-label"));
     expect(hints(tools[0] as Element)).toEqual(["Read-only"]);
     expect(hints(tools[1] as Element)).toEqual(["Writes", "Destructive", "Open-world (reaches outside the server)"]);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByTestId("mcp-tools")).toBeNull();
+  });
+
+  it("on a page: not in the panel's list, M opens nothing, view.panel.mcp opens nothing", () => {
+    useUiStore.setState({ selection: { kind: "view", name: "projects" } });
+    render(<SidePanel />);
+    expect(screen.getByTestId("panel-empty")).toBeTruthy();
+    expect(row()).toBeNull();
+    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "m" });
+    expect(getPanel("view:projects").groups[0]?.activeTabId ?? null).toBeNull();
+    act(() => {
+      showView("panel.mcp");
+    });
+    expect(getPanel("view:projects").groups[0]?.activeTabId ?? null).toBeNull();
+    expect(screen.queryByTestId("mcp-surface")).toBeNull();
+  });
+
+  it("the thread info card's MCP row: its menu's Open MCP panel opens the tab", async () => {
+    usePanelStore.setState({ byKey: { "thread:s-r": { open: false, groups: [{ tabs: [], activeTabId: null }] } } });
+    render(
+      <>
+        <McpGroup threadId="s-r" />
+        <SidePanel />
+      </>,
+    );
+    fireEvent.pointerDown(screen.getByTestId("ti-mcp"), { button: 0 });
+    fireEvent.click(await screen.findByTestId("ti-mcp-open-panel"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getPanel("thread:s-r")).toMatchObject({ open: true });
+    expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBe("mcp");
+    expect(screen.getByTestId("panel-body").getAttribute("data-surface")).toBe("mcp");
   });
 
   it("Reconnect runs thread.mcp-reconnect; meanwhile the card says Connecting… with a spinner", async () => {

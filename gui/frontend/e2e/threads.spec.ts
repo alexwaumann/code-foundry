@@ -11,30 +11,9 @@ function badge(page: Page, threadId: string) {
   return row(page, `s:${threadId}`).locator("[data-thread-badge]");
 }
 
-test("thread rows render with status badges, above the terminals no thread owns; none says whether Claude runs", async ({ page }) => {
-  await openApp(page);
-  const tree = page.getByTestId("thread-list");
-  await expect(badge(page, "s-1")).toHaveAttribute("data-thread-badge", /^(busy|idle)$/);
-  await expect(badge(page, "s-2")).toHaveAttribute("data-thread-badge", "attention");
-  // Stopped (at its prompt, after a crash) reads as idle; starting as working; stopping as idle.
-  await expect(badge(page, "s-3")).toHaveAttribute("data-thread-badge", "idle");
-  await expect(badge(page, "s-4")).toHaveAttribute("data-thread-badge", "idle");
-  await expect(badge(page, "s-5")).toHaveAttribute("data-thread-badge", "busy");
-  await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "working");
-  await expect(row(page, "s:s-5").getByTestId("row-status")).toHaveText(/^Working \d+[smhd]/);
-  await expect(badge(page, "s-6")).toHaveAttribute("data-thread-badge", "idle");
-  // Only threads have rows (and the Working, Snoozed and Archived headers): their terminals show
-  // through them, shells in bottom panels.
-  const keys = await tree.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  expect(keys.every((k) => k?.startsWith("s:") || k === "h:working" || k === "h:snoozed" || k === "h:archived")).toBe(true);
-  // A stopped thread's row looks like a running one's: not dimmed, no offline mark.
-  for (const id of ["s-3", "s-4", "s-6"]) {
-    await expect(row(page, `s:${id}`).getByTestId("thread-body")).not.toHaveAttribute("data-offline");
-    await expect(row(page, `s:${id}`).getByTestId("thread-body")).toHaveCSS("opacity", "1");
-  }
-  await expect(tree).not.toContainText(/disconnected|starting|closing/i);
-  // Starting to idle once Claude is up: threadBadge (src/lib/thread.test.ts).
-});
+// Rows' badges (stopped reads idle, starting working), only thread rows and the footers' headers, no
+// offline mark or lifecycle words: src/components/sidebar/Sidebar.test.tsx ("each row carries its badge…");
+// the badge rules: src/lib/thread.test.ts.
 
 test("a stopped thread shows its conversation and the composer; a message starts it and gets the answer", async ({ page }) => {
   await openApp(page);
@@ -84,40 +63,13 @@ test("a running thread that stops looks the same: the composer stays focused and
   await expect(page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.", { timeout: 10_000 });
 });
 
-test("a stopped thread keeps its status: busy ends interrupted, attention persists", async ({ page }) => {
-  await openApp(page);
-  await mockPost("thread/stop?id=s-1&reason=crashed&code=1&status=busy");
-  await expect(badge(page, "s-1")).toHaveAttribute("data-thread-badge", "error");
-  await expect(row(page, "s:s-1").getByTestId("row-status")).toHaveText("Interrupted");
-  await expect(row(page, "s:s-1").getByTestId("row-detail")).toHaveText("resend to continue");
-  await mockPost("thread/stop?id=s-2&reason=daemon%20stopped&code=0");
-  await expect(badge(page, "s-2")).toHaveAttribute("data-thread-badge", "attention");
-  // Still waiting on the user: counted, still on top, still saying so (not dimmed).
-  await expectAttention(page, 1);
-  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 1)).toEqual(["s:s-2"]);
-  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveText("Permission");
-  await expect(row(page, "s:s-2").getByTestId("row-detail")).toHaveText("Bash zig build -Doptimize=ReleaseFast");
-  await expect(row(page, "s:s-2").getByTestId("thread-body")).toHaveCSS("opacity", "1");
-});
+// A stopped thread keeping its status (busy ends Interrupted with "resend to continue"; a prompt stays
+// waiting on top with its word and detail): src/components/sidebar/Sidebar.test.tsx; counted in the
+// title: src/stores/threads.test.ts (attentionIds); interrupting a busy thread on stop is the
+// daemon's (internal/store/thread).
 
-test("a crashed thread keeps its composer, no card; the header says where it ran", async ({ page }) => {
-  await openApp(page);
-  // s-1 crashes mid-turn: interrupted, and the composer is still there.
-  await mockPost("thread/stop?id=s-1&reason=crashed&code=1&status=busy");
-  await row(page, "s:s-1").click();
-  await expect(page.getByTestId("thread-title")).toHaveText("Refactor sidebar tree");
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  await expect(page.getByTestId("thread-pane")).not.toContainText(/Not connected|Reconnect/);
-
-  // s-3 is seeded stopped, in the fix/resize worktree.
-  await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  // The header's crumb says where it runs (the project; the branch is the card's), not the path, model or status.
-  await expect(page.getByTestId("thread-crumb-place")).toHaveText("code-foundry");
-  await expect(page.getByTestId("thread-header")).not.toContainText("Opus");
-  await expect(page.getByTestId("thread-header")).not.toContainText("fix-resize");
-  await expect(page.getByTestId("thread-header")).not.toContainText(/disconnected|stopped|Close/);
-});
+// A crashed or stopped thread's header (the project, no path, model or state):
+// src/components/thread/ThreadHeaderStopped.test.tsx; ThreadPane renders the composer for every thread.
 
 test("needs-attention: window title and cmd+shift+a", async ({ page }) => {
   await openApp(page);
@@ -204,22 +156,11 @@ test("rename inline: double-click commits via thread.rename, cmd+r from the prom
   expect((await invocations()).length).toBe(before);
 });
 
-test("Regenerate name in the row menu runs thread.regenerate-name; the name is muted while it runs, then replaced", async ({ page }) => {
-  await openApp(page);
-  const name = row(page, "s:s-3").getByTestId("thread-name");
-  const before = await name.textContent();
-  await row(page, "s:s-3").click({ button: "right" });
-  await page.getByTestId("row-menu").getByTestId("menu-regenerate-name").click();
-  // The mock's "naming model" takes REGENERATE_NAME_MS: the old name shows muted and italic meanwhile.
-  await expect(name).toHaveAttribute("data-provisional", "true");
-  await expect(name).toHaveText(before ?? "");
-  await expect(name).toHaveText("Regenerated thread name");
-  await expect(name).not.toHaveAttribute("data-provisional");
-  const last = (await invocations()).at(-1);
-  expect(last).toMatchObject({ name: "thread.regenerate-name", args: { id: "s-3" } });
-  expect(last?.context?.activeThreadId).toBe("s-3");
-});
+// Regenerate name from the row menu (thread.regenerate-name's args and context, the old name muted
+// while it runs, then the new one): src/components/sidebar/Sidebar.test.tsx; the muted styles:
+// src/components/sidebar/SidebarRow.test.tsx ("SidebarRow provisional name").
 
+// The intent selecting the thread: src/stores/intents.test.ts; what is left is the prompt taking real focus.
 test("FocusThread intent selects the thread", async ({ page }) => {
   await openApp(page);
   await expect.poll(async () => ((await mockPost("thread/focus?id=s-3")) as { delivered: number }).delivered).toBeGreaterThan(0);
@@ -274,14 +215,12 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   await expect.poll(openStreams).toEqual({ "EventService/Watch": 1, "ThreadService/WatchThread": 1 });
 });
 
-test("a daemon without ThreadService degrades to 'service unavailable'", async ({ page }) => {
+// The notice ("Threads: service unavailable") and no rows: src/components/sidebar/Sidebar.test.tsx.
+test("a daemon without ThreadService: projects still work, and cmd+j's shell attaches live", async ({ page }) => {
   await mockPost("threads-service?enabled=false");
   // No rows to wait for (openApp waits for one): the notice is what shows.
   await page.goto(appPath);
-  await expect(page.getByTestId("threads-unavailable")).toHaveText("Threads: service unavailable");
-  // No thread rows; projects still work (the Projects page, and its shells' bottom panel).
-  await expect(page.locator('[data-row-kind="thread"]')).toHaveCount(0);
-  await expect(page.getByTestId("daemon-status")).not.toContainText("syncing");
+  await expect(page.getByTestId("threads-unavailable")).toBeVisible();
   await openProjects(page);
   await expect(page.getByTestId("project-name").first()).toBeVisible();
   await page.keyboard.press("Meta+j");
