@@ -104,6 +104,33 @@ describe("Sidebar: the thread list", () => {
     expect(active()).toBe("row-s:s-3");
   });
 
+  it("each row carries its badge: stopped (crashed or closing) reads idle, starting reads working; nothing says whether Claude runs", () => {
+    setThread("s-5", { statusChangedAtMs: Date.now() - 5_000 });
+    render(<Sidebar />);
+    const badge = (id: string) => rowOf(`s:${id}`)?.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge");
+    expect(["s-1", "s-2", "s-3", "s-4", "s-5", "s-6"].map(badge)).toEqual(["busy", "attention", "idle", "idle", "busy", "idle"]);
+    expect(rowOf("s:s-5")?.getAttribute("data-section")).toBe("working");
+    expect(within(rowOf("s:s-5") as HTMLElement).getByTestId("row-status").textContent).toMatch(/^Working \d+[smhd]/);
+    for (const id of ["s-3", "s-4", "s-6"]) expect(within(rowOf(`s:${id}`) as HTMLElement).getByTestId("thread-body").hasAttribute("data-offline")).toBe(false);
+    expect(list().textContent).not.toMatch(/disconnected|starting|closing/i);
+  });
+
+  it("a stopped thread keeps its status: busy ends interrupted; a prompt stays on top, waiting, with its word and detail", () => {
+    render(<Sidebar />);
+    // The daemon's stop of a busy thread (internal/store/thread): error, interrupted.
+    setThread("s-1", { state: "disconnected", status: "error", statusReason: "interrupted", statusChangedAtMs: Date.now() });
+    const s1 = rowOf("s:s-1") as HTMLElement;
+    expect(s1.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("error");
+    expect(within(s1).getByTestId("row-status").textContent).toBe("Interrupted");
+    expect(within(s1).getByTestId("row-detail").textContent).toBe("resend to continue");
+    setThread("s-2", { state: "disconnected", status: "attention", statusReason: "permission: Bash zig build -Doptimize=ReleaseFast" });
+    expect(rowKeys()[0]).toBe("s:s-2");
+    const s2 = rowOf("s:s-2") as HTMLElement;
+    expect(s2.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("attention");
+    expect(within(s2).getByTestId("row-status").textContent).toBe("Permission");
+    expect(within(s2).getByTestId("row-detail").textContent).toBe("Bash zig build -Doptimize=ReleaseFast");
+  });
+
   it("empty once loaded: the list is simply empty, no placeholder", () => {
     seedWorld({ empty: true });
     render(<Sidebar />);
@@ -208,6 +235,28 @@ describe("Sidebar: the row menu", () => {
       expect(rowKeys().slice(0, 4)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3"]);
     });
     expect(rowOf("s:s-3")?.getAttribute("data-section")).toBe("idle");
+  });
+});
+
+describe("Sidebar: Regenerate name", () => {
+  it("runs thread.regenerate-name for the row; the old name shows muted and italic while it runs, then the new one", async () => {
+    daemon.handlers.set("thread.regenerate-name", (inv) => {
+      setThread(inv.args.id ?? "", { naming: true });
+      return { message: "", resultJson: "" };
+    });
+    useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd("thread.regenerate-name", "Regenerate Thread Name")] }));
+    render(<Sidebar />);
+    fireEvent.contextMenu(rowOf("s:s-3") as HTMLElement);
+    fireEvent.click(within(await screen.findByTestId("row-menu")).getByTestId("menu-regenerate-name"));
+    const name = () => within(rowOf("s:s-3") as HTMLElement).getByTestId("thread-name");
+    await vi.waitFor(() => {
+      expect(name().getAttribute("data-provisional")).toBe("true");
+    });
+    expect(name().textContent).toBe("Fix resize race");
+    expect(lastInvocation("thread.regenerate-name")).toMatchObject({ args: { id: "s-3" }, context: { activeThreadId: "s-3" } });
+    setThread("s-3", { naming: false, name: "Regenerated thread name" });
+    expect(name().textContent).toBe("Regenerated thread name");
+    expect(name().getAttribute("data-provisional")).toBeNull();
   });
 });
 
