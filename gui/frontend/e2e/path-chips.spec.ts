@@ -50,7 +50,11 @@ test("an answer's paths open the File tab at their line, relative to the thread'
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/chips-file-tab.png` });
 });
 
+// A tool row's path opening its file while the rest of the row still toggles: src/components/thread/rows.test.tsx
+// ("an Edit row's path opens the file at its first change…"); a chip opening the File tab is the test above.
+// This keeps the tool row's screenshot.
 test("a Write row's path opens its file; the rest of the row still expands it", async ({ page }) => {
+  test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
   // Turn 1 is folded on return, above the viewport (the list sits at the bottom): the
   // wheel scrolls up to it (the user's scroll unpins the list), then down to the row.
   const header = pane(page).getByTestId("thread-turn-header").first();
