@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * e2e against the mock daemon. Ports differ from `pnpm run mock` / `wails3 dev` defaults so
+ * e2e against the mock daemon. Ports differ from `bun run mock` / `wails3 dev` defaults so
  * a running dev setup does not interfere.
  *
  * Every worker drives its own mock daemon: the mock is one world per process, and specs
@@ -20,7 +20,7 @@ export const VITE_PORT = Number(process.env.E2E_VITE_PORT ?? 9255);
 
 export default defineConfig({
   testDir: "e2e",
-  // e2e/live.spec.ts drives a real daemon: playwright.live.config.ts (pnpm run e2e:live).
+  // e2e/live.spec.ts drives a real daemon: playwright.live.config.ts (bun run e2e:live).
   testIgnore: /live(-[a-z]+)?\.spec\.ts$/,
   timeout: 20_000,
   expect: { timeout: 5_000 },

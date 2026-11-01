@@ -10,7 +10,7 @@ vars:
   # embedded Info.plist says). Quote it wherever it is used.
   APP_NAME: "Code Foundry"
   BIN_DIR: "bin"
-  PACKAGE_MANAGER: "pnpm"
+  PACKAGE_MANAGER: "bun"
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   GOOS: '{{.GOOS | default OS}}'
 

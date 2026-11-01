@@ -48,7 +48,11 @@ LDFLAGS  := -X github.com/alexwaumann/code-foundry/internal/version.Version=$(VE
             -X github.com/alexwaumann/code-foundry/internal/version.Commit=$(COMMIT) \
             -X github.com/alexwaumann/code-foundry/internal/version.PluginSDKTag=$(PLUGINSDK_TAG)
 FRONTEND := gui/frontend
-PNPM     := pnpm --dir $(FRONTEND)
+# `bun run --cwd` runs a package.json script there; `bun install --cwd` installs there. The
+# flag goes after the subcommand: `bun --cwd <dir> install` would look for a script "install".
+BUN      := bun run --cwd $(FRONTEND)
+# `bun check` (the TypeScript checker the frontend scripts use) arrived in Bun 1.4.3.
+BUN_MIN  := 1.4.3
 
 .PHONY: plugins
 
@@ -64,7 +68,7 @@ plugins:
 		cp "$$dir/bin/$$name" "bin/plugins/$$name/bin/$$name"; \
 	done
 
-.PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps gui-dist-stub pagelib pagelib-check \
+.PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps bun-version gui-dist-stub pagelib pagelib-check \
         dev gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp package release promote clean fuzz
 
 all: build
@@ -80,7 +84,7 @@ gen: pagelib
 ## runtime) from the GUI's sources into internal/pagelib/dist, which the daemon embeds.
 ## Committed like generated code (docs/notes/page-library.md).
 pagelib: frontend-deps
-	$(PNPM) run pagelib
+	$(BUN) pagelib
 
 # pagelib-check: rebuild the page library and fail when it differs from what git has (a
 # component, index.css or a dependency changed without `make pagelib`). Staged counts.
@@ -156,13 +160,18 @@ go-test: gui-dist-stub ghostty-vt whisper-cpp
 	go test -race ./...
 	cd pluginsdk && go test -race ./...
 
-frontend-deps:
-	$(PNPM) install --frozen-lockfile
+frontend-deps: bun-version
+	bun install --cwd $(FRONTEND) --frozen-lockfile
+
+bun-version:
+	@v=$$(bun --version 2>/dev/null) || { echo "bun not found: install Bun $(BUN_MIN) or newer (https://bun.sh)"; exit 1; }; \
+	if [ "$$(printf '%s\n%s\n' "$(BUN_MIN)" "$$v" | sort -V | head -1)" != "$(BUN_MIN)" ]; then \
+		echo "bun $$v is too old: the frontend needs $(BUN_MIN) or newer (bun upgrade)"; exit 1; fi
 
 frontend-check: frontend-deps pagelib-check
-	$(PNPM) run typecheck
-	$(PNPM) run lint
-	$(PNPM) run test
+	$(BUN) typecheck
+	$(BUN) lint
+	$(BUN) test
 
 ## dev: run the daemon in the foreground with text logs on stderr.
 # Builds then execs the binary (not `go run`, which exits 1 on Ctrl-C).
@@ -177,13 +186,13 @@ gui-build: build
 	rm -rf gui/bin/CodeFoundry.app gui/bin/CodeFoundry
 
 ## gui-e2e: Playwright (WebKit, one mock daemon per worker; E2E_WORKERS=4) against the mock
-## daemon. Not part of `check`: it needs the browser (`pnpm --dir gui/frontend exec playwright install webkit`).
+## daemon. Not part of `check`: it needs the browser (`bunx --cwd gui/frontend playwright install webkit`).
 gui-e2e: frontend-deps
-	$(PNPM) run e2e
+	$(BUN) e2e
 
-## gui-mock: run the mock daemon on :7788 (token dev-mock-token); pair with `pnpm run dev:mock`.
+## gui-mock: run the mock daemon on :7788 (token dev-mock-token); pair with `bun run dev:mock`.
 gui-mock: frontend-deps
-	$(PNPM) run mock
+	$(BUN) mock
 
 ## gui-dev: run the GUI with hot reload (auto-starts ./bin/code-foundry daemon if needed).
 gui-dev: build

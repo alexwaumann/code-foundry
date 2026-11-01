@@ -11,7 +11,7 @@
  *
  *   LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9372 LIVE_PROJECT=code-foundry \
  *   LIVE_PR_SLUG=alexwaumann/code-foundry LIVE_PR=1 LIVE_SHOTS=<dir> \
- *   pnpm run e2e:live e2e/live-prthread.spec.ts
+ *   bun run e2e:live e2e/live-prthread.spec.ts
  */
 import { expect, test } from "@playwright/test";
 

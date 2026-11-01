@@ -23,7 +23,7 @@ func IsSlot(name string) bool {
 
 // SchemeProblem is why a surface (#rrggbb) cannot carry a scheme, or "" when it can. The
 // words and the numbers are the GUI's schemeProblem, so the daemon refuses a file with
-// the message the editor and `pnpm run themes:check` give. This is a colour conversion,
+// the message the editor and `bun run themes:check` give. This is a colour conversion,
 // not a derivation: the daemon still resolves no slot.
 func SchemeProblem(scheme, surface string) string {
 	l, ok := oklabLightness(surface)

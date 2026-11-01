@@ -1,10 +1,10 @@
 /**
- * Ghostty themes -> theme files (docs/notes/theme-slots-1-engine.md). `pnpm run themes`
+ * Ghostty themes -> theme files (docs/notes/theme-slots-1-engine.md). `bun run themes`
  * regenerates src/themes/catalog.json (every curated theme as a theme file: base +
  * overrides) and the daemon's copy internal/theme/catalog.json (ids, names, schemes, pairs
  * and the defaults), plus the frame stylesheet's static part and defaults
  * (internal/theme/frame.css, frame-defaults.json; themes/frame.ts); all committed.
- * `pnpm run themes -- --refresh` first re-copies the
+ * `bun run themes -- --refresh` first re-copies the
  * vendored Ghostty files from /Applications/Ghostty.app. themes/convert.test.ts regenerates
  * in memory and fails on drift.
  *

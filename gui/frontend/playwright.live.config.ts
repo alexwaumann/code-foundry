@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
  * started for you: run an isolated daemon and the Vite dev server pointed at it first.
  * See docs/notes/phase2-integration.md for the recipe:
  *
- *   LIVE_DAEMON=1 CODE_FOUNDRY_HOME=/tmp/cf-live pnpm run e2e:live
+ *   LIVE_DAEMON=1 CODE_FOUNDRY_HOME=/tmp/cf-live bun run e2e:live
  */
 export default defineConfig({
   testDir: "e2e",

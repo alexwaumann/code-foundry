@@ -79,13 +79,17 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      # Bun installs the frontend's packages and type checks (bun check); Node runs Vite,
+      # Vitest and Playwright, which keep their node shebangs under `bun run`.
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 12.8.1
+          bun-version: 1.4.4
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: gui/frontend/pnpm-lock.yaml
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('gui/frontend/bun.lock') }}
       # typecheck + lint + vitest. Generated code is committed, so no buf or wails3.
       - run: make frontend-check

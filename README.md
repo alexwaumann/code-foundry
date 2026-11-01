@@ -81,8 +81,8 @@ Installed an earlier version as `CodeFoundry.app`? Quit it and remove
 ## Developing
 
 Requirements: an Apple silicon Mac with the Xcode Command Line Tools, Go 1.26 (go.mod's
-toolchain directive fetches it), `pkg-config` (`brew install pkgconf`), and Node 24 with
-pnpm. The GUI also needs `wails3`
+toolchain directive fetches it), `pkg-config` (`brew install pkgconf`), Node 24 and Bun
+1.4.3 or newer (`bun check` is the frontend's type checker). The GUI also needs `wails3`
 (`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28`).
 
 ```sh

@@ -1,11 +1,11 @@
 /**
  * Pushes a UiIntent to the mock daemon (UiService.Emit), like a CLI verb would.
  *
- *   pnpm run mock:emit focus-terminal t-top
- *   pnpm run mock:emit focus-thread s-3
- *   pnpm run mock:emit focus-repo repo-cf [worktreePath]
- *   pnpm run mock:emit palette [query]
- *   pnpm run mock:emit notify [info|warning|error] <title> [body]
+ *   bun run mock:emit focus-terminal t-top
+ *   bun run mock:emit focus-thread s-3
+ *   bun run mock:emit focus-repo repo-cf [worktreePath]
+ *   bun run mock:emit palette [query]
+ *   bun run mock:emit notify [info|warning|error] <title> [body]
  *
  * MOCK_URL (default http://127.0.0.1:7788) and MOCK_TOKEN (default dev-mock-token).
  */

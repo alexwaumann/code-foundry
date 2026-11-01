@@ -9,7 +9,7 @@
  * at it, then:
  *
  *   LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9257 LIVE_PROJECT=neovim \
- *   LIVE_WORKTREE=<this worktree> LIVE_SHOTS=<dir> pnpm run e2e:live e2e/live-prs.spec.ts
+ *   LIVE_WORKTREE=<this worktree> LIVE_SHOTS=<dir> bun run e2e:live e2e/live-prs.spec.ts
  */
 import { expect, test, type Page } from "@playwright/test";
 

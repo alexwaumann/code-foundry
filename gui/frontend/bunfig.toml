@@ -1,0 +1,9 @@
+# bun install settings (gui/frontend). Scripts and checks run via `bun run`.
+[install]
+# Match pnpm's layout: every package sees only its own dependencies (no phantom imports).
+linker = "isolated"
+# Refuse package versions published less than 7 days ago (carried over from the Wails
+# template's .npmrc), reducing exposure to freshly compromised releases.
+minimumReleaseAge = 604800
+# The Wails JS runtime must match the Go module version (github.com/wailsapp/wails/v3).
+minimumReleaseAgeExcludes = ["@wailsio/runtime"]
