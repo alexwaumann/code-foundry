@@ -238,7 +238,7 @@ describe("the settings page", () => {
     fireEvent.change(spin("appearance.font_size"), { target: { value: "99" } });
     press(spin("appearance.font_size"), "Enter");
     expect(within(row("appearance.font_size")).getByTestId("setting-error").textContent).toBe("Want 9 to 28");
-    expect(save.fn).not.toHaveBeenCalledWith(expect.objectContaining({ "appearance.font_size": expect.anything() }));
+    expect(save.fn.mock.calls.some(([v]) => "appearance.font_size" in v)).toBe(false);
 
     spin("threads.scrollback_lines").focus();
     fireEvent.change(spin("threads.scrollback_lines"), { target: { value: "20000" } });

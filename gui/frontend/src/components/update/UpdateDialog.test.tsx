@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import type { UpdateStateView, UpdateStatusView } from "@/api/update";
@@ -96,13 +96,8 @@ afterEach(() => {
 describe("useCutOffThreadIds", () => {
   it("counts working and waiting threads in sidebar order, not finished, idle or stopped ones", () => {
     setThreads([thread("a", "A", finished), thread("b", "B", waiting), thread("c", "C", idle), thread("d", "D", working), thread("e", "E", stoppedWaiting)]);
-    let ids: string[] = [];
-    function Probe() {
-      ids = useCutOffThreadIds();
-      return null;
-    }
-    render(<Probe />);
-    expect(ids).toEqual(["b", "d"]);
+    const { result } = renderHook(() => useCutOffThreadIds());
+    expect(result.current).toEqual(["b", "d"]);
   });
 });
 
@@ -128,7 +123,7 @@ describe("UpdateDialog", () => {
     expect(text("update-state")).toBe("Code Foundry v0.2.0 is available");
     expect(dialog().textContent).toContain("You’re on v0.1.0. Downloading happens in the background and changes nothing until you restart.");
     expect(text("update-download")).toBe("Download v0.2.0");
-    expect(text("update-notes")?.trim()).toBe("Release notes");
+    expect(text("update-notes").trim()).toBe("Release notes");
     expect(text("update-later")).toBe("Later");
     expect(q("update-close")).toBeNull();
     fireEvent.click(within(dialog()).getByTestId("update-download"));

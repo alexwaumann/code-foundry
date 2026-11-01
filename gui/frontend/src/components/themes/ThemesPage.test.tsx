@@ -294,14 +294,14 @@ describe("the list", { timeout: 30_000 }, () => {
 
   it("previewing paints the gallery's scope; Back to current and Apply; a companion is suggested, accepted or dismissed", async () => {
     open();
-    expect((screen.getByTestId("themes-apply") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId<HTMLButtonElement>("themes-apply").disabled).toBe(true);
     fireEvent.click(option("Gruvbox Dark"));
     expect(scope().dataset.theme).toBe("gruvbox-dark");
     expect(screen.getByTestId("themes-previewed-name").textContent).toBe("Gruvbox Dark");
     expect(themeSlots().dark).toBe("github-dark");
     fireEvent.click(screen.getByTestId("themes-reset"));
     expect(scope().dataset.theme).toBe("github-dark");
-    expect((screen.getByTestId("themes-apply") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId<HTMLButtonElement>("themes-apply").disabled).toBe(true);
 
     fireEvent.click(option("Gruvbox Dark"));
     fireEvent.click(screen.getByTestId("themes-apply"));
@@ -309,7 +309,7 @@ describe("the list", { timeout: 30_000 }, () => {
       expect(option("Gruvbox Dark").dataset.current).toBe("true");
     });
     expect(calls("theme.set-dark").map((c) => c[1])).toEqual([{ theme: "gruvbox-dark" }]);
-    expect((screen.getByTestId("themes-apply") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId<HTMLButtonElement>("themes-apply").disabled).toBe(true);
     const hint = await screen.findByTestId("themes-pair-hint");
     expect(hint.textContent).toContain("Gruvbox Light is this theme’s light companion. Use it for light?");
     expect(themeSlots().light).toBe("github-light");
@@ -595,14 +595,14 @@ describe("the editor", { timeout: 30_000 }, () => {
     expect(saved?.base.canvas).toBe("#2a3440");
     expect(Object.keys(saved?.overrides ?? {})).toEqual(["--cf-sidebar-row-hover"]);
     await waitFor(() => {
-      expect((screen.getByTestId("themes-revert") as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.getByTestId<HTMLButtonElement>("themes-revert").disabled).toBe(true);
     });
 
     setBase("canvas", "#101418");
     expect(screen.getByTestId("themes-edit-bar").textContent).toContain("unsaved");
     fireEvent.click(screen.getByTestId("themes-revert"));
     expect(scopeVar("--cf-canvas")).toBe("#2a3440");
-    expect((screen.getByTestId("themes-revert") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId<HTMLButtonElement>("themes-revert").disabled).toBe(true);
   });
 
   it("a contrast failure shows its ratio and Fix pins a value that reads", async () => {
@@ -653,7 +653,7 @@ describe("the editor", { timeout: 30_000 }, () => {
     expect(within(dialog).getByTestId("theme-save-refusal").textContent).toContain("A dark theme needs a dark surface");
     expect(dialog.textContent).not.toContain("You can save anyway");
     expect(within(dialog).queryByTestId("theme-save-contrast")).toBeNull();
-    expect((within(dialog).getByTestId("theme-save-submit") as HTMLButtonElement).disabled).toBe(true);
+    expect(within(dialog).getByTestId<HTMLButtonElement>("theme-save-submit").disabled).toBe(true);
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => {
       expect(screen.queryByTestId("theme-save-dialog")).toBeNull();
@@ -735,7 +735,7 @@ describe("the editor", { timeout: 30_000 }, () => {
     fireEvent.click(screen.getByTestId("editor-disk-reload"));
     expect(screen.queryByTestId("editor-disk-notice")).toBeNull();
     expect(scopeVar("--cf-canvas")).toBe("#440000");
-    expect((screen.getByTestId("themes-revert") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId<HTMLButtonElement>("themes-revert").disabled).toBe(true);
 
     // Keep mine: the draft stays, and Save writes it over the newer file.
     setBase("accent", "#ff00ff");
