@@ -94,7 +94,7 @@ describe("RowMore: the ellipsis of a row with its own click", () => {
     expect(screen.getByRole("button", { name: "Fix the badge #78" })).toBe(screen.getByTestId("r"));
   });
 
-  it("keeps its row marker under a wrapper's props (a wrapper's data-slot stays), and tints a non-interactive row while its menu is up", () => {
+  it("keeps its row marker under a wrapper's props (a wrapper's data-slot stays); a non-interactive row lights only its ellipsis block while the menu is up", () => {
     render(
       <Row
         data-slot="dropdown-menu-trigger"
@@ -112,7 +112,62 @@ describe("RowMore: the ellipsis of a row with its own click", () => {
     const row = screen.getByTestId("r");
     expect(row.hasAttribute("data-ti-row")).toBe(true);
     expect(row.getAttribute("data-slot")).toBe("dropdown-menu-trigger");
-    expect(row.className).toContain("has-[[data-row-more][aria-expanded=true]]:bg-cf-control-hover");
+    // The menu-open rule clears the row's block; the button's own block lights (below).
+    expect(row.className).toContain("has-[[data-row-more][aria-expanded=true]]:before:bg-transparent!");
+    expect(row.className).not.toContain("has-[[data-row-more][aria-expanded=true]]:bg-");
+    // No click of its own: the text is not a target, so no hover block for it.
+    expect(row.className).not.toContain("group/split");
+    expect(row.className).not.toContain("hover:not-has-[[data-row-more]:hover]:before:bg-cf-control-hover");
+    expect(screen.getByTestId("more").className).toContain("aria-expanded:after:bg-cf-control-hover");
+  });
+
+  it("splits the hover in two blocks: the row has no background of its own, its before is the left block and the button's after the ellipsis block", () => {
+    renderSplit(vi.fn(), vi.fn());
+    const row = screen.getByTestId("r");
+    const cls = row.className.split(" ");
+    // No whole-row tint: neither on hover, focus, nor while the menu is up.
+    expect(cls.filter((c) => /(^|:)bg-/.test(c) && !c.includes("before:"))).toEqual([]);
+    // Pseudos under the text: an isolated row, both blocks at z -1.
+    expect(cls).toEqual(expect.arrayContaining(["isolate", "before:-z-1", "before:right-6.5", "before:rounded-l-md", "group/split"]));
+    // Bright under the pointer or focus, half strength while the pointer is on the ellipsis.
+    expect(cls).toEqual(
+      expect.arrayContaining([
+        "hover:not-has-[[data-row-more]:hover]:before:bg-cf-control-hover",
+        "focus-visible:before:bg-cf-control-hover",
+        "has-[[data-row-more]:hover]:before:bg-cf-control-hover/50",
+      ]),
+    );
+    // The button is static, so its after is placed by the row: the last 24px, the row's full height.
+    const more = screen.getByTestId("more").className.split(" ");
+    expect(more).not.toContain("relative");
+    expect(more).toEqual(
+      expect.arrayContaining([
+        "after:absolute",
+        "after:inset-y-0",
+        "after:right-0",
+        "after:w-6",
+        "after:-z-1",
+        "after:rounded-r-md",
+        "group-hover/split:after:bg-cf-control-hover/50",
+        "hover:after:bg-cf-control-hover",
+        "focus-visible:after:bg-cf-control-hover",
+        "aria-expanded:after:bg-cf-control-hover",
+        "aria-expanded:text-cf-text",
+      ]),
+    );
+    expect(more.filter((c) => /^(hover|focus-visible|aria-expanded):bg-/.test(c))).toEqual([]);
+  });
+
+  it("leaves a row without an ellipsis on the whole-row tint", () => {
+    render(
+      <Row onActivate={vi.fn()} chevron="closed" testId="r">
+        Shells
+      </Row>,
+    );
+    const cls = screen.getByTestId("r").className.split(" ");
+    expect(cls).toEqual(expect.arrayContaining(["hover:bg-cf-control-hover", "focus-visible:bg-cf-control-hover"]));
+    expect(cls).not.toContain("isolate");
+    expect(cls.filter((c) => c.includes("before:"))).toEqual([]);
   });
 
   it("is a labelled, tabbable button after the value, with no chevron", () => {

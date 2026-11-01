@@ -158,6 +158,36 @@ async function rightOf(l: Locator): Promise<number> {
   return b.x + b.width;
 }
 
+/** A pseudo-element's background colour. */
+function pseudoBg(l: Locator, pseudo: "::before" | "::after"): Promise<string> {
+  return l.evaluate((el, p) => getComputedStyle(el, p).backgroundColor, pseudo);
+}
+
+/** An element's own background colour. */
+function ownBg(l: Locator): Promise<string> {
+  return l.evaluate((el) => getComputedStyle(el).backgroundColor);
+}
+
+/** The split hover's colours as the page computes them: no tint, the full tint, the half tint (Tailwind's `/50`), the bright glyph. */
+async function splitBlocks(page: Page): Promise<{ none: string; full: string; half: string; text: string }> {
+  return page.evaluate(() => {
+    const probe = (prop: "backgroundColor" | "color", value: string) => {
+      const d = document.createElement("div");
+      d.style[prop] = value;
+      document.body.append(d);
+      const c = getComputedStyle(d)[prop];
+      d.remove();
+      return c;
+    };
+    return {
+      none: probe("backgroundColor", "transparent"),
+      full: probe("backgroundColor", "var(--cf-control-hover)"),
+      half: probe("backgroundColor", "color-mix(in oklab, var(--cf-control-hover) 50%, transparent)"),
+      text: probe("color", "var(--cf-text)"),
+    };
+  });
+}
+
 /** The menu sits under its row at the row's width, once its open animation ends. */
 async function expectUnderRow(menu: Locator, rowEl: Locator): Promise<void> {
   await expect
@@ -198,23 +228,64 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
     "ti-usage-chevron",
   ];
   for (const id of ends) expect(Math.abs((await rightOf(c.getByTestId(id).first())) - edge), id).toBeLessThan(1);
-  // The ellipsis is the chevron's 16px box.
+  // The ellipsis glyph is the chevron's 16px box.
   const more = await box(c.getByTestId("ti-open-in-more"));
   const chev = await box(c.getByTestId("ti-project-chevron"));
   expect([more.width, more.height]).toEqual([chev.width, chev.height]);
 
-  const reveals = async () => (await invocations()).filter((i) => i.name === "worktree.reveal").length;
-  // Open in: the ellipsis opens the menu under the row, at its width, and reveals nothing; the row stays tinted while it is up.
+  // The split hover (docs/notes/thread-info-split-hover.md): the row's ::before is the left
+  // block, the ellipsis's ::after the right one (the last 24px, the row's full height, the
+  // click target); a 2px seam between them. The row itself has no tint.
+  const openInMore = c.getByTestId("ti-open-in-more");
+  const blocks = await splitBlocks(page);
+  expect(new Set([blocks.none, blocks.full, blocks.half]).size).toBe(3);
+  const lit = (rowEl: Locator, moreEl: Locator) => Promise.all([pseudoBg(rowEl, "::before"), pseudoBg(moreEl, "::after"), ownBg(rowEl)]);
+  for (const [rowEl, moreEl] of [
+    [openIn, openInMore],
+    [pr, pr.getByTestId("ti-pr-more")],
+  ] as const) {
+    const [r, m] = await Promise.all([box(rowEl), box(moreEl)]);
+    const geo = await moreEl.evaluate((el) => {
+      const a = getComputedStyle(el, "::after");
+      const b = getComputedStyle(el.closest("[data-ti-row]") ?? el, "::before");
+      return { w: a.width, h: a.height, right: a.right, top: a.top, gap: b.right };
+    });
+    expect(geo).toEqual({ w: "24px", h: `${String(r.height)}px`, right: "0px", top: "0px", gap: "26px" });
+    // The glyph sits inside its block: the hit area did not shrink.
+    expect(m.x + m.width).toBeLessThanOrEqual(r.x + r.width);
+    expect(m.x).toBeGreaterThanOrEqual(r.x + r.width - 24);
+  }
   await page.mouse.move(0, 0);
-  const bg = () => openIn.evaluate((el) => getComputedStyle(el).backgroundColor);
-  const resting = await bg();
-  await c.getByTestId("ti-open-in-more").click();
+  expect(await lit(openIn, openInMore)).toEqual([blocks.none, blocks.none, blocks.none]);
+  // The text under the pointer: the left block bright, the ellipsis dim.
+  await openIn.hover({ position: { x: 30, y: 10 } });
+  await expect.poll(() => lit(openIn, openInMore)).toEqual([blocks.full, blocks.half, blocks.none]);
+  // The ellipsis under the pointer: flipped.
+  await openInMore.hover();
+  await expect.poll(() => lit(openIn, openInMore)).toEqual([blocks.half, blocks.full, blocks.none]);
+  await expect.poll(() => openInMore.evaluate((el) => getComputedStyle(el).color)).toBe(blocks.text);
+  // A tall pull request row, both lines: the same two blocks.
+  const prMore = pr.getByTestId("ti-pr-more");
+  await pr.hover({ position: { x: 30, y: 10 } });
+  await expect.poll(() => lit(pr, prMore)).toEqual([blocks.full, blocks.half, blocks.none]);
+  await prMore.hover();
+  await expect.poll(() => lit(pr, prMore)).toEqual([blocks.half, blocks.full, blocks.none]);
+
+  const reveals = async () => (await invocations()).filter((i) => i.name === "worktree.reveal").length;
+  // Open in: the ellipsis opens the menu under the row, at its width, and reveals nothing.
+  // While it is up only the ellipsis block is lit, wherever the pointer is.
+  await openInMore.click();
   const openInMenu = page.getByTestId("ti-open-in-menu");
   await expect(openInMenu).toBeVisible();
-  await expect(c.getByTestId("ti-open-in-more")).toHaveAttribute("aria-expanded", "true");
+  await expect(openInMore).toHaveAttribute("aria-expanded", "true");
   await expectUnderRow(openInMenu, openIn);
+  await expect.poll(() => lit(openIn, openInMore)).toEqual([blocks.none, blocks.full, blocks.none]);
+  await openIn.hover({ position: { x: 30, y: 10 } });
+  await expect(openInMenu).toBeVisible();
+  await expect.poll(() => lit(openIn, openInMore)).toEqual([blocks.none, blocks.full, blocks.none]);
   await page.mouse.move(0, 0);
-  await expect.poll(bg).not.toBe(resting);
+  await expect.poll(() => lit(openIn, openInMore)).toEqual([blocks.none, blocks.full, blocks.none]);
+  await expect.poll(() => openInMore.evaluate((el) => getComputedStyle(el).color)).toBe(blocks.text);
   await expect(openInMenu.getByTestId("ti-open-finder")).toBeVisible();
   // A menu item is the item's, not the row's click too (React bubbles portal events to the row).
   await openInMenu.getByTestId("ti-open-terminal").click();
@@ -226,8 +297,16 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await openIn.focus();
   await page.keyboard.press("Enter");
   await expect.poll(reveals).toBe(2);
+  await page.mouse.move(0, 0);
   await page.keyboard.press("Tab");
   await expect(c.getByTestId("ti-open-in-more")).toBeFocused();
+  // Keyboard focus on the ellipsis lights its block only.
+  await expect.poll(() => lit(openIn, openInMore)).toEqual([blocks.none, blocks.full, blocks.none]);
+  await page.keyboard.press("Shift+Tab");
+  await expect(openIn).toBeFocused();
+  // On the row: the left block only.
+  await expect.poll(() => lit(openIn, openInMore)).toEqual([blocks.full, blocks.none, blocks.none]);
+  await page.keyboard.press("Tab");
   await page.keyboard.press("Enter");
   await expect(openInMenu).toBeVisible();
   await page.keyboard.press("Escape");
@@ -288,17 +367,18 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await expect(page.locator('[data-testid="panel-body"][data-surface="pullrequest"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  // Lineage's ellipsis is the same button with the same menu placement, and its row is tinted while the menu is up.
+  // Lineage's ellipsis is the same button with the same menu placement and the same
+  // menu-open rule: only its block lit. Its label has no click: hovering it lights nothing.
   const label = c.getByTestId("ti-lineage-label");
-  await page.mouse.move(0, 0);
-  const labelBg = () => label.evaluate((el) => getComputedStyle(el).backgroundColor);
-  const labelResting = await labelBg();
-  await c.getByTestId("ti-lineage-menu-trigger").click();
+  const labelMore = c.getByTestId("ti-lineage-menu-trigger");
+  await label.hover({ position: { x: 30, y: 10 } });
+  await expect.poll(() => lit(label, labelMore)).toEqual([blocks.none, blocks.none, blocks.none]);
+  await labelMore.click();
   const lineageMenu = page.getByTestId("ti-lineage-menu");
   await expect(lineageMenu.getByTestId("ti-show-hidden")).toBeVisible();
   await expectUnderRow(lineageMenu, label);
   await page.mouse.move(0, 0);
-  await expect.poll(labelBg).not.toBe(labelResting);
+  await expect.poll(() => lit(label, labelMore)).toEqual([blocks.none, blocks.full, blocks.none]);
   await page.keyboard.press("Escape");
 });
 
