@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, mockPost, openApp, openThreadChanges, resetMock, row } from "./fixtures";
+import { CF, openApp, openThreadChanges, resetMock, row } from "./fixtures";
 
 /**
  * The File and Diff panel tabs (docs/notes/file-viewer-3-tabs.md) against the mock

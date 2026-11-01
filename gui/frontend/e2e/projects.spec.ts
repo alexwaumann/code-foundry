@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, openProjectPage, openProjects, resetMock } from "./fixtures";
+import { CF, mockPost, openApp, openProjectPage, openProjects, resetMock } from "./fixtures";
 
 /**
  * The Projects view (docs/notes/projects-redesign-1-index.md): the index (rows by last
@@ -21,21 +21,11 @@ const checkout = (page: Page, path: string) => page.locator(`[data-testid="proje
 const checkoutRow = (page: Page, projectId: string, path: string) => page.locator(`[data-nav-key="pw:${projectId}::${path}"]`);
 const FEAT = `${CF}.worktrees/feat-sidebar`;
 const FIX = `${CF}.worktrees/fix-resize`;
-const MERGED = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-usage-polish";
 // POST /__mock/leftovers: three leftovers (SPIKE, COPY, exp/shaders; and MERGED with clean=1).
 const SPIKE = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-perf-spike";
 const COPY = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy";
 const leftover = (page: Page, path: string) => page.locator(`[data-testid="leftover-row"][data-path="${path}"]`);
 
-async function lastInvocation(name: string) {
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === name).length).toBeGreaterThan(0);
-  return (await invocations()).filter((i) => i.name === name).at(-1);
-}
-/** Escape closes the open menu (and waits out its closing animation). */
-async function closeMenu(page: Page, testId: string): Promise<void> {
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId(`${testId}-menu`)).toHaveCount(0);
-}
 const panelKey = (page: Page) => page.getByTestId("side-panel").getAttribute("data-panel-key");
 
 // The index's rows (order, kinds, status sentences, pills, setup links, ages, no hover actions), the

@@ -1,11 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
 });
-
-const toast = (page: Page, title: string) => page.locator("[data-sonner-toast]").filter({ has: page.locator("[data-title]", { hasText: title }) });
 
 /** The thread on code-foundry's main worktree: git commands take their worktree from the selection. */
 async function selectMainWorktree(page: Page): Promise<void> {
