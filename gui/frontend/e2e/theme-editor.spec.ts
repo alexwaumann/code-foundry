@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockUrl, openApp, resetMock } from "./fixtures";
+import { openApp, resetMock } from "./fixtures";
 
 // The theme editor on the Themes page (docs/notes/theme-editor.md). The mock seeds Ocean
 // Dusk (dark, from Catppuccin Mocha, one pin: --cf-sidebar-row-selected #1e2e3c); the
@@ -12,26 +12,8 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-async function raw(key: string): Promise<string | undefined> {
-  const res = await fetch(`${mockUrl}/__mock/settings`);
-  return ((await res.json()) as { raw: Record<string, string> }).raw[key];
-}
-
-interface MockTheme {
-  id: string;
-  name: string;
-  base: { canvas: string };
-  overrides?: Record<string, string>;
-}
-
-async function mockTheme(id: string): Promise<MockTheme | undefined> {
-  const res = await fetch(`${mockUrl}/__mock/themes`);
-  return ((await res.json()) as { themes: MockTheme[] }).themes.find((t) => t.id === id);
-}
-
 const option = (page: Page, name: string) => page.getByTestId("themes-list").getByRole("option", { name, exact: true });
 const inspector = (page: Page) => page.getByTestId("theme-inspector");
-const scopeVar = (page: Page, name: string) => page.getByTestId("themes-page").locator('[data-testid="theme-scope"]').last().evaluate((el, n) => (el as HTMLElement).style.getPropertyValue(n), name);
 
 async function openThemes(page: Page) {
   await openApp(page);
@@ -60,87 +42,20 @@ async function setBase(page: Page, key: string, hex: string) {
   await expect(page.getByTestId("editor-slots")).toBeVisible();
 }
 
-test("edit, pin, go stale, drill in, save and apply, revert", async ({ page }) => {
+// The edit bar, the origin, the summary, the filter's count, pins going stale, the slot view and
+// Escape back to the list, Reset to derived, the save dialog (stale pins, Re-derive, use now), the
+// saved file and Revert: src/components/themes/ThemesPage.test.tsx ("a base colour repaints the scope…").
+test("Edit shows on hover; a base edit saved and applied paints the window's computed --cf-canvas", async ({ page }) => {
   await editOceanDusk(page);
-  await expect(page.getByTestId("themes-edit-bar")).toContainText("Editing Ocean Dusk · from Catppuccin Mocha");
-  await expect(option(page, "Ocean Dusk").getByTestId("theme-origin")).toHaveText("editing · 1 pinned");
-  await expect(page.getByTestId("editor-slots-summary")).toHaveText("1 pinned");
-  // Every slot, Terminal and Syntax collapsed.
-  await expect(page.getByTestId("editor-filter")).toHaveAttribute("placeholder", "Filter 103 slots");
-  await expect(page.getByTestId("editor-group-terminal").getByTestId("editor-slot-terminal-fg")).toHaveCount(0);
-  await expect(page.getByTestId("editor-slot-sidebar-row-selected")).toHaveAttribute("data-pinned", "true");
-
-  // A base colour: the gallery repaints, the window does not.
-  await setBase(page, "canvas", "#202830");
-  expect(await scopeVar(page, "--cf-canvas")).toBe("#202830");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "github-dark");
-  // The seed pin keeps its value; its slot derives from the canvas, so it is stale now.
-  await expect(page.getByTestId("editor-slot-sidebar-row-selected")).toHaveAttribute("data-stale", "true");
-  await expect(page.getByTestId("editor-slots-summary")).toContainText("1 pinned · 1 stale");
-
-  // Pin a slot: touching its colour pins it.
-  await page.getByTestId("editor-slot-sidebar-row-hover").click();
-  await expect(page.getByTestId("slot-view")).toHaveAttribute("data-slot", "--cf-sidebar-row-hover");
-  await expect(page.getByTestId("slot-view")).toContainText("Change the colour below to pin it.");
-  await page.getByTestId("colour-hex").fill("#334455");
-  await page.getByTestId("colour-hex").press("Enter");
-  await expect(page.getByTestId("slot-view-yours")).toContainText("#334455");
-  await expect(page.getByTestId("slot-view-derived")).toBeVisible();
-  expect(await scopeVar(page, "--cf-sidebar-row-hover")).toBe("#334455");
-  // Escape goes back to the list (the page stays open).
-  await page.getByTestId("colour-plane").focus();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("editor-slots")).toBeVisible();
-  await expect(page.getByTestId("themes-page")).toBeVisible();
-  await expect(page.getByTestId("editor-slot-sidebar-row-hover")).toHaveAttribute("data-pinned", "true");
-  await expect(page.getByTestId("editor-slot-sidebar-row-hover")).not.toHaveAttribute("data-stale", "true");
-
-  // Another base change: the new pin goes stale too.
   await setBase(page, "canvas", "#2a3440");
-  await expect(page.getByTestId("editor-slots-summary")).toContainText("2 pinned · 2 stale");
-  await expect(page.getByTestId("editor-slot-sidebar-row-hover")).toContainText("pinned · would now derive #");
-
-  // The slot view says why and offers Reset to derived.
-  await page.getByTestId("editor-slot-sidebar-row-hover").click();
-  await expect(page.getByTestId("slot-view-stale")).toContainText("it would now derive #");
-  await expect(page.getByTestId("editor-pairs")).toContainText("sidebar-muted-foreground on it");
-  await page.getByTestId("slot-reset").click();
-  await expect(page.getByTestId("slot-view-stale")).toHaveCount(0);
-  await page.getByTestId("editor-back").click();
-  await expect(page.getByTestId("editor-slots-summary")).toContainText("2 pinned · 1 stale");
-
-  // Pinned only.
-  await page.getByTestId("editor-pinned-only").click();
-  await expect(page.getByTestId("editor-slots").locator("[data-testid^=editor-slot-]")).toHaveCount(2);
-  await page.getByTestId("editor-pinned-only").click();
-
-  // Save: the stale pin is listed; Re-derive unpins it; "use now" is checked (dark is in use).
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "github-dark");
   await page.getByTestId("themes-save").click();
   const dialog = page.getByTestId("theme-save-dialog");
-  await expect(dialog).toContainText("From Catppuccin Mocha · dark · 2 slots pinned");
-  await expect(dialog.getByTestId("theme-save-stale")).toContainText("sidebar-row-selected pinned before the base changed");
-  await dialog.getByTestId("theme-save-rederive").click();
-  await expect(dialog).toContainText("1 slot pinned");
-  await expect(dialog.getByTestId("theme-save-apply")).toHaveAttribute("aria-checked", "true");
-  await dialog.getByTestId("theme-save-name").fill("Ocean Dusk, deeper");
   await expect(dialog.getByTestId("theme-save-submit")).toHaveText("Save and apply");
   await dialog.getByTestId("theme-save-submit").click();
   await expect(dialog).toHaveCount(0);
-  await expect.poll(() => raw("appearance.theme_dark")).toBe("ocean-dusk");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "ocean-dusk");
-  const saved = await mockTheme("ocean-dusk");
-  expect(saved?.name).toBe("Ocean Dusk, deeper");
-  expect(saved?.base.canvas).toBe("#2a3440");
-  expect(Object.keys(saved?.overrides ?? {})).toEqual(["--cf-sidebar-row-hover"]);
   expect(await page.locator("html").evaluate((el) => getComputedStyle(el).getPropertyValue("--cf-canvas").trim())).toBe("#2a3440");
-  await expect(page.getByTestId("themes-revert")).toBeDisabled();
-
-  // Revert goes back to what was saved.
-  await setBase(page, "canvas", "#101418");
-  await expect(page.getByTestId("themes-edit-bar")).toContainText("unsaved");
-  await page.getByTestId("themes-revert").click();
-  expect(await scopeVar(page, "--cf-canvas")).toBe("#2a3440");
-  await expect(page.getByTestId("themes-revert")).toBeDisabled();
 });
 
 // Customise opening the editor on the copy, and leaving with changes: unit-tested in src/components/themes/ThemesPage.test.tsx.

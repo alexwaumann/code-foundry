@@ -574,6 +574,33 @@ describe("the editor", { timeout: 30_000 }, () => {
     expect(useViewsStore.getState().themesOpen).toBe(false);
   });
 
+  it("focus follows the views: the first row on open, arrows walk the rows, Enter opens the hex field, Escape comes back; ↓ from the filter", async () => {
+    await editOceanDusk();
+    const focused = () => document.activeElement?.getAttribute("data-testid");
+    await waitFor(() => {
+      expect(focused()).toBe("editor-base-canvas");
+    });
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowDown" });
+    expect(focused()).toBe("editor-base-surface");
+    // Enter on the row button is its click (the browser's activation; jsdom does not make it).
+    fireEvent.click(document.activeElement as HTMLElement);
+    await waitFor(() => {
+      expect(screen.getByTestId("base-view").dataset.base).toBe("surface");
+    });
+    await waitFor(() => {
+      expect(focused()).toBe("colour-hex");
+    });
+    fireEvent.keyDown(hex(), { key: "Escape" });
+    await waitFor(() => {
+      expect(focused()).toBe("editor-base-surface");
+    });
+    expect(screen.getByTestId("editor-slots")).toBeTruthy();
+    const filter = screen.getByTestId("editor-filter");
+    fireEvent.change(filter, { target: { value: "sidebar-row" } });
+    fireEvent.keyDown(filter, { key: "ArrowDown" });
+    expect(focused()).toMatch(/^editor-slot-sidebar-row/);
+  });
+
   it("in the editor the list's arrows stay put, and its footer says what Escape does", async () => {
     await editOceanDusk();
     expect(screen.getByTestId("themes-keys").textContent).toBe("esc close the editor");
@@ -612,6 +639,11 @@ describe("the editor", { timeout: 30_000 }, () => {
     await editOceanDusk();
     expect(screen.getByTestId("themes-edit-bar").textContent).toContain("Editing Ocean Dusk · from Catppuccin Mocha");
     expect(within(option("Ocean Dusk")).getByTestId("theme-origin").textContent).toBe("editing · 1 pinned");
+    expect(screen.getByTestId("editor-slots-summary").textContent).toBe("1 pinned");
+    // Every slot, Terminal and Syntax collapsed; the seed's pin marked.
+    expect(screen.getByTestId("editor-filter").getAttribute("placeholder")).toBe("Filter 103 slots");
+    expect(within(screen.getByTestId("editor-group-terminal")).queryByTestId("editor-slot-terminal-fg")).toBeNull();
+    expect(screen.getByTestId("editor-slot-sidebar-row-selected").dataset.pinned).toBe("true");
     setBase("canvas", "#202830");
     expect(scopeVar("--cf-canvas")).toBe("#202830");
     expect(themeSlots().dark).toBe("github-dark");
@@ -626,7 +658,10 @@ describe("the editor", { timeout: 30_000 }, () => {
     expect(screen.getByTestId("slot-view-yours").textContent).toContain("#334455");
     expect(screen.getByTestId("slot-view-derived")).toBeTruthy();
     expect(scopeVar("--cf-sidebar-row-hover")).toBe("#334455");
-    fireEvent.click(screen.getByTestId("editor-back"));
+    // Escape goes back to the list; the page stays open.
+    fireEvent.keyDown(screen.getByTestId("colour-plane"), { key: "Escape" });
+    expect(screen.getByTestId("editor-slots")).toBeTruthy();
+    expect(useViewsStore.getState().themesOpen).toBe(true);
     expect(screen.getByTestId("editor-slot-sidebar-row-hover").dataset.pinned).toBe("true");
     expect(screen.getByTestId("editor-slot-sidebar-row-hover").dataset.stale).toBeUndefined();
 
