@@ -20,6 +20,7 @@ import { bridgeCommands } from "./bridgeCommands";
 import { cloneExists } from "./clone";
 import { folderInfo, HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
+import { renameCommands } from "./projectRename";
 import { Hub } from "./hub";
 import { contextWindow, MockSettings, MODEL_VALUES } from "./settings";
 import { MockBackdrops } from "./backdrops";
@@ -3521,6 +3522,19 @@ export class World {
   }
 
   /** ProjectService.Publish succeeded: origin on GitHub, main tracking origin/main. */
+  /** Every project's id, name and folder (mock/projectRename.ts). */
+  projectList(): { id: string; name: string; path: string }[] {
+    return [...this.projects.values()].map((r) => ({ id: r.id, name: r.name, path: r.path }));
+  }
+
+  /** project.rename (mock/projectRename.ts): only the name changes. */
+  setProjectName(id: string, name: string): void {
+    const project = this.projects.get(id);
+    if (!project) return;
+    project.name = name;
+    this.projectEvents.publish({ event: { case: "projectUpdated", value: this.projectMsg(project) } });
+  }
+
   setOrigin(id: string, slug: string): void {
     const project = this.projects.get(id);
     if (!project) return;
@@ -4541,6 +4555,7 @@ export class World {
       ...this.gh.prDetails.commands(),
       ...this.prThreadCommands(),
       ...projectCommands(this),
+      ...renameCommands(this),
       {
         cmd: { name: "view.settings", title: "Settings", category: "View", description: "Show the settings page, or close it where it already shows", keybindings: ["cmd+,"], args: [] },
         when: always,

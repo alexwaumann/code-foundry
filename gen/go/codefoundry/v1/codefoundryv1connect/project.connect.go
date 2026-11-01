@@ -71,6 +71,8 @@ const (
 	ProjectServiceListRefsProcedure = "/codefoundry.v1.ProjectService/ListRefs"
 	// ProjectServiceInitGitProcedure is the fully-qualified name of the ProjectService's InitGit RPC.
 	ProjectServiceInitGitProcedure = "/codefoundry.v1.ProjectService/InitGit"
+	// ProjectServiceRenameProcedure is the fully-qualified name of the ProjectService's Rename RPC.
+	ProjectServiceRenameProcedure = "/codefoundry.v1.ProjectService/Rename"
 	// ProjectServiceSearchGitHubProcedure is the fully-qualified name of the ProjectService's
 	// SearchGitHub RPC.
 	ProjectServiceSearchGitHubProcedure = "/codefoundry.v1.ProjectService/SearchGitHub"
@@ -152,6 +154,13 @@ type ProjectServiceClient interface {
 	// <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
 	// FailedPrecondition when the project is already a git repository.
 	InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error)
+	// Rename sets a project's display name (registration names it after its folder).
+	// Nothing on disk changes: the folder, worktree paths and branches stay. The name is
+	// trimmed and NFC-normalised; InvalidArgument for an empty one, one over 100 bytes or
+	// with a control character or "/", "workspace" (the primary keyword) or another
+	// project's id; FailedPrecondition when another project has the name (any case), as
+	// project refs resolve a name only when exactly one project has it.
+	Rename(context.Context, *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error)
 	// SearchGitHub searches github.com repositories with GitHub's search syntax and
 	// returns the first 20 matches, best match first. The Add Project dialog sends it on
 	// Enter, never per keystroke. InvalidArgument for an empty query.
@@ -291,6 +300,12 @@ func NewProjectServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(projectServiceMethods.ByName("InitGit")),
 			connect.WithClientOptions(opts...),
 		),
+		rename: connect.NewClient[v1.RenameProjectRequest, v1.RenameProjectResponse](
+			httpClient,
+			baseURL+ProjectServiceRenameProcedure,
+			connect.WithSchema(projectServiceMethods.ByName("Rename")),
+			connect.WithClientOptions(opts...),
+		),
 		searchGitHub: connect.NewClient[v1.SearchGitHubRequest, v1.SearchGitHubResponse](
 			httpClient,
 			baseURL+ProjectServiceSearchGitHubProcedure,
@@ -353,6 +368,7 @@ type projectServiceClient struct {
 	getWorktreeFileDiff *connect.Client[v1.GetWorktreeFileDiffRequest, v1.GetWorktreeFileDiffResponse]
 	listRefs            *connect.Client[v1.ListRefsRequest, v1.ListRefsResponse]
 	initGit             *connect.Client[v1.InitGitRequest, v1.InitGitResponse]
+	rename              *connect.Client[v1.RenameProjectRequest, v1.RenameProjectResponse]
 	searchGitHub        *connect.Client[v1.SearchGitHubRequest, v1.SearchGitHubResponse]
 	lookupGitHub        *connect.Client[v1.LookupGitHubRequest, v1.LookupGitHubResponse]
 	clone               *connect.Client[v1.CloneProjectRequest, v1.CloneProjectEvent]
@@ -435,6 +451,11 @@ func (c *projectServiceClient) ListRefs(ctx context.Context, req *connect.Reques
 // InitGit calls codefoundry.v1.ProjectService.InitGit.
 func (c *projectServiceClient) InitGit(ctx context.Context, req *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
 	return c.initGit.CallUnary(ctx, req)
+}
+
+// Rename calls codefoundry.v1.ProjectService.Rename.
+func (c *projectServiceClient) Rename(ctx context.Context, req *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error) {
+	return c.rename.CallUnary(ctx, req)
 }
 
 // SearchGitHub calls codefoundry.v1.ProjectService.SearchGitHub.
@@ -534,6 +555,13 @@ type ProjectServiceHandler interface {
 	// <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
 	// FailedPrecondition when the project is already a git repository.
 	InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error)
+	// Rename sets a project's display name (registration names it after its folder).
+	// Nothing on disk changes: the folder, worktree paths and branches stay. The name is
+	// trimmed and NFC-normalised; InvalidArgument for an empty one, one over 100 bytes or
+	// with a control character or "/", "workspace" (the primary keyword) or another
+	// project's id; FailedPrecondition when another project has the name (any case), as
+	// project refs resolve a name only when exactly one project has it.
+	Rename(context.Context, *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error)
 	// SearchGitHub searches github.com repositories with GitHub's search syntax and
 	// returns the first 20 matches, best match first. The Add Project dialog sends it on
 	// Enter, never per keystroke. InvalidArgument for an empty query.
@@ -669,6 +697,12 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 		connect.WithSchema(projectServiceMethods.ByName("InitGit")),
 		connect.WithHandlerOptions(opts...),
 	)
+	projectServiceRenameHandler := connect.NewUnaryHandler(
+		ProjectServiceRenameProcedure,
+		svc.Rename,
+		connect.WithSchema(projectServiceMethods.ByName("Rename")),
+		connect.WithHandlerOptions(opts...),
+	)
 	projectServiceSearchGitHubHandler := connect.NewUnaryHandler(
 		ProjectServiceSearchGitHubProcedure,
 		svc.SearchGitHub,
@@ -743,6 +777,8 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 			projectServiceListRefsHandler.ServeHTTP(w, r)
 		case ProjectServiceInitGitProcedure:
 			projectServiceInitGitHandler.ServeHTTP(w, r)
+		case ProjectServiceRenameProcedure:
+			projectServiceRenameHandler.ServeHTTP(w, r)
 		case ProjectServiceSearchGitHubProcedure:
 			projectServiceSearchGitHubHandler.ServeHTTP(w, r)
 		case ProjectServiceLookupGitHubProcedure:
@@ -824,6 +860,10 @@ func (UnimplementedProjectServiceHandler) ListRefs(context.Context, *connect.Req
 
 func (UnimplementedProjectServiceHandler) InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.InitGit is not implemented"))
+}
+
+func (UnimplementedProjectServiceHandler) Rename(context.Context, *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.Rename is not implemented"))
 }
 
 func (UnimplementedProjectServiceHandler) SearchGitHub(context.Context, *connect.Request[v1.SearchGitHubRequest]) (*connect.Response[v1.SearchGitHubResponse], error) {

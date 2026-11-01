@@ -260,6 +260,7 @@ import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
+import { renameProjectIn } from "./projectRename";
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
@@ -397,6 +398,12 @@ function routes(router: ConnectRouter): void {
     refresh: () => ({}),
     listRefs: (req) => guard(() => world.listRefs(req.projectId)),
     initGit: (req) => guard(() => ({ project: world.projectMsg(world.initGit(req.id)) })),
+    rename: (req) =>
+      guard(() => {
+        const project = world.projects.get(renameProjectIn(world, req.id, req.name).id);
+        if (!project) throw new ConnectError("renamed project vanished", Code.Internal);
+        return { project: world.projectMsg(project) };
+      }),
     // The Add Project dialog's GitHub tab (mock/clone.ts).
     searchGitHub: (req) => searchGitHub(req.query),
     lookupGitHub: (req) => lookupGitHub(req.owner, req.name),
