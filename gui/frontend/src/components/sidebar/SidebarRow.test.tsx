@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { DashboardView, PullRequestDetailView, PullRequestView } from "@/api/gh";
 import type { ThreadView } from "@/api/threads";
 
@@ -346,6 +346,43 @@ describe("SidebarRow hover actions", () => {
     fireEvent.click(presets[0] as HTMLElement);
     expect(snoozeThread).toHaveBeenCalledWith("s-1", expect.any(Number));
     expect(onActivate).not.toHaveBeenCalled();
+  });
+
+  it("the snooze menu never opens the row's card: not moving over it, nor focus coming back as it closes", () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    useThreadsStore.setState({ byId: { "s-1": thread({}) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+      </TooltipProvider>,
+    );
+    // Radix opens the card on a timer even at delay 0.
+    const cardOpen = () => {
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      return screen.queryAllByTestId("thread-tooltip").filter((e) => e.getAttribute("data-state") !== "closed").length;
+    };
+    const trigger = screen.getByTestId("row-snooze");
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.pointerUp(document, { pointerType: "mouse" });
+    fireEvent.click(trigger);
+    const menu = screen.getByTestId("row-snooze-menu");
+    const preset = screen.getAllByTestId("snooze-preset")[0] as HTMLElement;
+    // Off the snooze button into the menu, then along it: React bubbles both to the row.
+    fireEvent.pointerOver(menu, { pointerType: "mouse", relatedTarget: trigger });
+    fireEvent.pointerMove(preset, { pointerType: "mouse" });
+    expect(cardOpen()).toBe(0);
+    // Escape closes the menu and hands focus back to the snooze button.
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByTestId("row-snooze-menu")).toBeNull();
+    expect(cardOpen()).toBe(0);
+    // A move over the row itself still opens it.
+    fireEvent.pointerMove(screen.getByTestId("thread-name"), { pointerType: "mouse" });
+    expect(cardOpen()).toBe(1);
   });
 
   it("a snoozed or archived row has no hover actions", () => {

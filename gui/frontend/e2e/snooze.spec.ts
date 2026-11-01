@@ -333,3 +333,33 @@ test("the palette's Snooze opens the custom dialog for the selected thread", asy
   await page.getByTestId("snooze-dialog").getByTestId("snooze-submit").click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("3");
 });
+
+test("the hover snooze menu keeps the row's card shut, and clicking away leaves it shut", async ({ page }) => {
+  await openApp(page);
+  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+  const r = row(page, "s:s-3");
+  await r.hover();
+  await expect(tip).toBeVisible();
+  await r.getByTestId("row-snooze").click();
+  const menu = page.getByTestId("row-snooze-menu");
+  await expect(menu).toBeVisible();
+  await expect(tip).toHaveCount(0);
+  // Along the presets: the card stays shut the whole way.
+  for (const preset of await menu.getByTestId("snooze-preset").all()) {
+    await preset.hover();
+    await page.waitForTimeout(100);
+    await expect(tip).toHaveCount(0);
+  }
+  // Away from the menu and the row, then a click there closes the menu: still shut.
+  const main = await page.getByTestId("content-pane").boundingBox();
+  if (!main) throw new Error("no content pane");
+  await page.mouse.move(main.x + main.width / 2, main.y + main.height / 2);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(menu).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(tip).toHaveCount(0);
+  // Back over the row: it opens as usual.
+  await r.hover();
+  await expect(tip).toBeVisible();
+});
