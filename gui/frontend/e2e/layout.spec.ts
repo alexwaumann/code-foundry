@@ -32,6 +32,59 @@ const BAND = 56;
 const HEADER = 44;
 const CENTER = 34;
 
+test("the sidebar starts at 220, a width saved by an older build resets once, and a dragged width is kept", async ({ page }) => {
+  const width = async () => (await box(page, "sidebar")).width;
+  // A store saved before version 4, at the old 280 default dragged to 360.
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("seeded")) return;
+    sessionStorage.setItem("seeded", "1");
+    localStorage.setItem("code-foundry.ui", JSON.stringify({ state: { sidebarWidth: 360, workingCollapsed: true }, version: 3 }));
+  });
+  await openApp(page);
+  await expect.poll(width).toBe(220);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as unknown)).toMatchObject({ state: { sidebarWidth: 220, workingCollapsed: true }, version: 4 });
+
+  // Dragging the handle: the width persists across a reload, capped at the maximum.
+  const handle = page.getByRole("separator", { name: "Resize sidebar" });
+  const hb = await handle.boundingBox();
+  if (!hb) throw new Error("no handle");
+  const y = hb.y + hb.height / 2;
+  await page.mouse.move(hb.x + hb.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 + 90, y, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(width).toBe(310);
+  await page.reload();
+  await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
+  await expect.poll(width).toBe(310);
+  await page.mouse.move(310 + hb.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(1200, y, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(width).toBe(520);
+  await page.reload();
+  await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
+  await expect.poll(width).toBe(520);
+
+  // Double-click restores the 220 default.
+  await handle.dblclick();
+  await expect.poll(width).toBe(220);
+});
+
+/** SHOTS=<dir>: the PR's screenshots of the 220px default, WebKit, 1280x800, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`sidebar default screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.emulateMedia({ colorScheme: scheme });
+    await openApp(page);
+    await expect.poll(async () => (await box(page, "sidebar")).width).toBe(220);
+    await page.mouse.move(640, 400);
+    await page.screenshot({ path: `${String(shots)}/sidebar-220-${scheme}.png` });
+  });
+}
+
 test("the app name fits whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
   await openApp(page);
   const title = page.getByTestId("sidebar-app-name");

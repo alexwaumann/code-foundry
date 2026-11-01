@@ -13,3 +13,7 @@
 - `migrate` now reads the persisted value through `persistedRecord`, so a non-record never
   reaches the destructure.
 - e2e specs that hard-coded the 280px sidebar in layout arithmetic were updated.
+- e2e (`layout.spec.ts`): a v3 store with 360 loads at 220 and is rewritten at v4; a drag
+  persists across reloads, capped at 520; double-click restores 220. Font size is not a
+  usable witness field there: the daemon's `appearance.font_size` overwrites it on load.
+- SHOTS=<dir> on `layout.spec.ts` writes `sidebar-220-{dark,light}.png` for the PR.
