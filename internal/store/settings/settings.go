@@ -64,14 +64,14 @@ type Ember struct {
 
 // Threads are defaults for new Claude Code sessions.
 type Threads struct {
-	DefaultModel    string // default model.Default
-	DefaultEffort   string // default "medium"
-	DefaultWorktree string // WorktreeNew or WorktreeCurrent; read by the GUI's composer only
-	AutoName        bool
-	NamingModel     string // default model.NamingDefault; the effort is always low
-	CacheTTLSeconds int    // the API's prompt cache lifetime; default 3600
-	CloseGraceSeconds  int
-	ScrollbackLines    int
+	DefaultModel      string // default model.Default
+	DefaultEffort     string // default "medium"
+	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer only
+	AutoName          bool
+	NamingModel       string // default model.NamingDefault; the effort is always low
+	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600
+	CloseGraceSeconds int
+	ScrollbackLines   int
 }
 
 // GitHub configures the gh poller.

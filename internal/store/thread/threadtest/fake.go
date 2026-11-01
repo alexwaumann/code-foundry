@@ -24,7 +24,7 @@ type Fake struct {
 	// Now is the clock used for CreatedAt.
 	Now func() time.Time
 	// Err, when set, is returned by every mutating method.
-	Err error
+	Err     error
 	mu      sync.Mutex
 	next    int
 	staged  int
