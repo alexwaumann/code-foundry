@@ -30,7 +30,11 @@ import {
 import { Tip } from "@/components/ui/tooltip";
 import { envStaleTip } from "@/lib/envStale";
 import { ownMovedText } from "@/lib/placementCandidates";
-import { chooseAction, moreProjects } from "@/lib/threadInfo";
+import {
+  chooseAction,
+  moreProjects,
+  type ActionChoice,
+} from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
 import { openActionEditor } from "@/stores/actionDialog";
 import { useAction, useActionsStore } from "@/stores/actions";
@@ -594,10 +598,22 @@ function AddActionItems({ members }: { members: readonly string[] }) {
 function ActionRow({ threadId }: { threadId: string }) {
   const { cwdProjectId, members } = useMembers(threadId);
   const { withActions, picks } = useActionPicks(threadId, members);
-  const choice = useMemo(
+  const fresh = useMemo(
     () => (picks ? chooseAction(picks, cwdProjectId) : null),
     [picks, cwdProjectId],
   );
+  // The picks are re-read after every run (their key carries the newest run), and are null
+  // while that read is in flight. Keep showing the last choice meanwhile: switching to the
+  // "Actions" row and back would remount the row, flash, and drop its keyboard focus.
+  const [kept, setKept] = useState<{
+    threadId: string;
+    choice: ActionChoice;
+  } | null>(null);
+  if (fresh && (kept?.choice !== fresh || kept.threadId !== threadId))
+    setKept({ threadId, choice: fresh });
+  const choice =
+    fresh ??
+    (picks === null && kept?.threadId === threadId ? kept.choice : null);
   const byProject = useActionsStore(
     useShallow((s) =>
       withActions.map((id) => (s.byProject[id] ?? []).join(",")),
@@ -629,7 +645,11 @@ function ActionRow({ threadId }: { threadId: string }) {
     return (
       <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
-          <Row icon={<Plus />} testId="ti-add-action-row">
+          <Row
+            icon={<Plus />}
+            chevron={open ? "open" : "closed"}
+            testId="ti-add-action-row"
+          >
             <span className="text-cf-text-muted">Add action</span>
           </Row>
         </DropdownMenuTrigger>
