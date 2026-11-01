@@ -35,15 +35,4 @@ test("a git op shows a progress toast, then its result (no duplicate command toa
 // A failure's output toggle and close button, CLI-started ops and a created PR's Open: unit-tested
 // in src/components/gitops/GitOpToast.test.tsx (the duplicate command toast in src/stores/commands.test.ts).
 
-test("a second op on the same worktree shows as waiting", async ({ page }) => {
-  await mockPost("gitops?delay=1500");
-  await selectMainWorktree(page);
-  await page.keyboard.press("Meta+Shift+f"); // git.fetch
-  await expect(toast(page, "Fetch main").first().getByTestId("gitop-toast")).toHaveAttribute("data-state", "running");
-  await page.keyboard.press("Meta+Shift+u"); // git.pull, queued behind the fetch
-  const pull = toast(page, "Pull main");
-  await expect(pull.getByTestId("gitop-toast")).toHaveAttribute("data-state", "queued");
-  await expect(pull).toContainText("waiting for the previous operation");
-  await expect(pull.getByTestId("gitop-toast")).toHaveAttribute("data-state", "running");
-  await expect(pull.getByTestId("gitop-summary")).toHaveText(/fast-forwarded/);
-});
+// A second op on the same worktree waiting, then running: src/components/gitops/GitOpToast.test.tsx ("a second op waiting on the worktree says so, then runs"); the queueing itself is the daemon's.
