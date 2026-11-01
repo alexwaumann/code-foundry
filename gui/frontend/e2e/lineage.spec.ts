@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { expectAttention, expectTooltip, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { expectAttention, expectTooltip, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Thread lineage in the GUI (docs/notes/agents-3-lineage-gui.md) over the mock's
@@ -122,27 +121,7 @@ test.describe("lineage", () => {
     await expect(header(page).getByTestId("thread-title")).toHaveText("Fix login redirect");
   });
 
-  test("timeline: a wake message is a collapsed Woken by note that expands to its payload", async ({ page }) => {
-    await openApp(page);
-    await open(page, P);
-    const note = page.getByTestId("thread-wake-note");
-    await expect(note).toBeVisible();
-    await expect(note.getByTestId("thread-wake-note-link")).toHaveText("Add retry to login redirect");
-    await expect(note.getByTestId("thread-wake-note-detail")).toHaveText(": idle, finished");
-    await expect(note.getByTestId("thread-wake-note-summary")).toHaveText("Retry added around exchangeToken, 3 attempts; PR opened");
-    await expect(note.locator("svg.t-emerald")).toHaveCount(1);
-    // Not a bubble: the wake text with its fenced block is not shown.
-    await expect(page.getByTestId("thread-pane")).not.toContainText("[code-foundry wake]");
-    await expect(note.getByTestId("thread-wake-note-body")).toHaveCount(0);
-    await note.getByTestId("thread-wake-note-line").click();
-    await expect(note.getByTestId("thread-wake-note-body").locator("pre")).toContainText('"subscription_id": "sub-l-1"');
-    await expect(note.getByTestId("thread-wake-note-body").locator("pre")).toContainText('"pr": 412');
-    await note.getByTestId("thread-wake-note-line").click();
-    await expect(note.getByTestId("thread-wake-note-body")).toHaveCount(0);
-    // The name opens the thread that woke it.
-    await note.getByTestId("thread-wake-note-link").click();
-    await expect(header(page).getByTestId("thread-title")).toHaveText("Add retry to login redirect");
-  });
+  // Timeline: a wake message as a collapsed Woken by note that expands to its payload and collapses again, its link selecting the thread: src/components/thread/lineageRows.test.tsx ("a wake message: …").
 
   test("header: a removed creator leaves an inert crumb segment saying so, with the recorded name; the orphan joins the sidebar", async ({ page }) => {
     await openApp(page);
@@ -170,26 +149,6 @@ test.describe("lineage", () => {
 });
 
 test.describe("child threads", () => {
-  async function invoke(name: string, args: Record<string, string>, context: Record<string, string> | null = null, confirmed = true): Promise<{ message?: string }> {
-    const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-      body: JSON.stringify({ name, args, ...(context ? { context } : {}), confirmed }),
-    });
-    expect(res.ok, await res.clone().text()).toBe(true);
-    return (await res.json()) as { message?: string };
-  }
-
-  async function archivedIds(): Promise<string[]> {
-    const res = await fetch(`${mockUrl}/codefoundry.v1.ThreadService/List`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-      body: "{}",
-    });
-    const { threads } = (await res.json()) as { threads: { id: string; archivedAt?: string }[] };
-    return threads.filter((t) => t.archivedAt).map((t) => t.id);
-  }
-
   test("are not in the attention count while their creator exists; orphaned, the waiting ones count", async ({ page }) => {
     await openApp(page);
     await expect(row(page, `s:${P}`)).toBeVisible();
@@ -279,38 +238,9 @@ test.describe("child threads", () => {
     await expect(rowMenu).not.toContainText("sidebar");
   });
 
-  test("a thread an agent creates does not take the view", async ({ page }) => {
-    await openApp(page);
-    await open(page, "s-3");
-    const title = header(page).getByTestId("thread-title");
-    await expect(title).not.toHaveText("");
-    const before = await title.textContent();
-    const made = await invoke("thread.new", { project: "repo-cf", "created-by": P, name: "Quiet worker", prompt: "work quietly" }, { activeProjectId: "repo-cf" });
-    expect(made.message).toMatch(/^created thread s-new-\d+ in /);
-    const id = /s-new-\d+/.exec(made.message ?? "")?.[0] ?? "";
-    // Give the intent time to land, then check nothing moved.
-    await page.waitForTimeout(500);
-    await expect(title).toHaveText(String(before));
-    await expect(row(page, `s:${id}`)).toHaveCount(0);
-  });
+  // A thread an agent creates not taking the view: src/lib/inSidebar.test.ts (threadFocus "a new created thread") and src/stores/intents.test.ts ("a new child (its creator exists)").
 
-  test("archiving the creator asks (its working children counted), then archives every child with it", async ({ page }) => {
-    await openApp(page);
-    await open(page, P);
-    await header(page).getByTestId("thread-title").click();
-    await page.getByTestId("thread-title-menu").getByTestId("menu-archive").click();
-    const dialog = page.getByTestId("confirm-dialog");
-    await expect(dialog).toContainText(
-      "Archive thread Fix login redirect? Claude is still working; archiving ends the turn. 2 child threads are still working; archiving ends their turns and archives them too.",
-    );
-    await page.getByTestId("confirm-ok").click();
-    await expect(dialog).toHaveCount(0);
-    await expect.poll(async () => (await archivedIds()).sort()).toEqual([P, ...ALL, "s-7"].sort());
-    // Under Archived: P only (its children stay out there too).
-    await page.getByTestId("archived-header").click();
-    await expect(row(page, `s:${P}`)).toHaveAttribute("data-section", "archived");
-    for (const id of ALL) await expect(row(page, `s:${id}`)).toHaveCount(0);
-  });
+  // Archiving the creator asking (its working children counted) and archiving them with it: the daemon's (internal/command/commands_thread_cascade_test.go); only the creator under Archived: src/lib/inSidebar.test.ts.
 });
 
 /** SHOTS=<dir>: the notes' screenshots, WebKit, 1440x900, dark and light. */
