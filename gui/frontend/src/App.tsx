@@ -37,7 +37,6 @@ import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { usePanelExpanded } from "@/stores/panel";
-import { useShowCreatedThreads } from "@/stores/settings";
 import { useAttentionCount } from "@/stores/threads";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, HOME, useUiStore, type FocusRegion } from "@/stores/ui";
@@ -203,7 +202,7 @@ export function App() {
   // Settings, Themes and Usage are modal sheets over the window (SettingsSheet,
   // UsageSheet), which stays laid out under them: no page replaces the content pane.
   const panelExpanded = usePanelExpanded();
-  useWindowTitle(useAttentionCount(useShowCreatedThreads()));
+  useWindowTitle(useAttentionCount());
 
   return (
     // The sheet: one background under the sidebar. The content area is a pane floating

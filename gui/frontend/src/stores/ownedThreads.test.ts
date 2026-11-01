@@ -18,8 +18,8 @@ describe("owned threads", () => {
     expect(Object.keys(d.byId).sort()).toEqual(["s-busy", "s-mine", "s-plugin"]);
     expect(d.order).toEqual(["s-mine"]);
     expect(d.owned).toEqual(["s-plugin", "s-busy"]);
-    expect(attentionIds(d, false)).toEqual([]);
-    expect(runningCount(d, false)).toBe(0);
+    expect(attentionIds(d)).toEqual([]);
+    expect(runningCount(d)).toBe(0);
     expect(isOwned(plugin)).toBe(true);
     expect(isOwned(mine)).toBe(false);
   });
@@ -31,8 +31,8 @@ describe("owned threads", () => {
     const d = replaceThreads(emptyThreads, [mine, ember, working]);
     expect(d.order).toEqual(["s-mine"]);
     expect(d.owned).toEqual(["s-ember", "s-ember-busy"]);
-    expect(attentionIds(d, true)).toEqual([]);
-    expect(runningCount(d, true)).toBe(0);
+    expect(attentionIds(d)).toEqual([]);
+    expect(runningCount(d)).toBe(0);
     expect(isOwned(ember)).toBe(true);
   });
 

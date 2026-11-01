@@ -44,7 +44,13 @@ for (const [scenario, icon, place, title] of [
 }
 
 test("a child's crumb names its parent, which opens on a click", async ({ page }) => {
-  await open(page, "child");
+  // A child has no sidebar row: open it from its parent's thread info card.
+  await mockPost("thread-info?scenario=child");
+  await openApp(page);
+  await row(page, "s:s-ti-1").click();
+  await page.getByTestId("thread-info-toggle").click();
+  await page.getByTestId("thread-info-card").locator('[data-testid="ti-lineage-row"][data-id="s-ti-child"]').click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-ti-child");
   const h = header(page);
   await expect(h.getByTestId("thread-crumb-place")).toHaveText("code-foundry");
   await expect(h.getByTestId("thread-crumb-parent")).toHaveText("Fix the stale PR badge");

@@ -29,11 +29,11 @@
  *   POST /__mock/resident                         (the resident thread s-resident-ember, "Ember": kind
  *        RESIDENT, epoch 2, stopped; hidden from the sidebar and counts; World.addResident)
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
- *        six siblings, one archived, one shown by its override (s-l-logs), and a child of
- *        its own; the others hidden while threads.show_created_threads is off; World.addLineage)
+ *        six siblings, one archived, and a child of its own; every child out of the
+ *        sidebar while its creator exists; World.addLineage)
  *   POST /__mock/live-count                       (the sidebar's live count: a working thread with background
- *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead
- *        shown by its override, one waiting on a shell alone; World.addLiveCount)
+ *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead,
+ *        one waiting on a shell alone; World.addLiveCount)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
  *   POST /__mock/thread/envstale?id=s-1&change=Hello%20removed%20CF_HELLO   (a plugin's environment changed
  *     since the running process started: Thread.plugin_env_stale; an empty change clears it)
@@ -43,9 +43,9 @@
  *     one exchange, its transcript deleted; MOCK_SCENARIO=transcript-deleted seeds it; World.addTranscriptDeleted)
  *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives;
- *                                                 hidden children go along: World.archiveCascade)
- *   POST /__mock/thread/sidebar?id=s-l-child[&shown=false]   (thread.sidebar as the CLI does it: the
- *                                                 override on a thread another thread created)
+ *                                                 child threads go along: World.archiveCascade)
+ *   POST /__mock/thread/forget?id=s-l-parent      (forgets that one thread, no cascade: its children's
+ *                                                 creator no longer exists, so they join the sidebar)
  *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true]   (thread.snooze as the CLI's
  *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
  *   POST /__mock/thread/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
@@ -985,7 +985,7 @@ const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idl
 const flagLevels: Record<string, ThreadFlagLevel | null> = { attention: ThreadFlagLevel.ATTENTION, error: ThreadFlagLevel.ERROR, none: null };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale|transcript}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript}?id=…[&status=…][&reason=…&code=…].
  * transcript: [&missing=false] (Claude Code deleted the thread's transcript: stopped, held and flagged).
  * flag: &plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1] (a plugin's thread/setFlag).
  */
@@ -1019,9 +1019,11 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
       case "archive":
         world.archiveThread(id, q.get("archived") !== "false");
         break;
-      case "sidebar":
-        world.setThreadSidebar(id, q.get("shown") !== "false");
-        break;
+      case "forget":
+        world.forgetThread(id);
+        // Gone: no summary to answer with.
+        json(res, 200, { forgotten: id });
+        return;
       case "snooze":
         world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
         break;
@@ -1103,7 +1105,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale|transcript)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;

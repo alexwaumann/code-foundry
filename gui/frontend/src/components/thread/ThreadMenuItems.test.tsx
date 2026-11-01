@@ -6,9 +6,8 @@ import type { ThreadView } from "@/api/threads";
 const pinThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const archiveThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const snoozeThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-const setThreadSidebar = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const regenerateThreadName = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), pinThread, archiveThread, snoozeThread, setThreadSidebar, regenerateThreadName }));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), pinThread, archiveThread, snoozeThread, regenerateThreadName }));
 const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
 const openSnoozeDialog = vi.hoisted(() => vi.fn());
@@ -43,7 +42,6 @@ const thread = (o: Partial<ThreadView>) =>
     createdBy: "",
     createdByName: "",
     parentId: "",
-    inSidebar: null,
     flags: [],
     ...o,
   }) as ThreadView;
@@ -56,7 +54,7 @@ function setThread(o: Partial<ThreadView>, others: ThreadView[] = []): void {
 const PROJECT = (id: string) => ({ id, name: id, git: true, githubSlug: "", remotes: [], worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
 
 beforeEach(() => {
-  useCommandsStore.setState({ commands: [cmd("thread.snooze"), cmd("thread.archive"), cmd("thread.pin"), cmd("thread.sidebar"), cmd("thread.restart"), cmd("thread.flag.clear")] });
+  useCommandsStore.setState({ commands: [cmd("thread.snooze"), cmd("thread.archive"), cmd("thread.pin"), cmd("thread.restart"), cmd("thread.flag.clear")] });
   useProjectsStore.setState({ byId: { web: PROJECT("web"), api: PROJECT("api") } as never, order: ["web", "api"] });
   useWorkspacesStore.setState({ byId: {}, order: [] });
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
@@ -90,16 +88,16 @@ function entries(menu: HTMLElement): string[] {
 }
 
 describe("ThreadMenuItems: one list for the sidebar row and the title menu", () => {
-  it("in order: Rename, Regenerate name, Pin, Snooze; New thread on this branch, Save as workspace, Run in, Hide from sidebar; Archive", () => {
-    setThread({ projectIds: ["web", "api"], createdBy: "s-0", inSidebar: true }, [thread({ id: "s-0", name: "Parent" })]);
-    const want = ["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Save as workspace", "Run in", "Hide from sidebar", "—", "Archive"];
+  it("in order: Rename, Regenerate name, Pin, Snooze; New thread on this branch, Save as workspace, Run in; Archive (no sidebar item on a child)", () => {
+    setThread({ projectIds: ["web", "api"], createdBy: "s-0" }, [thread({ id: "s-0", name: "Parent" })]);
+    const want = ["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Save as workspace", "Run in", "—", "Archive"];
     expect(entries(openTitleMenu())).toEqual(want);
     cleanup();
     // The row adds what only it offers after the shared list.
     expect(entries(openRowMenu())).toEqual([...want, "—", "New terminal here", "Fork", "Remove"]);
   });
 
-  it("a one-project thread of the user's: no Save as workspace, Run in or sidebar item", () => {
+  it("a one-project thread of the user's: no Save as workspace or Run in", () => {
     setThread({});
     expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "—", "Archive"]);
   });
@@ -107,18 +105,6 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
   it("a thread without a project: no second group", () => {
     setThread({ projectId: "", projectIds: [], worktreePath: "/Users/me" });
     expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "Archive"]);
-  });
-
-  it("a hidden child: Show in sidebar, which shows it", () => {
-    setThread({ createdBy: "s-0", inSidebar: false });
-    fireEvent.click(within(openTitleMenu()).getByTestId("menu-sidebar-show"));
-    expect(setThreadSidebar).toHaveBeenCalledWith("s-1", true);
-  });
-
-  it("no sidebar item when the daemon does not list thread.sidebar", () => {
-    useCommandsStore.setState({ commands: useCommandsStore.getState().commands.filter((c) => c.name !== "thread.sidebar") });
-    setThread({ createdBy: "s-0", inSidebar: true });
-    expect(within(openTitleMenu()).queryByTestId("menu-sidebar-hide")).toBeNull();
   });
 
   it("Restart Claude only while the plugin environment changed; it runs thread.restart for the thread", () => {

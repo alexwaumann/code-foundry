@@ -799,10 +799,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md`,
   `docs/notes/sidebar-working-section.md`, `docs/notes/archive-threads-2-sidebar.md` and
   `docs/notes/snooze-threads-2-sidebar.md`; a thread another thread created is hidden
-  from every sidebar list, the keyboard order and the attention counts unless
-  `threads.show_created_threads` or its own override shows it, one rule in
-  `lib/inSidebar.ts`, and a hidden selected thread highlights its nearest shown
-  ancestor: `docs/notes/hidden-children-2-gui.md`; nothing in the GUI shows whether a thread's
+  from every sidebar list, the keyboard order and the attention counts while its creator
+  exists (no setting, no override; an orphan whose creator was removed is listed), one
+  rule in `lib/inSidebar.ts`, and a hidden selected thread highlights its nearest shown
+  ancestor: `docs/notes/no-sidebar-override-1-gui.md`; nothing in the GUI shows whether a thread's
   Claude runs: its composer always sends, starting looks like working, a stopped thread
   reads as its status: `docs/notes/hide-connection-state.md`), content (a thread's conversation, the Pull Requests
   page, the Projects view: an index of projects and workspaces by last activity that
