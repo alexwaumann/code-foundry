@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, openProjects, resetMock } from "./fixtures";
+import { invocations, mockPost, openApp, openProjects, resetMock } from "./fixtures";
 
 /**
  * The Projects index's right-click menus (docs/notes/projects-table-2-context-menus.md): the items per kind,
@@ -34,40 +34,7 @@ async function closeMenu(page: Page, menu: ReturnType<Page["getByTestId"]>) {
   await expect(menu).toHaveCount(0);
 }
 
-test("a project row's menu: its items per kind, text only, the cursor on the row, and the row stays on the index", async ({ page }) => {
-  await openApp(page);
-  await openProjects(page);
-  const want: [string, string[]][] = [
-    ["repo-cf", ["New thread", "New terminal", "Open in Finder", "—", "Rename", "Clean up merged worktrees 0", "—", "Remove project"]],
-    ["repo-dot", ["New thread", "New terminal", "Open in Finder", "—", "Rename", "Clean up merged worktrees 0", "—", "Remove project"]],
-    ["repo-sk", ["New thread", "New terminal", "Open in Finder", "—", "Rename", "Publish to GitHub", "—", "Remove project"]],
-    ["repo-wr", ["New thread", "New terminal", "Open in Finder", "—", "Rename", "Initialize git", "—", "Remove project"]],
-  ];
-  for (const [id, items] of want) {
-    await row(page, id).click({ button: "right" });
-    expect(await entries(projectMenu(page)), id).toEqual(items);
-    await expect(projectMenu(page).locator("svg")).toHaveCount(0);
-    await expect(row(page, id)).toHaveAttribute("aria-selected", "true");
-    await closeMenu(page, projectMenu(page));
-  }
-  // Nothing to clean up: disabled.
-  await row(page, "repo-cf").click({ button: "right" });
-  await expect(projectMenu(page).getByTestId("project-cleanup")).toHaveAttribute("data-disabled", "");
-  // Open in Finder reveals the main checkout; the index stays.
-  await projectMenu(page).getByTestId("project-menu-reveal").click();
-  expect((await lastInvocation("worktree.reveal"))?.args).toEqual({ worktree: CF });
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
-
-  // New terminal: a shell in the main checkout, in the page's bottom panel.
-  await row(page, "repo-cf").click({ button: "right" });
-  await projectMenu(page).getByTestId("project-menu-new-terminal").click();
-  expect((await lastInvocation("terminal.new"))?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: CF });
-
-  // New thread: the composer in the project.
-  await row(page, "repo-gp").click({ button: "right" });
-  await projectMenu(page).getByTestId("project-menu-new-thread").click();
-  await expect(page.getByTestId("composer")).toBeVisible();
-});
+// A project row's menu (items per kind, Open in Finder, New terminal, New thread): unit-tested in src/components/projects/ProjectsIndex.test.tsx.
 
 test("Rename on a project row edits its name in place: Escape keeps, Enter renames, the list gets the keyboard back", async ({ page }) => {
   await openApp(page);

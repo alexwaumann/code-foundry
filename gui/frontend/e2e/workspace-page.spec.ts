@@ -476,13 +476,3 @@ test("members show by name, not by id, and the keyboard walks them then the thre
   await expect(page.getByTestId("new-workspace-project").locator("label")).toHaveText(["dotfiles", "ghostty-playground", "sketches", "writing", "Zebra"]);
   await page.keyboard.press("Escape");
 });
-
-test("the index filter matches a workspace by a project's name", async ({ page }) => {
-  await twoWorkspaces();
-  await openApp(page);
-  await openProjects(page);
-  await page.getByTestId("projects-filter").fill("ghostty");
-  await expect(page.getByTestId("index-workspace").getByTestId("workspace-name")).toHaveText(["shop"]);
-  await page.getByTestId("projects-filter").fill("");
-  await expect(page.getByTestId("index-workspace")).toHaveCount(2);
-});
