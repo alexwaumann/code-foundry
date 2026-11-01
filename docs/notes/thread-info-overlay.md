@@ -63,8 +63,14 @@ own box and does not take part in either:
   portals) and the document listener, in the bubble phase, reads the mark afterwards.
 * While a Radix modal menu is up `body` has `pointer-events: none`; a press then closes the
   menu only.
-* Escape is caught in the capture phase, ahead of a menu's own listener: after it the menu
-  would already be closing, and a focus check could not tell it was open.
+* Escape is caught in the capture phase on the window, ahead of a menu's own listener (after
+  it the menu would already be closing, and a focus check could not tell it was open) and of
+  every Radix dismiss layer, which listen on the document. A listener on the document came
+  after any layer opened before the overlay: a sidebar row's hover card, open at once since
+  the instant hover card (sidebar-pr-tag-plus) and reopened by WebKit's synthetic mouse move
+  whenever the list re-renders under a resting pointer, took Escape first and marked it
+  handled, so the overlay stayed (the e2e flaked three runs in four). Whoever has focus still
+  decides: a focused menu, list, dialog or field keeps its Escape.
 
 ## Tests
 

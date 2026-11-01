@@ -309,6 +309,18 @@ test("the overlay: off at narrow turns the card on, Escape and a press outside h
   await expect(page.getByTestId("thread-info")).toBeVisible();
   await page.setViewportSize({ width: 900, height: 800 });
 
+  // A tooltip open elsewhere (a sidebar row's hover card, open at once under the pointer)
+  // does not take Escape from the focused overlay.
+  await page.getByTestId("thread-pane").focus();
+  await page.keyboard.press("Meta+Shift+i");
+  await expect(overlay(page)).toBeVisible();
+  await expect(overlay(page)).toBeFocused();
+  await row(page, "s:s-1").hover();
+  await expect(page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])')).toHaveAttribute("data-thread-id", "s-1");
+  await page.keyboard.press("Escape");
+  await expect(overlay(page)).toHaveCount(0);
+  await expect(toggle(page)).toBeFocused();
+
   // A click does not move focus; a press outside (the conversation) hides it.
   await toggle(page).click();
   await expect(overlay(page)).toBeVisible();

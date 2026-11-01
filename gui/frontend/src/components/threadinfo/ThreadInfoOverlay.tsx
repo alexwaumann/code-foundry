@@ -43,12 +43,15 @@ function Overlay({ threadId }: { threadId: string }) {
       if (document.body.style.pointerEvents === "none") return;
       hideThreadInfoOverlay();
     };
-    // Capture, ahead of a menu's own Escape (which would close it before this sees it open).
-    document.addEventListener("keydown", onKey, true);
+    // Capture on the window: ahead of a menu's own Escape (which would close it before this
+    // sees it open) and of every Radix dismiss layer on the document. An open tooltip (a
+    // sidebar row's instant hover card under a resting pointer) is such a layer: it would
+    // take Escape first, mark it handled, and the overlay would stay.
+    window.addEventListener("keydown", onKey, true);
     // Bubble, after React has dispatched the press (onPointerDownCapture below).
     document.addEventListener("pointerdown", onDown);
     return () => {
-      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("pointerdown", onDown);
     };
   }, []);
