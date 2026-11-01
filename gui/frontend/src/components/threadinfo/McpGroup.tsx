@@ -14,8 +14,9 @@ const SEP = "\u0000";
 
 /**
  * The thread's MCP servers while its Claude runs: "N servers connected", or the connected
- * count with the failed ones (red) and those needing a login (amber). A click opens the MCP
- * tab; the chevron's menu refreshes the check or reconnects a failed server.
+ * count with, in the value column, those needing a login (amber) and the failed ones (red).
+ * A click opens the MCP tab; the value and the chevron (one zone) open the menu, which
+ * refreshes the check or reconnects a failed server.
  */
 export function McpGroup({ threadId }: { threadId: string }) {
   const connected = useThreadsStore((s) => s.byId[threadId]?.state === "connected");
@@ -39,6 +40,23 @@ export function McpGroup({ threadId }: { threadId: string }) {
               openMcpSurface();
             }}
             menuOnChevron
+            menuOnMeta
+            meta={
+              !clean && (
+                <>
+                  {counts.needsLogin > 0 && (
+                    <span className="text-cf-warning-text" data-testid="ti-mcp-needs-login">
+                      {counts.needsLogin} needs login
+                    </span>
+                  )}
+                  {counts.failed > 0 && (
+                    <span className="text-cf-error-text" data-testid="ti-mcp-failed">
+                      {counts.failed} failed
+                    </span>
+                  )}
+                </>
+              )
+            }
             testId="ti-mcp"
           >
             {clean ? (
@@ -47,19 +65,7 @@ export function McpGroup({ threadId }: { threadId: string }) {
               </>
             ) : (
               <>
-                {counts.connected} connected
-                {counts.needsLogin > 0 && (
-                  <>
-                    <span className="text-cf-text-muted"> · </span>
-                    <span className="text-cf-warning-text">{counts.needsLogin} needs login</span>
-                  </>
-                )}
-                {counts.failed > 0 && (
-                  <>
-                    <span className="text-cf-text-muted"> · </span>
-                    <span className="text-cf-error-text">{counts.failed} failed</span>
-                  </>
-                )}
+                {counts.connected} <span className="text-cf-text-muted">connected</span>
               </>
             )}
           </Row>
