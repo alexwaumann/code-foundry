@@ -85,6 +85,26 @@ through the creator's thread info card (its lineage group), the palette and link
   override first (`code-foundry thread sidebar --shown=true`, which the GUI now ignores:
   the child stayed out of the sidebar), so the removal skipped it.
 
+## Verification
+
+* `make check` green. `make gui-e2e`: 744 passed, 40 skipped; 3 failed, none of them
+  this PR's: `thread-prompts.spec.ts:236` and `thread-project-set.spec.ts:42` fail the
+  same way on main (170e720c3), and `dictation.spec.ts:202` passed 4 of 4 on rerun.
+* Live (`make gui-build`, `CODE_FOUNDRY_HOME=/tmp/nso1`, this branch's daemon, which
+  still has PR 1's override): a parent "Split the README work" and two children made with
+  `thread new --created-by`, one of them with the old `--sidebar=true`. Neither child was
+  in the sidebar (the override is ignored); both were in the parent's lineage group under
+  Previous agents with no eye or "hidden"; the lineage menu holds only the disabled
+  "Archive finished". A child opened from the card: the parent's row highlighted, the
+  crumb names the parent, the title menu is Rename, Regenerate name, Pin, Snooze, Archive.
+  `thread remove` on the parent took the plain child with it (the daemon's cascade) and
+  left the overridden one, which then appeared in the sidebar with its ↳. Dark and light
+  screenshots in the PR body (served from `cf/no-sidebar-override-1-gui-shots`). The theme
+  setting lived in the isolated home and was put back to `system`; nothing in the shared
+  WebKit storage changed. App and daemon stopped, `/tmp/nso1` removed.
+
+Daemon restart needed: no (frontend only; works against today's daemon and PR 2's).
+
 ## Tests
 
 * Unit: `lib/inSidebar.test.ts` (no creator, creator present, creator archived, creator
