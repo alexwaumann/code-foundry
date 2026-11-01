@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, freshCopyByDefault, invocations, openApp, resetMock, row } from "./fixtures";
+import { composeProject, openApp, resetMock } from "./fixtures";
 
 /**
  * The composer heading's set picker (docs/notes/workspaces-v2-3-composer.md): a
@@ -19,21 +19,15 @@ async function compose(page: Page, n = 1): Promise<void> {
 const heading = (page: Page) => page.getByTestId("composer-heading");
 const trigger = (page: Page) => page.getByTestId("composer-project-trigger");
 const list = (page: Page) => page.getByTestId("composer-project-list");
-const chips = (page: Page) => page.getByTestId("composer-member");
 /** The prompt as the draft stores it. */
 const prompt = (page: Page) => page.getByTestId("composer-prompt");
 
-test("the heading's picker: centred under the name, the current target checked; a project row makes it the whole set and the prompt takes focus", async ({ page }) => {
-  await freshCopyByDefault();
+// The trigger's name and popup, the rows (no headings, no hints, the source line), the current target checked, a
+// project row as the whole set with the draft kept, and thread.new's args: unit-tested in
+// src/components/compose/ComposerSets.test.tsx. What stays: where the list sits, the dotted underline, and focus.
+test("the heading's picker: centred under the name; a project row closes it and the prompt takes focus", async ({ page }) => {
   await openApp(page);
   await compose(page, 1);
-  await expect(heading(page)).toHaveText("What should we build in code-foundry?");
-  await expect(trigger(page)).toHaveAccessibleName("Change projects");
-  await expect(trigger(page)).toHaveAttribute("aria-haspopup", "dialog");
-  await page.keyboard.type("Port the login form");
-  await page.getByTestId("composer-model").click();
-  await page.getByTestId("composer-model-list").getByRole("option", { name: "Haiku 4.5", exact: true }).click();
-
   await trigger(page).click();
   await expect(list(page)).toBeVisible();
   await expect(page.getByPlaceholder("Switch to a workspace or project…")).toBeFocused();
@@ -48,49 +42,11 @@ test("the heading's picker: centred under the name, the current target checked; 
       return { centre: Math.round(Math.abs(n.x + n.width / 2 - (l.x + l.width / 2))) <= 1, gap: Math.round(l.y - (n.y + n.height)) };
     })
     .toEqual({ centre: true, gap: 8 });
-  // No workspaces: no group heading; the same rows as cmd+N without the cmd+1..9 hints.
-  await expect(list(page).locator("[cmdk-group-heading]")).toHaveCount(0);
-  await expect(list(page).locator("[data-project]")).toHaveCount(5);
-  await expect(list(page).locator('[data-slot="command-shortcut"]')).toHaveCount(0);
-  await expect(list(page).getByTestId("project-source").first()).toHaveText("alexwaumann/code-foundry · ~/src/code-foundry");
-  // The current project is checked.
-  await expect(list(page).locator('[data-project="repo-cf"]')).toHaveAttribute("data-current", "true");
-  await expect(list(page).locator('[data-project="repo-cf"]').getByTestId("picker-current")).toBeVisible();
-  await expect(list(page).locator("[data-current]")).toHaveCount(1);
-
-  // Enter on a project row: that project alone, the list closes, the prompt has focus; the draft is the same one.
   await page.keyboard.type("ghostty");
   await page.keyboard.press("Enter");
   await expect(list(page)).toHaveCount(0);
   await expect(page.getByTestId("composer-input")).toBeFocused();
   await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
-  await expect(prompt(page)).toHaveAttribute("data-value", "Port the login form");
-  await expect(page.getByTestId("composer-model")).toHaveText("Haiku 4.5");
-  await expect(chips(page)).toHaveCount(0);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
-
-  // A set of two: the heading's project row still replaces it all.
-  await page.getByTestId("composer-add-project").click();
-  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "code-foundry" }).click();
-  await page.keyboard.press("Escape");
-  await expect(heading(page)).toHaveText("What should we build in 2 projects?");
-  await trigger(page).click();
-  // Nothing checked: the set is not one row of the list.
-  await expect(list(page).locator("[data-current]")).toHaveCount(0);
-  await list(page).locator('[data-project="repo-gp"]').click();
-  await expect(list(page)).toHaveCount(0);
-  await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
-  await expect(chips(page)).toHaveCount(0);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  const args = (await invocations()).at(-1)?.args ?? {};
-  expect(args).toMatchObject({ project: "repo-gp", "new-worktree": "true", model: "claude-4.5-haiku[1m]", prompt: "Port the login form" });
-  expect(args.projects).toBeUndefined();
-  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
-  // The draft was code-foundry's composer's: it is clear now.
-  await compose(page, 1);
-  await expect(prompt(page)).toHaveAttribute("data-value", "");
 });
 
 test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc closes it and the prompt takes focus", async ({ page }) => {
@@ -126,27 +82,7 @@ test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc close
   await expect(prompt(page)).toHaveAttribute("data-value", "Keep me");
 });
 
-test("No project moves the draft, and a project row moves it back", async ({ page }) => {
-  await openApp(page);
-  await compose(page, 1);
-  await page.keyboard.type("Plan the week");
-  await trigger(page).click();
-  await list(page).getByTestId("picker-no-project").click();
-  await expect(list(page)).toHaveCount(0);
-  await expect(heading(page)).toHaveText("What should we build with No project?");
-  await expect(prompt(page)).toHaveAttribute("data-value", "Plan the week");
-  await expect(page.getByTestId("composer-input")).toBeFocused();
-
-  await trigger(page).click();
-  await expect(list(page).getByTestId("picker-no-project")).toHaveAttribute("data-current", "true");
-  await list(page).locator('[data-project="repo-gp"]').click();
-  await expect(list(page)).toHaveCount(0);
-  await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
-  await expect(prompt(page)).toHaveAttribute("data-value", "Plan the week");
-  await row(page, "s:s-1").click();
-  await compose(page, 1);
-  await expect(prompt(page)).toHaveAttribute("data-value", "");
-});
+// No project moving the draft and a project row moving it back: unit-tested in src/components/compose/ComposerSets.test.tsx.
 
 test("taking a project out drops its skill tags after a confirm; the rest stays", async ({ page }) => {
   await openApp(page);
@@ -167,14 +103,7 @@ test("taking a project out drops its skill tags after a confirm; the rest stays"
   const USER = "[/commit](cf-skill://~/commit)";
   await expect(prompt(page)).toHaveAttribute("data-value", `${CF} ${SK} ${USER} `);
 
-  const dialog = page.getByTestId("confirm-dialog");
-  await page.getByRole("button", { name: "Remove code-foundry" }).click();
-  await expect(dialog).toContainText("Remove code-foundry from the thread?");
-  await expect(dialog).toContainText("1 reference to code-foundry in your text will be removed.");
-  await page.getByTestId("confirm-cancel").click();
-  await expect(prompt(page)).toHaveAttribute("data-value", `${CF} ${SK} ${USER} `);
-  await expect(chips(page)).toHaveCount(2);
-
+  // The confirm's wording and Cancel: unit-tested in src/components/compose/ComposerSets.test.tsx.
   await page.getByRole("button", { name: "Remove code-foundry" }).click();
   await page.getByTestId("confirm-ok").click();
   await expect(heading(page)).toHaveText("What should we build in sketches?");

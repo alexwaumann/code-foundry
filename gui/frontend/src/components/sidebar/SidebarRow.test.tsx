@@ -166,6 +166,12 @@ describe("SidebarRow line 1: the project", () => {
     expect(p.querySelector("svg")).toBeNull();
   });
 
+  it("a thread in its workspace's folder: the workspace's name, never its w-<id> (composer-fixes.spec.ts)", () => {
+    useWorkspacesStore.setState({ byId: { "w-000000000001": { id: "w-000000000001", name: "shop", branch: "", members: [{ projectId: "cf", worktreePath: "" }], createdAtMs: null } }, order: ["w-000000000001"] });
+    renderRow({ projectId: "", projectIds: ["cf", "gp"], workspaceId: "w-000000000001", worktreePath: "/home/.code-foundry/workspaces/w-000000000001" });
+    expect(screen.getByTestId("row-project").textContent).toBe("shop");
+  });
+
   it("pinned: the pin glyph right after the project", () => {
     renderRow({ pinned: true });
     expect(screen.getByTestId("row-project").nextElementSibling?.getAttribute("data-testid")).toBe("row-pinned");

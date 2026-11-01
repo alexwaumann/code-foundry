@@ -13,3 +13,12 @@ export function tooltipText(el: HTMLElement): string | null {
   });
   return screen.queryByRole("tooltip")?.textContent ?? null;
 }
+
+/**
+ * Opens the Tip on a trigger that takes no focus (a span) the way a mouse does, waiting out
+ * the open delay, and returns its text (Radix's visually hidden role="tooltip" copy).
+ */
+export async function hoverTooltipText(el: HTMLElement): Promise<string> {
+  fireEvent.pointerMove(el, { pointerType: "mouse" });
+  return (await screen.findByRole("tooltip", undefined, { timeout: 2000 })).textContent;
+}
