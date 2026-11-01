@@ -182,21 +182,7 @@ async function openIdlePages(page: Page): Promise<void> {
   await expect(items(page)).toHaveCount(3);
 }
 
-test("pages shown between turns arrive open, outside the turn's fold", async ({ page }) => {
-  await openIdlePages(page);
-  for (const name of ["hello.html", "plain.html", "scheme.html"]) {
-    const r = items(page).filter({ hasText: name }).getByTestId("thread-html-row");
-    await expect(r).toHaveAttribute("aria-expanded", "true");
-    await expect(r).not.toContainText("folded");
-  }
-  await expect(page.getByTestId("thread-html-frame")).toHaveCount(3);
-  // The turn before them is folded (it ended); they are not in it, and no header follows them.
-  await expect(page.locator('[data-testid="thread-turn-header"]')).toHaveCount(1);
-  await expect(page.locator('[data-testid="thread-turn-header"][data-folded]')).toHaveCount(1);
-  // The chevron still closes one.
-  await items(page).filter({ hasText: "plain.html" }).getByTestId("thread-html-row").click();
-  await expect(page.getByTestId("thread-html-frame")).toHaveCount(2);
-});
+// Pages shown between turns arriving open, outside the turn's fold, the row still closing one: src/lib/threadTimeline.test.ts ("shown between turns: no turn, no header, never folded") and src/components/thread/rows.test.tsx ("a finished turn …: the row is there and the card open…", "only its row closes the card…").
 
 test("a theme switch keeps a page that acks cf:theme and reloads one that only links the stylesheet", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });

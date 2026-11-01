@@ -6,6 +6,7 @@ import { structOf, useThreadStore } from "@/stores/thread";
 import { ThreadContext } from "./context";
 import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
+import { TimelineList } from "./Timeline";
 
 afterEach(() => {
   cleanup();
@@ -115,6 +116,29 @@ describe("RowBoundary", () => {
     const details = c.querySelector('[data-testid="error-details"]')?.textContent ?? "";
     expect(details).toContain("cannot render t");
     expect(details).toContain('"file_path\\":\\"/w/a.go');
+  });
+
+  it("the timeline puts each row behind its own boundary: one broken row leaves the others", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // jsdom lays nothing out: give the list's scroller a height so the virtualizer renders rows.
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(600);
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(800);
+    setItems(tool("Edit", { file_path: "/w/a.go" }));
+    const rows = [
+      { type: "user" as const, key: "u", id: "u" },
+      { type: "tool" as const, key: "t", id: "t" },
+    ];
+    const c = render(
+      <TimelineList
+        threadId="s"
+        rows={rows}
+        bottomInset={0}
+        renderRow={(r) => (r.key === "t" ? <Boom id="t" /> : <p data-testid="sibling">fine</p>)}
+      />,
+    ).container;
+    expect(c.querySelectorAll('[data-testid="row-error"]')).toHaveLength(1);
+    expect(c.querySelector('[data-testid="row-error"]')?.textContent).toContain("Could not render this item.");
+    expect(c.querySelector('[data-testid="sibling"]')?.textContent).toBe("fine");
   });
 
   it("retries when one of its items changes", () => {

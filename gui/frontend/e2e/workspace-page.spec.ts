@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, openWorkspacePage, resetMock } from "./fixtures";
+import { expectTooltip, invocations, mockPost, mockUrl, openApp, openProjectPage, openWorkspacePage, resetMock } from "./fixtures";
 
 /**
  * A workspace's page on the Projects view (docs/notes/projects-redesign-3-workspace-page.md):
@@ -34,56 +34,7 @@ async function twoWorkspaces(): Promise<{ shop: string; mono: string }> {
   return { shop: shop.id, mono: mono.id };
 }
 
-test("a synthetic workspace: its projects by name with where threads start and their captions, no folder row, the instructions rows", async ({ page }) => {
-  const { shop, mono } = await twoWorkspaces();
-  await openApp(page);
-  await openProjects(page);
-  // On the index, without threads: by name, mono then shop; the contents read from the same fields.
-  await expect(page.getByTestId("index-workspace").getByTestId("workspace-name")).toHaveText(["mono", "shop"]);
-  await expect(page.locator(`[data-testid="index-workspace"][data-workspace="${shop}"]`).getByTestId("workspace-contents")).toHaveText("no instructions · no skills");
-  await expect(page.locator(`[data-testid="index-workspace"][data-workspace="${mono}"]`).getByTestId("workspace-contents")).toHaveText("CLAUDE.md · 2 skills");
-
-  await openWorkspacePage(page, shop);
-  const s = body(page, shop);
-  await expect(s).not.toHaveAttribute("data-rooted");
-  await expect(s.getByTestId("workspace-projects-title")).toHaveText(/Projects\s*· every thread checks these out together on one branch/);
-  await expect(s.getByTestId("member-name")).toHaveText(["code-foundry", "ghostty-playground"]);
-  await expect(s.getByTestId("member-caption")).toHaveText(["alexwaumann/code-foundry", "alexwaumann/ghostty-playground"]);
-  // The first project given starts threads; its row carries the pill, the others none.
-  await expect(s.locator('[data-testid="workspace-member"][data-default]')).toHaveAttribute("data-project", "repo-gp");
-  await expect(s.getByTestId("workspace-default")).toHaveCount(1);
-  await expect(member(page, shop, "repo-gp").getByTestId("workspace-default")).toHaveText("starts here");
-  // A synthetic workspace whose projects start threads shows nothing for its folder.
-  await expect(s.getByTestId("workspace-folder")).toHaveCount(0);
-  // No worktree rows: worktrees show under their projects.
-  await expect(s.getByTestId("project-worktree")).toHaveCount(0);
-
-  // No threads yet.
-  await expect(s.getByTestId("workspace-threads-title")).toHaveText(/Threads\s*· none yet/);
-  await expect(s.getByTestId("workspace-threads-empty")).toBeVisible();
-
-  // Instructions and skills.
-  await expect(s.getByTestId("workspace-instructions-label")).toHaveText("CLAUDE.md");
-  await expect(s.getByTestId("workspace-instructions-none")).toHaveText("None yet");
-  await expect(s.getByTestId("workspace-edit-instructions")).toHaveText("Write instructions");
-  await expect(s.getByTestId("workspace-instructions-reach")).toHaveText("(starts a thread)");
-  await expect(s.getByTestId("workspace-skills-none")).toHaveText("None yet");
-  await expect(s.getByTestId("workspace-folder-path")).toHaveText(new RegExp(`/workspaces/${shop}$`));
-  await expect(s.getByTestId("workspace-folder-kind")).toHaveText("kept by the app");
-
-  // What a thread writes in the workspace's folder shows up (the daemon re-reads it after a turn).
-  await mockPost(`workspace-files?workspace=${shop}&instructions=AGENTS.md&skills=lint,docs`);
-  await expect(s.getByTestId("workspace-instructions-label")).toHaveText("AGENTS.md");
-  await expect(s.getByTestId("workspace-instructions-path")).toHaveText(/\/AGENTS\.md$/);
-  await expect(s.getByTestId("workspace-instructions-open")).toHaveText("View");
-  await expect(s.getByTestId("workspace-edit-instructions")).toHaveText("Edit instructions");
-  await expect(s.getByTestId("workspace-skills-list")).toHaveText("docs, lint");
-
-  // Browse marketplace: Settings → Skills.
-  await s.getByTestId("workspace-browse-skills").click();
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(page.getByTestId("settings-nav-skills")).toHaveAttribute("aria-current", "page");
-});
+// A synthetic workspace (the index rows, its projects by name with where threads start, no folder row, the instructions rows, what a thread writes showing up, Browse marketplace): src/components/projects/WorkspacePage.test.tsx ("a synthetic workspace: …", "a synthetic workspace without either…") and ProjectsIndex.test.tsx; the Settings nav's current page is SettingsPage.test.tsx's.
 
 test("a rooted workspace: its folder row (the root, where threads start, marked missing when moved), the root's instructions open as a File tab", async ({ page }) => {
   const { mono } = await twoWorkspaces();

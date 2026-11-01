@@ -493,6 +493,16 @@ describe("the editor", { timeout: 30_000 }, () => {
     const list = screen.getByTestId("themes-list");
     fireEvent.keyDown(list, { key: "Escape" });
     await confirmShows("Ocean Dusk has changes that are not saved.");
+    // The question stays (the Escape that asked does not also dismiss it); Cancel keeps the editor.
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("confirm-cancel"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+    expect(inspector()).toBeTruthy();
+    fireEvent.keyDown(list, { key: "Escape" });
+    await confirmShows("Ocean Dusk has changes that are not saved.");
     fireEvent.keyDown(screen.getByTestId("confirm-ok"), { key: "Escape" });
     await waitFor(() => {
       expect(screen.queryByTestId("confirm-dialog")).toBeNull();
@@ -504,6 +514,8 @@ describe("the editor", { timeout: 30_000 }, () => {
       expect(screen.queryByTestId("theme-inspector")).toBeNull();
     });
     expect(screen.getByTestId("themes-preview-bar")).toBeTruthy();
+    // The list has the keyboard again.
+    expect(document.activeElement).toBe(list);
     fireEvent.keyDown(list, { key: "Escape" });
     expect(useViewsStore.getState().themesOpen).toBe(false);
   });
@@ -657,6 +669,10 @@ describe("the editor", { timeout: 30_000 }, () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => {
       expect(screen.queryByTestId("theme-save-dialog")).toBeNull();
+    });
+    // Closing the modal hands the keyboard back to Save….
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByTestId("themes-save"));
     });
 
     setBase("surface", "#16232f");

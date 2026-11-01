@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, mockPost, mockUrl, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
 
 /**
  * The read-only subagent view (docs/notes/subagent-view.md) over the mock's scripted thread
@@ -99,19 +98,6 @@ async function expectParent(page: Page): Promise<void> {
   await expect(threadPane(page)).toBeVisible();
   await expect(threadPane(page)).toHaveAttribute("data-thread-id", "s-r1");
   await expect(threadPrompt(page)).toBeVisible();
-}
-
-/**
- * CommandService.Invoke as the CLI calls it: no window (no active view), the thread its
- * --id names as the context's thread. Expects it to succeed or fail.
- */
-async function cli(ok: boolean, name: string, args: Record<string, string> = {}): Promise<void> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name, args, context: args.id ? { activeThreadId: args.id } : undefined }),
-  });
-  expect(res.ok, `${name}: ${await res.text()}`).toBe(ok);
 }
 
 test.beforeEach(async () => {
@@ -288,37 +274,4 @@ test("the failed run opened from its note shows its error; another run failing w
 
 // Selecting another thread drops the view: unit-tested in src/stores/subagentView.test.ts
 
-test("thread.agent.open from the CLI selects the thread and shows the run; the palette does not list it; thread.agent.up goes back", async ({ page }) => {
-  await mockPost("thread?state=agents");
-  await openApp(page);
-  await row(page, "s:s-2").click();
-  await expect(threadPane(page)).toHaveAttribute("data-thread-id", "s-2");
-
-  await cli(true, "thread.agent.open", { id: "s-r1", run: "a0" });
-  await expectViewing(page, "a0", "Find the header chip pattern");
-  // Another run of it, while one shows; a nested run and an unknown one are refused.
-  await cli(true, "thread.agent.open", { id: "s-r1", run: "a3" });
-  await expectViewing(page, "a3", "Screenshot the panel in Wails");
-  await cli(false, "thread.agent.open", { id: "s-r1", run: "a1b" });
-  await cli(false, "thread.agent.open", { id: "s-r1", run: "zz" });
-  await expectViewing(page, "a3", "Screenshot the panel in Wails");
-
-  // The palette: no Open Subagent (it takes a run id it cannot pick), Back to Parent Thread with its Escape.
-  await page.keyboard.press("Meta+k");
-  const palette = page.getByTestId("palette");
-  await expect(palette).toBeVisible();
-  await page.keyboard.type("Subagent");
-  await expect(palette.locator('[data-command="thread.agent.open"]')).toHaveCount(0);
-  await page.keyboard.press("Meta+a");
-  await page.keyboard.type("Back to Parent");
-  await expect(palette.locator('[data-command="thread.agent.up"]')).toBeVisible();
-  await expect(palette.locator('[data-command="thread.agent.up"]')).toContainText(/esc/i);
-  await page.keyboard.press("Escape");
-  await expect(palette).toHaveCount(0);
-  await expectViewing(page, "a3", "Screenshot the panel in Wails");
-
-  // The CLI's thread.agent.up reaches the window through ShowView "agent.up".
-  await cli(true, "thread.agent.up");
-  await expectParent(page);
-  expect((await invocations()).map((i) => i.name)).toContain("thread.agent.up");
-});
+// thread.agent.open from the CLI showing the run and thread.agent.up going back: src/stores/subagentView.test.ts ("UiIntent.ShowAgentRun shows the run, ShowView agent.up leaves it"); the palette not listing it: subagentView.test.ts and internal/command/palette_test.go; Back to Parent's Esc: src/keys/chord.test.ts; nested and unknown runs refused: internal/command/commands_agents_view_test.go.

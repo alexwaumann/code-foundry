@@ -63,9 +63,4 @@ test("view.panel.page opens the page in the thread's side panel with its bridge,
   }
 });
 
-test("view.panel.page refuses a file that is not a page", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  expect((await inS1("view.panel.page", { path: `${CF}/README.md` })).ok).toBe(false);
-  await expect(panel(page)).toHaveCount(0);
-});
+// view.panel.page refusing a file that is not a page (not html, missing, a directory): the daemon's, internal/command/commands_view_panel_page_test.go.

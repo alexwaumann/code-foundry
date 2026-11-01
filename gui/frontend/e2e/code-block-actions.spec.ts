@@ -93,31 +93,7 @@ test("Run in terminal: hidden while the block streams, then a new shell in the t
 });
 
 // A Bash row's Copy command (and no Run) is CodeActions.test.tsx's.
-test("Copy puts the raw code on the clipboard and shows Copied", async ({ page }) => {
-  // WebKit lets no test read the clipboard back: record what the app writes to it instead
-  // (lib/clipboard.ts takes the writeText path when it exists).
-  await page.addInitScript(() => {
-    const w = window as unknown as { __cfClipboard: string[] };
-    w.__cfClipboard = [];
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: (text: string) => { w.__cfClipboard.push(text); return Promise.resolve(); } },
-    });
-  });
-  const lastCopied = () => page.evaluate(() => (window as unknown as { __cfClipboard: string[] }).__cfClipboard.at(-1) ?? "");
-  await streamToBash(page);
-  await mockPost("thread/finish?rest=" + encodeURIComponent("\n```\n"));
-  const copy = goBlock(page).getByTestId("code-copy");
-  await goBlock(page).hover();
-  await copy.click();
-  await expect(copy).toHaveAttribute("aria-label", "Copied");
-  await expect(copy).toHaveText("Copied");
-  const text = await lastCopied();
-  expect(text).toContain("func fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{");
-  expect(text).not.toContain("<span");
-  expect(text.endsWith("}")).toBe(true);
-  await expect(copy).toHaveAttribute("aria-label", "Copy code", { timeout: 3000 });
-});
+// Copy putting the raw code (not the highlighted markup) on the clipboard and showing Copied for a moment: src/components/thread/CodeActions.test.tsx ("copies the raw code…").
 
 test("the buttons are keyboard reachable: focus shows them", async ({ page }) => {
   await streamToBash(page);

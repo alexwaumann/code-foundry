@@ -142,31 +142,8 @@ test("app.update from the palette opens the dialog and downloads", async ({ page
   expect((await invocations()).at(-1)?.name).toBe("app.update");
 });
 
-test("daemon.restart from the palette asks for confirmation instead of running", async ({ page }) => {
-  await openApp(page);
-  await mockPost("update/state?state=restartRequired&version=v0.2.0");
-  await paletteRun(page, "daemon.restart");
-  const confirm = page.getByTestId("confirm-dialog");
-  await expect(confirm).toContainText(/\d+ threads? working or waiting on you( and [^.]+)? will be cut off\. Restart the daemon anyway\?/);
-  await confirm.getByTestId("confirm-cancel").click();
-  await expect(confirm).toHaveCount(0);
-  // Only the unconfirmed attempt reached the daemon; nothing restarted.
-  const restarts = (await invocations()).filter((i) => i.name === "daemon.restart");
-  expect(restarts.map((i) => i.confirmed)).toEqual([false]);
-  await expectChip(page, "installed", "v0.2.0 installed", "Restart to apply");
-});
+// daemon.restart asking first: its message is the daemon's (internal/command/commands_update_test.go TestDaemonRestart); the confirm flow is src/stores/commands.test.ts and src/components/confirm/ConfirmDialog.test.tsx.
 
 // A failed download and Try Again: unit-tested in src/components/update/UpdateDialog.test.tsx.
 
-test("dev builds say updates are off", async ({ page }) => {
-  await openApp(page);
-  await mockPost("update/disabled?reason=dev%20build");
-  await page.keyboard.press("Meta+k");
-  await page.getByTestId("palette").locator('[data-command="app.update.check"]').click();
-  const d = dialog(page);
-  await expect(d.getByTestId("update-state")).toHaveText("Updates are off for this build");
-  await expect(d).toContainText("Dev build.");
-  await expect(d.getByTestId("update-error")).toContainText("disabled");
-  await expect(d.getByTestId("update-close")).toBeVisible();
-  await expect(indicator(page)).toHaveCount(0);
-});
+// Dev builds saying updates are off, and a check's refusal in the dialog: src/components/update/UpdateDialog.test.tsx ("disabled: …").

@@ -25,23 +25,9 @@ test("composer.stage fills the shown thread's composer without sending, then add
   await expect(prompt).not.toContainText("elsewhere");
 });
 
-test("view.settings --page opens Settings on that page", async ({ page }) => {
-  await openApp(page);
-  await emit({ showView: { name: "settings.memory" } });
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(page.getByTestId("settings-nav-memory")).toHaveAttribute("aria-current", "page");
-  // An open sheet moves to the page asked for.
-  await emit({ showView: { name: "settings.appearance" } });
-  await expect(page.getByTestId("settings-nav-appearance")).toHaveAttribute("aria-current", "page");
-});
+// view.settings --page opening Settings on that page, and moving an open one: src/stores/views.test.ts ("settings.<page>" opens settings on that page…); the nav's current page follows settingsPage in src/components/settings/SettingsPage.test.tsx.
 
-test("project.add without a folder opens the Add Project dialog", async ({ page }) => {
-  await openApp(page);
-  await emit({ showView: { name: "project.add" } });
-  const dialog = page.getByTestId("add-project-dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toHaveAttribute("data-tab", "local");
-});
+// project.add without a folder opening the Add Project dialog on Local folder: src/stores/views.test.ts ("project.add" opens the Add Project dialog…) and src/components/addproject/AddProjectDialog.test.tsx.
 
 test("a project added in the dialog project.add opened leaves the window on its thread", async ({ page }) => {
   await openApp(page);

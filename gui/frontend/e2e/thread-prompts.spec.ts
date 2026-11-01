@@ -173,15 +173,7 @@ test("keyboard: an empty editor's digits answer, a typed message keeps them, Esc
   await expect.poll(() => editorFocused(page)).toBe(true);
 });
 
-test("a failed answer brings the prompt back", async ({ page }) => {
-  await openThread(page, "permission");
-  await mockPost("thread/fail-respond");
-  await composer(page).getByTestId("thread-permission-allow").click();
-  await expect(page.getByText("Answer Thread Request failed")).toBeVisible();
-  await expect(composer(page).getByTestId("thread-permission")).toBeVisible();
-  await composer(page).getByTestId("thread-permission-allow").click();
-  await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
-});
+// A failed answer bringing the prompt back with an error toast: src/stores/threadActions.test.ts ("a failed answer brings the prompt back once…"), src/stores/openRequests.test.ts and src/stores/commands.test.ts (the failure toast).
 
 test("parallel requests stack oldest first; each is answerable; an Edit shows its change", async ({ page }) => {
   await openThread(page, "parallel");

@@ -25,52 +25,7 @@ function entry(page: Page, name: string) {
   return page.getByTestId("path-entry").and(page.locator(`[data-entry-name="${name}"]`));
 }
 
-test("Local folder completes paths with Tab and submits with Enter", async ({ page }) => {
-  const dialog = await openAddProject(page);
-  const input = page.getByTestId("add-project-local-input");
-
-  // Empty input lists home, without dot-directories.
-  await expect(entry(page, "src")).toBeVisible();
-  await expect(entry(page, "dotfiles")).toHaveAttribute("data-git", "true");
-  await expect(entry(page, "dotfiles")).toContainText("already added");
-  await expect(entry(page, ".config")).toHaveCount(0);
-  // No Wails host in the browser: no folder picker button.
-  await expect(page.getByTestId("pick-directory")).toHaveCount(0);
-
-  // A single match completes with a slash and lists the directory.
-  await page.keyboard.type("S");
-  await expect(page.getByTestId("path-entry")).toHaveCount(1);
-  await page.keyboard.press("Tab");
-  await expect(input).toHaveValue("src/");
-  await expect(input).toHaveAttribute("data-path", "~/src/");
-  await expect(input).toBeFocused();
-  await expect(entry(page, "new-app")).toBeVisible();
-  await expect(entry(page, "code-foundry")).toHaveAttribute("data-registered", "true");
-  await expect(entry(page, "new-app")).toHaveAttribute("data-git", "true");
-  await expect(entry(page, "new-app")).not.toContainText("already added");
-  await expect(entry(page, "Notebook")).not.toHaveAttribute("data-git", "true");
-
-  // Several matches complete to their common prefix (case-insensitively).
-  await page.keyboard.type("CO");
-  await expect(page.getByTestId("path-entry")).toHaveCount(2);
-  await page.keyboard.press("Tab");
-  await expect(input).toHaveValue("src/code-foundry");
-
-  // Dot-directories show for a "." segment.
-  await input.fill(".");
-  await expect(entry(page, ".config")).toBeVisible();
-  await expect(entry(page, "src")).toHaveCount(0);
-
-  // A pasted "~/..." path is not doubled; Enter submits what is typed (trailing slash dropped).
-  await input.fill("~/src/ne");
-  await expect(input).toHaveValue("src/ne");
-  await expect(page.getByTestId("path-entry")).toHaveCount(1);
-  await page.keyboard.press("Tab");
-  await expect(input).toHaveValue("src/new-app/");
-  await page.keyboard.press("Enter");
-  await expect(dialog).toHaveCount(0);
-  expect(await projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
-});
+// Local folder completion: what a listing holds (home without dot-directories, the case-insensitive common prefix, one match with a slash, a "." segment) is the daemon's, internal/fsx/list_test.go; Tab applying it and Enter adding: src/components/addproject/AddProjectDialog.test.tsx; a pasted ~ not doubled: src/palette/paths.test.ts; the git and already-added marks: src/components/palette/pathCompletion.test.tsx.
 
 test("a highlighted folder: / descends, Tab descends, Enter submits it", async ({ page }) => {
   const dialog = await openAddProject(page);
@@ -96,15 +51,7 @@ test("a highlighted folder: / descends, Tab descends, Enter submits it", async (
 });
 
 // Absolute paths mapping under home is paths.test.ts's (homeRelative).
-test("long listings are bounded to the first 200", async ({ page }) => {
-  const dialog = await openAddProject(page);
-  const input = page.getByTestId("add-project-local-input");
-  await input.fill("many/");
-  await expect(page.getByTestId("path-entry")).toHaveCount(200);
-  await expect(dialog.getByText("Folders (first 200)")).toBeVisible();
-  await page.keyboard.press("Tab");
-  await expect(input).toHaveValue("many/d");
-});
+// Long listings bounded to the first 200: the daemon's (internal/fsx/list_test.go "bounded"); the "Folders (first 200)" heading: src/components/palette/pathCompletion.test.tsx.
 
 test("the palette's path prompt still uses a clicked folder, with no chevron", async ({ page }) => {
   await openApp(page);

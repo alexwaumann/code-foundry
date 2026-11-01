@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, resetMock } from "./fixtures";
+import { CF, invocations, mockPost, openApp, openProjectPage, openProjects, resetMock } from "./fixtures";
 
 /**
  * The Projects view (docs/notes/projects-redesign-1-index.md): the index (rows by last
@@ -277,35 +276,7 @@ test("kind variants: no remote (note, no Sync or PR), another remote (no PR), no
   await expect(page.getByTestId("project-note")).toContainText("no remote");
 });
 
-test("Refresh fetches (with a remote) then refreshes, spinning meanwhile; a failed refresh shows in the header and Details", async ({ page }) => {
-  await openApp(page);
-  await openProjectPage(page, "repo-cf");
-  const refresh = page.getByTestId("project-refresh");
-  await refresh.click();
-  await expect(refresh).toBeDisabled();
-  await expect(refresh.locator("svg")).toHaveClass(/animate-spin/);
-  await expect(refresh).toBeEnabled();
-  const fetch = await lastInvocation("git.fetch");
-  expect(fetch?.args).toEqual({ worktree: CF });
-  const names = (await invocations()).map((i) => i.name).filter((n) => n === "git.fetch" || n === "project.refresh");
-  expect(names).toEqual(["git.fetch", "project.refresh"]);
-  // Without a remote: only project.refresh.
-  await openProjectPage(page, "repo-sk");
-  await page.getByTestId("project-refresh").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "project.refresh").length).toBe(2);
-  expect((await invocations()).filter((i) => i.name === "git.fetch")).toHaveLength(1);
-
-  await openProjectPage(page, "repo-cf");
-  await expect(page.getByTestId("project-refresh-failed")).toHaveCount(0);
-  await mockPost(`worktree/refresh-error?path=${encodeURIComponent(CF)}&error=${encodeURIComponent("could not reach origin")}&ago=870000`);
-  await expect(page.getByTestId("project-refresh-failed")).toHaveText(/^Refresh failed · could not reach origin· 1[45]m ago$/);
-  await expect(page.getByTestId("details-refreshed")).toHaveText(/^refresh failed 1[45]m ago$/);
-  await expect(page.getByTestId("details-refreshed")).toHaveAttribute("data-failed", "true");
-  // Everything else keeps the last known state.
-  await expect(page.getByTestId("worktree-branch")).toHaveCount(3);
-  await mockPost(`worktree/refresh-error?path=${encodeURIComponent(CF)}`);
-  await expect(page.getByTestId("project-refresh-failed")).toHaveCount(0);
-});
+// Refresh (fetch then refresh, spinning) and a failed refresh in the header and Details: unit-tested in src/components/projects/ProjectPage.test.tsx ("Refresh fetches…", "a failed refresh shows…").
 
 test("narrow: with the Changes tab open, Sync and the slug drop and Terminal shows its icon only", async ({ page }) => {
   await openApp(page);
@@ -390,33 +361,7 @@ test("a page's scroll position is remembered while the window lives", async ({ p
   expect(await page.getByTestId("projects-scroll").evaluate((el) => el.scrollTop)).toBe(0);
 });
 
-test("worktrees to tidy: the index pill and the project menu count the cleanable ones; a terminal holds one", async ({ page }) => {
-  await mockPost("worktree/merged?project=repo-cf&branch=cf/usage-polish");
-  await openApp(page);
-  await openProjects(page);
-  await expect(row(page, "repo-cf").getByTestId("index-tidy")).toHaveText("1 worktree to tidy");
-  await row(page, "repo-cf").getByTestId("project-name").click();
-  await page.getByTestId("project-more").click();
-  await expect(page.getByTestId("project-cleanup-count")).toHaveText("1");
-  await closeMenu(page, "project-more");
-
-  // A terminal open in it holds it (started as the CLI would: without threads the worktree
-  // is in its own block, not the table, and its clean row offers no terminal).
-  await expect(leftover(page, MERGED)).toHaveCount(1);
-  await expect(checkout(page, MERGED)).toHaveCount(0);
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name: "terminal.new", args: {}, context: { activeProjectId: "repo-cf", activeWorktreePath: MERGED } }),
-  });
-  expect(res.ok).toBe(true);
-  await expect(leftover(page, MERGED).getByTestId("leftover-reason")).toContainText("a terminal is open in it");
-  await page.getByTestId("project-more").click();
-  await expect(page.getByTestId("project-cleanup-count")).toHaveText("0");
-  await closeMenu(page, "project-more");
-  await openProjects(page);
-  await expect(page.getByTestId("index-tidy")).toHaveCount(0);
-});
+// Worktrees to tidy (the index pill, the menu's count, a terminal holding one): src/components/projects/ProjectsIndex.test.tsx and ProjectPage.test.tsx ("the project menu counts the cleanable ones; a terminal open in one holds it").
 
 // Clean up merged worktrees and Remove the N that are clean (confirm, cleanup, the pill going): unit-tested in src/components/projects/ProjectPage.test.tsx.
 

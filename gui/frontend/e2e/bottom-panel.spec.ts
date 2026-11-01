@@ -480,18 +480,7 @@ test("cmd+j on a thread without shells starts one; its exit hides the panel; the
   expect((await invocations()).length).toBe(before);
 });
 
-test("the last shell of a panel that is not on screen exiting closes that panel too", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-2");
-  await page.keyboard.press("Meta+j");
-  await expect(tabs(page)).toHaveCount(1);
-  const shell = await host(page).getAttribute("data-terminal-id");
-  await selectThread(page, "s-1");
-  await mockPost(`terminal/exit?id=${shell ?? ""}&code=0`);
-  await selectThread(page, "s-2");
-  await expect(bottom(page)).toHaveCount(0);
-  await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
-});
+// The last shell of a panel not on screen exiting closes it too: src/stores/bottomActions.test.ts ("another thread selected: hidden all the same"); the exit event's wiring is the Projects page test below.
 
 test("the Projects page: its last shell exiting hides the panel, and cmd+j then shows the empty state's hint", async ({ page }) => {
   await openApp(page);

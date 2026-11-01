@@ -66,23 +66,7 @@ test("the row shows only while Ember is on, under the menu pane and above the th
   await expect(emberRow(page)).toHaveCount(0);
 });
 
-test("the row opens the chat; its menu has no archive, snooze or rename", async ({ page }) => {
-  await enable();
-  await openApp(page);
-  await openChat(page);
-  await expect(emberRow(page)).toHaveAttribute("aria-selected", "true");
-  const header = page.getByTestId("thread-header");
-  await expect(header.getByTestId("ember-title")).toHaveText("Ember");
-  await expect(header.getByTestId("ember-header-status")).toHaveText("4 threads working · 1 blocked · 1 queued");
-  await expect(header.getByTestId("ember-board-toggle")).toBeVisible();
-  await expect(header.locator('[data-command-button="thread.archive"]')).toHaveCount(0);
-  await expect(page.getByTestId("thread-composer").locator("[aria-placeholder]")).toHaveAttribute("aria-placeholder", "Tell Ember what you want done…");
-  await emberRow(page).click({ button: "right" });
-  const menu = page.getByTestId("ember-row-menu");
-  await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem")).toHaveText(["Open board", "Settings"]);
-  await page.keyboard.press("Escape");
-});
+// The row opening the chat (selected), the chat's header and prompt, and the row's menu: src/components/ember/EmberRow.test.tsx ("a click opens the chat…", "its menu: Open board and Settings only…") and EmberPane.test.tsx ("the flame and Ember, the board's summary…").
 
 test("arrows reach the row from the thread list", async ({ page }) => {
   await enable();

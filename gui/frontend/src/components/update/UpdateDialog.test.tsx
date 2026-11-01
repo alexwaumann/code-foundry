@@ -17,7 +17,7 @@ vi.mock("@/api/app", async (orig) => ({
 
 const { UpdateDialog } = await import("./UpdateDialog");
 const { UpdateIndicator } = await import("./UpdateIndicator");
-const { useUpdateStore, useCutOffThreadIds } = await import("@/stores/update");
+const { runUpdateAction, useUpdateStore, useCutOffThreadIds } = await import("@/stores/update");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useCommandsStore } = await import("@/stores/commands");
 
@@ -243,11 +243,15 @@ describe("UpdateDialog", () => {
     expect(text("update-restart")).toBe("Install and Restart Now");
   });
 
-  it("disabled: updates are off, with the reason and a ×; no chip", () => {
+  it("disabled: updates are off, with the reason and a ×; no chip; a check says why it failed", async () => {
     show(status("idle", { enabled: false, disabledReason: "dev build", currentVersion: "dev" }));
     expect(text("update-state")).toBe("Updates are off for this build");
     expect(dialog().textContent).toContain("Dev build.");
     expect(q("update-close")).not.toBeNull();
     expect(chip()).toBeNull();
+    // A check run anyway (the palette's app.update.check): the daemon's refusal shows in the dialog.
+    invokeCommand.mockRejectedValueOnce(new Error("updates are disabled: dev build"));
+    await act(() => runUpdateAction("check"));
+    expect(text("update-error")).toBe("updates are disabled: dev build");
   });
 });

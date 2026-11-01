@@ -19,7 +19,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 
 const { ConfirmDialog } = await import("./ConfirmDialog");
 const { runCommand } = await import("@/stores/commands");
-const { useConfirmStore } = await import("@/stores/confirm");
+const { requestConfirm, useConfirmStore } = await import("@/stores/confirm");
 
 const ctx = { activeTerminalId: "", activeThreadId: "", activeProjectId: "", activeWorktreePath: "", activeView: "settings", activeWorkspaceId: "" };
 const clear = new NeedsConfirm({ command: "memory.clear", title: "Memory: Forget All Preferences", message: "Forget every remembered preference? New threads get none.", confirmLabel: "Forget all" });
@@ -33,6 +33,17 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("ConfirmDialog", () => {
+  it("names who asked when it was not the user (a page's or a plugin's call)", async () => {
+    render(<ConfirmDialog />);
+    let done!: Promise<boolean>;
+    act(() => {
+      done = requestConfirm({ title: "Thread: Archive", message: "Archive thread s-3?", confirmLabel: "Archive", caller: "Bridge check, a page in Fix stale badge" });
+    });
+    expect((await screen.findByTestId("confirm-caller")).textContent).toBe("Asked by Bridge check, a page in Fix stale badge");
+    fireEvent.click(screen.getByTestId("confirm-cancel"));
+    expect(await done).toBe(false);
+  });
+
   it("shows the daemon's question with the command's button words; Cancel runs nothing", async () => {
     invokeCommand.mockRejectedValueOnce(clear);
     render(<ConfirmDialog />);

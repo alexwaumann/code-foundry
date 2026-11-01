@@ -29,13 +29,6 @@ function scrollState(page: Page, testId: string) {
   return page.getByTestId(testId).evaluate((el) => ({ top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight }));
 }
 
-async function openMenu(page: Page, key: string) {
-  await row(page, key).click({ button: "right" });
-  const menu = page.getByTestId("row-menu");
-  await expect(menu).toBeVisible();
-  return menu;
-}
-
 test("Archived section: collapsed by default with its count; expanded, single-line rows with the archive age; hidden with no archived thread", async ({ page }) => {
   await openApp(page);
   const header = page.getByTestId("archived-header");
@@ -191,40 +184,4 @@ test("the footers stay pinned under a long main list, are capped, and scroll the
   await expect.poll(async () => (await scrollState(page, "sidebar-main")).top).toBeLessThanOrEqual(4);
 });
 
-test("archiving, snoozing or removing the selected thread selects home (the No project composer); another thread's leaves it (docs/notes/put-away-focuses-dashboard.md)", async ({ page }) => {
-  await openApp(page);
-  const pane = page.getByTestId("thread-pane");
-
-  // Archive the selected idle thread from its row menu: home shows. The thread
-  // stays in the archived list.
-  await row(page, "s:s-3").click();
-  await expect(pane).toHaveAttribute("data-thread-id", "s-3");
-  let menu = await openMenu(page, "s:s-3");
-  await menu.getByTestId("menu-archive").click();
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
-  await expect(pane).toHaveCount(0);
-  await expect(page.getByTestId("archived-count")).toHaveText("2");
-
-  // Another thread's archive (as from the CLI) leaves the selection alone.
-  await row(page, "s:s-2").click();
-  await expect(pane).toHaveAttribute("data-thread-id", "s-2");
-  await mockPost("thread/archive?id=s-6");
-  await expect(page.getByTestId("archived-count")).toHaveText("3");
-  await expect(pane).toHaveAttribute("data-thread-id", "s-2");
-
-  // The selected thread snoozed from the CLI: home.
-  await mockPost("thread/snooze?id=s-2&until=2m");
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
-  await expect(pane).toHaveCount(0);
-
-  // Remove the selected thread (the daemon's confirmation): home, no "no longer exists" pane.
-  await row(page, "s:s-4").click();
-  await expect(pane).toHaveAttribute("data-thread-id", "s-4");
-  menu = await openMenu(page, "s:s-4");
-  await menu.getByText("Remove", { exact: true }).click();
-  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
-  await page.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
-  await expect(page.getByTestId("thread-missing")).toHaveCount(0);
-  await expect(row(page, "s:s-4")).toHaveCount(0);
-});
+// Archiving, snoozing or removing the selected thread selecting home, another thread's leaving it: src/stores/archiveCleanup.test.ts ("selection"); the row menu's Archive and Remove are src/components/sidebar/RowMenu.test.tsx's, the confirm src/components/confirm/ConfirmDialog.test.tsx's.

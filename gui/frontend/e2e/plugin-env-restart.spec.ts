@@ -55,24 +55,4 @@ test("an idle stale thread: the card's project row says so; Restart Claude resta
   expect(calls.map((i) => [i.context?.activeThreadId, i.confirmed ?? false])).toEqual([["s-1", false]]);
 });
 
-test("restarting a working thread asks first: the conversation continues, the turn is interrupted", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await stale("s-1", "GitHub Actions added 2 variables");
-
-  let menu = await titleMenu(page);
-  await menu.getByTestId("menu-restart").click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Restart Claude for Refactor sidebar tree? The conversation continues; the current turn is interrupted.");
-  await expect(page.getByTestId("confirm-ok")).toHaveText("Restart Claude");
-  await page.getByTestId("confirm-cancel").click();
-
-  menu = await titleMenu(page);
-  await menu.getByTestId("menu-restart").click();
-  await page.getByTestId("confirm-ok").click();
-  menu = await titleMenu(page);
-  await expect(menu.getByTestId("menu-pin")).toBeVisible();
-  await expect(menu.getByTestId("menu-restart")).toHaveCount(0);
-  const confirmed = (await invocations()).filter((i) => i.name === "thread.restart");
-  expect(confirmed.map((i) => i.confirmed ?? false)).toEqual([false, false, true]);
-});
+// Restarting a working thread asking first (the conversation continues, the turn interrupted): the daemon's, internal/command/commands_thread_restart_test.go (TestThreadRestart "a working thread asks", "…restarts once confirmed"); the title menu's Restart Claude is src/components/thread/ThreadMenuItems.test.tsx's, the confirm src/components/confirm/ConfirmDialog.test.tsx's.

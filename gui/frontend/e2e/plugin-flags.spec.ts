@@ -49,12 +49,4 @@ test("a flag puts the thread in the attention group with the plugin's name on li
   await expectAttention(page, 2);
 });
 
-test("an until-seen flag goes when the thread is opened", async ({ page }) => {
-  await openApp(page);
-  await flag("s-3", "attention", "new run failed", "gh-actions", "GitHub Actions", true);
-  const s3 = row(page, "s:s-3");
-  await expect(s3.getByTestId("row-status")).toHaveText("GitHub Actions");
-  await expect(s3.getByTestId("row-detail")).toHaveText("new run failed");
-  await s3.click();
-  await expect(s3.getByTestId("row-status")).toHaveCount(0);
-});
+// An until-seen flag going when the thread is opened: the daemon's (internal/store/thread/flags_test.go, "until seen clears when the thread is opened…"); a flag's row status is src/components/sidebar/SidebarRow.test.tsx's.

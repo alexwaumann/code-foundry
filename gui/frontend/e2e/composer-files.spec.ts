@@ -228,58 +228,7 @@ test("a second project: files grouped by project, the primary first; tooltips na
   await expect(tip(page)).toHaveText("internal/api/thread.go");
 });
 
-test("Enter before the first answer does not send the half-typed reference", async ({ page }) => {
-  await openApp(page);
-  await compose(page);
-  await page.keyboard.type("look at @READM");
-  await page.keyboard.press("Enter"); // within the debounce: nothing has answered yet
-  await expect(labels(page)).toHaveText(["README.md"]);
-  expect(await newThreads()).toBe(0);
-  await page.keyboard.press("Enter");
-  await expect(value(page)).toHaveAttribute("data-value", "look at [README.md](cf-file://repo-cf/README.md) ");
-  expect(await newThreads()).toBe(0);
-});
-
-test("a slow search says Searching… until the rows land; Escape before the first answer keeps the card closed and Enter sends", async ({ page }) => {
-  await mockPost("files/search?delay=900");
-  await openApp(page);
-  await compose(page);
-  await page.keyboard.type("@READM");
-  await expect(card(page).getByTestId("completion-searching")).toHaveText("Searching…");
-  await expect(card(page).getByTestId("completion-hints")).toBeHidden();
-  await expect(labels(page)).toHaveText(["README.md"]);
-  await page.keyboard.press("Enter");
-  await expect(value(page)).toHaveAttribute("data-value", "[README.md](cf-file://repo-cf/README.md) ");
-
-  // A new query nothing has answered (no prefix of it is cached): Escape at once, then the
-  // answer lands.
-  const answered = page.waitForResponse((r) => r.url().endsWith("/SearchFiles") && (r.request().postData() ?? "").includes('"fork"'));
-  await page.keyboard.type("@fork");
-  await page.keyboard.press("Escape");
-  await answered;
-  await expect(card(page)).toHaveCount(0);
-  expect(await searches()).toContain("search repo-cf fork");
-  expect(await newThreads()).toBe(0);
-  await page.keyboard.press("Enter");
-  await expect.poll(newThreads).toBe(1);
-  expect((await invocations()).at(-1)?.args.prompt).toBe("@cf-file://repo-cf/README.md @fork");
-});
-
-test("a failing search: Enter waits for the answer (no match), the next Enter closes the card, the one after sends", async ({ page }) => {
-  await mockPost("files/search?fail=1&delay=300");
-  await openApp(page);
-  await compose(page);
-  await page.keyboard.type("@READM");
-  await page.keyboard.press("Enter");
-  await expect(card(page).getByTestId("completion-empty")).toHaveText("No threads or files match");
-  expect(await newThreads()).toBe(0);
-  await page.keyboard.press("Enter");
-  await expect(card(page)).toHaveCount(0);
-  expect(await newThreads()).toBe(0);
-  await page.keyboard.press("Enter");
-  await expect.poll(newThreads).toBe(1);
-  expect((await invocations()).at(-1)?.args.prompt).toBe("@READM");
-});
+// Enter before the first answer, a slow search (Searching…, hints hidden), Escape before the first answer and a failing search: src/components/compose/useCompletion.test.tsx (keys before and after the answer) and CompletionCard.test.tsx (what the card shows).
 
 // The card hangs under the worktree row, out of flow: it moves neither the composer card
 // nor that row, and its height is capped to the window below it (layout px = viewport px

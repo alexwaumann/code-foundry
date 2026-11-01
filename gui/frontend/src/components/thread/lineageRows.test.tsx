@@ -129,8 +129,10 @@ describe("Created by note", () => {
     expect(q(row, "thread-wake-note-body")?.querySelector("pre")?.textContent).toBe(JSON.stringify(JSON.parse(json), null, 2));
     fireEvent.click(q(row, "thread-wake-note-link") as HTMLElement);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "p" });
-    // The link does not toggle the body.
+    // The link does not toggle the body; the line again collapses it.
     expect(q(row, "thread-wake-note-body")).not.toBeNull();
+    fireEvent.click(q(row, "thread-wake-note-line") as HTMLElement);
+    expect(q(row, "thread-wake-note-body")).toBeNull();
   });
 
   it("a wake for an action run: a red cross, the action's name as plain text", () => {

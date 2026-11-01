@@ -350,16 +350,7 @@ test("11, 13: the collisions the banner showed are not toasted again; a chip is 
   await expect(page.getByText(/is also open in Busy one \(s-set-/)).toHaveCount(0);
 });
 
-test("12: the thread header's crumb names the thread's workspace (no separate chip)", async ({ page }) => {
-  await mockPost("workspace?name=shop&projects=repo-cf,repo-gp");
-  const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&workspace=shop&name=Shop")) as ThreadSummary;
-  await openApp(page);
-  await row(page, `s:${t.id}`).click();
-  await expect(page.getByTestId("pane-workspace")).toHaveCount(0);
-  const crumb = page.getByTestId("thread-crumb");
-  await expect(crumb).toHaveAttribute("data-icon", "layers");
-  await expect(crumb.getByTestId("thread-crumb-place")).toHaveText("shop");
-});
+// 12: the thread header's crumb naming the thread's workspace: src/components/thread/ThreadParts.test.tsx ("the thread header's crumb", "a named workspace"); pane-workspace no longer exists.
 
 test("16: cmd+N from a new-thread composer's prompt opens the project picker", async ({ page }) => {
   await openApp(page);
