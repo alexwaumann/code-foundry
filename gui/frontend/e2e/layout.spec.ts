@@ -241,7 +241,7 @@ test("every page header is 44px, ends on the band and drags; its controls do not
   await page.getByTestId("nav-pullrequests").click();
   await check('[data-testid="prs-page"] > header', ['[data-testid="panel-toggle"]']);
   await page.getByTestId("nav-projects").click();
-  await check('[data-testid="projects-page"] > header', ['[data-testid="projects-register"]', '[data-testid="panel-toggle"]']);
+  await check('[data-testid="projects-page"] > header', ['[data-testid="projects-filter"]', '[data-testid="panel-toggle"]']);
   // Settings is a sheet in the middle of the window (docs/notes/settings-sheet.md): its
   // header is as tall as a page's, inside the sheet's 1px border, and never drags.
   await page.keyboard.press("Meta+Comma");

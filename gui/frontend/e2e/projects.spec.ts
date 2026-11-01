@@ -48,7 +48,7 @@ async function menuItems(page: Page, testId: string): Promise<string[]> {
 }
 const panelKey = (page: Page) => page.getByTestId("side-panel").getAttribute("data-panel-key");
 
-test("the index: a row per project by last activity, its kind, caption, status sentence, pills and setup links", async ({ page }) => {
+test("the index: a table row per project by last activity, its kind, status sentence, default branch, pills and setup links", async ({ page }) => {
   // sketches gets the newest thread; writing has none, so it goes last.
   await mockPost("threads?project=repo-sk&count=1&status=busy");
   await openApp(page);
@@ -61,15 +61,20 @@ test("the index: a row per project by last activity, its kind, caption, status s
   expect(ids.indexOf("repo-gp")).toBeGreaterThan(ids.indexOf("repo-cf"));
   expect(ids.indexOf("repo-gp")).toBeGreaterThan(ids.indexOf("repo-dot"));
 
+  // The section titles count their rows; the header row names the columns.
+  await expect(page.getByTestId("projects-section").getByTestId("index-section-count")).toHaveText("(5)");
+  await expect(page.getByTestId("projects-table").getByTestId("index-columns").locator("span")).toHaveText(["Project", "Activity", "Default branch", "Needs a look", "Updated"]);
+  // The kind icon carries the kind: a name and no caption.
   const kinds: [string, string, string, string][] = [
-    ["repo-cf", "github", "alexwaumann/code-foundry", "2 threads working · 3 checkouts"],
-    ["repo-dot", "git", "origin · not GitHub", "idle · main only"],
-    ["repo-sk", "git", "local only", "1 thread working · main only"],
-    ["repo-wr", "nogit", "~/Documents/writing · no git", "idle"],
+    ["repo-cf", "github", "code-foundry", "2 threads working · 3 checkouts"],
+    ["repo-dot", "git", "dotfiles", "idle · main only"],
+    ["repo-sk", "git", "sketches", "1 thread working · main only"],
+    ["repo-wr", "nogit", "writing", "idle"],
   ];
-  for (const [id, kind, caption, status] of kinds) {
+  for (const [id, kind, name, status] of kinds) {
     await expect(row(page, id).getByTestId("index-project")).toHaveAttribute("data-kind", kind);
-    await expect(row(page, id).getByTestId("project-caption")).toHaveText(caption);
+    await expect(row(page, id).getByTestId("project-kind-icon")).toHaveAttribute("data-kind", kind);
+    await expect(row(page, id).getByTestId("project-name")).toHaveText(name);
     await expect(row(page, id).getByTestId("project-status")).toHaveText(status);
   }
   // Green dot only while a thread works.
@@ -81,26 +86,16 @@ test("the index: a row per project by last activity, its kind, caption, status s
   await expect(page.getByTestId("index-tidy")).toHaveCount(0);
   // Setup links: Publish on the repository without a remote, Initialize git on the folder.
   await expect(page.getByTestId("index-publish")).toHaveCount(1);
-  await expect(row(page, "repo-sk").getByTestId("index-publish")).toHaveText("Publish to GitHub…");
+  await expect(row(page, "repo-sk").getByTestId("index-publish")).toHaveText("Publish to GitHub");
   await expect(row(page, "repo-wr").getByTestId("index-init-git")).toHaveText("Initialize git");
   // Ages: a thread's, none for a project without threads.
   await expect(row(page, "repo-sk").getByTestId("index-age")).toHaveText("now");
   await expect(row(page, "repo-wr").getByTestId("index-age")).toHaveText("");
 
-  // Hover actions are hidden at rest and show on hover.
-  await page.mouse.move(0, 0);
-  const actions = row(page, "repo-gp").getByTestId("index-row-actions");
-  await expect(actions).toHaveCSS("opacity", "0");
+  // No hover actions or chevron: the row opens the page.
   await row(page, "repo-gp").hover();
-  await expect(actions).toHaveCSS("opacity", "1");
-  // No New worktree anywhere: worktrees are made by threads and agents.
-  await row(page, "repo-gp").getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Clean up merged worktrees 0", "Remove project"]);
-  await closeMenu(page, "project-more");
-  await row(page, "repo-wr").hover();
-  await row(page, "repo-wr").getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Initialize git", "Remove project"]);
-  await closeMenu(page, "project-more");
+  for (const id of ["project-new-thread", "project-new-terminal", "project-more"]) await expect(row(page, "repo-gp").getByTestId(id)).toHaveCount(0);
+  await expect(row(page, "repo-gp").locator("svg.lucide-chevron-right")).toHaveCount(0);
 
   // The setup links act without opening the page.
   await row(page, "repo-sk").getByTestId("index-publish").click();
@@ -116,14 +111,16 @@ test("the index: a row per project by last activity, its kind, caption, status s
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-gp");
 });
 
-test("the index's Workspaces rows: members, status, contents; a click opens the workspace's page", async ({ page }) => {
+test("the index's Workspaces rows: name, status, projects, contents; a click opens the workspace's page", async ({ page }) => {
   const ws = (await mockPost("workspace?name=platform&projects=repo-cf,repo-gp&skills=a,b")) as { id: string };
   await mockPost(`workspace-thread?workspace=${ws.id}&project=repo-gp&name=driver&status=busy&branch=cf/platform`);
   await openApp(page);
   await openProjects(page);
   const r = wsRow(page, ws.id);
   await expect(r.getByTestId("workspace-name")).toHaveText("platform");
-  await expect(r.getByTestId("workspace-caption")).toHaveText("code-foundry + ghostty-playground");
+  await expect(page.getByTestId("workspaces-table").getByTestId("index-columns").locator("span")).toHaveText(["Workspace", "Activity", "Projects", "Contents", "Updated"]);
+  await expect(page.getByTestId("workspaces-section").getByTestId("index-section-count")).toHaveText("(1)");
+  await expect(r.getByTestId("workspace-projects")).toHaveText("code-foundry + ghostty-playground");
   await expect(r.getByTestId("workspace-status")).toHaveText(/^1 thread working/);
   await expect(r.getByTestId("workspace-contents")).toHaveText("no instructions · 2 skills");
   await r.click();
@@ -141,6 +138,81 @@ test("the index's Workspaces rows: members, status, contents; a click opens the 
   await page.keyboard.press("Escape");
   await page.getByTestId("workspace-page-new-thread").click();
   await expect(page.getByTestId("composer")).toBeVisible();
+});
+
+test("the index's Default branch: the branch and its checks on GitHub, a click on failing checks opens the first failed one, — elsewhere", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  const cell = (id: string) => row(page, id).getByTestId("index-default-branch");
+  // The mock's repository activity: code-foundry's main fails 2 of 16, ghostty-playground's passes.
+  await expect(cell("repo-cf").getByTestId("index-default-branch-name")).toHaveText("main");
+  await expect(cell("repo-cf").locator("[data-checks]")).toHaveAttribute("data-checks", "failure");
+  await expect(cell("repo-cf").getByTestId("index-checks")).toHaveText("2/16 failing");
+  await expect(cell("repo-gp").locator("[data-checks]")).toHaveAttribute("data-checks", "success");
+  await expect(cell("repo-gp").getByTestId("index-checks")).toHaveText("10/10 passed");
+  // Not on GitHub, no remote, no git: a dash.
+  for (const id of ["repo-dot", "repo-sk", "repo-wr"]) await expect(cell(id)).toHaveText("—");
+
+  // Failing checks open the first failed check's page, and the row stays put.
+  await cell("repo-cf").getByTestId("index-checks").click();
+  expect((await lastInvocation("view.open.url"))?.args).toEqual({ url: "https://ci.example.com/job/code-foundry/main/812/" });
+  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
+  // Passing checks open nothing: a click there opens the project's page like the rest of the row.
+  await cell("repo-gp").getByTestId("index-checks").click();
+  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-gp");
+  expect((await invocations()).filter((i) => i.name === "view.open.url")).toHaveLength(1);
+});
+
+test("the pane header holds the filter and toggles; Add project and Add workspace sit on their section titles", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  const header = page.locator('[data-testid="projects-page"] > header');
+  await expect(header.getByRole("button", { name: /Add|New workspace/ })).toHaveCount(0);
+  await expect(header.getByTestId("projects-filter")).toBeVisible();
+  const add = page.getByTestId("projects-section").getByTestId("projects-register");
+  await expect(add).toHaveText("Add project");
+  await add.click();
+  await expect(page.getByTestId("add-project-dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("add-project-dialog")).toHaveCount(0);
+  // No workspaces yet: the hint names the button.
+  const ws = page.getByTestId("workspaces-section");
+  await expect(ws.getByTestId("workspaces-empty")).toHaveText("None yet: Add workspace, or code-foundry workspace new.");
+  await expect(ws.getByTestId("projects-new-workspace")).toHaveText("Add workspace");
+  await ws.getByTestId("projects-new-workspace").click();
+  await expect(page.getByTestId("new-workspace-dialog")).toBeVisible();
+});
+
+test("narrowing drops Activity, then Updated, then Default branch; Needs a look stays", async ({ page }) => {
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
+  await openApp(page);
+  await openProjects(page);
+  const scroll = page.getByTestId("projects-scroll");
+  // Sizes the window so the content (the scroll box) is `width` wide.
+  const contentWidth = async (width: number) => {
+    const now = await scroll.evaluate((el) => el.clientWidth);
+    const vp = page.viewportSize() ?? { width: 1280, height: 800 };
+    await page.setViewportSize({ width: vp.width + width - now, height: vp.height });
+    await expect.poll(() => scroll.evaluate((el) => el.clientWidth)).toBe(width);
+  };
+  const heads = (table: string) => page.getByTestId(table).getByTestId("index-columns").locator("span");
+  const steps: [number, string[], string[]][] = [
+    [900, ["Project", "Activity", "Default branch", "Needs a look", "Updated"], ["Workspace", "Activity", "Projects", "Contents", "Updated"]],
+    [800, ["Project", "Default branch", "Needs a look", "Updated"], ["Workspace", "Projects", "Contents", "Updated"]],
+    [650, ["Project", "Default branch", "Needs a look"], ["Workspace", "Projects", "Contents"]],
+    [560, ["Project", "Needs a look"], ["Workspace", "Projects"]],
+  ];
+  for (const [width, projects, workspaces] of steps) {
+    await contentWidth(width);
+    await expect(heads("projects-table")).toHaveText(projects);
+    await expect(heads("workspaces-table")).toHaveText(workspaces);
+  }
+  // The cells follow their headers, and what needs a look still shows.
+  await expect(row(page, "repo-cf").getByTestId("project-status")).toHaveCount(0);
+  await expect(row(page, "repo-cf").getByTestId("index-age")).toHaveCount(0);
+  await expect(row(page, "repo-cf").getByTestId("index-default-branch")).toHaveCount(0);
+  await expect(row(page, "repo-cf").getByTestId("index-prs")).toHaveText("2 PRs");
+  await expect(row(page, "repo-sk").getByTestId("index-publish")).toBeVisible();
 });
 
 test("the filter: / focuses it, it matches names, slugs, branches and paths, says when nothing matches, Escape clears it", async ({ page }) => {
@@ -287,7 +359,7 @@ test("the picker: projects by activity, then workspaces, then Add project…; pi
   await openApp(page);
   await openProjects(page);
   const order = await indexIds(page);
-  await row(page, "repo-cf").click();
+  await row(page, "repo-cf").getByTestId("project-name").click();
   await page.getByTestId("page-picker").click();
   const menu = page.getByTestId("page-picker-menu");
   await expect(menu).toBeVisible();
@@ -319,7 +391,7 @@ test("kind variants: no remote (note, no Sync or PR), another remote (no PR), no
   await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-project", "repo-sk");
   await page.keyboard.press("Escape");
   await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Publish to GitHub…", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New action…", "Publish to GitHub", "Remove project"]);
   await closeMenu(page, "project-more");
 
   await openProjectPage(page, "repo-dot");
@@ -412,7 +484,7 @@ test("each page has its own side panel; the sidebar row reopens the last page an
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
 
   // Back on code-foundry's page: its tab is still there.
-  await row(page, "repo-cf").click();
+  await row(page, "repo-cf").getByTestId("project-name").click();
   await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · fix/resize");
   expect(await panelKey(page)).toBe("view:projects:project:repo-cf");
 
@@ -449,7 +521,7 @@ test("a page's scroll position is remembered while the window lives", async ({ p
   expect(top).toBeGreaterThan(0);
   await page.getByTestId("projects-crumb").click();
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
-  await row(page, "repo-cf").click();
+  await row(page, "repo-cf").getByTestId("project-name").click();
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-cf");
   await expect.poll(() => page.getByTestId("projects-scroll").evaluate((el) => el.scrollTop)).toBe(top);
   // Another project's page starts at the top.
@@ -464,7 +536,7 @@ test("worktrees to tidy: the index pill and the project menu count the cleanable
   await openApp(page);
   await openProjects(page);
   await expect(row(page, "repo-cf").getByTestId("index-tidy")).toHaveText("1 worktree to tidy");
-  await row(page, "repo-cf").click();
+  await row(page, "repo-cf").getByTestId("project-name").click();
   await page.getByTestId("project-more").click();
   await expect(page.getByTestId("project-cleanup-count")).toHaveText("1");
   await closeMenu(page, "project-more");
@@ -518,7 +590,7 @@ test("Worktrees without threads: a row per leftover with why it stayed; Show dif
   await openApp(page);
   await openProjects(page);
   await expect(row(page, "repo-cf").getByTestId("index-tidy")).toHaveText("1 worktree to tidy");
-  await row(page, "repo-cf").click();
+  await row(page, "repo-cf").getByTestId("project-name").click();
   await page.getByTestId("project-more").click();
   await expect(page.getByTestId("project-cleanup-count")).toHaveText("1");
   await closeMenu(page, "project-more");

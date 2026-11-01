@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, invocations, openApp, openProjectPage, openProjects, resetMock, row } from "./fixtures";
 
 // Every way to start a shell lands in a bottom panel (docs/notes/bottom-panel-3-routing.md):
 // the thread's when a thread owns it, else the Projects page's. The sidebar never gets a row.
@@ -74,12 +74,10 @@ test("cmd+t from a Projects-page shell starts another in its worktree", async ({
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
 });
 
-test("a project row's New terminal: the Projects page's bottom panel", async ({ page }) => {
+test("a project page's Terminal: the Projects page's bottom panel", async ({ page }) => {
   await openApp(page);
-  await openProjects(page);
-  const cf = page.locator('[data-nav-key="p:repo-cf"]');
-  await cf.hover();
-  await cf.getByTestId("project-new-terminal").click();
+  await openProjectPage(page, "repo-cf");
+  await page.getByTestId("project-terminal").click();
   expect((await lastNew())?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: CF, activeThreadId: "" });
   // t-top (feat/sidebar) and the new one (main).
   await expect(bottom(page).getByRole("tab")).toHaveText(["feat-sidebar", "code-foundry"]);
@@ -112,11 +110,9 @@ test.describe("screenshots", () => {
       await shot("thread");
       await page.getByTestId("sidebar").screenshot({ path: `${String(shots)}/sidebar-${scheme}.png` });
 
-      // The Projects page: t-top, and a shell from dotfiles' row.
-      await openProjects(page);
-      const dot = page.locator('[data-nav-key="p:repo-dot"]');
-      await dot.hover();
-      await dot.getByTestId("project-new-terminal").click();
+      // The Projects page: t-top, and a shell from dotfiles' page.
+      await openProjectPage(page, "repo-dot");
+      await page.getByTestId("project-terminal").click();
       await expect(bottom(page).getByRole("tab")).toHaveCount(2);
       await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
       await page.mouse.move(0, 0);

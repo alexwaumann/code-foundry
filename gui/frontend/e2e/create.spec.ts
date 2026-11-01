@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { expectProjectRevealed, invocations, mockUrl, openAddProjectDialog, openApp, openProjects, resetMock, row } from "./fixtures";
+import { expectProjectRevealed, invocations, mockUrl, openAddProjectDialog, openApp, openProjectPage, openProjects, resetMock, row } from "./fixtures";
 
 // Add-project PR 4: the Add Project dialog's New tab (project.create, then optionally
 // project.github.publish) and the overview's Publish to GitHub dialog, against the mock's
@@ -240,12 +240,10 @@ test("the Projects index row's Publish to GitHub opens the publish dialog for sk
 
 test("project.github.publish in the palette opens the publish dialog; project.create opens New", async ({ page }) => {
   await openApp(page);
-  // The composer for sketches (its Projects page row's New thread) gives the palette the
+  // The composer for sketches (its project page's New thread) gives the palette the
   // project's context; the Projects page itself has none.
-  await openProjects(page);
-  const sk = page.locator('[data-nav-key="p:repo-sk"]');
-  await sk.hover();
-  await sk.getByTestId("project-new-thread").click();
+  await openProjectPage(page, "repo-sk");
+  await page.getByTestId("project-new-thread").click();
   await expect(page.getByTestId("composer")).toBeVisible();
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");

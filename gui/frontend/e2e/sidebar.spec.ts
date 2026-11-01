@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, composeProject, DEFAULT_ORDER, emit, expectAttention, holdThreads, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, openWorkspacePage, resetMock, row } from "./fixtures";
+import { CF, composeProject, DEFAULT_ORDER, emit, expectAttention, holdThreads, invocations, mockPost, mockUrl, openApp, openProjectPage, openWorkspacePage, resetMock, row } from "./fixtures";
 
 /** Where the mock (like the daemon) puts a project's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
@@ -223,11 +223,9 @@ test("the Projects view removes a workspace and offers project actions", async (
   await expect(page.locator('[data-testid="workspace"]')).toHaveCount(0);
   expect((await lastInvocation("workspace.remove"))?.args).toEqual({ workspace: "spare" });
 
-  // New thread from a project row opens its composer.
-  await openProjects(page);
-  const gp = page.locator('[data-nav-key="p:repo-gp"]');
-  await gp.hover();
-  await gp.getByTestId("project-new-thread").click();
+  // New thread from a project's page opens its composer.
+  await openProjectPage(page, "repo-gp");
+  await page.getByTestId("project-new-thread").click();
   await expect(page.getByTestId("composer-heading")).toContainText("ghostty-playground");
 
   // Remove a worktree (project.worktree.remove with that worktree's context, confirmed).

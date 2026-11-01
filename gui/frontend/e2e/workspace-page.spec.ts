@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, openWorkspacePage, resetMock } from "./fixtures";
+import { expectTooltip, invocations, mockPost, mockUrl, openApp, openProjectPage, openProjects, openWorkspacePage, resetMock } from "./fixtures";
 
 /**
  * A workspace's page on the Projects view (docs/notes/projects-redesign-3-workspace-page.md):
@@ -435,9 +435,8 @@ test("a project named “workspace”: Start here and Remove go by its id, not t
 test("an unregistered member reads “not registered” and opens nothing; a registered one shows its main checkout's changes", async ({ page }) => {
   const ws = (await mockPost("workspace?name=sk&projects=repo-sk,repo-cf")) as { id: string };
   await openApp(page);
-  await openProjects(page);
-  await page.locator('[data-nav-key="p:repo-sk"]').hover();
-  await page.locator('[data-nav-key="p:repo-sk"]').getByTestId("project-more").click();
+  await openProjectPage(page, "repo-sk");
+  await page.getByTestId("project-more").click();
   await page.getByTestId("project-unregister").click();
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
   await expect(page.locator('[data-nav-key="p:repo-sk"]')).toHaveCount(0);
