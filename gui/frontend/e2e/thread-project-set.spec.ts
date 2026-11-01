@@ -3,11 +3,12 @@ import { composeProject, expectTooltip, invocations, mockPost, openApp, resetMoc
 
 /**
  * A thread's project set on the fly (docs/notes/thread-project-set.md), from the thread
- * info card: Add project (the composer's multi-select list, thread.project.add per pick),
- * the Run in menu's × (thread.project.remove, asking first for a dirty checkout), the
- * thread leaving its named workspace (the crumb's "<cwd> +N", Save as workspace), and a
- * member whose worktree moved greyed with the daemon's refusal; the composer's Work in
- * greys such a branch the same way.
+ * info card: Add project (the composer's list of the projects not in the set: one pick,
+ * thread.project.add, and it closes), the Run in menu's × (thread.project.remove, asking
+ * first for a dirty checkout, never Run in), the thread leaving its named workspace (the
+ * crumb's "<cwd> +N", Save as workspace, or Use workspace when a saved one has the set),
+ * and a member whose worktree moved greyed with the daemon's refusal; the composer's Work
+ * in greys such a branch the same way.
  */
 
 const HOME = "/Users/dev";
@@ -38,7 +39,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("Add project: one add per pick, the thread leaves its workspace, then Save as workspace attaches it to the new one", async ({ page }) => {
+test("Add project: one pick adds and closes the list, the thread leaves its workspace, then Save as workspace attaches it to the new one", async ({ page }) => {
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   const id = await openMulti(page, "repo-cf,repo-gp", "repo-gp", "login");
   await expect(crumb(page)).toHaveAttribute("data-icon", "layers");
@@ -50,19 +51,35 @@ test("Add project: one add per pick, the thread leaves its workspace, then Save 
   await menu(page).getByTestId("ti-add-project").click();
   const list = page.getByTestId("ti-add-project-picker-list");
   await expect(list).toBeVisible();
-  // The thread's projects are checked; a pick adds one and the list stays open for the next.
-  await expect(list.locator('[data-checked="true"]')).toHaveCount(2);
+  // Only the projects not in the set are listed; a pick adds one and the list closes.
+  await expect(list.getByRole("option")).toHaveCount(3);
+  await expect(list.getByRole("option", { name: /code-foundry|ghostty/ })).toHaveCount(0);
   await list.getByRole("option", { name: /dotfiles/ }).click();
+  await expect(list).toHaveCount(0);
   await expect.poll(() => calls("thread.project.add")).toEqual([[{ project: "repo-dot" }, id]]);
-  await expect(list.getByRole("option", { name: /dotfiles/ })).toHaveAttribute("data-checked", "true");
+  await expect(card(page).getByTestId("ti-project")).toContainText("+2");
+  // The next add is another pick; dotfiles is no longer offered.
+  await card(page).getByTestId("ti-project").click();
+  await menu(page).getByTestId("ti-add-project").click();
+  await expect(list.getByRole("option")).toHaveCount(2);
   await list.getByRole("option", { name: /sketches/ }).click();
+  await expect(list).toHaveCount(0);
   await expect.poll(async () => (await calls("thread.project.add")).length).toBe(2);
+  // The last one in: the list then says every project is in the thread.
+  await card(page).getByTestId("ti-project").click();
+  await menu(page).getByTestId("ti-add-project").click();
+  await list.getByRole("option").first().click();
+  await expect.poll(async () => (await calls("thread.project.add")).length).toBe(3);
+  await card(page).getByTestId("ti-project").click();
+  await menu(page).getByTestId("ti-add-project").click();
+  await expect(list).toContainText("Every project is in this thread.");
+  await expect(list.getByRole("option")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(list).toHaveCount(0);
 
   // Out of the workspace: the crumb is the unnamed form, the card's workspace row is gone.
   await expect(crumb(page)).toHaveAttribute("data-icon", "folders");
-  await expect(page.getByTestId("thread-crumb-place")).toHaveText("ghostty-playground +3");
+  await expect(page.getByTestId("thread-crumb-place")).toHaveText("ghostty-playground +4");
   await expect(card(page).getByTestId("ti-workspace")).toHaveCount(0);
   await expect(page.getByText(/Added project dotfiles to this thread .*The thread no longer follows workspace login/)).toBeVisible();
 
@@ -77,15 +94,42 @@ test("Add project: one add per pick, the thread leaves its workspace, then Save 
   await expect(card(page).getByTestId("ti-workspace")).toContainText("quad");
 });
 
+test("Use workspace: a set that equals a saved workspace is offered that workspace, not a save", async ({ page }) => {
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
+  const id = await openMulti(page, "repo-cf,repo-gp,repo-sk", "repo-gp");
+  await expect(crumb(page)).toHaveAttribute("data-icon", "folders");
+  await card(page).getByTestId("ti-project").click();
+  // Three projects match no workspace: Save as workspace.
+  await expect(menu(page).getByTestId("ti-save-workspace")).toBeVisible();
+  await expect(menu(page).getByTestId("ti-use-workspace")).toHaveCount(0);
+  await runIn(page, "repo-sk").hover();
+  await runIn(page, "repo-sk").getByTestId("ti-runin-remove").click();
+  await expect.poll(() => calls("thread.project.remove")).toEqual([[{ project: "repo-sk" }, id]]);
+  // Down to login's two: Use workspace login takes the save's place, and attaches the thread.
+  await card(page).getByTestId("ti-project").click();
+  await expect(menu(page).getByTestId("ti-save-workspace")).toHaveCount(0);
+  const use = menu(page).getByTestId("ti-use-workspace");
+  await expect(use).toHaveText("Use workspace login");
+  await use.click();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.workspace").map((i) => [i.args.workspace?.startsWith("w-"), i.context?.activeThreadId])).toEqual([[true, id]]);
+  await expect(crumb(page)).toHaveAttribute("data-icon", "layers");
+  await expect(card(page).getByTestId("ti-workspace")).toContainText("login");
+});
+
 test("Remove from this thread: a × on every member but the cwd's; a dirty checkout asks first", async ({ page }) => {
   const id = await openMulti(page, "repo-cf,repo-gp,repo-sk", "repo-gp");
   await card(page).getByTestId("ti-project").click();
   await expect(menu(page).getByTestId("ti-runin-item")).toHaveCount(3);
   await expect(runIn(page, "repo-gp").getByTestId("ti-runin-remove")).toHaveCount(0);
   await runIn(page, "repo-sk").hover();
+  // The × (shown on the row's hover) says what it does.
+  await runIn(page, "repo-sk").getByTestId("ti-runin-remove").hover();
+  await expect(page.getByRole("tooltip")).toHaveText("Remove project");
   await runIn(page, "repo-sk").getByTestId("ti-runin-remove").click();
   await expect.poll(() => calls("thread.project.remove")).toEqual([[{ project: "repo-sk" }, id]]);
   await expect(page.getByText(/Removed project sketches from this thread\. Its checkout .* stays on disk\./)).toBeVisible();
+  // The × is only a removal: the thread did not run in sketches (the item's own select).
+  expect((await invocations()).filter((i) => i.name === "thread.run-in")).toEqual([]);
 
   // A member with uncommitted changes: the daemon's confirmation names the work, then it goes.
   await mockPost(`worktree/dirty?path=${encodeURIComponent(worktreeOf("alexwaumann/code-foundry", "feat/x"))}&modified=2`);
