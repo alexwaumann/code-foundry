@@ -17,7 +17,9 @@ import (
 
 // Branch links (docs/notes/linked-prs-branch.md): a thread's linked pull requests
 // include every pull request whose head is a branch the thread works on, in its
-// project's GitHub repository. The thread store knows none of the stores involved, so
+// project's GitHub repository, other than the project's default branch
+// (docs/notes/linked-prs-default-branch.md: work merges into it, so a pull request from
+// it is not the thread's work). The thread store knows none of the stores involved, so
 // the daemon resolves each thread's branches (the project store), matches
 // them against the GitHub store's cached lists (dashboards and branch lists; nothing is
 // polled or watched for this) and pushes the matches (LinkBranchPullRequests).
@@ -26,6 +28,9 @@ import (
 // implements it.
 type branchPRCache interface {
 	CachedPullRequests() []gh.PullRequest
+	// PullRequest reads one pull request (the cached detail when fresh): how a branch
+	// link made before heads were recorded learns its head (linked_prs_branch_settle.go).
+	PullRequest(ctx context.Context, slug string, number int) (gh.PullRequestDetail, error)
 }
 
 var _ branchPRCache = (*gh.Store)(nil)
@@ -35,6 +40,7 @@ var _ branchPRCache = (*gh.Store)(nil)
 type branchLinker interface {
 	Snapshot() *thread.Snapshot
 	LinkBranchPullRequests(id string, links []thread.LinkedPullRequest) int
+	SettleBranchLinks(id string, heads map[string]string, drop []string) int
 }
 
 var _ branchLinker = (*thread.Manager)(nil)
@@ -65,22 +71,24 @@ func prsByHead(prs []gh.PullRequest) map[headKey][]gh.PullRequest {
 // threadBranches is the branches thread th works on, each in its project's GitHub
 // repository: what each of its checkouts has checked out (its HEAD, at the path the
 // thread records; docs/notes/thread-checkouts.md), and for a worktree-mode checkout or a
-// cwd that is gone the branch the thread was created for (it is made again on it). A
-// project without a GitHub slug and a detached checkout contribute nothing; so does a
-// thread without a project.
+// cwd that is gone the branch the thread was created for (it is made again on it). The
+// project's default branch is left out, and so is every branch of a project whose
+// default branch is not known yet (the first reconcile after a start has not run: a
+// project event follows it). A project without a GitHub slug and a detached checkout
+// contribute nothing; so does a thread without a project.
 func threadBranches(th thread.Thread, projects *project.Snapshot) []headKey {
 	var out []headKey
 	// From the snapshot alone (every pass): an unlisted checkout is "not on a branch now".
 	for _, c := range thread.ListedCheckouts(th, projects) {
 		r, ok := projects.Project(c.ProjectID)
-		if !ok || r.GitHubSlug == "" {
+		if !ok || r.GitHubSlug == "" || r.DefaultBranch == "" {
 			continue
 		}
 		head := c.Branch // "" when detached
 		if !c.Listed && (c.WorktreeMode || c.Primary) {
 			head = th.Branch
 		}
-		if head == "" {
+		if head == "" || head == r.DefaultBranch {
 			continue
 		}
 		k := headKey{strings.ToLower(r.GitHubSlug), head}
@@ -126,7 +134,7 @@ func branchLinksFor(threads *thread.Snapshot, projects *project.Snapshot,
 					continue
 				}
 				links = append(links, thread.LinkedPullRequest{
-					Slug: k.slug, Number: p.Number, URL: p.URL, LinkedAt: cmp.Or(p.CreatedAt, now), Source: thread.LinkBranch,
+					Slug: k.slug, Number: p.Number, URL: p.URL, LinkedAt: cmp.Or(p.CreatedAt, now), Source: thread.LinkBranch, Head: k.head,
 				})
 			}
 		}
@@ -166,7 +174,8 @@ func wakesBranchLinks(ev any) bool {
 }
 
 // startBranchLinks runs a pass at once, and one branchLinkDelay after an event that may
-// change what it finds (wakesBranchLinks). Each pass reads the current state, so a
+// change what it finds (wakesBranchLinks) or after heads of old links were read
+// (linked_prs_branch_settle.go). Each pass reads the current state, so a
 // dropped event costs nothing as long as another one follows. The returned func stops
 // it.
 func startBranchLinks(ctx context.Context, log *slog.Logger, threads branchLinker, projects func() *project.Snapshot,
@@ -176,12 +185,22 @@ func startBranchLinks(ctx context.Context, log *slog.Logger, threads branchLinke
 	branches := bus.Subscribe[gh.BranchPullRequestsUpdated](b, 64)
 	threadEvents := bus.Subscribe[thread.Event](b, 256)
 	projectEvents := bus.Subscribe[project.Event](b, 256)
+	settler := newBranchLinkSettler()
+	heads := make(chan map[gh.PullRequestRef]prHead)
+	var wg sync.WaitGroup
 	pass := func() {
-		if n := linkBranchPullRequests(threads, projects(), prs, time.Now()); n > 0 {
+		snap := projects()
+		if n := linkBranchPullRequests(threads, snap, prs, time.Now()); n > 0 {
 			log.Info("linked pull requests from thread branches", "links", n)
 		}
+		dropped, toRead := settler.pass(threads, snap, prs.CachedPullRequests())
+		if dropped > 0 {
+			log.Info("dropped default-branch pull request links", "links", dropped)
+		}
+		if len(toRead) > 0 {
+			wg.Go(func() { readHeads(ctx, prs, toRead, heads) })
+		}
 	}
-	var wg sync.WaitGroup
 	wg.Go(func() {
 		defer dash.Close()
 		defer branches.Close()
@@ -200,6 +219,12 @@ func startBranchLinks(ctx context.Context, log *slog.Logger, threads branchLinke
 			case <-due:
 				due = nil
 				pass()
+				continue
+			case got := <-heads:
+				settler.merge(got)
+				if due == nil && len(got) > 0 {
+					due = time.After(branchLinkDelay)
+				}
 				continue
 			case e, o := <-dash.C():
 				ev, open = e, o

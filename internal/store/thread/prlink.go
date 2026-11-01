@@ -45,6 +45,10 @@ type LinkedPullRequest struct {
 	// ViaThreadID is, for LinkChild, the thread's direct child the link came through
 	// (not the descendant that linked it first); "" otherwise.
 	ViaThreadID string
+	// Head is, for LinkBranch, the head branch the daemon matched the pull request on;
+	// "" for a branch link made before it was recorded (prlink_branch.go resolves those)
+	// and for other sources. Stored, not on the API.
+	Head string
 }
 
 var quotedPRLink = []byte(`"pr-link"`)

@@ -129,3 +129,58 @@ func TestLinkBranchPullRequestsEdges(t *testing.T) {
 		t.Errorf("links = %+v; want #5 branch linked now", got.LinkedPullRequests)
 	}
 }
+
+func TestSettleBranchLinks(t *testing.T) {
+	e := newEnv(t)
+	ids, names := lineage(e, [][2]string{{"g", ""}, {"p", "g"}, {"c", "p"}, {"other", ""}})
+	// Old branch links on c (no head), copied up to p and g; g also has #2 from Claude.
+	e.m.linkPullRequests(ids["g"], childLinks(2))
+	e.m.LinkBranchPullRequests(ids["c"], branchLinks(1, 2, 3))
+	e.m.LinkBranchPullRequests(ids["other"], branchLinks(1))
+	// A link with a head is settled already and is never touched.
+	headed := childLink(4)
+	headed.Head = "main"
+	e.m.LinkBranchPullRequests(ids["c"], []LinkedPullRequest{headed})
+
+	url := func(n int) string { return childLink(n).URL }
+	if n := e.m.SettleBranchLinks(ids["c"], map[string]string{url(3): "cf/x", url(4): "cf/y"}, []string{url(1), url(2), url(4)}); n != 5 {
+		t.Errorf("removed %d; want 5 (#1 and #2 on c and p, #1 on g: its #2 is Claude's)", n)
+	}
+	if n := e.m.SettleBranchLinks("s-unknown", nil, []string{url(1)}); n != 0 {
+		t.Errorf("unknown thread: removed %d", n)
+	}
+	want := map[string][]string{
+		"g":     {"#2 claude", "#3 child p", "#4 child p"},
+		"p":     {"#3 child c", "#4 child c"},
+		"c":     {"#3 branch", "#4 branch"},
+		"other": {"#1 branch"},
+	}
+	heads := func(id string) []string {
+		got, _ := e.m.Get(e.ctx(), id)
+		var out []string
+		for _, l := range got.LinkedPullRequests {
+			out = append(out, l.Head)
+		}
+		return out
+	}
+	check := func(when string) {
+		for n, w := range want {
+			got, err := e.m.Get(e.ctx(), ids[n])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if facts := linkFacts(t, got.LinkedPullRequests, names); !slices.Equal(facts, w) {
+				t.Errorf("%s%s links = %q; want %q", when, n, facts, w)
+			}
+		}
+		if h := heads(ids["c"]); !slices.Equal(h, []string{"cf/x", "main"}) {
+			t.Errorf("%sc heads = %q; want cf/x and main", when, h)
+		}
+		if h := heads(ids["p"]); !slices.Equal(h, []string{"", ""}) {
+			t.Errorf("%sp heads = %q; copies carry none", when, h)
+		}
+	}
+	check("")
+	e.restart()
+	check("after restart ")
+}

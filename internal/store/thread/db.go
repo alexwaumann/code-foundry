@@ -10,7 +10,7 @@ import (
 )
 
 // Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015, 0016, 0017, 0018, 0023, 0027, 0028, 0032, 0036, 0040, 0041, 0047 and 0049) and thread_pull_requests (0010, 0039); thread_usage and usage_retired
+// 0015, 0016, 0017, 0018, 0023, 0027, 0028, 0032, 0036, 0040, 0041, 0047 and 0049) and thread_pull_requests (0010, 0039, 0052); thread_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // thread keeps the status it ended with.
@@ -217,9 +217,9 @@ func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedP
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, l := range links {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO thread_pull_requests (thread_id, slug, number, url, linked_at, source, via_thread_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (thread_id, url) DO NOTHING`,
-			threadID, l.Slug, l.Number, l.URL, millis(l.LinkedAt), string(cmp.Or(l.Source, LinkClaude)), l.ViaThreadID); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO thread_pull_requests (thread_id, slug, number, url, linked_at, source, via_thread_id, head)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (thread_id, url) DO NOTHING`,
+			threadID, l.Slug, l.Number, l.URL, millis(l.LinkedAt), string(cmp.Or(l.Source, LinkClaude)), l.ViaThreadID, l.Head); err != nil {
 			return fmt.Errorf("thread: save links of %s: %w", threadID, err)
 		}
 	}
@@ -229,7 +229,18 @@ func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedP
 	return nil
 }
 
-// deleteLinks removes thread threadID's links to urls (a member removed: members.go).
+// saveLinkHeads records the head branch of thread threadID's links (url to head).
+func saveLinkHeads(ctx context.Context, db *sql.DB, threadID string, heads map[string]string) error {
+	for u, head := range heads {
+		if _, err := db.ExecContext(ctx, `UPDATE thread_pull_requests SET head = ? WHERE thread_id = ? AND url = ?`, head, threadID, u); err != nil {
+			return fmt.Errorf("thread: save head of link %s of %s: %w", u, threadID, err)
+		}
+	}
+	return nil
+}
+
+// deleteLinks removes thread threadID's links to urls (a member removed: members.go; a
+// default-branch link dropped: prlink_branch.go).
 func deleteLinks(ctx context.Context, db *sql.DB, threadID string, urls []string) error {
 	for _, u := range urls {
 		if _, err := db.ExecContext(ctx, `DELETE FROM thread_pull_requests WHERE thread_id = ? AND url = ?`, threadID, u); err != nil {
@@ -242,7 +253,7 @@ func deleteLinks(ctx context.Context, db *sql.DB, threadID string, urls []string
 // loadLinks returns every thread's linked pull requests in first-seen (insertion)
 // order.
 func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest, error) {
-	rows, err := db.QueryContext(ctx, `SELECT thread_id, slug, number, url, linked_at, source, via_thread_id
+	rows, err := db.QueryContext(ctx, `SELECT thread_id, slug, number, url, linked_at, source, via_thread_id, head
 		FROM thread_pull_requests ORDER BY thread_id, rowid`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load links: %w", err)
@@ -254,7 +265,7 @@ func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest,
 		var l LinkedPullRequest
 		var at int64
 		var source string
-		if err := rows.Scan(&id, &l.Slug, &l.Number, &l.URL, &at, &source, &l.ViaThreadID); err != nil {
+		if err := rows.Scan(&id, &l.Slug, &l.Number, &l.URL, &at, &source, &l.ViaThreadID, &l.Head); err != nil {
 			return nil, fmt.Errorf("thread: load links: %w", err)
 		}
 		l.LinkedAt, l.Source = fromMillis(at), LinkSource(source)
