@@ -8,8 +8,8 @@
  */
 import { create } from "zustand";
 import { toast } from "sonner";
-import { canSaveAsWorkspace, WORKSPACE_PRIMARY } from "@/lib/projectSet";
-import { runCommandForResult } from "./commands";
+import { canSaveAsWorkspace, matchingWorkspace, WORKSPACE_PRIMARY } from "@/lib/projectSet";
+import { runCommand, runCommandForResult } from "./commands";
 import { THREAD_COMMANDS, threadContext } from "./threadActions";
 import { useThreadsStore } from "./threads";
 import { useWorkspacesStore } from "./workspaces";
@@ -39,6 +39,33 @@ export function useCanSaveAsWorkspace(threadId: string): boolean {
       inFolder,
     );
   });
+}
+
+/**
+ * The saved workspace whose members are exactly the thread's set, when one exists and the
+ * thread does not reference it (its id and name): the card offers "Use workspace <name>"
+ * (thread.workspace) in place of saving the same set twice. null otherwise.
+ */
+export function useMatchingWorkspace(threadId: string): { id: string; name: string } | null {
+  const ids = useThreadsStore((s) => (s.byId[threadId]?.projectIds ?? []).join("\u0000"));
+  const current = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
+  const key = useWorkspacesStore((s) => {
+    const projectIds = ids ? ids.split("\u0000") : [];
+    if (projectIds.length < 2) return "";
+    const w = matchingWorkspace(
+      projectIds,
+      s.order.map((id) => ({ id, members: s.byId[id]?.members.map((m) => m.projectId) ?? [] })),
+    );
+    return w && w.id !== current ? w.id + "\u0000" + (s.byId[w.id]?.name ?? "") : "";
+  });
+  if (!key) return null;
+  const [id = "", name = ""] = key.split("\u0000");
+  return { id, name: name || id };
+}
+
+/** Makes workspace `workspaceId` the thread's reference (thread.workspace): its set already matches. */
+export function followWorkspace(threadId: string, workspaceId: string): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.setWorkspace, { workspace: workspaceId }, threadContext(threadId));
 }
 
 /** Opens the dialog for a thread. Deferred, so the menu that picked it finishes closing first. */

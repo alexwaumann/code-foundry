@@ -1,6 +1,19 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Check, CircleAlert, Code, Layers, OctagonX, Play, Plug, Plus, Save, SquareTerminal, Unlink } from "lucide-react";
+import {
+  Check,
+  CircleAlert,
+  Code,
+  Layers,
+  LoaderCircle,
+  OctagonX,
+  Play,
+  Plug,
+  Plus,
+  Save,
+  SquareTerminal,
+  Unlink,
+} from "lucide-react";
 import { FinderMark } from "@/components/icons/FinderMark";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { ACTION_ICON } from "@/components/actions/actionIcons";
@@ -26,10 +39,19 @@ import { newBottomTerminal } from "@/stores/bottomActions";
 import { runCommand } from "@/stores/commands";
 import { useProjectRefusals } from "@/stores/placementChecks";
 import { useProjectsStore } from "@/stores/projects";
-import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace";
-import { runCardAction, useActionPicks, useEditorApps } from "@/stores/threadInfo";
+import {
+  followWorkspace,
+  openSaveWorkspace,
+  useCanSaveAsWorkspace,
+  useMatchingWorkspace,
+} from "@/stores/saveWorkspace";
+import {
+  runCardAction,
+  useActionPicks,
+  useEditorApps,
+} from "@/stores/threadInfo";
 import { runThreadIn, threadContext } from "@/stores/threadActions";
-import { removeThreadProject } from "@/stores/threadProjects";
+import { removeThreadProject, useAddingProject } from "@/stores/threadProjects";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { AddProjectPicker } from "./AddProjectPicker";
@@ -38,12 +60,22 @@ import { useMembers } from "./useMembers";
 
 /** A named workspace: its name and the set's size. */
 function WorkspaceRow({ threadId }: { threadId: string }) {
-  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
-  const count = useThreadsStore((s) => s.byId[threadId]?.projectIds.length ?? 0);
-  const name = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? "") : ""));
+  const workspaceId = useThreadsStore(
+    (s) => s.byId[threadId]?.workspaceId ?? "",
+  );
+  const count = useThreadsStore(
+    (s) => s.byId[threadId]?.projectIds.length ?? 0,
+  );
+  const name = useWorkspacesStore((s) =>
+    workspaceId ? (s.byId[workspaceId]?.name ?? "") : "",
+  );
   if (!name) return null;
   return (
-    <Row icon={<Layers />} meta={`${String(count)} ${count === 1 ? "project" : "projects"}`} testId="ti-workspace">
+    <Row
+      icon={<Layers />}
+      meta={`${String(count)} ${count === 1 ? "project" : "projects"}`}
+      testId="ti-workspace"
+    >
       <span className="font-medium">{name}</span>
     </Row>
   );
@@ -78,10 +110,19 @@ function RunInItem({
   onRemove: (projectId: string) => void;
 }) {
   const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
-  const branch = useProjectsStore((s) => s.byId[projectId]?.worktrees.find((w) => w.path === path)?.branch ?? "");
-  const detached = useProjectsStore((s) => s.byId[projectId]?.worktrees.find((w) => w.path === path)?.detached ?? false);
+  const branch = useProjectsStore(
+    (s) =>
+      s.byId[projectId]?.worktrees.find((w) => w.path === path)?.branch ?? "",
+  );
+  const detached = useProjectsStore(
+    (s) =>
+      s.byId[projectId]?.worktrees.find((w) => w.path === path)?.detached ??
+      false,
+  );
   // The thread's own checkout moved: say so, not the daemon's words naming this thread as the one working there.
-  const tip = refusal ? (ownMovedText(path, createdBranch, branch, detached) ?? refusal) : undefined;
+  const tip = refusal
+    ? (ownMovedText(path, createdBranch, branch, detached) ?? refusal)
+    : undefined;
   const item = (
     <DropdownMenuItem
       data-testid="ti-runin-item"
@@ -99,7 +140,11 @@ function RunInItem({
         }
       }}
     >
-      {cwd ? <Check className="text-cf-link" aria-hidden /> : <span className="size-4 shrink-0" aria-hidden />}
+      {cwd ? (
+        <Check className="text-cf-link" aria-hidden />
+      ) : (
+        <span className="size-4 shrink-0" aria-hidden />
+      )}
       <span className="min-w-0 flex-1 truncate">
         {name}
         {!cwd && branch && (branch !== cwdBranch || tip) && (
@@ -110,23 +155,30 @@ function RunInItem({
         )}
       </span>
       {!cwd && (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={`Remove ${name} from this thread`}
-          data-testid="ti-runin-remove"
-          className="-my-1 -mr-1 hidden size-5 shrink-0 items-center justify-center rounded-sm text-cf-text-muted group-hover/runin:flex group-data-highlighted/runin:flex hover:bg-cf-control-hover hover:text-cf-text"
-          onPointerDown={(e) => {
-            e.stopPropagation();
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onRemove(projectId);
-          }}
-        >
-          <Unlink className="size-3" aria-hidden />
-        </button>
+        <Tip label="Remove project" side="left">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={`Remove ${name} from this thread`}
+            data-testid="ti-runin-remove"
+            className="-my-1 -mr-1 hidden size-5 shrink-0 items-center justify-center rounded-sm text-cf-text-muted group-hover/runin:flex group-data-highlighted/runin:flex hover:bg-cf-control-hover hover:text-cf-text"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+            }}
+            onPointerUp={(e) => {
+              // Both, or the item takes the release as its own click (Radix selects an
+              // item on a pointer up it saw no pointer down for) and runs the thread here.
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove(projectId);
+            }}
+          >
+            <Unlink className="size-3" aria-hidden />
+          </button>
+        </Tip>
       )}
     </DropdownMenuItem>
   );
@@ -142,13 +194,20 @@ function RunInItem({
 /** What the project row's hover card says: the thread's plugin flags and a changed plugin environment. */
 function useProjectNotes(threadId: string) {
   const flags = useThreadsStore(
-    useShallow((s) => (s.byId[threadId]?.flags ?? []).map((f) => `${f.level}\u0000${f.pluginName}\u0000${f.reason}`)),
+    useShallow((s) =>
+      (s.byId[threadId]?.flags ?? []).map(
+        (f) => `${f.level}\u0000${f.pluginName}\u0000${f.reason}`,
+      ),
+    ),
   );
   const envChange = useThreadsStore((s) => {
     const t = s.byId[threadId];
     return t?.pluginEnvStale ? (t.pluginEnvChange ?? "") : null;
   });
-  return { flags: flags.map((f) => f.split("\u0000") as [string, string, string]), envChange };
+  return {
+    flags: flags.map((f) => f.split("\u0000") as [string, string, string]),
+    envChange,
+  };
 }
 
 /**
@@ -156,19 +215,40 @@ function useProjectNotes(threadId: string) {
  * plugin flag, red for an error and amber for attention, then "Plugin environment changed"
  * with what changed. Restart Claude is the title menu's (components/thread/ThreadMenuItems).
  */
-function ProjectNotes({ flags, envChange }: ReturnType<typeof useProjectNotes>) {
+function ProjectNotes({
+  flags,
+  envChange,
+}: ReturnType<typeof useProjectNotes>) {
   return (
-    <span className={cn(HOVER_CARD, "flex flex-col gap-1.5")} data-testid="ti-project-notes">
+    <span
+      className={cn(HOVER_CARD, "flex flex-col gap-1.5")}
+      data-testid="ti-project-notes"
+    >
       {flags.map(([level, plugin, reason]) => (
-        <span key={plugin} className={cn("flex items-start gap-1.5", level === "error" ? "text-cf-error-text" : "text-cf-warning-text")} data-testid="ti-project-flag" data-level={level}>
-          {level === "error" ? <OctagonX className="mt-0.5 size-3 shrink-0" aria-hidden /> : <CircleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />}
+        <span
+          key={plugin}
+          className={cn(
+            "flex items-start gap-1.5",
+            level === "error" ? "text-cf-error-text" : "text-cf-warning-text",
+          )}
+          data-testid="ti-project-flag"
+          data-level={level}
+        >
+          {level === "error" ? (
+            <OctagonX className="mt-0.5 size-3 shrink-0" aria-hidden />
+          ) : (
+            <CircleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
+          )}
           <span>
             <span className="font-medium">{plugin}</span>: {reason}
           </span>
         </span>
       ))}
       {envChange !== null && (
-        <span className="flex items-start gap-1.5" data-testid="ti-project-env-stale">
+        <span
+          className="flex items-start gap-1.5"
+          data-testid="ti-project-env-stale"
+        >
           <Plug className="mt-0.5 size-3 shrink-0" aria-hidden />
           <span className="whitespace-pre-line">
             <span className="font-medium">Plugin environment changed</span>
@@ -186,39 +266,77 @@ function NotesMark({ flags, envChange }: ReturnType<typeof useProjectNotes>) {
   const error = flags.some(([level]) => level === "error");
   if (flags.length > 0) {
     const Icon = error ? OctagonX : CircleAlert;
-    return <Icon className={cn("size-3 shrink-0", error ? "text-cf-error-text" : "text-cf-warning-text")} aria-hidden data-testid="ti-project-mark" />;
+    return (
+      <Icon
+        className={cn(
+          "size-3 shrink-0",
+          error ? "text-cf-error-text" : "text-cf-warning-text",
+        )}
+        aria-hidden
+        data-testid="ti-project-mark"
+      />
+    );
   }
-  return envChange !== null ? <Plug className="size-3 shrink-0" aria-hidden data-testid="ti-project-mark" /> : null;
+  return envChange !== null ? (
+    <Plug
+      className="size-3 shrink-0"
+      aria-hidden
+      data-testid="ti-project-mark"
+    />
+  ) : null;
 }
 
 /**
  * The cwd's project: its name (bold without a workspace row; "+N" when an unnamed set has
- * more), "Fresh copy" or "Project folder". It opens a menu: Add project (the composer's
- * multi-select list, anchored under the row: thread.project.add per pick), Save as
- * workspace for an unnamed set of two or more, then Run in with every member (a × takes one
- * out: thread.project.remove). Adding or removing a member takes the thread out of its
- * workspace (the daemon's rule): the crumb then reads "<cwd> +N". The thread's plugin flags
- * and a changed plugin environment mark the row, and show on hover.
+ * more), "Fresh copy" or "Project folder", or "Adding <name>…" with a spinner while the
+ * daemon adds a project. It opens a menu: Add project (the composer's list of the projects
+ * not in the set, anchored under the row: one pick, thread.project.add, and the list
+ * closes), for an unnamed set of two or more either Save as workspace or, when a saved
+ * workspace already has exactly this set, "Use workspace <name>" (thread.workspace), then
+ * Run in with every member (a × takes one out: thread.project.remove). Adding or removing a
+ * member takes the thread out of its workspace (the daemon's rule): the crumb then reads
+ * "<cwd> +N". The thread's plugin flags and a changed plugin environment mark the row, and
+ * show on hover.
  */
 function ProjectRow({ threadId }: { threadId: string }) {
   const { cwdProjectId, members, paths } = useMembers(threadId);
-  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
-  const named = useWorkspacesStore((s) => workspaceId !== "" && s.byId[workspaceId] !== undefined);
-  const worktreeMode = useThreadsStore((s) => s.byId[threadId]?.createdWorktree ?? false);
+  const workspaceId = useThreadsStore(
+    (s) => s.byId[threadId]?.workspaceId ?? "",
+  );
+  const named = useWorkspacesStore(
+    (s) => workspaceId !== "" && s.byId[workspaceId] !== undefined,
+  );
+  const worktreeMode = useThreadsStore(
+    (s) => s.byId[threadId]?.createdWorktree ?? false,
+  );
   const createdBranch = useThreadsStore((s) => {
     const t = s.byId[threadId];
     return t?.createdWorktree ? t.branch : "";
   });
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
-  const name = useProjectsStore((s) => s.byId[cwdProjectId]?.name ?? cwdProjectId);
+  const name = useProjectsStore(
+    (s) => s.byId[cwdProjectId]?.name ?? cwdProjectId,
+  );
   const git = useProjectsStore((s) => s.byId[cwdProjectId]?.git ?? false);
-  const cwdBranch = useProjectsStore((s) => s.byId[cwdProjectId]?.worktrees.find((w) => w.path === cwd)?.branch ?? "");
+  const cwdBranch = useProjectsStore(
+    (s) =>
+      s.byId[cwdProjectId]?.worktrees.find((w) => w.path === cwd)?.branch ?? "",
+  );
   const canSave = useCanSaveAsWorkspace(threadId);
+  const matching = useMatchingWorkspace(threadId);
+  const adding = useAddingProject(threadId);
+  const addingName = useProjectsStore((s) =>
+    adding ? (s.byId[adding]?.name ?? adding) : "",
+  );
   const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const notes = useProjectNotes(threadId);
   // While the menu is up: each member's worktree the daemon would refuse a new thread on the branch in.
-  const refusals = useProjectRefusals(members, createdBranch, open && members.length > 1);
+  const refusals = useProjectRefusals(
+    members,
+    createdBranch,
+    open && members.length > 1,
+  );
   if (!cwdProjectId) return null;
   const noted = notes.flags.length > 0 || notes.envChange !== null;
   // The hover card wraps the row (outside a menu trigger, as Tip asks).
@@ -237,7 +355,12 @@ function ProjectRow({ threadId }: { threadId: string }) {
       {more && <span className="text-cf-text-muted"> {more}</span>}
     </>
   );
-  const meta = (
+  const meta = adding ? (
+    <span className="flex items-center gap-1" data-testid="ti-project-adding">
+      <LoaderCircle className="size-3 shrink-0 animate-spin" aria-hidden />
+      Adding {addingName}…
+    </span>
+  ) : (
     <>
       {noted && <NotesMark {...notes} />}
       {worktreeMode && git ? "Fresh copy" : "Project folder"}
@@ -252,7 +375,12 @@ function ProjectRow({ threadId }: { threadId: string }) {
       <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         {withNotes(
           <DropdownMenuTrigger asChild>
-            <Row icon={<ProjectIcon projectId={cwdProjectId} />} meta={meta} chevron={open || picking ? "open" : "closed"} testId="ti-project">
+            <Row
+              icon={<ProjectIcon projectId={cwdProjectId} />}
+              meta={meta}
+              chevron={open || picking ? "open" : "closed"}
+              testId="ti-project"
+            >
               {label}
             </Row>
           </DropdownMenuTrigger>,
@@ -270,7 +398,19 @@ function ProjectRow({ threadId }: { threadId: string }) {
             <Plus aria-hidden />
             Add project
           </DropdownMenuItem>
-          {!named && members.length > 1 && (
+          {!named && members.length > 1 && matching && (
+            <DropdownMenuItem
+              data-testid="ti-use-workspace"
+              data-workspace={matching.id}
+              onSelect={() => {
+                void followWorkspace(threadId, matching.id);
+              }}
+            >
+              <Layers aria-hidden />
+              <span className="truncate">Use workspace {matching.name}</span>
+            </DropdownMenuItem>
+          )}
+          {!named && members.length > 1 && !matching && (
             <DropdownMenuItem
               disabled={!canSave}
               data-testid="ti-save-workspace"
@@ -285,7 +425,9 @@ function ProjectRow({ threadId }: { threadId: string }) {
           {members.length > 1 && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="font-normal text-cf-text-muted">Run in</DropdownMenuLabel>
+              <DropdownMenuLabel className="font-normal text-cf-text-muted">
+                Run in
+              </DropdownMenuLabel>
               {members.map((id) => (
                 <RunInItem
                   key={id}
@@ -308,7 +450,12 @@ function ProjectRow({ threadId }: { threadId: string }) {
         members={members}
         open={picking}
         onOpenChange={setPicking}
-        anchor={<span className="pointer-events-none absolute inset-x-0 bottom-0 h-0" aria-hidden />}
+        anchor={
+          <span
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-0"
+            aria-hidden
+          />
+        }
       />
     </div>
   );
@@ -321,11 +468,18 @@ function OpenInRow({ threadId }: { threadId: string }) {
   const editors = useEditorApps();
   if (!cwd) return null;
   const ctx = () => threadContext(threadId);
-  const reveal = () => void runCommand("worktree.reveal", { worktree: cwd }, ctx());
+  const reveal = () =>
+    void runCommand("worktree.reveal", { worktree: cwd }, ctx());
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Row icon={<FinderMark />} chevron={open ? "open" : "closed"} onActivate={reveal} menuOnChevron testId="ti-open-in">
+        <Row
+          icon={<FinderMark />}
+          chevron={open ? "open" : "closed"}
+          onActivate={reveal}
+          menuOnChevron
+          testId="ti-open-in"
+        >
           Open in Finder
         </Row>
       </DropdownMenuTrigger>
@@ -339,7 +493,13 @@ function OpenInRow({ threadId }: { threadId: string }) {
             key={a.bundleId}
             data-testid="ti-open-editor"
             data-app={a.bundleId}
-            onSelect={() => void runCommand("worktree.open.editor", { worktree: cwd, app: a.bundleId }, ctx())}
+            onSelect={() =>
+              void runCommand(
+                "worktree.open.editor",
+                { worktree: cwd, app: a.bundleId },
+                ctx(),
+              )
+            }
           >
             <Code aria-hidden />
             {a.name}
@@ -367,7 +527,11 @@ function ActionItem({ threadId, id }: { threadId: string; id: string }) {
   if (!action) return null;
   const Icon = ACTION_ICON[action.icon];
   return (
-    <DropdownMenuItem data-testid="ti-action-item" data-action={id} onSelect={() => void runCardAction(id, threadId)}>
+    <DropdownMenuItem
+      data-testid="ti-action-item"
+      data-action={id}
+      onSelect={() => void runCardAction(id, threadId)}
+    >
       <Icon aria-hidden />
       <span className="min-w-0 truncate">{action.name}</span>
     </DropdownMenuItem>
@@ -396,7 +560,10 @@ function AddActionItems({ members }: { members: readonly string[] }) {
   }
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger data-testid="ti-add-action" className="text-caption text-cf-text">
+      <DropdownMenuSubTrigger
+        data-testid="ti-add-action"
+        className="text-caption text-cf-text"
+      >
         <Plus aria-hidden />
         Add action
       </DropdownMenuSubTrigger>
@@ -426,10 +593,19 @@ function AddActionItems({ members }: { members: readonly string[] }) {
 function ActionRow({ threadId }: { threadId: string }) {
   const { cwdProjectId, members } = useMembers(threadId);
   const { withActions, picks } = useActionPicks(threadId, members);
-  const choice = useMemo(() => (picks ? chooseAction(picks, cwdProjectId) : null), [picks, cwdProjectId]);
-  const byProject = useActionsStore(useShallow((s) => withActions.map((id) => (s.byProject[id] ?? []).join(","))));
+  const choice = useMemo(
+    () => (picks ? chooseAction(picks, cwdProjectId) : null),
+    [picks, cwdProjectId],
+  );
+  const byProject = useActionsStore(
+    useShallow((s) =>
+      withActions.map((id) => (s.byProject[id] ?? []).join(",")),
+    ),
+  );
   const [open, setOpen] = useState(false);
-  const projectName = useProjectsStore((s) => (choice ? (s.byId[choice.action.projectId]?.name ?? "") : ""));
+  const projectName = useProjectsStore((s) =>
+    choice ? (s.byId[choice.action.projectId]?.name ?? "") : "",
+  );
   if (members.length === 0) return null;
   if (withActions.length === 0) {
     if (members.length === 1) {
@@ -457,7 +633,9 @@ function ActionRow({ threadId }: { threadId: string }) {
           </Row>
         </DropdownMenuTrigger>
         <RowMenu testId="ti-action-menu">
-          <DropdownMenuLabel className="font-normal text-cf-text-muted">Add an action to</DropdownMenuLabel>
+          <DropdownMenuLabel className="font-normal text-cf-text-muted">
+            Add an action to
+          </DropdownMenuLabel>
           {members.map((id) => (
             <DropdownMenuItem
               key={id}
@@ -484,20 +662,27 @@ function ActionRow({ threadId }: { threadId: string }) {
           icon={<Play />}
           tall={choice?.showProject}
           chevron={open ? "open" : "closed"}
-          onActivate={action ? () => void runCardAction(action.id, threadId) : undefined}
+          onActivate={
+            action ? () => void runCardAction(action.id, threadId) : undefined
+          }
           menuOnChevron={Boolean(action)}
           testId="ti-action"
           data-action={action?.id}
         >
           <span className="truncate">{action?.name ?? "Actions"}</span>
-          {choice?.showProject && <SubLine testId="ti-action-project">{projectName}</SubLine>}
+          {choice?.showProject && (
+            <SubLine testId="ti-action-project">{projectName}</SubLine>
+          )}
         </Row>
       </DropdownMenuTrigger>
       <RowMenu testId="ti-action-menu">
         {withActions.map((pid, i) => (
           <div key={pid} className="contents">
             {members.length > 1 && (
-              <DropdownMenuLabel className="font-normal text-cf-text-muted" data-testid="ti-action-group">
+              <DropdownMenuLabel
+                className="font-normal text-cf-text-muted"
+                data-testid="ti-action-group"
+              >
                 <ProjectName id={pid} />
               </DropdownMenuLabel>
             )}
