@@ -942,6 +942,8 @@ describe("SidebarRow card status time", () => {
   }
 
   it.each<[string, Partial<ThreadView>, string, string]>([
+    ["a permission prompt: its whole text, for 6m", { status: "attention", statusReason: "permission: Do you want to create hello.txt and then run the whole test suite?" }, "Needs input · Do you want to create hello.txt and then run the whole test suite? · for 6m", "amber"],
+    ["a plan: for 6m", { status: "attention", statusReason: "plan: Claude has written up a plan" }, "Plan ready for review · for 6m", "amber"],
     ["a question: for 6m", { status: "attention", statusReason: "question: Which one?" }, "Asked a question · for 6m", "amber"],
     ["an error: for 6m", { status: "attention", statusReason: "error: model_not_found" }, "Error · model_not_found · for 6m", "red"],
     ["interrupted: for 6m", { state: "disconnected", status: "error", statusReason: "interrupted" }, "Interrupted while working · for 6m", "red"],
@@ -951,6 +953,7 @@ describe("SidebarRow card status time", () => {
     const st = within(card).getByTestId("tip-status");
     expect(st.textContent).toBe(text);
     expect(st.getAttribute("data-tone")).toBe(tone);
+    if (tone !== "emerald") expect(st.className).toContain(tone === "amber" ? "text-cf-warning-text" : "text-cf-error-text");
     expect(within(card).getByTestId("tip-status-time").className).toContain("text-cf-text-muted");
   });
 
