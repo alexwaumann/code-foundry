@@ -51,6 +51,8 @@ through the mock.
 * `tsc -p .` does not include `e2e/`; `tsc -p tsconfig.node.json` does.
 * subagent-view.spec.ts had been failing on main since a2b08083e capitalised the model alias in
   the unit tests only. It is fixed here.
-* sidebar.spec.ts "multi-project card" asserts `tip-project-chip` "Fresh copy", while
-  `SidebarRow.test` asserts the same text as `tip-project-meta`. Left as is; one of them is
-  probably stale.
+* sidebar.spec.ts had two tests failing on main since d051a2aa4 made the card's place text
+  (`tip-project-meta`) instead of a chip; they expected `tip-project-chip`. Fixed here (only
+  "no git" is still a chip).
+* Full run: 744 passed, 40 skipped, 3 failed: the two sidebar tests above and one load flake in
+  threads.spec.ts that passes alone.

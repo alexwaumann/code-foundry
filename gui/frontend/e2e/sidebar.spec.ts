@@ -526,7 +526,7 @@ test("hovering a thread row shows its tooltip: name, project with where it runs,
   // Moving to the next row: s-2 in ghostty-playground's main checkout, no effort: Project folder.
   await row(page, "s:s-2").hover();
   await expect(tip).toHaveAttribute("data-thread-id", "s-2");
-  await expect(tip.getByTestId("tip-project-chip")).toHaveText("Project folder");
+  await expect(tip.getByTestId("tip-project-meta")).toHaveText("Project folder");
   await expect(tip.getByTestId("tip-branch")).toHaveText("main");
   await expect(tip.getByTestId("tip-model")).toHaveText("Sonnet 5");
 
@@ -584,7 +584,7 @@ test("a multi-project thread's card: workspace (or N projects), the run-in proje
   await expect(tip.getByTestId("tip-workspace")).toHaveText("login2 projects");
   await expect(tip.getByTestId("tip-workspace-meta")).toHaveText("2 projects");
   await expect(tip.getByTestId("tip-project")).toHaveText("ghostty-playgroundFresh copy");
-  await expect(tip.getByTestId("tip-project-chip")).toHaveText("Fresh copy");
+  await expect(tip.getByTestId("tip-project-meta")).toHaveText("Fresh copy");
   await expect(tip.getByTestId("tip-branch")).toHaveText("cf/login");
   await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
   await expect(tip.getByTestId("tip-set")).toHaveCount(0);
@@ -592,7 +592,7 @@ test("a multi-project thread's card: workspace (or N projects), the run-in proje
   await card(set.id);
   await expect(tip.getByTestId("tip-workspace")).toHaveText("2 projects");
   await expect(tip.getByTestId("tip-workspace-meta")).toHaveCount(0);
-  await expect(tip.getByTestId("tip-project-chip")).toHaveText("Fresh copy");
+  await expect(tip.getByTestId("tip-project-meta")).toHaveText("Fresh copy");
   await expect(tip.getByTestId("tip-branch")).toHaveText("feat/x");
 
   await card(folder.id);
