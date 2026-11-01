@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -24,7 +23,8 @@ type EditorApp struct {
 }
 
 // knownEditor is an editor the detection looks for: its display name, the bundle names
-// it installs as, and its bundle id (used when the bundle's Info.plist cannot be read).
+// it installs as (the current name first, then older ones), and its bundle id (used when
+// the bundle's Info.plist cannot be read).
 type knownEditor struct {
 	name     string
 	bundles  []string
@@ -38,7 +38,7 @@ var knownEditors = []knownEditor{
 	{"VS Code Insiders", []string{"Visual Studio Code - Insiders.app"}, "com.microsoft.VSCodeInsiders"},
 	{"Cursor", []string{"Cursor.app"}, "com.todesktop.230313mzl4w4u92"},
 	{"Zed", []string{"Zed.app"}, "dev.zed.Zed"},
-	{"Windsurf", []string{"Windsurf.app"}, "com.exafunction.windsurf"},
+	{"Devin", []string{"Devin.app", "Windsurf.app"}, "com.exafunction.windsurf"},
 	{"Sublime Text", []string{"Sublime Text.app"}, "com.sublimetext.4"},
 	{"IntelliJ IDEA", []string{"IntelliJ IDEA.app", "IntelliJ IDEA Ultimate.app"}, "com.jetbrains.intellij"},
 	{"IntelliJ IDEA CE", []string{"IntelliJ IDEA CE.app", "IntelliJ IDEA Community Edition.app"}, "com.jetbrains.intellij.ce"},
@@ -78,12 +78,7 @@ func systemAppEnv() appEnv {
 			return err == nil && fi.IsDir()
 		},
 		bundleID: func(ctx context.Context, app string) (string, error) {
-			out, err := exec.CommandContext(ctx, "/usr/bin/plutil", "-extract", "CFBundleIdentifier", "raw", "-o", "-",
-				filepath.Join(app, "Contents", "Info.plist")).Output()
-			if err != nil {
-				return "", fmt.Errorf("read the bundle id of %s: %w", app, err)
-			}
-			return strings.TrimSpace(string(out)), nil
+			return plutilString(ctx, filepath.Join(app, "Contents", "Info.plist"), "CFBundleIdentifier")
 		},
 	}
 }
@@ -135,8 +130,11 @@ type editorApps struct {
 
 // EditorApps implements Store: the installed editors "Open in" offers, detected on
 // first use and cached until RefreshEditorApps (the daemon calls it on a settings
-// change) or refresh.
+// change) or refresh. A refresh drops the cached icons too (AppIcons).
 func (m *Manager) EditorApps(ctx context.Context, refresh bool) []EditorApp {
+	if refresh {
+		m.icons.clear()
+	}
 	m.apps.mu.Lock()
 	defer m.apps.mu.Unlock()
 	if !m.apps.done || m.apps.stale || refresh {
@@ -152,11 +150,13 @@ func (m *Manager) EditorApps(ctx context.Context, refresh bool) []EditorApp {
 	return slices.Clone(m.apps.apps)
 }
 
-// RefreshEditorApps makes the next EditorApps detect again.
+// RefreshEditorApps makes the next EditorApps detect again and AppIcons read the icons
+// again.
 func (m *Manager) RefreshEditorApps() {
 	m.apps.mu.Lock()
 	m.apps.stale = true
 	m.apps.mu.Unlock()
+	m.icons.clear()
 }
 
 // editorApp finds bundleID among the detected editors.

@@ -51,6 +51,9 @@ const (
 	// GitOpsServiceListEditorAppsProcedure is the fully-qualified name of the GitOpsService's
 	// ListEditorApps RPC.
 	GitOpsServiceListEditorAppsProcedure = "/codefoundry.v1.GitOpsService/ListEditorApps"
+	// GitOpsServiceListAppIconsProcedure is the fully-qualified name of the GitOpsService's
+	// ListAppIcons RPC.
+	GitOpsServiceListAppIconsProcedure = "/codefoundry.v1.GitOpsService/ListAppIcons"
 	// GitOpsServiceRevealProcedure is the fully-qualified name of the GitOpsService's Reveal RPC.
 	GitOpsServiceRevealProcedure = "/codefoundry.v1.GitOpsService/Reveal"
 	// GitOpsServiceOpenUrlProcedure is the fully-qualified name of the GitOpsService's OpenUrl RPC.
@@ -85,6 +88,12 @@ type GitOpsServiceClient interface {
 	// "Open in" menu offers. Detected on first use and cached; a settings change or
 	// refresh detects again.
 	ListEditorApps(context.Context, *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error)
+	// ListAppIcons returns the icons of Finder (com.apple.finder) and the installed
+	// editor apps (EditorApp.bundle_id), read at runtime from the installed bundles (the
+	// Info.plist's CFBundleIconFile, rasterised with sips) and cached until the editors are
+	// detected again. Nothing is shipped: an unknown id, or an app whose icon cannot be
+	// read (an asset-catalog-only bundle), is simply absent from the response.
+	ListAppIcons(context.Context, *connect.Request[v1.ListAppIconsRequest]) (*connect.Response[v1.ListAppIconsResponse], error)
 	// Reveal shows the worktree (or file in it) in Finder (`open -R`).
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	// OpenUrl opens an http(s) URL in the default browser.
@@ -148,6 +157,12 @@ func NewGitOpsServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(gitOpsServiceMethods.ByName("ListEditorApps")),
 			connect.WithClientOptions(opts...),
 		),
+		listAppIcons: connect.NewClient[v1.ListAppIconsRequest, v1.ListAppIconsResponse](
+			httpClient,
+			baseURL+GitOpsServiceListAppIconsProcedure,
+			connect.WithSchema(gitOpsServiceMethods.ByName("ListAppIcons")),
+			connect.WithClientOptions(opts...),
+		),
 		reveal: connect.NewClient[v1.RevealRequest, v1.RevealResponse](
 			httpClient,
 			baseURL+GitOpsServiceRevealProcedure,
@@ -184,6 +199,7 @@ type gitOpsServiceClient struct {
 	openPullRequest   *connect.Client[v1.OpenPullRequestRequest, v1.OpenPullRequestResponse]
 	openEditor        *connect.Client[v1.OpenEditorRequest, v1.OpenEditorResponse]
 	listEditorApps    *connect.Client[v1.ListEditorAppsRequest, v1.ListEditorAppsResponse]
+	listAppIcons      *connect.Client[v1.ListAppIconsRequest, v1.ListAppIconsResponse]
 	reveal            *connect.Client[v1.RevealRequest, v1.RevealResponse]
 	openUrl           *connect.Client[v1.OpenUrlRequest, v1.OpenUrlResponse]
 	list              *connect.Client[v1.ListGitOpsRequest, v1.ListGitOpsResponse]
@@ -223,6 +239,11 @@ func (c *gitOpsServiceClient) OpenEditor(ctx context.Context, req *connect.Reque
 // ListEditorApps calls codefoundry.v1.GitOpsService.ListEditorApps.
 func (c *gitOpsServiceClient) ListEditorApps(ctx context.Context, req *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error) {
 	return c.listEditorApps.CallUnary(ctx, req)
+}
+
+// ListAppIcons calls codefoundry.v1.GitOpsService.ListAppIcons.
+func (c *gitOpsServiceClient) ListAppIcons(ctx context.Context, req *connect.Request[v1.ListAppIconsRequest]) (*connect.Response[v1.ListAppIconsResponse], error) {
+	return c.listAppIcons.CallUnary(ctx, req)
 }
 
 // Reveal calls codefoundry.v1.GitOpsService.Reveal.
@@ -269,6 +290,12 @@ type GitOpsServiceHandler interface {
 	// "Open in" menu offers. Detected on first use and cached; a settings change or
 	// refresh detects again.
 	ListEditorApps(context.Context, *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error)
+	// ListAppIcons returns the icons of Finder (com.apple.finder) and the installed
+	// editor apps (EditorApp.bundle_id), read at runtime from the installed bundles (the
+	// Info.plist's CFBundleIconFile, rasterised with sips) and cached until the editors are
+	// detected again. Nothing is shipped: an unknown id, or an app whose icon cannot be
+	// read (an asset-catalog-only bundle), is simply absent from the response.
+	ListAppIcons(context.Context, *connect.Request[v1.ListAppIconsRequest]) (*connect.Response[v1.ListAppIconsResponse], error)
 	// Reveal shows the worktree (or file in it) in Finder (`open -R`).
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	// OpenUrl opens an http(s) URL in the default browser.
@@ -328,6 +355,12 @@ func NewGitOpsServiceHandler(svc GitOpsServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(gitOpsServiceMethods.ByName("ListEditorApps")),
 		connect.WithHandlerOptions(opts...),
 	)
+	gitOpsServiceListAppIconsHandler := connect.NewUnaryHandler(
+		GitOpsServiceListAppIconsProcedure,
+		svc.ListAppIcons,
+		connect.WithSchema(gitOpsServiceMethods.ByName("ListAppIcons")),
+		connect.WithHandlerOptions(opts...),
+	)
 	gitOpsServiceRevealHandler := connect.NewUnaryHandler(
 		GitOpsServiceRevealProcedure,
 		svc.Reveal,
@@ -368,6 +401,8 @@ func NewGitOpsServiceHandler(svc GitOpsServiceHandler, opts ...connect.HandlerOp
 			gitOpsServiceOpenEditorHandler.ServeHTTP(w, r)
 		case GitOpsServiceListEditorAppsProcedure:
 			gitOpsServiceListEditorAppsHandler.ServeHTTP(w, r)
+		case GitOpsServiceListAppIconsProcedure:
+			gitOpsServiceListAppIconsHandler.ServeHTTP(w, r)
 		case GitOpsServiceRevealProcedure:
 			gitOpsServiceRevealHandler.ServeHTTP(w, r)
 		case GitOpsServiceOpenUrlProcedure:
@@ -411,6 +446,10 @@ func (UnimplementedGitOpsServiceHandler) OpenEditor(context.Context, *connect.Re
 
 func (UnimplementedGitOpsServiceHandler) ListEditorApps(context.Context, *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GitOpsService.ListEditorApps is not implemented"))
+}
+
+func (UnimplementedGitOpsServiceHandler) ListAppIcons(context.Context, *connect.Request[v1.ListAppIconsRequest]) (*connect.Response[v1.ListAppIconsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GitOpsService.ListAppIcons is not implemented"))
 }
 
 func (UnimplementedGitOpsServiceHandler) Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error) {
