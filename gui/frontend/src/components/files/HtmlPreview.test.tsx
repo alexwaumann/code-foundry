@@ -32,7 +32,8 @@ describe("HtmlPreview", () => {
     expect(HTML_PREVIEW_SANDBOX).not.toContain("allow-same-origin");
     expect(frame.getAttribute("allow")).toBe("clipboard-write");
     expect(HTML_PREVIEW_SANDBOX).not.toContain("allow-top-navigation");
-    expect(screen.getByTestId("file-html-footer").textContent).toContain("loads files under ~/proj");
+    expect(frame.getAttribute("referrerpolicy")).toBe("no-referrer");
+    expect(screen.getByTestId("file-html-footer").textContent).toBe("Sandboxed from Code Foundry · scripts and network on · loads files under ~/proj");
   });
 
   it("remounts the frame when the text changes, without asking for a new grant", async () => {

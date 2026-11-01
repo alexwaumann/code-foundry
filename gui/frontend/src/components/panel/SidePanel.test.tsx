@@ -1,6 +1,14 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The + runs view.panel.new-tab through its local presenter: the daemon is never asked.
+const invokeCommand = vi.hoisted(() => vi.fn());
+vi.mock("@/api/command", async (orig) => {
+  const real = await orig<typeof import("@/api/command")>();
+  invokeCommand.mockImplementation(real.invokeCommand);
+  return { ...real, invokeCommand };
+});
 import { create } from "zustand";
 import type { CommandView } from "@/api/command";
 import { useCommandsStore } from "@/stores/commands";
@@ -8,6 +16,7 @@ import { KEYS, useSettingsStore } from "@/stores/settings";
 import { closePanelTab, getPanel, isPicking, makeTab, openSurface, startPanelPicking, usePanelStore } from "@/stores/panel";
 import { PANEL_MIN, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
+import { diffSurface } from "@/surfaces/diff";
 import { filesSurface } from "@/surfaces/files";
 import { pullRequestSurface } from "@/surfaces/pullrequest";
 import { revealTab } from "./reveal";
@@ -408,6 +417,104 @@ describe("appearance.panel_keep_open", () => {
     if (!wrapper) throw new Error("no tab wrapper");
     fireEvent(wrapper, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
     expect(getPanel(KEY)).toEqual({ open: true, groups: [{ tabs: [], activeTabId: null }] });
+  });
+});
+
+// From e2e/panel.spec.ts: closing tabs, the strip's keyboard and the + (what is left there is
+// computed CSS, native button keys and real focus).
+describe("closing tabs", () => {
+  const files = makeTab("files", "Files");
+  const diff = makeTab("diff", "Diff");
+  const pr12 = makeTab("pullrequest", "#12", { number: "12" });
+  const pr13 = makeTab("pullrequest", "#13", { number: "13" });
+  const titles = () => screen.getAllByRole("tab").map((t) => t.textContent);
+  const body = () => screen.getByTestId("panel-body").getAttribute("data-tab-id");
+  const selected = (name: string) => screen.getByRole("tab", { name }).getAttribute("aria-selected");
+
+  beforeEach(() => {
+    for (const surface of [filesSurface, diffSurface, pullRequestSurface]) vi.spyOn(surface, "render").mockImplementation((tab) => <p data-testid="probe">{tab.id}</p>);
+    useSettingsStore.setState({ snapshot: { values: { [KEYS.panelKeepOpen]: "false" }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
+    act(() => {
+      for (const t of [files, diff, pr12, pr13]) openSurface(KEY, t);
+    });
+  });
+
+  afterEach(() => {
+    useSettingsStore.setState({ snapshot: null });
+  });
+
+  it("cmd+w activates the right neighbour, the × and middle click close, the last close hides and hands focus back", () => {
+    const focusContent = vi.spyOn(useUiStore.getState(), "focusContent");
+    render(<SidePanel />);
+    expect(titles()).toEqual(["Files", "Diff", "#12", "#13"]);
+    expect(body()).toBe("pullrequest?number=13");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Diff" }));
+    expect(body()).toBe("diff");
+    expect(fireEvent.keyDown(screen.getByTestId("probe"), { key: "w", metaKey: true })).toBe(false);
+    expect(titles()).toEqual(["Files", "#12", "#13"]);
+    expect(selected("#12")).toBe("true");
+    expect(body()).toBe("pullrequest?number=12");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close #13" }));
+    expect(titles()).toEqual(["Files", "#12"]);
+    const filesWrapper = screen.getByRole("tab", { name: "Files" }).parentElement as HTMLElement;
+    fireEvent(filesWrapper, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    expect(titles()).toEqual(["#12"]);
+    expect(selected("#12")).toBe("true");
+
+    fireEvent.keyDown(screen.getByTestId("probe"), { key: "w", metaKey: true });
+    expect(screen.queryByTestId("side-panel")).toBeNull();
+    expect(getPanel(KEY).open).toBe(false);
+    expect(focusContent).toHaveBeenCalled();
+  });
+
+  it("only the active tab is a tab stop; arrows move focus between tabs without activating them", () => {
+    act(() => {
+      usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [files, diff], activeTabId: diff.id }] } } });
+    });
+    render(<SidePanel />);
+    expect(screen.getByRole("tablist")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Diff" }).tabIndex).toBe(0);
+    expect(screen.getByRole("tab", { name: "Files" }).tabIndex).toBe(-1);
+    act(() => {
+      screen.getByRole("tab", { name: "Diff" }).focus();
+    });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Diff" }), { key: "ArrowLeft", code: "ArrowLeft" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Files" }));
+    expect(selected("Diff")).toBe("true");
+    expect(selected("Files")).toBe("false");
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Files" }), { key: "ArrowRight", code: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Diff" }));
+    // The active tab's × is in the tab order too.
+    expect(screen.getByRole("button", { name: "Close Diff" }).tabIndex).toBe(0);
+    expect(screen.getByRole("button", { name: "Close Files" }).tabIndex).toBe(-1);
+  });
+
+  it("the + shows the surface list, titled, without asking the daemon; cmd+w there is handled and goes back", () => {
+    vi.spyOn(filesSurface, "available").mockReturnValue("enabled");
+    vi.spyOn(filesSurface, "openDefault").mockReturnValue(files);
+    act(() => {
+      usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [files, diff], activeTabId: diff.id }] } } });
+    });
+    invokeCommand.mockClear();
+    render(<SidePanel />);
+    fireEvent.click(screen.getByTestId("panel-new-tab"));
+    expect(screen.getByTestId("side-panel").getAttribute("data-picking")).toBe("true");
+    expect(screen.getByRole("heading", { name: "Open a surface" })).toBeTruthy();
+    expect(titles()).toEqual(["Files", "Diff"]);
+    expect(invokeCommand).not.toHaveBeenCalled();
+    // The keyboard goes to the panel (Escape and the letters work at once).
+    expect(document.activeElement).toBe(screen.getByTestId("side-panel"));
+    // Picking the File surface brings back the panel's File tab; no tab is added.
+    fireEvent.click(screen.getByTestId("panel-empty").querySelector('[data-surface="files"]') as HTMLButtonElement);
+    expect(titles()).toEqual(["Files", "Diff"]);
+    expect(body()).toBe(files.id);
+    fireEvent.click(screen.getByTestId("panel-new-tab"));
+    expect(fireEvent.keyDown(screen.getByTestId("panel-empty"), { key: "w", metaKey: true })).toBe(false);
+    expect(screen.getByTestId("side-panel").hasAttribute("data-picking")).toBe(false);
+    expect(body()).toBe(files.id);
+    expect(titles()).toEqual(["Files", "Diff"]);
   });
 });
 

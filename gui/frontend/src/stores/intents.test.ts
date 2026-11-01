@@ -297,3 +297,28 @@ describe("showView from the daemon", () => {
     }
   });
 });
+
+// From e2e/panel.spec.ts: view.panel.new-tab from the palette and the CLI (ShowView "panel.new-tab").
+describe("showView panel.new-tab", () => {
+  const files = { id: "files", kind: "files", title: "Files", params: {} };
+  const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as const };
+
+  beforeEach(() => {
+    usePanelStore.setState({ byKey: { "thread:s1": { open: false, groups: [{ tabs: [files], activeTabId: files.id }] } } });
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" }, focus: "content", panelFocusSeq: 0, palette: closedPalette });
+  });
+
+  it("shows the hidden panel picking (no tab added) and asks for the keyboard there", () => {
+    applyIntent({ kind: "showView", name: "panel.new-tab" });
+    expect(usePanelStore.getState().byKey["thread:s1"]).toEqual({ open: true, groups: [{ tabs: [files], activeTabId: null, pickFrom: files.id }] });
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+  });
+
+  it("with the palette open, the palette's return target moves to the panel instead", () => {
+    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true } });
+    applyIntent({ kind: "showView", name: "panel.new-tab" });
+    expect(usePanelStore.getState().byKey["thread:s1"]?.groups[0]?.activeTabId).toBeNull();
+    expect(useUiStore.getState().palette.returnTo).toBe("panel");
+    expect(useUiStore.getState().panelFocusSeq).toBe(0);
+  });
+});
