@@ -6,10 +6,9 @@ import { WORKSPACE_FOLDER } from "@/lib/projectSet";
 import { canNewLike, canRunElsewhere, worktreeBranch } from "@/lib/threadRow";
 import { runCommand, useCommandsStore } from "@/stores/commands";
 import { composeLike } from "@/stores/compose";
-import { useSidebarShown } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
 import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace";
-import { archiveThread, pinThread, regenerateThreadName, runThreadIn, setThreadSidebar, snoozeThread, threadContext, THREAD_COMMANDS } from "@/stores/threadActions";
+import { archiveThread, pinThread, regenerateThreadName, runThreadIn, snoozeThread, threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { markInPlace, type MenuKit } from "./menuKit";
@@ -87,8 +86,7 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  * thread header's title menu (ThreadTitleMenu), each item a registry command (or the inline
  * rename that commits one): Rename, Regenerate name (not for a resident thread; disabled while
  * a naming call runs), Pin, Snooze ▸ (and Unsnooze while snoozed); New
- * thread on this branch, Save as workspace, Run in ▸, Hide or Show in sidebar (a thread
- * another created, while thread.sidebar is listed), Restart Claude (while a plugin's
+ * thread on this branch, Save as workspace, Run in ▸, Restart Claude (while a plugin's
  * environment changed since Claude started: thread.restart), Clear flag(s) (while plugins
  * flagged the thread: thread.flag.clear, every plugin's); Archive. An item a thread cannot
  * use is left out.
@@ -108,12 +106,9 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const runIn = useThreadsStore((s) => canRunElsewhere(s.byId[id]));
   const newLike = useThreadsStore((s) => canNewLike(s.byId[id])) && !noProject;
   const canSave = useCanSaveAsWorkspace(id) && !noProject;
-  // Another thread created it: shown (the rule, lib/inSidebar.ts) it can be handed back, hidden it can be shown.
-  const shown = useSidebarShown(id);
-  const sidebarListed = useCommandsStore((s) => s.commands.some((c) => c.name === THREAD_COMMANDS.sidebar));
   const restartListed = useCommandsStore((s) => s.commands.some((c) => c.name === "thread.restart"));
   const clearListed = useCommandsStore((s) => s.commands.some((c) => c.name === "thread.flag.clear"));
-  const second = newLike || canSave || runIn || (shown !== null && sidebarListed) || (stale && restartListed) || (flags > 0 && clearListed);
+  const second = newLike || canSave || runIn || (stale && restartListed) || (flags > 0 && clearListed);
   return (
     <>
       <kit.Item
@@ -193,16 +188,6 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
         </kit.Item>
       )}
       {runIn && <RunInMenu kit={kit} threadId={id} />}
-      {shown !== null && sidebarListed && (
-        <kit.Item
-          data-testid={shown ? "menu-sidebar-hide" : "menu-sidebar-show"}
-          onSelect={() => {
-            void setThreadSidebar(id, !shown);
-          }}
-        >
-          {shown ? "Hide from sidebar" : "Show in sidebar"}
-        </kit.Item>
-      )}
       {stale && restartListed && (
         <kit.Item
           data-testid="menu-restart"

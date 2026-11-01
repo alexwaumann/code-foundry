@@ -219,14 +219,6 @@ export interface ThreadView {
    */
   budgetUsd: number;
   /**
-   * Whether a thread another thread created is shown in the sidebar whatever the
-   * threads.show_created_threads setting says (thread.sidebar, thread.new --sidebar); null
-   * follows the setting, and is always null on the user's own threads. Effective visibility
-   * (the daemon's rule, Thread.in_sidebar): createdBy "" → shown; inSidebar set → it; else
-   * the setting (default off: hidden). docs/notes/hidden-children-1-daemon.md.
-   */
-  inSidebar: boolean | null;
-  /**
    * Flags plugins raised on the thread, errors first, then newest first; at most one per
    * plugin. An overlay on status that never changes it: a flagged thread counts as needing
    * attention (isAttention), sorts with prompts or errors (lib/thread threadGroup) and line 2
@@ -471,7 +463,6 @@ export function toThreadView(s: Thread): ThreadView {
     labels: [...s.labels],
     report: toThreadReportView(s),
     budgetUsd: s.budgetUsd,
-    inSidebar: s.inSidebar ?? null,
     flags: s.flags.flatMap(toThreadFlagView),
     ...(s.owner ? { owner: s.owner } : {}),
     ...(s.pluginEnvStale ? { pluginEnvStale: true as const, pluginEnvChange: s.pluginEnvChange } : {}),

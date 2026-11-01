@@ -14,7 +14,7 @@ import { useEventsStore } from "@/stores/events";
 import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { useRowHeight, useShowCreatedThreads } from "@/stores/settings";
+import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
 import { ResizeHandle } from "./ResizeHandle";
 import { HEADER_HEIGHT, ROW_GAP, rowSize } from "./rowSizes";
@@ -51,7 +51,7 @@ function splitFooter(rows: readonly Row[]): [HeaderRow | null, Row[]] {
  * rows that actually changed.
  */
 function useListRows(): ListRows {
-  const threadKeys = useThreadListKeys(useShowCreatedThreads());
+  const threadKeys = useThreadListKeys();
   const workingCollapsed = useUiStore((s) => s.workingCollapsed);
   const snoozedCollapsed = useUiStore((s) => s.snoozedCollapsed);
   const archivedCollapsed = useUiStore((s) => s.archivedCollapsed);
@@ -73,13 +73,12 @@ function useListRows(): ListRows {
 /**
  * The row the selection highlights: the selected thread's, or for a thread hidden from the
  * sidebar (opened from its creator's thread info card, the palette, a link) its nearest shown ancestor's
- * (lib/inSidebar.ts sidebarAnchor); null when none (the composer, a page, a hidden thread
- * with no shown ancestor). Arrow keys start from it. Derived, a primitive selector.
+ * (lib/inSidebar.ts sidebarAnchor); null when none (the composer, a page, a creator
+ * cycle). Arrow keys start from it. Derived, a primitive selector.
  */
 function useSelectedRowKey(): string | null {
-  const showCreated = useShowCreatedThreads();
   const id = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : null));
-  const anchor = useThreadsStore((s) => (id === null ? null : sidebarAnchor(s.byId, id, showCreated)));
+  const anchor = useThreadsStore((s) => (id === null ? null : sidebarAnchor(s.byId, id)));
   return anchor === null ? null : threadKey(anchor);
 }
 

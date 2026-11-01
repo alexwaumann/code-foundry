@@ -233,13 +233,13 @@ export function isAttention(s: Pick<ThreadView, "status" | "state"> & Partial<Pi
  * that was waiting (usually a finished turn) says the user is done with it, snoozing says
  * not until later, and it sits in a collapsed section. A snoozed thread counts again once
  * the daemon wakes it ("snooze ended" attention, snoozedUntilMs cleared). Neither does a
- * thread hidden from the sidebar (lib/inSidebar.ts, `showCreated` being
- * threads.show_created_threads): its creator answers it, not the user.
+ * thread hidden from the sidebar (lib/inSidebar.ts: another thread created it and that
+ * creator still exists): its creator answers it, not the user.
  */
-export function attentionIds(data: ThreadsData, showCreated: boolean): string[] {
+export function attentionIds(data: ThreadsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
-    return s !== undefined && s.archivedAtMs === null && s.snoozedUntilMs === null && inSidebar(s, showCreated) && isAttention(s);
+    return s !== undefined && s.archivedAtMs === null && s.snoozedUntilMs === null && inSidebar(s, data.byId) && isAttention(s);
   });
 }
 
@@ -252,19 +252,19 @@ export function isRunning(s: Pick<ThreadView, "status" | "state"> & Partial<Pick
 }
 
 /** Threads that are running (isRunning), in `order`, hidden ones left out (attentionIds). */
-function runningIds(data: ThreadsData, showCreated: boolean): string[] {
+function runningIds(data: ThreadsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
-    return s !== undefined && inSidebar(s, showCreated) && isRunning(s);
+    return s !== undefined && inSidebar(s, data.byId) && isRunning(s);
   });
 }
 
 /** Threads that are running (isRunning), hidden ones left out. */
-export function runningCount(data: ThreadsData, showCreated: boolean): number {
-  return runningIds(data, showCreated).length;
+export function runningCount(data: ThreadsData): number {
+  return runningIds(data).length;
 }
 
-/** Number of threads needing attention (a narrow, primitive selector); `showCreated` is useShowCreatedThreads. */
-export function useAttentionCount(showCreated: boolean): number {
-  return useThreadsStore((s) => attentionIds(s, showCreated).length);
+/** Number of threads needing attention (a narrow, primitive selector). */
+export function useAttentionCount(): number {
+  return useThreadsStore((s) => attentionIds(s).length);
 }

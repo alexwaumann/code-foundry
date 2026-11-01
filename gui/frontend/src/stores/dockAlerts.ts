@@ -13,7 +13,7 @@ import { bounceDock, playAlertSound, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
 import { isPageAttended } from "@/api/stream";
 import { attentionIds, useThreadsStore } from "./threads";
-import { KEYS, showCreatedThreadsOf, useSettingsStore } from "./settings";
+import { useSettingsStore } from "./settings";
 
 /** The notifications.* settings (internal/store/settings/schema.go). */
 export const NOTIFY_KEYS = {
@@ -154,8 +154,7 @@ const hostDeps: DockAlertsDeps = {
 function sameAlertSettings(a: SettingsSnapshotView | null, b: SettingsSnapshotView | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  // threads.show_created_threads moves threads in or out of the attention set.
-  return [...Object.values(NOTIFY_KEYS), KEYS.showCreatedThreads].every((k) => a.values[k] === b.values[k]);
+  return Object.values(NOTIFY_KEYS).every((k) => a.values[k] === b.values[k]);
 }
 
 /** Starts the badge and alerts; returns the stop function. */
@@ -165,7 +164,7 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
     const threads = useThreadsStore.getState();
     const next = stepDockAlerts(state, {
       epoch: threads.epoch,
-      attention: attentionIds(threads, showCreatedThreadsOf(useSettingsStore.getState().snapshot)),
+      attention: attentionIds(threads),
       attended: deps.attended(),
       nowMs: deps.now(),
       settings: alertSettings(useSettingsStore.getState().snapshot),

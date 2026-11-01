@@ -116,7 +116,7 @@ describe("the thread header's crumb", () => {
 describe("the thread header's right side", () => {
   it("is the three toggles only", () => {
     const cmd = (name: string) => ({ name, title: name, description: "", category: "", args: [], keybindings: [], available: true });
-    useCommandsStore.setState({ commands: ["view.thread-info", "view.bottom.toggle", "view.panel.toggle", "thread.snooze", "thread.archive", "thread.sidebar"].map(cmd) });
+    useCommandsStore.setState({ commands: ["view.thread-info", "view.bottom.toggle", "view.panel.toggle", "thread.snooze", "thread.archive"].map(cmd) });
     useThreadsStore.setState({ byId: { "s-1": thread("s-1") }, order: ["s-1"] });
     render(<HeaderActions />);
     expect([...screen.getByTestId("pane-actions").querySelectorAll("button")].map((b) => b.dataset.testid)).toEqual([

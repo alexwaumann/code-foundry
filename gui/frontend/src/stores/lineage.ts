@@ -5,10 +5,8 @@
  * a list re-renders only when a thread joins, leaves or changes creator.
  */
 import { useShallow } from "zustand/react/shallow";
-import { inSidebar } from "@/lib/inSidebar";
 import { creatorOf, noteCreator, type Creator } from "@/lib/lineage";
 import { liveCount } from "@/lib/liveCount";
-import { useShowCreatedThreads } from "./settings";
 import { useThreadsStore } from "./threads";
 
 /**
@@ -41,17 +39,4 @@ export function useMadeByThread(id: string): boolean {
  */
 export function useNoteCreator(createdBy: string, recorded: string): Creator {
   return useThreadsStore(useShallow((s) => noteCreator(s, createdBy, recorded)));
-}
-
-/**
- * Whether a thread another thread created is shown in the sidebar (lib/inSidebar.ts, with
- * threads.show_created_threads); null for the user's own thread (always shown, no override).
- * The thread menu's Show / Hide in sidebar item.
- */
-export function useSidebarShown(id: string): boolean | null {
-  const showCreated = useShowCreatedThreads();
-  return useThreadsStore((s) => {
-    const t = s.byId[id];
-    return t?.createdBy ? inSidebar(t, showCreated) : null;
-  });
 }

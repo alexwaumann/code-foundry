@@ -1,17 +1,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
-
-const setThreadSidebar = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), setThreadSidebar }));
 
 const { ContextMenu, ContextMenuTrigger } = await import("@/components/ui/context-menu");
 const { RowMenu } = await import("./RowMenu");
 const { useThreadsStore } = await import("@/stores/threads");
-const { useCommandsStore } = await import("@/stores/commands");
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "t", projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], branch: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", inSidebar: null, flags: [], ...o }) as ThreadView;
+  ({ id: "s-1", name: "t", projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], branch: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", flags: [], ...o }) as ThreadView;
 
 function openMenu(o: Partial<ThreadView>): void {
   useThreadsStore.setState({ byId: { "s-1": thread(o) }, order: ["s-1"] });
@@ -23,11 +19,6 @@ function openMenu(o: Partial<ThreadView>): void {
   );
   fireEvent.contextMenu(screen.getByTestId("row"));
 }
-
-beforeEach(() => {
-  setThreadSidebar.mockClear();
-  useCommandsStore.setState({ commands: [{ name: "thread.sidebar", title: "", description: "", category: "", args: [], keybindings: [], available: true }] });
-});
 
 afterEach(cleanup);
 
@@ -43,21 +34,11 @@ describe("RowMenu: Fork (docs/notes/transcript-deleted.md)", () => {
   });
 });
 
-describe("RowMenu: Hide from sidebar (docs/notes/hidden-children-2-gui.md)", () => {
-  it("a thread another thread created (shown, since its row is listed): Hide from sidebar before Archive, hiding it", () => {
-    openMenu({ createdBy: "s-0", inSidebar: true });
+describe("RowMenu: a child thread (docs/notes/no-sidebar-override-1-gui.md)", () => {
+  it("has no Show or Hide in sidebar item: a child stays its creator's", () => {
+    openMenu({ createdBy: "s-0" });
     const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
-    expect(items.indexOf("Hide from sidebar")).toBe(items.indexOf("Archive") - 1);
-    const item = screen.getByTestId("menu-sidebar-hide");
-    // Text only, like every menu item (docs/notes/projects-table-2-context-menus.md).
-    expect(item.querySelector("svg")).toBeNull();
-    fireEvent.click(item);
-    expect(setThreadSidebar).toHaveBeenCalledWith("s-1", false);
-  });
-
-  it("the user's own thread: no such item", () => {
-    openMenu({});
-    expect(screen.getByTestId("row-menu")).toBeTruthy();
-    expect(screen.queryByTestId("menu-sidebar-hide")).toBeNull();
+    expect(items).toContain("Archive");
+    expect(items.some((t) => /sidebar/i.test(t))).toBe(false);
   });
 });
