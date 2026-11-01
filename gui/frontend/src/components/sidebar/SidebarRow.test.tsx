@@ -1003,3 +1003,12 @@ describe("SidebarRow: a claude that did not start", () => {
     expect(screen.getByTestId("row-detail").textContent).toBe("did not start");
   });
 });
+
+describe("SidebarRow: a thread whose transcript Claude Code deleted", () => {
+  it("says Error in red, and why on line 3", () => {
+    renderRow({ state: "disconnected", transcriptMissing: true });
+    expect(screen.getByTestId("row-status").textContent).toBe("Error");
+    expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
+    expect(screen.getByTestId("row-detail").textContent).toBe("transcript deleted");
+  });
+});

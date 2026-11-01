@@ -12,7 +12,6 @@ import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./
  * (thread.agent.up) go back up.
  */
 
-const PARENT = "Agents panel";
 
 const view = (page: Page) => page.getByTestId("subagent-pane");
 const threadPane = (page: Page) => page.getByTestId("thread-pane");

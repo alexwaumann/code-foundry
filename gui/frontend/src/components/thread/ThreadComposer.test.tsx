@@ -206,3 +206,30 @@ describe("sending", () => {
     });
   });
 });
+
+describe("a thread whose transcript Claude Code deleted", () => {
+  it("the note in place of the cold-cache line, even with the cache expired; the prompt disabled, nothing to attach or send", () => {
+    put({ transcriptMissing: true, state: "disconnected", contextTokens: 25_700, contextRereadUsd: 0.26, cacheExpiresAtMs: Date.now() - 60_000 });
+    render(<ThreadComposer threadId="s-r1" pending={[]} busy={false} />);
+    expect(screen.getByTestId("thread-transcript-note")).toBeTruthy();
+    expect(screen.queryByTestId("thread-cold-cache")).toBeNull();
+    expect(editor().getAttribute("aria-disabled")).toBe("true");
+    expect(editor().getAttribute("aria-placeholder")).toBe("Transcript deleted");
+    expect(screen.getByTestId("thread-send")).toHaveProperty("disabled", true);
+    expect(screen.getByTestId("thread-attach")).toHaveProperty("disabled", true);
+  });
+});
+
+describe("a quote no draft has", () => {
+  it("a draft token whose body no draft holds (copied from a composer that sent it): the error under the composer, nothing sent", async () => {
+    updateDraft(KEY, { text: "[Assistant quote](cf-cite://c0123456789ab)" });
+    render(<ThreadComposer threadId="s-r1" pending={[]} busy={false} />);
+    // The prompt draws it as a chip with nothing to quote.
+    await waitFor(() => {
+      expect(screen.getByTestId("composer-input").querySelector('[data-testid="prompt-tag"][data-tag-kind="cite"]')?.textContent).toBe("Quote");
+    });
+    fireEvent.click(screen.getByTestId("thread-send"));
+    expect((await screen.findByTestId("thread-composer-error")).textContent).toBe("Nothing to send: the quote is no longer in any draft.");
+    expect(invocationsOf("thread.send")).toEqual([]);
+  });
+});

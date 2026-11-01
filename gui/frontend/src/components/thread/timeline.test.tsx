@@ -8,7 +8,8 @@ import { ANSWER, ANSWER_STREAMING, CF, fixStalePrBadge, publishThread, rowsOf, t
 import { ThreadContext } from "./context";
 import { TimelineRowView } from "./rows";
 
-vi.mock("@/stores/filePanel", () => ({ openFileInPanel: () => true }));
+const { openFileInPanel } = vi.hoisted(() => ({ openFileInPanel: vi.fn<(target: string, file: object) => boolean>(() => true) }));
+vi.mock("@/stores/filePanel", () => ({ openFileInPanel }));
 // The first message's image, as the daemon serves it.
 vi.mock("@/api/threads", async (orig) => ({ ...(await orig<typeof import("@/api/threads")>()), readAttachment: () => Promise.resolve({ data: new Uint8Array([1]), mimeType: "image/png" }) }));
 
@@ -192,6 +193,20 @@ describe("headers (s-r1, idle)", () => {
     expect(first.textContent).toMatch(/steps$/);
     expect(first.textContent).not.toContain("$");
     expect(first.textContent).not.toContain("Opus");
+  });
+});
+
+describe("path chips (s-r1, idle)", () => {
+  it("the last answer's prose and code paths are chips that open the File tab, relative ones against the thread's checkout, at their line", () => {
+    mount(fixStalePrBadge("idle").items, false);
+    const chips = within(finals().at(-1) as HTMLElement).getAllByTestId("path-chip");
+    expect(chips.map((c) => c.textContent)).toEqual(["README.md", "src/app.ts:12"]);
+    fireEvent.click(chips[1] as HTMLElement);
+    expect(openFileInPanel).toHaveBeenLastCalledWith("current", { project: "repo-cf", base: CF, path: `${CF}/src/app.ts`, line: 12 });
+    // Keyboard: focus and Enter.
+    (chips[0] as HTMLElement).focus();
+    fireEvent.keyDown(chips[0] as HTMLElement, { key: "Enter" });
+    expect(openFileInPanel).toHaveBeenLastCalledWith("current", { project: "repo-cf", base: CF, path: `${CF}/README.md` });
   });
 });
 

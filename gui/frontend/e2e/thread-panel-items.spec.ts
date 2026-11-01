@@ -38,6 +38,9 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
+// Which tab each item action opens in which thread's panel, without moving the window: unit-tested
+// in src/stores/threadPanelIntent.test.ts. Left here: the intents arriving over the UiService
+// stream from the CLI while another thread is shown, and the tabs there on return.
 test("a thread's model opens a file, a diff and a pull request in its own panel; the window stays on the user's thread", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-2").click();
@@ -59,12 +62,13 @@ test("a thread's model opens a file, a diff and a pull request in its own panel;
   await expect(page.getByTestId("pr-title")).toHaveText("fix(terminal): resize race between attach and first output");
   await shot(page, "thread-panel-pr");
 
-  await tabs(page).nth(0).click();
-  await expect(page.getByTestId("file-tab")).toHaveAttribute("data-path", `${CF}/README.md`);
-  await shot(page, "thread-panel-file");
-
-  await tabs(page).nth(1).click();
-  await expect(page.getByTestId("diff-tab")).toHaveAttribute("data-scope", "working");
-  await expect(page.getByTestId("diff-tab").locator('[data-line-type="change-addition"]').first()).toBeVisible();
-  await shot(page, "thread-panel-diff");
+  // The file and diff tabs themselves: e2e/file-tabs.spec.ts and src/components/files/DiffTab.test.tsx.
+  if (shots) {
+    await tabs(page).nth(0).click();
+    await expect(page.getByTestId("file-tab")).toHaveAttribute("data-path", `${CF}/README.md`);
+    await shot(page, "thread-panel-file");
+    await tabs(page).nth(1).click();
+    await expect(page.getByTestId("diff-tab").locator('[data-line-type="change-addition"]').first()).toBeVisible();
+    await shot(page, "thread-panel-diff");
+  }
 });

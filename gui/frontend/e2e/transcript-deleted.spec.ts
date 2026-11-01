@@ -11,32 +11,17 @@ test.beforeEach(async () => {
   await mockPost("thread/transcript?id=s-3");
 });
 
-test("the row, header and composer say it cannot continue; nothing can be sent", async ({ page }) => {
+// The row's Error and "transcript deleted" (SidebarRow.test.tsx), the header chip after the title
+// (ThreadParts.test.tsx), the note's text and its Archive and Remove (TranscriptDeleted.test.tsx),
+// no cold-cache line, the prompt disabled with its placeholder, Send and Attach disabled
+// (ThreadComposer.test.tsx): unit-tested. Left here: the real editor taking no typing and Enter
+// sending nothing.
+test("nothing can be typed or sent in its prompt", async ({ page }) => {
   await openApp(page);
-  const r = row(page, "s:s-3");
-  await expect(r.getByTestId("thread-body")).toHaveAttribute("data-status-line", "transcriptDeleted");
-  await expect(r.getByTestId("row-status")).toHaveText("Error");
-  await expect(r.getByTestId("row-status")).toHaveClass(/text-cf-error-text/);
-  await expect(r.getByTestId("row-detail")).toHaveText("transcript deleted");
-
-  await r.click();
+  await row(page, "s:s-3").click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
-  await expect(page.getByTestId("thread-transcript-deleted")).toHaveText("Transcript deleted");
-  // In the header's left bar, right after the title, not beside the toggles.
-  await expect(page.getByTestId("thread-title-bar").getByTestId("thread-transcript-deleted")).toBeVisible();
-
-  const note = page.getByTestId("thread-transcript-note");
-  await expect(note).toContainText("This thread can't continue.");
-  await expect(note).toContainText("Claude Code removes transcripts after cleanupPeriodDays (30 days by default)");
-  await expect(note.getByRole("button")).toHaveText(["Archive", "Remove"]);
-  // No cold cache line: there is no conversation to re-read.
-  await expect(page.getByTestId("thread-cold-cache")).toHaveCount(0);
-
   const prompt = threadPrompt(page);
   await expect(prompt).toHaveAttribute("aria-disabled", "true");
-  await expect(prompt).toHaveAttribute("aria-placeholder", "Transcript deleted");
-  await expect(page.getByTestId("thread-send")).toBeDisabled();
-  await expect(page.getByTestId("thread-attach")).toBeDisabled();
   // Not editable: a click (forced, Playwright sees it is disabled) and typing change nothing.
   await prompt.click({ force: true });
   await page.keyboard.type("still there?");
@@ -48,22 +33,6 @@ test("the row, header and composer say it cannot continue; nothing can be sent",
 
 // Fork disabled in the row menu: unit-tested in src/components/sidebar/RowMenu.test.tsx
 
-test("Archive archives it (home shows, as for any archive); opened again, Remove asks, then forgets it", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  const note = page.getByTestId("thread-transcript-note");
-  await note.getByTestId("thread-transcript-archive").click();
-  await expect(page.getByTestId("thread-pane")).toHaveCount(0);
-  await expect(page.getByTestId("archived-count")).toHaveText("2");
-
-  // Archived: Remove is what is left.
-  await page.getByTestId("archived-header").click();
-  await row(page, "s:s-3").click();
-  await expect(note.getByTestId("thread-transcript-archive")).toHaveCount(0);
-  await note.getByTestId("thread-transcript-remove").click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Remove thread s-3?");
-  await dialog.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("thread-pane")).toHaveCount(0);
-  expect((await invocations()).map((i) => i.name)).toEqual(expect.arrayContaining(["thread.archive", "thread.remove"]));
-});
+// Archive and Remove running the thread actions, an archived thread offering Remove only:
+// src/components/thread/TranscriptDeleted.test.tsx; archiving the selected thread selecting home:
+// e2e/archive.spec.ts; Remove's confirm: the daemon's (ConfirmDialog.test.tsx renders it).

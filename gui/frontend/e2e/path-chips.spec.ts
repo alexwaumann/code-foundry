@@ -33,21 +33,17 @@ test.beforeEach(async ({ page }) => {
   await expect(answer(page)).toContainText("All 412 tests pass");
 });
 
-test("an answer's paths open the File tab at their line, relative to the thread's checkout", async ({ page }) => {
-  const chips = answer(page).getByTestId("path-chip");
-  await expect(chips).toHaveText(["README.md", "src/app.ts:12"]);
-  if (process.env.SHOTS) await answer(page).screenshot({ path: `${process.env.SHOTS}/chips-answer.png` });
-
-  await chips.nth(1).click();
+// An answer's paths as chips opening the File tab at their line, relative to the thread's
+// checkout, by click and by Enter: unit-tested in src/components/thread/timeline.test.tsx and
+// rows.test.tsx; the File tab opened at a line (its line selected): e2e/file-tabs.spec.ts; one tab
+// per file: src/stores/filePanel.test.ts.
+test("the answer's chips (screenshot)", async ({ page }) => {
+  test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
+  await expect(answer(page).getByTestId("path-chip")).toHaveText(["README.md", "src/app.ts:12"]);
+  await answer(page).screenshot({ path: `${String(process.env.SHOTS)}/chips-answer.png` });
+  await answer(page).getByTestId("path-chip").nth(1).click();
   await expect(file(page)).toHaveAttribute("data-path", `${CF}/src/app.ts`);
-  await expect(file(page).getByTestId("file-code").locator('[data-line="12"][data-selected-line]').first()).toBeVisible();
-
-  // Keyboard: focus and Enter.
-  await chips.nth(0).focus();
-  await page.keyboard.press("Enter");
-  await expect(file(page)).toHaveAttribute("data-path", `${CF}/README.md`);
-  await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveText(["app.ts", "README.md"]);
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/chips-file-tab.png` });
+  await page.screenshot({ path: `${String(process.env.SHOTS)}/chips-file-tab.png` });
 });
 
 // A tool row's path opening its file while the rest of the row still toggles: src/components/thread/rows.test.tsx

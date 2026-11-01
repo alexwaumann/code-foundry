@@ -280,7 +280,9 @@ async function paste(page: Page, text: string): Promise<void> {
   }, text);
 }
 
-test("Go to source is not replayed when the thread is shown again; a quote no draft has does not send", async ({ page }) => {
+// A pasted quote no draft has (an error under the composer, nothing sent): unit-tested in
+// src/components/thread/ThreadComposer.test.tsx.
+test("Go to source is not replayed when the thread is shown again", async ({ page }) => {
   await openThread(page);
   const item = (await answer(page).getAttribute("data-cite-item")) ?? "";
   await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
@@ -301,14 +303,6 @@ test("Go to source is not replayed when the thread is shown again; a quote no dr
   await page.waitForTimeout(500);
   expect(await hasHighlight(page, "cf-cite-mark")).toBe(false);
 
-  // A draft token whose body no draft has (copied from a composer that has sent it): an error, nothing sent.
-  const before = (await invocations()).filter((i) => i.name === "thread.send").length;
-  await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
-  await paste(page, "[Assistant quote](cf-cite://c0123456789ab)");
-  await expect(chips(page)).toHaveText(["Quote"]);
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("thread-composer-error")).toHaveText("Nothing to send: the quote is no longer in any draft.");
-  expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(before);
 });
 
 test("with the thread info card shown, the Cite button and popover hang left of the card", async ({ page }) => {

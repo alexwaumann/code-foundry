@@ -33,32 +33,19 @@ const note = (page: Page) => page.getByTestId("thread-composer").getByTestId("th
 
 const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
 
+// The note showing at once when a thread update says the cache expired, a send starting or Claude
+// working hiding it, and a fresh result keeping it hidden: unit-tested in
+// src/components/thread/ColdCacheNote.test.tsx and src/lib/coldCache.test.ts. Left here: its place
+// inside the card, above the real editor.
 for (const scheme of schemes) {
-  test(`${scheme}: an expired cache shows the note above the prompt; sending hides it, the next result keeps it hidden`, async ({ page }) => {
+  test(`${scheme}: an expired cache's note sits in the card above the prompt`, async ({ page }) => {
     await openThread(page, scheme);
-    // Warm: nothing.
-    await expect(note(page)).toBeHidden();
-
-    // The last result an hour and a minute ago: the thread update shows it at once.
     await mockPost("thread/cache?id=s-r1&ago=3660");
     await expect(note(page)).toHaveText(NOTE);
-    // Inside the card, above the prompt.
     const n = await note(page).boundingBox();
     const editor = await page.getByTestId("thread-composer").locator('[contenteditable="true"]').boundingBox();
     expect(n && editor && n.y + n.height <= editor.y + 1).toBe(true);
     await shot(page, `thread-cold-cache-${scheme}`);
-
-    await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
-    await page.keyboard.type("Pick it up again");
-    await page.keyboard.press("Enter");
-    // Gone as the send starts, and while Claude works.
-    await expect(note(page)).toBeHidden();
-    await expect(page.getByTestId("thread-interrupt")).toBeVisible();
-    await expect(note(page)).toBeHidden();
-    // The reply's result is fresh: still hidden once idle.
-    await expect(page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
-    await expect(page.getByTestId("thread-interrupt")).toBeHidden();
-    await expect(note(page)).toBeHidden();
   });
 }
 
