@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectAttention, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { expectAttention, invocations, leaveSidebar, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -22,6 +22,7 @@ async function openThread(page: Page, state: State, scheme: "dark" | "light" = "
   await row(page, "s:s-r1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await expect(page.getByTestId("thread-timeline").locator("[data-row-type]").first()).toBeVisible();
+  await leaveSidebar(page, page.getByTestId("thread-pane"));
 }
 
 async function calls(): Promise<string[]> {
@@ -251,7 +252,10 @@ test("question keyboard: digits pick, Enter moves on and submits, Escape skips",
   expect(Object.values(JSON.parse(sent?.args.answer ?? "{}") as Record<string, string>)).toEqual(["Push to a new branch", "Yes"]);
 
   await openThread(page, "question");
-  await composer(page).getByTestId("thread-question").focus();
+  // The fresh question, not the one answered above: an Escape before it lands goes nowhere.
+  await expect(q).toContainText("1 of 2");
+  await q.focus();
+  await expect(q).toBeFocused();
   await page.keyboard.press("Escape");
   await expect.poll(async () => (await responds()).at(-1)).toBe("respond s-r1 deny req-push-q");
   await expect(lastText(page)).toContainText("No problem, I'll leave those for later.");

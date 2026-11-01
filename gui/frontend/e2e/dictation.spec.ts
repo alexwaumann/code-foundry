@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { leaveSidebar, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Dictation in the GUI (docs/notes/dictation-4-gui.md) against the mock's DictationService
@@ -30,9 +30,7 @@ async function openThread(page: Page, id = "s-3"): Promise<Locator> {
   await row(page, `s:${id}`).click();
   const card = page.getByTestId("thread-composer");
   await expect(card).toBeVisible();
-  // The row's hover card outlives the click for a moment; up, it would take the first Escape.
-  await card.hover();
-  await expect(page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])')).toHaveCount(0);
+  await leaveSidebar(page, card);
   return card;
 }
 
