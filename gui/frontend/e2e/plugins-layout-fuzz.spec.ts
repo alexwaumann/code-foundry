@@ -225,21 +225,7 @@ test("runs: select and Back thrash with slow acts and coalesced views ends consi
   expect(trail.filter((t) => t !== "detail:runs-run-2"), `md-3 flash: ${trail.join(" ")}`).toEqual([]);
 });
 
-test("runs: a refused choice after a later one leaves the later one's detail", async ({ page }) => {
-  await openDemo(page);
-  await tab(page, "run-list").click();
-  await expect(tab(page, "run-list")).toHaveAttribute("aria-selected", "true");
-  const md = surface(page).locator('[data-testid="plugin-master-detail"][data-key="runs-md"]');
-  const runRow = (n: number) => md.locator(`[data-testid="plugin-row"][data-key="runs-run-${String(n)}"]`);
-  await control("__actdelay:600");
-  await control("__failnext:runs-run-5");
-  await runRow(5).click(); // refused after 600 ms
-  await md.getByTestId("plugin-md-back").click();
-  await page.waitForTimeout(200);
-  await runRow(3).click(); // answered 600 ms later, 200 ms after the refusal
-  await page.waitForTimeout(450);
-  await expect(md).toHaveAttribute("data-showing", "detail");
-});
+// A refused choice after a later one leaves the later one's detail: unit-tested in src/components/plugin/layoutprobe.test.tsx (md-1)
 
 test("tab switching mid-act and resize thrash end on the plugin's tab with its drafts", async ({ page }) => {
   const errors = watchErrors(page);
