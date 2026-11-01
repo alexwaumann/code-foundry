@@ -17,7 +17,7 @@ export const card = {
   /** projectId → the action LastRun picks for the thread. */
   picks: new Map<string, ActionView>(),
   editors: [] as EditorAppView[],
-  /** projectId → the daemon's refusal of a new worktree-mode thread there. */
+  /** projectId (or "projectId@branch") → the daemon's refusal of a new worktree-mode thread there. */
   refusals: new Map<string, string>(),
 };
 
@@ -45,7 +45,7 @@ export const cardPlacementFakes = {
       branch: req.branch,
       branchNamedAtCreate: false,
       members: req.projectIds.map((projectId) => {
-        const message = card.refusals.get(projectId);
+        const message = card.refusals.get(`${projectId}@${req.branch}`) ?? card.refusals.get(projectId);
         return { projectId, projectName: projectId, outcome: message ? "refused" : "share", path: "", branch: req.branch, message: message ?? "" };
       }),
     }),
