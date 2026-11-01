@@ -143,14 +143,15 @@ test("a colour or weight utility beats a type role, in both schemes: Badge and B
   await snap(page, "roles");
 });
 
-test("an indeterminate Checkbox draws a dash, and strings that read like imports are left alone", async ({ page }) => {
+// Strings that read like imports left alone: src/pagelib/source.test.ts ("leaves strings that only read
+// like imports alone"); the indeterminate Checkbox's classes: src/components/ui/checkbox.test.tsx.
+test("an indeterminate Checkbox draws a dash through ui.css in the frame", async ({ page }) => {
   await openPages(page);
   const roles = await shown(page, "roles");
   const mixed = roles.getByTestId("mixed");
   await expect(mixed).toHaveAttribute("aria-checked", "mixed");
   await expect(mixed.locator("svg.lucide-minus")).toBeVisible();
   await expect(mixed.locator("svg.lucide-check")).toBeHidden();
-  await expect(roles.getByTestId("strings")).toHaveText(`copied from "/tmp/report.txt" | run: import './setup.js' first`);
 });
 
 test("the card shows a margin around the page's only child, and the error box whole", async ({ page }) => {
