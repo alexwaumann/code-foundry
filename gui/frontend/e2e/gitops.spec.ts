@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -33,25 +32,8 @@ test("a git op shows a progress toast, then its result (no duplicate command toa
   expect(inv[0]?.context?.activeWorktreePath).toBe(CF);
 });
 
-test("a failed op stays up and expands to show the output", async ({ page }) => {
-  await mockPost("gitops?delay=300&fail=git.push");
-  await selectMainWorktree(page);
-  await page.keyboard.press("Meta+k");
-  const palette = page.getByTestId("palette");
-  await palette.locator('[data-command="git.push"]').click();
-
-  const failed = toast(page, "Push main failed");
-  await expect(failed.getByTestId("gitop-summary")).toHaveText("[rejected] main -> main (fetch first)");
-  await expect(failed.getByTestId("gitop-output")).toHaveCount(0);
-  await failed.getByTestId("gitop-output-toggle").click();
-  await expect(failed.getByTestId("gitop-output")).toContainText("! [rejected]        main -> main (fetch first)");
-  await expect(failed.getByTestId("gitop-output")).toContainText("hint: Updates were rejected");
-  // No generic "Git: Push failed" toast on top of it.
-  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Git: Push failed" })).toHaveCount(0);
-  // Failures stay until dismissed: they carry a close button (success toasts time out).
-  await failed.getByRole("button", { name: "Close toast" }).click();
-  await expect(failed).toHaveCount(0);
-});
+// A failure's output toggle and close button, CLI-started ops and a created PR's Open: unit-tested
+// in src/components/gitops/GitOpToast.test.tsx (the duplicate command toast in src/stores/commands.test.ts).
 
 test("a second op on the same worktree shows as waiting", async ({ page }) => {
   await mockPost("gitops?delay=1500");
@@ -64,41 +46,4 @@ test("a second op on the same worktree shows as waiting", async ({ page }) => {
   await expect(pull).toContainText("waiting for the previous operation");
   await expect(pull.getByTestId("gitop-toast")).toHaveAttribute("data-state", "running");
   await expect(pull.getByTestId("gitop-summary")).toHaveText(/fast-forwarded/);
-});
-
-test("ops started outside the GUI (CLI) get toasts too", async ({ page }) => {
-  await mockPost("gitops?delay=200");
-  await openApp(page);
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name: "git.fetch", args: { worktree: `${CF}.worktrees/fix-resize` } }),
-  });
-  expect(res.ok).toBe(true);
-  const fetched = toast(page, "Fetch fix/resize");
-  await expect(fetched.getByTestId("gitop-summary")).toHaveText("fetched 2 updated refs");
-  await expect(fetched).toContainText("fix-resize");
-});
-
-test("pr.create needs a GitHub repo; its result offers to open the PR", async ({ page }) => {
-  await mockPost("gitops?delay=200");
-  await openApp(page);
-  // The thread in dotfiles (a non-GitHub remote), then one on feat/sidebar.
-  await row(page, "s:s-6").click();
-  await page.keyboard.press("Meta+k");
-  const palette = page.getByTestId("palette");
-  await expect(palette.locator('[data-command="git.fetch"]')).toBeVisible();
-  await expect(palette.locator('[data-command="pr.create"]')).toHaveCount(0);
-  await page.keyboard.press("Escape");
-
-  await row(page, "s:s-4").click();
-  await page.keyboard.press("Meta+k");
-  await palette.locator('[data-command="pr.create"]').click();
-  const created = toast(page, "Create PR for feat/sidebar");
-  await expect(created.getByTestId("gitop-summary")).toHaveText("created pull request #128");
-  await created.getByRole("button", { name: "Open" }).click();
-  await expect
-    .poll(async () => (await invocations()).find((i) => i.name === "view.open.url")?.args.url)
-    .toBe("https://github.com/alexwaumann/code-foundry/pull/128");
-  await expect(toast(page, "Open https://github.com/alexwaumann/code-foundry/pull/128").getByTestId("gitop-toast")).toHaveAttribute("data-state", "succeeded");
 });

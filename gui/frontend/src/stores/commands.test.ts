@@ -14,7 +14,16 @@ vi.mock("@/api/command", async (orig) => ({
   invokeCommand,
   confirmationOf: (err: unknown) => (err instanceof NeedsConfirm ? err.confirm : null),
 }));
-const { invokeConfirmed } = await import("./commands");
+// The git-op predicates are api/gitops.test.ts's: here a marker result and a marker error.
+const GIT_OP_RESULT = '{"gitop":true}';
+const gitOpFailure = new Error("[rejected] main -> main (fetch first)");
+vi.mock("@/api/gitops", () => ({
+  isGitOpResult: (json: string) => json === GIT_OP_RESULT,
+  isGitOpFailure: (err: unknown) => err === gitOpFailure,
+}));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
+const { invokeConfirmed, runCommand } = await import("./commands");
 
 const ctx = { activeTerminalId: "", activeThreadId: "", activeProjectId: "p1", activeWorktreePath: "/w/a", activeView: "projects", activeWorkspaceId: "" };
 const first = new NeedsConfirm({ command: "project.worktree.remove", title: "Remove Worktree", message: "Remove worktree /w/a? This deletes files on disk." });
@@ -106,5 +115,31 @@ describe("invokeConfirmed bind args", () => {
     await answer(consent.confirm.message, true);
     await done;
     expect(invokeCommand).toHaveBeenLastCalledWith("plugin.act", ctx, { key: "on" }, undefined, { confirmed: true });
+  });
+});
+
+describe("runCommand toasts", () => {
+  beforeEach(() => {
+    invokeCommand.mockReset();
+    toast.success.mockReset();
+    toast.error.mockReset();
+  });
+
+  it("toasts a command's result message and its failure", async () => {
+    invokeCommand.mockResolvedValueOnce({ message: "renamed the thread", resultJson: "" });
+    expect(await runCommand("thread.rename", {}, ctx)).toBe(true);
+    expect(toast.success).toHaveBeenCalledWith("renamed the thread");
+    invokeCommand.mockRejectedValueOnce(new Error("no such thread"));
+    expect(await runCommand("thread.rename", {}, ctx)).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith("thread.rename failed", { description: "no such thread" });
+  });
+
+  it("leaves a git op's result and failure to the op's own toast (stores/gitops.tsx)", async () => {
+    invokeCommand.mockResolvedValueOnce({ message: "pushed main to origin", resultJson: GIT_OP_RESULT });
+    expect(await runCommand("git.push", {}, ctx)).toBe(true);
+    invokeCommand.mockRejectedValueOnce(gitOpFailure);
+    expect(await runCommand("git.push", {}, ctx)).toBe(false);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
