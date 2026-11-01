@@ -82,12 +82,12 @@ test("one project: place, branch, pull requests, changes, shells, lineage, MCP, 
   await expect(c.locator('[data-testid="ti-lineage-row"][data-id="s-ti-k3"]')).toHaveAttribute("data-state", "done");
 
   await expect(c.getByTestId("ti-mcp").locator("> span").nth(1)).toHaveText("2 connected");
-  // Context: the row says only "Context"; its value column holds the warm cache's minutes, then the bar and share.
-  await expect(c.getByTestId("ti-context").locator("> span").nth(0)).toHaveText("Context");
-  await expect(c.getByTestId("ti-context-meta")).toHaveText(/^cache 41m\s*22%$/);
-  await expect(c.getByTestId("ti-context-cache")).toHaveText("cache 41m");
-  await expect(c.getByTestId("ti-context-pct")).toHaveText("22%");
-  await expectTooltip(page, c.getByTestId("ti-context"), /^221K of 1M tokens used\s*Cache expires in 41 min\s*\$2\.21 to re-read it after that$/);
+  // Context: "Context cached for 41m" on the left, the bar filling the middle, the window's tokens on the right.
+  await expect(c.getByTestId("ti-context-label")).toHaveText("Context cached for 41m");
+  await expect(c.getByTestId("ti-context-cache")).toHaveText("cached for 41m");
+  await expect(c.getByTestId("ti-context-bar")).toBeVisible();
+  await expect(c.getByTestId("ti-context-meta")).toHaveText("221K of 1M");
+  await expectTooltip(page, c.getByTestId("ti-context"), /^22% of context window used\s*Cache expires in 41 min\s*\$2\.21 to re-read it after that$/);
 
   // Usage: the row's value is the total cost in cents (no token count); the hover card splits it by model, one line each.
   const usage = c.getByTestId("ti-usage");
@@ -394,11 +394,12 @@ test("servers: a listening shell is a row that opens its port and stops the shel
 test("an expired cache: the context row and its hover card say nothing of it", async ({ page }) => {
   const id = await openWithCard(page, "single");
   const c = card(page);
-  await expect(c.getByTestId("ti-context-cache")).toHaveText("cache 41m");
+  await expect(c.getByTestId("ti-context-cache")).toHaveText("cached for 41m");
   await mockPost(`thread/cache?id=${id}&ago=3700`);
   await expect(c.getByTestId("ti-context-cache")).toHaveCount(0);
-  await expect(c.getByTestId("ti-context-meta")).toHaveText("22%");
-  await expectTooltip(page, c.getByTestId("ti-context"), /^221K of 1M tokens used$/);
+  await expect(c.getByTestId("ti-context-label")).toHaveText("Context");
+  await expect(c.getByTestId("ti-context-meta")).toHaveText("221K of 1M");
+  await expectTooltip(page, c.getByTestId("ti-context"), /^22% of context window used$/);
 });
 
 test("a thread under a cent: the row reads <$0.01, the kinds show no cost, nothing saved", async ({ page }) => {

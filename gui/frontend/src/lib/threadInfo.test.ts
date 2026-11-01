@@ -203,8 +203,8 @@ describe("small figures", () => {
 
   it("the cache countdown", () => {
     expect(cacheSuffix(cacheMinutesLeft(null, 0))).toBe("");
-    expect(cacheSuffix(cacheMinutesLeft(41 * 60_000, 0))).toBe("cache 41m");
-    expect(cacheSuffix(cacheMinutesLeft(30_000, 0))).toBe("cache 1m");
+    expect(cacheSuffix(cacheMinutesLeft(41 * 60_000, 0))).toBe("cached for 41m");
+    expect(cacheSuffix(cacheMinutesLeft(30_000, 0))).toBe("cached for 1m");
     // Expired: nothing (the composer's ColdCacheNote says so).
     expect(cacheSuffix(cacheMinutesLeft(0, 10))).toBe("");
     expect(cacheSuffix(cacheMinutesLeft(0, 0))).toBe("");
