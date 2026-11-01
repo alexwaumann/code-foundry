@@ -195,7 +195,7 @@ describe("PluginSurface", () => {
     await openDemo("layout");
     const toolbar = () => within(surface()).getByTestId("plugin-toolbar");
     const footer = () => within(surface()).getByTestId("plugin-footer");
-    const input = () => within(toolbar()).getByTestId("plugin-input");
+    const input = () => within(toolbar()).getByTestId<HTMLInputElement>("plugin-input");
     expect(input().placeholder).toBe("Filter runs");
     fireEvent.change(input(), { target: { value: "fix" } });
     fireEvent.keyDown(input(), { key: "Enter" });
