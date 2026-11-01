@@ -46,7 +46,9 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("the palette opens it: one card per server in every state, the header counts and dates the check", async ({ page }) => {
+// The cards in every state, the header's check line, the tab counts and their colours, Reconnect and
+// the tools toggle per state: src/surfaces/mcp.test.tsx ("shows the header and the servers…").
+test("the palette's Show MCP Servers opens the MCP tab in the thread's panel", async ({ page }) => {
   await openThread(page);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Show MCP Servers");
@@ -54,78 +56,23 @@ test("the palette opens it: one card per server in every state, the header count
   await palette.locator('[data-command="view.panel.mcp"]').click();
   await expect(palette).toHaveCount(0);
   await expectMcpTab(page);
-
-  await expect(surface(page).getByTestId("mcp-count")).toHaveCount(0);
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked \d+s ago, at the start of the last turn$/);
-  // Connected first; connecting counts as connected, needs login as failed.
   await expectTabs(page, [3, 2, 1], "connected", ["t3-code", "github", "filesystem"]);
-  await expect(mcpTab(page, "failed").getByTestId("mcp-tab-count")).toHaveClass(/text-cf-error-text/);
-  await expect(mcpTab(page, "connected").getByTestId("mcp-tab-count")).toHaveClass(/text-cf-text-muted/);
-  await expect(surface(page).getByTestId("mcp-pill")).toHaveText(["Connected", "Connected", "Connecting…"]);
-  await expect(card(page, "t3-code").getByTestId("mcp-version")).toHaveText("v0.4.2");
-  await expect(card(page, "t3-code").getByTestId("mcp-meta")).toHaveText("project·http·5 tools");
-
-  await mcpTab(page, "failed").click();
-  await expectTabs(page, [3, 2, 1], "failed", ["linear", "playwright"]);
-  await expect(surface(page).getByTestId("mcp-pill")).toHaveText(["Needs login", "Failed"]);
-  await expect(card(page, "linear").getByTestId("mcp-login-hint")).toHaveText("Needs login · run claude in a shell and use /mcp, then reconnect");
-  await expect(card(page, "playwright").getByTestId("mcp-error")).toHaveText("spawn npx ENOENT");
-
-  await mcpTab(page, "disabled").click();
-  await expectTabs(page, [3, 2, 1], "disabled", ["sentry"]);
-  await expect(surface(page).getByTestId("mcp-pill")).toHaveText(["Disabled"]);
-
-  // Reconnect on all but the connecting and the disabled server; tools only where connected.
-  for (const [bucket, name, reconnect, tools] of [
-    ["connected", "t3-code", 1, 1],
-    ["connected", "github", 1, 1],
-    ["failed", "linear", 1, 0],
-    ["failed", "playwright", 1, 0],
-    ["connected", "filesystem", 0, 0],
-    ["disabled", "sentry", 0, 0],
-  ] as const) {
-    await mcpTab(page, bucket).click();
-    await expect(card(page, name).getByTestId("mcp-reconnect")).toHaveCount(reconnect);
-    await expect(card(page, name).getByTestId("mcp-tools-toggle")).toHaveCount(tools);
-  }
 });
 
 // Empty tabs and no servers: unit-tested in src/surfaces/mcp.test.tsx
 
 // The chosen tab per panel, reset when the MCP tab closes: unit-tested in src/stores/mcpTabs.test.ts
 
-test("the card's row and the command open it, not M or the + list; tools expand with hint icons and their tooltips", async ({ page }) => {
+// Not in the + list, M opening nothing, the thread info card's Open MCP panel, view.panel.mcp's
+// ShowView, the tools' expand and collapse and their hint labels: src/surfaces/mcp.test.tsx.
+test("the CLI's view.panel.mcp opens it; a tool's hint icons show their tooltips on hover", async ({ page }) => {
   await openThread(page);
-  // Not in the panel's surface list, and M opens nothing (docs/notes/thread-header-crumb.md).
-  await page.getByTestId("thread-pane").getByRole("button", { name: "Toggle Side Panel" }).click();
-  await expect(page.getByTestId("panel-empty")).toBeVisible();
-  await expect(page.getByTestId("panel-empty").locator('[data-surface="mcp"]')).toHaveCount(0);
-  await page.keyboard.press("m");
-  await expect(page.getByTestId("panel-empty")).toBeVisible();
-  // Open, the toggle sits in the panel's header.
-  await panel(page).getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveCount(0);
-  // The thread info card's MCP row.
-  await page.getByTestId("thread-info-toggle").click();
-  // Its menu's Open MCP panel.
-  await openFromCard(page);
-  await expectMcpTab(page);
-  await page.getByTestId("thread-info-toggle").click();
-  await panel(page).getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveCount(0);
-  // view.panel.mcp from the CLI (a ShowView intent).
   expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
   await expectMcpTab(page);
-
   const github = card(page, "github");
-  await expect(github.getByTestId("mcp-tools")).toHaveCount(0);
   await github.getByTestId("mcp-tools-toggle").click();
-  await expect(github.getByTestId("mcp-tools-toggle")).toHaveAttribute("aria-expanded", "true");
   await expect(github.getByTestId("mcp-tool")).toHaveCount(5);
   const tool = (name: string) => github.locator(`[data-testid="mcp-tool"][data-tool="${name}"]`);
-  expect(await tool("merge_pull_request").getByTestId("mcp-hint").evaluateAll((els) => els.map((e) => e.getAttribute("data-hint")))).toEqual(["writes", "destructive", "open-world"]);
-  expect(await tool("get_pull_request").getByTestId("mcp-hint").evaluateAll((els) => els.map((e) => e.getAttribute("data-hint")))).toEqual(["read-only"]);
-
   // The open tooltip (the one before may still be fading out).
   const tip = page.locator('[data-testid="mcp-hint-tooltip"]:not([data-state="closed"])');
   await tool("get_pull_request").locator('[data-hint="read-only"]').hover();
@@ -136,9 +83,6 @@ test("the card's row and the command open it, not M or the + list; tools expand 
   await expect(tip).toHaveText("Open-world (reaches outside the server)");
   await tool("push_files").locator('[data-hint="writes"]').hover();
   await expect(tip).toHaveText("Writes");
-
-  await github.getByTestId("mcp-tools-toggle").click();
-  await expect(github.getByTestId("mcp-tools")).toHaveCount(0);
 });
 
 // Reconnect (Connecting…, then Connected in its tab, the check's words), a refused reconnect's toast, and
@@ -173,24 +117,8 @@ async function expectStale(page: Page, on: boolean): Promise<void> {
 
 // A thread Claude never reported for: unit-tested in src/surfaces/mcp.test.tsx.
 
-test("hidden for a page: not in the panel's list, not in the palette", async ({ page }) => {
-  await openThread(page);
-  // The Projects page does not list it.
-  await page.getByTestId("nav-projects").click();
-  await expect(page.getByTestId("projects-page")).toBeVisible();
-  await page.keyboard.press("Meta+Shift+e");
-  await expect(page.getByTestId("panel-empty")).toBeVisible();
-  await expect(page.getByTestId("panel-empty").locator('[data-surface="mcp"]')).toHaveCount(0);
-  await page.keyboard.press("m");
-  await expect(page.getByTestId("panel-empty")).toBeVisible();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show MCP Servers");
-  await expect(page.getByTestId("palette").locator('[data-command="view.panel.mcp"]')).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  // The ShowView from the CLI does nothing there either.
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expect(page.getByTestId("panel-body")).toHaveCount(0);
-});
+// Hidden for a page (not in the panel's list, M and view.panel.mcp open nothing): src/surfaces/mcp.test.tsx
+// ("on a page…"); not in the palette there: the daemon's When (internal/command/commands_mcp_test.go).
 
 /** The DOM edits stretchNames makes, by tab (a tab switch remounts the cards). */
 const STRETCH = {
