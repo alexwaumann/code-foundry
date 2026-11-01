@@ -251,31 +251,8 @@ test("a strip name opens its background run; the done Explore opened from the ca
   await expect(page.getByTestId("subagent-plate-text")).toHaveText(`Read-only. This agent finished and handed its report to ${PARENT}.`);
 });
 
-test("the run ending while viewed turns the view done in place, with the report it handed back", async ({ page }) => {
-  await openThread(page);
-  await openFromCard(page, "a1");
-  await expectViewing(page, "a1", "PR 1: daemon task frames");
-  await expect(page.getByTestId("subagent-status")).toHaveAttribute("data-status", "running");
-
-  await mockPost("thread/agent-end?run=a1");
-  await expect(page.getByTestId("subagent-status")).toHaveAttribute("data-status", "done");
-  await expect(page.getByTestId("subagent-status")).toHaveText("Done · just now");
-  await expectViewing(page, "a1", "PR 1: daemon task frames");
-  const footer = page.getByTestId("subagent-footer");
-  await expect(footer).toHaveAttribute("data-status", "done");
-  await expect(footer).toHaveText(/^Worked for 4m \d\ds·23 tools·48\.2K tokens·Opus$/);
-  // Its running test and its streaming reply stop with it.
-  await expect(view(page).locator('[data-tool="Bash"]')).toHaveAttribute("data-status", "done");
-  await expect(view(page).getByTestId("thread-text")).not.toHaveAttribute("data-streaming", "true");
-  // It handed the report back with a SubagentHandback call (not its last text): the
-  // report shows as the block, the call is no row of its own.
-  await expect(view(page).locator('[data-tool="SubagentHandback"]')).toHaveCount(0);
-  expect(await view(page).locator("[data-tool]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tool")))).toEqual(["Agent", "Edit", "Write", "Bash"]);
-  const report = page.getByTestId("subagent-report");
-  await expect(report).toContainText(`Report handed back to ${PARENT}`);
-  await expect(report).toContainText("Added task frame handling to the thread store with 14 table tests; make check is green.");
-  await expect(page.getByTestId("subagent-plate-text")).toHaveText(`Read-only. This agent finished and handed its report to ${PARENT}.`);
-});
+// The run ending while viewed (done in place, its report, no handback row): unit-tested in
+// src/components/thread/SubagentPane.test.tsx and src/lib/subagentView.test.ts.
 
 test("the failed run opened from its note shows its error; another run failing while viewed turns red in place", async ({ page }) => {
   await openThread(page);
