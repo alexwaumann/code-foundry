@@ -17,7 +17,6 @@ const thread = (o: Partial<ThreadView>) =>
     branch: "",
     createdWorktree: false,
     flags: [],
-    pluginEnvStale: false,
     ...o,
   }) as ThreadView;
 
@@ -70,7 +69,7 @@ describe("PlaceGroup: the project row's notes", () => {
     expect(within(notes()).getByTestId("ti-project-env-stale").textContent).toMatch(
       /^Plugin environment changed\s*Hello removed CF_HELLO\.\s*Claude is still running with the old environment\. Restart Claude restarts the Claude process with the new one; the conversation continues\.$/,
     );
-    setThread({ pluginEnvStale: false });
+    setThread({});
     expect(within(screen.getByTestId("ti-project")).queryByTestId("ti-project-mark")).toBeNull();
   });
 });
