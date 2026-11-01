@@ -28,7 +28,7 @@ const LOGIN = `${CF.replace("/src/code-foundry", "")}/.code-foundry/worktrees/al
 let ws = "";
 
 function cmd(name: string): CommandView {
-  return { name, title: name, description: "", category: "Thread", args: [], keybindings: [], available: true } as CommandView;
+  return { name, title: name, description: "", category: "Thread", args: [], keybindings: [], available: true };
 }
 
 beforeEach(() => {
@@ -42,7 +42,7 @@ beforeEach(() => {
     );
   });
   useCommandsStore.setState({ commands: [cmd("thread.pin"), cmd("thread.archive"), cmd("thread.snooze"), cmd("thread.run-in")] });
-  daemon.commands = useCommandsStore.getState().commands;
+  daemon.commands = [...useCommandsStore.getState().commands];
   useUiStore.setState({ selection: { kind: "thread", id: "s-drv" } });
 });
 afterEach(cleanup);

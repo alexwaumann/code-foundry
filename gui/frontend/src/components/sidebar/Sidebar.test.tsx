@@ -40,7 +40,7 @@ const { EMBER_THREAD, putEmberThread, setEmberEnabled, EmberWorld } = await impo
 const DEFAULT_ORDER = ["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "# Archived 1"];
 
 function cmd(name: string, title: string): CommandView {
-  return { name, title, description: "", category: "View", args: [], keybindings: [], available: true } as CommandView;
+  return { name, title, description: "", category: "View", args: [], keybindings: [], available: true };
 }
 
 beforeEach(() => {
@@ -49,13 +49,13 @@ beforeEach(() => {
   // The mock's s-6 has a last activity a minute ago, which puts it first among the idle threads.
   // Every thread gets the list fields projectsWorld leaves out (no flags, no linked PRs).
   useThreadsStore.setState((st) => ({
-    byId: Object.fromEntries(Object.entries(st.byId).map(([id, t]) => [id, { flags: [], linkedPullRequests: [], ...t, ...(id === "s-6" ? { lastActivityAtMs: Date.now() - 60_000 } : {}) }])),
+    byId: Object.fromEntries(Object.entries(st.byId).map(([id, t]) => [id, Object.assign({ flags: [], linkedPullRequests: [] }, t, id === "s-6" ? { lastActivityAtMs: Date.now() - 60_000 } : {})])),
     availability: "unknown",
   }) as never);
   setEmberEnabled(false);
   useUiStore.setState({ selection: HOME, cursorKey: null, sidebarVisible: true, workingCollapsed: false, snoozedCollapsed: true, archivedCollapsed: true });
   useCommandsStore.setState({ commands: [cmd("thread.new", "New Thread"), cmd("thread.pin", "Pin Thread")] });
-  daemon.commands = useCommandsStore.getState().commands;
+  daemon.commands = [...useCommandsStore.getState().commands];
 });
 afterEach(cleanup);
 
