@@ -29,33 +29,18 @@ const note = (page: Page) => page.getByTestId("thread-composer").getByTestId("th
 
 const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
 
+// The note's text, the thread busy meanwhile (Interrupt), the next frame clearing it, and the
+// countdown on the composer's own clock turning into "retrying now": unit-tested in
+// src/components/thread/ThreadComposer.test.tsx and src/lib/retryNote.test.ts. Left here: its
+// place inside the card, above the real editor.
 for (const scheme of schemes) {
-  test(`${scheme}: a rate-limit retry shows above the prompt while the thread works; the next frame clears it`, async ({ page }) => {
+  test(`${scheme}: a rate-limit retry's note sits in the card above the prompt`, async ({ page }) => {
     await openThread(page, scheme);
-    await expect(note(page)).toBeHidden();
-
     await mockPost("thread/retry?id=s-r1&in=20&attempt=3&max=10&status=429&error=rate_limit");
-    await expect(note(page)).toHaveText(/^Rate limited · retrying in (20|19) s \(attempt 3 of 10\)$/);
-    // Busy meanwhile, like the daemon's thread: the interrupt button shows.
-    await expect(page.getByTestId("thread-interrupt")).toBeVisible();
-    // Inside the card, above the prompt.
+    await expect(note(page)).toBeVisible();
     const n = await note(page).boundingBox();
     const editor = await page.getByTestId("thread-composer").locator('[contenteditable="true"]').boundingBox();
     expect(n && editor && n.y + n.height <= editor.y + 1).toBe(true);
     await shot(page, `thread-retry-${scheme}`);
-
-    await mockPost("thread/retry?id=s-r1&clear=1");
-    await expect(note(page)).toBeHidden();
   });
 }
-
-test("the countdown runs on the composer's own clock and turns into 'retrying now'", async ({ page }) => {
-  await page.clock.install();
-  await openThread(page);
-  await mockPost("thread/retry?id=s-r1&in=5&attempt=1&max=10&status=529&error=overloaded");
-  await expect(note(page)).toHaveText(/^API overloaded · retrying in [45] s \(attempt 1 of 10\)$/);
-  await page.clock.runFor(3_000);
-  await expect(note(page)).toHaveText(/^API overloaded · retrying in [12] s \(attempt 1 of 10\)$/);
-  await page.clock.runFor(4_000);
-  await expect(note(page)).toHaveText("API overloaded · retrying now (attempt 1 of 10)");
-});

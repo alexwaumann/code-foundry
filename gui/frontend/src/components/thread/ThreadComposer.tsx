@@ -15,7 +15,7 @@ import { TagMultiProjectContext } from "@/components/compose/tagContext";
 import { attachLabel, useHostFiles } from "@/components/compose/useHostFiles";
 import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
-import { useCommandSource, useCompletion, useFileSource, useSkillSource, type CompletionSource } from "@/components/compose/useCompletion";
+import { useCompletion, useFileSource, useSlashSource, type CompletionSource } from "@/components/compose/useCompletion";
 import { useMentionSource, useProjectSlugs, usePrSource } from "@/components/compose/useRefSources";
 import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
@@ -175,10 +175,7 @@ export function ThreadComposer({
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
   // "/": the running process's own list (what "/name" runs); the disk scan while there is
   // none (not running yet, or a daemon that predates the list).
-  const commands = useSlashCommands(threadId);
-  const skillSource = useSkillSource(trigger, skillSourcesKey(sources.skills), sources.projectIds);
-  const commandSource = useCommandSource(trigger, commands, skillSourcesKey(sources.skills), sources.projectIds);
-  const slashSource = commands.length > 0 ? commandSource : skillSource;
+  const slashSource = useSlashSource(trigger, useSlashCommands(threadId), skillSourcesKey(sources.skills), sources.projectIds);
   const fileSource = useFileSource(trigger, sources.files, sources.projectIds, sources.projectIds[0] ?? "");
   const mentionSource = useMentionSource(trigger, sources.noProject ? null : fileSource, threadId);
   const prSource = usePrSource(trigger, useProjectSlugs(sources.projectIds));
