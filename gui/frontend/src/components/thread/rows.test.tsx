@@ -75,6 +75,18 @@ describe("a tool waiting for permission", () => {
     expect(c.querySelector('[data-testid="thread-diff"] diffs-container')).not.toBeNull();
   });
 
+  it("once the daemon resolves the request the row stops waiting; a denied one says so", () => {
+    const resolved = (state: "allowed" | "denied" | "cancelled") =>
+      editWaiting("Bash", { command: "git push" }).map((it) => (it.kind === "permission" ? { ...it, request: { ...it.request, state } } : it.kind === "tool" ? { ...it, status: state === "allowed" ? ("done" as const) : ("error" as const) } : it));
+    const denied = show(resolved("denied"));
+    expect(denied.querySelector('[data-waiting="true"]')).toBeNull();
+    expect(denied.querySelector('[data-testid="thread-waiting"]')).toBeNull();
+    expect(denied.querySelector('[data-tool="Bash"] .chip.fail')?.textContent).toBe("denied");
+    cleanup();
+    const cancelled = show(resolved("cancelled"));
+    expect(cancelled.querySelector('[data-testid="thread-waiting"]')).toBeNull();
+  });
+
   it("a Bash call does not expand (the docked prompt shows the command)", () => {
     const c = show(editWaiting("Bash", { command: "git push" }));
     expect(c.querySelector('[data-waiting="true"]')).not.toBeNull();
