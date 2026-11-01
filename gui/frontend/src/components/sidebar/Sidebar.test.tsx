@@ -360,6 +360,8 @@ describe("Sidebar: Ember's row", () => {
     putEmberThread({}, order.map((id) => byId[id] as ThreadView));
     new EmberWorld().publish();
     render(<Sidebar />);
+    // The thread list never lists Ember itself: its row is the pinned one above.
+    expect(rowOf(`s:${EMBER_THREAD}`)).toBeNull();
     const cursorOnEmber = () => screen.getByTestId("sidebar-ember").getAttribute("data-cursor");
     press("Home");
     expect(active()).toBe("row-ember");
