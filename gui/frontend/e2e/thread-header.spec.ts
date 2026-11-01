@@ -22,26 +22,9 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-for (const [scenario, icon, place, title] of [
-  ["single", "folder", "code-foundry", "Fix the stale PR badge"],
-  ["ws9", "layers", "platform", "Roll out refresh tokens"],
-  ["unnamed", "folders", "ghostty-playground +2", "Sweep the config readers"],
-  ["home", "house", "No project", "Plan the week"],
-] as const) {
-  test(`the crumb of ${scenario}: ${place} › ${title}`, async ({ page }) => {
-    await open(page, scenario);
-    const h = header(page);
-    await expect(h.getByTestId("thread-crumb")).toHaveAttribute("data-icon", icon);
-    await expect(h.getByTestId("thread-crumb-place")).toHaveText(place);
-    await expect(h.getByTestId("thread-crumb-parent")).toHaveCount(0);
-    await expect(h.getByTestId("thread-title-name")).toHaveText(title);
-    // The right side is the three toggles, nothing else.
-    await expect(h.getByTestId("pane-actions").locator("button")).toHaveCount(3);
-    for (const gone of ["pane-linked-pr", "pane-linked-prs", "pane-snooze", "pane-sidebar", "pane-thread-menu", "pane-actions-menu", "thread-flag", "thread-env-stale", "thread-location"]) {
-      await expect(h.getByTestId(gone)).toHaveCount(0);
-    }
-  });
-}
+// The crumb of each kind of thread (one project, a named workspace, an unnamed set, no project:
+// icon, place, title, no parent) and the right side being the three toggles: src/components/thread/ThreadParts.test.tsx
+// ("the thread header's crumb", "is the three toggles only"). The removed header controls' test ids are gone from src.
 
 test("a child's crumb names its parent, which opens on a click", async ({ page }) => {
   // A child has no sidebar row: open it from its parent's thread info card.
