@@ -36,6 +36,12 @@ async function expectMcpTab(page: Page): Promise<void> {
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "mcp");
 }
 
+/** The thread info card's MCP row: the row opens its menu, whose first item opens the tab. */
+async function openFromCard(page: Page): Promise<void> {
+  await page.getByTestId("thread-info-card").getByTestId("ti-mcp").click();
+  await page.getByTestId("ti-mcp-open-panel").click();
+}
+
 async function threadCalls(): Promise<string[]> {
   const res = await fetch(`${mockUrl}/__mock/thread/calls`);
   return (await res.json()) as string[];
@@ -142,7 +148,7 @@ test("the chosen tab is kept per thread while the MCP tab stays open, and resets
   await panel(page).getByRole("button", { name: "Close MCP" }).click();
   await expect(surface(page)).toHaveCount(0);
   await page.getByTestId("thread-info-toggle").click();
-  await page.getByTestId("thread-info-card").getByTestId("ti-mcp").locator("> span").nth(1).click();
+  await openFromCard(page);
   await expectMcpTab(page);
   await expectTabs(page, [3, 2, 1], "connected", ["t3-code", "github", "filesystem"]);
 });
@@ -160,8 +166,8 @@ test("the card's row and the command open it, not M or the + list; tools expand 
   await expect(panel(page)).toHaveCount(0);
   // The thread info card's MCP row.
   await page.getByTestId("thread-info-toggle").click();
-  // Its text, not the value column (which opens the row's menu).
-  await page.getByTestId("thread-info-card").getByTestId("ti-mcp").locator("> span").nth(1).click();
+  // Its menu's Open MCP panel.
+  await openFromCard(page);
   await expectMcpTab(page);
   await page.getByTestId("thread-info-toggle").click();
   await panel(page).getByTestId("panel-toggle").click();
@@ -394,7 +400,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.setViewportSize({ width: 1680, height: 860 });
     await openThread(page);
     await page.getByTestId("thread-info-toggle").click();
-    await page.getByTestId("thread-info-card").getByTestId("ti-mcp").locator("> span").nth(1).click();
+    await openFromCard(page);
     await page.getByTestId("thread-info-toggle").click();
     await expectMcpTab(page);
     if (process.env.SHOTS_LONG) await stretchNames(page);

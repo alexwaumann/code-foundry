@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { expectTooltip, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
@@ -150,6 +150,112 @@ test("one project: place, branch, pull requests, changes, shells, lineage, MCP, 
   await expect(card(page)).toBeVisible();
   await toggle(page).click();
   await expect(page.getByTestId("thread-info")).toHaveCount(0);
+});
+
+/** A locator's right edge. */
+async function rightOf(l: Locator): Promise<number> {
+  const b = await box(l);
+  return b.x + b.width;
+}
+
+/** The menu sits under its row at the row's width, once its open animation ends. */
+async function expectUnderRow(menu: Locator, rowEl: Locator): Promise<void> {
+  await expect
+    .poll(async () => {
+      const [m, r] = await Promise.all([box(menu), box(rowEl)]);
+      return [Math.round(m.x - r.x), Math.round(m.width - r.width), m.y >= r.y + r.height];
+    })
+    .toEqual([0, 0, true]);
+}
+
+test("split rows: a click runs the row, the ellipsis opens its menu under the row; values, ellipses and chevrons share one right edge", async ({ page }) => {
+  await openWithCard(page, "single");
+  const c = card(page);
+  const openIn = c.getByTestId("ti-open-in");
+  const action = c.getByTestId("ti-action");
+  const pr = c.getByTestId("ti-pr").first();
+  await expect(action).toContainText("Dev");
+
+  // A chevron only on a disclosure: the split rows carry an ellipsis instead, rows without either reserve nothing.
+  for (const id of ["ti-open-in", "ti-action", "ti-pr", "ti-context", "ti-branch", "ti-lineage-label"]) await expect(c.getByTestId(`${id}-chevron`)).toHaveCount(0);
+  await expect(openIn.getByTestId("ti-open-in-more")).toHaveAttribute("aria-label", "Open in options");
+  await expect(action.getByTestId("ti-action-more")).toHaveAttribute("aria-label", "Actions options");
+  await expect(pr.getByTestId("ti-pr-more")).toHaveAttribute("aria-label", "Pull request options");
+  await expect(c.getByTestId("ti-lineage-menu-trigger")).toHaveAttribute("aria-label", "Lineage options");
+
+  // One right edge, the row's padding inside its own: values without a chevron, every ellipsis, every chevron.
+  const edge = (await rightOf(c.getByTestId("ti-context"))) - 4;
+  const ends = [
+    "ti-context-meta",
+    "ti-branch-meta",
+    "ti-lineage-menu-trigger",
+    "ti-open-in-more",
+    "ti-action-more",
+    "ti-pr-more",
+    "ti-project-chevron",
+    "ti-previous-chevron",
+    "ti-mcp-chevron",
+    "ti-usage-chevron",
+  ];
+  for (const id of ends) expect(Math.abs((await rightOf(c.getByTestId(id).first())) - edge), id).toBeLessThan(1);
+  // The ellipsis is the chevron's 16px box.
+  const more = await box(c.getByTestId("ti-open-in-more"));
+  const chev = await box(c.getByTestId("ti-project-chevron"));
+  expect([more.width, more.height]).toEqual([chev.width, chev.height]);
+
+  const reveals = async () => (await invocations()).filter((i) => i.name === "worktree.reveal").length;
+  // Open in: the ellipsis opens the menu under the row, at its width, and reveals nothing; the row stays tinted while it is up.
+  await page.mouse.move(0, 0);
+  const bg = () => openIn.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const resting = await bg();
+  await c.getByTestId("ti-open-in-more").click();
+  const openInMenu = page.getByTestId("ti-open-in-menu");
+  await expect(openInMenu).toBeVisible();
+  await expect(c.getByTestId("ti-open-in-more")).toHaveAttribute("aria-expanded", "true");
+  await expectUnderRow(openInMenu, openIn);
+  await page.mouse.move(0, 0);
+  await expect.poll(bg).not.toBe(resting);
+  await expect(openInMenu.getByTestId("ti-open-finder")).toBeVisible();
+  // A menu item is the item's, not the row's click too (React bubbles portal events to the row).
+  await openInMenu.getByTestId("ti-open-terminal").click();
+  await expect(openInMenu).toHaveCount(0);
+  expect(await reveals()).toBe(0);
+  // The row's click reveals; Enter on the row too; Tab reaches the ellipsis, whose Enter opens the menu.
+  await openIn.click();
+  await expect.poll(reveals).toBe(1);
+  await openIn.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(reveals).toBe(2);
+  await page.keyboard.press("Tab");
+  await expect(c.getByTestId("ti-open-in-more")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(openInMenu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(openInMenu).toHaveCount(0);
+  expect(await reveals()).toBe(2);
+
+  // The action: the ellipsis lists the actions and runs none.
+  await c.getByTestId("ti-action-more").click();
+  const actionMenu = page.getByTestId("ti-action-menu");
+  await expect(actionMenu).toBeVisible();
+  await expectUnderRow(actionMenu, action);
+  await page.keyboard.press("Escape");
+  expect((await invocations()).filter((i) => i.name === "action.run")).toEqual([]);
+
+  // A pull request (a taller row): the ellipsis offers GitHub and Copy URL, and opens no tab.
+  await pr.getByTestId("ti-pr-more").click();
+  const prMenu = page.getByTestId("ti-pr-menu");
+  await expect(prMenu.getByTestId("ti-pr-github")).toBeVisible();
+  await expectUnderRow(prMenu, pr);
+  await expect(page.locator('[data-testid="panel-body"][data-surface="pullrequest"]')).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  // Lineage's ellipsis is the same button with the same menu placement.
+  await c.getByTestId("ti-lineage-menu-trigger").click();
+  const lineageMenu = page.getByTestId("ti-lineage-menu");
+  await expect(lineageMenu.getByTestId("ti-show-hidden")).toBeVisible();
+  await expectUnderRow(lineageMenu, c.getByTestId("ti-lineage-label"));
+  await page.keyboard.press("Escape");
 });
 
 test("nine projects in a workspace: Run in menu, other projects' pull requests, Changes fold, Fix sends a prompt", async ({ page }) => {
@@ -519,7 +625,7 @@ test("a page's Expand covers the conversation, not the card beside it", async ({
   await expect(lightbox).toHaveCount(0);
 });
 
-test("the MCP row: connected count on the left, attention counts in the value column; the value and chevron open the menu, the rest opens the tab", async ({ page }) => {
+test("the MCP row: connected count on the left, attention counts in the value column; the whole row opens the menu, Open MCP panel first", async ({ page }) => {
   // s-r1 carries the MCP sketch's six servers (mock/mcp.ts): two connected, linear needs a login, playwright failed.
   await mockPost("thread?state=idle");
   await openApp(page);
@@ -532,29 +638,21 @@ test("the MCP row: connected count on the left, attention counts in the value co
   await expect(c.getByTestId("ti-mcp-meta")).toHaveText(/^1 needs login\s*1 failed$/);
   await expect(c.getByTestId("ti-mcp-needs-login")).toHaveClass(/text-cf-warning-text/);
   await expect(c.getByTestId("ti-mcp-failed")).toHaveClass(/text-cf-error-text/);
-  // The value lines up with the other rows' values (its right edge, the same chevron column).
-  const right = async (testId: string) => {
-    const b = await c.getByTestId(testId).boundingBox();
-    return (b?.x ?? 0) + (b?.width ?? 0);
-  };
-  expect(Math.abs((await right("ti-mcp-meta")) - (await right("ti-usage-meta")))).toBeLessThan(1);
-  // One trigger zone: the value and the chevron, tinted together on hover.
-  const zone = c.getByTestId("ti-mcp-menu-zone");
-  await expect(zone.getByTestId("ti-mcp-meta")).toHaveCount(1);
-  await expect(zone.getByTestId("ti-mcp-chevron")).toHaveCount(1);
-  const bg = () => zone.evaluate((el) => getComputedStyle(el).backgroundColor);
-  await page.mouse.move(0, 0);
-  const resting = await bg();
-  await c.getByTestId("ti-mcp-failed").hover();
-  await expect.poll(bg).not.toBe(resting);
+  // The value lines up with the other chevron rows' values (Usage's).
+  expect(Math.abs((await rightOf(c.getByTestId("ti-mcp-meta"))) - (await rightOf(c.getByTestId("ti-usage-meta"))))).toBeLessThan(1);
+  // No zone of its own any more: the row is the trigger.
+  await expect(c.getByTestId("ti-mcp-menu-zone")).toHaveCount(0);
+  await expect(mcp).toHaveAttribute("aria-haspopup", "menu");
 
-  // A press on the value opens the menu, not the tab.
+  // A press on the value opens the menu, not the tab, at the row's width.
   await c.getByTestId("ti-mcp-needs-login").click();
   const menu = page.getByTestId("ti-mcp-menu");
   await expect(menu).toBeVisible();
+  await expectUnderRow(menu, mcp);
   await expect(c.getByTestId("ti-mcp-chevron")).toHaveAttribute("data-open", "");
   await expect(page.getByTestId("mcp-surface")).toHaveCount(0);
-  // Reconnect is offered for the failed server only (a login cannot be done headlessly).
+  // Open MCP panel, Refresh, then Reconnect for the failed server only (a login cannot be done headlessly).
+  await expect(menu.getByRole("menuitem")).toHaveText(["Open MCP panel", "Refresh", "Reconnect playwright"]);
   await expect(menu.getByTestId("ti-mcp-reconnect")).toHaveCount(1);
   await expect(menu.getByTestId("ti-mcp-reconnect")).toHaveText("Reconnect playwright");
   await menu.getByTestId("ti-mcp-reconnect").click();
@@ -566,19 +664,25 @@ test("the MCP row: connected count on the left, attention counts in the value co
   await expect(c.getByTestId("ti-mcp-failed")).toHaveCount(0);
   await expect(mcp.locator("> span").nth(1)).toHaveText("3 connected");
 
-  // The chevron opens the menu too; ArrowDown from the focused row as well.
-  await c.getByTestId("ti-mcp-chevron").click();
-  await expect(menu).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(menu).toHaveCount(0);
-  await mcp.focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(menu).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(menu).toHaveCount(0);
+  // The text and the chevron open the menu too; Enter and ArrowDown from the focused row as well.
+  for (const target of [mcp.locator("> span").nth(1), c.getByTestId("ti-mcp-chevron")]) {
+    await target.click();
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+  }
+  for (const key of ["Enter", "ArrowDown"]) {
+    await mcp.focus();
+    await page.keyboard.press(key);
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+  }
+  await expect(page.getByTestId("mcp-surface")).toHaveCount(0);
 
-  // A press on the text opens the MCP tab.
-  await mcp.locator("> span").nth(1).click();
+  // Open MCP panel opens the MCP tab.
+  await mcp.click();
+  await menu.getByTestId("ti-mcp-open-panel").click();
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "mcp");
   await expect(menu).toHaveCount(0);
 });

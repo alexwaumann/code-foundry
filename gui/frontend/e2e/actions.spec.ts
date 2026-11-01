@@ -41,10 +41,10 @@ async function openMenu(page: Page, project = "repo-cf"): Promise<void> {
   await expect(menu(page)).toBeVisible();
 }
 
-/** The selected thread's card, its action row's menu open (its chevron). */
+/** The selected thread's card, its action row's menu open (its ellipsis). */
 async function openCardActions(page: Page): Promise<void> {
   if ((await page.getByTestId("thread-info-toggle").getAttribute("aria-pressed")) !== "true") await page.getByTestId("thread-info-toggle").click();
-  await card(page).getByTestId("ti-action").locator("[data-row-chevron]").click();
+  await card(page).getByTestId("ti-action-more").click();
   await expect(page.getByTestId("ti-action-menu")).toBeVisible();
 }
 
