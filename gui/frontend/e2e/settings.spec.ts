@@ -189,35 +189,7 @@ test("the dark and light theme rows offer their scheme's themes and apply live",
   await expect(page.locator("html")).not.toHaveClass(/dark/);
 });
 
-test("changing a bool and an enum saves to the file and applies live", async ({ page }) => {
-  await openSettings(page);
-  const autoName = setting(page, "threads.auto_name").getByRole("switch");
-  await expect(autoName).toHaveAttribute("aria-checked", "true");
-  await autoName.click();
-  await expect(autoName).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByText("Saved Name threads automatically")).toBeVisible();
-  await expect.poll(async () => (await mockSettings()).raw["threads.auto_name"]).toBe("false");
-
-  await goTo(page, "appearance");
-  await pick(page, "appearance.theme", "Light");
-  await expect.poll(async () => (await mockSettings()).raw["appearance.theme"]).toBe("light");
-  await expect(page.locator("html")).not.toHaveClass(/dark/);
-  await pick(page, "appearance.theme", "Dark");
-  await expect(page.locator("html")).toHaveClass(/dark/);
-
-  // An out-of-range number is rejected inline and not saved.
-  const size = setting(page, "appearance.font_size").getByRole("spinbutton");
-  await size.fill("99");
-  await size.press("Enter");
-  await expect(setting(page, "appearance.font_size").getByTestId("setting-error")).toHaveText("Want 9 to 28");
-  expect((await mockSettings()).raw["appearance.font_size"]).toBeUndefined();
-
-  // The restart-required field shows a pending badge once changed.
-  const scroll = setting(page, "threads.scrollback_lines").getByRole("spinbutton");
-  await scroll.fill("20000");
-  await scroll.press("Enter");
-  await expect(setting(page, "threads.scrollback_lines").getByTestId("restart-pending")).toBeVisible();
-});
+// A bool saving (toast), Light/Dark on html.dark, an out-of-range number refused inline and the restart badge: src/components/settings/SettingsPage.test.tsx ("a bool saves and says so…"), src/stores/settings.test.ts ("applies theme…") and src/lib/theme.test.ts. An enum saving is the keyboard test below.
 
 test("an enum select works from the keyboard", async ({ page }) => {
   await openSettings(page, "appearance");
@@ -302,27 +274,7 @@ test("hand edits to the file update the open page and the terminal font", async 
 
 // Open settings file in Finder: unit-tested in src/components/settings/SettingsPage.test.tsx.
 
-test("cmd+/ opens the help overlay; its shortcuts tab lists commands and app chords", async ({ page }) => {
-  await openApp(page);
-  await page.keyboard.press("Meta+Slash");
-  const help = page.getByTestId("help-overlay");
-  await expect(help).toBeVisible();
-  await expect(page.getByTestId("help-tab-guide")).toHaveAttribute("data-state", "active");
-  // Threads never need closing or reconnecting: a message always continues one.
-  await expect(page.getByTestId("help-guide")).toContainText("a thread keeps its history, and a message always continues it.");
-  await expect(help).not.toContainText(/disconnected|Reconnect/);
-  await page.getByTestId("help-tab-shortcuts").click();
-  await expect(help.locator('[data-help-command="thread.close"], [data-help-command="thread.reconnect"]')).toHaveCount(0);
-  await expect(help.locator('[data-help-section="App"]')).toContainText("Command palette");
-  await expect(help.locator('[data-help-section="App"]')).toContainText("⌘K");
-  // Registry commands with their effective chords, grouped by category; unavailable
-  // ones (thread.new without a worktree) are still listed.
-  await expect(help.locator('[data-help-command="thread.new"]')).toContainText("⌘N");
-  await expect(help.locator('[data-help-command="terminal.new"]')).toContainText("⌘T");
-  await expect(help.locator('[data-help-command="view.settings"]')).toContainText("⌘,");
-  await page.keyboard.press("Escape");
-  await expect(help).toHaveCount(0);
-});
+// cmd+/, the guide tab and Escape: help.spec.ts. The guide's wording, the App section's chords and a command's chord: src/components/help/HelpOverlay.test.tsx; no thread.close or thread.reconnect: internal/command/commands_thread_lifecycle_test.go.
 
 // ShowView settings, thread.next and help: unit-tested in src/stores/intents.test.ts.
 

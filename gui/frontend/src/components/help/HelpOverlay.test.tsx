@@ -97,6 +97,29 @@ describe("HelpOverlay", () => {
     expect(listCommands).toHaveBeenCalledTimes(1);
   });
 
+  it("the guide says a message always continues a thread, never that one disconnects or needs reconnecting", () => {
+    act(() => {
+      openHelp();
+    });
+    render(<HelpOverlay />);
+    const guide = screen.getByTestId("help-guide").textContent;
+    expect(guide).toContain("a thread keeps its history, and a message always continues it.");
+    expect(guide).not.toMatch(/disconnected|Reconnect/);
+  });
+
+  it("the shortcuts: the app's own chords under App, then each command with its chord", async () => {
+    act(() => {
+      openHelp("shortcuts");
+    });
+    render(<HelpOverlay />);
+    const row = await screen.findByText("New Thread");
+    expect(row.closest("[data-help-command]")?.getAttribute("data-help-command")).toBe("thread.new");
+    expect(row.closest("[data-help-command]")?.textContent).toContain("⌘N");
+    const app = document.querySelector('[data-help-section="App"]');
+    expect(app?.textContent).toContain("Command palette");
+    expect(app?.textContent).toContain("⌘K");
+  });
+
   it("switches tabs from the tab list", () => {
     act(() => {
       openHelp();
