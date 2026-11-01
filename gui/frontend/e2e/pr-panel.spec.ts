@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
+import { CF, invocations, mockPost, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 /**
  * The Pull request surface in the side panel, against the mock daemon's fixtures
@@ -86,359 +86,90 @@ function copied(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
 }
 
-test("a row on the Pull Requests page opens #145: header, reviewers, failing checks", async ({ page }) => {
+// "a row on the Pull Requests page opens #145: header, reviewers, failing checks": src/components/pr/PullRequestSurface.test.tsx ("#145: header, reviewers, ...").
+test("summary (screenshot)", async ({ page }) => {
+  test.skip(!shots, "SHOTS=<dir> only: the screenshot is all it adds");
   await openPrPage(page);
-  await expect(panel(page)).toHaveCount(0);
   await prRow(page, "authored", 145).click();
-  await expect(tabs(page)).toHaveText(["#145"]);
-  const s = page.getByTestId("pr-surface");
-  await expect(s).toBeVisible();
-  await expect(page.getByTestId("pr-repo-link")).toHaveText(`${SLUG}#145`);
-  await expect(page.getByTestId("pr-title")).toHaveText("fix(terminal): resize race between attach and first output");
-  await expect(page.getByTestId("pr-author")).toHaveText("alexwaumann");
-  await expect(page.getByTestId("pr-updated")).toHaveText("updated 5h ago");
-  await expect(page.getByTestId("pr-branches")).toHaveText(/main\s*fix\/resize/);
-  await expect(page.getByTestId("pr-diffstat")).toContainText("3 files");
-  await expect(page.getByTestId("pr-diffstat")).toContainText("+1,450");
-  await expect(page.getByTestId("pr-state")).toHaveText("Draft");
   await expect(page.getByTestId("pr-checks-summary")).toHaveText("2 failing");
-  await expect(page.getByTestId("pr-checks-summary")).toHaveAttribute("data-tone", "failure");
-
-  const reviewers = page.getByTestId("pr-reviewer");
-  await expect(reviewers).toHaveCount(4);
-  await expect(reviewers.first()).toHaveAttribute("data-login", "teammate-kim");
-  await expect(reviewers.first()).toHaveAttribute("data-status", "changes_requested");
-  await expect(reviewers.first()).toHaveAttribute("data-stale", "true");
-  await expect(page.getByTestId("pr-reviewers")).toContainText("and more on GitHub");
-
-  // Description renders markdown (a heading and a task list).
-  await expect(page.getByTestId("pr-description").getByRole("heading", { name: "Test plan" })).toBeVisible();
-  await expect(page.getByTestId("pr-description").locator('input[type="checkbox"]')).toHaveCount(2);
-
-  // Every check, failed first, with their status.
-  const checks = page.getByTestId("pr-check");
-  await expect(checks).toHaveCount(7);
-  await expect(checks.nth(0)).toContainText("test (macos-15)");
-  await expect(checks.nth(0)).toHaveAttribute("data-tone", "failure");
-  await expect(checks.nth(1)).toHaveAttribute("data-tone", "failure");
-  await expect(checks.filter({ hasText: "e2e (chromium)" })).toHaveAttribute("data-tone", "pending");
-  await expect(checks.filter({ hasText: "release-notes" })).toHaveAttribute("data-tone", "skipped");
-  // A check opens its log through view.open.url.
-  await checks.nth(0).click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").at(-1)?.args.url).toBe("https://github.com/alexwaumann/code-foundry/actions/runs/1/job/11");
-
-  // Comments: newest first; threads grouped with their location and badges.
-  await expect(page.getByTestId("pr-comments")).toContainText("Comments(9)");
-  const threads = page.getByTestId("pr-thread");
-  await expect(threads).toHaveCount(3);
-  await expect(page.getByTestId("pr-thread-location").first()).toHaveText("internal/store/terminal/actor.go:214");
-  await expect(threads.filter({ hasText: "terminal.go:40" })).toHaveAttribute("data-outdated", "true");
-  await expect(threads.filter({ hasText: "terminal.go:40" })).toContainText("Resolved");
-  const first = page.getByTestId("pr-comments-list").locator(":scope > *").first();
-  await expect(first).toContainText("requested changes");
-  await page.getByTestId("pr-comment-order").click();
-  await expect(page.getByTestId("pr-comment-order")).toHaveText("Oldest first");
-  // Oldest first: the outdated thread from 8 hours ago, then the bot's review.
-  await expect(page.getByTestId("pr-comments-list").locator(":scope > *").first()).toContainText("Why remove the size check?");
-  await expect(page.getByTestId("pr-comments-list").locator(":scope > *").nth(1)).toContainText("Walkthrough");
-  await page.getByTestId("pr-comment-order").click();
   await shot(page, "chunk3-summary");
-
-  // The header link opens the pull request on GitHub.
-  await page.getByTestId("pr-repo-link").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").at(-1)?.args.url).toBe(`https://github.com/${SLUG}/pull/145`);
 });
 
-test("Timeline lists the end state, commits, comments and reviews; inner tabs stay per panel tab", async ({ page }) => {
+// Timeline's entries, order, commit links and inner tabs per panel tab: src/components/pr/PullRequestSurface.test.tsx ("Timeline").
+test("Timeline at the default 420px: the counts end before the order toggle; the rail stops at the last entry's icon", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await page.getByTestId("pr-tab-timeline").click();
   const entries = page.getByTestId("pr-timeline-entry");
-  // 4 commits, 3 issue comments, 2 reviews, opened.
   await expect(entries).toHaveCount(10);
-  await expect(entries.first()).toHaveAttribute("data-kind", "commit");
-  await expect(entries.first()).toContainText("fix(terminal): replay resize after snapshot");
-  await expect(entries.first()).toContainText("8d4b3f6");
-  await expect(entries.nth(1)).toHaveAttribute("data-kind", "review");
-  await expect(entries.nth(1)).toContainText("teammate-kim");
-  await expect(entries.nth(1)).toContainText("requested changes");
-  await expect(entries.last()).toHaveAttribute("data-kind", "opened");
-  // The bar counts timeline entries (not the header's comments, which include thread replies) and commits.
-  await expect(page.getByTestId("pr-timeline-counts")).toHaveText(/10 entries\s*·\s*4/);
-  // At the default 420px width the counts and the order toggle (its icon) sit side by
-  // side: the counts' text fits their box, and that box ends before the toggle.
+  // The counts' text fits their box, and that box ends before the toggle (its icon).
   expect(await overflowX(page, "pr-timeline-counts")).toBeLessThanOrEqual(0);
   const counts = await boxOf(page, "pr-timeline-counts");
   expect(counts.x + counts.width).toBeLessThanOrEqual((await boxOf(page, "pr-timeline-order")).x);
-  // The rail stops at the last entry's icon.
   const lastBox = await entries.last().boundingBox();
   const railBox = await entries.last().getByTestId("pr-timeline-rail").boundingBox();
   expect(railBox && lastBox && railBox.y + railBox.height).toBeLessThanOrEqual((lastBox?.y ?? 0) + 25);
   await shot(page, "chunk3-timeline");
-  await page.getByTestId("pr-timeline-order").click();
-  await expect(entries.first()).toHaveAttribute("data-kind", "opened");
-  // A commit opens on GitHub.
-  await entries.filter({ hasText: "8d4b3f6" }).click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").at(-1)?.args.url).toMatch(/\/commit\/8d4b3f6/);
-
-  // Another tab starts on Summary; coming back finds Timeline still selected.
-  await prRow(page, "merged", 138).click();
-  await expect(tabs(page)).toHaveText(["#145", "#138"]);
-  await expect(page.getByTestId("pr-tab-summary")).toHaveAttribute("aria-selected", "true");
-  // Merged: the timeline starts with the merge.
-  await page.getByTestId("pr-tab-timeline").click();
-  await expect(entries.first()).toHaveAttribute("data-kind", "merged");
-  await page.getByTestId("pr-tab-summary").click();
-  await tabs(page).first().click();
-  await expect(page.getByTestId("pr-tab-timeline")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "oldest");
-  await expect(page.getByTestId("pr-tab-code")).toBeEnabled();
 });
 
-async function ghCalls(): Promise<Record<string, number>> {
-  const res = await fetch(`${mockUrl}/__mock/gh/calls`);
-  return (await res.json()) as Record<string, number>;
-}
-
-test("the reviewer picker shows requests and recents, searches GitHub from 2 characters, and toggles requests through pr.review.request", async ({ page }) => {
+// The reviewer picker's requests and recents, the search from 2 characters, toggling requests,
+// word matching ("jane doe" finds "Doe, Jane") and a refused request: src/components/pr/PullRequestSurface.test.tsx ("the reviewer picker").
+test("reviewer picker (screenshots)", async ({ page }) => {
+  test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await page.getByTestId("pr-add-reviewer").click();
-  const picker = page.getByTestId("pr-reviewer-picker");
   const search = page.getByTestId("pr-reviewer-search");
-  await expect(picker).toBeVisible();
-  await expect(search).toBeFocused();
-  await expect(search).toHaveAttribute("placeholder", "Search people with access");
   const cands = page.getByTestId("pr-reviewer-candidate");
-  const logins = () => cands.evaluateAll((els) => els.map((e) => [e.getAttribute("data-login"), e.getAttribute("data-requested")]));
-  // Under 2 characters: the pending requests (with a check); nobody recent yet.
-  await expect(page.getByTestId("pr-reviewer-requested")).toContainText("Requested");
-  await expect.poll(logins).toEqual([
-    ["acme/core", "true"],
-    ["teammate-ana", "true"],
-    ["teammate-kim", "true"],
-  ]);
-  await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
+  await expect(cands).toHaveCount(3);
   await shot(page, "chunk3-reviewers");
-
-  // Two or more search GitHub: someone past the first 100 is found under Matches; the
-  // pending requests that do not match stay below under Requested; no match says so.
   await search.fill("zoe-zim");
-  await expect.poll(logins).toEqual([
-    ["zoe-zimmerman", "false"],
-    ["acme/core", "true"],
-    ["teammate-ana", "true"],
-    ["teammate-kim", "true"],
-  ]);
   await expect(page.getByTestId("pr-reviewer-matches").getByTestId("pr-reviewer-candidate")).toHaveCount(1);
-  await expect(page.getByTestId("pr-reviewer-requested").getByTestId("pr-reviewer-candidate")).toHaveCount(3);
-  await expect(page.getByTestId("pr-reviewer-searching")).toHaveCount(0);
   await shot(page, "reviewer-search");
-  await search.fill("nobody-at-all");
-  await expect(page.getByTestId("pr-reviewer-nomatch")).toHaveText("No one matches.");
-
-  // Choosing a result requests a review; the candidates and the detail are read again.
+  // Requested, then withdrawn: it stays in Recent.
   await search.fill("lee");
-  const matched = page.getByTestId("pr-reviewer-matches").getByTestId("pr-reviewer-candidate");
-  await expect(matched).toHaveCount(1);
-  await expect(matched).toHaveAttribute("data-login", "teammate-lee");
-  await matched.click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").map((i) => i.args)).toEqual([
-    { "repo-slug": SLUG, number: "145", login: "teammate-lee", kind: "user", requested: "true" },
-  ]);
-  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "teammate-lee" })).toHaveAttribute("data-status", "requested");
-  // Read again, it stays under Matches with its check, once.
-  await expect(cands.filter({ hasText: "teammate-lee" })).toHaveCount(1);
-  await expect(matched).toHaveAttribute("data-requested", "true");
-
-  // Requested now, so not in Recent; withdrawn, it stays in Recent with a ×.
+  const lee = page.getByTestId("pr-reviewer-matches").getByTestId("pr-reviewer-candidate");
+  await expect(lee).toHaveAttribute("data-login", "teammate-lee");
+  await lee.click();
+  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "teammate-lee" })).toHaveCount(1);
   await search.fill("");
-  await expect(page.getByTestId("pr-reviewer-requested").getByTestId("pr-reviewer-candidate").filter({ hasText: "teammate-lee" })).toHaveCount(1);
-  await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
   await page.getByTestId("pr-reviewer-requested").getByTestId("pr-reviewer-candidate").filter({ hasText: "teammate-lee" }).click();
-  const recent = page.getByTestId("pr-reviewer-recent").getByTestId("pr-reviewer-candidate");
-  await expect(recent).toHaveCount(1);
-  await expect(recent).toHaveAttribute("data-login", "teammate-lee");
-  await expect(recent).toHaveAttribute("data-requested", "false");
-
-  // Recents survive closing the picker.
-  await page.keyboard.press("Escape");
-  await expect(picker).toHaveCount(0);
-  await page.getByTestId("pr-add-reviewer").click();
-  await expect(recent).toHaveCount(1);
+  await expect(page.getByTestId("pr-reviewer-recent").getByTestId("pr-reviewer-candidate")).toHaveCount(1);
   await shot(page, "reviewer-recent");
-
-  // × drops the row from Recent without requesting anything.
-  const before = (await invocations()).filter((i) => i.name === "pr.review.request").length;
-  await recent.getByTestId("pr-reviewer-recent-remove").click();
-  await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
-
-  // Choosing a requested team withdraws it; it is the only request since the ×.
-  await cands.filter({ hasText: "acme/core" }).click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").slice(before).map((i) => i.args)).toEqual([
-    { "repo-slug": SLUG, number: "145", login: "acme/core", kind: "team", requested: "false" },
-  ]);
-  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "acme/core" })).toHaveCount(0);
-
-  // Escape closes the picker; the panel keeps its tab.
-  await page.keyboard.press("Escape");
-  await expect(picker).toHaveCount(0);
-  await expect(tabs(page)).toHaveText(["#145"]);
-});
-
-test("the reviewer picker matches every word (\"jane doe\" finds \"Doe, Jane\"), keeps a requested row checked, and toasts a request GitHub did not take", async ({ page }) => {
-  await shotViewport(page);
-  await openPrPage(page);
-  await prRow(page, "authored", 145).click();
-  await page.getByTestId("pr-add-reviewer").click();
-  const search = page.getByTestId("pr-reviewer-search");
-  const cands = page.getByTestId("pr-reviewer-matches").getByTestId("pr-reviewer-candidate");
-  const logins = () => cands.evaluateAll((els) => els.map((e) => [e.getAttribute("data-login"), e.getAttribute("data-requested")]));
-  const pending = page.getByTestId("pr-reviewer-requested").getByTestId("pr-reviewer-candidate");
-  const pendingLogins = () => pending.evaluateAll((els) => els.map((e) => e.getAttribute("data-login")));
-
-  // First last against names stored "Last, First"; the word order does not matter.
-  await search.fill("doe, jane");
-  await expect.poll(logins).toEqual([
-    ["jdoe", "false"],
-    ["zdoe", "false"],
-  ]);
-  await search.fill("jane doe");
-  await expect.poll(logins).toEqual([
-    ["jdoe", "false"],
-    ["zdoe", "false"],
-  ]);
-  await shot(page, "reviewer-search-tokens");
-
-  // Choosing one requests a review; the row stays, checked, once the candidates are read
-  // again (requested now, it must match "jane doe" word by word to stay among the results).
-  await cands.filter({ hasText: "jdoe" }).click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").map((i) => i.args)).toEqual([
-    { "repo-slug": SLUG, number: "145", login: "jdoe", kind: "user", requested: "true" },
-  ]);
-  await expect(cands.filter({ hasText: "jdoe" }).getByLabel("Requested")).toBeVisible();
-  await expect.poll(logins).toEqual([
-    ["jdoe", "true"],
-    ["zdoe", "false"],
-  ]);
-  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "jdoe" })).toHaveAttribute("data-status", "requested");
-  // The other requests sit below under Requested; jdoe is not repeated there.
-  await expect.poll(pendingLogins).toEqual(["acme/core", "teammate-ana", "teammate-kim"]);
-  await expect(page.getByTestId("pr-reviewer-candidate").filter({ hasText: "jdoe" })).toHaveCount(1);
-  await shot(page, "reviewer-search-tokens-requested");
-
-  // Someone without access: GitHub answers without adding them, the daemon refuses, and
-  // the toast says why; the row stays unchecked.
-  await search.fill("olga outside");
-  await expect.poll(logins).toEqual([["outside-olga", "false"]]);
-  await cands.first().click();
-  await expect(page.getByText("Request Review failed")).toBeVisible();
-  await expect(page.getByText("GitHub did not add outside-olga as a reviewer (they may lack access to the repository)")).toBeVisible();
-  await expect(cands.first()).toHaveAttribute("data-requested", "false");
-  await expect(cands.first().getByLabel("Updating")).toHaveCount(0);
-});
-
-test("menu: Refresh (and a failed one), the thread actions, Open on GitHub, Copy link; shift+cmd+c copies too", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "authored", 145).click();
-  await page.getByTestId("pr-menu-button").click();
-  const menu = page.getByTestId("pr-menu");
-  await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem")).toHaveText([/^Refresh/, /^Ask a question/, /^Explain this PR/, /^Fix findings in a thread/, /^Open on GitHub/, /^Copy link⇧⌘C$/]);
-  for (const id of ["pr-menu-ask", "pr-menu-explain", "pr-menu-fix"]) {
-    await expect(page.getByTestId(id)).not.toHaveAttribute("data-disabled");
-    await expect(page.getByTestId(id)).not.toHaveAttribute("title");
-  }
-  await expect(page.getByTestId("pr-menu-ask")).toContainText("Starts a thread that knows which pull request you mean.");
-  await expect(page.getByTestId("pr-menu-explain")).toContainText("A walk through the diff and what to read closely.");
-  // No revert for an open pull request.
-  await expect(page.getByTestId("pr-menu-revert")).toHaveCount(0);
-  await expect(page.getByTestId("pr-menu-refresh-hint")).toHaveText(/^Updated \d+s ago$/);
-
-  // Refresh runs pr.refresh and stays open with the new time.
-  await page.getByTestId("pr-menu-refresh").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.refresh").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "145" }]);
-  await expect(menu).toBeVisible();
-  await expect(page.getByTestId("pr-menu-refresh-hint")).toHaveText(/^Updated [0-5]s ago$/);
-  // Quiet: the menu reports it, no toast.
-  await expect(page.getByText(/^Refreshed #145/)).toHaveCount(0);
-  // A failure is toasted and reported in the menu; the copy stays.
-  await mockPost("gh/pr-fail?command=pr.refresh");
-  await page.getByTestId("pr-menu-refresh").click();
-  await expect(page.getByText("Refresh Pull Request failed")).toBeVisible();
-  await expect(page.getByTestId("pr-refresh-error")).toContainText("502 Bad Gateway");
-  await expect(page.getByTestId("pr-check")).toHaveCount(7);
-
-  await page.getByTestId("pr-menu-copy").click();
-  await expect(menu).toHaveCount(0);
-  await expect.poll(() => copied(page)).toEqual([`https://github.com/${SLUG}/pull/145`]);
-  await expect(page.getByText("Link copied")).toBeVisible();
-
-  await page.getByTestId("pr-menu-button").click();
-  await page.getByTestId("pr-menu-open").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").at(-1)?.args.url).toBe(`https://github.com/${SLUG}/pull/145`);
-
-  // The chord works while the panel has focus.
-  await page.getByTestId("pr-title").click();
-  await page.keyboard.press("Meta+Shift+c");
-  await expect.poll(() => copied(page)).toHaveLength(2);
-});
-
-test("#138 (merged) offers Revert: it confirms, runs pr.revert and opens the new pull request as a tab", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "merged", 138).click();
-  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
-  await expect(page.getByTestId("pr-checks-summary")).toHaveText("All checks passed");
-  await page.getByTestId("pr-menu-button").click();
-  await expect(page.getByTestId("pr-menu-revert")).toBeVisible();
-  await shot(page, "chunk3-menu");
-  await page.getByTestId("pr-menu-revert").click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("This opens a new pull request that reverses the changes merged by #138.");
-  await page.getByTestId("confirm-ok").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.revert").map((i) => [i.args.number, Boolean(i.confirmed)])).toEqual([
-    ["138", false],
-    ["138", true],
-  ]);
-  await expect(tabs(page)).toHaveText(["#138", "#151"]);
-  await expect(page.getByTestId("pr-title")).toHaveText('Revert "chore(gh): pace requests through one worker"');
-  await expect(page.getByText("Opened #151 to revert #138")).toBeVisible();
-});
-
-test("declining the revert's confirmation sends nothing", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "merged", 138).click();
-  await page.getByTestId("pr-menu-button").click();
-  await page.getByTestId("pr-menu-revert").click();
-  await page.getByTestId("confirm-cancel").click();
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  expect((await invocations()).filter((i) => i.name === "pr.revert" && i.confirmed)).toEqual([]);
-  await expect(tabs(page)).toHaveText(["#138"]);
-});
-
-test("#140 (read access) explains the picker and has no revert; #131 is closed; unknown numbers say not found", async ({ page }) => {
-  await openPrPage(page);
-  await openPr(page, 140);
-  await expect(tabs(page)).toHaveText(["#140"]);
-  await expect(page.getByTestId("pr-author")).toHaveText("outside-contrib");
-  await page.getByTestId("pr-add-reviewer").click();
-  await expect(page.getByTestId("pr-reviewer-readonly")).toHaveText("Asking someone to review needs write access on this repository.");
-  await expect(page.getByTestId("pr-reviewer-candidate")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("pr-reviewer-picker")).toHaveCount(0);
 
-  await openPr(page, 131);
-  await expect(page.getByTestId("pr-state")).toHaveText("Closed");
-  await page.getByTestId("pr-menu-button").click();
-  await expect(page.getByTestId("pr-menu-open")).toBeVisible();
-  await expect(page.getByTestId("pr-menu-revert")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await page.getByTestId("pr-tab-timeline").click();
-  await expect(page.getByTestId("pr-timeline-entry").first()).toHaveAttribute("data-kind", "closed");
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.getByTestId("pr-add-reviewer").click();
+  const matches = page.getByTestId("pr-reviewer-matches").getByTestId("pr-reviewer-candidate");
+  await search.fill("jane doe");
+  await expect(matches).toHaveCount(2);
+  await shot(page, "reviewer-search-tokens");
+  await matches.filter({ hasText: "jdoe" }).click();
+  await expect(matches.filter({ hasText: "jdoe" }).getByLabel("Requested")).toBeVisible();
+  await shot(page, "reviewer-search-tokens-requested");
+});
 
-  await openPr(page, 9999);
-  await expect(page.getByTestId("pr-not-found")).toContainText("Pull request not found");
+// The menu's items, Refresh (and a failed one), Open on GitHub and Copy link: src/components/pr/PullRequestSurface.test.tsx ("the ⋯ menu").
+test("shift+cmd+c copies the link while the panel has focus", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await page.getByTestId("pr-title").click();
+  await page.keyboard.press("Meta+Shift+c");
+  await expect.poll(() => copied(page)).toEqual([`https://github.com/${SLUG}/pull/145`]);
+  await expect(page.getByText("Link copied")).toBeVisible();
+});
+
+// "#138 (merged) offers Revert", "declining the revert's confirmation sends nothing" and "#140 (read
+// access) explains the picker and has no revert; #131 is closed; unknown numbers say not found":
+// src/components/pr/PullRequestSurface.test.tsx ("the ⋯ menu", "Summary").
+test("merged pull request menu (screenshot)", async ({ page }) => {
+  test.skip(!shots, "SHOTS=<dir> only: the screenshot is all it adds");
+  await openPrPage(page);
+  await prRow(page, "merged", 138).click();
+  await page.getByTestId("pr-menu-button").click();
+  await expect(page.getByTestId("pr-menu-revert")).toBeVisible();
+  await shot(page, "chunk3-menu");
 });
 
 test("panel state is per selection; a thread or worktree on a PR branch enables the surface", async ({ page }) => {
@@ -482,20 +213,14 @@ test("light scheme", async ({ page }) => {
   await shot(page, "chunk3-light-summary");
 });
 
-test("closing a tab drops its inner state: reopened, it starts on Summary", async ({ page }) => {
+// Closing a tab drops its inner state (reopened, it starts on Summary): src/components/pr/PullRequestSurface.test.tsx ("closing a tab drops its inner state").
+test("cmd+w from inside the surface closes its tab; the last tab gone, the panel hides", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
-  await page.getByTestId("pr-tab-timeline").click();
-  await page.getByTestId("pr-timeline-order").click();
-  await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "oldest");
-  // cmd+w from inside the surface closes it; the last tab gone, the panel hides.
+  await expect(tabs(page)).toHaveText(["#145"]);
   await page.getByTestId("pr-title").click();
   await page.keyboard.press("Meta+w");
   await expect(panel(page)).toHaveCount(0);
-  await prRow(page, "authored", 145).click();
-  await expect(page.getByTestId("pr-tab-summary")).toHaveAttribute("aria-selected", "true");
-  await page.getByTestId("pr-tab-timeline").click();
-  await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "newest");
 });
 
 test("at 280px nothing overflows: header, inner tab bar, logins, popups; the active tab is revealed", async ({ page }) => {
@@ -601,12 +326,12 @@ async function threadInvocations(name: string): Promise<{ args: Record<string, s
   return (await invocations()).filter((i) => i.name === name).map((i) => ({ args: i.args, worktree: i.context?.activeWorktreePath }));
 }
 
-test("Explain this PR runs pr.explain, selects the new thread, and the PR tab stays on the Pull Requests page", async ({ page }) => {
+// Explain's spinner while it starts, its args (no worktree from the page) and the started toast: src/components/pr/PullRequestSurface.test.tsx ("Explain this PR").
+test("Explain this PR selects the new thread (the daemon's FocusThread), and the PR tab stays on the Pull Requests page", async ({ page }) => {
   await shotViewport(page);
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await expect(tabs(page)).toHaveText(["#145"]);
-  await mockPost("gh/pr-delay?ms=600");
   await page.getByTestId("pr-menu-button").click();
   await expect(page.getByTestId("pr-menu")).toBeVisible();
   // Let the menu's fade-in finish before the screenshot.
@@ -614,16 +339,9 @@ test("Explain this PR runs pr.explain, selects the new thread, and the PR tab st
   await shot(page, "chunk4-menu");
 
   await page.getByTestId("pr-menu-explain").click();
-  // The menu stays open with a spinner until the thread has started.
-  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByTestId("pr-menu")).toBeVisible();
-  // No worktree, model or effort args: the daemon picks them.
-  await expect.poll(() => threadInvocations("pr.explain")).toEqual([{ args: { "repo-slug": SLUG, number: "145" }, worktree: "" }]);
   // The daemon's FocusThread selects the new thread; its own panel is untouched.
   await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
-  await expect(page.getByText(/^Started thread s-new-\d+ for PR #145$/)).toBeVisible();
   await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
 
   // Back on the Pull Requests page, its panel still shows #145 (menu closed).
   await page.getByTestId("nav-pullrequests").click();
@@ -632,80 +350,32 @@ test("Explain this PR runs pr.explain, selects the new thread, and the PR tab st
   await expect(page.getByTestId("pr-menu")).toHaveCount(0);
 });
 
-test("Ask a question: a composer under the header; Escape cancels, Enter sends pr.ask with the question", async ({ page }) => {
+// The composer under the header, Escape into the panel, Shift+Enter, Enter sending pr.ask with the
+// thread's worktree in the context: src/components/pr/PullRequestSurface.test.tsx ("Ask a question from a thread").
+test("Ask from a thread's panel selects the new thread; back on that thread its panel keeps #145 without the composer", async ({ page }) => {
   await shotViewport(page);
-  // From a thread on main: ask uses its worktree through the context, not a worktree arg.
   await openApp(page);
   await row(page, "s:s-1").click();
   await openPr(page, 145);
   await expect(tabs(page)).toHaveText(["#145"]);
-
   await page.getByTestId("pr-menu-button").click();
   await page.getByTestId("pr-menu-ask").click();
-  await expect(page.getByTestId("pr-menu")).toHaveCount(0);
   const input = page.getByTestId("pr-ask-input");
   await expect(input).toBeFocused();
-  await expect(input).toHaveAttribute("placeholder", "Ask about this pull request…");
-  await input.pressSequentially("never mind");
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pr-ask")).toHaveCount(0);
-  // Escape stays in the composer (the panel keeps its tab, the panel has focus).
-  await expect(tabs(page)).toHaveText(["#145"]);
-  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("panel");
-
-  await page.getByTestId("pr-menu-button").click();
-  await page.getByTestId("pr-menu-ask").click();
-  await expect(input).toBeFocused();
-  await expect(input).toHaveValue(""); // a fresh composer
   await input.pressSequentially("Why does attach race the first output?");
-  await page.keyboard.press("Shift+Enter");
-  await input.pressSequentially("And is the fix covered by a test?");
-  await expect(input).toHaveValue("Why does attach race the first output?\nAnd is the fix covered by a test?");
-  expect(await threadInvocations("pr.ask")).toEqual([]);
   await shot(page, "chunk4-ask");
   await page.keyboard.press("Enter");
-
-  await expect
-    .poll(() => threadInvocations("pr.ask"))
-    .toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "Why does attach race the first output?\nAnd is the fix covered by a test?" }, worktree: CF }]);
   await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
   await expect(panel(page)).toHaveCount(0);
+  expect((await threadInvocations("pr.ask")).map((i) => i.worktree)).toEqual([CF]);
 
-  // The originating thread's panel keeps #145; the composer is gone.
   await row(page, "s:s-1").click();
   await expect(tabs(page)).toHaveText(["#145"]);
   await expect(page.getByTestId("pr-ask")).toHaveCount(0);
 });
 
-test("Fix findings: a failure toasts the daemon's hint; a retry prepares the worktree and selects the thread", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "authored", 145).click();
-  await mockPost("gh/pr-fail?command=pr.fix.findings");
-  await page.getByTestId("pr-menu-button").click();
-  await page.getByTestId("pr-menu-fix").click();
-  await expect(page.getByText("Fix Pull Request Findings failed")).toBeVisible();
-  await expect(page.getByText(/gh pr checkout 145/)).toBeVisible();
-  // A quick answer leaves no "Preparing" toast behind.
-  await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
-  // Nothing was selected; the menu stays open for a retry.
-  await expect(selectedThread(page)).toHaveCount(0);
-  await expect(page.getByTestId("pr-menu")).toBeVisible();
-  await expect(page.getByTestId("pr-menu-fix")).not.toHaveAttribute("aria-busy");
-
-  await mockPost("gh/pr-delay?ms=800");
-  await page.getByTestId("pr-menu-fix").click();
-  await expect(page.getByTestId("pr-menu-fix")).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByText("Preparing worktree for #145…")).toBeVisible();
-  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
-  await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
-  expect(await threadInvocations("pr.fix.findings")).toEqual([
-    { args: { "repo-slug": SLUG, number: "145" }, worktree: "" },
-    { args: { "repo-slug": SLUG, number: "145" }, worktree: "" },
-  ]);
-  await page.getByTestId("nav-pullrequests").click();
-  await expect(tabs(page)).toHaveText(["#145"]);
-});
-
+// "Fix findings: a failure toasts the daemon's hint; a retry prepares the worktree and selects the thread":
+// src/components/pr/PullRequestSurface.test.tsx ("Fix findings"); the new thread's selection is the daemon's FocusThread, kept in the Explain test above.
 const askInput = (page: Page) => page.getByTestId("pr-ask-input");
 
 async function openAsk(page: Page): Promise<void> {
@@ -714,54 +384,9 @@ async function openAsk(page: Page): Promise<void> {
   await expect(askInput(page)).toBeFocused();
 }
 
-test("Ask from the Pull Requests page sends no worktree; while it starts, Cancel is disabled and Escape does nothing", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "authored", 145).click();
-  await mockPost("gh/pr-delay?ms=800");
-  await openAsk(page);
-  await expect(page.getByTestId("pr-ask-hint")).toHaveText("⏎ send · ⇧⏎ newline");
-  await askInput(page).pressSequentially("What changed?");
-  await page.keyboard.press("Enter");
-
-  await expect(page.getByTestId("pr-ask-hint")).toHaveText("Starting a thread…");
-  await expect(page.getByTestId("pr-ask-send")).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByTestId("pr-ask-cancel")).toBeDisabled();
-  await expect(askInput(page)).toHaveJSProperty("readOnly", true);
-  // Escape neither closes the composer nor reaches the panel: the thread starts anyway.
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pr-ask")).toBeVisible();
-  await expect(tabs(page)).toHaveText(["#145"]);
-
-  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
-  // From the Pull Requests page there is no active worktree: the daemon picks one.
-  expect(await threadInvocations("pr.ask")).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "What changed?" }, worktree: "" }]);
-  await page.getByTestId("nav-pullrequests").click();
-  await expect(tabs(page)).toHaveText(["#145"]);
-  await expect(page.getByTestId("pr-ask")).toHaveCount(0);
-});
-
-test("a failed pr.ask is toasted and keeps the question for a retry", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "authored", 145).click();
-  await mockPost("gh/pr-fail?command=pr.ask");
-  await openAsk(page);
-  await askInput(page).pressSequentially("Is the retry bounded?");
-  await page.keyboard.press("Enter");
-
-  await expect(page.getByText("Ask About Pull Request failed")).toBeVisible();
-  await expect(page.getByText("read #145: github graphql: 502 Bad Gateway")).toBeVisible();
-  await expect(selectedThread(page)).toHaveCount(0);
-  await expect(page.getByTestId("pr-ask")).toBeVisible();
-  await expect(askInput(page)).toHaveValue("Is the retry bounded?");
-  await expect(askInput(page)).toHaveJSProperty("readOnly", false);
-  await expect(page.getByTestId("pr-ask-hint")).toHaveText("⏎ send · ⇧⏎ newline");
-  await expect(page.getByTestId("pr-ask-cancel")).toBeEnabled();
-
-  // The retry goes through.
-  await page.getByTestId("pr-ask-send").click();
-  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
-  expect((await threadInvocations("pr.ask")).map((i) => i.args.question)).toEqual(["Is the retry bounded?", "Is the retry bounded?"]);
-});
+// "Ask from the Pull Requests page sends no worktree; while it starts, Cancel is disabled and Escape does
+// nothing" and "a failed pr.ask is toasted and keeps the question for a retry": src/components/pr/PullRequestSurface.test.tsx
+// ("Ask from the Pull Requests page", "a failed pr.ask").
 
 test("choosing Ask again with the composer open focuses it; the menu reopened right after Ask stays open", async ({ page }) => {
   await openPrPage(page);
@@ -798,52 +423,7 @@ test("choosing Ask again with the composer open focuses it; the menu reopened ri
   await expect(page.getByTestId("pr-menu")).toHaveCount(0);
 });
 
-test("a pull request's running threads show on every surface that shows it", async ({ page }) => {
-  // Ask from thread s-1's panel, then look at #145 on the Pull Requests page meanwhile.
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await openPr(page, 145);
-  // Longer than the siblings' 800ms: s-1's ask must still be starting after the page switch and the typing below.
-  await mockPost("gh/pr-delay?ms=2000");
-  await openAsk(page);
-  await askInput(page).pressSequentially("From s-1");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("pr-ask-send")).toHaveAttribute("aria-busy", "true");
-
-  await page.getByTestId("nav-pullrequests").click();
-  await prRow(page, "authored", 145).click();
-  await expect(tabs(page)).toHaveText(["#145"]);
-  await openAsk(page);
-  await expect(page.getByTestId("pr-ask-hint")).toHaveText("Already starting a thread for this pull request");
-  await expect(page.getByTestId("pr-ask-send")).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByTestId("pr-ask-send")).toBeDisabled();
-  await askInput(page).pressSequentially("From the page");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("pr-ask-hint")).toHaveText("Already starting a thread for this pull request");
-  await expect(askInput(page)).toHaveValue("From the page");
-
-  // s-1's question starts its thread; this one was never sent.
-  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
-  expect(await threadInvocations("pr.ask")).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "From s-1" }, worktree: CF }]);
-
-  // Explain from the Pull Requests page; s-1's menu shows it running and disabled.
-  await page.getByTestId("nav-pullrequests").click();
-  await page.getByTestId("pr-menu-button").click();
-  await page.getByTestId("pr-menu-explain").click();
-  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-disabled", "true");
-  await row(page, "s:s-1").click();
-  await expect(tabs(page)).toHaveText(["#145"]);
-  await page.getByTestId("pr-menu-button").click();
-  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-disabled", "true");
-  await expect(page.getByTestId("pr-menu-fix")).not.toHaveAttribute("aria-disabled");
-  // aria-disabled keeps it focusable; a select sends nothing (Playwright will not click it unforced).
-  await page.getByTestId("pr-menu-explain").click({ force: true });
-  await expect(selectedThread(page)).not.toHaveAttribute("data-row-key", /^s:s-1$/);
-  await expect(page.getByText(/^Started thread s-new-\d+ for PR #145$/)).toHaveCount(2);
-  expect(await threadInvocations("pr.explain")).toHaveLength(1);
-});
+// "a pull request's running threads show on every surface that shows it": src/components/pr/PullRequestSurface.test.tsx (same title).
 
 test("at 280px the composer's hint fits and its field grows, then scrolls", async ({ page }) => {
   await openPrPage(page);
@@ -874,127 +454,25 @@ async function settledAnimations(page: Page, testId: string): Promise<void> {
   await page.getByTestId(testId).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
 }
 
-const HEAD_142 = "5eb1d0a142000000000000000000000000000000";
-const HEAD_146 = "f04c146000000000000000000000000000000000";
-const merges = async () => (await invocations()).filter((i) => i.name === "pr.merge").map((i) => [i.args, Boolean(i.confirmed)]);
-
-test("#142 merges: Squash and merge confirms, runs pr.merge with squash and the branch deleted, and the state turns Merged", async ({ page }) => {
+// The merge menu's items, the delete-branch note, the confirmation, pr.merge's args with the head, the
+// toast; draft, read-only and merged pull requests; unchecking the branch, declining, the spinner, a
+// refusal; a fork's branch: src/components/pr/PullRequestSurface.test.tsx ("the merge button").
+test("#142 merges from a menu inside the side panel; the dashboard moves it to recently merged", async ({ page }) => {
   await shotViewport(page);
   await openPrPage(page);
   await prRow(page, "authored", 142).click();
-  await expect(page.getByTestId("pr-state")).toHaveText("Open");
-  const button = page.getByTestId("pr-merge-button");
-  await expect(button).toBeVisible();
-  await expect(button).toHaveText("Merge");
-  await expect(button).not.toHaveAttribute("aria-disabled");
-
-  await button.click();
-  const menu = page.getByTestId("pr-merge-menu");
-  await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem")).toHaveText([/^Create a merge commit/, /^Squash and merge/, /^Rebase and merge/]);
-  const del = page.getByTestId("pr-merge-delete-branch");
-  await expect(del).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByTestId("pr-merge-delete-branch-note")).toHaveText("Deletes origin/feat/sidebar; local branches and worktrees are untouched");
+  await page.getByTestId("pr-merge-button").click();
+  await expect(page.getByTestId("pr-merge-menu")).toBeVisible();
   expect(inside(await boxOf(page, "pr-merge-menu"), await boxOf(page, "side-panel"))).toBe(true);
   await settledAnimations(page, "pr-merge-menu");
   await shot(page, "merge-button");
 
   await page.getByTestId("pr-merge-method-squash").click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText(`Merge #142 “feat(gui): virtualized sidebar tree with thread rows” into main in ${SLUG} with squash? Branch origin/feat/sidebar is deleted afterwards.`);
   await page.getByTestId("confirm-ok").click();
-  // With the head the panel shows: the daemon refuses if GitHub's moved since.
-  const args = { "repo-slug": SLUG, number: "142", method: "squash", "delete-branch": "true", "head-sha": HEAD_142 };
-  await expect.poll(merges).toEqual([
-    [args, false],
-    [args, true],
-  ]);
   await expect(page.getByTestId("pr-state")).toHaveText("Merged");
-  await expect(button).toHaveCount(0);
-  await expect(page.getByText("Merged #142 (e2e0142)")).toBeVisible();
-  await expect(page.getByText("deleted origin/feat/sidebar")).toBeVisible();
-  // The dashboard moved it to recently merged.
+  // The daemon announces the dashboard change: the row moves to recently merged.
   await expect(prRow(page, "merged", 142)).toBeVisible();
   await expect(prRow(page, "authored", 142)).toHaveCount(0);
-});
-
-test("the merge button: draft, read-only and merged pull requests; unchecking the branch, declining, a spinner, a refusal", async ({ page }) => {
-  await openPrPage(page);
-  // #145 is a draft: disabled with the reason, and a click opens nothing.
-  await prRow(page, "authored", 145).click();
-  const button = page.getByTestId("pr-merge-button");
-  await expect(button).toHaveAttribute("aria-disabled", "true");
-  await expectTooltip(page, button, "Draft pull requests cannot be merged");
-  await expect(button).toHaveAccessibleDescription("Draft pull requests cannot be merged");
-  // Playwright will not click an aria-disabled element; force it: it must open nothing.
-  await button.click({ force: true });
-  await expect(page.getByTestId("pr-merge-menu")).toHaveCount(0);
-  // #138 is merged: no button.
-  await prRow(page, "merged", 138).click();
-  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
-  await expect(button).toHaveCount(0);
-  // #140: read access only.
-  await openPr(page, 140);
-  await expectTooltip(page, button, "Merging needs write access");
-
-  // #142: keep the branch, then decline: nothing is sent.
-  await prRow(page, "authored", 142).click();
-  await button.click();
-  await page.getByTestId("pr-merge-delete-branch").click();
-  await expect(page.getByTestId("pr-merge-delete-branch")).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByTestId("pr-merge-menu")).toBeVisible();
-  await page.getByTestId("pr-merge-method-merge").click();
-  await expect(page.getByTestId("confirm-dialog")).toContainText(`Merge #142 “feat(gui): virtualized sidebar tree with thread rows” into main in ${SLUG} with a merge commit?`);
-  await expect(page.getByTestId("confirm-dialog")).not.toContainText("deleted afterwards");
-  await page.getByTestId("confirm-cancel").click();
-  // The dialog hands focus back as it unmounts: a menu opened before that would close.
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  // Declined: the button is idle again and its menu does not come back by itself.
-  await expect(button).not.toHaveAttribute("aria-busy");
-  await expect(page.getByTestId("pr-merge-menu")).toHaveCount(0);
-  expect((await merges()).filter(([, confirmed]) => confirmed)).toEqual([]);
-
-  // GitHub refuses (the head moved): toasted, still open, the button usable again.
-  await mockPost("gh/pr-fail?command=pr.merge");
-  await mockPost("gh/pr-delay?ms=800");
-  await button.click();
-  await expect(page.getByTestId("pr-merge-delete-branch")).toHaveAttribute("aria-checked", "false");
-  await page.getByTestId("pr-merge-method-rebase").click();
-  await page.getByTestId("confirm-ok").click();
-  await expect(button).toHaveAttribute("aria-busy", "true");
-  await expect(button).toHaveAttribute("aria-disabled", "true");
-  await expect(page.getByText("Merge Pull Request failed")).toBeVisible();
-  await expect(page.getByText(/changed on GitHub since it was loaded/)).toBeVisible();
-  await expect(button).not.toHaveAttribute("aria-busy");
-  await expect(button).not.toHaveAttribute("aria-disabled");
-  await expect(page.getByTestId("pr-state")).toHaveText("Open");
-  expect((await merges()).filter(([, confirmed]) => confirmed)).toEqual([[{ "repo-slug": SLUG, number: "142", method: "rebase", "delete-branch": "false", "head-sha": HEAD_142 }, true]]);
-});
-
-test("#146 from a fork: the branch cannot be deleted, and a merge asking anyway keeps it", async ({ page }) => {
-  await openPrPage(page);
-  await openPr(page, 146);
-  await expect(page.getByTestId("pr-state")).toHaveText("Open");
-  const button = page.getByTestId("pr-merge-button");
-  await button.click();
-  const del = page.getByTestId("pr-merge-delete-branch");
-  await expect(del).toHaveAttribute("aria-checked", "false");
-  await expect(del).toHaveAttribute("data-disabled", "");
-  await expect(page.getByTestId("pr-merge-delete-branch-note")).toHaveText("The branch is in a fork");
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pr-merge-menu")).toHaveCount(0);
-
-  // pr.merge with delete-branch on (as the CLI can): the confirmation promises no
-  // delete, and the merge keeps the fork's branch.
-  const args = { "repo-slug": SLUG, number: "146", method: "squash", "delete-branch": "true", "head-sha": HEAD_146 };
-  await page.evaluate(`__cfModule("/src/stores/commands.ts").then((m) => { void m.runCommandForResult("pr.merge", ${JSON.stringify(args)}); })`);
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText(`Merge #146 “fix(cli): typo in --help” into main in ${SLUG} with squash?`);
-  await expect(dialog).not.toContainText("deleted afterwards");
-  await page.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
-  await expect(page.getByText("kept patch-1: it is in a fork")).toBeVisible();
-  expect((await merges()).filter(([, confirmed]) => confirmed)).toEqual([[args, true]]);
 });
 
 test("at 280px the merge button keeps its icons and its dropdown stays inside the panel", async ({ page }) => {
@@ -1020,227 +498,35 @@ test("at 280px the merge button keeps its icons and its dropdown stays inside th
 
 // ---- Review ▾ (pr.review; docs/notes/pr-review-submit-2-gui.md) ----------------------
 
-const reviews = async () => (await invocations()).filter((i) => i.name === "pr.review").map((i) => i.args);
-const reviewInput = (page: Page) => page.getByTestId("pr-review-input");
-const focusedRegion = (page: Page) => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"));
-
-async function chooseVerdict(page: Page, verdict: "approve" | "request-changes" | "comment"): Promise<void> {
-  // The Review button, or the chip once the viewer has reviewed.
-  await page.getByTestId("pr-actions").locator('[data-testid="pr-review-button"], [data-testid="pr-your-review"]').click();
-  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
-  await page.getByTestId(`pr-review-${verdict}`).click();
-  await expect(page.getByTestId("pr-review-menu")).toHaveCount(0);
-  await expect(page.getByTestId("pr-review-composer")).toHaveAttribute("data-verdict", verdict);
-}
-
-test("Review on #139: the menu, Approve with cmd+Enter runs pr.review; the header says You approved and Comments has the review", async ({ page }) => {
+// The Review menu, the composer's label, hint and keys, pr.review's args, the toast, the chip, the
+// reviewer entry and the review in Comments: src/components/pr/PullRequestSurface.test.tsx ("Review ▾").
+test("Review on #139 sits left of Merge; its menu stays inside the panel", async ({ page }) => {
   await shotViewport(page);
   await openPrPage(page);
   await prRow(page, "review", 139).click();
-  await expect(page.getByTestId("pr-author")).toHaveText("teammate-kim");
-  const button = page.getByTestId("pr-review-button");
-  await expect(button).toHaveText("Review");
-  // Left of Merge.
+  await expect(page.getByTestId("pr-review-button")).toHaveText("Review");
   expect((await boxOf(page, "pr-review-button")).x).toBeLessThan((await boxOf(page, "pr-merge-button")).x);
-  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "alexwaumann" })).toHaveAttribute("data-status", "requested");
-
-  await button.click();
-  const menu = page.getByTestId("pr-review-menu");
-  await expect(menu).toBeVisible();
-  await expect(menu).toContainText("Review #139");
-  await expect(page.getByTestId("pr-review-approve")).toContainText("Submit an approving review, with an optional note.");
-  await expect(page.getByTestId("pr-review-request-changes")).toContainText("Block merging until your points are addressed.");
-  await expect(page.getByTestId("pr-review-comment")).toContainText("General feedback without a verdict.");
-  for (const v of ["approve", "request-changes", "comment"]) await expect(page.getByTestId(`pr-review-${v}`)).not.toHaveAttribute("data-disabled");
+  await page.getByTestId("pr-review-button").click();
+  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
   expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, "side-panel"))).toBe(true);
   await settledAnimations(page, "pr-review-menu");
   await shot(page, "review-menu");
+  if (!shots) return;
 
+  // The composer and the approved header, for the PR body.
   await page.getByTestId("pr-review-approve").click();
-  const composer = page.getByTestId("pr-review-composer");
-  await expect(composer).toHaveAttribute("data-verdict", "approve");
-  await expect(page.getByTestId("pr-review-label")).toHaveText("Approve #139");
-  await expect(reviewInput(page)).toBeFocused();
-  await expect(reviewInput(page)).toHaveAttribute("placeholder", "Say why, or leave it empty…");
-  await expect(page.getByTestId("pr-review-hint")).toHaveText("⌘⏎ submit · esc cancel");
-  // An approval needs no text.
-  await expect(page.getByTestId("pr-review-submit")).toBeEnabled();
-  await expect(page.getByTestId("pr-review-submit")).toHaveText("Approve");
-  // Enter is a newline; only cmd+Enter submits.
-  await reviewInput(page).pressSequentially("Read it through.");
-  await page.keyboard.press("Enter");
-  await reviewInput(page).pressSequentially("Ship it.");
-  await expect(reviewInput(page)).toHaveValue("Read it through.\nShip it.");
-  expect(await reviews()).toEqual([]);
+  await page.getByTestId("pr-review-input").pressSequentially("Read it through.");
   await shot(page, "review-approve");
-
   await page.keyboard.press("Meta+Enter");
-  await expect(composer).toHaveCount(0);
-  expect(await reviews()).toEqual([{ "repo-slug": SLUG, number: "139", verdict: "approve", body: "Read it through.\nShip it." }]);
-  expect((await ghCalls()).SubmitPullRequestReview).toBe(1);
-  await expect(page.getByText("Approved #139")).toBeVisible();
-  await expect.poll(() => focusedRegion(page)).toBe("panel");
-
-  // The refreshed detail: the chip in place of Review, the reviewer entry, the review in Comments.
-  const chip = page.getByTestId("pr-your-review");
-  await expect(chip).toHaveText("You approved");
-  await expect(chip).toHaveAttribute("data-review", "approved");
-  await expect(button).toHaveCount(0);
-  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "alexwaumann" })).toHaveAttribute("data-status", "approved");
-  const mine = page.getByTestId("pr-comment").filter({ hasText: "Ship it." });
-  await expect(mine).toHaveCount(1);
-  await expect(mine.getByTestId("pr-review-verdict")).toHaveText("approved");
+  await expect(page.getByTestId("pr-your-review")).toHaveText("You approved");
   await page.mouse.move(0, 0);
   await shot(page, "review-approved");
-
-  // The chip still opens the menu: GitHub takes another review.
-  await chip.click();
-  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pr-review-menu")).toHaveCount(0);
 });
 
-test("Review composer: Request changes waits for text, verdicts switch keeping it, Escape cancels, one composer at a time", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "review", 139).click();
-  await chooseVerdict(page, "request-changes");
-  await expect(page.getByTestId("pr-review-label")).toHaveText("Request changes on #139");
-  const submit = page.getByTestId("pr-review-submit");
-  await expect(submit).toBeDisabled();
-  await expect(submit).toHaveText("Request changes");
-  await expect(page.getByTestId("pr-review-hint")).toHaveText("Say what should change");
-  // Blank (spaces only) cannot be submitted, by key or button.
-  await reviewInput(page).pressSequentially("   ");
-  await page.keyboard.press("Meta+Enter");
-  await expect(page.getByTestId("pr-review-composer")).toBeVisible();
-  await expect(submit).toBeDisabled();
-  await reviewInput(page).fill("Rename the flag.");
-  await expect(page.getByTestId("pr-review-hint")).toHaveText("⌘⏎ submit · esc cancel");
-  await expect(submit).toBeEnabled();
-
-  // Another verdict: same text, new label and button.
-  await chooseVerdict(page, "comment");
-  await expect(page.getByTestId("pr-review-label")).toHaveText("Comment on #139");
-  await expect(submit).toHaveText("Comment");
-  await expect(reviewInput(page)).toHaveValue("Rename the flag.");
-  await expect(reviewInput(page)).toBeFocused();
-  await reviewInput(page).fill("");
-  await expect(page.getByTestId("pr-review-hint")).toHaveText("Write a comment");
-
-  // Escape cancels and hands focus to the panel; nothing was sent.
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
-  await expect(tabs(page)).toHaveText(["#139"]);
-  await expect.poll(() => focusedRegion(page)).toBe("panel");
-  expect(await reviews()).toEqual([]);
-
-  // Ask and Review share the slot: opening one closes the other.
-  await page.getByTestId("pr-menu-button").click();
-  await page.getByTestId("pr-menu-ask").click();
-  await expect(page.getByTestId("pr-ask")).toBeVisible();
-  await chooseVerdict(page, "approve");
-  await expect(page.getByTestId("pr-ask")).toHaveCount(0);
-  await page.getByTestId("pr-review-cancel").click();
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
-  await chooseVerdict(page, "comment");
-  await page.getByTestId("pr-menu-button").click();
-  await page.getByTestId("pr-menu-ask").click();
-  await expect(page.getByTestId("pr-ask")).toBeVisible();
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
-});
-
-test("a review GitHub did not confirm is toasted and keeps the text; the same text gets that answer again; while it runs the field is read-only", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "review", 139).click();
-  await chooseVerdict(page, "request-changes");
-  await reviewInput(page).fill("The retry loop never backs off.");
-  await mockPost("gh/pr-fail?command=pr.review");
-  await mockPost("gh/pr-delay?ms=800");
-  await page.getByTestId("pr-review-submit").click();
-  await expect(page.getByTestId("pr-review-submit")).toHaveAttribute("aria-busy", "true");
-  await expect(reviewInput(page)).toHaveAttribute("readonly", "");
-  await expect(page.getByTestId("pr-review-hint")).toHaveText("Submitting…");
-  await expect(page.getByTestId("pr-review-cancel")).toBeDisabled();
-  await expect(page.getByTestId("pr-review-button")).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByText("Review Pull Request failed")).toBeVisible();
-  await expect(page.getByText(/GitHub did not confirm the review/)).toBeVisible();
-  await expect(page.getByTestId("pr-review-submit")).not.toHaveAttribute("aria-busy");
-  await expect(reviewInput(page)).not.toHaveAttribute("readonly");
-  await expect(reviewInput(page)).toHaveValue("The retry loop never backs off.");
-  await expect(page.getByTestId("pr-review-button")).toHaveText("Review");
-
-  // The daemon remembers the unknown outcome: the same text gets the same answer for 2
-  // minutes (it may have been posted), and nothing is posted.
-  await mockPost("gh/pr-delay?ms=0");
-  await reviewInput(page).focus();
-  await page.keyboard.press("Meta+Enter");
-  await expect(page.getByText("Review Pull Request failed")).toHaveCount(2);
-  await expect(page.getByText(/GitHub did not confirm the review/)).toHaveCount(2);
-  await expect(page.getByTestId("pr-review-composer")).toBeVisible();
-  await expect(page.getByTestId("pr-review-button")).toHaveText("Review");
-  // Other text posts.
-  await reviewInput(page).fill("The retry loop never backs off; add a jittered delay.");
-  await page.keyboard.press("Meta+Enter");
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
-  await expect(page.getByTestId("pr-your-review")).toHaveText("You requested changes");
-  await expect(page.getByTestId("pr-your-review")).toHaveAttribute("data-review", "changes_requested");
-  await expect(page.getByTestId("pr-comment").filter({ hasText: "jittered delay" })).toHaveCount(1);
-  expect((await reviews()).map((a) => a.body)).toEqual([
-    "The retry loop never backs off.",
-    "The retry loop never backs off.",
-    "The retry loop never backs off; add a jittered delay.",
-  ]);
-});
-
-test("#145 (the viewer's own): Approve and Request changes are disabled with the reason; Comment posts a review; #140 and #138 have no Review", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "authored", 145).click();
-  await expect(page.getByTestId("pr-author")).toHaveText("alexwaumann");
-  await page.getByTestId("pr-review-button").click();
-  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
-  await expect(page.getByTestId("pr-review-approve")).toHaveAttribute("data-disabled", "");
-  await expect(page.getByTestId("pr-review-request-changes")).toHaveAttribute("data-disabled", "");
-  await expect(page.getByTestId("pr-review-comment")).not.toHaveAttribute("data-disabled");
-  await settledAnimations(page, "pr-review-menu");
-  await expectTooltip(page, page.getByTestId("pr-review-approve-reason"), "You cannot approve your own pull request.");
-  await expectTooltip(page, page.getByTestId("pr-review-request-changes-reason"), "Not on your own pull request.");
-  // A disabled item opens nothing.
-  await page.getByTestId("pr-review-approve").click({ force: true });
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
-  await page.getByTestId("pr-review-comment").click();
-  await expect(page.getByTestId("pr-review-composer")).toHaveAttribute("data-verdict", "comment");
-  await reviewInput(page).pressSequentially("Rebased on main.");
-  await page.keyboard.press("Meta+Enter");
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
-  await expect(page.getByTestId("pr-your-review")).toHaveText("You commented");
-  await expect(page.getByTestId("pr-comment").filter({ hasText: "Rebased on main." })).toHaveCount(1);
-  expect(await reviews()).toEqual([{ "repo-slug": SLUG, number: "145", verdict: "comment", body: "Rebased on main." }]);
-
-  // GitHub's refusal from the palette or CLI (the menu never sends it) comes back as its message.
-  await page.evaluate(`__cfModule("/src/stores/commands.ts").then((m) => m.runCommandForResult("pr.review", { "repo-slug": "${SLUG}", number: "145", verdict: "approve" }))`);
-  await expect(page.getByText("Review Can not approve your own pull request")).toBeVisible();
-
-  // Read access only: no Review. Merged: none either.
-  await openPr(page, 140);
-  await expect(page.getByTestId("pr-author")).toHaveText("outside-contrib");
-  await expect(page.getByTestId("pr-merge-button")).toBeVisible();
-  await expect(page.getByTestId("pr-review-button")).toHaveCount(0);
-  await expect(page.getByTestId("pr-your-review")).toHaveCount(0);
-  await prRow(page, "merged", 138).click();
-  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
-  await expect(page.getByTestId("pr-review-button")).toHaveCount(0);
-});
-
-test("the review composer closes when the pull request stops taking reviews (merged meanwhile)", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "authored", 142).click();
-  await chooseVerdict(page, "comment");
-  await reviewInput(page).fill("Looks done.");
-  await page.getByTestId("pr-merge-button").click();
-  await page.getByTestId("pr-merge-method-squash").click();
-  await page.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
-  await expect(page.getByTestId("pr-review-button")).toHaveCount(0);
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
-  expect(await reviews()).toEqual([]);
-});
+// "Review composer: Request changes waits for text, verdicts switch keeping it, Escape cancels, one
+// composer at a time", "a review GitHub did not confirm is toasted and keeps the text; the same text gets
+// that answer again; while it runs the field is read-only", "#145 (the viewer's own): Approve and Request
+// changes are disabled with the reason; Comment posts a review; #140 and #138 have no Review" and "the
+// review composer closes when the pull request stops taking reviews (merged meanwhile)": src/components/pr/PullRequestSurface.test.tsx
+// ("Review ▾"). The same text getting the same answer for 2 minutes is the daemon's
+// (internal/store/gh/pr_review_test.go).
