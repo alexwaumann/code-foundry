@@ -33,6 +33,8 @@ pull request, the Lineage label) lights as two blocks with a 2px seam between th
   block marks a second target, and the label is not one (the prototype dimmed it; changed
   in review). Its menu follows the menu-open rule.
 * Rows without a `RowMore` are unchanged: the whole-row tint.
+* The card's Actions menu items follow the same rule with their gear (a 32px block, a
+  34px left block; docs/notes/thread-info-action-menu-gear.md).
 
 ## Decisions
 
