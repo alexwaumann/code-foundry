@@ -70,6 +70,40 @@ describe("RowMore: the ellipsis of a row with its own click", () => {
     );
   }
 
+  it("leaves the row's accessible name to its text: the ellipsis is its own named button", () => {
+    renderSplit(vi.fn(), vi.fn());
+    expect(screen.getByRole("button", { name: "Open in Finder" })).toBe(screen.getByTestId("r"));
+    expect(screen.getByRole("button", { name: "Open in options" })).toBe(screen.getByTestId("more"));
+  });
+
+  it("names a row by its text and value together", () => {
+    render(
+      <Row onActivate={vi.fn()} meta="3 files" testId="r">
+        Changes
+      </Row>,
+    );
+    expect(screen.getByRole("button", { name: "Changes 3 files" })).toBe(screen.getByTestId("r"));
+  });
+
+  it("keeps its row marker under a wrapper's data-slot, and tints a non-interactive row while its menu is up", () => {
+    render(
+      <Row
+        data-slot="dropdown-menu-trigger"
+        trailing={
+          <RowMore label="Lineage options" testId="more" menuTestId="menu">
+            <DropdownMenuItem>Show hidden threads</DropdownMenuItem>
+          </RowMore>
+        }
+        testId="r"
+      >
+        Lineage
+      </Row>,
+    );
+    const row = screen.getByTestId("r");
+    expect(row.getAttribute("data-slot")).toBe("ti-row");
+    expect(row.className).toContain("has-[[data-row-more][aria-expanded=true]]:bg-cf-control-hover");
+  });
+
   it("is a labelled, tabbable button after the value, with no chevron", () => {
     renderSplit(vi.fn(), vi.fn());
     const more = screen.getByTestId("more");

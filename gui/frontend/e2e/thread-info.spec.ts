@@ -233,6 +233,44 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await page.keyboard.press("Escape");
   await expect(openInMenu).toHaveCount(0);
   expect(await reveals()).toBe(2);
+  // Escape hands focus back to the ellipsis, so Tab goes on to the next row.
+  await expect(c.getByTestId("ti-open-in-more")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(action).toBeFocused();
+  // A chevron row's menu gives it back to the row.
+  await c.getByTestId("ti-project").click();
+  await expect(page.getByTestId("ti-project-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(c.getByTestId("ti-project")).toBeFocused();
+
+  // The row buttons are named by their text and value, not by the ellipsis inside them.
+  await expect(c.getByRole("button", { name: "Open in Finder", exact: true })).toHaveAttribute("data-testid", "ti-open-in");
+  await expect(c.getByRole("button", { name: "Open in options", exact: true })).toHaveAttribute("data-testid", "ti-open-in-more");
+  await expect(c.getByRole("button", { name: "Dev", exact: true })).toHaveAttribute("data-testid", "ti-action");
+  await expect(c.getByRole("button", { name: /^Changes \+42/ })).toHaveAttribute("data-testid", "ti-changes");
+
+  // A run re-reads the action picks (their key carries the newest run): the row keeps its
+  // action meanwhile, the same element throughout (never the "Actions" row, which would
+  // remount it, flash and drop its focus). The run's terminal tab takes the keyboard.
+  const runs = async () => (await invocations()).filter((i) => i.name === "action.run").length;
+  await action.evaluate((el) => {
+    el.setAttribute("data-mark", "");
+    const seen: string[] = [];
+    (window as unknown as { actionTexts: string[] }).actionTexts = seen;
+    new MutationObserver(() => {
+      const row = document.querySelector('[data-testid="thread-info-card"] [data-testid="ti-action"]');
+      seen.push(row?.textContent ?? "");
+    }).observe(document.querySelector('[data-testid="thread-info-card"]') ?? document.body, { subtree: true, childList: true, characterData: true });
+  });
+  for (const n of [1, 2]) {
+    await action.focus();
+    await page.keyboard.press("Enter");
+    await expect.poll(runs).toBe(n);
+    await expect(page.getByTestId("bottom-panel").locator('[data-kind="action"]')).toHaveCount(n);
+  }
+  await page.waitForTimeout(300);
+  await expect(c.locator('[data-testid="ti-action"][data-mark]')).toHaveCount(1);
+  expect(await page.evaluate(() => (window as unknown as { actionTexts: string[] }).actionTexts.filter((t) => !t.includes("Dev")))).toEqual([]);
 
   // The action: the ellipsis lists the actions and runs none.
   await c.getByTestId("ti-action-more").click();
@@ -240,7 +278,7 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await expect(actionMenu).toBeVisible();
   await expectUnderRow(actionMenu, action);
   await page.keyboard.press("Escape");
-  expect((await invocations()).filter((i) => i.name === "action.run")).toEqual([]);
+  expect(await runs()).toBe(2);
 
   // A pull request (a taller row): the ellipsis offers GitHub and Copy URL, and opens no tab.
   await pr.getByTestId("ti-pr-more").click();
@@ -250,13 +288,55 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await expect(page.locator('[data-testid="panel-body"][data-surface="pullrequest"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  // Lineage's ellipsis is the same button with the same menu placement.
+  // Lineage's ellipsis is the same button with the same menu placement, and its row is tinted while the menu is up.
+  const label = c.getByTestId("ti-lineage-label");
+  await page.mouse.move(0, 0);
+  const labelBg = () => label.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const labelResting = await labelBg();
   await c.getByTestId("ti-lineage-menu-trigger").click();
   const lineageMenu = page.getByTestId("ti-lineage-menu");
   await expect(lineageMenu.getByTestId("ti-show-hidden")).toBeVisible();
-  await expectUnderRow(lineageMenu, c.getByTestId("ti-lineage-label"));
+  await expectUnderRow(lineageMenu, label);
+  await page.mouse.move(0, 0);
+  await expect.poll(labelBg).not.toBe(labelResting);
   await page.keyboard.press("Escape");
 });
+
+/** Sets the page zoom (stores/ui setZoom), as zoom-popovers.spec.ts does. */
+async function setZoom(page: Page, percent: number): Promise<void> {
+  await page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(percent)}))`);
+  await expect(page.locator("html")).toHaveAttribute("data-zoom", String(percent));
+}
+
+for (const zoom of [90, 125]) {
+  test(`at ${String(zoom)}% zoom the row menus sit under their rows at the rows' width`, async ({ page }) => {
+    // Wide enough that the card keeps its 480px of conversation at 125% (it steps aside otherwise).
+    await page.setViewportSize({ width: 1700, height: 900 });
+    await openWithCard(page, "single");
+    await setZoom(page, zoom);
+    const c = card(page);
+    await expect(c).toBeVisible();
+    // An ellipsis menu (measured offsets and width) and a chevron menu (Radix's trigger width).
+    await c.getByTestId("ti-open-in-more").click();
+    await expectUnderRow(page.getByTestId("ti-open-in-menu"), c.getByTestId("ti-open-in"));
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("ti-open-in-menu")).toHaveCount(0);
+    await c.getByTestId("ti-project").click();
+    await expectUnderRow(page.getByTestId("ti-project-menu"), c.getByTestId("ti-project"));
+    await page.keyboard.press("Escape");
+    // The gap under the row grows with the zoom, like every menu's.
+    const pr = c.getByTestId("ti-pr").first();
+    await pr.getByTestId("ti-pr-more").click();
+    await expectUnderRow(page.getByTestId("ti-pr-menu"), pr);
+    await expect
+      .poll(async () => {
+        const [m, r] = await Promise.all([box(page.getByTestId("ti-pr-menu")), box(pr)]);
+        return Math.abs(m.y - (r.y + r.height) - 4 * (zoom / 100)) < 1.5;
+      })
+      .toBe(true);
+    await page.keyboard.press("Escape");
+  });
+}
 
 test("nine projects in a workspace: Run in menu, other projects' pull requests, Changes fold, Fix sends a prompt", async ({ page }) => {
   const id = await openWithCard(page, "ws9");
