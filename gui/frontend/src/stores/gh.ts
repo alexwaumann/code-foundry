@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
-import { getBranchPullRequests, getDashboard, getPullRequestDetail, getViewer, type GhEventView } from "@/api/gh";
+import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, getViewer, type GhEventView } from "@/api/gh";
 import { errorMessage } from "@/api/stream";
 import { getUiContext } from "./context";
 import { createResource, useResource } from "./resource";
@@ -68,6 +68,13 @@ export const DASHBOARD_KEY = "all";
 /** Key: DASHBOARD_KEY. The viewer's pull request lists in every repository (GhService.GetDashboard). */
 export const dashboardResource = createResource((_key, signal) => getDashboard(undefined, signal));
 
+/**
+ * Key: the repository's slug, lower case (the daemon's). Its default branch checks, read
+ * from the daemon's snapshot (it polls every tracked repository's); re-read on
+ * repo_activity_updated. Watched only by the Projects index's rows while shown.
+ */
+export const repoActivityResource = createResource((slug, signal) => getRepoActivity(slug, undefined, signal));
+
 const SEP = "\u0000";
 export const branchKey = (slug: string, head: string): string => `${slug}${SEP}${head}`;
 
@@ -122,6 +129,9 @@ export function applyGhEvent(ev: GhEventView): void {
     case "dashboard":
       if (ev.kind === "viewer") viewerResource.invalidate(VIEWER_KEY);
       dashboardResource.invalidate(() => true);
+      break;
+    case "repoActivity":
+      repoActivityResource.invalidate(ev.repoSlug.toLowerCase());
       break;
     case "branchPullRequests":
       branchPullRequestsResource.invalidate(branchKey(ev.repoSlug, ev.headRef));

@@ -15,7 +15,7 @@ export function projectMenu(projectId: string, kind: ProjectKind, step: ProjectN
   if (kind !== "nogit" && cleanup !== null) {
     items.push({ label: "Clean up merged worktrees", icon: Broom, testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(projectId) });
   }
-  if (step === "publish") items.push({ label: "Publish to GitHub…", icon: CloudUpload, testId: "project-menu-publish", onSelect: () => { publishProject(projectId); } });
+  if (step === "publish") items.push({ label: "Publish to GitHub", icon: CloudUpload, testId: "project-menu-publish", onSelect: () => { publishProject(projectId); } });
   if (step === "init") items.push({ label: "Initialize git", icon: GitBranchPlus, testId: "project-menu-init-git", onSelect: () => void initGitIn(projectId) });
   items.push("separator", { label: "Remove project", icon: Unlink, destructive: true, testId: "project-unregister", onSelect: () => void unregisterProject(projectId) });
   return items;

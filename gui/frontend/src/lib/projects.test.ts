@@ -4,8 +4,10 @@ import {
   changesCell,
   checkoutsSummary,
   checkoutThreads,
+  defaultBranchCell,
   filterProjects,
-  indexCaption,
+  memberCaption,
+  indexColumns,
   isCleanable,
   projectActivity,
   projectKind,
@@ -292,14 +294,48 @@ describe("status sentences", () => {
   });
 });
 
-describe("indexCaption", () => {
+describe("memberCaption", () => {
   it.each<[string, { git?: boolean; githubSlug: string; remotes: string[]; path: string }, string]>([
     ["GitHub: the slug", { githubSlug: "o/r", remotes: ["origin"], path: "/x" }, "o/r"],
     ["another remote", { githubSlug: "", remotes: ["origin"], path: "/x" }, "origin · not GitHub"],
     ["no remote", { git: true, githubSlug: "", remotes: [], path: "/x" }, "local only"],
     ["no git: the path", { git: false, githubSlug: "", remotes: [], path: "/tmp/writing" }, "/tmp/writing · no git"],
   ])("%s", (_name, r, want) => {
-    expect(indexCaption(r)).toBe(want);
+    expect(memberCaption(r)).toBe(want);
+  });
+});
+
+describe("indexColumns", () => {
+  it.each<[number, string]>([
+    [1200, "activity updated branch"],
+    [840, "activity updated branch"],
+    [839, "updated branch"],
+    [700, "updated branch"],
+    [699, "branch"],
+    [600, "branch"],
+    [599, ""],
+  ])("%d px: %s", (width, want) => {
+    const c = indexColumns(width);
+    expect((["activity", "updated", "branch"] as const).filter((k) => c[k]).join(" ")).toBe(want);
+  });
+});
+
+describe("defaultBranchCell", () => {
+  const rollup = { state: "failure" as const, total: 16, passed: 14, failed: 2, pending: 0, skipped: 0 };
+  const failing = [
+    { name: "lint", workflow: "ci", url: "", conclusion: "failure" },
+    { name: "test", workflow: "ci", url: "https://ci/2", conclusion: "failure" },
+  ];
+  const status = { branch: "main", rollup, failing, fetchedAtMs: 1, lastError: "" };
+  it.each<[string, string, Parameters<typeof defaultBranchCell>[1], ReturnType<typeof defaultBranchCell>]>([
+    ["not on GitHub", "", status, null],
+    ["not loaded yet", "o/r", undefined, null],
+    ["no poll has included it", "o/r", null, null],
+    ["only an error known", "o/r", { ...status, fetchedAtMs: null, lastError: "not found" }, null],
+    ["failing: the first failed check with a link", "o/r", status, { branch: "main", rollup, failingUrl: "https://ci/2" }],
+    ["passing: nothing to open", "o/r", { ...status, failing: [] }, { branch: "main", rollup, failingUrl: "" }],
+  ])("%s", (_name, slug, d, want) => {
+    expect(defaultBranchCell(slug, d)).toEqual(want);
   });
 });
 

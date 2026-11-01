@@ -138,6 +138,24 @@ export interface DashboardView {
   trackedSlugs: string[];
 }
 
+/** A tracked repository's default branch head and its checks (DefaultBranchStatus). */
+export interface DefaultBranchView {
+  branch: string;
+  rollup: CheckRollupView;
+  /** The failed checks, failed first by workflow and name. */
+  failing: CheckRunView[];
+  /** When a poll last confirmed this state; null while only an error is known. */
+  fetchedAtMs: number | null;
+  lastError: string;
+}
+
+/** GetRepoActivity, as far as the GUI reads it (the Projects index's Default branch column). */
+export interface RepoActivityView {
+  repoSlug: string;
+  /** Null until a poll included the repository. */
+  defaultBranch: DefaultBranchView | null;
+}
+
 export interface BranchPullRequestsView {
   pullRequests: PullRequestView[];
   fetchedAtMs: number | null;
@@ -455,6 +473,16 @@ export async function getDashboard(conn: DaemonConnection = daemon, signal?: Abo
     fetchedAtMs: ms(r.fetchedAt),
     lastError: r.lastError,
     trackedSlugs: r.trackedSlugs,
+  };
+}
+
+export async function getRepoActivity(repoSlug: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RepoActivityView> {
+  const c = await conn.client(GhService);
+  const r = await c.getRepoActivity({ repoSlug }, { signal });
+  const d = r.defaultBranch;
+  return {
+    repoSlug: r.repoSlug,
+    defaultBranch: d ? { branch: d.branch, rollup: toRollupView(d.rollup), failing: d.failing.map(toCheckRunView), fetchedAtMs: ms(d.fetchedAt), lastError: d.lastError } : null,
   };
 }
 
