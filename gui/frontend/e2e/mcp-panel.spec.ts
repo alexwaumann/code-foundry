@@ -142,7 +142,7 @@ test("the chosen tab is kept per thread while the MCP tab stays open, and resets
   await panel(page).getByRole("button", { name: "Close MCP" }).click();
   await expect(surface(page)).toHaveCount(0);
   await page.getByTestId("thread-info-toggle").click();
-  await page.getByTestId("thread-info-card").getByTestId("ti-mcp").click();
+  await page.getByTestId("thread-info-card").getByTestId("ti-mcp").locator("> span").nth(1).click();
   await expectMcpTab(page);
   await expectTabs(page, [3, 2, 1], "connected", ["t3-code", "github", "filesystem"]);
 });
@@ -394,7 +394,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.setViewportSize({ width: 1680, height: 860 });
     await openThread(page);
     await page.getByTestId("thread-info-toggle").click();
-    await page.getByTestId("thread-info-card").getByTestId("ti-mcp").click();
+    await page.getByTestId("thread-info-card").getByTestId("ti-mcp").locator("> span").nth(1).click();
     await page.getByTestId("thread-info-toggle").click();
     await expectMcpTab(page);
     if (process.env.SHOTS_LONG) await stretchNames(page);
