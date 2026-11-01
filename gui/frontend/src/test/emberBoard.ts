@@ -269,7 +269,23 @@ export function setEmberEnabled(on: boolean): void {
 
 /** Ember's resident thread in the thread list (idle at its prompt, as the mock has it), with `others` beside it. */
 export function putEmberThread(o: Partial<ThreadView> = {}, others: ThreadView[] = []): void {
-  const ember = { id: EMBER_THREAD, name: "Ember", resident: "ember", state: "disconnected", status: "idle", statusReason: "", archivedAtMs: null, ...o } as ThreadView;
+  const ember = {
+    id: EMBER_THREAD,
+    name: "Ember",
+    resident: "ember",
+    projectId: "",
+    workspaceId: "",
+    worktreePath: "/Users/dev/.code-foundry/ember",
+    pendingWorktreePath: "",
+    state: "disconnected",
+    status: "idle",
+    statusReason: "",
+    archivedAtMs: null,
+    linkedPullRequests: [],
+    usage: [],
+    agentRuns: [],
+    ...o,
+  } as unknown as ThreadView;
   const all = [ember, ...others];
   useThreadsStore.setState({ byId: Object.fromEntries(all.map((t) => [t.id, t])), order: others.map((t) => t.id), owned: [EMBER_THREAD] });
 }
