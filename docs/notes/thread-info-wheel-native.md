@@ -114,5 +114,26 @@ pane) is untouched and still scrolls only itself.
 
 ## Verified
 
-See the PR: `make check`, the full `make gui-e2e`, and the built app on an isolated home
-with real trackpad-style scroll events over the card.
+* `make check` green.
+* `make gui-e2e` (4 workers): 736 passed, 10 failed. Four are the known ones on main
+  (`thread-project-set` "Add project: one pick", three `subagent-view` model-name
+  tests). Five passed on a rerun (3 repeats each): `composer-threads` :116, `panel` :593,
+  `plugins` :51, `thread-info` :28, `thread` :717 (Jump to bottom). `thread-prompts` :236
+  (question keyboard) fails 2 runs in 3 here and the same on main's Timeline and card, so
+  it is not this change. `inline-page-shows` :66 failed once under load in a targeted
+  run and passed 16 of 16 repeats.
+* The built app (`make gui-build`) on an isolated home (`CODE_FOUNDRY_HOME=/tmp/...`),
+  compact density, a plain scratch folder as the project (the worktree sandbox refuses
+  git outside the worktree; the card's git group is not what is under test), one Sonnet
+  5.5 medium thread with two answers of ten numbered paragraphs. With the card open,
+  CGEvent scroll gestures over the card (phases began, changed, ended, then a momentum
+  tail) scrolled the conversation to its top and back to the middle, and six line
+  notches (a mouse) scrolled it up. The newly exposed edges were painted every time,
+  "Jump to bottom" showed, and the card stayed put. Dark and light screenshots are in
+  the PR body. The card toggle was put back off, as it was found, before quitting (the
+  isolated app shares the installed app's WebKit storage); the home and folder were
+  removed.
+
+## Daemon restart
+
+Not needed: GUI only.
