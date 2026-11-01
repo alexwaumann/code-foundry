@@ -53,12 +53,13 @@ values lined up. A user asked for one meaning per mark; these are the agreed cha
 * **One menu placement for all four ellipsis menus** (Open in, Actions, PR, Lineage): the
   menu sits under the row at the row's width, as a chevron row's does. Radix anchors a
   menu to its trigger, here the 16px button, so `RowMore` measures the button and its row
-  (`[data-slot=ti-row]`) when the menu opens and passes `alignOffset` (row left minus
-  button left), `sideOffset` (row bottom minus button bottom, plus 4) and the row's width
-  as `--ti-row-width`. The button is centred in its row, so a flip above the row is placed
-  right too.
-* **The row keeps its hover tint while its ellipsis menu is up**
-  (`has-[[data-row-more][aria-expanded=true]]`), as a trigger row does with its own menu.
+  (`[data-ti-row]`) when the menu opens and passes `alignOffset` (row left minus button
+  left), `sideOffset` (row bottom minus button bottom, plus 4) and the row's width as
+  `--ti-row-width`, all divided by the page zoom (see Review fixes). The button is centred
+  in its row, so a flip above the row is placed right too.
+* **Every row with an ellipsis is tinted while its menu is up**
+  (`has-[[data-row-more][aria-expanded=true]]`, the Lineage label too), as a trigger row is
+  with its own menu.
 * **Ellipsis button**: `RowMoreButton`, the chevron's `size-4` box so the glyphs line up,
   muted, `hover:bg-cf-text/10` and the same on `aria-expanded`, `rounded-sm` (one step in
   from the row's `rounded-md`). Its hit area is a row tall and 4px wider each side (an
@@ -81,6 +82,37 @@ values lined up. A user asked for one meaning per mark; these are the agreed cha
 * TypeScript narrows `choice` from `const action = choice?.action; if (action)`, so
   `choice?.showProject` inside that branch is an "unnecessary optional chain" to oxlint.
 
+## Review fixes
+
+* **Zoom.** `getBoundingClientRect` is viewport px, but `ui/dropdown-menu` multiplies its
+  offsets by the zoom and the popper content zooms back (index.css), so the measured
+  offsets and width were scaled twice off 100%. `rowPlace` divides them by `zoomFactor()`.
+  Radix's `--radix-dropdown-menu-trigger-width` is viewport px too: `RowMenu` and the card's
+  Add project list divide it by `--cf-zoom`, as `ui/select` and FormNode do.
+* **The action row across runs.** `useActionPicks` is keyed by the newest run, so after a
+  run the picks are null until the new read lands, and the row switched to the "Actions"
+  tree and back: a remount (a flash, its focus dropped). ActionRow keeps the last choice
+  for the same thread while the picks are null. A run still moves the keyboard to its
+  terminal tab (`runAction` focuses the bottom panel by design), so "Enter twice on the
+  row" is not a thing; the e2e test checks the row element survives two runs and never
+  shows anything but the action's name.
+* **Escape gives focus back.** `RowMenu` let no menu return focus (`onCloseAutoFocus`
+  prevented), so after Escape Tab started from the top. It now lets Radix focus the
+  trigger after an Escape only (the ellipsis button, or the chevron row). Other closes
+  keep focus where it went: an item may focus what it opened (a terminal, the Add project
+  list, which closes on a focus outside), and a press outside is the reader's.
+* **Accessible names.** A row button containing its ellipsis was named "Open in Finder Open
+  in options". A row whose `trailing` is a `RowMore` is now `aria-labelledby` its text and
+  value spans. Only those rows: labelling every row the same way made
+  `plugin-env-restart.spec.ts`'s title menu miss its Escape in 3 of 6 runs (the Project row,
+  a Tip-wrapped menu trigger, is in that flow), 0 of 6 without; the cause was not pinned
+  down.
+* **Chevron on the multi-project "Add action" row**: it is a whole-row menu.
+* **Row marker.** `RowMore` finds its row by `data-ti-row`, set after the props spread.
+  Moving `data-slot="ti-row"` after the spread instead renamed every Radix trigger row's
+  slot, so the marker is its own attribute.
+* Left out: a menu open while the window resizes keeps its measured place (accepted).
+
 ## Tests
 
 * `src/components/threadinfo/Row.test.tsx`: chevron boxes only for "closed"/"open" and
@@ -96,5 +128,13 @@ values lined up. A user asked for one meaning per mark; these are the agreed cha
   Tab reaches the ellipsis and its Enter opens the menu; the action and PR menus run and
   open nothing. The MCP test now opens the menu from the value, the text, the chevron,
   Enter and ArrowDown, checks the item order and opens the tab through Open MCP panel.
+* Review round: the split-rows test also checks Escape returns focus to the ellipsis (then
+  Tab reaches the action row) and to the Project row; the row names ("Open in Finder",
+  "Open in options", "Dev"); the action row element across two runs; the Lineage label's
+  tint. New zoom tests at 90% and 125% check the Open in, Project and PR menus' left edge
+  and width against their rows and the PR menu's gap (4px times the zoom). `Row.test.tsx`
+  adds the ellipsis row's name, the marker under a wrapper's `data-slot`, and the tint
+  class on a non-interactive row. The zoom and action-row assertions fail with their fix
+  taken out.
 * `e2e/actions.spec.ts` opens the card's action menu through `ti-action-more`;
   `e2e/mcp-panel.spec.ts` opens the MCP tab through the row's menu.
