@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowRight, Bot, CornerLeftUp, Square } from "lucide-react";
-import { DropdownMenuCheckboxItem, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { agentName, fmtElapsed } from "@/lib/agents";
 import { useNowSelect } from "@/lib/clock";
@@ -19,7 +19,7 @@ import {
 } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
 import { useCreator, useLiveCount } from "@/stores/lineage";
-import { saveSettings, useModelChoices, useShowCreatedThreads } from "@/stores/settings";
+import { useModelChoices } from "@/stores/settings";
 import { openAgentRun } from "@/stores/subagentActions";
 import { useThreadStore } from "@/stores/thread";
 import { interruptThread } from "@/stores/threadActions";
@@ -65,7 +65,7 @@ function useAgentRows(threadId: string): readonly string[] {
   );
 }
 
-/** The threads created from this one (hidden ones too), encoded like useAgentRows. */
+/** The threads created from this one, encoded like useAgentRows. */
 function useChildRows(threadId: string): readonly string[] {
   return useThreadsStore(
     useShallow((s) =>
@@ -198,30 +198,16 @@ function ParentRow({ threadId }: { threadId: string }) {
 }
 
 /**
- * "Lineage · N running" with its menu (Show hidden threads; Archive finished, not built
- * yet). N is the sidebar badge's live count (lib/liveCount: background subagents plus live
- * child threads), so the two always agree; a foreground run listed here is the busy tool,
- * not counted.
+ * "Lineage · N running" with its menu (Archive finished, not built yet). N is the sidebar
+ * badge's live count (lib/liveCount: background subagents plus live child threads), so the
+ * two always agree; a foreground run listed here is the busy tool, not counted.
  */
 function LineageLabel({ threadId }: { threadId: string }) {
   const running = useLiveCount(threadId);
-  const showHidden = useShowCreatedThreads();
   return (
     <Row
       trailing={
         <RowMore label="Lineage options" testId="ti-lineage-menu-trigger" menuTestId="ti-lineage-menu">
-          <DropdownMenuCheckboxItem
-            checked={showHidden}
-            className="text-caption text-cf-text"
-            data-testid="ti-show-hidden"
-            onCheckedChange={(on) =>
-              void saveSettings({
-                "threads.show_created_threads": on ? "true" : "false",
-              })
-            }
-          >
-            Show hidden threads
-          </DropdownMenuCheckboxItem>
           <DropdownMenuItem disabled data-testid="ti-archive-finished">
             Archive finished
           </DropdownMenuItem>
@@ -236,7 +222,7 @@ function LineageLabel({ threadId }: { threadId: string }) {
 
 /**
  * Lineage: the creator first (a child thread), then each running or waiting subagent run
- * and child thread (hidden children too), newest first, then "Previous agents" folding
+ * and child thread, newest first, then "Previous agents" folding
  * the finished ones. Absent without a creator, runs or children.
  */
 export function LineageGroup({ threadId }: { threadId: string }) {

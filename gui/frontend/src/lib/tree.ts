@@ -34,8 +34,8 @@ export interface ListThread {
   /** When the snooze ends (epoch ms), null when not snoozed: it then sorts under Snoozed, whatever its pin and group. */
   snoozedUntilMs: number | null;
   /**
-   * Hidden from the sidebar (lib/inSidebar.ts: a thread another thread created, by the
-   * setting or its override): in no panel, no count, no keyboard order. Absent: shown.
+   * Hidden from the sidebar (lib/inSidebar.ts: a thread another thread created, while its
+   * creator exists): in no panel, no count, no keyboard order. Absent: shown.
    */
   hidden?: boolean;
   /**

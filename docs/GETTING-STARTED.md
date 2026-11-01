@@ -62,8 +62,7 @@ window title and the badge on the Dock icon count what is waiting.
 
 When a thread's agent starts threads of its own, they belong to that thread: they stay
 out of the sidebar and the Dock badge, and its thread info card lists them. Click one
-there and choose **Show in sidebar** from its title menu to take it over, or turn on
-Settings › Threads › **Show threads created by other threads** to list them all.
+there to open it. To carry its work on yourself, fork it or start a new thread.
 
 Tell any thread how you like things done ("keep your answers short", "always open pull
 requests as drafts") and it keeps that as a standing preference for every thread in

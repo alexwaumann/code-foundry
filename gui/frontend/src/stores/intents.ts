@@ -9,7 +9,6 @@ import { getUiContext } from "./context";
 import { notifyLinkAction, showingPage } from "./notifyLinks";
 import { usePluginsStore } from "./plugins";
 import { PENDING_FOCUS_MS } from "./bottomPanel";
-import { getShowCreatedThreads } from "./settings";
 import { showAgentRun } from "./subagentView";
 import { useTerminalsStore } from "./terminals";
 import { showThreadView } from "./threadPanelIntent";
@@ -59,8 +58,9 @@ useUiStore.subscribe((s, prev) => {
 function focusThread(id: string, explicit: boolean): void {
   clearPendingFocus();
   const decide = (): boolean => {
-    const t = useThreadsStore.getState().byId[id];
-    const d = explicit && t !== undefined ? "select" : threadFocus(t, getShowCreatedThreads(), Date.now());
+    const byId = useThreadsStore.getState().byId;
+    const t = byId[id];
+    const d = explicit && t !== undefined ? "select" : threadFocus(t, byId, Date.now());
     if (d === "select") useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
     return d !== "wait";
   };

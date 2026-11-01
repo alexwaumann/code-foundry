@@ -6,7 +6,6 @@
 import { sidebarAnchor } from "@/lib/inSidebar";
 import { neighbourIn, threadOrder } from "@/lib/tree";
 import { getListOptions, getListThreads } from "./context";
-import { getShowCreatedThreads } from "./settings";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 
@@ -18,10 +17,9 @@ import { useUiStore } from "./ui";
  * through `select`, so it lands in the window's history. Returns whether one was selected.
  */
 export function jumpToNeighbour(by: 1 | -1): boolean {
-  const showCreated = getShowCreatedThreads();
   const sel = useUiStore.getState().selection;
-  const order = threadOrder(getListThreads(showCreated), getListOptions());
-  const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id, showCreated) : null;
+  const order = threadOrder(getListThreads(), getListOptions());
+  const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id) : null;
   const id = neighbourIn(order, from, by);
   if (id === null) return false;
   useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });

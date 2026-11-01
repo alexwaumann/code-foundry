@@ -17,10 +17,9 @@ import { presentDictationToggle } from "@/stores/dictation";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
-import { toggleThreadSidebar } from "@/stores/threadActions";
 import { toggleThreadInfo } from "@/stores/threadInfoOverlay";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
-import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
+import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
@@ -40,19 +39,18 @@ export interface ViewAction {
 
 /** Selects the Nth thread in sidebar order (rows of a collapsed section and hidden threads do not count). */
 function jumpTo(n: number): void {
-  const id = threadOrder(getListThreads(getShowCreatedThreads()), getListOptions())[n - 1];
+  const id = threadOrder(getListThreads(), getListOptions())[n - 1];
   if (id !== undefined) useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }
 
 /** Selects the next thread that needs attention after the current one, wrapping. */
 export function jumpToAttention(): boolean {
-  const showCreated = getShowCreatedThreads();
-  const waiting = new Set(attentionIds(useThreadsStore.getState(), showCreated));
+  const waiting = new Set(attentionIds(useThreadsStore.getState()));
   const sel = useUiStore.getState().selection;
   // Threads that need attention are never in the collapsible Working section (threadGroup).
   // A hidden thread selected (from its creator's thread info card) starts from its creator's row.
-  const order = threadOrder(getListThreads(showCreated), getListOptions());
-  const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id, showCreated) : null;
+  const order = threadOrder(getListThreads(), getListOptions());
+  const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id) : null;
   // Ember's row is the sidebar's first; it counts while it waits on the user (stores/ember.ts).
   const ember = getEmberAttentionId();
   if (ember) waiting.add(ember);
@@ -143,7 +141,7 @@ function activeThread() {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-like", "thread.run-in", "thread.snooze", "thread.sidebar","project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-like", "thread.run-in", "thread.snooze", "project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -247,9 +245,6 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
   // unsnooze it when it is snoozed; both invoke thread.snooze.
   "thread.snooze": () => presentSnooze(getUiContext().activeThreadId),
-  // Show or hide in the sidebar: toggles the active thread (the header's button, the
-  // palette), so `shown` is never prompted for. The daemon refuses a thread the user created.
-  "thread.sidebar": () => toggleThreadSidebar(getUiContext().activeThreadId),
   // The Add Project dialog; its tabs call ProjectService.Register (project.add's CLI form with
   // a folder), stream ProjectService.Clone (project.clone's CLI form), or invoke project.create.
   // project.add's optional path is never prompted for. project.clone opens it on the GitHub tab.

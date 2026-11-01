@@ -78,7 +78,6 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     labels: [],
     report: null,
     budgetUsd: 0,
-    inSidebar: null,
     flags: [],
     ...over,
   };
@@ -373,7 +372,7 @@ describe("handleKeyDown precedence", () => {
     });
 
     it("a hidden thread selected starts from its creator's row, and is never a stop", () => {
-      useThreadsStore.setState((s) => ({ byId: { ...s.byId, g: thread("g", { createdBy: "d", inSidebar: false }) }, order: [...s.order, "g"] }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, g: thread("g", { createdBy: "d" }) }, order: [...s.order, "g"] }));
       useUiStore.setState({ selection: { kind: "thread", id: "g" } });
       expect(step(1)).toBe("b");
       expect(step(-1)).toBe("d");

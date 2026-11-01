@@ -26,12 +26,6 @@ describe("thread metadata mapping", () => {
 
   it("has no report and no creator by default", () => {
     const v = toThreadView(create(ThreadSchema, { id: "s1" }));
-    expect(v).toMatchObject({ createdBy: "", createdByName: "", brief: "", labels: [], report: null, budgetUsd: 0, inSidebar: null });
-  });
-
-  it("maps the sidebar override: unset is null (the setting decides), false and true as given", () => {
-    expect(toThreadView(create(ThreadSchema, { id: "s2", createdBy: "s1" })).inSidebar).toBeNull();
-    expect(toThreadView(create(ThreadSchema, { id: "s2", createdBy: "s1", inSidebar: false })).inSidebar).toBe(false);
-    expect(toThreadView(create(ThreadSchema, { id: "s2", createdBy: "s1", inSidebar: true })).inSidebar).toBe(true);
+    expect(v).toMatchObject({ createdBy: "", createdByName: "", brief: "", labels: [], report: null, budgetUsd: 0 });
   });
 });

@@ -15,7 +15,6 @@ const { usePanelStore } = await import("./panel");
 const { useThreadsStore } = await import("./threads");
 const { useTerminalsStore } = await import("./terminals");
 const { HOME, useUiStore } = await import("./ui");
-const { useSettingsStore } = await import("./settings");
 const { getDraft, updateDraft } = await import("./compose");
 const { threadDraftKey } = await import("./threadActions");
 
@@ -140,27 +139,20 @@ describe("a playAlertSound intent (notifications.test)", () => {
   });
 });
 
-describe("the focusThread intent (hidden child threads, docs/notes/hidden-children-2-gui.md)", () => {
+describe("the focusThread intent (child threads, docs/notes/no-sidebar-override-1-gui.md)", () => {
   const now = Date.now();
-  const made = (id: string, over: Partial<ThreadView>): ThreadView => ({ ...thread(id), createdBy: "", inSidebar: null, createdAtMs: now, ...over });
-  const setShowCreated = (on: boolean) => {
-    useSettingsStore.setState({ snapshot: { values: { "threads.show_created_threads": String(on) }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
-  };
+  const made = (id: string, over: Partial<ThreadView>): ThreadView => ({ ...thread(id), createdBy: "", createdAtMs: now, ...over });
   const selected = () => useUiStore.getState().selection;
   afterEach(() => {
     vi.useRealTimers();
-    useSettingsStore.setState({ snapshot: null });
   });
 
-  it.each<[string, Partial<ThreadView>, boolean, boolean]>([
-    ["the user's new thread", {}, false, true],
-    ["a new hidden child (setting off)", { createdBy: "s1" }, false, false],
-    ["a new child, the setting on", { createdBy: "s1" }, true, true],
-    ["a new child created with --sidebar", { createdBy: "s1", inSidebar: true }, false, true],
-    ["a new child created with --sidebar=false, setting on", { createdBy: "s1", inSidebar: false }, true, false],
-    ["an older hidden child (thread.focus)", { createdBy: "s1", createdAtMs: now - 60_000 }, false, true],
-  ])("%s: switches the view %s", (_name, over, showCreated, switches) => {
-    setShowCreated(showCreated);
+  it.each<[string, Partial<ThreadView>, boolean]>([
+    ["the user's new thread", {}, true],
+    ["a new child (its creator exists)", { createdBy: "s1" }, false],
+    ["a new child whose creator was removed", { createdBy: "gone" }, true],
+    ["an older child (thread.focus)", { createdBy: "s1", createdAtMs: now - 60_000 }, true],
+  ])("%s: switches the view %s", (_name, over, switches) => {
     useThreadsStore.setState({ byId: { s1: thread("s1"), n: made("n", over) }, order: ["s1", "n"] });
     applyIntent({ kind: "focusThread", threadId: "n" });
     expect(selected()).toEqual(switches ? { kind: "thread", id: "n" } : HOME);

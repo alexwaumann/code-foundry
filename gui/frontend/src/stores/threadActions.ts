@@ -15,7 +15,6 @@ import { isNotFound } from "@/api/errors";
 import { stageAttachment } from "@/api/threads";
 import { sendErrorMessage } from "@/api/stream";
 import type { ComposePermission } from "@/lib/compose";
-import { inSidebar } from "@/lib/inSidebar";
 import type { PermissionDecision } from "@/lib/threadRequest";
 import { projectPrompt } from "@/lib/prompt";
 import { newCitationId } from "@/lib/citation";
@@ -26,9 +25,7 @@ import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useC
 import { addStagedAttachments, clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, putCitation, updateDraft } from "./compose";
 import { getUiContext } from "./context";
 import { holdFailedNotice } from "./failedNotice";
-import { getShowCreatedThreads } from "./settings";
 import { setAnswering } from "./thread";
-import { useThreadsStore } from "./threads";
 
 export const THREAD_COMMANDS = {
   create: "thread.new",
@@ -48,7 +45,6 @@ export const THREAD_COMMANDS = {
   setMode: "thread.set-mode",
   respond: "thread.respond",
   setEffort: "thread.set-effort",
-  sidebar: "thread.sidebar",
   stopShell: "thread.shell.stop",
 } as const;
 
@@ -97,27 +93,6 @@ export function pinThread(id: string, pinned: boolean): Promise<boolean> {
  */
 export function archiveThread(id: string, archived: boolean): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.archive, { archived: String(archived) }, threadContext(id));
-}
-
-/**
- * thread.sidebar: show (hand to the user) or hide (back to its creator) a thread another
- * thread created, whatever threads.show_created_threads says. The daemon refuses a thread
- * the user created (always shown).
- */
-export function setThreadSidebar(id: string, shown: boolean): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.sidebar, { shown: String(shown) }, threadContext(id));
-}
-
-/**
- * thread.sidebar's presenter (the header button, the palette): hides the thread when the
- * rule shows it (lib/inSidebar.ts), else shows it. False for a thread the list does not
- * know (the command then prompts for `shown` as usual).
- */
-export function toggleThreadSidebar(id: string): boolean {
-  const t = useThreadsStore.getState().byId[id];
-  if (!t) return false;
-  void setThreadSidebar(id, !inSidebar(t, getShowCreatedThreads()));
-  return true;
 }
 
 /**

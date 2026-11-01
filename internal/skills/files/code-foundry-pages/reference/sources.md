@@ -89,8 +89,7 @@ An array of the user's threads in sidebar order (threads a plugin owns left out)
   snoozed (filter those out of a board).
 - `createdAtMs`, `lastActivityAtMs`.
 - `parentId`, `createdBy`, `createdByName`: the thread that started it ("" for the user's
-  own); `inSidebar`: null (the setting decides; children are hidden by default), true or
-  false; `labels`: strings.
+  own; a child is out of the sidebar while its creator exists); `labels`: strings.
 - `costUsd`: USD so far; `unpriced` true means a lower bound (say so, never $0).
   `usage`: buckets of `model`, `day` (UTC YYYY-MM-DD), `requests`, `input`, `output`,
   `cacheRead`, `costUsd`.
