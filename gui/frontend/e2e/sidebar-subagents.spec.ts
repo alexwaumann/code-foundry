@@ -44,13 +44,8 @@ test("the badge counts background subagents and live child threads; a waiting le
   await expect(lead.getByTestId("row-detail")).toHaveCount(0);
   await expect(lead.getByTestId("row-branch")).toHaveText("fix/resize");
 
-  // The nested lead, shown by its override: still a live row, with its own count.
-  const nested = row(page, "s:s-lc-nested");
-  await expect(nested).toHaveAttribute("data-section", "working");
-  await expect(nested.getByTestId("row-status")).toHaveText(/^Waiting/);
-  await expect(badge(page, "s-lc-nested")).toHaveText("1");
-  await expect(badge(page, "s-lc-nested")).toHaveAttribute("aria-label", "1 subagent");
-  await expect(nested.getByTestId("row-branch")).toHaveText("feat/sidebar");
+  // The nested lead is its creator's: no row of its own (its count is in its card).
+  await expect(row(page, "s:s-lc-nested")).toHaveCount(0);
 
   // Waiting on a shell alone: no badge, the shell is not a subagent; the branch on line 3.
   await expect(badge(page, "s-lc-shell")).toHaveCount(0);
@@ -98,20 +93,20 @@ test("the card's running count equals the badge; a nested lead is a live row", a
   await expect(card(page).getByTestId("ti-lineage-label")).toHaveText("Lineage · 2 running");
   await expect(badge(page, "s-lc-lead")).toHaveText("2");
 
-  await openCard(page, "s-lc-nested");
+  // The nested lead, opened from its creator's card (it has no sidebar row).
+  await lineageRow(page, "s-lc-nested").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-lc-nested");
   await expect(card(page).getByTestId("ti-lineage-label")).toHaveText("Lineage · 1 running");
-  await expect(badge(page, "s-lc-nested")).toHaveText("1");
 
-  // No background subagents: the card's word stands alone when nothing is live, and no badge.
+  // No background subagents: the card's word stands alone when nothing is live.
   await mockPost("thread/status?id=s-lc-snap&status=attention&reason=finished");
   await expect(card(page).getByTestId("ti-lineage-label")).toHaveText("Lineage");
-  await expect(badge(page, "s-lc-nested")).toHaveCount(0);
 });
 
-test("lineage: the creator's badge counts its working and asking children, hidden ones included; a waiting child stays live", async ({ page }) => {
+test("lineage: the creator's badge counts its working and asking children; a waiting child stays live", async ({ page }) => {
   await mockPost("lineage");
   await openApp(page);
-  // s-l-e2e works, s-l-cookie asks for a permission (both hidden); the rest finished, failed, idle or archived.
+  // s-l-e2e works, s-l-cookie asks for a permission (neither in the sidebar); the rest finished, failed, idle or archived.
   await expect(badge(page, "s-l-parent")).toHaveText("2");
   await openCard(page, "s-l-parent");
   await expect(card(page).getByTestId("ti-lineage-label")).toHaveText("Lineage · 2 running");

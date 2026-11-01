@@ -206,18 +206,21 @@ test("the File tab of a page its thread showed has that thread's bridge", async 
   await expect(inner.locator("#notify-out")).toHaveText("ok");
 });
 
-test("a page starts a thread without moving the view: its handler runs, the sidebar shows the new row", async ({ page }) => {
+test("a page starts a thread without moving the view: its handler runs, the new thread is its thread's child (no sidebar row)", async ({ page }) => {
   await openBridgeThread(page);
   await doc(page).locator("#start").click();
   await expect(doc(page).locator("#start-out")).toHaveText(/^started 1: created thread /);
   // The page's own success handling ran: the box is empty, so a second click cannot repeat it.
   await expect(doc(page).locator("#task")).toHaveValue("");
   const call = (await invocations()).find((i) => i.name === "thread.new");
-  // The skill's example call, unchanged: no project (the thread's placement), focus off by the host.
-  expect(call?.args).toEqual({ prompt: "Reply with OK only.", sidebar: "true", "created-by": "s-r1", focus: "false" });
+  // No project (the thread's placement), created by the page's thread, focus off by the host.
+  expect(call?.args).toEqual({ prompt: "Reply with OK only.", "created-by": "s-r1", focus: "false" });
   await expect(card(page)).toBeVisible();
   await expect(row(page, "s:s-r1")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("sidebar").getByText("Reply with OK only")).toBeVisible();
+  // Its creator exists, so it is out of the sidebar (docs/notes/no-sidebar-override-1-gui.md).
+  const id = /s-new-\d+/.exec(String(await doc(page).locator("#start-out").textContent()))?.[0] ?? "";
+  expect(id).not.toBe("");
+  await expect(row(page, `s:${id}`)).toHaveCount(0);
 });
 
 test("a page's errors show on its strip; Ask Claude puts them in the thread's composer, not sent", async ({ page }) => {

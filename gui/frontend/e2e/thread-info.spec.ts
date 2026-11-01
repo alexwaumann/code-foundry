@@ -600,7 +600,11 @@ test("a working thread: Push waits for the model, with the reason on hover", asy
 });
 
 test("a child thread: its parent row leads the lineage and goes to the parent", async ({ page }) => {
-  await openWithCard(page, "child");
+  // A child has no sidebar row: open it from its parent's card (the card stays open).
+  await mockPost("thread-info?scenario=child");
+  await openWithCard(page, "single");
+  await card(page).locator('[data-testid="ti-lineage-row"][data-id="s-ti-child"]').click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-ti-child");
   const parent = card(page).getByTestId("ti-parent");
   await expect(parent).toContainText("Fix the stale PR badge");
   await expect(parent).toHaveAttribute("data-id", "s-ti-1");

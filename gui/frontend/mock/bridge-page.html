@@ -78,12 +78,12 @@ $("archive").addEventListener("click", () => show($("archive-out"), cf.run("thre
 $("missing").addEventListener("click", () => show($("error-out"), cf.run("no.such.verb")));
 $("invalid").addEventListener("click", () => show($("error-out"), cf.run("ui.notify", {})));
 $("misspelt").addEventListener("click", () => show($("error-out"), cf.run("thread.list", { archivd: "true" })));
-// The pages skill's example call, unchanged: no project, shown in the sidebar.
+// A page starts a thread: no project; created by the page's thread, so out of the sidebar.
 let started = 0;
 $("start").addEventListener("click", () =>
   show(
     $("start-out"),
-    cf.run("thread.new", { prompt: $("task").value, sidebar: true }).then((r) => {
+    cf.run("thread.new", { prompt: $("task").value }).then((r) => {
       started++;
       $("task").value = "";
       return { text: "started " + String(started) + ": " + r.text, json: null };
