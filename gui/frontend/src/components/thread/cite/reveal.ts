@@ -20,12 +20,12 @@ export function dockTop(pane: HTMLElement): number {
 }
 
 /**
- * A thread body's box less the thread info card laid over its right (ThreadInfoCard, a
- * sibling of the body): where the cite surfaces may hang. The whole body without the card.
+ * A thread body's box less the thread info card laid over its right (ThreadInfoCard, in
+ * the timeline's scroller): where the cite surfaces may hang. The whole body without the card.
  */
 export function paneBox(pane: HTMLElement): DOMRect {
   const box = pane.getBoundingClientRect();
-  const card = pane.parentElement?.querySelector(':scope > [data-testid="thread-info"] > [data-testid="thread-info-card"]')?.getBoundingClientRect();
+  const card = pane.querySelector('[data-testid="thread-timeline"] [data-testid="thread-info"] > [data-testid="thread-info-card"]')?.getBoundingClientRect();
   if (!card || card.left >= box.right) return box;
   return DOMRect.fromRect({ x: box.left, y: box.top, width: Math.max(0, card.left - box.left), height: box.height });
 }

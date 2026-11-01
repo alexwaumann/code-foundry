@@ -112,7 +112,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
           </span>
         </PaneHeader>
         <div className="relative flex min-h-0 flex-1" ref={rowRef} data-testid="thread-pane-body" data-info-room={infoFits ? "" : undefined}>
-          {/* The card lays over this column's right side: the list and the dock keep clear of it (--ti-inset) and the list's scrollbar stays at the pane's edge. */}
+          {/* The card lays over this column's right side (inside the list's scroller): the list, the dock, the chips and the page modal keep clear of it (--ti-inset) and the list's scrollbar stays at the pane's edge. */}
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef} style={{ "--ti-inset": infoOpen && infoFits ? "var(--ti-card)" : "0px" } as CSSProperties}>
             {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
             <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
@@ -133,7 +133,16 @@ function ThreadBody({ threadId }: { threadId: string }) {
                   No messages yet.
                 </p>
               )}
-              <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={dockHeight} rail />
+              {/* The thread info card (view.thread-info) is drawn inside the list's scroller, over its right padding: a wheel over it scrolls the list natively. */}
+              <Timeline
+                key={threadId}
+                threadId={threadId}
+                working={timelineWorking}
+                strips={timelineStrips}
+                bottomInset={dockHeight}
+                rail
+                pinnedLayer={infoOpen && infoFits ? <ThreadInfoCard threadId={threadId} /> : undefined}
+              />
               <div className="dock" ref={dockRef}>
                 <AgentsStrip threadId={threadId} />
                 <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
@@ -141,8 +150,6 @@ function ThreadBody({ threadId }: { threadId: string }) {
               <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
             </PaneOverlay>
           </div>
-          {/* The thread info card (view.thread-info), over the column's right: the column's own messages, chips and page modal keep clear of it. */}
-          {infoOpen && infoFits && <ThreadInfoCard threadId={threadId} scrollerRef={bodyRef} />}
           {/* Without room, the card floats over the conversation instead: no --ti-inset, the conversation does not reflow under it. */}
           {!infoFits && <ThreadInfoOverlay threadId={threadId} />}
         </div>

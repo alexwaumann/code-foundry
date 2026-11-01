@@ -143,8 +143,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * item and the daemon's process_ended turn end; mock/world.ts stops the thread with status
  * error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "servers" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "html-repeat" | "theme" | "bridge" | "pagelib";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "servers", "stopped", "crashed", "html", "html-idle", "html-scroll", "html-repeat", "theme", "bridge", "pagelib"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "servers" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "html-repeat" | "theme" | "bridge" | "pagelib";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "servers", "stopped", "crashed", "html", "html-idle", "html-scroll", "long", "html-repeat", "theme", "bridge", "pagelib"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -948,6 +948,19 @@ export class MockThreadLogs {
       it({ case: "html", value: { path: "docs/hello.html", title: "", baseDir: cwd } }, { at: ago(1) });
       it({ case: "html", value: { path: "docs/plain.html", title: "", baseDir: cwd } }, { at: ago(1, 5) });
       it({ case: "html", value: { path: "docs/scheme.html", title: "", baseDir: cwd } }, { at: ago(1, 10) });
+      l.seq = l.items.length;
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
+      return;
+    }
+    if (state === "long") {
+      // Forty short exchanges, many rows taller than the pane: the virtualized list mounts
+      // only the rows near the viewport (docs/notes/thread-info-wheel-native.md).
+      for (let n = 1; n <= 40; n++) {
+        it({ case: "userMessage", value: { text: `Question ${String(n)}: what does step ${String(n)} change?`, attachments: [] } }, { at: ago(90 - 2 * n) });
+        tool("Bash", { command: `go test ./internal/store/pr/... -run Step${String(n)}` }, { output: Array.from({ length: 6 }, (_, i) => `ok  \tgithub.com/alexwaumann/code-foundry/internal/store/pr/s${String(i)}\t0.${String(i + 1)}s`).join("\n") }, { at: ago(90 - 2 * n, 10) });
+        it({ case: "assistantText", value: { text: n % 2 === 0 ? `Answer ${String(n)}:\n\n${ANSWER_HEAD}${GO_BLOCK}` : `Answer ${String(n)}: step ${String(n)} moves one piece of the work along, and the notes say why at some length.` } }, { at: ago(90 - 2 * n, 30) });
+        it({ case: "turnEnd", value: { subtype: "success", durationMs: 5_000n, numTurns: 1, costUsd: 0.01, turnCostUsd: 0.01, stopReason: "end_turn" } }, { at: ago(90 - 2 * n, 30) });
+      }
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       return;
