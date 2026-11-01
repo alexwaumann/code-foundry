@@ -164,6 +164,8 @@ describe("the Add Project dialog", () => {
     expect(dialog().getAttribute("data-tab")).toBe("local");
     expect(within(dialog()).getByRole("tab", { selected: true }).textContent).toContain("Local");
     expect(document.activeElement).toBe(localInput());
+    // No Wails host: no folder picker.
+    expect(screen.queryByTestId("pick-directory")).toBeNull();
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Escape" });
     await settle();
     expect(screen.queryByTestId("add-project-dialog")).toBeNull();
