@@ -383,6 +383,52 @@ describe("the list", { timeout: 30_000 }, () => {
     expect(scope().dataset.theme).toBe("github-dark");
   });
 
+  it("in the settings sheet: one dialog; the ×, the Settings crumb and Escape go back to Appearance; the backdrop's close shuts both", () => {
+    useViewsStore.setState({ settingsPage: "appearance" });
+    open("dark", "settings");
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getByTestId("settings-sheet").dataset.body).toBe("themes");
+    expect(screen.queryByTestId("settings-page")).toBeNull();
+    const back = { themesOpen: false, settingsOpen: true, settingsPage: "appearance" };
+    fireEvent.click(screen.getByRole("button", { name: "Close themes" }));
+    expect(useViewsStore.getState()).toMatchObject(back);
+    act(() => {
+      openThemes("light", "settings");
+    });
+    expect(screen.getByTestId("themes-crumbs").textContent).toMatch(/Settings.*Themes/);
+    fireEvent.click(screen.getByTestId("themes-crumb-settings"));
+    expect(useViewsStore.getState()).toMatchObject(back);
+    act(() => {
+      openThemes("dark", "settings");
+    });
+    fireEvent.keyDown(screen.getByTestId("themes-list"), { key: "Escape" });
+    expect(useViewsStore.getState()).toMatchObject(back);
+    act(() => {
+      openThemes("dark", "settings");
+      closeSheet();
+    });
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, settingsOpen: false });
+  });
+
+  it("theme.pick from outside Settings: Escape closes the sheet; its Settings crumb leads to Settings → Appearance", () => {
+    useViewsStore.setState({ settingsPage: "general" });
+    act(() => {
+      showView("themes");
+    });
+    render(
+      <TooltipProvider>
+        <SettingsSheet />
+      </TooltipProvider>,
+    );
+    fireEvent.keyDown(screen.getByTestId("themes-list"), { key: "Escape" });
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, settingsOpen: false });
+    act(() => {
+      showView("themes");
+    });
+    fireEvent.click(screen.getByTestId("themes-crumb-settings"));
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, settingsOpen: true, settingsPage: "appearance" });
+  });
+
   it("the scheme control saves appearance.theme", async () => {
     open();
     fireEvent.click(within(screen.getByTestId("themes-scheme")).getByRole("radio", { name: "Light" }));
