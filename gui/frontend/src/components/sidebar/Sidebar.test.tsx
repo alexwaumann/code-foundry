@@ -123,6 +123,8 @@ describe("Sidebar: the thread list", () => {
     expect(s1.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("error");
     expect(within(s1).getByTestId("row-status").textContent).toBe("Interrupted");
     expect(within(s1).getByTestId("row-detail").textContent).toBe("resend to continue");
+    // In the main list's waiting band (as after an Unsnooze of an interrupted thread).
+    expect(s1.getAttribute("data-section")).toBe("attention");
     setThread("s-2", { state: "disconnected", status: "attention", statusReason: "permission: Bash zig build -Doptimize=ReleaseFast" });
     expect(rowKeys()[0]).toBe("s:s-2");
     const s2 = rowOf("s:s-2") as HTMLElement;
@@ -206,6 +208,76 @@ describe("Sidebar: the Working footer", () => {
     setThread("s-5", { state: "disconnected", status: "idle" });
     expect(screen.queryByTestId("working-header")).toBeNull();
     expect(rowKeys().filter((k) => k.startsWith("#"))).toEqual(["# Snoozed 2", "# Archived 1"]);
+  });
+});
+
+describe("Sidebar: the Snoozed and Archived footers", () => {
+  it("Snoozed: collapsed by default with its count; expanded, one-line rows with the time left, soonest first; gone once none is snoozed", () => {
+    setThread("s-8", { statusReason: "finished" });
+    // The mock's s-9 wakes in 4 days and an hour.
+    setThread("s-9", { snoozedUntilMs: Date.now() + (4 * 24 * 60 + 60) * 60_000 });
+    render(<Sidebar />);
+    const header = () => screen.getByTestId("snoozed-header");
+    expect(header().getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByTestId("snoozed-label").textContent).toBe("Snoozed");
+    expect(screen.getByTestId("snoozed-count").textContent).toBe("2");
+    expect(header().getAttribute("aria-label") ?? header().textContent).toBe("Snoozed 2");
+    expect(rowOf("s:s-8")).toBeNull();
+    fireEvent.click(header());
+    expect(header().getAttribute("aria-expanded")).toBe("true");
+    expect(useUiStore.getState().snoozedCollapsed).toBe(false);
+    expect(rowKeys()).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "s:s-8", "s:s-9", "# Archived 1"]);
+    const s8 = rowOf("s:s-8") as HTMLElement;
+    expect(s8.getAttribute("data-section")).toBe("snoozed");
+    expect(within(s8).getByTestId("thread-name").textContent).toBe("Refactor the gh poller");
+    expect(within(s8).getByTestId("row-snooze-left").textContent).toBe("2h");
+    expect(within(s8).getByTestId("row-snooze-icon")).toBeTruthy();
+    expect(within(rowOf("s:s-9") as HTMLElement).getByTestId("row-snooze-left").textContent).toBe("4d");
+    expect(within(s8).queryByTestId("row-line-1")).toBeNull();
+    expect(within(s8).queryByTestId("row-actions")).toBeNull();
+    // Both unsnoozed (as from the CLI): no section; s-8 is its finished turn again.
+    setThread("s-8", { snoozedUntilMs: null });
+    setThread("s-9", { snoozedUntilMs: null });
+    expect(screen.queryByTestId("sidebar-snoozed")).toBeNull();
+    expect(rowOf("s:s-8")?.getAttribute("data-section")).toBe("done");
+  });
+
+  it("a wake brings the thread back to the top of the main list: Woke in amber, snooze ended", () => {
+    render(<Sidebar />);
+    setThread("s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() });
+    expect(screen.getByTestId("snoozed-count").textContent).toBe("1");
+    expect([...screen.getByTestId("sidebar-main").querySelectorAll("[data-row-key]")].map((e) => e.getAttribute("data-row-key"))).toEqual(["s:s-8", "s:s-2", "s:s-6", "s:s-4", "s:s-3"]);
+    const s8 = rowOf("s:s-8") as HTMLElement;
+    expect(s8.getAttribute("data-section")).toBe("attention");
+    expect(within(s8).getByTestId("row-status").textContent).toBe("Woke");
+    expect(within(s8).getByTestId("row-status").className).toContain("text-cf-warning-text");
+    expect(within(s8).getByTestId("row-detail").textContent).toBe("snooze ended");
+  });
+
+  it("Archived: collapsed by default with its count, last; expanded, the one-line row with its age; gone with no archived thread, back with one", () => {
+    render(<Sidebar />);
+    const header = () => screen.getByTestId("archived-header");
+    expect(header().getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByTestId("archived-label").textContent).toBe("Archived");
+    expect(screen.getByTestId("archived-count").textContent).toBe("1");
+    expect(header().getAttribute("aria-label") ?? header().textContent).toBe("Archived 1");
+    expect(rowOf("h:archived")?.getAttribute("role")).toBe("presentation");
+    expect(rowOf("s:s-7")).toBeNull();
+    expect(rowKeys().at(-1)).toBe("# Archived 1");
+    fireEvent.click(header());
+    expect(useUiStore.getState().archivedCollapsed).toBe(false);
+    const s7 = rowOf("s:s-7") as HTMLElement;
+    expect(s7.getAttribute("data-section")).toBe("archived");
+    expect(within(s7).getByTestId("thread-name").textContent).toBe("Spike a canvas sidebar");
+    expect(within(s7).getByTestId("row-archived-age").textContent).toBe("1h");
+    expect(within(s7).queryByTestId("row-line-1")).toBeNull();
+    // Unarchived (as from the CLI): no section; s-7 is back in the main list.
+    setThread("s-7", { archivedAtMs: null, statusReason: "finished" });
+    expect(screen.queryByTestId("sidebar-archived")).toBeNull();
+    expect(screen.queryByTestId("archived-header")).toBeNull();
+    expect(rowOf("s:s-7")?.getAttribute("data-section")).toBe("done");
+    setThread("s-7", { archivedAtMs: Date.now() });
+    expect(screen.getByTestId("archived-count").textContent).toBe("1");
   });
 });
 

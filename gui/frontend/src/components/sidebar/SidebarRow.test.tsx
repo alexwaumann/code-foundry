@@ -957,6 +957,12 @@ describe("SidebarRow card status time", () => {
     expect(within(card).getByTestId("tip-status-time").className).toContain("text-cf-text-muted");
   });
 
+  it("a snoozed finished thread: how long ago it finished, not when it wakes (the row says that)", () => {
+    const card = openCard({ status: "attention", statusReason: "finished", statusChangedAtMs: Date.now() - 6 * MIN - 5_000, snoozedUntilMs: Date.now() + 150 * MIN });
+    expect(within(card).getByTestId("tip-status").textContent).toBe("Finished 6m ago");
+    expect(card.textContent).not.toMatch(/Snoozed until/);
+  });
+
   it("a flag: its reason, no time", () => {
     const card = openCard({ flags: [flag("attention", "3 warnings")], statusChangedAtMs: Date.now() - 6 * MIN });
     expect(within(card).getByTestId("tip-status").textContent).toBe("Lint: 3 warnings");
