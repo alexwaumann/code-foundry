@@ -144,10 +144,10 @@ export function Row({
  * ellipsis block is lit (`!`: it beats the row's hover rules wherever the pointer is).
  */
 const SPLIT_ROW =
-  "isolate before:pointer-events-none before:absolute before:inset-y-0 before:right-6.5 before:left-0 before:-z-1 before:rounded-l-md has-[[data-row-more]:hover]:before:bg-cf-control-hover/50 has-[[data-row-more][aria-expanded=true]]:before:bg-transparent!";
-/** A split row with its own click: the left block is a target, bright under the pointer or focus; the ellipsis block dims with it. */
+  "isolate before:pointer-events-none before:absolute before:inset-y-0 before:right-6.5 before:left-0 before:-z-1 before:rounded-l-md has-[[data-row-more][aria-expanded=true]]:before:bg-transparent!";
+/** A split row with its own click: the left block is a target, bright under the pointer or focus, dim while the pointer is on the ellipsis; the ellipsis block dims with it. A row without a click (the Lineage label) only ever lights its ellipsis block. */
 const SPLIT_ROW_ACTIVE =
-  "group/split hover:not-has-[[data-row-more]:hover]:before:bg-cf-control-hover focus-visible:before:bg-cf-control-hover";
+  "group/split hover:not-has-[[data-row-more]:hover]:before:bg-cf-control-hover focus-visible:before:bg-cf-control-hover has-[[data-row-more]:hover]:before:bg-cf-control-hover/50";
 
 /**
  * A press on the row itself: not on its RowMore button, and not in that button's menu,

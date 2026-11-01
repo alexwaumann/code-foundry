@@ -373,6 +373,9 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   const labelMore = c.getByTestId("ti-lineage-menu-trigger");
   await label.hover({ position: { x: 30, y: 10 } });
   await expect.poll(() => lit(label, labelMore)).toEqual([blocks.none, blocks.none, blocks.none]);
+  // Hovering its ellipsis lights that block alone: no dim block over a label that is not a target.
+  await labelMore.hover();
+  await expect.poll(() => lit(label, labelMore)).toEqual([blocks.none, blocks.full, blocks.none]);
   await labelMore.click();
   const lineageMenu = page.getByTestId("ti-lineage-menu");
   await expect(lineageMenu.getByTestId("ti-show-hidden")).toBeVisible();

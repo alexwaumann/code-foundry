@@ -29,8 +29,9 @@ pull request, the Lineage label) lights as two blocks with a 2px seam between th
 * **Glyph**: `text-cf-text` while its block is bright (hover, focus-visible, expanded),
   muted otherwise.
 * **The Lineage label** has no click of its own: hovering its text lights nothing.
-  Hovering its ellipsis lights the ellipsis block bright and the left block dim (as the
-  prototype did); its menu follows the menu-open rule.
+  Hovering its ellipsis lights the ellipsis block alone, with no dim left block: the dim
+  block marks a second target, and the label is not one (the prototype dimmed it; changed
+  in review). Its menu follows the menu-open rule.
 * Rows without a `RowMore` are unchanged: the whole-row tint.
 
 ## Decisions

@@ -118,6 +118,8 @@ describe("RowMore: the ellipsis of a row with its own click", () => {
     // No click of its own: the text is not a target, so no hover block for it.
     expect(row.className).not.toContain("group/split");
     expect(row.className).not.toContain("hover:not-has-[[data-row-more]:hover]:before:bg-cf-control-hover");
+    // Nor a dim block while the ellipsis is hovered: the dim block marks a second target.
+    expect(row.className).not.toContain("has-[[data-row-more]:hover]:before:bg-cf-control-hover/50");
     expect(screen.getByTestId("more").className).toContain("aria-expanded:after:bg-cf-control-hover");
   });
 
