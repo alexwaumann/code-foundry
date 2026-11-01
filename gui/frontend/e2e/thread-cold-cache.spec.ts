@@ -15,9 +15,9 @@ test.beforeEach(async () => {
 
 const NOTE = "Cache expired · the next message re-reads 25.7K tokens (~$0.26)";
 
-async function openThread(page: Page, state: "idle" | "permission", scheme: "dark" | "light" = "dark"): Promise<void> {
+async function openThread(page: Page, scheme: "dark" | "light"): Promise<void> {
   await page.emulateMedia({ colorScheme: scheme });
-  await mockPost(`thread?state=${state}`);
+  await mockPost("thread?state=idle");
   await openApp(page);
   await row(page, "s:s-r1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
@@ -35,7 +35,7 @@ const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as 
 
 for (const scheme of schemes) {
   test(`${scheme}: an expired cache shows the note above the prompt; sending hides it, the next result keeps it hidden`, async ({ page }) => {
-    await openThread(page, "idle", scheme);
+    await openThread(page, scheme);
     // Warm: nothing.
     await expect(note(page)).toBeHidden();
 
@@ -62,21 +62,5 @@ for (const scheme of schemes) {
   });
 }
 
-test("the note appears on the composer's own timer while the user is looking", async ({ page }) => {
-  await page.clock.install();
-  await openThread(page, "idle");
-  // Expires in 10 s: still warm.
-  await mockPost("thread/cache?id=s-r1&ago=3590");
-  await page.waitForTimeout(300);
-  await expect(note(page)).toBeHidden();
-  // The next 30 s check finds it expired; nothing came from the daemon meanwhile.
-  await page.clock.runFor(31_000);
-  await expect(note(page)).toHaveText(NOTE);
-});
-
-test("a pending prompt hides the note", async ({ page }) => {
-  await openThread(page, "permission");
-  await mockPost("thread/cache?id=s-r1&ago=3660");
-  await expect(page.getByTestId("thread-composer").getByTestId("thread-permission").first()).toBeVisible();
-  await expect(note(page)).toBeHidden();
-});
+// The note on the composer's own timer, and hidden by a pending prompt: unit-tested in
+// src/components/thread/ColdCacheNote.test.tsx.
