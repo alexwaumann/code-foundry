@@ -88,7 +88,8 @@ test("the card's row and the command open it, not M or the + list; tools expand 
   await expect(panel(page)).toHaveCount(0);
   // The thread info card's MCP row.
   await page.getByTestId("thread-info-toggle").click();
-  await page.getByTestId("thread-info-card").getByTestId("ti-mcp").click();
+  // Its text, not the value column (which opens the row's menu).
+  await page.getByTestId("thread-info-card").getByTestId("ti-mcp").locator("> span").nth(1).click();
   await expectMcpTab(page);
   await page.getByTestId("thread-info-toggle").click();
   await panel(page).getByTestId("panel-toggle").click();

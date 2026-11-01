@@ -14,7 +14,10 @@ import { cn } from "@/lib/utils";
  *
  * As a menu trigger (Radix `asChild`) the row takes the trigger's props and ref. A row
  * with both a click action and a menu (`onClick` and `menuOnChevron`) opens the menu only
- * from its chevron: a press elsewhere on it is its click.
+ * from its chevron: a press elsewhere on it is its click. With `menuOnMeta` as well, the
+ * value and the chevron are one trigger zone (one hover tint over both, the row's full
+ * height, carrying `data-row-chevron`): a press on either opens the menu. The value stays
+ * where the other rows' values sit; a row without `menuOnMeta` renders exactly as before.
  */
 export function Row({
   icon,
@@ -23,6 +26,7 @@ export function Row({
   chevron = "none",
   onActivate,
   menuOnChevron = false,
+  menuOnMeta = false,
   hoverable = false,
   sub = false,
   tall = false,
@@ -39,6 +43,8 @@ export function Row({
   onActivate?: () => void;
   /** With a menu trigger's props: only the chevron opens it, the rest of the row clicks. */
   menuOnChevron?: boolean;
+  /** With `menuOnChevron` and a `meta`: the value opens the menu too (one zone with the chevron). */
+  menuOnMeta?: boolean;
   /** No action, but a hover card: the row shows its hover background. */
   hoverable?: boolean;
   /** A fold's sub-row: indented to the text column. */
@@ -52,9 +58,32 @@ export function Row({
 } & Omit<ComponentProps<"div">, "children">) {
   const menu = rest["aria-haspopup"] !== undefined;
   const interactive = Boolean(onActivate) || menu;
+  const hasMeta = meta !== undefined && meta !== null && meta !== false;
+  // The value joins the chevron's trigger zone (a split row with a value and menuOnMeta).
+  const zone = menuOnChevron && menuOnMeta && hasMeta && chevron !== "none";
   const fromChevron = (e: { target: EventTarget }) => e.target instanceof Element && e.target.closest("[data-row-chevron]") !== null;
   // A press that opens the menu (a menu-only row, or the chevron of a split one) is not a click.
   const clicks = (e: { target: EventTarget }) => Boolean(onActivate) && !(menu && (!menuOnChevron || fromChevron(e)));
+  const metaNode = (
+    <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-caption-sm tabular-nums [&_svg]:size-3.25" data-testid={testId && `${testId}-meta`}>
+      {meta}
+    </span>
+  );
+  // In a zone the zone is the trigger: it carries the marker and the hover tint.
+  const chevronNode = (
+    <span
+      className={cn(
+        "flex size-4 shrink-0 items-center justify-center rounded-sm text-cf-text-muted/70 [&_svg]:size-3.5",
+        zone ? "group-hover/zone:text-cf-text" : menuOnChevron && "hover:bg-cf-text/10 hover:text-cf-text",
+      )}
+      data-row-chevron={zone || chevron === "none" ? undefined : ""}
+      data-testid={testId && chevron !== "none" ? `${testId}-chevron` : undefined}
+      data-open={chevron === "open" ? "" : undefined}
+      aria-hidden
+    >
+      {chevron === "open" ? <ChevronDown /> : chevron === "closed" ? <ChevronRight /> : null}
+    </span>
+  );
   return (
     <div
       role={interactive ? "button" : undefined}
@@ -70,7 +99,7 @@ export function Row({
         className,
       )}
       onPointerDown={(e: PointerEvent<HTMLDivElement>) => {
-        // The menu opens from the chevron only; a press elsewhere is the row's click.
+        // The menu opens from the chevron (or its zone) only; a press elsewhere is the row's click.
         if (menuOnChevron && !fromChevron(e)) return;
         rest.onPointerDown?.(e);
       }}
@@ -92,27 +121,25 @@ export function Row({
     >
       {icon !== undefined && <span className="flex size-3.5 shrink-0 items-center justify-center text-cf-text-muted [&_svg]:size-3.5">{icon}</span>}
       <span className={cn("min-w-0 flex-1", tall ? "flex flex-col" : "truncate")}>{children}</span>
-      {meta !== undefined && meta !== null && meta !== false && (
-        <span
-          className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-caption-sm tabular-nums [&_svg]:size-3.25"
-          data-testid={testId && `${testId}-meta`}
-        >
-          {meta}
-        </span>
+      {zone ? (
+        <>
+          {trailing}
+          <span
+            className="group/zone -mr-1 ml-auto inline-flex shrink-0 items-center gap-2 self-stretch rounded-md pr-1 pl-2 hover:bg-cf-text/10"
+            data-row-chevron=""
+            data-testid={testId && `${testId}-menu-zone`}
+          >
+            {metaNode}
+            {chevronNode}
+          </span>
+        </>
+      ) : (
+        <>
+          {hasMeta && metaNode}
+          {trailing}
+          {chevronNode}
+        </>
       )}
-      {trailing}
-      <span
-        className={cn(
-          "flex size-4 shrink-0 items-center justify-center rounded-sm text-cf-text-muted/70 [&_svg]:size-3.5",
-          menuOnChevron && "hover:bg-cf-text/10 hover:text-cf-text",
-        )}
-        data-row-chevron={chevron === "none" ? undefined : ""}
-        data-testid={testId && chevron !== "none" ? `${testId}-chevron` : undefined}
-        data-open={chevron === "open" ? "" : undefined}
-        aria-hidden
-      >
-        {chevron === "open" ? <ChevronDown /> : chevron === "closed" ? <ChevronRight /> : null}
-      </span>
     </div>
   );
 }
