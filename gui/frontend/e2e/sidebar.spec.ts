@@ -216,7 +216,7 @@ test("the Projects view removes a workspace and offers project actions", async (
   await openApp(page);
   await openWorkspacePage(page, spare.id);
   await page.getByTestId("workspace-page-more").click();
-  await page.getByTestId("workspace-page-remove").click();
+  await page.getByTestId("workspace-menu-remove").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Remove workspace spare?");
   await dialog.getByTestId("confirm-ok").click();

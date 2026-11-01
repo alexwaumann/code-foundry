@@ -19,20 +19,20 @@ export function SnoozePresetItems({ id, Item, Separator, onPreset }: { id: strin
   return (
     <>
       {snoozePresets(now).map((p) => (
-          <Item
-            key={p.id}
-            data-testid="snooze-preset"
-            data-preset={p.id}
-            onSelect={() => {
-              onPreset?.();
-              void snoozeThread(id, p.untilMs);
-            }}
-          >
-            {p.label}
-            <span className="ml-auto pl-6 text-caption tabular-nums" data-testid="snooze-preset-time">
-              {p.hint}
-            </span>
-          </Item>
+        <Item
+          key={p.id}
+          data-testid="snooze-preset"
+          data-preset={p.id}
+          onSelect={() => {
+            onPreset?.();
+            void snoozeThread(id, p.untilMs);
+          }}
+        >
+          {p.label}
+          <span className="ml-auto pl-6 text-caption tabular-nums" data-testid="snooze-preset-time">
+            {p.hint}
+          </span>
+        </Item>
       ))}
       <Separator />
       <Item
