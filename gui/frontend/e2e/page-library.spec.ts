@@ -98,16 +98,7 @@ test("a Tailwind-runtime page styles itself with the app's tokens, arbitrary val
   await snap(page, "tailwind");
 });
 
-test("a TSX syntax error shows in a box in the page, with the line", async ({ page }) => {
-  await openPages(page);
-  const broken = doc(page, "broken");
-  await expect(broken.locator("html")).toHaveAttribute("data-cf-jsx", "error");
-  const box = broken.locator("[data-cf-jsx-error]");
-  await expect(box).toBeVisible();
-  await expect(box).toContainText("Syntax error in");
-  await expect(box).toContainText("const App = () => <div>unclosed;");
-  await snap(page, "broken");
-});
+// A TSX syntax error's box with its line: the "errors name the page's file and line" test below (broken.html), which takes its screenshot too.
 
 test("a mockup with its own CSS and no theme.css renders its own look, React and icons", async ({ page }) => {
   await openPages(page);
@@ -207,6 +198,7 @@ test("errors name the page's file and line: a mismatched tag, a syntax error, a 
   await expect(thrown).toContainText("throw.html:12");
   await expect(thrown).not.toContainText("blob:");
   await snap(page, "mismatch");
+  await snap(page, "broken");
 });
 
 test("a page pinned to light stays light in the dark app, and its type follows the root font-size", async ({ page }) => {
