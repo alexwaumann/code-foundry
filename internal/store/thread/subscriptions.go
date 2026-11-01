@@ -92,8 +92,9 @@ const ReasonWakeLimit = "wake limit"
 // and no answer is pending": not starting, and status idle, error (the process ended
 // mid-turn), or needs attention for anything but a pending permission prompt or
 // question (a turn that ended unseen, "finished" or "error: <code>", "snooze ended",
-// "budget reached", "wake limit"). A thread waiting on its child threads (idle
-// "waiting on N child threads", waiting.go) is idle, not attention. The
+// "budget reached", "wake limit"). A waiting thread (idle "waiting on N child threads",
+// "waiting on 1 shell": its child threads or its own background work will wake it,
+// waiting.go) is idle, not attention. The
 // ThreadService.Wait conditions are the same
 // (docs/notes/agents-1-wait-events.md). A thread being removed (Thread.Removing) meets
 // none: its closing snapshot is not a thread that settled.
