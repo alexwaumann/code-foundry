@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemoryEntryView, MemorySnapshotView } from "@/api/memory";
 import type { ThreadView } from "@/api/threads";
@@ -30,6 +30,11 @@ function entry(index: number, text: string, origin: MemoryEntryView["origin"], c
 function snapshot(entries: MemoryEntryView[]): MemorySnapshotView {
   return { entries, injected: entries.length, injectedBytes: 0, maxEntries: 40, maxBytes: 4096, maxEntryChars: 500, dir: "/m", error: "", version: 1 };
 }
+const rowWith = (text: string) => {
+  const row = screen.getAllByTestId("memory-row").find((r) => within(r).getByTestId("memory-text").textContent === text);
+  if (!row) throw new Error(`no row ${text}`);
+  return row;
+};
 const thread = (id: string, name: string, archivedAtMs: number | null = null) => ({ id, name, archivedAtMs }) as ThreadView;
 
 function show(entries: MemoryEntryView[]) {
@@ -135,6 +140,21 @@ describe("RememberedSection", () => {
     expect(getMemory).toHaveBeenCalledTimes(1);
   });
 
+  it("after the refresh, the next Forget takes the row clicked", async () => {
+    runForResult.mockImplementationOnce((_n, _a, opts) => {
+      opts.expected?.(new ConnectError("there is no entry e1 now", Code.NotFound));
+      return Promise.resolve(null);
+    });
+    getMemory.mockResolvedValue(snapshot([entry(2, "b", { kind: "user" }), entry(3, "c", { kind: "user" })]));
+    show([entry(1, "a", { kind: "user" }), entry(2, "b", { kind: "user" }), entry(3, "c", { kind: "user" })]);
+    fireEvent.click(within(rowWith("a")).getByTestId("memory-forget"));
+    await vi.waitFor(() => {
+      expect(screen.getAllByTestId("memory-text").map((t) => t.textContent)).toEqual(["b", "c"]);
+    });
+    fireEvent.click(within(rowWith("c")).getByTestId("memory-forget"));
+    expect(runForResult).toHaveBeenLastCalledWith("memory.remove", { id: "e3" }, expect.anything());
+  });
+
   it("another failure is not taken for a gone entry", async () => {
     runForResult.mockImplementationOnce((_n, _a, opts) => {
       expect(opts.expected?.(new ConnectError("denied", Code.PermissionDenied))).toBe(false);
@@ -151,9 +171,63 @@ describe("RememberedSection", () => {
 
   it("empty: the empty state, 0 of 40 and no Forget all", () => {
     show([]);
-    expect(screen.getByTestId("memory-empty").textContent).toContain("Nothing remembered yet");
+    const empty = screen.getByTestId("memory-empty").textContent;
+    expect(empty).toContain("Nothing remembered yet");
+    expect(empty).toContain("Tell a thread how you like things done and it will be kept here, for every thread in every project.");
+    expect(empty).toContain("“from now on, open PRs as drafts”");
     expect(screen.getByTestId("memory-count").textContent).toBe("0 of 40");
     expect(screen.queryByTestId("memory-forget-all")).toBeNull();
     expect(screen.queryByTestId("memory-footnote")).toBeNull();
+  });
+});
+
+describe("RememberedSection live", () => {
+  it("an entry arriving on the events stream shows at once, from the empty state", () => {
+    show([]);
+    act(() => {
+      applyMemoryEvent({ snapshot: snapshot([entry(1, "Use tabs", { kind: "thread", threadId: "s-1", threadName: "Recorded" }, Date.now())]) });
+    });
+    expect(screen.queryByTestId("memory-empty")).toBeNull();
+    expect(screen.getAllByTestId("memory-text").map((t) => t.textContent)).toEqual(["Use tabs"]);
+    expect(screen.getByTestId("memory-meta").textContent).toBe("Remembered just now · by Renamed thread");
+    expect(screen.getByTestId("memory-count").textContent).toBe("1 of 40");
+  });
+
+  it("a forgotten entry's row goes when the event lands, the count with it", () => {
+    const entries = [entry(1, "a", { kind: "user" }), entry(2, "Open PRs as drafts", { kind: "user" }), entry(3, "c", { kind: "user" })];
+    show(entries);
+    expect(screen.getByTestId("memory-count").textContent).toBe("3 of 40");
+    act(() => {
+      applyMemoryEvent({ snapshot: snapshot(entries.filter((e) => e.id !== "e2")) });
+    });
+    expect(screen.getAllByTestId("memory-row")).toHaveLength(2);
+    expect(screen.queryByText("Open PRs as drafts")).toBeNull();
+    expect(screen.getByTestId("memory-count").textContent).toBe("2 of 40");
+  });
+
+  it("Forget all's clear empties the page", () => {
+    show([entry(1, "a", { kind: "user" }), entry(2, "b", { kind: "user" })]);
+    act(() => {
+      applyMemoryEvent({ snapshot: snapshot([]) });
+    });
+    expect(screen.getByTestId("memory-empty")).toBeTruthy();
+    expect(screen.queryAllByTestId("memory-row")).toHaveLength(0);
+  });
+
+  it("a thread archived while the page is open stays a link, struck through", () => {
+    show([entry(1, "Open PRs as drafts", { kind: "thread", threadId: "s-1", threadName: "Recorded" })]);
+    expect(screen.getByTestId("memory-by").dataset.state).toBe("live");
+    act(() => {
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", "Renamed thread", 9) } }));
+    });
+    const by = screen.getByTestId("memory-by");
+    expect([by.tagName, by.dataset.state]).toEqual(["BUTTON", "archived"]);
+    expect(screen.getByTestId("memory-meta").textContent).toContain("by Renamed thread (archived)");
+  });
+
+  it("Forget's tooltip says Forget", async () => {
+    show([entry(1, "a", { kind: "user" })]);
+    fireEvent.focus(screen.getByTestId("memory-forget"));
+    expect((await screen.findAllByText("Forget", { selector: "[data-slot=tooltip-content] *, [data-slot=tooltip-content]" })).length).toBeGreaterThan(0);
   });
 });

@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 
 const setThreadSidebar = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), setThreadSidebar }));
+const removeThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), setThreadSidebar, removeThread }));
 
 const { ContextMenu, ContextMenuTrigger } = await import("@/components/ui/context-menu");
 const { RowMenu } = await import("./RowMenu");
@@ -59,5 +60,13 @@ describe("RowMenu: Hide from sidebar (docs/notes/hidden-children-2-gui.md)", () 
     openMenu({});
     expect(screen.getByTestId("row-menu")).toBeTruthy();
     expect(screen.queryByTestId("menu-sidebar-hide")).toBeNull();
+  });
+});
+
+describe("RowMenu: Remove", () => {
+  it("removes the thread through thread.remove, which asks first (ConfirmDialog.test)", () => {
+    openMenu({});
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
+    expect(removeThread).toHaveBeenCalledExactlyOnceWith("s-1");
   });
 });

@@ -125,25 +125,7 @@ test("Ask the model starts a no-project thread with the description and opens it
   expect(ask?.context?.activeView).toBe("themes");
 });
 
-test("the save modal's Also make a light pair asks the model for the pair after saving", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openApp(page);
-  await openThemes(page);
-  const ocean = page.getByTestId("themes-list").getByRole("option", { name: "Ocean Dusk", exact: true });
-  await ocean.hover();
-  await ocean.getByRole("button", { name: "Edit Ocean Dusk" }).click();
-  await expect(page.getByTestId("theme-inspector")).toBeVisible();
-  await page.getByTestId("themes-save").click();
-  const dialog = page.getByTestId("theme-save-dialog");
-  const pair = dialog.getByTestId("theme-save-pair");
-  await expect(pair).toBeVisible();
-  await expect(dialog).toContainText("Also make a light pair");
-  await pair.click();
-  await dialog.getByTestId("theme-save-submit").click();
-  await expect(dialog).toHaveCount(0);
-  await expect.poll(async () => (await invocations()).find((i) => i.name === "theme.ask")?.args).toEqual({ pair: "ocean-dusk" });
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-});
+// The save modal's Also make a light pair: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
 async function invoke(name: string, args: Record<string, string>, context: Record<string, string> | null = null): Promise<{ message?: string }> {
   const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {

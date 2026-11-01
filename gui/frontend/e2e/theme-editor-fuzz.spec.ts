@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { emit, openApp, resetMock, row } from "./fixtures";
 
 // The theme editor's fuzz fixes (docs/notes/theme-fuzz-editor.md), by finding. The mock seeds
 // Ocean Dusk (dark, from Catppuccin Mocha, one pin) and Mocha, warmer; the slots start on
@@ -9,20 +9,8 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-interface MockTheme {
-  id: string;
-  name: string;
-  base: Record<string, string>;
-}
-
-async function mockThemes(): Promise<{ themes: MockTheme[]; calls: string[] }> {
-  return (await (await fetch(`${mockUrl}/__mock/themes`)).json()) as { themes: MockTheme[]; calls: string[] };
-}
-
-const mockTheme = async (id: string) => (await mockThemes()).themes.find((t) => t.id === id);
 const option = (page: Page, name: string) => page.getByTestId("themes-list").getByRole("option", { name, exact: true });
 const inspector = (page: Page) => page.getByTestId("theme-inspector");
-const scopeVar = (page: Page, name: string) => page.getByTestId("themes-page").locator('[data-testid="theme-scope"]').last().evaluate((el, n) => (el as HTMLElement).style.getPropertyValue(n), name);
 const focusedTestId = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.tagName ?? "");
 
 async function openThemes(page: Page) {
@@ -54,40 +42,7 @@ async function setBase(page: Page, key: string, hex: string) {
   await expect(page.getByTestId("editor-slots")).toBeVisible();
 }
 
-test("1: a save from outside reaches the open editor; over unsaved edits it asks Reload or Keep mine", async ({ page }) => {
-  await editOceanDusk(page);
-  // Clean: it reloads by itself.
-  await mockPost("themes/edit?theme=ocean-dusk&canvas=%23330000");
-  await expect.poll(() => scopeVar(page, "--cf-canvas")).toBe("#330000");
-  await expect(inspector(page).getByTestId("editor-base-canvas")).toContainText("#330000");
-  await expect(page.getByTestId("themes-edit-bar")).not.toContainText("unsaved");
-  // theme edit on the theme already open: still the newer file, nothing to ask.
-  await themeEdit("ocean-dusk");
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  await expect(inspector(page).getByTestId("editor-base-canvas")).toContainText("#330000");
-
-  // Unsaved edits: the editor keeps them and says the file changed.
-  await setBase(page, "accent", "#ff00ff");
-  await mockPost("themes/edit?theme=ocean-dusk&canvas=%23440000");
-  await expect(page.getByTestId("editor-disk-notice")).toContainText("Changed on disk");
-  expect(await scopeVar(page, "--cf-canvas")).toBe("#330000");
-  // Reload takes the newer file and drops the edit.
-  await page.getByTestId("editor-disk-reload").click();
-  await expect(page.getByTestId("editor-disk-notice")).toHaveCount(0);
-  expect(await scopeVar(page, "--cf-canvas")).toBe("#440000");
-  await expect(page.getByTestId("themes-revert")).toBeDisabled();
-
-  // Keep mine: the draft stays, and Save writes it over the newer file knowingly.
-  await setBase(page, "accent", "#ff00ff");
-  await mockPost("themes/edit?theme=ocean-dusk&canvas=%23550000");
-  await page.getByTestId("editor-disk-keep").click();
-  await expect(page.getByTestId("editor-disk-notice")).toHaveCount(0);
-  await page.getByTestId("themes-save").click();
-  await page.getByTestId("theme-save-apply").click();
-  await page.getByTestId("theme-save-submit").click();
-  await expect(page.getByTestId("theme-save-dialog")).toHaveCount(0);
-  await expect.poll(async () => (await mockTheme("ocean-dusk"))?.base).toMatchObject({ canvas: "#440000", accent: "#ff00ff" });
-});
+// 1: a save from outside, Reload and Keep mine: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
 for (const width of [900, 1100, 1200, 1440]) {
   test(`2: at ${String(width)}px the edit bar, its buttons and the editing name stay on the page`, async ({ page }) => {
@@ -160,27 +115,7 @@ test("3: Escape with edits asks and the question stays; clean, it leaves the edi
   await expect(page.getByTestId("themes-page")).toHaveCount(0);
 });
 
-test("4: Fix on a pair no colour can mend leaves the slot alone and says why", async ({ page }) => {
-  await editOceanDusk(page);
-  // A mid-grey hovered row: muted text cannot hold 4.5:1 on it and on the dark panes at once.
-  await page.getByTestId("editor-filter").fill("control-hover");
-  await page.getByTestId("editor-slot-control-hover").click();
-  await page.getByTestId("colour-hex").fill("#8a8a8a");
-  await page.getByTestId("colour-hex").press("Enter");
-  await page.getByTestId("editor-back").click();
-  await page.getByTestId("themes-save").click();
-  const dialog = page.getByTestId("theme-save-dialog");
-  const unfixable = dialog.getByTestId("theme-save-unfixable").filter({ hasText: "No colour on control-hover reaches 4.5:1; change the surface or the base colour." });
-  await expect(unfixable.first()).toBeVisible();
-  await expect(dialog.getByTestId("theme-save-contrast").filter({ has: unfixable }).getByTestId("theme-save-fix")).toHaveCount(0);
-  // Every Fix offered mends its row and does not come back.
-  const before = await dialog.getByTestId("theme-save-contrast").count();
-  const fix = dialog.getByTestId("theme-save-fix").first();
-  if ((await fix.count()) > 0) {
-    await fix.click();
-    await expect(dialog.getByTestId("theme-save-contrast")).toHaveCount(before - 1);
-  }
-});
+// 4: an unfixable pair: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
 test("5: a light surface on a dark theme is refused in the editor, not by Save", async ({ page }) => {
   await editOceanDusk(page);
@@ -213,39 +148,9 @@ test("5: a light surface on a dark theme is refused in the editor, not by Save",
   expect(await focusedTestId(page)).toBe("themes-save");
 });
 
-test("6: Ask the model with unsaved edits asks first; Cancel starts nothing", async ({ page }) => {
-  await editOceanDusk(page);
-  await setBase(page, "accent", "#ff00ff");
-  await page.getByTestId("themes-ask").click();
-  await page.getByTestId("themes-ask-input").fill("warmer");
-  await page.getByTestId("themes-ask-send").click();
-  const confirm = page.getByTestId("confirm-dialog");
-  await expect(confirm).toContainText("The model does not see them: asking starts a thread and leaves the editor.");
-  await page.getByTestId("confirm-cancel").click();
-  await expect(inspector(page)).toBeVisible();
-  expect((await invocations()).some((i) => i.name === "theme.ask")).toBe(false);
-  await page.getByTestId("themes-ask").click();
-  await expect(page.getByTestId("themes-ask-input")).toHaveValue("warmer");
-  await page.getByTestId("themes-ask-send").click();
-  await page.getByTestId("confirm-ok").click();
-  await expect.poll(async () => (await invocations()).some((i) => i.name === "theme.ask")).toBe(true);
-});
+// 6: Ask the model over unsaved edits: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
-test("7: a double-click on Customise makes one copy; closing it unsaved deletes it", async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 900 });
-  await openThemes(page);
-  const nord = option(page, "Nord");
-  await nord.hover();
-  await nord.getByRole("button", { name: "Customise Nord" }).dblclick();
-  await expect(page.getByTestId("themes-editing-name")).toHaveText("Nord copy");
-  await expect.poll(async () => (await mockThemes()).themes.map((t) => t.id).filter((id) => id.startsWith("nord"))).toEqual(["nord-copy"]);
-  await page.getByTestId("themes-edit-done").click();
-  await expect(inspector(page)).toHaveCount(0);
-  await expect.poll(() => mockTheme("nord-copy")).toBeUndefined();
-  await expect(option(page, "Nord copy")).toHaveCount(0);
-  // The preview goes back to the slot's theme.
-  await expect(page.getByTestId("themes-previewed-name")).toHaveText("GitHub Dark");
-});
+// 7: a double-click on Customise, and its copy closed unsaved: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
 test("8, 9: focus follows the views; the list's arrows stay in the editor", async ({ page }) => {
   await editOceanDusk(page);
@@ -270,67 +175,10 @@ test("8, 9: focus follows the views; the list's arrows stay in the editor", asyn
   await expect(inspector(page)).toBeVisible();
 });
 
-test("10, 11: the hex field takes #rgb, marks what it cannot take, and an emptied L reverts", async ({ page }) => {
-  await editOceanDusk(page);
-  await inspector(page).getByTestId("editor-base-accent").click();
-  const hex = page.getByTestId("colour-hex");
-  await hex.fill("#abc");
-  await hex.press("Enter");
-  await expect(hex).toHaveValue("#aabbcc");
-  await hex.fill("rgb(1, 2, 3)");
-  await hex.press("Enter");
-  await expect(hex).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByTestId("colour-hex-invalid")).toHaveText("Use #rrggbb (or #rgb).");
-  await hex.fill("");
-  await hex.press("Enter");
-  await expect(hex).toHaveValue("#aabbcc");
-  await expect(page.getByTestId("colour-hex-invalid")).toHaveCount(0);
-  const l = page.getByRole("textbox", { name: "Accent lightness" });
-  await l.fill("");
-  await l.press("Enter");
-  await expect(hex).toHaveValue("#aabbcc");
-  // The hue wraps.
-  const h = page.getByRole("textbox", { name: "Accent hue" });
-  await h.fill("-50");
-  await h.press("Enter");
-  await expect(h).toHaveValue("310");
-});
+// 10, 11: the hex, L and hue fields: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
-test("12, 16: Pinned only with a filter that matches no pin says so; a group header changes nothing while filtered", async ({ page }) => {
-  await editOceanDusk(page);
-  await page.getByTestId("editor-pinned-only").click();
-  await page.getByTestId("editor-filter").fill("zzz");
-  await expect(page.getByTestId("editor-slots")).toContainText("No pinned slot matches “zzz”.");
-  await page.getByTestId("editor-pinned-only").click();
-  await page.getByTestId("editor-filter").fill("chrome");
-  const surfaces = page.getByTestId("editor-group-surfaces");
-  await expect(surfaces.getByTestId("editor-slot-chrome")).toBeVisible();
-  await surfaces.getByRole("button").first().click();
-  await expect(surfaces.getByTestId("editor-slot-chrome")).toBeVisible();
-  await page.getByTestId("editor-filter").fill("");
-  // Surfaces was open before the filter, and still is.
-  await expect(surfaces.getByTestId("editor-slot-canvas")).toBeVisible();
-});
+// 12, 16: Pinned only, the filter and the group headers: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
-test("14: Cancel on leaving through a selection change puts the selection back", async ({ page }) => {
-  await editOceanDusk(page);
-  await setBase(page, "accent", "#ff00ff");
-  // The sheet's backdrop covers the sidebar: the selection changes from the keyboard or the
-  // CLI (thread.next, the sidebar's next-thread chord).
-  expect(await emit({ showView: { name: "thread.next" } })).toBeGreaterThan(0);
-  await page.getByTestId("confirm-cancel").click();
-  await expect(inspector(page)).toBeVisible();
-  await expect(page.getByTestId("composer-project-name")).toHaveText("No project");
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await page.getByTestId("confirm-ok").click();
-  // Back to Settings (the page was opened from there), not to the thread clicked and cancelled.
-  await expect(page.getByTestId("themes-page")).toHaveCount(0);
-  await expect(page.getByTestId("thread-header")).toHaveCount(0);
-});
+// 14: Cancel on leaving through a selection change: unit-tested in src/components/themes/ThemesPage.test.tsx.
 
-test("16: the theme search keeps the files that did not load that it matches", async ({ page }) => {
-  await openThemes(page);
-  await page.getByRole("searchbox", { name: "Search themes" }).fill("draft");
-  await expect(page.getByTestId("themes-issues")).toContainText("draft.json did not load");
-  await expect(page.getByTestId("themes-list")).not.toContainText("No dark themes match");
-});
+// 16: the theme search keeping the files that did not load: unit-tested in src/components/themes/ThemesPage.test.tsx.
