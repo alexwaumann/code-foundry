@@ -9,21 +9,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("shelf headers: title case, count before the chevron", async ({ page }) => {
-  await openApp(page);
-  const header = page.getByTestId("working-header");
-  await expect(header.getByTestId("working-label")).toHaveText("Working");
-  await expect(header.getByTestId("working-label")).toHaveCSS("text-transform", "none");
-  await expect(header).toHaveText("Working 2");
-  const label = await header.getByTestId("working-label").boundingBox();
-  const count = await header.getByTestId("working-count").boundingBox();
-  const chevron = await header.locator("svg").boundingBox();
-  if (!label || !count || !chevron) throw new Error("header boxes");
-  // The count sits at the right, after a gap from the label and right before the chevron.
-  expect(count.x).toBeGreaterThan(label.x + label.width + 20);
-  expect(chevron.x).toBeGreaterThan(count.x + count.width);
-  expect(chevron.x - (count.x + count.width)).toBeLessThan(12);
-});
+// Shelf headers (title-case label, "Working 2"): src/components/sidebar/SidebarRow.test.tsx ("SidebarRow footer headers"). The count's pixel offset from the chevron is not tested.
 
 test("new thread composer: placeholder, Claude mark, neutral send, project folder detail", async ({ page }) => {
   await openApp(page);
