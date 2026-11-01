@@ -7,6 +7,7 @@
 import { useShallow } from "zustand/react/shallow";
 import { inSidebar } from "@/lib/inSidebar";
 import { creatorOf, noteCreator, type Creator } from "@/lib/lineage";
+import { liveCount } from "@/lib/liveCount";
 import { useShowCreatedThreads } from "./settings";
 import { useThreadsStore } from "./threads";
 
@@ -17,6 +18,15 @@ import { useThreadsStore } from "./threads";
  */
 export function useCreator(threadId: string): Creator | null {
   return useThreadsStore(useShallow((s) => creatorOf(s, threadId)));
+}
+
+/**
+ * The thread's live count (lib/liveCount): background subagents running plus live child
+ * threads. A number, so a row re-renders only when it changes. The sidebar row's Bot
+ * badge and the thread info card's "Lineage · N running" both read it.
+ */
+export function useLiveCount(id: string): number {
+  return useThreadsStore((s) => liveCount(s, id));
 }
 
 /** Whether a thread made by an agent: the sidebar's ↳ glyph. */

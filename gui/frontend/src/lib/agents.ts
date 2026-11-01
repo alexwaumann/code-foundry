@@ -47,14 +47,17 @@ export function agentStatusText(r: Pick<AgentRunView, "status" | "endedAtMs">, n
   return `${word} · ${formatAgo(r.endedAtMs, now)}`;
 }
 
-/** "1 agent", "3 agents". */
+/**
+ * "1 subagent", "3 subagents": the sidebar row's live count (lib/liveCount), background
+ * subagent runs and live child threads alike; the user need not know which the model used.
+ */
 export function agentsLabel(n: number): string {
-  return `${String(n)} ${n === 1 ? "agent" : "agents"}`;
+  return `${String(n)} ${n === 1 ? "subagent" : "subagents"}`;
 }
 
 /** The strip's sentence: "1 agent running in the background", "3 agents …"; "" when none runs. */
 export function backgroundLabel(agents: number): string {
-  return agents > 0 ? `${agentsLabel(agents)} running in the background` : "";
+  return agents > 0 ? `${String(agents)} ${agents === 1 ? "agent" : "agents"} running in the background` : "";
 }
 
 /** The running background runs the strip names (the thread's own, spawn depth 1), in spawn order. */

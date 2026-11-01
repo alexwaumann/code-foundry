@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
-import { isWaiting, waitingCount, waitingOnNames, waitingText } from "./waiting";
+import { isWaiting, waitingCount, waitingOnNames, waitingParts, waitingText } from "./waiting";
 
 function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
   return { id, name: id, state: "connected", status: "idle", statusReason: "at prompt", createdBy: "", archivedAtMs: null, ...over } as unknown as ThreadView;
@@ -10,6 +10,10 @@ describe("isWaiting / waitingCount", () => {
   it.each<[string, ThreadView["status"], string, boolean, number]>([
     ["two children", "idle", "waiting on 2 child threads", true, 2],
     ["one child", "idle", "waiting on 1 child thread", true, 1],
+    ["children and a subagent", "idle", "waiting on 2 child threads and 1 subagent", true, 2],
+    ["every part", "idle", "waiting on 1 child thread and 2 subagents and 3 shells", true, 1],
+    ["a subagent alone: no child", "idle", "waiting on 1 subagent", true, 0],
+    ["shells alone: no child", "idle", "waiting on 2 shells", true, 0],
     ["a queued wake alone", "idle", "waiting", true, 0],
     ["at its prompt", "idle", "at prompt", false, 0],
     ["a finished turn", "attention", "finished", false, 0],
@@ -24,13 +28,33 @@ describe("isWaiting / waitingCount", () => {
   });
 });
 
+describe("waitingParts", () => {
+  it.each<[string, { children: number; subagents: number; shells: number }]>([
+    ["waiting on 2 child threads", { children: 2, subagents: 0, shells: 0 }],
+    ["waiting on 1 child thread", { children: 1, subagents: 0, shells: 0 }],
+    ["waiting on 2 child threads and 1 subagent", { children: 2, subagents: 1, shells: 0 }],
+    ["waiting on 1 child thread and 3 subagents and 2 shells", { children: 1, subagents: 3, shells: 2 }],
+    ["waiting on 1 subagent and 1 shell", { children: 0, subagents: 1, shells: 1 }],
+    ["waiting on 4 subagents", { children: 0, subagents: 4, shells: 0 }],
+    ["waiting on 1 shell", { children: 0, subagents: 0, shells: 1 }],
+    ["waiting", { children: 0, subagents: 0, shells: 0 }],
+    ["at prompt", { children: 0, subagents: 0, shells: 0 }],
+    ["waiting on 2 goats and 1 subagent", { children: 0, subagents: 1, shells: 0 }],
+  ])("%s", (reason, want) => {
+    expect(waitingParts(reason)).toEqual(want);
+  });
+});
+
 describe("waitingText", () => {
-  it.each([
-    [2, "Waiting on 2 child threads"],
-    [1, "Waiting on 1 child thread"],
-    [0, "Waiting on a wake"],
-  ])("%d", (n, text) => {
-    expect(waitingText(n)).toBe(text);
+  it.each<[{ children: number; subagents: number; shells: number }, string]>([
+    [{ children: 2, subagents: 0, shells: 0 }, "Waiting on 2 child threads"],
+    [{ children: 1, subagents: 0, shells: 0 }, "Waiting on 1 child thread"],
+    [{ children: 2, subagents: 1, shells: 0 }, "Waiting on 2 child threads and 1 subagent"],
+    [{ children: 1, subagents: 2, shells: 3 }, "Waiting on 1 child thread and 2 subagents and 3 shells"],
+    [{ children: 0, subagents: 0, shells: 1 }, "Waiting on 1 shell"],
+    [{ children: 0, subagents: 0, shells: 0 }, "Waiting on a wake"],
+  ])("%j", (p, text) => {
+    expect(waitingText(p)).toBe(text);
   });
 });
 

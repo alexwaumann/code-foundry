@@ -181,11 +181,12 @@ const TEAM_LIST = 10;
 /**
  * A team member is working (internal/store/ember/team.go working): on a turn while its
  * process runs, starting, or waiting on child threads of its own ("waiting on 2 child
- * threads"; a bare "waiting" names none).
+ * threads", with " and 1 subagent" and so on; a bare "waiting", or one on its own
+ * subagents or shells alone, names none).
  */
 function teamWorking(t: EmberThreadView): boolean {
   if (t.state === ThreadState.STARTING) return true;
-  if (t.status === ThreadStatus.IDLE) return /^waiting on [1-9]/.test(t.statusReason);
+  if (t.status === ThreadStatus.IDLE) return /^waiting on [1-9]\d* child thread/.test(t.statusReason);
   return t.status === ThreadStatus.BUSY && t.state !== ThreadState.DISCONNECTED && t.state !== ThreadState.CLOSING;
 }
 

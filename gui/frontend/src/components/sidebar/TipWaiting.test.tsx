@@ -26,6 +26,17 @@ describe("TipWaiting", () => {
     expect(screen.getAllByTestId("tip-waiting-name").map((e) => e.textContent)).toEqual(["Store tag filtering", "CLI JSON output"]);
   });
 
+  it.each([
+    ["waiting on 2 child threads and 1 subagent", "Waiting on 2 child threads and 1 subagent"],
+    ["waiting on 1 child thread and 2 subagents and 1 shell", "Waiting on 1 child thread and 2 subagents and 1 shell"],
+    ["waiting on 3 shells", "Waiting on 3 shells"],
+    ["waiting", "Waiting on a wake"],
+  ])("says the whole reason: %s", (reason, text) => {
+    setThreads([thread("lead", { statusReason: reason })]);
+    render(<TipWaiting id="lead" />);
+    expect(screen.getByTestId("tip-waiting").textContent).toBe(text);
+  });
+
   it("is nothing for a thread that is not waiting", () => {
     setThreads([thread("lead", { status: "attention", statusReason: "finished" }), thread("kid", { createdBy: "lead", status: "busy" })]);
     render(<TipWaiting id="lead" />);

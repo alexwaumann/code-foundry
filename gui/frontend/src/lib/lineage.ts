@@ -56,6 +56,8 @@ export type LineageStatus = "working" | "input" | "finished" | "error" | "idle" 
 /**
  * The thread's status word: archived and snoozed first (such a thread is stopped and
  * waits on nothing), else the sidebar's line-2 kind (lib/statusLine) folded to one word.
+ * A thread waiting on its own children or background work is working: a nested lead
+ * stays a live row (and counts) for its creator (docs/notes/sidebar-live-count.md).
  */
 export function lineageStatus(t: ThreadView | undefined): LineageStatus {
   if (!t) return "idle";
@@ -63,6 +65,7 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
   if (t.snoozedUntilMs !== null) return "snoozed";
   switch (statusLine(t).kind) {
     case "working":
+    case "waiting": // on its own child threads or background work: its team works (lib/waiting)
       return "working";
     case "input":
     case "question":
@@ -79,7 +82,6 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
     case "transcriptDeleted":
       return "error";
     case "place":
-    case "waiting": // on its own child threads: needs nothing (lib/waiting)
       return "idle";
   }
 }

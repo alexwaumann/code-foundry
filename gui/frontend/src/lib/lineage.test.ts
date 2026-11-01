@@ -97,6 +97,11 @@ describe("lineageStatus", () => {
     ["crashed", { status: "error", statusReason: "crashed" }, "error"],
     ["archived wins", { status: "attention", statusReason: "finished", archivedAtMs: 1 }, "archived"],
     ["snoozed", { snoozedUntilMs: 9 }, "snoozed"],
+    // A lead waiting on its own workers (or its background work) is working, not idle.
+    ["waiting on child threads", { status: "idle", statusReason: "waiting on 2 child threads" }, "working"],
+    ["waiting on children and a subagent", { status: "idle", statusReason: "waiting on 1 child thread and 1 subagent" }, "working"],
+    ["waiting on a queued wake", { state: "disconnected", status: "idle", statusReason: "waiting" }, "working"],
+    ["waiting, archived", { status: "idle", statusReason: "waiting on 2 child threads", archivedAtMs: 1 }, "archived"],
   ] as const)("%s", (_n, o, want) => {
     expect(lineageStatus(t("x", o as Partial<ThreadView>))).toBe(want);
   });

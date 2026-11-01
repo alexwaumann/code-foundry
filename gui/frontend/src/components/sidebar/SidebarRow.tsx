@@ -21,7 +21,7 @@ import { projectKind, type ProjectKind } from "@/lib/projects";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
 import { modelLabel, projectsLabel, threadRowModel, type ThreadPlace, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
-import { useCreator, useMadeByThread } from "@/stores/lineage";
+import { useCreator, useLiveCount, useMadeByThread } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
 import { archiveThread, renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
@@ -266,13 +266,14 @@ function Count({ icon: Icon, n, className, label, testId }: { icon: LucideIcon; 
  * a working turn runs, the question, the error…), muted and truncated, or else the branch
  * (a GitBranch glyph and the name in mono; the No git badge for a project without git;
  * nothing for a thread without a project, the line keeps its height). A queued "Run in…"
- * move replaces both until the thread's worktree changes. On the right the background
- * agents (info tone) and shells (muted) running now, then the linked PR tag.
+ * move replaces both until the thread's worktree changes. On the right the live count
+ * (info tone; lib/liveCount: background subagents plus live child threads, one number
+ * whatever the model started), the background shells (muted), then the linked PR tag.
  */
 function LineMeta({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
   const detail = useThreadsStore((st) => statusDetail(line, st.byId[id]));
-  const agents = useThreadsStore((s) => s.byId[id]?.backgroundAgentsRunning ?? 0);
+  const agents = useLiveCount(id);
   const shells = useThreadsStore((s) => s.byId[id]?.backgroundShellsRunning ?? 0);
   const { branch, noGit, noProject, movingTo } = useThreadPlace(id);
   let left: ReactNode = null;
