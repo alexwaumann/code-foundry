@@ -560,7 +560,8 @@ function ThreadTipBody({ id }: { id: string }) {
 /**
  * A thread row's hover card, open at once (delayDuration 0, not the app root's 500 ms).
  * Pointer only: the rows are not focusable (the list uses aria-activedescendant), so
- * keyboard navigation never opens it; a click or right-click closes it. Not while
+ * keyboard navigation never opens it, nor does focus coming back to a row action, nor a move
+ * over the row's portalled snooze menu; a click or right-click closes it. Not while
  * renaming, and not over a badge with a tooltip of its own (data-tip) or one that wants
  * none (data-quiet, the linked PR tag).
  */
@@ -588,8 +589,18 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
       <TooltipTrigger
         asChild
         ref={ref}
+        // Pointer only: focus never opens the card. The snooze menu hands focus back to its
+        // button as it closes, which opened the card with nothing hovered (and kept it open).
+        onFocus={(e) => {
+          e.preventDefault();
+        }}
+        // Moves over the row's portalled content (the snooze menu) bubble here through React's
+        // tree; they are not over the row, so Radix must not see them.
+        onPointerMove={(e) => {
+          if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) e.preventDefault();
+        }}
         onPointerOver={(e) => {
-          if (!(e.target instanceof Element)) return;
+          if (!(e.target instanceof Element) || !e.currentTarget.contains(e.target)) return;
           if (e.target.closest(QUIET)) setOpen(false);
           // Back off a quiet element onto the row: Radix opens on a pointer move only once per
           // visit of the trigger, and that one was refused over the tag; open it here.

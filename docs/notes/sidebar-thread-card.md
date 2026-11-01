@@ -97,3 +97,22 @@ already says "N projects" as its label, so it gets no meta. The count is the thr
 project list (`projectCount`), including a thread in its workspace's folder. The label
 comes from `projectsLabel` in lib/threadRow, which `setLabel` now shares ("1 project" for a
 one-member workspace). Test ids: `tip-workspace-meta`.
+
+## Fix: the snooze menu reopened the card
+
+The row's hover card flickered while the snooze menu (a row action) was open, and closing
+the menu by clicking away left the card open with nothing hovered. Two causes, both in
+`ThreadTooltip`, whose trigger is the whole row:
+
+* React bubbles events through portals by component tree, not DOM. Pointer moves over the
+  portalled menu reached the row's `TooltipTrigger`, so Radix opened the card, and the
+  `pointerover` "back off a quiet element" path did too (relatedTarget was the snooze button).
+  Both now ignore events whose target is outside the row's DOM (`preventDefault` makes
+  Radix's composed handler skip).
+* The menu hands focus back to its button as it closes; Radix's trigger opens on focus, and
+  with the pointer already elsewhere no pointerleave ever closed it. The card was meant to be
+  pointer only, so the trigger's `onFocus` now prevents Radix's handler.
+
+Test gotcha: Radix opens on a `setTimeout` even at delay 0, and ignores focus until a
+`pointerup` on the document follows a `pointerdown` on the trigger. The regression test in
+`SidebarRow.test.tsx` uses fake timers and fires that pointerup, or it passes on the old code.
