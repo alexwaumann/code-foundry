@@ -141,3 +141,73 @@ describe("the thread composer's placeholders (composer-polish.spec.ts)", () => {
     expect(screen.getByTestId("composer-input").getAttribute("aria-placeholder")).toBe("Steer the agent mid-turn. @ files and threads, / skills and commands");
   });
 });
+
+describe("the mic's availability and the session's end (dictation.spec.ts)", () => {
+  const setEnabled = (on: boolean) => {
+    act(() => {
+      useSettingsStore.setState({ snapshot: { values: { "dictation.enabled": on ? "true" : "false" }, path: "", revision: 2, loadError: "", issues: [], restartPending: [] } });
+    });
+  };
+
+  it("no mic while dictation is off or has no model; once ready, left of attach; turned off, none again", async () => {
+    setEnabled(false);
+    render(<ThreadComposer threadId="s-3" pending={[]} busy={false} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("thread-attach")).not.toBeNull();
+    expect(screen.queryByTestId("dictation-mic")).toBeNull();
+    setEnabled(true);
+    await publish(dictationSnap({ model: { downloaded: false } }));
+    expect(screen.queryByTestId("dictation-mic")).toBeNull();
+    await publish(dictationSnap());
+    // Left of attach: before it in the row.
+    expect(mic().compareDocumentPosition(screen.getByTestId("thread-attach")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    setEnabled(false);
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId("dictation-mic")).toBeNull();
+    });
+  });
+
+  it("an auto-stop (the daemon's end) returns to the mic without a failure; turning dictation off ends it", async () => {
+    await mount(dictationSnap());
+    fireEvent.click(mic());
+    await pill();
+    act(() => {
+      fakeDictation.end("silence");
+    });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("dictation-mic")).not.toBeNull();
+    });
+    expect(screen.queryByTestId("dictation-failure")).toBeNull();
+
+    fireEvent.click(mic());
+    await pill();
+    // Turned off in Settings: the daemon ends the session and says it is off.
+    act(() => {
+      fakeDictation.end("disabled");
+    });
+    await publish(dictationSnap({ enabled: false }));
+    setEnabled(false);
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId("dictation-pill")).toBeNull();
+      expect(screen.queryByTestId("dictation-mic")).toBeNull();
+    });
+  });
+
+  it("one composer at a time: the dictating composer unmounting stops it; another composer starts its own", async () => {
+    await mount(dictationSnap());
+    fireEvent.click(mic());
+    await pill();
+    cleanup();
+    await vi.waitFor(() => {
+      expect(fakeDictation.calls.filter((c) => c.startsWith("stop "))).toHaveLength(1);
+    });
+    render(<ThreadComposer threadId="s-4" pending={[]} busy={false} />);
+    fireEvent.click(await screen.findByTestId("dictation-mic"));
+    await pill();
+    const starts = fakeDictation.calls.filter((c) => c.startsWith("start "));
+    expect(starts).toHaveLength(2);
+    expect(starts[1]).toMatch(/^start thread:s-4@/);
+  });
+});
