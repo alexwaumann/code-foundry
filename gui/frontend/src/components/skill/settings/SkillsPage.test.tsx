@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { InstalledSkillView, SkillEntryView } from "@/api/skill";
+import type { InstalledSkillView, SkillEntryView, SkillRegistryView } from "@/api/skill";
 import { skillItemKey } from "@/api/skill";
 import { confirmPresenter } from "@/stores/confirm";
 import { useSkillMarketplaceStore } from "@/stores/skill";
@@ -35,6 +35,9 @@ vi.mock("@/stores/skill", async (orig) => ({
 const { InstalledSection } = await import("./InstalledSection");
 const { BrowseSection } = await import("./BrowseSection");
 const { SkillsPage } = await import("./SkillsPage");
+const { RegistriesSection } = await import("./RegistriesSection");
+
+const RESTART = "Threads that are running keep it until they restart. New threads pick this up at once.";
 
 function inst(o: Partial<InstalledSkillView> & { name: string }): InstalledSkillView {
   const kind = o.kind ?? "skill";
@@ -252,5 +255,186 @@ describe("the page's confirm", () => {
     await vi.waitFor(() => {
       expect(answered).toBe(true);
     });
+  });
+});
+
+describe("Installed rows: what each says", () => {
+  it("kind, state, source and version; a plugin's version, its update and its skills", () => {
+    useSkillMarketplaceStore.setState((st) => ({
+      installed: st.installed && {
+        ...st.installed,
+        installed: st.installed.installed.map((r) => (r.name === "pr-review" ? { ...r, by: "Code Quality Guild" } : r.name === "enterprise-data" ? { ...r, skills: ["catalog", "data-quality", "lineage", "query-warehouse"] } : r)),
+      },
+    }));
+    render(<InstalledSection onConfirm={vi.fn()} />);
+    const pr = within(installedRow("pr-review"));
+    expect(pr.getByTestId("skill-kind").textContent).toBe("Skill");
+    expect(pr.getByTestId("skill-state").textContent).toBe("Enabled");
+    expect(pr.getByTestId("skill-source").textContent).toBe("from ai-marketplace · by Code Quality Guild");
+    expect(pr.getByTestId("skill-version").textContent).toContain("20260912 · ");
+    expect(within(installedRow("sql-helper")).getByTestId("skill-state").textContent).toBe("Disabled");
+    expect(within(installedRow("jira-sync")).getByTestId("skill-state").textContent).toBe("Needs setup");
+    expect(within(installedRow("incident-postmortem")).getByTestId("skill-update").textContent).toBe("Update to 20261016");
+    // A local skill has no state.
+    expect(within(installedRow("my-notes")).queryByTestId("skill-state")).toBeNull();
+
+    const data = within(installedRow("enterprise-data"));
+    expect(installedRow("enterprise-data").dataset.kind).toBe("plugin");
+    expect(data.getByTestId("skill-kind").textContent).toBe("Plugin");
+    expect(data.getByTestId("skill-version").textContent).toBe("1.3.2");
+    expect(data.getByTestId("skill-update").textContent).toBe("Update to 1.4.0");
+    fireEvent.click(data.getByTestId("skill-plugin-skills"));
+    expect(data.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["catalog", "data-quality", "lineage", "query-warehouse"]);
+  });
+
+  it("Update passes the kind, and the offer goes once the row has no update", () => {
+    render(<InstalledSection onConfirm={vi.fn()} />);
+    fireEvent.click(within(installedRow("incident-postmortem")).getByTestId("skill-update"));
+    expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ name: "incident-postmortem", kind: "skill" }));
+    act(() => {
+      useSkillMarketplaceStore.setState((st) => ({
+        installed: st.installed && { ...st.installed, installed: st.installed.installed.map((r) => (r.name === "incident-postmortem" ? { ...r, update: null } : r)) },
+      }));
+    });
+    expect(within(installedRow("incident-postmortem")).queryByTestId("skill-update")).toBeNull();
+  });
+
+  it("Run setup, off with no thread or project, says why in its tooltip", () => {
+    m.owner.value = false;
+    render(<InstalledSection onConfirm={vi.fn()} />);
+    const wrap = within(installedRow("jira-sync")).getByTestId("skill-setup-wrap");
+    // The wrapper is not focusable (the button inside is disabled): keyboard-navigation focus reaches it as an event.
+    fireEvent.keyDown(document, { key: "Tab" });
+    fireEvent.focus(wrap);
+    expect(screen.queryByRole("tooltip")?.textContent).toBe("Select a thread or project first: setup runs in its bottom panel.");
+  });
+});
+
+describe("Browse rows: what each says", () => {
+  it("counts the hits, says the tier, author, keywords and installed state; a plugin's skills expand", () => {
+    useSkillMarketplaceStore.setState((st) => ({
+      search: st.search && { ...st.search, entries: st.search.entries.map((e) => (e.name === "sql-helper" ? { ...e, by: "Jane Doe", keywords: ["sql", "postgres"] } : e)) },
+    }));
+    render(<BrowseSection />);
+    expect(screen.getByTestId("skill-results").textContent).toBe("3 results");
+    const helper = within(entryRow("sql-helper"));
+    expect(helper.getByTestId("skill-tier").textContent).toBe("Enterprise");
+    expect(helper.getByTestId("skill-by").textContent).toBe("by Jane Doe");
+    expect(helper.getByTestId("skill-keywords").textContent).toBe("sql · postgres");
+    expect(helper.getByTestId("skill-installed-mark").textContent).toBe("Installed, disabled");
+    const plugin = within(entryRow("enterprise-data"));
+    expect(plugin.getByTestId("skill-browse-update").textContent).toBe("Update to 1.4.0");
+    fireEvent.click(plugin.getByTestId("skill-plugin-skills"));
+    expect(plugin.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("one hit is “1 result”; many are virtualised", () => {
+    useSkillMarketplaceStore.setState((st) => ({ search: st.search && { ...st.search, entries: [entry({ name: "pandas-tips" })], total: 1 } }));
+    render(<BrowseSection />);
+    expect(screen.getByTestId("skill-results").textContent).toBe("1 result");
+    expect(screen.getByTestId("skill-entries").dataset.virtual).toBe("false");
+    cleanup();
+    const many = Array.from({ length: 42 }, (_, i) => entry({ name: `skill-${String(i).padStart(2, "0")}` }));
+    useSkillMarketplaceStore.setState((st) => ({ search: st.search && { ...st.search, entries: many, total: 42 } }));
+    render(<BrowseSection />);
+    expect(screen.getByTestId("skill-results").textContent).toBe("42 results");
+    expect(screen.getByTestId("skill-entries").dataset.virtual).toBe("true");
+  });
+
+  it("nothing found names the query", () => {
+    useSkillMarketplaceStore.setState((st) => ({ query: { ...st.query, text: "sql" }, search: st.search && { ...st.search, entries: [], total: 0 } }));
+    render(<BrowseSection />);
+    expect(screen.getByTestId("skill-results-none").textContent).toBe("Nothing matches “sql”.");
+  });
+
+  it("a chip shows pressed; one pressed while typing waits takes the text along, and the wait does not undo it", () => {
+    vi.useFakeTimers();
+    try {
+      render(<BrowseSection />);
+      const chip = screen.getByTestId("skill-chip-community");
+      expect(chip.getAttribute("aria-pressed")).toBe("false");
+      fireEvent.change(screen.getByTestId("skill-search"), { target: { value: "data" } });
+      fireEvent.click(chip);
+      expect(chip.getAttribute("aria-pressed")).toBe("true");
+      expect(m.search).toHaveBeenCalledTimes(1);
+      expect(m.search).toHaveBeenLastCalledWith("data", "community", "");
+      vi.advanceTimersByTime(400);
+      expect(m.search).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a failed install stays under its hit until dismissed", () => {
+    const key = skillItemKey("skill", "dbt-model", "ai-marketplace");
+    useSkillMarketplaceStore.setState({ failures: { [key]: { action: "install", message: "~/.claude/skills/k8s-manifest exists and is not ours" } } });
+    render(<BrowseSection />);
+    const dbt = within(entryRow("dbt-model"));
+    expect(dbt.getByTestId("skill-failure").textContent).toContain("~/.claude/skills/k8s-manifest exists and is not ours");
+    fireEvent.click(dbt.getByTestId("skill-failure-dismiss"));
+    expect(dbt.queryByTestId("skill-failure")).toBeNull();
+  });
+});
+
+describe("the page's confirm: words and Cancel", () => {
+  it("Disable names the skill with the restart warning; Cancel runs nothing", () => {
+    render(<SkillsPage schema={schema} page={page} />);
+    fireEvent.click(within(installedRow("pr-review")).getByTestId("skill-disable"));
+    const dialog = screen.getByTestId("skill-confirm");
+    expect(dialog.textContent).toContain("Disable pr-review?");
+    expect(dialog.textContent).toContain(RESTART);
+    fireEvent.click(screen.getByTestId("skill-confirm-cancel"));
+    expect(screen.queryByTestId("skill-confirm")).toBeNull();
+    expect(m.disable).not.toHaveBeenCalled();
+  });
+
+  it("Remove on a local skill says it deletes a skill you wrote, and removes it once confirmed", async () => {
+    render(<SkillsPage schema={schema} page={page} />);
+    fireEvent.click(within(installedRow("my-notes")).getByTestId("skill-remove"));
+    const dialog = screen.getByTestId("skill-confirm");
+    expect(dialog.textContent).toContain("a skill you wrote");
+    expect(dialog.textContent).toContain(RESTART);
+    fireEvent.click(screen.getByTestId("skill-confirm-ok"));
+    await vi.waitFor(() => {
+      expect(m.remove).toHaveBeenCalledWith(expect.objectContaining({ name: "my-notes" }));
+    });
+  });
+});
+
+describe("Registries", () => {
+  const reg = (o: Partial<SkillRegistryView>): SkillRegistryView => ({
+    name: "ai-marketplace",
+    repo: "cof-primary/ai-marketplace",
+    source: "github",
+    url: "",
+    ref: "",
+    dir: "",
+    owner: "",
+    plugins: 3,
+    skills: 39,
+    shallow: false,
+    readAtMs: Date.now() - 5 * 60_000,
+    refreshedAtMs: null,
+    error: "",
+    issues: [],
+    ...o,
+  });
+
+  it("lists each marketplace with its counts and when it was read", () => {
+    useSkillMarketplaceStore.setState({ registries: { registries: [reg({})], error: "", expectedMarketplace: "ai-marketplace", epoch: 1 } });
+    render(<RegistriesSection />);
+    const row = screen.getByTestId("skill-registry");
+    expect(row.dataset.name).toBe("ai-marketplace");
+    expect(row.textContent).toContain("cof-primary/ai-marketplace");
+    expect(within(row).getByTestId("skill-registry-line").textContent).toContain("3 plugins · 39 skills · read ");
+  });
+
+  it("says how to add one when Claude Code has none", () => {
+    useSkillMarketplaceStore.setState({ registries: { registries: [], error: "", expectedMarketplace: "ai-marketplace", epoch: 1 } });
+    render(<RegistriesSection />);
+    expect(screen.getByTestId("skill-registries-none").textContent).toBe(
+      "No marketplace is configured. Add your organisation's with claude plugin marketplace add <owner/repo> (for example ai-marketplace) and Refresh.",
+    );
+    expect(screen.queryByTestId("skill-registry")).toBeNull();
   });
 });
