@@ -100,17 +100,6 @@ test("a turn that ends in error before any text: the request failed; any message
   await expect(note(page)).toHaveCount(0);
 });
 
-test("Edit with no draft: the prompt alone; another error subtype", async ({ page }) => {
-  await openThread(page, "idle");
-  await mockPost("thread/fail-turn?subtype=error_max_turns");
-  await threadPrompt(page).click();
-  await page.keyboard.type("Run the tests");
-  await page.keyboard.press("Enter");
-  await expect(note(page).getByTestId("thread-failed-reason")).toHaveText("The request failed (error max turns), so your message was not sent.");
-  await note(page).getByTestId("thread-failed-edit").click();
-  await expect(prompt(page)).toHaveAttribute("data-value", "Run the tests");
-});
-
 /** SHOTS=<dir>: the PR's screenshots, WebKit, 1280x800, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`screenshots (${scheme})`, async ({ page }, info) => {
@@ -141,8 +130,8 @@ const API_FAILED = "The request failed (invalid API key), so your message was no
 const API_ERROR_TEXT = "Invalid API key · Fix external API key";
 
 /** Sends "Run the tests" with the mock's next turn ending in Claude Code's API-error text. */
-async function sendIntoAPIError(page: Page, text?: string): Promise<void> {
-  await mockPost(text === undefined ? "thread/api-error" : `thread/api-error?text=${encodeURIComponent(text)}`);
+async function sendIntoAPIError(page: Page): Promise<void> {
+  await mockPost("thread/api-error");
   await threadPrompt(page).click();
   await page.keyboard.type("Run the tests");
   await page.keyboard.press("Enter");
@@ -169,11 +158,7 @@ test("an API error in place of a reply: the request failed with its reason; the 
   await expect(note(page)).toHaveCount(0);
 });
 
-test("an API error's reason is its first line, Claude Code's prefix dropped", async ({ page }) => {
-  await openThread(page, "idle");
-  await sendIntoAPIError(page, "API Error: Request timed out.\nRetry later");
-  await expect(note(page).getByTestId("thread-failed-reason")).toHaveText("The request failed (request timed out), so your message was not sent.");
-});
+// The reason's first line without Claude Code's prefix, and Edit with no draft: unit-tested in src/lib/failedPrompt.test.ts
 
 /** SHOTS=<dir>: the API-error screenshots, WebKit, 1280x800, dark and light. */
 for (const scheme of ["dark", "light"] as const) {

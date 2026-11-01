@@ -85,16 +85,7 @@ test("a stale list: Forget never takes another entry, says the entry is gone and
   await expect(page.getByTestId("memory-text")).toHaveText(["Open PRs as drafts", "Keep answers short; one paragraph unless I ask for detail"]);
 });
 
-test("an entry too long for threads is listed, muted, and says why", async ({ page }) => {
-  await mockPost("memory?set=long");
-  await openMemory(page);
-  await expect(rows(page)).toHaveCount(5);
-  const long = rowWith(page, "Always write very detailed commit messages");
-  await expect(long).toHaveAttribute("data-injected", "false");
-  await expect(long.getByTestId("memory-meta")).toHaveText("Added by hand");
-  await expect(long.getByTestId("memory-left-out")).toHaveText("Not given to threads: longer than 500 characters. Forget it and say it shorter.");
-  await expect(page.getByTestId("memory-left-out")).toHaveCount(1);
-});
+// An entry too long for threads (muted, says why): unit-tested in src/components/memory/settings/RememberedSection.test.tsx
 
 test("Forget all asks first, then empties the page", async ({ page }) => {
   await openMemory(page);

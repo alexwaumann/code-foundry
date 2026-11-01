@@ -46,12 +46,7 @@ test("the row, header and composer say it cannot continue; nothing can be sent",
   expect((await invocations()).filter((i) => i.name === "thread.send")).toEqual([]);
 });
 
-test("Fork is disabled in the row menu", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-3").click({ button: "right" });
-  await expect(page.getByTestId("row-menu")).toBeVisible();
-  await expect(page.getByTestId("menu-fork")).toHaveAttribute("data-disabled", "");
-});
+// Fork disabled in the row menu: unit-tested in src/components/sidebar/RowMenu.test.tsx
 
 test("Archive archives it (home shows, as for any archive); opened again, Remove asks, then forgets it", async ({ page }) => {
   await openApp(page);

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, mockPost, openApp, resetMock } from "./fixtures";
+import { expectTooltip, openApp, resetMock } from "./fixtures";
 
 /**
  * The new-thread composer's collision banner (docs/notes/composer-collision-banner.md):
@@ -60,13 +60,4 @@ test("a set: 2 of 3 projects, one banner, the pill and the two chips name the th
   await expect(page.getByTestId("composer-member-warning")).toHaveCount(0);
 });
 
-test("one project: the banner goes when the other thread stops", async ({ page }) => {
-  await openApp(page);
-  await compose(page, "repo-gp");
-  await expect(page.getByTestId("composer-collision-text")).toContainText("This project is already being edited on main by another running thread.");
-  await expect(page.getByTestId("composer-worktree")).toHaveAttribute("data-warning", "");
-  // Port renderer's process ends (the idle stop): a stopped thread edits nothing.
-  await mockPost("thread/stop?id=s-2&reason=idle");
-  await expect(page.getByTestId("composer-collision")).toHaveCount(0);
-  await expect(page.getByTestId("composer-worktree")).not.toHaveAttribute("data-warning", "");
-});
+// One project, and the banner going when the other thread stops: unit-tested in src/components/compose/Composer.test.tsx.

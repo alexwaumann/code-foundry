@@ -44,6 +44,19 @@ cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-sta
 - Text uses a type role class (`text-display`, `text-display-sm`, `text-title`, `text-heading`, `text-subheading`, `text-overline`, `text-body`, `text-body-sm`, `text-label`, `text-caption`, `text-caption-sm`, `text-link`, `text-code`; `text-brand` is the sidebar's app name only; the display roles are for a page's or panel's one big figure), with colour/weight utilities as modifiers after it; never a Tailwind size (`text-sm`, `text-[13px]`) or `leading-[…]` directly. A weight (`font-medium`) is fine as a modifier on a role. `cn` comes from `@/lib/utils`, which knows the roles.
 - Radii use the scale (`rounded-sm` 4, `rounded-md` 6, `rounded-lg` 10, `rounded-pane` 12, `rounded-2xl` 16, `rounded-full`), never bare `rounded` or `rounded-[…]`; an inner corner is one step smaller than its padded parent's. `src/design/guards.test.ts` enforces both, strictly: no file under `src` may have a hit.
 
+## Tests: vitest first, e2e only for the browser
+
+- If a vitest test (jsdom + RTL, or a pure function) can verify it, write a vitest test and no
+  Playwright e2e test. This covers formatting, ordering, state transitions, conditional
+  rendering, which command runs with which args, confirm flows, and menu contents.
+- An e2e test is for what only a real browser or the whole app shows: geometry, scroll, resize,
+  pointer drags, focus moving between regions, global chords through the keymap, iframes and the
+  bridge, xterm, real ProseMirror editing (caret, undo, paste, tag atoms), computed theme CSS,
+  stream counts, and a flow across routes and the daemon's streams.
+- A test mixing both is split: the logic goes in vitest and a short e2e test keeps only the
+  browser part. Never repeat in e2e an assertion a unit test already makes.
+- Daemon rules (refusals, git detection) are tested in Go, not through the mock.
+
 ## Verification
 
 Before claiming a step done: `make check` green, the new behavior exercised end to end

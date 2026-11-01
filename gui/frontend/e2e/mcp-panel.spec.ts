@@ -95,63 +95,9 @@ test("the palette opens it: one card per server in every state, the header count
   }
 });
 
-test("each tab says when it is empty", async ({ page }) => {
-  await openThread(page);
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expectMcpTab(page);
-  await mockPost("thread/mcp-servers?id=s-r1&keep=t3-code,github");
-  await expectTabs(page, [2, 0, 0], "connected", ["t3-code", "github"]);
-  await expect(surface(page).getByTestId("mcp-tab-empty")).toHaveCount(0);
-  await expect(mcpTab(page, "failed").getByTestId("mcp-tab-count")).toHaveClass(/text-cf-text-muted/);
-  await mcpTab(page, "failed").click();
-  await expectTabs(page, [2, 0, 0], "failed", []);
-  await expect(surface(page).getByTestId("mcp-tab-empty")).toHaveText("No failed servers. Nothing needs a login.");
-  await mcpTab(page, "disabled").click();
-  await expect(surface(page).getByTestId("mcp-tab-empty")).toHaveText("No disabled servers.");
-  await mockPost("thread/mcp-servers?id=s-r1&keep=sentry");
-  await mcpTab(page, "connected").click();
-  await expectTabs(page, [0, 0, 1], "connected", []);
-  await expect(surface(page).getByTestId("mcp-tab-empty")).toHaveText("No connected servers.");
-  // No servers at all: the surface's own line, no tabs.
-  await mockPost("thread/mcp-servers?id=s-r1&keep=");
-  await expect(surface(page).getByTestId("mcp-none")).toHaveText("Claude has no MCP servers in this thread.");
-  await expect(surface(page).getByTestId("mcp-tabs")).toHaveCount(0);
-});
+// Empty tabs and no servers: unit-tested in src/surfaces/mcp.test.tsx
 
-test("the chosen tab is kept per thread while the MCP tab stays open, and resets to Connected once it closes", async ({ page }) => {
-  await openThread(page);
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expectMcpTab(page);
-  await mcpTab(page, "failed").click();
-  await expectTabs(page, [3, 2, 1], "failed", ["linear", "playwright"]);
-
-  // Another thread: its own panel, its own MCP tab on Connected.
-  await row(page, "s:s-1").click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
-  await expect(surface(page)).toHaveAttribute("data-thread", "s-1");
-  await expectTabs(page, [3, 2, 1], "connected", ["t3-code", "github", "filesystem"]);
-  await mcpTab(page, "disabled").click();
-
-  // Back: each remembers its own.
-  await row(page, "s:s-r1").click();
-  await expectMcpTab(page);
-  await expectTabs(page, [3, 2, 1], "failed", ["linear", "playwright"]);
-  await row(page, "s:s-1").click();
-  await expect(surface(page)).toHaveAttribute("data-thread", "s-1");
-  await expectTabs(page, [3, 2, 1], "disabled", ["sentry"]);
-  await row(page, "s:s-r1").click();
-  await expectMcpTab(page);
-
-  // Closing the MCP tab forgets it: reopened, it starts on Connected.
-  await panel(page).getByRole("button", { name: "Close MCP" }).click();
-  await expect(surface(page)).toHaveCount(0);
-  await page.getByTestId("thread-info-toggle").click();
-  await openFromCard(page);
-  await expectMcpTab(page);
-  await expectTabs(page, [3, 2, 1], "connected", ["t3-code", "github", "filesystem"]);
-});
+// The chosen tab per panel, reset when the MCP tab closes: unit-tested in src/stores/mcpTabs.test.ts
 
 test("the card's row and the command open it, not M or the + list; tools expand with hint icons and their tooltips", async ({ page }) => {
   await openThread(page);
