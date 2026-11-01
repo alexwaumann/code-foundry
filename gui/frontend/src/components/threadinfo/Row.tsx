@@ -16,8 +16,9 @@ import { zoomFactor } from "@/lib/zoom";
  *   is up; an open fold shows only its chevron (a tinted fold read as selected).
  * - **Ellipsis: more options for a row with its own click.** The row's click (and Enter,
  *   Space) runs its primary thing; `RowMore`, passed as `trailing`, is its own focusable
- *   button that opens the menu, laid under the row at the row's width. Every row with one
- *   (the Lineage label too) is tinted while that menu is up.
+ *   button that opens the menu, laid under the row at the row's width. Such a row hovers as
+ *   two blocks, the row's and the ellipsis's (SPLIT_ROW); while the menu is up only the
+ *   ellipsis block is lit (the Lineage label too).
  *
  * A row button with a RowMore is named by its text and value (`aria-labelledby`), not by
  * the ellipsis inside it. Escape in either kind of menu gives focus back to its trigger
@@ -68,8 +69,8 @@ export function Row({
   // inside it ("Open in Finder", not "Open in Finder Open in options"). Only those rows: on
   // every row (the Project row's Tip-wrapped trigger too) it made plugin-env-restart.spec's
   // title menu miss its Escape about half the time, for reasons not pinned down.
-  const named =
-    interactive && isValidElement(trailing) && trailing.type === RowMore && rest["aria-label"] === undefined && rest["aria-labelledby"] === undefined;
+  const split = isValidElement(trailing) && trailing.type === RowMore;
+  const named = interactive && split && rest["aria-label"] === undefined && rest["aria-labelledby"] === undefined;
   return (
     <div
       role={interactive ? "button" : undefined}
@@ -84,9 +85,11 @@ export function Row({
         "group/row relative flex min-w-0 shrink-0 items-center gap-2 rounded-md pr-1 pl-2 text-caption text-cf-text outline-none",
         tall ? "py-1" : sub ? "h-6.5" : "h-7",
         sub && "pl-7.5",
-        (interactive || hoverable) && "cursor-default hover:bg-cf-control-hover focus-visible:bg-cf-control-hover",
+        (interactive || hoverable) && "cursor-default",
+        (interactive || hoverable) && !split && "hover:bg-cf-control-hover focus-visible:bg-cf-control-hover",
         menu && "aria-expanded:bg-cf-control-hover",
-        "has-[[data-row-more][aria-expanded=true]]:bg-cf-control-hover",
+        split && SPLIT_ROW,
+        split && interactive && SPLIT_ROW_ACTIVE,
         className,
       )}
       onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
@@ -133,6 +136,20 @@ export function Row({
 }
 
 /**
+ * A row with a RowMore draws its hover as two blocks with a 2px seam (docs/notes/thread-info-split-hover.md):
+ * the row's `before:` from its left edge to 26px short of its right, and the button's `after:`,
+ * the last 24px at the row's full height. The row has no background of its own; it isolates
+ * so both pseudos (z -1) paint under its text and the glyph, not over them. The block under
+ * the pointer is bright, the other half strength (`/50`). While the menu is up only the
+ * ellipsis block is lit (`!`: it beats the row's hover rules wherever the pointer is).
+ */
+const SPLIT_ROW =
+  "isolate before:pointer-events-none before:absolute before:inset-y-0 before:right-6.5 before:left-0 before:-z-1 before:rounded-l-md has-[[data-row-more][aria-expanded=true]]:before:bg-transparent!";
+/** A split row with its own click: the left block is a target, bright under the pointer or focus, dim while the pointer is on the ellipsis; the ellipsis block dims with it. A row without a click (the Lineage label) only ever lights its ellipsis block. */
+const SPLIT_ROW_ACTIVE =
+  "group/split hover:not-has-[[data-row-more]:hover]:before:bg-cf-control-hover focus-visible:before:bg-cf-control-hover has-[[data-row-more]:hover]:before:bg-cf-control-hover/50";
+
+/**
  * A press on the row itself: not on its RowMore button, and not in that button's menu,
  * whose events reach the row through React's portal bubbling though the menu is not in
  * the row's DOM.
@@ -143,10 +160,13 @@ function ownPress(e: { target: EventTarget; currentTarget: Element }): boolean {
 }
 
 /**
- * The ellipsis "more options" button: the chevron's 16px box, so the two glyphs share the
- * row's right edge, with a hit area as tall as a row. Muted; tinted on hover and while its
- * menu is up. Use it as a Radix trigger's child (RowMore does). An explicit tabIndex: WebKit
- * (the app's WKWebView) leaves plain buttons out of the Tab order, unlike the rows.
+ * The ellipsis "more options" button: the chevron's 16px glyph box, so the two glyphs share
+ * the row's right edge. Its hit area and hover block is its `after:`, the row's last 24px at
+ * the row's full height: the button is static, so the overlay is placed by the row
+ * (`relative`), not by the button. Bright (and the glyph full colour) on hover, focus and
+ * while its menu is up; half strength while the pointer is elsewhere on a clickable row
+ * (`group/split`). Use it as a Radix trigger's child (RowMore does). An explicit tabIndex:
+ * WebKit (the app's WKWebView) leaves plain buttons out of the Tab order, unlike the rows.
  */
 export function RowMoreButton({ label, className, ...rest }: { label: string } & Omit<ComponentProps<"button">, "children">) {
   return (
@@ -157,7 +177,7 @@ export function RowMoreButton({ label, className, ...rest }: { label: string } &
       data-row-more=""
       {...rest}
       className={cn(
-        "relative flex size-4 shrink-0 items-center justify-center rounded-sm text-cf-text-muted outline-none after:absolute after:-inset-x-1 after:-inset-y-1.5 hover:bg-cf-text/10 focus-visible:bg-cf-text/10 aria-expanded:bg-cf-text/10 [&_svg]:size-3.5",
+        "flex size-4 shrink-0 items-center justify-center text-cf-text-muted outline-none after:absolute after:inset-y-0 after:right-0 after:-z-1 after:w-6 after:rounded-r-md group-hover/split:after:bg-cf-control-hover/50 hover:text-cf-text hover:after:bg-cf-control-hover focus-visible:text-cf-text focus-visible:after:bg-cf-control-hover aria-expanded:text-cf-text aria-expanded:after:bg-cf-control-hover [&_svg]:size-3.5",
         className,
       )}
     >

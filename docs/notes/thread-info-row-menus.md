@@ -57,13 +57,21 @@ values lined up. A user asked for one meaning per mark; these are the agreed cha
   left), `sideOffset` (row bottom minus button bottom, plus 4) and the row's width as
   `--ti-row-width`, all divided by the page zoom (see Review fixes). The button is centred
   in its row, so a flip above the row is placed right too.
-* **Every row with an ellipsis is tinted while its menu is up**
-  (`has-[[data-row-more][aria-expanded=true]]`, the Lineage label too), as a trigger row is
-  with its own menu.
-* **Ellipsis button**: `RowMoreButton`, the chevron's `size-4` box so the glyphs line up,
-  muted, `hover:bg-cf-text/10` and the same on `aria-expanded`, `rounded-sm` (one step in
-  from the row's `rounded-md`). Its hit area is a row tall and 4px wider each side (an
-  `after:` overlay). An `aria-label` ("<row> options"), no tooltip.
+* ~~**Every row with an ellipsis is tinted while its menu is up**~~ Superseded by the split
+  hover (docs/notes/thread-info-split-hover.md): while the menu is up only the ellipsis
+  block is lit, the row's own block is not (the Lineage label too).
+* **Ellipsis button**: `RowMoreButton`, the chevron's `size-4` box so the glyphs line up.
+  An `aria-label` ("<row> options"), no tooltip. ~~Muted, `hover:bg-cf-text/10` and the same
+  on `aria-expanded`, `rounded-sm`, a hit area a row tall and 4px wider each side.~~
+  Superseded on 2026-11-01 by the split hover: a user asked for it because two distinct
+  hover zones make the second target obvious. A row with a `RowMore` lights as two blocks
+  with a 2px seam: the row's `before:` (left edge to 26px short of the right, `rounded-l-md`)
+  and the button's `after:` (the row's last 24px at its full height, tall PR rows too,
+  `rounded-r-md`; it is still the click target). The block under the pointer gets
+  `bg-cf-control-hover`, the other the same at half strength; keyboard focus lights only
+  its own block; while the menu is up only the ellipsis block is lit. The glyph is
+  `text-cf-text` while its block is bright, muted otherwise. Rows without a `RowMore`
+  keep the whole-row tint.
 * **Usage's fold detail keeps `pr-7`**: Usage still has a chevron, so its value (and the
   fold's cost column under it) stays left of the chevron box. MCP's value lines up with
   Usage's for the same reason.
@@ -123,15 +131,15 @@ values lined up. A user asked for one meaning per mark; these are the agreed cha
   Open in, Actions, PRs, Context, branch and the Lineage label; the right edges of the
   Context and branch values, the four ellipses and the Project, Previous agents, MCP and
   Usage chevrons all within 1px of the row's padding edge; the ellipsis box equals the
-  chevron box; each ellipsis menu under its row at its width; the Open in row stays tinted
-  while its menu is up; a menu item does not reveal; click and Enter on the row reveal;
+  chevron box; each ellipsis menu under its row at its width; ~~the Open in row stays tinted
+  while its menu is up~~ (now the split hover's blocks, see thread-info-split-hover.md); a menu item does not reveal; click and Enter on the row reveal;
   Tab reaches the ellipsis and its Enter opens the menu; the action and PR menus run and
   open nothing. The MCP test now opens the menu from the value, the text, the chevron,
   Enter and ArrowDown, checks the item order and opens the tab through Open MCP panel.
 * Review round: the split-rows test also checks Escape returns focus to the ellipsis (then
   Tab reaches the action row) and to the Project row; the row names ("Open in Finder",
   "Open in options", "Dev"); the action row element across two runs; the Lineage label's
-  tint. New zoom tests at 90% and 125% check the Open in, Project and PR menus' left edge
+  tint (now its blocks). New zoom tests at 90% and 125% check the Open in, Project and PR menus' left edge
   and width against their rows and the PR menu's gap (4px times the zoom). `Row.test.tsx`
   adds the ellipsis row's name, the marker under a wrapper's `data-slot`, and the tint
   class on a non-interactive row. The zoom and action-row assertions fail with their fix
