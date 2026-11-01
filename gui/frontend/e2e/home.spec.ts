@@ -62,21 +62,4 @@ test("cmd+[ never goes past home: back from a thread lands on the composer, and 
   await expectHome(page);
 });
 
-test("a custom backdrop shows the user's image behind the composer", async ({ page }) => {
-  // An import selects the image (appearance.backdrop = custom).
-  await mockPost("backdrops/import?path=/Users/me/Pictures/sea.png");
-  await openApp(page);
-  const art = page.getByTestId("backdrop");
-  await expect(art).toHaveAttribute("data-backdrop", "custom");
-  await expect(art.locator(".cf-backdrop-art")).toHaveAttribute("style", /--cf-backdrop-narrow: url\("blob:.*--cf-backdrop-wide: url\("blob:/);
-  // Gone from the folder (removed by hand): the forest again.
-  await mockPost("settings/external?appearance.backdrop_file=0000000000000000000000000000dead.png");
-  await expect(art).toHaveAttribute("data-backdrop", "forest");
-});
-
-test("appearance.backdrop none removes the artwork from the composer", async ({ page }) => {
-  await openApp(page);
-  await expect(page.getByTestId("backdrop")).toHaveAttribute("data-backdrop", "forest");
-  await mockPost("settings/external?appearance.backdrop=none");
-  await expect(page.getByTestId("backdrop")).toHaveCount(0);
-});
+// The backdrop (custom, none, a missing file): unit-tested in src/components/backdrop/Backdrop.test.tsx
