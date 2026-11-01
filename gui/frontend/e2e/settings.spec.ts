@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { mockUrl, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -46,15 +46,6 @@ function listbox(page: Page) {
   return page.locator('[data-slot="select-content"]');
 }
 
-/** Opens an enum setting's select and lists its options, then closes it with Escape (which leaves the page open). */
-async function expectOptions(page: Page, key: string, labels: string[]) {
-  await select(page, key).click();
-  await expect(listbox(page).getByRole("option")).toHaveText(labels);
-  await page.keyboard.press("Escape");
-  await expect(listbox(page)).toHaveCount(0);
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-}
-
 /** Picks an enum setting's option by its label. */
 async function pick(page: Page, key: string, label: string) {
   await select(page, key).click();
@@ -69,125 +60,43 @@ async function goTo(page: Page, id: string) {
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", id);
 }
 
-test("cmd+, opens settings on General; the nav switches pages, one at a time", async ({ page }) => {
+// The nav, General's sections, the raw key hidden, enum values and option lists (" (default)"),
+// units, restart hints, the settings path and a keybinding's default chord:
+// src/components/settings/SettingsPage.test.tsx ("the settings page", "Keybindings"); Escape outside
+// a field closing it: the same file; the real schema's pages and models: internal/store/settings.
+test("cmd+, opens settings on General and closes it; reopened it is on General again; the trigger hides (default)", async ({ page }) => {
   const settings = await openSettings(page);
-  const nav = settings.getByRole("navigation", { name: "Settings pages" });
-  await expect(nav.getByRole("button")).toHaveText(["General", "Appearance", "Notifications", "Source control", "Ember", "Keybindings", "Advanced", "Plugins", "Skills", "Memory"]);
   await expect(page.getByTestId("settings-nav-general")).toHaveAttribute("aria-current", "page");
-  await expect(settings.getByRole("heading", { name: "General", level: 2 })).toBeVisible();
-  // General's sections, each a card; only this page's fields render.
-  await expect(settings.getByTestId("settings-section").locator("h3")).toHaveText(["Threads", "Text generation", "Lifecycle", "Dictation", "Updates"]);
-  await expect(setting(page, "appearance.font_size")).toHaveCount(0);
-  // The raw key is not shown under a row any more.
-  await expect(setting(page, "threads.auto_name").getByTestId("setting-key")).toHaveCount(0);
-  await expect(setting(page, "threads.auto_name")).not.toContainText("threads.auto_name");
-
-  await expect(select(page, "threads.default_model")).toHaveAttribute("data-value", "claude-sonnet-5[1m]");
-  // The trigger names the value alone; the list marks the setting's own default.
+  // The list's " (default)" is hidden on the trigger by CSS.
   await expect(select(page, "threads.default_model")).toHaveText("Sonnet 5", { useInnerText: true });
-  await expect(select(page, "threads.default_effort")).toHaveAttribute("data-value", "medium");
-  await expectOptions(page, "threads.default_model", [
-    "Opus 5.5",
-    "Opus 4.8",
-    "Opus 4.7",
-    "Sonnet 5.5",
-    "Sonnet 5 (default)",
-    "Sonnet 4.6",
-    "Haiku 5.5",
-    "Haiku 4.5",
-  ]);
-  // Where new threads work: a dropdown with plain-language labels, the project folder by default.
-  await expect(setting(page, "threads.default_worktree")).toContainText("New threads work in");
-  await expect(select(page, "threads.default_worktree")).toHaveAttribute("data-value", "current");
-  await expectOptions(page, "threads.default_worktree", ["A fresh copy of the project", "The project folder itself (default)"]);
-  // The naming model is its own live setting, defaulting to Sonnet 4.6.
-  await expect(select(page, "threads.naming_model")).toHaveAttribute("data-value", "claude-sonnet-4-6[1m]");
-  await expect(setting(page, "threads.naming_model").getByTestId("restart-hint")).toHaveCount(0);
-  // Every thread is rendered: no view setting (the schema has none).
-  await expect(setting(page, "threads.render")).toHaveCount(0);
-  // A unit sits inside the number input.
-  await expect(setting(page, "threads.cache_ttl_seconds").getByTestId("setting-unit")).toHaveText("s");
-  await expect(setting(page, "threads.cache_ttl_seconds").getByRole("spinbutton")).toHaveValue("3600");
-  await expect(page.getByTestId("settings-path")).toContainText("settings.toml");
-
-  await goTo(page, "appearance");
-  await expect(settings.getByRole("heading", { name: "Appearance", level: 2 })).toBeVisible();
-  await expect(setting(page, "threads.auto_name")).toHaveCount(0);
-  await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
-  await expect(setting(page, "appearance.font_size").getByTestId("setting-unit")).toHaveText("pt");
-  // Restart-required fields say so; live ones do not. Scrollback shows under Terminal.
-  await expect(settings.locator('[data-section="terminal"] [data-setting="threads.scrollback_lines"]').getByTestId("restart-hint")).toBeVisible();
-  await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);
-
   await goTo(page, "keybindings");
-  // One keybinding field per bindable registry command, with its default chord.
-  await expect(setting(page, "keybindings.thread.new").getByRole("button", { name: /shortcut/ })).toHaveText("⌘N");
-
-  // Leaving and coming back lands on General again.
   await page.keyboard.press("Meta+Comma");
   await expect(settings).toHaveCount(0);
   await page.keyboard.press("Meta+Comma");
   await expect(page.getByTestId("settings-nav-general")).toHaveAttribute("aria-current", "page");
-
-  // Escape (outside a field) closes the page.
-  await page.getByRole("heading", { name: "Settings", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await expect(settings).toHaveCount(0);
 });
 
 // Model and effort sharing a row: unit-tested in src/components/settings/SettingsPage.test.tsx.
 
-test("a dependent row is indented under its toggle and dims while it is off; across sections it says why", async ({ page }) => {
-  await openSettings(page);
-  // Naming model (Text generation) depends on Name threads automatically (Threads).
-  const naming = setting(page, "threads.naming_model");
-  await expect(naming).not.toHaveAttribute("data-dimmed");
-  await setting(page, "threads.auto_name").getByRole("switch").click();
-  await expect(naming).toHaveAttribute("data-dimmed", "true");
-  await expect(naming).toContainText("Not used while Name threads automatically is off.");
-  // Dimmed, not disabled.
-  await expect(select(page, "threads.naming_model")).toBeEnabled();
-
-  await goTo(page, "notifications");
+// The dimming, its sentence across sections and the editor staying enabled:
+// src/components/settings/SettingsPage.test.tsx ("a dependent row dims…").
+test("a dependent row is indented under its toggle", async ({ page }) => {
+  await openSettings(page, "notifications");
   const volume = setting(page, "notifications.sound_volume");
   const sound = setting(page, "notifications.sound");
-  // Alert sound is off by default: the volume row sits indented under it, dimmed.
-  await expect(volume).toHaveAttribute("data-dimmed", "true");
-  await expect(volume).not.toContainText("Not used while");
-  const v = await volume.boundingBox();
-  const s = await sound.boundingBox();
-  if (!v || !s) throw new Error("no boxes");
   const indent = (await volume.locator(".text-label").first().boundingBox())?.x ?? 0;
   const parent = (await sound.locator(".text-label").first().boundingBox())?.x ?? 0;
   expect(indent - parent).toBeGreaterThanOrEqual(16);
-  await sound.getByRole("switch").click();
-  await expect(volume).not.toHaveAttribute("data-dimmed");
 });
 
 // Keybindings' Bound only (the buckets, the tooltip, the persisted choice): unit-tested in src/components/settings/SettingsPage.test.tsx.
 
 // The search (results, crumbs, nav counts, Escape, nav while searching): unit-tested in src/components/settings/SettingsPage.test.tsx.
 
-test("the dark and light theme rows offer their scheme's themes and apply live", async ({ page }) => {
-  await openSettings(page, "appearance");
-  await pick(page, "appearance.theme", "Dark");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "github-dark");
-  await pick(page, "appearance.theme_dark", "Dracula");
-  await expect.poll(async () => (await mockSettings()).raw["appearance.theme_dark"]).toBe("dracula");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dracula");
-  await expect(page.locator("html")).toHaveClass(/dark/);
-
-  await select(page, "appearance.theme_light").click();
-  await expect(listbox(page).getByRole("option", { name: "Rosé Pine Dawn", exact: true })).toBeVisible();
-  await expect(listbox(page).getByRole("option", { name: "Dracula", exact: true })).toHaveCount(0);
-  await listbox(page).getByRole("option", { name: "Rosé Pine Dawn", exact: true }).click();
-  await expect.poll(async () => (await mockSettings()).raw["appearance.theme_light"]).toBe("rose-pine-dawn");
-  // The dark scheme still shows Dracula; flipping the scheme shows the light slot.
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dracula");
-  await pick(page, "appearance.theme", "Light");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "rose-pine-dawn");
-  await expect(page.locator("html")).not.toHaveClass(/dark/);
-});
+// The dark and light theme rows (the field's options, the pick saved, Choose…):
+// src/components/settings/SettingRow.test.tsx; the per-scheme lists: internal/store/settings
+// theme_test.go; the slots on html[data-theme] and the dark class: src/stores/settings.test.ts and
+// src/lib/theme.test.ts.
 
 // A bool saving (toast), Light/Dark on html.dark, an out-of-range number refused inline and the restart badge: src/components/settings/SettingsPage.test.tsx ("a bool saves and says so…"), src/stores/settings.test.ts ("applies theme…") and src/lib/theme.test.ts. An enum saving is the keyboard test below.
 
@@ -219,51 +128,32 @@ test("an enum select works from the keyboard", async ({ page }) => {
 
 // appearance.thread_width on html[data-thread-width]: unit-tested in src/stores/settings.test.ts.
 
-test("a keybinding override rejects a reserved chord and applies a valid one", async ({ page }) => {
+// The reserved chord's message, the daemon's collision refusal shown, a valid chord saved and
+// Escape cancelling a recording before it closes the sheet: src/components/settings/SettingsPage.test.tsx
+// ("the recorder…"); the collision rule: internal/store/settings.
+test("a recording recorder swallows cmd+k before the global keymap; the new chord reaches the palette", async ({ page }) => {
   await openSettings(page, "keybindings");
   const recorder = setting(page, "keybindings.thread.new").getByRole("button", { name: /shortcut/ });
   await recorder.click();
   await page.keyboard.press("Meta+k");
   await expect(setting(page, "keybindings.thread.new").getByTestId("setting-error")).toHaveText("cmd+k is reserved by the app");
-  // Recording swallowed the chord: the palette did not open.
   await expect(page.getByTestId("palette")).toHaveCount(0);
-  expect((await mockSettings()).raw["keybindings.thread.new"]).toBeUndefined();
-
-  // Colliding with another command's chord is rejected by the daemon.
-  await recorder.click();
-  await page.keyboard.press("Meta+t");
-  await expect(setting(page, "keybindings.thread.new").getByTestId("setting-error")).toContainText("already bound to terminal.new");
 
   await recorder.click();
   await page.keyboard.press("Meta+Shift+y");
   await expect(recorder).toHaveText("⇧⌘Y");
-  await expect.poll(async () => (await mockSettings()).raw["keybindings.thread.new"]).toBe("cmd+shift+y");
-
-  // An idle recorder lets Escape close the sheet (only a recording one keeps it).
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("settings-sheet")).toHaveCount(0);
-
   // CommandService.List reports the override: the palette shows the new chord.
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+k");
   await expect(page.getByTestId("palette").locator('[data-command="thread.new"]')).toContainText("⇧⌘Y");
 });
 
-test("hand edits to the file update the open page and the terminal font", async ({ page }) => {
+// Hand edits reaching the open page and a file that does not parse: src/components/settings/SettingsPage.test.tsx;
+// density on html[data-density]: src/stores/settings.test.ts.
+test("cmd+= zooms the whole page (CSS zoom on <html>) and saves it; cmd+0 resets", async ({ page }) => {
   await openSettings(page, "appearance");
-  // Comfortable is the default density; a hand edit to compact applies live.
-  await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
-  await mockPost("settings/external?appearance.font_size=18&appearance.density=compact");
-  await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("18");
-  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
-
-  await mockPost("settings/external?loadError=toml%3A+line+2%3A+expected+%27%5D%27");
-  await expect(page.getByTestId("settings-load-error")).toContainText("expected ']'");
-  await mockPost("settings/external?appearance.font_size=");
-  await expect(page.getByTestId("settings-load-error")).toHaveCount(0);
-  await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
-
-  // cmd+= zooms the whole page (CSS zoom on <html>) and saves the zoom to the file.
   await page.keyboard.press("Meta+Equal");
   await expect(page.locator("html")).toHaveCSS("zoom", "1.1");
   await expect.poll(async () => (await mockSettings()).raw["appearance.zoom"]).toBe("110");

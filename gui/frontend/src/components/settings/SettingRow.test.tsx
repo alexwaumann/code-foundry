@@ -9,6 +9,8 @@ vi.mock("@/stores/settings", async (orig) => ({ ...(await orig<typeof import("@/
 
 const { SettingRow } = await import("./SettingRow");
 const { useSettingsStore } = await import("@/stores/settings");
+const { useViewsStore } = await import("@/stores/views");
+const { useThemePickerStore } = await import("@/stores/themePicker");
 
 const base: Omit<SettingFieldView, "key" | "title" | "type"> = {
   description: "",
@@ -93,5 +95,24 @@ describe("SettingRow editors", () => {
     fireEvent.change(input, { target: { value: "wip/" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(save.fn).toHaveBeenCalledExactlyOnceWith({ [text.key]: "wip/" });
+  });
+
+  // The options are the daemon's per-scheme list (internal/store/settings theme_test.go
+  // TestThemeSlotFields); applying the saved slot to <html> is src/stores/settings.test.ts and
+  // src/lib/theme.test.ts (syncDocumentScheme).
+  it("a theme slot is a select of its field's themes without (default), saves the pick, and Choose… opens Themes on the slot", () => {
+    const dark: SettingFieldView = { ...base, key: "appearance.theme_dark", title: "Dark theme", type: "enum", enumValues: ["github-dark", "dracula"], enumLabels: ["GitHub Dark", "Dracula"], defaultValue: "github-dark" };
+    setValues({ [dark.key]: "github-dark" });
+    useViewsStore.setState({ settingsOpen: true, themesOpen: false });
+    render(<SettingRow field={dark} />);
+    const trigger = screen.getByRole("combobox", { name: "Dark theme" });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["GitHub Dark", "Dracula"]);
+    fireEvent.click(screen.getByRole("option", { name: "Dracula" }));
+    expect(save.fn).toHaveBeenCalledExactlyOnceWith({ [dark.key]: "dracula" });
+    fireEvent.click(screen.getByTestId("choose-theme-dark"));
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: true, settingsOpen: false });
+    expect(useThemePickerStore.getState().slot).toBe("dark");
+    useViewsStore.setState({ themesOpen: false });
   });
 });
