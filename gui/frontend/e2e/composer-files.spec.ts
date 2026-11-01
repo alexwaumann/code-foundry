@@ -145,26 +145,8 @@ test("Escape leaves the text; no matches says so; a click inserts a directory; T
   expect(await newThreads()).toBe(0);
 });
 
-test("navigating the card with arrows searches nothing more; re-opening with the same query is instant", async ({ page }) => {
-  await openApp(page);
-  await compose(page);
-  await page.keyboard.type("@thr");
-  await expect(rows(page)).toHaveCount(4);
-  await page.waitForTimeout(300); // let the debounce settle
-  const before = await searches();
-  for (const key of ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowUp", "ArrowDown", "ArrowDown"]) await page.keyboard.press(key);
-  await expect(rows(page).nth(0)).toHaveAttribute("aria-selected", "true"); // wrapped
-  await page.waitForTimeout(300);
-  expect(await searches()).toEqual(before);
-
-  // A space ends the trigger; Backspace puts the caret back in it: the cached answer, no request.
-  await page.keyboard.type(" ");
-  await expect(card(page)).toHaveCount(0);
-  await page.keyboard.press("Backspace");
-  await expect(rows(page)).toHaveCount(4);
-  await page.waitForTimeout(300);
-  expect(await searches()).toEqual(before);
-});
+// The card's arrows (wrapping, no new search: the query is unchanged) and the cached answer for a query asked again:
+// unit-tested in src/components/compose/useCompletion.test.tsx and src/stores/files.test.ts.
 
 test("a second project: files grouped by project, the primary first; tooltips name the project; removing the project removes its file tag after a confirm", async ({ page }) => {
   await setFiles("repo-cf", ["internal/api/thread.go", "README.md"]);
@@ -199,27 +181,11 @@ test("a second project: files grouped by project, the primary first; tooltips na
   await expect(tip(page)).toHaveText("code-foundry/internal/api/thread.go");
   await page.mouse.move(0, 0);
 
-  // Sketches as the primary: its group comes first.
-  await page.getByTestId("composer-primary").click();
-  await page.getByTestId("composer-primary-list").getByRole("option").filter({ hasText: "sketches" }).click();
-  await expect(page.getByTestId("composer-primary")).toHaveText("sketches");
-  await page.getByTestId("composer-input").click();
-  await page.keyboard.press("End");
-  await page.keyboard.type("@thread.go");
-  await expect(card(page).getByTestId("completion-group")).toHaveText(["sketches", "code-foundry"]);
-  await page.keyboard.press("Escape");
-  for (let i = 0; i < "@thread.go".length; i++) await page.keyboard.press("Backspace");
-  await expect(value(page)).toHaveAttribute("data-value", `${SK} and ${THREAD_GO} `);
-
-  // Cancel keeps both; confirm removes the project and its file tag.
-  const dialog = page.getByTestId("confirm-dialog");
+  // The primary's group first: unit-tested in src/lib/completion.test.ts (fileItems).
+  // The confirm's wording and Cancel: unit-tested in src/components/compose/ComposerSets.test.tsx. Confirm removes the
+  // project and its file tag from the real editor.
   await page.getByRole("button", { name: "Remove sketches" }).click();
-  await expect(dialog).toContainText("Remove sketches from the thread?");
-  await expect(dialog).toContainText("1 reference to sketches in your text will be removed.");
-  await dialog.getByTestId("confirm-cancel").click();
-  await expect(tags(page)).toHaveCount(2);
-  await page.getByRole("button", { name: "Remove sketches" }).click();
-  await dialog.getByTestId("confirm-ok").click();
+  await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
   await expect(page.getByTestId("composer-member")).toHaveCount(0);
   await expect(tags(page)).toHaveText(["thread.go"]);
   await expect(value(page)).toHaveAttribute("data-value", `and ${THREAD_GO}`);
