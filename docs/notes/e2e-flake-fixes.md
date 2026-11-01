@@ -19,6 +19,20 @@ failed again with the machine idle; all three were tests racing the app.
 
 thread-info "split rows" failed once under load and passed alone. Left as is.
 
+A second full run turned up two more.
+
+* project-sets, "Save as workspace": a real bug. The dialog's name field took focus, then
+  lost it to the body. The dialog's overlay appears under the pointer, so the pointer "leaves"
+  the menu item while the menu is still fading out. Radix's onItemLeave then focuses the closing
+  menu's content, which unmounts. The shared `DropdownMenuItem` and `ContextMenuItem` now call
+  preventDefault on that pointerleave while their menu's `data-state` is closed
+  (`components/ui/menuItemLeave.ts`, unit-tested). That covers every menu item that opens a
+  dialog, and Snooze › Pick a date too.
+* thread-prompts, "question keyboard": an Escape sent right after the reload, before the fresh
+  question landed, went nowhere. The test now waits for "1 of 2" and for focus. Its
+  `openThread` also uses the new `leaveSidebar` fixture (pointer off the row, hover card
+  closed), which dictation now shares.
+
 ## Open question
 
 The first two are real, if rare, behaviour: a click on a menu trigger within the previous
