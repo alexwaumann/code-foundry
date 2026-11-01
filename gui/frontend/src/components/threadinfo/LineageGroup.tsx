@@ -17,7 +17,7 @@ import {
   type LineageRowState,
 } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
-import { useCreator } from "@/stores/lineage";
+import { useCreator, useLiveCount } from "@/stores/lineage";
 import { saveSettings, useShowCreatedThreads } from "@/stores/settings";
 import { openAgentRun } from "@/stores/subagentActions";
 import { useThreadStore } from "@/stores/thread";
@@ -186,8 +186,14 @@ function ParentRow({ threadId }: { threadId: string }) {
   );
 }
 
-/** "Lineage · N running" with its menu (Show hidden threads; Archive finished, not built yet). */
-function LineageLabel({ running }: { running: number }) {
+/**
+ * "Lineage · N running" with its menu (Show hidden threads; Archive finished, not built
+ * yet). N is the sidebar badge's live count (lib/liveCount: background subagents plus live
+ * child threads), so the two always agree; a foreground run listed here is the busy tool,
+ * not counted.
+ */
+function LineageLabel({ threadId }: { threadId: string }) {
+  const running = useLiveCount(threadId);
   const showHidden = useShowCreatedThreads();
   return (
     <Row
@@ -243,7 +249,7 @@ export function LineageGroup({ threadId }: { threadId: string }) {
   if (!hasParent && agents.length === 0 && children.length === 0) return null;
   return (
     <Group testId="ti-lineage">
-      <LineageLabel running={live.length} />
+      <LineageLabel threadId={threadId} />
       <ParentRow threadId={threadId} />
       {live.map((r) => (
         <LineageItem key={`${r.kind}:${r.id}`} threadId={threadId} row={r} />

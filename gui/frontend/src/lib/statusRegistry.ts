@@ -24,7 +24,6 @@ import {
 import type { ThreadView } from "@/api/threads";
 import type { StatusLine, StatusLineKind } from "./statusLine";
 import { statusNote } from "./thread";
-import { waitingCount } from "./waiting";
 
 /** The row's status tones. */
 export type RowTone = "warning" | "error" | "success" | "info" | "muted";
@@ -98,7 +97,8 @@ export type StatusDetailThread = Pick<ThreadView, "status" | "statusReason"> & {
  * - snoozeEnded: "snooze ended"; error: the error note (statusNote)
  * - interrupted / crashed: "resend to continue"; transcriptDeleted: "transcript deleted"
  * - working: the current tool (busyTool), "compacting" while Claude compacts, else ""
- * - waiting: "2 child threads", "1 child thread", or "a queued wake" when only a wake keeps it
+ * - waiting: "": line 3 shows the branch, and the row's badge counts the subagents and
+ *   child threads still live (lib/liveCount); the hover card says what it waits on (TipWaiting)
  * - finished, place: ""
  * Not lib/thread.ts statusDetail (the reason's part after "<kind>: "), which this builds on.
  */
@@ -124,16 +124,10 @@ export function statusDetail(line: StatusLine, thread: StatusDetailThread | unde
       if (!thread) return "";
       return thread.statusReason === "compacting" ? "compacting" : (thread.busyTool ?? "");
     case "waiting":
-      return thread ? waitingDetail(waitingCount(thread)) : "";
     case "finished":
     case "place":
       return "";
   }
-}
-
-function waitingDetail(n: number): string {
-  if (n <= 0) return "a queued wake";
-  return n === 1 ? "1 child thread" : `${String(n)} child threads`;
 }
 
 /**

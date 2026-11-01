@@ -31,6 +31,9 @@
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, one shown by its override (s-l-logs), and a child of
  *        its own; the others hidden while threads.show_created_threads is off; World.addLineage)
+ *   POST /__mock/live-count                       (the sidebar's live count: a working thread with background
+ *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead
+ *        shown by its override, one waiting on a shell alone; World.addLiveCount)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
  *   POST /__mock/thread/envstale?id=s-1&change=Hello%20removed%20CF_HELLO   (a plugin's environment changed
  *     since the running process started: Thread.plugin_env_stale; an empty change clears it)
@@ -1419,6 +1422,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/status-kinds":
       json(res, 200, world.addStatusKinds());
+      break;
+    case "POST /__mock/live-count":
+      json(res, 200, world.addLiveCount());
       break;
     case "POST /__mock/lineage":
       json(res, 200, world.addLineage());

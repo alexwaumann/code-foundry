@@ -85,9 +85,12 @@ describe("statusBadge / statusDetail / statusTimeAt", () => {
     ["working, no tool", { state: "connected", status: "busy", statusReason: "working: Say hi" }, "working", "Working", "", 1_000],
     ["compacting", { state: "connected", status: "busy", statusReason: "compacting", busyTool: "Bash" }, "working", "Working", "compacting", 1_000],
     ["starting", { state: "starting", status: "unknown", statusReason: "" }, "working", "Working", "", 1_000],
-    ["waiting on two", { state: "connected", status: "idle", statusReason: "waiting on 2 child threads" }, "waiting", "Waiting", "2 child threads", 1_000],
-    ["waiting on one", { state: "connected", status: "idle", statusReason: "waiting on 1 child thread" }, "waiting", "Waiting", "1 child thread", 1_000],
-    ["waiting on a wake", { state: "disconnected", status: "idle", statusReason: "waiting" }, "waiting", "Waiting", "a queued wake", 1_000],
+    // No detail: line 3 shows the branch, the badge the live count (lib/liveCount).
+    ["waiting on two", { state: "connected", status: "idle", statusReason: "waiting on 2 child threads" }, "waiting", "Waiting", "", 1_000],
+    ["waiting on one", { state: "connected", status: "idle", statusReason: "waiting on 1 child thread" }, "waiting", "Waiting", "", 1_000],
+    ["waiting on children and a subagent", { state: "connected", status: "idle", statusReason: "waiting on 2 child threads and 1 subagent" }, "waiting", "Waiting", "", 1_000],
+    ["waiting on a shell", { state: "connected", status: "idle", statusReason: "waiting on 1 shell" }, "waiting", "Waiting", "", 1_000],
+    ["waiting on a wake", { state: "disconnected", status: "idle", statusReason: "waiting" }, "waiting", "Waiting", "", 1_000],
     ["idle", { state: "connected", status: "idle", statusReason: "at prompt" }, "place", "", "", 2_000],
     ["unknown", { state: "unknown", status: "unknown", statusReason: "" }, "place", "", "", 2_000],
   ])("%s", (_name, f, kind, word, detail, at) => {

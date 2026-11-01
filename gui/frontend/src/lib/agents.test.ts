@@ -62,8 +62,8 @@ describe("labels", () => {
   });
 
   it.each([
-    [1, "1 agent"],
-    [3, "3 agents"],
+    [1, "1 subagent"],
+    [3, "3 subagents"],
   ])("agentsLabel(%i) = %s", (n, want) => {
     expect(agentsLabel(n)).toBe(want);
   });

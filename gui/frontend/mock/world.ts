@@ -28,7 +28,8 @@ import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
-import { agentCounts, agentsCommands, listRuns } from "./agents";
+import { agentCounts, agentsCommands, listRuns, type AgentRunInit } from "./agents";
+import { backgroundRun, waitingReason } from "./liveCount";
 import { shellCommands } from "./shells";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
@@ -1442,6 +1443,51 @@ export class World {
         createdByName: w.createdBy ? (emberWorkers().find((x) => x.id === w.createdBy)?.name ?? "") : "Ember", brief: w.brief, held: true });
       this.publishThread(s);
     }
+  }
+
+  /**
+   * Scenario: the sidebar row's live count (docs/notes/sidebar-live-count.md). "Port the
+   * settings page" works with two background subagents (badge 2). "Split the inbox
+   * rewrite" is a lead waiting on two child threads and its own background subagent
+   * ("waiting on 2 child threads and 1 subagent"): one child works, one ("Rewrite the row
+   * tests") is a nested lead waiting on its own worker, one finished (badge 1 + 2 = 3).
+   * The nested lead is shown by its sidebar override (badge 1); the workers stay hidden.
+   * "Watch the e2e run" waits on a shell alone ("waiting on 1 shell", no badge). All
+   * held. POST /__mock/live-count. Idempotent; returns the ids.
+   */
+  addLiveCount(): string[] {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const A = ThreadStatus.NEEDS_ATTENTION;
+    const B = ThreadStatus.BUSY;
+    const I = ThreadStatus.IDLE;
+    const L = "s-lc-lead";
+    const LN = "Split the inbox rewrite";
+    const N = "s-lc-nested";
+    const NN = "Rewrite the row tests";
+    type Spec = Partial<MockThread> & Pick<MockThread, "id" | "name"> & { min: number };
+    const specs: Spec[] = [
+      { id: "s-lc-work", name: "Port the settings page", status: B, statusReason: "working", busyTool: "Edit SettingsPage.tsx", min: 7, worktreePath: `${CFW}/feat-sidebar` },
+      { id: L, name: LN, model: "claude-opus-5-5[1m]", effort: "high", status: I, statusReason: waitingReason({ children: 2, subagents: 1 }), min: 4, worktreePath: `${CFW}/fix-resize` },
+      { id: "s-lc-row", name: "Inbox row layout", createdBy: L, createdByName: LN, brief: "Lay the inbox row out on three lines", status: B, statusReason: "working", min: 12 },
+      { id: N, name: NN, createdBy: L, createdByName: LN, brief: "Rewrite the row tests for the three-line row", status: I, statusReason: waitingReason({ children: 1 }), min: 3, inSidebar: true, worktreePath: `${CFW}/feat-sidebar` },
+      { id: "s-lc-snap", name: "Row snapshot tests", createdBy: N, createdByName: NN, brief: "Snapshot every status kind", status: B, statusReason: "working", min: 9 },
+      { id: "s-lc-done", name: "Inbox row tooltips", createdBy: L, createdByName: LN, brief: "Hover card for the row", status: A, statusReason: "finished", state: ThreadState.DISCONNECTED, min: 10 },
+      { id: "s-lc-shell", name: "Watch the e2e run", status: I, statusReason: waitingReason({ shells: 1 }), min: 2 },
+    ];
+    const runs: Record<string, AgentRunInit[]> = {
+      "s-lc-work": [backgroundRun("lc-a1", "Port the theme tab", "Reading ThemeTab.tsx", 6), backgroundRun("lc-a2", "Port the keybindings tab", "Editing KeysTab.tsx", 5)],
+      [L]: [backgroundRun("lc-a3", "Survey the row tests", "Running rg -n statusDetail", 4)],
+    };
+    const out: string[] = [];
+    for (const { min, ...o } of specs) {
+      out.push(o.id);
+      if (this.threads.has(o.id)) continue;
+      const s = this.addThread({ projectId: "repo-cf", worktreePath: CF, model: "claude-sonnet-5-5[1m]", effort: "medium", createdAt: ago(min + 20), lastActivityAt: ago(min), statusChangedAt: ago(min), held: true, ...o });
+      const r = runs[s.id];
+      if (r) this.logs.setAgents(s.id, r);
+      this.publishThread(s);
+    }
+    return out;
   }
 
   /**

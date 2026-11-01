@@ -179,7 +179,6 @@ describe("SidebarRow line 3: detail or branch", () => {
     ["a plan", { status: "attention", statusReason: "plan: Claude has written up a plan" }, "ready for review"],
     ["a flag: its reason", { flags: [flag("attention", "3 warnings in main.go")] }, "3 warnings in main.go"],
     ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted" }, "resend to continue"],
-    ["waiting", { status: "idle", statusReason: "waiting on 2 child threads" }, "2 child threads"],
   ])("%s: the detail, muted and truncated, no branch", (_name, o, text) => {
     renderRow(o);
     const d = screen.getByTestId("row-detail");
@@ -192,6 +191,10 @@ describe("SidebarRow line 3: detail or branch", () => {
     ["idle", {}],
     ["done", { status: "attention", statusReason: "finished" }],
     ["working with no tool yet", { status: "busy" }],
+    // Waiting: the badge carries the count (lib/liveCount), line 3 the branch.
+    ["waiting on child threads", { status: "idle", statusReason: "waiting on 2 child threads" }],
+    ["waiting on children and a subagent", { status: "idle", statusReason: "waiting on 2 child threads and 1 subagent" }],
+    ["waiting on a wake", { status: "idle", statusReason: "waiting" }],
   ])("%s: the branch glyph and the branch in mono", (_name, o) => {
     renderRow(o);
     expect(screen.queryByTestId("row-detail")).toBeNull();
@@ -227,6 +230,35 @@ describe("SidebarRow line 3: detail or branch", () => {
     renderRow({ agentsRunning: 2, backgroundAgentsRunning: 0, backgroundShellsRunning: 0 });
     expect(screen.queryByTestId("row-bg-agents")).toBeNull();
     expect(screen.queryByTestId("row-bg-shells")).toBeNull();
+  });
+
+  it("the bot badge counts background subagents and live child threads as one number", () => {
+    const kid = (id: string, o: Partial<ThreadView>) => thread({ id, name: id, createdBy: "s-1", archivedAtMs: null, snoozedUntilMs: null, ...o });
+    useThreadsStore.setState({
+      byId: {
+        "s-1": thread({ status: "idle", statusReason: "waiting on 2 child threads and 1 subagent", backgroundAgentsRunning: 1, archivedAtMs: null, snoozedUntilMs: null }),
+        k1: kid("k1", { status: "busy" }),
+        k2: kid("k2", { status: "idle", statusReason: "waiting on 1 child thread" }),
+        k3: kid("k3", { status: "attention", statusReason: "finished" }),
+      },
+      order: ["s-1", "k1", "k2", "k3"],
+    });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "working", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+      </TooltipProvider>,
+    );
+    const a = screen.getByTestId("row-bg-agents");
+    expect(a.textContent).toBe("3");
+    expect(a.getAttribute("aria-label")).toBe("3 subagents");
+    expect(screen.queryByTestId("row-detail")).toBeNull();
+    expect(screen.getByTestId("row-branch").textContent).toBe("main");
+    // The last live child settles: the badge follows.
+    act(() => {
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, k1: kid("k1", { status: "attention", statusReason: "finished" }), k2: kid("k2", { status: "attention", statusReason: "finished" }) } }));
+    });
+    expect(screen.getByTestId("row-bg-agents").textContent).toBe("1");
+    expect(screen.getByTestId("row-bg-agents").getAttribute("aria-label")).toBe("1 subagent");
   });
 
   it("a stopped thread looks like any other: not dimmed, no offline mark", () => {
