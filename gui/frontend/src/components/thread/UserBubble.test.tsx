@@ -1,5 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { DASHBOARD_KEY, dashboardResource } from "@/stores/gh";
+import { seedPrWorld } from "@/test/prWorld";
 import { UserBubble } from "./UserBubble";
 
 // readAttachment serves a PDF (an empty type, so the store types it from the ".pdf" path)
@@ -13,6 +15,8 @@ const loadPdf = vi.hoisted(() =>
   vi.fn<(file: Blob) => Promise<unknown>>(() => Promise.resolve({ pages: 2, pageSize: () => Promise.resolve({ width: 300, height: 200 }), renderPage: () => Promise.reject(new Error("no canvas")), destroy: () => undefined })),
 );
 vi.mock("@/lib/pdf", () => ({ pdfSummary, loadPdf }));
+// The dashboard a PR chip reads its state and title from: the mock's (src/test/prWorld.ts).
+vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
 
 beforeAll(() => {
   URL.createObjectURL = vi.fn(() => "blob:x");
@@ -86,5 +90,22 @@ describe("UserBubble", () => {
       expect(pdf.className).toContain("border-dashed");
     });
     expect((pdf as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("a pull request tag is a chip in its state's colour; its tooltip is the title and owner/repo#N", async () => {
+    seedPrWorld();
+    dashboardResource.store.setState({ entries: {} });
+    render(<UserBubble text="alexwaumann/code-foundry#138 broke it?" composerText="[#138](cf-pr://alexwaumann/code-foundry/138) broke it?" attachments={[]} createdAtMs={null} />);
+    const chip = () => document.querySelector<HTMLElement>('[data-tag-kind="pr"]');
+    expect(chip()?.textContent).toBe("#138");
+    // #138 is merged on the dashboard, once it has been read.
+    await waitFor(() => {
+      expect(chip()?.dataset.state).toBe("merged");
+    });
+    expect(dashboardResource.store.getState().entries[DASHBOARD_KEY]?.data).toBeTruthy();
+    fireEvent.pointerMove(chip() as HTMLElement, { pointerType: "mouse" });
+    await waitFor(() => {
+      expect(screen.queryByRole("tooltip")?.textContent).toBe("chore(gh): pace requests through one worker\nalexwaumann/code-foundry#138");
+    });
   });
 });

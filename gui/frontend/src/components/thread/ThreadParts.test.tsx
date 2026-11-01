@@ -41,6 +41,8 @@ describe("the thread header's crumb", () => {
     expect(crumb().dataset.icon).toBe(icon);
     expect(screen.getByTestId("thread-crumb-place").textContent).toBe(label);
     expect(screen.queryByTestId("thread-crumb-parent")).toBeNull();
+    // The place is text, not a button.
+    expect(crumb().querySelector("button")).toBeNull();
     expect(screen.getByTestId("thread-title-name").textContent).toBe("Thread s-1");
   });
 

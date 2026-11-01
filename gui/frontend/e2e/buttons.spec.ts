@@ -1,28 +1,20 @@
 import { expect, test } from "@playwright/test";
-import { freshCopyByDefault, invocations, openApp, resetMock, row } from "./fixtures";
+import { invocations, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
 });
 
-test("sidebar new-thread button opens the project picker, then the composer", async ({ page }) => {
-  await freshCopyByDefault();
+// "sidebar new-thread button opens the project picker, then the composer", shortened. The button enabled with nothing selected: src/components/command/CommandButton.test.tsx; No project
+// highlighted first and a search's top hit: src/components/compose/ProjectPicker.test.tsx; thread.new's
+// args and context: src/lib/compose.test.ts. This keeps the flow through the real editor to the new thread.
+test("sidebar new-thread button: the project picker, then typing in the composer starts the thread", async ({ page }) => {
   await openApp(page);
-  const button = page.getByTestId("sidebar-new-thread");
-  // Nothing selected: the picker supplies the project, so the button is enabled anyway.
-  await expect(button).toBeEnabled();
-  // A thread in ghostty-playground (s-2) is selected.
   await row(page, "s:s-2").click();
-  await button.click();
-
-  // No project is highlighted first, not the selected thread's project; a search
-  // highlights its top hit and Enter picks it.
+  await page.getByTestId("sidebar-new-thread").click();
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "projects");
-  await expect(palette.getByTestId("picker-no-project")).toHaveAttribute("data-selected", "true");
-  await expect(palette.locator('[data-project="repo-gp"]')).toHaveAttribute("data-selected", "false");
   await page.keyboard.type("ghostty");
-  await expect(palette.locator('[data-project="repo-gp"]')).toHaveAttribute("data-selected", "true");
   await page.keyboard.press("Enter");
   await expect(palette).toHaveCount(0);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
@@ -31,83 +23,33 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   await page.keyboard.press("Enter");
 
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  const last = (await invocations()).at(-1);
-  expect(last?.args).toMatchObject({ project: "repo-gp", "new-worktree": "true", prompt: "Port the renderer" });
-  expect(last?.context).toMatchObject({ activeProjectId: "repo-gp", activeWorktreePath: "", activeView: "compose" });
+  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-gp", prompt: "Port the renderer" });
   const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
-  await expect(created).toBeVisible();
-  expect(await created.getAttribute("data-row-key")).toMatch(/^s:s-new-/);
+  await expect(created).toHaveAttribute("data-row-key", /^s:s-new-/);
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 });
 
-test("status row buttons toggle settings, open help and the palette", async ({ page }) => {
-  await openApp(page);
+// "status row buttons toggle settings, open help and the palette": src/components/sidebar/SidebarStatus.test.tsx;
+// the click on the gear under the sheet's backdrop is e2e/settings-sheet.spec.ts's.
 
-  const status = page.getByTestId("sidebar-status");
-  await expect(status.getByTestId("daemon-status")).toBeVisible();
-
-  const settings = status.getByTestId("status-settings");
-  await expect(settings).toHaveAttribute("aria-pressed", "false");
-  await settings.click();
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(settings).toHaveAttribute("aria-pressed", "true");
-  // A toggle, like usage: the button stays pressed under the sheet's backdrop, and a click
-  // there (on the backdrop over it) closes the sheet it opened.
-  const gear = await settings.boundingBox();
-  if (!gear) throw new Error("no settings button");
-  await page.mouse.click(gear.x + gear.width / 2, gear.y + gear.height / 2);
-  await expect(page.getByTestId("settings-page")).toHaveCount(0);
-  await expect(settings).toHaveAttribute("aria-pressed", "false");
-  await settings.click();
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("settings-page")).toHaveCount(0);
-
-  await status.getByTestId("status-help").click();
-  await expect(page.getByTestId("help-overlay")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("help-overlay")).toHaveCount(0);
-
-  await status.getByTestId("status-palette").click();
-  await expect(page.getByTestId("palette")).toBeVisible();
-  // Presented locally, like cmd+k: no round trip through the daemon.
-  expect((await invocations()).some((i) => i.name === "ui.palette.open")).toBe(false);
-});
-
-test("thread pane header: the title's menu renames; the crumb is not a button; no Close; fork is palette-only", async ({ page }) => {
+// "thread pane header: the title's menu renames; the crumb is not a button; no Close; fork is palette-only",
+// shortened. The header's height is e2e/layout.spec.ts's; no thread buttons but the three toggles, and the crumb's
+// place as text: src/components/thread/ThreadParts.test.tsx.
+test("thread pane header: the title's menu renames in the sidebar; fork is palette-only", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   const header = page.getByTestId("thread-header");
-  await expect(header.getByTestId("thread-title")).toHaveText("Refactor sidebar tree");
-  // 44px, like every pane header (window/PaneHeader; layout.spec.ts).
-  expect((await header.boundingBox())?.height).toBe(44);
-  // The thread's commands only: no Kill Terminal (a thread has no terminal).
-  await expect(header.getByRole("button", { name: "Kill Terminal" })).toHaveCount(0);
-  // No rename or fork buttons.
-  await expect(header.getByRole("button", { name: "Rename Thread" })).toHaveCount(0);
-  await expect(header.getByRole("button", { name: "Fork Thread" })).toHaveCount(0);
-
   // The title's menu: Rename, presented inline in the sidebar, as from the palette.
   await header.getByTestId("thread-title").click();
   await page.getByTestId("thread-title-menu").getByTestId("menu-rename").click();
   await expect(page.getByTestId("rename-input")).toBeFocused();
   await page.keyboard.press("Escape");
 
-  // The crumb's place is text: where the thread runs (its branch is the card's).
-  await expect(header.getByTestId("thread-crumb-place")).toHaveText("code-foundry");
-  await expect(header.getByTestId("thread-crumb").locator("button")).toHaveCount(0);
-
-  // Fork stays in the palette.
+  // Fork stays in the palette: it runs with the thread's context and the daemon selects the fork.
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Fork Thread");
   await page.getByTestId("palette").locator('[data-command="thread.fork"]').click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.fork");
   expect((await invocations()).at(-1)?.context?.activeThreadId).toBe("s-1");
-  const fork = page.locator('[data-row-kind="thread"][aria-selected="true"]');
-  await expect(fork).toHaveAttribute("data-row-key", /^s:s-new-/);
-
-  // No Close: the daemon starts and stops Claude itself (docs/notes/hide-connection-state.md).
-  await row(page, "s:s-1").click();
-  await expect(header.getByRole("button", { name: "Close Thread" })).toHaveCount(0);
-  await expect(header.getByRole("button", { name: "Reconnect Thread" })).toHaveCount(0);
+  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toHaveAttribute("data-row-key", /^s:s-new-/);
 });

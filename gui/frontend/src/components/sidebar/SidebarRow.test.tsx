@@ -675,6 +675,18 @@ describe("SidebarRow linked PRs tag", () => {
     expect(tag()?.getAttribute("data-state")).toBe("merged");
   });
 
+  it("a detail read later (a PR tab's) drops a closed one from the count", () => {
+    dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(142, "open"), pr(145, "open", { draft: true })], [pr(138, "merged")]) });
+    renderRow({ linkedPullRequests: [link(138), link(145), link(142), link(131)] });
+    // #131 is on no dashboard: it counts until its detail is read.
+    expect(tag()?.textContent).toBe("+4");
+    act(() => {
+      pullRequestDetailResource.set(pullRequestKey(SLUG, 131), { data: { pullRequest: pr(131, "closed", { updatedAtMs: 2 }) } as PullRequestDetailView });
+    });
+    expect(tag()?.textContent).toBe("+3");
+    expect(tag()?.getAttribute("data-state")).toBe("draft");
+  });
+
   it("re-renders when the state moves", () => {
     dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(142, "open")]) });
     renderRow({ linkedPullRequests: [link(142)] });
@@ -880,6 +892,25 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     expect(rows[3]?.querySelector("span")?.className).toContain("text-cf-highlight-text");
     expect(rows[1]?.querySelector(".truncate")?.textContent).toBe("Fix the login");
     expect(within(card).queryByTestId("tip-prs-more")).toBeNull();
+  });
+
+  it("details read later (a PR tab's) fill in the open card: a closed one leaves, an unknown one gets its state and title", () => {
+    dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(142, "open", { title: "Fix the login" })]) });
+    const card = openCard({ linkedPullRequests: [link(142, 1), link(147, 2), link(131, 3)] });
+    expect(within(card).getAllByTestId("tip-pr").map((r) => [r.textContent, r.getAttribute("data-state")])).toEqual([
+      ["#131", "unknown"],
+      ["#147", "unknown"],
+      ["#142Fix the login", "open"],
+    ]);
+    act(() => {
+      pullRequestDetailResource.set(pullRequestKey(SLUG, 131), { data: { pullRequest: pr(131, "closed") } as PullRequestDetailView });
+      pullRequestDetailResource.set(pullRequestKey(SLUG, 147), { data: { pullRequest: pr(147, "open", { title: "Link them" }) } as PullRequestDetailView });
+    });
+    const rows = within(screen.getAllByTestId("thread-tooltip")[0] as HTMLElement).getAllByTestId("tip-pr");
+    expect(rows.map((r) => [r.textContent, r.getAttribute("data-state")])).toEqual([
+      ["#147Link them", "open"],
+      ["#142Fix the login", "open"],
+    ]);
   });
 
   it("at most five rows, then +N more", () => {

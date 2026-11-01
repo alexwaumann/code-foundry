@@ -121,22 +121,13 @@ test("by title; typing on to a number nothing has closes the card without a word
   await expect(value(page)).toHaveAttribute("data-value", "#14");
 });
 
-test("a second project: both repositories' pull requests, the repository as the hint", async ({ page }) => {
-  await openApp(page);
-  await compose(page);
-  await page.getByTestId("composer-add-project").click();
-  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("composer-member")).toHaveCount(2);
-  await page.getByTestId("composer-input").click();
-  await page.keyboard.type("#12");
-  await expect(labels(page).first()).toHaveText("#12");
-  await expect(rows(page).first().getByTestId("completion-hint")).toHaveText("alexwaumann/ghostty-playground");
-  await page.keyboard.press("Enter");
-  await expect(value(page)).toHaveAttribute("data-value", "[#12](cf-pr://alexwaumann/ghostty-playground/12) ");
-});
+// "a second project: both repositories' pull requests, the repository as the hint":
+// src/components/compose/usePrSource.test.tsx (both repositories, the hint on the card); adding a project
+// to the draft is src/stores/compose.test.ts's; picking a tag into the real editor is the tests above.
 
-test("in a thread: the sent bubble draws a merged pull request in its colour with its title", async ({ page }) => {
+// The bubble's chip (#138 in the merged colour, its title and owner/repo#N as the tooltip):
+// src/components/thread/UserBubble.test.tsx ("a pull request tag is a chip ...").
+test("in a thread: a pull request picked in the thread's editor is sent as owner/repo#N and drawn as a chip in the bubble", async ({ page }) => {
   await mockPost("thread?state=idle"); // s-r1 in code-foundry
   await openApp(page);
   await row(page, "s:s-r1").click();
@@ -150,12 +141,13 @@ test("in a thread: the sent bubble draws a merged pull request in its colour wit
   await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.send")?.args.text ?? "").toBe("alexwaumann/code-foundry#138 broke it?");
   const chip = page.getByTestId("thread-user").last().locator('[data-tag-kind="pr"]');
   await expect(chip).toHaveText("#138");
-  await expect(chip).toHaveAttribute("data-state", "merged");
   await expect(page.locator('[data-testid="thread-text"]').last()).toContainText("Got it");
-  await expect(async () => {
-    await page.mouse.move(0, 0);
-    await chip.hover();
-    await expect(openTooltip(page)).toHaveText(/^chore\(gh\): pace requests through one worker\s*alexwaumann\/code-foundry#138$/, { timeout: 1500 });
-  }).toPass();
-  await shot(page, "pr-bubble");
+  if (process.env.SHOTS) {
+    await expect(async () => {
+      await page.mouse.move(0, 0);
+      await chip.hover();
+      await expect(openTooltip(page)).toBeVisible({ timeout: 1500 });
+    }).toPass();
+    await shot(page, "pr-bubble");
+  }
 });
