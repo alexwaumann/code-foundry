@@ -160,7 +160,7 @@ export type Thread = Message<"codefoundry.v1.Thread"> & {
    * Short explanation of status from the detector, e.g. "finished", "at prompt",
    * "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
    * disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
-   * thread, by the next start), "budget reached" (NEEDS_ATTENTION: the thread's cost
+   * thread, by the next start, and to IDLE "at prompt" by Archive and Snooze), "budget reached" (NEEDS_ATTENTION: the thread's cost
    * reached budget_usd mid-turn and the daemon interrupted Claude; cleared by the next
    * message, or once seen like "finished"), "wake limit" (NEEDS_ATTENTION: the thread's
    * wake subscriptions woke it 60 times within an hour and further wakes are dropped;

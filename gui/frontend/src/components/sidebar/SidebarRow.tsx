@@ -494,15 +494,15 @@ function TipMoving({ id }: { id: string }) {
   );
 }
 
-/** The project row's chip: where the thread runs, in the composer's Work in words (lib/threadRow threadPlace). */
+/** The project row's muted meta: where the thread runs, in the composer's Work in words (lib/threadRow threadPlace). */
 const placeWords: Readonly<Record<NonNullable<ThreadPlace>, string>> = { fresh: FRESH_COPY, folder: PROJECT_FOLDER };
 
 /**
  * The tooltip's body: name, status (attention or error only; a thread waiting on its child
  * threads says on which, TipWaiting), who created it (a thread an agent made), a queued move,
  * the workspace of a multi-project thread (its name with "N projects" as muted meta on the right, else "N projects"), the project it runs in ("No project" with
- * the House icon for a thread without one; "Workspace folder" for its workspace's folder) with where it runs as the
- * chip (Fresh copy, Project folder), branch (git only), model, and the linked pull requests (TipLinkedPrs).
+ * the House icon for a thread without one; "Workspace folder" for its workspace's folder) with where it runs as muted
+ * meta on the right like the workspace's count (Fresh copy, Project folder; a "no git" chip instead), branch (git only), model, and the linked pull requests (TipLinkedPrs).
  * Mounted only while open (docs/notes/sidebar-thread-card.md).
  */
 function ThreadTipBody({ id }: { id: string }) {
@@ -538,7 +538,8 @@ function ThreadTipBody({ id }: { id: string }) {
       )}
       <TipRow
         icon={m.noProject ? <TipIcon icon={House} /> : m.inFolder ? <TipIcon icon={Layers} /> : <ProjectKindIcon kind={m.kind} className={TIP_ICON} />}
-        chip={m.noGit ? "no git" : m.place === null ? null : placeWords[m.place]}
+        chip={m.noGit ? "no git" : null}
+        meta={m.place === null ? null : placeWords[m.place]}
         testId="tip-project"
       >
         {m.inFolder ? WORKSPACE_FOLDER : m.project}

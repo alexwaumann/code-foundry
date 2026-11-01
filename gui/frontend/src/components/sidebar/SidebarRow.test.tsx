@@ -739,11 +739,13 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
   it.each([
     ["the main checkout: Project folder", { worktreePath: "/src/cf" }, "Project folder", "main"],
     ["a worktree made for it: Fresh copy, no worktree chip on the branch", { worktreePath: "/wt/cf/feat-x", createdWorktree: true, branch: "feat/x" }, "Fresh copy", "feat/x"],
-    ["a worktree the user picked: no chip", { worktreePath: "/wt/cf/feat-x" }, null, "feat/x"],
-  ])("one project, %s", (_name, o, chip, branch) => {
+    ["a worktree the user picked: no place", { worktreePath: "/wt/cf/feat-x" }, null, "feat/x"],
+  ])("one project, %s", (_name, o, place, branch) => {
     const card = openCard(o);
     expect(ids(card)).toEqual(["tip-name", "tip-project", "tip-branch", "tip-model"]);
-    expect(text(card, "tip-project-chip")).toBe(chip);
+    // Where it runs is muted text, like a workspace's count, not a chip.
+    expect(text(card, "tip-project-meta")).toBe(place);
+    expect(within(card).queryByTestId("tip-project-chip")).toBeNull();
     expect(text(card, "tip-branch")).toBe(branch);
     expect(within(card).queryByTestId("tip-branch-chip")).toBeNull();
   });
@@ -751,6 +753,7 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
   it("a project without git keeps its no git chip", () => {
     const card = openCard({ projectId: "notes", projectIds: ["notes"], worktreePath: "/src/notes" });
     expect(text(card, "tip-project-chip")).toBe("no git");
+    expect(within(card).queryByTestId("tip-project-meta")).toBeNull();
     expect(within(card).queryByTestId("tip-branch")).toBeNull();
   });
 
@@ -761,7 +764,7 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     expect(text(card, "tip-workspace-meta")).toBe("2 projects");
     expect(within(card).getByTestId("tip-workspace").querySelector("svg")?.getAttribute("class")).toContain("lucide-layers");
     expect(text(card, "tip-project")).toBe("ghostty-playgroundFresh copy");
-    expect(text(card, "tip-project-chip")).toBe("Fresh copy");
+    expect(text(card, "tip-project-meta")).toBe("Fresh copy");
     expect(text(card, "tip-branch")).toBe("cf/login");
     expect(within(card).queryByTestId("tip-set")).toBeNull();
   });
@@ -770,7 +773,7 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     const card = openCard({ projectId: "gp", projectIds: ["cf", "gp"], worktreePath: "/src/gp" });
     expect(text(card, "tip-workspace")).toBe("2 projects");
     expect(within(card).queryByTestId("tip-workspace-meta")).toBeNull();
-    expect(text(card, "tip-project-chip")).toBe("Project folder");
+    expect(text(card, "tip-project-meta")).toBe("Project folder");
   });
 
   it("a thread in its workspace's folder: the workspace, then the folder as the place, no chip", () => {
@@ -778,6 +781,7 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     expect(text(card, "tip-workspace")).toBe("login2 projects");
     expect(text(card, "tip-project")).toBe("Workspace folder");
     expect(within(card).queryByTestId("tip-project-chip")).toBeNull();
+    expect(within(card).queryByTestId("tip-project-meta")).toBeNull();
   });
 
   it("no linked PRs, or only closed ones: no section, no hairline", () => {
