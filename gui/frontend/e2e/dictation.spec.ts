@@ -30,6 +30,9 @@ async function openThread(page: Page, id = "s-3"): Promise<Locator> {
   await row(page, `s:${id}`).click();
   const card = page.getByTestId("thread-composer");
   await expect(card).toBeVisible();
+  // The row's hover card outlives the click for a moment; up, it would take the first Escape.
+  await card.hover();
+  await expect(page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])')).toHaveCount(0);
   return card;
 }
 
