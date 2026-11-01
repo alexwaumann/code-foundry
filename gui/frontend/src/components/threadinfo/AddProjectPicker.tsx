@@ -62,7 +62,7 @@ export function AddProjectPicker({ threadId, members, open, onOpenChange, anchor
         if (!members.includes(id)) void addThreadProject(threadId, id);
       }}
       filterPlaceholder="Filter projects…"
-      contentClassName="w-(--radix-popover-trigger-width) min-w-0"
+      contentClassName="w-[calc(var(--radix-popover-trigger-width)/var(--cf-zoom))] min-w-0"
       anchor={anchor}
       open={open}
       onOpenChange={onOpenChange}

@@ -1,7 +1,8 @@
-import { useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Ellipsis } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { zoomFactor } from "@/lib/zoom";
 
 /**
  * The thread info card's row (docs/sketches/thread-info v14, docs/notes/thread-info-row-menus.md):
@@ -15,8 +16,11 @@ import { cn } from "@/lib/utils";
  *   is up; an open fold shows only its chevron (a tinted fold read as selected).
  * - **Ellipsis: more options for a row with its own click.** The row's click (and Enter,
  *   Space) runs its primary thing; `RowMore`, passed as `trailing`, is its own focusable
- *   button that opens the menu, laid under the row at the row's width. The row keeps its
- *   hover tint while that menu is up.
+ *   button that opens the menu, laid under the row at the row's width. Every row with one
+ *   (the Lineage label too) is tinted while that menu is up.
+ *
+ * A row button is named by its text and value (`aria-labelledby`), never by a button inside
+ * it. Escape in either kind of menu gives focus back to its trigger (RowMenu).
  *
  * A row without a chevron reserves nothing: its value (or trailing button) ends at the
  * row's padding, the edge a chevron's box ends at, so every row's last mark shares one
@@ -58,20 +62,26 @@ export function Row({
   const interactive = Boolean(onActivate) || menu;
   const hasMeta = meta !== undefined && meta !== null && meta !== false;
   const activates = Boolean(onActivate) && !menu;
+  const id = useId();
+  // A row button is named by its text and value only: not by a trailing button inside it
+  // (an ellipsis's "Open in options", a Fix), which is its own button with its own name.
+  const named = interactive && rest["aria-label"] === undefined && rest["aria-labelledby"] === undefined;
   return (
     <div
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       data-testid={testId}
-      data-slot="ti-row"
+      aria-labelledby={named ? (hasMeta ? `${id}-text ${id}-meta` : `${id}-text`) : undefined}
       {...rest}
+      // After the spread: a Radix trigger's own data-slot must not hide the row from RowMore.
+      data-slot="ti-row"
       className={cn(
         "group/row relative flex min-w-0 shrink-0 items-center gap-2 rounded-md pr-1 pl-2 text-caption text-cf-text outline-none",
         tall ? "py-1" : sub ? "h-6.5" : "h-7",
         sub && "pl-7.5",
         (interactive || hoverable) && "cursor-default hover:bg-cf-control-hover focus-visible:bg-cf-control-hover",
         menu && "aria-expanded:bg-cf-control-hover",
-        interactive && "has-[[data-row-more][aria-expanded=true]]:bg-cf-control-hover",
+        "has-[[data-row-more][aria-expanded=true]]:bg-cf-control-hover",
         className,
       )}
       onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
@@ -90,9 +100,15 @@ export function Row({
       }}
     >
       {icon !== undefined && <span className="flex size-3.5 shrink-0 items-center justify-center text-cf-text-muted [&_svg]:size-3.5">{icon}</span>}
-      <span className={cn("min-w-0 flex-1", tall ? "flex flex-col" : "truncate")}>{children}</span>
+      <span id={`${id}-text`} className={cn("min-w-0 flex-1", tall ? "flex flex-col" : "truncate")}>
+        {children}
+      </span>
       {hasMeta && (
-        <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-caption-sm tabular-nums [&_svg]:size-3.25" data-testid={testId && `${testId}-meta`}>
+        <span
+          id={`${id}-meta`}
+          className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-caption-sm tabular-nums [&_svg]:size-3.25"
+          data-testid={testId && `${testId}-meta`}
+        >
           {meta}
         </span>
       )}
@@ -157,9 +173,12 @@ function rowPlace(button: HTMLElement | null): RowPlace | null {
   if (!button || !row) return null;
   const b = button.getBoundingClientRect();
   const r = row.getBoundingClientRect();
+  // Rects are viewport px; the menu wants layout px: ui/dropdown-menu scales its offsets by
+  // the page zoom and the content zooms back (index.css), so divide once here (lib/zoom).
+  const z = zoomFactor();
   // Radix anchors the menu to its trigger, the button: shift it to the row's left edge and
   // below the row's bottom. The button is centred in its row, so a flip above fits too.
-  return { width: r.width, alignOffset: r.left - b.left, sideOffset: r.bottom - b.bottom + 4 };
+  return { width: r.width / z, alignOffset: (r.left - b.left) / z, sideOffset: (r.bottom - b.bottom) / z + 4 };
 }
 
 /**
@@ -214,19 +233,41 @@ export function Group({ children, testId }: { children: ReactNode; testId: strin
   );
 }
 
-/** A row's menu: the card's full width less 6px each side (the row's own width), under its trigger row (RowMore anchors it to its row the same way). */
-export function RowMenu({ children, testId, className, ...rest }: { children: ReactNode; testId: string } & ComponentProps<typeof DropdownMenuContent>) {
+/**
+ * A row's menu: the card's full width less 6px each side (the row's own width), under its
+ * trigger row (RowMore anchors it to its row the same way). The trigger width Radix gives is
+ * viewport px and the content zooms back with the page, so it divides by --cf-zoom.
+ *
+ * Escape hands the keyboard back to the trigger (the row, or RowMore's button), so Tab goes
+ * on from there. Any other close keeps focus where it went: an item may focus what it
+ * opened (a terminal, the Add project list), and a press outside is the reader's.
+ */
+export function RowMenu({
+  children,
+  testId,
+  className,
+  onEscapeKeyDown,
+  onCloseAutoFocus,
+  ...rest
+}: { children: ReactNode; testId: string } & ComponentProps<typeof DropdownMenuContent>) {
+  const escaped = useRef(false);
   return (
     <DropdownMenuContent
       align="start"
       sideOffset={4}
       className={cn(
-        "w-(--radix-dropdown-menu-trigger-width) min-w-0 [&_[data-slot=dropdown-menu-item]]:text-caption [&_[data-slot=dropdown-menu-item]]:text-cf-text",
+        "w-[calc(var(--radix-dropdown-menu-trigger-width)/var(--cf-zoom))] min-w-0 [&_[data-slot=dropdown-menu-item]]:text-caption [&_[data-slot=dropdown-menu-item]]:text-cf-text",
         className,
       )}
       data-testid={testId}
+      onEscapeKeyDown={(e) => {
+        escaped.current = true;
+        onEscapeKeyDown?.(e);
+      }}
       onCloseAutoFocus={(e) => {
-        e.preventDefault();
+        if (!escaped.current) e.preventDefault();
+        escaped.current = false;
+        onCloseAutoFocus?.(e);
       }}
       {...rest}
     >
