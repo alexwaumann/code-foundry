@@ -1,5 +1,8 @@
 # Thread info card: MCP row
 
+(The trigger zone below is gone: since `docs/notes/thread-info-row-menus.md` the whole row
+opens the menu, whose first item is Open MCP panel.)
+
 The card's MCP row read `2 connected · 1 needs login · 1 failed` on one line, and only the
 chevron opened its Refresh / Reconnect menu. The attention counts now sit in the row's
 value column, and the value and the chevron are one menu trigger.

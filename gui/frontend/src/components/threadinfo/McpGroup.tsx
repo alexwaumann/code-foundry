@@ -15,8 +15,8 @@ const SEP = "\u0000";
 /**
  * The thread's MCP servers while its Claude runs: "N servers connected", or the connected
  * count with, in the value column, those needing a login (amber) and the failed ones (red).
- * A click opens the MCP tab; the value and the chevron (one zone) open the menu, which
- * refreshes the check or reconnects a failed server.
+ * The whole row opens the menu (its chevron): Open MCP panel (the MCP tab), Refresh, then
+ * Reconnect for each failed server.
  */
 export function McpGroup({ threadId }: { threadId: string }) {
   const connected = useThreadsStore((s) => s.byId[threadId]?.state === "connected");
@@ -36,11 +36,6 @@ export function McpGroup({ threadId }: { threadId: string }) {
           <Row
             icon={<Plug className={cn(counts.failed > 0 ? "text-cf-error-text" : counts.needsLogin > 0 && "text-cf-warning-text")} />}
             chevron={open ? "open" : "closed"}
-            onActivate={() => {
-              openMcpSurface();
-            }}
-            menuOnChevron
-            menuOnMeta
             meta={
               !clean && (
                 <>
@@ -71,6 +66,15 @@ export function McpGroup({ threadId }: { threadId: string }) {
           </Row>
         </DropdownMenuTrigger>
         <RowMenu testId="ti-mcp-menu">
+          <DropdownMenuItem
+            onSelect={() => {
+              openMcpSurface();
+            }}
+            data-testid="ti-mcp-open-panel"
+          >
+            <Plug aria-hidden />
+            Open MCP panel
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void refreshMcp(threadId)} data-testid="ti-mcp-refresh">
             <RefreshCw aria-hidden />
             Refresh

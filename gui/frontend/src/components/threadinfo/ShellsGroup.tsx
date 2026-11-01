@@ -104,7 +104,7 @@ function ServerRow({ threadId, shell }: { threadId: string; shell: BackgroundShe
           type="button"
           aria-label={`Stop ${serverAddress(first)}`}
           aria-disabled={stopping}
-          className="absolute top-1/2 right-7 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-cf-error-text opacity-0 group-hover/srv:opacity-100 hover:bg-cf-text/10 focus-visible:opacity-100 aria-disabled:opacity-50 aria-disabled:hover:bg-transparent [&_svg]:size-3 [&_svg]:fill-current"
+          className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-cf-error-text opacity-0 group-hover/srv:opacity-100 hover:bg-cf-text/10 focus-visible:opacity-100 aria-disabled:opacity-50 aria-disabled:hover:bg-transparent [&_svg]:size-3 [&_svg]:fill-current"
           data-testid="ti-server-stop"
           data-task={shell.taskId}
           onClick={(e) => {
