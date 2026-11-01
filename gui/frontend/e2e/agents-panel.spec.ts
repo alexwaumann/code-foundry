@@ -31,31 +31,8 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("the strip shows only background runs and goes when they end; the sidebar counts every run", async ({ page }) => {
-  await openThread(page);
-  await expect(strip(page)).toBeVisible();
-  // The background agents only: the thread's background shell is the card's.
-  await expect(strip(page).getByTestId("agents-strip-count")).toHaveText("2 agents running in the background");
-  await expect(strip(page)).toHaveAttribute("data-kind", "agents");
-  // The nested foreground run is not named; the two background ones are, with their activity.
-  await expect(strip(page).getByTestId("agents-strip-runs")).toHaveText("PR 1: daemon task frames · Running go test ./internal/store/...PR 2: Agents surface in the panel · Editing AgentsSurface.tsx");
-  // The row counts the background agents only (line 3, a bot and the number).
-  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveText("2");
-
-  await expect(strip(page).getByTestId("agents-strip-open")).toHaveCount(0);
-
-  await mockPost("thread/agent-end?run=a1");
-  await expect(strip(page).getByTestId("agents-strip-count")).toHaveText("1 agent running in the background");
-  await expect(strip(page).getByTestId("agents-strip-runs")).toHaveText("PR 2: Agents surface in the panel · Editing AgentsSurface.tsx");
-  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveText("1");
-
-  // The last background run ends: the strip goes, though a shell and the nested foreground run run on.
-  await mockPost("thread/agent-end?run=a2&status=failed");
-  await expect(strip(page)).toHaveCount(0);
-  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveCount(0);
-  await mockPost("thread/agent-end?run=a1b");
-  await expect(row(page, "s:s-r1").getByTestId("row-bg-agents")).toHaveCount(0);
-});
+// The strip's count, kind and run names as runs end, and the row's badge: unit-tested in
+// src/components/thread/AgentsStrip.test.tsx and src/components/sidebar/SidebarRow.test.tsx.
 
 test("background shells only: no strip (the card's Shells group has them), the calls run until their shell ends", async ({ page }) => {
   await openThread(page, "shells");

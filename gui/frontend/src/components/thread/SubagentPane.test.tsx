@@ -167,6 +167,40 @@ describe("SubagentPane", () => {
     expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent failed. Its parent Agents panel was told.");
   });
 
+  it("the run ending while viewed turns the view done in place: its running tool stops, the handback call is no row, the report shows", () => {
+    show();
+    expect(tid("subagent-status").getAttribute("data-status")).toBe("running");
+    const handback = tool("h1", "toolu_a1", { name: "SubagentHandback", inputJson: JSON.stringify({ message: "Added task frame handling." }) });
+    act(() => {
+      setLog(
+        [run("a1", { status: "done", durationMs: 252_000, endedAtMs: Date.now(), summary: "Added task frame handling to the thread store with 14 table tests; make check is green." }), NESTED],
+        [...ITEMS.map((it) => (it.id === "b1" ? { ...it, status: "done" } as ThreadItemView : it)), handback],
+      );
+    });
+    expect(tid("subagent-status").getAttribute("data-status")).toBe("done");
+    expect(tid("subagent-status").textContent).toBe("Done · just now");
+    expect(tid("subagent-footer").getAttribute("data-status")).toBe("done");
+    expect(tid("subagent-footer").textContent).toBe("Worked for 4m 12s·23 tools·48.2K tokens·Opus");
+    const tools = [...tid("subagent-pane").querySelectorAll("[data-tool]")];
+    expect(tools.map((t) => t.getAttribute("data-tool"))).not.toContain("SubagentHandback");
+    expect(tools.find((t) => t.getAttribute("data-tool") === "Bash")?.getAttribute("data-status")).toBe("done");
+    expect(tid("subagent-pane").querySelector('[data-testid="thread-text"][data-streaming="true"]')).toBeNull();
+    expect(tid("subagent-report").textContent).toBe("Report handed back to Agents panelAdded task frame handling to the thread store with 14 table tests; make check is green.");
+    expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent finished and handed its report to Agents panel.");
+  });
+
+  it("a run failing while viewed turns red in place", () => {
+    show();
+    act(() => {
+      setLog([run("a1", { status: "failed", error: "Stopped: the agent was killed", endedAtMs: Date.now() }), NESTED], ITEMS);
+    });
+    expect(tid("subagent-status").getAttribute("data-status")).toBe("failed");
+    expect(tid("subagent-footer").getAttribute("data-status")).toBe("failed");
+    expect(tid("subagent-footer").textContent).toContain("Stopped: the agent was killed");
+    expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent failed. Its parent Agents panel was told.");
+    expect(screen.queryByTestId("subagent-report")).toBeNull();
+  });
+
   it("names the parent by its current name, its id without one", () => {
     show();
     act(() => {

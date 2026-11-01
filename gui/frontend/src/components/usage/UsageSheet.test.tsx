@@ -91,7 +91,11 @@ describe("UsageSheet", () => {
   it("switches the chart between tokens and cost, and shows a day's tooltip", () => {
     setUsage({ a: [bucket({ cacheRead: 2_000_000, costUsd: 1.25 }), bucket({ model: "claude-fable-5-1", cacheRead: 1_000_000, costUsd: 3 })] });
     render(<UsageSheet />);
-    expect(screen.getByTestId("usage-page-chart").getAttribute("data-mode")).toBe("tokens");
+    const chart = screen.getByTestId("usage-page-chart");
+    const axis = () => [...chart.querySelectorAll("svg text")].map((t) => t.textContent);
+    expect(chart.getAttribute("data-mode")).toBe("tokens");
+    expect(screen.getByTestId("usage-page-mode-tokens").getAttribute("aria-pressed")).toBe("true");
+    expect(axis()[0]).toBe("0");
     const day = screen.getAllByTestId("usage-page-day").at(-1);
     if (!day) throw new Error("no day");
     fireEvent.mouseMove(day, { clientX: 10, clientY: 10 });
@@ -99,6 +103,8 @@ describe("UsageSheet", () => {
     fireEvent.click(screen.getByTestId("usage-page-mode-cost"));
     expect(screen.getByTestId("usage-page-chart").getAttribute("data-mode")).toBe("cost");
     expect(screen.getByTestId("usage-page-tooltip").textContent).toBe("Oct 10claude-opus-5-5$1.25claude-fable-5-1$3.00Total$4.25");
+    expect(screen.getByTestId("usage-page-mode-cost").getAttribute("aria-pressed")).toBe("true");
+    expect(axis().some((t) => t.startsWith("$"))).toBe(true);
     fireEvent.mouseLeave(day);
     expect(screen.queryByTestId("usage-page-tooltip")).toBeNull();
   });

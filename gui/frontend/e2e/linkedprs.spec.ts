@@ -48,28 +48,8 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("hidden without links; a link brings the sidebar tag, and the header shows none", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await expect(page.getByTestId("pane-actions")).toBeVisible();
-  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveCount(0);
-
-  await link("s-1", 142);
-  // One open PR: its bare number (docs/notes/sidebar-pr-tag.md).
-  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("142");
-  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-state", "open");
-  // The header has no PR button: the card's rows are the pane's pull requests.
-  await expect(page.getByTestId("pane-linked-pr")).toHaveCount(0);
-  await expect(page.getByTestId("pane-linked-prs")).toHaveCount(0);
-
-  await link("s-1", 147);
-  // Two: "+2" in the open tone (#147 is on no dashboard, unknown; docs/notes/sidebar-pr-tag-plus.md).
-  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("+2");
-  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-state", "open");
-  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-tone", "success");
-  // Other threads have none.
-  await expect(row(page, "s:s-2").getByTestId("row-linked-prs")).toHaveCount(0);
-});
+// The sidebar tag's number, +N, state and tone as links arrive: unit-tested in
+// src/components/sidebar/linkedPrTag.test.ts and SidebarRow.test.tsx.
 
 test("one PR: the sidebar tag opens it in that thread's panel and selects the thread", async ({ page }) => {
   await link("s-2", 142);

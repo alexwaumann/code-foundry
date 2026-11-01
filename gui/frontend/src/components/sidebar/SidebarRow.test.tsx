@@ -787,6 +787,33 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     expect(within(card).queryByTestId("tip-branch-chip")).toBeNull();
   });
 
+  it("a waiting thread's card says the daemon's whole reason and names its live children", () => {
+    const kid = (id: string, name: string, o: Partial<ThreadView>) => thread({ id, name, createdBy: "s-1", archivedAtMs: null, snoozedUntilMs: null, ...o });
+    const kids = {
+      k1: kid("k1", "Inbox row layout", { status: "busy" }),
+      k2: kid("k2", "Rewrite the row tests", { status: "idle", statusReason: "waiting on 1 child thread" }),
+      k3: kid("k3", "Done one", { status: "attention", statusReason: "finished" }),
+    };
+    vi.useFakeTimers();
+    try {
+      useThreadsStore.setState({ byId: { "s-1": thread({ status: "idle", statusReason: "waiting on 2 child threads and 1 subagent", archivedAtMs: null, snoozedUntilMs: null }), ...kids }, order: ["s-1", "k1", "k2", "k3"] });
+      render(
+        <TooltipProvider>
+          <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "working", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+        </TooltipProvider>,
+      );
+      fireEvent.pointerMove(screen.getByRole("option"), { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    const card = screen.getAllByTestId("thread-tooltip")[0] as HTMLElement;
+    expect(text(card, "tip-waiting")).toContain("Waiting on 2 child threads and 1 subagent");
+    expect(within(card).getAllByTestId("tip-waiting-name").map((e) => e.textContent)).toEqual(["Inbox row layout", "Rewrite the row tests"]);
+  });
+
   it("a project without git keeps its no git chip", () => {
     const card = openCard({ projectId: "notes", projectIds: ["notes"], worktreePath: "/src/notes" });
     expect(text(card, "tip-project-chip")).toBe("no git");

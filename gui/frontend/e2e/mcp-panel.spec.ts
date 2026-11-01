@@ -146,40 +146,8 @@ test("the card's row and the command open it, not M or the + list; tools expand 
   await expect(github.getByTestId("mcp-tools")).toHaveCount(0);
 });
 
-test("Reconnect on the failed card: Connecting…, then Connected with its tools", async ({ page }) => {
-  await openThread(page);
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expectMcpTab(page);
-  await mcpTab(page, "failed").click();
-  const pw = card(page, "playwright");
-  await pw.getByTestId("mcp-reconnect").click();
-  await expect(pw).toHaveAttribute("data-status", "pending");
-  await expect(pw.getByTestId("mcp-pill")).toHaveText("Connecting…");
-  await expect(pw.getByTestId("mcp-reconnect")).toBeDisabled();
-
-  // Connected, it leaves the Failed tab for the Connected one.
-  await expectTabs(page, [4, 1, 1], "failed", ["linear"]);
-  await mcpTab(page, "connected").click();
-  await expectTabs(page, [4, 1, 1], "connected", ["t3-code", "github", "playwright", "filesystem"]);
-  await expect(pw).toHaveAttribute("data-status", "connected");
-  await expect(pw.getByTestId("mcp-pill")).toHaveText("Connected");
-  await expect(pw.getByTestId("mcp-error")).toHaveCount(0);
-  await expect(pw.getByTestId("mcp-version")).toHaveText("v0.0.41");
-  await expect(pw.getByTestId("mcp-tools-toggle")).toHaveText("3 tools");
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked (just now|\d+s ago), after reconnecting playwright$/);
-  expect(await threadCalls()).toContain("mcp-reconnect s-r1 playwright");
-
-  // A needs-login server stays so: Claude's refusal is toasted.
-  await mcpTab(page, "failed").click();
-  await card(page, "linear").getByTestId("mcp-reconnect").click();
-  await expect(page.getByText("Could not reconnect linear")).toBeVisible();
-  await expect(card(page, "linear")).toHaveAttribute("data-status", "needs-auth");
-
-  // Refresh re-asks (thread.mcp --refresh).
-  await surface(page).getByTestId("mcp-refresh").click();
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked (just now|\d+s ago)$/);
-  expect(await threadCalls()).toContain("mcp s-r1 refresh");
-});
+// Reconnect (Connecting…, then Connected in its tab, the check's words), a refused reconnect's toast, and
+// Refresh: unit-tested in src/surfaces/mcp.test.tsx.
 
 test("a stopped thread keeps its last status; Refresh and Reconnect are enabled and work (the daemon starts Claude)", async ({ page }) => {
   await mockPost("thread?state=stopped");
@@ -245,16 +213,7 @@ test("a check 10 min old goes stale: amber line, dashed pills, Refresh as the ca
   expect(await threadCalls()).toContain("mcp s-r1 refresh");
 });
 
-test("a thread Claude never reported for says so without mentioning running; Refresh checks", async ({ page }) => {
-  await mockPost("thread?state=crashed");
-  await openApp(page);
-  await row(page, "s:s-r1").click();
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expectMcpTab(page);
-  await expect(surface(page).getByTestId("mcp-empty")).toHaveText("No MCP status yet. Refresh to check.");
-  await surface(page).getByTestId("mcp-refresh").click();
-  await expectTabs(page, [3, 2, 1], "connected", ["t3-code", "github", "filesystem"]);
-});
+// A thread Claude never reported for: unit-tested in src/surfaces/mcp.test.tsx.
 
 test("hidden for a page: not in the panel's list, not in the palette", async ({ page }) => {
   await openThread(page);

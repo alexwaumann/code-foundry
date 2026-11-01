@@ -55,6 +55,7 @@ describe("AgentsStrip", () => {
   it("names the thread's running background runs", () => {
     setup({ agentsRunning: 4, backgroundAgentsRunning: 2 }, RUNS);
     expect(screen.getByTestId("agents-strip-count").textContent).toBe("2 agents running in the background");
+    expect(screen.getByTestId("agents-strip").dataset.kind).toBe("agents");
     expect(screen.getByTestId("agents-strip-runs").textContent).toBe("PR 1 · Running go testPR 2");
     expect(screen.queryByTestId("agents-strip-open")).toBeNull();
   });
@@ -76,6 +77,20 @@ describe("AgentsStrip", () => {
     ["archived", { agentsRunning: 2, backgroundAgentsRunning: 2, archivedAtMs: 5 }],
   ])("hidden: %s", (_n, o) => {
     setup(o, RUNS);
+    expect(screen.queryByTestId("agents-strip")).toBeNull();
+  });
+
+  it("follows the thread's count and its runs: one ends, then the last, while a shell and a foreground run go on", () => {
+    setup({ agentsRunning: 4, backgroundAgentsRunning: 2, backgroundShellsRunning: 1 }, RUNS);
+    act(() => {
+      useThreadsStore.setState({ byId: { s: thread({ agentsRunning: 3, backgroundAgentsRunning: 1, backgroundShellsRunning: 1 }) } });
+      useThreadStore.setState({ logs: { s: { seq: 2, byId: {}, order: [], pending: [], mcp: null, commands: [], agents: RUNS.map((r) => (r.id === "PR 1" ? { ...r, status: "done" as const } : r)) } } });
+    });
+    expect(screen.getByTestId("agents-strip-count").textContent).toBe("1 agent running in the background");
+    expect(screen.getByTestId("agents-strip-runs").textContent).toBe("PR 2");
+    act(() => {
+      useThreadsStore.setState({ byId: { s: thread({ agentsRunning: 2, backgroundAgentsRunning: 0, backgroundShellsRunning: 1 }) } });
+    });
     expect(screen.queryByTestId("agents-strip")).toBeNull();
   });
 

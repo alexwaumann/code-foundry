@@ -149,7 +149,7 @@ function emberMarkdown(text: string) {
 }
 
 /** Ember's text as markdown, its task links (alone on their line) as pointer lines. */
-function EmberMarkdown({ text }: { text: string }) {
+export function EmberMarkdown({ text }: { text: string }) {
   const parts = useMemo(() => splitTaskLinks(text), [text]);
   return parts.map((p, i) => (p.kind === "md" ? <ThreadMarkdown key={i}>{p.text}</ThreadMarkdown> : <TaskPointer key={i} id={p.id} name={p.title} />));
 }
