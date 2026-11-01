@@ -117,26 +117,7 @@ test("range control filters by day and persists; the table lists unpriced and Ot
   await expect(page.getByTestId("usage-page-day")).toHaveCount(7);
 });
 
-test("Tokens / Cost switches the chart; a day shows its tooltip", async ({ page }) => {
-  await openUsage(page);
-  const chart = page.getByTestId("usage-page-chart");
-  await expect(chart).toHaveAttribute("data-mode", "tokens");
-  await expect(page.getByTestId("usage-page-mode-tokens")).toHaveAttribute("aria-pressed", "true");
-  await expect(chart.locator("svg text").first()).toHaveText("0");
-
-  const today = page.getByTestId("usage-page-day").last();
-  await today.hover();
-  const tip = page.getByTestId("usage-page-tooltip");
-  await expect(tip).toBeVisible();
-  await expect(tip).toContainText("claude-opus-5-5");
-  await expect(tip).toContainText(/Total\s*[\d.]+M/);
-
-  await page.getByTestId("usage-page-mode-cost").click();
-  await expect(chart).toHaveAttribute("data-mode", "cost");
-  await today.hover();
-  await expect(tip).toContainText(/Total\s*\$[\d,.]+/);
-  await expect(chart.locator("svg text").filter({ hasText: /^\$/ }).first()).toBeVisible();
-});
+// Tokens / Cost, the axis and a day's tooltip: unit-tested in src/components/usage/UsageSheet.test.tsx.
 
 /** SHOTS=<dir>: the PR screenshots, WebKit, 1440x900, dark and light, tokens and cost. */
 for (const scheme of ["dark", "light"] as const) {
