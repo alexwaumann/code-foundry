@@ -82,61 +82,7 @@ test("Check for Updates finds a release; the chip and the palette offer it", asy
   await expect(page.getByTestId("palette").locator('[data-command="app.update"]')).toContainText("Download v0.2.0");
 });
 
-test("download shows progress, then lists busy threads; Install and Restart Now runs app.restart confirmed", async ({ page }) => {
-  await openApp(page);
-  await settleThreads(2);
-  await mockPost("update/state?state=available&version=v0.2.0");
-  await indicator(page).click();
-  const d = dialog(page);
-  await d.getByTestId("update-download").click();
-
-  await expect(d).toHaveAttribute("data-state-name", "downloading");
-  await expect(d).toHaveAttribute("data-variant", "downloading");
-  await expect(d.getByTestId("update-state")).toHaveText("Downloading v0.2.0…");
-  await expect(d).toContainText("You can close this and keep working. Nothing changes on disk until you install and restart.");
-  await expect(d.getByTestId("update-progress")).toContainText("==>");
-  // No fraction to report: the shadcn Progress without a value, a sliding bar.
-  const bar = d.getByRole("progressbar", { name: "Downloading the update" });
-  await expect(bar).toHaveAttribute("data-state", "indeterminate");
-  await expect(bar).not.toHaveAttribute("aria-valuenow");
-  await expect(d.getByTestId("update-later")).toHaveText("Hide");
-  await expectChip(page, "downloading", "Downloading v0.2.0…", null);
-
-  // Downloaded with two threads mid-turn and one waiting on a permission: they are named,
-  // with the right count (the daemon's: working or waiting on you).
-  await expect(d).toHaveAttribute("data-variant", "readyBusy", { timeout: 8000 });
-  await expect(d).toHaveAttribute("data-state-name", "downloaded");
-  await expect(d.getByTestId("update-state")).toHaveText("Code Foundry v0.2.0 is ready");
-  await expect(d).toContainText("Restarting now cuts these threads off. Let them finish first, or install and restart anyway: they keep their history, and a message continues each.");
-  await expect(d).not.toContainText(/connect/);
-  const box = d.getByTestId("update-busy-threads");
-  await expect(box.getByTestId("update-busy-heading")).toHaveText("3 threads would be cut off");
-  await expect(box.getByTestId("update-busy-thread")).toHaveText([/^Port renderer\s*waiting on you$/, /^Job 1\s*working$/, /^Job 2\s*working$/]);
-  await expect(d.getByTestId("update-later")).toHaveText("Wait, I’ll restart later");
-  await expect(d.getByTestId("update-meta")).toContainText("Running v0.1.0");
-  await expect(d.getByTestId("update-close")).toHaveCount(0);
-  await expect(d.getByTestId("update-restart")).toHaveText("Install and Restart Now");
-  await expectChip(page, "downloaded", "v0.2.0 downloaded", "Restart to apply");
-
-  // Another busy thread shows up live.
-  await mockPost("thread/status?id=s-1&status=busy");
-  await expect(box.getByTestId("update-busy-heading")).toHaveText("4 threads would be cut off");
-  await expect(box).toContainText("Refactor sidebar tree");
-
-  // Install and Restart Now: the dialog is the confirmation, so no confirm dialog and one
-  // confirmed call; the daemon installs the download inside app.restart.
-  await d.getByTestId("update-restart").click();
-  await expect(d).toHaveAttribute("data-variant", "restarting");
-  await expect(d.getByTestId("update-state")).toHaveText("Installing and restarting…");
-  await expect(d).toContainText("Code Foundry will reopen in a moment on v0.2.0.");
-  await expect(d.getByTestId("update-meta")).toHaveText("Stopping daemon");
-  await expect(d.locator("button")).toHaveCount(0);
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  const restarts = (await invocations()).filter((i) => i.name === "app.restart" || i.name === "daemon.restart");
-  expect(restarts.map((i) => [i.name, i.confirmed])).toEqual([["app.restart", true]]);
-  // The mock comes back as the installed version; nothing is pending any more.
-  await expect(indicator(page)).toHaveCount(0);
-});
+// Downloading, the busy-thread list (live), Install and Restart Now: unit-tested in src/components/update/UpdateDialog.test.tsx.
 
 test("available → Download → downloading → downloaded → Install and Restart Now", async ({ page }) => {
   await openApp(page);
@@ -185,25 +131,7 @@ test("available → Download → downloading → downloaded → Install and Rest
   expect(await (await fetch(`${mockUrl}/__mock/update`)).json()).toMatchObject({ state: "IDLE", current: "v0.2.0", restarts: 1 });
 });
 
-test("installed with threads idle or stopped says nothing will be interrupted", async ({ page }) => {
-  await openApp(page);
-  await settleThreads(0);
-  // s-2 stops while waiting on a permission: its prompt is gone with the process, so a
-  // restart cuts nothing off (it still shows as waiting on you in the sidebar).
-  await mockPost("thread/stop?id=s-2&reason=idle&code=0");
-  await mockPost("update/state?state=installed&version=v0.2.0");
-  await expectChip(page, "installed", "v0.2.0 installed", "Restart to apply");
-  await indicator(page).click();
-  const d = dialog(page);
-  await expect(d).toHaveAttribute("data-variant", "readyIdle");
-  await expect(d).toContainText("Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted.");
-  await expect(d).not.toContainText(/connect|open/);
-  await expect(d.getByTestId("update-busy-threads")).toHaveCount(0);
-  await expect(d.getByTestId("update-restart")).toHaveText("Restart Now");
-  await expect(d.getByTestId("update-later")).toHaveText("Later");
-  await d.getByTestId("update-later").click();
-  await expect(d).toHaveCount(0);
-});
+// Installed with a thread stopped while waiting (not cut off): unit-tested in src/components/update/UpdateDialog.test.tsx.
 
 test("app.update from the palette opens the dialog and downloads", async ({ page }) => {
   await openApp(page);
@@ -228,28 +156,7 @@ test("daemon.restart from the palette asks for confirmation instead of running",
   await expectChip(page, "installed", "v0.2.0 installed", "Restart to apply");
 });
 
-test("a failed download shows the reason and can be retried", async ({ page }) => {
-  await openApp(page);
-  await settleThreads(0);
-  await mockPost("update/state?state=available&version=v0.2.0");
-  await mockPost("update/fail?reason=installer: exit status 1: error: checksum mismatch");
-  await indicator(page).click();
-  const d = dialog(page);
-  await d.getByTestId("update-download").click();
-  await expect(d.getByTestId("update-failure")).toHaveText("installer: exit status 1: error: checksum mismatch", { timeout: 8000 });
-  await expect(d).toHaveAttribute("data-variant", "failed");
-  await expect(d.getByTestId("update-state")).toHaveText("Couldn’t update to v0.2.0");
-  await expect(d).toContainText("Nothing changed. You’re still on v0.1.0.");
-  await expect(d).toContainText("Installer exited with status 1");
-  await expect(d.getByTestId("update-download")).toHaveText("Try Again");
-  await expect(d.getByTestId("update-later")).toHaveText("Not now");
-  await expect(d.getByTestId("update-close")).toHaveCount(0);
-  await expectChip(page, "failed", "Update failed", "Details");
-  await d.getByTestId("update-download").click(); // Try Again: downloads again
-  await expect(d).toHaveAttribute("data-variant", /^ready/, { timeout: 8000 });
-  await expect(d).toHaveAttribute("data-state-name", "downloaded");
-  await expect(d.getByTestId("update-restart")).toHaveText("Install and Restart Now");
-});
+// A failed download and Try Again: unit-tested in src/components/update/UpdateDialog.test.tsx.
 
 test("dev builds say updates are off", async ({ page }) => {
   await openApp(page);
