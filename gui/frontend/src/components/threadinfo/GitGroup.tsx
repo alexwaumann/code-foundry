@@ -20,7 +20,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import type { PullRequestView } from "@/api/gh";
-import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { fileTotals } from "@/components/changes/files";
 import {
@@ -48,7 +48,7 @@ import { threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
 import { openChangesTab } from "@/stores/changesPanel";
-import { DiffCounts, Group, HOVER_CARD, Row, RowMenu, SubLine } from "./Row";
+import { DiffCounts, Group, HOVER_CARD, Row, RowMore, SubLine } from "./Row";
 import { useMembers } from "./useMembers";
 
 const SEP = "\u0000";
@@ -179,51 +179,46 @@ const CHECK_ICON: Record<"ok" | "failed" | "running", ReactNode> = {
   running: <LoaderCircle className="animate-spin text-cf-warning-text" aria-hidden />,
 };
 
-/** One linked pull request: title; #n and its status (→ #base when stacked); its project when not the cwd's. A click opens its tab; the chevron offers GitHub and Copy URL. */
+/** One linked pull request: title; #n and its status (→ #base when stacked); its project when not the cwd's. A click opens its tab; the ellipsis offers GitHub and Copy URL. */
 function PrRowView({ row }: { row: PrRow }) {
-  const [open, setOpen] = useState(false);
   const ref = { slug: row.slug, number: row.number };
   return (
-    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Row
-          icon={PR_ICON[row.state]}
-          tall
-          chevron={open ? "open" : "closed"}
-          onActivate={() => void openPullRequestInPanel(ref)}
-          menuOnChevron
-          testId="ti-pr"
-          data-number={row.number}
-          data-state={row.state}
-          className="[&>span:first-child]:self-start [&>span:first-child]:mt-0.5"
-        >
-          <span className="truncate" data-testid="ti-pr-title">
-            {row.title}
+    <Row
+      icon={PR_ICON[row.state]}
+      tall
+      onActivate={() => void openPullRequestInPanel(ref)}
+      trailing={
+        <RowMore label="Pull request options" testId="ti-pr-more" menuTestId="ti-pr-menu">
+          <DropdownMenuItem onSelect={() => void openUrl(row.url)} data-testid="ti-pr-github">
+            <ExternalLink aria-hidden />
+            Open on GitHub
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void copyPullRequestLink(ref, row.url)} data-testid="ti-pr-copy">
+            <Copy aria-hidden />
+            Copy URL
+          </DropdownMenuItem>
+        </RowMore>
+      }
+      testId="ti-pr"
+      data-number={row.number}
+      data-state={row.state}
+      className="[&>span:first-child]:self-start [&>span:first-child]:mt-0.5"
+    >
+      <span className="truncate" data-testid="ti-pr-title">
+        {row.title}
+      </span>
+      <SubLine testId="ti-pr-line">
+        <span className="tabular-nums">#{row.number}</span>
+        {row.check.icon && CHECK_ICON[row.check.icon]}
+        <span>{row.check.word}</span>
+        {row.stackedOn !== null && (
+          <span className="inline-flex items-center gap-0.5" data-testid="ti-pr-stacked">
+            <ArrowRight aria-hidden />#{row.stackedOn}
           </span>
-          <SubLine testId="ti-pr-line">
-            <span className="tabular-nums">#{row.number}</span>
-            {row.check.icon && CHECK_ICON[row.check.icon]}
-            <span>{row.check.word}</span>
-            {row.stackedOn !== null && (
-              <span className="inline-flex items-center gap-0.5" data-testid="ti-pr-stacked">
-                <ArrowRight aria-hidden />#{row.stackedOn}
-              </span>
-            )}
-          </SubLine>
-          {row.project && <SubLine testId="ti-pr-project">{row.project}</SubLine>}
-        </Row>
-      </DropdownMenuTrigger>
-      <RowMenu testId="ti-pr-menu">
-        <DropdownMenuItem onSelect={() => void openUrl(row.url)} data-testid="ti-pr-github">
-          <ExternalLink aria-hidden />
-          Open on GitHub
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void copyPullRequestLink(ref, row.url)} data-testid="ti-pr-copy">
-          <Copy aria-hidden />
-          Copy URL
-        </DropdownMenuItem>
-      </RowMenu>
-    </DropdownMenu>
+        )}
+      </SubLine>
+      {row.project && <SubLine testId="ti-pr-project">{row.project}</SubLine>}
+    </Row>
   );
 }
 

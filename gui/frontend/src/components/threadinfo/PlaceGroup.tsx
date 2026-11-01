@@ -55,7 +55,7 @@ import { removeThreadProject, useAddingProject } from "@/stores/threadProjects";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { AddProjectPicker } from "./AddProjectPicker";
-import { Group, HOVER_CARD, Row, RowMenu, SubLine } from "./Row";
+import { Group, HOVER_CARD, Row, RowMenu, RowMore, SubLine } from "./Row";
 import { useMembers } from "./useMembers";
 
 /** A named workspace: its name and the set's size. */
@@ -461,63 +461,63 @@ function ProjectRow({ threadId }: { threadId: string }) {
   );
 }
 
-/** "Open in Finder": a click reveals the cwd; the chevron's menu offers Finder, the installed editors and a terminal. */
+/** "Open in Finder": a click reveals the cwd; the ellipsis's menu offers Finder, the installed editors and a terminal. */
 function OpenInRow({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
-  const [open, setOpen] = useState(false);
   const editors = useEditorApps();
   if (!cwd) return null;
   const ctx = () => threadContext(threadId);
   const reveal = () =>
     void runCommand("worktree.reveal", { worktree: cwd }, ctx());
-  return (
-    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Row
-          icon={<FinderIcon />}
-          chevron={open ? "open" : "closed"}
-          onActivate={reveal}
-          menuOnChevron
-          testId="ti-open-in"
-        >
-          Open in Finder
-        </Row>
-      </DropdownMenuTrigger>
-      <RowMenu testId="ti-open-in-menu">
-        <DropdownMenuItem onSelect={reveal} data-testid="ti-open-finder">
-          <FinderIcon aria-hidden />
-          Finder
-        </DropdownMenuItem>
-        {editors.map((a) => (
-          <DropdownMenuItem
-            key={a.bundleId}
-            data-testid="ti-open-editor"
-            data-app={a.bundleId}
-            onSelect={() =>
-              void runCommand(
-                "worktree.open.editor",
-                { worktree: cwd, app: a.bundleId },
-                ctx(),
-              )
-            }
-          >
-            <AppIcon bundleId={a.bundleId} fallback={SquareArrowOutUpRight} />
-            {a.name}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
+  const more = (
+    <RowMore
+      label="Open in options"
+      testId="ti-open-in-more"
+      menuTestId="ti-open-in-menu"
+    >
+      <DropdownMenuItem onSelect={reveal} data-testid="ti-open-finder">
+        <FinderIcon aria-hidden />
+        Finder
+      </DropdownMenuItem>
+      {editors.map((a) => (
         <DropdownMenuItem
-          data-testid="ti-open-terminal"
-          onSelect={() => {
-            const key = bottomKeyOf({ kind: "thread", id: threadId });
-            if (key !== null) void newBottomTerminal(key);
-          }}
+          key={a.bundleId}
+          data-testid="ti-open-editor"
+          data-app={a.bundleId}
+          onSelect={() =>
+            void runCommand(
+              "worktree.open.editor",
+              { worktree: cwd, app: a.bundleId },
+              ctx(),
+            )
+          }
         >
-          <SquareTerminal aria-hidden />
-          Terminal
+          <AppIcon bundleId={a.bundleId} fallback={SquareArrowOutUpRight} />
+          {a.name}
         </DropdownMenuItem>
-      </RowMenu>
-    </DropdownMenu>
+      ))}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        data-testid="ti-open-terminal"
+        onSelect={() => {
+          const key = bottomKeyOf({ kind: "thread", id: threadId });
+          if (key !== null) void newBottomTerminal(key);
+        }}
+      >
+        <SquareTerminal aria-hidden />
+        Terminal
+      </DropdownMenuItem>
+    </RowMore>
+  );
+  return (
+    <Row
+      icon={<FinderIcon />}
+      onActivate={reveal}
+      trailing={more}
+      testId="ti-open-in"
+    >
+      Open in Finder
+    </Row>
   );
 }
 
@@ -587,8 +587,9 @@ function AddActionItems({ members }: { members: readonly string[] }) {
 /**
  * The action to run: the one last run in this thread (else the cwd's project's last, else
  * its first; lib/threadInfo chooseAction), by name, with its project on a second line when
- * that is not the cwd's. A click runs it; the chevron lists every action by project, then
- * Add action. With no actions at all: a muted "Add action" row.
+ * that is not the cwd's. A click runs it; the ellipsis lists every action by project, then
+ * Add action (with none picked the whole row opens that list, its chevron). With no actions
+ * at all: a muted "Add action" row.
  */
 function ActionRow({ threadId }: { threadId: string }) {
   const { cwdProjectId, members } = useMembers(threadId);
@@ -655,6 +656,62 @@ function ActionRow({ threadId }: { threadId: string }) {
     );
   }
   const action = choice?.action;
+  const items = (
+    <>
+      {withActions.map((pid, i) => (
+        <div key={pid} className="contents">
+          {members.length > 1 && (
+            <DropdownMenuLabel
+              className="font-normal text-cf-text-muted"
+              data-testid="ti-action-group"
+            >
+              <ProjectName id={pid} />
+            </DropdownMenuLabel>
+          )}
+          {(byProject[i] ?? "")
+            .split(",")
+            .filter(Boolean)
+            .map((id) => (
+              <ActionItem key={id} threadId={threadId} id={id} />
+            ))}
+        </div>
+      ))}
+      <DropdownMenuSeparator />
+      <AddActionItems members={members} />
+    </>
+  );
+  const text = (
+    <>
+      <span className="truncate">{action?.name ?? "Actions"}</span>
+      {choice?.showProject && (
+        <SubLine testId="ti-action-project">{projectName}</SubLine>
+      )}
+    </>
+  );
+  // An action to run: a click runs it, the ellipsis lists the rest.
+  if (action) {
+    return (
+      <Row
+        icon={<Play />}
+        tall={choice.showProject}
+        onActivate={() => void runCardAction(action.id, threadId)}
+        trailing={
+          <RowMore
+            label="Actions options"
+            testId="ti-action-more"
+            menuTestId="ti-action-menu"
+          >
+            {items}
+          </RowMore>
+        }
+        testId="ti-action"
+        data-action={action.id}
+      >
+        {text}
+      </Row>
+    );
+  }
+  // None picked: the whole row opens the list.
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
@@ -662,41 +719,12 @@ function ActionRow({ threadId }: { threadId: string }) {
           icon={<Play />}
           tall={choice?.showProject}
           chevron={open ? "open" : "closed"}
-          onActivate={
-            action ? () => void runCardAction(action.id, threadId) : undefined
-          }
-          menuOnChevron={Boolean(action)}
           testId="ti-action"
-          data-action={action?.id}
         >
-          <span className="truncate">{action?.name ?? "Actions"}</span>
-          {choice?.showProject && (
-            <SubLine testId="ti-action-project">{projectName}</SubLine>
-          )}
+          {text}
         </Row>
       </DropdownMenuTrigger>
-      <RowMenu testId="ti-action-menu">
-        {withActions.map((pid, i) => (
-          <div key={pid} className="contents">
-            {members.length > 1 && (
-              <DropdownMenuLabel
-                className="font-normal text-cf-text-muted"
-                data-testid="ti-action-group"
-              >
-                <ProjectName id={pid} />
-              </DropdownMenuLabel>
-            )}
-            {(byProject[i] ?? "")
-              .split(",")
-              .filter(Boolean)
-              .map((id) => (
-                <ActionItem key={id} threadId={threadId} id={id} />
-              ))}
-          </div>
-        ))}
-        <DropdownMenuSeparator />
-        <AddActionItems members={members} />
-      </RowMenu>
+      <RowMenu testId="ti-action-menu">{items}</RowMenu>
     </DropdownMenu>
   );
 }

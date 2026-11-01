@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowRight, Bot, CornerLeftUp, Ellipsis, Square } from "lucide-react";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ArrowRight, Bot, CornerLeftUp, Square } from "lucide-react";
+import { DropdownMenuCheckboxItem, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { agentName, fmtElapsed } from "@/lib/agents";
 import { useNowSelect } from "@/lib/clock";
@@ -25,7 +25,7 @@ import { useThreadStore } from "@/stores/thread";
 import { interruptThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { Group, HOVER_CARD, Row, RowMenu } from "./Row";
+import { Group, HOVER_CARD, Row, RowMore } from "./Row";
 
 const DOT: Record<LineageRowState, string> = {
   working: "text-cf-link",
@@ -149,7 +149,7 @@ function LineageItem({ threadId, row, sub = false }: { threadId: string; row: Li
           <button
             type="button"
             aria-label={`Interrupt ${row.name}`}
-            className="absolute top-1/2 right-7 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-cf-error-text opacity-0 group-hover/li:opacity-100 hover:bg-cf-text/10 focus-visible:opacity-100 [&_svg]:size-3 [&_svg]:fill-current"
+            className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-cf-error-text opacity-0 group-hover/li:opacity-100 hover:bg-cf-text/10 focus-visible:opacity-100 [&_svg]:size-3 [&_svg]:fill-current"
             data-testid="ti-lineage-stop"
             data-id={row.id}
             onClick={(e) => {
@@ -209,35 +209,23 @@ function LineageLabel({ threadId }: { threadId: string }) {
   return (
     <Row
       trailing={
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="Lineage options"
-              className="flex size-5 shrink-0 items-center justify-center rounded-sm text-cf-text-muted hover:bg-cf-text/10 aria-expanded:bg-cf-text/10 [&_svg]:size-3.5"
-              data-testid="ti-lineage-menu-trigger"
-            >
-              <Ellipsis aria-hidden />
-            </button>
-          </DropdownMenuTrigger>
-          <RowMenu testId="ti-lineage-menu" align="end" className="min-w-52">
-            <DropdownMenuCheckboxItem
-              checked={showHidden}
-              className="text-caption text-cf-text"
-              data-testid="ti-show-hidden"
-              onCheckedChange={(on) =>
-                void saveSettings({
-                  "threads.show_created_threads": on ? "true" : "false",
-                })
-              }
-            >
-              Show hidden threads
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuItem disabled data-testid="ti-archive-finished">
-              Archive finished
-            </DropdownMenuItem>
-          </RowMenu>
-        </DropdownMenu>
+        <RowMore label="Lineage options" testId="ti-lineage-menu-trigger" menuTestId="ti-lineage-menu">
+          <DropdownMenuCheckboxItem
+            checked={showHidden}
+            className="text-caption text-cf-text"
+            data-testid="ti-show-hidden"
+            onCheckedChange={(on) =>
+              void saveSettings({
+                "threads.show_created_threads": on ? "true" : "false",
+              })
+            }
+          >
+            Show hidden threads
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuItem disabled data-testid="ti-archive-finished">
+            Archive finished
+          </DropdownMenuItem>
+        </RowMore>
       }
       testId="ti-lineage-label"
     >
