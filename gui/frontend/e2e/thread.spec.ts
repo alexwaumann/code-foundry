@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { composeProject, invocations, mockPost, mockUrl, openApp, openStreams, resetMock, row, testPdf } from "./fixtures";
+import { composeProject, invocations, leaveSidebar, mockPost, mockUrl, openApp, openStreams, resetMock, row, testPdf } from "./fixtures";
 
 /**
  * A thread (components/thread, docs/notes/rendered-threads-2-gui.md) over the
@@ -720,6 +720,8 @@ test("scrolled up, a Jump to bottom chip floats above the composer; a click scro
   const chip = page.getByTestId("thread-jump-bottom");
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");
   await expect(chip).toBeHidden();
+  // The row's hover card outlives the click and would take the wheel.
+  await leaveSidebar(page, timeline);
 
   const box = await timeline.boundingBox();
   await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);

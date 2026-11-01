@@ -29,12 +29,12 @@ function focusedGroupEl(page: Page) {
 }
 
 async function setPanelWidth(page: Page, width: number): Promise<void> {
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
 }
 
 /** The current panel's stored entry, through the app's own store. */
 function entry(page: Page): Promise<{ ratio?: number; focused?: number; groups: { tabs: { id: string }[]; activeTabId: string | null }[] }> {
-  return page.evaluate(`import("/src/stores/panel.ts").then((m) => m.getPanel("current"))`);
+  return page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.getPanel("current"))`);
 }
 
 /** The persisted panel store (localStorage), for the current panel key. */
@@ -70,7 +70,7 @@ async function worktreeAndDiff(page: Page, width = 420): Promise<void> {
 
 /** The expanded panel's derived width (stores/ui.ts expandedPanelWidth) for the window and sidebar now. */
 function expandedWidth(page: Page): Promise<number> {
-  return page.evaluate(`import("/src/stores/ui.ts").then((m) => { const s = m.useUiStore.getState(); return m.expandedPanelWidth(s.windowWidth, m.visibleSidebarWidth(s)); })`);
+  return page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => { const s = m.useUiStore.getState(); return m.expandedPanelWidth(s.windowWidth, m.visibleSidebarWidth(s)); })`);
 }
 
 async function invokeSplit(): Promise<void> {
@@ -335,7 +335,7 @@ test("each group has its own + and picker; cmd+alt+\\ moves between groups; cmd+
   // Again, and a tab opened from elsewhere (a path chip's File tab) lands in the focused (second) group.
   await page.keyboard.press("Meta+Backslash");
   await expect(group(page, 1)).toHaveAttribute("data-picking", "true");
-  await page.evaluate(`import("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: `${CF}/README.md` })}))`);
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: `${CF}/README.md` })}))`);
   await expect(tabsOf(page, 1)).toHaveText(["README.md"]);
   await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
   await expect(tabsOf(page, 0)).toHaveText(["Changes"]);

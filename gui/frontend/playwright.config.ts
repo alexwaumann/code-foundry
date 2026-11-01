@@ -11,12 +11,18 @@ import { defineConfig, devices } from "@playwright/test";
  * is stateless and shared. E2E_MOCK_PORT / E2E_VITE_PORT move the ports (e.g. two worktrees
  * running e2e at once: leave E2E_WORKERS ports of room). `--workers` on the command line
  * must not exceed E2E_WORKERS: there is no mock for the extra workers. See e2e/fixtures.ts.
+ *
+ * The app is a bundled development build served by `vite preview`, rebuilt each run (about a
+ * second). Specs reach its stores through `__cfModule("/src/stores/….ts")` (src/devModules.ts),
+ * never `import("/src/…")`, which only the dev server answers.
  */
 export const WORKERS = Number(process.env.E2E_WORKERS ?? 4);
 const MOCK_PORT_BASE = Number(process.env.E2E_MOCK_PORT ?? 7799);
 export const MOCK_PORT = MOCK_PORT_BASE + Number(process.env.TEST_PARALLEL_INDEX ?? 0);
 export const MOCK_TOKEN = "e2e-token";
 export const VITE_PORT = Number(process.env.E2E_VITE_PORT ?? 9255);
+/** Where the e2e build of the app goes (gitignored); rebuilt on every run. */
+const E2E_DIST = "dist-e2e";
 
 export default defineConfig({
   testDir: "e2e",
@@ -48,7 +54,12 @@ export default defineConfig({
       stdout: "ignore" as const,
     })),
     {
-      command: `./node_modules/.bin/vite --port ${String(VITE_PORT)} --strictPort`,
+      // A bundled development build, not the dev server: the dev server sends the app as
+      // ~780 module requests per page load and every test loads it fresh, which cost about a
+      // second a test (docs/notes/e2e-bundled-build.md). NODE_ENV=development keeps
+      // import.meta.env.DEV (the ?daemon= override, window.__cfModule) and React's dev build.
+      command: `./node_modules/.bin/vite build --mode development --outDir ${E2E_DIST} --emptyOutDir --logLevel warn && ./node_modules/.bin/vite preview --mode development --outDir ${E2E_DIST} --host 127.0.0.1 --port ${String(VITE_PORT)} --strictPort`,
+      env: { NODE_ENV: "development" },
       url: `http://127.0.0.1:${String(VITE_PORT)}`,
       reuseExistingServer: false,
       stdout: "ignore",

@@ -21,17 +21,17 @@ const band = (page: Page) => panel(page).getByTestId("panel-drop-band");
 const ghost = (page: Page) => page.getByTestId("panel-tab-ghost");
 
 async function setPanelWidth(page: Page, width: number): Promise<void> {
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
 }
 
 /** Calls a function of the app's own panel store with JSON arguments. */
 async function store(page: Page, fn: string, ...args: unknown[]): Promise<void> {
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.${fn}(${args.map((a) => JSON.stringify(a)).join(", ")}))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.${fn}(${args.map((a) => JSON.stringify(a)).join(", ")}))`);
 }
 
 /** The current panel's groups, as tab ids, and the focused group. */
 function groups(page: Page): Promise<{ tabs: string[]; active: string | null }[]> {
-  return page.evaluate(`import("/src/stores/panel.ts").then((m) => m.getPanel("current").groups.map((g) => ({ tabs: g.tabs.map((t) => t.id), active: g.activeTabId })))`);
+  return page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.getPanel("current").groups.map((g) => ({ tabs: g.tabs.map((t) => t.id), active: g.activeTabId })))`);
 }
 
 function rect(l: Locator) {
@@ -50,7 +50,7 @@ async function panelWith(page: Page, width: number, tabs: [string, string, Recor
   await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await setPanelWidth(page, width);
   for (const [kind, title, params] of tabs) {
-    await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab(${JSON.stringify(kind)}, ${JSON.stringify(title)}, ${JSON.stringify(params ?? {})})))`);
+    await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab(${JSON.stringify(kind)}, ${JSON.stringify(title)}, ${JSON.stringify(params ?? {})})))`);
   }
   await expect(panel(page).getByRole("tab")).toHaveCount(tabs.length);
   await store(page, "activatePanelTab", "current", tabs[0]?.[0] ?? "");
@@ -270,7 +270,7 @@ test("a drag over the other group's HTML render keeps moving and drops on that b
   await store(page, "movePanelTabToGroup", "current", "diff", 1);
   await expect(split(page)).toHaveAttribute("data-split", "true");
   const target = JSON.stringify({ project: "repo-cf", base: CF, path: "docs/preview.html" });
-  await page.evaluate(`import("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
   const frame = group(page, 1).getByTestId("file-html-frame");
   await expect(frame).toBeVisible();
   await expect(page.frameLocator('[data-testid="file-html-frame"]').locator("#title")).toHaveText("script ran");

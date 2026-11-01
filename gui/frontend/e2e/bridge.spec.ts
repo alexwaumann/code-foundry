@@ -185,7 +185,7 @@ test("a File tab on a page its thread did not show gets a bridge that refuses ca
   await openApp(page);
   await row(page, "s:s-1").click();
   const target = JSON.stringify({ project: "repo-cf", base: CF, path: "docs/bridge.html" });
-  await page.evaluate(`import("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
   const inner = page.frameLocator('[data-testid="file-html-frame"]');
   await expect(inner.locator("body")).toHaveAttribute("data-ready", "1");
   await expect(inner.locator("#thread")).toHaveText("no thread");
@@ -280,7 +280,7 @@ const mockWaitList = async (): Promise<unknown> => (await fetch(`${mockUrl}/__mo
 
 test("a page that leads its frame to another page, another grant's or itself without the nonce, has no bridge there", async ({ page }) => {
   await openBridgeThread(page);
-  const other = await page.evaluate(`import("/src/api/files.ts").then((m) => m.previewFile("", "/Users/dev/elsewhere/bridge.html")).then((p) => p.url)`);
+  const other = await page.evaluate(`__cfModule("/src/api/files.ts").then((m) => m.previewFile("", "/Users/dev/elsewhere/bridge.html")).then((p) => p.url)`);
   expect(other).toMatch(/\/preview\/mock-preview-\d+\/bridge\.html$/);
   const before = await bridgeCounters(page);
   await doc(page).locator("body").evaluate((_b, url) => {
@@ -327,7 +327,7 @@ test("a reload keeps the frame's nonce and its bridge", async ({ page }) => {
 test("a File tab page with no thread is opaque: it cannot reach a thread's page beside it", async ({ page }) => {
   await openBridgeThread(page);
   const target = JSON.stringify({ project: "repo-cf", base: CF, path: "docs/probe.html" });
-  await page.evaluate(`import("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
   const probe = page.getByTestId("file-html-frame");
   await expect(probe).not.toHaveAttribute("sandbox", /allow-same-origin/);
   await expect(card(page).getByTestId("thread-html-frame")).toHaveAttribute("sandbox", /allow-same-origin/);

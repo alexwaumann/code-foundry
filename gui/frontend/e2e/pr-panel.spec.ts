@@ -57,12 +57,12 @@ async function openPrPage(page: Page): Promise<void> {
 
 /** Opens a pull request in the current selection's panel through the app's own store (for PRs on no dashboard). */
 async function openPr(page: Page, number: number): Promise<void> {
-  await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(number)} }))`);
+  await page.evaluate(`__cfModule("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(number)} }))`);
 }
 
 /** Sets the current selection's side panel width through the app's own panel store, and waits for it. */
 async function setPanelWidth(page: Page, width: number): Promise<void> {
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
   await expect.poll(async () => (await panel(page).boundingBox())?.width).toBe(width);
 }
 
@@ -987,7 +987,7 @@ test("#146 from a fork: the branch cannot be deleted, and a merge asking anyway 
   // pr.merge with delete-branch on (as the CLI can): the confirmation promises no
   // delete, and the merge keeps the fork's branch.
   const args = { "repo-slug": SLUG, number: "146", method: "squash", "delete-branch": "true", "head-sha": HEAD_146 };
-  await page.evaluate(`import("/src/stores/commands.ts").then((m) => { void m.runCommandForResult("pr.merge", ${JSON.stringify(args)}); })`);
+  await page.evaluate(`__cfModule("/src/stores/commands.ts").then((m) => { void m.runCommandForResult("pr.merge", ${JSON.stringify(args)}); })`);
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText(`Merge #146 “fix(cli): typo in --help” into main in ${SLUG} with squash?`);
   await expect(dialog).not.toContainText("deleted afterwards");
@@ -1217,7 +1217,7 @@ test("#145 (the viewer's own): Approve and Request changes are disabled with the
   expect(await reviews()).toEqual([{ "repo-slug": SLUG, number: "145", verdict: "comment", body: "Rebased on main." }]);
 
   // GitHub's refusal from the palette or CLI (the menu never sends it) comes back as its message.
-  await page.evaluate(`import("/src/stores/commands.ts").then((m) => m.runCommandForResult("pr.review", { "repo-slug": "${SLUG}", number: "145", verdict: "approve" }))`);
+  await page.evaluate(`__cfModule("/src/stores/commands.ts").then((m) => m.runCommandForResult("pr.review", { "repo-slug": "${SLUG}", number: "145", verdict: "approve" }))`);
   await expect(page.getByText("Review Can not approve your own pull request")).toBeVisible();
 
   // Read access only: no Review. Merged: none either.

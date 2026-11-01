@@ -58,7 +58,7 @@ async function composerBoxes(page: Page): Promise<{ composer: Box; row: Box }> {
   return { composer: await boxOf(page, "composer-card"), row: await boxOf(page, "composer-worktree-row") };
 }
 
-const setZoom = (page: Page, z: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
+const setZoom = (page: Page, z: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
 
 /** The list's height in layout px and how many rows it shows whole. */
 function listFit(page: Page) {

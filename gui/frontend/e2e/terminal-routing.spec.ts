@@ -13,7 +13,7 @@ async function lastNew() {
 }
 
 async function shellLabels(page: Page, id: string): Promise<Record<string, string>> {
-  return page.evaluate(`import("/src/stores/terminals.ts").then((m) => m.useTerminalsStore.getState().byId[${JSON.stringify(id)}]?.labels ?? {})`);
+  return page.evaluate(`__cfModule("/src/stores/terminals.ts").then((m) => m.useTerminalsStore.getState().byId[${JSON.stringify(id)}]?.labels ?? {})`);
 }
 
 async function noTerminalRows(page: Page): Promise<void> {

@@ -98,7 +98,7 @@ test("snoozing a working thread from the title menu asks first; it then drops it
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   await page.getByTestId("thread-header").getByTestId("bottom-toggle").click();
   await expect(page.getByTestId("bottom-panel")).toBeVisible();
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
   await expect(page.getByTestId("side-panel")).toBeVisible();
 
   const header = page.getByTestId("thread-header");
@@ -133,7 +133,7 @@ test("snoozing a working thread from the title menu asks first; it then drops it
   await expect(page.getByTestId("reconnect")).toHaveCount(0);
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
-  expect(await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`)).toEqual({ open: false, groups: [{ tabs: [], activeTabId: null }] });
+  expect(await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`)).toEqual({ open: false, groups: [{ tabs: [], activeTabId: null }] });
   // The title menu offers Unsnooze now.
   await header.getByTestId("thread-title").click();
   await expect(titleMenu.getByTestId("menu-unsnooze")).toBeVisible();
@@ -151,7 +151,7 @@ test("snoozing a working thread from the title menu asks first; it then drops it
 
   // Snoozed from the CLI (another client): the same panel reset.
   await row(page, "s:s-2").click();
-  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
   await expect(page.getByTestId("side-panel")).toBeVisible();
   await mockPost("thread/snooze?id=s-2&until=2h");
   await expect(page.getByTestId("snoozed-count")).toHaveText("3");
