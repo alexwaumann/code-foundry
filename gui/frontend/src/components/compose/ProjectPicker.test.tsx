@@ -7,6 +7,7 @@ import { useComposeStore } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
 import { HOME, useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { seedWorld } from "@/test/projectsWorld";
 import { ProjectPicker } from "./ProjectPicker";
 
 const project = (id: string): ProjectView => ({ id, path: `/Users/dev/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] });
@@ -169,5 +170,40 @@ describe("ProjectPicker", () => {
     });
     expect(listed()).toEqual(["picker-no-project", "web"]);
     expect(highlighted()).toBe("picker-no-project");
+  });
+});
+
+describe("ProjectPicker over the mock's projects (compose.spec.ts)", () => {
+  beforeEach(() => {
+    seedWorld();
+    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "", members: [{ projectId: "repo-cf", worktreePath: "" }, { projectId: "repo-gp", worktreePath: "" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
+  });
+
+  it("each project's initials and where it lives: its GitHub slug, a remote, Local only or No git; the hints", () => {
+    render(<ProjectPicker close={() => undefined} />);
+    const projects = Array.from(document.querySelectorAll<HTMLElement>("[data-project]"));
+    expect(projects).toHaveLength(5);
+    expect(projects[0]?.textContent).toContain("CF");
+    expect(projects[0]?.textContent).toContain("code-foundry");
+    expect(screen.getAllByTestId("project-source").map((s) => s.textContent)).toEqual([
+      "alexwaumann/code-foundry · ~/src/code-foundry",
+      "origin · ~/dotfiles",
+      "alexwaumann/ghostty-playground · ~/src/ghostty-playground",
+      "Local only · ~/src/sketches",
+      "No git · ~/Documents/writing",
+    ]);
+    // No project, the workspace, then the projects: cmd+1, cmd+2, cmd+3...
+    expect(listed()).toEqual(["picker-no-project", "w-1", "repo-cf", "repo-dot", "repo-gp", "repo-sk", "repo-wr"]);
+    expect(shortcutOf(projects[0])).toBe("⌘3");
+    expect(shortcutOf(projects[2])).toBe("⌘5");
+    expect(screen.getByTestId("picker-hints").textContent).toBe("↑↓NavigateEnterSelectBackspaceBackEscClose");
+  });
+
+  it("a query: code-foundry's own name above the workspace that has it, Add a project still pinned", () => {
+    render(<ProjectPicker close={() => undefined} />);
+    search("foundry");
+    expect(listed()).toEqual(["repo-cf", "w-1"]);
+    expect(shortcutOf(screen.getByTestId("picker-rows").querySelector('[data-project="repo-cf"]') ?? undefined)).toBe("⌘1");
+    expect(screen.getByTestId("picker-add-project")).not.toBeNull();
   });
 });

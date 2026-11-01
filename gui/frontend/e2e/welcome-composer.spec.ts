@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, invocations, mockPost, openAddProjectDialog, projectAt, resetMock } from "./fixtures";
+import { appPath, mockPost, resetMock } from "./fixtures";
 
 // The first-run welcome on the home composer (docs/notes/welcome-composer.md): with zero
 // projects the No project composer greets and prefills, never sends, the tutorial prompt
@@ -24,41 +24,17 @@ async function openWelcome(page: Page): Promise<void> {
   await expect(page.getByTestId("composer-input")).toHaveText(PROMPT);
 }
 
-test("zero projects: Welcome heading and the tutorial prompt; Enter sends it as a No project thread's first message", async ({ page }) => {
-  await openWelcome(page);
-  // Prefilled, not sent.
-  expect((await invocations()).filter((i) => i.name === "thread.new")).toEqual([]);
-
-  await page.getByTestId("composer-input").click();
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("thread-crumb-place")).toHaveText("No project");
-  const created = (await invocations()).filter((i) => i.name === "thread.new");
-  expect(created).toHaveLength(1);
-  expect(created[0]?.args).toMatchObject({ "no-project": "true", prompt: PROMPT });
-  expect(created[0]?.args).not.toHaveProperty("project");
-});
-
-/** Adds ~/src/new-app through the Local folder tab, then steps back to home (cmd+[). */
-async function addFirstProject(page: Page): Promise<void> {
-  await openAddProjectDialog(page);
-  await page.getByTestId("add-project-local-input").fill("src/new-app");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("add-project-dialog")).toHaveCount(0);
-  expect(await projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app" });
-  await page.getByTestId("sidebar-menu").click({ position: { x: 4, y: 4 } });
-  await page.keyboard.press("Meta+BracketLeft");
-  await expect(page.getByTestId("composer")).toBeVisible();
-}
+// Zero projects: the Welcome heading and the prefilled prompt, not sent; Enter sending it as a No project
+// thread's first message: unit-tested in src/components/compose/Composer.test.tsx.
 
 // The first project reverting the heading and clearing an untouched prompt: src/components/compose/Composer.test.tsx ("the first project clears an untouched prefill, and the heading reverts"); the editor showing the draft is the next test.
 
-test("the first project: a prompt the user edited stays", async ({ page }) => {
+// The edited prompt staying when the first project arrives: unit-tested in src/components/compose/Composer.test.tsx.
+// What stays: the real editor's focus and caret after the prefilled text.
+test("the welcome prompt has focus, the caret after the prefilled text: typing appends", async ({ page }) => {
   await openWelcome(page);
   // The prompt has focus and the caret is after the prefilled text: typing appends.
   await expect(page.getByTestId("composer-input")).toBeFocused();
   await page.keyboard.type(" Slowly.");
-  await expect(prompt(page)).toHaveAttribute("data-value", `${PROMPT} Slowly.`);
-  await addFirstProject(page);
-  await expect(heading(page)).toHaveText("What should we build with No project?");
   await expect(prompt(page)).toHaveAttribute("data-value", `${PROMPT} Slowly.`);
 });

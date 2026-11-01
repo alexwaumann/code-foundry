@@ -35,61 +35,30 @@ async function shot(page: Page, name: string): Promise<void> {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png` });
 }
 
-test("Up on the empty thread composer opens the card in This thread with the thread's prompts, newest first", async ({ page }) => {
+// The card's scope, rows, times, heading, hints, placeholder, the arrows and Escape: unit-tested in
+// src/components/compose/PromptHistory.test.tsx. What stays: Up in the real editor, the keyboard staying in the
+// prompt, and the card's place above the composer.
+test("Up on the empty thread composer opens the card above it, the keyboard still in the prompt", async ({ page }) => {
   await openThread(page);
-  await expect(card(page)).toHaveCount(0);
   await page.keyboard.press("ArrowUp");
   await expect(card(page)).toBeVisible();
-  await expect(card(page)).toHaveAttribute("data-scope", "thread");
-  await expect(scopeTab(card(page), "thread")).toHaveAttribute("data-state", "active");
   await expect(items(page)).toHaveCount(2);
-  await expect(items(page).nth(0).getByTestId("prompt-history-text")).toHaveText(SECOND);
-  await expect(items(page).nth(1).getByTestId("prompt-history-text")).toContainText(FIRST);
-  // This thread: the sent time, no thread name.
-  await expect(items(page).nth(0).getByTestId("prompt-history-time")).not.toBeEmpty();
-  await expect(card(page).getByTestId("prompt-history-thread")).toHaveCount(0);
-  await expect(items(page).nth(0)).toHaveAttribute("aria-selected", "true");
-  await expect(card(page).getByTestId("prompt-history-heading")).toHaveText("Previous prompts");
-  await expect(card(page).getByTestId("prompt-history-hints")).toContainText("Show in thread");
-  // The composer is now the filter; the keyboard stays in it.
-  await expect(page.getByTestId("thread-composer").getByText("Type to filter previous prompts")).toBeVisible();
   await expect(threadPrompt(page)).toBeFocused();
-  // The card sits above the composer.
   const c = await card(page).boundingBox();
   const composer = await page.getByTestId("thread-composer").boundingBox();
   if (!c || !composer) throw new Error("no boxes");
   expect(c.y + c.height).toBeLessThanOrEqual(composer.y);
-
-  // Down and Up move (wrapping), Escape closes.
-  await page.keyboard.press("ArrowDown");
-  await expect(items(page).nth(1)).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("ArrowDown");
-  await expect(items(page).nth(0)).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Escape");
-  await expect(card(page)).toHaveCount(0);
-  await expect(page.getByTestId("thread-composer").getByText("Reply or ask anything.", { exact: false })).toBeVisible();
 });
 
-test("Up does not open the card over a draft; typing filters, hits are highlighted, Escape keeps the typed draft", async ({ page }) => {
+// Filtering, the marked hits, No matches and Escape keeping the typed draft: unit-tested in
+// src/components/compose/PromptHistory.test.tsx. What stays: Up over a draft moving the real caret.
+test("Up does not open the card over a draft: it moves the caret to the line's start", async ({ page }) => {
   await openThread(page);
   await page.keyboard.type("x");
   await page.keyboard.press("ArrowUp");
   await expect(card(page)).toHaveCount(0);
-  // Up moved the caret to the line's start.
   await page.keyboard.press("Delete");
   await expect(threadValue(page)).toHaveAttribute("data-value", "");
-
-  await page.keyboard.press("ArrowUp");
-  await expect(items(page)).toHaveCount(2);
-  await page.keyboard.type("BADGE");
-  await expect(items(page)).toHaveCount(1);
-  await expect(items(page).first().getByTestId("prompt-history-hit")).toHaveText("badge");
-  await expect(card(page).getByTestId("prompt-history-heading")).toHaveText("Previous prompts · 1 match");
-  await page.keyboard.type("zzz");
-  await expect(card(page).getByTestId("prompt-history-status")).toHaveText("No matches");
-  await page.keyboard.press("Escape");
-  await expect(card(page)).toHaveCount(0);
-  await expect(threadValue(page)).toHaveAttribute("data-value", "BADGEzzz");
 });
 
 test("Enter puts the selected prompt in the draft, replacing the filter; a click does too", async ({ page }) => {
@@ -113,89 +82,46 @@ test("Enter puts the selected prompt in the draft, replacing the filter; a click
   await expect(threadValue(page)).toHaveAttribute("data-value", SECOND);
 });
 
-test("cmd+S cycles the scope: Project and All show each prompt's thread and age", async ({ page }) => {
+// Project and All naming each prompt's thread and age, the cycle, the toggle and filtering in Project, and cmd+Enter
+// showing the prompt in its thread: unit-tested in src/components/compose/PromptHistory.test.tsx. What stays: cmd+S
+// reaching the picker from the focused editor (not the app's chord), and a toggle click keeping the keyboard there.
+test("cmd+S in the prompt switches the scope; a click on the toggle keeps the keyboard in the prompt", async ({ page }) => {
   await openThread(page);
   await page.keyboard.press("ArrowUp");
   await expect(items(page)).toHaveCount(2);
   await page.keyboard.press("Meta+s");
   await expect(card(page)).toHaveAttribute("data-scope", "project");
-  await expect(scopeTab(card(page), "project")).toHaveAttribute("data-state", "active");
-  const threads = card(page).getByTestId("prompt-history-thread");
-  await expect(threads.filter({ hasText: "Fix resize race" }).first()).toBeVisible();
-  await expect(threads.filter({ hasText: "Fix stale PR badge" }).first()).toBeVisible();
-  // repo-dot's thread is not in Project.
-  await expect(threads.filter({ hasText: "Tidy zshrc" })).toHaveCount(0);
-  await expect(card(page).getByTestId("prompt-history-age").first()).not.toBeEmpty();
-  await page.keyboard.press("Meta+s");
-  await expect(card(page)).toHaveAttribute("data-scope", "all");
-  await expect(threads.filter({ hasText: "Tidy zshrc" }).first()).toBeVisible();
-  await page.keyboard.press("Meta+s");
+  await scopeTab(card(page), "thread").click();
   await expect(card(page)).toHaveAttribute("data-scope", "thread");
-  // A click on the toggle switches too, and the keyboard stays in the prompt.
-  await scopeTab(card(page), "project").click();
-  await expect(card(page)).toHaveAttribute("data-scope", "project");
   await expect(threadPrompt(page)).toBeFocused();
-  // Filtering in Project.
-  await page.keyboard.type("resize");
-  await expect(card(page).getByTestId("prompt-history-heading")).toHaveText(/Previous prompts · \d+ match/);
-  await expect(threads.filter({ hasText: "Fix resize race" }).first()).toBeVisible();
 });
 
-test("cmd+Enter in Project shows the prompt in its thread", async ({ page }) => {
-  await openThread(page);
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("Meta+s");
-  await page.keyboard.type("useResize");
-  await expect(items(page)).toHaveCount(1);
-  await page.keyboard.press("Meta+Enter");
-  await expect(card(page)).toHaveCount(0);
-  await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-});
-
-test("the new-thread composer opens it in Project, This thread disabled; a prompt with tags comes back with its chips", async ({ page }) => {
+// Project by default, This thread disabled and cmd+S skipping it: unit-tested in
+// src/components/compose/PromptHistory.test.tsx. What stays: the prompt's thread tag back in the real editor.
+test("the new-thread composer: a prompt with tags comes back with its chips, the keyboard in the prompt", async ({ page }) => {
   await openApp(page);
   await composeProject(page, 1);
   await page.keyboard.press("ArrowUp");
-  const c = card(page);
-  await expect(c).toBeVisible();
-  await expect(c).toHaveAttribute("data-scope", "project");
-  await expect(scopeTab(c, "thread")).toBeDisabled();
-  await expect(c.getByTestId("prompt-history-thread").filter({ hasText: "Refactor sidebar tree" }).first()).toBeVisible();
-  await expect(page.getByTestId("composer").getByText("Type to filter previous prompts")).toBeVisible();
-  // cmd+S skips This thread.
-  await page.keyboard.press("Meta+s");
-  await expect(c).toHaveAttribute("data-scope", "all");
-  await page.keyboard.press("Meta+s");
-  await expect(c).toHaveAttribute("data-scope", "project");
+  await expect(card(page)).toBeVisible();
   await page.keyboard.type("keyboard navigation");
   await expect(items(page)).toHaveCount(1);
   await page.keyboard.press("Enter");
-  await expect(c).toHaveCount(0);
+  await expect(card(page)).toHaveCount(0);
   await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "Keep the keyboard navigation from [Fix resize race](cf-thread://s-3)");
-  // Escape on the empty composer still leaves it as before (the picker took it only while open).
+  await expect(page.getByTestId("composer").getByTestId("prompt-tag")).toHaveText(["Fix resize race"]);
   await expect(page.getByTestId("composer-input")).toBeFocused();
 });
 
+// The prompts page's scope, rows, hints, cycling and filtering: unit-tested in
+// src/components/compose/PromptHistory.test.tsx. What stays: from the palette into the thread's real editor, focused.
 test("composer.history from the palette opens its prompts page; Enter puts the prompt in the thread's composer", async ({ page }) => {
   await openThread(page);
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await page.keyboard.type("Previous Prompts");
-  await expect(palette.locator('[data-command="composer.history"]')).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(palette).toHaveAttribute("data-mode", "prompts");
   await expect(palette.getByPlaceholder("Search previous prompts…")).toBeFocused();
-  await expect(scopeTab(palette, "thread")).toHaveAttribute("data-state", "active");
-  await expect(palette.getByTestId("prompt-history-item")).toHaveCount(2);
-  await expect(palette.getByTestId("prompt-history-hints")).toContainText("Insert into composer");
-  await page.keyboard.press("Meta+s");
-  await expect(scopeTab(palette, "project")).toHaveAttribute("data-state", "active");
-  await page.keyboard.type("flaky");
-  await expect(palette.getByTestId("prompt-history-item").first().getByTestId("prompt-history-hit").first()).toBeVisible();
-  await page.keyboard.press("Meta+s");
-  await page.keyboard.press("Meta+s");
-  await expect(scopeTab(palette, "thread")).toHaveAttribute("data-state", "active");
-  await page.keyboard.press("Meta+a");
   await page.keyboard.type("suite");
   await expect(palette.getByTestId("prompt-history-item")).toHaveCount(1);
   await page.keyboard.press("Enter");

@@ -606,6 +606,7 @@ describe("Claude Code's API-error text", () => {
     const c = show([hi, apiError, turnEndItem({ isError: true, terminalReason: "api_error" })], { fold: () => true });
     const row = c.querySelector('[data-testid="thread-error"]');
     expect(row?.textContent).toBe("Invalid API key · Fix external API key");
+    expect(row?.className).toMatch(/border-cf-error/);
     expect(c.querySelector('[data-testid="thread-text"]')).toBeNull();
     expect(c.querySelector('[data-testid="thread-copy-answer"]')).toBeNull();
   });

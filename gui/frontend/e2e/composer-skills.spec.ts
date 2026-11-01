@@ -200,7 +200,7 @@ test("hovering a skill tag says what it is", async ({ page }) => {
   await expect(tip).toContainText("Write a commit message and commit.");
 });
 
-test("a second project: skills grouped by project; removing the project removes its tags after a confirm", async ({ page }) => {
+test("a second project: skills grouped by project", async ({ page }) => {
   await openApp(page);
   await compose(page);
   await page.getByTestId("composer-add-project").click();
@@ -226,25 +226,7 @@ test("a second project: skills grouped by project; removing the project removes 
   await tags(page).nth(0).hover();
   await expect(page.getByTestId("prompt-tag-tooltip")).toContainText("Project skill · sketches");
 
-  // Cancel keeps both; confirm removes the project and its tag.
-  const dialog = page.getByTestId("confirm-dialog");
-  await page.getByRole("button", { name: "Remove sketches" }).click();
-  await expect(dialog).toContainText("Remove sketches from the thread?");
-  await expect(dialog).toContainText("1 reference to sketches in your text will be removed.");
-  await dialog.getByTestId("confirm-cancel").click();
-  await expect(page.getByTestId("composer-member")).toHaveCount(2);
-  await expect(tags(page)).toHaveCount(2);
-  await page.getByRole("button", { name: "Remove sketches" }).click();
-  await dialog.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("composer-member")).toHaveCount(0);
-  await expect(tags(page)).toHaveText(["/commit"]);
-  await expect(value(page)).toHaveAttribute("data-value", `and ${COMMIT}`);
-
-  // Without references, removing asks nothing.
-  await page.getByTestId("composer-add-project").click();
-  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Remove sketches" }).click();
-  await expect(page.getByTestId("composer-member")).toHaveCount(0);
-  await expect(dialog).toHaveCount(0);
+  // Removing the project after a confirm strips its tag from the real editor: composer-switch.spec.ts and
+  // composer-files.spec.ts; the confirm's wording, Cancel, and no confirm without references: unit-tested in
+  // src/components/compose/ComposerSets.test.tsx.
 });

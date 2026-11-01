@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { composeProject, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 // Thread tags under "@" (docs/notes/composer-thread-pr-tags.md): a "Threads" group above
 // "Files" lists up to three active threads by name (not archived, not snoozed, never the
@@ -36,15 +36,13 @@ const tip = (page: Page) => page.getByTestId("prompt-tag-tooltip").locator("p");
 
 const RESIZE = "[Fix resize race](cf-thread://s-3)";
 
-test("@res: a Threads group above Files; Enter inserts the thread tag; the send projects it for the daemon", async ({ page }) => {
+test("@res: a Threads group above Files; Enter inserts the thread tag", async ({ page }) => {
   await openApp(page);
   await compose(page);
   await page.keyboard.type("@res");
   await expect(headings(page)).toHaveText(["Threads", "Files"]);
   await expect(labels(page)).toHaveText(["Fix resize race", "resize.md"]);
-  await expect(rows(page).nth(0)).toContainText("code-foundry · Idle");
   await expect(rows(page).nth(0)).toHaveAttribute("aria-selected", "true");
-  await expect(card(page).getByRole("listbox")).toHaveAttribute("aria-label", "Threads and files");
   await shot(page, "threads-card");
 
   await page.keyboard.press("Enter");
@@ -59,28 +57,12 @@ test("@res: a Threads group above Files; Enter inserts the thread tag; the send 
   await shot(page, "thread-tag-tooltip");
   await page.mouse.move(0, 0);
 
-  await page.keyboard.type("hit the same bug");
-  await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.new").length).toBe(1);
-  const args = (await invocations()).at(-1)?.args;
-  expect(args?.prompt).toBe('[Thread "Fix resize race" (id s-3)] hit the same bug');
-  expect(args?.["composer-prompt"]).toBe(`${RESIZE} hit the same bug`);
+  // The row's project and status, the card's name, and the send's projection for the daemon: unit-tested in
+  // src/components/compose/useRefSources.test.tsx and src/components/compose/ComposerSend.test.tsx.
 });
 
-test("archived and snoozed threads are not offered; at most three; the files stay below", async ({ page }) => {
-  await openApp(page);
-  await compose(page);
-  await page.keyboard.type("@spike");
-  await expect(card(page).getByTestId("completion-empty")).toHaveText("No threads or files match");
-  await page.keyboard.press("Escape");
-  await page.keyboard.type(" @gh");
-  await expect(card(page)).toHaveCount(0); // "Refactor the gh poller" is snoozed; no file either
-  await page.keyboard.type(" @");
-  // An empty query: the three most recently active threads, then the files.
-  await expect(headings(page)).toHaveText(["Threads", "Files"]);
-  await expect(rows(page).filter({ hasText: "·" })).toHaveCount(3);
-  await expect(labels(page).filter({ hasText: /^(Spike a canvas sidebar|Refactor the gh poller)$/ })).toHaveCount(0);
-});
+// Archived and snoozed threads not offered, at most three, the empty card's text: unit-tested in
+// src/components/compose/useRefSources.test.tsx (the rule in src/lib/tagCandidates.test.ts).
 
 test("the tag shows the thread's current name; Backspace removes it whole, undo brings it back; a pasted token becomes a tag", async ({ page }) => {
   await openApp(page);
@@ -113,34 +95,24 @@ test("the tag shows the thread's current name; Backspace removes it whole, undo 
   await expect(tip(page)).toHaveText(["Thread not found"]);
 });
 
-test("a thread's composer leaves itself out; the sent bubble draws the tag with its tooltip", async ({ page }) => {
+// The thread's composer leaving itself out, thread.send's projection, and the bubble's chip with its tooltip:
+// unit-tested in src/components/compose/useRefSources.test.tsx, src/components/thread/ThreadComposerSend.test.tsx
+// and src/components/thread/UserBubble.test.tsx. What stays: the tag typed in the thread's real editor and the
+// sent bubble drawing it in the timeline.
+test("a thread's composer: the tag typed in, sent, and drawn in the bubble", async ({ page }) => {
   await mockPost("thread?state=idle"); // s-r1 "Fix stale PR badge" in code-foundry
   await openApp(page);
   await row(page, "s:s-r1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
   await page.keyboard.type("@fix");
-  await expect(card(page)).toBeVisible();
-  await expect(labels(page).filter({ hasText: "Fix stale PR badge" })).toHaveCount(0);
   await expect(labels(page).first()).toHaveText("Fix resize race");
   await page.keyboard.press("Enter");
   await page.keyboard.type("has the same race");
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.send")?.args.text ?? "").toBe('[Thread "Fix resize race" (id s-3)] has the same race');
-  const send = (await invocations()).find((i) => i.name === "thread.send");
-  expect(send?.args["composer-text"]).toBe(`${RESIZE} has the same race`);
+  await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.send")?.args["composer-text"] ?? "").toBe(`${RESIZE} has the same race`);
   const bubble = page.getByTestId("thread-user").last();
   await expect(bubble).toContainText("has the same race");
-  const chip = bubble.locator('[data-tag-kind="thread"]');
-  await expect(chip).toHaveText("Fix resize race");
-  await expect(chip).toHaveAttribute("data-thread", "s-3");
-  // The reply streams in under the bubble first (the timeline moves while it does).
-  await expect(page.locator('[data-testid="thread-text"]').last()).toContainText("Got it");
-  // The timeline settles after the turn (it folds and keeps to the bottom): hover until the tooltip shows.
-  await expect(async () => {
-    await page.mouse.move(0, 0);
-    await chip.hover();
-    await expect(openTooltip(page)).toHaveText(/^code-foundry\s*Idle$/, { timeout: 1500 });
-  }).toPass();
+  await expect(bubble.locator('[data-tag-kind="thread"]')).toHaveText("Fix resize race");
   await shot(page, "thread-bubble");
 });

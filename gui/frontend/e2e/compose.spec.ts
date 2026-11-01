@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
+import { composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
 
 /** A 1x1 transparent PNG. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
@@ -7,11 +7,6 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 test.beforeEach(async () => {
   await resetMock();
 });
-
-async function threadCount(): Promise<number> {
-  const res = await fetch(`${mockUrl}/__mock/threads`);
-  return ((await res.json()) as unknown[]).length;
-}
 
 async function staged(): Promise<{ path: string; name: string; mimeType: string; size: number; pages: number }[]> {
   const res = await fetch(`${mockUrl}/__mock/attachments`);
@@ -45,71 +40,31 @@ function promptFocused(page: Page): Promise<boolean> {
   return page.evaluate(() => document.activeElement?.closest('[data-testid="thread-composer"]') != null);
 }
 
+// The picker's rows, sources, numbering, hints and ranking: unit-tested in src/components/compose/ProjectPicker.test.tsx;
+// the composer's heading, placeholder, default pills, Creating worktree… and thread.new's args, and the
+// cleared draft: src/components/compose/ComposerSend.test.tsx. What stays: the global chord, real
+// typing, and the flow from thread.new over the daemon's streams.
 test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktree", async ({ page }) => {
   await freshCopyByDefault();
   await mockPost("thread-new?delay=1500");
-  // A workspace around changes nothing for a single-project thread.
-  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "projects");
-  const projects = palette.locator("[data-project]");
-  await expect(projects).toHaveCount(5);
-  await expect(projects.nth(0)).toContainText("CF");
-  await expect(projects.nth(0)).toContainText("code-foundry");
-  // The subtitle names where the project lives: its GitHub slug, a remote, or "Local only".
-  await expect(projects.getByTestId("project-source")).toHaveText([
-    "alexwaumann/code-foundry · ~/src/code-foundry",
-    "origin · ~/dotfiles",
-    "alexwaumann/ghostty-playground · ~/src/ghostty-playground",
-    "Local only · ~/src/sketches",
-    "No git · ~/Documents/writing",
-  ]);
-  // One list: No project, the workspace, then the projects, numbered in that order.
-  const listed = palette.getByTestId("picker-rows").locator("[cmdk-item]");
-  await expect(listed).toHaveCount(7);
-  await expect(listed.nth(0)).toHaveAttribute("data-testid", "picker-no-project");
-  await expect(listed.nth(0)).toHaveAttribute("aria-selected", "true");
-  await expect(listed.nth(1)).toHaveAttribute("data-workspace", /.+/);
-  await expect(palette.locator("[cmdk-group-heading]")).toHaveCount(0);
-  await expect(listed.nth(0)).toContainText("⌘1");
-  await expect(projects.nth(0)).toContainText("⌘3");
-  await expect(projects.nth(2)).toContainText("⌘5");
-  await expect(page.getByTestId("picker-hints")).toHaveText(/↑↓\s*Navigate\s*Enter\s*Select\s*Backspace\s*Back\s*Esc\s*Close/);
-  // The search box filters and ranks across workspaces and projects: code-foundry's own
-  // name beats the workspace that has it as a member, and Add a project stays pinned.
   await page.keyboard.type("foundry");
-  await expect(listed).toHaveCount(2);
-  await expect(listed.nth(0)).toHaveAttribute("data-project", "repo-cf");
-  await expect(listed.nth(0)).toContainText("⌘1");
-  await expect(listed.nth(1)).toHaveAttribute("data-workspace", /.+/);
-  await expect(palette.getByTestId("picker-add-project")).toBeVisible();
   await page.keyboard.press("Meta+1"); // the top row of the list on screen
   await expect(palette).toHaveCount(0);
 
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
   await expect(page.getByTestId("composer-input")).toBeFocused();
-  await expect(page.getByTestId("composer-input")).toHaveAttribute("aria-placeholder", "Ask anything. @ files and threads, / skills and commands");
-  await expect(page.getByTestId("composer")).toContainText("Ask anything. @ files and threads, / skills and commands");
   // A composer has no sidebar row: nothing in the thread list is selected.
   await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(0);
-  // Defaults: settings (Sonnet 5 / medium), Auto, a new worktree (pinned above) from the
-  // default branch (no base sent: the daemon's rule picks origin's copy or the local one).
-  await expect(page.getByTestId("composer-model")).toHaveText("Sonnet 5");
-  await expect(page.getByTestId("composer-effort")).toHaveText("Medium");
-  await expect(page.getByTestId("composer-permission")).toHaveText("Auto");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
-  await expect(page.getByTestId("composer-worktree")).toHaveAccessibleName("Work in: Fresh copy");
-  await expect(page.getByTestId("composer-base")).toHaveText("From default");
-  await expect(page.getByTestId("composer-base")).toHaveAccessibleName("Branch from: From default");
 
   await page.keyboard.type("Add a dark mode toggle");
   await page.keyboard.press("Shift+Enter");
   await page.keyboard.type("in settings");
   await expect(prompt(page)).toHaveAttribute("data-value", "Add a dark mode toggle\nin settings");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-send")).toHaveText("Creating worktree…");
   await expect(page.getByTestId("composer-input")).toBeDisabled();
 
   // The daemon's focus intent replaces the composer with the thread; its prompt has focus.
@@ -125,19 +80,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   // Unnamed at first: the id stands in until the daemon names it.
   await expect(created.getByTestId("thread-name")).toHaveText(key.slice(2));
   await expect(created.getByTestId("thread-name")).toHaveText("Add a dark mode", { timeout: 5000 });
-
-  const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("thread.new");
-  expect(last?.args).toEqual({
-    project: "repo-cf",
-    "new-worktree": "true",
-    model: "claude-sonnet-5[1m]",
-    effort: "medium",
-    permission: "auto",
-    prompt: "Add a dark mode toggle\nin settings",
-  });
-  const threads = (await (await fetch(`${mockUrl}/__mock/threads`)).json()) as { id: string; workspaceId: string }[];
-  expect(threads.find((t) => t.id === key.slice(2))?.workspaceId).toBe("");
+  expect((await invocations()).at(-1)?.args.prompt).toBe("Add a dark mode toggle\nin settings");
   // The prompt goes out as the thread's first message once Claude is up.
   await expect(page.getByTestId("thread-user").first()).toContainText("Add a dark mode toggle", { timeout: 8000 });
   // The thread's row names its project and the new worktree's branch; it is the newest thread.
@@ -146,10 +89,6 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   // Starting, it sits under Working; once idle it joins the idle threads (sorted by their
   // last activity, so where among them depends on what else just ran).
   await expect(created).toHaveAttribute("data-section", "idle", { timeout: 8000 });
-
-  // The draft was cleared: a new composer for the project starts empty.
-  await compose(page);
-  await expect(prompt(page)).toHaveAttribute("data-value", "");
 });
 
 test("pickers are keyboard operable; Tab goes prompt → pickers → send", async ({ page }) => {
@@ -241,223 +180,26 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 });
 
-test("a failed start keeps the draft editable and shows why", async ({ page }) => {
-  await freshCopyByDefault();
-  await mockPost("thread-new?delay=300");
-  await openApp(page);
-  const before = await threadCount();
-  await compose(page);
-  await page.keyboard.type("Please FAIL here");
-  await page.keyboard.press("Enter");
-  const error = page.getByTestId("composer-error");
-  await expect(error).toHaveText("create worktree: git fetch origin main: exit status 128");
-  const input = page.getByTestId("composer-input");
-  await expect(input).toBeEnabled();
-  await expect(prompt(page)).toHaveAttribute("data-value", "Please FAIL here");
-  await expect(input).toBeFocused();
-  await expect(page.getByTestId("composer")).toBeVisible();
-  expect(await threadCount()).toBe(before);
+// A failed start (the refusal, the draft kept and editable, Work in's options, Project folder dropping the base,
+// editing clearing the error, the send in the folder): unit-tested in src/components/compose/ComposerSend.test.tsx.
 
-  // Work in the project folder instead: the base picker goes away. Editing clears the error.
-  await page.getByTestId("composer-worktree").click();
-  const list = page.getByTestId("composer-worktree-list");
-  const options = list.getByRole("option");
-  // The two choices, then the project's branches (newest first, the default branch left
-  // out: Project folder works on it) under a search box.
-  await expect(options).toHaveText([
-    /^Fresh copy\s*Edits land in a new branch with its own worktree\. Multiple threads at a time is safe\.$/,
-    /^Project folder\s*Edits land in the project's checkout directly\. One thread at a time is safest\.$/,
-    "feat/sidebar",
-    "fix/resize",
-    "release/v0.3",
-  ]);
-  await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Work in"]);
-  await expect(list.getByPlaceholder("Find existing branch")).toBeFocused();
-  await options.filter({ hasText: "Project folder" }).click();
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Project folder");
-  await expect(page.getByTestId("composer-base")).toHaveCount(0);
-  await input.fill("Please work");
-  await expect(error).toHaveCount(0);
-  await input.press("Enter");
-  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
-  const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ project: "repo-cf", worktree: CF, model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto", prompt: "Please work" });
-  expect(await threadCount()).toBe(before + 1);
-});
+// The current checkout's branch (read-only, not a Tab stop, live), an existing branch and the base slot, and Work in
+// by default (in place; a pick for its draft only): unit-tested in src/components/compose/ComposerSend.test.tsx.
 
-test("an existing worktree or the current checkout shows its branch, read-only and live", async ({ page }) => {
-  await freshCopyByDefault();
+// Picked, rejected (the notice), removed without a confirm, staged on send in the draft's order:
+// unit-tested in src/components/compose/ComposerAttachments.test.tsx. What stays: a real paste.
+test("attachments: a pasted image lands as a thumbnail; into an empty prompt, with no chip", async ({ page }) => {
   await openApp(page);
   await compose(page);
-  await page.keyboard.type("Look around");
-  const indicator = page.getByTestId("composer-checkout-branch");
-  const worktree = page.getByTestId("composer-worktree");
-  const options = page.getByTestId("composer-worktree-list").getByRole("option");
-  // New worktree: the base picker, no indicator.
-  await expect(page.getByTestId("composer-base")).toBeVisible();
-  await expect(indicator).toHaveCount(0);
-
-  await worktree.click();
-  await options.filter({ hasText: "Project folder" }).click();
-  // The pick hands the keyboard to the prompt, again once the list's exit animation ends;
-  // wait for that before moving focus by hand below.
-  await expect(page.getByTestId("composer-worktree-list")).toHaveCount(0);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
-  await expect(page.getByTestId("composer-base")).toHaveCount(0);
-  await expect(indicator).toHaveText("On main");
-  await expect(indicator).toHaveAccessibleName("Current checkout is on main");
-  await expect(page.getByRole("note", { name: "Current checkout is on main" })).toBeVisible();
-
-  // Not focusable: no tabindex, focus() is a no-op, and Tab goes worktree → send (and back).
-  await expect(indicator).not.toHaveAttribute("tabindex");
-  expect(
-    await indicator.evaluate((el) => {
-      (el as HTMLElement).focus();
-      return document.activeElement === el;
-    }),
-  ).toBe(false);
-  await worktree.focus();
-  await page.keyboard.press("Tab");
-  await expect(page.getByTestId("composer-send")).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
-  await expect(worktree).toBeFocused();
-
-  // Follows the project store: a checkout elsewhere, then a detached HEAD.
-  await mockPost(`worktree/checkout?path=${encodeURIComponent(CF)}&branch=release%2Fv0.3`);
-  await expect(indicator).toHaveText("On release/v0.3");
-  await mockPost(`worktree/checkout?path=${encodeURIComponent(CF)}`);
-  await expect(indicator).toHaveText("Detached at 3c3c465");
-  await expect(indicator).toHaveAccessibleName("Current checkout is detached at 3c3c465");
-
-  // An existing branch: the pill is its name, no indicator and no base (the daemon reuses its worktree).
-  await worktree.click();
-  await expect(options).toHaveText([/^Fresh copy/, /^Project folder\s*Edits land in the project's checkout directly/, "feat/sidebar", "fix/resize", "release/v0.3"]);
-  await options.filter({ hasText: "feat/sidebar" }).click();
-  await expect(worktree).toHaveText("feat/sidebar");
-  await expect(worktree).toHaveAccessibleName("Work in: feat/sidebar");
-  await expect(indicator).toHaveCount(0);
-  await expect(page.getByTestId("composer-base")).toHaveCount(0);
-
-  // Back to a new worktree: the base picker returns in the same slot.
-  await worktree.click();
-  await options.filter({ hasText: "Fresh copy" }).click();
-  await expect(indicator).toHaveCount(0);
-  await expect(page.getByTestId("composer-base")).toHaveText("From default");
-});
-
-test("Work in: by default a thread starts in place; a pick applies to its draft only", async ({ page }) => {
-  // threads.default_worktree is unset: its default is the project folder itself.
-  await openApp(page);
-  await compose(page);
-  const worktree = page.getByTestId("composer-worktree");
-  await expect(worktree).toHaveText("Project folder");
-  await expect(page.getByTestId("composer-base")).toHaveCount(0);
-  await expect(page.getByTestId("composer-checkout-branch")).toHaveText("On main");
-
-  // Picking a fresh copy brings the base back for this draft.
-  await worktree.click();
-  await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Fresh copy" }).click();
-  await expect(worktree).toHaveText("Fresh copy");
-  await expect(page.getByTestId("composer-base")).toHaveText("From default");
-  await page.getByTestId("composer-input").focus();
-  await page.keyboard.type("Tidy the README");
-  await page.keyboard.press("Enter");
-  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
-  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-cf", "new-worktree": "true" });
-  expect((await invocations()).at(-1)?.args).not.toHaveProperty("base");
-  await expect.poll(() => promptFocused(page)).toBe(true);
-
-  // The next code-foundry draft starts from the setting again, not from the pick.
-  await compose(page);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Project folder");
-  await expect(page.getByTestId("composer-base")).toHaveCount(0);
-
-  // So does one after a reload.
-  await openApp(page);
-  await compose(page);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Project folder");
-});
-
-test("attachments: picked, rejected, removed, staged on send", async ({ page }) => {
-  await openApp(page);
-  await compose(page);
-  const input = page.getByTestId("composer-file-input");
-  await input.setInputFiles([
-    { name: "shot.png", mimeType: "image/png", buffer: PNG },
-    { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") },
-  ]);
-  const thumbs = page.getByTestId("attachment");
-  await expect(thumbs).toHaveCount(1);
-  await expect(thumbs.first().locator("img")).toHaveAttribute("src", /^blob:/);
-  await expect(page.getByTestId("composer-notice")).toHaveText("notes.txt: not a PNG, JPEG, GIF, WebP or PDF file");
-
-  await input.setInputFiles([{ name: "other.png", mimeType: "image/png", buffer: PNG }]);
-  await expect(thumbs).toHaveCount(2);
-  await expect(page.getByTestId("composer-notice")).toHaveCount(0);
-  // Not referenced in the (empty) text: × removes it without asking.
-  await page.getByRole("button", { name: "Remove other.png" }).click();
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  await expect(thumbs).toHaveCount(1);
-
-  // A pasted image lands as a thumbnail too; into an empty prompt, with no chip.
   await pasteImage(page, "pasted.png");
-  await expect(thumbs).toHaveCount(2);
+  await expect(page.getByTestId("attachment")).toHaveCount(1);
   await expect(page.getByTestId("prompt-chip")).toHaveCount(0);
-
-  await page.getByTestId("composer-input").fill("Match these screenshots");
-  await expect(page.getByTestId("prompt-chip")).toHaveCount(0);
-  await page.getByTestId("composer-input").press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  const up = await staged();
-  expect(up.map((a) => [a.name, a.mimeType, a.size])).toEqual([
-    ["shot.png", "image/png", PNG.length],
-    ["pasted.png", "image/png", PNG.length],
-  ]);
-  expect((await invocations()).at(-1)?.args.attachments).toBe(up.map((a) => a.path).join(","));
-  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 });
 
-/** What the Wails host sends for a native drop (gui/filedrop.go), dispatched the way the runtime delivers it. */
-async function nativeDrop(page: Page, paths: string[], target: string): Promise<void> {
-  await page.evaluate(
-    ([data]) => {
-      (window as unknown as { _wails: { dispatchWailsEvent(e: unknown): void } })._wails.dispatchWailsEvent({ name: "app:files-dropped", data });
-    },
-    [{ paths, target }],
-  );
-}
+// A native drop (images and PDFs staged by path, other paths inserted, another target ignored, the send reusing
+// the staged paths): unit-tested in src/components/compose/hostFiles.test.tsx.
 
-test("a native drop: images and PDFs staged by path and attached, other paths inserted; the send reuses the staged paths", async ({ page }) => {
-  await openApp(page);
-  await compose(page);
-  const card = page.getByTestId("composer-card");
-  await expect(card).toHaveAttribute("data-file-drop-target", "");
-  const id = (await card.getAttribute("data-drop-id")) ?? "";
-  expect(id).not.toBe("");
-  await page.getByTestId("composer-input").fill("Compare");
-
-  // Another target's drop is not this composer's.
-  await nativeDrop(page, ["/Users/me/elsewhere.txt"], "not-this-one");
-  await nativeDrop(page, ["/Users/me/shot.png", "/Users/me/my notes.txt", "/Users/me/spec.PDF", "/Users/me/src"], id);
-  await expect(page.getByTestId("attachment")).toHaveCount(2);
-  await expect(page.getByTestId("prompt-chip")).toHaveCount(2);
-  await expect(prompt(page)).toHaveAttribute("data-value", /^Compare "\/Users\/me\/my notes\.txt" \/Users\/me\/src !\[shot\.png\]\(cf-attachment:\/\/a\d+\) !\[spec\.PDF\]\(cf-attachment:\/\/a\d+\) $/);
-  // Staged side by side, so in either order.
-  expect((await staged()).map((a) => [a.name, a.mimeType]).sort()).toEqual([
-    ["shot.png", "image/png"],
-    ["spec.PDF", "application/pdf"],
-  ]);
-
-  await page.getByTestId("composer-input").press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  // Staged once, at the drop; sent in the draft's order.
-  const up = await staged();
-  expect(up).toHaveLength(2);
-  const path = (name: string) => up.find((a) => a.name === name)?.path ?? "";
-  expect((await invocations()).at(-1)?.args.attachments).toBe(`${path("shot.png")},${path("spec.PDF")}`);
-});
-
-test("the draft survives switching away; Backspace goes back; Esc on an empty draft shows the project", async ({ page }) => {
+test("the draft survives switching away; Esc on an empty draft shows the project", async ({ page }) => {
   await openApp(page);
   await compose(page, 3);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
@@ -465,19 +207,8 @@ test("the draft survives switching away; Backspace goes back; Esc on an empty dr
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("composer")).toHaveCount(0);
 
-  // Back through the picker: No project is highlighted (not the selected project), Backspace returns to the commands.
-  await page.keyboard.press("Meta+n");
-  const palette = page.getByTestId("palette");
-  await expect(palette.getByTestId("picker-no-project")).toHaveAttribute("data-selected", "true");
-  await expect(palette.locator('[data-project="repo-cf"]')).toHaveAttribute("data-selected", "false");
-  await page.keyboard.press("Backspace");
-  await expect(palette).toHaveAttribute("data-mode", "commands");
-  // Picking thread.new in the palette shows the picker again, not model/effort prompts.
-  await page.keyboard.type("new thread");
-  await page.keyboard.press("Enter");
-  await expect(palette).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press("Escape");
-  await expect(palette).toHaveCount(0);
+  // No project highlighted in the picker, Backspace back to the commands, and thread.new from the
+  // palette showing the picker: unit-tested in src/components/palette/CommandPalette.test.tsx.
   await compose(page, 3);
   await expect(prompt(page)).toHaveAttribute("data-value", "Half-written idea");
 
@@ -580,33 +311,9 @@ test("image chips: inserted at the caret, one unit for arrows and Backspace, × 
   expect(args?.attachments).toBe(up?.path);
 });
 
-test("a local-only repository: local branches, no remote git commands", async ({ page }) => {
-  await freshCopyByDefault();
-  await openApp(page);
-  await compose(page, 4);
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in sketches?");
-  await expect(page.getByTestId("composer-base")).toHaveText("From default");
-  await page.getByTestId("composer-base").click();
-  const list = page.getByTestId("composer-base-list");
-  // One project: "Default branch", then its other branches (main is the default row).
-  await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Branch from"]);
-  await expect(list.getByRole("option")).toHaveText(["Default branch", "experiment/shaders"]);
-  await expect(list.locator('[data-slot="picker-footer"]')).toHaveText("The project takes origin's copy of the branch, or its own when that is ahead.");
-  await list.getByRole("option").filter({ hasText: "experiment/shaders" }).click();
-  await expect(page.getByTestId("composer-base")).toHaveText("From experiment/shaders");
-  await page.getByTestId("composer-input").click();
-  await page.keyboard.type("Try a new shader");
-  await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-sk", "new-worktree": "true", base: "experiment/shaders" });
-  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
-
-  // The new thread is selected: fetch/pull/push/PR are not offered for a project without git.
-  await page.keyboard.press("Meta+k");
-  const palette = page.getByTestId("palette");
-  await expect(palette.locator('[data-command="terminal.new"]')).toBeVisible();
-  for (const name of ["git.fetch", "git.pull", "git.push", "pr.create", "pr.open"]) await expect(palette.locator(`[data-command="${name}"]`)).toHaveCount(0);
-});
+// A local-only repository's Branch from (local branches, the rule, the base sent): unit-tested in
+// src/components/compose/ComposerSend.test.tsx; no remote git commands for it is the daemon's availability
+// (internal/command/commands_gitops_test.go).
 
 test("an image dropped on the prompt attaches it and puts a chip at the caret", async ({ page }) => {
   await openApp(page);
@@ -634,39 +341,23 @@ async function pasteText(page: Page, text: string): Promise<void> {
   }, text);
 }
 
-test("attachment preview: from the thumbnail; Esc, ×, and the backdrop close it and focus returns", async ({ page }) => {
+// The preview's name, size and image, Esc and × closing it with focus back on the thumbnail, and × on the tile
+// opening none: unit-tested in src/components/compose/ComposerAttachments.test.tsx. What stays: the geometry and
+// the backdrop's outside press.
+test("attachment preview: centred in the window; the backdrop closes it and focus returns", async ({ page }) => {
   await openApp(page);
   await compose(page);
   await page.getByTestId("composer-file-input").setInputFiles([{ name: "shot.png", mimeType: "image/png", buffer: PNG }]);
   const open = page.getByTestId("attachment-open");
   await expect(open).toHaveCSS("cursor", "pointer");
   const preview = page.getByTestId("attachment-preview");
-  await expect(preview).toHaveCount(0);
-
   await open.click();
   await expect(preview).toBeVisible();
-  await expect(preview.getByRole("heading")).toHaveText("shot.png");
-  await expect(page.getByTestId("attachment-preview-size")).toHaveText("1 KB");
-  const src = await page.getByTestId("attachment").locator("img").getAttribute("src");
-  await expect(preview.locator("img")).toHaveAttribute("src", src ?? "");
   // Centered in the window.
   const box = await preview.boundingBox();
   const vp = page.viewportSize();
   expect(Math.abs((box?.y ?? 0) + (box?.height ?? 0) / 2 - (vp?.height ?? 0) / 2)).toBeLessThan(2);
   expect(Math.abs((box?.x ?? 0) + (box?.width ?? 0) / 2 - (vp?.width ?? 0) / 2)).toBeLessThan(2);
-
-  await page.keyboard.press("Escape");
-  await expect(preview).toHaveCount(0);
-  await expect(open).toBeFocused();
-  await expect(page.getByTestId("composer")).toBeVisible(); // Esc did not leave the composer
-
-  await open.click();
-  await page.getByTestId("attachment-preview-close").click();
-  await expect(preview).toHaveCount(0);
-  await expect(open).toBeFocused();
-
-  await open.click();
-  await expect(preview).toBeVisible();
   // The backdrop. Moved onto first: Chromium misses Radix's outside-press when the
   // pointer jumps there and presses in one go (the confirm dialog too); WebKit does not.
   await page.mouse.move(8, 8);
@@ -674,11 +365,6 @@ test("attachment preview: from the thumbnail; Esc, ×, and the backdrop close it
   await page.mouse.up();
   await expect(preview).toHaveCount(0);
   await expect(open).toBeFocused();
-
-  // × still removes (unreferenced: no confirm), and opens no preview.
-  await page.getByRole("button", { name: "Remove shot.png" }).click();
-  await expect(page.getByTestId("attachment")).toHaveCount(0);
-  await expect(preview).toHaveCount(0);
 });
 
 test("attachment preview: from an inline chip by click or Space; Enter next to a chip still sends", async ({ page }) => {
@@ -759,40 +445,34 @@ async function pasteFile(page: Page, name: string, type: string, data: Buffer): 
   );
 }
 
-test("PDFs: picked and pasted, a first-page tile and a chip with pages, previewed page by page, sent as [PDF: …]", async ({ page }) => {
+// The attach button's label and accept list, the tile's kind, pages and label, the preview's size line, no notice,
+// the staged page counts and the [PDF: …] prompt: unit-tested in src/components/compose/ComposerAttachments.test.tsx.
+// What stays: pdf.js drawing the tile, the chip and the pages, the canvases' backing size, the preview fitting the
+// window, and a real paste.
+test("PDFs: picked and pasted, a first-page tile and a chip with pages, previewed page by page", async ({ page }) => {
   await openApp(page);
   await compose(page);
   const two = testPdf(2);
   const tiles = page.getByTestId("attachment");
   const chips = page.getByTestId("prompt-chip");
-  await expect(page.getByTestId("composer-attach")).toHaveAttribute("aria-label", "Attach images or PDFs");
-  await expect(page.getByTestId("composer-file-input")).toHaveAttribute("accept", /application\/pdf,\.pdf$/);
 
   // Picked, with prose in the prompt: a tile and a chip at the caret.
   await page.keyboard.type("Summarize");
   await page.getByTestId("composer-file-input").setInputFiles([{ name: "spec.pdf", mimeType: "application/pdf", buffer: two }]);
   await expect(tiles).toHaveCount(1);
-  await expect(tiles.first()).toHaveAttribute("data-kind", "pdf");
-  await expect(tiles.first()).toHaveAttribute("data-pages", "2");
-  await expect(tiles.first()).toContainText("PDF");
   // pdf.js drew the first page.
   await expect(tiles.first().locator("img")).toHaveAttribute("src", /^data:image\/png;base64,/);
-  await expect(page.getByTestId("attachment-open")).toHaveAttribute("aria-label", "Preview spec.pdf, PDF, 2 pages, 1 KB");
   await expect(chips).toHaveCount(1);
   await expect(chips.first()).toHaveAttribute("data-attachment-kind", "pdf");
   await expect(chips.first()).toHaveAttribute("aria-label", "PDF attachment, spec.pdf, 2 pages");
   await expect(chips.first()).toContainText("2 pages");
   await expect(chips.first().locator("img")).toHaveAttribute("src", /^data:image\/png/);
-  await expect(page.getByTestId("composer-notice")).toHaveCount(0);
 
-  // The preview: name, size and pages; a canvas per page, each drawn.
+  // The preview: a canvas per page, each drawn.
   const preview = page.getByTestId("attachment-preview");
   const open = page.getByTestId("attachment-open");
   await open.click();
   await expect(preview).toBeVisible();
-  await expect(preview).toHaveAttribute("data-kind", "pdf");
-  await expect(preview.getByRole("heading")).toHaveText("spec.pdf");
-  await expect(page.getByTestId("attachment-preview-size")).toHaveText("1 KB · 2 pages");
   const pages = preview.getByTestId("pdf-page");
   await expect(pages).toHaveCount(2);
   await expect(pages.locator("canvas")).toHaveCount(2);
@@ -823,34 +503,17 @@ test("PDFs: picked and pasted, a first-page tile and a chip with pages, previewe
   await expect(preview.getByTestId("pdf-page")).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(preview).toHaveCount(0);
-
   await page.getByTestId("composer-input").press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  const up = await staged();
   // With pdf.js's page counts, which the daemon takes when it has no pdfinfo.
-  expect(up.map((a) => [a.name, a.mimeType, a.size, a.pages])).toEqual([
-    ["spec.pdf", "application/pdf", two.length, 2],
-    ["notes.pdf", "application/pdf", testPdf(1).length, 1],
+  expect((await staged()).map((a) => [a.name, a.pages])).toEqual([
+    ["spec.pdf", 2],
+    ["notes.pdf", 1],
   ]);
-  const args = (await invocations()).at(-1)?.args;
-  expect(args?.prompt).toBe(`Summarize [PDF: spec.pdf; ref=${up[0]?.path ?? ""}] and [PDF: notes.pdf; ref=${up[1]?.path ?? ""}]`);
-  expect(args?.attachments).toBe(up.map((a) => a.path).join(","));
 });
 
-test("PDFs: over 20 MB is rejected; over 10 pages goes as a path and says so", async ({ page }) => {
-  await openApp(page);
-  await compose(page);
-  const input = page.getByTestId("composer-file-input");
-  const notice = page.getByTestId("composer-notice");
-  await input.setInputFiles([{ name: "huge.pdf", mimeType: "application/pdf", buffer: testPdf(1, 21 * 1024 * 1024) }]);
-  await expect(notice).toHaveText("huge.pdf: larger than 20 MB");
-  await expect(page.getByTestId("attachment")).toHaveCount(0);
-
-  await input.setInputFiles([{ name: "book.pdf", mimeType: "application/pdf", buffer: testPdf(30) }]);
-  await expect(page.getByTestId("attachment")).toHaveAttribute("data-pages", "30");
-  await expect(notice).toHaveText("book.pdf has 30 pages; Claude reads it page by page");
-  await expect(page.getByTestId("attachment-open")).toHaveAttribute("aria-label", /^Preview book\.pdf, PDF, 30 pages, \d+ KB$/);
-});
+// Over 20 MB rejected and over 10 pages sent as a path with its notice: unit-tested in
+// src/components/compose/ComposerAttachments.test.tsx.
 
 test.describe("a long PDF's preview", () => {
   test.use({ deviceScaleFactor: 3 });

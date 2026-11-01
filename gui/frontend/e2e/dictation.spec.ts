@@ -60,22 +60,8 @@ test.describe("composer", () => {
   // engine's failure, the microphone-denied line and a session held elsewhere: unit-tested in
   // src/components/thread/ThreadComposerDictation.test.tsx; the PR review composer's mic in
   // src/components/pr/PrReviewComposer.test.tsx.
-  test("no mic while dictation is off or has no model", async ({ page }) => {
-    const card = await openThread(page);
-    await expect(card.getByTestId("thread-attach")).toBeVisible();
-    await expect(card.getByTestId("dictation-mic")).toHaveCount(0);
-    await mockPost("dictation?state=no-model");
-    await expect(card.getByTestId("dictation-mic")).toHaveCount(0);
-    await mockPost("dictation?state=ready");
-    await expect(card.getByTestId("dictation-mic")).toBeVisible();
-    // Left of attach.
-    const mic = await card.getByTestId("dictation-mic").boundingBox();
-    const attach = await card.getByTestId("thread-attach").boundingBox();
-    expect(mic && attach && mic.x < attach.x).toBe(true);
-    // Disabling returns it to nothing.
-    await mockPost("dictation?state=off");
-    await expect(card.getByTestId("dictation-mic")).toHaveCount(0);
-  });
+  // No mic while off or without a model, its place before attach, and none once turned off: unit-tested in
+  // src/components/thread/ThreadComposerDictation.test.tsx.
 
   test("listening: the pill, Listening…, phrases land at the caret with a space and a fading tint", async ({ page }) => {
     await mockPost("dictation?state=ready");
@@ -102,7 +88,7 @@ test.describe("composer", () => {
     expect((await dictation()).calls.at(-1)).toMatch(/^stop dict-\d+ false$/);
   });
 
-  test("Escape in the prompt stops; auto-stop and disabling return to idle", async ({ page }) => {
+  test("Escape in the prompt stops", async ({ page }) => {
     await mockPost("dictation?state=ready");
     await mockPost("dictation/script?phrases=&gap=1000");
     const card = await openThread(page);
@@ -112,20 +98,11 @@ test.describe("composer", () => {
     await page.keyboard.press("Escape");
     await expect(card.getByTestId("dictation-mic")).toBeVisible();
 
-    await card.getByTestId("dictation-mic").click();
-    await expect(card.getByTestId("dictation-pill")).toBeVisible();
-    await mockPost("dictation/end?reason=silence");
-    await expect(card.getByTestId("dictation-mic")).toBeVisible();
-    await expect(card.getByTestId("dictation-failure")).toHaveCount(0);
-
-    await card.getByTestId("dictation-mic").click();
-    await expect(card.getByTestId("dictation-pill")).toBeVisible();
-    await mockPost("settings/external?dictation.enabled=false");
-    await expect(card.getByTestId("dictation-pill")).toHaveCount(0);
-    await expect(card.getByTestId("dictation-mic")).toHaveCount(0);
+    // An auto-stop and turning dictation off returning to idle: unit-tested in
+    // src/components/thread/ThreadComposerDictation.test.tsx.
   });
 
-  test("one composer at a time: leaving the dictating composer stops it, and another composer starts its own", async ({ page }) => {
+  test("leaving the dictating composer for the new-thread composer (cmd+N) stops it", async ({ page }) => {
     await mockPost("dictation?state=ready");
     await mockPost("dictation/script?phrases=");
     await openApp(page);
@@ -138,14 +115,9 @@ test.describe("composer", () => {
     const palette = page.getByTestId("palette");
     await expect(palette).toHaveAttribute("data-mode", "projects");
     await palette.locator("[data-project]").first().click();
-    const card = page.getByTestId("composer-card");
-    await expect(card).toBeVisible();
-    await card.getByTestId("dictation-mic").click();
-    await expect(card.getByTestId("dictation-pill")).toBeVisible();
-    const d = await dictation();
-    expect(d.session?.clientId).not.toMatch(/^thread:/);
-    expect(d.calls.filter((c) => c.startsWith("start "))).toHaveLength(2);
-    expect(d.calls.filter((c) => c.startsWith("stop "))).toHaveLength(1);
+    await expect(page.getByTestId("composer-card")).toBeVisible();
+    // Another composer starting its own session: unit-tested in src/components/thread/ThreadComposerDictation.test.tsx.
+    await expect.poll(async () => (await dictation()).calls.filter((c) => c.startsWith("stop "))).toHaveLength(1);
   });
 
   test("⌘⇧M toggles the focused composer, else the content pane's", async ({ page }) => {
