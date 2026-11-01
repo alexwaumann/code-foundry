@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
+// A PDF's pages (pdf.js does not run in jsdom) and the daemon's staging, which names the file with them.
+vi.mock("@/lib/pdf", () => ({ pdfSummary: () => Promise.resolve({ pages: 3, thumb: "data:image/png;base64,AA==" }), loadPdf: () => Promise.reject(new Error("no pdf.js")) }));
+vi.mock("@/api/threads", async (orig) => ({ ...(await orig<typeof import("@/api/threads")>()), stageAttachment: (_f: unknown, pages: number | null) => Promise.resolve(`/att/0123-${String(pages)}p.pdf`) }));
 
 const { daemon, invocationsOf, refuse, resetDaemon } = await import("@/test/daemonFakes");
 const { thread } = await import("@/test/projectsWorld");
@@ -169,5 +172,37 @@ describe("a message the daemon refuses", () => {
       expect(screen.queryByTestId("thread-composer-error")).toBeNull();
     });
     expect(draftText()).toBe("");
+  });
+});
+
+describe("sending", () => {
+  it("a message while Claude works goes through thread.send like any (the timeline shows it as a steer)", async () => {
+    render(<ThreadComposer threadId="s-r1" pending={[]} busy />);
+    act(() => {
+      updateDraft(KEY, { text: "Also say hi when you are done" });
+    });
+    fireEvent.click(screen.getByTestId("thread-send"));
+    await waitFor(() => {
+      expect(invocationsOf("thread.send").map((i) => i.args)).toEqual([{ id: "s-r1", text: "Also say hi when you are done" }]);
+    });
+    expect(draftText()).toBe("");
+  });
+
+  it("a follow-up takes a PDF: a tile and a chip with its pages, sent as [PDF: name; ref=staged path]", async () => {
+    render(<ThreadComposer threadId="s-r1" pending={[]} busy={false} />);
+    expect(screen.getByTestId("thread-attach").getAttribute("aria-label")).toBe("Attach images or PDFs");
+    act(() => {
+      updateDraft(KEY, { text: "Check " });
+    });
+    const pdf = new File([new Uint8Array(1200)], "spec.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByTestId("thread-file-input"), { target: { files: [pdf] } });
+    await waitFor(() => {
+      expect(screen.getByTestId("attachment").getAttribute("data-pages")).toBe("3");
+    });
+    expect(screen.getByTestId("prompt-chip").getAttribute("aria-label")).toBe("PDF attachment, spec.pdf, 3 pages");
+    fireEvent.click(screen.getByTestId("thread-send"));
+    await waitFor(() => {
+      expect(invocationsOf("thread.send").map((i) => i.args.text)).toEqual(["Check [PDF: spec.pdf; ref=/att/0123-3p.pdf]"]);
+    });
   });
 });
