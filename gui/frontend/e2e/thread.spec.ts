@@ -503,44 +503,20 @@ test("leaving a thread forgets how it was folded: back on it, every finished tur
   await expect(editButton()).toHaveAttribute("aria-expanded", "false");
 });
 
+// The live tool strip (one row per run of work in the running turn, "N steps", expanding in
+// place, gone once the turn ends): src/components/thread/rows.test.tsx ("a live tool strip"),
+// src/lib/threadTimeline.test.ts ("live tool strip (stripRuns)"; finished turns unchanged) and
+// src/components/thread/activity.test.ts (strips on while the thread is on a turn). This keeps
+// the open strip's screenshots.
 for (const scheme of ["dark", "light"] as const) {
-  test(`live tool strip (${scheme}): a run of work in the running turn is one row that expands in place; once the turn ends, unfolding shows the flat rows`, async ({ page }) => {
+  test(`SHOTS: the live tool strip open (${scheme})`, async ({ page }) => {
+    test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
     await openThread(page, "streaming", scheme);
-    const timeline = page.getByTestId("thread-timeline");
-    // Write, Bash (failed), Edit, Bash, Agent between the question and the answer: one strip,
-    // its latest step the Agent; the explore groups between texts are runs of one step.
     const strip = pane(page).getByTestId("thread-strip");
-    await expect(strip).toHaveCount(1);
-    await expect(strip.getByTestId("thread-strip-meta")).toHaveText("5 steps");
-    await expect(strip.getByTestId("thread-strip-row")).toHaveAttribute("aria-expanded", "false");
-    await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
-    await expect(pane(page).getByTestId("thread-group").first()).toBeAttached();
-    const box = await timeline.boundingBox();
-    await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
-    await page.mouse.wheel(0, -200);
     await wheelUpTo(page, strip);
     await strip.getByTestId("thread-strip-row").click();
     await expect(strip).toHaveAttribute("data-open", "true");
-    await expect(strip.getByTestId("thread-strip-head")).toHaveText("5 steps");
-    await expect(strip.locator(".members").getByTestId("thread-tool")).toHaveCount(5);
-    await expect(strip.locator('.members [data-tool="Edit"]')).toHaveCount(1);
     await shot(page, `thread-strip-open-${scheme}`);
-    await strip.getByTestId("thread-strip-head").click();
-    await expect(strip).not.toHaveAttribute("data-open", "true");
-    await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
-
-    // The turn ends: no strip; folded once pinned, unfolded it shows the flat rows as before.
-    await mockPost("thread/finish");
-    await expect(page.getByTestId("thread-working")).toHaveCount(0);
-    await expect(strip).toHaveCount(0);
-    await page.getByTestId("thread-jump-bottom").click();
-    const header = headers(page).last();
-    await expect(header).toHaveAttribute("data-folded", "true");
-    await header.locator("button.fold").click();
-    await expect(header).not.toHaveAttribute("data-folded", "true");
-    await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
-    await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(1);
-    await expect(pane(page).getByTestId("thread-strip")).toHaveCount(0);
   });
 }
 

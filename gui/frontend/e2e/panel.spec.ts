@@ -203,20 +203,7 @@ test("dragging the handle resizes the panel within its bounds, and the width per
   expect((await box(page, "side-panel")).width).toBe(436);
 });
 
-test("surface hotkeys do nothing while their surfaces are disabled", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  await page.getByTestId("panel-toggle").click();
-  // Opening the panel moves focus into it, so its hotkeys apply.
-  await expect.poll(() => region(page)).toBe("panel");
-  for (const key of ["f", "d", "p"]) await page.keyboard.press(key);
-  await expect(panel(page)).toBeVisible();
-  await expect(panel(page).getByTestId("panel-empty")).toBeVisible();
-  await expect(panel(page).getByTestId("panel-tabs")).toHaveCount(0);
-  // Clicking a disabled entry does nothing either.
-  await panel(page).locator('[data-surface="files"]').click({ force: true });
-  await expect(panel(page).getByTestId("panel-tabs")).toHaveCount(0);
-});
+// Surface hotkeys doing nothing while their surfaces are disabled: src/components/panel/keys.test.ts (panelKeyAction "disabled surface hotkey does nothing", "pull request is disabled for now"); focus moving into the panel on open is asserted by the tests below.
 
 test("cmd+shift+e toggles the panel, even from the thread's prompt, and the daemon intent does too", async ({ page }) => {
   await openApp(page);
