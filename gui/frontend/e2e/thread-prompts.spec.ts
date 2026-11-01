@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectAttention, invocations, leaveSidebar, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { invocations, leaveSidebar, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -46,20 +46,6 @@ async function shot(page: Page, name: string): Promise<void> {
 
 const composer = (page: Page) => page.getByTestId("thread-composer");
 const editor = (page: Page) => composer(page).locator('[contenteditable="true"]');
-const lastText = (page: Page) => page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last();
-
-/**
- * Waits for the running turn to end (it folds under its header), then opens it again.
- * `headers` is how many the thread has once it ended: the final text streams in before
- * the turn_end, so until then the last header is an earlier turn's (also folded).
- */
-async function unfoldLatest(page: Page, headers: number): Promise<void> {
-  await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])')).toHaveCount(headers);
-  const header = page.locator('[data-testid="thread-turn-header"]:not([data-live])').nth(headers - 1);
-  await expect(header).toHaveAttribute("data-folded", "true");
-  await header.getByRole("button", { name: "Show this turn's work" }).click();
-  await expect(header).not.toHaveAttribute("data-folded", "true");
-}
 
 async function editorFocused(page: Page): Promise<boolean> {
   return page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);

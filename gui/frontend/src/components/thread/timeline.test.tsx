@@ -200,7 +200,7 @@ describe("streaming (s-r1, streaming)", () => {
     const at = items.length;
     const last = items[at - 1];
     if (last?.kind !== "text") throw new Error("not streaming");
-    const end: TurnEnd = { ...(last as object), id: "end", ordinal: last.ordinal + 1, kind: "turnEnd", subtype: "success", isError: false, interrupted: false, stopReason: "end_turn", terminalReason: "", durationMs: 30_000, numTurns: 9, costUsd: 1.16, turnCostUsd: 0.04, model: "claude-opus-4-8", inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, errors: [] } as TurnEnd;
+    const end: TurnEnd = { ...last, id: "end", ordinal: last.ordinal + 1, kind: "turnEnd", subtype: "success", isError: false, interrupted: false, stopReason: "end_turn", terminalReason: "", durationMs: 30_000, numTurns: 9, costUsd: 1.16, turnCostUsd: 0.04, model: "claude-opus-4-8", inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, errors: [] };
     return [...items.slice(0, -1), { ...last, text: ANSWER, streaming: false }, end];
   };
 

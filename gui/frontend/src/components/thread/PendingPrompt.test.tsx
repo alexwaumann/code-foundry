@@ -1,6 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Code } from "@connectrpc/connect";
-import { useRef } from "react";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView, ThreadPendingView, ThreadRequestView } from "@/api/thread";
@@ -180,14 +179,13 @@ function publish(w: World): void {
 }
 
 const refocus = vi.fn();
-let keys: { current: PromptKeys | null } = { current: null };
+/** The composer's ref the oldest prompt registers its key handler on. */
+const keys: { current: PromptKeys | null } = { current: null };
 
 /** The composer's dock: the open requests (answered ones leave at once), the oldest taking the editor's keys. */
 function Dock() {
   const open = useOpenRequests("s-r1");
-  const keysRef = useRef<PromptKeys | null>(null);
-  keys = keysRef;
-  return open.length > 0 ? <PendingPrompts pending={open} keysRef={keysRef} refocus={refocus} /> : null;
+  return open.length > 0 ? <PendingPrompts pending={open} keysRef={keys} refocus={refocus} /> : null;
 }
 
 function mount(w: World) {

@@ -115,6 +115,9 @@ export function request(over: Partial<ThreadRequestView>): ThreadRequestView {
 
 export type TurnEnd = Extract<ThreadItemView, { kind: "turnEnd" }>;
 
+/** An item without what every item has (its id, ordinal, parent, times, streaming). */
+type Body<T> = T extends ThreadItemView ? Omit<T, "id" | "ordinal" | "parentToolUseId" | "createdAtMs" | "updatedAtMs" | "streaming"> : never;
+
 export type ThreadWorldState = "idle" | "permission" | "question" | "streaming";
 
 export interface ThreadWorld {
@@ -129,21 +132,21 @@ export function fixStalePrBadge(state: ThreadWorldState, now = Date.now()): Thre
   const ago = (min: number, sec = 0) => now - min * 60_000 + sec * 1000;
   const p = (rel: string) => `${CF}/${rel}`;
   type Over = { at?: number; until?: number; parent?: string; id?: string; streaming?: boolean };
-  const push = <T extends ThreadItemView>(x: Omit<T, "id" | "ordinal" | "parentToolUseId" | "createdAtMs" | "updatedAtMs" | "streaming">, o: Over): T => {
+  const push = (x: Body<ThreadItemView>, o: Over): ThreadItemView => {
     ordinal++;
-    const it = { id: o.id ?? `i${String(ordinal)}`, ordinal, parentToolUseId: o.parent ?? "", createdAtMs: o.at ?? now, updatedAtMs: o.until ?? o.at ?? now, streaming: o.streaming ?? false, ...x } as T;
+    const it = { id: o.id ?? `i${String(ordinal)}`, ordinal, parentToolUseId: o.parent ?? "", createdAtMs: o.at ?? now, updatedAtMs: o.until ?? o.at ?? now, streaming: o.streaming ?? false, ...x } as ThreadItemView;
     items.push(it);
     return it;
   };
   const text = (t: string, o: Over) => push({ kind: "text", text: t }, o);
   const tool = (name: string, input: object, v: { output?: string; isError?: boolean; resultJson?: string; status?: "running" | "done" | "error" }, o: Over) => {
     const id = `toolu_${name.toLowerCase()}_${String(ordinal + 1)}`;
-    return push({ kind: "tool", toolUseId: id, name, inputJson: JSON.stringify(input), status: v.status ?? "done", output: v.output ?? "", isError: v.isError ?? false, resultJson: v.resultJson ?? "" }, { ...o, id });
+    return push({ kind: "tool", toolUseId: id, name, inputJson: JSON.stringify(input), status: v.status ?? "done", output: v.output ?? "", isError: v.isError ?? false, resultJson: v.resultJson ?? "" }, { ...o, id }) as Extract<ThreadItemView, { kind: "tool" }>;
   };
   const read = (rel: string, lines: number, at: number, parent = "") =>
     tool("Read", { file_path: p(rel) }, { output: "     1\tpackage pr\n", resultJson: JSON.stringify({ type: "text", file: { filePath: p(rel), content: "package pr\n\n// …\n", numLines: lines, startLine: 1, totalLines: lines } }) }, { at, parent });
   const end = (v: Partial<TurnEnd>, at: number) =>
-    push<TurnEnd>(
+    push(
       {
         kind: "turnEnd",
         subtype: "success",

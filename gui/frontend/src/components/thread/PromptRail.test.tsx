@@ -63,7 +63,7 @@ const scrollToRow = vi.fn<(index: number) => void>();
 function list(): TimelineListApi {
   const el = document.createElement("div");
   Object.defineProperty(el, "clientHeight", { value: 800 });
-  return { scroller: () => el as HTMLDivElement, rowStart: (i) => i * 100, scrollToRow };
+  return { scroller: () => el, rowStart: (i) => i * 100, scrollToRow };
 }
 
 function show(items: ThreadItemView[], api = list()) {
@@ -140,7 +140,8 @@ describe("the prompt rail", () => {
   });
 
   it("a wake is no prompt: no tick for it", () => {
-    render(show([...IDLE, { ...user("w", 9, "woken"), wake: { title: "build", json: '{"status":"ok"}' } }]).ui);
+    const wake: ThreadItemView = { ...base, id: "w", ordinal: 9, createdAtMs: at(14, 30), kind: "user", text: "woken", attachments: [], composerText: "", wake: { title: "build", json: '{"status":"ok"}' } };
+    render(show([...IDLE, wake]).ui);
     expect(ticks()).toHaveLength(2);
   });
 });
