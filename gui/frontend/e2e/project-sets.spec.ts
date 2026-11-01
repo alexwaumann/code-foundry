@@ -48,7 +48,7 @@ test.beforeEach(async () => {
 // Add project's multi-select (open across picks, checked, by name), the chips by id, Clear, the primary
 // picker and thread.new's args; Work in's existing branches and Branch from's list, footer and args; a
 // workspace row, its chip's × and Clear; the collision banner and the hints not toasted again; New
-// thread on this branch (row and title menus) and a removed workspace: src/components/compose/ComposerSets.test.tsx.
+// thread on this branch (row and title menus) and a removed workspace: src/components/compose/ComposerProjectSet.test.tsx.
 // A set thread's sidebar line 1: src/components/sidebar/SidebarRow.test.tsx ("line 1 of a multi-project thread").
 // What the daemon makes of thread.new (branch names, worktrees) is Go's.
 test("a set's Work in and Run in share one row; a pill's pick and a closed picker hand the keyboard to the prompt", async ({ page }) => {
@@ -72,7 +72,7 @@ test("a set's Work in and Run in share one row; a pill's pick and a closed picke
 });
 
 // Save as workspace's projects, name, args and the item going once saved, a taken name refused in
-// place: ComposerSets.test.tsx. Here the name taking the keyboard as the title menu closes.
+// place: ComposerProjectSet.test.tsx. Here the name taking the keyboard as the title menu closes.
 test("Save as workspace: the name takes the keyboard as the menu closes", async ({ page }) => {
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&project=repo-gp&name=Pair")) as ThreadSummary;
   await openApp(page);
@@ -84,7 +84,7 @@ test("Save as workspace: the name takes the keyboard as the menu closes", async 
 });
 
 // The like composer's read-only set, mode, banner, primary and thread.new-like, the title and row
-// menus' items: ComposerSets.test.tsx. Here Escape back to the thread and the palette's entry taking the prompt.
+// menus' items: ComposerProjectSet.test.tsx. Here Escape back to the thread and the palette's entry taking the prompt.
 test("New thread on this branch: Escape goes back to the thread; from the palette it takes the prompt", async ({ page }) => {
   const t = (await mockPost("set-thread?projects=repo-cf&name=Solo")) as ThreadSummary;
   await openApp(page);

@@ -22,7 +22,7 @@ New component tests:
 * `components/threadinfo/ProjectSet.test.tsx` (4): Add project (one pick, "+N", "Every project
   is in this thread."), leaving the workspace (the header crumb), Save as workspace, Use
   workspace, Run in's × (tooltip, no Run in, the daemon's confirm), a moved member greyed.
-* `components/compose/ComposerSets.test.tsx` (13): Add project's multi-select (open across
+* `components/compose/ComposerProjectSet.test.tsx` (13): Add project's multi-select (open across
   picks), chips, Clear, the primary picker and thread.new's args; Work in's existing branches
   and Branch from (lists, filters, footer, base_from_origin off); a workspace row and its chip's
   ×; the collision banner and the daemon's hints not toasted again; a removed workspace; a
