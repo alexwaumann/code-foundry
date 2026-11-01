@@ -633,30 +633,7 @@ test("the + after the last tab shows the surface list without adding a tab; pick
   await expect.poll(() => cmdW(page)).toEqual([true]);
 });
 
-test("closing the tab picking came from keeps picking; picking survives a reload", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  await page.getByTestId("panel-toggle").click();
-  await injectTab(page, "files", "Files");
-  await injectTab(page, "diff", "Diff");
-  await injectTab(page, "pullrequest", "#12", { number: "12" });
-  const tabs = panel(page).getByRole("tab");
-  await tabs.filter({ hasText: "Diff" }).click();
-  await panel(page).getByTestId("panel-new-tab").click();
-  await panel(page).getByRole("button", { name: "Close Diff" }).click({ force: true });
-  await expect(tabs).toHaveText(["Files", "#12"]);
-  await expect(panel(page)).toHaveAttribute("data-picking", "true");
-
-  await page.reload();
-  await expect(row(page, "s:s-1")).toBeVisible();
-  await row(page, "s:s-1").click();
-  await expect(panel(page)).toHaveAttribute("data-picking", "true");
-  await expect(panel(page).getByTestId("panel-new-tab")).toHaveAttribute("aria-pressed", "true");
-  // Escape goes to the closed tab's right neighbour.
-  await panel(page).focus();
-  await page.keyboard.press("Escape");
-  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "pullrequest?number=12");
-});
+// Closing the tab picking came from keeps picking, and picking persists: unit-tested in src/components/panel/SidePanel.test.tsx and src/stores/panel.test.ts.
 
 test("view.panel.new-tab from the palette and the CLI shows a hidden panel picking", async ({ page }) => {
   await openApp(page);
