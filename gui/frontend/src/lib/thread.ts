@@ -148,8 +148,8 @@ export function attentionTier(s: Pick<ThreadView, "status" | "statusReason">): A
 /**
  * The sidebar group an unpinned thread sorts in (lib/tree.ts buildRows): "prompt" (waits on
  * the user, attentionTier, or a plugin's attention flag), "error" (error / interrupted, a
- * plugin's error flag, or a transcript Claude Code deleted), "done" (an unseen finished turn), "working" (busy, or Claude
- * starting), "idle" (everything else). The same reading as
+ * plugin's error flag, or a transcript Claude Code deleted), "done" (an unseen finished turn), "working" (busy, Claude
+ * starting, or waiting on child threads), "idle" (everything else). The same reading as
  * threadBadge: attention and error win, so a thread waiting on the user never hides in the
  * collapsible Working section (keys/bindings.ts jumpToAttention); a stopped or stopping
  * busy thread is idle.
@@ -191,6 +191,15 @@ export function restartCutsOff(
   return s.backgroundWakePending ? "reporting" : null;
 }
 
+/**
+ * Whether the thread is waiting on its child threads (lib/waiting): idle, with the daemon's
+ * reason "waiting on N child threads" or "waiting" alone (only a wake to it is queued).
+ */
+export function isWaiting(s: Pick<ThreadView, "status" | "statusReason"> | undefined): boolean {
+  if (s?.status !== "idle") return false;
+  return s.statusReason === "waiting" || s.statusReason.startsWith("waiting on ");
+}
+
 export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReason"> & Partial<Pick<ThreadView, "flags" | "transcriptMissing">>): ThreadGroup {
   // Its transcript is gone, so it cannot continue: an error whatever status it kept
   // (docs/notes/transcript-deleted.md).
@@ -203,6 +212,9 @@ export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReas
   const flag = topFlag(s);
   if (flag) return flag.level === "error" ? "error" : "prompt";
   if (tier === "done") return tier;
+  // Waiting on its child threads (lib/waiting): the daemon will wake it, so it is working
+  // as far as the list goes (docs/notes/sidebar-waiting-under-working.md).
+  if (isWaiting(s)) return "working";
   return threadBadge(s) === "busy" ? "working" : "idle";
 }
 

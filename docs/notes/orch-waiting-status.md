@@ -16,7 +16,8 @@ the sidebar row, its tooltip, and the CLI's status word.
   `thread.wait`'s description put the guide 50 bytes over its 29,000-byte cap
   (`TestGuide`), so it was left out), `thread list --status idle`, the GUI's attention count (bell, window
   title, dock badge, bounce, sound: `attentionIds` counts status attention only, so the
-  dock-alert gating needed no change), cmd+shift+a and the sidebar's idle group.
+  dock-alert gating needed no change), cmd+shift+a and the sidebar's idle group (since 2026-10-31 it sorts under Working instead:
+  docs/notes/sidebar-waiting-under-working.md).
 * **The rule** (`waiting.go`, `waitingLocked`): the thread's own status ("raw") is a
   plainly ended turn, needs attention `finished` or idle `at prompt`, and at least one
   target of its `settled`, `idle` or `attention` thread subscriptions is pending, or a

@@ -2,11 +2,12 @@
  * A thread waiting on its child threads (docs/notes/orch-waiting-status.md): it ended its
  * turn while threads it subscribed to still work, so the daemon will wake it and it needs
  * nothing from the user. The daemon says so with status "idle" and the reason "waiting on
- * 2 child threads" ("waiting" alone while only a wake to it is queued). It sorts with the
- * idle threads, never counts in the window title or the dock, and its row says "Waiting". Pure.
+ * 2 child threads" ("waiting" alone while only a wake to it is queued). It sorts under the
+ * sidebar's Working footer (lib/thread threadGroup; docs/notes/sidebar-waiting-under-working.md),
+ * never counts in the window title or the dock, and its row says "Waiting". Pure.
  */
 import type { ThreadView } from "@/api/threads";
-import { threadBadge } from "./thread";
+import { isWaiting, threadBadge } from "./thread";
 
 /** The thread list as read here (stores/threads ThreadsData). */
 interface ThreadsData {
@@ -14,11 +15,8 @@ interface ThreadsData {
   order: readonly string[];
 }
 
-/** Whether the thread is waiting on its child threads. */
-export function isWaiting(s: Pick<ThreadView, "status" | "statusReason"> | undefined): boolean {
-  if (s?.status !== "idle") return false;
-  return s.statusReason === "waiting" || s.statusReason.startsWith("waiting on ");
-}
+/** Whether the thread is waiting on its child threads (lib/thread, where threadGroup needs it). */
+export { isWaiting };
 
 /** How many threads the daemon says it waits on: 2 for "waiting on 2 child threads"; 0 for "waiting" alone. */
 export function waitingCount(s: Pick<ThreadView, "status" | "statusReason">): number {

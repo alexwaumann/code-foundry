@@ -180,7 +180,7 @@ export interface Sections {
  * recent statusChangedAtMs first); finished turns (most recent statusChangedAtMs first);
  * idle ones (idle, unknown; lib/thread threadGroup; most recent lastActivityAtMs first). In
  * a band, threads without the time sort after those with one, newest created first, as do
- * equal times. Working: the working ones (busy or starting)
+ * equal times. Working: the working ones (busy, starting, or waiting on child threads)
  * under a Working header that counts them, newest created first. Snoozed: every snoozed thread (pinned or not,
  * whatever its group; it appears nowhere else) under a Snoozed header, soonest wake first.
  * Archived: every archived thread (pinned or not, whatever its group; it appears nowhere
