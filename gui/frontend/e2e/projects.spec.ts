@@ -17,17 +17,14 @@ test.beforeEach(async () => {
 });
 
 const row = (page: Page, projectId: string) => page.locator(`[data-nav-key="p:${projectId}"]`);
-const wsRow = (page: Page, workspaceId: string) => page.locator(`[data-nav-key="ws:${workspaceId}"]`);
 const checkout = (page: Page, path: string) => page.locator(`[data-testid="project-worktree"][data-path="${path}"]`);
 const checkoutRow = (page: Page, projectId: string, path: string) => page.locator(`[data-nav-key="pw:${projectId}::${path}"]`);
-const indexIds = (page: Page) => page.locator('[data-testid="index-project"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-project")));
 const FEAT = `${CF}.worktrees/feat-sidebar`;
 const FIX = `${CF}.worktrees/fix-resize`;
 const MERGED = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-usage-polish";
-// POST /__mock/leftovers: three leftovers (and MERGED with clean=1).
+// POST /__mock/leftovers: three leftovers (SPIKE, COPY, exp/shaders; and MERGED with clean=1).
 const SPIKE = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-perf-spike";
 const COPY = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy";
-const SHADERS = `${CF}-shaders`;
 const leftover = (page: Page, path: string) => page.locator(`[data-testid="leftover-row"][data-path="${path}"]`);
 
 async function lastInvocation(name: string) {
@@ -39,77 +36,10 @@ async function closeMenu(page: Page, testId: string): Promise<void> {
   await page.keyboard.press("Escape");
   await expect(page.getByTestId(`${testId}-menu`)).toHaveCount(0);
 }
-async function menuItems(page: Page, testId: string): Promise<string[]> {
-  const menu = page.getByTestId(`${testId}-menu`);
-  await expect(menu).toBeVisible();
-  // A count badge reads "Clean up merged worktrees 1".
-  return (await menu.getByRole("menuitem").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
-}
 const panelKey = (page: Page) => page.getByTestId("side-panel").getAttribute("data-panel-key");
 
-test("the index: a table row per project by last activity, its kind, status sentence, default branch, pills and setup links", async ({ page }) => {
-  // sketches gets the newest thread; writing has none, so it goes last.
-  await mockPost("threads?project=repo-sk&count=1&status=busy");
-  await openApp(page);
-  await openProjects(page);
-  await expect(page.getByTestId("index-project")).toHaveCount(5);
-  const ids = await indexIds(page);
-  expect(ids[0]).toBe("repo-sk");
-  expect(ids.at(-1)).toBe("repo-wr");
-  // ghostty-playground's latest thread is older than code-foundry's and dotfiles'.
-  expect(ids.indexOf("repo-gp")).toBeGreaterThan(ids.indexOf("repo-cf"));
-  expect(ids.indexOf("repo-gp")).toBeGreaterThan(ids.indexOf("repo-dot"));
-
-  // The section titles count their rows; the header row names the columns.
-  await expect(page.getByTestId("projects-section").getByTestId("index-section-count")).toHaveText("(5)");
-  await expect(page.getByTestId("projects-table").getByTestId("index-columns").locator("span")).toHaveText(["Project", "Activity", "Default branch", "Needs a look", "Updated"]);
-  // The kind icon carries the kind: a name and no caption.
-  const kinds: [string, string, string, string][] = [
-    ["repo-cf", "github", "code-foundry", "2 threads working · 3 checkouts"],
-    ["repo-dot", "git", "dotfiles", "idle · main only"],
-    ["repo-sk", "git", "sketches", "1 thread working · main only"],
-    ["repo-wr", "nogit", "writing", "idle"],
-  ];
-  for (const [id, kind, name, status] of kinds) {
-    await expect(row(page, id).getByTestId("index-project")).toHaveAttribute("data-kind", kind);
-    await expect(row(page, id).getByTestId("project-kind-icon")).toHaveAttribute("data-kind", kind);
-    await expect(row(page, id).getByTestId("project-name")).toHaveText(name);
-    await expect(row(page, id).getByTestId("project-status")).toHaveText(status);
-  }
-  // Green dot only while a thread works.
-  await expect(row(page, "repo-cf").locator("[data-live]")).toHaveCount(1);
-  await expect(row(page, "repo-dot").locator("[data-live]")).toHaveCount(0);
-  // Pills only for what needs a look: code-foundry's open pull requests (a draft counts).
-  await expect(row(page, "repo-cf").getByTestId("index-prs")).toHaveText("2 PRs");
-  await expect(page.getByTestId("index-prs")).toHaveCount(1);
-  await expect(page.getByTestId("index-tidy")).toHaveCount(0);
-  // Setup links: Publish on the repository without a remote, Initialize git on the folder.
-  await expect(page.getByTestId("index-publish")).toHaveCount(1);
-  await expect(row(page, "repo-sk").getByTestId("index-publish")).toHaveText("Publish to GitHub");
-  await expect(row(page, "repo-wr").getByTestId("index-init-git")).toHaveText("Initialize git");
-  // Ages: a thread's, none for a project without threads.
-  await expect(row(page, "repo-sk").getByTestId("index-age")).toHaveText("now");
-  await expect(row(page, "repo-wr").getByTestId("index-age")).toHaveText("");
-
-  // No hover actions or chevron: the row opens the page.
-  await row(page, "repo-gp").hover();
-  for (const id of ["project-new-thread", "project-new-terminal", "project-more"]) await expect(row(page, "repo-gp").getByTestId(id)).toHaveCount(0);
-  await expect(row(page, "repo-gp").locator("svg.lucide-chevron-right")).toHaveCount(0);
-
-  // The setup links act without opening the page.
-  await row(page, "repo-sk").getByTestId("index-publish").click();
-  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-project", "repo-sk");
-  await page.keyboard.press("Escape");
-  await row(page, "repo-wr").getByTestId("index-init-git").click();
-  expect((await lastInvocation("project.git.init"))?.args).toEqual({ project: "repo-wr" });
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
-  await expect(row(page, "repo-wr").getByTestId("index-project")).toHaveAttribute("data-kind", "git");
-
-  // A click opens the project's page.
-  await row(page, "repo-gp").click();
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-gp");
-});
-
+// The index's rows (order, kinds, status sentences, pills, setup links, ages, no hover actions), the
+// setup links and the kind after Initialize git: unit-tested in src/components/projects/ProjectsIndex.test.tsx.
 // The index's Default branch, the filter, the page picker and the crumb: unit-tested in src/components/projects/ProjectsIndex.test.tsx.
 
 test("narrowing drops Activity, then Updated, then Default branch; Needs a look stays", async ({ page }) => {
@@ -144,24 +74,10 @@ test("narrowing drops Activity, then Updated, then Default branch; Needs a look 
   await expect(row(page, "repo-sk").getByTestId("index-publish")).toBeVisible();
 });
 
-test("keyboard: ↑/↓ move the cursor over projects then workspaces, Enter opens the page", async ({ page }) => {
-  const ws = (await mockPost("workspace?name=login&projects=repo-cf")) as { id: string };
+// The index's ↑/↓/Home/End/Enter, and End then Enter on a project's page opening that checkout's Changes tab:
+// ProjectsIndex.test.tsx and ProjectPage.test.tsx. Left: the real focus and the tab drawn in the page's panel.
+test("keyboard: a project page's list has the keyboard; End then Enter shows a checkout's Changes tab", async ({ page }) => {
   await openApp(page);
-  await openProjects(page);
-  const list = page.getByTestId("projects-list");
-  await expect(list).toBeFocused();
-  const ids = await indexIds(page);
-  await page.keyboard.press("ArrowDown");
-  await expect(row(page, ids[0] ?? "")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("ArrowDown");
-  await expect(row(page, ids[1] ?? "")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("End");
-  await expect(wsRow(page, ws.id)).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Home");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", ids[1] ?? "");
-  // The project page's list has the keyboard: ↓ then Enter opens a checkout's Changes tab.
   await openProjectPage(page, "repo-cf");
   await expect(page.getByTestId("projects-list")).toBeFocused();
   await page.keyboard.press("End");
@@ -169,112 +85,9 @@ test("keyboard: ↑/↓ move the cursor over projects then workspaces, Enter ope
   await expect(page.getByTestId("changes-surface")).toBeVisible();
 });
 
-test("a project's page: header, the checkouts table by activity, a row opens its Changes tab, the row menu", async ({ page }) => {
-  await openApp(page);
-  await openProjectPage(page, "repo-cf");
-  await expect(page.getByTestId("page-name")).toHaveText("code-foundry");
-  await expect(page.getByTestId("project-meta")).toHaveText("alexwaumann/code-foundry");
-  for (const id of ["project-refresh", "project-terminal", "project-new-thread", "project-more"]) await expect(page.getByTestId(id)).toBeVisible();
-  await expect(page.getByTestId("project-terminal")).toHaveText("Terminal");
-  await expect(page.getByTestId("checkouts-title")).toContainText("main plus 2 worktrees · 2 threads working");
-  await expect(page.getByTestId("checkouts-head")).toHaveText(/Branch\s*Threads\s*Changes\s*Sync\s*Pull request/);
-
-  // Working first (main: s-1, feat/sidebar: s-5 starting), then the rest.
-  const branches = page.getByTestId("worktree-branch");
-  await expect(branches).toHaveCount(3);
-  await expect(branches.last()).toHaveText("fix/resize");
-  await expect(checkout(page, CF).getByTestId("worktree-main-tag")).toHaveText("main");
-  // main: s-1 working, s-8 snoozed (idle); s-7 archived is left out.
-  await expect(checkout(page, CF).getByTestId("worktree-threads")).toHaveText("1 working · 1 idle");
-  await expect(checkout(page, FIX).getByTestId("worktree-threads")).toHaveText("1 idle");
-  await expect(checkout(page, FIX).getByTestId("worktree-sync")).toHaveText("1 behind");
-  await expect(checkout(page, CF).getByTestId("worktree-sync")).toHaveText("up to date");
-  await expect(checkout(page, CF).getByTestId("worktree-changes-cell")).toHaveText("clean");
-  // Pull requests as tinted pills; none on main.
-  await expect(checkout(page, FEAT).getByTestId("worktree-pr")).toContainText("#142");
-  await expect(checkout(page, FEAT).getByTestId("worktree-pr")).toHaveAttribute("data-state", "open");
-  await expect(checkout(page, CF).getByTestId("worktree-pr")).toHaveCount(0);
-
-  // A click opens the checkout's Changes tab in this page's own panel.
-  await checkoutRow(page, "repo-cf", FIX).click();
-  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", FIX);
-  expect(await panelKey(page)).toBe("view:projects:project:repo-cf");
-
-  // The row menu: main has no Remove; the others do.
-  await checkoutRow(page, "repo-cf", CF).hover();
-  await checkoutRow(page, "repo-cf", CF).getByTestId("worktree-more").click();
-  expect(await menuItems(page, "worktree-more")).toEqual(["New thread here", "New terminal here", "Show changes", "Open in Finder", "Copy path"]);
-  await closeMenu(page, "worktree-more");
-  await checkoutRow(page, "repo-cf", FEAT).hover();
-  await checkoutRow(page, "repo-cf", FEAT).getByTestId("worktree-more").click();
-  expect(await menuItems(page, "worktree-more")).toEqual(["New thread here", "New terminal here", "Show changes", "Open pull request #142", "Open in Finder", "Copy path", "Remove worktree"]);
-  await page.getByTestId("worktree-reveal").click();
-  const reveal = await lastInvocation("worktree.reveal");
-  expect(reveal?.args).toEqual({ worktree: FEAT });
-  await checkoutRow(page, "repo-cf", FIX).hover();
-  await checkoutRow(page, "repo-cf", FIX).getByTestId("worktree-more").click();
-  await page.getByTestId("worktree-remove").click();
-  await expect(page.getByTestId("remove-worktree-title")).toHaveText("Remove the worktree on fix/resize?");
-  await page.getByTestId("remove-worktree-ok").click();
-  expect((await lastInvocation("project.worktree.remove"))?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: FIX });
-
-  // The header's menu: no New worktree.
-  await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Clean up merged worktrees 0", "Remove project"]);
-  await closeMenu(page, "project-more");
-
-  // Details.
-  await expect(page.getByTestId("details-path")).toContainText("~/src/code-foundry");
-  await expect(page.getByTestId("details-default-branch")).toContainText("main");
-  await expect(page.getByTestId("details-refreshed")).toHaveText(/^refreshed (just now|\d+m ago)$/);
-  await expect(page.getByTestId("details-remote")).toContainText("origin · github.com/alexwaumann/code-foundry");
-  await expect(page.getByTestId("details-worktrees")).toContainText("~/src/code-foundry.worktrees · 1"); // fix/resize was removed above
-  await expect(page.getByText("Show in sidebar")).toHaveCount(0);
-  // Worktrees without threads sits between Checkouts and Details; threads hold both worktrees here.
-  const sections = await page.getByTestId("projects-list").evaluate((el) => [...el.children].map((c) => c.getAttribute("data-testid")));
-  expect(sections).toEqual(["project-checkouts", "leftover-worktrees", "project-details"]);
-  await expect(page.getByTestId("leftover-empty")).toBeVisible();
-});
-
-test("kind variants: no remote (note, no Sync or PR), another remote (no PR), no git (note, Threads, no table)", async ({ page }) => {
-  await openApp(page);
-  await openProjectPage(page, "repo-sk");
-  await expect(page.getByTestId("project-meta")).toHaveText("local only · no remote");
-  await expect(page.getByTestId("project-note")).toContainText("This repository has no remote. Threads can commit, but nothing can be pushed and there are no pull requests.");
-  await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(0);
-  await expect(page.getByTestId("checkouts-col-pr")).toHaveCount(0);
-  await expect(page.getByTestId("checkouts-title")).toContainText("main only");
-  await expect(page.getByTestId("details-remote")).toHaveCount(0);
-  await page.getByTestId("project-publish").click();
-  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-project", "repo-sk");
-  await page.keyboard.press("Escape");
-  await page.getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Publish to GitHub", "Remove project"]);
-  await closeMenu(page, "project-more");
-
-  await openProjectPage(page, "repo-dot");
-  await expect(page.getByTestId("project-meta")).toHaveText("origin · not GitHub");
-  await expect(page.getByTestId("project-note")).toHaveCount(0);
-  await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(1);
-  await expect(page.getByTestId("checkouts-col-pr")).toHaveCount(0);
-  await expect(page.getByTestId("details-remote")).toContainText("origin · pull requests need GitHub");
-
-  await openProjectPage(page, "repo-wr");
-  await expect(page.getByTestId("project-meta")).toHaveText("~/Documents/writing");
-  await expect(page.getByTestId("project-note")).toContainText("A plain folder, not a git repository.");
-  await expect(page.getByTestId("checkouts-table")).toHaveCount(0);
-  await expect(page.getByTestId("project-refresh")).toHaveCount(0);
-  await expect(page.getByTestId("project-threads")).toContainText("No thread is working here. New thread or Terminal.");
-  await expect(page.getByTestId("details-default-branch")).toHaveCount(0);
-  await expect(page.getByTestId("details-actions")).toContainText(/none\s*·\s*Add an action/);
-  await page.getByTestId("project-init-git").click();
-  const init = await lastInvocation("project.git.init");
-  expect(init?.args).toEqual({ project: "repo-wr" });
-  expect(init?.context).toMatchObject({ activeProjectId: "repo-wr", activeView: "projects" });
-  // A git repository without a remote now: its checkouts and the Publish note.
-  await expect(page.getByTestId("checkouts-table")).toBeVisible();
-  await expect(page.getByTestId("project-note")).toContainText("no remote");
-});
+// A project's page (header, checkouts table, a row opening its Changes tab in the page's panel, the row
+// and header menus, Details) and the kind variants (with Initialize git): ProjectPage.test.tsx. A row's
+// tab drawn in the page's own panel is "each page has its own side panel" below; hover actions, "narrow".
 
 // Refresh (fetch then refresh, spinning) and a failed refresh in the header and Details: unit-tested in src/components/projects/ProjectPage.test.tsx ("Refresh fetches…", "a failed refresh shows…").
 
@@ -365,124 +178,22 @@ test("a page's scroll position is remembered while the window lives", async ({ p
 
 // Clean up merged worktrees and Remove the N that are clean (confirm, cleanup, the pill going): unit-tested in src/components/projects/ProjectPage.test.tsx.
 
-test("Worktrees without threads: a row per leftover with why it stayed; Show diff, Resume, New thread; the three cleanable counts agree", async ({ page }) => {
-  await mockPost("leftovers?project=repo-cf&clean=1");
+// The rows, why each stayed, their actions, the counts, New thread and Resume, and the whole Remove…
+// confirm (what goes, the uncommitted files, Show diff, Cancel, force, the rows leaving):
+// ProjectPage.test.tsx. Left: the narrow page Show diff makes (real width) and Resume over the stream.
+test("Worktrees without threads: Show diff narrows the page (Remove icon-only); Resume unarchives and the worktree moves to the table", async ({ page }) => {
+  await mockPost("leftovers?project=repo-cf");
   await openApp(page);
-  await openProjects(page);
-  await expect(row(page, "repo-cf").getByTestId("index-tidy")).toHaveText("1 worktree to tidy");
-  await row(page, "repo-cf").getByTestId("project-name").click();
-  await page.getByTestId("project-more").click();
-  await expect(page.getByTestId("project-cleanup-count")).toHaveText("1");
-  await closeMenu(page, "project-more");
-
-  await expect(page.getByTestId("leftover-title")).toHaveText(/Worktrees without threads\s*· 4 kept/);
-  await expect(page.getByTestId("leftover-remove-clean")).toHaveText("Remove the 1 that is clean");
-  // Threads hold feat/sidebar and fix/resize: not leftovers.
-  await expect(page.getByTestId("leftover-row")).toHaveCount(4);
-  await expect(leftover(page, FEAT)).toHaveCount(0);
-  // A worktree shows once: the table keeps main and the two held ones, the caption counts all seven.
-  await expect(page.getByTestId("checkouts-title")).toContainText("main plus 6 worktrees · 2 threads working");
-  await expect(page.getByTestId("project-worktree")).toHaveCount(3);
-  for (const path of [CF, FEAT, FIX]) await expect(checkout(page, path)).toHaveCount(1);
-  for (const path of [SPIKE, COPY, SHADERS, MERGED]) await expect(checkout(page, path)).toHaveCount(0);
-  const rows: [string, string, string, boolean][] = [
-    [SPIKE, "cf/perf-spike", "3 commits not on main · last thread archived 12d ago", true],
-    [COPY, "cf/old-copy", "4 uncommitted files · merged otherwise · last thread archived 3w ago", true],
-    [SHADERS, "exp/shaders", "made outside Code Foundry · clean · merged", false],
-    [MERGED, "cf/usage-polish", "clean · merged", false],
-  ];
-  for (const [path, branch, reason, work] of rows) {
-    const r = leftover(page, path);
-    await expect(r.getByTestId("leftover-branch")).toHaveText(branch);
-    await expect(r.getByTestId("leftover-reason")).toHaveText(reason);
-    // Holding work: Show diff and Resume; clean: New thread. Remove… on every row.
-    await expect(r.getByTestId("leftover-show-diff")).toHaveCount(work ? 1 : 0);
-    await expect(r.getByTestId("leftover-resume")).toHaveCount(work ? 1 : 0);
-    await expect(r.getByTestId("leftover-new-thread")).toHaveCount(work ? 0 : 1);
-    await expect(r.getByTestId("leftover-remove")).toHaveText("Remove…");
-    if (work) await expect(r).toHaveAttribute("data-work", "true");
-    else await expect(r).not.toHaveAttribute("data-work");
-  }
-  await expect(page.getByTestId("leftover-footer")).toHaveText(
-    "Worktrees made for a thread go on their own once its last thread is archived and the work is on main. These stayed because they still hold something.",
-  );
-  // Details counts the worktrees Code Foundry made.
-  await expect(page.getByTestId("details-worktrees")).toContainText("6, 3 made by Code Foundry");
-
-  // Show diff: the worktree's Changes tab in this page's panel; narrow, Remove shows its icon only.
+  await openProjectPage(page, "repo-cf");
   await leftover(page, COPY).getByTestId("leftover-show-diff").click();
   await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", COPY);
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-narrow", "true");
   await expect(leftover(page, COPY).getByTestId("leftover-remove")).toHaveText("");
   await expect(leftover(page, COPY).getByTestId("leftover-remove")).toHaveAttribute("aria-label", "Remove worktree…");
-  await page.getByTestId("side-panel").getByTestId("panel-toggle").click();
 
-  // New thread on a clean one: the composer in that checkout.
-  await leftover(page, MERGED).getByTestId("leftover-new-thread").click();
-  await expect(page.getByTestId("composer-heading")).toContainText("code-foundry");
-  await expect(page.getByTestId("composer-worktree")).toContainText("cf/usage-polish");
-
-  // Resume with an archived thread there: it is unarchived and shown, so the worktree is no leftover.
-  await openProjectPage(page, "repo-cf");
   await leftover(page, SPIKE).getByTestId("leftover-resume").click();
-  const archive = await lastInvocation("thread.archive");
-  expect(archive?.args).toMatchObject({ archived: "false" });
-  expect(archive?.context).toMatchObject({ activeThreadId: "s-lo-spike" });
   await expect(page.getByTestId("thread-header").getByTestId("thread-title")).toHaveText("Profile the renderer");
   await openProjectPage(page, "repo-cf");
   await expect(leftover(page, SPIKE)).toHaveCount(0);
-  await expect(page.getByTestId("leftover-title")).toContainText("3 kept");
-  // ... and moves to the table.
   await expect(checkout(page, SPIKE)).toHaveCount(1);
-  await expect(page.getByTestId("project-worktree")).toHaveCount(4);
-
-  // Resume with no archived thread there: the composer in that checkout.
-  await mockPost(`worktree/dirty?path=${encodeURIComponent(SHADERS)}&modified=2`);
-  await expect(leftover(page, SHADERS).getByTestId("leftover-reason")).toHaveText("made outside Code Foundry · 2 uncommitted files · merged otherwise");
-  await leftover(page, SHADERS).getByTestId("leftover-resume").click();
-  await expect(page.getByTestId("composer-worktree")).toContainText("exp/shaders");
-});
-
-test("Remove…: the confirm names what goes and what stays; with uncommitted files it warns and lists them, and one yes removes", async ({ page }) => {
-  await mockPost("leftovers?project=repo-cf");
-  await openApp(page);
-  await openProjectPage(page, "repo-cf");
-  await expect(page.getByTestId("leftover-remove-clean")).toHaveCount(0);
-
-  // Dirty: the warning, the first three files and how many more; Show diff closes it and opens the Changes tab.
-  await leftover(page, COPY).getByTestId("leftover-remove").click();
-  const dialog = page.getByTestId("remove-worktree-dialog");
-  await expect(page.getByTestId("remove-worktree-title")).toHaveText("Remove the worktree on cf/old-copy?");
-  await expect(page.getByTestId("remove-worktree-body")).toHaveText("~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy goes. The branch cf/old-copy stays.");
-  await expect(page.getByTestId("remove-worktree-loss-count")).toHaveText("4 uncommitted files are lost.");
-  await expect(page.getByTestId("remove-worktree-loss-files")).toHaveText("gui/frontend/src/lib/tree.ts, docs/notes/sidebar.md, scratch.txt and 1 more · Show diff");
-  await page.getByTestId("remove-worktree-show-diff").click();
-  await expect(dialog).toHaveCount(0);
-  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", COPY);
-  await expect(leftover(page, COPY)).toHaveCount(1);
-
-  // Cancel keeps it.
-  await leftover(page, SPIKE).getByTestId("leftover-remove").click();
-  await expect(page.getByTestId("remove-worktree-loss")).toHaveCount(0);
-  await page.getByTestId("remove-worktree-cancel").click();
-  await expect(dialog).toHaveCount(0);
-  await expect(leftover(page, SPIKE)).toHaveCount(1);
-
-  // One yes removes the dirty one: the daemon's second question (force) is answered by it.
-  await leftover(page, COPY).getByTestId("leftover-remove").click();
-  await page.getByTestId("remove-worktree-ok").click();
-  await expect(leftover(page, COPY)).toHaveCount(0);
-  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  const removes = (await invocations()).filter((i) => i.name === "project.worktree.remove");
-  expect(removes.at(-1)?.args).toEqual({ path: COPY, force: "true" });
-  expect(removes.at(-1)?.confirmed).toBe(true);
-
-  // Clean: no warning, no force.
-  await leftover(page, SHADERS).getByTestId("leftover-remove").click();
-  await expect(page.getByTestId("remove-worktree-title")).toHaveText("Remove the worktree on exp/shaders?");
-  await expect(page.getByTestId("remove-worktree-loss")).toHaveCount(0);
-  await page.getByTestId("remove-worktree-ok").click();
-  await expect(leftover(page, SHADERS)).toHaveCount(0);
-  expect((await lastInvocation("project.worktree.remove"))?.args).toEqual({ path: SHADERS });
-  await expect(page.getByTestId("leftover-title")).toContainText("1 kept");
 });

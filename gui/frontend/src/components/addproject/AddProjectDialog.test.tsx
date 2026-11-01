@@ -251,6 +251,32 @@ describe("the Local folder tab", () => {
     expect(register()).toEqual(["register ~/src/Website"]);
   });
 
+  it("a highlighted folder: / descends into it, Tab descends, Enter adds it", async () => {
+    await open();
+    await typePath("Documents/");
+    expect(entry("Projects")).not.toBeNull();
+    fireEvent.keyDown(localInput(), { key: "ArrowDown" });
+    expect(entry("Projects")?.getAttribute("data-selected")).toBe("true");
+    fireEvent.keyDown(localInput(), { key: "/" });
+    await settle(200);
+    expect(localInput().value).toBe("Documents/Projects/");
+    expect(entry("side-project")?.getAttribute("data-git")).toBe("true");
+
+    fireEvent.keyDown(localInput(), { key: "ArrowDown" });
+    fireEvent.keyDown(localInput(), { key: "Tab" });
+    await settle(200);
+    expect(localInput().value).toBe("Documents/Projects/side-project/");
+
+    await typePath("Documents/Projects/");
+    expect(entry("side-project")).not.toBeNull();
+    fireEvent.keyDown(localInput(), { key: "ArrowDown" });
+    enter(localInput());
+    await settle();
+    expect(screen.queryByTestId("add-project-dialog")).toBeNull();
+    expect(register()).toEqual(["register ~/Documents/Projects/side-project"]);
+    await expectRevealed("side-project");
+  });
+
   it("after a click, Enter adds the typed path (not a folder in its listing), and so does the button", async () => {
     await open();
     await settle(200);

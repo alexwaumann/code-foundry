@@ -221,6 +221,8 @@ describe("SidebarRow line 3: detail or branch", () => {
     renderRow({ projectId: "notes", projectIds: ["notes"], worktreePath: "/src/notes" });
     expect(screen.queryByTestId("row-branch")).toBeNull();
     expect(line3().textContent).toBe("No git");
+    expect(screen.getByTestId("no-git-badge")).toBeTruthy();
+    expect(screen.getByTestId("row-project").textContent).toBe("writing");
   });
 
   it("background agents (info, a bot) and shells (muted, a terminal), only when running", () => {

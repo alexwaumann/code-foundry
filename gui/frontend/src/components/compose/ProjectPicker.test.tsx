@@ -127,6 +127,19 @@ describe("ProjectPicker", () => {
     });
   });
 
+  it("a click on Add a project… closes the picker and opens the dialog on Local folder", async () => {
+    useAddProjectStore.setState({ open: false });
+    const close = vi.fn();
+    render(<ProjectPicker close={close} />);
+    const rows = items();
+    expect(rows.at(-1)?.dataset.testid).toBe("picker-add-project");
+    fireEvent.click(screen.getByTestId("picker-add-project"));
+    expect(close).toHaveBeenCalledOnce();
+    await vi.waitFor(() => {
+      expect(useAddProjectStore.getState()).toMatchObject({ open: true, tab: "local" });
+    });
+  });
+
   it("keeps Add a project… when a query matches nothing, highlighted, with the empty text above it", () => {
     render(<ProjectPicker close={() => undefined} />);
     search("zzz-no-such-project");
