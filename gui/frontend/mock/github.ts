@@ -302,7 +302,7 @@ export class GhWorld {
       },
       fetchedAt: this.at(8_000),
       lastError: "",
-      projectOpen: { pullRequests: projectOpen, totalCount: projectOpen.length, searchUrl: searchUrl(`is:pr is:open archived:false ${repos} -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc`) },
+      projectOpen: { pullRequests: projectOpen, totalCount: projectOpen.length, searchUrl: searchUrl(`is:pr is:open archived:false updated:>=${new Date(this.t0 - 30 * DAY).toISOString().slice(0, 19)}+00:00 ${repos} -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc`) },
       projectMerged: { pullRequests: projectMerged, totalCount: projectMerged.length, searchUrl: searchUrl(`is:pr is:merged merged:>=${since} ${repos} sort:updated-desc`) },
       projectsFetchedAt: this.at(8_000),
       projectsLastError: "",

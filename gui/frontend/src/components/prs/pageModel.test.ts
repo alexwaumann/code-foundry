@@ -151,7 +151,7 @@ describe("pageModel", () => {
       ["Needs your review", 3, "2 requested · 1 re-review", true],
       ["Reviewed by you", 2, "open, waiting on the author", false],
       ["Your pull requests", 3, "1 CI failing · 1 ready to merge", false],
-      ["Everything else open", 5, "in your projects, for awareness", false],
+      ["Everything else open", 5, "in your projects, updated in the last month", false],
       ["Merged · 7 days", 7, "4 involving you · 3 more", false],
     ]);
     expect([m.othersCap, m.mergedCap]).toEqual([null, null]);

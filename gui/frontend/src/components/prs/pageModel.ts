@@ -252,7 +252,7 @@ export function cards(m: PageModel): Card[] {
     { section: "review", label: "Needs your review", count: m.counts.review, subtitle: needsSubtitle(m.needs), warn: m.counts.review > 0 },
     { section: "reviewed", label: "Reviewed by you", count: m.counts.reviewed, subtitle: "open, waiting on the author", warn: false },
     { section: "authored", label: "Your pull requests", count: m.counts.authored, subtitle: authoredSubtitle(m.authored), warn: false },
-    { section: "else", label: "Everything else open", count: m.counts.else, subtitle: "in your projects, for awareness", warn: false },
+    { section: "else", label: "Everything else open", count: m.counts.else, subtitle: "in your projects, updated in the last month", warn: false },
     { section: "merged", label: "Merged · 7 days", count: m.counts.merged, subtitle: mergedSubtitle(m.mergedInvolved, m.mergedMore), warn: false },
   ];
 }
