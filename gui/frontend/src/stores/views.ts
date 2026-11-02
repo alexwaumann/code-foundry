@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { create } from "zustand";
 import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPanel";
 import { expandPanel, getPanel, isSplit, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
-import { useUiStore, viewNames, type FocusRegion } from "./ui";
+import { projectPage, useUiStore, viewNames, workspacePage, type FocusRegion, type Selection } from "./ui";
 import { openMcpSurface } from "./mcpPanel";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
@@ -110,9 +110,10 @@ export function toggleView(name: "settings" | "usage"): boolean {
 
 /**
  * Shows a named view (UiIntent.ShowView.name). Returns false for an unknown name. Pages
- * only show: one already open stays (toggleView is the window's own toggle).
+ * only show: one already open stays (toggleView is the window's own toggle). `params`
+ * pick the page: view.projects --project or --workspace (that one's page on Projects).
  */
-export function showView(name: string): boolean {
+export function showView(name: string, params?: Readonly<Record<string, string>>): boolean {
   // theme.edit: the Themes page in edit mode on one of the user's themes.
   if (name.startsWith(THEME_EDIT_VIEW)) {
     void openThemeEditor(name.slice(THEME_EDIT_VIEW.length));
@@ -219,10 +220,17 @@ export function showView(name: string): boolean {
       // usage here too covers re-selecting the page that is already selected.
       if (!viewNames.includes(name)) return false;
       setPages({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false }, () => {
-        useUiStore.getState().select({ kind: "view", name });
+        useUiStore.getState().select(pageSelection(name, params));
       });
       return true;
   }
+}
+
+/** The selection a top-level page's ShowView names: a project's or workspace's page for "projects" with one in params. */
+function pageSelection(name: string, params: Readonly<Record<string, string>> | undefined): Extract<Selection, { kind: "view" }> {
+  if (name === "projects" && params?.project) return projectPage(params.project);
+  if (name === "projects" && params?.workspace) return workspacePage(params.workspace);
+  return { kind: "view", name };
 }
 
 /**

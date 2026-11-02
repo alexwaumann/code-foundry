@@ -4,8 +4,9 @@ import { useShallow } from "zustand/react/shallow";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
-import { crumbParent, crumbPlace, type CrumbIcon, type CrumbParent } from "@/lib/threadCrumb";
+import { crumbLink, crumbParent, crumbPlace, type CrumbIcon, type CrumbParent } from "@/lib/threadCrumb";
 import { cn } from "@/lib/utils";
+import { runCommand } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -68,34 +69,55 @@ function ParentSegment({ parent }: { parent: CrumbParent }) {
  * Where the thread runs, in front of its title (lib/threadCrumb.ts): a project's folder
  * and name, a workspace's layers and name, an unnamed set's folders and "api +8", or home
  * and "No project"; then the parent thread (its creator, or what it was forked from),
- * which opens on a click. Muted, each segment followed by "›". The branch and the rest of
- * the place are the thread info card's.
+ * which opens on a click. Muted, each segment followed by "›". The place opens its page on
+ * the Projects view on a click (view.projects --workspace or --project: the workspace's,
+ * else the primary project's); no project, or a removed one, is plain text. The branch and
+ * the rest of the place are the thread info card's.
  */
 function ThreadCrumb({ id }: { id: string }) {
   const input = usePlaceInput(id);
   const wsName = useWorkspacesStore((s) => (input.workspaceId ? (s.byId[input.workspaceId]?.name ?? null) : null));
-  // One string over the projects: a status refresh elsewhere does not re-render the crumb.
-  const place = useProjectsStore((s) => {
-    const t = { ...input, projectIds: input.projectIds ? input.projectIds.split("\u0000") : [] };
-    const p = crumbPlace(t, s, { byId: wsName === null ? {} : { [input.workspaceId]: { name: wsName } } });
-    return `${p.icon}\u0000${p.label}`;
-  });
-  const [icon, label] = place.split("\u0000") as [CrumbIcon, string];
+  // Primitives over the projects (shallow): a status refresh elsewhere does not re-render the crumb.
+  const { icon, label, workspace, project } = useProjectsStore(
+    useShallow((s) => {
+      const t = { ...input, projectIds: input.projectIds ? input.projectIds.split("\u0000") : [] };
+      const workspaces = { byId: wsName === null ? {} : { [input.workspaceId]: { name: wsName } } };
+      const link = crumbLink(t, s, workspaces);
+      return { ...crumbPlace(t, s, workspaces), workspace: link && "workspace" in link ? link.workspace : "", project: link && "project" in link ? link.project : "" };
+    }),
+  );
   const parent = useThreadsStore(useShallow((s) => crumbParent(s.byId[id] ?? { createdBy: "", createdByName: "", parentId: "" }, s)));
-  const crumb = { icon, label, parent };
-  const Icon = crumb.icon === "folder" ? null : crumbIcons[crumb.icon];
-  return (
-    <span className="flex min-w-0 shrink items-center gap-1 text-label text-cf-text-muted" data-testid="thread-crumb" data-icon={crumb.icon}>
-      <span className="flex min-w-0 items-center gap-1.5 px-1">
-        {Icon ? <Icon className="size-3.5 shrink-0" aria-hidden /> : <ProjectIcon projectId={input.projectId} className="size-3.5 shrink-0" />}
-        <span className="truncate" data-testid="thread-crumb-place">
-          {crumb.label}
-        </span>
+  // view.projects' args (--workspace or --project); null: plain text.
+  const args: Record<string, string> | null = workspace ? { workspace } : project ? { project } : null;
+  const Icon = icon === "folder" ? null : crumbIcons[icon];
+  const content = (
+    <>
+      {Icon ? <Icon className="size-3.5 shrink-0" aria-hidden /> : <ProjectIcon projectId={input.projectId} className="size-3.5 shrink-0" />}
+      <span className="truncate" data-testid="thread-crumb-place">
+        {label}
       </span>
+    </>
+  );
+  return (
+    <span className="flex min-w-0 shrink items-center gap-1 text-label text-cf-text-muted" data-testid="thread-crumb" data-icon={icon}>
+      {args ? (
+        <button
+          type="button"
+          className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
+          data-testid="thread-crumb-place-link"
+          onClick={() => {
+            void runCommand("view.projects", args);
+          }}
+        >
+          {content}
+        </button>
+      ) : (
+        <span className="flex min-w-0 items-center gap-1.5 px-1">{content}</span>
+      )}
       <Sep />
-      {crumb.parent && (
+      {parent && (
         <>
-          <ParentSegment parent={crumb.parent} />
+          <ParentSegment parent={parent} />
           <Sep />
         </>
       )}

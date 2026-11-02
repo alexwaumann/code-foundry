@@ -4,6 +4,7 @@
  * components/thread/ThreadParts.tsx renders it.
  */
 import type { ThreadView } from "@/api/threads";
+import { isWithin } from "./path";
 import { isNoProject, NO_PROJECT, threadRowModel, type ProjectLookup, type WorkspaceLookup } from "./threadRow";
 
 /** The place segment's icon: one project (its kind icon), a named workspace's layers, an unnamed set's folders, home. */
@@ -17,10 +18,18 @@ export interface CrumbParent {
   exists: boolean;
 }
 
+/**
+ * The page the place segment opens on a click: view.projects' args, a workspace's page
+ * or a project's (docs/notes/thread-crumb-links.md).
+ */
+export type CrumbLink = { workspace: string } | { project: string };
+
 export interface ThreadCrumb {
   icon: CrumbIcon;
   /** "web", "platform", "api +8", "No project". */
   label: string;
+  /** What a click on the place opens; null (plain text) for no project or a removed one. */
+  link: CrumbLink | null;
   /** The thread whose agent created it, else the thread it was forked from; null for neither. */
   parent: CrumbParent | null;
 }
@@ -62,7 +71,22 @@ export function crumbPlace(t: Omit<CrumbThread, "createdBy" | "createdByName" | 
   return { icon: "folder", label: here };
 }
 
-/** The whole crumb: crumbPlace, then crumbParent. */
+/**
+ * The page the place opens: a workspace the store knows, its page (a workspace's thread,
+ * whatever its primary); else the primary project's page while that project is known
+ * (one project, or an unnamed set: the cwd's project, the one its label names), or for an
+ * older row with no project id the project whose checkout holds its cwd. Null for no
+ * project, and for a project (or set) whose project was removed: plain text.
+ */
+export function crumbLink(t: Omit<CrumbThread, "createdBy" | "createdByName" | "parentId" | "projectIds">, projects: ProjectLookup, workspaces: WorkspaceLookup): CrumbLink | null {
+  if (isNoProject(t, projects)) return null;
+  if (t.workspaceId && workspaces.byId[t.workspaceId]) return { workspace: t.workspaceId };
+  if (t.projectId) return projects.byId[t.projectId] ? { project: t.projectId } : null;
+  for (const [id, p] of Object.entries(projects.byId)) if (p?.worktrees.some((w) => isWithin(t.worktreePath, w.path))) return { project: id };
+  return null;
+}
+
+/** The whole crumb: crumbPlace and crumbLink, then crumbParent. */
 export function threadCrumb(t: CrumbThread, projects: ProjectLookup, workspaces: WorkspaceLookup, threads: ParentLookup): ThreadCrumb {
-  return { ...crumbPlace(t, projects, workspaces), parent: crumbParent(t, threads) };
+  return { ...crumbPlace(t, projects, workspaces), link: crumbLink(t, projects, workspaces), parent: crumbParent(t, threads) };
 }

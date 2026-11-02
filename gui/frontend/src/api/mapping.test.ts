@@ -156,6 +156,7 @@ describe("ui intent mapping", () => {
     [{ case: "focusThread" as const, value: { threadId: "s1" } }, { kind: "focusThread", threadId: "s1" }],
     [{ case: "focusThread" as const, value: { threadId: "s1", explicit: true } }, { kind: "focusThread", threadId: "s1", explicit: true }],
     [{ case: "showView" as const, value: { name: "projects" } }, { kind: "showView", name: "projects" }],
+    [{ case: "showView" as const, value: { name: "projects", params: { workspace: "w-1" } } }, { kind: "showView", name: "projects", params: { workspace: "w-1" } }],
     [{ case: "showView" as const, value: { name: "panel.mcp", threadId: "s1" } }, { kind: "showView", name: "panel.mcp", threadId: "s1" }],
     [
       { case: "showView" as const, value: { name: "panel.pr", threadId: "s1", params: { slug: "o/r", number: "7" } } },
