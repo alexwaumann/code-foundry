@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import type { EditorAppView } from "@/api/gitops";
 import { Ellipsis, SquareArrowOutUpRight } from "lucide-react";
 import { AppIcon, FinderIcon } from "@/components/icons/AppIcon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -7,6 +8,59 @@ import { runCommand } from "@/stores/commands";
 import { worktreeContext } from "@/stores/context";
 import { newTerminalIn } from "@/stores/projectActions";
 import { useEditorApps } from "@/stores/threadInfo";
+import type { MenuParts } from "./OverflowMenu";
+
+const DROPDOWN_PARTS: MenuParts = { Item: DropdownMenuItem, Separator: DropdownMenuSeparator };
+
+/**
+ * The Open in list for a checkout, the same in a dropdown (Details' ⋯ here) and a context
+ * menu (a checkout row's split Open in Finder, OpenInMenuItem.tsx): Finder, the installed
+ * editors (their real icons), a separator, then Terminal (a new terminal in the checkout).
+ * `editors` comes from the always-mounted control (useEditorApps), so the list is read before
+ * the menu opens.
+ * `parts` are the menu's item and separator; each item records its action in `onPick`, to
+ * run once the menu has closed. Test ids `<testIdPrefix>-finder`, `-editor` (data-app), `-terminal`.
+ */
+export function OpenInList({
+  projectId,
+  path,
+  editors,
+  parts: { Item, Separator },
+  onPick,
+  testIdPrefix,
+}: {
+  projectId: string;
+  path: string;
+  editors: readonly EditorAppView[];
+  parts: MenuParts;
+  onPick: (run: () => void) => void;
+  testIdPrefix: string;
+}) {
+  const ctx = () => worktreeContext(projectId, path);
+  return (
+    <>
+      <Item data-testid={`${testIdPrefix}-finder`} onSelect={() => { onPick(() => void runCommand("worktree.reveal", { worktree: path }, ctx())); }}>
+        <FinderIcon aria-hidden />
+        Finder
+      </Item>
+      {editors.map((a) => (
+        <Item
+          key={a.bundleId}
+          data-testid={`${testIdPrefix}-editor`}
+          data-app={a.bundleId}
+          onSelect={() => { onPick(() => void runCommand("worktree.open.editor", { worktree: path, app: a.bundleId }, ctx())); }}
+        >
+          <AppIcon bundleId={a.bundleId} fallback={SquareArrowOutUpRight} />
+          {a.name}
+        </Item>
+      ))}
+      <Separator />
+      <Item data-testid={`${testIdPrefix}-terminal`} onSelect={() => { onPick(() => void newTerminalIn(projectId, path)); }}>
+        Terminal
+      </Item>
+    </>
+  );
+}
 
 /**
  * The split hover (docs/notes/thread-info-split-hover.md) on two real buttons with a 2px
@@ -31,11 +85,7 @@ export function OpenInFinder({ projectId, path, compact }: { projectId: string; 
   const editors = useEditorApps();
   const moreRef = useRef<HTMLButtonElement>(null);
   const picked = useRef<(() => void) | null>(null);
-  const ctx = () => worktreeContext(projectId, path);
-  const reveal = () => void runCommand("worktree.reveal", { worktree: path }, ctx());
-  const pick = (run: () => void) => () => {
-    picked.current = run;
-  };
+  const reveal = () => void runCommand("worktree.reveal", { worktree: path }, worktreeContext(projectId, path));
   return (
     <span className="group/split inline-flex min-w-0 items-center" data-testid="details-open-in">
       <Tip label={compact ? "Open in Finder" : null}>
@@ -70,25 +120,7 @@ export function OpenInFinder({ projectId, path, compact }: { projectId: string; 
             run?.();
           }}
         >
-          <DropdownMenuItem data-testid="details-open-finder" onSelect={pick(reveal)}>
-            <FinderIcon aria-hidden />
-            Finder
-          </DropdownMenuItem>
-          {editors.map((a) => (
-            <DropdownMenuItem
-              key={a.bundleId}
-              data-testid="details-open-editor"
-              data-app={a.bundleId}
-              onSelect={pick(() => void runCommand("worktree.open.editor", { worktree: path, app: a.bundleId }, ctx()))}
-            >
-              <AppIcon bundleId={a.bundleId} fallback={SquareArrowOutUpRight} />
-              {a.name}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem data-testid="details-open-terminal" onSelect={pick(() => void newTerminalIn(projectId, path))}>
-            Terminal
-          </DropdownMenuItem>
+          <OpenInList projectId={projectId} path={path} editors={editors} parts={DROPDOWN_PARTS} onPick={(run) => { picked.current = run; }} testIdPrefix="details-open" />
         </DropdownMenuContent>
       </DropdownMenu>
     </span>

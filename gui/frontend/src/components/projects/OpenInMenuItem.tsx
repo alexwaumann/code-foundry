@@ -1,21 +1,18 @@
 import { useContext, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { ChevronRight, SquareArrowOutUpRight } from "lucide-react";
-import { AppIcon, FinderIcon } from "@/components/icons/AppIcon";
+import { ChevronRight } from "lucide-react";
 import { ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger } from "@/components/ui/context-menu";
 import { runCommand } from "@/stores/commands";
 import { worktreeContext } from "@/stores/context";
-import { newTerminalIn } from "@/stores/projectActions";
 import { useEditorApps } from "@/stores/threadInfo";
+import { OpenInList } from "./OpenInFinder";
+import type { MenuParts } from "./OverflowMenu";
 import { RowMenuPickContext } from "./RowContextMenu";
+
+const CONTEXT_PARTS: MenuParts = { Item: ContextMenuItem, Separator: ContextMenuSeparator };
 
 /** worktree.reveal: the checkout in Finder. */
 function revealCheckout(projectId: string, path: string): void {
   void runCommand("worktree.reveal", { worktree: path }, worktreeContext(projectId, path));
-}
-
-/** worktree.open.editor: the checkout in an installed editor. */
-function openInEditor(projectId: string, path: string, app: string): void {
-  void runCommand("worktree.open.editor", { worktree: path, app }, worktreeContext(projectId, path));
 }
 
 const onMore = (t: EventTarget | null): boolean => t instanceof Element && t.closest("[data-open-in-more]") !== null;
@@ -42,9 +39,9 @@ export const OPEN_IN_MORE =
 /**
  * "Open in Finder" as a split item of a row's right-click menu (docs/notes/project-page-2-checkouts.md):
  * a click on it (or Enter, Space) reveals the checkout in Finder and closes the menu; its › block
- * at the right opens a submenu (hover there, a click on it, or ArrowRight) with Finder, the
- * installed editors (their real icons) and, after a separator, Terminal (a new terminal in the
- * checkout). It hovers as two blocks like the thread info card's Actions items with their gear.
+ * at the right opens a submenu (hover there, a click on it, or ArrowRight) with the Open in
+ * list Details' ⋯ has (OpenInFinder.tsx OpenInList): Finder, the installed editors (their real
+ * icons) and, after a separator, Terminal (a new terminal in the checkout). It hovers as two blocks like the thread info card's Actions items with their gear.
  *
  * It is a Radix sub trigger whose own opening is kept to the › block: a pointer move over the
  * rest focuses the item without Radix (which would open the submenu) and closes a submenu left
@@ -99,41 +96,7 @@ export function OpenInSplitItem({ projectId, path, testId }: { projectId: string
         </span>
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="min-w-48" data-testid={`${testId}-menu`}>
-        <ContextMenuItem
-          data-testid="open-in-finder"
-          onSelect={() => {
-            pick(() => {
-              revealCheckout(projectId, path);
-            });
-          }}
-        >
-          <FinderIcon />
-          Finder
-        </ContextMenuItem>
-        {editors.map((a) => (
-          <ContextMenuItem
-            key={a.bundleId}
-            data-testid="open-in-editor"
-            data-app={a.bundleId}
-            onSelect={() => {
-              pick(() => {
-                openInEditor(projectId, path, a.bundleId);
-              });
-            }}
-          >
-            <AppIcon bundleId={a.bundleId} fallback={SquareArrowOutUpRight} />
-            {a.name}
-          </ContextMenuItem>
-        ))}
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          data-testid="open-in-terminal"
-          onSelect={() => {
-            pick(() => void newTerminalIn(projectId, path));
-          }}
-        >
-          Terminal
-        </ContextMenuItem>
+        <OpenInList projectId={projectId} path={path} editors={editors} parts={CONTEXT_PARTS} onPick={pick} testIdPrefix="open-in" />
       </ContextMenuSubContent>
     </ContextMenuSub>
   );

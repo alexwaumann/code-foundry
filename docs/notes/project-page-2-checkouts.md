@@ -43,7 +43,9 @@ renders with injected DOM.
 - **Split Open in item** (`OpenInMenuItem.tsx` `OpenInSplitItem`, for reuse in PR 3): a click,
   Enter or Space reveals in Finder. The › block (the item's last 32px) opens a submenu on
   hover, click or ArrowRight. The submenu lists Finder, the installed editors (`AppIcon`) and,
-  after a separator, Terminal. It hovers like `GearMenuItem`: the left block is `before:` and
+  after a separator, Terminal. That list is `OpenInList` in PR 1's `OpenInFinder.tsx`, shared
+  with Details' ⋯: it takes the menu's item and separator parts. The always-mounted control
+  reads `useEditorApps`, so the editors are known before the menu opens. It hovers like `GearMenuItem`: the left block is `before:` and
   ends 34px short, and the › block is the span's `after:`. The block under the pointer is
   bright and the other is at half strength. While the submenu is open, the › block is bright
   and the left block is at half strength. The chevron always shows, because it marks a
@@ -62,8 +64,9 @@ renders with injected DOM.
 ## Decisions
 
 - **The table measures itself** (`useWidth` on the table) instead of ProjectPage passing a
-  width. The ladder's widths are the table's, and this keeps ProjectPage's diff small for
-  PR 1's rebase. ProjectPage passes only `remote` and `github`.
+  width. The ladder's widths are the table's. ProjectPage passes only `remote` and `github`;
+  its `narrow` (`PROJECT_NARROW_BELOW`) no longer touches the table and stays for the
+  leftovers.
 - **Copy path and Copy branch name toast** ("Path copied"). A menu item has no other place
   to confirm itself. The Details copy button (PR 1) uses its check icon instead.
 - **Moving the pointer onto the split item's text closes its open submenu.** The left block

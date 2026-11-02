@@ -446,7 +446,7 @@ export function actionsDetail(names: readonly string[]): string {
 /** A project page's title block and Details drop to their compact layout (no slug, Open in Finder's icon only) below this content width. */
 export const PROJECT_TITLE_COMPACT_BELOW = 720;
 
-/** The narrow layout of a project page (the Checkouts table's Sync column drops, the leftover rows' Remove shows its icon only) below this content width. */
+/** The narrow layout of a project page (the leftover rows' Remove shows its icon only; the Checkouts table drops its own columns, CHECKOUT_DROP_BELOW) below this content width. */
 export const PROJECT_NARROW_BELOW = 840;
 
 /** The Projects index's optional columns (Project and Needs a look always show). */
