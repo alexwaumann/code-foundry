@@ -432,7 +432,10 @@ func (m *Manager) runMove(ctx context.Context, id string, job *moveJob) (bool, e
 			return false, fmt.Errorf("%w: Claude did not start to move the thread: %s", ErrFailedPrecondition, nonEmpty(s.LastError, "it ended before answering"))
 		case !s.needsTranscript():
 			// No conversation yet: nothing for Claude to relocate.
-			return false, m.moveStopped(ctx, id, job)
+			if moved, err := m.moveStopped(ctx, id, job); err != nil || moved {
+				return false, err
+			}
+			// started meanwhile: queue it on that process
 		default:
 			job.started = true
 			_, err := m.startStopped(ctx, id, startOpts{move: job})
@@ -472,17 +475,23 @@ func (m *Manager) queueMove(id string, r *runner, job *moveJob) bool {
 	return true
 }
 
-// moveStopped moves a stopped thread without a conversation: its row, at once.
-func (m *Manager) moveStopped(ctx context.Context, id string, job *moveJob) error {
+// moveStopped moves a stopped thread without a conversation: its row, at once. false
+// without an error: it is starting or running now (a send since runMove looked), so the
+// move goes to that process instead; the row never says a project while Claude runs in
+// the old cwd.
+func (m *Manager) moveStopped(ctx context.Context, id string, job *moveJob) (bool, error) {
 	m.mu.Lock()
 	rec, err := m.record(id)
 	switch {
 	case err != nil:
 		m.mu.Unlock()
-		return err
+		return false, err
 	case !rec.s.ArchivedAt.IsZero():
 		m.mu.Unlock()
-		return errArchivedWhileMoving
+		return false, errArchivedWhileMoving
+	case rec.run != nil || rec.reserved != nil:
+		m.mu.Unlock()
+		return false, nil
 	}
 	rec.s = rec.s.withMove(job)
 	rec.moving = false
@@ -493,7 +502,7 @@ func (m *Manager) moveStopped(ctx context.Context, id string, job *moveJob) erro
 	m.noteMembers(ctx, id, movedNote(job), "")
 	m.movedHooks(id, job)
 	job.done <- nil
-	return nil
+	return true, nil
 }
 
 // onMoved applies a move Claude accepted (streamCd): the row takes the placement, a

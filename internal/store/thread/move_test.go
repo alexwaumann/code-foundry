@@ -562,3 +562,52 @@ func TestMoveArchivedWhileNaming(t *testing.T) {
 		})
 	}
 }
+
+// moveStopped never writes the row of a thread that started (a send) after runMove saw
+// it stopped: it reports not moved, so runMove queues the move on that process.
+func TestMoveStoppedSeesAStart(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(e *wsEnv, id string) (undo func())
+	}{
+		{"running", func(*wsEnv, string) func() { return func() {} }},
+		{"starting", func(e *wsEnv, id string) func() {
+			e.exit(id, 0)
+			e.waitFor(id, "stopped", func(s Thread) bool { return s.State == StateDisconnected })
+			e.m.mu.Lock()
+			e.m.recs[id].reserve()
+			e.m.mu.Unlock()
+			return func() {
+				e.m.mu.Lock()
+				e.m.recs[id].release()
+				e.m.recs[id].s.State = StateDisconnected
+				e.m.mu.Unlock()
+			}
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, _ := newMoveEnv(t, "text-table")
+			s := e.connected(CreateOptions{NoProject: true, Name: "scratch"})
+			defer tt.setup(e, s.ID)()
+			job := &moveJob{placed: placedThread{projectID: "r1", projectIDs: []string{"r1"}, path: e.wt}, place: "repo", done: make(chan error, 1)}
+			moved, err := e.m.moveStopped(e.ctx(), s.ID, job)
+			if moved || err != nil {
+				t.Fatalf("moveStopped = %v, %v; want not moved", moved, err)
+			}
+			if got, _ := e.m.Get(e.ctx(), s.ID); got.ProjectID != "" || got.WorktreePath != e.home {
+				t.Errorf("row written: %+v", got)
+			}
+		})
+	}
+	// Through Move: a running thread without a conversation moves with set_cwd.
+	e, _ := newMoveEnv(t, "text-table")
+	s := e.connected(CreateOptions{NoProject: true, Name: "scratch"})
+	got, err := e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true})
+	if err != nil || got.ProjectID != "r1" || got.WorktreePath != e.wt {
+		t.Fatalf("Move = %+v, %v", got, err)
+	}
+	if !e.sentSetCwd(e.wt) {
+		t.Error("no set_cwd")
+	}
+}
