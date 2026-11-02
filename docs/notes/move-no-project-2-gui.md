@@ -80,8 +80,10 @@ from the thread's header, without starting over.
   `stores/compose` into every module that imports views, and `Code.test.tsx`'s narrow
   `vi.mock("@/api/threads")` broke on `ATTACHMENT_MIME_TYPES`. The store builds the thread
   context with `getUiContext` directly.
-* Typing a project's name in step 1 can match a workspace first: a workspace row's keywords
-  are its members' names, as in cmd+N's picker. Kept consistent with cmd+N.
+* Found in the built app: typing "webapp" in step 1 picked the workspace that has webapp,
+  listed above the projects, because its row's search keywords were its members' names (as
+  in cmd+N's picker, whose row shows them). The move list shows "N projects", not the
+  members, so a workspace row matches on its name only.
 * The mock's `thread/<action>` control regex lists every action. New ones (`move-fail`,
   `move-delay`) must be added there too, or the server answers "unknown control endpoint".
 

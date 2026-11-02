@@ -155,6 +155,9 @@ describe("step 2: where it works there", () => {
   it("the filter narrows the list and Enter picks; a project without git: no Work in, the No git badge", () => {
     openPicker();
     const input = screen.getByTestId("move-filter");
+    // A workspace matches on its name only: "web" is the project, not platform (which has web).
+    fireEvent.change(input, { target: { value: "web" } });
+    expect([...picker().querySelectorAll("[cmdk-item]")].map((r) => r.textContent)).toEqual(["WEweb"]);
     fireEvent.change(input, { target: { value: "note" } });
     expect([...picker().querySelectorAll("[cmdk-item]")].map((r) => r.textContent)).toEqual(["NOnotesNo git"]);
     fireEvent.keyDown(input, { key: "Enter" });

@@ -27,16 +27,18 @@ export const MOVE_FOOTER = "Claude keeps the conversation and carries on there."
 /** Step 2's footer, beside Move. */
 export const MOVE_NOTE = "The thread is renamed and Claude carries on there.";
 
-/** A workspace's row: layers, its name, and "N projects" on the right. */
+/**
+ * A workspace's row: layers, its name, and "N projects" on the right. A search matches its
+ * name only: the row does not show its members, and a project's name typed in full must
+ * land on the project, not on a workspace listed above it.
+ */
 function WorkspaceItem({ id, onPick }: { id: string; onPick: (t: MoveTarget) => void }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
-  const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.projectId)));
-  const members = useProjectsStore(useShallow((s) => memberIds.map((m) => s.byId[m]?.name ?? m)));
-  const n = memberIds.length;
+  const n = useWorkspacesStore((s) => s.byId[id]?.members.length ?? 0);
   return (
     <CommandItem
       value={`ws:${id}`}
-      keywords={[name, ...members]}
+      keywords={[name]}
       onSelect={() => {
         onPick({ kind: "workspace", workspaceId: id });
       }}
