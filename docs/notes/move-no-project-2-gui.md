@@ -135,3 +135,52 @@ set_cwd is meant to be dropped (`runner.cdResultOwed`); with fakeclaude's
 here). Real Claude probably sends something before that result that marks the turn busy
 (`streamStatus.turnStarted`), so `cdResult` treats the result as a turn's. It needs a
 capture of real Claude's stream around set_cwd.
+
+## Review fixes
+
+1. **Focus after Move and after a refusal.** While moving, the crumb is plain text, so the
+   popover and its trigger unmount together and Radix had nowhere to return focus: it fell
+   to `<body>`. `moveThread` now asks the thread's prompt for the keyboard
+   (`focusMovedThreadPrompt`, the `promptFocusSeq` request `focusPromptAfterMenu` makes)
+   before it closes the picker. On a refusal, the prompt takes it back if focus fell to the
+   body meanwhile (`focusDropped`). Focus the user moved elsewhere is left alone. A thread
+   moved from the CLI while its popover was open unmounts the trigger too. `MovePicker`'s
+   unmount cleanup asks the prompt when focus fell to the body and the window still shows
+   the thread. Leaving the thread asks nothing. e2e: the prompt is focused after Move, and
+   after a refused move (where typing lands in it). vitest: Move, a pending_move arriving
+   while the popover is open, and leaving the thread.
+2. **Deleted transcript.** `canMove` and `useCanMove` read `transcriptMissing`: the daemon
+   always refuses that move. Rows in `lib/move.test.ts` and `ThreadMenuItems.test.tsx`.
+3. **Between Move and `pending_move`.** `canMoveThread` and `useCanMove` are false while
+   this window's `sending[id]` is set, so the menus, the palette and `openMovePicker` don't
+   offer a second Move (the daemon would refuse it as "already moving"). `moveThread`'s
+   `finally` clears `open` for the thread, so an opening that raced in doesn't pop the
+   popover open by itself after a refusal. vitest covers both.
+4. **Composer re-renders.** `usePlacement` returns a memoized object keyed on primitives:
+   the resolved choice's kind and its name or path, `isSet`, `many`, `single`, the
+   shallow-stable `worktrees` and `gitIds`, `noGitPath`, `singleKind` and `setGit`. The
+   choice object is rebuilt from those. `chosen`, `existingPath` and `pickedBranch` derive
+   inside the memo. The composer's and the move picker's `mine` (which depend on
+   `placement`) are stable across a keystroke again. `placement.test.tsx` pins the identity
+   for equal inputs and counts `draftCheckouts` calls across prompt keystrokes in the
+   composer.
+5. **e2e repeat.** `move-no-project.spec.ts` no longer asserts `thread.move`'s args;
+   `MovePicker.test.tsx` and `lib/move.test.ts` already do. The move over the mock's
+   streams stays.
+6. **One window for `thread.move.open` from the CLI.** No existing pattern: the daemon
+   sends every UiIntent to every window, and every other ShowView acts in all of them.
+   This view alone now acts in one window (`stores/windowFocus.ts`), the focused one, or
+   else the one focused most recently. Each window writes a random id to localStorage when
+   it takes focus (`startWindowFocus`, started in `App.tsx`). WebKit's localStorage is
+   shared by every window on the machine (`stores/persisted.ts`), so the key names the
+   daemon's address (`cf.window.lastFocused <baseUrl>`), and another daemon's windows keep
+   their own. A closing window that was the last focused clears the key on `pagehide`.
+   With no record (never focused, or no storage), every window acts, as before. The
+   palette's presenter is this window's own and is unchanged. vitest
+   (`windowFocus.test.ts`): the rule, the per-daemon key, focus and pagehide, and the
+   ShowView.
+
+Gotcha: `make check` failed once on `TestFailedMoveStopsItsStart/started_for_the_move`
+(`internal/store/thread/move_test.go:794`, PR 1): a nil `runnerOf(s.ID)` right after the
+thread reports Starting. It passed 30/30 alone and on the re-run. A test race in PR 1's
+code; not changed here.
