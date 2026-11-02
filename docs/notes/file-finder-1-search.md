@@ -10,10 +10,10 @@ whatever the project, each row labelled with its project.
 | Path | What |
 |---|---|
 | `proto/codefoundry/v1/filesystem.proto` | `FileSource`; `SearchFilesRequest.sources`, `files_only`; `FileMatch.project_id`, `checkout`, `path_positions`, `project_positions`; the ranking and project-word rule in the RPC comment |
-| `internal/fuzzy/fuzzy.go` | `Positions`, `Splits`, `RankSources` (replaces `Rank`); the matcher works on runes for non-ASCII text |
+| `internal/fuzzy/fuzzy.go` | `Positions`, `Words`, `ScoreWords`, `PositionsWords`, `Splits`, `RankSources` (replaces `Rank`); the query matches word by word; the matcher works on runes for non-ASCII text |
 | `internal/fsx/files.go` | `Source`, `Match`, `FileIndex.SearchSources` (lists the checkouts concurrently, one ranked list, files only); `Search` is its one-checkout form; `MaxSearchSources` = 16 |
 | `internal/api/filesystem.go` | `SearchFiles` takes `sources` or the old `project_id`/`path`, removes duplicate checkouts, fills the new match fields; `resolve` returns the project and the named path too |
-| `gui/frontend/mock/filesystem.ts`, `mock/server.ts` | the same request, rule, ranking (bonus included) and positions; `POST /__mock/files` sets several projects in one call |
+| `gui/frontend/mock/filesystem.ts`, `mock/server.ts` | the same request, words, rule, ranking (bonus included) and positions; `POST /__mock/files` sets several projects in one call |
 
 ## The request
 
@@ -30,41 +30,83 @@ whatever the project, each row labelled with its project.
 * The limit (default 50, max 200) counts across all sources. At most 16 sources, below the
   32-entry candidate cache, so one search can't evict its own lists.
 
+## Words
+
+The query is split into words at whitespace (`strings.Fields`), and every word must match
+the path on its own: a case-insensitive subsequence, in any order, overlapping allowed, like
+VS Code's quick open. `comp tsx` finds `gui/frontend/src/components/compose/Composer.tsx`;
+`tsx comp` finds the same; `comp zzz` finds nothing. This holds with one source too: the
+spaces used to be literal characters, so `comp tsx` matched nothing. The composer's `@`
+completion never sends a space, so its one-word queries rank and position as before.
+
 ## Ranking
 
-One list across sources with internal/fuzzy's existing order: exact base name > base-name
-prefix > base-name subsequence > path subsequence, then the boundary and run bonus, then
-the shorter path, then the path, then the earlier source (the GUI sends the primary
-project first). An empty query ranks by depth, then path, then source.
+Each word gets internal/fuzzy's tier against the path (exact base name > base-name prefix >
+base-name subsequence > path subsequence) and, within the subsequence tiers, the boundary
+and run bonus. A path's words combine as:
+
+1. the weakest word's tier: a path where every word lands in the base name beats any path
+   where some word matches only across directories, even when that path has an exact base
+   word (`comp tsx`: `x/y/Composer.tsx` above `src/components/tsx`);
+2. the sum of the words' tiers (more exact and prefix words);
+3. the sum of their bonuses;
+
+then the shorter path, then the path, then the earlier source (the GUI sends the primary
+project first). An empty query ranks by depth, then path, then source. With one word the
+three parts are its tier, its tier and its bonus: exactly Score's order.
+
+The three parts are packed into one int (`fuzzy.ScoreWords`: tier in bits 50-52, tier sum
+capped at 1023 in 40-49, bonus sum capped at 2^40-1 below), under 2^53, so the mock's
+JavaScript number holds it exactly and compares the same way.
+
+Rejected: the sum of the word scores (an exact base word plus a directory-only word would
+outrank two base-name subsequence words, against "base-name words beat directory words");
+the weakest word's whole score alone (drops the other words, so a prefix word counts for
+no more than a subsequence one); the count of base-name words first (with project words it
+makes dropping a word to the name always worse, so `ghostty tree` would rank code-foundry's
+`docs/ghostty-tree.md` above ghostty-playground's `src/tree.zig`).
 
 ## The project-word rule
 
-Only with more than one source. Split the query into words at whitespace. A run of words
-at the **start or end** of the query that leaves **at least one** word for the path may go
-to the source's project name instead: the run's words, in order and with their spaces
-dropped, must be a case-insensitive subsequence of the name. The rest, joined by single
-spaces, matches the path exactly as a one-source query would. A file's score is its best
-path score over these splits (the whole query on the path, then each run that fits the
-name). On equal scores the split that leaves more of the query on the path wins, so a
-match that didn't need the name never shows bold name letters.
+Only with more than one source. A run of words at the **start or end** of the query that
+leaves **at least one** word for the path may go to the source's project name instead, each
+of the run's words on its own a case-insensitive subsequence of the name (in any order,
+like the path words). The rest match the path word by word. A file's score is its best
+over these splits (`fuzzy.Splits`: all words on the path, then runs of 1, 2, ... words,
+leading before trailing), scored over the path words alone; on equal scores the earlier
+split wins, the one with more words on the path.
+
+Because only the path words count and the weakest one leads, a word goes to the name only
+when that lifts the weakest path word: `src index` in a project named `src` drops `src` (a
+directory-only match) and ranks `index` alone; `index ts` in a project named `index` keeps
+both words on the path (moving `index`, a prefix word, would leave `ts` as weak as before
+and lower the tier sum), so no name letters are bold.
 
 * `tree`: one word, never touches the name. Exactly as before.
-* `ghostty tree`: in ghostty-playground the path is matched against `tree`, so its tree
-  files rank as if `tree` had been typed there; in code-foundry `ghostty` isn't in the name,
-  so the whole `ghostty tree` must match the path (it almost never does).
-* `tree gp`, `readme ghostty`: the run can trail. `code foundry readme`: a run of two words
-  (`codefoundry` is a subsequence of `code-foundry`).
-* A word in the middle (`readme foundry tree`) is never a project word. Leading and trailing
-  runs cover how people type a qualifier, and keep the splits at most 2n-1 for n words, so
-  a pathological query costs a few passes over the candidates, not 2^n.
-* With one source the query is matched as typed, spaces included, exactly as before.
+* `ghostty tree`: in ghostty-playground the path is matched against `tree`, so
+  `src/tree.zig` ranks as a base prefix and comes first. In code-foundry `ghostty` isn't in
+  the name, so both words must match the path: `docs/ghostty-tree.md` does now (it didn't
+  when the path query was the literal `ghostty tree`) and comes second, both words in its
+  base name, above ghostty-playground's `src/subtree/x.zig` (`tree` only in a directory).
+* `tree gp`, `readme ghostty`: the run can trail. `code foundry readme` and `foundry code
+  readme`: a run of two words, each in `code-foundry` (the old rule joined the run, in
+  order, so the second needed the two words in the name's order).
+* `gh zig tree`: `gh` on the name, `zig` and `tree` on the path in either order.
+* A word in the middle (`readme foundry tree`) is never a project word: leading and
+  trailing runs cover how people type a qualifier. A run stops at the first word not in the
+  name (`code src foundry`: `code` may lead, `foundry` may trail, `src` stays).
+* Every word in the name (`code foundry`) still needs one on the path, so it matches
+  nothing in code-foundry rather than everything.
+* Cost: each word is scored once per path (cached across splits, lazily, so a word that
+  misses ends the one-source case at once); the at most 2n-1 splits only combine those
+  scores.
 
-Rejected: a greedy "any word that fits the name goes to the name" (a short path word like
-`src` fits `resources`, and then disappears from the path query); any subset of words
-(exponential, and harder to explain); joining path words without spaces (`ghostty tree`
-would then match `ghostty-tree.md` in every project, and multi-source would disagree with
-one-source on the same query); ranking project-word matches in a tier of their own (the
-path score already lifts them: dropping the project word makes the path query shorter).
+Rejected: any word anywhere may go to the name (cheap now that words score independently,
+but a short path word like `src` fits `resources` far more often than it means the
+project, and the middle of a query is where people put path words); a greedy "any word that
+fits the name goes to the name" (the word then disappears from the path even when it was a
+strong path match); joining a run's words in the name's order (the path words are in any
+order, so the name words being ordered was a second rule to learn).
 
 ## Positions
 
@@ -72,9 +114,10 @@ path score already lifts them: dropping the project word makes the path query sh
 `Array.from(s)` indices), ascending. Not bytes (the GUI would have to re-encode) and not
 UTF-16 units (Go would). They are the alignment the daemon scored, not a re-match in the
 GUI: the base name's leading characters for an exact or prefix match, else the alignment
-with the best boundary/run bonus (ties: the nearest earlier character). The project's
-positions are the same alignment over the name of the words it took; empty when the whole
-query matched the path.
+with the best boundary/run bonus (ties: the nearest earlier character). With several words,
+every path word's positions, merged (sorted, without repeats: overlapping words share
+characters). The project's positions are each project word's alignment over the name,
+merged the same way; empty when every word matched the path.
 
 ## Gotchas
 
@@ -98,6 +141,11 @@ query matched the path.
   cross-check (20,000 random Score/Positions cases, 3,000 random multi-source searches with
   non-ASCII names, paths and multi-word queries) then agreed everywhere. The rest of the
   per-code-point lowering differs only for letters newer than Go's Unicode tables.
+* Words split at Go's `unicode.IsSpace` (`strings.Fields`). JavaScript's `\s` has U+FEFF
+  and lacks U+0085, so the mock splits at an explicit class of Go's spaces, and decides
+  "empty query" by the word count rather than `trim()` (which strips U+FEFF too).
+* A word that misses a path is scored once per path, not once per split: RankSources
+  caches each word's Score for the path and evaluates the splits lazily.
 * Review: a failed listing names its checkout (`list <dir>: ...`); with several sources the
   bare git or walk error didn't say which one.
 
@@ -107,10 +155,16 @@ query matched the path.
 * A scratch daemon (`CODE_FOUNDRY_HOME=/tmp/...`, `make build`) with two scratch git repos
   under home, registered with `project.add`, `SearchFiles` called over Connect JSON with
   curl: the old fields (project id, checkout and positions filled), two sources for `tree`
-  (one list, interleaved by score), `ghostty tree` (only ghostty-playground's tree files,
+  (one list, interleaved by score), `ghostty tree` (ghostty-playground's tree files first,
   project positions 0-6), `readme` (ties in the order of the sources sent), directories
   without `files_only`, and the refusals (both field sets InvalidArgument, a source outside
   home InvalidArgument, an unknown project NotFound). Scratch repos deleted afterwards.
 * The mock against the Go tests' cases (same order and positions, through a throwaway
   script), and the e2e specs that use SearchFiles through it (`composer-files`,
   `composer-skills`, `no-project`, `file-tabs`).
+* Per-word matching: a throwaway cross-check of Go against the mock, two runs of 4,000
+  random searches over one to three sources (non-ASCII names and paths, multi-word queries
+  with odd whitespace: tab, NBSP, U+0085, U+3000, U+2028, U+FEFF), the second with queries
+  built from slices of the sources' names and paths (641 searches used project words), plus
+  20,000 random ScoreWords/PositionsWords cases: identical order, scores and positions
+  everywhere. The four e2e specs above pass with it.
