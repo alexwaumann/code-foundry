@@ -8,6 +8,8 @@ import {
   filterProjects,
   memberCaption,
   indexColumns,
+  checkoutColumns,
+  checkoutHasChanges,
   isCleanable,
   projectActivity,
   projectKind,
@@ -318,6 +320,40 @@ describe("indexColumns", () => {
   ])("%d px: %s", (width, want) => {
     const c = indexColumns(width);
     expect((["activity", "updated", "branch"] as const).filter((k) => c[k]).join(" ")).toBe(want);
+  });
+});
+
+describe("checkoutColumns", () => {
+  const all = { remote: true, github: true };
+  it.each<[string, number, { remote: boolean; github: boolean }, string]>([
+    ["wide: every column", 1100, all, "threads changes sync pr"],
+    ["at Sync's threshold", 900, all, "threads changes sync pr"],
+    ["below 900: Sync drops", 899, all, "threads changes pr"],
+    ["at Threads' threshold", 720, all, "threads changes pr"],
+    ["below 720: Threads drops", 719, all, "changes pr"],
+    ["at Changes' threshold", 560, all, "changes pr"],
+    ["below 560: Changes drops, Pull request stays", 559, all, "pr"],
+    ["very narrow", 300, all, "pr"],
+    ["no remote: no Sync even when wide", 1100, { remote: false, github: false }, "threads changes"],
+    ["another remote: Sync, no Pull request", 1100, { remote: true, github: false }, "threads changes sync"],
+    ["another remote, narrow: Branch alone", 400, { remote: true, github: false }, ""],
+  ])("%s", (_name, width, project, want) => {
+    const c = checkoutColumns(width, project);
+    expect((["threads", "changes", "sync", "pr"] as const).filter((k) => c[k]).join(" ")).toBe(want);
+  });
+});
+
+describe("checkoutHasChanges", () => {
+  const clean = { staged: 0, modified: 0, untracked: 0, dirty: false };
+  it.each<[string, Parameters<typeof checkoutHasChanges>[0], boolean]>([
+    ["clean, nothing ahead", clean, false],
+    ["clean, base unknown", { ...clean, baseAhead: undefined }, false],
+    ["an untracked file", { ...clean, untracked: 1, dirty: true }, true],
+    ["a conflict", { ...clean, conflicted: 1 }, true],
+    ["dirty with no counted file", { ...clean, dirty: true }, true],
+    ["commits ahead of its base", { ...clean, baseAhead: 3 }, true],
+  ])("%s", (_name, st, want) => {
+    expect(checkoutHasChanges(st)).toBe(want);
   });
 });
 

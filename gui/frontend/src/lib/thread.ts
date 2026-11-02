@@ -22,6 +22,9 @@ export function threadBadge(s: Pick<ThreadView, "state" | "status"> | undefined)
   return s.status;
 }
 
+/** A badge as a word: a workspace page's thread rows, a checkout's Open thread menu. */
+export const BADGE_WORD: Record<ThreadBadge, string> = { busy: "working", idle: "idle", attention: "needs you", error: "error", unknown: "idle" };
+
 /**
  * Whether a thread counts as running for the composer's collision banner
  * (lib/collisionHints): not archived, not snoozed (a wake time still ahead of `now`), and

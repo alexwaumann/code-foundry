@@ -9,7 +9,6 @@ import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
 import { checkoutsHint, projectActivity, projectNextStep, PROJECT_NARROW_BELOW, PROJECT_TITLE_COMPACT_BELOW } from "@/lib/projects";
 import { useWidth } from "@/lib/useWidth";
-import { openChangesTab } from "@/stores/changesPanel";
 import { composeIn } from "@/stores/compose";
 import { initGitIn, newTerminalIn, publishProject } from "@/stores/projectActions";
 import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
@@ -25,6 +24,7 @@ import { ProjectsCrumb, PagePicker } from "./PagePicker";
 import { ProjectDetails } from "./ProjectDetails";
 import { ProjectNameEditor } from "./ProjectNameEditor";
 import { ProjectTitle } from "./ProjectTitle";
+import { openCursorRowMenu } from "./RowContextMenu";
 
 /** A note card at the top of a project page (no remote, no git) with its setup button. */
 function KindNote({ icon, children, action }: { icon: React.ReactNode; children: React.ReactNode; action: React.ReactNode }) {
@@ -73,10 +73,10 @@ function ThreadsBlock({ projectId, main }: { projectId: string; main: string }) 
  * A project's page (docs/notes/project-page-1-title-block.md): the pane header (crumb, picker
  * or the name editor, the panel toggles), then in the content column its title block
  * (ProjectTitle: name, meta line, ⋯), a note for a repository without a remote or a folder
- * without git, the Checkouts table (main and the worktrees a thread is on; click or Enter
- * opens a checkout's Changes tab in the page's side panel), Worktrees without threads
+ * without git, the Checkouts table (main and the worktrees a thread is on; a row's right-click menu holds
+ * what it does, and its columns drop by the table's own width), Worktrees without threads
  * (LeftoverWorktrees, every other worktree), and Details. Below PROJECT_NARROW_BELOW of
- * content width the Sync column drops and the leftover rows' Remove shows its icon only;
+ * content width the leftover rows' Remove shows its icon only;
  * below PROJECT_TITLE_COMPACT_BELOW the slug drops and Open in Finder shows its icon only.
  */
 export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey: string }) {
@@ -109,7 +109,8 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   const [widthRef, width] = useWidth(1200);
   const narrow = width < PROJECT_NARROW_BELOW;
   const compact = width < PROJECT_TITLE_COMPACT_BELOW;
-  const navItems = useMemo<NavItem[]>(() => (git ? paths.map((p) => ({ key: `pw:${projectId}::${p}`, activate: () => { openChangesTab("current", projectId, p); } })) : []), [git, paths, projectId]);
+  // A checkout row has no activation: its right-click menu (ContextMenu key, Shift+F10) holds what it does.
+  const navItems = useMemo<NavItem[]>(() => (git ? paths.map((p) => ({ key: `pw:${projectId}::${p}` })) : []), [git, paths, projectId]);
   const nav = useNav(navItems);
   const reveal = useProjectsPageStore((s) => s.reveal);
   const setCursor = nav.ctx.setCursor;
@@ -164,7 +165,9 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
             className="mx-auto flex max-w-6xl flex-col gap-6 outline-none"
             data-testid="projects-list"
             data-focus-root
-            onKeyDown={nav.onKeyDown}
+            onKeyDown={(e) => {
+              if (!openCursorRowMenu(e)) nav.onKeyDown(e);
+            }}
           >
             {exists && (
               <>
@@ -198,7 +201,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
                 {git ? (
                   <div data-testid="project-checkouts">
                     <SectionHeader label="Checkouts" count={paths.length} detail={checkoutsHint(working)} testId="checkouts-title" />
-                    <CheckoutsTable projectId={projectId} paths={paths} columns={{ sync: hasRemote && !narrow, pr: kind === "github", narrow }} />
+                    <CheckoutsTable projectId={projectId} paths={paths} remote={hasRemote} github={kind === "github"} />
                   </div>
                 ) : (
                   <ThreadsBlock projectId={projectId} main={main} />
