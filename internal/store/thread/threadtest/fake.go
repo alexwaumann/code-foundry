@@ -482,6 +482,59 @@ func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread
 	})
 }
 
+// Move moves a thread without a project into a project or a workspace (call "Move <id>
+// <project> <workspace> <worktree> [new-worktree=<base>] [branch=<b>] [checkout]"): the
+// refusals of thread.CheckMove, then at once (a disconnected thread or a live one alike)
+// the project or the workspace's first member as the primary, at the given worktree, else
+// /worktrees/<branch with dashes> for a new worktree (branch cf/<N> unless given), else
+// /projects/<project>; the name becomes "Moved <id>".
+func (f *Fake) Move(_ context.Context, id string, o thread.MoveOptions) (thread.Thread, error) {
+	call := "Move " + id + " " + o.ProjectID + " " + o.WorkspaceID + " " + o.WorktreePath
+	if o.NewWorktree != nil {
+		call += " new-worktree=" + o.NewWorktree.BaseRef
+		if o.NewWorktree.Branch != "" {
+			call += " branch=" + o.NewWorktree.Branch
+		}
+	}
+	if o.CheckoutMode {
+		call += " checkout"
+	}
+	if o.ProjectID == "" && o.WorkspaceID == "" && o.WorktreePath == "" {
+		return thread.Thread{}, fmt.Errorf("%w: a project or a workspace to move the thread to is required", thread.ErrInvalidArgument)
+	}
+	f.mu.Lock()
+	n := f.next + 1
+	f.mu.Unlock()
+	return f.mutate(call, id, func(s *thread.Thread) error {
+		if err := thread.CheckMove(*s); err != nil {
+			return err
+		}
+		primary := o.ProjectID
+		if o.WorkspaceID != "" {
+			s.WorkspaceID = o.WorkspaceID
+			if primary == "" {
+				primary = o.WorkspaceID + "-1"
+			}
+		}
+		s.ProjectID, s.ProjectIDs = primary, []string{primary}
+		switch {
+		case o.WorktreePath != "":
+			s.WorktreePath = o.WorktreePath
+		case o.NewWorktree != nil:
+			s.Branch = fmt.Sprintf("cf/%d", n)
+			if b := o.NewWorktree.Branch; b != "" {
+				s.Branch = b
+			}
+			s.WorktreePath = "/worktrees/" + strings.ReplaceAll(s.Branch, "/", "-")
+			s.CreatedWorktree, s.BaseRef = true, o.NewWorktree.BaseRef
+		default:
+			s.WorktreePath = "/projects/" + primary
+		}
+		s.Name, s.AutoNamed = "Moved "+id, true
+		return nil
+	})
+}
+
 // Remove forgets a thread and publishes Removed. Like the Manager, a thread's usage
 // moves to the retired ledger (then RetiredUsage is published too).
 func (f *Fake) Remove(_ context.Context, id string) error {

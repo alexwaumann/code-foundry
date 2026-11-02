@@ -80,6 +80,12 @@ func TestBuildNamingPromptConversation(t *testing.T) {
 			[]string{"Recent conversation:\nUser: now"}, []string{"first ask"}},
 		{"a blank conversation is the first-message prompt", NamingRequest{Message: "fix it", Conversation: " \n"},
 			[]string{namingPrompt + "fix it"}, []string{"Recent conversation"}},
+		// A move into a new worktree (move.go): the title and the branch from the conversation.
+		{"conversation and a semantic branch", NamingRequest{Conversation: "User: fix it", Branch: &BranchRequest{Mode: BranchModeSemantic}},
+			[]string{"currently working on", "twice: a title and a git branch", "Branch: <type>/<slug>", "Title: <title>\nBranch: <branch>", "Recent conversation:\nUser: fix it"},
+			[]string{"Request:", "Reply with only the title."}},
+		{"conversation and a prefix branch", NamingRequest{Conversation: "User: fix it", Branch: &BranchRequest{Mode: BranchModePrefix}},
+			[]string{"Branch: a slug of", "Recent conversation:\nUser: fix it"}, []string{"Request:"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -37,6 +37,7 @@ type ThreadBackend interface {
 	RegenerateName(context.Context, *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
 	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
+	Move(context.Context, *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error)
 	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
 	Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error)
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)

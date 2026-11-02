@@ -111,6 +111,13 @@ func baseFromOrigin(st *settings.Store) func() bool {
 	return func() bool { return st.Settings().Projects.BaseFromOrigin }
 }
 
+// newWorktreeDefault is the thread store's Options.NewWorktreeDefault: whether
+// threads.default_worktree is a new worktree, read at every Move that leaves the
+// placement to it (docs/notes/move-no-project-1-daemon.md).
+func newWorktreeDefault(st *settings.Store) func() bool {
+	return func() bool { return st.Settings().Threads.DefaultWorktree == settings.WorktreeNew }
+}
+
 // cacheTTLSetter is the thread store's live cache TTL (*thread.Manager).
 type cacheTTLSetter interface{ SetCacheTTL(time.Duration) }
 

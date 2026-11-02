@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -30,6 +31,9 @@ const (
 	streamDrain = 2 * time.Second
 	// streamControlTimeout bounds control requests the runner makes itself.
 	streamControlTimeout = 5 * time.Second
+	// setCwdTimeout bounds a set_cwd (a move, a Run in): Claude relocates the
+	// transcript before it answers, which takes longer for a long conversation.
+	setCwdTimeout = 30 * time.Second
 )
 
 // outgoing is a user message on its way to Claude.
@@ -308,7 +312,10 @@ func (r *runner) run() {
 			if !st.initialized && !r.closing {
 				r.failStart(errors.New("no answer to the initialize handshake after a restart"))
 			}
-		case <-r.closeReq:
+		case why := <-r.closeReq:
+			if why != "" && !r.closing {
+				r.disconnectAs = why
+			}
 			r.beginClose()
 		case req := <-r.cdReq:
 			r.onCdRequest(req)
@@ -478,6 +485,11 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 
 func (r *runner) onStreamEvent(ev claudestream.Event) {
 	r.activity = r.m.opts.Now()
+	if r.cdResult(ev) {
+		r.tryCd()
+		r.maybeRestart()
+		return
+	}
 	r.st.proj.event(ev)
 	r.st.sd.event(ev)
 	switch e := ev.(type) {
@@ -511,6 +523,22 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 	r.checkStatus()
 	r.tryCd()
 	r.maybeRestart()
+}
+
+// cdResult reports whether ev is the empty result Claude writes after a set_cwd it
+// accepted (runner.cdResultOwed): no turn ran, so it is neither a turn end in the
+// timeline nor a finished turn (status, wakes, thread wait). A result while a turn or a
+// compaction runs is that turn's own.
+func (r *runner) cdResult(ev claudestream.Event) bool {
+	if _, ok := ev.(*claudestream.Result); !ok || !r.cdResultOwed {
+		return false
+	}
+	r.cdResultOwed = false
+	if r.st.sd.busy || r.st.sd.compacting {
+		return false
+	}
+	r.log().debug("dropped the empty result after set_cwd")
+	return true
 }
 
 // onAPIRetry records that Claude waits to retry a failed API request (Thread.Retry),
@@ -569,6 +597,7 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	if !st.initialized || r.closing {
 		return Item{}, fmt.Errorf("%w: thread %s is not ready for a message", ErrFailedPrecondition, r.id)
 	}
+	r.cdResultOwed = false // a result from now on may be this message's turn
 	// The first message of a fresh session a reseed asked for starts with its prefix
 	// (reseed.go); o keeps the prompt as it was, should this send fail.
 	prompt, seed := o.prompt, r.seed
@@ -820,6 +849,11 @@ func (r *runner) onViewers() {
 // recorded since.
 func (r *runner) streamCd(req cdRequest) {
 	fail := func(msg string) {
+		if req.move != nil {
+			r.log().warn("move failed", "path", req.path, "err", msg)
+			r.onMoveFailed(req.move, msg)
+			return
+		}
 		r.log().warn("run in failed", "path", req.path, "err", msg)
 		r.m.update(r.id, false, func(rec *record) {
 			if rec.s.PendingWorktreePath == req.path {
@@ -833,19 +867,42 @@ func (r *runner) streamCd(req cdRequest) {
 			r.log().warn("pre-trust member before set_cwd", "path", req.path, "err", err)
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), streamControlTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), setCwdTimeout)
 	defer cancel()
 	res, err := r.st.conn.SetCwd(ctx, req.path)
+	if err != nil && r.cdLanded(req.path) {
+		// No answer (a timeout, a transport error), but the transcript is under the
+		// destination: Claude moved, and rolling back would leave the row in the old cwd
+		// while Claude is in the new one.
+		r.log().warn("set_cwd did not answer, but the transcript moved; taking it as done", "path", req.path, "err", err)
+		res, err = &claudestream.SetCwdResponse{Status: "ok", TranscriptRelocated: true}, nil
+	}
 	switch {
 	case err != nil:
 		fail(err.Error())
+		return
+	case res.Status == "needs_trust" && req.move != nil && !req.move.retried:
+		// Claude reads folder trust at start, and this one was trusted after (placeMove,
+		// above): restart it (resuming, with the destination's folders) and try once more.
+		req.move.retried, req.move.started = true, true
+		r.moveRestart, r.pendingCd = req.move, &req
+		r.log().info("claude needs the move's folder trusted; restarting it to read its config again", "path", req.path)
 		return
 	case res.Status != "ok":
 		fail(nonEmpty(res.Message, res.Status))
 		return
 	}
 	r.cwd = req.path
-	r.tail.cwd = req.path
+	r.cdResultOwed = true
+	if res.TranscriptRelocated {
+		r.tail.relocated(req.path)
+	} else {
+		r.tail.cwd = req.path
+	}
+	if req.move != nil {
+		r.onMoved(req.move, res.TranscriptRelocated)
+		return
+	}
 	r.m.update(r.id, true, func(rec *record) {
 		rec.s = rec.s.movedTo(req.projectID, req.path)
 		if rec.s.PendingWorktreePath == req.path {
@@ -853,6 +910,25 @@ func (r *runner) streamCd(req cdRequest) {
 		}
 	})
 	r.log().info("thread moved to another workspace member", "path", req.path, "transcript_relocated", res.TranscriptRelocated)
+}
+
+// cdLanded reports whether the conversation's transcript is under cwd now and no longer
+// under the runner's cwd (set_cwd relocated it): the destination's own project dir, or
+// (a slug Claude shortened) anywhere once the old copy is gone. False without a
+// conversation.
+func (r *runner) cdLanded(cwd string) bool {
+	id, paths := r.tail.id, r.m.opts.Paths
+	if id == "" {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(paths.projectDir(cwd), id+".jsonl")); err == nil {
+		return true
+	}
+	if _, err := os.Stat(filepath.Join(paths.projectDir(r.cwd), id+".jsonl")); err == nil {
+		return false
+	}
+	_, ok := paths.transcriptPath(cwd, id)
+	return ok
 }
 
 // beginClose: deny what is pending, interrupt a running turn, close stdin; then

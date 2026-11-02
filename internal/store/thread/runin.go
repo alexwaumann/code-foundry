@@ -28,9 +28,11 @@ import (
 // momentary "at prompt" (between a send and the turn it starts) does not count.
 const cdSettle = time.Second
 
-// cdRequest is a queued move. An empty path cancels the queued move.
+// cdRequest is a queued move. An empty path cancels the queued move. move is a Move's
+// (move.go): the row takes its placement once Claude accepts.
 type cdRequest struct {
 	path, projectID string
+	move            *moveJob
 }
 
 // RunIn implements Store.
@@ -154,28 +156,23 @@ func (r *runner) onCdRequest(req cdRequest) {
 // closing or restarting, and has been at its prompt for cdSettle. It runs after every
 // stream event and tick, so it also keeps atPromptSince current.
 func (r *runner) tryCd() {
-	// Take a newer request first (select picks among ready cases at random, so a
-	// cancel may still sit in the channel when a tick gets here).
-	select {
-	case req := <-r.cdReq:
-		if req.path == "" {
-			r.pendingCd = nil
-		} else {
-			r.pendingCd = &req
-		}
-	default:
-	}
+	r.takeCdReq()
 	if !r.st.sd.AtPrompt() {
 		r.atPromptSince = time.Time{}
 	} else if r.atPromptSince.IsZero() {
 		r.atPromptSince = time.Now()
 	}
-	if r.pendingCd == nil || r.closing || r.state != StateConnected || r.restarting() ||
+	if r.pendingCd == nil || r.closing || r.state != StateConnected || r.restarting() || r.moveRestart != nil ||
 		r.atPromptSince.IsZero() || time.Since(r.atPromptSince) < cdSettle {
 		return
 	}
 	req := *r.pendingCd
 	r.pendingCd = nil
+	if !isDir(req.path) && req.move != nil {
+		r.log().warn("queued move dropped: checkout is gone", "path", req.path)
+		r.onMoveFailed(req.move, "the checkout "+req.path+" no longer exists")
+		return
+	}
 	if !isDir(req.path) {
 		r.log().warn("queued move dropped: worktree is gone", "path", req.path)
 		r.m.update(r.id, false, func(rec *record) {
@@ -187,6 +184,21 @@ func (r *runner) tryCd() {
 		return
 	}
 	r.streamCd(req)
+}
+
+// takeCdReq takes a newer request from RunIn or Move into pendingCd: select picks among
+// ready cases at random, so a request (a cancel too) may still sit in the channel when a
+// tick or an idle check gets here.
+func (r *runner) takeCdReq() {
+	select {
+	case req := <-r.cdReq:
+		if req.path == "" {
+			r.pendingCd = nil
+		} else {
+			r.pendingCd = &req
+		}
+	default:
+	}
 }
 
 // unsentCd is the move a finishing runner still owes: the queued one, including one

@@ -260,7 +260,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		Namer:          settingsNamer(s.settings, thread.ClaudeNamer(claude, "/tmp", threadLog)),
 		BranchNaming:   branchNaming(s.settings),
 		BaseFromOrigin: baseFromOrigin(s.settings),
-		AttachmentsDir: p.Attachments(), SkillsDir: p.Claude(), Env: threadEnv, CacheTTL: cfg.CacheTTL(),
+		// A Move without a placement follows threads.default_worktree, as the composer does.
+		NewWorktreeDefault: newWorktreeDefault(s.settings),
+		AttachmentsDir:     p.Attachments(), SkillsDir: p.Claude(), Env: threadEnv, CacheTTL: cfg.CacheTTL(),
 		// The user's standing preferences, read at every spawn into the system prompt
 		// (docs/notes/control-3-app-memory.md).
 		Memory: s.memory.Injected,

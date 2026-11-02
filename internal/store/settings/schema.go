@@ -351,9 +351,10 @@ var staticFields = []Field{
 		bind: func(s *Settings) any { return &s.Threads.DefaultEffort },
 	},
 	{
-		// Read by the GUI only: the composer's "Work in" picker starts every draft from it
-		// (a pick applies to that draft only). thread.new itself stays explicit
-		// (--new-worktree or --worktree).
+		// Read by the GUI's composer: its "Work in" picker starts every draft from it (a
+		// pick applies to that draft only). thread.new itself stays explicit
+		// (--new-worktree or --worktree). The daemon reads it for a thread.move that gives
+		// no placement (thread.Options.NewWorktreeDefault).
 		Key: KeyDefaultWorktree, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "New threads work in",
 		Description: "A fresh copy gives each thread its own folder and branch, so several can run at once. The project folder itself edits your files in place.",
 		Enum:        []string{WorktreeNew, WorktreeCurrent},

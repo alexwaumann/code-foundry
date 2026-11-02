@@ -381,10 +381,28 @@ message Thread {
   // calls (parent_tool_use_id set) do not count, its Agent call does. Not persisted: a
   // disconnected thread has none. See docs/notes/sidebar-inbox-1-busy-tool.md.
   string busy_tool = 73;
-  // A naming call is in flight for the thread now (RegenerateName): the GUI shows the
-  // current name muted and italic, as a provisional one, until it lands or fails. Not
-  // persisted.
+  // A naming call is in flight for the thread now (RegenerateName, or a Move naming it
+  // from its conversation): the GUI shows the current name muted and italic, as a
+  // provisional one, until it lands or fails. Not persisted.
   bool naming = 74;
+  // A Move is taking this thread (without a project) into a project or a workspace:
+  // set from the call until Claude accepted its set_cwd, or the move failed. The GUI
+  // shows "Moving to <place>…" (project_id, else workspace_id). Unset otherwise. Not
+  // persisted. See docs/notes/move-no-project-1-daemon.md.
+  ThreadMove pending_move = 75;
+}
+
+// ThreadMove is a Move under way (Thread.pending_move).
+message ThreadMove {
+  // The project it goes to (with a workspace: the primary member); empty when it goes to
+  // a workspace's folder.
+  string project_id = 1;
+  // The workspace it goes to; empty for a project.
+  string workspace_id = 2;
+  // The checkout it will run in and, for a worktree, its branch; empty until the
+  // placement is made (the worktree exists, the branch is named).
+  string worktree_path = 3;
+  string branch = 4;
 }
 
 // BackgroundShell is one of a thread's own background shells while it runs: a Bash call
@@ -963,6 +981,39 @@ message RunInThreadRequest {
 
 message RunInThreadResponse {
   Thread thread = 1;
+}
+
+// MoveThreadRequest moves a thread without a project into a project or a workspace
+// (ThreadService.Move). The placement fields mean what CreateThreadRequest's of the same
+// names mean for a new thread there.
+message MoveThreadRequest {
+  string id = 1;
+  // The project (id or name); with workspace_id the primary: a member, or "workspace"
+  // for the workspace's folder (default: the workspace's default primary).
+  string project_id = 2;
+  // An existing checkout of the project to run in (in place).
+  string worktree_path = 3;
+  // The workspace (id or name): its members are the thread's projects.
+  string workspace_id = 4;
+  // A new worktree: on a new branch named from the conversation (base_ref, the
+  // composer's "Branch from"), or on an existing branch (branch; base_ref ignored),
+  // made when missing.
+  NewWorktree new_worktree = 5;
+  // The project's folder (each member's own checkout), no worktree. Not with
+  // new_worktree. Neither, nor worktree_path: threads.default_worktree decides.
+  bool checkout_mode = 6;
+}
+
+message MoveThreadResponse {
+  // The thread: moved, or with pending_move set while a running turn holds the move.
+  Thread thread = 1;
+  // What the placement did with the primary, as CreateThreadResponse's fields.
+  bool made_worktree = 2;
+  bool made_branch = 3;
+  bool existing_worktree = 4;
+  string shared_with = 5;
+  // Collision hints, as CreateThreadResponse.hints.
+  repeated string hints = 6;
 }
 
 message AddThreadProjectRequest {

@@ -127,6 +127,8 @@ type startOpts struct {
 	first *outgoing
 	// backToList unarchives and unsnoozes the thread (a message, Reconnect).
 	backToList bool
+	// move starts the thread for a Move (move.go): the destination's --add-dir list.
+	move *moveJob
 }
 
 // startStopped starts claude for a stopped thread: it reserves the thread against a
@@ -150,6 +152,9 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	case rec.run != nil || rec.reserved != nil || rec.s.State != StateDisconnected:
 		m.mu.Unlock()
 		return Item{}, errNotStopped
+	case o.move != nil && !rec.s.ArchivedAt.IsZero():
+		m.mu.Unlock()
+		return Item{}, errArchivedWhileMoving // archived during the move's naming: it never starts
 	}
 	prev := rec.s
 	rec.reserve()
@@ -175,6 +180,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		m.refuseStart(id, prev)
 		return Item{}, launchErr
 	}
+	l.move = o.move
 	// A worktree a cleanup removed is made again first (recreate.go); clients see the
 	// thread STARTING meanwhile.
 	var notes []string
@@ -462,6 +468,7 @@ func (m *Manager) cacheTTLNow() time.Duration {
 // onIdleCheck stops the process gracefully (beginClose, disconnect reason ReasonIdle)
 // when nothing holds it (idleHold), and tells c.done the hold ("" when it stopped).
 func (r *runner) onIdleCheck(c idleCheck) {
+	r.takeCdReq() // a move queued just now holds it (messageOnItsWay)
 	hold := r.idleHold(c.now)
 	if hold == "" {
 		r.log().info("stopping idle thread at its prompt cache expiry", "idle", c.now.Sub(r.lastActive()).Round(time.Second).String())
@@ -545,11 +552,14 @@ func (r *runner) idleHold(now time.Time) string {
 func (r *runner) idleInputs(now time.Time) idleInputs {
 	st := r.st
 	s, _ := r.m.Snapshot().Thread(r.id)
+	// A queued move or Run in counts too, and a move being placed or named (PendingMove:
+	// it is about to queue, so a stop now would only fail it).
+	onItsWay := st.first != nil || len(st.queued) > 0 || len(st.held) > 0 || r.pendingCd != nil || s.PendingMove != nil
 	return idleInputs{
 		now:             now,
 		closing:         r.closing || r.finished,
 		starting:        !st.initialized || st.restart != restartNone,
-		messageOnItsWay: st.first != nil || len(st.queued) > 0 || len(st.held) > 0,
+		messageOnItsWay: onItsWay,
 		effortChange:    st.wantEffort != st.effort,
 		pendingRequest:  len(st.pending) > 0 || len(st.sd.pending) > 0,
 		atPrompt:        st.sd.AtPrompt(),

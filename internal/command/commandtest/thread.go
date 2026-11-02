@@ -54,6 +54,8 @@ type Thread struct {
 	// Cascade is List's answer to a filter with archive_cascade_of, by that id (none
 	// when absent): the hidden threads archiving it takes along.
 	Cascade map[string][]*v1.Thread
+	// MoveErr, when set, is Move's error for a request (after it is recorded).
+	MoveErr func(*v1.MoveThreadRequest) error
 	// Placement, when set, gives Create's made_worktree, made_branch, existing_worktree, shared_with
 	// and worktree_mode_dropped (else made_worktree and made_branch are new_worktree's presence).
 	Placement *v1.CreateThreadResponse
@@ -267,6 +269,49 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 // RunIn returns Current (default: a CONNECTED thread in workspace "w-1") with the
 // requested id. A disconnected thread runs in the target at once; a live one gets it
 // as pending_worktree_path. The target is worktree_path, else /worktrees/<project_id>.
+// Move echoes the request on Current (default: a DISCONNECTED thread without a project):
+// the project (or the workspace's "<workspace>-1") as the primary, in the worktree given,
+// else /worktrees/<project> (new_worktree: branch "cf/1" unless given, made_worktree and
+// made_branch), else /projects/<project>.
+func (s *Thread) Move(_ context.Context, r *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if s.MoveErr != nil {
+		if err := s.MoveErr(r.Msg); err != nil {
+			return nil, err
+		}
+	}
+	m := r.Msg
+	cur := &v1.Thread{State: v1.ThreadState_THREAD_STATE_DISCONNECTED}
+	if s.Current != nil {
+		cur = proto.CloneOf(s.Current)
+	}
+	cur.Id = m.GetId()
+	primary := m.GetProjectId()
+	if w := m.GetWorkspaceId(); w != "" {
+		cur.WorkspaceId = w
+		if primary == "" {
+			primary = w + "-1"
+		}
+	}
+	cur.ProjectId, cur.ProjectIds = primary, []string{primary}
+	res := &v1.MoveThreadResponse{Thread: cur, Hints: s.Hints}
+	switch nw := m.GetNewWorktree(); {
+	case m.GetWorktreePath() != "":
+		cur.WorktreePath = m.GetWorktreePath()
+	case nw != nil:
+		cur.WorktreePath, cur.Branch, cur.BaseRef, cur.CreatedWorktree = "/worktrees/"+primary, "cf/1", nw.GetBaseRef(), true
+		if nw.GetBranch() != "" {
+			cur.Branch = nw.GetBranch()
+		}
+		res.MadeWorktree, res.MadeBranch = true, nw.GetBranch() == ""
+	default:
+		cur.WorktreePath = "/projects/" + primary
+	}
+	return connect.NewResponse(res), nil
+}
+
 func (s *Thread) RunIn(_ context.Context, r *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err

@@ -179,6 +179,33 @@ func TestThreadRunIn(t *testing.T) {
 	}
 }
 
+// Move maps the placement fields onto MoveOptions (thread new's names), answers the
+// moved thread, refuses a thread with a project as FAILED_PRECONDITION, and a thread's
+// pending move reaches the proto.
+func TestThreadMove(t *testing.T) {
+	fake, c := newThreadServer(t)
+	ctx := context.Background()
+	fake.Put(thread.Thread{ID: "s-1", WorktreePath: "/home", State: thread.StateDisconnected})
+	fake.Put(thread.Thread{ID: "s-2", ProjectID: "web", WorktreePath: "/src/web", State: thread.StateConnected})
+	res, err := c.Move(ctx, connect.NewRequest(&v1.MoveThreadRequest{Id: "s-1", ProjectId: "web", NewWorktree: &v1.NewWorktree{BaseRef: "develop", Branch: "feat/x"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := res.Msg.GetThread(); s.GetProjectId() != "web" || s.GetBranch() != "feat/x" || s.GetWorktreePath() != "/worktrees/feat-x" || s.GetPendingMove() != nil {
+		t.Errorf("Move = %v", s)
+	}
+	if _, err := c.Move(ctx, connect.NewRequest(&v1.MoveThreadRequest{Id: "s-2", WorkspaceId: "plat", CheckoutMode: true})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("Move of a project's thread = %v", err)
+	}
+	if want := []string{"Move s-1 web   new-worktree=develop branch=feat/x", "Move s-2  plat  checkout"}; !slices.Equal(fake.Calls(), want) {
+		t.Errorf("calls = %q, want %q", fake.Calls(), want)
+	}
+	moving := threadToProto(thread.Thread{ID: "s-3", PendingMove: &thread.MoveTarget{ProjectID: "web", Path: "/wt/x", Branch: "fix/y"}})
+	if m := moving.GetPendingMove(); m.GetProjectId() != "web" || m.GetWorktreePath() != "/wt/x" || m.GetBranch() != "fix/y" || m.GetWorkspaceId() != "" {
+		t.Errorf("pending move = %v", m)
+	}
+}
+
 func TestThreadStageAttachment(t *testing.T) {
 	fake, c := newThreadServer(t)
 	ctx := context.Background()

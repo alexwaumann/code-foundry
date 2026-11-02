@@ -39,6 +39,9 @@ type tailer struct {
 	f       *os.File
 	off     int64
 	skipped int64 // bytes fromEnd skipped when the file was opened (backfill reads them)
+	// moved: set_cwd relocated the file (relocated); the next poll opens it at its new
+	// path and reads on from off, as the same file, not a discovery.
+	moved bool
 	lineSplitter
 
 	w       *fsnotify.Watcher // nil if fsnotify is unavailable; polling still works
@@ -79,6 +82,21 @@ func (t *tailer) follow(id string, fromEnd bool) {
 	t.path, t.off, t.skipped, t.lineSplitter = "", 0, 0, lineSplitter{}
 }
 
+// relocated follows the transcript to cwd after Claude moved it there (set_cwd's
+// transcript_relocated): the open file may be the old copy, so the next poll opens the
+// one under cwd and reads on from the same offset.
+func (t *tailer) relocated(cwd string) {
+	t.cwd = cwd
+	if t.f == nil {
+		return // not opened yet: the next poll finds it under cwd
+	}
+	if p, ok := t.paths.transcriptPath(cwd, t.id); ok && p == t.path {
+		return
+	}
+	t.closeFile()
+	t.moved = true
+}
+
 func (t *tailer) closeFile() {
 	if t.f != nil {
 		_ = t.f.Close()
@@ -108,6 +126,17 @@ func (t *tailer) poll() (lines [][]byte, discovered bool) {
 		f, err := os.Open(p)
 		if err != nil {
 			return nil, false
+		}
+		if t.moved {
+			// The same transcript at its new path: read on where the old one stopped.
+			t.moved = false
+			t.f, t.path = f, p
+			t.watch(filepath.Dir(p))
+			lines, err := readAppended(t.f, &t.off, &t.lineSplitter, lines)
+			if err != nil {
+				t.closeFile()
+			}
+			return lines, false
 		}
 		t.f, t.path, discovered = f, p, true
 		if t.fromEnd {

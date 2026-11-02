@@ -62,6 +62,11 @@ type Options struct {
 	// BaseFromOrigin reads projects.base_from_origin at every new or recreated
 	// worktree (project.CreateWorktreeOptions.BaseFromOrigin). Default: on.
 	BaseFromOrigin func() bool
+	// NewWorktreeDefault reads threads.default_worktree at every Move that leaves the
+	// placement unspecified (move.go): true places the thread in a new worktree, false in
+	// the project's folder (each member's own checkout). Default: false (the setting's
+	// default, "current").
+	NewWorktreeDefault func() bool
 	// AttachmentsDir is where StageAttachment writes images and PDFs. Empty disables
 	// attachments. New creates it and removes files older than
 	// AttachmentMaxAge, then again every AttachmentReapInterval until Shutdown;
@@ -250,6 +255,9 @@ func (o Options) withDefaults() (Options, error) {
 	if o.BaseFromOrigin == nil {
 		o.BaseFromOrigin = func() bool { return true }
 	}
+	if o.NewWorktreeDefault == nil {
+		o.NewWorktreeDefault = func() bool { return false }
+	}
 	if o.Home == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -383,6 +391,12 @@ type record struct {
 	// archiving is set while an archive closes the thread (archive.go markArchiving):
 	// the close's end publishes a cut-off turn as idle "archived" at once.
 	archiving bool
+	// moving is set while a Move places the thread or waits for its set_cwd (move.go):
+	// a second Move is refused meanwhile.
+	moving bool
+	// lateMoveName is the title a move's naming gave after SlugTimeout while the move
+	// was still queued: applied when it lands (move.go, applyLateMoveName).
+	lateMoveName string
 }
 
 var _ Store = (*Manager)(nil)
@@ -967,7 +981,11 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 		// the parent; they keep their original times (usage.go).
 		r.usage.notBefore = s.CreatedAt
 	}
-	argv, env, extras, mem := m.claudeCommand(ctx, s, l, grants{}, true)
+	cs := s
+	if l.move != nil {
+		cs = s.withMove(l.move) // the destination's --add-dir list and instructions (move.go)
+	}
+	argv, env, extras, mem := m.claudeCommand(ctx, cs, l, grants{}, true)
 	r.memNote, r.memHash = mem.note, mem.hash
 	if err := m.spawnStream(ctx, rec, r, argv, env, first); err != nil {
 		return err

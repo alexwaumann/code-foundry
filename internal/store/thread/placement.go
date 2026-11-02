@@ -548,7 +548,12 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 			paths[i] = r.Path
 		}
 		bc = m.existingBranchChoice(ctx, paths, bc, nw.Branch)
-		sl, err := m.waitNaming(ctx, id, name, o.InitialPrompt, bc)
+		var sl slugWait
+		if o.naming != nil {
+			sl, err = o.naming(ctx, bc)
+		} else {
+			sl, err = m.waitNaming(ctx, id, name, o.InitialPrompt, bc)
+		}
 		if err != nil {
 			return p, err
 		}

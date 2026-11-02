@@ -296,6 +296,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		Branch:              s.Branch,
 		WorkspaceId:         s.WorkspaceID,
 		PendingWorktreePath: s.PendingWorktreePath,
+		PendingMove:         moveToProto(s.PendingMove),
 		Pinned:              s.Pinned,
 		EffortPending:       s.EffortPending,
 		CheckoutPaths:       checkoutPathsToProto(s),

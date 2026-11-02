@@ -38,6 +38,17 @@
 // CF_FAKE_CLAUDE_INIT_GATE=<path> holds it until <path> exists (the lifecycle tests'
 // slow start).
 //
+// set_cwd: answered ok with transcript_relocated (Claude moves the transcript; the fake
+// writes none). With CF_FAKE_CLAUDE_SET_CWD_REFUSE=<message> it is refused with status
+// "error" and that message (a thread move's failure path). With
+// CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE=<path> the first set_cwd (the one that creates <path>)
+// answers needs_trust, as a Claude started before the folder was trusted does;
+// CF_FAKE_CLAUDE_SET_CWD_NEEDS_TRUST (any value) answers needs_trust every time.
+// CF_FAKE_CLAUDE_SET_CWD_GATE=<path> holds every set_cwd answer until <path> exists, and
+// CF_FAKE_CLAUDE_SET_CWD_ERROR=<message> answers with a control error (a set_cwd whose
+// answer is lost). CF_FAKE_CLAUDE_SET_CWD_RESULT (any value) writes, after an ok answer, the empty
+// result (no turn, 0 tokens) real Claude emits after a set_cwd.
+//
 // A stuck Claude: with CF_FAKE_CLAUDE_STALL set, the first user message starts its turn
 // (the turn's lines but its result), then the process stops reading stdin for good
 // and ignores SIGTERM (its event loop is stuck): control requests go unanswered, and a
@@ -289,7 +300,31 @@ func Run(fixture string) int {
 				}
 				resp["response"] = map[string]any{"pid": os.Getpid(), "current_permission_mode": "default", "commands": commands}
 			case "set_cwd":
-				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true}
+				if gate := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_GATE"); gate != "" {
+					for {
+						if _, err := os.Stat(gate); err == nil {
+							break
+						}
+						time.Sleep(5 * time.Millisecond)
+					}
+				}
+				if msg := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_ERROR"); msg != "" {
+					resp = map[string]any{"subtype": "error", "request_id": m.RequestID, "error": msg}
+					break
+				}
+				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true, "transcript_relocated": true}
+				if msg := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_REFUSE"); msg != "" {
+					resp["response"] = map[string]any{"status": "error", "message": msg}
+				}
+				if os.Getenv("CF_FAKE_CLAUDE_SET_CWD_NEEDS_TRUST") != "" {
+					resp["response"] = map[string]any{"status": "needs_trust"}
+				}
+				if p := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE"); p != "" {
+					if _, err := os.Stat(p); err != nil {
+						_ = os.WriteFile(p, nil, 0o644)
+						resp["response"] = map[string]any{"status": "needs_trust"}
+					}
+				}
 			case "mcp_status":
 				resp["response"] = map[string]any{"mcpServers": mcp.servers()}
 			case "mcp_reconnect":
@@ -313,6 +348,9 @@ func Run(fixture string) int {
 			}
 			b, _ := json.Marshal(map[string]any{"type": "control_response", "response": resp})
 			write(string(b))
+			if r, _ := resp["response"].(map[string]any); m.Request["subtype"] == "set_cwd" && r["status"] == "ok" && os.Getenv("CF_FAKE_CLAUDE_SET_CWD_RESULT") != "" {
+				write(setCwdResult)
+			}
 		case "control_response":
 			mu.Lock()
 			if ch, ok := waiting[m.Response.RequestID]; ok {
@@ -460,3 +498,7 @@ func (f *fakeMcp) reconnect(name string) string {
 	}
 	return ""
 }
+
+// setCwdResult is the empty result real Claude writes right after a set_cwd it accepted:
+// no turn ran (CF_FAKE_CLAUDE_SET_CWD_RESULT).
+const setCwdResult = `{"type":"result","subtype":"success","is_error":false,"duration_ms":21,"duration_api_ms":0,"num_turns":0,"result":"","stop_reason":null,"total_cost_usd":0,"usage":{"input_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":0},"modelUsage":{},"permission_denials":[]}`

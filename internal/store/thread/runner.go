@@ -15,14 +15,17 @@ const activityPersistGap = 30 * time.Second
 // runner owns one connected thread: its claude process over stdio (stream.go), the
 // transcript tailer, status publishing, RunIn and close. All fields below are touched
 // only by run (the goroutine), except closeReq, cdReq, stopReq and done, and st's
-// documented exceptions.
+// documented exceptions. startedFor is set once, at newRunner.
 type runner struct {
 	m      *Manager
 	id     string
 	cwd    string
 	launch launch
+	// startedFor is the move this process was started for (launch.move at spawn).
+	startedFor *moveJob
 
-	closeReq chan struct{}
+	// closeReq carries the disconnect reason of a close the daemon asks for ("": closed).
+	closeReq chan string
 	cdReq    chan cdRequest // RunIn; capacity 1, latest wins
 	stopReq  chan struct{}
 	idleReq  chan idleCheck // stopIdle; capacity 1 (lifecycle.go)
@@ -48,6 +51,13 @@ type runner struct {
 	// Claude was last seen arriving at its prompt; zero while it is not there.
 	pendingCd     *cdRequest
 	atPromptSince time.Time
+	// moveRestart: a queued move waits for this restart (Claude asked for the folder's
+	// trust, which it reads at start; move.go); respawn gives the new process the move's
+	// folders and clears it.
+	moveRestart *moveJob
+	// cdResultOwed: Claude accepted a set_cwd and owes the empty result it writes after
+	// one (no turn ran); onStreamEvent drops it so it is not a finished turn.
+	cdResultOwed bool
 
 	// reseedPending: a reseed waits to stop the process (reseed.go). seed is the prefix
 	// of this fresh session's first message, until it went out (sendMessage).
@@ -119,8 +129,8 @@ type runner struct {
 
 func newRunner(m *Manager, id, cwd string, l launch) *runner {
 	return &runner{
-		m: m, id: id, cwd: cwd, launch: l,
-		closeReq: make(chan struct{}, 1),
+		m: m, id: id, cwd: cwd, launch: l, startedFor: l.move,
+		closeReq: make(chan string, 1),
 		cdReq:    make(chan cdRequest, 1),
 		stopReq:  make(chan struct{}, 1),
 		idleReq:  make(chan idleCheck, 1),
@@ -131,9 +141,13 @@ func newRunner(m *Manager, id, cwd string, l launch) *runner {
 	}
 }
 
-func (r *runner) requestClose() {
+func (r *runner) requestClose() { r.requestCloseAs("") }
+
+// requestCloseAs asks for a graceful close recorded as reason (Thread.DisconnectReason);
+// a close already asked for or begun keeps its own.
+func (r *runner) requestCloseAs(reason string) {
 	select {
-	case r.closeReq <- struct{}{}:
+	case r.closeReq <- reason:
 	default:
 	}
 }
@@ -412,11 +426,16 @@ func (r *runner) finish(fn func(*Thread)) {
 	// (transcriptmissing.go).
 	cur, _ := r.m.Snapshot().Thread(r.id)
 	gone := r.m.transcriptGone(cur)
+	var lostMove *moveJob
 	r.m.detach(r, func(s *Thread) {
 		fn(s)
 		s.TranscriptMissing = gone && s.ClaudeSessionID == cur.ClaudeSessionID && s.needsTranscript()
 		// Under m.mu, which RunIn holds while it queues: nothing can be queued after.
-		if owed := r.unsentCd(); owed != nil {
+		if owed := r.unsentCd(); owed != nil && owed.move != nil {
+			// A Move moves only through set_cwd, which relocates the transcript: without
+			// the process it does not happen (move.go).
+			lostMove = owed.move
+		} else if owed != nil {
 			// The process is gone; the next reconnect resumes in the requested member.
 			*s = s.movedTo(owed.projectID, owed.path)
 		}
@@ -437,6 +456,14 @@ func (r *runner) finish(fn func(*Thread)) {
 			s.LastActivityAt = r.activity
 		}
 	})
+	if lostMove != nil {
+		err := fmt.Errorf("%w: Claude stopped before the thread could move", ErrFailedPrecondition)
+		r.m.wg.Add(1) // this runner is still counted: no race with Shutdown's Wait
+		go func() {
+			defer r.m.wg.Done()
+			r.m.failMove(context.Background(), r.id, lostMove, err, false)
+		}()
+	}
 }
 
 // slogger prefixes runner logs with the thread id.
