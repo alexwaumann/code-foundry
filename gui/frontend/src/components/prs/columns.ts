@@ -62,7 +62,7 @@ const INSET = 1 + 0.25;
 const REM_PX = 16;
 
 /**
- * The columns a section's table shows at `width` px (its border box less the border),
+ * The columns a section's table shows at `width` px (its clientWidth: inside the border),
  * in display order: the longest prefix of IMPORTANCE whose floors and gaps fit. Title
  * and the next two always show, however narrow.
  */

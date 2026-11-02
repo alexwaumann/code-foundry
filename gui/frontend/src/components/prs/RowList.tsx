@@ -13,6 +13,11 @@ interface RowListProps<T> {
   maxHeight?: number;
   /** Short lists scroll inside maxHeight too (a fixed region in a panel); long ones always do. */
   capped?: boolean;
+  /**
+   * Whether the list is long enough to virtualize; by default more than VIRTUALIZE_OVER
+   * rows. A list that mixes in non-row lines (group labels) decides by its rows alone.
+   */
+  virtualize?: boolean;
   testId?: string;
 }
 
@@ -20,8 +25,8 @@ interface RowListProps<T> {
  * Renders rows directly when short, virtualized (fixed row height) when long. When the
  * page's keyboard cursor lands on a row that is not mounted, it scrolls to it first.
  */
-export function RowList<T>({ rows, rowKey, render, rowHeight, maxHeight = 520, capped = false, testId }: RowListProps<T>) {
-  if (rows.length <= VIRTUALIZE_OVER) {
+export function RowList<T>({ rows, rowKey, render, rowHeight, maxHeight = 520, capped = false, virtualize = rows.length > VIRTUALIZE_OVER, testId }: RowListProps<T>) {
+  if (!virtualize) {
     return (
       <div className={capped ? "overflow-y-auto" : undefined} style={capped ? { maxHeight } : undefined} data-testid={testId} data-virtual="false">
         {rows.map((r) => (
@@ -35,7 +40,7 @@ export function RowList<T>({ rows, rowKey, render, rowHeight, maxHeight = 520, c
   return <VirtualRows rows={rows} rowKey={rowKey} render={render} rowHeight={rowHeight} maxHeight={maxHeight} testId={testId} />;
 }
 
-function VirtualRows<T>({ rows, rowKey, render, rowHeight, maxHeight, testId }: Required<Omit<RowListProps<T>, "testId" | "capped">> & { testId?: string }) {
+function VirtualRows<T>({ rows, rowKey, render, rowHeight, maxHeight, testId }: Required<Omit<RowListProps<T>, "testId" | "capped" | "virtualize">> & { testId?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cursor = useNavCursor();
   // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.

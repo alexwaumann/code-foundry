@@ -29,7 +29,8 @@ last month.
   row, and the sort inside a group is unchanged. The keyboard follows the same order.
   `pageModel.tableItems` puts a label row (`GroupLabel`: name, count, hairline) before each
   repository's run. The label shows owner/name only when two groups share a name. Labels
-  are 28px like the rows, so the virtualized list keeps a fixed row height. They are not
+  are 28px like the rows, so the virtualized list keeps a fixed row height, and only the
+  rows count toward its threshold (`RowList`'s `virtualize`). They are not
   options, so the keyboard skips them. The two grouped tables have no Repository column.
 * `SectionTitle` keeps the title and count on one line. The caption truncates instead of
   wrapping the title ("Everything else open in your projects" wrapped beside the panel).

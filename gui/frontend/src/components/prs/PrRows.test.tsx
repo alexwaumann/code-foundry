@@ -8,7 +8,7 @@ const tableWidth = vi.hoisted(() => ({ px: 1100 }));
 vi.mock("@/lib/useWidth", () => ({ useWidth: () => [{ current: null }, tableWidth.px] }));
 
 const { MergedRow, OtherPrRow, PrTable } = await import("./PrRows");
-const { otherStatus, tableItems } = await import("./pageModel");
+const { groupByRepo, otherStatus, tableItems } = await import("./pageModel");
 
 /**
  * The Pull Requests page's tables (docs/notes/prs-shrink-2-gui.md): the columns a table
@@ -52,6 +52,13 @@ describe("PrTable", () => {
     expect([...document.querySelectorAll("[data-testid=prs-group]")].map((g) => g.textContent)).toEqual(["code-foundry2", "ghostty-playground1"]);
     expect(screen.getAllByTestId("prs-group").every((g) => g.closest("[role=option]") === null)).toBe(true);
     expect(screen.getAllByRole("option")).toHaveLength(3);
+  });
+
+  it("the labels do not make a list long: 50 pull requests over 11 repositories render inline, not in a virtual scroll box", () => {
+    const rows = groupByRepo(Array.from({ length: 50 }, (_, i) => ({ pr: pr(i + 1, `o/r${String(i % 11)}`), involved: true })));
+    render(<PrTable section="merged" rows={rows} render={(r) => <MergedRow row={r} viewer="me" />} />);
+    expect(screen.getAllByTestId("prs-group")).toHaveLength(11);
+    expect(document.querySelector("[data-virtual]")?.getAttribute("data-virtual")).toBe("false");
   });
 });
 

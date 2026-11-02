@@ -29,7 +29,7 @@ import { prKey, repoName } from "./format";
 import { capKey, tableItems, type Cap, type MergedRowModel, type OtherRow, type Section } from "./pageModel";
 import { Age, ChecksBadge, Diff, PrStateIcon } from "./PrBits";
 import { needsLabel, verdictLabel, type NeedsRow, type NeedsWhy, type ReviewedRow, type Verdict } from "./reviewQueue";
-import { RowList } from "./RowList";
+import { RowList, VIRTUALIZE_OVER } from "./RowList";
 
 const ROW_H = 28;
 
@@ -304,8 +304,8 @@ function GroupLabel({ name, count }: { name: string; count: number }) {
  */
 export function PrTable<T extends { pr: PullRequestView }>({ section, rows, render, cap, className }: { section: Section; rows: readonly T[]; render: (row: T) => ReactNode; cap?: Cap | null; className?: string }) {
   const [ref, width] = useWidth(1100);
-  // The table's border (1px each side) is not room for the grid.
-  const cols = useMemo(() => visibleColumns(section, width - 2), [section, width]);
+  // clientWidth: the border is already out.
+  const cols = useMemo(() => visibleColumns(section, width), [section, width]);
   const shown = useMemo<Shown>(() => ({ cols, template: gridTemplate(cols) }), [cols]);
   const items = useMemo(() => tableItems(rows, GROUPED.has(section)), [rows, section]);
   return (
@@ -321,6 +321,8 @@ export function PrTable<T extends { pr: PullRequestView }>({ section, rows, rend
         <div className="p-0.5">
           <RowList
             rows={items}
+            // The label lines do not make a list long: only its pull requests count.
+            virtualize={rows.length > VIRTUALIZE_OVER}
             rowKey={(it) => (it.kind === "group" ? `group:${section}:${it.slug.toLowerCase()}` : prKey(section, it.row.pr))}
             rowHeight={ROW_H}
             render={(it) => (it.kind === "group" ? <GroupLabel name={it.name} count={it.count} /> : render(it.row))}
