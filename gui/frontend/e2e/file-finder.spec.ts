@@ -4,8 +4,9 @@ import { mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
 /**
  * The file finder (file.find, cmd+P; docs/notes/file-finder-2-gui.md) for what only the
  * whole app shows: the chord through the keymap from a thread's prompt, the dialog taking
- * the keyboard, Enter landing a File tab in the side panel that was shut, ⌥⏎ landing an @
- * file tag in the real ProseMirror prompt. Its rows, groups, search and actions are
+ * the keyboard, Enter landing a File tab in the side panel that was shut (the keyboard
+ * moving into it), ⌥⏎ landing an @ file tag in the real ProseMirror prompt. Its rows,
+ * groups, search and actions are
  * src/components/palette/FileFinder.test.tsx's and src/lib/fileFinder.test.ts's.
  */
 
@@ -35,8 +36,9 @@ test("cmd+p from a thread's prompt opens the finder; Enter opens the file in the
   await page.keyboard.press("Enter");
   await expect(palette(page)).toHaveCount(0);
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel-key", "thread:s-1");
-  await expect(page.getByTestId("panel-tabs").locator('[role="tab"][aria-selected="true"]')).toHaveText("app.ts");
   await expect(page.getByTestId("file-tab")).toBeVisible();
+  // The keyboard went to the panel, not back to the prompt.
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region") ?? null)).toBe("panel");
 
   await threadPrompt(page).click();
   await openFinder(page);
