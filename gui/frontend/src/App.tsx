@@ -45,6 +45,7 @@ import { startArchiveCleanup } from "@/stores/archiveCleanup";
 import { startWelcomeSync } from "@/stores/welcome";
 import { startDockAlerts } from "@/stores/dockAlerts";
 import { startUpdateSync } from "@/stores/update";
+import { startRecentFiles } from "@/stores/recentFiles";
 import { EmberView } from "@/components/ember/EmberView";
 import { EMBER_VIEW } from "@/surfaces/emberTarget";
 
@@ -89,6 +90,7 @@ function startApp(): () => void {
     startUpdateSync(),
     startMenuCommands(),
     startDockAlerts(),
+    startRecentFiles(),
   ];
   return () => {
     document.removeEventListener("focusin", onFocusIn);

@@ -151,3 +151,43 @@ export async function searchFiles(req: FileSearchRequest, conn: DaemonConnection
     throw orOutdatedDaemon(err);
   }
 }
+
+// ---- file finder ----------------------------------------------------------------------------
+
+/** A checkout the file finder searches (FileSource): a project's worktree, by absolute path. */
+export interface FinderSourceView {
+  projectId: string;
+  path: string;
+}
+
+/** One file the finder offers (FileMatch from a several-source search). */
+export interface FinderMatchView {
+  projectId: string;
+  /** The checkout `path` is relative to (the source's path as sent). */
+  checkout: string;
+  /** Relative to the checkout, "/"-separated. */
+  path: string;
+  /** Code-point indices (Array.from) of `path` the query matched, ascending. */
+  pathPositions: number[];
+  /** Code-point indices of the project's name that project words matched; empty when none did. */
+  projectPositions: number[];
+}
+
+/**
+ * Searches several checkouts for files (FilesystemService.SearchFiles with sources and
+ * files_only): one list ranked across them, best first. The daemon refuses a query of more
+ * than 8 words (lib/fileFinder MAX_WORDS): callers do not send one.
+ */
+export async function findFiles(
+  req: { sources: readonly FinderSourceView[]; query: string; limit?: number },
+  conn: DaemonConnection = daemon,
+  signal?: AbortSignal,
+): Promise<FinderMatchView[]> {
+  const c = await conn.client(FilesystemService);
+  try {
+    const res = await c.searchFiles({ sources: req.sources.map((s) => ({ projectId: s.projectId, path: s.path })), query: req.query, limit: req.limit ?? 0, filesOnly: true }, { signal });
+    return res.matches.map((m) => ({ projectId: m.projectId, checkout: m.checkout, path: m.path, pathPositions: [...m.pathPositions], projectPositions: [...m.projectPositions] }));
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}

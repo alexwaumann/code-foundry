@@ -140,6 +140,7 @@ func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
 //   - composer.history (commands_view_composer.go), the Previous prompts picker, and
 //     composer.stage (commands_composer_stage.go), text in a thread's composer;
 //   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
+//   - file.find (commands_view_file_find.go), the file finder over the thread on screen.
 //
 // Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, d ViewDeps) error {
@@ -288,5 +289,5 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:         show(ViewThreadNext),
 		},
 	}
-	return r.RegisterAll(append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand())...)
+	return r.RegisterAll(append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand())...)
 }
