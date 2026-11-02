@@ -38,9 +38,12 @@ right).
   thread's order, each at the checkout the thread records. A project without a known
   checkout falls back to its main worktree, and the GUI always sends a path, so a match's
   `checkout` is the one sent. A workspace's folder is no project, so it is never a source.
-* **Rows.** Text only. The name is at the label role's weight (500) with the matched letters
-  semibold in the foreground colour, as in the sketch. The directory uses the caption role,
-  muted and cut from the left (`[direction:rtl]` with LRM marks, the Changes tab's trick).
+* **Rows.** Text only. The name is regular (400, `font-normal` on the label role) with the
+  matched letters semibold (600) in the foreground colour. The first cut kept the label
+  role's 500 for the name: 500 against 600 at 14px did not read as a highlight in either
+  theme (review of the first screenshots), so the rest of the name dropped to 400. The
+  directory uses the caption role, muted and cut from the left (`[direction:rtl]` with LRM
+  marks, the Changes tab's trick).
   Directory positions are not drawn: the dimmed directory stays plain. On the right come
   `open`, the project label (only with 2+ checkouts, its matched letters bold) and the status
   letter (`statusColor`). The status column is always reserved with 2+ projects, so the
@@ -62,7 +65,12 @@ right).
   `startApp`.
 * **Search.** Debounced 80 ms like the composer's `@`. A newer query or a closed finder
   aborts the one out (AbortController). The last answer stays on screen until the next lands
-  (no flicker). The limit is 50. More than 8 words sends nothing and shows "At most 8 words".
+  (no flicker), and the status line says "Searching…" (not "No matching files.") while the
+  typed query's answer is out. Enter or ⌥⏎ pressed before that answer waits for it and takes
+  its first row (a pending action in a ref, dropped when the query changes or the search
+  fails): typing a name and pressing Enter at once must not open the previous query's top
+  row, nor do nothing on the first query. A click on a stale row is explicit and acts at once.
+  The limit is 50. More than 8 words sends nothing and shows "At most 8 words".
   A failure shows "Cannot search: …" above the stale rows.
 * **`name:42`.** A trailing `:<digits>` is split off: the name is searched and Enter opens
   at that line. `name:` while typing searches the name. A colon elsewhere stays in the query.
@@ -109,11 +117,14 @@ right).
   persisted merge), `components/palette/FileFinder.test.tsx` (presenter, placeholder,
   no-project and pages, the chord through `handleKeyDown`, unavailable leaves the chord and
   the palette alone, both empty-state layouts, sources primary first, highlights, `:line`,
-  8 words, stale rows during a search and the debounce, errors, Enter into a shut panel at
+  8 words, stale rows during a search and the debounce, "Searching…" after an empty
+  answer, errors, Enter before the answer (waits and takes its first row; dropped on a new
+  query or a failure), Enter into a shut panel at
   a line, a changed file opening a File tab, ⌥⏎ calling the composer's tag insert).
 * Playwright `e2e/file-finder.spec.ts` (one test): cmd+P from a thread's focused prompt opens
   the finder with the input focused; typing and Enter open the File tab in the panel that was
-  shut; ⌥⏎ lands a tag in the real ProseMirror prompt, which is focused.
+  shut, with the keyboard in the panel; ⌥⏎ lands a tag in the real ProseMirror prompt, which
+  is focused.
 
 ## Verified
 
@@ -136,3 +147,14 @@ right).
   `/tmp/cf-ff` deleted. Starting the threads made Claude Code record the two scratch folders
   under `projects` in `~/.claude.json` (trust). That shared file was left alone; the two keys
   point at folders that no longer exist.
+
+## Review fixes
+
+* Matched letters were not visibly bold (name 500, hits 600); the name is now 400.
+* Enter or ⌥⏎ before the typed query's answer opened the previous query's top row (or did
+  nothing on the first query); it now waits for the answer. The status line said "No
+  matching files." while a new search was out after an empty answer; it says "Searching…".
+* The e2e asserts the keyboard lands in the panel after Enter (browser-only) instead of the
+  active tab's title, which the unit test already pins through the panel store.
+* The PR's screenshots were retaken on the mock (`code-foundry` and `ghostty-playground`
+  main worktrees, workspace `terminal-port`) with the new weights.
