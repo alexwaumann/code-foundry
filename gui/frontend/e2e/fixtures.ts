@@ -168,14 +168,15 @@ async function openChangesTabFor(page: Page, projectId: string, path: string): P
 /**
  * Shows a worktree's Changes tab: its project's page with the worktree's tab in the page's
  * side panel (a checkout row has no click; its menu's Show changes runs the same, and only
- * with changes), or, with `workspaceId`, the workspace's page and the project's member row.
- * The page stays selected: the palette has no worktree context here; tests that need one
- * select a thread in the worktree.
+ * with changes), or, with `workspaceId`, the workspace's page with the tab in its panel (a
+ * member row opens nothing; a thread row's menu shows a changed member's). The page stays
+ * selected: the palette has no worktree context here; tests that need one select a thread in
+ * the worktree.
  */
 export async function selectWorktree(page: Page, projectId: string, path: string, workspaceId?: string): Promise<void> {
   if (workspaceId) {
     await openWorkspacePage(page, workspaceId);
-    await page.locator(`[data-nav-key="m:${workspaceId}::${projectId}"]`).dblclick();
+    await openChangesTabFor(page, projectId, path);
   } else {
     await openProjectPage(page, projectId);
     await openChangesTabFor(page, projectId, path);
