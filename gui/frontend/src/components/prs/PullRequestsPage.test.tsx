@@ -49,6 +49,8 @@ function Harness() {
 
 const rows = (section: string) => [...screen.getByTestId("prs-list").querySelectorAll<HTMLElement>(`[data-nav-key^="${section}:"]`)];
 const keys = (section: string) => rows(section).map((r) => r.dataset.navKey);
+/** A grouped section's repository labels: name and count. */
+const groups = (section: string) => [...screen.getByTestId(`prs-${section}`).querySelectorAll("[data-testid=prs-group]")].map((g) => g.textContent);
 const textsIn = (els: HTMLElement[], testId: string) => els.flatMap((e) => [...e.querySelectorAll<HTMLElement>(`[data-testid="${testId}"]`)].map((x) => x.textContent));
 
 async function openPage() {
@@ -89,13 +91,13 @@ describe("the Pull Requests page", () => {
     expect(within(card("review")).getByTestId("prs-card-count").className).toContain("text-cf-warning-text");
     expect(card("merged").textContent).toBe("Merged · 7 days74 involving you · 3 more");
 
-    // Every table has a header row, with Diff before Age (Merged).
+    // Every table has a header row, with Diff before Age (Merged); the grouped tables have no Repository column.
     const head = (s: string) => [...(screen.getByTestId(`prs-${s}`).querySelector(".text-overline")?.children ?? [])].map((h) => h.textContent);
     expect(head("review")).toEqual(["Repository", "#", "Author", "Title", "Why", "Checks", "Diff", "Age"]);
     expect(head("reviewed")).toEqual(["Repository", "#", "Author", "Title", "Your review", "Checks", "Diff", "Age"]);
     expect(head("authored")).toEqual(["Repository", "#", "Title", "Status", "Checks", "Comments", "Diff", "Age"]);
-    expect(head("else")).toEqual(["Repository", "#", "Author", "Title", "Status", "Checks", "Diff", "Age"]);
-    expect(head("merged")).toEqual(["Repository", "#", "Author", "Title", "Diff", "Merged"]);
+    expect(head("else")).toEqual(["#", "Author", "Title", "Status", "Checks", "Diff", "Age"]);
+    expect(head("merged")).toEqual(["#", "Author", "Title", "Diff", "Merged"]);
 
     // Needs your review, newest first: requested by name, a stale review, a team request (other-org/lib is no project).
     expect(screen.getByTestId("prs-review").querySelector("h2")?.textContent).toBe("Needs your review(3)");
@@ -115,20 +117,22 @@ describe("the Pull Requests page", () => {
     expect(authored[0]?.querySelector("[data-checks]")?.getAttribute("data-checks")).toBe("failure");
     expect(textsIn([authored[1] as HTMLElement], "prs-comments")).toEqual(["3"]);
 
-    // Everything else open in the projects: others' pull requests, with the author and a status.
+    // Everything else open in the projects: others' pull requests, with the author and a status, under a label per repository.
     expect(screen.getByTestId("prs-else").querySelector("h2")?.textContent).toBe("Everything else open in your projects(5)not yours, not waiting on you · updated in the last month");
-    expect(keys("else").map((k) => k?.split("/")[1])).toEqual(["code-foundry#148", "code-foundry#149", "ghostty-playground#16", "ghostty-playground#15", "code-foundry#144"]);
-    expect(textsIn(rows("else"), "prs-status")).toEqual(["Awaiting review · 2", "Draft", "Approved", "No reviewers", "Blocked"]);
+    expect(keys("else").map((k) => k?.split("/")[1])).toEqual(["code-foundry#148", "code-foundry#149", "code-foundry#144", "ghostty-playground#16", "ghostty-playground#15"]);
+    expect(groups("else")).toEqual(["code-foundry3", "ghostty-playground2"]);
+    expect(textsIn(rows("else"), "prs-status")).toEqual(["Awaiting review · 2", "Draft", "Blocked", "Approved", "No reviewers"]);
     expect(textsIn(rows("else"), "prs-diff")[0]).toBe("+412−58");
 
-    // Merged: the viewer's and the projects', newest merge first; the projects' only are dimmed.
+    // Merged: the viewer's and the projects', grouped by repository (newest first), newest merge first inside; the projects' only are dimmed.
+    expect(groups("merged")).toEqual(["code-foundry4", "lib1", "ghostty-playground2"]);
     expect(screen.getByTestId("prs-merged").querySelector("h2")?.textContent).toBe("Merged in the last 7 days(7)4 involving you · 3 more in your projects");
     expect(rows("merged").map((r) => [r.dataset.navKey?.split("#")[1], r.className.includes("opacity-60")])).toEqual([
       ["138", false],
       ["137", true],
       ["136", false],
-      ["70", false],
       ["135", true],
+      ["70", false],
       ["11", true],
       ["10", false],
     ]);
@@ -209,8 +213,8 @@ describe("the Pull Requests page", () => {
     expect(document.activeElement).toBe(list);
 
     // An open tooltip takes the first Escape (Radix prevents its default); the second clears the filter.
-    fireEvent.click(card("merged"));
-    const repo = rows("merged")[0]?.querySelector("span") as HTMLElement;
+    fireEvent.click(card("review"));
+    const repo = rows("review")[0]?.querySelector("span") as HTMLElement;
     fireEvent.pointerMove(repo, { pointerType: "mouse" });
     await vi.waitFor(() => {
       expect(screen.queryByRole("tooltip")?.textContent).toBe(SLUG);
@@ -219,7 +223,7 @@ describe("the Pull Requests page", () => {
     await vi.waitFor(() => {
       expect(screen.queryByRole("tooltip")).toBeNull();
     });
-    expect(sections()).toEqual(["prs-merged"]);
+    expect(sections()).toEqual(["prs-review"]);
     fireEvent.keyDown(list, { key: "Escape" });
     expect(sections()).toHaveLength(5);
 

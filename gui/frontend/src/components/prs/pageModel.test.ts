@@ -5,6 +5,7 @@ import type { AuthoredRow, AuthoredStatusKind } from "./authoredStatus";
 import {
   authoredSubtitle,
   cards,
+  groupByRepo,
   liveFilter,
   mergedCounts,
   mergedRows,
@@ -136,14 +137,15 @@ describe("pageModel", () => {
   it("the mock's dashboard: counts, cards and the rows of the new sections", () => {
     const m = pageModel(base());
     expect(m.counts).toEqual({ review: 3, reviewed: 2, authored: 3, else: 5, merged: 7 });
-    expect(nums(m.others)).toEqual([148, 149, 16, 15, 144]);
-    expect(m.others.map((r) => r.status.label)).toEqual(["Awaiting review · 2", "Draft", "Approved", "No reviewers", "Blocked"]);
+    // Grouped by repository, the newest first; newest updated first inside.
+    expect(nums(m.others)).toEqual([148, 149, 144, 16, 15]);
+    expect(m.others.map((r) => r.status.label)).toEqual(["Awaiting review · 2", "Draft", "Blocked", "Approved", "No reviewers"]);
     expect(m.merged.map((r) => [r.pr.number, r.involved])).toEqual([
       [138, true],
       [137, false],
       [136, true],
-      [70, true],
       [135, false],
+      [70, true],
       [11, false],
       [10, true],
     ]);
@@ -174,7 +176,7 @@ describe("pageModel", () => {
     const d = base();
     const dup = d.reviewRequested[0] as PullRequestView;
     const m = pageModel({ ...d, projectOpen: list([...d.projectOpen.pullRequests, dup, d.authored[0] as PullRequestView]) });
-    expect(nums(m.others)).toEqual([148, 149, 16, 15, 144]);
+    expect(nums(m.others)).toEqual([148, 149, 144, 16, 15]);
     expect(m.counts.else).toBe(5);
   });
 
@@ -199,5 +201,20 @@ describe("olderFreshness", () => {
     ["else the projects' error", { fetchedAtMs: 5000, lastError: "" }, { fetchedAtMs: 3000, lastError: "b" }, { fetchedAtMs: 3000, lastError: "b" }],
   ])("%s", (_name, a, b, want) => {
     expect(olderFreshness(a, b)).toEqual(want);
+  });
+});
+
+describe("groupByRepo", () => {
+  it.each([
+    { name: "empty", rows: [], want: [] },
+    { name: "one repository keeps its order", rows: [pr(3), pr(2), pr(1)], want: [3, 2, 1] },
+    {
+      name: "repositories in the order of their first row, each row kept in order inside",
+      rows: [pr(9, {}, GP), pr(8), pr(7, {}, OTHER), pr(6, {}, GP), pr(5), pr(4, {}, OTHER)],
+      want: [9, 6, 8, 5, 7, 4],
+    },
+    { name: "slugs differing only in case are one repository", rows: [pr(2, {}, GP), pr(1), pr(3, {}, GP.toUpperCase())], want: [2, 3, 1] },
+  ])("$name", ({ rows, want }) => {
+    expect(nums(groupByRepo(rows.map((p) => ({ pr: p }))))).toEqual(want);
   });
 });

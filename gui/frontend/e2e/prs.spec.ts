@@ -69,6 +69,28 @@ test.describe("Pull Requests page", () => {
     }
   });
 
+  // Which columns fit which width: src/components/prs/columns.test.ts; the cells per column: PrRows.test.tsx.
+  test("beside the side panel, the tables drop columns instead of running past their right edge", async ({ page }) => {
+    await openApp(page);
+    await page.getByTestId("nav-pullrequests").click();
+    const table = (s: string) => page.getByTestId(`prs-${s}`).locator("[data-columns]");
+    /** How far any cell of the section's table reaches past the table's right edge (px). */
+    const overflow = (s: string) =>
+      table(s).evaluate((t) => {
+        const right = t.getBoundingClientRect().right;
+        return Math.max(0, ...[...t.querySelectorAll("[data-nav-key] > .grid > *, .text-overline > *")].map((c) => c.getBoundingClientRect().right - right));
+      });
+    const sections = ["review", "reviewed", "authored", "else", "merged"];
+    await expect(table("review")).toHaveAttribute("data-columns", "Repository,#,Author,Title,Why,Checks,Diff,Age");
+    await page.getByTestId("prs-list").press("ArrowDown");
+    await page.getByTestId("prs-list").press("Enter");
+    await expect(page.getByTestId("pr-surface")).toBeVisible();
+    // Narrower: Diff went first, and nothing overflows.
+    await expect(table("review")).not.toHaveAttribute("data-columns", /Diff/);
+    await expect(table("review")).toHaveAttribute("data-columns", /^Repository,#,.*Title,Why/);
+    for (const s of sections) expect(await overflow(s)).toBeLessThanOrEqual(0.5);
+  });
+
   test("a capped project list arrives over the gh stream with its footer", async ({ page }) => {
     await openApp(page);
     await page.getByTestId("nav-pullrequests").click();

@@ -4,6 +4,7 @@
  */
 import type { DashboardView, ProjectPullRequestsView, PullRequestView } from "@/api/gh";
 import type { Freshness } from "@/stores/gh";
+import { repoName } from "./format";
 import { ACTION_RANK, authoredRows, authoredStatus, type AuthoredRow, type AuthoredStatus, type AuthoredStatusKind } from "./authoredStatus";
 import { reviewQueue, type NeedsRow, type ReviewedRow } from "./reviewQueue";
 
@@ -28,6 +29,7 @@ export interface PageModel {
   needs: NeedsRow[];
   reviewed: ReviewedRow[];
   authored: AuthoredRow[];
+  /** Grouped by repository (groupByRepo), like merged. */
   others: OtherRow[];
   merged: MergedRowModel[];
   /** What each card and section title counts: the rows, plus what a capped list holds beyond them. */
@@ -113,6 +115,57 @@ export function mergedRows(involved: readonly PullRequestView[], project: readon
 }
 
 /**
+ * Rows grouped by repository, for the two awareness tables: each repository's rows
+ * together, in their order, and the repositories in the order of their first row (the
+ * newest). Stable, so it keeps the list's sort inside a group; the page's keyboard order
+ * is this order too.
+ */
+export function groupByRepo<T extends { pr: Pick<PullRequestView, "repoSlug"> }>(rows: readonly T[]): T[] {
+  const groups = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = r.pr.repoSlug.toLowerCase();
+    const g = groups.get(k);
+    if (g) g.push(r);
+    else groups.set(k, [r]);
+  }
+  return [...groups.values()].flat();
+}
+
+/** A line of a table: a repository label (grouped sections) or a row. */
+export type TableItem<T> = { kind: "group"; slug: string; name: string; count: number } | { kind: "row"; row: T };
+
+/**
+ * The table's lines: its rows, and in a grouped section a label before each repository's
+ * rows. The label is the repository's name, or its owner/name when another group has the
+ * same name.
+ */
+export function tableItems<T extends { pr: Pick<PullRequestView, "repoSlug"> }>(rows: readonly T[], grouped: boolean): TableItem<T>[] {
+  if (!grouped) return rows.map((row) => ({ kind: "row", row }));
+  const counts = new Map<string, { slug: string; n: number }>();
+  for (const r of rows) {
+    const k = r.pr.repoSlug.toLowerCase();
+    const c = counts.get(k);
+    if (c) c.n++;
+    else counts.set(k, { slug: r.pr.repoSlug, n: 1 });
+  }
+  const names = new Map<string, number>();
+  for (const { slug } of counts.values()) names.set(repoName(slug).toLowerCase(), (names.get(repoName(slug).toLowerCase()) ?? 0) + 1);
+  const out: TableItem<T>[] = [];
+  let last = "";
+  for (const row of rows) {
+    const k = row.pr.repoSlug.toLowerCase();
+    if (k !== last) {
+      const c = counts.get(k) ?? { slug: row.pr.repoSlug, n: 0 };
+      const name = repoName(c.slug);
+      out.push({ kind: "group", slug: c.slug, name: (names.get(name.toLowerCase()) ?? 0) > 1 ? c.slug : name, count: c.n });
+      last = k;
+    }
+    out.push({ kind: "row", row });
+  }
+  return out;
+}
+
+/**
  * The merged section's counts. `more` counts the rows not involving the viewer, plus the
  * project matches GitHub did not return when capped, less the viewer's own merges in
  * tracked repositories that are among those (they are counted as involving already).
@@ -135,8 +188,8 @@ export function pageModel(d: DashboardView): PageModel {
   const queue = reviewQueue(d.reviewRequested, d.reviewed, viewer);
   const authored = authoredRows(d.authored);
   const mine = new Set([...d.reviewRequested, ...d.reviewed, ...d.authored].map(prId));
-  const others = otherRows(d.projectOpen.pullRequests, mine);
-  const merged = mergedRows(d.recentlyMerged, d.projectMerged.pullRequests);
+  const others = groupByRepo(otherRows(d.projectOpen.pullRequests, mine));
+  const merged = groupByRepo(mergedRows(d.recentlyMerged, d.projectMerged.pullRequests));
   const m = mergedCounts(merged, d.projectMerged, d.trackedSlugs);
   // Beyond the cap, the search's negations already left out the viewer's own.
   const elseCount = others.length + hiddenCount(d.projectOpen);

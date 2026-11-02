@@ -15,44 +15,30 @@ import {
   UserX,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { createContext, Fragment, useContext, useMemo, type ReactNode } from "react";
 import type { PullRequestView } from "@/api/gh";
 import { statusPill, toneText } from "@/components/pr/tones";
 import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
+import { useWidth } from "@/lib/useWidth";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import type { AuthoredRow, AuthoredStatus, AuthoredStatusKind } from "./authoredStatus";
+import { COLUMNS, gridTemplate, RIGHT, visibleColumns, type Column } from "./columns";
 import { prKey, repoName } from "./format";
-import { capKey, type Cap, type MergedRowModel, type OtherRow, type Section } from "./pageModel";
+import { capKey, tableItems, type Cap, type MergedRowModel, type OtherRow, type Section } from "./pageModel";
 import { Age, ChecksBadge, Diff, PrStateIcon } from "./PrBits";
 import { needsLabel, verdictLabel, type NeedsRow, type NeedsWhy, type ReviewedRow, type Verdict } from "./reviewQueue";
 import { RowList } from "./RowList";
 
 const ROW_H = 28;
 
-// Flexible tracks only (fr with a floor): fixed maxima grow before an fr track gets any
-// room, which squeezed the title to nothing beside the side panel. Review, reviewed and
-// everything else share a template, so their columns line up down the page.
-const SHARED_COLS = "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(8.5rem,1.3fr)_minmax(6.5rem,1fr)_minmax(4.5rem,0.6fr)_3rem]";
-const columns: Record<Section, string> = {
-  review: SHARED_COLS,
-  reviewed: SHARED_COLS,
-  authored: "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(6rem,2.4fr)_minmax(8.5rem,1.2fr)_minmax(6.5rem,1fr)_minmax(4.5rem,0.5fr)_minmax(4.5rem,0.6fr)_3rem]",
-  else: SHARED_COLS,
-  merged: "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(4.5rem,0.6fr)_3.5rem]",
-};
-
-const headers: Record<Section, string[]> = {
-  review: ["Repository", "#", "Author", "Title", "Why", "Checks", "Diff", "Age"],
-  reviewed: ["Repository", "#", "Author", "Title", "Your review", "Checks", "Diff", "Age"],
-  authored: ["Repository", "#", "Title", "Status", "Checks", "Comments", "Diff", "Age"],
-  else: ["Repository", "#", "Author", "Title", "Status", "Checks", "Diff", "Age"],
-  merged: ["Repository", "#", "Author", "Title", "Diff", "Merged"],
-};
-
-/** The right-aligned columns: Diff and the last (Age, Merged). */
-const RIGHT = new Set(["Diff", "Age", "Merged"]);
+/** The columns a table shows and their grid template, from its own width (PrTable); rows read it. */
+interface Shown {
+  cols: readonly Column[];
+  template: string;
+}
+const ShownColumns = createContext<Shown | null>(null);
 
 /** Rows that do not involve the viewer now: dimmed until hovered or under the cursor. */
 const QUIET = "opacity-60 hover:opacity-100 aria-selected:opacity-100";
@@ -107,17 +93,19 @@ export function StatusPill({ status }: { status: AuthoredStatus }) {
   );
 }
 
-/** The cells every row starts with: repository and number. */
-function Lead({ pr }: { pr: PullRequestView }) {
+function Repo({ pr }: { pr: PullRequestView }) {
   return (
-    <>
-      <Tip label={pr.repoSlug}>
-        <span className="truncate text-cf-text-muted">{repoName(pr.repoSlug)}</span>
-      </Tip>
-      <span className="flex items-center gap-1 text-cf-text-muted tabular-nums">
-        <PrStateIcon state={pr.state} draft={pr.draft} />#{pr.number}
-      </span>
-    </>
+    <Tip label={pr.repoSlug}>
+      <span className="truncate text-cf-text-muted">{repoName(pr.repoSlug)}</span>
+    </Tip>
+  );
+}
+
+function Num({ pr }: { pr: PullRequestView }) {
+  return (
+    <span className="flex items-center gap-1 text-cf-text-muted tabular-nums">
+      <PrStateIcon state={pr.state} draft={pr.draft} />#{pr.number}
+    </span>
   );
 }
 
@@ -137,33 +125,50 @@ function Title({ pr }: { pr: PullRequestView }) {
   );
 }
 
-/** A table row: Enter and click open it in the side panel (the page's nav), cmd+click on GitHub. */
-function Row({ section, pr, className, children }: { section: Section; pr: PullRequestView; className?: string; children: ReactNode }) {
+type Cells = Partial<Record<Column, ReactNode>>;
+
+/**
+ * A table row: the cells of the columns its table shows, in order. Enter and click open
+ * it in the side panel (the page's nav), cmd+click on GitHub.
+ */
+function Row({ section, pr, className, cells }: { section: Section; pr: PullRequestView; className?: string; cells: Cells }) {
+  const shown = useContext(ShownColumns);
+  const cols = shown?.cols ?? COLUMNS[section];
   return (
     <NavRow
       navKey={prKey(section, pr)}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
-      className={cn("grid h-full items-center gap-3 rounded-md px-2 text-body", columns[section], className)}
+      className={cn("h-full rounded-md px-2 text-body", className)}
     >
-      {children}
+      <div className="grid h-full items-center gap-3" style={{ gridTemplateColumns: shown?.template ?? gridTemplate(cols) }}>
+        {cols.map((c) => (
+          <Fragment key={c}>{cells[c]}</Fragment>
+        ))}
+      </div>
     </NavRow>
   );
 }
+
 
 export function NeedsReviewRow({ row, viewer }: { row: NeedsRow; viewer: string }) {
   const { pr, why } = row;
   const look = WHY_LOOK[why];
   return (
-    <Row section="review" pr={pr}>
-      <Lead pr={pr} />
-      <Author pr={pr} viewer={viewer} />
-      <Title pr={pr} />
-      <IconLabel icon={look.icon} cls={look.cls} label={needsLabel[why]} testId="prs-why" value={why} />
-      <ChecksBadge checks={pr.checks} />
-      <Diff pr={pr} />
-      <Age ms={pr.updatedAtMs} className="text-right" />
-    </Row>
+    <Row
+      section="review"
+      pr={pr}
+      cells={{
+        Repository: <Repo pr={pr} />,
+        "#": <Num pr={pr} />,
+        Author: <Author pr={pr} viewer={viewer} />,
+        Title: <Title pr={pr} />,
+        Why: <IconLabel icon={look.icon} cls={look.cls} label={needsLabel[why]} testId="prs-why" value={why} />,
+        Checks: <ChecksBadge checks={pr.checks} />,
+        Diff: <Diff pr={pr} />,
+        Age: <Age ms={pr.updatedAtMs} className="text-right" />,
+      }}
+    />
   );
 }
 
@@ -172,15 +177,21 @@ export function ReviewedByYouRow({ row, viewer }: { row: ReviewedRow; viewer: st
   const look = VERDICT_LOOK[verdict];
   return (
     // Waiting on the author.
-    <Row section="reviewed" pr={pr} className={QUIET}>
-      <Lead pr={pr} />
-      <Author pr={pr} viewer={viewer} />
-      <Title pr={pr} />
-      <IconLabel icon={look.icon} cls={look.cls} label={verdictLabel[verdict]} testId="prs-verdict" value={verdict} />
-      <ChecksBadge checks={pr.checks} />
-      <Diff pr={pr} />
-      <Age ms={pr.updatedAtMs} className="text-right" />
-    </Row>
+    <Row
+      section="reviewed"
+      pr={pr}
+      className={QUIET}
+      cells={{
+        Repository: <Repo pr={pr} />,
+        "#": <Num pr={pr} />,
+        Author: <Author pr={pr} viewer={viewer} />,
+        Title: <Title pr={pr} />,
+        "Your review": <IconLabel icon={look.icon} cls={look.cls} label={verdictLabel[verdict]} testId="prs-verdict" value={verdict} />,
+        Checks: <ChecksBadge checks={pr.checks} />,
+        Diff: <Diff pr={pr} />,
+        Age: <Age ms={pr.updatedAtMs} className="text-right" />,
+      }}
+    />
   );
 }
 
@@ -188,53 +199,71 @@ export function AuthoredPrRow({ row }: { row: AuthoredRow }) {
   const { pr, status } = row;
   const comments = pr.comments + pr.reviews;
   return (
-    <Row section="authored" pr={pr}>
-      <Lead pr={pr} />
-      <Title pr={pr} />
-      <StatusPill status={status} />
-      <ChecksBadge checks={pr.checks} />
-      <span className="flex items-center gap-1 text-body-sm text-cf-text-muted tabular-nums" aria-label={`${String(comments)} comments and reviews`} data-testid="prs-comments">
-        <MessageCircle className="size-3.5 shrink-0" aria-hidden />
-        {comments}
-      </span>
-      <Diff pr={pr} />
-      <Age ms={pr.updatedAtMs} className="text-right" />
-    </Row>
+    <Row
+      section="authored"
+      pr={pr}
+      cells={{
+        Repository: <Repo pr={pr} />,
+        "#": <Num pr={pr} />,
+        Title: <Title pr={pr} />,
+        Status: <StatusPill status={status} />,
+        Checks: <ChecksBadge checks={pr.checks} />,
+        Comments: (
+          <span className="flex items-center gap-1 text-body-sm text-cf-text-muted tabular-nums" aria-label={`${String(comments)} comments and reviews`} data-testid="prs-comments">
+            <MessageCircle className="size-3.5 shrink-0" aria-hidden />
+            {comments}
+          </span>
+        ),
+        Diff: <Diff pr={pr} />,
+        Age: <Age ms={pr.updatedAtMs} className="text-right" />,
+      }}
+    />
   );
 }
 
-/** Someone else's open pull request in a tracked repository. */
+/** Someone else's open pull request in a tracked repository (its repository is the group label above it). */
 export function OtherPrRow({ row, viewer }: { row: OtherRow; viewer: string }) {
   const { pr, status } = row;
   return (
-    <Row section="else" pr={pr}>
-      <Lead pr={pr} />
-      <Author pr={pr} viewer={viewer} />
-      <Title pr={pr} />
-      <StatusPill status={status} />
-      <ChecksBadge checks={pr.checks} />
-      <Diff pr={pr} />
-      <Age ms={pr.updatedAtMs} className="text-right" />
-    </Row>
+    <Row
+      section="else"
+      pr={pr}
+      cells={{
+        "#": <Num pr={pr} />,
+        Author: <Author pr={pr} viewer={viewer} />,
+        Title: <Title pr={pr} />,
+        Status: <StatusPill status={status} />,
+        Checks: <ChecksBadge checks={pr.checks} />,
+        Diff: <Diff pr={pr} />,
+        Age: <Age ms={pr.updatedAtMs} className="text-right" />,
+      }}
+    />
   );
 }
 
-/** A merge this week; one not involving the viewer (the project-wide list only) is dimmed. */
+/** A merge this week (its repository is the group label above it); one not involving the viewer (the project-wide list only) is dimmed. */
 export function MergedRow({ row, viewer }: { row: MergedRowModel; viewer: string }) {
   const { pr, involved } = row;
   return (
-    <Row section="merged" pr={pr} className={involved ? undefined : QUIET}>
-      <Lead pr={pr} />
-      <Author pr={pr} viewer={viewer} />
-      <Title pr={pr} />
-      <Diff pr={pr} />
-      <Age ms={pr.mergedAtMs} className="text-right" />
-    </Row>
+    <Row
+      section="merged"
+      pr={pr}
+      className={involved ? undefined : QUIET}
+      cells={{
+        "#": <Num pr={pr} />,
+        Author: <Author pr={pr} viewer={viewer} />,
+        Title: <Title pr={pr} />,
+        Diff: <Diff pr={pr} />,
+        Merged: <Age ms={pr.mergedAtMs} className="text-right" />,
+      }}
+    />
   );
 }
 
-/** A capped project-wide list's last line: how many of GitHub's matches show, and the search there. */
 /**
+ * A capped project-wide list's last line: how many of GitHub's matches show, and the
+ * search there.
+ *
  * An option of the page's listbox like the rows (no button inside it): Enter, click and
  * cmd+click open the search on GitHub (the page's nav item does it).
  */
@@ -254,22 +283,51 @@ function CapFooter({ section, cap }: { section: Section; cap: Cap }) {
   );
 }
 
-/** A bordered table: the column header row, the rows, and the cap footer when GitHub matched more. */
-export function PrTable<T extends { pr: PullRequestView }>({ section, rows, render, cap, className }: { section: Section; rows: readonly T[]; render: (row: T) => ReactNode; cap?: Cap | null; className?: string }) {
-  const head = headers[section];
+/** The sections whose rows are grouped by repository (pageModel's groupByRepo order) under a label row each. */
+const GROUPED: ReadonlySet<Section> = new Set<Section>(["else", "merged"]);
+
+/** A repository's label in a grouped table: its name, its row count, and a hairline to the edge. Not an option. */
+function GroupLabel({ name, count }: { name: string; count: number }) {
   return (
-    <div className={cn("rounded-lg border", className)}>
-      <div className={cn("grid gap-3 border-b px-2 py-1 text-overline", columns[section])}>
-        {head.map((h) => (
-          <span key={h} className={cn(RIGHT.has(h) && "text-right")}>
-            {h}
-          </span>
-        ))}
-      </div>
-      <div className="p-0.5">
-        <RowList rows={rows} rowKey={(r) => prKey(section, r.pr)} rowHeight={ROW_H} render={render} />
-      </div>
-      {cap && <CapFooter section={section} cap={cap} />}
+    <div className="flex h-full items-center gap-2 px-2 pt-1.5 text-label text-cf-text-muted" data-testid="prs-group">
+      <span className="truncate font-medium text-cf-text">{name}</span>
+      <span className="shrink-0 tabular-nums">{count}</span>
+      <span className="h-px flex-1 bg-cf-border" aria-hidden />
     </div>
+  );
+}
+
+/**
+ * A bordered table: the column header row, the rows (under repository labels in a
+ * grouped section), and the cap footer when GitHub matched more. It measures its own
+ * width and shows the columns that fit (visibleColumns), least important dropped first.
+ */
+export function PrTable<T extends { pr: PullRequestView }>({ section, rows, render, cap, className }: { section: Section; rows: readonly T[]; render: (row: T) => ReactNode; cap?: Cap | null; className?: string }) {
+  const [ref, width] = useWidth(1100);
+  // The table's border (1px each side) is not room for the grid.
+  const cols = useMemo(() => visibleColumns(section, width - 2), [section, width]);
+  const shown = useMemo<Shown>(() => ({ cols, template: gridTemplate(cols) }), [cols]);
+  const items = useMemo(() => tableItems(rows, GROUPED.has(section)), [rows, section]);
+  return (
+    <ShownColumns value={shown}>
+      <div ref={ref} className={cn("rounded-lg border", className)} data-columns={cols.join(",")}>
+        <div className="grid gap-3 border-b px-2.5 py-1 text-overline" style={{ gridTemplateColumns: shown.template }}>
+          {cols.map((h) => (
+            <span key={h} className={cn(RIGHT.has(h) && "text-right")}>
+              {h}
+            </span>
+          ))}
+        </div>
+        <div className="p-0.5">
+          <RowList
+            rows={items}
+            rowKey={(it) => (it.kind === "group" ? `group:${section}:${it.slug.toLowerCase()}` : prKey(section, it.row.pr))}
+            rowHeight={ROW_H}
+            render={(it) => (it.kind === "group" ? <GroupLabel name={it.name} count={it.count} /> : render(it.row))}
+          />
+        </div>
+        {cap && <CapFooter section={section} cap={cap} />}
+      </div>
+    </ShownColumns>
   );
 }
