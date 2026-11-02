@@ -10,9 +10,9 @@ export function NavProvider({ value, children }: { value: NavCtx; children: Reac
 /**
  * One navigable row. Click moves the cursor (or activates, with activateOnClick);
  * double-click activates; cmd+click runs onCmdClick when given. The cursor row is
- * highlighted and scrolled into view. A `passive` row has neither click nor hover tint: only
- * the keyboard (and its right-click menu, RowContextMenu) moves the cursor onto it, as on a
- * project page's Checkouts table. `tip` is a hover tooltip for what the row hides (a
+ * highlighted and scrolled into view. A `passive` row has no click (it still tints on hover,
+ * so the pointer finds its right-click menu): only the keyboard (and that menu, RowContextMenu)
+ * moves the cursor onto it, as on a project page's Checkouts table. `tip` is a hover tooltip for what the row hides (a
  * full path); with `tipWhenTruncated` it opens only while the row's text is cut short. The
  * rows are not focusable (the list uses aria-activedescendant), so arrow keys never open it.
  */
@@ -48,7 +48,7 @@ export function NavRow({
       role="option"
       aria-selected={selected}
       data-nav-key={navKey}
-      className={cn("cursor-default rounded-sm", selected ? "bg-cf-control-hover text-cf-text ring-1 ring-cf-focus/40" : !passive && "hover:bg-cf-control-hover/50", className)}
+      className={cn("cursor-default rounded-sm", selected ? "bg-cf-control-hover text-cf-text ring-1 ring-cf-focus/40" : "hover:bg-cf-control-hover/50", className)}
       onClick={
         passive
           ? undefined

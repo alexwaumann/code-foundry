@@ -1,11 +1,12 @@
 import { useShallow } from "zustand/react/shallow";
-import { FolderRoot, Layers } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, FolderRoot, Layers, Split, type LucideIcon } from "lucide-react";
 import { ChecksBadge, PrStateIcon } from "@/components/prs/PrBits";
 import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
+import { cn } from "@/lib/utils";
 import { tildify } from "@/lib/path";
 import { threadLabel } from "@/lib/prompt";
-import { changesCell, checkoutColumns, checkoutHasChanges, checkoutThreads, projectWorktreeKey, syncCell, threadOnCheckout, threadsCell, type CheckoutColumns } from "@/lib/projects";
+import { changesCell, checkoutColumns, checkoutHasChanges, checkoutThreads, projectWorktreeKey, syncState, threadOnCheckout, threadsCell, type CheckoutColumns, type SyncKind } from "@/lib/projects";
 import { threadBadge } from "@/lib/thread";
 import { worktreeBranch } from "@/lib/threadRow";
 import { useWidth } from "@/lib/useWidth";
@@ -28,7 +29,7 @@ interface Column {
   testId: string;
 }
 
-/** Branch takes the room; the others fit their longest usual text ("1 working · 1 idle", "2 to push · 1 behind", a pill with checks). */
+/** Branch takes the room; the others fit their longest usual text ("1 working · 1 idle", "diverged ↑2 ↓1", a pill with checks). */
 function tableColumns(c: CheckoutColumns): Column[] {
   return [
     { label: "Branch", track: "minmax(0,1fr)", testId: "checkouts-col-branch" },
@@ -75,6 +76,27 @@ function PrCell({ pr }: { pr: ReturnType<typeof useBranchPr> }) {
         </Pill>
       </button>
     </Tip>
+  );
+}
+
+/** Each Sync state's colour and icon: done green, to push blue, behind or diverged amber, no upstream muted and bare. */
+const SYNC_LOOK: Record<SyncKind, { tone: string; Icon: LucideIcon | null }> = {
+  none: { tone: "text-cf-text-muted", Icon: null },
+  even: { tone: "text-cf-success-text", Icon: Check },
+  ahead: { tone: "text-cf-info-text", Icon: ArrowUp },
+  behind: { tone: "text-cf-warning-text", Icon: ArrowDown },
+  diverged: { tone: "text-cf-warning-text", Icon: Split },
+};
+
+/** A checkout's Sync cell (lib/projects.ts syncState): no tooltip, its text hides nothing ("diverged ↑2 ↓1"). */
+function SyncCell({ st }: { st: { upstream: string; ahead: number; behind: number } }) {
+  const sync = syncState(st);
+  const { tone, Icon } = SYNC_LOOK[sync.kind];
+  return (
+    <span className={cn("flex min-w-0 items-center gap-1 text-body-sm", tone)} data-testid="worktree-sync" data-sync={sync.kind}>
+      {Icon && <Icon className="size-3.5 shrink-0" aria-hidden />}
+      <span className="truncate">{sync.text}</span>
+    </span>
   );
 }
 
@@ -151,10 +173,12 @@ function CheckoutRow({ projectId, path, columns, template }: { projectId: string
     const st = findWorktree(s, projectId, path)?.status;
     return st ? changesCell(st) : "";
   });
-  const sync = useProjectsStore((s) => {
-    const st = findWorktree(s, projectId, path)?.status;
-    return st ? syncCell(st) : "";
-  });
+  const sync = useProjectsStore(
+    useShallow((s) => {
+      const st = findWorktree(s, projectId, path)?.status;
+      return st ? { upstream: st.upstream, ahead: st.ahead, behind: st.behind } : null;
+    }),
+  );
   const { working, idle, workspaceId } = useThreadsStore(
     useShallow((s) => {
       const t = checkoutThreads(s, path);
@@ -181,11 +205,9 @@ function CheckoutRow({ projectId, path, columns, template }: { projectId: string
         <span className="grid h-full items-center gap-3 px-2 text-body" style={{ gridTemplateColumns: template }} data-testid="project-worktree" data-path={path} data-main={isMain || undefined}>
           <span className="flex min-w-0 items-center gap-2">
             <StatusDot live={working > 0} />
-            <Tip label={tildify(path)} align="start">
-              <span className="min-w-0 truncate text-code" data-testid="worktree-branch">
-                {branch}
-              </span>
-            </Tip>
+            <span className="min-w-0 truncate text-code" data-testid="worktree-branch">
+              {branch}
+            </span>
             {isMain && <MainSignal path={path} />}
             {workspaceId && <WorkspaceSignal workspaceId={workspaceId} path={path} />}
           </span>
@@ -199,11 +221,7 @@ function CheckoutRow({ projectId, path, columns, template }: { projectId: string
               {changes}
             </span>
           )}
-          {columns.sync && (
-            <span className="truncate text-body-sm text-cf-text-secondary" data-testid="worktree-sync">
-              {sync}
-            </span>
-          )}
+          {columns.sync && (sync ? <SyncCell st={sync} /> : <span />)}
           {columns.pr && (
             <span className="flex min-w-0 items-center">
               <PrCell pr={pr} />
@@ -218,9 +236,9 @@ function CheckoutRow({ projectId, path, columns, template }: { projectId: string
 /**
  * The project's checkouts a thread is on (and main; pageHooks.ts useCheckoutOrder), in the
  * Projects index's table grammar: Branch (a FolderRoot on main, Layers on a workspace's
- * checkout) | Threads | Changes | Sync (with a remote) | Pull request (on GitHub). The columns
- * drop by the table's own width (lib/projects.ts checkoutColumns). A row has no click and no
- * hover tint: its right-click menu (menus.ts checkoutMenu) holds what it does, the keyboard's
+ * checkout) | Threads | Changes | Sync (with a remote; SyncCell) | Pull request (on GitHub). The
+ * columns drop by the table's own width (lib/projects.ts checkoutColumns). A row has no click
+ * (it tints on hover): its right-click menu (menus.ts checkoutMenu) holds what it does, the keyboard's
  * ContextMenu key or Shift+F10 opens it on the cursor's row. docs/notes/project-page-2-checkouts.md.
  */
 export function CheckoutsTable({ projectId, paths, remote, github }: { projectId: string; paths: readonly string[]; remote: boolean; github: boolean }) {

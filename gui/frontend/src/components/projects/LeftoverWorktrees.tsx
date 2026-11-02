@@ -4,7 +4,6 @@ import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { holdsWork, lastArchivedOn, leftoverReason, removeCleanLabel } from "@/lib/leftovers";
 import { NavRow } from "@/lib/NavRow";
-import { tildify } from "@/lib/path";
 import { threadLabel } from "@/lib/prompt";
 import { projectWorktreeKey, terminalHolds } from "@/lib/projects";
 import { cn } from "@/lib/utils";
@@ -20,14 +19,16 @@ import { RowContextMenu } from "./RowContextMenu";
 import { RowAction } from "./RowAction";
 import { useCleanableCount } from "./useCleanable";
 
-/** The section's hint, beside its title. */
-const LEFTOVER_HINT = "a thread's worktree goes on its own once its work is on main";
-
 /**
- * Branch (as wide as a usual branch, shrinking first), Why it stayed (the rest; it truncates),
- * and the two 24px icon slots with their 4px gap. No column ever drops.
+ * The table's one set of columns, shared by the header and every row (each a CSS subgrid of
+ * it, SUBGRID): Branch as wide as the longest branch, Why it stayed the rest (at least 10rem;
+ * it truncates), and the two 24px icon slots with their 4px gap. Only a table narrower than
+ * the longest branch plus 10rem cuts the branch (down to 6rem). No column ever drops.
  */
-const TEMPLATE = "minmax(6rem,14rem) minmax(0,1fr) 3.25rem";
+const TEMPLATE = "minmax(6rem,max-content) minmax(10rem,1fr) 3.25rem";
+
+/** A level between the table and a row's cells: it spans the columns and lays its children on them. */
+const SUBGRID = "col-span-full grid grid-cols-subgrid";
 
 /** The last thread archived on the worktree, with its label, read when the menu opens. */
 function archivedOn(path: string): { id: string; name: string } | null {
@@ -38,10 +39,10 @@ function archivedOn(path: string): { id: string; name: string } | null {
 }
 
 /**
- * One leftover: a dot (amber while it holds work, grey when clean), the branch (its path as
- * the tooltip), why it stayed, and at the right Show diff (while it holds work; the slot stays
- * empty otherwise, so the icons line up) and Remove worktree. The row has no click and no
- * hover tint: its right-click menu (menus.ts leftoverMenu) holds the rest.
+ * One leftover: a dot (amber while it holds work, grey when clean), the branch, why it stayed
+ * (in full in a tooltip when cut), and at the right Show diff (while it holds work; the slot
+ * stays empty otherwise, so the icons line up) and Remove worktree. The row has no click (it
+ * tints on hover): its right-click menu (menus.ts leftoverMenu) holds the rest.
  */
 function LeftoverRow({ projectId, path }: { projectId: string; path: string }) {
   const wt = useProjectsStore((s) => findWorktree(s, projectId, path));
@@ -59,16 +60,14 @@ function LeftoverRow({ projectId, path }: { projectId: string; path: string }) {
     return leftoverMenu({ projectId, path, branch: w?.branch ?? "", work: w ? holdsWork(w) : false, archived: archivedOn(path) });
   };
   return (
-    <RowContextMenu navKey={navKey} testId="leftover-menu" items={items} parts={LEFTOVER_MENU_PARTS}>
-      <NavRow navKey={navKey} passive className="h-9 rounded-md">
-        <span className="grid h-full items-center gap-3 px-2 text-body" style={{ gridTemplateColumns: TEMPLATE }} data-testid="leftover-row" data-path={path} data-work={work || undefined}>
+    <RowContextMenu navKey={navKey} testId="leftover-menu" items={items} parts={LEFTOVER_MENU_PARTS} className={SUBGRID}>
+      <NavRow navKey={navKey} passive className={cn(SUBGRID, "h-9 rounded-md")}>
+        <span className={cn(SUBGRID, "h-full items-center px-2 text-body")} data-testid="leftover-row" data-path={path} data-work={work || undefined}>
           <span className="flex min-w-0 items-center gap-2">
             <span className={cn("size-1.5 shrink-0 rounded-full", work ? "bg-cf-warning" : "bg-cf-border-strong")} data-testid="leftover-dot" aria-hidden />
-            <Tip label={tildify(path)} align="start">
-              <span className="min-w-0 truncate text-code" data-testid="leftover-branch">
-                {branch}
-              </span>
-            </Tip>
+            <span className="min-w-0 truncate text-code" data-testid="leftover-branch">
+              {branch}
+            </span>
           </span>
           <Tip label={reason} whenTruncated align="start">
             <span className="min-w-0 truncate text-body-sm text-cf-text-secondary" data-testid="leftover-reason">
@@ -109,7 +108,6 @@ export function LeftoverWorktrees({ projectId, paths }: { projectId: string; pat
       <SectionHeader
         label="Worktrees without threads"
         count={paths.length}
-        detail={LEFTOVER_HINT}
         testId="leftover-title"
         right={
           clean > 0 ? (
@@ -125,13 +123,13 @@ export function LeftoverWorktrees({ projectId, paths }: { projectId: string; pat
           Nothing kept. Every worktree here has a thread.
         </p>
       ) : (
-        <div className="rounded-lg border" data-testid="leftover-table">
-          <div className="grid gap-3 border-b px-2 py-1 text-overline" style={{ gridTemplateColumns: TEMPLATE }} data-testid="leftover-head">
+        <div className="grid gap-x-3 rounded-lg border" style={{ gridTemplateColumns: TEMPLATE }} data-testid="leftover-table">
+          <div className={cn(SUBGRID, "border-b px-2 py-1 text-overline")} data-testid="leftover-head">
             <span className="truncate">Branch</span>
             <span className="truncate">Why it stayed</span>
             <span aria-hidden />
           </div>
-          <div className="p-0.5">
+          <div className={cn(SUBGRID, "p-0.5")}>
             {paths.map((p) => (
               <LeftoverRow key={p} projectId={projectId} path={p} />
             ))}

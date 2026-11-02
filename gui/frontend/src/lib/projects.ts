@@ -324,13 +324,32 @@ export function changesCell(st: Pick<GitStatusView, "staged" | "modified" | "unt
   return plural(n, "file");
 }
 
-/** A checkout's Sync cell against its upstream: "2 to push", "1 behind", both, "up to date", or "not pushed" without one. */
+/** A checkout's Sync text against its upstream: "2 to push", "1 behind", both, "up to date", or "not pushed" without one. */
 export function syncCell(st: Pick<GitStatusView, "upstream" | "ahead" | "behind">): string {
   if (!st.upstream) return "not pushed";
   const parts: string[] = [];
   if (st.ahead > 0) parts.push(`${String(st.ahead)} to push`);
   if (st.behind > 0) parts.push(`${String(st.behind)} behind`);
   return parts.length === 0 ? "up to date" : parts.join(" · ");
+}
+
+/**
+ * How a checkout stands against its upstream, for the Checkouts table's Sync cell: `none`
+ * without one ("not pushed"), `even` ("up to date"), `ahead` ("2 to push"), `behind`
+ * ("1 behind"), or both at once, `diverged` ("diverged ↑2 ↓1": the counts stay in sight).
+ */
+export type SyncKind = "none" | "even" | "ahead" | "behind" | "diverged";
+
+export interface SyncState {
+  kind: SyncKind;
+  text: string;
+}
+
+/** A checkout's Sync state against its upstream (SyncKind). */
+export function syncState(st: Pick<GitStatusView, "upstream" | "ahead" | "behind">): SyncState {
+  if (!st.upstream) return { kind: "none", text: "not pushed" };
+  if (st.ahead > 0 && st.behind > 0) return { kind: "diverged", text: `diverged ↑${String(st.ahead)} ↓${String(st.behind)}` };
+  return { kind: st.ahead > 0 ? "ahead" : st.behind > 0 ? "behind" : "even", text: syncCell(st) };
 }
 
 /** The thread is on the checkout: its own cwd, or one of its set's checkouts (a multi-project thread's member). */

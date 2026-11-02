@@ -18,18 +18,21 @@ function OpenItems<P extends RowMenuPart>({ items, parts, onPick }: { items: () 
  * item runs after the menu has closed and given the keyboard back to the page's list (an item that
  * opens a dialog, the palette or an inline editor then keeps its focus). Entries with a `kind`
  * (submenus, a split item) are drawn by `parts` (docs/notes/project-page-2-checkouts.md).
+ * `className` styles the trigger's wrapper (a subgrid level in a table whose rows share columns).
  */
 export function RowContextMenu<P extends RowMenuPart = never>({
   navKey,
   items,
   parts,
   testId,
+  className,
   children,
 }: {
   navKey: string;
   items: () => readonly RowMenuEntry<P>[];
   parts?: RowMenuParts<P>;
   testId: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   const { setCursor } = useContext(NavContext);
@@ -55,7 +58,7 @@ export function RowContextMenu<P extends RowMenuPart = never>({
       }}
     >
       <ContextMenuTrigger asChild>
-        <div ref={triggerRef} data-row-menu-trigger="">
+        <div ref={triggerRef} data-row-menu-trigger="" className={className}>
           {children}
         </div>
       </ContextMenuTrigger>

@@ -22,7 +22,7 @@ import {
   remoteDetail,
   sortByActivity,
   sortCheckouts,
-  syncCell,
+  syncState,
   threadActivityMs,
   threadsCell,
   workspaceActivity,
@@ -393,14 +393,14 @@ describe("checkout cells", () => {
   ])("changes: %s", (_name, st, want) => {
     expect(changesCell(st)).toBe(want);
   });
-  it.each<[string, { upstream: string; ahead: number; behind: number }, string]>([
-    ["up to date", { upstream: "origin/x", ahead: 0, behind: 0 }, "up to date"],
-    ["to push", { upstream: "origin/x", ahead: 2, behind: 0 }, "2 to push"],
-    ["behind", { upstream: "origin/x", ahead: 0, behind: 1 }, "1 behind"],
-    ["both", { upstream: "origin/x", ahead: 2, behind: 1 }, "2 to push · 1 behind"],
-    ["no upstream", { upstream: "", ahead: 0, behind: 0 }, "not pushed"],
+  it.each<[string, { upstream: string; ahead: number; behind: number }, ReturnType<typeof syncState>]>([
+    ["up to date", { upstream: "origin/x", ahead: 0, behind: 0 }, { kind: "even", text: "up to date" }],
+    ["to push", { upstream: "origin/x", ahead: 2, behind: 0 }, { kind: "ahead", text: "2 to push" }],
+    ["behind", { upstream: "origin/x", ahead: 0, behind: 1 }, { kind: "behind", text: "1 behind" }],
+    ["both: diverged with both counts in sight", { upstream: "origin/x", ahead: 2, behind: 1 }, { kind: "diverged", text: "diverged ↑2 ↓1" }],
+    ["no upstream (counts ignored)", { upstream: "", ahead: 3, behind: 0 }, { kind: "none", text: "not pushed" }],
   ])("sync: %s", (_name, st, want) => {
-    expect(syncCell(st)).toBe(want);
+    expect(syncState(st)).toEqual(want);
   });
   it("checkoutThreads: own cwd or a set member's checkout, archived left out, the first workspace", () => {
     const ts = slice({
