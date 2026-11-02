@@ -7,8 +7,20 @@ afterEach(cleanup);
 
 /** Fakes the trigger's layout: jsdom has none, so nothing overflows unless told. */
 function overflow(el: HTMLElement, cut: boolean) {
+  layout(el, { clip: true, scrollWidth: cut ? 180 : 100 });
+}
+
+/**
+ * Fakes an element's box: 100 x 18 px, its content `scrollWidth` x `scrollHeight` (default
+ * the box), clipped (overflow hidden, like truncate) or not.
+ */
+function layout(el: HTMLElement, { clip, scrollWidth = 100, scrollHeight = 18 }: { clip: boolean; scrollWidth?: number; scrollHeight?: number }) {
   Object.defineProperty(el, "clientWidth", { configurable: true, value: 100 });
-  Object.defineProperty(el, "scrollWidth", { configurable: true, value: cut ? 180 : 100 });
+  Object.defineProperty(el, "clientHeight", { configurable: true, value: 18 });
+  Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+  Object.defineProperty(el, "scrollHeight", { configurable: true, value: scrollHeight });
+  el.style.overflowX = clip ? "hidden" : "visible";
+  el.style.overflowY = clip ? "hidden" : "visible";
 }
 
 describe("Tip", () => {
@@ -94,6 +106,25 @@ describe("Tip", () => {
     );
     overflow(screen.getByTestId("inner"), true);
     expect(tooltipText(screen.getByRole("button"))).toBe("main ← feat/long-branch");
+  });
+
+  it.each<[string, { clip: boolean; scrollWidth?: number; scrollHeight?: number }, string | null]>([
+    // The live app at 110% zoom: a value that fits reads a pixel over its box both ways.
+    ["fits under a page zoom (a pixel over both ways): stays closed", { clip: true, scrollWidth: 101, scrollHeight: 19 }, null],
+    ["cut by more than the zoom's pixel: opens", { clip: true, scrollWidth: 102 }, "a-very-long-name"],
+    ["a clamped second line (taller than its box): opens", { clip: true, scrollHeight: 36 }, "a-very-long-name"],
+    ["overflows without clipping (all of it shows): stays closed", { clip: false, scrollWidth: 180, scrollHeight: 36 }, null],
+  ])("whenTruncated, %s", (_name, box, want) => {
+    render(
+      <Tip label="a-very-long-name" whenTruncated>
+        <button type="button" className="truncate">
+          a-very-long-name
+        </button>
+      </Tip>,
+    );
+    const b = screen.getByRole("button");
+    layout(b, box);
+    expect(tooltipText(b)).toBe(want);
   });
 
   it.each([
