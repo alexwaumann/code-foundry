@@ -10,6 +10,9 @@ import { tooltipText } from "@/test/tooltip";
 import { HeaderActions } from "./HeaderActions";
 import { ThreadTitle } from "./ThreadParts";
 
+vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
+const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
+
 const thread = (id: string, o: Partial<ThreadView> = {}) =>
   ({ id, name: `Thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], pendingWorktreePath: "", createdBy: "", createdByName: "", parentId: "", checkoutPaths: [], flags: [], ...o }) as ThreadView;
 const PROJECT = (id: string) => ({ id, name: id, git: true, githubSlug: "", remotes: [], worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
@@ -26,24 +29,37 @@ beforeEach(() => {
   useProjectsStore.setState({ byId: { web: PROJECT("web"), api: PROJECT("api") } as never, order: ["web", "api"] });
   useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "platform", members: [] } } as never, order: ["w-1"] });
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+  resetDaemon();
 });
 
 afterEach(cleanup);
 
 describe("the thread header's crumb", () => {
-  it.each<[string, Partial<ThreadView>, string, string]>([
-    ["one project", {}, "folder", "web"],
-    ["a named workspace", { workspaceId: "w-1", projectIds: ["web", "api"] }, "layers", "platform"],
-    ["an unnamed set", { projectIds: ["web", "api"] }, "folders", "web +1"],
-    ["no project", { projectId: "", projectIds: [], worktreePath: "/Users/me" }, "house", "No project"],
-  ])("%s: its icon and place, then the title", (_n, o, icon, label) => {
+  it.each<[string, Partial<ThreadView>, string, string, Record<string, string> | null]>([
+    ["one project: its page", {}, "folder", "web", { project: "web" }],
+    ["a named workspace: its page", { workspaceId: "w-1", projectIds: ["web", "api"] }, "layers", "platform", { workspace: "w-1" }],
+    ["a workspace thread in the workspace's folder: its page", { workspaceId: "w-1", projectId: "", worktreePath: "/ws/platform", projectIds: ["web", "api"] }, "layers", "platform", { workspace: "w-1" }],
+    ["an unnamed set: the primary project's page", { projectId: "api", worktreePath: "/src/api", projectIds: ["web", "api"] }, "folders", "api +1", { project: "api" }],
+    ["no project: plain text", { projectId: "", projectIds: [], worktreePath: "/Users/me" }, "house", "No project", null],
+    ["a removed project: plain text", { projectId: "gone", worktreePath: "/src/gone", projectIds: ["gone"] }, "folder", "gone", null],
+  ])("%s", async (_n, o, icon, label, args) => {
     show(o);
     expect(crumb().dataset.icon).toBe(icon);
     expect(screen.getByTestId("thread-crumb-place").textContent).toBe(label);
     expect(screen.queryByTestId("thread-crumb-parent")).toBeNull();
-    // The place is text, not a button.
-    expect(crumb().querySelector("button")).toBeNull();
     expect(screen.getByTestId("thread-title-name").textContent).toBe("Thread s-1");
+    const link = screen.queryByTestId("thread-crumb-place-link");
+    if (args === null) {
+      // Plain text: no button in the crumb.
+      expect(crumb().querySelector("button")).toBeNull();
+      return;
+    }
+    expect(link?.textContent).toBe(label);
+    fireEvent.click(link as HTMLElement);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(invocationsOf("view.projects").map((i) => i.args)).toEqual([args]);
   });
 
   it("a child: the place, then its parent, which opens on a click", () => {

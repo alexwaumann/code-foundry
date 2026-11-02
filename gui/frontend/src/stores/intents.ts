@@ -153,7 +153,7 @@ export function applyIntent(intent: UiIntentView): void {
         break;
       }
       clearPendingFocus();
-      showView(intent.name);
+      showView(intent.name, intent.params);
       break;
     case "playAlertSound":
       // notifications.test: a preview, whatever the focus, cooldown and sound toggle.

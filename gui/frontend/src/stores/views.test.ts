@@ -196,6 +196,17 @@ describe("showView", () => {
     expect(useViewsStore.getState().settingsOpen).toBe(false);
   });
 
+  it.each([
+    ["project", { project: "r1" }, { kind: "view", name: "projects", projectId: "r1" }],
+    ["workspace", { workspace: "w-1" }, { kind: "view", name: "projects", workspaceId: "w-1" }],
+  ])("\"projects\" with a %s param selects that page (view.projects --project / --workspace)", (_kind, params, want) => {
+    useUiStore.setState({ selection: { kind: "thread", id: "a" } });
+    useViewsStore.setState({ settingsOpen: true, helpOpen: false });
+    expect(showView("projects", params)).toBe(true);
+    expect(useUiStore.getState().selection).toEqual(want);
+    expect(useViewsStore.getState().settingsOpen).toBe(false);
+  });
+
   it("\"dashboard\" (removed, docs/notes/remove-dashboard.md) is an unknown name: ignored", () => {
     useUiStore.setState({ selection: { kind: "thread", id: "a" } });
     useViewsStore.setState({ settingsOpen: true, helpOpen: false });

@@ -87,7 +87,8 @@ export type UiIntentView =
    * A named view, or a panel action. `threadId` (a view.panel.* verb run inside a thread)
    * scopes a panel action to that thread's panel, whatever the window has selected
    * (stores/threadPanelIntent.ts); absent, it acts on the selection. `params` name the
-   * item a panel action opens ("panel.file" path and line, "panel.diff", "panel.pr").
+   * item a panel action opens ("panel.file" path and line, "panel.diff", "panel.pr"),
+   * or which page a page shows ("projects": `project` or `workspace`, view.projects).
    */
   | { kind: "showView"; name: string; threadId?: string; params?: Record<string, string> }
   | { kind: "playAlertSound"; volume: number }
@@ -133,8 +134,7 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
     }
     case "showView": {
       const { name, threadId, params } = e.value;
-      if (!threadId) return { kind: "showView", name };
-      return Object.keys(params).length > 0 ? { kind: "showView", name, threadId, params: { ...params } } : { kind: "showView", name, threadId };
+      return { kind: "showView", name, ...(threadId ? { threadId } : {}), ...(Object.keys(params).length > 0 ? { params: { ...params } } : {}) };
     }
     case "playAlertSound":
       return { kind: "playAlertSound", volume: e.value.volume };

@@ -5,6 +5,7 @@
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
+import { ArgType } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource } from "../src/gen/codefoundry/v1/events_pb";
 import {
   CheckConclusion,
@@ -555,13 +556,18 @@ export function viewCommands(emit: (intent: IntentInit) => number) {
         name: "view.projects",
         title: "Show Projects",
         category: "View",
-        description: "Show the Projects page: each project's worktrees and each workspace's members",
+        description: "Show the Projects page: each project's worktrees and each workspace's members; --project or --workspace opens that one's page",
         keybindings: ["cmd+shift+j"],
-        args: [],
+        args: [
+          { name: "project", type: ArgType.STRING, required: false, description: "Open this project's page" },
+          { name: "workspace", type: ArgType.STRING, required: false, description: "Open this workspace's page" },
+        ],
       },
       when: () => true,
-      run: () => {
-        emit({ intent: { case: "showView", value: { name: "projects" } } });
+      run: (_ctx: unknown, a: Record<string, string> = {}) => {
+        // Like the daemon: which page in the ShowView's params (the ids as given; the mock resolves no names).
+        const params: Record<string, string> = a.project ? { project: a.project } : a.workspace ? { workspace: a.workspace } : {};
+        emit({ intent: { case: "showView", value: { name: "projects", params } } });
         return "";
       },
     },
