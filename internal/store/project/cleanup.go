@@ -29,50 +29,66 @@ const FreshFor = 10 * time.Minute
 // Live threads, running terminals and workspace membership are the other half; the
 // project store does not know them (CleanupOptions.Hold).
 func CleanupVerdict(w Worktree, now time.Time) (removable bool, reason string) {
-	return cleanupVerdict(w, now, false)
+	removable, reason, _ = cleanupJudge(w, now, false)
+	return removable, reason
 }
+
+// CleanupKind is why the merged rule removes a worktree, for a short label.
+type CleanupKind int
+
+const (
+	// KindOther: another rule (CleanupOptions.Verdict), or kept.
+	KindOther CleanupKind = iota
+	// KindMerged: its branch is in the base.
+	KindMerged
+	// KindSquashMerged: a rebased or squash-merged copy of its changes is in the base.
+	KindSquashMerged
+	// KindNoCommits: no commits since it was made.
+	KindNoCommits
+)
 
 // AbandonedReason is the reason an abandoned worktree (CleanupOptions.Abandoned) with
 // no commits since it was made goes.
 const AbandonedReason = "no commits since it was made; its threads are archived or removed"
 
-// cleanupVerdict is CleanupVerdict; abandoned lifts the FreshFor rule (a worktree whose
-// threads are all archived or removed: none of them will commit).
-func cleanupVerdict(w Worktree, now time.Time, abandoned bool) (removable bool, reason string) {
+// cleanupJudge is CleanupVerdict with the kind of a removable verdict; abandoned lifts
+// the FreshFor rule (a worktree whose threads are all archived or removed: none of them
+// will commit).
+func cleanupJudge(w Worktree, now time.Time, abandoned bool) (removable bool, reason string, kind CleanupKind) {
 	st := w.Status
 	switch {
 	case w.IsMain:
-		return false, "main worktree"
+		return false, "main worktree", KindOther
 	case !w.Managed:
-		return false, NotManagedReason
+		return false, NotManagedReason, KindOther
 	case w.Detached || w.Branch == "":
-		return false, "detached HEAD"
+		return false, "detached HEAD", KindOther
 	case st.Error != "":
-		return false, "git status failed: " + st.Error
+		return false, "git status failed: " + st.Error, KindOther
 	case st.RefreshedAt.IsZero():
-		return false, "git status not read yet"
+		return false, "git status not read yet", KindOther
 	case st.Operation != "":
-		return false, st.Operation + " in progress"
+		return false, st.Operation + " in progress", KindOther
 	case st.HasUncommitted():
-		return false, UncommittedReason
+		return false, UncommittedReason, KindOther
 	case st.BaseRef == "":
-		return false, "no remote default branch to compare with"
+		return false, "no remote default branch to compare with", KindOther
 	case justMade(w, now) && !abandoned:
-		return false, "no commits yet, made less than " + strconv.Itoa(int(FreshFor/time.Minute)) + " minutes ago"
+		return false, "no commits yet, made less than " + strconv.Itoa(int(FreshFor/time.Minute)) + " minutes ago", KindOther
 	case justMade(w, now) && st.BaseAhead == 0:
-		return true, AbandonedReason
+		return true, AbandonedReason, KindNoCommits
 	case st.BaseAhead > 0 && st.BaseMerged:
-		return true, "a rebased or squash-merged copy is in " + st.BaseRef
+		return true, "a rebased or squash-merged copy is in " + st.BaseRef, KindSquashMerged
 	case st.BaseAhead > 0:
 		n := "commits"
 		if st.BaseAhead == 1 {
 			n = "commit"
 		}
-		return false, strconv.Itoa(st.BaseAhead) + " " + n + " not in " + st.BaseRef
+		return false, strconv.Itoa(st.BaseAhead) + " " + n + " not in " + st.BaseRef, KindOther
 	case w.CreatedHead != "" && w.Head == w.CreatedHead:
-		return true, "no commits since it was made"
+		return true, "no commits since it was made", KindNoCommits
 	}
-	return true, "branch is in " + st.BaseRef
+	return true, "branch is in " + st.BaseRef, KindMerged
 }
 
 // justMade: w was made less than FreshFor before now and HEAD has not moved since (or
@@ -145,10 +161,6 @@ type CleanupOptions struct {
 	// DryRun evaluates the current snapshot only: no refresh, nothing removed, and
 	// Removed lists what would be.
 	DryRun bool
-	// Force also removes the worktrees kept only for their uncommitted changes (every
-	// other CleanupVerdict condition passes and Hold has nothing), with `git worktree
-	// remove --force`, deleting those changes. It relaxes no other condition.
-	Force bool
 	// Hold returns why something outside git keeps w (a live thread runs in it, a
 	// terminal is open there, a workspace has it), or "". It is asked right before each
 	// removal. Nil: nothing holds a worktree.
@@ -171,9 +183,9 @@ type CleanupOptions struct {
 type CleanupItem struct {
 	Worktree Worktree
 	Reason   string
-	// Uncommitted: kept only for its uncommitted changes (Force removes it), or, when
-	// removed, removed with Force and its uncommitted changes with it.
-	Uncommitted bool
+	// Kind is Reason's kind for a removed worktree under the merged rule; KindOther
+	// otherwise.
+	Kind CleanupKind
 }
 
 // CleanupResult is what Cleanup did.
@@ -186,9 +198,9 @@ type CleanupResult struct {
 // Cleanup removes the worktrees of a project whose work is already in its default branch
 // (CleanupVerdict removable and no Hold): it refreshes the project's status (reconcile, base,
 // every worktree; callers that want fresh remote refs fetch first), re-evaluates each
-// worktree, and removes it with RemoveWorktree, not forced unless opts.Force and only
-// for a worktree kept for its uncommitted changes alone, so git itself still refuses a
-// clean worktree that changed meanwhile. Branches are never deleted. A failed
+// worktree, and removes it with RemoveWorktree, never forced, so git itself still
+// refuses a clean worktree that changed meanwhile. A worktree with uncommitted work is
+// kept: removing it is an explicit RemoveWorktree. Branches are never deleted. A failed
 // removal is a skip with git's error as the reason, not an error. Without a Path the
 // main worktree is left out of Skipped.
 func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, error) {
@@ -224,29 +236,22 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 		if opts.Path == "" && w.IsMain {
 			continue
 		}
-		verdict := opts.Verdict
-		if verdict == nil {
-			abandoned := opts.Abandoned != nil && opts.Abandoned(w)
-			verdict = func(w Worktree, at time.Time) (bool, string) { return cleanupVerdict(w, at, abandoned) }
+		var (
+			removable bool
+			reason    string
+			kind      CleanupKind
+		)
+		if opts.Verdict != nil {
+			removable, reason = opts.Verdict(w, now())
+		} else {
+			removable, reason, kind = cleanupJudge(w, now(), opts.Abandoned != nil && opts.Abandoned(w))
 		}
-		removable, reason := verdict(w, now())
-		// Kept for its uncommitted changes alone: with them set aside every other
-		// condition passes.
-		uncommitted := false
-		if !removable && w.Status.HasUncommitted() {
-			if ok, why := verdict(withoutUncommitted(w), now()); ok {
-				uncommitted = true
-				if opts.Force {
-					removable, reason = true, why
-				}
-			}
-		}
-		if (removable || uncommitted) && opts.Hold != nil {
+		if removable && opts.Hold != nil {
 			if held := opts.Hold(w); held != "" {
-				removable, reason, uncommitted = false, held, false
+				removable, reason, kind = false, held, KindOther
 			}
 		}
-		item := CleanupItem{Worktree: w, Reason: reason, Uncommitted: uncommitted}
+		item := CleanupItem{Worktree: w, Reason: reason, Kind: kind}
 		if !removable {
 			res.Skipped = append(res.Skipped, item)
 			continue
@@ -255,7 +260,7 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 			if opts.Removing != nil {
 				opts.Removing(ctx, w)
 			}
-			if err := s.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path, Force: uncommitted}); err != nil {
+			if err := s.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path}); err != nil {
 				if ctx.Err() != nil {
 					return res, ctx.Err()
 				}

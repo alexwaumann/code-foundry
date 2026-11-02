@@ -1,5 +1,6 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
+  CleanupKind,
   ProjectService,
   type GitStatus,
   type Project,
@@ -201,4 +202,62 @@ export async function listRefs(projectId: string, conn: DaemonConnection = daemo
   } catch (err) {
     throw orOutdatedDaemon(err);
   }
+}
+
+/** Why a cleanup removes a worktree, in a few words (the dialog's right column). */
+export type CleanupKindView = "merged" | "squash-merged" | "no commits" | "";
+
+/** A worktree project.worktree.cleanup would remove (ProjectService.CleanupWorktrees dry_run). */
+export interface CleanupRowView {
+  path: string;
+  /** Its branch, else its directory's name. */
+  branch: string;
+  kind: CleanupKindView;
+  /** The base its work is in ("origin/main"); "" when unknown. */
+  baseRef: string;
+}
+
+function toCleanupKind(k: CleanupKind): CleanupKindView {
+  switch (k) {
+    case CleanupKind.MERGED:
+      return "merged";
+    case CleanupKind.SQUASH_MERGED:
+      return "squash-merged";
+    case CleanupKind.NO_COMMITS:
+      return "no commits";
+    default:
+      return "";
+  }
+}
+
+/**
+ * What project.worktree.cleanup would remove now (ProjectService.CleanupWorktrees with
+ * dry_run: the daemon's snapshot, before the fetch the command runs). `path` narrows it
+ * to one worktree.
+ */
+export async function previewCleanup(project: string, path = "", conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<CleanupRowView[]> {
+  const c = await conn.client(ProjectService);
+  const res = await c.cleanupWorktrees({ project, path, dryRun: true }, { signal });
+  return res.removed.map((r) => {
+    const w = r.worktree;
+    const p = w?.path ?? "";
+    return { path: p, branch: w?.branch || p.slice(p.lastIndexOf("/") + 1), kind: toCleanupKind(r.kind), baseRef: w?.status?.baseRef ?? "" };
+  });
+}
+
+/** The branches (else directory names) a project.worktree.cleanup result removed, from its JSON (CleanupWorktreesResponse). */
+export function removedByCleanup(resultJson: string): string[] {
+  let v: unknown;
+  try {
+    v = JSON.parse(resultJson || "null");
+  } catch {
+    return [];
+  }
+  const removed = (v as { removed?: { worktree?: { branch?: unknown; path?: unknown } }[] } | null)?.removed;
+  if (!Array.isArray(removed)) return [];
+  return removed.map((r) => {
+    const branch = typeof r.worktree?.branch === "string" ? r.worktree.branch : "";
+    const path = typeof r.worktree?.path === "string" ? r.worktree.path : "";
+    return branch || path.slice(path.lastIndexOf("/") + 1);
+  });
 }

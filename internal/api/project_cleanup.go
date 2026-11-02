@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 
 	"connectrpc.com/connect"
 
@@ -27,25 +29,48 @@ func (h *Project) WithCleanupAbandoned(abandoned func(project.Worktree) bool, re
 }
 
 // CleanupWorktrees removes the project's merged, clean, unheld worktrees
-// (project.Cleanup), or with dry_run lists them.
+// (project.Cleanup), or with dry_run lists them. It reports only what it removed: with
+// a path, a worktree it kept fails the call (FailedPrecondition, with why); a dry run
+// with a path lists nothing for it instead (the real run fetches first and may differ).
 func (h *Project) CleanupWorktrees(ctx context.Context, req *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
 	r, err := workspace.ResolveProject(h.store.Snapshot(), req.Msg.GetProject())
 	if err != nil {
 		return nil, workspaceError(err)
 	}
 	res, err := project.Cleanup(ctx, h.store, project.CleanupOptions{
-		ProjectID: r.ID, Path: req.Msg.GetPath(), DryRun: req.Msg.GetDryRun(), Force: req.Msg.GetForce(), Hold: h.cleanupHold,
+		ProjectID: r.ID, Path: req.Msg.GetPath(), DryRun: req.Msg.GetDryRun(), Hold: h.cleanupHold,
 		Abandoned: h.cleanupAbandoned, Removing: h.cleanupRemoving,
 	})
 	if err != nil {
 		return nil, projectError(err)
 	}
+	if req.Msg.GetPath() != "" && !req.Msg.GetDryRun() && len(res.Removed) == 0 && len(res.Skipped) > 0 {
+		s := res.Skipped[0]
+		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("%s was not removed: %s", cleanupLabel(s.Worktree), s.Reason))
+	}
 	out := &v1.CleanupWorktreesResponse{ProjectId: res.ProjectID}
 	for _, w := range res.Removed {
-		out.Removed = append(out.Removed, &v1.RemovedWorktree{Worktree: worktreeToProto(w.Worktree), Reason: w.Reason, Uncommitted: w.Uncommitted})
-	}
-	for _, s := range res.Skipped {
-		out.Skipped = append(out.Skipped, &v1.SkippedWorktree{Worktree: worktreeToProto(s.Worktree), Reason: s.Reason, Uncommitted: s.Uncommitted})
+		out.Removed = append(out.Removed, &v1.RemovedWorktree{Worktree: worktreeToProto(w.Worktree), Reason: w.Reason, Kind: cleanupKindToProto(w.Kind)})
 	}
 	return connect.NewResponse(out), nil
+}
+
+// cleanupLabel names a worktree in a cleanup error: its branch, else its directory.
+func cleanupLabel(w project.Worktree) string {
+	if w.Branch != "" {
+		return w.Branch
+	}
+	return filepath.Base(w.Path)
+}
+
+func cleanupKindToProto(k project.CleanupKind) v1.CleanupKind {
+	switch k {
+	case project.KindMerged:
+		return v1.CleanupKind_CLEANUP_KIND_MERGED
+	case project.KindSquashMerged:
+		return v1.CleanupKind_CLEANUP_KIND_SQUASH_MERGED
+	case project.KindNoCommits:
+		return v1.CleanupKind_CLEANUP_KIND_NO_COMMITS
+	}
+	return v1.CleanupKind_CLEANUP_KIND_UNSPECIFIED
 }

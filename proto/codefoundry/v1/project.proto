@@ -327,21 +327,36 @@ message CleanupWorktreesRequest {
   // Evaluate the current snapshot only: nothing is refreshed or removed, and removed
   // lists what would be.
   bool dry_run = 3;
-  // Also remove the worktrees kept only for their uncommitted changes (every other
-  // condition of the rule passes and nothing holds them), deleting those changes
-  // (`git worktree remove --force`). It relaxes no other condition.
-  bool force = 4;
+  // Was force: removing the worktrees kept only for their uncommitted changes. A
+  // worktree with uncommitted work is never cleaned up; remove it with RemoveWorktree.
+  reserved 4;
+  reserved "force";
 }
 
 message CleanupWorktreesResponse {
   string project_id = 1;
   // Was the removed worktrees without their reasons.
   reserved 2;
+  // Was the worktrees kept, with why: a cleanup reports only what it removed. With a
+  // path, a worktree that is not removed fails the call (FailedPrecondition, with why).
+  reserved 3;
+  reserved "skipped";
   // Removed worktrees (their state just before removal), in the project's order, with
   // why each could go. With dry_run, the ones that would be.
   repeated RemovedWorktree removed = 4;
-  // Worktrees kept, with why. Without a path the main worktree is not listed.
-  repeated SkippedWorktree skipped = 3;
+}
+
+// Why a cleanup could remove a worktree, for a short label ("merged", "squash-merged",
+// "no commits").
+enum CleanupKind {
+  // A rule other than the merged one (an archived thread's worktree).
+  CLEANUP_KIND_UNSPECIFIED = 0;
+  // Its branch is in origin/<default>.
+  CLEANUP_KIND_MERGED = 1;
+  // A rebased or squash-merged copy of its changes is in origin/<default>.
+  CLEANUP_KIND_SQUASH_MERGED = 2;
+  // No commits since it was made.
+  CLEANUP_KIND_NO_COMMITS = 3;
 }
 
 message RemovedWorktree {
@@ -349,18 +364,11 @@ message RemovedWorktree {
   // Why it could go: "branch is in origin/main", "no commits since it was made", "a
   // rebased or squash-merged copy is in origin/main".
   string reason = 2;
-  // Removed with force: its uncommitted changes were deleted with it (or would be).
-  bool uncommitted = 3;
-}
-
-message SkippedWorktree {
-  Worktree worktree = 1;
-  // Why it was kept, e.g. "uncommitted changes", "2 commits not in origin/main",
-  // "not a Code Foundry worktree", "no commits yet, made less than 10 minutes ago",
-  // "thread fix-x is on it"; or the removal's error.
-  string reason = 2;
-  // Kept only for its uncommitted changes: CleanupWorktreesRequest.force removes it.
-  bool uncommitted = 3;
+  // Was uncommitted: removed with force.
+  reserved 3;
+  reserved "uncommitted";
+  // reason as a kind.
+  CleanupKind kind = 4;
 }
 
 // UncommittedWork is the error detail (with FailedPrecondition) of a worktree removal

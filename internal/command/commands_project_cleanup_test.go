@@ -19,8 +19,8 @@ func cleanWt(branch, path string) *v1.Worktree {
 }
 
 // cleanupFixture is a registry with project.worktree.cleanup over fakes sharing one call
-// log. Project r1 ("proj", origin) has main at /p and the worktrees a (merged) and b
-// (unmerged); r2 ("local") has no remote.
+// log. Project r1 ("proj", origin) has main at /p; r2 ("local") has no remote. dry and
+// real are what the dry and the real cleanup answer.
 func cleanupFixture(t *testing.T, dry, real *v1.CleanupWorktreesResponse) (*command.Registry, *commandtest.Calls, *commandtest.Project, *commandtest.GitOps) {
 	t.Helper()
 	shared := &commandtest.Calls{}
@@ -59,8 +59,7 @@ const inMain = "branch is in origin/main"
 
 func TestProjectCleanupArgsAndFlow(t *testing.T) {
 	merged := cleanWt("cf/a", "/wt/a")
-	unmerged := &v1.Worktree{ProjectId: "r1", Branch: "cf/b", Path: "/wt/b"}
-	dry := &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: []*v1.RemovedWorktree{{Worktree: merged, Reason: inMain}}, Skipped: []*v1.SkippedWorktree{{Worktree: unmerged, Reason: "1 commit not in origin/main"}}}
+	dry := &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: []*v1.RemovedWorktree{{Worktree: merged, Reason: inMain, Kind: v1.CleanupKind_CLEANUP_KIND_MERGED}}}
 	tests := []struct {
 		name    string
 		ctx     command.Context
@@ -74,31 +73,24 @@ func TestProjectCleanupArgsAndFlow(t *testing.T) {
 	}{
 		{
 			name: "project by name, every worktree", args: map[string]string{"project": "proj"},
-			real:    &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: dry.Removed, Skipped: dry.Skipped},
+			real:    &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: []*v1.RemovedWorktree{dry.Removed[0], {Worktree: cleanWt("cf/c", "/wt/c"), Reason: inMain}}},
 			wantSeq: []string{"CleanupWorktreesRequest", "ListProjectsRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
 			wantReq: &v1.CleanupWorktreesRequest{Project: "proj"},
-			wantMsg: "Removed 1 worktree: cf/a (branch is in origin/main); kept 1 worktree: cf/b (1 commit not in origin/main)",
+			wantMsg: "Removed 2 worktrees: cf/a, cf/c",
 		},
 		{
 			name: "repo from the context, one path", ctx: command.Context{ActiveProjectID: "r1"}, args: map[string]string{"path": "/wt/a"},
 			real:    &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: dry.Removed},
 			wantSeq: []string{"CleanupWorktreesRequest", "ListProjectsRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
 			wantReq: &v1.CleanupWorktreesRequest{Project: "r1", Path: "/wt/a"},
-			wantMsg: "Removed 1 worktree: cf/a (branch is in origin/main)",
-		},
-		{
-			name: "after the fetch it is no longer merged", args: map[string]string{"project": "r1", "path": "/wt/a"},
-			real:    &v1.CleanupWorktreesResponse{ProjectId: "r1", Skipped: []*v1.SkippedWorktree{{Worktree: merged, Reason: "2 commits not in origin/main"}}},
-			wantSeq: []string{"CleanupWorktreesRequest", "ListProjectsRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
-			wantReq: &v1.CleanupWorktreesRequest{Project: "r1", Path: "/wt/a"},
-			wantMsg: "Nothing removed; kept 1 worktree: cf/a (2 commits not in origin/main)",
+			wantMsg: "Removed 1 worktree: cf/a",
 		},
 		{
 			name: "no origin: no fetch", args: map[string]string{"project": "local"},
 			real:    &v1.CleanupWorktreesResponse{ProjectId: "r2"},
 			wantSeq: []string{"CleanupWorktreesRequest", "ListProjectsRequest", "CleanupWorktreesRequest"},
 			wantReq: &v1.CleanupWorktreesRequest{Project: "local"},
-			wantMsg: "No worktrees to clean up",
+			wantMsg: "No merged worktrees to remove",
 		},
 		{name: "project is required", args: map[string]string{}, wantErr: "project"},
 		{name: "unknown project: nothing fetched", args: map[string]string{"project": "nope"}, wantErr: "not registered", wantSeq: []string{"CleanupWorktreesRequest"}},
@@ -153,18 +145,14 @@ func TestProjectCleanupFetchFailureRemovesNothing(t *testing.T) {
 	}
 }
 
-// The prompt without --yes is the dry run in full: every worktree that would go and
-// every one kept, with branch, path and why.
-func TestProjectCleanupConfirmListsWhatGoesAndStays(t *testing.T) {
+// The prompt without --yes lists what would go, each with a short why; nothing about
+// what stays.
+func TestProjectCleanupConfirmListsWhatGoes(t *testing.T) {
 	a, b, c := cleanWt("cf/a", "/wt/a"), cleanWt("cf/b", "/wt/b"), cleanWt("cf/c", "/wt/c")
-	hand := &v1.Worktree{ProjectId: "r1", Branch: "by-hand", Path: "/wt/by-hand"}
 	removed := []*v1.RemovedWorktree{
-		{Worktree: a, Reason: inMain},
-		{Worktree: b, Reason: "a rebased or squash-merged copy is in origin/main"},
-	}
-	kept := []*v1.SkippedWorktree{
-		{Worktree: c, Reason: "no commits yet, made less than 10 minutes ago"},
-		{Worktree: hand, Reason: "not a Code Foundry worktree"},
+		{Worktree: a, Reason: inMain, Kind: v1.CleanupKind_CLEANUP_KIND_MERGED},
+		{Worktree: b, Reason: "a rebased or squash-merged copy is in origin/main", Kind: v1.CleanupKind_CLEANUP_KIND_SQUASH_MERGED},
+		{Worktree: c, Reason: "no commits since it was made", Kind: v1.CleanupKind_CLEANUP_KIND_NO_COMMITS},
 	}
 	tests := []struct {
 		name string
@@ -174,33 +162,24 @@ func TestProjectCleanupConfirmListsWhatGoesAndStays(t *testing.T) {
 	}{
 		{
 			name: "every worktree", args: map[string]string{"project": "proj"},
-			dry: &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: removed, Skipped: kept},
-			want: "Fetch, then remove 2 worktrees (branches are kept; each is checked again after the fetch):\n" +
-				"- cf/a at /wt/a: branch is in origin/main\n" +
-				"- cf/b at /wt/b: a rebased or squash-merged copy is in origin/main\n" +
-				"Keep 2:\n" +
-				"- cf/c at /wt/c: no commits yet, made less than 10 minutes ago\n" +
-				"- by-hand at /wt/by-hand: not a Code Foundry worktree",
+			dry: &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: removed},
+			want: "Remove 3 merged worktrees? Their work is already in origin/main. Branches are kept.\n" +
+				"- cf/a (merged)\n" +
+				"- cf/b (squash-merged)\n" +
+				"- cf/c (no commits)",
 		},
 		{
-			name: "nothing removable yet", args: map[string]string{"project": "proj"},
-			dry: &v1.CleanupWorktreesResponse{ProjectId: "r1", Skipped: kept[1:]},
-			want: "Fetch and remove the worktrees Code Foundry made whose work is in the default branch? None would be removed now; each is checked again after the fetch.\n" +
-				"Keep 1:\n" +
-				"- by-hand at /wt/by-hand: not a Code Foundry worktree",
+			name: "one worktree", args: map[string]string{"project": "proj"},
+			dry:  &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: removed[1:2]},
+			want: "Remove the merged worktree cf/b? Its work is already in origin/main. The branch is kept.",
 		},
 		{
 			name: "one path that goes", args: map[string]string{"project": "proj", "path": "/wt/a"},
 			dry:  &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: removed[:1]},
-			want: "Remove the worktree of cf/a at /wt/a (branch is in origin/main)? The branch is kept. It is checked again after a fetch.",
+			want: "Remove the merged worktree cf/a? Its work is already in origin/main. The branch is kept.",
 		},
 		{
-			name: "one path that stays", args: map[string]string{"project": "proj", "path": "/wt/c"},
-			dry:  &v1.CleanupWorktreesResponse{ProjectId: "r1", Skipped: kept[:1]},
-			want: "Fetch and check the worktree of cf/c at /wt/c again? Right now it is kept: no commits yet, made less than 10 minutes ago.",
-		},
-		{
-			name: "no worktrees at all", args: map[string]string{"project": "proj"},
+			name: "nothing removable yet", args: map[string]string{"project": "proj"},
 			dry:  &v1.CleanupWorktreesResponse{ProjectId: "r1"},
 			want: "Fetch proj and remove the worktrees Code Foundry made whose work is already in the default branch? Branches are kept.",
 		},
