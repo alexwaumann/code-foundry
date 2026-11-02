@@ -318,6 +318,17 @@ func TestRankWords(t *testing.T) {
 		{"extra spaces are ignored", "  comp   tsx ", []string{
 			"gui/frontend/src/components/compose/Composer.tsx", "gui/frontend/src/components/Thread.tsx",
 		}},
+		{"one word", "comp", []string{
+			"internal/compose/compose.go",                      // base prefix
+			"docs/notes/composer-tags-1.md",                    // base prefix, longer
+			"gui/frontend/src/components/compose/Composer.tsx", // base prefix, longest
+			"gui/frontend/src/components/Thread.tsx",           // path, the shorter
+			"gui/frontend/src/components/compose/Tags.ts",
+		}},
+		{"a repeated word ranks as the word once", "comp COMP", []string{
+			"internal/compose/compose.go", "docs/notes/composer-tags-1.md", "gui/frontend/src/components/compose/Composer.tsx",
+			"gui/frontend/src/components/Thread.tsx", "gui/frontend/src/components/compose/Tags.ts",
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -460,6 +471,26 @@ func TestRankSources(t *testing.T) {
 			name:    "one source: the name is not used, every word must match the path",
 			sources: []Source{gh}, query: "ghostty tree",
 		},
+		{
+			name:    "a repeated project word: a run of two",
+			sources: []Source{cf, gh}, query: "ghostty Ghostty tree",
+			want: []hit{
+				{src: 1, path: "src/tree.zig", pathPos: []int{4, 5, 6, 7}, namePos: []int{0, 1, 2, 3, 4, 5, 6}, pathPosOK: true},
+				{src: 0, path: "docs/ghostty-tree.md"},
+				{src: 1, path: "src/subtree/x.zig"},
+			},
+		},
+		{
+			name:    "a repeated path word in the name stays on the path",
+			sources: []Source{cf, gh}, query: "tree tree",
+			// "tree" fits neither name, so both copies match the path, as "tree" does.
+			want: []hit{
+				{src: 1, path: "src/tree.zig", pathPos: []int{4, 5, 6, 7}, pathPosOK: true},
+				{src: 0, path: "internal/tree/tree.go"},
+				{src: 0, path: "docs/ghostty-tree.md"},
+				{src: 1, path: "src/subtree/x.zig"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -482,5 +513,41 @@ func TestRankSources(t *testing.T) {
 				t.Fatalf("truncated = %v, want %v", truncated, tt.wantTruncated)
 			}
 		})
+	}
+}
+
+// TestRankSourcesBestSplit checks RankSources' per-path score cache (lazy, shared by
+// repeated words) against the definition: the best ScoreWords over the source's Splits.
+func TestRankSourcesBestSplit(t *testing.T) {
+	sources := []Source{
+		{Name: "code-foundry", Paths: []string{"README.md", "internal/tree/tree.go", "docs/ghostty-tree.md", "src/index.ts", "src/Code.go"}},
+		{Name: "ghostty-playground", Paths: []string{"README.md", "src/tree.zig", "src/subtree/x.zig", "build.zig", "ſrc/a.go"}},
+	}
+	queries := []string{
+		"tree", "tree tree", "TREE tree", "ghostty tree", "ghostty ghostty tree tree", "code code", "gh zig tree zig",
+		"s ſ", "src ſrc", "readme gp gp", "code foundry code", "a a a a a a a a", "tree zz tree", "o o",
+	}
+	for _, q := range queries {
+		words := Words(q)
+		want := map[[2]int]int{}
+		for si, src := range sources {
+			for i, p := range src.Paths {
+				for _, sp := range Splits(words, src.Name, true) {
+					want[[2]int{si, i}] = max(want[[2]int{si, i}], ScoreWords(p, words[sp.Lo:sp.Hi]))
+				}
+				if want[[2]int{si, i}] == 0 {
+					delete(want, [2]int{si, i})
+				}
+			}
+		}
+		hits, _ := RankSources(sources, q, 0)
+		if len(hits) != len(want) {
+			t.Fatalf("RankSources(%q): %d hits, want %d", q, len(hits), len(want))
+		}
+		for _, h := range hits {
+			if w := want[[2]int{h.Source, h.Index}]; h.Score != w {
+				t.Fatalf("RankSources(%q) %s: score %d, want %d", q, sources[h.Source].Paths[h.Index], h.Score, w)
+			}
+		}
 	}
 }

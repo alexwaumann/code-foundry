@@ -98,8 +98,14 @@ and lower the tier sum), so no name letters are bold.
 * Every word in the name (`code foundry`) still needs one on the path, so it matches
   nothing in code-foundry rather than everything.
 * Cost: each word is scored once per path (cached across splits, lazily, so a word that
-  misses ends the one-source case at once); the at most 2n-1 splits only combine those
-  scores.
+  misses ends the one-source case at once; a repeated word, `tree tree`, shares its first
+  copy's score); the at most 2n-1 splits only combine those scores.
+* At most 8 words (`fuzzy.MaxWords`); more is InvalidArgument, from the daemon and the
+  mock. The splits make the cost grow faster than the word count: 256 one-letter words
+  took 17 s over three 50,000-path checkouts. `BenchmarkRankSources` (M3 Pro, three
+  checkouts of 50,000 paths): `composer` 35 ms, `comp tsx` 34 ms, `src comp tsx` 48 ms,
+  eight distinct one-letter words 165 ms, `s` eight times 100 ms. One checkout is about a
+  third of that, and one word is as fast as before the word split.
 
 Rejected: any word anywhere may go to the name (cheap now that words score independently,
 but a short path word like `src` fits `resources` far more often than it means the

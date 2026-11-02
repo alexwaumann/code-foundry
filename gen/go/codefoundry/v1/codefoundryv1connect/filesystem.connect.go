@@ -97,8 +97,8 @@ type FilesystemServiceClient interface {
 	// as if "tree" had been typed there.
 	//
 	// An unknown project is NotFound; a path outside the home directory, a source without
-	// a project, both sources and project_id/path, or more than 16 sources is
-	// InvalidArgument.
+	// a project, both sources and project_id/path, more than 16 sources, or a query of
+	// more than 8 words is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
 	// ReadFile reads one file for the file viewer. path is absolute, or relative to
 	// base_dir (a thread's worktree, or the home directory); "~/" is the home
@@ -249,8 +249,8 @@ type FilesystemServiceHandler interface {
 	// as if "tree" had been typed there.
 	//
 	// An unknown project is NotFound; a path outside the home directory, a source without
-	// a project, both sources and project_id/path, or more than 16 sources is
-	// InvalidArgument.
+	// a project, both sources and project_id/path, more than 16 sources, or a query of
+	// more than 8 words is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
 	// ReadFile reads one file for the file viewer. path is absolute, or relative to
 	// base_dir (a thread's worktree, or the home directory); "~/" is the home

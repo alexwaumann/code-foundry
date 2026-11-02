@@ -197,6 +197,8 @@ func TestFilesystemSearchFiles(t *testing.T) {
 		{name: "missing checkout", req: &v1.SearchFilesRequest{ProjectId: "p", Path: filepath.Join(root, "gone")}, code: connect.CodeNotFound},
 		{name: "a file is not a checkout", req: &v1.SearchFilesRequest{ProjectId: "p", Path: filepath.Join(root, "proj", "README.md")}, code: connect.CodeInvalidArgument},
 		{name: "negative limit", req: &v1.SearchFilesRequest{ProjectId: "p", Limit: -1}, code: connect.CodeInvalidArgument},
+		{name: "eight words", req: &v1.SearchFilesRequest{ProjectId: "p", Query: "i n d e x t s s"}, want: []string{"src/index.ts"}},
+		{name: "nine words", req: &v1.SearchFilesRequest{ProjectId: "p", Query: "i n d e x t s s s"}, code: connect.CodeInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

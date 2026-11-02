@@ -670,8 +670,8 @@ export const FilesystemService: GenService<{
    * as if "tree" had been typed there.
    *
    * An unknown project is NotFound; a path outside the home directory, a source without
-   * a project, both sources and project_id/path, or more than 16 sources is
-   * InvalidArgument.
+   * a project, both sources and project_id/path, more than 16 sources, or a query of
+   * more than 8 words is InvalidArgument.
    *
    * @generated from rpc codefoundry.v1.FilesystemService.SearchFiles
    */

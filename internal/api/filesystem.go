@@ -16,6 +16,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
+	"github.com/alexwaumann/code-foundry/internal/fuzzy"
 	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
@@ -129,6 +130,9 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("set sources or project_id and path, not both"))
 	case len(named) > fsx.MaxSearchSources:
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%d sources, at most %d", len(named), fsx.MaxSearchSources))
+	}
+	if n := len(fuzzy.Words(msg.GetQuery())); n > fuzzy.MaxWords {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("query has %d words, at most %d", n, fuzzy.MaxWords))
 	}
 	type source struct{ projectID, checkout string }
 	var srcs []fsx.Source

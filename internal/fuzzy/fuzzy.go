@@ -217,6 +217,13 @@ func isBoundary[T byte | rune](c T) bool {
 // Words splits a query into the words RankSources matches one by one: at whitespace.
 func Words(query string) []string { return strings.Fields(query) }
 
+// MaxWords bounds the words of one query (callers refuse more). Each distinct word is
+// scored against every path and each of up to 2·MaxWords-1 splits combines its words,
+// so the cost grows with the word count: over three 50,000-path checkouts (M3 Pro,
+// BenchmarkRankSources) three words take about 50 ms, eight one-letter words that
+// match almost every path 170 ms, and 256 of them took 17 s before this bound.
+const MaxWords = 8
+
 // ScoreWords rates path against words that must all match it, each on its own (Score,
 // in any order, overlapping allowed). Zero when one doesn't; higher is better. The
 // weakest word's tier dominates, so a path where every word lands in the base name
@@ -339,7 +346,19 @@ func RankSources(sources []Source, query string, limit int) (hits []Hit, truncat
 		split int // into splits[Source]: the one that scored the path
 	}
 	splits := make([][]Split, len(sources))
-	scores := make([]int, len(words)) // per path: Score of each word, -1 until needed
+	// first[w]: the first word that lower-cases like words[w] (so scores the same), whose
+	// Score it shares: "tree tree" scores one word per path. Not EqualFold: "ſ" folds to
+	// "s" but does not lower to it.
+	first := make([]int, len(words))
+	seen := map[string]int{}
+	for w, word := range words {
+		lw := strings.ToLower(word)
+		if _, ok := seen[lw]; !ok {
+			seen[lw] = w
+		}
+		first[w] = seen[lw]
+	}
+	scores := make([]int, len(words)) // per path: Score of each first word, -1 until needed
 	var out []scored
 	for si, src := range sources {
 		splits[si] = Splits(words, src.Name, len(sources) > 1)
@@ -350,7 +369,7 @@ func RankSources(sources []Source, query string, limit int) (hits []Hit, truncat
 			best, which := 0, 0
 			for k, sp := range splits[si] {
 				s := combine(sp.Hi-sp.Lo, func(j int) int {
-					w := sp.Lo + j
+					w := first[sp.Lo+j]
 					if scores[w] < 0 {
 						scores[w] = Score(p, words[w])
 					}

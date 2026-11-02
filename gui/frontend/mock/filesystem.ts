@@ -285,6 +285,8 @@ export interface SearchRequest {
 }
 
 const MAX_SOURCES = 16;
+/** internal/fuzzy MaxWords: a query of more words is InvalidArgument. */
+const MAX_WORDS = 8;
 const BOUNDARY_BONUS = 4;
 const NONE = -(2 ** 30);
 
@@ -458,6 +460,8 @@ export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, re
   if (named.length === 0) named = [{ projectId: req.projectId, path: req.path }];
   else if (req.projectId !== "" || req.path !== "") throw invalid("set sources or project_id and path, not both");
   else if (named.length > MAX_SOURCES) throw invalid(`${String(named.length)} sources, at most ${String(MAX_SOURCES)}`);
+  const words = queryWords(query);
+  if (words.length > MAX_WORDS) throw invalid(`query has ${String(words.length)} words, at most ${String(MAX_WORDS)}`);
   const sources: { project: CompletionProject; checkout: string }[] = [];
   for (const n of named) {
     const project = completionCheckout(projects, n.projectId, n.path);
@@ -465,7 +469,6 @@ export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, re
     if (!sources.some((s) => s.checkout === checkout)) sources.push({ project, checkout });
   }
   completionCalls.push(`search ${sources.map((s) => s.project.id).join(",")} ${query}`);
-  const words = queryWords(query);
   const depth = (p: string) => p.split("/").length;
   const hits = sources.flatMap((src, si) => {
     const splits = querySplits(words, src.project.name, sources.length > 1);
