@@ -56,3 +56,30 @@ test("a member's actions (Start here) are hidden at rest and shown on hover", as
 // while on its first turn, steer once idle) and an unregistered member opening nothing (a registered
 // one its Changes tab): WorkspacePage.test.tsx. The daemon's focus intent selecting a new thread is
 // src/stores/intents.test.ts's; a Changes tab drawn in a page's panel is e2e/projects.spec.ts's.
+
+// The ⋯'s items and what its Open in list runs: WorkspacePage.test.tsx. Left: the split item drawn
+// in a dropdown (not a context menu) hovers as two blocks, the › block the item's last 32px.
+test("the page ⋯'s Open in Finder is the split item: › block at full height, its submenu on hover there, a click on its text reveals", async ({ page }) => {
+  const { mono } = await twoWorkspaces();
+  await openApp(page);
+  await openWorkspacePage(page, mono);
+  await page.getByTestId("workspace-page-more").click();
+  const split = page.getByTestId("workspace-menu-reveal");
+  const more = page.getByTestId("workspace-menu-reveal-more");
+  const geo = await more.evaluate((e) => {
+    const item = e.closest('[role="menuitem"]') as HTMLElement;
+    const a = getComputedStyle(e, "::after");
+    const ib = item.getBoundingClientRect();
+    const mb = e.getBoundingClientRect();
+    return { w: a.width, h: a.height, itemH: `${String(item.offsetHeight)}px`, position: getComputedStyle(item).position, inside: mb.right <= ib.right && mb.left >= ib.left };
+  });
+  expect(geo).toEqual({ w: "32px", h: geo.itemH, itemH: geo.itemH, position: "relative", inside: true });
+  await split.hover({ position: { x: 20, y: 8 } });
+  await expect(page.getByTestId("workspace-menu-reveal-menu")).toHaveCount(0);
+  await more.hover();
+  await expect(page.getByTestId("workspace-menu-reveal-menu")).toBeVisible();
+  await split.hover({ position: { x: 20, y: 8 } });
+  await expect(page.getByTestId("workspace-menu-reveal-menu")).toHaveCount(0);
+  await split.click({ position: { x: 20, y: 8 } });
+  await expect(page.getByTestId("workspace-page-more-menu")).toHaveCount(0);
+});
