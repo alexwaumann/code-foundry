@@ -2,6 +2,7 @@ package gh
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -28,17 +29,23 @@ func TestProjectSections(t *testing.T) {
 		slugs      []string
 		wantOpen   string
 		wantMerged string
+		// github.com's syntax (SearchURL): an OR group, since its search ANDs repo:s.
+		wantWebOpen, wantWebMerged string
 	}{
 		{name: "nothing tracked", login: "@me"},
 		{
 			name: "one repository", login: "@me", slugs: []string{"o/r"},
-			wantOpen:   "is:pr is:open archived:false repo:o/r -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc",
-			wantMerged: "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 repo:o/r sort:updated-desc",
+			wantOpen:      "is:pr is:open archived:false repo:o/r -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc",
+			wantMerged:    "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 repo:o/r sort:updated-desc",
+			wantWebOpen:   "is:pr is:open archived:false repo:o/r -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc",
+			wantWebMerged: "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 repo:o/r sort:updated-desc",
 		},
 		{
 			name: "several repositories, search as a login", login: "mitchellh", slugs: []string{"a/one", "a/two", "b/three"},
-			wantOpen:   "is:pr is:open archived:false repo:a/one repo:a/two repo:b/three -author:mitchellh -reviewed-by:mitchellh -review-requested:mitchellh sort:updated-desc",
-			wantMerged: "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 repo:a/one repo:a/two repo:b/three sort:updated-desc",
+			wantOpen:      "is:pr is:open archived:false repo:a/one repo:a/two repo:b/three -author:mitchellh -reviewed-by:mitchellh -review-requested:mitchellh sort:updated-desc",
+			wantMerged:    "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 repo:a/one repo:a/two repo:b/three sort:updated-desc",
+			wantWebOpen:   "is:pr is:open archived:false (repo:a/one OR repo:a/two OR repo:b/three) -author:mitchellh -reviewed-by:mitchellh -review-requested:mitchellh sort:updated-desc",
+			wantWebMerged: "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 (repo:a/one OR repo:a/two OR repo:b/three) sort:updated-desc",
 		},
 	}
 	for _, tt := range tests {
@@ -59,6 +66,9 @@ func TestProjectSections(t *testing.T) {
 			}
 			if merged.name != sectionProjectMerged || merged.query != tt.wantMerged || merged.first != searchFirstProjectMerged || merged.checks {
 				t.Errorf("merged = %+v\nwant query %s", merged, tt.wantMerged)
+			}
+			if open.webQuery != tt.wantWebOpen || merged.webQuery != tt.wantWebMerged {
+				t.Errorf("web queries = %q, %q\nwant %q, %q", open.webQuery, merged.webQuery, tt.wantWebOpen, tt.wantWebMerged)
 			}
 			// ISSUE ORs repeated repo: qualifiers; ISSUE_ADVANCED ANDs them and silently
 			// finds nothing (verified against GitHub 2026-11-02).
@@ -117,12 +127,13 @@ func TestProjectListSearchURL(t *testing.T) {
 		query, want string
 	}{
 		{"", ""},
-		{"is:pr is:open repo:o/r -author:@me sort:updated-desc",
-			"https://github.com/search?q=is%3Apr+is%3Aopen+repo%3Ao%2Fr+-author%3A%40me+sort%3Aupdated-desc&type=pullrequests"},
+		{"is:pr is:open (repo:o/r OR repo:o/s) -author:@me sort:updated-desc",
+			"https://github.com/search?q=is%3Apr+is%3Aopen+%28repo%3Ao%2Fr+OR+repo%3Ao%2Fs%29+-author%3A%40me+sort%3Aupdated-desc&type=pullrequests"},
 		{"merged:>=2026-10-26T12:30:00+01:00", "https://github.com/search?q=merged%3A%3E%3D2026-10-26T12%3A30%3A00%2B01%3A00&type=pullrequests"},
 	}
 	for _, tt := range tests {
-		if got := (ProjectList{Query: tt.query}).SearchURL(); got != tt.want {
+		// The URL is built from WebQuery, never from the API's Query.
+		if got := (ProjectList{Query: "is:pr", WebQuery: tt.query}).SearchURL(); got != tt.want {
 			t.Errorf("SearchURL(%q) = %s, want %s", tt.query, got, tt.want)
 		}
 	}
@@ -341,17 +352,36 @@ func TestPollProjects(t *testing.T) {
 	}
 }
 
-// The lists come back from the cache after a restart.
+// The lists come back from the cache after a restart, with the last cycle's fetch time
+// and merged window even when that cycle changed nothing (the full row is written only
+// on a change).
 func TestPollProjectsCache(t *testing.T) {
 	db := openTestDB(t)
 	g, _ := projectsWorld()
 	f := (&fakeRunner{}).serve(g)
-	s := startStore(t, testOptions(db, f, nil))
+	s, err := New(context.Background(), testOptions(db, f, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); _ = s.Run(ctx) }()
 	if err := s.Track("o/r"); err != nil {
 		t.Fatal(err)
 	}
-	pollOnce(t, s, f)
+	waitFor(t, "projects", func() bool { return !s.Snapshot().Projects.FetchedAt.IsZero() })
+	first := s.Snapshot().Projects.FetchedAt
+	waitFor(t, "a later cycle", func() bool {
+		pollOnce(t, s, f)
+		return s.Snapshot().Projects.FetchedAt.After(first)
+	})
+	cancel()
+	<-done
 	want := s.Snapshot().Projects
+	full, _, err := loadActivityRow[ProjectPullRequests](context.Background(), s.cache, activityProjects)
+	if err != nil || !full.FetchedAt.Before(want.FetchedAt) {
+		t.Fatalf("full row fetched %v (err %v), want older than the last cycle's %v", full.FetchedAt, err, want.FetchedAt)
+	}
 
 	s2, err := New(context.Background(), testOptions(db, f, nil))
 	if err != nil {
@@ -359,8 +389,49 @@ func TestPollProjectsCache(t *testing.T) {
 	}
 	got := s2.Snapshot().Projects
 	if prNumbers(got.Open.PullRequests) != prNumbers(want.Open.PullRequests) || got.Merged.Total != want.Merged.Total ||
-		got.Open.Query != want.Open.Query || !got.FetchedAt.Equal(want.FetchedAt) || got.Open.PullRequests[0].Additions != 412 {
-		t.Errorf("cached projects = %+v, want %+v", got, want)
+		got.Open.Query != want.Open.Query || got.Merged.Query != want.Merged.Query || got.Merged.WebQuery != want.Merged.WebQuery ||
+		!got.FetchedAt.Equal(want.FetchedAt) || got.Open.PullRequests[0].Additions != 412 {
+		t.Errorf("cached projects = %+v\nwant %+v", got, want)
+	}
+}
+
+// The dashboard poll owns the mergeability recheck of a pull request it holds: when
+// GitHub settles between its detail fetch and the projects', the projects request must
+// not consume the recheck, or the dashboard's copy stays UNKNOWN (and the projects' copy,
+// resolved from it, with it).
+func TestPollProjectsLeaveDashboardRechecks(t *testing.T) {
+	g := newFakeGitHub()
+	t0 := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	g.setRepo("o/r", &fakeRepo{branch: "main", sha: "m1"})
+	p := fakePR("PR_z", "o/r", 9, t0)
+	p.Author, p.ReviewRequests = "someone", []string{"octocat"}
+	p.Mergeable, p.MergeStateStatus = MergeableUnknown, "UNKNOWN"
+	g.addPR(p, sectionReview, sectionProjectOpen) // index lag: in both
+	f := &fakeRunner{}
+	details := 0
+	f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+		data, err := g.respond(op, doc, vars)
+		if op == "PullRequestDetails" {
+			if details++; details == 1 {
+				// Settled right after the dashboard's fetch saw UNKNOWN.
+				g.edit("PR_z", func(p *PullRequest) { p.Mergeable, p.MergeStateStatus = MergeableMergeable, "CLEAN" })
+			}
+		}
+		return data, err
+	})
+	s := startStore(t, testOptions(openTestDB(t), f, nil))
+	if err := s.Track("o/r"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "projects", func() bool { return len(s.Snapshot().Projects.Open.PullRequests) == 1 })
+	for range 3 {
+		pollOnce(t, s, f)
+	}
+	if d := s.Snapshot().Dashboard.ReviewRequested; len(d) != 1 || d[0].MergeStateStatus != "CLEAN" {
+		t.Errorf("dashboard copy = %+v, want CLEAN", d)
+	}
+	if o := s.Snapshot().Projects.Open.PullRequests; len(o) != 1 || o[0].MergeStateStatus != "CLEAN" || o[0].Mergeable != MergeableMergeable {
+		t.Errorf("projects copy = %+v, want CLEAN", o)
 	}
 }
 

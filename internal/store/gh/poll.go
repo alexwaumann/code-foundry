@@ -645,6 +645,19 @@ func knownPullRequests(d Dashboard, b *branchStates) map[string]PullRequest {
 // with reviews lacking their commits (a cache from before they were fetched), or GitHub
 // was still computing its mergeability.
 func (s *Store) needsDetail(k PullRequest, ok bool, f prFingerprint) bool {
+	if fingerprintNeedsDetail(k, ok, f) {
+		return true
+	}
+	if s.recheck[f.ID] > 0 {
+		s.recheck[f.ID]--
+		return true
+	}
+	return false
+}
+
+// fingerprintNeedsDetail is needsDetail without the mergeability recheck: what the
+// fingerprint and the stored copy alone say.
+func fingerprintNeedsDetail(k PullRequest, ok bool, f prFingerprint) bool {
 	switch {
 	case !ok || k.Partial:
 		return true
@@ -656,9 +669,6 @@ func (s *Store) needsDetail(k PullRequest, ok bool, f prFingerprint) bool {
 		return true // summary only (it was closed when fetched)
 	case f.State == PullRequestOpen && len(k.LatestReviews) > 0 && !k.ReviewCommits:
 		return true // reviews cached before their commits were fetched
-	case s.recheck[f.ID] > 0:
-		s.recheck[f.ID]--
-		return true
 	}
 	return false
 }

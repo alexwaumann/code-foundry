@@ -337,7 +337,7 @@ function projectLists(t0: number, merged: PullRequestView[]): Pick<DashboardView
     pr(GP_SLUG, 11, "ci: cache the zig toolchain", { author: "someone", headRef: "ci-cache", mergedAgoMs: 5 * DAY, ageMs: 5 * DAY, additions: 22, deletions: 4, changedFiles: 1 }),
   ].sort((a, b) => (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0));
   const url = (q: string) => `https://github.com/search?${new URLSearchParams({ q, type: "pullrequests" }).toString()}`;
-  const repos = `repo:${SLUG} repo:${GP_SLUG}`;
+  const repos = `(repo:${SLUG} OR repo:${GP_SLUG})`; // github.com ANDs repeated repo: qualifiers
   const since = `${new Date(t0 - 7 * DAY).toISOString().slice(0, 19)}+00:00`;
   return {
     projectOpen: { pullRequests: open, totalCount: open.length, searchUrl: url(`is:pr is:open archived:false ${repos} -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc`) },

@@ -42,14 +42,16 @@ type ProjectList struct {
 	Total int `json:"total"`
 	// Query is the search that produced the list ("" before the first fetch).
 	Query string `json:"query,omitempty"`
+	// WebQuery is the same search in github.com's syntax (webRepos), for SearchURL.
+	WebQuery string `json:"webQuery,omitempty"`
 }
 
 // SearchURL is the list's search on github.com ("" when there is no query).
 func (l ProjectList) SearchURL() string {
-	if l.Query == "" {
+	if l.WebQuery == "" {
 		return ""
 	}
-	return "https://github.com/search?q=" + url.QueryEscape(l.Query) + "&type=pullrequests"
+	return "https://github.com/search?q=" + url.QueryEscape(l.WebQuery) + "&type=pullrequests"
 }
 
 // ProjectPullRequests are the project-wide lists. Both are empty while nothing is
@@ -74,18 +76,41 @@ func projectSections(login string, slugs []string, now time.Time) []searchSectio
 	if len(slugs) == 0 {
 		return nil
 	}
-	var repos strings.Builder
-	for _, slug := range slugs {
-		repos.WriteString("repo:" + slug + " ")
-	}
 	since := now.Add(-recentlyMergedWindow).Format(searchTimeLayout)
-	return []searchSection{
-		{name: sectionProjectOpen, typ: "ISSUE", first: searchFirstProjectOpen, checks: true,
-			query: "is:pr is:open archived:false " + repos.String() +
-				"-author:" + login + " -reviewed-by:" + login + " -review-requested:" + login + " sort:updated-desc"},
-		{name: sectionProjectMerged, typ: "ISSUE", first: searchFirstProjectMerged,
-			query: "is:pr is:merged merged:>=" + since + " " + repos.String() + "sort:updated-desc"},
+	open := func(repos string) string {
+		return "is:pr is:open archived:false " + repos + " -author:" + login + " -reviewed-by:" + login +
+			" -review-requested:" + login + " sort:updated-desc"
 	}
+	merged := func(repos string) string {
+		return "is:pr is:merged merged:>=" + since + " " + repos + " sort:updated-desc"
+	}
+	api, web := apiRepos(slugs), webRepos(slugs)
+	return []searchSection{
+		{name: sectionProjectOpen, typ: "ISSUE", first: searchFirstProjectOpen, checks: true, query: open(api), webQuery: open(web)},
+		{name: sectionProjectMerged, typ: "ISSUE", first: searchFirstProjectMerged, query: merged(api), webQuery: merged(web)},
+	}
+}
+
+// apiRepos is the repository part of a type ISSUE search: repeated repo: qualifiers,
+// which it ORs.
+func apiRepos(slugs []string) string { return strings.Join(repoQualifiers(slugs), " ") }
+
+// webRepos is the repository part of the same search on github.com, whose search
+// (like ISSUE_ADVANCED) ANDs repeated repo: qualifiers: an explicit OR group, or the
+// one qualifier.
+func webRepos(slugs []string) string {
+	if len(slugs) == 1 {
+		return "repo:" + slugs[0]
+	}
+	return "(" + strings.Join(repoQualifiers(slugs), " OR ") + ")"
+}
+
+func repoQualifiers(slugs []string) []string {
+	out := make([]string, len(slugs))
+	for i, slug := range slugs {
+		out[i] = "repo:" + slug
+	}
+	return out
 }
 
 // projectSlugs are the tracked repositories as GitHub names them now (a renamed one's
@@ -156,6 +181,14 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 	// Details through the poll's flow: what the dashboards, the branches and the last
 	// project lists hold is reused while its fingerprint holds.
 	known := knownPullRequests(s.Snapshot().Dashboard, &s.branches)
+	// The pull requests the dashboards and branch lists hold were resolved by this
+	// cycle's poll, which owns their mergeability rechecks: here they are refetched only
+	// when the fingerprint says so, and a fetch leaves their recheck counts alone, so the
+	// two copies cannot settle apart (one refetched, the other left UNKNOWN).
+	held := map[string]int{}
+	for id := range known {
+		held[id] = s.recheck[id]
+	}
 	for _, l := range []ProjectList{prev.Open, prev.Merged} {
 		for _, p := range l.PullRequests {
 			if _, ok := known[p.ID]; !ok && p.ID != "" {
@@ -176,13 +209,21 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 	s.staleFullDetails(fps)
 	s.markMovedDetails(fps, known)
 	for _, f := range fps {
-		if k, ok := known[f.ID]; s.needsDetail(k, ok, f) {
+		k, ok := known[f.ID]
+		if _, dash := held[f.ID]; dash && fingerprintNeedsDetail(k, ok, f) || !dash && s.needsDetail(k, ok, f) {
 			need = append(need, f)
 		}
 	}
 	fetched, detailErr := s.fetchDetails(ctx, need)
 	if ctx.Err() != nil {
 		return
+	}
+	for _, f := range need {
+		if n, dash := held[f.ID]; dash && n > 0 {
+			s.recheck[f.ID] = n
+		} else if dash {
+			delete(s.recheck, f.ID)
+		}
 	}
 
 	next := prev
@@ -197,7 +238,8 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 			errs = append(errs, x.name+": "+r.Err.Error())
 			continue // keep the last good list
 		}
-		*x.list = ProjectList{PullRequests: resolveFingerprints(r.PRs, fetched, known), Total: r.Total, Query: plan.section(x.name).query}
+		sec := plan.section(x.name)
+		*x.list = ProjectList{PullRequests: resolveFingerprints(r.PRs, fetched, known), Total: r.Total, Query: sec.query, WebQuery: sec.webQuery}
 	}
 	if detailErr != nil {
 		errs = append(errs, "pull request details: "+detailErr.Error())
@@ -206,28 +248,55 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 	s.setProjects(ctx, next)
 }
 
-// setProjects stores the project lists; on a change it writes the cache and publishes
-// DashboardUpdated.
-func (s *Store) setProjects(ctx context.Context, next ProjectPullRequests) {
-	var changed bool
-	s.updateSnapshot(func(n *Snapshot) {
-		changed = !sameProjects(n.Projects, next)
-		n.Projects = next
-	})
-	if !changed {
+// projectsFetchedRow is the "projects_fetched" row, written every cycle (the full
+// "projects" row only on a change): what moves without the lists changing, so a
+// restart shows the last fetch's time and merged:>= window.
+type projectsFetchedRow struct {
+	FetchedAt time.Time   `json:"fetchedAt"`
+	Merged    ProjectList `json:"merged"` // queries only
+}
+
+// apply moves p's fetch time and merged queries to the row's when it is newer.
+func (r projectsFetchedRow) apply(p *ProjectPullRequests) {
+	if p.FetchedAt.IsZero() || !r.FetchedAt.After(p.FetchedAt) {
 		return
 	}
-	if err := s.cache.saveActivity(ctx, activityProjects, next.FetchedAt, next); err != nil {
-		s.log.Warn("gh cache write failed", "err", err)
+	p.FetchedAt = r.FetchedAt
+	if r.Merged.Query != "" {
+		p.Merged.Query, p.Merged.WebQuery = r.Merged.Query, r.Merged.WebQuery
 	}
-	publish(s, DashboardUpdated{FetchedAt: s.Snapshot().Dashboard.FetchedAt})
+}
+
+// setProjects stores the project lists and their fetch time; on a change it writes the
+// lists and publishes DashboardUpdated.
+func (s *Store) setProjects(ctx context.Context, next ProjectPullRequests) {
+	var changed, moved bool
+	s.updateSnapshot(func(n *Snapshot) {
+		changed = !sameProjects(n.Projects, next)
+		moved = !n.Projects.FetchedAt.Equal(next.FetchedAt)
+		n.Projects = next
+	})
+	if changed {
+		if err := s.cache.saveActivity(ctx, activityProjects, next.FetchedAt, next); err != nil {
+			s.log.Warn("gh cache write failed", "err", err)
+		}
+	}
+	if changed || moved {
+		row := projectsFetchedRow{FetchedAt: next.FetchedAt, Merged: ProjectList{Query: next.Merged.Query, WebQuery: next.Merged.WebQuery}}
+		if err := s.cache.saveActivity(ctx, activityProjectsFetched, next.FetchedAt, row); err != nil {
+			s.log.Warn("gh cache write failed", "err", err)
+		}
+	}
+	if changed {
+		publish(s, DashboardUpdated{FetchedAt: s.Snapshot().Dashboard.FetchedAt})
+	}
 }
 
 // sameProjects compares everything clients see except the fetch time and the merged
 // search's query, whose merged:>= moves with every fetch.
 func sameProjects(a, b ProjectPullRequests) bool {
 	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
-	a.Merged.Query, b.Merged.Query = "", ""
+	a.Merged.Query, b.Merged.Query, a.Merged.WebQuery, b.Merged.WebQuery = "", "", "", ""
 	return a.LastError == b.LastError && sameJSON(a, b)
 }
 

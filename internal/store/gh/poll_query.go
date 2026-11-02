@@ -51,6 +51,8 @@ type searchSection struct {
 	first int
 	// checks selects the check fingerprint (open lists); merged PRs need only identity.
 	checks bool
+	// webQuery is query in github.com's syntax (project searches only; see webRepos).
+	webQuery string
 }
 
 // dashboardSections builds the searches for login (@me or a login) at now.

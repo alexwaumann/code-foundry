@@ -303,8 +303,9 @@ func TestGhDashboardProjectLists(t *testing.T) {
 	merged := gh.PullRequest{Repo: "o/tracked", Number: 137, Title: "fix", Author: "someone", State: gh.PullRequestMerged,
 		MergedAt: at, Additions: 30, Deletions: 4}
 	store.SetProjects(gh.ProjectPullRequests{
-		Open:      gh.ProjectList{PullRequests: []gh.PullRequest{open}, Total: 1, Query: "is:pr is:open repo:neworg/tracked -author:@me"},
-		Merged:    gh.ProjectList{PullRequests: []gh.PullRequest{merged}, Total: 64, Query: "is:pr is:merged repo:neworg/tracked"},
+		Open: gh.ProjectList{PullRequests: []gh.PullRequest{open}, Total: 1,
+			Query: "is:pr is:open repo:neworg/tracked repo:x/y -author:@me", WebQuery: "is:pr is:open (repo:neworg/tracked OR repo:x/y) -author:@me"},
+		Merged:    gh.ProjectList{PullRequests: []gh.PullRequest{merged}, Total: 64, Query: "is:pr is:merged repo:neworg/tracked", WebQuery: "is:pr is:merged repo:neworg/tracked"},
 		FetchedAt: at,
 		LastError: "project_merged: busy",
 	})
@@ -315,7 +316,7 @@ func TestGhDashboardProjectLists(t *testing.T) {
 	m := res.Msg
 	o := m.GetProjectOpen()
 	if len(o.GetPullRequests()) != 1 || o.GetTotalCount() != 1 ||
-		o.GetSearchUrl() != "https://github.com/search?q=is%3Apr+is%3Aopen+repo%3Aneworg%2Ftracked+-author%3A%40me&type=pullrequests" {
+		o.GetSearchUrl() != "https://github.com/search?q=is%3Apr+is%3Aopen+%28repo%3Aneworg%2Ftracked+OR+repo%3Ax%2Fy%29+-author%3A%40me&type=pullrequests" {
 		t.Errorf("project open = %v", o)
 	}
 	// A renamed repository's results are under the tracked slug, like the dashboards'.

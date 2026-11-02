@@ -210,7 +210,7 @@ export class GhWorld {
     const merged10 = this.pr(gp, 10, "build: zig 0.16", { headRef: "zig-016", mergedAgoMs: 6 * DAY, ageMs: 6 * DAY });
     // The project-wide lists (GetDashboardResponse.project_open/project_merged): others'
     // open PRs in the two tracked repositories, and every PR merged in them this week.
-    const repos = `repo:${cf} repo:${gp}`;
+    const repos = `(repo:${cf} OR repo:${gp})`; // github.com ANDs repeated repo: qualifiers
     const projectOpen = [
       this.pr(cf, 148, "feat(prs): per-project open pull requests", { author: "teammate-kim", headRef: "prs-per-project", reviewRequests: ["teammate-lee", "someone"], checks: rollup(CheckRollupState.SUCCESS, 30), additions: 412, deletions: 58, changedFiles: 14, commentCount: 3, reviewCount: 0, ageMs: 50 * MIN }),
       this.pr(cf, 146, "feat(usage): weekly totals on the Usage page", { author: "teammate-kim", headRef: "usage-weekly", draft: true, checks: rollup(CheckRollupState.PENDING, 8, 0, 22), additions: 188, deletions: 20, changedFiles: 6, commentCount: 0, reviewCount: 0, ageMs: 4 * HOUR }),

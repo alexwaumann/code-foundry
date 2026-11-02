@@ -13,13 +13,15 @@ import (
 
 // gh_activity keys (schema.sql).
 const (
-	activityDashboard     = "dashboard"
-	activityProjects      = "projects"
-	activityStats         = "stats"
-	activityRepoStats     = "repo_stats:"
-	activityDefaultBranch = "default_branch:"
-	activityBranch        = "branch:"
-	activityPoll          = "poll"
+	activityDashboard = "dashboard"
+	activityProjects  = "projects"
+	// activityProjectsFetched is the projects' fetch time, written every cycle.
+	activityProjectsFetched = "projects_fetched"
+	activityStats           = "stats"
+	activityRepoStats       = "repo_stats:"
+	activityDefaultBranch   = "default_branch:"
+	activityBranch          = "branch:"
+	activityPoll            = "poll"
 	// activityFull prefixes a FullPullRequest's key: "pr_detail:<slug>#<number>"
 	// (pr_detail.go).
 	activityFull = "pr_detail:"
@@ -92,6 +94,7 @@ func (s *Store) loadActivityRows(ctx context.Context, snap *Snapshot) error {
 		return fmt.Errorf("gh: load activity: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
+	var projectsFetched projectsFetchedRow
 	repo := func(slug string, fn func(*RepoState)) {
 		r := snap.Repos[slug]
 		r.Slug = slug
@@ -114,6 +117,10 @@ func (s *Store) loadActivityRows(ctx context.Context, snap *Snapshot) error {
 			if p, ok := decodePayload[ProjectPullRequests](payload); ok {
 				snap.Projects = p
 			}
+		case key == activityProjectsFetched:
+			if r, ok := decodePayload[projectsFetchedRow](payload); ok {
+				projectsFetched = r
+			}
 		case key == activityPoll:
 			if p, ok := decodePayload[pollRow](payload); ok {
 				snap.Poll.FetchedAt = p.FetchedAt
@@ -135,6 +142,7 @@ func (s *Store) loadActivityRows(ctx context.Context, snap *Snapshot) error {
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("gh: load activity: %w", err)
 	}
+	projectsFetched.apply(&snap.Projects)
 	return nil
 }
 

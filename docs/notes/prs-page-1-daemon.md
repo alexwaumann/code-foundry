@@ -33,11 +33,25 @@ This PR is the daemon, proto, view model and mock side. PR 2 builds the page on 
   `prChanges`, `mergedShown` and the stats all read `Dashboard` or the branch lists, so
   none of them sees the new lists. They do not feed `PullRequestChanged`, wakes, linked
   PR branch matching, the needs-review count or the stats. `TestPollProjects` pins
-  this. The poll's mergeability recheck cleanup keeps ids that the project lists hold.
-* Cache: gh_activity row `"projects"`. This is only a new key in the existing key/value
-  table, so it needs no migration (schema.sql's comment lists it). The row is written
-  only when the lists change, so after a restart `projects_fetched_at` can be older
-  than the last fetch until the first cycle, which runs right away.
+  this.
+* Mergeability rechecks (`s.recheck`, for PRs GitHub reports as UNKNOWN) have one owner
+  per PR. The dashboard poll owns those its lists or the branch lists hold. For those,
+  `pollProjects` refetches only when the fingerprint says so
+  (`fingerprintNeedsDetail`), and puts their recheck counts back after its fetch.
+  Without that, the two requests shared the counter: if GitHub settled between the two
+  detail fetches, the projects fetch consumed the recheck, and the dashboard's copy
+  (which the project list then reused) stayed UNKNOWN until the PR moved again
+  (`TestPollProjectsLeaveDashboardRechecks`). The rechecks of project-only PRs are
+  `pollProjects`' own, and the poll's cleanup keeps them.
+* Cache: gh_activity rows `"projects"` (the lists, written when they change) and
+  `"projects_fetched"` (the fetch time and the merged queries, written every cycle,
+  like the poll row). These are only new keys in the existing key/value table, so no
+  migration is needed (schema.sql's comment lists them). On load, a newer
+  `projects_fetched` row moves the fetch time and the merged `merged:>=` window forward.
+  This matters because the first cycle after a restart does not run right away: a
+  recent poll row makes it wait out the interval (`store.go`, `pollNext`). Without the
+  second row, `projects_fetched_at` and the merged search URL's date would read stale
+  for that interval.
 * Events: `DashboardUpdated` goes out when the lists, totals, open query or error
   change. A fetch time alone does not send it, and neither does the merged query, whose
   `merged:>=` moves every cycle. Like the dashboard's own fetch time, the projects'
@@ -50,7 +64,8 @@ This PR is the daemon, proto, view model and mock side. PR 2 builds the page on 
   `GetDashboardResponse.project_open` (12), `project_merged` (13),
   `projects_fetched_at` (14) and `projects_last_error` (15), and
   `GhEvent.Polled.projects_fetched_at` (3) and `projects_last_error` (4).
-  `search_url` is `https://github.com/search?q=<QueryEscape(query)>&type=pullrequests`.
+  `search_url` is `https://github.com/search?q=<QueryEscape(webQuery)>&type=pullrequests`,
+  where `webQuery` is the API query with its repositories as an OR group (see Gotchas).
   The API maps renamed repositories back to the tracked slug (`localRepos`), as it does
   for the dashboard lists.
 * GUI (src/api only): `DashboardView.projectOpen`, `projectMerged`
@@ -82,6 +97,14 @@ that is a zero value, not a missing one.
   ISSUE_ADVANCED. The dashboard's merged section uses ISSUE_ADVANCED for its
   parenthesised OR; do not copy that. `TestProjectSections` and `TestProjectsDocument`
   pin ISSUE.
+* **search_url needs an OR group.** github.com's web search uses the advanced syntax,
+  which ANDs repeated `repo:` qualifiers just as ISSUE_ADVANCED does. The URL's query
+  therefore groups them: `(repo:a OR repo:b …)`, or a plain `repo:a` for one
+  repository. Checked live with ISSUE_ADVANCED: the open search over cli/cli and
+  junegunn/fzf with the group and the three exclusions returned 116, the same as the
+  ISSUE search, while ungrouped it returned 0. The API query stays on ISSUE with
+  repeated qualifiers. `ProjectList` keeps both (`Query`, `WebQuery`). The mock and
+  prWorld build the URL the same way.
 * A `repo:` naming a missing repository is ignored when another one in the query is
   valid (checked live), so one bad tracked repository does not empty the lists.
 * Negated qualifiers are filters, not boolean operators, so they are fine under ISSUE.
