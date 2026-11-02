@@ -19,6 +19,7 @@ import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
 import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
+import { presentFileFinder } from "./fileFinder";
 import { presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
@@ -193,6 +194,9 @@ export function showView(name: string): boolean {
     case "composer.history":
       // composer.history: the focused composer's Previous prompts, else the palette's.
       return presentPromptHistory();
+    case "file.find":
+      // file.find: the palette's file finder over the selected thread (nothing on a page).
+      return presentFileFinder();
     case "project.add":
       // project.add without a folder from the CLI or a page: the Add Project dialog, which
       // leaves the window where it is once the project is added (a page asked for it).

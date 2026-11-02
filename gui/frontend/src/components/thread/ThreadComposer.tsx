@@ -197,12 +197,16 @@ export function ThreadComposer({
     void loadSkills(sources.skills);
   }, [sources.skills]);
 
-  // The thread's cite layer inserts citations at the prompt's caret (docs/notes/citations.md).
+  // The thread's cite layer inserts citations at the prompt's caret (docs/notes/citations.md),
+  // the file finder an @ file (⌥⏎).
   useEffect(
     () =>
       registerCiteTarget(draftKey, {
         insert: (id) => {
           editorRef.current?.insertCite(id);
+        },
+        insertTag: (tag) => {
+          editorRef.current?.insertTagAtCaret(tag);
         },
         focus: () => {
           editorRef.current?.focusCollapsed();

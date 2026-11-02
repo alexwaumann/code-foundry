@@ -13,6 +13,7 @@ import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
 import { presentPromptHistory } from "@/stores/historyComposers";
+import { presentFileFinder } from "@/stores/fileFinder";
 import { presentDictationToggle } from "@/stores/dictation";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
@@ -348,6 +349,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Window-local: the focused composer's Previous prompts picker, else the palette's
   // prompts page (stores/promptHistory.ts). The CLI's reaches every window through ShowView.
   "composer.history": () => presentPromptHistory(),
+  // Window-local: the palette's file finder over the selected thread (stores/fileFinder.ts).
+  // The CLI's reaches every window through ShowView.
+  "file.find": () => presentFileFinder(),
   // Window-local: dictation into the focused composer, else the one dictating (it stops),
   // else the content pane's (stores/dictation.ts). The CLI's reaches every window through ShowView.
   "dictation.toggle": () => presentDictationToggle(),

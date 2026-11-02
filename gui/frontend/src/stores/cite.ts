@@ -8,6 +8,7 @@
  */
 import { create } from "zustand";
 import type { CitationBody } from "@/lib/citation";
+import type { PromptTag } from "@/lib/prompt";
 
 export interface CiteState {
   /** The composer chip whose comment the cite layer edits (the chip gets a ring). */
@@ -44,10 +45,12 @@ export function takeFlash(seq: number): void {
   useCiteStore.setState((s) => (s.flash?.seq === seq ? { flash: null } : s));
 }
 
-/** What a composer offers the cite layer. */
+/** What a composer offers the cite layer (and the file finder, which puts an @ file at its caret). */
 export interface CiteTarget {
   /** Inserts a citation tag at the caret and focuses the prompt after it. */
   insert(citationId: string): void;
+  /** Inserts any tag at the caret the same way (the file finder's ⌥⏎). */
+  insertTag(tag: PromptTag): void;
   /** Focuses the prompt with a collapsed caret (a clicked chip is no longer selected, so typing does not replace it). */
   focus(): void;
 }
@@ -66,6 +69,13 @@ export function registerCiteTarget(draftKey: string, target: CiteTarget): () => 
 export function insertCite(draftKey: string, citationId: string): boolean {
   const t = targets.get(draftKey);
   t?.insert(citationId);
+  return t !== undefined;
+}
+
+/** Inserts a tag into a draft's composer at its caret; false when no composer of that draft is mounted. */
+export function insertTagInto(draftKey: string, tag: PromptTag): boolean {
+  const t = targets.get(draftKey);
+  t?.insertTag(tag);
   return t !== undefined;
 }
 

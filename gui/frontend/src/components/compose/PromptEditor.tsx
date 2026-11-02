@@ -49,6 +49,8 @@ export interface PromptEditorHandle {
    * prompt after it. One undo step.
    */
   insertCite(citationId: string): void;
+  /** insertCite for any tag (the file finder's ⌥⏎ puts a file tag): the same spacing, focus and undo step. */
+  insertTagAtCaret(tag: PromptTag): void;
   /** Focuses the prompt with the selection collapsed to its end (a clicked tag is no longer selected). */
   focusCollapsed(): void;
   /**
@@ -362,46 +364,12 @@ export function PromptEditor({
 
   useImperativeHandle(
     handleRef,
-    () => ({
-      // Synchronous: TipTap's focus command focuses again a frame later, which takes the
-      // keyboard back from whatever got it meanwhile (cmd+k right after a thread is
-      // selected would lose the palette to its prompt).
-      focus: () => {
-        if (editor.isDestroyed) return;
-        try {
-          editor.view.focus();
-          editor.commands.scrollIntoView();
-        } catch {
-          editor.commands.focus();
-        }
-      },
-      insertChips: (attachments) => {
-        const { state } = editor;
-        const tokens = attachments.map((a) => chipToken(a.id, a.name));
-        const replacing = focused.current && !state.selection.empty;
-        // Unknown caret (never focused): the end of the prompt.
-        const end = TextSelection.atEnd(state.doc);
-        const sel = focused.current ? state.selection : end;
-        const before = sel.$from.parent.textBetween(0, sel.$from.parentOffset, undefined, LEAF_CHAR);
-        const insert = chipInsertText(tokens, before, { hasProse: proseOf(shown.current).trim() !== "", replacingSelection: replacing });
-        if (insert === null) return;
-        editor.chain().insertContentAt({ from: sel.from, to: sel.to }, piecesToNodes(parseLine(insert))).run();
-      },
-      insertTag: (range, tag) => {
-        const { doc } = editor.state;
-        const end = doc.resolve(range.to).end();
-        const spaced = doc.textBetween(range.to, Math.min(range.to + 1, end), undefined, LEAF_CHAR) === " ";
-        const nodes = piecesToNodes(spaced ? [{ kind: "tag", ...tag }] : [{ kind: "tag", ...tag }, { kind: "text", text: " " }]);
-        // The caret ends after the space: the inserted one, or the one already there.
-        editor
-          .chain()
-          .focus()
-          .insertContentAt(range, nodes)
-          .setTextSelection(range.from + 2)
-          .scrollIntoView()
-          .run();
-      },
-      insertCite: (citationId) => {
+    () => {
+      /**
+       * A tag at the caret (the end of the prompt when it was never focused), a space before it
+       * unless whitespace is there and one after it, the prompt focused after it. One undo step.
+       */
+      const insertAtCaret = (tag: PromptTag): void => {
         if (editor.isDestroyed) return;
         const { state } = editor;
         const at = focused.current ? state.selection.to : TextSelection.atEnd(state.doc).to;
@@ -410,7 +378,7 @@ export function PromptEditor({
         const after = $at.parent.textBetween($at.parentOffset, Math.min($at.parentOffset + 1, $at.parent.content.size), undefined, LEAF_CHAR);
         const pieces: PromptPiece[] = [];
         if (before !== "" && !/\s$/.test(before)) pieces.push({ kind: "text", text: " " });
-        pieces.push({ kind: "tag", tagKind: "cite", id: citationId });
+        pieces.push({ kind: "tag", ...tag });
         if (after !== " ") pieces.push({ kind: "text", text: " " });
         const size = pieces.length + (after === " " ? 1 : 0);
         editor
@@ -420,65 +388,111 @@ export function PromptEditor({
           .setTextSelection(at + size)
           .scrollIntoView()
           .run();
-      },
-      focusCollapsed: () => {
-        if (editor.isDestroyed) return;
-        editor.chain().focus().setTextSelection(editor.state.selection.to).run();
-      },
-      insertPlain: (text) => {
-        if (editor.isDestroyed || !editor.isEditable || text === "") return;
-        const { state } = editor;
-        const sel = focused.current ? state.selection : TextSelection.atEnd(state.doc);
-        const { $from, $to } = sel;
-        const before = $from.parent.textBetween(0, $from.parentOffset, undefined, LEAF_CHAR);
-        const after = $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, LEAF_CHAR);
-        const insert = spacedAtCaret(text, before, after);
-        editor
-          .chain()
-          .focus()
-          .insertContentAt({ from: sel.from, to: sel.to }, { type: "text", text: insert })
-          .setTextSelection(sel.from + insert.length)
-          .scrollIntoView()
-          .run();
-      },
-      insertDictated: (text) => {
-        if (editor.isDestroyed) return;
-        const { state } = editor;
-        const sel = focused.current ? state.selection : TextSelection.atEnd(state.doc);
-        const { $from, $to } = sel;
-        const before = $from.parent.textBetween(0, $from.parentOffset, undefined, LEAF_CHAR);
-        const after = $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, LEAF_CHAR);
-        const insert = phraseAtCaret(text, before, after);
-        if (insert === "") return;
-        const lead = insert.length - insert.trimStart().length;
-        const words = insert.trim().length;
-        const at = Date.now();
-        const tr = state.tr.insertText(insert, sel.from, sel.to);
-        const start = sel.from + lead;
-        tr.setSelection(TextSelection.create(tr.doc, sel.from + insert.length));
-        tr.setMeta(dictationLandingKey, landedMeta(start, start + words, at));
-        editor.view.dispatch(tr.scrollIntoView());
-        setTimeout(() => {
-          if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(dictationLandingKey, expireMeta(at)));
-        }, LANDED_MS + 100);
-      },
-      setDictationMarker: (on) => {
-        if (editor.isDestroyed || dictationLandingKey.getState(editor.state)?.marker === on) return;
-        editor.view.dispatch(editor.state.tr.setMeta(dictationLandingKey, markerMeta(on)));
-      },
-      insertText: (range, text) => {
-        const { doc } = editor.state;
-        const end = doc.resolve(range.to).end();
-        const spaced = doc.textBetween(range.to, Math.min(range.to + 1, end), undefined, LEAF_CHAR) === " ";
-        editor
-          .chain()
-          .focus()
-          .insertContentAt(range, { type: "text", text: spaced ? text : `${text} ` })
-          .setTextSelection(range.from + text.length + 1)
-          .scrollIntoView()
-          .run();
-      },
-    }),
+      };
+      return {
+        // Synchronous: TipTap's focus command focuses again a frame later, which takes the
+        // keyboard back from whatever got it meanwhile (cmd+k right after a thread is
+        // selected would lose the palette to its prompt).
+        focus: () => {
+          if (editor.isDestroyed) return;
+          try {
+            editor.view.focus();
+            editor.commands.scrollIntoView();
+          } catch {
+            editor.commands.focus();
+          }
+        },
+        insertChips: (attachments) => {
+          const { state } = editor;
+          const tokens = attachments.map((a) => chipToken(a.id, a.name));
+          const replacing = focused.current && !state.selection.empty;
+          // Unknown caret (never focused): the end of the prompt.
+          const end = TextSelection.atEnd(state.doc);
+          const sel = focused.current ? state.selection : end;
+          const before = sel.$from.parent.textBetween(0, sel.$from.parentOffset, undefined, LEAF_CHAR);
+          const insert = chipInsertText(tokens, before, { hasProse: proseOf(shown.current).trim() !== "", replacingSelection: replacing });
+          if (insert === null) return;
+          editor.chain().insertContentAt({ from: sel.from, to: sel.to }, piecesToNodes(parseLine(insert))).run();
+        },
+        insertTag: (range, tag) => {
+          const { doc } = editor.state;
+          const end = doc.resolve(range.to).end();
+          const spaced = doc.textBetween(range.to, Math.min(range.to + 1, end), undefined, LEAF_CHAR) === " ";
+          const nodes = piecesToNodes(spaced ? [{ kind: "tag", ...tag }] : [{ kind: "tag", ...tag }, { kind: "text", text: " " }]);
+          // The caret ends after the space: the inserted one, or the one already there.
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(range, nodes)
+            .setTextSelection(range.from + 2)
+            .scrollIntoView()
+            .run();
+        },
+        insertCite: (citationId) => {
+          insertAtCaret({ tagKind: "cite", id: citationId });
+        },
+        insertTagAtCaret: (tag) => {
+          insertAtCaret(tag);
+        },
+        focusCollapsed: () => {
+          if (editor.isDestroyed) return;
+          editor.chain().focus().setTextSelection(editor.state.selection.to).run();
+        },
+        insertPlain: (text) => {
+          if (editor.isDestroyed || !editor.isEditable || text === "") return;
+          const { state } = editor;
+          const sel = focused.current ? state.selection : TextSelection.atEnd(state.doc);
+          const { $from, $to } = sel;
+          const before = $from.parent.textBetween(0, $from.parentOffset, undefined, LEAF_CHAR);
+          const after = $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, LEAF_CHAR);
+          const insert = spacedAtCaret(text, before, after);
+          editor
+            .chain()
+            .focus()
+            .insertContentAt({ from: sel.from, to: sel.to }, { type: "text", text: insert })
+            .setTextSelection(sel.from + insert.length)
+            .scrollIntoView()
+            .run();
+        },
+        insertDictated: (text) => {
+          if (editor.isDestroyed) return;
+          const { state } = editor;
+          const sel = focused.current ? state.selection : TextSelection.atEnd(state.doc);
+          const { $from, $to } = sel;
+          const before = $from.parent.textBetween(0, $from.parentOffset, undefined, LEAF_CHAR);
+          const after = $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, LEAF_CHAR);
+          const insert = phraseAtCaret(text, before, after);
+          if (insert === "") return;
+          const lead = insert.length - insert.trimStart().length;
+          const words = insert.trim().length;
+          const at = Date.now();
+          const tr = state.tr.insertText(insert, sel.from, sel.to);
+          const start = sel.from + lead;
+          tr.setSelection(TextSelection.create(tr.doc, sel.from + insert.length));
+          tr.setMeta(dictationLandingKey, landedMeta(start, start + words, at));
+          editor.view.dispatch(tr.scrollIntoView());
+          setTimeout(() => {
+            if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(dictationLandingKey, expireMeta(at)));
+          }, LANDED_MS + 100);
+        },
+        setDictationMarker: (on) => {
+          if (editor.isDestroyed || dictationLandingKey.getState(editor.state)?.marker === on) return;
+          editor.view.dispatch(editor.state.tr.setMeta(dictationLandingKey, markerMeta(on)));
+        },
+        insertText: (range, text) => {
+          const { doc } = editor.state;
+          const end = doc.resolve(range.to).end();
+          const spaced = doc.textBetween(range.to, Math.min(range.to + 1, end), undefined, LEAF_CHAR) === " ";
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(range, { type: "text", text: spaced ? text : `${text} ` })
+            .setTextSelection(range.from + text.length + 1)
+            .scrollIntoView()
+            .run();
+        },
+      };
+    },
     [editor],
   );
 
