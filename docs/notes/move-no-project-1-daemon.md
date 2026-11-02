@@ -223,6 +223,8 @@ had `threads.naming_model = claude-sonnet-5-5[1m]`.
   acknowledge. The flag clears on that result, on `sendMessage` (a result from then on
   may be the message's turn) and on a restart (the old process's result never comes).
   Fakeclaude writes that result after an ok set_cwd with `CF_FAKE_CLAUDE_SET_CWD_RESULT`.
+  (Superseded: real Claude wraps that result in a command of its own; see
+  `set-cwd-empty-turn.md`.)
 * **Archived while moving.** An archive during the naming wait (or while the move waits
   for a close or a start) fails the move with "the thread was archived while moving" and
   the usual rollback. `runMove` checks each pass, and `startStopped` (with `o.move`) and
