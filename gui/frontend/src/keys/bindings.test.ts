@@ -52,6 +52,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     checkoutPaths: [],
     workspaceId: "",
     pendingWorktreePath: "",
+    pendingMove: null,
     pinned: false,
     archivedAtMs: null,
     snoozedUntilMs: null,
@@ -567,5 +568,18 @@ describe("inPalette", () => {
 
   it("leaves out a command that is not startable here", () => {
     expect(inPalette(cmd({ name: "git.push", available: false }))).toBe(false);
+  });
+
+  it("thread.move.open only for a thread the move picker takes (not archived or moving)", () => {
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" } });
+    const home = { projectId: "", worktreePath: "/Users/me" };
+    for (const [over, want] of [
+      [{}, true],
+      [{ archivedAtMs: 1 }, false],
+      [{ pendingMove: { projectId: "web", workspaceId: "", worktreePath: "", branch: "" } }, false],
+    ] as const) {
+      useThreadsStore.setState({ byId: { s1: thread("s1", { ...home, ...over }) }, order: ["s1"] });
+      expect(inPalette(cmd({ name: "thread.move.open" }))).toBe(want);
+    }
   });
 });

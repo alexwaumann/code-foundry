@@ -159,6 +159,10 @@ interface MockThread {
   workspaceId: string;
   /** A queued thread.run-in target; "" when none (published, not "persisted"). */
   pendingWorktreePath: string;
+  /** Thread.pending_move: a thread.move under way (World.moveThread); null when none. */
+  pendingMove: { projectId: string; workspaceId: string; worktreePath: string; branch: string } | null;
+  /** Mock-only: a move queued mid-turn lands (moveIn ticks after the turn ends); null when none. */
+  landMove: (() => void) | null;
   /** thread.pin. */
   pinned: boolean;
   /** thread.archive: when it was archived; null when not. A message and pin(true) clear it, like the daemon. */
@@ -485,6 +489,9 @@ const enc = new TextEncoder();
 const RUN_PROMPT_MS = 150;
 /** thread.regenerate-name: how long "the naming model" takes, and the title it gives. */
 export const REGENERATE_NAME_MS = 400;
+/** thread.move: how long the move takes (placing, naming, set_cwd), and the title "the naming model" gives it. */
+export const MOVE_MS = 600;
+export const MOVED_NAME = "Fix the login redirect";
 export const REGENERATED_NAME = "Regenerated thread name";
 
 /**
@@ -931,6 +938,10 @@ export class World {
   attachmentBytes = new Map<string, Uint8Array>();
   /** How long thread.new takes to create a worktree (ms). */
   worktreeDelayMs = 700;
+  /** thread.move: how long placing and naming take (POST /__mock/thread/move-delay). */
+  moveDelayMs = MOVE_MS;
+  /** thread.move fails with this once it has placed and named, as a refused set_cwd (POST /__mock/thread/move-fail); null: it lands. */
+  moveFail: string | null = null;
   /** terminal.new: how long it takes (ms), and whether its next run fails (the reason). POST /__mock/terminal/new. */
   terminalNewDelayMs = 0;
   terminalNewFail: string | null = null;
@@ -961,6 +972,8 @@ export class World {
     this.worktreeDelayMs = 700;
     this.terminalNewDelayMs = 0;
     this.terminalNewFail = null;
+    this.moveFail = null;
+    this.moveDelayMs = MOVE_MS;
     this.generation++;
     this.gitops.reset();
     this.settings.reset();
@@ -1876,6 +1889,115 @@ export class World {
   }
 
   /**
+   * thread.move like the daemon (internal/store/thread/move.go): a thread without a project
+   * or workspace goes into a project (`project`) or a workspace (`workspace`, `project` its
+   * primary: a member or "workspace"), placed as thread.new places one: `new-worktree`
+   * true a new branch (`branch` an existing one, else cf/<slug of the new name>) with a
+   * worktree in every git project, false each project's own checkout, absent the
+   * threads.default_worktree setting; `worktree` an existing checkout. CheckMove's
+   * refusals and checkPlacement's. pending_move and naming are on for moveDelayMs; then the
+   * thread is renamed (MOVED_NAME) and runs there, with the daemon's timeline note. Busy:
+   * it returns at once with pending_move set and lands ~2 ticks after the turn ends.
+   * moveFail fails it after the wait, as a refused set_cwd: nothing moves, last_error and
+   * the note say why.
+   */
+  async moveThread(s: MockThread, args: Record<string, string>): Promise<InvokeOut> {
+    const label = s.name ? `${s.name} (${s.id})` : s.id;
+    if (s.projectId || s.workspaceId || this.projectIdsOf(s).length > 0) throw new CommandError("unavailable", `thread ${s.id} already has a project; only a thread without one can be moved`);
+    if (s.archivedAt !== null) throw new CommandError("unavailable", `thread ${s.id} is archived; unarchive it first`);
+    if (s.resident) throw new CommandError("unavailable", `thread ${s.id} is the resident ${s.resident} thread; it cannot be moved`);
+    if (s.transcriptMissing) throw new CommandError("unavailable", `thread ${s.id} cannot be moved: ${TRANSCRIPT_MISSING_MESSAGE}`);
+    if (s.pendingMove) throw new CommandError("unavailable", `thread ${s.id} is already moving`);
+    if (!args.project && !args.workspace && !args.worktree) throw new CommandError("invalid", "name the project or workspace to move the thread to");
+    const ws = args.workspace ? this.workspaceRef(args.workspace) : undefined;
+    const ids = ws ? [...ws.members] : [this.projectRef(args.project || this.projectOfPath(args.worktree ?? "")).id];
+    let primary = ws ? (args.project === "workspace" ? "workspace" : args.project ? this.projectRef(args.project).id : ws.defaultPrimary || ids[0] || "workspace") : (ids[0] ?? "");
+    if (ws && primary !== "workspace" && !ids.includes(primary)) throw new CommandError("unavailable", `${args.project ?? ""} is not in workspace ${ws.name}`);
+    if (!primary) primary = "workspace";
+    const flag = args["new-worktree"];
+    const newWorktree = args.worktree ? false : flag === "true" ? true : flag === "false" ? false : this.settings.values()["threads.default_worktree"] === "new";
+    const git = ids.filter((id) => this.projectRef(id).git !== false);
+    if (newWorktree && git.length === 0) {
+      const p = this.projectRef(ids[0] ?? "");
+      throw new CommandError("unavailable", `${p.name} is not a git repository; threads run in its current checkout`);
+    }
+    const branch = newWorktree ? args.branch || `cf/${promptSlug(MOVED_NAME)}` : "";
+    if (newWorktree) {
+      const members: { outcome: PlacementOutcome; message?: string }[] = this.checkPlacement(git, branch, false).members;
+      const refused = members.find((m) => m.outcome === PlacementOutcome.REFUSED);
+      if (refused) throw new CommandError("unavailable", (refused.message ?? "").replace(/^failed precondition: /, ""));
+    }
+    const place = ws ? `workspace ${ws.name}` : this.projectRef(ids[0] ?? "").name;
+    s.pendingMove = { projectId: primary === "workspace" ? "" : primary, workspaceId: ws?.id ?? "", worktreePath: "", branch };
+    s.naming = true;
+    this.publishThread(s);
+    const gen = this.generation;
+    const land = (): string => {
+      s.landMove = null;
+      s.naming = false;
+      if (this.moveFail !== null) {
+        const why = this.moveFail;
+        s.pendingMove = null;
+        s.lastError = why;
+        this.logs.addNote(s.id, `Could not move this thread to ${place}: ${why}. It stays where it was, without a project.`);
+        this.publishThread(s);
+        throw new CommandError("unavailable", `Claude did not move to ${place}: ${why}`);
+      }
+      const paths: Record<string, string> = {};
+      const made: string[] = [];
+      for (const id of ids) {
+        const p = this.projectRef(id);
+        if (!newWorktree || p.git === false) paths[id] = args.worktree && id === ids[0] ? args.worktree : this.mainPathOf(id);
+        else {
+          const have = p.worktrees.find((w) => !w.isMain && w.branch === branch);
+          const w = have ?? this.addWorktree(p, branch, args.branch ? "" : args.base || (p.remotes.length > 0 ? `origin/${p.defaultBranch}` : p.defaultBranch));
+          if (!have) made.push(id);
+          paths[id] = w.path;
+        }
+      }
+      const cwd = primary === "workspace" && ws ? this.workspaceDirOf(ws) : (paths[primary] ?? "");
+      s.pendingMove = null;
+      s.projectId = primary === "workspace" ? "" : primary;
+      s.workspaceId = ws?.id ?? "";
+      s.projectIds = ws ? [...ids].sort() : [];
+      s.checkoutPaths = paths;
+      s.worktreePath = cwd;
+      s.createdWorktree = newWorktree;
+      s.branch = branch;
+      s.baseRef = newWorktree && made.length > 0 && !args.branch ? args.base || "origin/main" : "";
+      s.name = MOVED_NAME;
+      s.autoNamed = true;
+      s.lastError = "";
+      const how = newWorktree ? (made.length > 0 && !args.branch ? ` (new worktree on ${branch})` : ` (new worktree on existing branch ${branch})`) : ` (${cwd})`;
+      this.logs.addNote(s.id, `Moved this thread to ${place}${how}.`);
+      for (const id of made) this.actions.worktreeCreated(s.id, id, paths[id] ?? "");
+      this.publishThread(s);
+      return `moved thread ${MOVED_NAME} (${s.id}) to ${ws ? `workspace ${ws.id}, ` : `${place}, `}in ${cwd}${how}`;
+    };
+    if (s.status === ThreadStatus.BUSY) {
+      // Mid-turn: the daemon returns at once and moves the thread once its turn ends.
+      s.landMove = () => {
+        try {
+          land();
+        } catch {
+          // The failure shows as the note, last_error and pending_move clearing.
+        }
+      };
+      s.moveIn = 2;
+      return { message: `thread ${label} moves to ${place} once its turn ends`, resultJson: JSON.stringify({ id: s.id }) };
+    }
+    await sleep(this.moveDelayMs);
+    if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.move ran");
+    return { message: land(), resultJson: JSON.stringify({ id: s.id, worktreePath: s.worktreePath }) };
+  }
+
+  /** The project whose worktree holds `path` (thread.move --worktree without a project). */
+  private projectOfPath(path: string): string {
+    for (const p of this.projects.values()) if (p.worktrees.some((w) => w.path === path)) return p.id;
+    throw new CommandError("notfound", `no project has a checkout at ${path}`);
+  }
+
+  /**
    * thread.run-in like the daemon: the target is one of the thread's checkouts (by project
    * or path) or "workspace" (its workspace's folder). A stopped thread moves at once; a
    * running one gets the target as pendingWorktreePath and moves ~2s after it stops being
@@ -2004,6 +2126,8 @@ export class World {
       checkoutPaths: {},
       workspaceId: "",
       pendingWorktreePath: "",
+      pendingMove: null,
+      landMove: null,
       pinned: false,
       archivedAt: null,
       snoozedUntil: null,
@@ -2133,6 +2257,7 @@ export class World {
       checkoutPaths: this.projectIdsOf(s).map((id) => ({ projectId: id, path: id === s.projectId ? s.worktreePath : (s.checkoutPaths[id] ?? "") })),
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
+      ...(s.pendingMove ? { pendingMove: s.pendingMove } : {}),
       pinned: s.pinned,
       flags: s.flags.map((f) => ({ ...f, setAt: timestampFromDate(f.setAt) })),
       ...(s.owner ? { owner: s.owner } : {}),
@@ -2612,6 +2737,8 @@ export class World {
       if (s.snoozedUntil !== null && s.snoozedUntil.getTime() <= Date.now()) this.wakeThread(s.id);
       // A queued run-in: the daemon sends set_cwd once the thread is idle.
       if (s.pendingWorktreePath && s.status !== ThreadStatus.BUSY && --s.moveIn <= 0) this.applyMove(s);
+      // A thread.move queued mid-turn: it lands once the turn ended (World.moveThread).
+      if (s.landMove && s.status !== ThreadStatus.BUSY && --s.moveIn <= 0) s.landMove();
       if (s.nameIn > 0 && --s.nameIn === 0 && !s.name) {
         s.name = s.pendingName;
         this.publishThread(s);
@@ -3833,6 +3960,47 @@ export class World {
           const out = this.runIn(s, args.project ?? "", args.worktree ?? "");
           const label = out.name ? `${out.name} (${out.id})` : out.id;
           return out.pendingWorktreePath ? `thread ${label} moves to ${out.pendingWorktreePath} once it is idle` : `thread ${label} runs in ${out.worktreePath}`;
+        },
+      },
+      {
+        cmd: {
+          name: "thread.move", noPalette: true,
+          title: "Move Thread to Project…",
+          category: "Thread",
+          description: "Move a thread without a project into a project or workspace, placed as thread new places one; it is renamed from its conversation.",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "to", type: ArgType.STRING, required: false, description: "Project or workspace" },
+            { name: "project", type: ArgType.STRING, required: false, description: "With workspace: where it runs (workspace: its folder)" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name" },
+            { name: "worktree", type: ArgType.PATH, required: false, description: "An existing checkout to run in" },
+            { name: "new-worktree", type: ArgType.BOOL, required: false, description: "New worktree, branch named from the conversation; =false: the project's folder" },
+            { name: "base", type: ArgType.STRING, required: false, description: "As thread new's" },
+            { name: "branch", type: ArgType.STRING, required: false, description: "As thread new's" },
+          ],
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const to = args.to ?? "";
+          const placed = to && !args.project && !args.workspace ? (this.projects.has(to) || [...this.projects.values()].some((p) => p.name === to) ? { ...args, project: to } : { ...args, workspace: to }) : to ? { ...args, project: to } : args;
+          return this.moveThread(this.thread(args.id || (ctx?.activeThreadId ?? "")), placed);
+        },
+      },
+      {
+        cmd: {
+          name: "thread.move.open",
+          title: "Move Thread to a Project or Workspace…",
+          category: "Thread",
+          description: "Open the move picker for a thread without a project: pick a project or workspace, where it works there, then Move (thread.move).",
+          keybindings: [],
+          args: [{ name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" }],
+        },
+        // Like the daemon (canOpenMove): a thread without a project or workspace.
+        when: (ctx) => Boolean(ctx?.activeThreadId) && !ctx?.activeProjectId && !ctx?.activeWorkspaceId,
+        run: (ctx, args) => {
+          this.intents.publish({ intent: { case: "showView", value: { name: "thread.move", threadId: "", params: { id: args.id || (ctx?.activeThreadId ?? "") } } } });
+          return "";
         },
       },
       {

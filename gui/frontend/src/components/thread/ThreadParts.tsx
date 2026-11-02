@@ -4,14 +4,18 @@ import { useShallow } from "zustand/react/shallow";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
+import { movingLabel, movingTo } from "@/lib/move";
 import { crumbLink, crumbParent, crumbPlace, type CrumbIcon, type CrumbParent } from "@/lib/threadCrumb";
 import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
+import { useMovePickerStore } from "@/stores/movePicker";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { dropdownMenuKit, focusPromptAfterMenu, keepFocusAfterMenu } from "./menuKit";
+import { MovePicker } from "./MovePicker";
+import { useCanMove } from "./useNoProject";
 import { ThreadMenuItems } from "./ThreadMenuItems";
 import { TranscriptDeletedChip } from "./TranscriptDeleted";
 
@@ -32,6 +36,21 @@ function usePlaceInput(id: string) {
       };
     }),
   );
+}
+
+/**
+ * Where the thread is moving to, by name (lib/move movingTo): its pending_move, else a
+ * move this window sent and the daemon has not answered; null when it is not moving.
+ */
+function useMovingTo(id: string): string | null {
+  const pending = useThreadsStore(useShallow((s) => {
+    const m = s.byId[id]?.pendingMove;
+    return m ? { projectId: m.projectId, workspaceId: m.workspaceId } : null;
+  }));
+  const sending = useMovePickerStore((s) => s.sending[id]);
+  const project = useProjectsStore((s) => (pending?.projectId ? s.byId[pending.projectId]?.name : undefined));
+  const workspace = useWorkspacesStore((s) => (pending?.workspaceId ? s.byId[pending.workspaceId]?.name : undefined));
+  return movingTo(pending, sending, { project: () => project, workspace: () => workspace });
 }
 
 /** The crumb's separator. */
@@ -87,6 +106,9 @@ function ThreadCrumb({ id }: { id: string }) {
     }),
   );
   const parent = useThreadsStore(useShallow((s) => crumbParent(s.byId[id] ?? { createdBy: "", createdByName: "", parentId: "" }, s)));
+  // No project: the place opens the move picker (MovePicker); while it moves, "Moving to <name>…".
+  const movable = useCanMove(id) && icon === "house";
+  const moving = useMovingTo(id);
   // view.projects' args (--workspace or --project); null: plain text.
   const args: Record<string, string> | null = workspace ? { workspace } : project ? { project } : null;
   const Icon = icon === "folder" ? null : crumbIcons[icon];
@@ -94,13 +116,15 @@ function ThreadCrumb({ id }: { id: string }) {
     <>
       {Icon ? <Icon className="size-3.5 shrink-0" aria-hidden /> : <ProjectIcon projectId={input.projectId} className="size-3.5 shrink-0" />}
       <span className="truncate" data-testid="thread-crumb-place">
-        {label}
+        {moving === null ? label : movingLabel(moving)}
       </span>
     </>
   );
   return (
     <span className="flex min-w-0 shrink items-center gap-1 text-label text-cf-text-muted" data-testid="thread-crumb" data-icon={icon}>
-      {args ? (
+      {movable && moving === null ? (
+        <MovePicker threadId={id}>{content}</MovePicker>
+      ) : args ? (
         <button
           type="button"
           className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"

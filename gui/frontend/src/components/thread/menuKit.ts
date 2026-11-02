@@ -82,13 +82,26 @@ export function markInPlace(kit: MenuKit, id: string): void {
 
 /**
  * For a menu's onCloseAutoFocus: Rename puts an input in the sidebar row, New thread on
- * this branch focuses the composer's prompt, and an in-place item of the title menu hands
+ * this branch focuses the composer's prompt, Move to project… opens the move picker (markMovePicking), and an in-place item of the title menu hands
  * the keyboard to the thread's prompt (focusPromptAfterMenu), so closing must not move
  * focus back to the menu's trigger. True when it should stay where the item put it.
  */
 export function keepFocusAfterMenu(id: string): boolean {
   const ui = useUiStore.getState();
-  return inPlace === id || ui.renamingThreadId === id || (ui.selection.kind === "compose" && ui.selection.likeThreadId === id);
+  return inPlace === id || ui.renamingThreadId === id || (ui.selection.kind === "compose" && ui.selection.likeThreadId === id) || movePicking === id;
+}
+
+/** The thread "Move to project…" just ran for: its picker opens, so the menu's close leaves focus alone. */
+let movePicking: string | null = null;
+let movePickingLapse: ReturnType<typeof setTimeout> | undefined;
+
+/** "Move to project…" ran for thread `id`: the closing menu must not take focus back (keepFocusAfterMenu). */
+export function markMovePicking(id: string): void {
+  movePicking = id;
+  clearTimeout(movePickingLapse);
+  movePickingLapse = setTimeout(() => {
+    movePicking = null;
+  }, 1000);
 }
 
 /** After keepFocusAfterMenu: when an in-place item closed the menu, asks the selected thread's prompt for the keyboard. */

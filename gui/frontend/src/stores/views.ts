@@ -22,6 +22,8 @@ import { presentPromptHistory } from "./historyComposers";
 import { presentFileFinder } from "./fileFinder";
 import { presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";
+import { openMovePicker } from "./movePicker";
+import { isActingWindow } from "./windowFocus";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
@@ -203,6 +205,15 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
       // leaves the window where it is once the project is added (a page asked for it).
       openAddProject("local", { stay: true });
       return true;
+    case "thread.move": {
+      // thread.move.open from the CLI: the move picker under that thread's crumb (the window
+      // selects it), in one window only: the focused one, else the last focused (stores/windowFocus).
+      const id = params?.id ?? "";
+      void isActingWindow().then((acts) => {
+        if (acts) openMovePicker(id);
+      });
+      return true;
+    }
     case "dictation.toggle":
       // dictation.toggle from the CLI: the focused composer's dictation, else the content pane's.
       return presentDictationToggle();

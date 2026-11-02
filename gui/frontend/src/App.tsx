@@ -37,6 +37,7 @@ import { useWindowTitle } from "@/lib/title";
 import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
+import { startWindowFocus } from "@/stores/windowFocus";
 import { usePanelExpanded } from "@/stores/panel";
 import { useAttentionCount } from "@/stores/threads";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
@@ -92,6 +93,7 @@ function startApp(): () => void {
     startMenuCommands(),
     startDockAlerts(),
     startRecentFiles(),
+    startWindowFocus(),
   ];
   return () => {
     document.removeEventListener("focusin", onFocusIn);

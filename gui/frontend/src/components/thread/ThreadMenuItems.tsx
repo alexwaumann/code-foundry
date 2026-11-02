@@ -6,13 +6,14 @@ import { WORKSPACE_FOLDER } from "@/lib/projectSet";
 import { canNewLike, canRunElsewhere, worktreeBranch } from "@/lib/threadRow";
 import { runCommand, useCommandsStore } from "@/stores/commands";
 import { composeLike } from "@/stores/compose";
+import { openMovePicker } from "@/stores/movePicker";
 import { useProjectsStore } from "@/stores/projects";
 import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace";
 import { archiveThread, pinThread, regenerateThreadName, runThreadIn, snoozeThread, threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { markInPlace, type MenuKit } from "./menuKit";
-import { useNoProjectThread } from "./useNoProject";
+import { markInPlace, markMovePicking, type MenuKit } from "./menuKit";
+import { useCanMove, useNoProjectThread } from "./useNoProject";
 import { useThreadCheckouts } from "./useThreadCheckouts";
 
 function MemberItem({ kit, threadId, projectId, path, current, queued }: { kit: MenuKit; threadId: string; projectId: string; path: string; current: boolean; queued: boolean }) {
@@ -85,7 +86,7 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  * A thread's menu items, one list for the sidebar row's context menu (RowMenu) and the
  * thread header's title menu (ThreadTitleMenu), each item a registry command (or the inline
  * rename that commits one): Rename, Regenerate name (not for a resident thread; disabled while
- * a naming call runs), Pin, Snooze ▸ (and Unsnooze while snoozed); New
+ * a naming call runs), Move to project… (a thread without a project: the move picker), Pin, Snooze ▸ (and Unsnooze while snoozed); New
  * thread on this branch, Save as workspace, Run in ▸, Restart Claude (while a plugin's
  * environment changed since Claude started: thread.restart), Clear flag(s) (while plugins
  * flagged the thread: thread.flag.clear, every plugin's); Archive. An item a thread cannot
@@ -93,6 +94,8 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  */
 export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const noProject = useNoProjectThread(id);
+  // No project: "Move to project…" opens the move picker under the header crumb (opening the thread first).
+  const movable = useCanMove(id);
   const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
   // A resident thread (Ember) keeps its name; one naming call at a time.
   const resident = useThreadsStore((s) => (s.byId[id]?.resident ?? "") !== "");
@@ -130,6 +133,20 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
         >
           Regenerate name
         </kit.Item>
+      )}
+      {movable && (
+        <>
+          <kit.Item
+            data-testid="menu-move"
+            onSelect={() => {
+              markMovePicking(id);
+              openMovePicker(id);
+            }}
+          >
+            Move to project…
+          </kit.Item>
+          <kit.Separator />
+        </>
       )}
       <kit.Item
         data-testid="menu-pin"
