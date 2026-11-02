@@ -75,13 +75,13 @@ test("keyboard: a project page's list has the keyboard; End then Enter shows a c
   await expect(page.getByTestId("changes-surface")).toBeVisible();
 });
 
-// A project's page (header, checkouts table, a row opening its Changes tab in the page's panel, the row
-// and header menus, Details) and the kind variants (with Initialize git): ProjectPage.test.tsx. A row's
+// A project's page (title block, checkouts table, a row opening its Changes tab in the page's panel, the row
+// and title block menus, Details with Copy and Open in) and the kind variants (with Initialize git): ProjectPage.test.tsx. A row's
 // tab drawn in the page's own panel is "each page has its own side panel" below; hover actions, "narrow".
 
-// Refresh (fetch then refresh, spinning) and a failed refresh in the header and Details: unit-tested in src/components/projects/ProjectPage.test.tsx ("Refresh fetches…", "a failed refresh shows…").
+// Refresh (fetch then refresh, spinning) and a failed refresh in the title block: unit-tested in src/components/projects/ProjectPage.test.tsx ("Refresh fetches…", "a failed refresh turns…").
 
-test("narrow: with the Changes tab open, Sync and the slug drop and Terminal shows its icon only", async ({ page }) => {
+test("narrow: with the Changes tab open, Sync and the slug drop and Open in Finder shows its icon only", async ({ page }) => {
   await openApp(page);
   await openProjectPage(page, "repo-cf");
   await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-narrow");
@@ -90,8 +90,10 @@ test("narrow: with the Changes tab open, Sync and the slug drop and Terminal sho
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-narrow", "true");
   await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(0);
   await expect(page.getByTestId("worktree-sync")).toHaveCount(0);
+  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-compact", "true");
   await expect(page.getByTestId("project-meta")).toHaveCount(0);
-  await expect(page.getByTestId("project-terminal")).toHaveText("");
+  await expect(page.getByTestId("title-default-branch")).toBeVisible();
+  await expect(page.getByTestId("details-reveal")).toHaveText("");
   await expect(page.getByTestId("checkouts-col-pr")).toHaveCount(1);
   // Row actions still reach: on hover, over the row's end.
   await checkoutRow(page, "repo-cf", FIX).hover();
@@ -100,7 +102,42 @@ test("narrow: with the Changes tab open, Sync and the slug drop and Terminal sho
   await page.getByTestId("side-panel").getByTestId("panel-toggle").click();
   await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-narrow");
   await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(1);
-  await expect(page.getByTestId("project-terminal")).toHaveText("Terminal");
+  await expect(page.getByTestId("project-meta")).toHaveText("alexwaumann/code-foundry");
+  await expect(page.getByTestId("details-reveal")).toHaveText("Open in Finder");
+});
+
+// Details' Open in Finder: the split hover (docs/notes/thread-info-split-hover.md) on two real
+// buttons. Which items its ⋯ lists and what they run: ProjectPage.test.tsx.
+test("Details' Open in Finder: two blocks with a 2px seam, the one under the pointer bright, the other half; menu open: only the ⋯", async ({ page }) => {
+  await openApp(page);
+  await openProjectPage(page, "repo-cf");
+  const main = page.getByTestId("details-reveal");
+  const more = page.getByTestId("details-open-in-more");
+  const tint = await page.evaluate(() => {
+    const probe = (value: string) => {
+      const d = document.createElement("div");
+      d.style.backgroundColor = value;
+      document.body.append(d);
+      const c = getComputedStyle(d).backgroundColor;
+      d.remove();
+      return c;
+    };
+    return { none: probe("transparent"), full: probe("var(--cf-control-hover)"), half: probe("color-mix(in oklab, var(--cf-control-hover) 50%, transparent)") };
+  });
+  expect(new Set(Object.values(tint)).size).toBe(3);
+  const lit = () => Promise.all([main.evaluate((el) => getComputedStyle(el).backgroundColor), more.evaluate((el) => getComputedStyle(el).backgroundColor)]);
+  const [a, b] = await Promise.all([main.boundingBox(), more.boundingBox()]);
+  expect(Math.round((b?.x ?? 0) - ((a?.x ?? 0) + (a?.width ?? 0)))).toBe(2);
+  expect(await lit()).toEqual([tint.none, tint.none]);
+  await main.hover();
+  await expect.poll(lit).toEqual([tint.full, tint.half]);
+  await more.hover();
+  await expect.poll(lit).toEqual([tint.half, tint.full]);
+  await more.click();
+  await expect(page.getByTestId("details-open-in-menu")).toBeVisible();
+  await expect.poll(lit).toEqual([tint.none, tint.full]);
+  await main.hover({ force: true });
+  await expect.poll(lit).toEqual([tint.none, tint.full]);
 });
 
 test("each page has its own side panel; the sidebar row reopens the last page and goes to the index from one", async ({ page }) => {

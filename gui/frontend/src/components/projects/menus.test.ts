@@ -55,9 +55,24 @@ describe("projectMenu (an index row's context menu, the project page's ⋯)", ()
     expect(labels(projectMenu("p-1", facts))).toEqual(want);
   });
 
-  it("the page's ⋯ puts New action first, then the row's items", () => {
-    const items = projectMenu("p-1", { kind: "github", step: null, cleanup: 0 }, { newAction: true });
-    expect(labels(items)).toEqual(["New action", "—", "New thread", "New terminal", "Open in Finder", "—", "Rename", "Clean up merged worktrees 0", "—", "Remove project"]);
+  it.each([
+    {
+      name: "GitHub",
+      facts: { kind: "github", step: null, cleanup: 0 },
+      want: ["New thread", "New terminal", "—", "Rename", "Clean up merged worktrees 0", "—", "Remove project"],
+    },
+    {
+      name: "git without a remote",
+      facts: { kind: "git", step: "publish", cleanup: null },
+      want: ["New thread", "New terminal", "—", "Rename", "Publish to GitHub", "—", "Remove project"],
+    },
+    {
+      name: "a folder without git",
+      facts: { kind: "nogit", step: "init", cleanup: null },
+      want: ["New thread", "New terminal", "—", "Rename", "Initialize git", "—", "Remove project"],
+    },
+  ] as const)("the page's ⋯ ($name) has no Open in Finder and no New action: Details has both", ({ facts, want }) => {
+    expect(labels(projectMenu("p-1", facts, { page: true }))).toEqual(want);
   });
 
   it("Clean up is disabled at 0 and runs the cleanup otherwise; Remove project is destructive", () => {
@@ -107,7 +122,7 @@ describe("workspaceMenu (an index row's context menu, the workspace page's ⋯)"
 
 it("no item ends in an ellipsis (the app's menu style)", () => {
   const all = [
-    ...projectMenu("p-1", { kind: "git", step: "publish", cleanup: 1 }, { newAction: true }),
+    ...projectMenu("p-1", { kind: "git", step: "publish", cleanup: 1 }, { page: true }),
     ...projectMenu("p-1", { kind: "nogit", step: "init", cleanup: null }),
     ...workspaceMenu("w-1", { folder: true }),
   ];

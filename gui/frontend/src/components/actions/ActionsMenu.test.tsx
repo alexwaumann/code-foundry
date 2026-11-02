@@ -155,7 +155,7 @@ describe("a checkout row's actions menu", () => {
     renderPage("repo-gp");
     await settle();
     expect(screen.queryByTestId("worktree-actions-menu")).toBeNull();
-    expect(screen.getByTestId("details-actions").textContent).toMatch(/none\s*·\s*Add an action/);
+    expect(screen.getByTestId("details-actions-value").textContent).toBe("none");
     fireEvent.click(screen.getByTestId("details-add-action"));
     await settle();
     expect(dialog()?.dataset.mode).toBe("new");
@@ -163,21 +163,37 @@ describe("a checkout row's actions menu", () => {
     expect(document.activeElement).toBe(field("action-name"));
   });
 
-  it("the project menu's New action adds one to that project", async () => {
-    renderPage("repo-gp");
+  it("Details' Actions row names them; its Edit menu lists them with their icons (each opens its editor) and New action", async () => {
+    renderPage("repo-cf");
     await settle();
-    fireEvent.pointerDown(screen.getByTestId("project-more"), { button: 0, ctrlKey: false, pointerType: "mouse" });
-    await pickItem(screen.getByTestId("project-new-action"));
+    expect(screen.getByTestId("details-actions-value").textContent).toBe(ACTION_NAMES.join(" · "));
+    fireEvent.pointerDown(screen.getByTestId("details-edit-actions"), { button: 0, ctrlKey: false, pointerType: "mouse" });
+    const edit = screen.getByTestId("details-actions-menu");
+    expect(edit.querySelector('[data-slot="dropdown-menu-label"]')?.textContent).toBe("Edit an action");
+    const entries = within(edit).getAllByTestId("details-action-edit");
+    expect(entries.map((e) => e.textContent)).toEqual(ACTION_NAMES);
+    for (const e of entries) expect(e.querySelector("svg")).toBeTruthy();
+    expect(within(edit).getByTestId("details-new-action").textContent).toBe("New action");
+    await pickItem(entries[1] as HTMLElement);
+    expect(dialog()?.dataset.mode).toBe("edit");
+    expect(field("action-name").value).toBe(ACTION_NAMES[1]);
+  });
+
+  it("Details' Edit menu's New action adds one to that project", async () => {
+    renderPage("repo-cf");
+    await settle();
+    fireEvent.pointerDown(screen.getByTestId("details-edit-actions"), { button: 0, ctrlKey: false, pointerType: "mouse" });
+    await pickItem(screen.getByTestId("details-new-action"));
     expect(dialog()?.dataset.mode).toBe("new");
-    expect(dialog()?.textContent).toContain("Saved for every thread in ghostty-playground. Runs in the worktree's checkout");
+    expect(dialog()?.textContent).toContain("Saved for every thread in code-foundry. Runs in the worktree's checkout");
     fireEvent.change(field("action-name"), { target: { value: "Zig build" } });
     fireEvent.change(field("action-command"), { target: { value: "zig build" } });
     fireEvent.click(field("action-save"));
     await settle();
     expect(dialog()).toBeNull();
-    expect(lastInvocation("action.add")?.args).toMatchObject({ name: "Zig build", command: "zig build", project: "repo-gp" });
-    const ids = useActionsStore.getState().byProject["repo-gp"] ?? [];
-    expect(ids.map((id) => useActionsStore.getState().byId[id]?.name)).toEqual(["Zig build"]);
+    expect(lastInvocation("action.add")?.args).toMatchObject({ name: "Zig build", command: "zig build", project: "repo-cf" });
+    const ids = useActionsStore.getState().byProject["repo-cf"] ?? [];
+    expect(ids.map((id) => useActionsStore.getState().byId[id]?.name)).toEqual([...ACTION_NAMES, "Zig build"]);
   });
 });
 

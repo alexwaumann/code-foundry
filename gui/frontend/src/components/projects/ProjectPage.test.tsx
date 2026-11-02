@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/daemonFakes")).ghFakes }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
+vi.mock("@/api/gitops", async (orig) => ({ ...(await orig<typeof import("@/api/gitops")>()), ...(await import("@/test/cardFakes")).cardGitopsFakes }));
+const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@/lib/clipboard", () => ({ copyText }));
 
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { RemoveWorktreeDialog } = await import("./RemoveWorktreeDialog");
@@ -14,6 +17,9 @@ const { projectPage, useUiStore } = await import("@/stores/ui");
 const { usePublishDialogStore } = await import("@/stores/publish");
 const { useComposeStore } = await import("@/stores/compose");
 const { useProjectsStore } = await import("@/stores/projects");
+const { editorAppsResource } = await import("@/stores/threadInfo");
+const { card } = await import("@/test/cardFakes");
+const { hoverTooltipText, tooltipText } = await import("@/test/tooltip");
 
 /**
  * A project's page (docs/notes/projects-redesign-1-index.md) and its Worktrees without threads
@@ -98,20 +104,28 @@ beforeEach(() => {
   resetPanels();
   usePublishDialogStore.setState({ open: false, projectId: "" });
   useComposeStore.setState({ drafts: {} });
+  card.editors = [];
+  editorAppsResource.store.setState({ entries: {} });
+  copyText.mockClear();
 });
 afterEach(() => {
   cleanup();
 });
 
 describe("a project's page", () => {
-  it("the header, the checkouts table by activity, Details, and the sections in order", async () => {
+  it("the title block, the checkouts table by activity, Details, and the sections in order", async () => {
     renderPage("repo-cf");
     await settle();
+    // The pane header keeps the crumb, the picker and the panel toggles; the rest is the title block's.
     expect(screen.getByTestId("page-name").textContent).toBe("code-foundry");
-    expect(screen.getByTestId("project-meta").textContent).toBe("alexwaumann/code-foundry");
-    for (const id of ["project-refresh", "project-terminal", "project-new-thread", "project-more"]) expect(screen.getByTestId(id)).toBeTruthy();
-    expect(screen.getByTestId("project-terminal").textContent).toBe("Terminal");
-    expect(screen.getByTestId("checkouts-title").textContent).toContain("main plus 2 worktrees · 2 threads working");
+    for (const id of ["project-terminal", "project-new-thread", "project-refresh-failed"]) expect(screen.queryByTestId(id)).toBeNull();
+    const title = screen.getByTestId("project-title");
+    expect(within(title).getByTestId("project-title-name").textContent).toBe("code-foundry");
+    expect(within(title).getByTestId("project-meta").textContent).toBe("alexwaumann/code-foundry");
+    expect(within(title).getByTestId("project-title-meta").textContent).toMatch(/^alexwaumann\/code-foundry·main \S+ \S+·refreshed (just now|\d+m ago)$/);
+    expect(within(title).getByTestId("title-default-branch").querySelector("[data-checks]")).toBeTruthy();
+    for (const id of ["project-refresh", "project-more"]) expect(within(title).getByTestId(id)).toBeTruthy();
+    expect(screen.getByTestId("checkouts-title").textContent).toBe("Checkouts(3)· 2 threads working");
     expect(screen.getByTestId("checkouts-head").textContent).toMatch(/Branch\s*Threads\s*Changes\s*Sync\s*Pull request/);
 
     // Working first (main: s-1, feat/sidebar: s-5 starting), then the rest.
@@ -130,14 +144,13 @@ describe("a project's page", () => {
     expect(inEl(checkout(CF), "worktree-pr")).toBeNull();
 
     // Details.
-    expect(screen.getByTestId("details-path").textContent).toContain("~/src/code-foundry");
-    expect(screen.getByTestId("details-default-branch").textContent).toContain("main");
-    expect(screen.getByTestId("details-refreshed").textContent).toMatch(/^refreshed (just now|\d+m ago)$/);
-    expect(screen.getByTestId("details-remote").textContent).toContain("origin · github.com/alexwaumann/code-foundry");
-    expect(screen.getByTestId("details-worktrees").textContent).toContain("~/src/code-foundry.worktrees · 2");
+    expect(screen.getByTestId("details-path-value").textContent).toBe("~/src/code-foundry");
+    expect(screen.queryByTestId("details-default-branch")).toBeNull();
+    expect(screen.getByTestId("details-remote-value").textContent).toBe("origin · github.com/alexwaumann/code-foundry");
+    expect(screen.getByTestId("details-worktrees-value").textContent).toBe("2 in ~/src/code-foundry.worktrees");
     expect(screen.queryByText("Show in sidebar")).toBeNull();
     // Worktrees without threads sits between Checkouts and Details; threads hold both worktrees here.
-    expect([...list().children].map((c) => c.getAttribute("data-testid"))).toEqual(["project-checkouts", "leftover-worktrees", "project-details"]);
+    expect([...list().children].map((c) => c.getAttribute("data-testid"))).toEqual(["project-title", "project-checkouts", "leftover-worktrees", "project-details"]);
     expect(screen.getByTestId("leftover-empty")).toBeTruthy();
 
     // A click opens the checkout's Changes tab in this page's own panel, shown.
@@ -180,21 +193,56 @@ describe("a project's page", () => {
     expect(removes.at(-1)?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: FIX });
     // Once the daemon removed it: gone from the table and from Details' count.
     expect(checkout(FIX)).toBeNull();
-    expect(screen.getByTestId("details-worktrees").textContent).toContain("~/src/code-foundry.worktrees · 1");
+    expect(screen.getByTestId("details-worktrees-value").textContent).toBe("1 in ~/src/code-foundry.worktrees");
   });
 
-  it("the header's menu has no New worktree; New thread and Terminal start in the project", async () => {
+  it("the title block's ⋯: no New worktree, New action or Open in Finder; New terminal and New thread start in the project", async () => {
     renderPage("repo-cf");
     await settle();
-    const menu = openDropdown(screen.getByTestId("project-more"), "project-more-menu");
-    expect(menuEntries(menu)).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Clean up merged worktrees 0", "Remove project"]);
-    fireEvent.keyDown(menu, { key: "Escape" });
-    await settle();
-    fireEvent.click(screen.getByTestId("project-terminal"));
-    await settle();
+    let menu = openDropdown(screen.getByTestId("project-more"), "project-more-menu");
+    expect(menuEntries(menu, true)).toEqual(["New thread", "New terminal", "—", "Rename", "Clean up merged worktrees 0", "—", "Remove project"]);
+    await pick(menu, "project-menu-new-terminal");
     expect(lastInvocation("terminal.new")?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: CF });
-    fireEvent.click(screen.getByTestId("project-new-thread"));
+    menu = openDropdown(screen.getByTestId("project-more"), "project-more-menu");
+    await pick(menu, "project-menu-new-thread");
     expect(selection()).toEqual({ kind: "compose", projectId: "repo-cf" });
+  });
+
+  it("Details' path: Copy shows a check for a moment, no toast; Open in Finder reveals the main checkout, its ⋯ lists Finder, the editors and Terminal", async () => {
+    card.editors = [{ bundleId: "com.microsoft.VSCode", name: "Visual Studio Code" }] as typeof card.editors;
+    renderPage("repo-cf");
+    await settle();
+    const copy = screen.getByTestId("details-copy-path");
+    expect(tooltipText(copy)).toBe("Copy path");
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(copy);
+        await Promise.resolve();
+      });
+      expect(copyText).toHaveBeenCalledWith(CF);
+      expect(copy.getAttribute("data-copied")).toBe("true");
+      expect(document.querySelector("[data-sonner-toast]")).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      expect(copy.getAttribute("data-copied")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    fireEvent.click(screen.getByTestId("details-reveal"));
+    await settle();
+    expect(lastInvocation("worktree.reveal")).toMatchObject({ args: { worktree: CF }, context: { activeProjectId: "repo-cf", activeWorktreePath: CF } });
+    expect(screen.getByTestId("details-reveal").textContent).toBe("Open in Finder");
+
+    let menu = openDropdown(screen.getByTestId("details-open-in-more"), "details-open-in-menu");
+    expect(menuEntries(menu, true)).toEqual(["Finder", "Visual Studio Code", "—", "Terminal"]);
+    await pick(menu, "details-open-editor");
+    expect(lastInvocation("worktree.open.editor")?.args).toEqual({ worktree: CF, app: "com.microsoft.VSCode" });
+    menu = openDropdown(screen.getByTestId("details-open-in-more"), "details-open-in-menu");
+    await pick(menu, "details-open-terminal");
+    expect(lastInvocation("terminal.new")?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: CF });
   });
 
   it("kind variants: no remote (note, Publish, no Sync or PR), another remote (no PR), no git (note, Threads, no table)", async () => {
@@ -202,16 +250,19 @@ describe("a project's page", () => {
     const r = renderPage("repo-sk");
     await settle();
     expect(screen.getByTestId("project-meta").textContent).toBe("local only · no remote");
+    // Not on GitHub: the default branch by name, no checks.
+    expect(screen.getByTestId("title-default-branch").textContent).toBe("main");
+    expect(screen.getByTestId("title-default-branch").querySelector("[data-checks]")).toBeNull();
     expect(screen.getByTestId("project-note").textContent).toContain("This repository has no remote. Threads can commit, but nothing can be pushed and there are no pull requests.");
     expect(screen.queryByTestId("checkouts-col-sync")).toBeNull();
     expect(screen.queryByTestId("checkouts-col-pr")).toBeNull();
-    expect(screen.getByTestId("checkouts-title").textContent).toContain("main only");
+    expect(screen.getByTestId("checkouts-title").textContent).toBe("Checkouts(1)");
     expect(screen.queryByTestId("details-remote")).toBeNull();
     fireEvent.click(screen.getByTestId("project-publish"));
     await settle();
     expect(usePublishDialogStore.getState()).toMatchObject({ open: true, projectId: "repo-sk" });
     const menu = openDropdown(screen.getByTestId("project-more"), "project-more-menu");
-    expect(menuEntries(menu)).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Publish to GitHub", "Remove project"]);
+    expect(menuEntries(menu)).toEqual(["New thread", "New terminal", "Rename", "Publish to GitHub", "Remove project"]);
     r.unmount();
 
     const d = renderPage("repo-dot");
@@ -220,7 +271,7 @@ describe("a project's page", () => {
     expect(screen.queryByTestId("project-note")).toBeNull();
     expect(screen.getAllByTestId("checkouts-col-sync")).toHaveLength(1);
     expect(screen.queryByTestId("checkouts-col-pr")).toBeNull();
-    expect(screen.getByTestId("details-remote").textContent).toContain("origin · pull requests need GitHub");
+    expect(screen.getByTestId("details-remote-value").textContent).toBe("origin · pull requests need GitHub");
     d.unmount();
 
     renderPage("repo-wr");
@@ -228,12 +279,15 @@ describe("a project's page", () => {
     expect(page().getAttribute("data-kind")).toBe("nogit");
     expect(screen.queryByTestId("worktree-branch")).toBeNull();
     expect(screen.getByTestId("project-meta").textContent).toBe("~/Documents/writing");
+    // No git: the path alone on the meta line, no branch, no refresh.
+    expect(screen.getByTestId("project-title-meta").textContent).toBe("~/Documents/writing");
     expect(screen.getByTestId("project-note").textContent).toContain("A plain folder, not a git repository.");
     expect(screen.queryByTestId("checkouts-table")).toBeNull();
     expect(screen.queryByTestId("project-refresh")).toBeNull();
     expect(screen.getByTestId("project-threads").textContent).toContain("No thread is working here. New thread or Terminal.");
     expect(screen.queryByTestId("details-default-branch")).toBeNull();
-    expect(screen.getByTestId("details-actions").textContent).toMatch(/none\s*·\s*Add an action/);
+    expect(screen.getByTestId("details-actions-value").textContent).toBe("none");
+    expect(screen.getByTestId("details-add-action").textContent).toBe("Add action");
     fireEvent.click(screen.getByTestId("project-init-git"));
     await settle();
     const init = lastInvocation("project.git.init");
@@ -282,20 +336,22 @@ describe("a project's page", () => {
     expect(invocationsOf("git.fetch")).toHaveLength(1);
   });
 
-  it("a failed refresh shows in the header and Details; everything else keeps the last known state", async () => {
+  it("a failed refresh turns the title block's refreshed part red with the error as its tooltip; everything else keeps the last known state", async () => {
     renderPage("repo-cf");
     await settle();
-    expect(screen.queryByTestId("project-refresh-failed")).toBeNull();
+    expect(screen.getByTestId("project-refreshed").getAttribute("data-failed")).toBeNull();
     const fail = (error: string, ago: number) => {
       updateProject("repo-cf", (p) => ({ ...p, worktrees: p.worktrees.map((w) => (w.path === CF ? { ...w, status: { ...w.status, error, refreshedAtMs: Date.now() - ago } } : w)) }));
     };
     fail("could not reach origin", 870_000);
-    expect(screen.getByTestId("project-refresh-failed").textContent).toMatch(/^Refresh failed · could not reach origin· 1[45]m ago$/);
-    expect(screen.getByTestId("details-refreshed").textContent).toMatch(/^refresh failed 1[45]m ago$/);
-    expect(screen.getByTestId("details-refreshed").getAttribute("data-failed")).toBe("true");
+    const refreshed = screen.getByTestId("project-refreshed");
+    expect(refreshed.textContent).toMatch(/^Refresh failed · 1[45]m ago$/);
+    expect(refreshed.getAttribute("data-failed")).toBe("true");
+    expect(await hoverTooltipText(refreshed)).toBe("could not reach origin");
     expect(texts(document, "worktree-branch")).toHaveLength(3);
     fail("", 0);
-    expect(screen.queryByTestId("project-refresh-failed")).toBeNull();
+    expect(screen.getByTestId("project-refreshed").textContent).toBe("refreshed just now");
+    expect(screen.getByTestId("project-refreshed").getAttribute("data-failed")).toBeNull();
   });
 });
 
@@ -327,7 +383,7 @@ describe("Clean up merged worktrees", () => {
     renderPage("repo-cf");
     await settle();
     const menu = openDropdown(screen.getByTestId("project-more"), "project-more-menu");
-    expect(menuEntries(menu)).toEqual(["New action", "New thread", "New terminal", "Open in Finder", "Rename", "Clean up merged worktrees 2", "Remove project"]);
+    expect(menuEntries(menu)).toEqual(["New thread", "New terminal", "Rename", "Clean up merged worktrees 2", "Remove project"]);
     await pick(menu, "project-cleanup");
     const dialog = await screen.findByTestId("confirm-dialog");
     expect(dialog.textContent).toContain("Fetch, then remove 2 worktrees");
@@ -358,7 +414,7 @@ describe("Worktrees without threads", () => {
     expect(screen.getAllByTestId("leftover-row")).toHaveLength(4);
     expect(leftover(FEAT)).toBeNull();
     // A worktree shows once: the table keeps main and the two held ones, the caption counts all seven.
-    expect(screen.getByTestId("checkouts-title").textContent).toContain("main plus 6 worktrees · 2 threads working");
+    expect(screen.getByTestId("checkouts-title").textContent).toBe("Checkouts(3)· 2 threads working");
     expect(screen.getAllByTestId("project-worktree")).toHaveLength(3);
     for (const path of [CF, FEAT, FIX]) expect(checkout(path)).not.toBeNull();
     for (const path of [SPIKE, COPY, SHADERS, MERGED]) expect(checkout(path)).toBeNull();
@@ -383,7 +439,7 @@ describe("Worktrees without threads", () => {
       "Worktrees made for a thread go on their own once its last thread is archived and the work is on main. These stayed because they still hold something.",
     );
     // Details counts the worktrees Code Foundry made.
-    expect(screen.getByTestId("details-worktrees").textContent).toContain("6, 3 made by Code Foundry");
+    expect(screen.getByTestId("details-worktrees-value").textContent).toContain("6 · 3 made by Code Foundry");
     // Uncommitted files on a leftover show in its reason.
     updateProject("repo-cf", (p) => ({ ...p, worktrees: p.worktrees.map((w) => (w.path === SHADERS ? { ...w, status: status({ upstream: "", baseRef: "origin/main", modified: 2, dirty: true }) } : w)) }));
     expect(inEl(leftover(SHADERS), "leftover-reason")?.textContent).toBe("made outside Code Foundry · 2 uncommitted files · merged otherwise");

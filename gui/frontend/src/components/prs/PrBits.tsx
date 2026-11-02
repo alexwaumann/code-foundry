@@ -7,15 +7,15 @@ import { cn } from "@/lib/utils";
 import { checksSummary, freshness, shortAge, updatedAgo } from "./format";
 import { prStateLook } from "./prState";
 
-export function ChecksBadge({ checks, compact = false }: { checks: CheckRollupView; compact?: boolean }) {
+export function ChecksBadge({ checks, compact = false, branch, className }: { checks: CheckRollupView; compact?: boolean; /** Named before the label, in its tone: "⊗ main 2/16 failing". */ branch?: string; className?: string }) {
   const { tone, label } = checksSummary(checks);
   const Icon = tone === "success" ? CircleCheck : tone === "failure" ? CircleX : tone === "pending" ? CircleDot : CircleDashed;
   // Compact shows the icon alone: the label is its tooltip.
   return (
     <Tip label={compact ? label : null}>
-      <span className={cn("inline-flex items-center gap-1 text-body-sm tabular-nums", toneText[tone === "none" ? "neutral" : tone])} role={compact ? "img" : undefined} aria-label={compact ? label : undefined} data-checks={tone}>
+      <span className={cn("inline-flex items-center gap-1 text-body-sm tabular-nums", toneText[tone === "none" ? "neutral" : tone], className)} role={compact ? "img" : undefined} aria-label={compact ? label : undefined} data-checks={tone}>
         <Icon className="size-3.5 shrink-0" aria-hidden />
-        {!compact && <span className="truncate">{label}</span>}
+        {!compact && <span className="truncate">{branch ? `${branch} ${label}` : label}</span>}
       </span>
     </Tip>
   );

@@ -47,16 +47,55 @@ export function StatusDot({ live }: { live: boolean }) {
   return <span className={cn("size-1.5 shrink-0 rounded-full", live ? "bg-cf-success" : "bg-cf-border-strong")} data-live={live || undefined} aria-hidden />;
 }
 
-/** A section's overline title with its muted detail ("Checkouts · main plus 5 worktrees") and something at the right. */
-export function SectionHeader({ label, detail, right, testId }: { label: string; detail?: React.ReactNode; right?: React.ReactNode; testId?: string }) {
+/**
+ * A section's title on the Projects pages (the index, a project's page, a workspace's page):
+ * the heading, its row count in parentheses (`count`, left out when undefined), a muted
+ * "· hint" (`detail`, truncating) and something at the right (`right`).
+ */
+export function SectionHeader({ label, count, detail, right, testId }: { label: string; count?: number; detail?: React.ReactNode; right?: React.ReactNode; testId?: string }) {
   return (
-    <div className="mb-2 flex min-h-6 items-center gap-2" data-testid={testId}>
-      <span className="text-overline text-cf-text-muted">{label}</span>
-      {detail !== undefined && detail !== "" && <span className="min-w-0 truncate text-caption text-cf-text-muted">· {detail}</span>}
-      {right !== undefined && <span className="ml-auto flex items-center">{right}</span>}
+    <div className="mb-2 flex min-h-7 items-center gap-2" data-testid={testId}>
+      <h2 className="shrink-0 text-title">{label}</h2>
+      {count !== undefined && (
+        <span className="shrink-0 text-caption text-cf-text-muted tabular-nums" data-testid="section-count">
+          ({count})
+        </span>
+      )}
+      {detail !== undefined && detail !== "" && (
+        <span className="min-w-0 truncate text-caption text-cf-text-muted" data-testid="section-hint">
+          · {detail}
+        </span>
+      )}
+      {right !== undefined && <span className="ml-auto flex shrink-0 items-center gap-1.5 [--wails-draggable:no-drag]">{right}</span>}
     </div>
   );
 }
+
+/**
+ * The first thing on a project's or workspace's page: its icon (20px), its name and a muted
+ * meta line under it, and at the right the page's ⋯ (`right`).
+ */
+export function TitleBlock({ icon, name, meta, right, testId }: { icon: React.ReactNode; name: string; meta: React.ReactNode; right: React.ReactNode; testId: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3" data-testid={testId}>
+      <span className="flex shrink-0 [&_svg]:size-5" aria-hidden>
+        {icon}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h1 className="truncate text-title" data-testid={`${testId}-name`}>
+          {name}
+        </h1>
+        <div className="flex min-h-5 min-w-0 items-center gap-1.5 text-caption whitespace-nowrap text-cf-text-muted" data-testid={`${testId}-meta`}>
+          {meta}
+        </div>
+      </div>
+      <span className="flex shrink-0 items-center">{right}</span>
+    </div>
+  );
+}
+
+/** The meta line's separator. */
+export const MetaDot = () => <span aria-hidden>·</span>;
 
 /** A text link that runs an action (no navigation): Details' Open in Finder, Copy, Edit. */
 export function LinkButton({ children, onClick, testId, className }: { children: React.ReactNode; onClick: () => void; testId?: string; className?: string }) {
