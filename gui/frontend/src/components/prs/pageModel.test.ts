@@ -37,7 +37,7 @@ describe("otherStatus", () => {
     ["mergeable, no review required, reviewed", { review: null, mergeState: "clean", checks: ok, latestReviews: [{ author: "kim", state: "commented", submittedAtMs: T0, commitSha: "" }] }, "ready", "Mergeable"],
     ["draft", { draft: true, review: "review_required", mergeState: "blocked", checks: ok }, "draft", "Draft"],
     ["awaiting two reviewers", { reviewRequests: ["kim", "lee"], mergeState: "blocked", checks: ok }, "awaiting_review", "Awaiting review · 2"],
-    ["nobody asked", { review: null, mergeState: "clean", checks: { ...ok, total: 0, passed: 0, state: null } }, "no_reviewers", "No reviewers"],
+    ["nobody asked", { review: null, mergeState: "clean", checks: { ...ok, total: 0, passed: 0, state: "none" } }, "no_reviewers", "No reviewers"],
     ["changes requested", { review: "changes_requested", mergeState: "blocked", checks: ok }, "changes_requested", "Changes requested"],
     ["CI failing", { review: "approved", mergeState: "unstable", checks: { ...ok, failed: 1, passed: 3, state: "failure" } }, "ci_failing", "CI failing"],
     ["conflicts", { review: "approved", mergeable: "conflicting", mergeState: "dirty", checks: ok }, "conflicts", "Conflicts"],
