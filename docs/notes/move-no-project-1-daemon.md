@@ -124,3 +124,96 @@ thread; `thread.move` takes it there.
   `thread.run-in`'s description shortened (25,646).
 * Run in's Claude answers now carry `transcript_relocated` in the fake; the tailer's
   `relocated` is a no-op when the transcript resolves to the path it already has.
+
+## Found with real Claude (fixed in this PR)
+
+* **A running Claude answers `needs_trust`** to set_cwd for a folder trusted after it
+  started (it reads folder trust at start; the pre-trust the move writes comes too late
+  for it). The first version failed the move (it rolled back cleanly: the thread stayed
+  in home, the timeline said "needs_trust"). Now `streamCd` restarts that process once
+  (`runner.moveRestart`: resuming, still in the old cwd, with the destination's
+  `--add-dir` list, so it rereads its config), then sends set_cwd again; a second
+  `needs_trust` fails the move. A worktree the daemon already trusted before the process
+  started (the workspace case below) moves without it.
+* `thread move <name>`: the registry's project resolver passes an unknown ref through,
+  so a workspace name reached the daemon as a project (NOT_FOUND). The command now
+  retries a project NOT_FOUND as a workspace and says "no project or workspace" when it
+  is neither.
+
+## Observed, not changed
+
+* Claude emits an empty `result` (0 tokens, ~20 ms) right after a set_cwd, which the
+  timeline shows as a 0.0 s turn end. A plain `thread run-in` does the same, so it is
+  existing behaviour, left for a follow-up (it may set a moved thread's status to
+  "finished").
+
+## Verified with real Claude
+
+`make build`; `CODE_FOUNDRY_HOME=/tmp/cf-move bin/code-foundry daemon --dev`; scratch git
+repos `~/cf-move-scratch/movedemo` and `movelib` (each with a local bare origin), `project
+add` both, `workspace new duo --projects movedemo,movelib`. Threads on
+`claude-sonnet-5-5[1m]` at medium effort. The default naming model (Sonnet 4.6 [1m]) was
+refused by the account ("Usage credits required for 1M context"), so the scratch daemon
+had `threads.naming_model = claude-sonnet-5-5[1m]`.
+
+1. Not running, fresh copy:
+   `thread new --no-project --model 'claude-sonnet-5-5[1m]' --effort medium --created-by=
+   --prompt "The login page redirects to /home after sign-in instead of the page the user
+   came from. Remember the word PELICAN for later. …"`, then `thread archive` and
+   `thread archive --archived=false` to stop it. Transcript at
+   `~/.claude/projects/-Users-alex/37632434-….jsonl`.
+   `thread move movedemo --id s-1df6187039ec --new-worktree` (6.9 s, naming included):
+   "moved thread Fix login redirect destination (s-1df6187039ec) to movedemo, in
+   /private/tmp/cf-move/worktrees/_local/movedemo/fix-login-redirect-destination (new
+   worktree on fix/login-redirect-destination from origin/main)". Log: "started thread to
+   move it" with `--resume 37632434-…` and `cwd=/Users/alex`, then "thread moved …
+   transcript_relocated=true". The transcript was then only at
+   `~/.claude/projects/-private-tmp-cf-move-worktrees--local-movedemo-fix-login-redirect-destination/37632434-….jsonl`.
+   Timeline: "Moved this thread to movedemo (new worktree on fix/login-redirect-destination)."
+   `thread send --wait "What word did I ask you to remember, and what bug did I describe?
+   Also print your current working directory with pwd."`: same process (no new spawn),
+   `pwd` = the worktree, "The word was PELICAN, and the bug is that the login page
+   redirects to /home after sign-in instead of the page the user came from."
+   With `threads.cache_ttl_seconds = 60` it stopped by itself ("stopping idle thread at
+   its prompt cache expiry", reason idle) about two minutes after the move's start: the
+   five-minute start grace did not hold it.
+2. Not running with an expired cache, project folder: `thread move movedemo --id
+   s-3294216254ec --new-worktree=false` → "in /Users/alex/cf-move-scratch/movedemo",
+   transcript_relocated=true, stopped (idle) 25 s later at the stopper's next pass.
+3. Running and idle, project folder (`threads.default_worktree = current`, no flag):
+   `thread move movelib --id s-faa8827605a5` → the needs_trust restart above
+   ("claude needs the move's folder trusted; restarting it…", "claude restarted" with
+   `--resume`), then "thread moved … transcript_relocated=true"; 3.5 s.
+4. Workspace, running and idle: `thread move duo --id s-6e25e6d49a07 --new-worktree` →
+   "to workspace w-46b6b35a4a96, in …/movedemo/refactor-share-version-constant (new
+   worktree on refactor/share-version-constant from origin/main)"; worktrees made in both
+   members on the one branch, `checkout_paths` has both; set_cwd ok
+   (transcript_relocated=true), then "restarting claude for a changed project set" and
+   "claude restarted" with `--resume 13505c19-…`, `--add-dir
+   /tmp/cf-move/workspaces/w-46b6b35a4a96` and `--add-dir …/movelib/refactor-share-version-constant`.
+   A send afterwards: "You asked me to remember MANGO", `pwd` = the movedemo worktree.
+5. Mid-turn: a thread running `sleep 20` (busy tool "Bash sleep 20"); `thread move movelib
+   --new-worktree` returned at once: "moves to …/movelib/chore-run-sleep-command once its
+   turn ends"; `thread get`: status busy, `worktreePath` /Users/alex, `pendingMove
+   {projectId, worktreePath, branch: chore/run-sleep-command}`. The move happened 20 s
+   later, as the turn ended.
+6. Daemon log: no warnings or errors besides the refused naming model and the needs_trust
+   failure of the first version. Scratch repos, `/tmp/cf-move` and the test transcripts
+   removed.
+
+## Tests
+
+* Store (`move_test.go`): `TestCheckMove` (table), `TestMoveStoppedIntoNewWorktree`
+  (start in home with `--resume`, set_cwd, row, report, naming request with the
+  conversation and a branch, note, WorktreeCreated, no start grace, next start in the
+  worktree), `TestMoveLiveIntoProjectFolder` (no restart), `TestMoveMidTurnWaitsForTheTurn`
+  (pending move, a second move refused), `TestMoveLiveIntoWorkspace` (the restart with the
+  members, resumed, cwd), `TestMoveStoppedIntoWorkspaceFolder` (the start's add-dirs),
+  `TestMoveOntoExistingBranch` (base ignored, title only), `TestMoveSetCwdRefusedRollsBack`,
+  `TestMoveRefusals` (project, no place, both modes, unknown project, main checkout on the
+  branch, archived, transcript missing), `TestMoveWithoutConversation` (row only, setting
+  default, `cf/<id>`), `TestMoveNamingFails`, `TestMoveQueuedLostWhenClaudeStops`,
+  `TestMoveLiveRestartsForTrust`; `TestBuildNamingPromptConversation` rows;
+  `TestTailerFollowsARelocatedTranscript`.
+* API `TestThreadMove`; command `TestThreadMove` (placement flags, workspace fallback,
+  queued message, refusals); the command and NoPalette lists.
