@@ -43,7 +43,9 @@
 // "error" and that message (a thread move's failure path). With
 // CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE=<path> the first set_cwd (the one that creates <path>)
 // answers needs_trust, as a Claude started before the folder was trusted does.
-// CF_FAKE_CLAUDE_SET_CWD_RESULT (any value) writes, after an ok answer, the empty
+// CF_FAKE_CLAUDE_SET_CWD_GATE=<path> holds every set_cwd answer until <path> exists, and
+// CF_FAKE_CLAUDE_SET_CWD_ERROR=<message> answers with a control error (a set_cwd whose
+// answer is lost). CF_FAKE_CLAUDE_SET_CWD_RESULT (any value) writes, after an ok answer, the empty
 // result (no turn, 0 tokens) real Claude emits after a set_cwd.
 //
 // A stuck Claude: with CF_FAKE_CLAUDE_STALL set, the first user message starts its turn
@@ -297,6 +299,18 @@ func Run(fixture string) int {
 				}
 				resp["response"] = map[string]any{"pid": os.Getpid(), "current_permission_mode": "default", "commands": commands}
 			case "set_cwd":
+				if gate := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_GATE"); gate != "" {
+					for {
+						if _, err := os.Stat(gate); err == nil {
+							break
+						}
+						time.Sleep(5 * time.Millisecond)
+					}
+				}
+				if msg := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_ERROR"); msg != "" {
+					resp = map[string]any{"subtype": "error", "request_id": m.RequestID, "error": msg}
+					break
+				}
 				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true, "transcript_relocated": true}
 				if msg := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_REFUSE"); msg != "" {
 					resp["response"] = map[string]any{"status": "error", "message": msg}

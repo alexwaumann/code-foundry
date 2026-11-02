@@ -611,3 +611,80 @@ func TestMoveStoppedSeesAStart(t *testing.T) {
 		t.Error("no set_cwd")
 	}
 }
+
+// A set_cwd whose answer is lost (a timeout, a transport error) moved when the
+// transcript is under the destination now, and did not when it is still in the old
+// cwd: a move is applied or rolled back, a Run in applied or dropped, accordingly.
+func TestSetCwdLostAnswer(t *testing.T) {
+	tests := []struct {
+		name     string
+		run      bool // a Run in, else a move
+		relocate bool // the transcript moved to the destination
+	}{
+		{"move, transcript moved", false, true},
+		{"move, transcript stayed", false, false},
+		{"run in, transcript moved", true, true},
+		{"run in, transcript stayed", true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gate := filepath.Join(t.TempDir(), "answer")
+			knobs := func(o *Options) {
+				o.Env = append(o.Env, "CF_FAKE_CLAUDE_SET_CWD_GATE="+gate, "CF_FAKE_CLAUDE_SET_CWD_ERROR=connection lost")
+			}
+			var (
+				e        *wsEnv
+				id, cid  string
+				from, to string
+			)
+			if tt.run {
+				e = newWSFixtureEnv(t, "write-allow", knobs)
+				s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
+				e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
+				id, cid, from, to = s.ID, argOf(e.spec(s.ID).Argv, "--session-id"), e.wt, e.wt2
+				e.writeTranscriptIn(from, cid, userLine("write"))
+				e.answer(id)
+				e.waitItems(id, "turn end", hasTurnEnd)
+			} else {
+				e, _ = newMoveEnv(t, "text-table", knobs)
+				var s Thread
+				s, cid = e.noProjectThread("check the slack thread", true)
+				id, from, to = s.ID, e.home, e.wt
+			}
+			errc := make(chan error, 1)
+			go func() {
+				var err error
+				if tt.run {
+					_, err = e.m.RunIn(e.ctx(), id, RunInTarget{ProjectID: "r2"})
+				} else {
+					_, err = e.m.Move(e.ctx(), id, MoveOptions{ProjectID: "r1", CheckoutMode: true})
+				}
+				errc <- err
+			}()
+			e.waitSent("set_cwd", isSetCwd(to))
+			if tt.relocate {
+				dst := e.paths.projectDir(to)
+				if err := os.MkdirAll(dst, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(filepath.Join(e.paths.projectDir(from), cid+".jsonl"), filepath.Join(dst, cid+".jsonl")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(gate, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			err := <-errc
+			if !tt.run && tt.relocate != (err == nil) {
+				t.Fatalf("Move = %v", err)
+			}
+			got := e.waitFor(id, "settled", func(s Thread) bool { return s.PendingMove == nil && s.PendingWorktreePath == "" })
+			if moved := samePath(got.WorktreePath, to); moved != tt.relocate {
+				t.Errorf("cwd = %s, moved %v, want %v (last error %q)", got.WorktreePath, moved, tt.relocate, got.LastError)
+			}
+			if !tt.relocate && !strings.Contains(got.LastError, "connection lost") {
+				t.Errorf("last error = %q", got.LastError)
+			}
+		})
+	}
+}
