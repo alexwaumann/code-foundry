@@ -9,7 +9,7 @@ import { keyOf } from "@/stores/panel";
 import { useRecentFiles } from "@/stores/recentFiles";
 import { useCheckoutChanges, useFinderCheckouts, useFinderScopeName, useFinderSearch, useOpenFilePaths, type FindFilesFn } from "./useFileFinder";
 
-/** Text runs, the matched ones bold in the foreground colour. */
+/** Text runs, the matched ones semibold in the foreground colour (the rest stays regular, so they stand out). */
 function Runs({ runs }: { runs: readonly Run[] }) {
   return (
     <>
@@ -45,7 +45,7 @@ function FinderItem({ row, multi, onOpen }: { row: FinderRow; multi: boolean; on
       data-project={row.projectId}
     >
       <span className="flex min-w-0 flex-1 items-baseline gap-2">
-        <span className="max-w-full shrink-0 truncate text-cf-text" data-testid="finder-name">
+        <span className="max-w-full shrink-0 truncate font-normal text-cf-text" data-testid="finder-name">
           <Runs runs={row.name} />
         </span>
         {row.dir && (
@@ -142,12 +142,33 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
     tagFoundFile(threadId, r);
   };
 
+  // The rows on screen answer an older query while the typed one's search is out (or still
+  // debounced). Enter or ⌥⏎ then waits for the answer and takes its first row: typing a name
+  // and pressing Enter at once must not open the previous query's file (nor do nothing on
+  // the first query).
+  const waiting = searching && !parsed.tooMany && found.answered !== parsed.query;
+  const pending = useRef<{ query: string; tag: boolean } | null>(null);
+  useEffect(() => {
+    const p = pending.current;
+    if (p === null) return;
+    if (p.query !== parsed.query) {
+      pending.current = null;
+      return;
+    }
+    if (found.answered !== p.query) return;
+    pending.current = null;
+    const r = rows[0];
+    if (r === undefined || found.error !== null) return;
+    if (p.tag) tagFoundFile(threadId, r);
+    else openFoundFile(threadId, r, parsed.line);
+  }, [found, rows, parsed.query, parsed.line, threadId]);
+
   const status = parsed.tooMany
     ? `At most ${String(MAX_WORDS)} words`
     : searching
       ? found.error && found.answered === parsed.query
         ? null
-        : found.answered === null
+        : waiting
           ? "Searching…"
           : "No matching files."
       : "No changed or recently opened files. Type to search.";
@@ -161,7 +182,14 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
       data-testid="palette"
       data-mode="files"
       onKeyDown={(e) => {
-        if (e.key !== "Enter" || !e.altKey || e.nativeEvent.isComposing) return;
+        if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+        if (waiting) {
+          e.preventDefault();
+          e.stopPropagation();
+          pending.current = { query: parsed.query, tag: e.altKey };
+          return;
+        }
+        if (!e.altKey) return;
         e.preventDefault();
         e.stopPropagation();
         const r = rows.find((x) => x.key === selected);

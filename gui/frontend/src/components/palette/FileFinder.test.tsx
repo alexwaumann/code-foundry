@@ -244,6 +244,18 @@ describe("a typed query", () => {
     expect(rows()).toEqual(["[tr]ee.ts"]);
   });
 
+  it("says Searching… (not No matching files.) while a new query's search is out after an empty answer", async () => {
+    search.mockResolvedValueOnce([]);
+    await openFinder("s-1");
+    typeQuery("zz");
+    await searched();
+    expect(screen.getByTestId("finder-status-line").textContent).toBe("No matching files.");
+    search.mockReturnValue(new Promise(() => undefined));
+    typeQuery("zzz");
+    await searched();
+    expect(screen.getByTestId("finder-status-line").textContent).toBe("Searching…");
+  });
+
   it("shows a failed search's message", async () => {
     search.mockRejectedValue(new Error("list /x: permission denied"));
     await openFinder("s-1");
@@ -264,6 +276,52 @@ describe("picking a file", () => {
     await settle(5);
     expect(useUiStore.getState().palette.open).toBe(false);
     expect(panelActive("thread:s-1")).toEqual({ open: true, kind: "files", title: "tree.ts", params: { project: "repo-cf", base: CF, path: `${CF}/gui/src/lib/tree.ts`, line: "42" } });
+  });
+
+  it("Enter before the typed query's answer waits for it and opens its first row, not the previous query's", async () => {
+    search.mockResolvedValueOnce([match("repo-cf", CF, "gui/src/lib/tree.ts", [12, 13])]);
+    await openFinder("s-1");
+    typeQuery("tr");
+    await searched();
+    let answer: (m: FinderMatchView[]) => void = () => undefined;
+    search.mockReturnValueOnce(
+      new Promise((r) => {
+        answer = r;
+      }),
+    );
+    typeQuery("app:7");
+    fireEvent.keyDown(input(), { key: "Enter" });
+    await searched();
+    expect(useUiStore.getState().palette.open).toBe(true);
+    expect(panelActive("thread:s-1")).toBeNull();
+    await act(async () => {
+      answer([match("repo-cf", CF, "src/app.ts", [4, 5, 6])]);
+      await Promise.resolve();
+    });
+    await settle(5);
+    expect(useUiStore.getState().palette.open).toBe(false);
+    expect(panelActive("thread:s-1")?.params).toEqual({ project: "repo-cf", base: CF, path: `${CF}/src/app.ts`, line: "7" });
+  });
+
+  it("a waiting Enter is dropped when the query changes or the search fails", async () => {
+    search.mockReturnValueOnce(new Promise(() => undefined));
+    await openFinder("s-1");
+    typeQuery("tree");
+    fireEvent.keyDown(input(), { key: "Enter" });
+    await searched();
+    expect(screen.getByTestId("finder-status-line").textContent).toBe("Searching…");
+    search.mockResolvedValueOnce([match("repo-cf", CF, "tree.go", [0])]);
+    typeQuery("tree.go");
+    await searched();
+    expect(rows()).toEqual(["[t]ree.go"]);
+    expect(useUiStore.getState().palette.open).toBe(true);
+    search.mockRejectedValueOnce(new Error("boom"));
+    typeQuery("tree.g");
+    fireEvent.keyDown(input(), { key: "Enter" });
+    await searched();
+    expect(screen.getByTestId("finder-error").textContent).toBe("Cannot search: boom");
+    expect(useUiStore.getState().palette.open).toBe(true);
+    expect(panelActive("thread:s-1")).toBeNull();
   });
 
   it("Enter on a changed file opens a File tab, not a Diff tab, and an open one only activates", async () => {
