@@ -21,17 +21,61 @@ test.beforeEach(async () => {
 });
 
 test.describe("Pull Requests page", () => {
-  // "sidebar entry opens it: the review queue, your pull requests, merges, then the charts" and "the
-  // sidebar counts the pull requests that need review; inbox zero shows Ember": src/components/prs/PullRequestsPage.test.tsx.
+  // The sections, cards, filter, inbox zero, caps and the header's freshness:
+  // src/components/prs/PullRequestsPage.test.tsx and pageModel.test.ts.
   test("page and inbox zero (screenshots)", async ({ page }) => {
     test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
     await openApp(page);
     await page.getByTestId("nav-pullrequests").click();
-    await expect(prRows(page, "merged")).toHaveCount(4);
+    await expect(prRows(page, "merged")).toHaveCount(7);
     await shot(page, "prs-page");
     await mockPost("gh/inbox-zero");
-    await expect(page.getByTestId("prs-inbox-zero")).toBeVisible();
+    await expect(page.getByTestId("prs-review")).toHaveCount(0);
     await shot(page, "prs-inbox-zero");
+  });
+
+  test("the five cards sit in one row under the half-height charts, and wrap beside the side panel", async ({ page }) => {
+    await openApp(page);
+    await page.getByTestId("nav-pullrequests").click();
+    const cards = page.getByTestId("prs-cards").getByRole("button");
+    await expect(cards).toHaveCount(5);
+    const row = async () => {
+      const boxes = await Promise.all((await cards.all()).map(async (c) => c.boundingBox()));
+      const tops = new Set(boxes.map((b) => Math.round(b?.y ?? -1)));
+      const widths = boxes.map((b) => b?.width ?? 0);
+      return { tops: tops.size, spread: Math.max(...widths) - Math.min(...widths), minWidth: Math.min(...widths) };
+    };
+    const wide = await row();
+    expect(wide.tops).toBe(1);
+    expect(wide.spread).toBeLessThan(1.5);
+    // The chart's plot is about half its old 170px.
+    const chart = await page.getByTestId("activity-merged").locator("svg").boundingBox();
+    expect(chart?.height).toBeLessThan(100);
+    // The cards sit below both charts.
+    const charts = await page.getByTestId("activity").boundingBox();
+    const first = await cards.first().boundingBox();
+    expect((first?.y ?? 0) >= (charts?.y ?? 0) + (charts?.height ?? 0)).toBe(true);
+    await page.getByTestId("prs-list").press("ArrowDown");
+    await page.getByTestId("prs-list").press("Enter");
+    await expect(page.getByTestId("pr-surface")).toBeVisible();
+    // A pull request open in the side panel narrows the page below 640px: three cards a row, none clipped.
+    const narrow = await row();
+    expect(narrow.tops).toBe(2);
+    expect(narrow.minWidth).toBeGreaterThan(150);
+    const box = await page.getByTestId("prs-cards").boundingBox();
+    for (const c of await cards.all()) {
+      const b = await c.boundingBox();
+      expect((b?.x ?? 0) + (b?.width ?? 0)).toBeLessThanOrEqual((box?.x ?? 0) + (box?.width ?? 0) + 0.5);
+    }
+  });
+
+  test("a capped project list arrives over the gh stream with its footer", async ({ page }) => {
+    await openApp(page);
+    await page.getByTestId("nav-pullrequests").click();
+    await expect(prRows(page, "merged")).toHaveCount(7);
+    await expect(page.getByTestId("prs-cap")).toHaveCount(0);
+    await mockPost("gh/project-merged-capped?shown=3&total=64");
+    await expect(page.getByTestId("prs-merged").getByTestId("prs-cap")).toBeVisible();
   });
 
   test("activity charts share the hovered month; one tooltip, in the card under the pointer", async ({ page }) => {

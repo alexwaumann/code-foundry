@@ -3,7 +3,7 @@ import { applyGhEvent, pollFreshness, usePollStore } from "./gh";
 
 describe("gh poll freshness", () => {
   afterEach(() => {
-    usePollStore.setState({ fetchedAtMs: null, lastError: "", known: false });
+    usePollStore.setState({ fetchedAtMs: null, lastError: "", known: false, projectsFetchedAtMs: null, projectsLastError: "" });
   });
 
   it("uses the data's own time until a polled event arrives", () => {
@@ -18,6 +18,11 @@ describe("gh poll freshness", () => {
     // A failed poll keeps the last success's time.
     applyGhEvent({ kind: "polled", fetchedAtMs: 2000, lastError: "rate limited", projectsFetchedAtMs: null, projectsLastError: "" });
     expect(pollFreshness(usePollStore.getState(), 5000, "").fetchedAtMs).toBe(2000);
+  });
+
+  it("the polled event carries the project lists' fetch time and error too", () => {
+    applyGhEvent({ kind: "polled", fetchedAtMs: 5000, lastError: "", projectsFetchedAtMs: 4000, projectsLastError: "search timed out" });
+    expect(usePollStore.getState()).toMatchObject({ fetchedAtMs: 5000, projectsFetchedAtMs: 4000, projectsLastError: "search timed out" });
   });
 
   it("a daemon that never polled successfully keeps the data's time", () => {

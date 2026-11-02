@@ -20,9 +20,13 @@ interface PollState {
   lastError: string;
   /** Whether a polled event arrived since the stream (re)connected. */
   known: boolean;
+  /** When the project-wide lists (the Pull Requests page's) were last fetched, from the same polled event; null if never. */
+  projectsFetchedAtMs: number | null;
+  /** Their last fetch's error; "" when it succeeded. */
+  projectsLastError: string;
 }
 
-export const usePollStore = create<PollState>()(() => ({ fetchedAtMs: null, lastError: "", known: false }));
+export const usePollStore = create<PollState>()(() => ({ fetchedAtMs: null, lastError: "", known: false, projectsFetchedAtMs: null, projectsLastError: "" }));
 
 export interface Freshness {
   fetchedAtMs: number | null;
@@ -34,7 +38,7 @@ export interface Freshness {
  * answer. Every successful poll confirms the data (it would have been re-read had it
  * changed), and the daemon sends the data events of a poll before its polled event.
  */
-export function pollFreshness(poll: PollState, fetchedAtMs: number | null, lastError: string): Freshness {
+export function pollFreshness(poll: Pick<PollState, "fetchedAtMs" | "lastError" | "known">, fetchedAtMs: number | null, lastError: string): Freshness {
   if (!poll.known) return { fetchedAtMs, lastError };
   return { fetchedAtMs: poll.fetchedAtMs ?? fetchedAtMs, lastError: poll.lastError || lastError };
 }
@@ -45,6 +49,17 @@ export function useFreshness(fetchedAtMs: number | null, lastError: string, poll
   const pollErr = usePollStore((s) => s.lastError);
   const known = usePollStore((s) => s.known);
   return polled ? pollFreshness({ fetchedAtMs: pollAt, lastError: pollErr, known }, fetchedAtMs, lastError) : { fetchedAtMs, lastError };
+}
+
+/**
+ * useFreshness for the project-wide lists (DashboardView.projectOpen, projectMerged): the
+ * polled event's projects fetch time and error once one arrived, else the dashboard's.
+ */
+export function useProjectsFreshness(fetchedAtMs: number | null, lastError: string): Freshness {
+  const pollAt = usePollStore((s) => s.projectsFetchedAtMs);
+  const pollErr = usePollStore((s) => s.projectsLastError);
+  const known = usePollStore((s) => s.known);
+  return pollFreshness({ fetchedAtMs: pollAt, lastError: pollErr, known }, fetchedAtMs, lastError);
 }
 
 /** The one key of viewerResource. */
@@ -123,7 +138,7 @@ export const pullRequestDetailResource = createResource(
 export function applyGhEvent(ev: GhEventView): void {
   switch (ev.kind) {
     case "polled":
-      usePollStore.setState({ fetchedAtMs: ev.fetchedAtMs, lastError: ev.lastError, known: true });
+      usePollStore.setState({ fetchedAtMs: ev.fetchedAtMs, lastError: ev.lastError, known: true, projectsFetchedAtMs: ev.projectsFetchedAtMs, projectsLastError: ev.projectsLastError });
       break;
     case "viewer":
     case "dashboard":

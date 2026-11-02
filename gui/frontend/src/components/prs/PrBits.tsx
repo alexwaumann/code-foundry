@@ -1,5 +1,5 @@
 import { CircleCheck, CircleDashed, CircleDot, CircleX } from "lucide-react";
-import type { CheckRollupView, PrStateView } from "@/api/gh";
+import type { CheckRollupView, PrStateView, PullRequestView } from "@/api/gh";
 import { prStateText, toneText } from "@/components/pr/tones";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
@@ -25,6 +25,17 @@ export function PrStateIcon({ state, draft }: { state: PrStateView; draft: boole
   const look = prStateLook(state, draft);
   const Icon = look.icon;
   return <Icon className={cn("size-3.5 shrink-0", prStateText[look.tone])} aria-label={look.label} />;
+}
+
+/** "+1,412 −58" in the success and error colours; empty for a partial row (its detail is not fetched yet). */
+export function Diff({ pr, className }: { pr: Pick<PullRequestView, "additions" | "deletions" | "partial">; className?: string }) {
+  if (pr.partial) return <span className={className} data-testid="prs-diff" />;
+  return (
+    <span className={cn("flex justify-end gap-1.5 text-code tabular-nums", className)} data-testid="prs-diff" aria-label={`${String(pr.additions)} additions, ${String(pr.deletions)} deletions`}>
+      <span className={toneText.success}>+{pr.additions.toLocaleString("en-US")}</span>
+      <span className={toneText.failure}>−{pr.deletions.toLocaleString("en-US")}</span>
+    </span>
+  );
 }
 
 /** Relative age that refreshes every 30s. */
@@ -53,12 +64,16 @@ export function Freshness({ fetchedAtMs, lastError, staleAfterMs, testId }: { fe
   );
 }
 
-export function SectionTitle({ children, count, extra }: { children: React.ReactNode; count?: number; extra?: React.ReactNode }) {
+export function SectionTitle({ children, count, caption }: { children: React.ReactNode; count?: number; /** Muted, after the count: "open, waiting on the author". */ caption?: React.ReactNode }) {
   return (
     <h2 className="mb-1.5 flex items-baseline gap-2 text-heading">
       <span>{children}</span>
       {count !== undefined && <span className="text-caption tabular-nums">({count})</span>}
-      {extra && <span className="ml-auto text-body-sm">{extra}</span>}
+      {caption && (
+        <span className="truncate text-caption" data-testid="prs-section-caption">
+          {caption}
+        </span>
+      )}
     </h2>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MonthView } from "@/api/gh";
-import { axisLabel, chartMonths, countScale, countStep, labelledIndex, monthLabelAt, tickLabel, tooltipSide } from "./activity";
+import { axisLabel, chartMonths, countScale, countStep, labelledIndex, labelledIndexes, labelledTicks, monthLabelAt, tickLabel, tooltipSide } from "./activity";
 
 // 2026-10-17 noon, local time (the daemon's months are local too).
 const NOW = new Date(2026, 9, 17, 12).getTime();
@@ -56,6 +56,30 @@ describe("labelledIndex", () => {
     ["after a rollover: the newest", 6, new Date(2026, 10, 2).getTime(), 5],
   ])("%s", (_name, n, now, want) => {
     expect(labelledIndex(chartMonths(SIX.slice(0, n), now))).toBe(want);
+  });
+});
+
+describe("labelledIndexes", () => {
+  it.each([
+    ["six months: the last closed and the current", 6, NOW, [4, 5]],
+    ["only the current month", 1, NOW, [0]],
+    ["current and one closed", 2, NOW, [0, 1]],
+    ["no months", 0, NOW, []],
+    ["after a rollover: the newest only", 6, new Date(2026, 10, 2).getTime(), [5]],
+  ])("%s", (_name, n, now, want) => {
+    expect(labelledIndexes(chartMonths(SIX.slice(0, n), now))).toEqual(want);
+  });
+});
+
+describe("labelledTicks", () => {
+  it.each([
+    [[0, 10, 20, 30, 40], [0, 40]],
+    [[0, 200, 400, 600], [0, 600]],
+    [[0, 1], [0, 1]],
+    [[0], [0]],
+    [[], []],
+  ])("%o labels %o", (ticks, want) => {
+    expect(labelledTicks(ticks)).toEqual(want);
   });
 });
 

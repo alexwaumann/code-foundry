@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Check, GitPullRequest } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { GitPullRequest } from "lucide-react";
 import type { DashboardView, PullRequestView } from "@/api/gh";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Tip } from "@/components/ui/tooltip";
@@ -7,22 +7,22 @@ import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { DASHBOARD_KEY, dashboardResource, openUrl, useFreshness } from "@/stores/gh";
+import { DASHBOARD_KEY, dashboardResource, openUrl, useFreshness, useProjectsFreshness } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
 import { ActivityCharts } from "./ActivityCharts";
-import { authoredRows } from "./authoredStatus";
 import { prKey } from "./format";
-import { InboxZero } from "./InboxZero";
+import { capKey, cards, liveFilter, mergedSubtitle, olderFreshness, pageModel, sectionRows, SECTIONS, type PageModel, type Section } from "./pageModel";
 import { Freshness, SectionTitle } from "./PrBits";
-import { AuthoredPrRow, MergedRow, NeedsReviewRow, PrTable, ReviewedByYouRow, type Section } from "./PrRows";
-import { needsReviewCount, reviewQueue } from "./reviewQueue";
+import { AuthoredPrRow, MergedRow, NeedsReviewRow, OtherPrRow, PrTable, ReviewedByYouRow } from "./PrRows";
+import { needsReviewCount } from "./reviewQueue";
+import { SummaryCards } from "./SummaryCards";
 
 /** The daemon polls every minute by default; older than a few polls plus slack is stale. */
 const STALE_AFTER_MS = 5 * 60_000;
 
-function Banner({ tone, children }: { tone: "warn" | "info"; children: React.ReactNode }) {
+function Banner({ tone, children }: { tone: "warn" | "info"; children: ReactNode }) {
   return (
     <p className={cn("rounded-lg border px-3 py-2 text-body", tone === "warn" ? "border-cf-warning/40 bg-cf-warning-surface text-cf-warning-text" : "text-cf-text-muted")} role="status">
       {children}
@@ -30,44 +30,66 @@ function Banner({ tone, children }: { tone: "warn" | "info"; children: React.Rea
   );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="px-2 text-body text-cf-text-muted">{children}</p>;
+/** A section's rows in page order, for the keyboard. */
+function sectionPrs(m: PageModel, s: Section): readonly { pr: PullRequestView }[] {
+  switch (s) {
+    case "review":
+      return m.needs;
+    case "reviewed":
+      return m.reviewed;
+    case "authored":
+      return m.authored;
+    case "else":
+      return m.others;
+    case "merged":
+      return m.merged;
+  }
 }
 
 function Body({ d }: { d: DashboardView }) {
   const viewer = d.viewer?.login ?? "";
-  const queue = useMemo(() => reviewQueue(d.reviewRequested, d.reviewed, viewer), [d.reviewRequested, d.reviewed, viewer]);
-  const authored = useMemo(() => authoredRows(d.authored), [d.authored]);
-  // Newest merge first (the daemon's search sorts by update, which a later comment moves).
-  const merged = useMemo(() => d.recentlyMerged.map((pr) => ({ pr })).sort((a, b) => (b.pr.mergedAtMs ?? -Infinity) - (a.pr.mergedAtMs ?? -Infinity)), [d.recentlyMerged]);
-  const items = useMemo<NavItem[]>(() => {
-    const mk = (section: Section, list: readonly { pr: PullRequestView }[]) =>
-      list.map(({ pr: p }) => ({
-        key: prKey(section, p),
-        // Enter and click open the pull request in the side panel; cmd+Enter and cmd+click on GitHub.
-        activate: () => void openPullRequestInPanel({ slug: p.repoSlug, number: p.number }),
-        secondary: () => void openUrl(p.url),
-      }));
-    // Keyboard order is page order.
-    return [...mk("review", queue.needs), ...mk("reviewed", queue.reviewed), ...mk("authored", authored), ...mk("merged", merged)];
-  }, [queue, authored, merged]);
+  const m = useMemo(() => pageModel(d), [d]);
+  const [picked, setPicked] = useState<Section | null>(null);
+  // A filtered section that emptied after a poll clears the filter (for good, not until it fills again).
+  const filter = liveFilter(m, picked);
+  if (picked !== null && filter === null) setPicked(null);
+  const shown = useMemo(() => SECTIONS.filter((s) => sectionRows(m, s) > 0 && (filter === null || filter === s)), [m, filter]);
+  const items = useMemo<NavItem[]>(
+    () =>
+      // Keyboard order is page order, over the sections shown; a capped section's footer after its rows.
+      shown.flatMap((s): NavItem[] => {
+        const rows = sectionPrs(m, s).map(({ pr: p }) => ({
+          key: prKey(s, p),
+          // Enter and click open the pull request in the side panel; cmd+Enter and cmd+click on GitHub.
+          activate: () => void openPullRequestInPanel({ slug: p.repoSlug, number: p.number }),
+          secondary: () => void openUrl(p.url),
+        }));
+        const cap = s === "else" ? m.othersCap : s === "merged" ? m.mergedCap : null;
+        if (!cap) return rows;
+        const open = () => void openUrl(cap.searchUrl);
+        return [...rows, { key: capKey(s), activate: open, secondary: open }];
+      }),
+    [m, shown],
+  );
   const nav = useNav(items);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     rootRef.current?.focus({ preventScroll: true });
   }, []);
+  const has = (s: Section) => shown.includes(s);
   return (
     <NavProvider value={nav.ctx}>
+      {/* Escape anywhere on the page (the list, a card) shows every section again, unless something
+          open on it (a tooltip, a menu) already took the key. */}
       <div
-        ref={rootRef}
-        tabIndex={0}
-        role="listbox"
-        aria-label="Pull requests"
-        aria-activedescendant={nav.activeDescendant}
-        className="flex flex-col gap-6 outline-none"
-        data-testid="prs-list"
-        data-focus-root
-        onKeyDown={nav.onKeyDown}
+        className="flex flex-col gap-6"
+        onKeyDown={(e) => {
+          if (e.key !== "Escape" || e.defaultPrevented || filter === null || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setPicked(null);
+          rootRef.current?.focus({ preventScroll: true });
+        }}
       >
         {!d.authenticated && <Banner tone="warn">gh is not authenticated. Run `gh auth login`; the lists below are from the last successful poll.</Banner>}
         {d.dashboardsDisabled && (
@@ -75,44 +97,88 @@ function Body({ d }: { d: DashboardView }) {
             Pull request dashboards are turned off (<span className="font-mono">github.dashboards_enabled</span> in Settings), so the lists are empty.
           </Banner>
         )}
-        <section data-testid="prs-review">
-          <SectionTitle count={queue.needs.length}>Needs your review</SectionTitle>
-          {queue.needs.length > 0 ? (
-            <PrTable section="review" rows={queue.needs} render={(r) => <NeedsReviewRow row={r} viewer={viewer} />} />
-          ) : (
-            <InboxZero authored={authored} merged={d.recentlyMerged} viewer={viewer} />
-          )}
-          {queue.reviewed.length > 0 && (
-            <div className="mt-2.5" data-testid="prs-reviewed">
-              <p className="mb-1.5 flex items-center gap-1.5 px-0.5 text-body-sm text-cf-text-muted">
-                <Check className="size-3.5 shrink-0" aria-hidden />
-                <span>Reviewed by you</span>
-                <span className="tabular-nums">({queue.reviewed.length})</span>
-                <span>· open, waiting on the author</span>
-              </p>
-              <PrTable section="reviewed" rows={queue.reviewed} render={(r) => <ReviewedByYouRow row={r} viewer={viewer} />} />
-            </div>
-          )}
-        </section>
-        <section data-testid="prs-authored">
-          <SectionTitle count={authored.length}>Your open pull requests</SectionTitle>
-          {authored.length > 0 ? <PrTable section="authored" rows={authored} render={(r) => <AuthoredPrRow row={r} />} /> : <Empty>No open pull requests of yours.</Empty>}
-        </section>
-        <section data-testid="prs-merged">
-          <SectionTitle count={merged.length}>Merged in the last 7 days</SectionTitle>
-          {merged.length > 0 ? <PrTable section="merged" rows={merged} render={(r) => <MergedRow pr={r.pr} viewer={viewer} />} /> : <Empty>Nothing merged in the last 7 days.</Empty>}
-        </section>
         <ActivityCharts months={d.stats.months} />
+        <SummaryCards
+          cards={cards(m)}
+          filter={filter}
+          rows={(s) => sectionRows(m, s)}
+          onToggle={(s) => {
+            setPicked(filter === s ? null : s);
+            // Keep the keyboard on the list (a click may have focused the card).
+            rootRef.current?.focus({ preventScroll: true });
+          }}
+        />
+        {/* The listbox holds the sections only: their rows and cap footers are its options. */}
+        <div
+          ref={rootRef}
+          tabIndex={0}
+          role="listbox"
+          aria-label="Pull requests"
+          aria-activedescendant={nav.activeDescendant}
+          className="flex flex-col gap-6 outline-none"
+          data-testid="prs-list"
+          data-focus-root
+          onKeyDown={nav.onKeyDown}
+        >
+          {has("review") && (
+            <section data-testid="prs-review">
+              <SectionTitle count={m.counts.review}>Needs your review</SectionTitle>
+              <PrTable section="review" rows={m.needs} render={(r) => <NeedsReviewRow row={r} viewer={viewer} />} />
+            </section>
+          )}
+          {has("reviewed") && (
+            <section data-testid="prs-reviewed">
+              <SectionTitle count={m.counts.reviewed} caption="open, waiting on the author">
+                Reviewed by you
+              </SectionTitle>
+              <PrTable section="reviewed" rows={m.reviewed} render={(r) => <ReviewedByYouRow row={r} viewer={viewer} />} />
+            </section>
+          )}
+          {has("authored") && (
+            <section data-testid="prs-authored">
+              <SectionTitle count={m.counts.authored}>Your open pull requests</SectionTitle>
+              <PrTable section="authored" rows={m.authored} render={(r) => <AuthoredPrRow row={r} />} />
+            </section>
+          )}
+          {has("else") && (
+            <section data-testid="prs-else">
+              <SectionTitle count={m.counts.else} caption="not yours, not waiting on you">
+                Everything else open in your projects
+              </SectionTitle>
+              <PrTable section="else" rows={m.others} cap={m.othersCap} render={(r) => <OtherPrRow row={r} viewer={viewer} />} />
+            </section>
+          )}
+          {has("merged") && (
+            <section data-testid="prs-merged">
+              <SectionTitle count={m.counts.merged} caption={mergedSubtitle(m.mergedInvolved, m.mergedMore, true)}>
+                Merged in the last 7 days
+              </SectionTitle>
+              <PrTable section="merged" rows={m.merged} cap={m.mergedCap} render={(r) => <MergedRow row={r} viewer={viewer} />} />
+            </section>
+          )}
+          {shown.length === 0 && (
+            <p className="px-0.5 text-body text-cf-text-muted" data-testid="prs-empty">
+              No open pull requests, and nothing merged this week.
+            </p>
+          )}
+        </div>
       </div>
     </NavProvider>
   );
 }
 
-/** The global Pull Requests page: the viewer's review inbox and own pull requests in every repository. */
+/**
+ * The global Pull Requests page (docs/notes/prs-page-2-gui.md): activity charts, five
+ * summary cards that filter the page, then the viewer's review queue and own pull requests
+ * in every repository, the rest open in the tracked ones, and this week's merges.
+ */
 export function PullRequestsPage() {
   const entry = useResource(dashboardResource, DASHBOARD_KEY);
   const d = entry?.data ?? null;
-  const fresh = useFreshness(d?.fetchedAtMs ?? null, d?.lastError || entry?.error || "", true);
+  const dashFresh = useFreshness(d?.fetchedAtMs ?? null, d?.lastError || entry?.error || "", true);
+  const projectsFresh = useProjectsFreshness(d?.projectsFetchedAtMs ?? null, d?.projectsLastError ?? "");
+  // The page shows two fetches: the older time, and either's error.
+  const fresh = olderFreshness(dashFresh, projectsFresh);
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Pull Requests" data-testid="prs-page">
       <PaneHeader className="gap-3 px-5">

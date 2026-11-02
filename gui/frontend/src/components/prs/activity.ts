@@ -40,6 +40,27 @@ export function labelledIndex(months: readonly ActivityMonth[]): number {
   return -1;
 }
 
+/**
+ * The months that get a direct value label: the newest closed month (labelledIndex) and
+ * the current, partial one beside its hollow marker. Oldest first; none twice.
+ */
+export function labelledIndexes(months: readonly ActivityMonth[]): number[] {
+  const out: number[] = [];
+  const closed = labelledIndex(months);
+  if (closed >= 0) out.push(closed);
+  const current = months.findIndex((m) => m.partial);
+  if (current >= 0 && current !== closed) out.push(current);
+  return out.sort((a, b) => a - b);
+}
+
+/** The y axis labels on a short chart: only 0 and the top tick (the gridlines stay for every tick). */
+export function labelledTicks(ticks: readonly number[]): number[] {
+  const first = ticks[0];
+  const last = ticks[ticks.length - 1];
+  if (first === undefined || last === undefined) return [];
+  return first === last ? [first] : [first, last];
+}
+
 /** The y scale over counts: whole-number gridlines from 0 to the rounded-up max. */
 export interface CountScale {
   step: number;
