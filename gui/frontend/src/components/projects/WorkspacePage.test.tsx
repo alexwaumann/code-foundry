@@ -427,7 +427,7 @@ describe("the workspace's Projects card", () => {
 });
 
 describe("the workspace's Threads table", () => {
-  it("Branch | Thread | Changes over every member, working first, archived only counted; the row menu shows changes only where there are some; a click opens the thread", async () => {
+  it("Branch | Thread | Runs in | Changes over every member, working first, archived only counted; the row menu shows changes only where there are some; a click opens the thread", async () => {
     const ws = addWorkspace("platform", ["repo-cf", "repo-gp", "repo-wr"], { primary: "repo-cf" });
     const idle = workspaceThread(ws.id, "s-helper", { name: "helper", branch: "cf/helper" });
     const driver = workspaceThread(ws.id, "s-driver", { name: "driver", status: "busy" });
@@ -439,12 +439,15 @@ describe("the workspace's Threads table", () => {
     await settle();
     const b = body(ws.id);
     expect(by(b, "workspace-threads-title").textContent).toMatch(/Threads\s*· 1 working · 1 idle · 1 archived/);
-    expect(by(b, "threads-head").textContent).toBe("BranchThreadChanges");
+    expect(by(b, "threads-head").textContent).toBe("BranchThreadRuns inChanges");
     expect(within(b).getAllByTestId("workspace-thread")).toHaveLength(2);
     // The name alone: the status is the dot (live while it works), no word.
     expect(texts(b, "thread-name")).toEqual(["driver", "helper"]);
     const d = threadRow(ws.id, driver.id);
     expect(by(d, "thread-branch").textContent).toBe("cf/platform");
+    // Runs in: its primary project's checkout, by the project's name.
+    expect(by(d, "thread-runs-in").textContent).toBe("code-foundry");
+    expect(by(d, "thread-runs-in").getAttribute("data-kind")).toBe("checkout");
     expect(d.querySelectorAll('[data-live="true"]')).toHaveLength(1);
     expect(by(d, "thread-changes").textContent).toBe("2 files");
     expect(by(threadRow(ws.id, idle.id), "thread-changes").textContent).toBe("clean");
@@ -472,6 +475,17 @@ describe("the workspace's Threads table", () => {
     const reveal = lastInvocation("worktree.reveal");
     expect(reveal?.args).toEqual({ worktree: driver.worktreePath });
     expect(reveal?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: driver.worktreePath });
+    // Open in Finder is a split item: its › lists Finder, the editors and Terminal, all on the checkout Runs in names.
+    const split = () => within(openDropdown(by(d, "thread-more"), "thread-more-menu")).getByTestId("thread-menu-reveal");
+    let apps = openSub(split(), "thread-menu-reveal-menu");
+    expect(menuEntries(apps, true)).toEqual(["Finder", "VS Code", "—", "Terminal"]);
+    fireEvent.click(within(apps).getByTestId("open-in-editor"));
+    await settle();
+    expect(lastInvocation("worktree.open.editor")?.args).toEqual({ worktree: driver.worktreePath, app: "com.microsoft.VSCode" });
+    apps = openSub(split(), "thread-menu-reveal-menu");
+    fireEvent.click(within(apps).getByTestId("open-in-terminal"));
+    await settle();
+    expect(lastInvocation("terminal.new")?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: driver.worktreePath });
 
     // Its chevron opens the thread; so does a click on the row.
     expect(tooltipText(by(d, "thread-open"))).toBe("Open thread");
@@ -492,11 +506,35 @@ describe("the workspace's Threads table", () => {
     await settle();
     const r = threadRow(mono, t.id);
     expect(by(r, "thread-changes").textContent).toBe("clean");
+    expect(by(r, "thread-runs-in").textContent).toBe("workspace folder");
+    expect(by(r, "thread-runs-in").getAttribute("data-kind")).toBe("folder");
     // Nothing changed: no Show changes.
     const menu = openDropdown(by(r, "thread-more"), "thread-more-menu");
     expect(menuEntries(menu)).toEqual(["Open in Finder", "Copy path"]);
     await pick(menu, "thread-menu-reveal");
     expect(lastInvocation("workspace.reveal")?.args).toEqual({ workspace: mono });
+    // Its › opens the workspace's folder: workspace.open.editor, and Terminal there.
+    const split = within(openDropdown(by(r, "thread-more"), "thread-more-menu")).getByTestId("thread-menu-reveal");
+    const apps = openSub(split, "thread-menu-reveal-menu");
+    expect(menuEntries(apps, true)).toEqual(["Finder", "VS Code", "—", "Terminal"]);
+    fireEvent.click(within(apps).getByTestId("open-in-editor"));
+    await settle();
+    expect(lastInvocation("workspace.open.editor")?.args).toEqual({ workspace: mono, app: "com.microsoft.VSCode" });
+  });
+
+  it("a narrow Threads table drops Runs in (its row menu's Open in still goes there)", async () => {
+    const { mono } = twoWorkspaces();
+    workspaceThread(mono, "s-docs", { name: "docs", primary: "workspace" });
+    const spy = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(600);
+    try {
+      renderPage(mono);
+      await settle();
+      const b = body(mono);
+      expect(by(b, "threads-head").textContent).toBe("BranchThreadChanges");
+      expect(within(b).queryAllByTestId("thread-runs-in")).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("members show by name, not by id, and the keyboard walks them then the threads", async () => {

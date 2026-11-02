@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GitStatusView } from "@/api/project";
 import type { ActivityThread, ActivityThreads } from "./projects";
-import { changedCheckouts, memberCheckoutPath, threadChangesCell, workspaceThreads, workspaceThreadsCaption } from "./workspacePage";
+import { changedCheckouts, memberCheckoutPath, threadChangesCell, threadPlace, workspaceThreads, workspaceThreadsCaption } from "./workspacePage";
 
 const thread = (o: Partial<ActivityThread>): ActivityThread => ({
   projectId: "",
@@ -90,5 +90,16 @@ describe("changedCheckouts (the row menu's Show changes)", () => {
       { projectId: "d", status: status({ baseAhead: 2 }) },
     ];
     expect(changedCheckouts(cs).map((c) => c.projectId)).toEqual(["b", "d"]);
+  });
+});
+
+describe("threadPlace", () => {
+  it.each([
+    ["its primary's checkout", { projectId: "repo-cf", worktreePath: "/wt/repo-cf/x", workspaceId: "w-1" }, { kind: "checkout", projectId: "repo-cf", path: "/wt/repo-cf/x" }],
+    ["the workspace's folder (no primary)", { projectId: "", worktreePath: "/Users/dev/.code-foundry/workspaces/w-1", workspaceId: "w-1" }, { kind: "folder", workspaceId: "w-1" }],
+    ["a primary with no checkout yet: nothing", { projectId: "repo-cf", worktreePath: "", workspaceId: "w-1" }, null],
+    ["neither: nothing", { projectId: "", worktreePath: "/tmp", workspaceId: "" }, null],
+  ])("%s", (_, t, want) => {
+    expect(threadPlace(t)).toEqual(want);
   });
 });
