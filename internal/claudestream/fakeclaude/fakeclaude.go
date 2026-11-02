@@ -43,6 +43,8 @@
 // "error" and that message (a thread move's failure path). With
 // CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE=<path> the first set_cwd (the one that creates <path>)
 // answers needs_trust, as a Claude started before the folder was trusted does.
+// CF_FAKE_CLAUDE_SET_CWD_RESULT (any value) writes, after an ok answer, the empty
+// result (no turn, 0 tokens) real Claude emits after a set_cwd.
 //
 // A stuck Claude: with CF_FAKE_CLAUDE_STALL set, the first user message starts its turn
 // (the turn's lines but its result), then the process stops reading stdin for good
@@ -328,6 +330,9 @@ func Run(fixture string) int {
 			}
 			b, _ := json.Marshal(map[string]any{"type": "control_response", "response": resp})
 			write(string(b))
+			if r, _ := resp["response"].(map[string]any); m.Request["subtype"] == "set_cwd" && r["status"] == "ok" && os.Getenv("CF_FAKE_CLAUDE_SET_CWD_RESULT") != "" {
+				write(setCwdResult)
+			}
 		case "control_response":
 			mu.Lock()
 			if ch, ok := waiting[m.Response.RequestID]; ok {
@@ -475,3 +480,7 @@ func (f *fakeMcp) reconnect(name string) string {
 	}
 	return ""
 }
+
+// setCwdResult is the empty result real Claude writes right after a set_cwd it accepted:
+// no turn ran (CF_FAKE_CLAUDE_SET_CWD_RESULT).
+const setCwdResult = `{"type":"result","subtype":"success","is_error":false,"duration_ms":21,"duration_api_ms":0,"num_turns":0,"result":"","stop_reason":null,"total_cost_usd":0,"usage":{"input_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":0},"modelUsage":{},"permission_denials":[]}`

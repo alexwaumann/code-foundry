@@ -235,6 +235,7 @@ func (r *runner) respawn() {
 	r.memNote, r.memHash = mem.note, mem.hash
 	st.events = st.conn.Events()
 	st.initialized, st.outputEnded, st.exited, st.commandsPushed = false, false, false, false
+	r.cdResultOwed = false // the old process's empty result after a set_cwd never comes now
 	st.restartFrom, st.effort = st.effort, s.Effort
 	st.restart = restartStarting
 	r.startedAt = r.m.opts.Now()

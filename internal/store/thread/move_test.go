@@ -448,3 +448,66 @@ func TestMoveLiveRestartsForTrust(t *testing.T) {
 	}
 	e.waitItems(s.ID, "the move note", hasNote("Moved this thread to workspace login"))
 }
+
+// turnEnds counts the timeline's turn ends.
+func turnEnds(items []Item) int {
+	n := 0
+	for _, it := range items {
+		if it.Kind == KindTurnEnd {
+			n++
+		}
+	}
+	return n
+}
+
+// Claude writes an empty result (no turn ran) right after a set_cwd it accepted. A move
+// and a Run in both drop it: no turn end in the timeline, and a thread that was at its
+// prompt stays there instead of becoming "finished" (which would fire wakes and settle
+// thread wait).
+func TestSetCwdEmptyResultIsNotATurn(t *testing.T) {
+	knob := func(o *Options) { o.Env = append(o.Env, "CF_FAKE_CLAUDE_SET_CWD_RESULT=1") }
+	tests := []struct {
+		name string
+		// run moves the thread and returns its id once it moved.
+		run func(t *testing.T) (*wsEnv, string)
+	}{
+		{"move", func(t *testing.T) (*wsEnv, string) {
+			e, _ := newMoveEnv(t, "text-table", knob)
+			s, _ := e.noProjectThread("check the slack thread", true)
+			if _, err := e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true}); err != nil {
+				t.Fatal(err)
+			}
+			e.waitItems(s.ID, "the move note", hasNote("Moved this thread to repo"))
+			return e, s.ID
+		}},
+		{"run in", func(t *testing.T) (*wsEnv, string) {
+			e := newWSFixtureEnv(t, "write-allow", knob)
+			s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
+			e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
+			e.answer(s.ID)
+			e.waitItems(s.ID, "turn end", hasTurnEnd)
+			unwatch := openViewer(t, e.env, s.ID) // seen
+			e.waitFor(s.ID, "at prompt", isIdleStatus)
+			unwatch()
+			time.Sleep(settle) // no viewer acknowledges the empty result
+			if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{ProjectID: "r2"}); err != nil {
+				t.Fatal(err)
+			}
+			e.waitFor(s.ID, "moved", func(s Thread) bool { return s.WorktreePath == e.wt2 })
+			return e, s.ID
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, id := tt.run(t)
+			time.Sleep(settle)
+			got, _ := e.m.Get(e.ctx(), id)
+			if !isIdleStatus(got) {
+				t.Errorf("status after set_cwd = %s %q, want idle at prompt", got.Status, got.StatusReason)
+			}
+			if n := turnEnds(e.items(id).Items); n != 1 {
+				t.Errorf("turn ends = %d, want the first turn's only", n)
+			}
+		})
+	}
+}

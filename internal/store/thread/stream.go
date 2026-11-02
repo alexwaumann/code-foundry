@@ -478,6 +478,11 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 
 func (r *runner) onStreamEvent(ev claudestream.Event) {
 	r.activity = r.m.opts.Now()
+	if r.cdResult(ev) {
+		r.tryCd()
+		r.maybeRestart()
+		return
+	}
 	r.st.proj.event(ev)
 	r.st.sd.event(ev)
 	switch e := ev.(type) {
@@ -511,6 +516,22 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 	r.checkStatus()
 	r.tryCd()
 	r.maybeRestart()
+}
+
+// cdResult reports whether ev is the empty result Claude writes after a set_cwd it
+// accepted (runner.cdResultOwed): no turn ran, so it is neither a turn end in the
+// timeline nor a finished turn (status, wakes, thread wait). A result while a turn or a
+// compaction runs is that turn's own.
+func (r *runner) cdResult(ev claudestream.Event) bool {
+	if _, ok := ev.(*claudestream.Result); !ok || !r.cdResultOwed {
+		return false
+	}
+	r.cdResultOwed = false
+	if r.st.sd.busy || r.st.sd.compacting {
+		return false
+	}
+	r.log().debug("dropped the empty result after set_cwd")
+	return true
 }
 
 // onAPIRetry records that Claude waits to retry a failed API request (Thread.Retry),
@@ -569,6 +590,7 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	if !st.initialized || r.closing {
 		return Item{}, fmt.Errorf("%w: thread %s is not ready for a message", ErrFailedPrecondition, r.id)
 	}
+	r.cdResultOwed = false // a result from now on may be this message's turn
 	// The first message of a fresh session a reseed asked for starts with its prefix
 	// (reseed.go); o keeps the prompt as it was, should this send fail.
 	prompt, seed := o.prompt, r.seed
@@ -857,6 +879,7 @@ func (r *runner) streamCd(req cdRequest) {
 		return
 	}
 	r.cwd = req.path
+	r.cdResultOwed = true
 	if res.TranscriptRelocated {
 		r.tail.relocated(req.path)
 	} else {
