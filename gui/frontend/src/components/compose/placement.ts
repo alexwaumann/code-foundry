@@ -122,7 +122,11 @@ export interface Placement {
   pickedBranch: string;
 }
 
-/** `set` null: nothing to place (no project, or a like draft, which copies its thread's placement). */
+/**
+ * `set` null: nothing to place (no project, or a like draft, which copies its thread's
+ * placement). The same object while nothing it holds changes (a keystroke in the prompt
+ * does not make a new one).
+ */
 export function usePlacement(set: ResolvedSet | null, choice: WorktreeChoice | null): Placement {
   const workInSetting = useSettingValue(WORK_IN_SETTING_KEY);
   const isSet = set?.isSet ?? false;
@@ -135,17 +139,36 @@ export function usePlacement(set: ResolvedSet | null, choice: WorktreeChoice | n
   const gitIds = useProjectsStore(useShallow((s) => (set ? set.projectIds.filter((id) => s.byId[id]?.git === true) : [])));
   const setGit = isSet ? gitIds.length : 0;
   const setMode = setWorkIn(choice, workInSetting, setGit > 0);
-  const worktree: WorktreeChoice = isSet
+  const resolved: WorktreeChoice = isSet
     ? choice?.kind === "branch" && setGit > 0
       ? choice
       : { kind: setMode }
     : noGitPath !== undefined
       ? { kind: "existing", path: noGitPath }
       : resolveWorktree(choice ?? defaultWorktree({ setting: workInSetting, mainPath }), worktrees);
-  const chosen = !isSet && worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
-  const existingPath = !isSet && worktree.kind === "existing" ? worktree.path : "";
-  const pickedBranch = worktree.kind === "branch" ? worktree.name : "";
-  return { isSet, many, single, worktrees, noGitPath, singleKind, gitIds, setGit, worktree, chosen, existingPath, pickedBranch };
+  // The result is memoized on primitives: a draft's choice object (and the resolved one)
+  // is new on every render, and the composer's collision check and pills key on this.
+  const kind = resolved.kind;
+  const arg = resolved.kind === "branch" ? resolved.name : resolved.kind === "existing" ? resolved.path : "";
+  return useMemo(() => {
+    const worktree = choiceOf(kind, arg);
+    const chosen = !isSet && worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
+    const existingPath = !isSet && worktree.kind === "existing" ? worktree.path : "";
+    const pickedBranch = worktree.kind === "branch" ? worktree.name : "";
+    return { isSet, many, single, worktrees, noGitPath, singleKind, gitIds, setGit, worktree, chosen, existingPath, pickedBranch };
+  }, [kind, arg, isSet, many, single, worktrees, noGitPath, singleKind, gitIds, setGit]);
+}
+
+/** A WorktreeChoice from its kind and its name or path. */
+function choiceOf(kind: WorktreeChoice["kind"], arg: string): WorktreeChoice {
+  switch (kind) {
+    case "branch":
+      return { kind, name: arg };
+    case "existing":
+      return { kind, path: arg };
+    default:
+      return { kind };
+  }
 }
 
 /**
