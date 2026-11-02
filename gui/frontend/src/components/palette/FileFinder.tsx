@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
 import { statusColor } from "@/components/changes/files";
@@ -124,12 +124,16 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
   const rows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
 
   // The highlighted row: the first of each new list, else the one the keys or pointer moved to.
+  // cmdk picks the first row when the input changes, before a search answers: the answer's
+  // first row takes over then, and whenever the highlighted row leaves the list.
   const [selected, setSelected] = useState("");
-  const [listFor, setListFor] = useState(rows);
-  if (listFor !== rows) {
-    setListFor(rows);
-    if (!rows.some((r) => r.key === selected) || rows[0]?.key !== listFor[0]?.key) setSelected(rows[0]?.key ?? "");
-  }
+  const firstKey = rows[0]?.key ?? "";
+  const shownFirst = useRef(firstKey);
+  useEffect(() => {
+    const moved = shownFirst.current !== firstKey;
+    shownFirst.current = firstKey;
+    setSelected((cur) => (moved || !rows.some((r) => r.key === cur) ? firstKey : cur));
+  }, [rows, firstKey]);
 
   const open = (r: FinderRow) => {
     openFoundFile(threadId, r, parsed.line);
