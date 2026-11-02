@@ -159,17 +159,22 @@ export function folderInfo(abs: string): { path: string; isRepo: boolean; childR
   return { path: abs, isRepo: false, childRepos };
 }
 
-// ---- composer completion: ListSkills and SearchFiles -------------------------------------
+// ---- composer completion and the file finder: ListSkills and SearchFiles ---------------
 //
 // Every project has the same small file list unless a test sets its own
-// (POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts; no path: an empty project), and
+// (POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts, or several projects at once:
+// ?project=repo-cf&path=a.ts&project=repo-gh&path=b.zig; no path: an empty project), and
 // the project skills `review` and `deploy`; the user has `commit`. Ranking mirrors
 // internal/fuzzy: exact base name > base name prefix > base name subsequence > path
-// subsequence, then shorter path, then path; an empty query lists the shallowest first.
+// subsequence, then the boundary/run bonus, then shorter path, then path, then source
+// order; an empty query lists the shallowest first. Several sources are ranked in one list
+// and query words may match a project's name (fuzzy.Splits); positions are code-point
+// indices, like the daemon's.
 
-/** A project the completion RPCs can see: its id and main worktree (world.ts MockProject). */
+/** A project the completion RPCs can see: its id, name and main worktree (world.ts MockProject). */
 export interface CompletionProject {
   id: string;
+  name: string;
   path: string;
 }
 
@@ -262,48 +267,183 @@ function withParentDirs(files: readonly string[]): { path: string; isDir: boolea
   return [...dirs.map((path) => ({ path, isDir: true })), ...files.map((path) => ({ path, isDir: false }))];
 }
 
-function isSubsequence(s: string, q: string): boolean {
-  let j = 0;
-  for (let i = 0; i < s.length && j < q.length; i++) if (s[i] === q[j]) j++;
-  return j === q.length;
+/** One checkout of a SearchFiles request. */
+export interface SearchSource {
+  projectId: string;
+  path: string;
 }
 
-/** 4 exact base name, 3 base prefix, 2 base subsequence, 1 path subsequence, 0 none. */
-export function fileTier(path: string, query: string): number {
-  if (query === "") return 1;
-  const p = path.toLowerCase();
-  const q = query.toLowerCase();
-  const base = p.slice(p.lastIndexOf("/") + 1);
-  if (base === q) return 4;
-  if (base.startsWith(q)) return 3;
-  if (isSubsequence(base, q)) return 2;
-  return isSubsequence(p, q) ? 1 : 0;
+/** The SearchFiles request fields the mock reads (SearchFilesRequest). */
+export interface SearchRequest {
+  projectId: string;
+  path: string;
+  query: string;
+  limit: number;
+  sources: readonly SearchSource[];
+  filesOnly: boolean;
+}
+
+const MAX_SOURCES = 16;
+const BOUNDARY_BONUS = 4;
+const NONE = -(2 ** 30);
+
+/** Code points, each lower-cased on its own so indices stay those of the original (Go's unicode.ToLower). */
+function lowerRunes(s: string): string[] {
+  return Array.from(s, (c) => {
+    const l = c.toLowerCase();
+    return Array.from(l).length === 1 ? l : c;
+  });
+}
+
+function isBoundary(c: string | undefined): boolean {
+  return c === "/" || c === "." || c === "-" || c === "_" || c === " ";
+}
+
+/**
+ * The best-bonus alignment of q in s (internal/fuzzy align): BOUNDARY_BONUS per character at
+ * the start or after a separator, 1 per character right after the previous one. Undefined
+ * when q is not a subsequence of s.
+ */
+function align(s: readonly string[], q: readonly string[]): { bonus: number; pos: number[] } | undefined {
+  const n = s.length;
+  const m = q.length;
+  if (m === 0) return { bonus: 0, pos: [] };
+  const bonusAt = (i: number) => (i === 0 || isBoundary(s[i - 1]) ? BOUNDARY_BONUS : 0);
+  const table: number[][] = [];
+  const best = new Array<number>(m).fill(NONE);
+  let at = new Array<number>(m).fill(NONE);
+  for (let i = 0; i < n; i++) {
+    const next = new Array<number>(m).fill(NONE);
+    for (let j = 0; j < m; j++) {
+      if (s[i] !== q[j]) continue;
+      if (j === 0) next[j] = bonusAt(i);
+      else if ((best[j - 1] ?? NONE) !== NONE) next[j] = bonusAt(i) + Math.max(best[j - 1] ?? NONE, (at[j - 1] ?? NONE) + 1);
+    }
+    for (let j = 0; j < m; j++) best[j] = Math.max(best[j] ?? NONE, next[j] ?? NONE);
+    table.push(next);
+    at = next;
+  }
+  const top = best[m - 1] ?? NONE;
+  if (top === NONE) return undefined;
+  const pos = new Array<number>(m).fill(0);
+  let i = table.findIndex((row) => row[m - 1] === top);
+  pos[m - 1] = i;
+  for (let j = m - 1; j > 0; j--) {
+    const want = (table[i]?.[j] ?? NONE) - bonusAt(i);
+    let k = i - 1;
+    for (; k >= 0; k--) {
+      let v = table[k]?.[j - 1] ?? NONE;
+      if (v === NONE) continue;
+      if (k === i - 1) v++;
+      if (v === want) break;
+    }
+    i = k;
+    pos[j - 1] = i;
+  }
+  return { bonus: top, pos };
+}
+
+/** Score and matched code-point positions of path against query (internal/fuzzy match); score 0: no match. */
+export function fileScore(path: string, query: string): { score: number; pos: number[] } {
+  if (query === "") return { score: 1, pos: [] };
+  const p = lowerRunes(path);
+  const q = lowerRunes(query);
+  const cut = p.lastIndexOf("/") + 1;
+  const base = p.slice(cut);
+  const tier = (t: number, bonus: number, pos: number[]) => ({ score: t * 2 ** 20 + Math.min(bonus, 2 ** 20 - 1), pos });
+  if (base.join("") === q.join("")) return tier(4, 0, q.map((_, i) => cut + i));
+  if (base.join("").startsWith(q.join(""))) return tier(3, 0, q.map((_, i) => cut + i));
+  const inBase = align(base, q);
+  if (inBase) return tier(2, inBase.bonus, inBase.pos.map((i) => cut + i));
+  const inPath = align(p, q);
+  if (inPath) return tier(1, inPath.bonus, inPath.pos);
+  return { score: 0, pos: [] };
+}
+
+/** One way to share a query between a project name and a path (internal/fuzzy Split). */
+interface Split {
+  path: string;
+  name: string[];
+}
+
+/** internal/fuzzy Splits: the query on the path, then leading/trailing word runs on the name. */
+export function querySplits(query: string, name: string, multi: boolean): Split[] {
+  if (!multi || query === "") return [{ path: query, name: [] }];
+  const words = query.split(/\s+/).filter((w) => w !== "");
+  const out: Split[] = [{ path: words.join(" "), name: [] }];
+  const seen = new Set([out[0]?.path]);
+  const lname = lowerRunes(name);
+  const add = (nameWords: string[], rest: string[]) => {
+    const path = rest.join(" ");
+    if (seen.has(path)) return;
+    if (align(lname, lowerRunes(nameWords.join(""))) === undefined) return;
+    seen.add(path);
+    out.push({ path, name: nameWords });
+  };
+  for (let k = 1; k < words.length; k++) {
+    add(words.slice(0, k), words.slice(k));
+    add(words.slice(words.length - k), words.slice(0, words.length - k));
+  }
+  return out;
 }
 
 /** searchFiles as the router serves it: logged, then after searchMode.delayMs, failing when searchMode.fail. */
-export async function searchFilesSlow(projects: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): Promise<SearchInit> {
+export async function searchFilesSlow(projects: ReadonlyMap<string, CompletionProject>, req: SearchRequest): Promise<SearchInit> {
   if (searchMode.delayMs > 0) await new Promise((r) => setTimeout(r, searchMode.delayMs));
   if (searchMode.fail) {
-    completionCalls.push(`search ${projectId} ${query}`);
+    completionCalls.push(`search ${(req.sources.length > 0 ? req.sources : [req]).map((s) => s.projectId).join(",")} ${req.query}`);
     throw new ConnectError("search failed", Code.Internal);
   }
-  return searchFiles(projects, projectId, path, query, limit);
+  return searchFiles(projects, req);
 }
 
-export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): SearchInit {
+const cmpStr = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, req: SearchRequest): SearchInit {
+  const { query, limit } = req;
   if (limit < 0) throw invalid(`limit ${String(limit)} is negative`);
-  const project = completionCheckout(projects, projectId, path);
-  completionCalls.push(`search ${project.id} ${query}`);
+  let named: readonly SearchSource[] = req.sources;
+  if (named.length === 0) named = [{ projectId: req.projectId, path: req.path }];
+  else if (req.projectId !== "" || req.path !== "") throw invalid("set sources or project_id and path, not both");
+  else if (named.length > MAX_SOURCES) throw invalid(`${String(named.length)} sources, at most ${String(MAX_SOURCES)}`);
+  const sources: { project: CompletionProject; checkout: string }[] = [];
+  for (const n of named) {
+    const project = completionCheckout(projects, n.projectId, n.path);
+    const checkout = n.path === "" ? project.path : clean(n.path);
+    if (!sources.some((s) => s.checkout === checkout)) sources.push({ project, checkout });
+  }
+  completionCalls.push(`search ${sources.map((s) => s.project.id).join(",")} ${query}`);
   const q = query.trim();
   const depth = (p: string) => p.split("/").length;
-  const ranked = withParentDirs(filesByProject.get(project.id) ?? DEFAULT_FILES)
-    .map((e) => ({ ...e, tier: fileTier(e.path, q) }))
-    .filter((e) => e.tier > 0)
-    .sort((a, b) =>
-      q === ""
-        ? depth(a.path) - depth(b.path) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
-        : b.tier - a.tier || a.path.length - b.path.length || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
-    );
+  const hits = sources.flatMap((src, si) => {
+    const splits = querySplits(q, src.project.name, sources.length > 1);
+    return withParentDirs(filesByProject.get(src.project.id) ?? DEFAULT_FILES)
+      .filter((e) => !req.filesOnly || !e.isDir)
+      .map((e) => {
+        let best = { score: 0, pos: [] as number[], split: splits[0] };
+        for (const sp of splits) {
+          const s = fileScore(e.path, sp.path);
+          if (s.score > best.score) best = { ...s, split: sp };
+        }
+        return { ...e, si, src, ...best };
+      })
+      .filter((h) => h.score > 0);
+  });
+  hits.sort((a, b) =>
+    (q === ""
+      ? depth(a.path) - depth(b.path) || cmpStr(a.path, b.path)
+      : b.score - a.score || a.path.length - b.path.length || cmpStr(a.path, b.path)) || a.si - b.si,
+  );
   const n = Math.min(limit === 0 ? DEFAULT_FILE_LIMIT : limit, MAX_FILE_LIMIT);
-  return { matches: ranked.slice(0, n).map(({ path, isDir }) => ({ path, isDir })), truncated: ranked.length > n };
+  return {
+    matches: hits.slice(0, n).map((h) => ({
+      path: h.path,
+      isDir: h.isDir,
+      projectId: h.src.project.id,
+      checkout: h.src.checkout,
+      pathPositions: h.pos,
+      projectPositions: h.split && h.split.name.length > 0 ? (align(lowerRunes(h.src.project.name), lowerRunes(h.split.name.join("")))?.pos ?? []) : [],
+    })),
+    truncated: hits.length > n,
+  };
 }
