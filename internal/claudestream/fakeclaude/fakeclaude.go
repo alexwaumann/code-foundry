@@ -38,6 +38,10 @@
 // CF_FAKE_CLAUDE_INIT_GATE=<path> holds it until <path> exists (the lifecycle tests'
 // slow start).
 //
+// set_cwd: answered ok with transcript_relocated (Claude moves the transcript; the fake
+// writes none). With CF_FAKE_CLAUDE_SET_CWD_REFUSE=<message> it is refused with status
+// "error" and that message (a thread move's failure path).
+//
 // A stuck Claude: with CF_FAKE_CLAUDE_STALL set, the first user message starts its turn
 // (the turn's lines but its result), then the process stops reading stdin for good
 // and ignores SIGTERM (its event loop is stuck): control requests go unanswered, and a
@@ -289,7 +293,10 @@ func Run(fixture string) int {
 				}
 				resp["response"] = map[string]any{"pid": os.Getpid(), "current_permission_mode": "default", "commands": commands}
 			case "set_cwd":
-				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true}
+				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true, "transcript_relocated": true}
+				if msg := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_REFUSE"); msg != "" {
+					resp["response"] = map[string]any{"status": "error", "message": msg}
+				}
 			case "mcp_status":
 				resp["response"] = map[string]any{"mcpServers": mcp.servers()}
 			case "mcp_reconnect":

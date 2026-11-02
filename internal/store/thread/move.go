@@ -515,7 +515,9 @@ func (m *Manager) failMove(ctx context.Context, id string, job *moveJob, err err
 	m.releaseMove(id)
 	m.update(id, false, func(rec *record) { rec.s.LastError = "move to " + job.place + ": " + err.Error() })
 	if !noted {
-		m.noteMembers(context.WithoutCancel(ctx), id, moveFailedNote(job, err.Error()), "")
+		// The error's class is for callers, not the timeline.
+		why := strings.ReplaceAll(err.Error(), ErrFailedPrecondition.Error()+": ", "")
+		m.noteMembers(context.WithoutCancel(ctx), id, moveFailedNote(job, why), "")
 	}
 	select {
 	case job.done <- err:
