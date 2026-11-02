@@ -10,10 +10,14 @@ import { isNoProject, type ProjectLookup } from "./threadRow";
 /**
  * Whether the move picker is offered for a thread: one without a project (lib/threadRow
  * isNoProject) that thread.move would take: not archived, not resident (Ember), not
- * moving already. The crumb, the menus and the palette's thread.move.open share it.
+ * moving already, its transcript not deleted (the daemon refuses: nothing to resume).
+ * The crumb, the menus and the palette's thread.move.open share it.
  */
-export function canMove(t: Pick<ThreadView, "projectId" | "workspaceId" | "worktreePath" | "archivedAtMs" | "resident" | "pendingMove"> | undefined, projects: ProjectLookup): boolean {
-  if (!t || t.archivedAtMs !== null || (t.resident ?? "") !== "" || t.pendingMove !== null) return false;
+export function canMove(
+  t: Pick<ThreadView, "projectId" | "workspaceId" | "worktreePath" | "archivedAtMs" | "resident" | "pendingMove" | "transcriptMissing"> | undefined,
+  projects: ProjectLookup,
+): boolean {
+  if (!t || t.archivedAtMs !== null || (t.resident ?? "") !== "" || t.pendingMove !== null || t.transcriptMissing) return false;
   return isNoProject(t, projects);
 }
 

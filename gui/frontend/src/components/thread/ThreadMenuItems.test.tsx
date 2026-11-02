@@ -115,6 +115,7 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     ["a workspace folder thread", { projectId: "", projectIds: [], workspaceId: "w-docs", worktreePath: "/ws" }],
     ["an archived thread without a project", { projectId: "", projectIds: [], worktreePath: "/Users/me", archivedAtMs: 1 }],
     ["a thread without a project that is moving", { projectId: "", projectIds: [], worktreePath: "/Users/me", pendingMove: { projectId: "web", workspaceId: "", worktreePath: "", branch: "" } }],
+    ["a thread without a project whose transcript is deleted", { projectId: "", projectIds: [], worktreePath: "/Users/me", transcriptMissing: true }],
   ])("no Move to project… for %s", (_, o) => {
     setThread(o);
     expect(entries(openRowMenu())).not.toContain("Move to project…");

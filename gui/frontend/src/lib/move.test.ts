@@ -61,6 +61,7 @@ describe("canMove", () => {
     ["a thread whose cwd is in a project (an older row)", t({ worktreePath: `${MAIN}/sub` }), false],
     ["archived", t({ archivedAtMs: 1 }), false],
     ["resident (Ember)", t({ resident: "ember" }), false],
+    ["its transcript deleted", t({ transcriptMissing: true }), false],
     ["moving", t({ pendingMove: { projectId: "web", workspaceId: "", worktreePath: "", branch: "" } }), false],
     ["unknown", undefined, false],
   ])("%s: %s", (_, thread, want) => {

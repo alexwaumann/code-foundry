@@ -21,18 +21,30 @@ export function useNoProjectThread(id: string | null): boolean {
 
 /**
  * Whether the move picker is offered for a thread (lib/move canMove): no project, not
- * archived, not resident, not moving. Narrow selectors, as useNoProjectThread.
+ * archived, not resident, not moving, transcript not deleted. Narrow selectors, as useNoProjectThread.
  */
 export function useCanMove(id: string | null): boolean {
   const s = useThreadsStore(
     useShallow((st) => {
       const x = id === null ? undefined : st.byId[id];
       return x
-        ? { projectId: x.projectId, workspaceId: x.workspaceId, worktreePath: x.worktreePath, archivedAtMs: x.archivedAtMs, resident: x.resident ?? "", moving: x.pendingMove !== null }
+        ? {
+            projectId: x.projectId,
+            workspaceId: x.workspaceId,
+            worktreePath: x.worktreePath,
+            archivedAtMs: x.archivedAtMs,
+            resident: x.resident ?? "",
+            moving: x.pendingMove !== null,
+            transcriptMissing: x.transcriptMissing === true,
+          }
         : null;
     }),
   );
-  return useProjectsStore((st) => s !== null && canMove({ ...s, pendingMove: s.moving ? PENDING : null }, st));
+  return useProjectsStore((st) => {
+    if (s === null) return false;
+    const { moving, transcriptMissing, ...rest } = s;
+    return canMove({ ...rest, pendingMove: moving ? PENDING : null, ...(transcriptMissing ? { transcriptMissing: true as const } : {}) }, st);
+  });
 }
 
 /** canMove reads only whether a move is pending. */
