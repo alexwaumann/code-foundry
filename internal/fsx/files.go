@@ -280,8 +280,8 @@ func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query s
 		case <-ctx.Done():
 			return nil, false, ctx.Err()
 		}
-		if l.err != nil {
-			return nil, false, l.err
+		if l.err != nil { // with several checkouts, say which one
+			return nil, false, fmt.Errorf("list %s: %w", sources[i].Dir, l.err)
 		}
 		lists[i] = l.c
 		ranked[i] = fuzzy.Source{Name: sources[i].Name, Paths: l.c.paths}

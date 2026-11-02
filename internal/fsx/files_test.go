@@ -487,8 +487,8 @@ func TestFileIndexSearchSourcesListsConcurrently(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, _, err := x.SearchSources(ctx, []Source{{Dir: "/a"}, {Dir: "/bad"}}, "", 0, false)
-	if err == nil || err.Error() != "boom" {
-		t.Fatalf("err = %v, want boom", err)
+	if err == nil || err.Error() != "list /bad: boom" {
+		t.Fatalf("err = %v, want list /bad: boom", err)
 	}
 	// The good source's list is cached; the bad one is listed again.
 	x.list = func(context.Context, string, bool) ([]FileEntry, error) { return []FileEntry{{Path: "b.go"}}, nil }
