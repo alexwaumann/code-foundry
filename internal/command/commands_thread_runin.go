@@ -16,8 +16,7 @@ func threadRunIn(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.run-in",
 		Title: "Run Thread In…",
-		Description: "Move a thread to another of its checkouts (thread checkouts). " +
-			"A thread moves once it is idle at its prompt (at once when Claude is not running for it).",
+		Description: "Move a thread to another of its checkouts (thread checkouts) once it is idle at its prompt (at once when Claude is not running).",
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,
