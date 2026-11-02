@@ -20,12 +20,20 @@ type moveNamer struct {
 	mu   sync.Mutex
 	reqs []NamingRequest
 	err  error
+	// gate, when set, holds a conversation's naming call until it is closed.
+	gate chan struct{}
 }
 
 func (n *moveNamer) namer(_ context.Context, req NamingRequest) (Naming, error) {
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	n.reqs = append(n.reqs, req)
+	gate := n.gate
+	n.mu.Unlock()
+	if gate != nil && req.Conversation != "" {
+		<-gate
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if n.err != nil {
 		return Naming{}, n.err
 	}
@@ -508,6 +516,49 @@ func TestSetCwdEmptyResultIsNotATurn(t *testing.T) {
 			if n := turnEnds(e.items(id).Items); n != 1 {
 				t.Errorf("turn ends = %d, want the first turn's only", n)
 			}
+		})
+	}
+}
+
+// A thread archived while its move waits for the name never moves and never starts
+// (stopped or running when the archive came): the move fails with the usual rollback.
+func TestMoveArchivedWhileNaming(t *testing.T) {
+	for _, stop := range []bool{true, false} {
+		t.Run(map[bool]string{true: "stopped", false: "running"}[stop], func(t *testing.T) {
+			e, n := newMoveEnv(t, "text-table")
+			n.gate = make(chan struct{})
+			s, _ := e.noProjectThread("check the slack thread", stop)
+			errc := make(chan error, 1)
+			go func() {
+				_, err := e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", NewWorktree: &NewWorktree{}})
+				errc <- err
+			}()
+			e.waitFor(s.ID, "naming", func(s Thread) bool { return s.Naming })
+			if _, err := e.m.Archive(e.ctx(), s.ID, true); err != nil {
+				t.Fatal(err)
+			}
+			e.waitFor(s.ID, "stopped", func(s Thread) bool { return s.State == StateDisconnected })
+			spawns := e.spawnCount()
+			close(n.gate)
+			if err := <-errc; !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "archived while moving") {
+				t.Fatalf("Move = %v", err)
+			}
+			got := e.waitFor(s.ID, "move over", func(s Thread) bool { return s.PendingMove == nil })
+			if got.ProjectID != "" || got.WorktreePath != e.home || got.State != StateDisconnected || got.Naming {
+				t.Errorf("after = %+v", got)
+			}
+			if e.spawnCount() != spawns {
+				t.Error("Claude started for an archived thread")
+			}
+			wt := filepath.Join(e.projects.WorktreeRoot, "_local", "repo", "fix-login-redirect")
+			deadline := time.Now().Add(5 * time.Second)
+			for !slices.Contains(e.projects.Calls, "RemoveWorktree r1 "+wt) {
+				if time.Now().After(deadline) {
+					t.Fatalf("worktree not removed: %q", e.projects.Calls)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			e.waitItems(s.ID, "the failure note", hasNote("Could not move this thread to repo: the thread was archived while moving."))
 		})
 	}
 }

@@ -152,6 +152,9 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	case rec.run != nil || rec.reserved != nil || rec.s.State != StateDisconnected:
 		m.mu.Unlock()
 		return Item{}, errNotStopped
+	case o.move != nil && !rec.s.ArchivedAt.IsZero():
+		m.mu.Unlock()
+		return Item{}, errArchivedWhileMoving // archived during the move's naming: it never starts
 	}
 	prev := rec.s
 	rec.reserve()

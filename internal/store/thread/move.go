@@ -40,6 +40,10 @@ import (
 // happened either way. A workspace's members reach a running Claude by the project-set
 // restart (runner.dirsStale, maybeRestart), which resumes in the new cwd.
 
+// errArchivedWhileMoving fails a move whose thread was archived before Claude moved
+// (during the naming wait, or while it waited to start): an archived thread never starts.
+var errArchivedWhileMoving = fmt.Errorf("%w: the thread was archived while moving", ErrFailedPrecondition)
+
 // moveWait bounds how long Move waits for a thread that is not mid-turn to move; past
 // it the call returns the thread with the move still queued.
 const moveWait = 45 * time.Second
@@ -394,6 +398,8 @@ func (m *Manager) runMove(ctx context.Context, id string, job *moveJob) (bool, e
 		switch {
 		case err != nil:
 			return false, err
+		case !s.ArchivedAt.IsZero():
+			return false, errArchivedWhileMoving
 		case live != nil:
 			select {
 			case <-live.ready:
@@ -426,15 +432,20 @@ func (m *Manager) runMove(ctx context.Context, id string, job *moveJob) (bool, e
 			return false, fmt.Errorf("%w: Claude did not start to move the thread: %s", ErrFailedPrecondition, nonEmpty(s.LastError, "it ended before answering"))
 		case !s.needsTranscript():
 			// No conversation yet: nothing for Claude to relocate.
-			m.moveStopped(ctx, id, job)
-			return false, nil
+			return false, m.moveStopped(ctx, id, job)
 		default:
 			job.started = true
-			if _, err := m.startStopped(ctx, id, startOpts{move: job}); errors.Is(err, errNotStopped) {
+			_, err := m.startStopped(ctx, id, startOpts{move: job})
+			switch {
+			case errors.Is(err, errNotStopped):
 				job.started = false // started meanwhile: queue it on that process
-			} else if err != nil {
+			case errors.Is(err, errArchivedWhileMoving):
+				job.started = false
+				return false, err
+			case err != nil:
+				job.started = false
 				return false, fmt.Errorf("start Claude to move the thread: %w", err)
-			} else {
+			default:
 				m.log.Info("started thread to move it", "thread", id)
 			}
 		}
@@ -462,16 +473,27 @@ func (m *Manager) queueMove(id string, r *runner, job *moveJob) bool {
 }
 
 // moveStopped moves a stopped thread without a conversation: its row, at once.
-func (m *Manager) moveStopped(ctx context.Context, id string, job *moveJob) {
-	m.update(id, true, func(rec *record) {
-		rec.s = rec.s.withMove(job)
-		rec.moving = false
-		rec.namingTried = rec.namingTried || job.title != ""
-	})
+func (m *Manager) moveStopped(ctx context.Context, id string, job *moveJob) error {
+	m.mu.Lock()
+	rec, err := m.record(id)
+	switch {
+	case err != nil:
+		m.mu.Unlock()
+		return err
+	case !rec.s.ArchivedAt.IsZero():
+		m.mu.Unlock()
+		return errArchivedWhileMoving
+	}
+	rec.s = rec.s.withMove(job)
+	rec.moving = false
+	rec.namingTried = rec.namingTried || job.title != ""
+	m.commitLocked(rec, true)
+	m.mu.Unlock()
 	m.log.Info("thread moved", "thread", id, "to", job.place, "cwd", job.placed.path)
 	m.noteMembers(ctx, id, movedNote(job), "")
 	m.movedHooks(id, job)
 	job.done <- nil
+	return nil
 }
 
 // onMoved applies a move Claude accepted (streamCd): the row takes the placement, a
