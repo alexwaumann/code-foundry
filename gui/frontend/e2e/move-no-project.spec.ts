@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
 
 // Moving a No project thread into a project (docs/notes/move-no-project-2-gui.md), against
 // the mock's thread.move. The steps, the request each choice builds, the menu items, the
 // moving crumb, the refusal and Enter: src/components/thread/MovePicker.test.tsx,
 // src/lib/move.test.ts and ThreadMenuItems.test.tsx. What is left: the popover under the
 // crumb, the keyboard surviving a closing menu or palette, and a whole move over the
-// mock's streams.
+// mock's streams, and where the keyboard goes when the crumb's trigger unmounts.
 
 test.beforeEach(async () => {
   await resetMock();
@@ -42,6 +42,8 @@ test("the sidebar row's Move to project… opens the thread and the picker under
   await page.keyboard.press("Enter");
   await expect(picker).toHaveCount(0);
   await expect(page.getByTestId("thread-crumb-place")).toHaveText("Moving to code-foundry…");
+  // The trigger went with the popover: the thread's prompt has the keyboard, and typing lands there.
+  await expect(threadPrompt(page)).toBeFocused();
 
   // Landed: renamed, the crumb and the row name the project, the timeline has the note.
   await expect(page.getByTestId("thread-crumb-place")).toHaveText("code-foundry");
@@ -68,4 +70,20 @@ test("the palette's Move Thread and the title menu's Move to project… open the
   await page.getByTestId("menu-move").click();
   await expect(page.getByTestId("move-filter")).toBeFocused();
   await expect(page.getByTestId("thread-crumb-move")).toHaveAttribute("aria-expanded", "true");
+});
+
+test("a refused move leaves the keyboard in the thread's prompt", async ({ page }) => {
+  const id = await homeThread();
+  await openApp(page);
+  await row(page, `s:${id}`).click();
+  await page.getByTestId("thread-crumb-move").click();
+  await page.keyboard.type("code-f");
+  await page.keyboard.press("Enter");
+  await mockPost("thread/move-delay?ms=300");
+  await mockPost("thread/move-fail?message=set_cwd refused");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("thread-crumb-place")).toHaveText("No project");
+  await expect(threadPrompt(page)).toBeFocused();
+  await page.keyboard.type("still here");
+  await expect(threadPrompt(page)).toContainText("still here");
 });

@@ -17,7 +17,7 @@ import { moveArgs, moveLine, type MoveTarget } from "@/lib/move";
 import { tildify } from "@/lib/path";
 import { resolveSet, type ResolvedSet } from "@/lib/projectSet";
 import { cn } from "@/lib/utils";
-import { closeMovePicker, moveThread, useMovePickerStore } from "@/stores/movePicker";
+import { closeMovePicker, focusDropped, focusMovedThreadPrompt, moveThread, useMovePickerStore } from "@/stores/movePicker";
 import { useProjectsStore } from "@/stores/projects";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
@@ -284,9 +284,12 @@ function PlacementStep({ threadId, target, onBack }: { threadId: string; target:
 export function MovePicker({ threadId, children }: { threadId: string; children: ReactNode }) {
   const open = useMovePickerStore((s) => s.open === threadId);
   // Leaving the thread (its header unmounts) closes it, so coming back does not reopen it.
+  // The thread moving (from here or the CLI) unmounts the trigger with the popover: when
+  // the keyboard was in either, it falls to the body, so the thread's prompt takes it.
   useEffect(
     () => () => {
       closeMovePicker(threadId);
+      if (focusDropped()) focusMovedThreadPrompt(threadId);
     },
     [threadId],
   );

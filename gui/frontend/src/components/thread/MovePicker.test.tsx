@@ -252,6 +252,35 @@ describe("Move", () => {
   });
 });
 
+describe("the keyboard when the crumb's trigger unmounts", () => {
+  const seq = () => useUiStore.getState().promptFocusSeq;
+  it("Move asks the thread's prompt for it", () => {
+    openPicker();
+    const before = seq();
+    fireEvent.click(within(pick("web")).getByTestId("move-submit"));
+    expect(seq()).toBeGreaterThan(before);
+  });
+
+  it("a move from elsewhere (pending_move) while the popover is open: the prompt takes it", () => {
+    openPicker();
+    expect(document.activeElement).toBe(screen.getByTestId("move-filter"));
+    const before = seq();
+    setThread({ pendingMove: { projectId: "web", workspaceId: "", worktreePath: "", branch: "" } });
+    expect(screen.queryByTestId("thread-crumb-move")).toBeNull();
+    expect(seq()).toBe(before + 1);
+  });
+
+  it("the picker going with the thread view (another selection): the prompt is not asked", () => {
+    openPicker();
+    const before = seq();
+    act(() => {
+      useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });
+      useThreadsStore.setState({ byId: {}, order: [] });
+    });
+    expect(seq()).toBe(before);
+  });
+});
+
 describe("openMovePicker (the menus' Move to project…, thread.move.open)", () => {
   it("selects the thread, then opens its picker; false for a thread that cannot move", async () => {
     useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });

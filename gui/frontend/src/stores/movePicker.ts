@@ -50,22 +50,41 @@ export function openMovePicker(threadId: string): boolean {
   return true;
 }
 
+/**
+ * Asks the thread's prompt for the keyboard (ui promptFocusSeq, as focusPromptAfterMenu
+ * does) when the window shows the thread. The crumb's trigger and its popover unmount
+ * together while the thread moves, so Radix has nowhere to hand focus back.
+ */
+export function focusMovedThreadPrompt(threadId: string): void {
+  const sel = useUiStore.getState().selection;
+  if (sel.kind === "thread" && sel.id === threadId) useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+}
+
+/** Whether the keyboard is nowhere: focus fell to the body (or no element has it). */
+export function focusDropped(): boolean {
+  const a = typeof document === "undefined" ? null : document.activeElement;
+  return a === null || a === document.body;
+}
+
 export function closeMovePicker(threadId?: string): void {
   useMovePickerStore.setState((s) => (threadId === undefined || s.open === threadId ? { open: null } : s));
 }
 
 /**
- * Moves the thread: closes the picker, shows "Moving to <name>…" in the crumb until the
- * daemon answers (its pending_move takes over from there), then invokes thread.move with
- * `args` (lib/move moveArgs). A refusal is the usual failure toast with the daemon's words
- * and the thread stays where it was; the daemon's collision hints are toasted as
- * warnings, as after a new thread. Resolves whether the call succeeded.
+ * Moves the thread: hands the keyboard to the thread's prompt, closes the picker, shows
+ * "Moving to <name>…" in the crumb until the daemon answers (its pending_move takes over
+ * from there), then invokes thread.move with `args` (lib/move moveArgs). A refusal is the
+ * usual failure toast with the daemon's words and the thread stays where it was; the
+ * prompt takes the keyboard back if it fell to the body meanwhile. The daemon's collision
+ * hints are toasted as warnings, as after a new thread. Resolves whether the call succeeded.
  */
 export async function moveThread(threadId: string, args: Record<string, string>, name: string): Promise<boolean> {
+  focusMovedThreadPrompt(threadId);
   useMovePickerStore.setState((s) => ({ open: s.open === threadId ? null : s.open, sending: { ...s.sending, [threadId]: name } }));
   try {
     const res = await runCommandForResult(MOVE_COMMAND, args, { ctx: getUiContext({ kind: "thread", id: threadId }), quiet: true });
     for (const w of res?.warnings ?? []) toast.warning(w);
+    if (res === null && focusDropped()) focusMovedThreadPrompt(threadId);
     return res !== null;
   } finally {
     useMovePickerStore.setState((s) => {
