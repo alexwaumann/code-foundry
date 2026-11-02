@@ -55,9 +55,9 @@ type runner struct {
 	// trust, which it reads at start; move.go); respawn gives the new process the move's
 	// folders and clears it.
 	moveRestart *moveJob
-	// cdResultOwed: Claude accepted a set_cwd and owes the empty result it writes after
-	// one (no turn ran); onStreamEvent drops it so it is not a finished turn.
-	cdResultOwed bool
+	// echo: Claude accepted a set_cwd and writes its echo, a command with an empty result
+	// and no turn (setcwd_echo.go); onStreamEvent drops it.
+	echo cdEcho
 
 	// reseedPending: a reseed waits to stop the process (reseed.go). seed is the prefix
 	// of this fresh session's first message, until it went out (sendMessage).

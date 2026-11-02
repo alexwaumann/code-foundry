@@ -46,8 +46,9 @@
 // CF_FAKE_CLAUDE_SET_CWD_NEEDS_TRUST (any value) answers needs_trust every time.
 // CF_FAKE_CLAUDE_SET_CWD_GATE=<path> holds every set_cwd answer until <path> exists, and
 // CF_FAKE_CLAUDE_SET_CWD_ERROR=<message> answers with a control error (a set_cwd whose
-// answer is lost). CF_FAKE_CLAUDE_SET_CWD_RESULT (any value) writes, after an ok answer, the empty
-// result (no turn, 0 tokens) real Claude emits after a set_cwd.
+// answer is lost). CF_FAKE_CLAUDE_SET_CWD_ECHO names a capture of what real Claude writes
+// around an ok answer (claudestream/testdata/set-cwd.jsonl): its lines before the
+// control_response are written before the answer, the ones after it after (SetCwdEcho).
 //
 // A stuck Claude: with CF_FAKE_CLAUDE_STALL set, the first user message starts its turn
 // (the turn's lines but its result), then the process stops reading stdin for good
@@ -201,6 +202,11 @@ func Run(fixture string) int {
 		fmt.Fprintln(os.Stderr, "fake claude:", err)
 		return 2
 	}
+	echoBefore, echoAfter, err := SetCwdEcho(os.Getenv("CF_FAKE_CLAUDE_SET_CWD_ECHO"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "fake claude:", err)
+		return 2
+	}
 	var outMu sync.Mutex
 	write := func(line string) {
 		outMu.Lock()
@@ -346,10 +352,19 @@ func Run(fixture string) int {
 				}
 				mu.Unlock()
 			}
+			r, _ := resp["response"].(map[string]any)
+			echo := m.Request["subtype"] == "set_cwd" && r["status"] == "ok"
+			if echo {
+				for _, l := range echoBefore {
+					write(l)
+				}
+			}
 			b, _ := json.Marshal(map[string]any{"type": "control_response", "response": resp})
 			write(string(b))
-			if r, _ := resp["response"].(map[string]any); m.Request["subtype"] == "set_cwd" && r["status"] == "ok" && os.Getenv("CF_FAKE_CLAUDE_SET_CWD_RESULT") != "" {
-				write(setCwdResult)
+			if echo {
+				for _, l := range echoAfter {
+					write(l)
+				}
 			}
 		case "control_response":
 			mu.Lock()
@@ -499,6 +514,33 @@ func (f *fakeMcp) reconnect(name string) string {
 	return ""
 }
 
-// setCwdResult is the empty result real Claude writes right after a set_cwd it accepted:
-// no turn ran (CF_FAKE_CLAUDE_SET_CWD_RESULT).
-const setCwdResult = `{"type":"result","subtype":"success","is_error":false,"duration_ms":21,"duration_api_ms":0,"num_turns":0,"result":"","stop_reason":null,"total_cost_usd":0,"usage":{"input_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":0},"modelUsage":{},"permission_denials":[]}`
+// SetCwdEcho splits a capture of a set_cwd's echo (CF_FAKE_CLAUDE_SET_CWD_ECHO) at its
+// control_response: the lines Claude writes before its answer and after it. "" is none.
+func SetCwdEcho(path string) (before, after []string, err error) {
+	if path == "" {
+		return nil, nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	answered := false
+	for _, l := range strings.Split(string(data), "\n") {
+		var head struct {
+			Type string `json:"type"`
+		}
+		switch {
+		case strings.TrimSpace(l) == "":
+		case json.Unmarshal([]byte(l), &head) == nil && head.Type == "control_response":
+			answered = true
+		case answered:
+			after = append(after, l)
+		default:
+			before = append(before, l)
+		}
+	}
+	if !answered {
+		return nil, nil, fmt.Errorf("%s has no set_cwd answer", path)
+	}
+	return before, after, nil
+}

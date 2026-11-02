@@ -473,7 +473,8 @@ func turnEnds(items []Item) int {
 // prompt stays there instead of becoming "finished" (which would fire wakes and settle
 // thread wait).
 func TestSetCwdEmptyResultIsNotATurn(t *testing.T) {
-	knob := func(o *Options) { o.Env = append(o.Env, "CF_FAKE_CLAUDE_SET_CWD_RESULT=1") }
+	echo, _ := filepath.Abs(filepath.Join("..", "..", "claudestream", "testdata", "set-cwd.jsonl"))
+	knob := func(o *Options) { o.Env = append(o.Env, "CF_FAKE_CLAUDE_SET_CWD_ECHO="+echo) }
 	tests := []struct {
 		name string
 		// run moves the thread and returns its id once it moved.
