@@ -20,7 +20,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/fuzzy"
 )
 
-// File search for the composer's "@" completion (FilesystemService.SearchFiles).
+// File search for the composer's "@" completion and the file finder
+// (FilesystemService.SearchFiles).
 
 // Bounds and defaults of file search.
 const (
@@ -31,6 +32,9 @@ const (
 	// DefaultFileLimit and MaxFileLimit bound one search's matches.
 	DefaultFileLimit = 50
 	MaxFileLimit     = 200
+	// MaxSearchSources bounds the checkouts of one search (below maxCachedCheckouts, so
+	// one search never evicts its own lists).
+	MaxSearchSources = 16
 	// FileCacheTTL is how long a checkout's candidate list is reused.
 	FileCacheTTL = 5 * time.Second
 	// maxCachedCheckouts bounds the cache; the oldest entry goes first.
@@ -194,8 +198,12 @@ type FileIndex struct {
 type cachedFiles struct {
 	key     string
 	files   []FileEntry
-	paths   []string // files[i].Path, for fuzzy.Rank
-	created time.Time
+	paths   []string // files[i].Path, for fuzzy.RankSources
+	// filePaths are the paths of the files alone (no directories); fileIdx[i] is
+	// filePaths[i]'s index in files.
+	filePaths []string
+	fileIdx   []int
+	created   time.Time
 }
 
 // listing is one in-flight listing of a checkout; c and err are set before done closes.
@@ -215,38 +223,95 @@ func NewFileIndex(log *slog.Logger) *FileIndex {
 	return x
 }
 
-// Search fuzzy-matches query against the files and directories of the checkout dir
-// (absolute, symlinks resolved): git's view when git is true, else a bounded walk.
-// When git ls-files fails (say .git is broken) the walk is used. limit is clamped to
-// [1, MaxFileLimit] with zero meaning DefaultFileLimit. When ctx ends first, Search
-// returns its error at once; the listing goes on (at most listTimeout) and fills the
-// cache for the next search.
+// Source is one checkout of a search.
+type Source struct {
+	// Dir is absolute, symlinks resolved.
+	Dir string
+	// Git: list git's view (falling back to the walk when git ls-files fails), else walk.
+	Git bool
+	// Name is the checkout's project name, which query words may match instead of the
+	// path when a search has several sources (fuzzy.Splits).
+	Name string
+}
+
+// Match is one result of SearchSources.
+type Match struct {
+	FileEntry
+	// Source indexes the sources passed to SearchSources.
+	Source int
+	// PathPositions and NamePositions are the rune indices of Path and of the source's
+	// Name that the query matched (fuzzy.Hit).
+	PathPositions, NamePositions []int
+}
+
+// Search is SearchSources over the one checkout dir.
 func (x *FileIndex) Search(ctx context.Context, dir string, git bool, query string, limit int) (matches []FileEntry, truncated bool, err error) {
-	if limit <= 0 {
-		limit = DefaultFileLimit
-	}
-	limit = min(limit, MaxFileLimit)
-	c, err := x.candidates(ctx, dir, git)
+	ms, truncated, err := x.SearchSources(ctx, []Source{{Dir: dir, Git: git}}, query, limit, false)
 	if err != nil {
 		return nil, false, err
 	}
-	ranked, truncated := fuzzy.Rank(c.paths, strings.TrimSpace(query), limit)
-	matches = make([]FileEntry, len(ranked))
-	for i, r := range ranked {
-		matches[i] = c.files[r.Index]
+	matches = make([]FileEntry, len(ms))
+	for i, m := range ms {
+		matches[i] = m.FileEntry
 	}
 	return matches, truncated, nil
 }
 
-// candidates returns dir's cached list, else waits for the listing in flight for it,
-// starting one if there is none.
-func (x *FileIndex) candidates(ctx context.Context, dir string, git bool) (cachedFiles, error) {
+// SearchSources fuzzy-matches query against the files and directories (only the files
+// when filesOnly) of every source checkout and ranks them in one list
+// (fuzzy.RankSources: best first, ties to the earlier source). limit is clamped to
+// [1, MaxFileLimit] with zero meaning DefaultFileLimit. The checkouts are listed
+// concurrently. When ctx ends first, SearchSources returns its error at once; the
+// listings go on (at most listTimeout) and fill the cache for the next search.
+func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query string, limit int, filesOnly bool) (matches []Match, truncated bool, err error) {
+	if limit <= 0 {
+		limit = DefaultFileLimit
+	}
+	limit = min(limit, MaxFileLimit)
+	pending := make([]*listing, len(sources))
+	for i, src := range sources {
+		pending[i] = x.start(ctx, src.Dir, src.Git)
+	}
+	lists := make([]cachedFiles, len(sources))
+	ranked := make([]fuzzy.Source, len(sources))
+	for i, l := range pending {
+		select {
+		case <-l.done:
+		case <-ctx.Done():
+			return nil, false, ctx.Err()
+		}
+		if l.err != nil {
+			return nil, false, l.err
+		}
+		lists[i] = l.c
+		ranked[i] = fuzzy.Source{Name: sources[i].Name, Paths: l.c.paths}
+		if filesOnly {
+			ranked[i].Paths = l.c.filePaths
+		}
+	}
+	hits, truncated := fuzzy.RankSources(ranked, query, limit)
+	matches = make([]Match, len(hits))
+	for i, h := range hits {
+		c, idx := lists[h.Source], h.Index
+		if filesOnly {
+			idx = c.fileIdx[idx]
+		}
+		matches[i] = Match{FileEntry: c.files[idx], Source: h.Source, PathPositions: h.PathPositions, NamePositions: h.NamePositions}
+	}
+	return matches, truncated, nil
+}
+
+// start returns the listing of dir: a finished one holding the cached list when it is
+// fresh, else the one in flight for it, starting one if there is none.
+func (x *FileIndex) start(ctx context.Context, dir string, git bool) *listing {
 	key := fmt.Sprintf("%t:%s", git, dir)
 	now := x.now()
 	x.mu.Lock()
+	defer x.mu.Unlock()
 	if c, ok := x.entries[key]; ok && now.Sub(c.created) < x.ttl {
-		x.mu.Unlock()
-		return c, nil
+		l := &listing{done: make(chan struct{}), c: c}
+		close(l.done)
+		return l
 	}
 	l, ok := x.inflight[key]
 	if !ok {
@@ -254,13 +319,7 @@ func (x *FileIndex) candidates(ctx context.Context, dir string, git bool) (cache
 		x.inflight[key] = l
 		go x.fill(context.WithoutCancel(ctx), key, dir, git, l)
 	}
-	x.mu.Unlock()
-	select {
-	case <-l.done:
-		return l.c, l.err
-	case <-ctx.Done():
-		return cachedFiles{}, ctx.Err()
-	}
+	return l
 }
 
 // fill lists dir, caches the list under key on success, and finishes l.
@@ -276,6 +335,10 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, l *list
 		c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), created: now}
 		for i, f := range files {
 			c.paths[i] = f.Path
+			if !f.IsDir {
+				c.filePaths = append(c.filePaths, f.Path)
+				c.fileIdx = append(c.fileIdx, i)
+			}
 		}
 	}
 
