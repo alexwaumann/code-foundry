@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, openProjectPage, openTooltip, resetMock } from "./fixtures";
+import { mockPost, openApp, openProjectPage, resetMock } from "./fixtures";
 
-// Actions (docs/notes/actions-2-gui.md): the Projects page row's actions menu (the thread
+// Actions (docs/notes/actions-2-gui.md): a Projects page checkout's Run action submenu (the thread
 // header's Play menu is gone, docs/notes/thread-header-crumb.md), the thread info card's
 // action row, the editor dialog, and a run's bottom-panel tab with its command echo and
 // status line. Mock seeds
@@ -13,22 +13,27 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-/** A project's main worktree row's actions menu on the Projects page. */
-const trigger = (page: Page, project = "repo-cf") => page.locator(`[data-nav-key^="pw:${project}::"]`).first().getByTestId("worktree-actions-menu");
-const menu = (page: Page) => page.getByTestId("worktree-actions-menu-menu");
+/** A project's first checkout row on its Projects page. */
+const checkoutRow = (page: Page, project = "repo-cf") => page.locator(`[data-nav-key^="pw:${project}::"]`).first();
+const menu = (page: Page) => page.getByTestId("checkout-menu-actions-menu");
 const card = (page: Page) => page.getByTestId("thread-info-card");
-const items = (page: Page) => menu(page).getByTestId("action-item");
+const items = (page: Page) => menu(page).getByTestId("checkout-menu-action");
 const item = (page: Page, name: string) => items(page).filter({ hasText: name });
 const dialog = (page: Page) => page.getByTestId("action-dialog");
 const bottom = (page: Page) => page.getByTestId("bottom-panel");
 const status = (page: Page) => page.getByTestId("action-status");
 
+/** The row's right-click menu, then its Run action submenu. */
+async function openRunAction(page: Page, project = "repo-cf"): Promise<void> {
+  await checkoutRow(page, project).click({ button: "right" });
+  await page.getByTestId("checkout-menu-actions").hover();
+  await expect(menu(page)).toBeVisible();
+}
+
 async function openMenu(page: Page, project = "repo-cf"): Promise<void> {
   await openApp(page);
   await openProjectPage(page, project);
-  await trigger(page, project).hover();
-  await trigger(page, project).click();
-  await expect(menu(page)).toBeVisible();
+  await openRunAction(page, project);
 }
 
 /** The selected thread's card, its action row's menu open (its ellipsis). */
@@ -48,30 +53,14 @@ async function runFromMenu(page: Page, name: string): Promise<string> {
   return (await tab.getAttribute("data-tab-id")) ?? "";
 }
 
-// The menu's project label, items, New action and the pencil's label: src/components/actions/ActionsMenu.test.tsx.
-test("a project page row's actions menu: the project's actions, a pencil on the highlighted row, Escape through its tooltip", async ({ page }) => {
-  await openMenu(page);
-  // The pencil shows on the highlighted row only.
-  const pencil = (name: string) => item(page, name).getByTestId("action-edit");
-  await item(page, "Test").hover();
-  await expect(pencil("Test")).toHaveCSS("opacity", "1");
-  await expect(pencil("Dev")).toHaveCSS("opacity", "0");
-  // The pencil's tooltip opens inside the menu; Escape closes the tooltip and then the
-  // menu under it (the tooltip must not swallow it), and the menu opens again.
-  await pencil("Test").hover();
-  await expect(openTooltip(page)).toHaveText("Edit Test");
-  await page.keyboard.press("Escape");
-  await expect(openTooltip(page)).toHaveCount(0);
-  await expect(menu(page)).toHaveCount(0);
-  await trigger(page).click();
-  await expect(menu(page)).toBeVisible();
-});
+// The submenu's items, their gear, Add action, a run from a checkout, add/edit/delete: src/components/actions/CheckoutActions.test.tsx;
+// the gear's split hover: e2e/thread-info.spec.ts (the same GearMenuItem).
 
 // The card's action menu and a run's tab (its echo, Running, the failure, Rerun, no exit overlay, no
 // toast): src/components/threadinfo/PlaceGroup.actions.test.tsx, src/components/bottom/BottomPanel.test.tsx
 // ("an action run's tab"), src/components/actions/ActionRunDialog.test.tsx (a user's run does not toast).
 // A project without actions, the icon tiles, add/edit/delete and a checkout row's run and the project
-// menu's New action: src/components/actions/ActionsMenu.test.tsx and ActionDialog.test.tsx.
+// menu's New action: src/components/actions/CheckoutActions.test.tsx and ActionDialog.test.tsx.
 // Stop, Rerun, ×, Stop on a run that ignores SIGHUP, and an agent's run: BottomPanel.test.tsx.
 
 // The toast, Open selecting the thread, the dialog's heading, meta, output and Run in terminal, a
@@ -98,7 +87,7 @@ test("a failed worktree-create run's output at a narrow window: the meta on one 
 for (const scheme of ["dark", "light"] as const) {
   test.describe(`screenshots (${scheme})`, () => {
     test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
-    test("menu, empty menu, dialogs, running and exited tabs", async ({ page }, info) => {
+    test("menu, dialogs, running and exited tabs", async ({ page }, info) => {
       const shots = process.env.SHOTS;
       test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
       test.setTimeout(60_000);
@@ -111,14 +100,8 @@ for (const scheme of ["dark", "light"] as const) {
       await page.keyboard.press("Escape");
       await expect(menu(page)).toHaveCount(0);
 
-      await trigger(page, "repo-gp").click();
-      await settle();
-      await page.screenshot({ path: `${dir}/menu-empty-${scheme}.png` });
-      await page.keyboard.press("Escape");
-      await expect(menu(page)).toHaveCount(0);
-
-      await trigger(page).click();
-      await menu(page).getByTestId("action-new").click();
+      await openRunAction(page);
+      await menu(page).getByTestId("checkout-menu-add-action").click();
       await dialog(page).getByTestId("action-name").fill("Install deps");
       await dialog(page).getByTestId("action-command").fill("cd gui/frontend\npnpm install --frozen-lockfile");
       await dialog(page).locator('[data-testid="action-icon"][data-icon="configure"]').click();
@@ -128,9 +111,9 @@ for (const scheme of ["dark", "light"] as const) {
       await page.screenshot({ path: `${dir}/dialog-new-${scheme}.png` });
       await dialog(page).getByTestId("action-cancel").click();
 
-      await trigger(page).click();
+      await openRunAction(page);
       await item(page, "Test").hover();
-      await item(page, "Test").getByTestId("action-edit").click();
+      await item(page, "Test").getByTestId("checkout-menu-action-gear").click();
       await settle();
       await page.screenshot({ path: `${dir}/dialog-edit-${scheme}.png` });
       await dialog(page).getByTestId("action-delete").click();

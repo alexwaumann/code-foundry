@@ -97,12 +97,12 @@ test("needs-attention: window title and cmd+shift+a", async ({ page }) => {
   await expectAttention(page, 1);
 });
 
-test("new thread: a checkout's + on its project page opens the composer with that worktree", async ({ page }) => {
+test("new thread: a checkout's New thread here on its project page opens the composer with that worktree", async ({ page }) => {
   await openApp(page);
   await openProjectPage(page, "repo-cf");
   const wt = page.locator(`[data-nav-key="pw:repo-cf::${FIX_RESIZE}"]`);
-  await wt.hover();
-  await wt.getByTestId("worktree-new-thread").click();
+  await wt.click({ button: "right" });
+  await page.getByTestId("checkout-menu-new-thread").click();
   await expect(page.getByTestId("palette")).toHaveCount(0);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
   await expect(page.getByTestId("composer-worktree")).toHaveText("fix/resize");
