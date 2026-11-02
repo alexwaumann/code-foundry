@@ -27,6 +27,7 @@ type fakeRunner struct {
 
 type fakeCall struct {
 	op         string
+	doc        string
 	vars       map[string]any
 	start, end time.Time
 }
@@ -47,7 +48,7 @@ func (f *fakeRunner) GraphQL(ctx context.Context, q string, vars map[string]any)
 	data, err := h(op, q, vars)
 	f.mu.Lock()
 	f.inflight--
-	f.calls = append(f.calls, fakeCall{op: op, vars: vars, start: start, end: time.Now()})
+	f.calls = append(f.calls, fakeCall{op: op, doc: q, vars: vars, start: start, end: time.Now()})
 	f.mu.Unlock()
 	return data, err
 }
@@ -97,11 +98,16 @@ func (f *fakeRunner) count(op string) int {
 	return n
 }
 
-// opsSince lists the operations called since call index from.
+// opsSince lists the operations called since call index from, except PollProjects
+// (poll_projects_test.go counts those): the dashboard poll's requests are what most
+// tests pin, and the projects request of a cycle can land on either side of from.
 func (f *fakeRunner) opsSince(from int) []string {
 	calls, _ := f.snapshot()
 	var out []string
 	for _, c := range calls[min(from, len(calls)):] {
+		if c.op == "PollProjects" {
+			continue
+		}
 		out = append(out, c.op)
 	}
 	return out
@@ -181,8 +187,13 @@ func TestStorePacing(t *testing.T) {
 	if f.maxInflight != 1 {
 		t.Errorf("max in flight = %d, want 1", f.maxInflight)
 	}
-	// One request per poll covers every repository.
-	last := calls[len(calls)-1]
+	// One request per poll covers every repository (the projects request follows it).
+	var last fakeCall
+	for _, c := range calls {
+		if c.op == "Poll" {
+			last = c
+		}
+	}
 	if last.op != "Poll" || last.vars["r0n"] != "one" || last.vars["r1n"] != "three" || last.vars["r2n"] != "two" {
 		t.Errorf("last request = %s %v, want a poll of all three repositories", last.op, last.vars)
 	}

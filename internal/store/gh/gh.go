@@ -343,7 +343,10 @@ type Snapshot struct {
 	// Dashboard is the viewer's pull request dashboards and global monthly stats
 	// (activity.go), unfiltered: readers keep the tracked repositories they want.
 	Dashboard Dashboard
-	Poll      PollState
+	// Projects are the project-wide lists of the Pull Requests page (poll_projects.go),
+	// apart from Dashboard so that none of its readers sees them.
+	Projects ProjectPullRequests
+	Poll     PollState
 }
 
 // Repo returns the state for slug (any case). ok is false for an unknown or invalid slug.
@@ -375,7 +378,7 @@ func (s *Snapshot) LocalRepo(repo string) string {
 }
 
 func (s *Snapshot) clone() *Snapshot {
-	n := &Snapshot{Viewer: s.Viewer, Dashboard: s.Dashboard, Poll: s.Poll, Repos: make(map[string]RepoState, len(s.Repos)+1)}
+	n := &Snapshot{Viewer: s.Viewer, Dashboard: s.Dashboard, Projects: s.Projects, Poll: s.Poll, Repos: make(map[string]RepoState, len(s.Repos)+1)}
 	for k, v := range s.Repos {
 		n.Repos[k] = v
 	}
@@ -390,6 +393,10 @@ type Polled struct {
 	// poll when this one failed).
 	FetchedAt time.Time
 	LastError string
+	// ProjectsFetchedAt and ProjectsLastError are Snapshot.Projects' (fetched in the
+	// same cycle, before this event).
+	ProjectsFetchedAt time.Time
+	ProjectsLastError string
 }
 
 // ViewerUpdated is published on the bus when the viewer or authentication state changes.

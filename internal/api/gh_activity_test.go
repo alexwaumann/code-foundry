@@ -280,3 +280,58 @@ func TestStatsToProto(t *testing.T) {
 		})
 	}
 }
+
+func TestGhDashboardProjectLists(t *testing.T) {
+	store, client, _ := newGhTest(t)
+	ctx := context.Background()
+	at := time.Date(2026, 11, 2, 6, 0, 0, 0, time.UTC)
+	_ = store.Track("o/tracked")
+	store.SetCanonicalSlug("o/tracked", "neworg/tracked")
+
+	// Never fetched: empty lists, no URL, no time.
+	res, err := client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := res.Msg; len(m.GetProjectOpen().GetPullRequests()) != 0 || m.GetProjectOpen().GetSearchUrl() != "" ||
+		m.GetProjectMerged().GetTotalCount() != 0 || m.GetProjectsFetchedAt() != nil {
+		t.Errorf("unfetched = %v", m)
+	}
+
+	open := gh.PullRequest{Repo: "neworg/tracked", Number: 148, Title: "feat", Author: "someone", State: gh.PullRequestOpen,
+		Additions: 412, Deletions: 58, ReviewDecision: gh.ReviewRequired, ReviewRequests: []string{"a", "b"}}
+	merged := gh.PullRequest{Repo: "o/tracked", Number: 137, Title: "fix", Author: "someone", State: gh.PullRequestMerged,
+		MergedAt: at, Additions: 30, Deletions: 4}
+	store.SetProjects(gh.ProjectPullRequests{
+		Open: gh.ProjectList{PullRequests: []gh.PullRequest{open}, Total: 1,
+			Query: "is:pr is:open repo:neworg/tracked repo:x/y -author:@me", WebQuery: "is:pr is:open (repo:neworg/tracked OR repo:x/y) -author:@me"},
+		Merged:    gh.ProjectList{PullRequests: []gh.PullRequest{merged}, Total: 64, Query: "is:pr is:merged repo:neworg/tracked", WebQuery: "is:pr is:merged repo:neworg/tracked"},
+		FetchedAt: at,
+		LastError: "project_merged: busy",
+	})
+	res, err = client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := res.Msg
+	o := m.GetProjectOpen()
+	if len(o.GetPullRequests()) != 1 || o.GetTotalCount() != 1 ||
+		o.GetSearchUrl() != "https://github.com/search?q=is%3Apr+is%3Aopen+%28repo%3Aneworg%2Ftracked+OR+repo%3Ax%2Fy%29+-author%3A%40me&type=pullrequests" {
+		t.Errorf("project open = %v", o)
+	}
+	// A renamed repository's results are under the tracked slug, like the dashboards'.
+	if p := o.GetPullRequests()[0]; p.GetRepoSlug() != "o/tracked" || p.GetAdditions() != 412 || p.GetDeletions() != 58 || len(p.GetReviewRequests()) != 2 {
+		t.Errorf("project open PR = %v", p)
+	}
+	mg := m.GetProjectMerged()
+	if len(mg.GetPullRequests()) != 1 || mg.GetTotalCount() != 64 || mg.GetPullRequests()[0].GetMergedAt() == nil || mg.GetPullRequests()[0].GetAdditions() != 30 {
+		t.Errorf("project merged = %v", mg)
+	}
+	if !m.GetProjectsFetchedAt().AsTime().Equal(at) || m.GetProjectsLastError() != "project_merged: busy" {
+		t.Errorf("projects fetched %v error %q", m.GetProjectsFetchedAt(), m.GetProjectsLastError())
+	}
+	// They are not in the viewer's lists.
+	if len(m.GetAuthored())+len(m.GetReviewRequested())+len(m.GetReviewed())+len(m.GetRecentlyMerged()) != 0 {
+		t.Errorf("dashboard lists = %v", m)
+	}
+}

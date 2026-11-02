@@ -20,8 +20,10 @@ type fakeGitHub struct {
 	viewer   Viewer
 	prs      map[string]*PullRequest // by node id
 	sections map[string][]string     // section name -> PR ids, in order
-	repos    map[string]*fakeRepo    // by slug; missing slugs are NOT_FOUND
-	branches map[string][]string     // slug + "\x00" + head -> PR ids
+	// totals overrides a section's issueCount (len of its list otherwise): a capped list.
+	totals   map[string]int
+	repos    map[string]*fakeRepo // by slug; missing slugs are NOT_FOUND
+	branches map[string][]string  // slug + "\x00" + head -> PR ids
 	// merged are the viewer's merged pull requests the stats' count searches see
 	// (global, or narrowed with repo:).
 	merged []mergedItem
@@ -168,7 +170,7 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 		"resetAt": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}}
 	var errs []map[string]any
 	switch op {
-	case "Poll", "PollStats":
+	case "Poll", "PollStats", "PollProjects":
 		g.poll(doc, vars, data, &errs)
 	case "PullRequestDetails":
 		for _, list := range []string{"open", "closed"} {
@@ -228,7 +230,7 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 
 func (g *fakeGitHub) poll(doc string, vars map[string]any, data map[string]any, errs *[]map[string]any) {
 	data["viewer"] = map[string]any{"id": g.viewer.ID, "login": g.viewer.Login, "name": g.viewer.Name}
-	for _, name := range []string{sectionAuthored, sectionReview, sectionReviewed, sectionMerged} {
+	for _, name := range []string{sectionAuthored, sectionReview, sectionReviewed, sectionMerged, sectionProjectOpen, sectionProjectMerged} {
 		if _, ok := vars["q_"+name]; !ok {
 			continue
 		}
@@ -236,7 +238,11 @@ func (g *fakeGitHub) poll(doc string, vars map[string]any, data map[string]any, 
 		for _, id := range g.sections[name] {
 			nodes = append(nodes, prJSON(g.prs[id]))
 		}
-		data[sectionAlias(name)] = map[string]any{"issueCount": len(nodes), "nodes": nodes}
+		total := len(nodes)
+		if n, ok := g.totals[name]; ok {
+			total = n
+		}
+		data[sectionAlias(name)] = map[string]any{"issueCount": total, "nodes": nodes}
 	}
 	for _, m := range repoBlockRE.FindAllStringSubmatch(doc, -1) {
 		alias, block := m[1], m[2]

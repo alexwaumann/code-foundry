@@ -21,6 +21,7 @@ import {
   type CheckRun,
   type GhEvent,
   type MonthActivity,
+  type ProjectPullRequests,
   type PullRequest,
   type PullRequestComment,
   type PullRequestDetail,
@@ -136,6 +137,29 @@ export interface DashboardView {
   fetchedAtMs: number | null;
   lastError: string;
   trackedSlugs: string[];
+  /**
+   * The Pull Requests page's project-wide lists, over the tracked repositories only: open
+   * PRs the viewer did not author, is not asked to review and has not reviewed (GitHub's
+   * index can lag, so one may also be in the lists above), and every PR merged in the last
+   * 7 days. Empty while nothing is tracked or dashboards are disabled. Nothing but the
+   * Pull Requests page reads them.
+   */
+  projectOpen: ProjectPullRequestsView;
+  projectMerged: ProjectPullRequestsView;
+  /** When the project lists were last fetched (the same poll cycle as the lists above); null if never. The polled event carries it too. */
+  projectsFetchedAtMs: number | null;
+  /** The project lists' last fetch error; they are then the last good ones. */
+  projectsLastError: string;
+}
+
+/** One project-wide pull request search (DashboardView.projectOpen, projectMerged). */
+export interface ProjectPullRequestsView {
+  /** The first matches (up to 50), most recently updated first. */
+  pullRequests: PullRequestView[];
+  /** GitHub's match count: exact, even when pullRequests is capped. */
+  totalCount: number;
+  /** The same search on github.com; "" before the first fetch. */
+  searchUrl: string;
 }
 
 /** A tracked repository's default branch head and its checks (DefaultBranchStatus). */
@@ -167,7 +191,7 @@ export interface BranchPullRequestsView {
  * last poll's time and error itself (sent after every poll; the others only on change).
  */
 export type GhEventView =
-  | { kind: "polled"; fetchedAtMs: number | null; lastError: string }
+  | { kind: "polled"; fetchedAtMs: number | null; lastError: string; projectsFetchedAtMs: number | null; projectsLastError: string }
   | { kind: "viewer" }
   | { kind: "dashboard" }
   | { kind: "repoActivity"; repoSlug: string }
@@ -434,7 +458,13 @@ export function toGhEventView(e: GhEvent): GhEventView | null {
   const g = e.event;
   switch (g.case) {
     case "polled":
-      return { kind: "polled", fetchedAtMs: ms(g.value.fetchedAt), lastError: g.value.lastError };
+      return {
+        kind: "polled",
+        fetchedAtMs: ms(g.value.fetchedAt),
+        lastError: g.value.lastError,
+        projectsFetchedAtMs: ms(g.value.projectsFetchedAt),
+        projectsLastError: g.value.projectsLastError,
+      };
     case "viewerUpdated":
       return { kind: "viewer" };
     case "dashboardUpdated":
@@ -473,7 +503,15 @@ export async function getDashboard(conn: DaemonConnection = daemon, signal?: Abo
     fetchedAtMs: ms(r.fetchedAt),
     lastError: r.lastError,
     trackedSlugs: r.trackedSlugs,
+    projectOpen: toProjectPullRequestsView(r.projectOpen),
+    projectMerged: toProjectPullRequestsView(r.projectMerged),
+    projectsFetchedAtMs: ms(r.projectsFetchedAt),
+    projectsLastError: r.projectsLastError,
   };
+}
+
+function toProjectPullRequestsView(p: ProjectPullRequests | undefined): ProjectPullRequestsView {
+  return { pullRequests: (p?.pullRequests ?? []).map(toPullRequestView), totalCount: p?.totalCount ?? 0, searchUrl: p?.searchUrl ?? "" };
 }
 
 export async function getRepoActivity(repoSlug: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RepoActivityView> {

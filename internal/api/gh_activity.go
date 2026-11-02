@@ -26,11 +26,24 @@ func (h *Gh) GetDashboard(_ context.Context, _ *connect.Request[v1.GetDashboardR
 		LastError:          d.LastError,
 		TrackedSlugs:       trackedSlugs(snap),
 		DashboardsDisabled: d.Disabled,
+		ProjectOpen:        projectListToProto(snap, snap.Projects.Open),
+		ProjectMerged:      projectListToProto(snap, snap.Projects.Merged),
+		ProjectsFetchedAt:  timestamp(snap.Projects.FetchedAt),
+		ProjectsLastError:  snap.Projects.LastError,
 	}
 	if v := snap.Viewer.Viewer; v != nil {
 		res.Viewer = &v1.GhViewer{Login: v.Login, Name: v.Name, AvatarUrl: v.AvatarURL, Url: v.URL}
 	}
 	return connect.NewResponse(res), nil
+}
+
+// projectListToProto maps a project-wide list (gh.Snapshot.Projects).
+func projectListToProto(snap *gh.Snapshot, l gh.ProjectList) *v1.ProjectPullRequests {
+	return &v1.ProjectPullRequests{
+		PullRequests: searchPullRequestsToProto(localRepos(snap, l.PullRequests), nil),
+		TotalCount:   int32(l.Total),
+		SearchUrl:    l.SearchURL(),
+	}
 }
 
 // GetRepoActivity returns one repository's activity from the snapshot.

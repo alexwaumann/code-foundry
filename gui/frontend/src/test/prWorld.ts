@@ -319,6 +319,32 @@ function dashboardLists(t0: number) {
   };
 }
 
+/** The mock's project-wide lists (mock/github.ts reset): others' open PRs in the tracked repositories, and every PR merged in them this week. */
+function projectLists(t0: number, merged: PullRequestView[]): Pick<DashboardView, "projectOpen" | "projectMerged"> {
+  const pr = (slug: string, n: number, title: string, o: Parameters<typeof prSummary>[4] = {}) => prSummary(t0, slug, n, title, o);
+  const ours = (p: PullRequestView) => p.repoSlug === SLUG || p.repoSlug === GP_SLUG;
+  const open = [
+    pr(SLUG, 148, "feat(prs): per-project open pull requests", { author: "teammate-kim", headRef: "prs-per-project", reviewRequests: ["teammate-lee", "someone"], checks: rollup("success", 30), additions: 412, deletions: 58, changedFiles: 14, comments: 3, reviews: 0, ageMs: 50 * MIN }),
+    pr(SLUG, 146, "feat(usage): weekly totals on the Usage page", { author: "teammate-kim", headRef: "usage-weekly", draft: true, checks: rollup("pending", 8, 0, 22), additions: 188, deletions: 20, changedFiles: 6, comments: 0, reviews: 0, ageMs: 4 * HOUR }),
+    pr(GP_SLUG, 16, "fix: font fallback on Linux", { author: "someone", headRef: "font-fallback", review: "approved", mergeState: "clean", headSha: "16".padEnd(40, "0"), latestReviews: [{ author: "teammate-kim", state: "approved", submittedAtMs: t0 - 7 * HOUR, commitSha: "16".padEnd(40, "0") }], checks: rollup("success", 9, 0, 0, 1), additions: 54, deletions: 9, changedFiles: 2, comments: 1, reviews: 1, ageMs: 6 * HOUR }),
+    pr(GP_SLUG, 15, "docs: atlas layout notes", { author: "someone", headRef: "atlas-notes", review: null, mergeState: "clean", checks: rollup("none", 0), additions: 40, deletions: 0, changedFiles: 1, comments: 0, reviews: 0, ageMs: DAY }),
+    pr(SLUG, 131, "build(deps): bump vite from 7.1.4 to 7.2.0", { author: "dependabot", headRef: "dependabot/npm_and_yarn/vite-7.2.0", review: null, checks: rollup("success", 30), additions: 12, deletions: 12, changedFiles: 2, comments: 0, reviews: 0, ageMs: 2 * DAY }),
+  ];
+  const projectMerged = [
+    ...merged.filter(ours),
+    pr(SLUG, 137, "fix(sidebar): keep pinned rows on archive", { author: "teammate-kim", headRef: "pinned-archive", mergedAgoMs: 2 * DAY - HOUR, ageMs: 2 * DAY - HOUR, additions: 46, deletions: 12 }),
+    pr(SLUG, 135, "build(deps): bump zustand from 5.0.14 to 5.0.15", { author: "dependabot", headRef: "dependabot/npm_and_yarn/zustand-5.0.15", mergedAgoMs: 4 * DAY, ageMs: 4 * DAY, additions: 3, deletions: 3, changedFiles: 2 }),
+    pr(GP_SLUG, 11, "ci: cache the zig toolchain", { author: "someone", headRef: "ci-cache", mergedAgoMs: 5 * DAY, ageMs: 5 * DAY, additions: 22, deletions: 4, changedFiles: 1 }),
+  ].sort((a, b) => (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0));
+  const url = (q: string) => `https://github.com/search?${new URLSearchParams({ q, type: "pullrequests" }).toString()}`;
+  const repos = `(repo:${SLUG} OR repo:${GP_SLUG})`; // github.com ANDs repeated repo: qualifiers
+  const since = `${new Date(t0 - 7 * DAY).toISOString().slice(0, 19)}+00:00`;
+  return {
+    projectOpen: { pullRequests: open, totalCount: open.length, searchUrl: url(`is:pr is:open archived:false ${repos} -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc`) },
+    projectMerged: { pullRequests: projectMerged, totalCount: projectMerged.length, searchUrl: url(`is:pr is:merged merged:>=${since} ${repos} sort:updated-desc`) },
+  };
+}
+
 /** The mock's activity stats: the last six months, newest first. */
 function stats(t0: number, rows: [number, number][]): StatsView {
   const d = new Date(t0);
@@ -426,6 +452,9 @@ export class PrWorld {
       fetchedAtMs: t0 - 8_000,
       lastError: "",
       trackedSlugs: [SLUG, GP_SLUG],
+      ...projectLists(t0, lists.recentlyMerged),
+      projectsFetchedAtMs: t0 - 8_000,
+      projectsLastError: "",
     };
     const find = (n: number) => [...lists.authored, ...lists.reviewRequested, ...lists.recentlyMerged].find((p) => p.repoSlug === SLUG && p.number === n);
     const set = (d: PullRequestDetailView) => this.details.set(key(d.pullRequest.repoSlug, d.pullRequest.number), d);

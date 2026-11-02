@@ -182,7 +182,7 @@ describe("the Pull Requests page", () => {
     const pr = prSummary(Date.now(), SLUG, 150, "feat(gui): Pull Requests page", { headRef: "phase3a", checks: { state: "pending", total: 8, passed: 3, failed: 0, pending: 5, skipped: 0 }, ageMs: 0 });
     world.dashboard = { ...world.dashboard, authored: [pr, ...world.dashboard.authored], fetchedAtMs: Date.now() };
     gh({ kind: "dashboard" });
-    gh({ kind: "polled", fetchedAtMs: world.dashboard.fetchedAtMs, lastError: "" });
+    gh({ kind: "polled", fetchedAtMs: world.dashboard.fetchedAtMs, lastError: "", projectsFetchedAtMs: null, projectsLastError: "" });
     await settle();
     expect(rows("authored")).toHaveLength(4);
     // #150 needs no action from its author yet: after #145 (CI failing).
@@ -192,11 +192,11 @@ describe("the Pull Requests page", () => {
 
     // A failed poll arrives as a polled event only: no re-read, the header turns red.
     const reads = world.reads.dashboard;
-    gh({ kind: "polled", fetchedAtMs: Date.now() - 10 * 60_000 - 5_000, lastError: "github rate limit (secondary): paused" });
+    gh({ kind: "polled", fetchedAtMs: Date.now() - 10 * 60_000 - 5_000, lastError: "github rate limit (secondary): paused", projectsFetchedAtMs: null, projectsLastError: "" });
     expect(screen.getByTestId("prs-updated").dataset.freshness).toBe("error");
     expect(screen.getByTestId("prs-updated").textContent).toContain("updated 10m ago");
     // A poll that changed nothing freshens the header, still without a re-read.
-    gh({ kind: "polled", fetchedAtMs: Date.now(), lastError: "" });
+    gh({ kind: "polled", fetchedAtMs: Date.now(), lastError: "", projectsFetchedAtMs: null, projectsLastError: "" });
     expect(screen.getByTestId("prs-updated").dataset.freshness).toBe("fresh");
     expect(screen.getByTestId("prs-updated").textContent).toMatch(/updated \d+s ago/);
     await settle();

@@ -11,17 +11,17 @@ describe("gh poll freshness", () => {
   });
 
   it("a later poll confirms unchanged data; its error wins", () => {
-    applyGhEvent({ kind: "polled", fetchedAtMs: 5000, lastError: "" });
+    applyGhEvent({ kind: "polled", fetchedAtMs: 5000, lastError: "", projectsFetchedAtMs: null, projectsLastError: "" });
     expect(pollFreshness(usePollStore.getState(), 1000, "")).toEqual({ fetchedAtMs: 5000, lastError: "" });
-    applyGhEvent({ kind: "polled", fetchedAtMs: 5000, lastError: "rate limited" });
+    applyGhEvent({ kind: "polled", fetchedAtMs: 5000, lastError: "rate limited", projectsFetchedAtMs: null, projectsLastError: "" });
     expect(pollFreshness(usePollStore.getState(), 1000, "")).toEqual({ fetchedAtMs: 5000, lastError: "rate limited" });
     // A failed poll keeps the last success's time.
-    applyGhEvent({ kind: "polled", fetchedAtMs: 2000, lastError: "rate limited" });
+    applyGhEvent({ kind: "polled", fetchedAtMs: 2000, lastError: "rate limited", projectsFetchedAtMs: null, projectsLastError: "" });
     expect(pollFreshness(usePollStore.getState(), 5000, "").fetchedAtMs).toBe(2000);
   });
 
   it("a daemon that never polled successfully keeps the data's time", () => {
-    applyGhEvent({ kind: "polled", fetchedAtMs: null, lastError: "offline" });
+    applyGhEvent({ kind: "polled", fetchedAtMs: null, lastError: "offline", projectsFetchedAtMs: null, projectsLastError: "" });
     expect(pollFreshness(usePollStore.getState(), 1000, "")).toEqual({ fetchedAtMs: 1000, lastError: "offline" });
   });
 });

@@ -61,7 +61,8 @@ func (s *Store) SetRepo(r gh.RepoState) {
 func (s *Store) SetPoll(p gh.PollState) {
 	s.update(func(n *gh.Snapshot) { n.Poll = p })
 	if s.bus != nil {
-		bus.Publish(s.bus, gh.Polled(p))
+		pr := s.Snapshot().Projects
+		bus.Publish(s.bus, gh.Polled{FetchedAt: p.FetchedAt, LastError: p.LastError, ProjectsFetchedAt: pr.FetchedAt, ProjectsLastError: pr.LastError})
 	}
 }
 
@@ -103,7 +104,7 @@ func (s *Store) update(fn func(*gh.Snapshot)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	old := s.snap.Load()
-	n := &gh.Snapshot{Viewer: old.Viewer, Dashboard: old.Dashboard, Poll: old.Poll, Repos: make(map[string]gh.RepoState, len(old.Repos)+1)}
+	n := &gh.Snapshot{Viewer: old.Viewer, Dashboard: old.Dashboard, Projects: old.Projects, Poll: old.Poll, Repos: make(map[string]gh.RepoState, len(old.Repos)+1)}
 	for k, v := range old.Repos {
 		n.Repos[k] = v
 	}

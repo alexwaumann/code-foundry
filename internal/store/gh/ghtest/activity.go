@@ -18,6 +18,14 @@ func (s *Store) SetDashboard(d gh.Dashboard) {
 	}
 }
 
+// SetProjects replaces the project-wide lists and publishes gh.DashboardUpdated.
+func (s *Store) SetProjects(p gh.ProjectPullRequests) {
+	s.update(func(n *gh.Snapshot) { n.Projects = p })
+	if s.bus != nil {
+		bus.Publish(s.bus, gh.DashboardUpdated{FetchedAt: s.Snapshot().Dashboard.FetchedAt})
+	}
+}
+
 // SetActivity replaces a repository's activity (keyed by slug) and publishes
 // gh.RepoActivityUpdated.
 func (s *Store) SetActivity(slug string, a gh.RepoActivity) {

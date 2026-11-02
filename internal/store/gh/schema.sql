@@ -31,7 +31,9 @@ CREATE TABLE IF NOT EXISTS gh_ref_checks (
 CREATE INDEX IF NOT EXISTS gh_pull_request_details_fetched_at ON gh_pull_request_details (fetched_at);
 CREATE INDEX IF NOT EXISTS gh_ref_checks_fetched_at ON gh_ref_checks (fetched_at);
 
--- The polled state (activity_cache.go): the viewer dashboards ("dashboard"), global
+-- The polled state (activity_cache.go): the viewer dashboards ("dashboard"), the
+-- Pull Requests page's project-wide lists ("projects", poll_projects.go, with their
+-- per-cycle fetch time in "projects_fetched"), global
 -- monthly stats ("stats"), per-repository stats ("repo_stats:<slug>") and default-branch
 -- CI ("default_branch:<slug>"), per-branch pull requests ("branch:<slug>:<head>"), the
 -- last successful poll ("poll"), the pull request detail panel's on-demand fetches

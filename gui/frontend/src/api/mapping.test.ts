@@ -9,6 +9,7 @@ import {
   CheckRollupState,
   CheckStatus,
   DiffSide,
+  GetDashboardResponseSchema,
   GhEventSchema,
   Mergeable,
   MergeStateStatus,
@@ -26,9 +27,9 @@ import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState }
 import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
 import { WorkspaceEventSchema } from "@/gen/codefoundry/v1/workspace_pb";
 import { toCommandView } from "./command";
-import { overrideEndpoint } from "./endpoint";
+import { overrideEndpoint, type DaemonConnection } from "./endpoint";
 import { toEventView } from "./events";
-import { statsMonth, toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView, toStatsView } from "./gh";
+import { getDashboard, statsMonth, toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView, toStatsView } from "./gh";
 import { isRemoteless, toProjectEventView, toProjectView } from "./project";
 import { toThreadListEventView, toThreadView } from "./threads";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
@@ -246,6 +247,30 @@ describe("gh mapping", () => {
     expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false, headSha: "", baseSha: "", headRepoSlug: "" });
   });
 
+  it("maps the dashboard's project-wide lists", async () => {
+    const conn = {
+      client: () =>
+        Promise.resolve({
+          getDashboard: () =>
+            Promise.resolve(
+              create(GetDashboardResponseSchema, {
+                projectOpen: { pullRequests: [{ repoSlug: "o/r", number: 148, additions: 412, deletions: 58 }], totalCount: 1, searchUrl: "https://github.com/search?q=a&type=pullrequests" },
+                projectMerged: { pullRequests: [{ repoSlug: "o/r", number: 137, state: PullRequestState.MERGED }], totalCount: 64 },
+                projectsFetchedAt: timestampFromMs(4000),
+                projectsLastError: "busy",
+              }),
+            ),
+        }),
+    } as unknown as DaemonConnection;
+    const d = await getDashboard(conn);
+    expect(d.projectOpen).toMatchObject({ totalCount: 1, searchUrl: "https://github.com/search?q=a&type=pullrequests", pullRequests: [{ repoSlug: "o/r", number: 148, additions: 412, deletions: 58 }] });
+    expect(d.projectMerged).toMatchObject({ totalCount: 64, searchUrl: "", pullRequests: [{ number: 137, state: "merged" }] });
+    expect([d.projectsFetchedAtMs, d.projectsLastError]).toEqual([4000, "busy"]);
+    // A daemon that never fetched them: empty lists, no URL, no time.
+    const none = await getDashboard({ client: () => Promise.resolve({ getDashboard: () => Promise.resolve(create(GetDashboardResponseSchema)) }) } as unknown as DaemonConnection);
+    expect([none.projectOpen, none.projectMerged, none.projectsFetchedAtMs]).toEqual([{ pullRequests: [], totalCount: 0, searchUrl: "" }, { pullRequests: [], totalCount: 0, searchUrl: "" }, null]);
+  });
+
   it("maps a pull request detail", () => {
     const d = create(PullRequestDetailSchema, {
       pullRequest: { repoSlug: "o/r", number: 7, state: PullRequestState.MERGED, checks: { state: CheckRollupState.FAILURE, total: 2, passed: 1, failed: 1 } },
@@ -371,7 +396,10 @@ describe("events mapping", () => {
     [{ case: "project" as const, value: create(ProjectEventSchema, { event: { case: "snapshot", value: { projects: [] } } }) }, { source: "project", event: { kind: "snapshot", projects: [] } }],
     [{ case: "terminal" as const, value: create(TerminalEventSchema, { event: { case: "removedId", value: "t1" } }) }, { source: "terminal", event: { kind: "removed", id: "t1" } }],
     [{ case: "threadList" as const, value: create(ThreadListEventSchema, { event: { case: "removedId", value: "s1" } }) }, { source: "threadList", event: { kind: "removed", id: "s1" } }],
-    [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "polled", value: { fetchedAt: timestampFromMs(5000), lastError: "boom" } } }) }, { source: "gh", event: { kind: "polled", fetchedAtMs: 5000, lastError: "boom" } }],
+    [
+      { case: "gh" as const, value: create(GhEventSchema, { event: { case: "polled", value: { fetchedAt: timestampFromMs(5000), lastError: "boom", projectsFetchedAt: timestampFromMs(4000), projectsLastError: "busy" } } }) },
+      { source: "gh", event: { kind: "polled", fetchedAtMs: 5000, lastError: "boom", projectsFetchedAtMs: 4000, projectsLastError: "busy" } },
+    ],
     [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "repoActivityUpdated", value: { repoSlug: "o/r" } } }) }, { source: "gh", event: { kind: "repoActivity", repoSlug: "o/r" } }],
     [{ case: "ui" as const, value: create(UiIntentSchema, { intent: { case: "openPalette", value: { query: "q" } } }) }, { source: "ui", event: { kind: "openPalette", query: "q" } }],
     [{ case: "workspace" as const, value: create(WorkspaceEventSchema, { event: { case: "removedId", value: "w-1" } }) }, { source: "workspace", event: { kind: "removed", id: "w-1" } }],

@@ -295,8 +295,7 @@ func (s *Store) pollFailed(ctx context.Context, cfg Config, err error, retryNow 
 		n.Poll.LastError = msg
 		n.Dashboard.LastError = msg
 	})
-	snap := s.Snapshot()
-	publish(s, Polled{FetchedAt: snap.Poll.FetchedAt, LastError: msg})
+	publish(s, s.polled(s.Snapshot().Poll.FetchedAt, msg))
 	return err
 }
 
@@ -349,8 +348,9 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			need = append(need, f)
 		}
 	}
+	inProjects := projectIDs(snap.Projects) // their rechecks are pollProjects' to run
 	for id := range s.recheck {
-		if !seen[id] {
+		if !seen[id] && !inProjects[id] {
 			delete(s.recheck, id)
 		}
 	}
@@ -358,25 +358,8 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	if ctx.Err() != nil {
 		return
 	}
-	resolve := func(f prFingerprint) PullRequest {
-		if d, ok := fetched[f.ID]; ok {
-			return d
-		}
-		k, ok := known[f.ID]
-		if !ok {
-			return f.placeholder()
-		}
-		if f.HasChecks {
-			k.Checks = f.Checks
-		}
-		return k
-	}
 	resolveAll := func(list []prFingerprint) []PullRequest {
-		out := make([]PullRequest, 0, len(list))
-		for _, f := range list {
-			out = append(out, resolve(f))
-		}
-		return out
+		return resolveFingerprints(list, fetched, known)
 	}
 
 	// 2. Default branches, with failing checks where they changed.
@@ -580,7 +563,12 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	if err := s.cache.saveActivity(ctx, activityPoll, now, pollRow{FetchedAt: now}); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
 	}
-	publish(s, Polled{FetchedAt: now, LastError: pollErr})
+	// The Pull Requests page's project-wide lists: same cycle, own request.
+	s.pollProjects(ctx, cfg)
+	if ctx.Err() != nil {
+		return
+	}
+	publish(s, s.polled(now, pollErr))
 
 	interval := nextInterval(cfg, s.presence(), idle, s.opts.IdleInterval)
 	if plan.statsDeferred && s.authorID() != "" {
@@ -657,6 +645,19 @@ func knownPullRequests(d Dashboard, b *branchStates) map[string]PullRequest {
 // with reviews lacking their commits (a cache from before they were fetched), or GitHub
 // was still computing its mergeability.
 func (s *Store) needsDetail(k PullRequest, ok bool, f prFingerprint) bool {
+	if fingerprintNeedsDetail(k, ok, f) {
+		return true
+	}
+	if s.recheck[f.ID] > 0 {
+		s.recheck[f.ID]--
+		return true
+	}
+	return false
+}
+
+// fingerprintNeedsDetail is needsDetail without the mergeability recheck: what the
+// fingerprint and the stored copy alone say.
+func fingerprintNeedsDetail(k PullRequest, ok bool, f prFingerprint) bool {
 	switch {
 	case !ok || k.Partial:
 		return true
@@ -668,9 +669,6 @@ func (s *Store) needsDetail(k PullRequest, ok bool, f prFingerprint) bool {
 		return true // summary only (it was closed when fetched)
 	case f.State == PullRequestOpen && len(k.LatestReviews) > 0 && !k.ReviewCommits:
 		return true // reviews cached before their commits were fetched
-	case s.recheck[f.ID] > 0:
-		s.recheck[f.ID]--
-		return true
 	}
 	return false
 }
