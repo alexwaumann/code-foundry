@@ -114,6 +114,11 @@ requests across GitHub, in any repository:
 - `authored`: the user's open PRs; `reviewRequested`: open PRs waiting for the user's
   review; `reviewed`: open PRs the user reviewed; `recentlyMerged`: merged in the last 7
   days. No closed PRs, and no PR outside these lists.
+- `projectOpen`, `projectMerged`: across the projects' repositories only, others' open PRs
+  that are none of the user's business and every PR merged there in the last 7 days; each
+  `{pullRequests, totalCount, searchUrl}` (the first 50; `totalCount` is exact;
+  `searchUrl` opens the full search on github.com). `projectsFetchedAtMs`,
+  `projectsLastError`.
 - `dashboardsDisabled`: the lists are off in Settings; `fetchedAtMs`; `lastError`;
   `trackedSlugs`: the repositories (owner/name) of the user's projects (the lists are not
   limited to them).
