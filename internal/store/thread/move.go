@@ -481,7 +481,7 @@ func (r *runner) onMoved(job *moveJob, relocated bool) {
 		rec.s = rec.s.withMove(job)
 		rec.moving = false
 		rec.namingTried = rec.namingTried || job.title != "" // a first-prompt namer not started yet never will
-		if job.restart && !job.started && rec.run == r { // a process started (or restarted) for the move has them
+		if job.restart && !job.started && rec.run == r {     // a process started (or restarted) for the move has them
 			rec.run.dirsStale.Store(true) // the members as --add-dir (maybeRestart)
 		}
 	})
