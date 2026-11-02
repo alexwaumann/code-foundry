@@ -38,11 +38,13 @@ an unclipped overflow); e2e projects.spec.ts hovers the title meta and every Det
   (the plain string) stays for the workspace page's member sentence. The colours and icons are
   one record (`SYNC_LOOK` in CheckoutsTable.tsx), easy to change.
 - Worktrees without threads: one column set for the header and every row through CSS subgrid
-  (`minmax(6rem,max-content) minmax(10rem,1fr) 3.25rem`). Every level between the table and the
+  (`minmax(min(6rem,25%),max-content) minmax(min(10rem,35%),1fr) 3.25rem`). Every level between the table and the
   cells is a subgrid, including RowContextMenu's trigger wrapper (new optional `className`).
   The branch is as wide as the longest branch; Why it stayed takes the rest and truncates (its
   tooltip only when cut); only a table narrower than the longest branch plus 10rem cuts the
-  branch. The section hint is gone.
+  branch. The two floors are shares of the table below about 23rem (25%, 35%): with plain
+  6rem + 10rem the header overflowed the narrowest pane (live, 150% zoom in a 760px window).
+  The section hint is gone.
 
 ## Gotchas
 

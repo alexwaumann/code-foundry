@@ -23,9 +23,11 @@ import { useCleanableCount } from "./useCleanable";
  * The table's one set of columns, shared by the header and every row (each a CSS subgrid of
  * it, SUBGRID): Branch as wide as the longest branch, Why it stayed the rest (at least 10rem;
  * it truncates), and the two 24px icon slots with their 4px gap. Only a table narrower than
- * the longest branch plus 10rem cuts the branch (down to 6rem). No column ever drops.
+ * the longest branch plus 10rem cuts the branch (down to 6rem). The two floors give way as a
+ * share of the table (25%, 35%) below about 23rem, so the narrowest pane never overflows. No
+ * column ever drops.
  */
-const TEMPLATE = "minmax(6rem,max-content) minmax(10rem,1fr) 3.25rem";
+const TEMPLATE = "minmax(min(6rem,25%),max-content) minmax(min(10rem,35%),1fr) 3.25rem";
 
 /** A level between the table and a row's cells: it spans the columns and lays its children on them. */
 const SUBGRID = "col-span-full grid grid-cols-subgrid";
