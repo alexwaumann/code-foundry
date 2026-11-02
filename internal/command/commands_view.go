@@ -103,6 +103,9 @@ type ViewDeps struct {
 	// Settings lists the settings pages view.settings --page takes (SettingsService.GetSchema).
 	// Nil: only the GUI's own pages (SettingsGUIPages).
 	Settings SettingsSchemaReader
+	// Workspaces resolves view.projects --workspace (an id or a name) to its id. Nil: the
+	// value goes to the GUI as given.
+	Workspaces WorkspaceLister
 }
 
 // pageFocusArg is the page verbs' --focus.
@@ -116,11 +119,16 @@ var pageFocusArg = ArgSpec{Name: "focus", Type: Bool,
 // outside a thread, are unchanged. With no window open there is nothing to take over:
 // it says so.
 func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
+	return d.showPageWith(uctx, a, name, nil)
+}
+
+// showPageWith is showPage with ShowView params (view.projects --project: which page).
+func (d ViewDeps) showPageWith(uctx Context, a Args, name string, params map[string]string) (Result, error) {
 	fromThread := uctx.ActiveView == "" && uctx.CallerThreadID != ""
 	if fromThread && !a.Bool("focus") && d.Viewed != nil && d.Emitter.Windows() > 0 && !d.Viewed(uctx.CallerThreadID) {
 		return Result{}, connect.NewError(connect.CodeFailedPrecondition, errNotViewed)
 	}
-	return EmitTo(d.Emitter, showViewIntent(name, "", nil)).CLIResult(uctx), nil
+	return EmitTo(d.Emitter, showViewIntent(name, "", params)).CLIResult(uctx), nil
 }
 
 // RegisterView registers the View category's verbs, all emitted as UiIntent.ShowView:
@@ -192,15 +200,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Args:        pageArgs,
 			Run:         page(ViewPullRequests),
 		},
-		{
-			Name:        "view.projects",
-			Title:       "Show Projects",
-			Description: "Show the Projects page in every app window: each project's worktrees and each workspace's members, with their git state and actions.",
-			Category:    "View",
-			Keybindings: []string{"cmd+shift+j"},
-			Args:        pageArgs,
-			Run:         page(ViewProjects),
-		},
+		d.projectsCommand(),
 		d.settingsCommand(),
 		{
 			Name:        "view.help",

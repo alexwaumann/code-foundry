@@ -53,7 +53,7 @@ func RegisterWorkspaceReveal(r *Registry, b WorkspaceBackend, reveal RevealFunc)
 }
 
 // findWorkspace is the workspace ref names: its id, or its name in any case.
-func findWorkspace(ctx context.Context, b WorkspaceBackend, ref string) (*v1.Workspace, error) {
+func findWorkspace(ctx context.Context, b WorkspaceLister, ref string) (*v1.Workspace, error) {
 	res, err := b.List(ctx, connect.NewRequest(&v1.ListWorkspacesRequest{}))
 	if err != nil {
 		return nil, err
