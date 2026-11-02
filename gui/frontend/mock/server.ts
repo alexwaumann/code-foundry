@@ -149,6 +149,8 @@
  *        GET /__mock/update counts app.restart runs (restarts)
  *   POST /__mock/gh/update | poll | stale | inbox-zero | auth?ok=false | touch?path=…   (GitHub + detail;
  *        inbox-zero empties the review queue, leaving the reviews that wait on their authors)
+ *   POST /__mock/gh/project-merged-capped[?shown=3&total=64]   (the dashboard's project-wide
+ *        merged list shows its first `shown` of `total`: "Showing 3 of 64")
  *   POST /__mock/gh/branch-pr?slug=o/r&head=b&number=N&title=…&state=open|draft|merged|closed[&ago=ms][&append=1]
  *                                                 (that branch's pull request, alone or beside the others)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts;
@@ -1489,6 +1491,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/gh/inbox-zero":
       world.gh.inboxZero();
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/gh/project-merged-capped":
+      world.gh.capProjectMerged(Number(q.get("shown") ?? "3"), Number(q.get("total") ?? "64"));
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/gh/stale":

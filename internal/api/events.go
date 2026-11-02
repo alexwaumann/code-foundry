@@ -723,7 +723,8 @@ func (s ghSource) snapshot(context.Context) []*v1.Event {
 	snap := s.store.Snapshot()
 	out := []*v1.Event{
 		ghWrap(ghViewerEvent(gh.ViewerUpdated{FetchedAt: snap.Viewer.FetchedAt})),
-		ghWrap(ghPolledEvent(gh.Polled{FetchedAt: snap.Poll.FetchedAt, LastError: snap.Poll.LastError})),
+		ghWrap(ghPolledEvent(gh.Polled{FetchedAt: snap.Poll.FetchedAt, LastError: snap.Poll.LastError,
+			ProjectsFetchedAt: snap.Projects.FetchedAt, ProjectsLastError: snap.Projects.LastError})),
 		ghWrap(ghDashboardEvent(gh.DashboardUpdated{FetchedAt: snap.Dashboard.FetchedAt})),
 	}
 	slugs := make([]string, 0, len(snap.Repos))

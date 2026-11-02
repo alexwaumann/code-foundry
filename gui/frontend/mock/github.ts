@@ -55,6 +55,12 @@ export interface PrInit {
   /** Each reviewer's latest review; commitSha is the head it was submitted on ("" when GitHub has none). */
   latestReviews?: { author: string; state: PullRequestReviewState; submittedAt?: Timestamp; commitSha: string }[];
 }
+/** One project-wide search (GetDashboardResponse.project_open / project_merged). */
+interface ProjectListInit {
+  pullRequests: PrInit[];
+  totalCount: number;
+  searchUrl: string;
+}
 interface DashboardInit {
   viewer: { login: string; name: string; url: string };
   authenticated: boolean;
@@ -67,6 +73,12 @@ interface DashboardInit {
   fetchedAt?: Timestamp;
   lastError: string;
   trackedSlugs?: string[];
+  /** Others' open PRs in the tracked repositories (not the viewer's, not asking for or reviewed by them). */
+  projectOpen: ProjectListInit;
+  /** Every PR merged in a tracked repository in the last 7 days. */
+  projectMerged: ProjectListInit;
+  projectsFetchedAt?: Timestamp;
+  projectsLastError: string;
 }
 interface ActivityInit {
   repoSlug: string;
@@ -108,6 +120,9 @@ const rollup = (state: CheckRollupState, passed: number, failed = 0, pending = 0
   pending,
   skipped,
 });
+
+/** The github.com search URL the daemon sends for a query (ProjectList.SearchURL). */
+const searchUrl = (q: string): string => `https://github.com/search?${new URLSearchParams({ q, type: "pullrequests" }).toString()}`;
 
 /** A 40-character commit id from a short tag ("14a" -> "14a000…"). */
 const sha = (tag: string): string => tag.padEnd(40, "0");
@@ -190,6 +205,42 @@ export class GhWorld {
       checks: rollup(CheckRollupState.FAILURE, 2, 2, 2, 1),
       ageMs: 5 * HOUR,
     });
+    const merged138 = this.pr(cf, 138, "chore(gh): pace requests through one worker", { headRef: "gh-pacing", mergedAgoMs: 1 * DAY, ageMs: 1 * DAY });
+    const merged136 = this.pr(cf, 136, "fix(repo): ignore Chmod-only fs events", { author: "teammate-kim", headRef: "kqueue-chmod", mergedAgoMs: 2 * DAY, ageMs: 2 * DAY });
+    const merged10 = this.pr(gp, 10, "build: zig 0.16", { headRef: "zig-016", mergedAgoMs: 6 * DAY, ageMs: 6 * DAY });
+    // The project-wide lists (GetDashboardResponse.project_open/project_merged): others'
+    // open PRs in the two tracked repositories, and every PR merged in them this week.
+    const repos = `repo:${cf} repo:${gp}`;
+    const projectOpen = [
+      this.pr(cf, 148, "feat(prs): per-project open pull requests", { author: "teammate-kim", headRef: "prs-per-project", reviewRequests: ["teammate-lee", "someone"], checks: rollup(CheckRollupState.SUCCESS, 30), additions: 412, deletions: 58, changedFiles: 14, commentCount: 3, reviewCount: 0, ageMs: 50 * MIN }),
+      this.pr(cf, 146, "feat(usage): weekly totals on the Usage page", { author: "teammate-kim", headRef: "usage-weekly", draft: true, checks: rollup(CheckRollupState.PENDING, 8, 0, 22), additions: 188, deletions: 20, changedFiles: 6, commentCount: 0, reviewCount: 0, ageMs: 4 * HOUR }),
+      this.pr(gp, 16, "fix: font fallback on Linux", {
+        author: "someone",
+        headRef: "font-fallback",
+        reviewDecision: ReviewDecision.APPROVED,
+        latestReviews: [{ author: "teammate-kim", state: PullRequestReviewState.APPROVED, submittedAt: this.at(7 * HOUR), commitSha: sha("16") }],
+        headSha: sha("16"),
+        mergeStateStatus: MergeStateStatus.CLEAN,
+        checks: rollup(CheckRollupState.SUCCESS, 9, 0, 0, 1),
+        additions: 54,
+        deletions: 9,
+        changedFiles: 2,
+        commentCount: 1,
+        reviewCount: 1,
+        ageMs: 6 * HOUR,
+      }),
+      this.pr(gp, 15, "docs: atlas layout notes", { author: "someone", headRef: "atlas-notes", reviewDecision: ReviewDecision.UNSPECIFIED, mergeStateStatus: MergeStateStatus.CLEAN, checks: rollup(CheckRollupState.UNSPECIFIED, 0), additions: 40, deletions: 0, changedFiles: 1, commentCount: 0, reviewCount: 0, ageMs: DAY }),
+      this.pr(cf, 131, "build(deps): bump vite from 7.1.4 to 7.2.0", { author: "dependabot", headRef: "dependabot/npm_and_yarn/vite-7.2.0", reviewDecision: ReviewDecision.UNSPECIFIED, checks: rollup(CheckRollupState.SUCCESS, 30), additions: 12, deletions: 12, changedFiles: 2, commentCount: 0, reviewCount: 0, ageMs: 2 * DAY }),
+    ];
+    const projectMerged = [
+      merged138,
+      this.pr(cf, 137, "fix(sidebar): keep pinned rows on archive", { author: "teammate-kim", headRef: "pinned-archive", mergedAgoMs: 2 * DAY - HOUR, ageMs: 2 * DAY - HOUR, additions: 46, deletions: 12, changedFiles: 3 }),
+      merged136,
+      this.pr(cf, 135, "build(deps): bump zustand from 5.0.14 to 5.0.15", { author: "dependabot", headRef: "dependabot/npm_and_yarn/zustand-5.0.15", mergedAgoMs: 4 * DAY, ageMs: 4 * DAY, additions: 3, deletions: 3, changedFiles: 2 }),
+      this.pr(gp, 11, "ci: cache the zig toolchain", { author: "someone", headRef: "ci-cache", mergedAgoMs: 5 * DAY, ageMs: 5 * DAY, additions: 22, deletions: 4, changedFiles: 1 }),
+      merged10,
+    ];
+    const since = `${new Date(this.t0 - 7 * DAY).toISOString().slice(0, 19)}+00:00`;
     this.dashboard = {
       viewer: { login: VIEWER, name: "Alex", url: `https://github.com/${VIEWER}` },
       authenticated: true,
@@ -232,9 +283,9 @@ export class GhWorld {
         }),
       ],
       recentlyMerged: [
-        this.pr(cf, 138, "chore(gh): pace requests through one worker", { headRef: "gh-pacing", mergedAgoMs: 1 * DAY, ageMs: 1 * DAY }),
-        this.pr(cf, 136, "fix(repo): ignore Chmod-only fs events", { author: "teammate-kim", headRef: "kqueue-chmod", mergedAgoMs: 2 * DAY, ageMs: 2 * DAY }),
-        this.pr(gp, 10, "build: zig 0.16", { headRef: "zig-016", mergedAgoMs: 6 * DAY, ageMs: 6 * DAY }),
+        merged138,
+        merged136,
+        merged10,
         this.pr("other-org/lib", 70, "docs: README", { author: "someone", mergedAgoMs: 3 * DAY, ageMs: 3 * DAY }),
       ],
       stats: {
@@ -251,6 +302,10 @@ export class GhWorld {
       },
       fetchedAt: this.at(8_000),
       lastError: "",
+      projectOpen: { pullRequests: projectOpen, totalCount: projectOpen.length, searchUrl: searchUrl(`is:pr is:open archived:false ${repos} -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc`) },
+      projectMerged: { pullRequests: projectMerged, totalCount: projectMerged.length, searchUrl: searchUrl(`is:pr is:merged merged:>=${since} ${repos} sort:updated-desc`) },
+      projectsFetchedAt: this.at(8_000),
+      projectsLastError: "",
     };
     this.activity = new Map([
       [
@@ -424,7 +479,7 @@ export class GhWorld {
   /** A pull request any dashboard list or watched branch holds. */
   findPr(slug: string, number: number): PrInit | undefined {
     const d = this.dashboard;
-    const all = [...d.authored, ...d.reviewRequested, ...d.reviewed, ...d.recentlyMerged, ...[...this.branches.values()].flat()];
+    const all = [...d.authored, ...d.reviewRequested, ...d.reviewed, ...d.recentlyMerged, ...[...this.branches.values()].flat(), ...d.projectOpen.pullRequests, ...d.projectMerged.pullRequests];
     return all.find((p) => p.repoSlug.toLowerCase() === slug.toLowerCase() && p.number === number);
   }
 
@@ -475,7 +530,8 @@ export class GhWorld {
 
   /** The polled event: the daemon sends it after every poll and in its gh snapshot. */
   polledEvent(): GhEventInit {
-    return { event: { case: "polled", value: { fetchedAt: this.dashboard.fetchedAt, lastError: this.dashboard.lastError } } };
+    const d = this.dashboard;
+    return { event: { case: "polled", value: { fetchedAt: d.fetchedAt, lastError: d.lastError, projectsFetchedAt: d.projectsFetchedAt, projectsLastError: d.projectsLastError } } };
   }
 
   /** A poll found a new PR: add it and announce the dashboard (and the poll). */
@@ -509,7 +565,21 @@ export class GhWorld {
 
   /** A poll that changed nothing: only the polled event, with a fresh time. */
   poll(): void {
-    this.dashboard = { ...this.dashboard, fetchedAt: timestampFromDate(new Date()), lastError: "" };
+    const at = timestampFromDate(new Date());
+    this.dashboard = { ...this.dashboard, fetchedAt: at, lastError: "", projectsFetchedAt: at, projectsLastError: "" };
+    this.publishGh(this.polledEvent());
+  }
+
+  /**
+   * Test control (POST /__mock/gh/project-merged-capped?shown=3&total=64): the project-wide
+   * merged list is capped, showing its first `shown` of `total` (GitHub's issueCount), like
+   * a busy week. Announced like a poll.
+   */
+  capProjectMerged(shown: number, total: number): void {
+    const d = this.dashboard;
+    const at = timestampFromDate(new Date());
+    this.dashboard = { ...d, projectMerged: { ...d.projectMerged, pullRequests: d.projectMerged.pullRequests.slice(0, shown), totalCount: total }, fetchedAt: at, projectsFetchedAt: at };
+    this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: at } } });
     this.publishGh(this.polledEvent());
   }
 

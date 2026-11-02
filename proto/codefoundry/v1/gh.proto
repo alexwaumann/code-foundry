@@ -40,7 +40,9 @@ service GhService {
   // GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
   // PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
   // involving them) and their monthly stats across GitHub, from the last poll. The
-  // lists are viewer-wide: every repository, tracked or not.
+  // lists are viewer-wide: every repository, tracked or not. project_open and
+  // project_merged are the Pull Requests page's project-wide lists over the tracked
+  // repositories only (fetched in the same poll cycle by a request of their own).
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse) {}
   // GetRepoActivity returns the viewer's monthly stats in one repository, its default
   // branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
@@ -416,6 +418,10 @@ message GhEvent {
     google.protobuf.Timestamp fetched_at = 1;
     // This poll's error; empty when it succeeded.
     string last_error = 2;
+    // GetDashboardResponse.projects_fetched_at and projects_last_error as of this poll
+    // (the project lists are fetched in the same cycle, before this event).
+    google.protobuf.Timestamp projects_fetched_at = 3;
+    string projects_last_error = 4;
   }
 }
 
@@ -528,6 +534,31 @@ message GetDashboardResponse {
   repeated PullRequest reviewed = 10;
   // github.dashboards_enabled is off: the lists are empty and not polled.
   bool dashboards_disabled = 11;
+  // Open pull requests in the tracked repositories that the viewer did not author, is
+  // not asked to review, and has not reviewed (awareness only; GitHub's index can lag,
+  // so one may also be in the lists above). Empty while nothing is tracked or
+  // dashboards are disabled.
+  ProjectPullRequests project_open = 12;
+  // Every pull request merged in a tracked repository in the last 7 days (the
+  // recently_merged window), any author.
+  ProjectPullRequests project_merged = 13;
+  // When the two project lists were last fetched; unset if never (or nothing is
+  // tracked). GhEvent.Polled carries it too.
+  google.protobuf.Timestamp projects_fetched_at = 14;
+  // The project lists' last fetch error; they are then the last good ones.
+  string projects_last_error = 15;
+}
+
+// One project-wide pull request search (GetDashboardResponse.project_open and
+// project_merged).
+message ProjectPullRequests {
+  // The first matches (up to 50), most recently updated first. Open pull requests
+  // carry every field; merged ones the summary (additions and deletions included).
+  repeated PullRequest pull_requests = 1;
+  // GitHub's match count: exact, even when pull_requests is capped.
+  int32 total_count = 2;
+  // The same search on github.com; empty before the first fetch.
+  string search_url = 3;
 }
 
 message GetRepoActivityRequest {

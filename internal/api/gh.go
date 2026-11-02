@@ -162,6 +162,7 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 func ghPolledEvent(e gh.Polled) *v1.GhEvent {
 	return &v1.GhEvent{Event: &v1.GhEvent_Polled_{Polled: &v1.GhEvent_Polled{
 		FetchedAt: timestamp(e.FetchedAt), LastError: e.LastError,
+		ProjectsFetchedAt: timestamp(e.ProjectsFetchedAt), ProjectsLastError: e.ProjectsLastError,
 	}}}
 }
 

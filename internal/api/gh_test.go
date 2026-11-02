@@ -181,10 +181,12 @@ func TestGhTrackAndWatch(t *testing.T) {
 			break
 		}
 	}
+	store.SetProjects(gh.ProjectPullRequests{FetchedAt: at.Add(-time.Minute), LastError: "busy"})
 	store.SetPoll(gh.PollState{FetchedAt: at, LastError: "boom"})
 	for stream.Receive() {
 		if ev := stream.Msg().GetPolled(); ev != nil {
-			if !ev.GetFetchedAt().AsTime().Equal(at) || ev.GetLastError() != "boom" {
+			if !ev.GetFetchedAt().AsTime().Equal(at) || ev.GetLastError() != "boom" ||
+				!ev.GetProjectsFetchedAt().AsTime().Equal(at.Add(-time.Minute)) || ev.GetProjectsLastError() != "busy" {
 				t.Errorf("polled event = %v", ev)
 			}
 			break
