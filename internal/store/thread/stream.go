@@ -486,6 +486,7 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 func (r *runner) onStreamEvent(ev claudestream.Event) {
 	r.activity = r.m.opts.Now()
 	if r.echo.drop(ev, r.m.opts.Now()) { // setcwd_echo.go
+		r.log().debug("dropped a line of claude's set_cwd echo", "event", fmt.Sprintf("%T", ev))
 		r.tryCd()
 		r.maybeRestart()
 		return
