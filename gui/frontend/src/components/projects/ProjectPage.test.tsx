@@ -414,7 +414,6 @@ describe("Clean up merged worktrees", () => {
 });
 
 describe("Worktrees without threads", () => {
-  const HINT = "a thread's worktree goes on its own once its work is on main";
   const leftoverRow = (path: string) => document.querySelector<HTMLElement>(`[data-nav-key="pw:repo-cf::${path}"]`) as HTMLElement;
   function openLeftoverMenu(path: string): HTMLElement {
     fireEvent.contextMenu(leftoverRow(path));
@@ -431,7 +430,7 @@ describe("Worktrees without threads", () => {
     await settle();
 
     // The index's title grammar: the count, the hint, the bulk button at the right.
-    expect(screen.getByTestId("leftover-title").textContent).toBe(`Worktrees without threads(4)· ${HINT}Remove the 1 that is clean`);
+    expect(screen.getByTestId("leftover-title").textContent).toBe("Worktrees without threads(4)Remove the 1 that is clean");
     expect(screen.getByTestId("leftover-remove-clean").textContent).toBe("Remove the 1 that is clean");
     expect(screen.getByTestId("leftover-head").textContent).toBe("BranchWhy it stayed");
     // Threads hold feat/sidebar and fix/resize: not leftovers.
@@ -461,10 +460,10 @@ describe("Worktrees without threads", () => {
       expect(r?.getAttribute("data-work")).toBe(work ? "true" : null);
     }
     for (const id of ["leftover-footer", "leftover-resume", "leftover-new-thread"]) expect(screen.queryByTestId(id)).toBeNull();
-    // The icons' and the branch's tooltips: what they hide.
+    // The icons' tooltips name them; the branch, on screen in full, has none.
     expect(tooltipText(inEl(leftover(COPY), "leftover-show-diff") as HTMLElement)).toBe("Show diff");
     expect(tooltipText(inEl(leftover(COPY), "leftover-remove") as HTMLElement)).toBe("Remove worktree");
-    expect(await hoverTooltipText(inEl(leftover(COPY), "leftover-branch") as HTMLElement)).toBe("~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy");
+    expect(inEl(leftover(COPY), "leftover-branch")?.hasAttribute("data-tip")).toBe(false);
     // Details counts the worktrees Code Foundry made.
     expect(screen.getByTestId("details-worktrees-value").textContent).toContain("6 · 3 made by Code Foundry");
     // Uncommitted files on a leftover show in its reason, and it holds work then.
@@ -472,12 +471,12 @@ describe("Worktrees without threads", () => {
     expect(inEl(leftover(SHADERS), "leftover-reason")?.textContent).toBe("made outside Code Foundry · 2 uncommitted files · merged otherwise");
     expect(inEl(leftover(SHADERS), "leftover-show-diff")).not.toBeNull();
 
-    // A row has no click: no tab opens, the cursor stays put. Show diff: the worktree's Changes tab in this page's panel.
+    // A row has no click (it tints on hover): no tab opens, the cursor stays put. Show diff: the worktree's Changes tab in this page's panel.
     fireEvent.click(leftoverRow(COPY));
     fireEvent.doubleClick(leftoverRow(COPY));
     expect(pagePanel()).toBeNull();
     expect(leftoverRow(COPY).getAttribute("aria-selected")).toBe("false");
-    expect(leftoverRow(COPY).className).not.toContain("hover:");
+    expect(leftoverRow(COPY).className).toContain("hover:bg-cf-control-hover/50");
     fireEvent.click(inEl(leftover(COPY), "leftover-show-diff") as HTMLElement);
     expect(pagePanel()).toMatchObject({ open: true, kind: "changes", params: { project: "repo-cf", path: COPY } });
     expect(page().getAttribute("data-project")).toBe("repo-cf");
@@ -601,7 +600,7 @@ describe("Worktrees without threads", () => {
     // ghostty-playground: nothing kept.
     renderPage("repo-gp");
     await settle();
-    expect(screen.getByTestId("leftover-title").textContent).toBe(`Worktrees without threads(0)· ${HINT}`);
+    expect(screen.getByTestId("leftover-title").textContent).toBe("Worktrees without threads(0)");
     expect(screen.getByTestId("leftover-empty").textContent).toBe("Nothing kept. Every worktree here has a thread.");
     expect(screen.queryByTestId("leftover-table")).toBeNull();
     expect(screen.queryByTestId("leftover-remove-clean")).toBeNull();

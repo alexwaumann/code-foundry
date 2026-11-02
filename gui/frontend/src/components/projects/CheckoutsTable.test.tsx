@@ -13,7 +13,7 @@ const { ProjectsPage } = await import("./ProjectsPage");
 const { OPEN_IN_ITEM, OPEN_IN_MORE } = await import("./OpenInMenuItem");
 const { card } = await import("@/test/cardFakes");
 const { lastInvocation, resetDaemon } = await import("@/test/daemonFakes");
-const { addThreads, addWorkspace, addWorktrees, CF, FEAT, FIX, HOME, menuEntries, resetPanels, seedWorld, thread, worktree } = await import("@/test/projectsWorld");
+const { addThreads, addWorkspace, addWorktrees, CF, FEAT, FIX, HOME, menuEntries, resetPanels, seedWorld, status, thread, updateProject, worktree } = await import("@/test/projectsWorld");
 const { projectPage, useUiStore } = await import("@/stores/ui");
 const { editorAppsResource } = await import("@/stores/threadInfo");
 const { hoverTooltipText } = await import("@/test/tooltip");
@@ -89,13 +89,29 @@ describe("the columns", () => {
 });
 
 describe("a row", () => {
-  it("has no click and no hover tint; its branch's tooltip is the tildified path", async () => {
+  it("has no click but tints on hover; its branch has no tooltip (the text is on screen)", async () => {
     renderPage();
     await settle();
-    expect(row(FIX).className).not.toContain("hover:");
+    expect(row(FIX).className).toContain("hover:bg-cf-control-hover/50");
     fireEvent.click(row(FIX));
     expect(row(FIX).getAttribute("aria-selected")).toBe("false");
-    expect(await hoverTooltipText(within(cells(FIX)).getByTestId("worktree-branch"))).toBe("~/src/code-foundry.worktrees/fix-resize");
+    expect(within(cells(FIX)).getByTestId("worktree-branch").hasAttribute("data-tip")).toBe(false);
+  });
+
+  it.each<[string, Partial<{ upstream: string; ahead: number; behind: number }>, string, string, string | null]>([
+    ["up to date: green with a check", { upstream: "origin/fix", ahead: 0, behind: 0 }, "up to date", "text-cf-success-text", "lucide-check"],
+    ["to push: blue with an up arrow", { upstream: "origin/fix", ahead: 2, behind: 0 }, "2 to push", "text-cf-info-text", "lucide-arrow-up"],
+    ["behind: amber with a down arrow", { upstream: "origin/fix", ahead: 0, behind: 1 }, "1 behind", "text-cf-warning-text", "lucide-arrow-down"],
+    ["both: amber diverged with a split, both counts in sight", { upstream: "origin/fix", ahead: 2, behind: 1 }, "diverged ↑2 ↓1", "text-cf-warning-text", "lucide-split"],
+    ["no upstream: muted, no icon", { upstream: "", ahead: 0, behind: 0 }, "not pushed", "text-cf-text-muted", null],
+  ])("Sync, %s; no tooltip (nothing is hidden)", (_name, st, text, tone, icon) => {
+    updateProject("repo-cf", (p) => ({ ...p, worktrees: p.worktrees.map((w) => (w.path === FIX ? { ...w, status: status({ ...w.status, ...st }) } : w)) }));
+    renderPage();
+    const cell = within(cells(FIX)).getByTestId("worktree-sync");
+    expect(cell.textContent).toBe(text);
+    expect(cell.className).toContain(tone);
+    expect(cell.hasAttribute("data-tip")).toBe(false);
+    expect(cell.querySelector("svg")?.getAttribute("class")?.split(" ").find((c) => c.startsWith("lucide-") && c !== "lucide-icon") ?? null).toBe(icon);
   });
 
   it("the main checkout's FolderRoot and a workspace checkout's Layers, nothing on the others", async () => {

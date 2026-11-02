@@ -194,13 +194,29 @@ function wanted(el: HTMLElement | null): boolean {
 }
 
 /**
- * Whether the trigger's text is cut short: the trigger or an element inside it overflows
- * its box (truncate, line-clamp, overflow-hidden, sr-only).
+ * Whether the trigger's text is cut short: the trigger or an element inside it clips its
+ * content (overflow other than visible: truncate, line-clamp, sr-only) and that content is
+ * wider or taller than its box by more than a pixel. An element that does not clip shows
+ * all it holds, however far it reaches.
+ *
+ * The pixel of slack is the page zoom's (lib/zoom.ts, CSS `zoom` on <html>): away from 100%
+ * WebKit rounds scroll* and client* back to CSS px separately, so text that fits reads a
+ * pixel wider and taller than its box (at 110% a Details value: scrollWidth 436 on a
+ * clientWidth of 435, scrollHeight 19 on a clientHeight of 18) and the tooltip opened on
+ * every value. A cut under a pixel goes without its tooltip. docs/notes/project-page-polish.md.
  */
 function truncated(el: HTMLElement | null): boolean {
   if (!el) return true
-  const overflows = (e: Element) => e.scrollWidth > e.clientWidth || e.scrollHeight > e.clientHeight
-  return overflows(el) || Array.from(el.querySelectorAll("*")).some(overflows)
+  return clipsOverflow(el) || Array.from(el.querySelectorAll("*")).some(clipsOverflow)
+}
+
+/** The element clips content that overflows its box by more than the zoom's rounding (truncated). */
+function clipsOverflow(e: Element): boolean {
+  const wide = e.scrollWidth - e.clientWidth > 1
+  const tall = e.scrollHeight - e.clientHeight > 1
+  if (!wide && !tall) return false
+  const style = getComputedStyle(e)
+  return (wide && style.overflowX !== "visible") || (tall && style.overflowY !== "visible")
 }
 
 const NAV_KEYS = new Set(["Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"])
