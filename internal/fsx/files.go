@@ -196,9 +196,9 @@ type FileIndex struct {
 }
 
 type cachedFiles struct {
-	key     string
-	files   []FileEntry
-	paths   []string // files[i].Path, for fuzzy.RankSources
+	key   string
+	files []FileEntry
+	paths []string // files[i].Path, for fuzzy.RankSources
 	// filePaths are the paths of the files alone (no directories); fileIdx[i] is
 	// filePaths[i]'s index in files.
 	filePaths []string

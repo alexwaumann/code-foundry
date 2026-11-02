@@ -241,7 +241,7 @@ func TestFilesystemSearchFilesSources(t *testing.T) {
 	n := &v1.FileSource{ProjectId: "n"}
 	type match struct {
 		project, checkout, path string // "/" suffix for directories
-		pathPos, projectPos        []int32
+		pathPos, projectPos     []int32
 	}
 	tests := []struct {
 		name          string
@@ -268,7 +268,7 @@ func TestFilesystemSearchFilesSources(t *testing.T) {
 		{name: "the limit spans sources", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{n, p}, Query: "readme", Limit: 1},
 			want: []match{{"n", plain, "README.md", nil, nil}}, wantTruncated: true},
 		{name: "checkout as named; the same checkout twice is searched once",
-			req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{{ProjectId: "p", Path: filepath.Join(root, "projlink") + "/"}, p}, Query: "readme"},
+			req:  &v1.SearchFilesRequest{Sources: []*v1.FileSource{{ProjectId: "p", Path: filepath.Join(root, "projlink") + "/"}, p}, Query: "readme"},
 			want: []match{{"p", filepath.Join(root, "projlink"), "README.md", nil, nil}}},
 		{name: "sources and project_id", req: &v1.SearchFilesRequest{ProjectId: "p", Sources: []*v1.FileSource{p}}, code: connect.CodeInvalidArgument},
 		{name: "sources and path", req: &v1.SearchFilesRequest{Path: proj, Sources: []*v1.FileSource{p}}, code: connect.CodeInvalidArgument},
