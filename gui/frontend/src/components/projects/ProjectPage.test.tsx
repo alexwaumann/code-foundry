@@ -58,6 +58,12 @@ async function settle() {
   });
 }
 
+/** A checkout row's right-click menu. */
+function openRowMenu(path: string): HTMLElement {
+  fireEvent.contextMenu(checkoutRow(path));
+  return screen.getByTestId("checkout-menu");
+}
+
 function openDropdown(trigger: HTMLElement, menuTestId: string): HTMLElement {
   fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
   return screen.getByTestId(menuTestId);
@@ -131,7 +137,8 @@ describe("a project's page", () => {
     // Working first (main: s-1, feat/sidebar: s-5 starting), then the rest.
     expect(texts(document, "worktree-branch")).toHaveLength(3);
     expect(texts(document, "worktree-branch").at(-1)).toBe("fix/resize");
-    expect(inEl(checkout(CF), "worktree-main-tag")?.textContent).toBe("main");
+    expect(inEl(checkout(CF), "worktree-main-signal")).toBeTruthy();
+    expect(inEl(checkout(FEAT), "worktree-main-signal")).toBeNull();
     // main: s-1 working, s-8 snoozed (idle); s-7 archived is left out.
     expect(inEl(checkout(CF), "worktree-threads")?.textContent).toBe("1 working · 1 idle");
     expect(inEl(checkout(FIX), "worktree-threads")?.textContent).toBe("1 idle");
@@ -153,38 +160,46 @@ describe("a project's page", () => {
     expect([...list().children].map((c) => c.getAttribute("data-testid"))).toEqual(["project-title", "project-checkouts", "leftover-worktrees", "project-details"]);
     expect(screen.getByTestId("leftover-empty")).toBeTruthy();
 
-    // A click opens the checkout's Changes tab in this page's own panel, shown.
+    // A row has no click: no tab opens, the cursor stays put.
     fireEvent.click(checkoutRow(FIX));
-    expect(pagePanel()).toEqual({ open: true, kind: "changes", title: "Changes · code-foundry · fix/resize", params: { project: "repo-cf", path: FIX } });
+    fireEvent.doubleClick(checkoutRow(FIX));
+    expect(pagePanel()).toBeNull();
+    expect(checkoutRow(FIX).getAttribute("aria-selected")).toBe("false");
     expect(page().getAttribute("data-project")).toBe("repo-cf");
   });
 
-  it("the project page's list has the keyboard: End then Enter opens the last checkout's Changes tab", async () => {
+  it("the project page's list has the keyboard: End moves the cursor, Enter does nothing, Shift+F10 opens that row's menu", async () => {
     renderPage("repo-cf");
     await settle();
     expect(document.activeElement).toBe(list());
     fireEvent.keyDown(list(), { key: "End" });
     fireEvent.keyDown(list(), { key: "Enter" });
-    const last = document.querySelector('[data-nav-key][aria-selected="true"]')?.getAttribute("data-nav-key") ?? "";
-    expect(last.startsWith("pw:repo-cf::")).toBe(true);
-    expect(pagePanel()?.kind).toBe("changes");
-    expect(pagePanel()?.params.path).toBe(last.slice("pw:repo-cf::".length));
+    expect(checkoutRow(FIX).getAttribute("aria-selected")).toBe("true");
+    expect(pagePanel()).toBeNull();
+    fireEvent.keyDown(list(), { key: "F10", shiftKey: true });
+    expect(menuEntries(screen.getByTestId("checkout-menu"))).toContain("Open “Fix resize race”");
+    fireEvent.keyDown(screen.getByTestId("checkout-menu"), { key: "Escape" });
+    await settle();
+    fireEvent.keyDown(list(), { key: "ContextMenu" });
+    expect(screen.getByTestId("checkout-menu")).toBeTruthy();
   });
 
-  it("a checkout row's menu: main has no Remove; Open in Finder reveals it; Remove worktree asks in its dialog, then removes", async () => {
+  it("a checkout row's menu: main has no Remove; Show changes opens its tab; Remove worktree asks in its dialog, then removes", async () => {
     fakeRemove();
     renderPage("repo-cf");
     await settle();
-    let menu = openDropdown(within(checkoutRow(CF)).getByTestId("worktree-more"), "worktree-more-menu");
-    expect(menuEntries(menu)).toEqual(["New thread here", "New terminal here", "Show changes", "Open in Finder", "Copy path"]);
+    // main: s-1 working and s-8 snoozed (s-7 archived is left out): the Open thread submenu; nothing to show; no actions (CheckoutsTable.test.tsx has Run action).
+    let menu = openRowMenu(CF);
+    expect(menuEntries(menu, true)).toEqual(["Open thread", "New thread here", "New terminal here", "—", "Open in Finder", "Copy path", "Copy branch name"]);
+    expect(checkoutRow(CF).getAttribute("aria-selected")).toBe("true");
     fireEvent.keyDown(menu, { key: "Escape" });
     await settle();
-    menu = openDropdown(within(checkoutRow(FEAT)).getByTestId("worktree-more"), "worktree-more-menu");
-    expect(menuEntries(menu)).toEqual(["New thread here", "New terminal here", "Show changes", "Open pull request #142", "Open in Finder", "Copy path", "Remove worktree"]);
-    await pick(menu, "worktree-reveal");
-    expect(lastInvocation("worktree.reveal")?.args).toEqual({ worktree: FEAT });
+    menu = openRowMenu(FEAT);
+    expect(menuEntries(menu, true)).toEqual(["Open thread", "New thread here", "New terminal here", "—", "Show changes", "Open pull request #142", "—", "Open in Finder", "Copy path", "Copy branch name", "—", "Remove worktree"]);
+    await pick(menu, "checkout-menu-changes");
+    expect(pagePanel()).toEqual({ open: true, kind: "changes", title: "Changes · code-foundry · feat/sidebar", params: { project: "repo-cf", path: FEAT } });
 
-    await pick(openDropdown(within(checkoutRow(FIX)).getByTestId("worktree-more"), "worktree-more-menu"), "worktree-remove");
+    await pick(openRowMenu(FIX), "checkout-menu-remove");
     expect((await screen.findByTestId("remove-worktree-title")).textContent).toBe("Remove the worktree on fix/resize?");
     fireEvent.click(screen.getByTestId("remove-worktree-ok"));
     await settle();
