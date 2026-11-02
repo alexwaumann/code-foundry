@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -35,16 +36,16 @@ func TestProjectSections(t *testing.T) {
 		{name: "nothing tracked", login: "@me"},
 		{
 			name: "one repository", login: "@me", slugs: []string{"o/r"},
-			wantOpen:      "is:pr is:open archived:false repo:o/r -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc",
+			wantOpen:      "is:pr is:open archived:false updated:>=2026-10-03T12:30:00+00:00 repo:o/r -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc",
 			wantMerged:    "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 repo:o/r sort:updated-desc",
-			wantWebOpen:   "is:pr is:open archived:false repo:o/r -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc",
+			wantWebOpen:   "is:pr is:open archived:false updated:>=2026-10-03T12:30:00+00:00 repo:o/r -author:@me -reviewed-by:@me -review-requested:@me sort:updated-desc",
 			wantWebMerged: "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 repo:o/r sort:updated-desc",
 		},
 		{
 			name: "several repositories, search as a login", login: "mitchellh", slugs: []string{"a/one", "a/two", "b/three"},
-			wantOpen:      "is:pr is:open archived:false repo:a/one repo:a/two repo:b/three -author:mitchellh -reviewed-by:mitchellh -review-requested:mitchellh sort:updated-desc",
+			wantOpen:      "is:pr is:open archived:false updated:>=2026-10-03T12:30:00+00:00 repo:a/one repo:a/two repo:b/three -author:mitchellh -reviewed-by:mitchellh -review-requested:mitchellh sort:updated-desc",
 			wantMerged:    "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 repo:a/one repo:a/two repo:b/three sort:updated-desc",
-			wantWebOpen:   "is:pr is:open archived:false (repo:a/one OR repo:a/two OR repo:b/three) -author:mitchellh -reviewed-by:mitchellh -review-requested:mitchellh sort:updated-desc",
+			wantWebOpen:   "is:pr is:open archived:false updated:>=2026-10-03T12:30:00+00:00 (repo:a/one OR repo:a/two OR repo:b/three) -author:mitchellh -reviewed-by:mitchellh -review-requested:mitchellh sort:updated-desc",
 			wantWebMerged: "is:pr is:merged merged:>=2026-10-26T12:30:00+00:00 (repo:a/one OR repo:a/two OR repo:b/three) sort:updated-desc",
 		},
 	}
@@ -353,13 +354,18 @@ func TestPollProjects(t *testing.T) {
 }
 
 // The lists come back from the cache after a restart, with the last cycle's fetch time
-// and merged window even when that cycle changed nothing (the full row is written only
-// on a change).
+// and updated and merged windows even when that cycle changed nothing (the full row is
+// written only on a change).
 func TestPollProjectsCache(t *testing.T) {
 	db := openTestDB(t)
 	g, _ := projectsWorld()
 	f := (&fakeRunner{}).serve(g)
-	s, err := New(context.Background(), testOptions(db, f, nil))
+	// A clock the test moves, so the later cycle's windows differ from the first's.
+	var clock atomic.Int64
+	clock.Store(time.Now().UnixNano())
+	opts := testOptions(db, f, nil)
+	opts.Now = func() time.Time { return time.Unix(0, clock.Load()) }
+	s, err := New(context.Background(), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,14 +376,18 @@ func TestPollProjectsCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "projects", func() bool { return !s.Snapshot().Projects.FetchedAt.IsZero() })
-	first := s.Snapshot().Projects.FetchedAt
+	first := s.Snapshot().Projects
+	clock.Add(int64(time.Minute))
 	waitFor(t, "a later cycle", func() bool {
 		pollOnce(t, s, f)
-		return s.Snapshot().Projects.FetchedAt.After(first)
+		return s.Snapshot().Projects.FetchedAt.After(first.FetchedAt)
 	})
 	cancel()
 	<-done
 	want := s.Snapshot().Projects
+	if want.Open.Query == first.Open.Query || want.Merged.Query == first.Merged.Query {
+		t.Fatalf("the later cycle's queries did not move: open %q, merged %q", want.Open.Query, want.Merged.Query)
+	}
 	full, _, err := loadActivityRow[ProjectPullRequests](context.Background(), s.cache, activityProjects)
 	if err != nil || !full.FetchedAt.Before(want.FetchedAt) {
 		t.Fatalf("full row fetched %v (err %v), want older than the last cycle's %v", full.FetchedAt, err, want.FetchedAt)
@@ -389,7 +399,7 @@ func TestPollProjectsCache(t *testing.T) {
 	}
 	got := s2.Snapshot().Projects
 	if prNumbers(got.Open.PullRequests) != prNumbers(want.Open.PullRequests) || got.Merged.Total != want.Merged.Total ||
-		got.Open.Query != want.Open.Query || got.Merged.Query != want.Merged.Query || got.Merged.WebQuery != want.Merged.WebQuery ||
+		got.Open.Query != want.Open.Query || got.Open.WebQuery != want.Open.WebQuery || got.Merged.Query != want.Merged.Query || got.Merged.WebQuery != want.Merged.WebQuery ||
 		!got.FetchedAt.Equal(want.FetchedAt) || got.Open.PullRequests[0].Additions != 412 {
 		t.Errorf("cached projects = %+v\nwant %+v", got, want)
 	}

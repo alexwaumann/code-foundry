@@ -116,7 +116,7 @@ describe("the Pull Requests page", () => {
     expect(textsIn([authored[1] as HTMLElement], "prs-comments")).toEqual(["3"]);
 
     // Everything else open in the projects: others' pull requests, with the author and a status.
-    expect(screen.getByTestId("prs-else").querySelector("h2")?.textContent).toBe("Everything else open in your projects(5)not yours, not waiting on you");
+    expect(screen.getByTestId("prs-else").querySelector("h2")?.textContent).toBe("Everything else open in your projects(5)not yours, not waiting on you · updated in the last month");
     expect(keys("else").map((k) => k?.split("/")[1])).toEqual(["code-foundry#148", "code-foundry#149", "ghostty-playground#16", "ghostty-playground#15", "code-foundry#144"]);
     expect(textsIn(rows("else"), "prs-status")).toEqual(["Awaiting review · 2", "Draft", "Approved", "No reviewers", "Blocked"]);
     expect(textsIn(rows("else"), "prs-diff")[0]).toBe("+412−58");

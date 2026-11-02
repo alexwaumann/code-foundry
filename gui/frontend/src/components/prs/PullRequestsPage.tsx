@@ -142,7 +142,7 @@ function Body({ d }: { d: DashboardView }) {
           )}
           {has("else") && (
             <section data-testid="prs-else">
-              <SectionTitle count={m.counts.else} caption="not yours, not waiting on you">
+              <SectionTitle count={m.counts.else} caption="not yours, not waiting on you · updated in the last month">
                 Everything else open in your projects
               </SectionTitle>
               <PrTable section="else" rows={m.others} cap={m.othersCap} render={(r) => <OtherPrRow row={r} viewer={viewer} />} />

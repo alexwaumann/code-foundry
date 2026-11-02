@@ -12,7 +12,8 @@ import (
 
 // Project-wide pull request lists for the Pull Requests page: the open pull requests in
 // the tracked repositories that are none of the viewer's business (not authored by
-// them, not asking for their review, not reviewed by them), and every pull request
+// them, not asking for their review, not reviewed by them) and were updated within
+// projectOpenWindow (an abandoned one drops off), and every pull request
 // merged in them within recentlyMergedWindow. One search each across every tracked
 // repository, in a request of its own (PollProjects) that follows the dashboard poll in
 // the same cycle, so it runs on the same pacer tiers. Details come through the poll's
@@ -27,6 +28,10 @@ const (
 	sectionProjectOpen   = "project_open"
 	sectionProjectMerged = "project_merged"
 )
+
+// projectOpenWindow is how recently an open pull request in the project-wide list was
+// updated: the Pull Requests page says "updated in the last month".
+const projectOpenWindow = 30 * 24 * time.Hour
 
 // Project search sizes (a 502/504 halves them like the dashboard's; see shrinkSearches).
 const (
@@ -77,8 +82,9 @@ func projectSections(login string, slugs []string, now time.Time) []searchSectio
 		return nil
 	}
 	since := now.Add(-recentlyMergedWindow).Format(searchTimeLayout)
+	updated := now.Add(-projectOpenWindow).Format(searchTimeLayout)
 	open := func(repos string) string {
-		return "is:pr is:open archived:false " + repos + " -author:" + login + " -reviewed-by:" + login +
+		return "is:pr is:open archived:false updated:>=" + updated + " " + repos + " -author:" + login + " -reviewed-by:" + login +
 			" -review-requested:" + login + " sort:updated-desc"
 	}
 	merged := func(repos string) string {
@@ -250,22 +256,29 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 
 // projectsFetchedRow is the "projects_fetched" row, written every cycle (the full
 // "projects" row only on a change): what moves without the lists changing, so a
-// restart shows the last fetch's time and merged:>= window.
+// restart shows the last fetch's time and its updated:>= and merged:>= windows.
 type projectsFetchedRow struct {
 	FetchedAt time.Time   `json:"fetchedAt"`
+	Open      ProjectList `json:"open"`   // queries only; empty in rows written before it had a window
 	Merged    ProjectList `json:"merged"` // queries only
 }
 
-// apply moves p's fetch time and merged queries to the row's when it is newer.
+// apply moves p's fetch time and queries to the row's when it is newer.
 func (r projectsFetchedRow) apply(p *ProjectPullRequests) {
 	if p.FetchedAt.IsZero() || !r.FetchedAt.After(p.FetchedAt) {
 		return
 	}
 	p.FetchedAt = r.FetchedAt
+	if r.Open.Query != "" {
+		p.Open.Query, p.Open.WebQuery = r.Open.Query, r.Open.WebQuery
+	}
 	if r.Merged.Query != "" {
 		p.Merged.Query, p.Merged.WebQuery = r.Merged.Query, r.Merged.WebQuery
 	}
 }
+
+// queriesOnly is l without its results: the part of a list that moves with the clock.
+func queriesOnly(l ProjectList) ProjectList { return ProjectList{Query: l.Query, WebQuery: l.WebQuery} }
 
 // setProjects stores the project lists and their fetch time; on a change it writes the
 // lists and publishes DashboardUpdated.
@@ -282,7 +295,7 @@ func (s *Store) setProjects(ctx context.Context, next ProjectPullRequests) {
 		}
 	}
 	if changed || moved {
-		row := projectsFetchedRow{FetchedAt: next.FetchedAt, Merged: ProjectList{Query: next.Merged.Query, WebQuery: next.Merged.WebQuery}}
+		row := projectsFetchedRow{FetchedAt: next.FetchedAt, Open: queriesOnly(next.Open), Merged: queriesOnly(next.Merged)}
 		if err := s.cache.saveActivity(ctx, activityProjectsFetched, next.FetchedAt, row); err != nil {
 			s.log.Warn("gh cache write failed", "err", err)
 		}
@@ -292,10 +305,11 @@ func (s *Store) setProjects(ctx context.Context, next ProjectPullRequests) {
 	}
 }
 
-// sameProjects compares everything clients see except the fetch time and the merged
-// search's query, whose merged:>= moves with every fetch.
+// sameProjects compares everything clients see except the fetch time and the searches'
+// queries, whose updated:>= and merged:>= move with every fetch.
 func sameProjects(a, b ProjectPullRequests) bool {
 	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
+	a.Open.Query, b.Open.Query, a.Open.WebQuery, b.Open.WebQuery = "", "", "", ""
 	a.Merged.Query, b.Merged.Query, a.Merged.WebQuery, b.Merged.WebQuery = "", "", "", ""
 	return a.LastError == b.LastError && sameJSON(a, b)
 }
