@@ -192,7 +192,7 @@ describe("checkoutMenu (a checkout's right-click menu on its project page)", () 
 
 it("no item ends in an ellipsis (the app's menu style)", () => {
   const all = [
-    ...checkoutMenu({ projectId: "p-1", path: "/u/app", branch: "main", isMain: false, threads: [{ id: "s-1", name: "x", badge: "idle" }], changed: true, pr: { slug: "o/r", number: 1 }, actions: true }).filter((x) => x === "separator" || !("kind" in x)),
+    ...checkoutMenu({ projectId: "p-1", path: "/u/app", branch: "main", isMain: false, threads: [{ id: "s-1", name: "x", badge: "idle" }], changed: true, pr: { slug: "o/r", number: 1 }, actions: true }).flatMap((x) => (x === "separator" || !("kind" in x) ? [x] : [])),
     ...projectMenu("p-1", { kind: "git", step: "publish", cleanup: 1 }, { page: true }),
     ...projectMenu("p-1", { kind: "nogit", step: "init", cleanup: null }),
     ...workspaceMenu("w-1", { folder: true }),
