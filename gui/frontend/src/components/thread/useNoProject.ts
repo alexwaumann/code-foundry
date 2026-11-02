@@ -1,6 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import { canMove } from "@/lib/move";
 import { isNoProject } from "@/lib/threadRow";
+import { useMovePickerStore } from "@/stores/movePicker";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 
@@ -21,9 +22,12 @@ export function useNoProjectThread(id: string | null): boolean {
 
 /**
  * Whether the move picker is offered for a thread (lib/move canMove): no project, not
- * archived, not resident, not moving, transcript not deleted. Narrow selectors, as useNoProjectThread.
+ * archived, not resident, not moving, transcript not deleted, and no Move this window sent
+ * for it still waiting on the daemon (stores/movePicker canMoveThread). Narrow selectors,
+ * as useNoProjectThread.
  */
 export function useCanMove(id: string | null): boolean {
+  const sending = useMovePickerStore((st) => id !== null && id in st.sending);
   const s = useThreadsStore(
     useShallow((st) => {
       const x = id === null ? undefined : st.byId[id];
@@ -41,7 +45,7 @@ export function useCanMove(id: string | null): boolean {
     }),
   );
   return useProjectsStore((st) => {
-    if (s === null) return false;
+    if (s === null || sending) return false;
     const { moving, transcriptMissing, ...rest } = s;
     return canMove({ ...rest, pendingMove: moving ? PENDING : null, ...(transcriptMissing ? { transcriptMissing: true as const } : {}) }, st);
   });

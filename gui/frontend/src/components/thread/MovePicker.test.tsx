@@ -13,7 +13,8 @@ const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success:
 vi.mock("sonner", () => ({ toast }));
 
 const { ThreadTitle } = await import("./ThreadParts");
-const { useMovePickerStore, openMovePicker } = await import("@/stores/movePicker");
+const { useMovePickerStore, openMovePicker, canMoveThread } = await import("@/stores/movePicker");
+const { useCanMove } = await import("./useNoProject");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useSettingsStore } = await import("@/stores/settings");
 const { useThreadsStore } = await import("@/stores/threads");
@@ -249,6 +250,51 @@ describe("Move", () => {
       expect(crumb()).toBe("No project");
     });
     expect(screen.getByTestId("thread-crumb-move")).toBeTruthy();
+  });
+});
+
+describe("between Move and the daemon's pending_move", () => {
+  function CanMove() {
+    return <span data-testid="can-move">{String(useCanMove("s-1"))}</span>;
+  }
+
+  it("Move is not offered again while this window's move is in flight; an opening asked for meanwhile does not pop up after a refusal", async () => {
+    let refuseNow: () => void = () => undefined;
+    daemon.handlers.set(
+      "thread.move",
+      () =>
+        new Promise((_, reject) => {
+          refuseNow = () => {
+            reject(refuse("set_cwd refused"));
+          };
+        }),
+    );
+    openPicker();
+    render(<CanMove />);
+    expect(screen.getByTestId("can-move").textContent).toBe("true");
+    fireEvent.keyDown(pick("web"), { key: "Enter" });
+    await waitFor(() => {
+      expect(useMovePickerStore.getState().sending).toEqual({ "s-1": "web" });
+    });
+    // No pending_move yet: the menus' hook, the palette's rule and openMovePicker all say no.
+    expect(screen.getByTestId("can-move").textContent).toBe("false");
+    expect(canMoveThread("s-1")).toBe(false);
+    expect(openMovePicker("s-1")).toBe(false);
+    // An opening that raced in anyway (set before the Move went out) is dropped with the answer.
+    act(() => {
+      useMovePickerStore.setState({ open: "s-1" });
+    });
+    act(() => {
+      refuseNow();
+    });
+    await waitFor(() => {
+      expect(useMovePickerStore.getState().sending).toEqual({});
+    });
+    expect(useMovePickerStore.getState().open).toBeNull();
+    expect(screen.queryByTestId("move-picker")).toBeNull();
+    expect(screen.getByTestId("thread-crumb-move")).toBeTruthy();
+    expect(screen.getByTestId("can-move").textContent).toBe("true");
+    expect(canMoveThread("s-1")).toBe(true);
   });
 });
 

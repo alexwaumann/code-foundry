@@ -26,9 +26,13 @@ interface MovePickerState {
 
 export const useMovePickerStore = create<MovePickerState>()(() => ({ open: null, sending: {} }));
 
-/** Whether the picker may open for the thread now (lib/move canMove over the stores). */
+/**
+ * Whether the picker may open for the thread now (lib/move canMove over the stores), and
+ * this window is not still waiting on a move it sent for it (the daemon's pending_move may
+ * not have arrived yet: a second Move would be refused as already moving).
+ */
 export function canMoveThread(threadId: string): boolean {
-  return canMove(useThreadsStore.getState().byId[threadId], useProjectsStore.getState());
+  return !(threadId in useMovePickerStore.getState().sending) && canMove(useThreadsStore.getState().byId[threadId], useProjectsStore.getState());
 }
 
 /**
@@ -87,9 +91,11 @@ export async function moveThread(threadId: string, args: Record<string, string>,
     if (res === null && focusDropped()) focusMovedThreadPrompt(threadId);
     return res !== null;
   } finally {
+    // An opening asked for meanwhile (openMovePicker from a menu or the CLI) does not pop
+    // the popover open by itself once the crumb is a trigger again.
     useMovePickerStore.setState((s) => {
       const { [threadId]: _done, ...rest } = s.sending;
-      return { sending: rest };
+      return { sending: rest, open: s.open === threadId ? null : s.open };
     });
   }
 }
