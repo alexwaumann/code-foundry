@@ -792,7 +792,15 @@ func TestFailedMoveStopsItsStart(t *testing.T) {
 				}
 				go func() { _, _ = e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true}) }()
 				e.waitFor(s.ID, "starting for the move", func(s Thread) bool { return s.State == StateStarting })
-				job = e.runnerOf(s.ID).startedFor
+				// Starting is published while the start is still reserved, before the
+				// runner is in the record: wait for the runner itself.
+				job = nil
+				for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+					if r := e.runnerOf(s.ID); r != nil {
+						job = r.startedFor
+						break
+					}
+				}
 				if job == nil {
 					t.Fatal("the move's start does not know its move")
 				}
