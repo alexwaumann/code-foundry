@@ -66,7 +66,7 @@ type Ember struct {
 type Threads struct {
 	DefaultModel      string // default model.Default
 	DefaultEffort     string // default "medium"
-	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer only
+	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer and by a thread move without a placement
 	AutoName          bool
 	NamingModel       string // default model.NamingDefault; the effort is always low
 	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600

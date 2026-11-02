@@ -67,6 +67,9 @@ type launch struct {
 	fork bool
 	// newID is passed as --session-id for new conversations and forks.
 	newID string
+	// move is the Move this start is for (move.go): the process starts in the old cwd
+	// with the destination's --add-dir list, and set_cwd takes it there.
+	move *moveJob
 }
 
 // claudeID is the Claude session id the process will run under.

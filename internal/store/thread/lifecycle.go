@@ -127,6 +127,8 @@ type startOpts struct {
 	first *outgoing
 	// backToList unarchives and unsnoozes the thread (a message, Reconnect).
 	backToList bool
+	// move starts the thread for a Move (move.go): the destination's --add-dir list.
+	move *moveJob
 }
 
 // startStopped starts claude for a stopped thread: it reserves the thread against a
@@ -175,6 +177,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		m.refuseStart(id, prev)
 		return Item{}, launchErr
 	}
+	l.move = o.move
 	// A worktree a cleanup removed is made again first (recreate.go); clients see the
 	// thread STARTING meanwhile.
 	var notes []string
@@ -549,7 +552,7 @@ func (r *runner) idleInputs(now time.Time) idleInputs {
 		now:             now,
 		closing:         r.closing || r.finished,
 		starting:        !st.initialized || st.restart != restartNone,
-		messageOnItsWay: st.first != nil || len(st.queued) > 0 || len(st.held) > 0,
+		messageOnItsWay: st.first != nil || len(st.queued) > 0 || len(st.held) > 0 || r.pendingCd != nil, // a queued move too
 		effortChange:    st.wantEffort != st.effort,
 		pendingRequest:  len(st.pending) > 0 || len(st.sd.pending) > 0,
 		atPrompt:        st.sd.AtPrompt(),

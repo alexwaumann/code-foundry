@@ -205,9 +205,13 @@ type Thread struct {
 	// whose primary is the workspace has an empty ProjectID and runs in its root, or its
 	// managed dir.
 	WorkspaceID string
-	// PendingWorktreePath is the checkout a queued RunIn moves the thread to once it is
-	// idle at its prompt; empty when nothing is queued. Not persisted.
+	// PendingWorktreePath is the checkout a queued RunIn (or Move) moves the thread to
+	// once it is idle at its prompt; empty when nothing is queued. Not persisted.
 	PendingWorktreePath string
+	// PendingMove is where a Move takes a thread without a project (move.go), from the
+	// call until Claude accepted its set_cwd (or the move failed); nil otherwise. Path and
+	// Branch are empty until the placement is made. Not persisted. Never changed in place.
+	PendingMove *MoveTarget
 	// Pinned is the user's pin (Store.Pin). Persisted.
 	Pinned bool
 	// ArchivedAt is when the user archived the thread (Store.Archive); zero when it is
@@ -518,6 +522,36 @@ type CreateOptions struct {
 	// model that is not the user's words (theme.ask's), on every spawn. At most 64 KiB, no
 	// NUL.
 	SystemPromptAppend string
+
+	// naming, when set, replaces waitNaming for a new branch's name (Move names the
+	// branch and the title from the conversation: move.go).
+	naming func(ctx context.Context, bc branchChoice) (slugWait, error)
+}
+
+// MoveOptions is where Store.Move takes a thread without a project: one project or one
+// workspace, placed as CreateOptions' fields of the same names place a new thread
+// (placement.go). ProjectID is the project (an id or a name), or with WorkspaceID the
+// primary (a member, or workspace.PrimaryWorkspace for its folder). WorktreePath is an
+// existing checkout of the project to run in. NewWorktree is a new worktree, on a new
+// branch (named from the conversation) or an existing one (NewWorktree.Branch);
+// CheckoutMode the project's folder (each member's own checkout). Neither nor a path:
+// Options.NewWorktreeDefault decides.
+type MoveOptions struct {
+	ProjectID    string
+	WorktreePath string
+	WorkspaceID  string
+	NewWorktree  *NewWorktree
+	CheckoutMode bool
+	// Report, when set, is filled in with what the placement did with the primary.
+	Report *CreateReport
+}
+
+// MoveTarget is a Move under way (Thread.PendingMove): the project (empty for a
+// workspace whose folder is the primary) and workspace it goes to, and once placed the
+// checkout it runs in and the branch of a worktree.
+type MoveTarget struct {
+	ProjectID, WorkspaceID string
+	Path, Branch           string
 }
 
 // RunInTarget names the checkout a thread should run in: a member's project id (or
@@ -584,6 +618,15 @@ type Store interface {
 	// for its new --add-dir list once it is quiet (members.go).
 	AddProject(ctx context.Context, id, ref string) (Thread, error)
 	RemoveProject(ctx context.Context, id, ref string) (Thread, error)
+	// Move takes a thread without a project into a project or a workspace (move.go): it
+	// is placed as Create would place a new thread there, named again from its
+	// conversation (a new branch too), and Claude moves with set_cwd, started in the old
+	// cwd to do it when it is not running. A live thread mid-turn moves once it is idle
+	// (PendingMove meanwhile; the call returns at once); otherwise the call waits for
+	// set_cwd. Any failure leaves the thread without a project, its new worktrees
+	// removed. ErrFailedPrecondition for a thread with a project, an archived or resident
+	// one, a missing transcript, a move already under way.
+	Move(ctx context.Context, id string, o MoveOptions) (Thread, error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds
 	// the cwd, the deepest winning) and lists its checkouts (checkouts.go).
 	Checkouts(ctx context.Context, ref CheckoutsRef) (ThreadCheckouts, error)

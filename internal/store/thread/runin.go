@@ -28,9 +28,11 @@ import (
 // momentary "at prompt" (between a send and the turn it starts) does not count.
 const cdSettle = time.Second
 
-// cdRequest is a queued move. An empty path cancels the queued move.
+// cdRequest is a queued move. An empty path cancels the queued move. move is a Move's
+// (move.go): the row takes its placement once Claude accepts.
 type cdRequest struct {
 	path, projectID string
+	move            *moveJob
 }
 
 // RunIn implements Store.
@@ -176,6 +178,11 @@ func (r *runner) tryCd() {
 	}
 	req := *r.pendingCd
 	r.pendingCd = nil
+	if !isDir(req.path) && req.move != nil {
+		r.log().warn("queued move dropped: checkout is gone", "path", req.path)
+		r.onMoveFailed(req.move, "the checkout "+req.path+" no longer exists")
+		return
+	}
 	if !isDir(req.path) {
 		r.log().warn("queued move dropped: worktree is gone", "path", req.path)
 		r.m.update(r.id, false, func(rec *record) {

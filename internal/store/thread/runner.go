@@ -412,11 +412,16 @@ func (r *runner) finish(fn func(*Thread)) {
 	// (transcriptmissing.go).
 	cur, _ := r.m.Snapshot().Thread(r.id)
 	gone := r.m.transcriptGone(cur)
+	var lostMove *moveJob
 	r.m.detach(r, func(s *Thread) {
 		fn(s)
 		s.TranscriptMissing = gone && s.ClaudeSessionID == cur.ClaudeSessionID && s.needsTranscript()
 		// Under m.mu, which RunIn holds while it queues: nothing can be queued after.
-		if owed := r.unsentCd(); owed != nil {
+		if owed := r.unsentCd(); owed != nil && owed.move != nil {
+			// A Move moves only through set_cwd, which relocates the transcript: without
+			// the process it does not happen (move.go).
+			lostMove = owed.move
+		} else if owed != nil {
 			// The process is gone; the next reconnect resumes in the requested member.
 			*s = s.movedTo(owed.projectID, owed.path)
 		}
@@ -437,6 +442,14 @@ func (r *runner) finish(fn func(*Thread)) {
 			s.LastActivityAt = r.activity
 		}
 	})
+	if lostMove != nil {
+		err := fmt.Errorf("%w: Claude stopped before the thread could move", ErrFailedPrecondition)
+		r.m.wg.Add(1) // this runner is still counted: no race with Shutdown's Wait
+		go func() {
+			defer r.m.wg.Done()
+			r.m.failMove(context.Background(), r.id, lostMove, err, false)
+		}()
+	}
 }
 
 // slogger prefixes runner logs with the thread id.

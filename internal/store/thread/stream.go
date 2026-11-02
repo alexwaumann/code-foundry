@@ -820,6 +820,11 @@ func (r *runner) onViewers() {
 // recorded since.
 func (r *runner) streamCd(req cdRequest) {
 	fail := func(msg string) {
+		if req.move != nil {
+			r.log().warn("move failed", "path", req.path, "err", msg)
+			r.onMoveFailed(req.move, msg)
+			return
+		}
 		r.log().warn("run in failed", "path", req.path, "err", msg)
 		r.m.update(r.id, false, func(rec *record) {
 			if rec.s.PendingWorktreePath == req.path {
@@ -846,6 +851,10 @@ func (r *runner) streamCd(req cdRequest) {
 	}
 	r.cwd = req.path
 	r.tail.cwd = req.path
+	if req.move != nil {
+		r.onMoved(req.move, res.TranscriptRelocated)
+		return
+	}
 	r.m.update(r.id, true, func(rec *record) {
 		rec.s = rec.s.movedTo(req.projectID, req.path)
 		if rec.s.PendingWorktreePath == req.path {

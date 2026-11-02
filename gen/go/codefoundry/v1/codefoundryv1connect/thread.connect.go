@@ -59,6 +59,8 @@ const (
 	// ThreadServiceAddProjectProcedure is the fully-qualified name of the ThreadService's AddProject
 	// RPC.
 	ThreadServiceAddProjectProcedure = "/codefoundry.v1.ThreadService/AddProject"
+	// ThreadServiceMoveProcedure is the fully-qualified name of the ThreadService's Move RPC.
+	ThreadServiceMoveProcedure = "/codefoundry.v1.ThreadService/Move"
 	// ThreadServiceRemoveProjectProcedure is the fully-qualified name of the ThreadService's
 	// RemoveProject RPC.
 	ThreadServiceRemoveProjectProcedure = "/codefoundry.v1.ThreadService/RemoveProject"
@@ -212,6 +214,19 @@ type ThreadServiceClient interface {
 	// for a thread without a project and for one running in its workspace's folder. See
 	// docs/notes/thread-project-set.md.
 	AddProject(context.Context, *connect.Request[v1.AddThreadProjectRequest]) (*connect.Response[v1.AddThreadProjectResponse], error)
+	// Move takes a thread without a project into one project or one workspace, placed as
+	// Create would place a new thread there (a new worktree on a new or existing branch,
+	// the project's folder, an existing checkout; for a workspace its members and a
+	// primary), named again from its conversation (and its new branch with it), and moves
+	// Claude there with set_cwd, which relocates its transcript. A thread that is not
+	// running is started in its old cwd to move (no API call) and then stops at its cache
+	// expiry; one mid-turn moves once the turn ends (Thread.pending_move until then; the
+	// call returns at once), otherwise the call returns once it moved. Any failure leaves
+	// the thread without a project, with a timeline note and the worktrees the move made
+	// removed. FAILED_PRECONDITION for a thread with a project, an archived or resident
+	// one, a missing transcript, a move under way, and Create's placement refusals. See
+	// docs/notes/move-no-project-1-daemon.md.
+	Move(context.Context, *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error)
 	RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
 	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
@@ -507,6 +522,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("AddProject")),
 			connect.WithClientOptions(opts...),
 		),
+		move: connect.NewClient[v1.MoveThreadRequest, v1.MoveThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceMoveProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Move")),
+			connect.WithClientOptions(opts...),
+		),
 		removeProject: connect.NewClient[v1.RemoveThreadProjectRequest, v1.RemoveThreadProjectResponse](
 			httpClient,
 			baseURL+ThreadServiceRemoveProjectProcedure,
@@ -746,6 +767,7 @@ type threadServiceClient struct {
 	remove            *connect.Client[v1.RemoveThreadRequest, v1.RemoveThreadResponse]
 	runIn             *connect.Client[v1.RunInThreadRequest, v1.RunInThreadResponse]
 	addProject        *connect.Client[v1.AddThreadProjectRequest, v1.AddThreadProjectResponse]
+	move              *connect.Client[v1.MoveThreadRequest, v1.MoveThreadResponse]
 	removeProject     *connect.Client[v1.RemoveThreadProjectRequest, v1.RemoveThreadProjectResponse]
 	checkouts         *connect.Client[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse]
 	checkPlacement    *connect.Client[v1.CheckPlacementRequest, v1.CheckPlacementResponse]
@@ -843,6 +865,11 @@ func (c *threadServiceClient) RunIn(ctx context.Context, req *connect.Request[v1
 // AddProject calls codefoundry.v1.ThreadService.AddProject.
 func (c *threadServiceClient) AddProject(ctx context.Context, req *connect.Request[v1.AddThreadProjectRequest]) (*connect.Response[v1.AddThreadProjectResponse], error) {
 	return c.addProject.CallUnary(ctx, req)
+}
+
+// Move calls codefoundry.v1.ThreadService.Move.
+func (c *threadServiceClient) Move(ctx context.Context, req *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error) {
+	return c.move.CallUnary(ctx, req)
 }
 
 // RemoveProject calls codefoundry.v1.ThreadService.RemoveProject.
@@ -1091,6 +1118,19 @@ type ThreadServiceHandler interface {
 	// for a thread without a project and for one running in its workspace's folder. See
 	// docs/notes/thread-project-set.md.
 	AddProject(context.Context, *connect.Request[v1.AddThreadProjectRequest]) (*connect.Response[v1.AddThreadProjectResponse], error)
+	// Move takes a thread without a project into one project or one workspace, placed as
+	// Create would place a new thread there (a new worktree on a new or existing branch,
+	// the project's folder, an existing checkout; for a workspace its members and a
+	// primary), named again from its conversation (and its new branch with it), and moves
+	// Claude there with set_cwd, which relocates its transcript. A thread that is not
+	// running is started in its old cwd to move (no API call) and then stops at its cache
+	// expiry; one mid-turn moves once the turn ends (Thread.pending_move until then; the
+	// call returns at once), otherwise the call returns once it moved. Any failure leaves
+	// the thread without a project, with a timeline note and the worktrees the move made
+	// removed. FAILED_PRECONDITION for a thread with a project, an archived or resident
+	// one, a missing transcript, a move under way, and Create's placement refusals. See
+	// docs/notes/move-no-project-1-daemon.md.
+	Move(context.Context, *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error)
 	RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
 	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
@@ -1382,6 +1422,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("AddProject")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceMoveHandler := connect.NewUnaryHandler(
+		ThreadServiceMoveProcedure,
+		svc.Move,
+		connect.WithSchema(threadServiceMethods.ByName("Move")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceRemoveProjectHandler := connect.NewUnaryHandler(
 		ThreadServiceRemoveProjectProcedure,
 		svc.RemoveProject,
@@ -1630,6 +1676,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceRunInHandler.ServeHTTP(w, r)
 		case ThreadServiceAddProjectProcedure:
 			threadServiceAddProjectHandler.ServeHTTP(w, r)
+		case ThreadServiceMoveProcedure:
+			threadServiceMoveHandler.ServeHTTP(w, r)
 		case ThreadServiceRemoveProjectProcedure:
 			threadServiceRemoveProjectHandler.ServeHTTP(w, r)
 		case ThreadServiceCheckoutsProcedure:
@@ -1759,6 +1807,10 @@ func (UnimplementedThreadServiceHandler) RunIn(context.Context, *connect.Request
 
 func (UnimplementedThreadServiceHandler) AddProject(context.Context, *connect.Request[v1.AddThreadProjectRequest]) (*connect.Response[v1.AddThreadProjectResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.AddProject is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Move(context.Context, *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Move is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error) {

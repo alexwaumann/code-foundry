@@ -35,8 +35,9 @@ type NamingRequest struct {
 	// Branch asks for a branch too; nil asks for the title only.
 	Branch *BranchRequest
 	// Conversation is the thread's most recent turns (recentTurnsContext) when the user
-	// asked to name it again (RegenerateName): the title names what the thread is doing
-	// now, and Message and Branch are not used.
+	// asked to name it again (RegenerateName, Move): the title names what the thread is
+	// doing now, and Message is not used. With Branch (a Move into a new worktree) the
+	// branch is named from it too.
 	Conversation string
 }
 
@@ -170,11 +171,13 @@ const namingTitleRule = "Title: a short title of 3 to 6 words that names the cod
 const namingSlugRule = "2 to 5 lowercase English words joined by dashes (letters, digits and dashes only)"
 
 // buildNamingPrompt is the prompt of a naming call: regenerateNamingPrompt and the
-// conversation when it has one, namingPrompt for a title only, else the title and branch
-// rules, the reply format, the context, and the request.
+// conversation when it has one and no branch is asked, namingPrompt for a title only,
+// else the title and branch rules, the reply format, the context, and the request (or
+// the conversation).
 func buildNamingPrompt(req NamingRequest) string {
-	if c := strings.TrimSpace(req.Conversation); c != "" {
-		return regenerateNamingPrompt + c
+	conv := strings.TrimSpace(req.Conversation)
+	if conv != "" && req.Branch == nil {
+		return regenerateNamingPrompt + conv
 	}
 	msg := req.Message
 	if len(msg) > maxNamingInput {
@@ -185,7 +188,11 @@ func buildNamingPrompt(req NamingRequest) string {
 		return namingPrompt + msg
 	}
 	var p strings.Builder
-	p.WriteString("Name the coding task in the request below twice: a title and a git branch.\n" + namingTitleRule)
+	if conv != "" {
+		p.WriteString("Name what the coding thread below is currently working on, judged by its most recent turns, twice: a title and a git branch.\n" + namingTitleRule)
+	} else {
+		p.WriteString("Name the coding task in the request below twice: a title and a git branch.\n" + namingTitleRule)
+	}
 	switch b.Mode {
 	case BranchModePrefix:
 		p.WriteString("Branch: a slug of " + namingSlugRule + ". Example: fix-login-redirect.\n")
@@ -207,6 +214,10 @@ func buildNamingPrompt(req NamingRequest) string {
 	p.WriteString("Reply with exactly these two lines and nothing else:\nTitle: <title>\nBranch: <branch>\n")
 	if n := strings.TrimSpace(req.Name); n != "" {
 		p.WriteString("\nThe user named this task: " + n + "\n")
+	}
+	if conv != "" {
+		p.WriteString("\nRecent conversation:\n" + conv)
+		return p.String()
 	}
 	if strings.TrimSpace(msg) == "" {
 		msg = strings.TrimSpace(req.Name)

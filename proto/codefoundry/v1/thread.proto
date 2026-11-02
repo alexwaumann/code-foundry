@@ -76,6 +76,19 @@ service ThreadService {
   // for a thread without a project and for one running in its workspace's folder. See
   // docs/notes/thread-project-set.md.
   rpc AddProject(AddThreadProjectRequest) returns (AddThreadProjectResponse) {}
+  // Move takes a thread without a project into one project or one workspace, placed as
+  // Create would place a new thread there (a new worktree on a new or existing branch,
+  // the project's folder, an existing checkout; for a workspace its members and a
+  // primary), named again from its conversation (and its new branch with it), and moves
+  // Claude there with set_cwd, which relocates its transcript. A thread that is not
+  // running is started in its old cwd to move (no API call) and then stops at its cache
+  // expiry; one mid-turn moves once the turn ends (Thread.pending_move until then; the
+  // call returns at once), otherwise the call returns once it moved. Any failure leaves
+  // the thread without a project, with a timeline note and the worktrees the move made
+  // removed. FAILED_PRECONDITION for a thread with a project, an archived or resident
+  // one, a missing transcript, a move under way, and Create's placement refusals. See
+  // docs/notes/move-no-project-1-daemon.md.
+  rpc Move(MoveThreadRequest) returns (MoveThreadResponse) {}
   rpc RemoveProject(RemoveThreadProjectRequest) returns (RemoveThreadProjectResponse) {}
   // Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
   // cwd, the deepest winning) and lists one checkout per project in its set: the primary
