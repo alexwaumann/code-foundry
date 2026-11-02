@@ -105,6 +105,8 @@ func main() {
 	})
 	appService.window = window
 	forwardFileDrops(window)
+	// The mouse's side buttons step back and forward like a browser's (mousebuttons.go).
+	forwardMouseButtons(window)
 	// Wails shows a window once its page has loaded (WebViewDidFinishNavigation), but
 	// WebKit composites the page a moment later; until then an opaque webview shows its
 	// empty-page colour (#1e1e1e in dark mode) instead of BackgroundColour. So the
