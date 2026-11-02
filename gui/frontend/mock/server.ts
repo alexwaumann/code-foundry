@@ -118,6 +118,10 @@
  *                                                 (a connected thread that references the workspace, its
  *                                                 members as its set, in project's main worktree)
  *   thread.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
+ *   thread.move (and ThreadService.Move) takes a thread without a project into a project or a
+ *   workspace: pending_move and naming for ~600ms, then renamed and placed (World.moveThread).
+ *   POST /__mock/thread/move-fail[?message=…]  (the next moves fail after the wait; no message: they land)
+ *   POST /__mock/thread/move-delay?ms=3000     (how long a move takes)
  *   thread.new takes workspace and/or projects (the set; new-worktree makes worktrees on a new
  *   branch), or no-project (a thread in the home directory with no project or workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size, pages)
@@ -558,6 +562,25 @@ function routes(router: ConnectRouter): void {
     remove: () => {
       throw new ConnectError("use the thread.remove command in the mock", Code.Unimplemented);
     },
+    // ThreadService.Move: the thread.move command's World.moveThread, from the request's fields.
+    move: async (req) => {
+      try {
+        const args: Record<string, string> = {};
+        if (req.projectId) args.project = req.projectId;
+        if (req.workspaceId) args.workspace = req.workspaceId;
+        if (req.worktreePath) args.worktree = req.worktreePath;
+        if (req.newWorktree) {
+          args["new-worktree"] = "true";
+          if (req.newWorktree.baseRef) args.base = req.newWorktree.baseRef;
+          if (req.newWorktree.branch) args.branch = req.newWorktree.branch;
+        } else if (req.checkoutMode) args["new-worktree"] = "false";
+        const s = world.thread(req.id);
+        await world.moveThread(s, args);
+        return { thread: world.threadMsg(s) };
+      } catch (err) {
+        throw rpcError(err);
+      }
+    },
     stageAttachment: (req) =>
       guard(() => ({ path: req.path ? world.stageAttachmentPath(req.path, req.pages) : world.stageAttachment(req.name, req.mimeType, req.data, req.pages) })),
     // The scripted thread's image (mock/thread.ts); a staged PDF reads back as its bytes, a
@@ -989,7 +1012,7 @@ const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idl
 const flagLevels: Record<string, ThreadFlagLevel | null> = { attention: ThreadFlagLevel.ATTENTION, error: ThreadFlagLevel.ERROR, none: null };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
  * transcript: [&missing=false] (Claude Code deleted the thread's transcript: stopped, held and flagged).
  * flag: &plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1] (a plugin's thread/setFlag).
  */
@@ -1023,6 +1046,15 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
       case "archive":
         world.archiveThread(id, q.get("archived") !== "false");
         break;
+      case "move-fail":
+        // thread.move fails after its wait with this message (a refused set_cwd); none: it lands.
+        world.moveFail = q.get("message");
+        json(res, 200, { moveFail: world.moveFail });
+        return;
+      case "move-delay":
+        world.moveDelayMs = Number(q.get("ms") ?? 600);
+        json(res, 200, { moveDelayMs: world.moveDelayMs });
+        return;
       case "forget":
         world.forgetThread(id);
         // Gone: no summary to answer with.
@@ -1109,7 +1141,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript|move-fail|move-delay)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;

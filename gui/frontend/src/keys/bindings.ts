@@ -9,6 +9,7 @@ import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stor
 import { openAddProject } from "@/stores/addProject";
 import { composeLike, openNewThreadPicker } from "@/stores/compose";
 import { getEmberAttentionId } from "@/stores/ember";
+import { canMoveThread, openMovePicker } from "@/stores/movePicker";
 import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
@@ -129,11 +130,14 @@ export function isStartable(c: CommandView): boolean {
  * task board; internal/command/palette_test.go keeps the list). thread.run-in only for a
  * thread with somewhere else to run and thread.new-like only for one with a project or
  * workspace (lib/threadRow; the daemon's availability is the same rule, this keeps a list
- * fetched before the thread changed honest).
+ * fetched before the thread changed honest), thread.move.open only for one the move picker
+ * takes (lib/move canMove).
  */
 export function inPalette(c: CommandView): boolean {
   if (c.name === "thread.run-in" && !canRunElsewhere(activeThread())) return false;
   if (c.name === "thread.new-like" && !canNewLike(activeThread())) return false;
+  // thread.move.open: not for an archived, resident or moving thread either (lib/move canMove).
+  if (c.name === "thread.move.open" && !canMoveThread(getUiContext().activeThreadId)) return false;
   return isStartable(c) && !c.noPalette;
 }
 
@@ -142,7 +146,7 @@ function activeThread() {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-like", "thread.run-in", "thread.snooze", "project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-like", "thread.run-in", "thread.move.open", "thread.snooze", "project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -243,6 +247,8 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "thread.new-like": () => composeLike(getUiContext().activeThreadId),
   // "Run in…": the picker of the active thread's other places to run; it invokes thread.run-in.
   "thread.run-in": () => openRunInPicker(getUiContext().activeThreadId),
+  // The move picker under the active thread's crumb (a thread without a project); its Move invokes thread.move.
+  "thread.move.open": () => openMovePicker(getUiContext().activeThreadId),
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
   // unsnooze it when it is snoozed; both invoke thread.snooze.
   "thread.snooze": () => presentSnooze(getUiContext().activeThreadId),

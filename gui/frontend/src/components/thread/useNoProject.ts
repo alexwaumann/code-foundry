@@ -1,4 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
+import { canMove } from "@/lib/move";
 import { isNoProject } from "@/lib/threadRow";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
@@ -17,3 +18,22 @@ export function useNoProjectThread(id: string | null): boolean {
   );
   return useProjectsStore((st) => s !== null && isNoProject(s, st));
 }
+
+/**
+ * Whether the move picker is offered for a thread (lib/move canMove): no project, not
+ * archived, not resident, not moving. Narrow selectors, as useNoProjectThread.
+ */
+export function useCanMove(id: string | null): boolean {
+  const s = useThreadsStore(
+    useShallow((st) => {
+      const x = id === null ? undefined : st.byId[id];
+      return x
+        ? { projectId: x.projectId, workspaceId: x.workspaceId, worktreePath: x.worktreePath, archivedAtMs: x.archivedAtMs, resident: x.resident ?? "", moving: x.pendingMove !== null }
+        : null;
+    }),
+  );
+  return useProjectsStore((st) => s !== null && canMove({ ...s, pendingMove: s.moving ? PENDING : null }, st));
+}
+
+/** canMove reads only whether a move is pending. */
+const PENDING = { projectId: "", workspaceId: "", worktreePath: "", branch: "" };
