@@ -1,51 +1,40 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { FileText, Folder, Sparkles } from "lucide-react";
-import { FinderIcon } from "@/components/icons/AppIcon";
 import { Tip } from "@/components/ui/tooltip";
 import { tildify } from "@/lib/path";
 import { threadLabel } from "@/lib/prompt";
 import { instructionsName, instructionsThread } from "@/lib/workspaceCard";
 import { useThreadsStore } from "@/stores/threads";
 import { openSettingsPage } from "@/stores/views";
-import { editWorkspaceInstructions, openWorkspaceInstructions, revealWorkspace } from "@/stores/workspaceActions";
+import { editWorkspaceInstructions, openWorkspaceInstructions } from "@/stores/workspaceActions";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { LinkButton, SectionHeader } from "./bits";
-
-function InfoRow({ icon, label, children, testId, data }: { icon: React.ReactNode; label: string; children: React.ReactNode; testId: string; data?: Record<string, string | undefined> }) {
-  return (
-    <div className="flex min-h-10 items-center gap-4 border-b border-cf-divider py-1.5 last:border-b-0" data-testid={testId} {...data}>
-      <span className="flex w-30 shrink-0 items-center gap-1.5 text-caption text-cf-text-muted [&_svg]:size-3.5">
-        {icon}
-        <span className="truncate" data-testid={`${testId}-label`}>
-          {label}
-        </span>
-      </span>
-      <span className="flex min-w-0 flex-wrap items-center gap-x-1 text-body-sm text-cf-text-secondary">{children}</span>
-    </div>
-  );
-}
-
-const Dot = () => <span aria-hidden>·</span>;
+import { SectionHeader } from "./bits";
+import { CopyPath, DetailButton, DetailRow } from "./DetailRow";
+import { workspaceOpenIn } from "./openIn";
+import { OpenInSplit } from "./OpenInFinder";
+import { useWorkspaceTerminal } from "./workspaceHooks";
 
 /**
  * Who "Write instructions" / "Edit instructions" reaches (lib/workspaceCard.ts
- * instructionsThread): "starts a thread", or the thread already in the workspace's folder
- * it steers.
+ * instructionsThread): a new thread, or the thread already in the workspace's folder it
+ * steers. The button's tooltip says so (it is not on screen).
  */
-function useInstructionsReach(workspaceId: string): string {
+function useInstructionsReach(workspaceId: string): { steers: boolean; text: string } {
   const rootPath = useWorkspacesStore((s) => s.byId[workspaceId]?.rootPath ?? "");
   const managedDir = useWorkspacesStore((s) => s.byId[workspaceId]?.managedDir ?? "");
-  return useThreadsStore((s) => {
+  const text = useThreadsStore((s) => {
     const id = instructionsThread(s, { id: workspaceId, rootPath, managedDir });
-    return id === null ? "starts a thread" : `sends to ${threadLabel(s.byId[id]?.name ?? "", id)}`;
+    return id === null ? "" : `Sends to ${threadLabel(s.byId[id]?.name ?? "", id)}`;
   });
+  return text ? { steers: true, text } : { steers: false, text: "Starts a thread" };
 }
 
 /**
- * The instructions file: "None yet · Write instructions (starts a thread)", or its path
- * with View (a File tab in the page's panel) and Edit instructions. Both steer the thread
- * already in the workspace's folder, else start one there (stores/workspaceActions.ts).
+ * The instructions file: its path (or "None yet") | View (a File tab in the page's panel) and
+ * Edit instructions (Write instructions without one), whose tooltip says whom it reaches. Both
+ * steer the thread already in the workspace's folder, else start one there
+ * (stores/workspaceActions.ts).
  */
 function InstructionsRow({ workspaceId }: { workspaceId: string }) {
   const file = useWorkspacesStore((s) => s.byId[workspaceId]?.instructions ?? "");
@@ -59,95 +48,93 @@ function InstructionsRow({ workspaceId }: { workspaceId: string }) {
   };
   const action = file ? "Edit instructions" : "Write instructions";
   return (
-    <InfoRow icon={<FileText aria-hidden />} label={instructionsName({ instructions: file }) || "CLAUDE.md"} testId="workspace-instructions" data={{ "data-file": file || undefined }}>
-      {file ? (
+    <DetailRow
+      icon={<FileText aria-hidden />}
+      label={instructionsName({ instructions: file }) || "CLAUDE.md"}
+      testId="workspace-instructions"
+      data={{ "data-file": file || undefined }}
+      value={file ? tildify(file) : "None yet"}
+      full={file || undefined}
+      valueTestId={file ? "workspace-instructions-path" : "workspace-instructions-none"}
+      right={
         <>
-          <Tip label={file} whenTruncated>
-            <span className="min-w-0 truncate font-mono text-code" data-testid="workspace-instructions-path">
-              {tildify(file)}
-            </span>
+          {file && (
+            <DetailButton testId="workspace-instructions-open" onClick={() => openWorkspaceInstructions(workspaceId)}>
+              View
+            </DetailButton>
+          )}
+          <Tip label={reach.text}>
+            <DetailButton testId="workspace-edit-instructions" busy={busy} data-reach={reach.text} onClick={edit}>
+              {busy ? (reach.steers ? "Sending…" : "Starting…") : action}
+            </DetailButton>
           </Tip>
-          <Dot />
-          <LinkButton testId="workspace-instructions-open" onClick={() => openWorkspaceInstructions(workspaceId)}>
-            View
-          </LinkButton>
-          <Dot />
         </>
-      ) : (
-        <>
-          <span data-testid="workspace-instructions-none">None yet</span>
-          <Dot />
-        </>
-      )}
-      <LinkButton testId="workspace-edit-instructions" className={busy ? "pointer-events-none opacity-60" : undefined} onClick={edit}>
-        {busy ? (reach === "starts a thread" ? "Starting…" : "Sending…") : action}
-      </LinkButton>
-      <span className="text-cf-text-muted" data-testid="workspace-instructions-reach">
-        ({reach})
-      </span>
-    </InfoRow>
+      }
+    />
   );
 }
 
-/** The skills in the workspace's .claude/skills by name (or "None yet") · Browse marketplace (Settings → Skills). */
+/** The skills in the workspace's .claude/skills by name (or "None yet") | Browse marketplace (Settings → Skills). */
 function SkillsRow({ workspaceId }: { workspaceId: string }) {
   const skills = useWorkspacesStore(useShallow((s) => [...(s.byId[workspaceId]?.skills ?? [])]));
-  const list = skills.join(", ");
   return (
-    <InfoRow icon={<Sparkles aria-hidden />} label="Skills" testId="workspace-skills">
-      {skills.length === 0 ? (
-        <span data-testid="workspace-skills-none">None yet</span>
-      ) : (
-        <Tip label={list} whenTruncated>
-          <span className="max-w-[40rem] min-w-0 truncate" data-testid="workspace-skills-list">
-            {list}
-          </span>
-        </Tip>
-      )}
-      <Dot />
-      <LinkButton testId="workspace-browse-skills" onClick={() => { openSettingsPage("skills"); }}>
-        Browse marketplace
-      </LinkButton>
-    </InfoRow>
+    <DetailRow
+      icon={<Sparkles aria-hidden />}
+      label="Skills"
+      testId="workspace-skills"
+      value={skills.length === 0 ? "None yet" : skills.join(", ")}
+      valueTestId={skills.length === 0 ? "workspace-skills-none" : "workspace-skills-list"}
+      right={
+        <DetailButton testId="workspace-browse-skills" onClick={() => { openSettingsPage("skills"); }}>
+          Browse marketplace
+        </DetailButton>
+      }
+    />
   );
 }
 
-/** Where the instructions and skills live: the folder the app keeps (synthetic) or the workspace's root · Open in Finder. */
-function FolderInfoRow({ workspaceId }: { workspaceId: string }) {
+/**
+ * Where the instructions and skills live: the folder the app keeps (synthetic) or the
+ * workspace's root | Copy path and Open in Finder with its Open in list (the editors, and
+ * Terminal while the folder has a place for one).
+ */
+function FolderInfoRow({ workspaceId, compact }: { workspaceId: string; compact: boolean }) {
   const root = useWorkspacesStore((s) => s.byId[workspaceId]?.rootPath ?? "");
   const managed = useWorkspacesStore((s) => s.byId[workspaceId]?.managedDir ?? "");
+  const terminal = useWorkspaceTerminal(workspaceId);
   const dir = root || managed;
   return (
-    <InfoRow icon={<Folder aria-hidden />} label="Folder" testId="workspace-folder-info">
-      {dir && (
+    <DetailRow
+      icon={<Folder aria-hidden />}
+      label="Folder"
+      testId="workspace-folder-info"
+      value={tildify(dir)}
+      full={dir}
+      detail={root ? "its root" : "kept by the app"}
+      valueTestId="workspace-folder-path"
+      right={
         <>
-          <Tip label={dir} whenTruncated>
-            <span className="min-w-0 truncate" data-testid="workspace-folder-path">
-              {tildify(dir)}
-            </span>
-          </Tip>
-          <Dot />
+          {dir && <CopyPath path={dir} testId="workspace-folder-copy-path" />}
+          <OpenInSplit target={workspaceOpenIn(workspaceId, terminal)} compact={compact} testId="workspace-folder" />
         </>
-      )}
-      <span data-testid="workspace-folder-kind">{root ? "its root" : "kept by the app"}</span>
-      <Dot />
-      <LinkButton testId="workspace-folder-reveal" onClick={() => void revealWorkspace(workspaceId)}>
-        <FinderIcon />
-        Open in Finder
-      </LinkButton>
-    </InfoRow>
+      }
+    />
   );
 }
 
-/** Instructions and skills: what every thread in the workspace gets (the daemon appends the instructions; the skills folder is an --add-dir). */
-export function WorkspaceInstructions({ workspaceId }: { workspaceId: string }) {
+/**
+ * Instructions and skills: what every thread in the workspace gets (the daemon appends the
+ * instructions; the skills folder is an --add-dir), in a project's Details grammar
+ * (DetailRow.tsx). `compact`: Open in Finder shows its icon only.
+ */
+export function WorkspaceInstructions({ workspaceId, compact }: { workspaceId: string; compact: boolean }) {
   return (
     <div data-testid="workspace-contents">
       <SectionHeader label="Instructions and skills" detail="added to every thread in this workspace" testId="workspace-contents-title" />
-      <div className="rounded-lg border bg-cf-surface px-3.5">
+      <div className="rounded-lg border bg-cf-surface">
         <InstructionsRow workspaceId={workspaceId} />
         <SkillsRow workspaceId={workspaceId} />
-        <FolderInfoRow workspaceId={workspaceId} />
+        <FolderInfoRow workspaceId={workspaceId} compact={compact} />
       </div>
     </div>
   );

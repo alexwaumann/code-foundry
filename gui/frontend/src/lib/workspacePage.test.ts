@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GitStatusView } from "@/api/project";
 import type { ActivityThread, ActivityThreads } from "./projects";
-import { memberCheckoutPath, memberCheckoutState, workspaceThreads, workspaceThreadsCaption, type MemberCheckoutInput } from "./workspacePage";
+import { changedCheckouts, memberCheckoutPath, threadChangesCell, workspaceThreads, workspaceThreadsCaption } from "./workspacePage";
 
 const thread = (o: Partial<ActivityThread>): ActivityThread => ({
   projectId: "",
@@ -67,28 +67,28 @@ describe("memberCheckoutPath", () => {
 });
 
 const status = (o: Partial<GitStatusView> = {}): GitStatusView => ({ upstream: "origin/x", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null, ...o });
-const base: MemberCheckoutInput = { inSet: true, path: "/wt", git: true, known: true, worktree: { isMain: false, status: status() } };
+describe("threadChangesCell (a thread row's Changes over its member checkouts)", () => {
+  it.each<[string, Partial<GitStatusView>[], string]>([
+    ["files and commits summed over the members", [{ modified: 2, dirty: true, baseAhead: 1 }, { untracked: 1, dirty: true, baseAhead: 1 }], "3 files · 2 commits"],
+    ["one of each", [{ staged: 1, dirty: true, baseAhead: 1 }, {}], "1 file · 1 commit"],
+    ["commits only", [{ baseAhead: 4 }], "4 commits"],
+    ["conflicted entries count as files", [{ conflicted: 2, dirty: true }], "2 files"],
+    ["dirty without counts", [{ dirty: true }, { baseAhead: 1 }], "changed · 1 commit"],
+    ["nothing anywhere", [{}, {}], "clean"],
+    ["no checkout to read", [], ""],
+  ])("%s", (_name, sts, want) => {
+    expect(threadChangesCell(sts.map((o) => status(o)))).toBe(want);
+  });
+});
 
-describe("memberCheckoutState", () => {
-  const wt = (o: Partial<GitStatusView>, isMain = false) => ({ worktree: { isMain, status: status(o) } });
-  it.each<[string, Partial<MemberCheckoutInput>, string]>([
-    ["clean and pushed, commits not on the default branch yet", wt({ baseRef: "origin/main", baseAhead: 2 }), "clean · up to date"],
-    ["no default branch to compare with", {}, "clean · up to date"],
-    ["files to commit and commits to push", wt({ modified: 3, untracked: 1, dirty: true, ahead: 2, baseRef: "origin/main", baseAhead: 2 }), "4 files · 2 to push"],
-    ["behind its upstream", wt({ behind: 1, baseRef: "origin/main", baseAhead: 1 }), "clean · 1 behind"],
-    ["committed, never pushed", wt({ upstream: "", baseRef: "origin/main", baseAhead: 3 }), "clean · not pushed"],
-    ["pushed and every commit on the default branch", wt({ baseRef: "origin/main", baseAhead: 0 }), "clean · merged"],
-    ["merged, with files changed since", wt({ modified: 1, dirty: true, baseRef: "origin/main", baseAhead: 0 }), "1 file · merged"],
-    ["a fresh branch: never pushed, nothing committed", wt({ upstream: "", baseRef: "origin/main", baseAhead: 0 }), "clean · no commits yet"],
-    ["a fresh branch with files", wt({ upstream: "", untracked: 2, dirty: true, baseRef: "origin/main", baseAhead: 0 }), "2 files · no commits yet"],
-    ["the main checkout is never merged", wt({ behind: 2, baseRef: "origin/main", baseAhead: 0 }, true), "clean · 2 behind"],
-    ["the main checkout up to date", wt({ baseRef: "origin/main", baseAhead: 0 }, true), "clean · up to date"],
-    ["not in the thread's set", { inSet: false }, "not in this thread"],
-    ["an unregistered project", { known: false, git: false, worktree: undefined }, "not registered"],
-    ["a plain folder", { git: false }, "folder · no git"],
-    ["no path recorded yet", { path: "", worktree: undefined }, "made at the next start"],
-    ["a path the projects slice does not know", { worktree: undefined }, "made at the next start"],
-  ])("%s", (_name, o, want) => {
-    expect(memberCheckoutState({ ...base, ...o })).toBe(want);
+describe("changedCheckouts (the row menu's Show changes)", () => {
+  it("keeps the members whose checkout has files or commits on its branch, in order", () => {
+    const cs = [
+      { projectId: "a", status: status() },
+      { projectId: "b", status: status({ modified: 1, dirty: true }) },
+      { projectId: "c", status: undefined },
+      { projectId: "d", status: status({ baseAhead: 2 }) },
+    ];
+    expect(changedCheckouts(cs).map((c) => c.projectId)).toEqual(["b", "d"]);
   });
 });

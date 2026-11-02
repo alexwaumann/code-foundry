@@ -5,11 +5,11 @@ import { PanelToggle } from "@/components/panel/PanelToggle";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
-import { memberKey } from "@/lib/projects";
+import { memberKey, PROJECT_TITLE_COMPACT_BELOW } from "@/lib/projects";
 import { membersByName } from "@/lib/workspaceCard";
 import { workspaceThreadKey } from "@/lib/workspacePage";
-import { openChangesTab } from "@/stores/changesPanel";
-import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
+import { useWidth } from "@/lib/useWidth";
+import { useProjectsStore } from "@/stores/projects";
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { PROJECTS_INDEX, useUiStore } from "@/stores/ui";
 import { endWorkspaceRename, useWorkspaceRenameStore } from "@/stores/workspaceRename";
@@ -39,10 +39,10 @@ function useMembersByName(workspaceId: string): string[] {
  * docs/notes/project-page-1-title-block.md): the pane header (crumb › name + picker, the
  * panel toggles), then its title block (WorkspaceTitle: name, "N projects · contents", and
  * its ⋯: the index row's context menu, components/projects/menus.ts workspaceMenu), its
- * Projects (where threads start, Start here, Remove, Add project), its Threads (one column
- * per member's checkout) and its Instructions and skills. Keyboard: ↑/↓ walk the member rows
- * (Enter shows the project's main checkout's changes) and the thread rows (Enter opens the
- * thread).
+ * Projects (where threads start, Start here, Remove, Add project), its Threads (Branch |
+ * Thread | Changes) and its Instructions and skills (docs/notes/workspace-page-polish.md).
+ * Keyboard: ↑/↓ walk the member rows (Enter opens nothing) and the thread rows (Enter opens
+ * the thread).
  */
 export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; pageKey: string }) {
   const loaded = useWorkspacesStore((s) => s.loaded);
@@ -65,14 +65,8 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
 
   const navItems = useMemo<NavItem[]>(
     () => [
-      ...members.map((projectId) => ({
-        key: memberKey(workspaceId, projectId),
-        // A member: its project's main worktree's changes; an unregistered one opens nothing.
-        activate: () => {
-          const at = mainWorktreePath(useProjectsStore.getState(), projectId);
-          if (at) openChangesTab("current", projectId, at);
-        },
-      })),
+      // A member row opens nothing (its hover actions and the page's panel do the rest).
+      ...members.map((projectId) => ({ key: memberKey(workspaceId, projectId) })),
       ...threads.ids.map((id) => ({ key: workspaceThreadKey(workspaceId, id), activate: () => { openThread(id); } })),
     ],
     [workspaceId, members, threads.ids],
@@ -86,7 +80,10 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
     clearProjectsPageReveal(reveal);
   }, [reveal, navItems, setCursor]);
   const rootRef = useRef<HTMLDivElement>(null);
-  const scrollRef = usePageScroll(pageKey);
+  // The content pane's width (the side panel takes from it): the scroll box's.
+  const [widthRef, width] = useWidth(1200);
+  const compact = width < PROJECT_TITLE_COMPACT_BELOW;
+  const scrollRef = usePageScroll(pageKey, widthRef);
   useEffect(() => {
     rootRef.current?.focus({ preventScroll: true });
   }, []);
@@ -138,7 +135,7 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
                 <WorkspaceTitle workspaceId={workspaceId} members={members.length} />
                 <WorkspaceProjects workspaceId={workspaceId} members={members} />
                 <WorkspaceThreads workspaceId={workspaceId} members={members} ids={threads.ids} caption={threads.caption} />
-                <WorkspaceInstructions workspaceId={workspaceId} />
+                <WorkspaceInstructions workspaceId={workspaceId} compact={compact} />
               </div>
             )}
           </div>
