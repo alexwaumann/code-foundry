@@ -269,3 +269,11 @@ had `threads.naming_model = claude-sonnet-5-5[1m]`.
   `TestMoveNeedsTrustTwice`, `TestMoveRestartFails`. The empty-result, archive,
   lost-answer, idle-hold, caller and queued-title tests were each checked to fail with
   their fix taken out.
+
+## Test flake: Starting before the runner
+
+`TestFailedMoveStopsItsStart` read `runnerOf(id).startedFor` as soon as the thread showed
+`StateStarting`, but a start publishes Starting while it is still only reserved
+(`rec.reserved`), before the runner is in the record, so `runnerOf` could be nil (seen once
+in `make check`). The test now polls for the runner; `startedFor` is set in `newRunner`, so
+a runner in the record always has it.
