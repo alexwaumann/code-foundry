@@ -193,6 +193,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
 		command.RegisterWorkspaceReveal(r, d.Workspace, d.Reveal),
+		command.RegisterWorkspaceOpen(r, command.WorkspaceOpenDeps{Workspace: d.Workspace, Editors: d.GitOps.Backend}),
 		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread}),
 		command.RegisterPlugin(r, d.Plugin),
 		command.RegisterPluginSurface(r, d.PluginSurface),
