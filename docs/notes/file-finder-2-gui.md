@@ -89,6 +89,11 @@ right).
   mock's `SPACE`).
 * Radix keeps the dialog's content mounted during its close animation in jsdom, so the unit
   tests assert `palette.open` and not the DOM.
+* `stores/fileFinder.ts` is imported by `keys/bindings.ts` and `stores/views.ts`. Importing
+  `threadDraftKey` from `stores/threadActions.ts` pulled the compose store into everything
+  that imports those, and `Code.test.tsx` (which mocks `@/api/threads` without
+  `ATTACHMENT_MIME_TYPES`) failed at import. `threadDraftKey` moved to `lib/threadDraft.ts`;
+  `threadActions` re-exports it.
 * `insertAtCaret` lives inside the `useImperativeHandle` factory. Outside it, the hook's
   dependency rule wanted it in the dependency array, which would rebuild the handle on every
   render.
