@@ -118,7 +118,7 @@ thread; `thread.move` takes it there.
   queued move must not be applied that way (the transcript was never relocated), so it
   fails instead.
 * A queued move now holds the idle stop (`messageOnItsWay`), so an idle stop cannot cut a
-  move that is about to happen.
+  move that is about to happen (see Review fixes for the channel and naming windows).
 * The guide was at its cap (25,650 bytes, `internal/guide/topics_test.go`). `thread.move`
   is in it with short descriptions; `--base-from-origin` was left out and
   `thread.run-in`'s description shortened (25,646).
@@ -139,13 +139,6 @@ thread; `thread.move` takes it there.
   so a workspace name reached the daemon as a project (NOT_FOUND). The command now
   retries a project NOT_FOUND as a workspace and says "no project or workspace" when it
   is neither.
-
-## Observed, not changed
-
-* Claude emits an empty `result` (0 tokens, ~20 ms) right after a set_cwd, which the
-  timeline shows as a 0.0 s turn end. A plain `thread run-in` does the same, so it is
-  existing behaviour, left for a follow-up (it may set a moved thread's status to
-  "finished").
 
 ## Verified with real Claude
 
@@ -217,3 +210,60 @@ had `threads.naming_model = claude-sonnet-5-5[1m]`.
   `TestTailerFollowsARelocatedTranscript`.
 * API `TestThreadMove`; command `TestThreadMove` (placement flags, workspace fallback,
   queued message, refusals); the command and NoPalette lists.
+
+## Review fixes
+
+* **The empty result after set_cwd is not a turn (move and Run in).** Real Claude writes
+  a successful `result` with no turn running right after it accepts a set_cwd. It made the
+  thread needs-attention "finished" (firing wake subscriptions and settling `thread
+  wait`) and drew a 0.0 s turn end. Plain `thread run-in` had the same bug, since both go
+  through `streamCd`, so both are fixed: an ok set_cwd sets `runner.cdResultOwed`, and
+  `onStreamEvent` drops the next `Result` while the flag is set and no turn or compaction
+  runs. Dropping it skips the status, the projection (no turn-end row), `wakeOver` and the
+  acknowledge. The flag clears on that result, on `sendMessage` (a result from then on
+  may be the message's turn) and on a restart (the old process's result never comes).
+  Fakeclaude writes that result after an ok set_cwd with `CF_FAKE_CLAUDE_SET_CWD_RESULT`.
+* **Archived while moving.** An archive during the naming wait (or while the move waits
+  for a close or a start) fails the move with "the thread was archived while moving" and
+  the usual rollback. `runMove` checks each pass, and `startStopped` (with `o.move`) and
+  `moveStopped` check under `m.mu`, so an archived thread never starts for a move.
+* **`moveStopped` vs a concurrent start.** A thread without a conversation moves its row
+  only under `m.mu` with `rec.run == nil && rec.reserved == nil`. When a send started it
+  since `runMove` looked, it reports "not moved" and `runMove` loops, queueing the move
+  on the new process (set_cwd), so the row never names a project while Claude runs in
+  home.
+* **A set_cwd without an answer.** A timeout or a transport/control error no longer
+  rolls back blindly. When the transcript is now under the destination's project dir
+  (`runner.cdLanded`: the destination's own slug dir, or, for a slug Claude shortened,
+  anywhere once the old copy is gone), the set_cwd is taken as done (`onMoved`, or Run
+  in's row move). Otherwise it fails as before. This applies to Run in too, which
+  relocates the same way. Move and Run in set_cwd now wait up to 30 s
+  (`setCwdTimeout`; other control requests keep `streamControlTimeout`, 5 s), since a
+  long transcript takes a while to relocate. The run goroutine blocks for that wait, as
+  it already did for 5 s. Fakeclaude: `CF_FAKE_CLAUDE_SET_CWD_GATE=<path>` holds the answer,
+  and `CF_FAKE_CLAUDE_SET_CWD_ERROR=<message>` answers with a control error.
+* **Idle stop vs a just-queued move.** `onIdleCheck` first takes a request still in
+  `cdReq` (`takeCdReq`, the select `tryCd` used). `messageOnItsWay` also counts
+  `PendingMove`, so a move being placed or named (before it queues) holds the stop too.
+  `PendingMove` always clears (`releaseMove`, `withMove`), so it cannot hold a thread
+  forever.
+* **A cancelled caller.** `runMove` runs on `context.WithoutCancel` (its waits are
+  bounded by the handshake and close timeouts), so a move whose Claude is starting
+  continues and lands after the caller stops waiting. `failMove` cleans up on a context
+  without cancel and stops the process started for the move (`runner.startedFor`, set
+  once at spawn from `launch.move`) with reason idle (`requestCloseAs`: `closeReq`
+  carries a reason now). A process started by a send is left alone.
+* **Minor.** A failed move restart (the needs_trust one) says "Claude did not restart to
+  move the thread: …". A title that misses `SlugTimeout` while the move is still queued
+  is kept on the record (`lateMoveName`) and applied when the move lands (`landMove`). A
+  failed move drops it. Fakeclaude: `CF_FAKE_CLAUDE_SET_CWD_NEEDS_TRUST` always answers
+  needs_trust.
+* Tests: `TestSetCwdEmptyResultIsNotATurn` (move, run in), `TestMoveArchivedWhileNaming`
+  (stopped, running), `TestMoveStoppedSeesAStart` (running, starting, and Move on a
+  running thread without a conversation), `TestSetCwdLostAnswer` (move or Run in ×
+  transcript moved or not), `TestMoveHoldsTheIdleStop` (naming; a request in the channel
+  with the run loop held, 20 rounds), `TestMoveOutlivesItsCaller`,
+  `TestFailedMoveStopsItsStart`, `TestMoveLateTitle` (moved already, still queued),
+  `TestMoveNeedsTrustTwice`, `TestMoveRestartFails`. The empty-result, archive,
+  lost-answer, idle-hold, caller and queued-title tests were each checked to fail with
+  their fix taken out.
