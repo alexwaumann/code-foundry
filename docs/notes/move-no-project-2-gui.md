@@ -105,4 +105,33 @@ from the thread's header, without starting over.
 
 ## Verified in the built app
 
-See the PR body for the screenshots and steps.
+`make build`, `make gui-build`; `CODE_FOUNDRY_HOME=/tmp/cf-move-gui bin/code-foundry daemon`
+and the GUI from `gui/bin`. Scratch repos `~/cf-move-gui-scratch/webapp` and `authlib`
+(each with a local bare origin and two branches), a plain folder `notes`, and workspace
+`platform` (webapp, authlib). `threads.default_worktree = new`, `threads.naming_model =
+claude-sonnet-5-5[1m]`. Threads: `thread new --no-project --model 'claude-sonnet-5-5[1m]'
+--effort medium`.
+
+1. Dark, a running thread: `thread move.open --id …` from the CLI opened the picker under
+   the crumb, with the filter focused (ShowView `thread.move`). Step 1 listed platform
+   (2 projects), authlib, notes (No git), webapp. Typing "webapp" + Enter picked the
+   workspace (the keyword gotcha above, fixed after). Step 2 for platform: Fresh copies,
+   From defaults, Run in webapp, the members on the right. Backspace went back; ↓↓↓
+   Enter picked webapp; Work in listed Fresh copy, Project folder and the repo's
+   branches. Esc, then Enter moved it. The crumb read "Moving to webapp…" (the title
+   muted while renamed) for about 2 s. Then "webapp ›  Fix login redirect destination",
+   the sidebar row on `fix/login-redirect-destination`, the card on webapp (Fresh copy),
+   and the note "Moved this thread to webapp (new worktree on
+   fix/login-redirect-destination)." The daemon took its needs_trust restart path.
+2. Light, a stopped thread (archived and unarchived): the same through the rebuilt GUI.
+   "webapp" + Enter now lands on the project. It moved through "started thread to move
+   it", in about 3 s.
+
+Found, not fixed here (the daemon's, PR 1): with real Claude, both moves left an empty
+turn end right after the move note (`turnEnd {subtype: success, durationMs: 22–34,
+turnCostUsd: 0}`, drawn as a bare "Worked" row). The empty result after an accepted
+set_cwd is meant to be dropped (`runner.cdResultOwed`); with fakeclaude's
+`CF_FAKE_CLAUDE_SET_CWD_RESULT` it is, both directly and after a trust restart (checked
+here). Real Claude probably sends something before that result that marks the turn busy
+(`streamStatus.turnStarted`), so `cdResult` treats the result as a turn's. It needs a
+capture of real Claude's stream around set_cwd.
