@@ -20,11 +20,17 @@ const row = (page: Page, projectId: string) => page.locator(`[data-nav-key="p:${
 const checkout = (page: Page, path: string) => page.locator(`[data-testid="project-worktree"][data-path="${path}"]`);
 const checkoutRow = (page: Page, projectId: string, path: string) => page.locator(`[data-nav-key="pw:${projectId}::${path}"]`);
 const FEAT = `${CF}.worktrees/feat-sidebar`;
-const FIX = `${CF}.worktrees/fix-resize`;
 // POST /__mock/leftovers: three leftovers (SPIKE, COPY, exp/shaders; and MERGED with clean=1).
 const SPIKE = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-perf-spike";
 const COPY = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy";
 const leftover = (page: Page, path: string) => page.locator(`[data-testid="leftover-row"][data-path="${path}"]`);
+
+/** A checkout row's right-click menu, then one of its items. */
+async function pickCheckout(page: Page, path: string, testId: string): Promise<void> {
+  await checkoutRow(page, "repo-cf", path).click({ button: "right" });
+  await page.getByTestId("checkout-menu").getByTestId(testId).click();
+  await expect(page.getByTestId("checkout-menu")).toHaveCount(0);
+}
 
 const panelKey = (page: Page) => page.getByTestId("side-panel").getAttribute("data-panel-key");
 
@@ -64,20 +70,62 @@ test("narrowing drops Activity, then Updated, then Default branch; Needs a look 
   await expect(row(page, "repo-sk").getByTestId("index-publish")).toBeVisible();
 });
 
-// The index's ↑/↓/Home/End/Enter, and End then Enter on a project's page opening that checkout's Changes tab:
-// ProjectsIndex.test.tsx and ProjectPage.test.tsx. Left: the real focus and the tab drawn in the page's panel.
-test("keyboard: a project page's list has the keyboard; End then Enter shows a checkout's Changes tab", async ({ page }) => {
+// The index's ↑/↓/Home/End/Enter, and on a project's page End then Shift+F10 opening that row's menu:
+// ProjectsIndex.test.tsx and ProjectPage.test.tsx. Left: the real focus, the keymap leaving Shift+F10
+// to the list, the menu taking the keyboard and Escape giving it back.
+test("keyboard: a project page's list has the keyboard; Shift+F10 opens the cursor row's menu, Escape returns", async ({ page }) => {
   await openApp(page);
   await openProjectPage(page, "repo-cf");
   await expect(page.getByTestId("projects-list")).toBeFocused();
   await page.keyboard.press("End");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("changes-surface")).toBeVisible();
+  await page.keyboard.press("Shift+F10");
+  const menu = page.getByTestId("checkout-menu");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.locator('[role="menuitem"][data-highlighted]')).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByTestId("projects-list")).toBeFocused();
 });
 
-// A project's page (title block, checkouts table, a row opening its Changes tab in the page's panel, the row
-// and title block menus, Details with Copy and Open in) and the kind variants (with Initialize git): ProjectPage.test.tsx. A row's
-// tab drawn in the page's own panel is "each page has its own side panel" below; hover actions, "narrow".
+// Which items a checkout's menu has, what each runs, Open thread and the apps submenu: menus.test.ts,
+// ProjectPage.test.tsx and CheckoutsTable.test.tsx. Left: the split item's two hover blocks (pseudo-elements).
+test("a checkout menu's Open in Finder hovers as two blocks: text bright with › dim, › bright with its submenu open", async ({ page }) => {
+  await openApp(page);
+  await openProjectPage(page, "repo-cf");
+  await checkoutRow(page, "repo-cf", FEAT).click({ button: "right" });
+  const split = page.getByTestId("checkout-menu-open-in");
+  const more = page.getByTestId("checkout-menu-open-in-more");
+  const bg = (pseudo: "::before" | "::after", el = split) => el.evaluate((e, p) => getComputedStyle(e, p).backgroundColor, pseudo);
+  // Geometry: the › block is the item's last 32px at its full height; the left block ends 34px short.
+  const box = await split.boundingBox();
+  const geo = await more.evaluate((e) => {
+    const a = getComputedStyle(e, "::after");
+    const item = e.closest('[role="menuitem"]') as HTMLElement;
+    return { w: a.width, h: a.height, itemH: `${String(item.offsetHeight)}px`, right: getComputedStyle(item, "::before").right };
+  });
+  expect(geo).toEqual({ w: "32px", h: geo.itemH, itemH: geo.itemH, right: "34px" });
+  expect(box?.height).toBeGreaterThan(0);
+  const none = await bg("::before");
+  await split.hover({ position: { x: 20, y: 8 } });
+  await expect(page.getByTestId("checkout-menu-open-in-menu")).toHaveCount(0);
+  const bright = await bg("::before");
+  const half = await bg("::after", more);
+  expect(new Set([none, bright, half]).size).toBe(3);
+  await more.hover();
+  await expect(page.getByTestId("checkout-menu-open-in-menu")).toBeVisible();
+  await expect.poll(() => bg("::after", more)).toBe(bright);
+  await expect.poll(() => bg("::before")).toBe(half);
+  // Back on its text: the submenu closes; a click there reveals and closes the menu.
+  await split.hover({ position: { x: 20, y: 8 } });
+  await expect(page.getByTestId("checkout-menu-open-in-menu")).toHaveCount(0);
+  await split.click({ position: { x: 20, y: 8 } });
+  await expect(page.getByTestId("checkout-menu")).toHaveCount(0);
+});
+
+// A project's page (title block, checkouts table, the row and title block menus, Details with Copy and
+// Open in) and the kind variants (with Initialize git): ProjectPage.test.tsx; the table's columns and menu parts: CheckoutsTable.test.tsx.
+// A row's Changes tab drawn in the page's own panel is "each page has its own side panel" below.
 
 // Refresh (fetch then refresh, spinning) and a failed refresh in the title block: unit-tested in src/components/projects/ProjectPage.test.tsx ("Refresh fetches…", "a failed refresh turns…").
 
@@ -85,7 +133,7 @@ test("narrow: with the Changes tab open, Sync and the slug drop and Open in Find
   await openApp(page);
   await openProjectPage(page, "repo-cf");
   await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-narrow");
-  await checkoutRow(page, "repo-cf", FEAT).click();
+  await pickCheckout(page, FEAT, "checkout-menu-changes");
   await expect(page.getByTestId("changes-surface")).toBeVisible();
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-narrow", "true");
   await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(0);
@@ -95,9 +143,9 @@ test("narrow: with the Changes tab open, Sync and the slug drop and Open in Find
   await expect(page.getByTestId("title-default-branch")).toBeVisible();
   await expect(page.getByTestId("details-reveal")).toHaveText("");
   await expect(page.getByTestId("checkouts-col-pr")).toHaveCount(1);
-  // Row actions still reach: on hover, over the row's end.
-  await checkoutRow(page, "repo-cf", FIX).hover();
-  await expect(checkoutRow(page, "repo-cf", FIX).getByTestId("worktree-new-terminal")).toBeVisible();
+  // The table drops by its own width (lib/projects.ts checkoutColumns), whatever the page's narrow flag.
+  const w = await page.getByTestId("checkouts-table").evaluate((e) => e.getBoundingClientRect().width);
+  expect(await page.getByTestId("checkouts-col-threads").count()).toBe(w >= 720 ? 1 : 0);
   // Closing the panel gives the room back.
   await page.getByTestId("side-panel").getByTestId("panel-toggle").click();
   await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-narrow");
@@ -143,8 +191,8 @@ test("Details' Open in Finder: two blocks with a 2px seam, the one under the poi
 test("each page has its own side panel; the sidebar row reopens the last page and goes to the index from one", async ({ page }) => {
   await openApp(page);
   await openProjectPage(page, "repo-cf");
-  await checkoutRow(page, "repo-cf", FIX).click();
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · fix/resize");
+  await pickCheckout(page, FEAT, "checkout-menu-changes");
+  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · feat/sidebar");
 
   // ghostty-playground's page has its own panel: closed, nothing of code-foundry's.
   await openProjectPage(page, "repo-gp");
@@ -155,7 +203,7 @@ test("each page has its own side panel; the sidebar row reopens the last page an
 
   // Back on code-foundry's page: its tab is still there.
   await row(page, "repo-cf").getByTestId("project-name").click();
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · fix/resize");
+  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · feat/sidebar");
   expect(await panelKey(page)).toBe("view:projects:project:repo-cf");
 
   // Elsewhere, then the sidebar row: the last Projects page; again: the index.

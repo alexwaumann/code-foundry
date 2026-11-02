@@ -160,11 +160,17 @@ export async function openWorkspacePage(page: Page, workspaceId: string): Promis
   await expect(page.locator(`[data-testid="projects-page"][data-page="workspace"][data-workspace="${workspaceId}"]`)).toBeVisible();
 }
 
+/** Opens a checkout's Changes tab in the shown page's side panel (stores/changesPanel.ts openChangesTab, what a checkout menu's Show changes runs). */
+async function openChangesTabFor(page: Page, projectId: string, path: string): Promise<void> {
+  await page.evaluate(`__cfModule("/src/stores/changesPanel.ts").then((c) => c.openChangesTab("current", ${JSON.stringify(projectId)}, ${JSON.stringify(path)}))`);
+}
+
 /**
  * Shows a worktree's Changes tab: its project's page with the worktree's tab in the page's
- * side panel, by clicking its checkout row (or, with `workspaceId`, the workspace's page and
- * the project's member row). The page stays selected: the palette has no worktree context
- * here; tests that need one select a thread in the worktree.
+ * side panel (a checkout row has no click; its menu's Show changes runs the same, and only
+ * with changes), or, with `workspaceId`, the workspace's page and the project's member row.
+ * The page stays selected: the palette has no worktree context here; tests that need one
+ * select a thread in the worktree.
  */
 export async function selectWorktree(page: Page, projectId: string, path: string, workspaceId?: string): Promise<void> {
   if (workspaceId) {
@@ -172,24 +178,17 @@ export async function selectWorktree(page: Page, projectId: string, path: string
     await page.locator(`[data-nav-key="m:${workspaceId}::${projectId}"]`).dblclick();
   } else {
     await openProjectPage(page, projectId);
-    await page.locator(`[data-nav-key="pw:${projectId}::${path}"]`).click();
+    await openChangesTabFor(page, projectId, path);
   }
   await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", path);
 }
 
-/**
- * Shows a project's main checkout's Changes tab in its page's side panel: its main row, or
- * for a folder without git (no checkouts table) the tab opened directly.
- */
+/** Shows a project's main checkout's Changes tab in its page's side panel (opened directly: a checkout row has no click). */
 export async function selectProject(page: Page, projectId: string): Promise<void> {
   await openProjectPage(page, projectId);
-  const main = page.locator('[data-testid="project-worktree"][data-main]');
-  if ((await main.count()) > 0) await main.click();
-  else {
-    await page.evaluate(
-      `Promise.all([__cfModule("/src/stores/changesPanel.ts"), __cfModule("/src/stores/projects.ts")]).then(([c, p]) => c.openChangesTab("current", ${JSON.stringify(projectId)}, p.mainWorktreePath(p.useProjectsStore.getState(), ${JSON.stringify(projectId)})))`,
-    );
-  }
+  await page.evaluate(
+    `Promise.all([__cfModule("/src/stores/changesPanel.ts"), __cfModule("/src/stores/projects.ts")]).then(([c, p]) => c.openChangesTab("current", ${JSON.stringify(projectId)}, p.mainWorktreePath(p.useProjectsStore.getState(), ${JSON.stringify(projectId)})))`,
+  );
   await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-project", projectId);
 }
 

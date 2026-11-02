@@ -16,23 +16,23 @@ const { Toaster } = await import("@/components/ui/sonner");
 const { daemon, invocationsOf, lastInvocation, refuse, resetDaemon } = await import("@/test/daemonFakes");
 const { attach } = await import("@/test/terminalHost");
 const { ACTION_IDS, ACTION_NAMES, action, fakeActionCommands, seedActions } = await import("@/test/actionsWorld");
-const { CF, seedWorld } = await import("@/test/projectsWorld");
+const { CF, GP, seedWorld } = await import("@/test/projectsWorld");
 const { useActionDialogStore } = await import("@/stores/actionDialog");
 const { useActionsStore } = await import("@/stores/actions");
 const { useBottomStore } = await import("@/stores/bottomPanel");
 const { projectPage, useUiStore } = await import("@/stores/ui");
 
 /**
- * Actions on the Projects page (docs/notes/actions-2-gui.md): a checkout row's actions menu
- * (ActionsMenu), the editor it opens (ActionDialog) saving through action.add / action.edit /
+ * Actions on the Projects page (docs/notes/actions-2-gui.md): a checkout row's Run action
+ * submenu (its right-click menu, docs/notes/project-page-2-checkouts.md), the editor it opens (ActionDialog) saving through action.add / action.edit /
  * action.remove, a run's tab in the page's bottom panel, and Details' Add an action. The
  * daemon's answers change the actions store the way its events would. e2e/actions.spec.ts
- * keeps the pencil's hover opacity and Escape closing its tooltip before the menu.
+ * keeps the gear's split hover in a real browser.
  */
 
-const trigger = (path = CF, project = "repo-cf") => document.querySelector<HTMLElement>(`[data-nav-key="pw:${project}::${path}"] [data-testid="worktree-actions-menu"]`);
-const menu = () => screen.getByTestId("worktree-actions-menu-menu");
-const items = () => within(menu()).queryAllByTestId("action-item");
+const row = (path = CF, project = "repo-cf") => document.querySelector<HTMLElement>(`[data-nav-key="pw:${project}::${path}"]`) as HTMLElement;
+const menu = () => screen.getByTestId("checkout-menu-actions-menu");
+const items = () => within(menu()).queryAllByTestId("checkout-menu-action");
 const item = (name: string) => items().find((e) => e.textContent === name) as HTMLElement;
 const dialog = () => screen.queryByTestId("action-dialog");
 const field = (id: string) => within(dialog() as HTMLElement).getByTestId<HTMLInputElement>(id);
@@ -46,8 +46,14 @@ async function settle(n = 3) {
   }
 }
 
+/** The row's right-click menu, then its Run action submenu (ArrowRight on its trigger). */
 function openMenu(path = CF, project = "repo-cf"): HTMLElement {
-  fireEvent.pointerDown(trigger(path, project) as HTMLElement, { button: 0, ctrlKey: false, pointerType: "mouse" });
+  fireEvent.contextMenu(row(path, project));
+  const sub = screen.getByTestId("checkout-menu-actions");
+  act(() => {
+    sub.focus();
+  });
+  fireEvent.keyDown(sub, { key: "ArrowRight" });
   return menu();
 }
 
@@ -127,15 +133,15 @@ afterEach(() => {
   cleanup();
 });
 
-describe("a checkout row's actions menu", () => {
-  it("the project's name, its actions in order, New action; each pencil names its action", async () => {
+describe("a checkout row's Run action submenu", () => {
+  it("the project's actions in order with their icons, Add action; each gear names its action", async () => {
     renderPage("repo-cf");
     await settle();
     openMenu();
-    expect(within(menu()).getByTestId("actions-project").textContent).toBe("code-foundry");
     expect(items().map((e) => e.textContent)).toEqual(ACTION_NAMES);
-    expect(within(menu()).getByTestId("action-new").textContent).toBe("New action");
-    expect(within(item("Test")).getByTestId("action-edit").getAttribute("aria-label")).toBe("Edit Test");
+    expect(items().every((e) => e.querySelector("svg") !== null)).toBe(true);
+    expect(within(menu()).getByTestId("checkout-menu-add-action").textContent).toBe("Add action");
+    expect(within(item("Test")).getByTestId("checkout-menu-action-gear").getAttribute("aria-label")).toBe("Edit Test");
   });
 
   it("an item runs the action for that worktree, in the Projects page's bottom panel", async () => {
@@ -151,10 +157,14 @@ describe("a checkout row's actions menu", () => {
     expect(screen.getByTestId("action-echo").textContent).toBe("$ make build");
   });
 
-  it("a project without actions has no row menu; Details says none, and Add an action opens a new one's editor", async () => {
+  it("a project without actions has no Run action; Details says none, and Add an action opens a new one's editor", async () => {
     renderPage("repo-gp");
     await settle();
-    expect(screen.queryByTestId("worktree-actions-menu")).toBeNull();
+    fireEvent.contextMenu(row(GP, "repo-gp"));
+    expect(screen.getByTestId("checkout-menu")).toBeTruthy();
+    expect(screen.queryByTestId("checkout-menu-actions")).toBeNull();
+    fireEvent.keyDown(screen.getByTestId("checkout-menu"), { key: "Escape" });
+    await settle();
     expect(screen.getByTestId("details-actions-value").textContent).toBe("none");
     fireEvent.click(screen.getByTestId("details-add-action"));
     await settle();
@@ -197,11 +207,11 @@ describe("a checkout row's actions menu", () => {
   });
 });
 
-describe("add, then edit (pencil and ArrowRight), then delete an action", () => {
+describe("add, then edit (gear by pointer and by keyboard), then delete an action", () => {
   it("each step sends what the editor holds, and the menu follows the store", async () => {
     renderPage("repo-cf");
     await settle();
-    await pickItem(within(openMenu()).getByTestId("action-new"));
+    await pickItem(within(openMenu()).getByTestId("checkout-menu-add-action"));
     expect(dialog()?.dataset.mode).toBe("new");
     expect(within(dialog() as HTMLElement).getByRole("heading", { name: "New action" })).toBeTruthy();
     const save = () => field("action-save") as unknown as HTMLButtonElement;
@@ -225,7 +235,7 @@ describe("add, then edit (pencil and ArrowRight), then delete an action", () => 
 
     // A name the project has (ignoring case): the daemon's refusal, in place, without its
     // "failed precondition: " and without a toast.
-    await pickItem(within(openMenu()).getByTestId("action-new"));
+    await pickItem(within(openMenu()).getByTestId("checkout-menu-add-action"));
     fireEvent.change(field("action-name"), { target: { value: "test" } });
     fireEvent.change(field("action-command"), { target: { value: "true" } });
     fireEvent.click(save());
@@ -237,13 +247,13 @@ describe("add, then edit (pencil and ArrowRight), then delete an action", () => 
     await settle();
     expect(dialog()).toBeNull();
 
-    // The pencil edits (it runs nothing); only what changed is sent; Cmd+Enter saves.
+    // The gear edits (it runs nothing); only what changed is sent; Cmd+Enter saves.
     const lint = Object.values(useActionsStore.getState().byId).find((a) => a.name === "Lint");
     expect(lint).toBeDefined();
     openMenu();
-    fireEvent.click(within(item("Lint")).getByTestId("action-edit"));
+    fireEvent.click(within(item("Lint")).getByTestId("checkout-menu-action-gear"));
     await settle();
-    expect(screen.queryByTestId("worktree-actions-menu-menu")).toBeNull();
+    expect(screen.queryByTestId("checkout-menu")).toBeNull();
     expect(invocationsOf("action.run")).toHaveLength(0);
     expect(dialog()?.dataset.mode).toBe("edit");
     expect(field("action-name").value).toBe("Lint");
@@ -254,9 +264,15 @@ describe("add, then edit (pencil and ArrowRight), then delete an action", () => 
     expect(dialog()).toBeNull();
     expect(invocationsOf("action.edit").map((i) => i.args)).toEqual([{ action: lint?.id, command: "make lint", project: "repo-cf" }]);
 
-    // ArrowRight on a highlighted row is the pencil's keyboard path.
+    // ArrowRight on a highlighted item focuses its gear; Enter there edits.
     openMenu();
+    act(() => {
+      item("Lint").focus();
+    });
     fireEvent.keyDown(item("Lint"), { key: "ArrowRight" });
+    const gear = within(item("Lint")).getByTestId("checkout-menu-action-gear");
+    expect(document.activeElement).toBe(gear);
+    fireEvent.keyDown(gear, { key: "Enter" });
     await settle();
     expect(dialog()?.dataset.mode).toBe("edit");
     expect(field("action-command").value).toBe("make lint");

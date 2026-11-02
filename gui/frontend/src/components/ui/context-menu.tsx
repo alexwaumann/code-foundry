@@ -37,11 +37,12 @@ function ContextMenuSub({ ...props }: React.ComponentProps<typeof ContextMenuPri
   return <ContextMenuPrimitive.Sub data-slot="context-menu-sub" {...props} />
 }
 
-function ContextMenuSubTrigger({ className, children, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.SubTrigger>) {
+/** `chevron={false}` leaves the trailing chevron to the caller (a split item draws it in its own block). */
+function ContextMenuSubTrigger({ className, children, chevron = true, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.SubTrigger> & { chevron?: boolean }) {
   return (
     <ContextMenuPrimitive.SubTrigger data-slot="context-menu-sub-trigger" className={cn(itemClass, "data-[state=open]:bg-accent", className)} {...props}>
       {children}
-      <ChevronRightIcon className="ml-auto size-4" />
+      {chevron && <ChevronRightIcon className="ml-auto size-4" />}
     </ContextMenuPrimitive.SubTrigger>
   )
 }

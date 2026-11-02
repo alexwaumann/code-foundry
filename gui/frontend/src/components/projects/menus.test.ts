@@ -3,16 +3,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const unregisterProject = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const cleanupMergedWorktrees = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const newTerminalIn = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/projectActions", async (orig) => ({ ...(await orig<typeof import("@/stores/projectActions")>()), unregisterProject, cleanupMergedWorktrees, newTerminalIn }));
+const removeWorktree = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/stores/projectActions", async (orig) => ({ ...(await orig<typeof import("@/stores/projectActions")>()), unregisterProject, cleanupMergedWorktrees, newTerminalIn, removeWorktree }));
+const openChangesTab = vi.hoisted(() => vi.fn(() => true));
+vi.mock("@/stores/changesPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/changesPanel")>()), openChangesTab }));
+const openPullRequestInPanel = vi.hoisted(() => vi.fn(() => true));
+vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/prPanel")>()), openPullRequestInPanel }));
+const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@/lib/clipboard", () => ({ copyText }));
 const removeWorkspace = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/workspaceActions", async (orig) => ({ ...(await orig<typeof import("@/stores/workspaceActions")>()), removeWorkspace }));
 
-const { projectMenu, workspaceMenu } = await import("./menus");
+const { checkoutMenu, projectMenu, workspaceMenu } = await import("./menus");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useProjectRenameStore } = await import("@/stores/projectRename");
 const { useWorkspaceRenameStore } = await import("@/stores/workspaceRename");
 const { useWorkspaceAddProjectStore } = await import("@/stores/workspaceAddProject");
 const { useUiStore } = await import("@/stores/ui");
+const { useComposeStore } = await import("@/stores/compose");
 type Items = ReturnType<typeof projectMenu>;
 
 /** The menu as the user reads it: labels (a count after its item), "—" for a separator. */
@@ -120,8 +128,71 @@ describe("workspaceMenu (an index row's context menu, the workspace page's ⋯)"
   });
 });
 
+describe("checkoutMenu (a checkout's right-click menu on its project page)", () => {
+  type Facts = Parameters<typeof checkoutMenu>[0];
+  const T1 = { id: "s-1", name: "Refactor sidebar tree", badge: "busy" as const };
+  const T2 = { id: "s-2", name: "Spike a canvas sidebar", badge: "idle" as const };
+  const base: Facts = { projectId: "p-1", path: "/u/app.wt/feat", branch: "feat/x", isMain: false, threads: [], changed: false, pr: null, actions: false };
+  /** Text items by label, parts by kind in brackets, "—" for a separator. */
+  const read = (f: Partial<Facts>) =>
+    checkoutMenu({ ...base, ...f }).map((it) => (it === "separator" ? "—" : "kind" in it ? `[${it.kind}]` : it.label));
+
+  it.each<[string, Partial<Facts>, string[]]>([
+    ["a quiet worktree: no threads, nothing to show, no pull request, no actions", {}, ["New thread here", "New terminal here", "—", "[open-in]", "Copy path", "Copy branch name", "—", "Remove worktree"]],
+    ["one thread: a direct Open item", { threads: [T1] }, ["Open “Refactor sidebar tree”", "New thread here", "New terminal here", "—", "[open-in]", "Copy path", "Copy branch name", "—", "Remove worktree"]],
+    ["two threads: the Open thread submenu", { threads: [T1, T2] }, ["[threads]", "New thread here", "New terminal here", "—", "[open-in]", "Copy path", "Copy branch name", "—", "Remove worktree"]],
+    ["changes: Show changes in its own group", { changed: true }, ["New thread here", "New terminal here", "—", "Show changes", "—", "[open-in]", "Copy path", "Copy branch name", "—", "Remove worktree"]],
+    ["a pull request: Open pull request #N", { pr: { slug: "o/r", number: 142 } }, ["New thread here", "New terminal here", "—", "Open pull request #142", "—", "[open-in]", "Copy path", "Copy branch name", "—", "Remove worktree"]],
+    [
+      "busy: everything",
+      { threads: [T1, T2], changed: true, pr: { slug: "o/r", number: 142 }, actions: true },
+      ["[threads]", "New thread here", "New terminal here", "—", "Show changes", "Open pull request #142", "—", "[open-in]", "Copy path", "Copy branch name", "[actions]", "—", "Remove worktree"],
+    ],
+    ["main: no Remove worktree", { isMain: true, branch: "main", actions: true }, ["New thread here", "New terminal here", "—", "[open-in]", "Copy path", "Copy branch name", "[actions]"]],
+    ["detached: no Copy branch name", { branch: "" }, ["New thread here", "New terminal here", "—", "[open-in]", "Copy path", "—", "Remove worktree"]],
+  ])("%s", (_name, f, want) => {
+    expect(read(f)).toEqual(want);
+  });
+
+  it("the parts carry what they draw: the threads, the checkout", () => {
+    const items = checkoutMenu({ ...base, threads: [T1, T2], actions: true });
+    expect(items.find((x) => x !== "separator" && "kind" in x && x.kind === "threads")).toEqual({ kind: "threads", testId: "checkout-menu-threads", threads: [T1, T2] });
+    expect(items.find((x) => x !== "separator" && "kind" in x && x.kind === "open-in")).toEqual({ kind: "open-in", testId: "checkout-menu-open-in", projectId: "p-1", path: "/u/app.wt/feat" });
+    expect(items.find((x) => x !== "separator" && "kind" in x && x.kind === "actions")).toEqual({ kind: "actions", testId: "checkout-menu-actions", projectId: "p-1", path: "/u/app.wt/feat" });
+  });
+
+  it("each text item runs its store action for this checkout", async () => {
+    const items = checkoutMenu({ ...base, threads: [T1], changed: true, pr: { slug: "o/r", number: 142 } });
+    const run = (testId: string) => {
+      const it = items.find((x) => x !== "separator" && !("kind" in x) && x.testId === testId);
+      if (!it || it === "separator" || "kind" in it) throw new Error(`no ${testId}`);
+      it.onSelect();
+      return it;
+    };
+    run("checkout-menu-open-thread");
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
+    run("checkout-menu-new-terminal");
+    expect(newTerminalIn).toHaveBeenCalledWith("p-1", "/u/app.wt/feat");
+    run("checkout-menu-changes");
+    expect(openChangesTab).toHaveBeenCalledWith("current", "p-1", "/u/app.wt/feat");
+    run("checkout-menu-pr");
+    expect(openPullRequestInPanel).toHaveBeenCalledWith({ slug: "o/r", number: 142 });
+    run("checkout-menu-copy-path");
+    run("checkout-menu-copy-branch");
+    await Promise.resolve();
+    expect(copyText.mock.calls).toEqual([["/u/app.wt/feat"], ["feat/x"]]);
+    const remove = run("checkout-menu-remove");
+    expect(remove.destructive).toBe(true);
+    expect(removeWorktree).toHaveBeenCalledWith("p-1", "/u/app.wt/feat");
+    run("checkout-menu-new-thread");
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "p-1" });
+    expect(useComposeStore.getState().drafts["p-1"]?.worktree).toEqual({ kind: "existing", path: "/u/app.wt/feat" });
+  });
+});
+
 it("no item ends in an ellipsis (the app's menu style)", () => {
   const all = [
+    ...checkoutMenu({ projectId: "p-1", path: "/u/app", branch: "main", isMain: false, threads: [{ id: "s-1", name: "x", badge: "idle" }], changed: true, pr: { slug: "o/r", number: 1 }, actions: true }).flatMap((x) => (x === "separator" || !("kind" in x) ? [x] : [])),
     ...projectMenu("p-1", { kind: "git", step: "publish", cleanup: 1 }, { page: true }),
     ...projectMenu("p-1", { kind: "nogit", step: "init", cleanup: null }),
     ...workspaceMenu("w-1", { folder: true }),

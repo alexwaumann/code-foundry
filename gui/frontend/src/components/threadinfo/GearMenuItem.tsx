@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useRef, type ComponentType, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Settings } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -24,12 +24,17 @@ import { cn } from "@/lib/utils";
  * reach the item's own handling (Radix ignores keys whose target is not the item): Enter and
  * Space click the gear, ArrowLeft gives focus back to the item, ArrowUp and ArrowDown do too
  * and then move from it. ArrowRight on the item focuses its gear.
+ *
+ * `item` is the menu's item part: a dropdown's by default, a context menu's on a Projects
+ * page checkout's Run action submenu (CheckoutMenuParts.tsx).
  */
 export function GearMenuItem({
   children,
   onRun,
   onGear,
   gearLabel,
+  gearTestId = "ti-action-gear",
+  item: Item = DropdownMenuItem,
   className,
   ...rest
 }: {
@@ -37,11 +42,13 @@ export function GearMenuItem({
   onRun: () => void;
   onGear: () => void;
   gearLabel: string;
+  gearTestId?: string;
+  item?: ComponentType<GearItemProps>;
   className?: string;
 } & Record<`data-${string}`, string | undefined>) {
   const fromGear = useRef(false);
   return (
-    <DropdownMenuItem
+    <Item
       {...rest}
       className={cn(GEAR_ITEM, className)}
       onClick={(e: MouseEvent<HTMLDivElement>) => {
@@ -65,7 +72,7 @@ export function GearMenuItem({
         tabIndex={-1}
         aria-label={gearLabel}
         data-action-gear=""
-        data-testid="ti-action-gear"
+        data-testid={gearTestId}
         className={GEAR_BUTTON}
         onKeyDown={(e: KeyboardEvent<HTMLButtonElement>) => {
           if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -94,8 +101,17 @@ export function GearMenuItem({
       >
         <Settings aria-hidden className="size-3.5 text-current" />
       </button>
-    </DropdownMenuItem>
+    </Item>
   );
+}
+
+/** What GearMenuItem passes its item part (a dropdown's or a context menu's item takes these). */
+export interface GearItemProps {
+  className?: string;
+  children?: ReactNode;
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
+  onSelect?: (e: Event) => void;
+  onKeyDown?: (e: KeyboardEvent<HTMLDivElement>) => void;
 }
 
 function onGearTarget(t: EventTarget | null): boolean {

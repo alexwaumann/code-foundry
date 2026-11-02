@@ -1,44 +1,42 @@
 import { useShallow } from "zustand/react/shallow";
-import { toast } from "sonner";
-import { FileDiff, Layers, SquarePen, SquareTerminal } from "lucide-react";
-import { ActionsMenu } from "@/components/actions/ActionsMenu";
+import { FolderRoot, Layers } from "lucide-react";
 import { ChecksBadge, PrStateIcon } from "@/components/prs/PrBits";
 import { Tip } from "@/components/ui/tooltip";
-import { copyText } from "@/lib/clipboard";
 import { NavRow } from "@/lib/NavRow";
-import { cn } from "@/lib/utils";
-import { changesCell, checkoutThreads, projectWorktreeKey, syncCell, threadsCell } from "@/lib/projects";
+import { tildify } from "@/lib/path";
+import { threadLabel } from "@/lib/prompt";
+import { changesCell, checkoutColumns, checkoutHasChanges, checkoutThreads, projectWorktreeKey, syncCell, threadOnCheckout, threadsCell, type CheckoutColumns } from "@/lib/projects";
+import { threadBadge } from "@/lib/thread";
 import { worktreeBranch } from "@/lib/threadRow";
-import { useProjectActionIds } from "@/stores/actions";
-import { openChangesTab } from "@/stores/changesPanel";
-import { runCommand } from "@/stores/commands";
-import { composeIn } from "@/stores/compose";
-import { worktreeContext } from "@/stores/context";
+import { useWidth } from "@/lib/useWidth";
+import { useActionsStore } from "@/stores/actions";
 import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
-import { newTerminalIn, removeWorktree } from "@/stores/projectActions";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
 import { useResource } from "@/stores/resource";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { Pill, StatusDot, type PillTone } from "./bits";
-import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
-import { RowAction } from "./RowAction";
+import { CHECKOUT_MENU_PARTS } from "./CheckoutMenuParts";
+import { checkoutMenu, type CheckoutMenuThread } from "./menus";
+import { RowContextMenu } from "./RowContextMenu";
 
-/**
- * Which columns the table has: Sync with a remote and room for it, Pull request on
- * GitHub; `narrow` (the content pane under PROJECT_NARROW_BELOW) tightens them and lays the
- * row actions over the row's end instead of keeping a column for them.
- */
-export interface CheckoutColumns {
-  sync: boolean;
-  pr: boolean;
-  narrow: boolean;
+/** A table column: its header, grid track and test id. */
+interface Column {
+  label: string;
+  track: string;
+  testId: string;
 }
 
-function gridColumns(c: CheckoutColumns): string {
-  if (c.narrow) return ["minmax(0,1fr)", "7rem", "4.5rem", ...(c.sync ? ["6.5rem"] : []), ...(c.pr ? ["6.5rem"] : [])].join(" ");
-  return ["minmax(0,1fr)", "8rem", "6.5rem", ...(c.sync ? ["8rem"] : []), ...(c.pr ? ["9rem"] : []), "7.5rem"].join(" ");
+/** Branch takes the room; the others fit their longest usual text ("1 working · 1 idle", "2 to push · 1 behind", a pill with checks). */
+function tableColumns(c: CheckoutColumns): Column[] {
+  return [
+    { label: "Branch", track: "minmax(0,1fr)", testId: "checkouts-col-branch" },
+    c.threads && { label: "Threads", track: "9.5rem", testId: "checkouts-col-threads" },
+    c.changes && { label: "Changes", track: "6.5rem", testId: "checkouts-col-changes" },
+    c.sync && { label: "Sync", track: "7rem", testId: "checkouts-col-sync" },
+    c.pr && { label: "Pull request", track: "7.5rem", testId: "checkouts-col-pr" },
+  ].filter((x): x is Column => x !== false);
 }
 
 /** Open pull requests read green, drafts neutral, merged blue, closed red (the pill's tint). */
@@ -48,18 +46,17 @@ function prTone(state: string, draft: boolean): PillTone {
   return draft ? "neutral" : "success";
 }
 
-/** The viewer's pull request on the branch (watched while shown), or null. */
-function useBranchPr(projectId: string, branch: string) {
+/** The viewer's pull request on the branch (watched while shown; not on GitHub, nothing), or null. */
+function useBranchPr(projectId: string, branch: string, github: boolean) {
   const slug = useProjectsStore((s) => s.byId[projectId]?.githubSlug.toLowerCase() ?? "");
   const isDefault = useProjectsStore((s) => s.byId[projectId]?.defaultBranch === branch);
-  const entry = useResource(branchPullRequestsResource, slug && branch && !isDefault ? branchKey(slug, branch) : null);
+  const entry = useResource(branchPullRequestsResource, github && slug && branch && !isDefault ? branchKey(slug, branch) : null);
   const pr = entry?.data?.pullRequests[0] ?? null;
   return pr ? { ...pr, repoSlug: pr.repoSlug || slug } : null;
 }
 
-function PrCell({ projectId, branch }: { projectId: string; branch: string }) {
-  const pr = useBranchPr(projectId, branch);
-  if (!pr) return <span className="text-caption text-cf-text-muted">—</span>;
+function PrCell({ pr }: { pr: ReturnType<typeof useBranchPr> }) {
+  if (!pr) return <span className="text-body-sm text-cf-text-muted">—</span>;
   return (
     <Tip label={`#${String(pr.number)} ${pr.title}`}>
       <button
@@ -68,12 +65,8 @@ function PrCell({ projectId, branch }: { projectId: string; branch: string }) {
         className="flex w-fit"
         data-testid="worktree-pr"
         data-state={pr.state}
-        onClick={(e) => {
-          e.stopPropagation();
+        onClick={() => {
           openPullRequestInPanel({ slug: pr.repoSlug, number: pr.number });
-        }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
         }}
       >
         <Pill tone={prTone(pr.state, pr.draft)} className="hover:brightness-110">
@@ -85,43 +78,72 @@ function PrCell({ projectId, branch }: { projectId: string; branch: string }) {
   );
 }
 
-/** worktree.reveal: the checkout in Finder. */
-function revealCheckout(projectId: string, path: string): void {
-  void runCommand("worktree.reveal", { worktree: path }, worktreeContext(projectId, path));
-}
+const SIGNAL = "size-3.5 shrink-0 text-cf-text-muted";
 
-async function copyPath(path: string): Promise<void> {
-  try {
-    await copyText(path);
-    toast.success("Path copied", { description: path });
-  } catch {
-    toast.error("Copy failed");
-  }
-}
-
-/** The row's menu: what the hover actions do, its pull request, Finder and the path, then Remove worktree (not on main). */
-function rowMenu(projectId: string, path: string, isMain: boolean, pr: { slug: string; number: number } | null): OverflowItem[] {
-  const items: OverflowItem[] = [
-    { label: "New thread here", testId: "worktree-menu-new-thread", onSelect: () => { composeIn(projectId, path); } },
-    { label: "New terminal here", testId: "worktree-menu-new-terminal", onSelect: () => void newTerminalIn(projectId, path) },
-    { label: "Show changes", testId: "changes-show-panel", onSelect: () => { openChangesTab("current", projectId, path); } },
-  ];
-  if (pr) items.push({ label: `Open pull request #${String(pr.number)}`, testId: "worktree-open-pr", onSelect: () => { openPullRequestInPanel(pr); } });
-  items.push(
-    "separator",
-    { label: "Open in Finder", testId: "worktree-reveal", onSelect: () => { revealCheckout(projectId, path); } },
-    { label: "Copy path", testId: "worktree-copy-path", onSelect: () => void copyPath(path) },
+/** The main checkout's signal: the project's own folder. */
+function MainSignal({ path }: { path: string }) {
+  return (
+    <Tip
+      className="max-w-[32rem]"
+      label={
+        <>
+          <span className="font-medium">Main checkout</span>
+          <span className="text-cf-text-muted"> · the project folder, {tildify(path)}</span>
+        </>
+      }
+    >
+      <FolderRoot className={SIGNAL} aria-label="Main checkout" data-testid="worktree-main-signal" />
+    </Tip>
   );
-  if (!isMain) items.push("separator", { label: "Remove worktree", destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(projectId, path) });
-  return items;
 }
 
-function RowMenu({ projectId, path, isMain, branch }: { projectId: string; path: string; isMain: boolean; branch: string }) {
-  const pr = useBranchPr(projectId, branch);
-  return <OverflowMenu label="More actions" testId="worktree-more" items={rowMenu(projectId, path, isMain, pr ? { slug: pr.repoSlug, number: pr.number } : null)} />;
+/** A workspace checkout's signal; its card names the workspace, its projects and the threads on the checkout from it. */
+function WorkspaceSignal({ workspaceId, path }: { workspaceId: string; path: string }) {
+  const name = useWorkspacesStore((s) => s.byId[workspaceId]?.name ?? "");
+  const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId)));
+  const members = useProjectsStore(useShallow((s) => memberIds.map((p) => s.byId[p]?.name ?? p)));
+  const threads = useThreadsStore(
+    useShallow((s) =>
+      s.order.flatMap((id) => {
+        const t = s.byId[id];
+        return t && t.archivedAtMs === null && t.workspaceId === workspaceId && threadOnCheckout(t, path) ? [threadLabel(t.name, t.id)] : [];
+      }),
+    ),
+  );
+  if (!name) return null;
+  return (
+    <Tip
+      className="w-[260px]"
+      label={
+        <span className="flex flex-col gap-0.5" data-testid="worktree-workspace-card">
+          <span className="flex items-center gap-1.5 font-medium">
+            <Layers className="size-3.5 shrink-0" aria-hidden />
+            <span className="min-w-0 truncate">{name}</span>
+          </span>
+          <span className="text-cf-text-muted">Workspace · {members.join(", ")}</span>
+          {threads.length > 0 && (
+            <span className="text-cf-text-muted">
+              {threads.length === 1 ? "1 thread" : `${String(threads.length)} threads`} · {threads.join(", ")}
+            </span>
+          )}
+        </span>
+      }
+    >
+      <Layers className={SIGNAL} aria-label={`Workspace ${name}`} data-testid="worktree-workspace-signal" data-workspace={workspaceId} />
+    </Tip>
+  );
 }
 
-function CheckoutRow({ projectId, path, columns }: { projectId: string; path: string; columns: CheckoutColumns }) {
+/** The checkout's open threads for its menu, in the store's order, read when the menu opens. */
+function menuThreads(path: string): CheckoutMenuThread[] {
+  const s = useThreadsStore.getState();
+  return s.order.flatMap((id) => {
+    const t = s.byId[id];
+    return t && t.archivedAtMs === null && threadOnCheckout(t, path) ? [{ id, name: threadLabel(t.name, id), badge: threadBadge(t) }] : [];
+  });
+}
+
+function CheckoutRow({ projectId, path, columns, template }: { projectId: string; path: string; columns: CheckoutColumns; template: string }) {
   const branch = useProjectsStore((s) => worktreeBranch(s, projectId, path));
   const realBranch = useProjectsStore((s) => findWorktree(s, projectId, path)?.branch ?? "");
   const isMain = useProjectsStore((s) => findWorktree(s, projectId, path)?.isMain ?? false);
@@ -133,95 +155,93 @@ function CheckoutRow({ projectId, path, columns }: { projectId: string; path: st
     const st = findWorktree(s, projectId, path)?.status;
     return st ? syncCell(st) : "";
   });
-  const { working, idle, workspaceId } = useThreadsStore(useShallow((s) => {
-    const t = checkoutThreads(s, path);
-    return { working: t.working, idle: t.idle, workspaceId: t.workspaceId };
-  }));
-  const workspace = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? "") : ""));
-  const hasActions = useProjectActionIds(projectId).length > 0;
+  const { working, idle, workspaceId } = useThreadsStore(
+    useShallow((s) => {
+      const t = checkoutThreads(s, path);
+      return { working: t.working, idle: t.idle, workspaceId: t.workspaceId };
+    }),
+  );
+  const pr = useBranchPr(projectId, realBranch, columns.pr);
+  const items = () => {
+    const st = findWorktree(useProjectsStore.getState(), projectId, path)?.status;
+    return checkoutMenu({
+      projectId,
+      path,
+      branch: realBranch,
+      isMain,
+      threads: menuThreads(path),
+      changed: st ? checkoutHasChanges(st) : false,
+      pr: pr ? { slug: pr.repoSlug, number: pr.number } : null,
+      actions: (useActionsStore.getState().byProject[projectId]?.length ?? 0) > 0,
+    });
+  };
   return (
-    <NavRow navKey={projectWorktreeKey(projectId, path)} activateOnClick className="group/row rounded-none border-b border-cf-divider last:border-b-0" tip={path} tipWhenTruncated>
-      <span className="relative grid min-h-11 w-full items-center gap-x-3 px-3.5" style={{ gridTemplateColumns: gridColumns(columns) }} data-testid="project-worktree" data-path={path} data-main={isMain || undefined}>
-        <span className="flex min-w-0 items-center gap-2">
-          <StatusDot live={working > 0} />
-          <span className="min-w-0 truncate text-code" data-testid="worktree-branch">
-            {branch}
+    <RowContextMenu navKey={projectWorktreeKey(projectId, path)} testId="checkout-menu" items={items} parts={CHECKOUT_MENU_PARTS}>
+      <NavRow navKey={projectWorktreeKey(projectId, path)} passive className="h-9 rounded-md">
+        <span className="grid h-full items-center gap-3 px-2 text-body" style={{ gridTemplateColumns: template }} data-testid="project-worktree" data-path={path} data-main={isMain || undefined}>
+          <span className="flex min-w-0 items-center gap-2">
+            <StatusDot live={working > 0} />
+            <Tip label={tildify(path)} align="start">
+              <span className="min-w-0 truncate text-code" data-testid="worktree-branch">
+                {branch}
+              </span>
+            </Tip>
+            {isMain && <MainSignal path={path} />}
+            {workspaceId && <WorkspaceSignal workspaceId={workspaceId} path={path} />}
           </span>
-          {isMain && (
-            <Pill small data-testid="worktree-main-tag">
-              main
-            </Pill>
+          {columns.threads && (
+            <span className="truncate text-body-sm text-cf-text-secondary" data-testid="worktree-threads">
+              {threadsCell(working, idle)}
+            </span>
           )}
-          {workspace && (
-            <Pill small data-testid="worktree-workspace-tag">
-              <Layers aria-hidden />
-              {workspace}
-            </Pill>
+          {columns.changes && (
+            <span className="truncate text-body-sm text-cf-text-secondary" data-testid="worktree-changes-cell">
+              {changes}
+            </span>
+          )}
+          {columns.sync && (
+            <span className="truncate text-body-sm text-cf-text-secondary" data-testid="worktree-sync">
+              {sync}
+            </span>
+          )}
+          {columns.pr && (
+            <span className="flex min-w-0 items-center">
+              <PrCell pr={pr} />
+            </span>
           )}
         </span>
-        <span className="truncate text-body-sm text-cf-text-secondary" data-testid="worktree-threads">
-          {threadsCell(working, idle)}
-        </span>
-        <span className="truncate text-body-sm text-cf-text-secondary" data-testid="worktree-changes-cell">
-          {changes}
-        </span>
-        {columns.sync && (
-          <span className="truncate text-body-sm text-cf-text-secondary" data-testid="worktree-sync">
-            {sync}
-          </span>
-        )}
-        {columns.pr && (
-          <span className="flex min-w-0 items-center">
-            <PrCell projectId={projectId} branch={realBranch} />
-          </span>
-        )}
-        <span
-          className={cn(
-            "flex items-center justify-end opacity-0 transition-opacity group-hover/row:opacity-100 group-aria-selected/row:opacity-100 has-[[aria-expanded=true]]:opacity-100",
-            // Narrow: over the row's end, on the row's own hover colour, so no column is kept for them.
-            columns.narrow && "pointer-events-none absolute inset-y-0 right-0 bg-cf-surface group-hover/row:pointer-events-auto group-aria-selected/row:pointer-events-auto has-[[aria-expanded=true]]:pointer-events-auto",
-          )}
-          data-testid="worktree-actions"
-        >
-          <span className={cn("flex h-full items-center", columns.narrow && "bg-cf-control-hover/50 pr-3.5 pl-2")}>
-          <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(projectId, path); }}>
-            <SquarePen />
-          </RowAction>
-          <RowAction label="New terminal here" testId="worktree-new-terminal" onClick={() => void newTerminalIn(projectId, path)}>
-            <SquareTerminal />
-          </RowAction>
-          <RowAction label="Show changes" testId="worktree-show-changes" onClick={() => { openChangesTab("current", projectId, path); }}>
-            <FileDiff />
-          </RowAction>
-          {hasActions && <ActionsMenu projectId={projectId} owner={{ kind: "worktree", projectId, path }} from="projects" testId="worktree-actions-menu" />}
-          <RowMenu projectId={projectId} path={path} isMain={isMain} branch={realBranch} />
-          </span>
-        </span>
-      </span>
-    </NavRow>
+      </NavRow>
+    </RowContextMenu>
   );
 }
 
 /**
- * The project's checkouts a thread is on (and main; pageHooks.ts useCheckoutOrder) as a table: Branch (with a "main" or workspace tag) | Threads |
- * Changes | Sync | Pull request | hover actions. Click or Enter opens the checkout's Changes
- * tab in the page's side panel.
+ * The project's checkouts a thread is on (and main; pageHooks.ts useCheckoutOrder), in the
+ * Projects index's table grammar: Branch (a FolderRoot on main, Layers on a workspace's
+ * checkout) | Threads | Changes | Sync (with a remote) | Pull request (on GitHub). The columns
+ * drop by the table's own width (lib/projects.ts checkoutColumns). A row has no click and no
+ * hover tint: its right-click menu (menus.ts checkoutMenu) holds what it does, the keyboard's
+ * ContextMenu key or Shift+F10 opens it on the cursor's row. docs/notes/project-page-2-checkouts.md.
  */
-export function CheckoutsTable({ projectId, paths, columns }: { projectId: string; paths: readonly string[]; columns: CheckoutColumns }) {
+export function CheckoutsTable({ projectId, paths, remote, github }: { projectId: string; paths: readonly string[]; remote: boolean; github: boolean }) {
+  const [ref, width] = useWidth(1100);
+  const columns = checkoutColumns(width, { remote, github });
+  const cols = tableColumns(columns);
+  const template = cols.map((c) => c.track).join(" ");
   return (
-    <div className="overflow-hidden rounded-lg border bg-cf-surface" data-testid="checkouts-table">
-      <div className="grid h-8 items-center gap-x-3 border-b border-cf-divider px-3.5 text-caption text-cf-text-muted" style={{ gridTemplateColumns: gridColumns(columns) }} data-testid="checkouts-head">
-        <span>Branch</span>
-        <span>Threads</span>
-        <span>Changes</span>
-        {columns.sync && <span data-testid="checkouts-col-sync">Sync</span>}
-        {columns.pr && <span data-testid="checkouts-col-pr">Pull request</span>}
-        {!columns.narrow && <span aria-hidden />}
+    <div ref={ref} className="rounded-lg border" data-testid="checkouts-table" data-columns={cols.map((c) => c.label).join(",")}>
+      <div className="grid gap-3 border-b px-2 py-1 text-overline" style={{ gridTemplateColumns: template }} data-testid="checkouts-head">
+        {cols.map((c) => (
+          <span key={c.label} className="truncate" data-testid={c.testId}>
+            {c.label}
+          </span>
+        ))}
       </div>
-      {paths.map((p) => (
-        <CheckoutRow key={p} projectId={projectId} path={p} columns={columns} />
-      ))}
+      <div className="p-0.5">
+        {paths.map((p) => (
+          <CheckoutRow key={p} projectId={projectId} path={p} columns={columns} template={template} />
+        ))}
+      </div>
     </div>
   );
 }
-

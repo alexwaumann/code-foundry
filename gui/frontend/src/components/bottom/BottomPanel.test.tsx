@@ -368,7 +368,8 @@ describe("shells", () => {
       </>,
     );
     await settle();
-    fireEvent.click(document.querySelector(`[data-nav-key="pw:repo-dot::${DOT}"] [data-testid="worktree-new-terminal"]`) as HTMLElement);
+    fireEvent.contextMenu(document.querySelector(`[data-nav-key="pw:repo-dot::${DOT}"]`) as HTMLElement);
+    fireEvent.click(screen.getByTestId("checkout-menu-new-terminal"));
     await settle();
     expect(lastInvocation("terminal.new")?.context).toMatchObject({ activeProjectId: "repo-dot", activeWorktreePath: DOT, activeThreadId: "" });
     expect(tabTexts()).toEqual(["feat-sidebar", "feat-sidebar 2", "dotfiles"]);

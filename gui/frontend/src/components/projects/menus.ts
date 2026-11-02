@@ -1,12 +1,19 @@
+import { toast } from "sonner";
+import { copyText } from "@/lib/clipboard";
 import type { ProjectKind, ProjectNextStep } from "@/lib/projects";
+import type { ThreadBadge } from "@/lib/thread";
+import { openChangesTab } from "@/stores/changesPanel";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
-import { cleanupMergedWorktrees, initGitIn, newTerminalIn, publishProject, revealProject, unregisterProject } from "@/stores/projectActions";
+import { openPullRequestInPanel } from "@/stores/prPanel";
+import { cleanupMergedWorktrees, initGitIn, newTerminalIn, publishProject, removeWorktree, revealProject, unregisterProject } from "@/stores/projectActions";
 import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
 import { startProjectRename } from "@/stores/projectRename";
 import { openWorkspaceAddProject } from "@/stores/workspaceAddProject";
 import { newWorkspaceTerminal, removeWorkspace, revealWorkspace } from "@/stores/workspaceActions";
 import { startWorkspaceRename } from "@/stores/workspaceRename";
 import type { OverflowItem } from "./OverflowMenu";
+import type { RowMenuEntry } from "./rowMenu";
+import { openThread } from "./workspaceHooks";
 
 /** What a project's menu depends on (the rest is read when an item runs). */
 export interface ProjectMenuFacts {
@@ -59,5 +66,80 @@ export function workspaceMenu(workspaceId: string, { folder }: { folder: boolean
     "separator",
     { label: "Remove workspace", destructive: true, testId: "workspace-menu-remove", onSelect: () => void removeWorkspace(workspaceId) },
   );
+  return items;
+}
+
+/** A thread on a checkout, as its menu lists it. */
+export interface CheckoutMenuThread {
+  id: string;
+  /** Its label (lib/prompt.ts threadLabel: the id when it has no name yet). */
+  name: string;
+  badge: ThreadBadge;
+}
+
+/** What a checkout's menu depends on, read when it opens. */
+export interface CheckoutMenuFacts {
+  projectId: string;
+  path: string;
+  /** Its branch; "" when HEAD is detached (no Copy branch name). */
+  branch: string;
+  isMain: boolean;
+  /** Its open (not archived) threads. */
+  threads: readonly CheckoutMenuThread[];
+  /** Uncommitted files or commits ahead of its base (lib/projects.ts checkoutHasChanges). */
+  changed: boolean;
+  pr: { slug: string; number: number } | null;
+  /** The project has actions. */
+  actions: boolean;
+}
+
+/** The parts of a checkout's menu drawn by CheckoutMenuParts.tsx: two submenus and the split Open in Finder item. */
+export type CheckoutMenuPart =
+  | { kind: "threads"; testId: string; threads: readonly CheckoutMenuThread[] }
+  | { kind: "open-in"; testId: string; projectId: string; path: string }
+  | { kind: "actions"; testId: string; projectId: string; path: string };
+
+/** Copies `text`, saying so in a toast (a menu item has no other place to). */
+async function copyWithToast(text: string, what: string): Promise<void> {
+  try {
+    await copyText(text);
+    toast.success(`${what} copied`, { description: text });
+  } catch {
+    toast.error("Copy failed");
+  }
+}
+
+/**
+ * A checkout's right-click menu on its project's page (docs/notes/project-page-2-checkouts.md):
+ * Open thread (a submenu of its threads; `Open “<name>”` for exactly one; nothing with none),
+ * New thread here, New terminal here; Show changes (with something to show) and Open pull
+ * request #N (with one); Open in Finder (a split item whose › opens the apps), Copy path, Copy
+ * branch name (on a branch), Run action (a submenu, when the project has actions); Remove
+ * worktree (not on main). Text only, like every Projects page menu.
+ */
+export function checkoutMenu(f: CheckoutMenuFacts): RowMenuEntry<CheckoutMenuPart>[] {
+  const { projectId, path } = f;
+  const items: RowMenuEntry<CheckoutMenuPart>[] = [];
+  const only = f.threads.length === 1 ? f.threads[0] : undefined;
+  if (only) items.push({ label: `Open “${only.name}”`, testId: "checkout-menu-open-thread", onSelect: () => { openThread(only.id); } });
+  else if (f.threads.length > 1) items.push({ kind: "threads", testId: "checkout-menu-threads", threads: f.threads });
+  items.push(
+    { label: "New thread here", testId: "checkout-menu-new-thread", onSelect: () => { composeIn(projectId, path); } },
+    { label: "New terminal here", testId: "checkout-menu-new-terminal", onSelect: () => void newTerminalIn(projectId, path) },
+  );
+  const look: OverflowItem[] = [];
+  if (f.changed) look.push({ label: "Show changes", testId: "checkout-menu-changes", onSelect: () => { openChangesTab("current", projectId, path); } });
+  const pr = f.pr;
+  if (pr) look.push({ label: `Open pull request #${String(pr.number)}`, testId: "checkout-menu-pr", onSelect: () => { openPullRequestInPanel(pr); } });
+  if (look.length > 0) items.push("separator", ...look);
+  items.push(
+    "separator",
+    { kind: "open-in", testId: "checkout-menu-open-in", projectId, path },
+    { label: "Copy path", testId: "checkout-menu-copy-path", onSelect: () => void copyWithToast(path, "Path") },
+  );
+  const branch = f.branch;
+  if (branch) items.push({ label: "Copy branch name", testId: "checkout-menu-copy-branch", onSelect: () => void copyWithToast(branch, "Branch name") });
+  if (f.actions) items.push({ kind: "actions", testId: "checkout-menu-actions", projectId, path });
+  if (!f.isMain) items.push("separator", { label: "Remove worktree", destructive: true, testId: "checkout-menu-remove", onSelect: () => void removeWorktree(projectId, path) });
   return items;
 }

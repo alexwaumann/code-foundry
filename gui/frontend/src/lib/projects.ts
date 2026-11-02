@@ -446,7 +446,7 @@ export function actionsDetail(names: readonly string[]): string {
 /** A project page's title block and Details drop to their compact layout (no slug, Open in Finder's icon only) below this content width. */
 export const PROJECT_TITLE_COMPACT_BELOW = 720;
 
-/** The narrow layout of a project page (the Checkouts table's Sync column drops, the leftover rows' Remove shows its icon only) below this content width. */
+/** The narrow layout of a project page (the leftover rows' Remove shows its icon only; the Checkouts table drops its own columns, CHECKOUT_DROP_BELOW) below this content width. */
 export const PROJECT_NARROW_BELOW = 840;
 
 /** The Projects index's optional columns (Project and Needs a look always show). */
@@ -463,6 +463,34 @@ export const INDEX_DROP_BELOW = { activity: PROJECT_NARROW_BELOW, updated: 700, 
 /** The index's columns at a content width (the scroll box's, which the side panel takes from). */
 export function indexColumns(width: number): IndexColumns {
   return { activity: width >= INDEX_DROP_BELOW.activity, updated: width >= INDEX_DROP_BELOW.updated, branch: width >= INDEX_DROP_BELOW.branch };
+}
+
+/** The Checkouts table's optional columns (Branch and, on GitHub, Pull request always show). */
+export interface CheckoutColumns {
+  threads: boolean;
+  changes: boolean;
+  /** With a remote and room for it. */
+  sync: boolean;
+  /** On GitHub. */
+  pr: boolean;
+}
+
+/** The table widths the Checkouts table drops its columns below: Sync first, then Threads, then Changes. */
+export const CHECKOUT_DROP_BELOW = { sync: 900, threads: 720, changes: 560 } as const;
+
+/** The Checkouts table's columns at its own width (the side panel takes from it), for a project with or without a remote, on GitHub or not. */
+export function checkoutColumns(width: number, project: { remote: boolean; github: boolean }): CheckoutColumns {
+  return {
+    threads: width >= CHECKOUT_DROP_BELOW.threads,
+    changes: width >= CHECKOUT_DROP_BELOW.changes,
+    sync: project.remote && width >= CHECKOUT_DROP_BELOW.sync,
+    pr: project.github,
+  };
+}
+
+/** A checkout has something to show in its Changes tab: uncommitted files, or commits ahead of its base. */
+export function checkoutHasChanges(st: Pick<GitStatusView, "staged" | "modified" | "untracked" | "conflicted" | "dirty" | "baseAhead">): boolean {
+  return st.dirty || st.staged + st.modified + st.untracked + (st.conflicted ?? 0) > 0 || (st.baseAhead ?? 0) > 0;
 }
 
 /** An index row's Default branch cell; null shows "—". */

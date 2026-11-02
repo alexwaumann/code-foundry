@@ -6,7 +6,7 @@ import { copyText } from "@/lib/clipboard";
 import { NavRow } from "@/lib/NavRow";
 import { threadLabel } from "@/lib/prompt";
 import { isWorking } from "@/lib/projects";
-import { threadBadge, type ThreadBadge } from "@/lib/thread";
+import { BADGE_WORD, threadBadge, type ThreadBadge } from "@/lib/thread";
 import { cn } from "@/lib/utils";
 import { memberCheckoutPath, memberCheckoutState, workspaceThreadKey } from "@/lib/workspacePage";
 import { openChangesTab } from "@/stores/changesPanel";
@@ -27,7 +27,6 @@ function gridColumns(members: number): string {
   return ["minmax(9rem,1.2fr)", "minmax(9rem,1fr)", ...Array.from({ length: members }, () => "minmax(8rem,1fr)"), "3.5rem"].join(" ");
 }
 
-const STATUS_WORD: Record<ThreadBadge, string> = { busy: "working", idle: "idle", attention: "needs you", error: "error", unknown: "idle" };
 const STATUS_TONE: Record<ThreadBadge, string> = { busy: "text-cf-info-text", idle: "", attention: "text-cf-warning-text", error: "text-cf-error-text", unknown: "" };
 
 async function copyPath(path: string): Promise<void> {
@@ -115,7 +114,7 @@ function ThreadRow({ workspaceId, threadId, members, first }: { workspaceId: str
           <span className="min-w-0 truncate">{name}</span>
           <span aria-hidden>·</span>
           <span className={cn("shrink-0", STATUS_TONE[badge])} data-testid="thread-status" data-status={badge}>
-            {STATUS_WORD[badge]}
+            {BADGE_WORD[badge]}
           </span>
         </span>
         {members.map((p) => (
