@@ -194,9 +194,11 @@ test("the panes start a shell gap (12px) from the top and their 44px headers dra
     // the band's centre (the app name, the traffic lights).
     expect(Math.abs((header.top + header.bottom - 1) / 2 - CENTER)).toBeLessThanOrEqual(0.5);
     expect(await drag(page, '[data-testid="thread-header"]')).toBe("drag");
-    // The title is a button (its menu): it does not drag; the crumb's place is text and does.
+    // The title is a button (its menu) and the crumb's place a link (its project's page): they
+    // do not drag; the crumb around them (its separators) does.
     expect(await drag(page, '[data-testid="thread-title"]')).toBe("no-drag");
-    expect(await drag(page, '[data-testid="thread-crumb-place"]')).toBe("drag");
+    expect(await drag(page, '[data-testid="thread-crumb-place-link"]')).toBe("no-drag");
+    expect(await drag(page, '[data-testid="thread-crumb"]')).toBe("drag");
     expect(await drag(page, '[data-testid="pane-actions"]')).toBe("no-drag");
     // The conversation itself never drags.
     expect(await drag(page, '[data-testid="thread-timeline"]')).toBe("");
