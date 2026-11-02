@@ -850,7 +850,11 @@ func (r *runner) streamCd(req cdRequest) {
 		return
 	}
 	r.cwd = req.path
-	r.tail.cwd = req.path
+	if res.TranscriptRelocated {
+		r.tail.relocated(req.path)
+	} else {
+		r.tail.cwd = req.path
+	}
 	if req.move != nil {
 		r.onMoved(req.move, res.TranscriptRelocated)
 		return

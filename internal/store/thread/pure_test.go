@@ -328,6 +328,56 @@ func TestTailerSplitsLinesAcrossReads(t *testing.T) {
 	}
 }
 
+// set_cwd relocated the transcript (a copy under the new cwd's dir, the old one gone):
+// the tailer reads on from the same offset at the new path, without a second discovery.
+func TestTailerFollowsARelocatedTranscript(t *testing.T) {
+	dir := t.TempDir()
+	paths := ClaudePaths{Dir: filepath.Join(dir, "claude")}
+	home, wt := filepath.Join(dir, "home"), filepath.Join(dir, "wt")
+	writeAt := func(cwd, text string) string {
+		t.Helper()
+		pdir := paths.projectDir(cwd)
+		if err := os.MkdirAll(pdir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(pdir, "abc.jsonl")
+		f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = f.Close() }()
+		if _, err := f.WriteString(text); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	old := writeAt(home, "{\"a\":1}\n")
+	tl := newTailer(paths, home)
+	defer tl.close()
+	tl.follow("abc", false)
+	if lines, found := tl.poll(); !found || len(lines) != 1 {
+		t.Fatalf("first poll = %q, %v", lines, found)
+	}
+	writeAt(wt, "{\"a\":1}\n")
+	if err := os.Remove(old); err != nil {
+		t.Fatal(err)
+	}
+	tl.relocated(wt)
+	writeAt(wt, "{\"b\":2}\n")
+	lines, found := tl.poll()
+	if found || len(lines) != 1 || string(lines[0]) != `{"b":2}` {
+		t.Fatalf("poll after the move = %q, %v", lines, found)
+	}
+	if want := filepath.Join(paths.projectDir(wt), "abc.jsonl"); tl.path != want {
+		t.Errorf("path = %s, want %s", tl.path, want)
+	}
+	// Relocated to where it already is: nothing changes.
+	tl.relocated(wt)
+	if tl.f == nil || tl.moved {
+		t.Error("a relocation to the same path reopened the file")
+	}
+}
+
 func TestPidSessionID(t *testing.T) {
 	dir := t.TempDir()
 	paths := ClaudePaths{Dir: dir}
