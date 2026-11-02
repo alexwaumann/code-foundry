@@ -5,7 +5,6 @@ import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { shortAge } from "@/components/prs/format";
-import { ChecksBadge } from "@/components/prs/PrBits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
@@ -15,7 +14,6 @@ import { useWidth } from "@/lib/useWidth";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import {
-  defaultBranchCell,
   filterProjects,
   indexColumns,
   prCountLabel,
@@ -35,18 +33,18 @@ import {
 import { cn } from "@/lib/utils";
 import { startCommandNamed } from "@/keys/bindings";
 import { openAddProject, type AddProjectTab } from "@/stores/addProject";
-import { branchKey, branchPullRequestsResource, openUrl, repoActivityResource } from "@/stores/gh";
+import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { addProject, initGitIn, publishProject } from "@/stores/projectActions";
 import { useProjectsStore } from "@/stores/projects";
 import { endProjectRename, useProjectRenameStore } from "@/stores/projectRename";
-import { useResource } from "@/stores/resource";
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
 import { projectPage, useUiStore, workspacePage } from "@/stores/ui";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { endWorkspaceRename, useWorkspaceRenameStore } from "@/stores/workspaceRename";
-import { KindIcon, Pill, StatusDot, WorkspaceIcon } from "./bits";
+import { KindIcon, Pill, SectionHeader, StatusDot, WorkspaceIcon } from "./bits";
+import { DefaultBranch } from "./DefaultBranch";
 import { usePageScroll } from "./pageHooks";
 import { useProjectKind } from "@/components/icons/projectKind";
 import { projectMenu, workspaceMenu } from "./menus";
@@ -142,67 +140,9 @@ function IndexTable({ columns, testId, children }: { columns: readonly Column[];
   );
 }
 
-/** A section's title, its row count, a muted hint and its Add button at the right. */
-function SectionTitle({ heading, count, hint, action }: { heading: string; count: number; hint?: string; action: React.ReactNode }) {
-  return (
-    <div className="mb-2 flex min-h-7 items-center gap-2">
-      <h2 className="shrink-0 text-title">{heading}</h2>
-      <span className="shrink-0 text-caption text-cf-text-muted tabular-nums" data-testid="index-section-count">
-        ({count})
-      </span>
-      {hint && <span className="min-w-0 truncate text-caption text-cf-text-muted">· {hint}</span>}
-      <span className="ml-auto flex shrink-0 items-center [--wails-draggable:no-drag]">{action}</span>
-    </div>
-  );
-}
-
 /** The NavRow (cursor, hover); its inner span is the row's grid. */
 const ROW = "h-9 rounded-md";
 const ROW_INNER = "grid h-full items-center gap-3 px-2 text-body";
-
-/**
- * The project's default branch and its checks (the daemon polls every tracked GitHub
- * repository's), watched while the row shows. A click on failing checks opens the first
- * failed one; "—" off GitHub and until the status arrives.
- */
-function DefaultBranch({ projectId }: { projectId: string }) {
-  const slug = useProjectsStore((s) => s.byId[projectId]?.githubSlug.toLowerCase() ?? "");
-  const entry = useResource(repoActivityResource, slug === "" ? null : slug);
-  const cell = defaultBranchCell(slug, entry?.data?.defaultBranch);
-  if (!cell) {
-    return (
-      <span className="text-body-sm text-cf-text-muted" data-testid="index-default-branch">
-        —
-      </span>
-    );
-  }
-  const url = cell.failingUrl;
-  return (
-    <span className="flex min-w-0 items-center gap-2" data-testid="index-default-branch">
-      <span className="min-w-0 shrink truncate font-mono text-caption text-cf-text-muted" data-testid="index-default-branch-name">
-        {cell.branch}
-      </span>
-      {url ? (
-        <button
-          type="button"
-          tabIndex={-1}
-          className="flex min-w-0 shrink-0 hover:underline"
-          data-testid="index-checks"
-          onClick={(e) => {
-            e.stopPropagation();
-            void openUrl(url);
-          }}
-        >
-          <ChecksBadge checks={cell.rollup} />
-        </button>
-      ) : (
-        <span className="flex min-w-0 shrink-0" data-testid="index-checks">
-          <ChecksBadge checks={cell.rollup} />
-        </span>
-      )}
-    </span>
-  );
-}
 
 function ProjectRow({ id, columns, cols }: { id: string; columns: IndexColumns; cols: string }) {
   const name = useProjectsStore((s) => s.byId[id]?.name ?? id);
@@ -532,10 +472,10 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
               <>
                 {projects.length > 0 && (
                   <section data-testid="projects-section">
-                    <SectionTitle
-                      heading="Projects"
+                    <SectionHeader
+                      label="Projects"
                       count={projects.length}
-                      action={
+                      right={
                         <Button type="button" variant="outline" size="sm" className="h-7" data-testid="projects-register" onClick={() => { addProject(); }}>
                           <FolderPlus />
                           Add project
@@ -551,11 +491,11 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
                 )}
                 {(workspaces.length > 0 || (!filtering && wsOrder.length === 0)) && (
                   <section data-testid="workspaces-section">
-                    <SectionTitle
-                      heading="Workspaces"
+                    <SectionHeader
+                      label="Workspaces"
                       count={workspaces.length}
-                      hint="sets of projects threads start in together"
-                      action={
+                      detail="sets of projects threads start in together"
+                      right={
                         <Button type="button" variant="outline" size="sm" className="h-7" data-testid="projects-new-workspace" onClick={() => { openNewWorkspaceDialog(); }}>
                           <Layers />
                           Add workspace

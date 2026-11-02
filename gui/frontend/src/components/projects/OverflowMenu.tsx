@@ -2,6 +2,7 @@ import { useRef, type ComponentType, type ReactNode } from "react";
 import { Ellipsis } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 /**
  * One item of a Projects page menu (a header's or row's ⋯, a row's context menu); "separator" draws a line.
@@ -63,7 +64,7 @@ const DROPDOWN_PARTS: MenuParts = { Item: DropdownMenuItem, Separator: DropdownM
  * or the palette the item opened (and their focus scopes select the input on return, so
  * the next keystroke replaced what was typed).
  */
-export function OverflowMenu({ label, items, testId }: { label: string; items: readonly OverflowItem[]; testId: string }) {
+export function OverflowMenu({ label, items, testId, size = "sm" }: { label: string; items: readonly OverflowItem[]; testId: string; /** "md": a page title block's (28px, a 16px glyph); "sm": a row's. */ size?: "sm" | "md" }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const picked = useRef<(() => void) | null>(null);
   return (
@@ -76,7 +77,10 @@ export function OverflowMenu({ label, items, testId }: { label: string; items: r
             tabIndex={-1}
             aria-label={label}
             data-testid={testId}
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text [&_svg]:size-3.5"
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text",
+              size === "md" ? "size-7 [&_svg]:size-4" : "size-6 [&_svg]:size-3.5",
+            )}
             onClick={(e) => {
               e.stopPropagation();
             }}

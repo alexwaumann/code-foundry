@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   actionsDetail,
   changesCell,
-  checkoutsSummary,
+  checkoutsHint,
   checkoutThreads,
   defaultBranchCell,
   filterProjects,
@@ -16,6 +16,7 @@ import {
   projectRef,
   projectStatusSentence,
   refreshedText,
+  refreshFailedText,
   remoteDetail,
   sortByActivity,
   sortCheckouts,
@@ -396,11 +397,17 @@ describe("sortCheckouts", () => {
 });
 
 describe("details and summaries", () => {
-  it("checkoutsSummary", () => {
-    expect(checkoutsSummary(6, 2)).toBe("main plus 5 worktrees · 2 threads working");
-    expect(checkoutsSummary(2, 0)).toBe("main plus 1 worktree");
-    expect(checkoutsSummary(1, 1)).toBe("main only · 1 thread working");
-    expect(checkoutsSummary(1, 0)).toBe("main only");
+  it("checkoutsHint", () => {
+    expect(checkoutsHint(2)).toBe("2 threads working");
+    expect(checkoutsHint(1)).toBe("1 thread working");
+    expect(checkoutsHint(0)).toBe("");
+  });
+  it.each<[string, number | null, string]>([
+    ["minutes", NOW - 14 * 60_000, "Refresh failed · 14m ago"],
+    ["just now", NOW - 5_000, "Refresh failed · just now"],
+    ["never read", null, "Refresh failed"],
+  ])("refreshFailedText: %s", (_name, at, want) => {
+    expect(refreshFailedText(at, NOW)).toBe(want);
   });
   it.each<[string, number | null, number, boolean, string]>([
     ["just now", NOW - 5_000, NOW, false, "refreshed just now"],
@@ -417,22 +424,22 @@ describe("details and summaries", () => {
     expect(remoteDetail({ githubSlug: "", remotes: ["origin"] })).toBe("origin · pull requests need GitHub");
     expect(remoteDetail({ githubSlug: "", remotes: [] })).toBe("");
   });
-  it("worktreesDetail: the folder they share and the count", () => {
-    expect(worktreesDetail(["/tmp/x.worktrees/a", "/tmp/x.worktrees/b"])).toBe("/tmp/x.worktrees · 2");
-    expect(worktreesDetail(["/tmp/wt/cf/a", "/tmp/wt/gp/b"])).toBe("/tmp/wt · 2");
-    expect(worktreesDetail(["/a/x", "/b/y"])).toBe("2");
-    expect(worktreesDetail([])).toBe("");
-  });
-  it("worktreesDetail: how many Code Foundry made", () => {
-    const two = ["/tmp/x.worktrees/a", "/tmp/x.worktrees/b"];
-    expect(worktreesDetail(two, 1)).toBe("/tmp/x.worktrees · 2, 1 made by Code Foundry");
-    expect(worktreesDetail(two, 2)).toBe("/tmp/x.worktrees · 2 made by Code Foundry");
-    expect(worktreesDetail(two, 0)).toBe("/tmp/x.worktrees · 2");
-    expect(worktreesDetail(["/a/x", "/b/y"], 1)).toBe("2, 1 made by Code Foundry");
+  it.each<[string, string[], number, string]>([
+    ["shared folder, none made", ["/tmp/x.worktrees/a", "/tmp/x.worktrees/b"], 0, "2 in /tmp/x.worktrees"],
+    ["nested folders", ["/tmp/wt/cf/a", "/tmp/wt/gp/b"], 0, "2 in /tmp/wt"],
+    ["no shared folder", ["/a/x", "/b/y"], 0, "2"],
+    ["none", [], 0, ""],
+    ["some made", ["/tmp/x.worktrees/a", "/tmp/x.worktrees/b"], 1, "2 · 1 made by Code Foundry, in /tmp/x.worktrees"],
+    ["all made", ["/tmp/x.worktrees/a", "/tmp/x.worktrees/b"], 2, "2 · all made by Code Foundry, in /tmp/x.worktrees"],
+    ["the one made", ["/tmp/x.worktrees/a"], 1, "1 · made by Code Foundry, in /tmp/x.worktrees"],
+    ["some made, no shared folder", ["/a/x", "/b/y"], 1, "2 · 1 made by Code Foundry"],
+    ["only the home folder shared", ["/Users/me/a/x", "/Users/me/b/y"], 1, "2 · 1 made by Code Foundry"],
+  ])("worktreesDetail: %s", (_name, paths, managed, want) => {
+    expect(worktreesDetail(paths, managed)).toBe(want);
   });
   it("actionsDetail", () => {
-    expect(actionsDetail(0)).toBe("none");
-    expect(actionsDetail(1)).toBe("1 project action");
-    expect(actionsDetail(2)).toBe("2 project actions");
+    expect(actionsDetail([])).toBe("none");
+    expect(actionsDetail(["Dev"])).toBe("Dev");
+    expect(actionsDetail(["Dev", "Test", "Build"])).toBe("Dev · Test · Build");
   });
 });

@@ -81,7 +81,8 @@ test.describe("screenshots", () => {
 
       // The Projects page: t-top, and a shell from dotfiles' page.
       await openProjectPage(page, "repo-dot");
-      await page.getByTestId("project-terminal").click();
+      await page.getByTestId("project-more").click();
+      await page.getByTestId("project-menu-new-terminal").click();
       await expect(bottom(page).getByRole("tab")).toHaveCount(2);
       await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
       await page.mouse.move(0, 0);

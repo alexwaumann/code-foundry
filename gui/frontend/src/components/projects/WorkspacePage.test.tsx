@@ -119,23 +119,26 @@ afterEach(() => {
 });
 
 describe("the workspace page's header", () => {
-  it("Open in Finder (header and Folder row) is workspace.reveal; New thread opens the composer in the workspace; ⋯ has the row's items", async () => {
+  it("the title block: name, projects and contents; its ⋯ has the row's items (New thread first), Open in Finder is workspace.reveal; the pane header holds no buttons", async () => {
     const { mono } = twoWorkspaces();
     renderPage(mono);
     await settle();
     expect(screen.getByTestId("page-name").textContent).toBe("mono");
-    expect(screen.getByTestId("workspace-meta").textContent).toBe("workspace · 1 project");
-    fireEvent.click(screen.getByTestId("workspace-page-reveal"));
-    await settle();
+    for (const id of ["workspace-page-reveal", "workspace-page-new-thread"]) expect(screen.queryByTestId(id)).toBeNull();
+    const title = screen.getByTestId("workspace-title");
+    expect(within(title).getByTestId("workspace-title-name").textContent).toBe("mono");
+    expect(within(title).getByTestId("workspace-meta").textContent).toBe("1 project");
+    expect(within(title).getByTestId("workspace-title-meta").textContent).toMatch(/^1 project·.+ · .+$/);
+    expect(by(body(mono), "workspace-projects-title").textContent).toMatch(/^Projects\(1\)· every thread/);
+    let menu = openDropdown(within(title).getByTestId("workspace-page-more"), "workspace-page-more-menu");
+    expect(menuEntries(menu)).toEqual(["New thread", "New terminal", "Open in Finder", "Rename", "Add project", "Remove workspace"]);
+    await pick(menu, "workspace-menu-reveal");
     expect(lastInvocation("workspace.reveal")?.args).toEqual({ workspace: mono });
     fireEvent.click(by(body(mono), "workspace-folder-reveal"));
     await settle();
     expect(invocationsOf("workspace.reveal").map((i) => i.args)).toEqual([{ workspace: mono }, { workspace: mono }]);
-    const menu = openDropdown(screen.getByTestId("workspace-page-more"), "workspace-page-more-menu");
-    expect(menuEntries(menu)).toEqual(["New thread", "New terminal", "Open in Finder", "Rename", "Add project", "Remove workspace"]);
-    fireEvent.keyDown(menu, { key: "Escape" });
-    await settle();
-    fireEvent.click(screen.getByTestId("workspace-page-new-thread"));
+    menu = openDropdown(within(title).getByTestId("workspace-page-more"), "workspace-page-more-menu");
+    await pick(menu, "workspace-menu-new-thread");
     expect(selection()).toEqual({ kind: "compose", projectId: "repo-dot", workspaceId: mono });
   });
 
@@ -235,7 +238,7 @@ describe("the workspace's Projects card", () => {
     await settle();
     const s = body(shop);
     expect(s.hasAttribute("data-rooted")).toBe(false);
-    expect(by(s, "workspace-projects-title").textContent).toMatch(/Projects\s*· every thread checks these out together on one branch/);
+    expect(by(s, "workspace-projects-title").textContent).toMatch(/Projects\(2\)\s*· every thread checks these out together on one branch/);
     expect(texts(s, "member-name")).toEqual(["code-foundry", "ghostty-playground"]);
     expect(texts(s, "member-caption")).toEqual(["alexwaumann/code-foundry", "alexwaumann/ghostty-playground"]);
     // The first project given starts threads; its row carries the pill, the others none.
@@ -307,7 +310,7 @@ describe("the workspace's Projects card", () => {
     expect(lastInvocation("workspace.add-project")?.args).toEqual({ project: "repo-wr", workspace: shop });
     updateWorkspace(shop, (w) => ({ ...w, members: [...w.members, { projectId: "repo-wr", worktreePath: "" }] }));
     expect(texts(body(shop), "member-name")).toEqual(["code-foundry", "ghostty-playground", "writing"]);
-    expect(screen.getByTestId("workspace-meta").textContent).toBe("workspace · 3 projects");
+    expect(screen.getByTestId("workspace-meta").textContent).toBe("3 projects");
 
     const remove = by(member(shop, "repo-gp"), "member-remove");
     expect(remove.textContent).toBe("Remove");

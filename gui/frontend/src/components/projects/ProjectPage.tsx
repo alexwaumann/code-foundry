@@ -1,81 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CloudUpload, Folder, GitBranchPlus, RefreshCw, SquarePen, SquareTerminal, TriangleAlert } from "lucide-react";
+import { CloudUpload, Folder, GitBranchPlus } from "lucide-react";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
+import { useProjectKind } from "@/components/icons/projectKind";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Button } from "@/components/ui/button";
-import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
-import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
-import { tildify } from "@/lib/path";
-import { checkoutsSummary, projectActivity, projectKind, projectNextStep, PROJECT_NARROW_BELOW, refreshedText } from "@/lib/projects";
+import { checkoutsHint, projectActivity, projectNextStep, PROJECT_NARROW_BELOW, PROJECT_TITLE_COMPACT_BELOW } from "@/lib/projects";
 import { useWidth } from "@/lib/useWidth";
-import { cn } from "@/lib/utils";
 import { openChangesTab } from "@/stores/changesPanel";
 import { composeIn } from "@/stores/compose";
-import { initGitIn, newTerminalIn, publishProject, refreshProject } from "@/stores/projectActions";
-import { findWorktree, mainWorktreePath, useProjectsStore } from "@/stores/projects";
+import { initGitIn, newTerminalIn, publishProject } from "@/stores/projectActions";
+import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
+import { endProjectRename, useProjectRenameStore } from "@/stores/projectRename";
 import { useThreadsStore } from "@/stores/threads";
 import { PROJECTS_INDEX, useUiStore } from "@/stores/ui";
-import { endProjectRename, useProjectRenameStore } from "@/stores/projectRename";
-import { KindIcon, Pill, SectionHeader } from "./bits";
-import { useCheckoutOrder, usePageScroll } from "./pageHooks";
-import { useProjectKind } from "@/components/icons/projectKind";
+import { KindIcon, SectionHeader } from "./bits";
 import { CheckoutsTable } from "./CheckoutsTable";
 import { LeftoverWorktrees } from "./LeftoverWorktrees";
-import { projectMenu } from "./menus";
-import { OverflowMenu } from "./OverflowMenu";
+import { useCheckoutOrder, usePageScroll } from "./pageHooks";
 import { ProjectsCrumb, PagePicker } from "./PagePicker";
 import { ProjectDetails } from "./ProjectDetails";
 import { ProjectNameEditor } from "./ProjectNameEditor";
-import { useCleanableCount } from "./useCleanable";
-
-
-/** Fetch (with a remote) and refresh the project's git status; the icon spins meanwhile. */
-function RefreshButton({ projectId }: { projectId: string }) {
-  const [busy, setBusy] = useState(false);
-  return (
-    <Tip label={busy ? "Refreshing…" : "Fetch and refresh"}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="size-7 text-cf-text-muted hover:text-cf-text"
-        aria-label="Fetch and refresh"
-        data-testid="project-refresh"
-        disabled={busy}
-        onClick={() => {
-          setBusy(true);
-          void refreshProject(projectId).finally(() => {
-            setBusy(false);
-          });
-        }}
-      >
-        <RefreshCw className={cn("size-4", busy && "animate-spin")} data-busy={busy || undefined} />
-      </Button>
-    </Tip>
-  );
-}
-
-/** "⚠ Refresh failed · <reason> · 14m ago" in the header while the main checkout's last status read failed. */
-function RefreshFailed({ projectId, main }: { projectId: string; main: string }) {
-  const error = useProjectsStore((s) => findWorktree(s, projectId, main)?.status.error ?? "");
-  const at = useProjectsStore((s) => findWorktree(s, projectId, main)?.status.refreshedAtMs ?? null);
-  const now = useNow(30_000);
-  if (!error) return null;
-  const ago = refreshedText(at, now).replace(/^refreshed /, "");
-  return (
-    <Tip label={error} whenTruncated>
-      <Pill tone="error" className="max-w-96 min-w-0 shrink-0" data-testid="project-refresh-failed">
-        <TriangleAlert aria-hidden />
-        <span className="min-w-0 truncate">Refresh failed · {error}</span>
-        {at !== null && <span className="shrink-0">· {ago}</span>}
-      </Pill>
-    </Tip>
-  );
-}
+import { ProjectTitle } from "./ProjectTitle";
 
 /** A note card at the top of a project page (no remote, no git) with its setup button. */
 function KindNote({ icon, children, action }: { icon: React.ReactNode; children: React.ReactNode; action: React.ReactNode }) {
@@ -121,24 +70,20 @@ function ThreadsBlock({ projectId, main }: { projectId: string; main: string }) 
 }
 
 /**
- * A project's page: the header (crumb, picker, meta, Refresh, Terminal, New thread, more),
- * a note for a repository without a remote or a folder without git, the Checkouts table
- * (main and the worktrees a thread is on; click or Enter opens a checkout's Changes tab in
- * the page's side panel), Worktrees without threads (LeftoverWorktrees, every other
- * worktree), and Details. Below PROJECT_NARROW_BELOW of content
- * width the Sync column and the slug drop and Terminal and the leftover rows' Remove show
- * their icon only. docs/notes/projects-redesign-1-index.md.
+ * A project's page (docs/notes/project-page-1-title-block.md): the pane header (crumb, picker
+ * or the name editor, the panel toggles), then in the content column its title block
+ * (ProjectTitle: name, meta line, ⋯), a note for a repository without a remote or a folder
+ * without git, the Checkouts table (main and the worktrees a thread is on; click or Enter
+ * opens a checkout's Changes tab in the page's side panel), Worktrees without threads
+ * (LeftoverWorktrees, every other worktree), and Details. Below PROJECT_NARROW_BELOW of
+ * content width the Sync column drops and the leftover rows' Remove shows its icon only;
+ * below PROJECT_TITLE_COMPACT_BELOW the slug drops and Open in Finder shows its icon only.
  */
 export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey: string }) {
   const loaded = useProjectsStore((s) => s.loaded);
   const exists = useProjectsStore((s) => s.byId[projectId] !== undefined);
   const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
   const kind = useProjectKind(projectId);
-  const meta = useProjectsStore((s) => {
-    const r = s.byId[projectId];
-    if (!r) return "";
-    return r.git ? projectKind(r).meta : tildify(r.path);
-  });
   const step = useProjectsStore((s) => {
     const r = s.byId[projectId];
     return r ? projectNextStep(r) : null;
@@ -146,10 +91,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   const hasRemote = useProjectsStore((s) => (s.byId[projectId]?.remotes.length ?? 0) > 0);
   const main = useProjectsStore((s) => mainWorktreePath(s, projectId));
   const working = useThreadsStore((s) => projectActivity(s, projectId).working);
-  const cleanable = useCleanableCount(projectId);
   const paths = useCheckoutOrder(projectId);
-  // The caption counts every worktree, the ones without threads (their own block) too.
-  const worktreeCount = useProjectsStore((s) => s.byId[projectId]?.worktrees.length ?? 0);
   const git = kind !== "nogit";
   const renaming = useProjectRenameStore((s) => s.renamingProjectId === projectId);
   // Leaving the page closes its editor (the field's blur has renamed by then).
@@ -166,6 +108,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   // The content pane's width (the side panel takes from it): the scroll box's.
   const [widthRef, width] = useWidth(1200);
   const narrow = width < PROJECT_NARROW_BELOW;
+  const compact = width < PROJECT_TITLE_COMPACT_BELOW;
   const navItems = useMemo<NavItem[]>(() => (git ? paths.map((p) => ({ key: `pw:${projectId}::${p}`, activate: () => { openChangesTab("current", projectId, p); } })) : []), [git, paths, projectId]);
   const nav = useNav(navItems);
   const reveal = useProjectsPageStore((s) => s.reveal);
@@ -182,7 +125,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   }, []);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label={name} data-testid="projects-page" data-page="project" data-project={projectId} data-kind={kind} data-narrow={narrow || undefined}>
+    <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label={name} data-testid="projects-page" data-page="project" data-project={projectId} data-kind={kind} data-narrow={narrow || undefined} data-compact={compact || undefined}>
       <PaneHeader className="gap-2 px-5">
         <ProjectsCrumb />
         {renaming ? (
@@ -205,32 +148,12 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
         ) : (
           <PagePicker icon={<KindIcon kind={kind} />} name={name} currentProject={projectId} />
         )}
-        {!narrow && meta && (
-          <span className="min-w-0 shrink truncate text-caption text-cf-text-muted" data-testid="project-meta">
-            {meta}
-          </span>
-        )}
-        {git && <RefreshFailed projectId={projectId} main={main} />}
-        <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-2 [--wails-draggable:no-drag]">
-          {git && <RefreshButton projectId={projectId} />}
-          <Tip label={narrow ? "New terminal" : null}>
-            <Button type="button" variant="outline" size={narrow ? "icon-sm" : "sm"} className={cn("h-7", narrow && "w-7")} aria-label="New terminal" data-testid="project-terminal" onClick={() => void newTerminalIn(projectId, main)}>
-              <SquareTerminal />
-              {!narrow && "Terminal"}
-            </Button>
-          </Tip>
-          <Button type="button" size="sm" className="h-7" data-testid="project-new-thread" onClick={() => { composeIn(projectId); }}>
-            <SquarePen />
-            New thread
-          </Button>
-          <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(projectId, { kind, step, cleanup: git && hasRemote ? cleanable : null }, { newAction: true })} />
-        </span>
-        <span className="-mr-2 flex shrink-0 items-center">
+        <span className="-mr-2 ml-auto flex shrink-0 items-center pl-2">
           <BottomToggle />
           <PanelToggle />
         </span>
       </PaneHeader>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-5" data-testid="projects-scroll">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-testid="projects-scroll">
         <NavProvider value={nav.ctx}>
           <div
             ref={rootRef}
@@ -238,13 +161,14 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
             role="listbox"
             aria-label={`${name} checkouts`}
             aria-activedescendant={nav.activeDescendant}
-            className="mx-auto flex max-w-5xl flex-col gap-6 outline-none"
+            className="mx-auto flex max-w-6xl flex-col gap-6 outline-none"
             data-testid="projects-list"
             data-focus-root
             onKeyDown={nav.onKeyDown}
           >
             {exists && (
               <>
+                <ProjectTitle projectId={projectId} compact={compact} />
                 {step === "publish" && (
                   <KindNote
                     icon={<CloudUpload />}
@@ -273,14 +197,14 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
                 )}
                 {git ? (
                   <div data-testid="project-checkouts">
-                    <SectionHeader label="Checkouts" detail={checkoutsSummary(worktreeCount, working)} testId="checkouts-title" />
+                    <SectionHeader label="Checkouts" count={paths.length} detail={checkoutsHint(working)} testId="checkouts-title" />
                     <CheckoutsTable projectId={projectId} paths={paths} columns={{ sync: hasRemote && !narrow, pr: kind === "github", narrow }} />
                   </div>
                 ) : (
                   <ThreadsBlock projectId={projectId} main={main} />
                 )}
                 {git && <LeftoverWorktrees projectId={projectId} narrow={narrow} />}
-                <ProjectDetails projectId={projectId} />
+                <ProjectDetails projectId={projectId} compact={compact} />
               </>
             )}
           </div>

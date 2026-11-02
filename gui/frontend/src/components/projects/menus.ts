@@ -1,5 +1,4 @@
 import type { ProjectKind, ProjectNextStep } from "@/lib/projects";
-import { openActionEditor } from "@/stores/actionDialog";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
 import { cleanupMergedWorktrees, initGitIn, newTerminalIn, publishProject, revealProject, unregisterProject } from "@/stores/projectActions";
 import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
@@ -18,24 +17,23 @@ export interface ProjectMenuFacts {
 }
 
 /**
- * A project's menu, one list for its index row's context menu and its page's ⋯ (which puts
- * New action… first, `newAction`): New thread, New terminal, Open in Finder; Rename, Clean up
- * merged worktrees (git with a remote; the count at the right, disabled at 0), its setup step
- * (Publish to GitHub or Initialize git); Remove project. No icons and no trailing "…" (the app's
- * menu style). No New worktree: worktrees are made by threads and agents (project.worktree.new
- * stays for the CLI and the palette). docs/notes/projects-table-2-context-menus.md.
+ * A project's menu, one list for its index row's context menu and its page's ⋯ (`page`):
+ * New thread, New terminal, Open in Finder (the row's only: the page's Details has it);
+ * Rename, Clean up merged worktrees (git with a remote; the count at the right, disabled at
+ * 0), its setup step (Publish to GitHub or Initialize git); Remove project. No icons and no
+ * trailing "…" (the app's menu style). No New worktree: worktrees are made by threads and
+ * agents (project.worktree.new stays for the CLI and the palette). No New action: Details'
+ * Actions row has it. docs/notes/projects-table-2-context-menus.md,
+ * docs/notes/project-page-1-title-block.md.
  */
-export function projectMenu(projectId: string, { kind, step, cleanup }: ProjectMenuFacts, opts: { newAction?: boolean } = {}): OverflowItem[] {
+export function projectMenu(projectId: string, { kind, step, cleanup }: ProjectMenuFacts, opts: { page?: boolean } = {}): OverflowItem[] {
   const main = () => mainWorktreePath(useProjectsStore.getState(), projectId);
-  const items: OverflowItem[] = [];
-  if (opts.newAction) items.push({ label: "New action", testId: "project-new-action", onSelect: () => { openActionEditor({ mode: "new", projectId, from: "projects" }); } }, "separator");
-  items.push(
+  const items: OverflowItem[] = [
     { label: "New thread", testId: "project-menu-new-thread", onSelect: () => { composeIn(projectId); } },
     { label: "New terminal", testId: "project-menu-new-terminal", onSelect: () => void newTerminalIn(projectId, main()) },
-    { label: "Open in Finder", testId: "project-menu-reveal", onSelect: () => void revealProject(projectId) },
-    "separator",
-    { label: "Rename", testId: "project-menu-rename", onSelect: () => { startProjectRename(projectId); } },
-  );
+  ];
+  if (!opts.page) items.push({ label: "Open in Finder", testId: "project-menu-reveal", onSelect: () => void revealProject(projectId) });
+  items.push("separator", { label: "Rename", testId: "project-menu-rename", onSelect: () => { startProjectRename(projectId); } });
   if (kind !== "nogit" && cleanup !== null) {
     items.push({ label: "Clean up merged worktrees", testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(projectId) });
   }

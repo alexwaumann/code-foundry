@@ -387,10 +387,9 @@ export function sortCheckouts<T extends CheckoutSortRow>(rows: readonly T[]): T[
   });
 }
 
-/** The Checkouts title's detail: "main plus 5 worktrees · 2 threads working", "main only". */
-export function checkoutsSummary(worktrees: number, working: number): string {
-  const head = worktrees <= 1 ? "main only" : `main plus ${plural(worktrees - 1, "worktree")}`;
-  return working > 0 ? `${head} · ${plural(working, "thread")} working` : head;
+/** The Checkouts title's hint: "2 threads working"; "" while none works (the title's count says how many checkouts). */
+export function checkoutsHint(working: number): string {
+  return working > 0 ? `${plural(working, "thread")} working` : "";
 }
 
 /** "refreshed just now", "refreshed 14m ago", "not refreshed yet"; "refresh failed 14m ago" with an error. */
@@ -406,6 +405,12 @@ export function refreshedText(at: number | null, now: number, failed = false): s
   return `${verb} ${String(Math.floor(h / 24))}d ago`;
 }
 
+/** The title block's failed refresh: "Refresh failed · 14m ago", "Refresh failed" before any read. */
+export function refreshFailedText(at: number | null, now: number): string {
+  if (at === null) return "Refresh failed";
+  return `Refresh failed · ${refreshedText(at, now).replace(/^refreshed /, "")}`;
+}
+
 /** Details' Remote row: "origin · github.com/o/r", "origin · pull requests need GitHub"; "" without a remote. */
 export function remoteDetail(r: Pick<ProjectView, "githubSlug" | "remotes">): string {
   const remote = r.remotes[0];
@@ -414,29 +419,34 @@ export function remoteDetail(r: Pick<ProjectView, "githubSlug" | "remotes">): st
 }
 
 /**
- * Details' Worktrees row: the folder they share (tildified), how many, and how many Code
- * Foundry made: "~/x.worktrees · 5, 3 made by Code Foundry", "… · 1 made by Code Foundry"
- * when it made them all, "… · 2" when none; just the count part when they share no folder;
- * "" with none.
+ * Details' Worktrees row: how many, how many Code Foundry made, and the folder they share
+ * (tildified): "6 · 3 made by Code Foundry, in ~/.code-foundry/worktrees", "2 · all made by
+ * Code Foundry, in …", "2 in ~/x.worktrees", "2". The folder is left out when they share
+ * none, only "/" or only the home folder ("~" says nothing). "" with none.
  */
 export function worktreesDetail(paths: readonly string[], managed = 0): string {
-  if (paths.length === 0) return "";
-  const made = managed <= 0 ? "" : managed >= paths.length ? " made by Code Foundry" : `, ${String(managed)} made by Code Foundry`;
-  const count = `${String(paths.length)}${made}`;
+  const n = paths.length;
+  if (n === 0) return "";
+  const made = managed <= 0 ? "" : managed >= n ? (n === 1 ? " · made by Code Foundry" : " · all made by Code Foundry") : ` · ${String(managed)} made by Code Foundry`;
   const parents = paths.map((p) => p.slice(0, Math.max(0, p.lastIndexOf("/"))));
   let common = parents[0] ?? "";
   for (const p of parents) {
     while (common && p !== common && !p.startsWith(`${common}/`)) common = common.slice(0, Math.max(0, common.lastIndexOf("/")));
   }
-  return common && common !== "/" ? `${tildify(common)} · ${count}` : count;
+  const folder = common && common !== "/" ? tildify(common) : "";
+  const where = folder && folder !== "~" ? `${made ? "," : ""} in ${folder}` : "";
+  return `${String(n)}${made}${where}`;
 }
 
-/** Details' Actions row's count: "none", "1 project action", "2 project actions". */
-export function actionsDetail(n: number): string {
-  return n === 0 ? "none" : plural(n, "project action");
+/** Details' Actions row: the actions' names, "Dev · Test · Build", or "none". */
+export function actionsDetail(names: readonly string[]): string {
+  return names.length === 0 ? "none" : names.join(" · ");
 }
 
-/** The narrow layout of a project page (Sync and the slug drop, Terminal shows its icon only) below this content width. */
+/** A project page's title block and Details drop to their compact layout (no slug, Open in Finder's icon only) below this content width. */
+export const PROJECT_TITLE_COMPACT_BELOW = 720;
+
+/** The narrow layout of a project page (the Checkouts table's Sync column drops, the leftover rows' Remove shows its icon only) below this content width. */
 export const PROJECT_NARROW_BELOW = 840;
 
 /** The Projects index's optional columns (Project and Needs a look always show). */

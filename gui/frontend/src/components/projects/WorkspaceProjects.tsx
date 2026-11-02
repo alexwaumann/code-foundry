@@ -189,7 +189,7 @@ export function WorkspaceProjects({ workspaceId, members }: { workspaceId: strin
   const empty = members.length === 0 && !folderShown;
   return (
     <div data-testid="workspace-projects">
-      <SectionHeader label="Projects" detail="every thread checks these out together on one branch" right={<AddMember workspaceId={workspaceId} />} testId="workspace-projects-title" />
+      <SectionHeader label="Projects" count={members.length} detail="every thread checks these out together on one branch" right={<AddMember workspaceId={workspaceId} />} testId="workspace-projects-title" />
       <div className="overflow-hidden rounded-lg border bg-cf-surface" data-testid="workspace-members" data-workspace={workspaceId}>
         <FolderRow workspaceId={workspaceId} first />
         {members.length > 0 && (

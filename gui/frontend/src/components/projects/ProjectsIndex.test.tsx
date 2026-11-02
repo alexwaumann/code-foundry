@@ -99,7 +99,7 @@ describe("the index's project rows", () => {
     expect(ids.indexOf("repo-gp")).toBeGreaterThan(ids.indexOf("repo-dot"));
 
     // The section titles count their rows; the header row names the columns.
-    expect(within(screen.getByTestId("projects-section")).getByTestId("index-section-count").textContent).toBe("(5)");
+    expect(within(screen.getByTestId("projects-section")).getByTestId("section-count").textContent).toBe("(5)");
     expect([...within(screen.getByTestId("projects-table")).getByTestId("index-columns").querySelectorAll("span")].map((s) => s.textContent)).toEqual(["Project", "Activity", "Default branch", "Needs a look", "Updated"]);
     const kinds: [string, string, string, string][] = [
       ["repo-cf", "github", "code-foundry", "2 threads working · 3 checkouts"],
@@ -238,7 +238,7 @@ describe("the index's workspace rows", () => {
     const r = wsRow(ws.id);
     expect(inRow(r, "workspace-name")?.textContent).toBe("platform");
     expect([...within(screen.getByTestId("workspaces-table")).getByTestId("index-columns").querySelectorAll("span")].map((s) => s.textContent)).toEqual(["Workspace", "Activity", "Projects", "Contents", "Updated"]);
-    expect(within(screen.getByTestId("workspaces-section")).getByTestId("index-section-count").textContent).toBe("(1)");
+    expect(within(screen.getByTestId("workspaces-section")).getByTestId("section-count").textContent).toBe("(1)");
     expect(inRow(r, "workspace-projects")?.textContent).toBe("code-foundry + ghostty-playground");
     expect(inRow(r, "workspace-status")?.textContent).toMatch(/^1 thread working/);
     expect(inRow(r, "workspace-contents")?.textContent).toBe("no instructions · 2 skills");
@@ -246,7 +246,7 @@ describe("the index's workspace rows", () => {
     expect(page().getAttribute("data-page")).toBe("workspace");
     expect(page().getAttribute("data-workspace")).toBe(ws.id);
     expect(screen.getByTestId("page-name").textContent).toBe("platform");
-    expect(screen.getByTestId("workspace-meta").textContent).toBe("workspace · 2 projects");
+    expect(screen.getByTestId("workspace-meta").textContent).toBe("2 projects");
     expect(document.querySelector(`[data-testid="workspace"][data-workspace="${ws.id}"]`)).not.toBeNull();
     // The crumb goes back to the index.
     fireEvent.click(screen.getByTestId("projects-crumb"));
