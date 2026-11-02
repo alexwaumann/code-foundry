@@ -8,7 +8,7 @@ import { runAction } from "@/stores/actionActions";
 import { openActionEditor } from "@/stores/actionDialog";
 import { useAction, useProjectActionIds } from "@/stores/actions";
 import { StatusDot } from "./bits";
-import type { CheckoutMenuPart } from "./menus";
+import type { CheckoutMenuPart, LeftoverMenuPart } from "./menus";
 import { OpenInSplitItem } from "./OpenInMenuItem";
 import { RowMenuPickContext, type RowMenuParts } from "./rowMenu";
 import { openThread } from "./workspaceHooks";
@@ -106,3 +106,6 @@ function OpenIn({ entry }: { entry: Part<"open-in"> }) {
 
 /** The parts of a checkout's right-click menu (menus.ts checkoutMenu), by kind. */
 export const CHECKOUT_MENU_PARTS: RowMenuParts<CheckoutMenuPart> = { threads: ThreadsSub, "open-in": OpenIn, actions: ActionsSub };
+
+/** The part of a leftover worktree's right-click menu (menus.ts leftoverMenu): the same split Open in Finder item. */
+export const LEFTOVER_MENU_PARTS: RowMenuParts<LeftoverMenuPart> = { "open-in": OpenIn };

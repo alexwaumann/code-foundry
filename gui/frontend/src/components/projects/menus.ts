@@ -5,7 +5,7 @@ import type { ThreadBadge } from "@/lib/thread";
 import { openChangesTab } from "@/stores/changesPanel";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
 import { openPullRequestInPanel } from "@/stores/prPanel";
-import { cleanupMergedWorktrees, initGitIn, newTerminalIn, publishProject, removeWorktree, revealProject, unregisterProject } from "@/stores/projectActions";
+import { cleanupMergedWorktrees, initGitIn, newTerminalIn, publishProject, removeWorktree, resumeWorktree, revealProject, unregisterProject } from "@/stores/projectActions";
 import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
 import { startProjectRename } from "@/stores/projectRename";
 import { openWorkspaceAddProject } from "@/stores/workspaceAddProject";
@@ -141,5 +141,47 @@ export function checkoutMenu(f: CheckoutMenuFacts): RowMenuEntry<CheckoutMenuPar
   if (branch) items.push({ label: "Copy branch name", testId: "checkout-menu-copy-branch", onSelect: () => void copyWithToast(branch, "Branch name") });
   if (f.actions) items.push({ kind: "actions", testId: "checkout-menu-actions", projectId, path });
   if (!f.isMain) items.push("separator", { label: "Remove worktree", destructive: true, testId: "checkout-menu-remove", onSelect: () => void removeWorktree(projectId, path) });
+  return items;
+}
+
+/** What a leftover worktree's menu depends on, read when it opens. */
+export interface LeftoverMenuFacts {
+  projectId: string;
+  path: string;
+  /** Its branch; "" when HEAD is detached (no Copy branch name). */
+  branch: string;
+  /** It still holds work (lib/leftovers.ts holdsWork): Show changes. */
+  work: boolean;
+  /** The last thread archived on it (its label), for Resume; null when none was. */
+  archived: { id: string; name: string } | null;
+}
+
+/** The part of a leftover's menu drawn by CheckoutMenuParts.tsx: the split Open in Finder item. */
+export type LeftoverMenuPart = Extract<CheckoutMenuPart, { kind: "open-in" }>;
+
+/**
+ * A leftover worktree's right-click menu on its project's page, in "Worktrees without threads"
+ * (docs/notes/project-page-3-leftovers.md): Resume “<name>” (its last archived thread, when one
+ * was), New thread here, New terminal here; Show changes (while it holds work); Open in Finder
+ * (the checkouts' split item), Copy path, Copy branch name (on a branch); Remove worktree.
+ */
+export function leftoverMenu(f: LeftoverMenuFacts): RowMenuEntry<LeftoverMenuPart>[] {
+  const { projectId, path } = f;
+  const items: RowMenuEntry<LeftoverMenuPart>[] = [];
+  const archived = f.archived;
+  if (archived) items.push({ label: `Resume “${archived.name}”`, testId: "leftover-menu-resume", onSelect: () => void resumeWorktree(projectId, path, archived.id) });
+  items.push(
+    { label: "New thread here", testId: "leftover-menu-new-thread", onSelect: () => { composeIn(projectId, path); } },
+    { label: "New terminal here", testId: "leftover-menu-new-terminal", onSelect: () => void newTerminalIn(projectId, path) },
+  );
+  if (f.work) items.push("separator", { label: "Show changes", testId: "leftover-menu-changes", onSelect: () => { openChangesTab("current", projectId, path); } });
+  items.push(
+    "separator",
+    { kind: "open-in", testId: "leftover-menu-open-in", projectId, path },
+    { label: "Copy path", testId: "leftover-menu-copy-path", onSelect: () => void copyWithToast(path, "Path") },
+  );
+  const branch = f.branch;
+  if (branch) items.push({ label: "Copy branch name", testId: "leftover-menu-copy-branch", onSelect: () => void copyWithToast(branch, "Branch name") });
+  items.push("separator", { label: "Remove worktree", destructive: true, testId: "leftover-menu-remove", onSelect: () => void removeWorktree(projectId, path) });
   return items;
 }

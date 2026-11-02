@@ -7,7 +7,7 @@ import { CF, mockPost, openApp, openProjectPage, openProjects, resetMock } from 
  * (header, picker, checkouts table, kind variants, details, narrow layout), the workspace
  * page's header, navigation (a selection and a side panel per page, the sidebar row
  * reopening the last page), and a project's Worktrees without threads with the remove
- * confirm (docs/notes/projects-redesign-2-leftovers.md). The mock's projects: code-foundry (repo-cf) and
+ * confirm (docs/notes/projects-redesign-2-leftovers.md, project-page-3-leftovers.md). The mock's projects: code-foundry (repo-cf) and
  * ghostty-playground (repo-gp) on GitHub, dotfiles (repo-dot, a remote that is not
  * GitHub), sketches (repo-sk, git without a remote) and writing (repo-wr, no git).
  */
@@ -132,10 +132,9 @@ test("a checkout menu's Open in Finder hovers as two blocks: text bright with �
 test("narrow: with the Changes tab open, Sync and the slug drop and Open in Finder shows its icon only", async ({ page }) => {
   await openApp(page);
   await openProjectPage(page, "repo-cf");
-  await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-narrow");
+  await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-compact");
   await pickCheckout(page, FEAT, "checkout-menu-changes");
   await expect(page.getByTestId("changes-surface")).toBeVisible();
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-narrow", "true");
   await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(0);
   await expect(page.getByTestId("worktree-sync")).toHaveCount(0);
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-compact", "true");
@@ -143,12 +142,12 @@ test("narrow: with the Changes tab open, Sync and the slug drop and Open in Find
   await expect(page.getByTestId("title-default-branch")).toBeVisible();
   await expect(page.getByTestId("details-reveal")).toHaveText("");
   await expect(page.getByTestId("checkouts-col-pr")).toHaveCount(1);
-  // The table drops by its own width (lib/projects.ts checkoutColumns), whatever the page's narrow flag.
+  // The table drops by its own width (lib/projects.ts checkoutColumns).
   const w = await page.getByTestId("checkouts-table").evaluate((e) => e.getBoundingClientRect().width);
   expect(await page.getByTestId("checkouts-col-threads").count()).toBe(w >= 720 ? 1 : 0);
   // Closing the panel gives the room back.
   await page.getByTestId("side-panel").getByTestId("panel-toggle").click();
-  await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-narrow");
+  await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-compact");
   await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(1);
   await expect(page.getByTestId("project-meta")).toHaveText("alexwaumann/code-foundry");
   await expect(page.getByTestId("details-reveal")).toHaveText("Open in Finder");
@@ -253,20 +252,31 @@ test("a page's scroll position is remembered while the window lives", async ({ p
 
 // Clean up merged worktrees and Remove the N that are clean (confirm, cleanup, the pill going): unit-tested in src/components/projects/ProjectPage.test.tsx.
 
-// The rows, why each stayed, their actions, the counts, New thread and Resume, and the whole Remove…
-// confirm (what goes, the uncommitted files, Show diff, Cancel, force, the rows leaving):
-// ProjectPage.test.tsx. Left: the narrow page Show diff makes (real width) and Resume over the stream.
-test("Worktrees without threads: Show diff narrows the page (Remove icon-only); Resume unarchives and the worktree moves to the table", async ({ page }) => {
+// The rows, why each stayed, their icons and menu, the counts, New thread and Resume, and the whole
+// Remove confirm (what goes, the uncommitted files, Show diff, Cancel, force, the rows leaving):
+// ProjectPage.test.tsx and menus.test.ts. Left: the narrow content Show diff makes (real width: the
+// reason truncates, no column drops, the icons stay in the row) and Resume from the menu over the stream.
+test("Worktrees without threads: at the width Show diff leaves, the reason truncates and the icons stay; Resume from the menu unarchives and the worktree moves to the table", async ({ page }) => {
   await mockPost("leftovers?project=repo-cf");
   await openApp(page);
   await openProjectPage(page, "repo-cf");
+  const reason = leftover(page, COPY).getByTestId("leftover-reason");
+  await expect.poll(() => reason.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(false);
   await leftover(page, COPY).getByTestId("leftover-show-diff").click();
   await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", COPY);
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-narrow", "true");
-  await expect(leftover(page, COPY).getByTestId("leftover-remove")).toHaveText("");
-  await expect(leftover(page, COPY).getByTestId("leftover-remove")).toHaveAttribute("aria-label", "Remove worktree…");
+  // A smaller window beside the panel: the page's content about 480px wide.
+  const vp = page.viewportSize() ?? { width: 1280, height: 800 };
+  await page.setViewportSize({ width: 1100, height: vp.height });
+  await expect.poll(() => reason.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await expect(page.getByTestId("leftover-head")).toHaveText(/Branch\s*Why it stayed/);
+  // The icons stay inside the row, at its right end.
+  const box = await leftover(page, COPY).boundingBox();
+  const remove = await leftover(page, COPY).getByTestId("leftover-remove").boundingBox();
+  expect(box && remove && remove.x + remove.width <= box.x + box.width).toBe(true);
+  await expect(leftover(page, COPY).getByTestId("leftover-show-diff")).toBeVisible();
 
-  await leftover(page, SPIKE).getByTestId("leftover-resume").click();
+  await leftover(page, SPIKE).click({ button: "right" });
+  await page.getByTestId("leftover-menu").getByTestId("leftover-menu-resume").click();
   await expect(page.getByTestId("thread-header").getByTestId("thread-title")).toHaveText("Profile the renderer");
   await openProjectPage(page, "repo-cf");
   await expect(leftover(page, SPIKE)).toHaveCount(0);
