@@ -394,6 +394,9 @@ type record struct {
 	// moving is set while a Move places the thread or waits for its set_cwd (move.go):
 	// a second Move is refused meanwhile.
 	moving bool
+	// lateMoveName is the title a move's naming gave after SlugTimeout while the move
+	// was still queued: applied when it lands (move.go, applyLateMoveName).
+	lateMoveName string
 }
 
 var _ Store = (*Manager)(nil)

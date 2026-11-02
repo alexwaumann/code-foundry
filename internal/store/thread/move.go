@@ -247,9 +247,22 @@ func (m *Manager) claimMove(id string, want MoveTarget) error {
 // releaseMove ends a move that did not happen: the thread is as it was.
 func (m *Manager) releaseMove(id string) {
 	m.update(id, false, func(rec *record) {
-		rec.moving = false
+		rec.moving, rec.lateMoveName = false, ""
 		rec.s.PendingMove, rec.s.PendingWorktreePath, rec.s.Naming = nil, "", false
 	})
+}
+
+// landMove gives rec the placement job made, and the name that arrived late while it was
+// queued (applyLateMoveName). Callers hold m.mu.
+func landMove(rec *record, job *moveJob) {
+	rec.s = rec.s.withMove(job)
+	named := job.title != ""
+	if t := rec.lateMoveName; t != "" && !named {
+		rec.s.Name, rec.s.AutoNamed, rec.s.NameProvisional = t, true, false
+		named = true
+	}
+	rec.moving, rec.lateMoveName = false, ""
+	rec.namingTried = rec.namingTried || named // a first-prompt namer not started yet never will
 }
 
 // placeMove names the thread from its conversation and places it with Create's code
@@ -360,9 +373,9 @@ func (m *Manager) track() bool {
 	return true
 }
 
-// applyLateMoveName names a moved thread from a title that missed SlugTimeout, once the
-// thread has moved; a move that failed or is still queued when it arrives keeps the
-// name.
+// applyLateMoveName names a moved thread from a title that missed SlugTimeout: at once
+// when the thread has moved, when the move lands if it is still queued (landMove); a
+// move that failed keeps the name.
 func (m *Manager) applyLateMoveName(id string, ch <-chan namingResult) {
 	if !m.track() {
 		return
@@ -383,7 +396,11 @@ func (m *Manager) applyLateMoveName(id string, ch <-chan namingResult) {
 			return
 		}
 		m.update(id, true, func(rec *record) {
-			if !rec.moving && rec.s.PendingMove == nil && len(rec.s.Projects())+len(rec.s.WorkspaceID) > 0 {
+			switch {
+			case rec.moving:
+				rec.lateMoveName = title
+				m.log.Info("moved thread named; the name waits for the move", "thread", id, "name", title)
+			case len(rec.s.Projects())+len(rec.s.WorkspaceID) > 0:
 				rec.s.Name, rec.s.AutoNamed, rec.s.NameProvisional = title, true, false
 				m.log.Info("moved thread named after it moved", "thread", id, "name", title)
 			}
@@ -496,9 +513,7 @@ func (m *Manager) moveStopped(ctx context.Context, id string, job *moveJob) (boo
 		m.mu.Unlock()
 		return false, nil
 	}
-	rec.s = rec.s.withMove(job)
-	rec.moving = false
-	rec.namingTried = rec.namingTried || job.title != ""
+	landMove(rec, job)
 	m.commitLocked(rec, true)
 	m.mu.Unlock()
 	m.log.Info("thread moved", "thread", id, "to", job.place, "cwd", job.placed.path)
@@ -514,10 +529,8 @@ func (m *Manager) moveStopped(ctx context.Context, id string, job *moveJob) (boo
 // expiry). Run goroutine.
 func (r *runner) onMoved(job *moveJob, relocated bool) {
 	r.m.update(r.id, true, func(rec *record) {
-		rec.s = rec.s.withMove(job)
-		rec.moving = false
-		rec.namingTried = rec.namingTried || job.title != "" // a first-prompt namer not started yet never will
-		if job.restart && !job.started && rec.run == r {     // a process started (or restarted) for the move has them
+		landMove(rec, job)
+		if job.restart && !job.started && rec.run == r { // a process started (or restarted) for the move has them
 			rec.run.dirsStale.Store(true) // the members as --add-dir (maybeRestart)
 		}
 	})

@@ -184,7 +184,8 @@ func (r *runner) respawn() {
 	st.dirsApplied = r.dirsStale.Swap(false)
 	forDirs := st.dirsApplied && st.wantEffort == st.effort
 	cs := s
-	if r.moveRestart != nil {
+	forMove := r.moveRestart != nil
+	if forMove {
 		// A move's restart (move.go): the destination's folders, as a start for a move has.
 		cs, r.moveRestart = s.withMove(r.moveRestart), nil
 	}
@@ -204,6 +205,9 @@ func (r *runner) respawn() {
 		msg := "Claude did not restart for the effort change: " + err.Error()
 		if forDirs {
 			msg = "Claude did not restart for the changed projects: " + err.Error()
+		}
+		if forMove {
+			msg = "Claude did not restart to move the thread: " + err.Error()
 		}
 		if st.userRestart {
 			msg = "Claude did not restart: " + err.Error()

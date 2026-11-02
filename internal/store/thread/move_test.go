@@ -814,3 +814,96 @@ func TestFailedMoveStopsItsStart(t *testing.T) {
 		})
 	}
 }
+
+// A title that misses SlugTimeout names the thread once it moved: at once when it moved
+// already, when the move lands when it is still queued (mid-turn).
+func TestMoveLateTitle(t *testing.T) {
+	for _, queued := range []bool{false, true} {
+		t.Run(map[bool]string{false: "moved already", true: "still queued"}[queued], func(t *testing.T) {
+			fixture := "text-table"
+			if queued {
+				fixture = "write-allow"
+			}
+			e, n := newMoveEnv(t, fixture, func(o *Options) { o.SlugTimeout = 200 * time.Millisecond })
+			n.gate = make(chan struct{})
+			var s Thread
+			if queued {
+				s = e.create(CreateOptions{NoProject: true, InitialPrompt: "write"})
+				e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
+			} else {
+				s, _ = e.noProjectThread("check the slack thread", true)
+			}
+			got, err := e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Name != s.Name || (got.PendingMove != nil) != queued {
+				t.Fatalf("after the timeout = %+v", got)
+			}
+			close(n.gate)
+			if queued {
+				time.Sleep(settle)
+				if got, _ := e.m.Get(e.ctx(), s.ID); got.Name != s.Name || got.ProjectID != "" {
+					t.Fatalf("named before the move landed: %+v", got)
+				}
+				e.answer(s.ID)
+			}
+			e.waitFor(s.ID, "moved and named", func(s Thread) bool {
+				return s.ProjectID == "r1" && s.Name == "Fix the login redirect" && s.AutoNamed
+			})
+			if len(n.requests()) != 1 {
+				t.Errorf("naming requests = %+v", n.requests())
+			}
+		})
+	}
+}
+
+// Claude that still needs the folder's trust after the restart for it fails the move:
+// rolled back, and the process started (restarted) for the move stops.
+func TestMoveNeedsTrustTwice(t *testing.T) {
+	e, _ := newMoveEnv(t, "text-table", func(o *Options) { o.Env = append(o.Env, "CF_FAKE_CLAUDE_SET_CWD_NEEDS_TRUST=1") })
+	s, _ := e.noProjectThread("check the slack thread", false)
+	_, err := e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true})
+	if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "needs_trust") {
+		t.Fatalf("Move = %v", err)
+	}
+	if n := len(slices.DeleteFunc(e.sent(), func(m map[string]any) bool { return !isSetCwd(e.wt)(m) })); n != 2 {
+		t.Errorf("set_cwd sent %d times, want 2", n)
+	}
+	got := e.waitFor(s.ID, "stopped", func(s Thread) bool { return s.State == StateDisconnected && s.PendingMove == nil })
+	if got.ProjectID != "" || got.WorktreePath != e.home {
+		t.Errorf("after = %+v", got)
+	}
+	e.waitItems(s.ID, "the failure note", hasNote("Could not move this thread to repo: needs_trust."))
+}
+
+// The restart for the folder's trust fails (Claude cannot be run): the timeline says the
+// restart was for the move, and the move fails with the thread where it was.
+func TestMoveRestartFails(t *testing.T) {
+	link := filepath.Join(t.TempDir(), "claude")
+	if err := os.Symlink(fakeClaudeBin, link); err != nil {
+		t.Fatal(err)
+	}
+	flag := filepath.Join(t.TempDir(), "trusted")
+	e, _ := newMoveEnv(t, "text-table", func(o *Options) {
+		o.Claude = link
+		o.Env = append(o.Env, "CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE="+flag)
+	})
+	s, _ := e.noProjectThread("check the slack thread", false)
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true}); !errors.Is(err, ErrFailedPrecondition) {
+		t.Fatalf("Move = %v", err)
+	}
+	got := e.waitFor(s.ID, "stopped", func(s Thread) bool { return s.State == StateDisconnected && s.PendingMove == nil })
+	if got.ProjectID != "" || got.WorktreePath != e.home {
+		t.Errorf("after = %+v", got)
+	}
+	e.waitItems(s.ID, "the restart failure", func(items []Item) bool {
+		return slices.ContainsFunc(items, func(it Item) bool {
+			return it.Kind == KindError && strings.HasPrefix(it.Text, "Claude did not restart to move the thread: ")
+		})
+	})
+	e.waitItems(s.ID, "the failure note", hasNote("Could not move this thread to repo"))
+}

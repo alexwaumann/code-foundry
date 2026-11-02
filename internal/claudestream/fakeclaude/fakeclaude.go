@@ -42,7 +42,8 @@
 // writes none). With CF_FAKE_CLAUDE_SET_CWD_REFUSE=<message> it is refused with status
 // "error" and that message (a thread move's failure path). With
 // CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE=<path> the first set_cwd (the one that creates <path>)
-// answers needs_trust, as a Claude started before the folder was trusted does.
+// answers needs_trust, as a Claude started before the folder was trusted does;
+// CF_FAKE_CLAUDE_SET_CWD_NEEDS_TRUST (any value) answers needs_trust every time.
 // CF_FAKE_CLAUDE_SET_CWD_GATE=<path> holds every set_cwd answer until <path> exists, and
 // CF_FAKE_CLAUDE_SET_CWD_ERROR=<message> answers with a control error (a set_cwd whose
 // answer is lost). CF_FAKE_CLAUDE_SET_CWD_RESULT (any value) writes, after an ok answer, the empty
@@ -314,6 +315,9 @@ func Run(fixture string) int {
 				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true, "transcript_relocated": true}
 				if msg := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_REFUSE"); msg != "" {
 					resp["response"] = map[string]any{"status": "error", "message": msg}
+				}
+				if os.Getenv("CF_FAKE_CLAUDE_SET_CWD_NEEDS_TRUST") != "" {
+					resp["response"] = map[string]any{"status": "needs_trust"}
 				}
 				if p := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE"); p != "" {
 					if _, err := os.Stat(p); err != nil {
