@@ -105,9 +105,9 @@ function FolderRow({ workspaceId, first }: { workspaceId: string; first: boolean
 
 /**
  * One member project: kind, name, "starts here" on the default primary, its caption (the
- * GitHub slug, "local only", …); hover: Start here and Remove. A double-click or Enter
- * shows its main worktree's changes in the page's panel; an unregistered one (its id, "not
- * registered") opens nothing.
+ * GitHub slug, "local only", …); hover: Start here and Remove (workspace.remove-project, which
+ * asks first: nothing on disk goes). The row tints on hover but opens nothing (a click moves
+ * the cursor; a double-click or Enter does nothing); an unregistered one reads "not registered".
  */
 function MemberRow({ workspaceId, projectId, first }: { workspaceId: string; projectId: string; first: boolean }) {
   const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);

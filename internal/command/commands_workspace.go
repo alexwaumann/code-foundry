@@ -1,6 +1,7 @@
 package command
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
@@ -133,6 +134,12 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Args: []ArgSpec{
 				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id or name"},
 				wsArg,
+			},
+			Confirm:      "Remove {project} from the workspace? Nothing on disk is deleted, and its threads keep their checkouts; new threads in the workspace no longer check it out.",
+			ConfirmLabel: "Remove",
+			// The GUI names the project by its id: the prompt says its name, and the workspace's.
+			DynamicConfirm: func(ctx context.Context, c Context, a Args) string {
+				return removeProjectConfirm(ctx, b, r.projectNamer(ctx)(a.String("project")), cmp.Or(strings.TrimSpace(a.String("workspace")), c.ActiveWorkspaceID))
 			},
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 				w, err := ws(c, a)

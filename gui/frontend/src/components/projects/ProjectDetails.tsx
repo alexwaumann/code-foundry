@@ -1,59 +1,16 @@
 import { useShallow } from "zustand/react/shallow";
-import { Check, ChevronDown, Copy } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { ACTION_ICON } from "@/components/actions/actionIcons";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Tip } from "@/components/ui/tooltip";
 import { tildify } from "@/lib/path";
 import { actionsDetail, remoteDetail, worktreesDetail } from "@/lib/projects";
-import { useCopied } from "@/lib/useCopied";
-import { cn } from "@/lib/utils";
 import { openActionEditor } from "@/stores/actionDialog";
 import { useAction, useActionsStore, useProjectActionIds } from "@/stores/actions";
 import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
 import { SectionHeader } from "./bits";
+import { CopyPath, DetailRow } from "./DetailRow";
 import { OpenInFinder } from "./OpenInFinder";
-
-/**
- * One fact: label | value | its controls at the right. The row carries its own 12px
- * padding (the card has none), so the dividers run edge to edge. A truncated value shows
- * in full in a tooltip (`full`, when the value says it shorter: a tildified path).
- */
-function DetailRow({ label, value, full, right, testId }: { label: string; value: string; full?: string; right?: React.ReactNode; testId: string }) {
-  return (
-    <div className="grid min-h-10 grid-cols-[8.25rem_minmax(0,1fr)_auto] items-center gap-4 border-b border-cf-divider px-3 py-1 last:border-b-0" data-testid={testId}>
-      <span className="truncate text-caption text-cf-text-muted">{label}</span>
-      <Tip label={full ?? value} whenTruncated>
-        <span className="min-w-0 truncate text-body-sm text-cf-text-secondary" data-testid={`${testId}-value`}>
-          {value}
-        </span>
-      </Tip>
-      <span className="flex shrink-0 items-center gap-1">{right}</span>
-    </div>
-  );
-}
-
-/** The path's copy button: a check in the success colour for a moment after (lib/useCopied), no toast. */
-function CopyPath({ path }: { path: string }) {
-  const { copied, copy } = useCopied();
-  return (
-    <Tip label={copied ? "Copied" : "Copy path"}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        tabIndex={-1}
-        className={cn("size-7 [&_svg]:size-3.5", copied ? "text-cf-success-text hover:text-cf-success-text" : "text-cf-text-muted hover:text-cf-text")}
-        aria-label="Copy path"
-        data-testid="details-copy-path"
-        data-copied={copied || undefined}
-        onClick={() => void copy(path)}
-      >
-        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-      </Button>
-    </Tip>
-  );
-}
 
 function EditActionItem({ id, projectId }: { id: string; projectId: string }) {
   const action = useAction(id);

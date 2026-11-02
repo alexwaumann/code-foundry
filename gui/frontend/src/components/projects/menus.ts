@@ -9,7 +9,7 @@ import { cleanupMergedWorktrees, initGitIn, newTerminalIn, publishProject, remov
 import { mainWorktreePath, useProjectsStore } from "@/stores/projects";
 import { startProjectRename } from "@/stores/projectRename";
 import { openWorkspaceAddProject } from "@/stores/workspaceAddProject";
-import { newWorkspaceTerminal, removeWorkspace, revealWorkspace } from "@/stores/workspaceActions";
+import { newWorkspaceTerminal, removeWorkspace } from "@/stores/workspaceActions";
 import { startWorkspaceRename } from "@/stores/workspaceRename";
 import type { OverflowItem } from "./OverflowMenu";
 import type { RowMenuEntry } from "./rowMenu";
@@ -50,16 +50,26 @@ export function projectMenu(projectId: string, { kind, step, cleanup }: ProjectM
   return items;
 }
 
+/** The part of a workspace's menu drawn by WorkspaceMenuParts.tsx: the split Open in Finder item for its folder. */
+export interface WorkspaceMenuPart {
+  kind: "workspace-open-in";
+  testId: string;
+  workspaceId: string;
+  /** Its Open in list has Terminal (the folder has a place for one, as New terminal). */
+  terminal: boolean;
+}
+
 /**
  * A workspace's menu, one list for its index row's context menu and its page's ⋯: New thread,
- * New terminal (in its own folder; left out when it has none, `folder`), Open in Finder; Rename,
- * Add project (its page's Add project list); Remove workspace.
+ * New terminal (in its own folder; left out when it has none, `folder`), Open in Finder (a split
+ * item whose › opens the apps for its folder, as a checkout's); Rename, Add project (its page's
+ * Add project list); Remove workspace. docs/notes/workspace-page-polish.md.
  */
-export function workspaceMenu(workspaceId: string, { folder }: { folder: boolean }): OverflowItem[] {
-  const items: OverflowItem[] = [{ label: "New thread", testId: "workspace-menu-new-thread", onSelect: () => { composeInWorkspace(workspaceId); } }];
+export function workspaceMenu(workspaceId: string, { folder }: { folder: boolean }): RowMenuEntry<WorkspaceMenuPart>[] {
+  const items: RowMenuEntry<WorkspaceMenuPart>[] = [{ label: "New thread", testId: "workspace-menu-new-thread", onSelect: () => { composeInWorkspace(workspaceId); } }];
   if (folder) items.push({ label: "New terminal", testId: "workspace-menu-new-terminal", onSelect: () => void newWorkspaceTerminal(workspaceId) });
   items.push(
-    { label: "Open in Finder", testId: "workspace-menu-reveal", onSelect: () => void revealWorkspace(workspaceId) },
+    { kind: "workspace-open-in", testId: "workspace-menu-reveal", workspaceId, terminal: folder },
     "separator",
     { label: "Rename", testId: "workspace-menu-rename", onSelect: () => { startWorkspaceRename(workspaceId); } },
     { label: "Add project", testId: "workspace-menu-add-project", onSelect: () => { openWorkspaceAddProject(workspaceId); } },

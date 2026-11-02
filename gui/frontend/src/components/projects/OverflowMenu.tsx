@@ -1,8 +1,9 @@
-import { useRef, type ComponentType, type ReactNode } from "react";
+import { useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Ellipsis } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { dismissFrom, RowMenuPickContext, type RowMenuEntry, type RowMenuPart, type RowMenuParts, type RowMenuPick } from "./rowMenu";
 
 /**
  * One item of a Projects page menu (a header's or row's ⋯, a row's context menu); "separator" draws a line.
@@ -52,7 +53,33 @@ export function MenuItems({ items, parts: { Item, Separator }, onPick }: { items
   );
 }
 
+/**
+ * A menu's entries (rowMenu.ts RowMenuEntry): runs of text items go to MenuItems, an entry
+ * with a `kind` (a submenu, a split item) to the part registered for it in `parts`.
+ */
+export function MenuEntries<P extends RowMenuPart>({ entries, parts, menu, onPick }: { entries: readonly RowMenuEntry<P>[]; parts: RowMenuParts<P>; menu: MenuParts; onPick: (run: () => void) => void }) {
+  let run: OverflowItem[] = [];
+  const out: React.ReactNode[] = [];
+  const flush = () => {
+    if (run.length > 0) out.push(<MenuItems key={`items-${String(out.length)}`} items={run} parts={menu} onPick={onPick} />);
+    run = [];
+  };
+  for (const e of entries) {
+    if (e === "separator" || !("kind" in e)) {
+      run.push(e);
+      continue;
+    }
+    flush();
+    // Each kind's part takes that kind's entry (RowMenuParts); looked up by the entry's own kind.
+    const Part = (parts as unknown as Readonly<Partial<Record<string, ComponentType<{ entry: P }>>>>)[e.kind];
+    if (Part) out.push(<Part key={e.testId} entry={e} />);
+  }
+  flush();
+  return out;
+}
+
 const DROPDOWN_PARTS: MenuParts = { Item: DropdownMenuItem, Separator: DropdownMenuSeparator };
+const NO_PARTS = {};
 
 /**
  * The "More" (…) action of a Projects page row or header: a dropdown of the row's less
@@ -62,11 +89,34 @@ const DROPDOWN_PARTS: MenuParts = { Item: DropdownMenuItem, Separator: DropdownM
  * the page's list, and only then runs the picked item: a menu still animating out takes
  * the focus back when the pointer leaves its items, which would pull it out of a dialog
  * or the palette the item opened (and their focus scopes select the input on return, so
- * the next keystroke replaced what was typed).
+ * the next keystroke replaced what was typed). Entries with a `kind` (a split item) are drawn
+ * by `parts`, as in a row's right-click menu (RowContextMenu.tsx).
  */
-export function OverflowMenu({ label, items, testId, size = "sm" }: { label: string; items: readonly OverflowItem[]; testId: string; /** "md": a page title block's (28px, a 16px glyph); "sm": a row's. */ size?: "sm" | "md" }) {
+export function OverflowMenu<P extends RowMenuPart = never>({
+  label,
+  items,
+  parts,
+  testId,
+  size = "sm",
+}: {
+  label: string;
+  items: readonly RowMenuEntry<P>[];
+  parts?: RowMenuParts<P>;
+  testId: string;
+  /** "md": a page title block's (28px, a 16px glyph); "sm": a row's. */
+  size?: "sm" | "md";
+}) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const picked = useRef<(() => void) | null>(null);
+  const [pick] = useState<RowMenuPick>(() => ({
+    pick: (run) => {
+      picked.current = run;
+    },
+    close: (run, from) => {
+      picked.current = run;
+      dismissFrom(from);
+    },
+  }));
   return (
     <DropdownMenu modal={false}>
       <Tip label={label}>
@@ -117,13 +167,9 @@ export function OverflowMenu({ label, items, testId, size = "sm" }: { label: str
           run?.();
         }}
       >
-        <MenuItems
-          items={items}
-          parts={DROPDOWN_PARTS}
-          onPick={(run) => {
-            picked.current = run;
-          }}
-        />
+        <RowMenuPickContext.Provider value={pick}>
+          <MenuEntries entries={items} parts={parts ?? (NO_PARTS as RowMenuParts<P>)} menu={DROPDOWN_PARTS} onPick={pick.pick} />
+        </RowMenuPickContext.Provider>
       </DropdownMenuContent>
     </DropdownMenu>
   );

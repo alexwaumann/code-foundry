@@ -122,3 +122,40 @@ func TestWorkspaceRemoveConfirm(t *testing.T) {
 		})
 	}
 }
+
+// workspace.remove-project asks first, naming the project and the workspace by name and
+// saying nothing on disk goes.
+func TestWorkspaceRemoveProjectConfirm(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  command.Context
+		args map[string]string
+		want string
+	}{
+		{name: "named workspace", args: map[string]string{"project": "api", "workspace": "w-1"}, want: "Remove api from workspace shop? Nothing on disk is deleted"},
+		{name: "the active workspace", ctx: command.Context{ActiveWorkspaceID: "w-1"}, args: map[string]string{"project": "api"}, want: "Remove api from workspace shop?"},
+		{name: "an unknown workspace: the static prompt", args: map[string]string{"project": "api", "workspace": "nope"}, want: "Remove api from the workspace?"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, fake := newWorkspaceRegistry(t)
+			ctx := context.Background()
+			if _, err := fake.Create(ctx, workspace.CreateOptions{Name: "shop", Members: []string{"web", "api"}}); err != nil {
+				t.Fatal(err)
+			}
+			_, err := reg.Invoke(ctx, tt.ctx, "workspace.remove-project", tt.args)
+			var ce *command.ConfirmError
+			if !errors.As(err, &ce) {
+				t.Fatalf("err = %v, want a ConfirmError", err)
+			}
+			if !strings.Contains(ce.Message, tt.want) {
+				t.Fatalf("confirm %q, want %q", ce.Message, tt.want)
+			}
+			for _, call := range fake.Calls() {
+				if strings.HasPrefix(call, "RemoveProject") {
+					t.Fatalf("calls %v: removed before the confirm", fake.Calls())
+				}
+			}
+		})
+	}
+}

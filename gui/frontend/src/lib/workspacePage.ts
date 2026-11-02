@@ -1,11 +1,11 @@
 /**
  * A workspace's page on the Projects view (docs/notes/projects-redesign-3-workspace-page.md):
- * which threads its Threads table lists, in what order, the section's caption, and each
- * member's checkout state for a thread. Pure; inputs are the threads and projects slices'
- * shapes.
+ * which threads its Threads table lists, in what order, the section's caption, a member's
+ * checkout for a thread, and a thread's Changes over them. Pure; inputs are the threads and
+ * projects slices' shapes.
  */
-import type { GitStatusView, WorktreeView } from "@/api/project";
-import { changesCell, isWorking, syncCell, threadActivityMs, type ActivityThread, type ActivityThreads } from "./projects";
+import type { GitStatusView } from "@/api/project";
+import { checkoutHasChanges, isWorking, threadActivityMs, type ActivityThread, type ActivityThreads } from "./projects";
 
 /** A thread row's navigation key on a workspace's page. */
 export const workspaceThreadKey = (workspaceId: string, threadId: string): string => `wt:${workspaceId}::${threadId}`;
@@ -55,42 +55,34 @@ export function memberCheckoutPath(t: Pick<ActivityThread, "projectId" | "projec
   return t.projectId === projectId ? t.worktreePath : "";
 }
 
-export interface MemberCheckoutInput {
-  /** The member is in the thread's set. */
-  inSet: boolean;
-  /** The checkout's path (memberCheckoutPath); "" with none recorded. */
-  path: string;
-  /** The member project is registered and a git repository (false: a plain folder). */
-  git: boolean;
-  /** The project is registered. */
-  known: boolean;
-  /** The project's worktree at the path, when the projects slice has it. */
-  worktree: Pick<WorktreeView, "isMain" | "status"> | undefined;
-}
+type ChangesStatus = Pick<GitStatusView, "staged" | "modified" | "untracked" | "conflicted" | "dirty" | "baseAhead">;
+
+const count = (n: number, one: string): string => `${String(n)} ${n === 1 ? one : `${one}s`}`;
 
 /**
- * A member's cell in a thread's row: what is uncommitted, then where the branch stands:
- * "clean · up to date", "4 files · 2 to push", "clean · merged" (pushed once, nothing to
- * push and every commit on the default branch), "2 files · no commits yet" (never pushed,
- * nothing committed: a fresh branch, not a merged one, though the daemon's merged_clean
- * says so for both), "clean · not pushed"; or "not in this thread", "made at the next
- * start" (worktree mode, not made yet), "folder · no git", "not registered".
+ * A thread row's Changes cell, over its member checkouts' statuses (the ones the projects
+ * slice has): uncommitted files and commits on its branch summed, "3 files · 2 commits";
+ * "changed" when git says dirty without counts; "clean" with nothing; "" without a status to
+ * read (no checkout made yet), drawn as "—".
  */
-export function memberCheckoutState(m: MemberCheckoutInput): string {
-  if (!m.inSet) return "not in this thread";
-  if (!m.known) return "not registered";
-  if (!m.git) return "folder · no git";
-  if (!m.path || !m.worktree) return "made at the next start";
-  const st = m.worktree.status;
-  return `${changesCell(st)} · ${branchState(st, m.worktree.isMain)}`;
+export function threadChangesCell(statuses: readonly ChangesStatus[]): string {
+  if (statuses.length === 0) return "";
+  let files = 0;
+  let commits = 0;
+  let dirty = false;
+  for (const st of statuses) {
+    files += st.staged + st.modified + st.untracked + (st.conflicted ?? 0);
+    commits += st.baseAhead ?? 0;
+    dirty ||= st.dirty;
+  }
+  const parts: string[] = [];
+  if (files > 0) parts.push(count(files, "file"));
+  else if (dirty) parts.push("changed");
+  if (commits > 0) parts.push(count(commits, "commit"));
+  return parts.length === 0 ? "clean" : parts.join(" · ");
 }
 
-/** Where a checkout's branch stands against its upstream and the default branch (memberCheckoutState). */
-function branchState(st: GitStatusView, isMain: boolean): string {
-  const onBase = Boolean(st.baseRef) && (st.baseAhead ?? 0) === 0;
-  if (!isMain && onBase && st.ahead === 0) {
-    if (st.upstream) return st.behind > 0 ? syncCell(st) : "merged";
-    return "no commits yet";
-  }
-  return syncCell(st);
+/** The member checkouts of a thread whose changes its row's menu offers to show: the ones not clean (lib/projects.ts checkoutHasChanges). */
+export function changedCheckouts<T extends { status: ChangesStatus | undefined }>(checkouts: readonly T[]): T[] {
+  return checkouts.filter((c) => c.status !== undefined && checkoutHasChanges(c.status));
 }

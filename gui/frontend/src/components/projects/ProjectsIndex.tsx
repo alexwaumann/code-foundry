@@ -53,6 +53,7 @@ import { RowContextMenu } from "./RowContextMenu";
 import { useCleanableCount } from "./useCleanable";
 import { useProjectLastMs, useProjectOrder, useWorkspaceLastMs, useWorkspaceOrder } from "./useOrder";
 import { useWorkspaceTerminal } from "./workspaceHooks";
+import { WORKSPACE_MENU_PARTS } from "./WorkspaceMenuParts";
 import { WorkspaceNameEditor } from "./WorkspaceNameEditor";
 
 const SEP = "\u0001";
@@ -246,7 +247,7 @@ function WorkspaceRow({ id, columns, cols }: { id: string; columns: IndexColumns
   const renaming = useWorkspaceRenameStore((s) => s.renamingWorkspaceId === id);
   useEffect(() => () => { endWorkspaceRename(id); }, [id]);
   return (
-    <RowContextMenu navKey={workspaceKey(id)} testId="workspace-row-menu" items={() => workspaceMenu(id, { folder: terminal })}>
+    <RowContextMenu navKey={workspaceKey(id)} testId="workspace-row-menu" items={() => workspaceMenu(id, { folder: terminal })} parts={WORKSPACE_MENU_PARTS}>
       <NavRow navKey={workspaceKey(id)} activateOnClick className={ROW}>
         <span className={ROW_INNER} style={{ gridTemplateColumns: cols }} data-testid="index-workspace" data-workspace={id}>
           <span className="flex min-w-0 items-center gap-3">

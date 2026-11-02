@@ -13,7 +13,7 @@ import { PermissionMode, PlacementOutcome, ThreadFlagLevel, ThreadKind, ThreadSt
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
-import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
+import { EDITOR_APPS, MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
 import { bridgeCommands } from "./bridgeCommands";
@@ -4028,6 +4028,15 @@ export class World {
             { name: "project", type: ArgType.STRING, required: true, description: "Project id or name" },
             { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name (default: the active workspace)" },
           ],
+          // Like the daemon's DynamicConfirm: the project and the workspace by name.
+          confirm: (ctx, args) => {
+            const project = this.projects.get(args.project ?? "")?.name ?? args.project ?? "";
+            const ref = args.workspace || ctx?.activeWorkspaceId || "";
+            const ws = [...this.workspaces.values()].find((w) => w.id === ref || w.name.toLowerCase() === ref.toLowerCase());
+            const tail = "? Nothing on disk is deleted, and its threads keep their checkouts; new threads in the workspace no longer check it out.";
+            return ws ? `Remove ${project} from workspace ${ws.name}${tail}` : `Remove ${project} from the workspace${tail}`;
+          },
+          confirmLabel: "Remove",
         },
         when: always,
         run: (ctx, args) => {
@@ -4067,6 +4076,25 @@ export class World {
         },
         when: (ctx) => Boolean(ctx?.activeWorkspaceId || !ctx?.activeView || ctx.activeView === "projects"),
         run: (ctx, args) => `revealed ${this.workspaceDirOf(this.workspaceRef(args.workspace || ctx?.activeWorkspaceId || ""))}`,
+      },
+      {
+        cmd: {
+          name: "workspace.open.editor", noPalette: true,
+          title: "Open Workspace in Editor",
+          category: "Workspace",
+          description: "Open a workspace's folder (its root when it has one, else its own folder) in an installed editor app.",
+          keybindings: [],
+          args: [
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name (default: the active workspace)" },
+            { name: "app", type: ArgType.STRING, required: true, description: "The editor app's bundle id (`worktree editors` lists them)" },
+          ],
+        },
+        when: (ctx) => Boolean(ctx?.activeWorkspaceId || !ctx?.activeView || ctx.activeView === "projects"),
+        run: (ctx, args) => {
+          const app = EDITOR_APPS.find((a) => a.bundleId === args.app);
+          if (!app) throw new CommandError("invalid", `no installed editor has bundle id "${args.app ?? ""}"`);
+          return `opened ${this.workspaceDirOf(this.workspaceRef(args.workspace || ctx?.activeWorkspaceId || ""))} in ${app.name}`;
+        },
       },
       {
         cmd: {

@@ -88,3 +88,16 @@ func removeWorkspaceConfirm(ctx context.Context, b WorkspaceBackend, ref string)
 	}
 	return "Remove workspace " + w.GetName() + "? Its instructions and skills are deleted too."
 }
+
+// removeProjectConfirm is workspace.remove-project's prompt: the project (by its name) and
+// the workspace ref names (by its name; "" when it cannot be read: the static prompt).
+func removeProjectConfirm(ctx context.Context, b WorkspaceBackend, project, ref string) string {
+	if ref == "" {
+		return ""
+	}
+	w, err := findWorkspace(ctx, b, ref)
+	if err != nil {
+		return ""
+	}
+	return "Remove " + project + " from workspace " + w.GetName() + "? Nothing on disk is deleted, and its threads keep their checkouts; new threads in the workspace no longer check it out."
+}

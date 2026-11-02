@@ -1,31 +1,14 @@
-import { useContext, useRef, useState, type ComponentType } from "react";
+import { useContext, useRef, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { NavContext } from "@/lib/nav";
-import { MenuItems, type MenuParts, type OverflowItem } from "./OverflowMenu";
+import { MenuEntries, type MenuParts } from "./OverflowMenu";
 import { dismissFrom, RowMenuPickContext, type RowMenuEntry, type RowMenuPart, type RowMenuParts, type RowMenuPick } from "./rowMenu";
 
 const CONTEXT_PARTS: MenuParts = { Item: ContextMenuItem, Separator: ContextMenuSeparator };
 
-/** The entries, built when the menu opens (Radix mounts the content only then); runs of text items go to MenuItems. */
+/** The entries, built when the menu opens (Radix mounts the content only then). */
 function OpenItems<P extends RowMenuPart>({ items, parts, onPick }: { items: () => readonly RowMenuEntry<P>[]; parts: RowMenuParts<P>; onPick: (run: () => void) => void }) {
-  let run: OverflowItem[] = [];
-  const out: React.ReactNode[] = [];
-  const flush = () => {
-    if (run.length > 0) out.push(<MenuItems key={`items-${String(out.length)}`} items={run} parts={CONTEXT_PARTS} onPick={onPick} />);
-    run = [];
-  };
-  for (const e of items()) {
-    if (e === "separator" || !("kind" in e)) {
-      run.push(e);
-      continue;
-    }
-    flush();
-    // Each kind's part takes that kind's entry (RowMenuParts); looked up by the entry's own kind.
-    const Part = (parts as unknown as Readonly<Partial<Record<string, ComponentType<{ entry: P }>>>>)[e.kind];
-    if (Part) out.push(<Part key={e.testId} entry={e} />);
-  }
-  flush();
-  return out;
+  return <MenuEntries entries={items()} parts={parts} menu={CONTEXT_PARTS} onPick={onPick} />;
 }
 
 /**

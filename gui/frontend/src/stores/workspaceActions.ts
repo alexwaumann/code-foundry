@@ -67,6 +67,11 @@ export function revealWorkspace(workspaceId: string): Promise<boolean> {
   return runCommand("workspace.reveal", { workspace: workspaceId }, workspaceContext(workspaceId));
 }
 
+/** workspace.open.editor: its root, else its own folder, in an installed editor app (its bundle id). */
+export function openWorkspaceInEditor(workspaceId: string, app: string): Promise<boolean> {
+  return runCommand("workspace.open.editor", { workspace: workspaceId, app }, workspaceContext(workspaceId));
+}
+
 /**
  * Where a workspace's New terminal starts and who owns the shell: its folder (workspaceFolder), owned by the
  * first registered member's main checkout (a shell belongs to a thread or a worktree, and the folder is

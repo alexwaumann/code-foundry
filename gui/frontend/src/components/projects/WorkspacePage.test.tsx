@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/daemonFakes")).ghFakes }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
+vi.mock("@/api/gitops", async (orig) => ({ ...(await orig<typeof import("@/api/gitops")>()), ...(await import("@/test/cardFakes")).cardGitopsFakes }));
 
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { NewWorkspaceDialog } = await import("./NewWorkspaceDialog");
@@ -18,6 +19,8 @@ const { useWorkspaceAddProjectStore } = await import("@/stores/workspaceAddProje
 const { useWorkspacesStore } = await import("@/stores/workspaces");
 const { useViewsStore } = await import("@/stores/views");
 const { useProjectsStore } = await import("@/stores/projects");
+const { card } = await import("@/test/cardFakes");
+const { editorAppsResource } = await import("@/stores/threadInfo");
 
 /**
  * A workspace's page (docs/notes/projects-redesign-3-workspace-page.md) and the New workspace
@@ -61,6 +64,15 @@ async function nextFrame() {
 
 function openDropdown(trigger: HTMLElement, menuTestId: string): HTMLElement {
   fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+  return screen.getByTestId(menuTestId);
+}
+
+/** A submenu's trigger, focused, then ArrowRight (Radix's keyboard path into it). */
+function openSub(trigger: HTMLElement, menuTestId: string): HTMLElement {
+  act(() => {
+    trigger.focus();
+  });
+  fireEvent.keyDown(trigger, { key: "ArrowRight" });
   return screen.getByTestId(menuTestId);
 }
 
@@ -110,6 +122,8 @@ beforeEach(() => {
   seedWorld();
   resetPanels();
   resetInstructionsPresses();
+  card.editors = [{ name: "VS Code", bundleId: "com.microsoft.VSCode", path: "/Applications/Visual Studio Code.app" }];
+  editorAppsResource.store.setState({ entries: {} });
   useWorkspaceAddProjectStore.setState({ addingTo: null });
   useNewWorkspaceDialogStore.setState({ open: false });
 });
@@ -119,7 +133,7 @@ afterEach(() => {
 });
 
 describe("the workspace page's header", () => {
-  it("the title block: name, projects and contents; its ⋯ has the row's items (New thread first), Open in Finder is workspace.reveal; the pane header holds no buttons", async () => {
+  it("the title block: name, projects and contents; its ⋯ has the row's items (New thread first), Open in Finder (a split item) is workspace.reveal; the pane header holds no buttons", async () => {
     const { mono } = twoWorkspaces();
     renderPage(mono);
     await settle();
@@ -134,6 +148,7 @@ describe("the workspace page's header", () => {
     expect(menuEntries(menu)).toEqual(["New thread", "New terminal", "Open in Finder", "Rename", "Add project", "Remove workspace"]);
     await pick(menu, "workspace-menu-reveal");
     expect(lastInvocation("workspace.reveal")?.args).toEqual({ workspace: mono });
+    expect(screen.queryByTestId("workspace-page-more-menu")).toBeNull();
     fireEvent.click(by(body(mono), "workspace-folder-reveal"));
     await settle();
     expect(invocationsOf("workspace.reveal").map((i) => i.args)).toEqual([{ workspace: mono }, { workspace: mono }]);
@@ -148,6 +163,31 @@ describe("the workspace page's header", () => {
     renderPage(ws.id);
     await settle();
     expect(menuEntries(openDropdown(screen.getByTestId("workspace-page-more"), "workspace-page-more-menu"))).toEqual(["New thread", "Open in Finder", "Rename", "Add project", "Remove workspace"]);
+    // Its Open in list has no Terminal either (no place for one).
+    const split = within(screen.getByTestId("workspace-page-more-menu")).getByTestId("workspace-menu-reveal");
+    expect(menuEntries(openSub(split, "workspace-menu-reveal-menu"), true)).toEqual(["Finder", "VS Code"]);
+  });
+
+  it("the ⋯'s Open in Finder ›: Finder, the editors (workspace.open.editor on its folder), then Terminal in its folder", async () => {
+    const { mono } = twoWorkspaces();
+    renderPage(mono);
+    await settle();
+    const split = () => within(openDropdown(screen.getByTestId("workspace-page-more"), "workspace-page-more-menu")).getByTestId("workspace-menu-reveal");
+    let apps = openSub(split(), "workspace-menu-reveal-menu");
+    expect(menuEntries(apps, true)).toEqual(["Finder", "VS Code", "—", "Terminal"]);
+    fireEvent.click(within(apps).getByTestId("open-in-editor"));
+    await settle();
+    expect(screen.queryByTestId("workspace-page-more-menu")).toBeNull();
+    expect(lastInvocation("workspace.open.editor")?.args).toEqual({ workspace: mono, app: "com.microsoft.VSCode" });
+    expect(lastInvocation("workspace.open.editor")?.context).toMatchObject({ activeView: "projects", activeWorkspaceId: mono });
+    apps = openSub(split(), "workspace-menu-reveal-menu");
+    fireEvent.click(within(apps).getByTestId("open-in-terminal"));
+    await settle();
+    expect(lastInvocation("terminal.new")?.args.cwd).toBe("/Users/dev/mono");
+    // A click on its › block opens the apps instead of revealing.
+    fireEvent.click(within(split()).getByTestId("workspace-menu-reveal-more"));
+    expect(screen.getByTestId("workspace-menu-reveal-menu")).toBeTruthy();
+    expect(invocationsOf("workspace.reveal")).toHaveLength(0);
   });
 
   it("rename from the header's menu: a taken name is refused, Escape keeps, Enter renames once, leaving the field renames once", async () => {
@@ -296,8 +336,9 @@ describe("the workspace's Projects card", () => {
     expect(body(rooted.id).querySelector('[data-testid="workspace-member"][data-default]')).toBeNull();
   });
 
-  it("Add project lists the registered projects not in it; Remove takes one out without asking", async () => {
+  it("Add project lists the registered projects not in it; Remove asks first (nothing on disk goes), then takes one out", async () => {
     const { shop } = twoWorkspaces();
+    confirmFirst("workspace.remove-project", "Remove ghostty-playground from workspace shop? Nothing on disk is deleted, and its threads keep their checkouts.");
     renderPage(shop);
     await settle();
     fireEvent.click(by(body(shop), "workspace-add-member"));
@@ -315,9 +356,12 @@ describe("the workspace's Projects card", () => {
     const remove = by(member(shop, "repo-gp"), "member-remove");
     expect(remove.textContent).toBe("Remove");
     fireEvent.click(remove);
+    const dialog = await screen.findByTestId("confirm-dialog");
+    expect(dialog.textContent).toContain("Remove ghostty-playground from workspace shop? Nothing on disk is deleted");
+    fireEvent.click(screen.getByTestId("confirm-ok"));
     await settle();
+    expect(invocationsOf("workspace.remove-project").map((i) => i.confirmed)).toEqual([false, true]);
     expect(lastInvocation("workspace.remove-project")?.args).toEqual({ project: "repo-gp", workspace: shop });
-    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
     // Once the folder starts threads (the mock's fallback; the daemon picks the first member left), a synthetic workspace's folder row shows.
     updateWorkspace(shop, (w) => ({ ...w, members: w.members.filter((m) => m.projectId !== "repo-gp"), defaultPrimary: "workspace" }));
     expect(texts(body(shop), "member-name")).toEqual(["code-foundry", "writing"]);
@@ -359,7 +403,7 @@ describe("the workspace's Projects card", () => {
     expect(within(body(mono)).queryAllByTestId("workspace-member")).toHaveLength(0);
   });
 
-  it("an unregistered member reads “not registered”", async () => {
+  it("an unregistered member reads “not registered”; no member row opens anything (the rows tint on hover only)", async () => {
     const ws = addWorkspace("sk", ["repo-sk", "repo-cf"]);
     removeProject("repo-sk");
     renderPage(ws.id);
@@ -367,21 +411,25 @@ describe("the workspace's Projects card", () => {
     const sk = member(ws.id, "repo-sk");
     expect(by(sk, "workspace-member").getAttribute("data-unregistered")).toBe("true");
     expect(sk.textContent).toContain("not registered");
-    // It opens nothing, by a double click or Enter; a registered one shows its main checkout's changes.
+    // A click moves the cursor; a double click or Enter opens nothing, on a registered one too.
     fireEvent.click(sk);
     fireEvent.doubleClick(sk);
     expect(sk.getAttribute("aria-selected")).toBe("true");
     fireEvent.keyDown(list(), { key: "Enter" });
     expect(pagePanel(ws.id)).toBeNull();
-    fireEvent.doubleClick(member(ws.id, "repo-cf"));
-    expect(pagePanel(ws.id)).toMatchObject({ open: true, kind: "changes", title: "Changes · code-foundry", params: { project: "repo-cf" } });
+    const cf = member(ws.id, "repo-cf");
+    fireEvent.doubleClick(cf);
+    expect(cf.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(list(), { key: "Enter" });
+    expect(pagePanel(ws.id)).toBeNull();
+    expect(selection()).toEqual(workspacePage(ws.id));
   });
 });
 
 describe("the workspace's Threads table", () => {
-  it("one column per member with its checkout, working first, archived only counted; the row menu; a click opens the thread", async () => {
+  it("Branch | Thread | Changes over every member, working first, archived only counted; the row menu shows changes only where there are some; a click opens the thread", async () => {
     const ws = addWorkspace("platform", ["repo-cf", "repo-gp", "repo-wr"], { primary: "repo-cf" });
-    const idle = workspaceThread(ws.id, "s-helper", { name: "helper" });
+    const idle = workspaceThread(ws.id, "s-helper", { name: "helper", branch: "cf/helper" });
     const driver = workspaceThread(ws.id, "s-driver", { name: "driver", status: "busy" });
     workspaceThread(ws.id, "s-old", { name: "old", archived: true });
     // ghostty-playground's worktree has two files changed.
@@ -391,24 +439,30 @@ describe("the workspace's Threads table", () => {
     await settle();
     const b = body(ws.id);
     expect(by(b, "workspace-threads-title").textContent).toMatch(/Threads\s*· 1 working · 1 idle · 1 archived/);
-    expect(by(b, "threads-head").textContent).toMatch(/Branch\s*Thread\s*code-foundry\s*ghostty-playground\s*writing/);
+    expect(by(b, "threads-head").textContent).toBe("BranchThreadChanges");
     expect(within(b).getAllByTestId("workspace-thread")).toHaveLength(2);
-    const nameStatus = texts(b, "thread-name-status");
-    expect(nameStatus[0]).toMatch(/driver\s*·\s*working/);
-    expect(nameStatus[1]).toMatch(/helper\s*·\s*idle/);
+    // The name alone: the status is the dot (live while it works), no word.
+    expect(texts(b, "thread-name")).toEqual(["driver", "helper"]);
     const d = threadRow(ws.id, driver.id);
     expect(by(d, "thread-branch").textContent).toBe("cf/platform");
     expect(d.querySelectorAll('[data-live="true"]')).toHaveLength(1);
-    expect(texts(d, "thread-member-state")).toEqual(["clean · no commits yet", "2 files · no commits yet", "folder · no git"]);
+    expect(by(d, "thread-changes").textContent).toBe("2 files");
+    expect(by(threadRow(ws.id, idle.id), "thread-changes").textContent).toBe("clean");
+    expect(by(threadRow(ws.id, idle.id), "thread-changes").getAttribute("data-clean")).toBe("true");
 
-    // A project added to the workspace later is not in the thread's set.
-    updateWorkspace(ws.id, (w) => ({ ...w, members: [...w.members, { projectId: "repo-dot", worktreePath: "" }] }));
-    expect(d.querySelector('[data-testid="thread-member-state"][data-project="repo-dot"]')?.textContent).toBe("not in this thread");
-    expect(texts(b, "threads-col-member")).toEqual(["code-foundry", "dotfiles", "ghostty-playground", "writing"]);
+    // Commits on code-foundry's checkout add up with ghostty-playground's files.
+    const cfPath = "/wt/repo-cf/cf-platform";
+    updateProject("repo-cf", (p) => ({ ...p, worktrees: p.worktrees.map((w) => (w.path === cfPath ? { ...w, status: status({ upstream: "", baseRef: "origin/main", baseAhead: 2 }) } : w)) }));
+    expect(by(d, "thread-changes").textContent).toBe("2 files · 2 commits");
 
-    // The row menu: each git member's changes, Finder, the path.
+    // The row menu: Show changes only for the members with some, then Finder and the path.
     let menu = openDropdown(by(d, "thread-more"), "thread-more-menu");
     expect(menuEntries(menu)).toEqual(["Show changes in code-foundry", "Show changes in ghostty-playground", "Open in Finder", "Copy path"]);
+    fireEvent.keyDown(menu, { key: "Escape" });
+    await settle();
+    updateProject("repo-cf", (p) => ({ ...p, worktrees: p.worktrees.map((w) => (w.path === cfPath ? { ...w, status: status({ upstream: "" }) } : w)) }));
+    menu = openDropdown(by(d, "thread-more"), "thread-more-menu");
+    expect(menuEntries(menu)).toEqual(["Show changes in ghostty-playground", "Open in Finder", "Copy path"]);
     fireEvent.click(within(menu).getByText("Show changes in ghostty-playground"));
     await settle();
     expect(pagePanel(ws.id)).toMatchObject({ open: true, kind: "changes", params: { project: "repo-gp", path: gpPath } });
@@ -437,8 +491,11 @@ describe("the workspace's Threads table", () => {
     renderPage(mono);
     await settle();
     const r = threadRow(mono, t.id);
-    expect(texts(r, "thread-member-state")).toEqual(["clean · no commits yet"]);
-    await pick(openDropdown(by(r, "thread-more"), "thread-more-menu"), "thread-menu-reveal");
+    expect(by(r, "thread-changes").textContent).toBe("clean");
+    // Nothing changed: no Show changes.
+    const menu = openDropdown(by(r, "thread-more"), "thread-more-menu");
+    expect(menuEntries(menu)).toEqual(["Open in Finder", "Copy path"]);
+    await pick(menu, "thread-menu-reveal");
     expect(lastInvocation("workspace.reveal")?.args).toEqual({ workspace: mono });
   });
 
@@ -450,7 +507,6 @@ describe("the workspace's Threads table", () => {
     renderPage(ws.id);
     await settle();
     expect(texts(body(ws.id), "member-name")).toEqual(["dotfiles", "ghostty-playground", "Zebra"]);
-    expect(texts(body(ws.id), "threads-col-member")).toEqual(["dotfiles", "ghostty-playground", "Zebra"]);
     expect(document.activeElement).toBe(list());
     const cursor = () => document.querySelector('[aria-selected="true"][data-nav-key]')?.getAttribute("data-nav-key");
     fireEvent.keyDown(list(), { key: "ArrowDown" });
@@ -473,10 +529,12 @@ describe("the workspace's Instructions and skills", () => {
     expect(by(s, "workspace-instructions-label").textContent).toBe("CLAUDE.md");
     expect(by(s, "workspace-instructions-none").textContent).toBe("None yet");
     expect(by(s, "workspace-edit-instructions").textContent).toBe("Write instructions");
-    expect(by(s, "workspace-instructions-reach").textContent).toBe("(starts a thread)");
+    // Whom it reaches is its tooltip, not text on the row.
+    expect(tooltipText(by(s, "workspace-edit-instructions"))).toBe("Starts a thread");
+    expect(by(s, "workspace-instructions").textContent).not.toMatch(/starts a thread/i);
+    expect(maybe(s, "workspace-instructions-open")).toBeNull();
     expect(by(s, "workspace-skills-none").textContent).toBe("None yet");
-    expect(by(s, "workspace-folder-path").textContent).toMatch(new RegExp(`/workspaces/${shop}$`));
-    expect(by(s, "workspace-folder-kind").textContent).toBe("kept by the app");
+    expect(by(s, "workspace-folder-path").textContent).toMatch(new RegExp(`/workspaces/${shop} · kept by the app$`));
 
     // What a thread writes in the workspace's folder shows up (the daemon re-reads it after a turn).
     updateWorkspace(shop, (w) => ({ ...w, instructions: `${w.managedDir ?? ""}/AGENTS.md`, skills: ["docs", "lint"] }));
@@ -499,8 +557,17 @@ describe("the workspace's Instructions and skills", () => {
     expect(by(m, "workspace-instructions").getAttribute("data-file")).toBe("/Users/dev/mono/CLAUDE.md");
     expect(by(m, "workspace-instructions-path").textContent).toBe("~/mono/CLAUDE.md");
     expect(by(m, "workspace-skills-list").textContent).toBe("demo, release");
-    expect(by(m, "workspace-folder-path").textContent).toBe("~/mono");
-    expect(by(m, "workspace-folder-kind").textContent).toBe("its root");
+    expect(by(m, "workspace-folder-path").textContent).toBe("~/mono · its root");
+
+    // The folder row: Copy path, and Open in Finder with its Open in list for the root.
+    expect(by(m, "workspace-folder-copy-path").getAttribute("aria-label")).toBe("Copy path");
+    fireEvent.click(by(m, "workspace-folder-reveal"));
+    await settle();
+    expect(lastInvocation("workspace.reveal")?.args).toEqual({ workspace: mono });
+    const apps = openDropdown(by(m, "workspace-folder-open-in-more"), "workspace-folder-open-in-menu");
+    expect(menuEntries(apps, true)).toEqual(["Finder", "VS Code", "—", "Terminal"]);
+    await pick(apps, "workspace-folder-open-editor");
+    expect(lastInvocation("workspace.open.editor")?.args).toEqual({ workspace: mono, app: "com.microsoft.VSCode" });
 
     // View: the root's instructions as a File tab in the workspace page's own panel.
     fireEvent.click(by(m, "workspace-instructions-open"));
@@ -515,7 +582,7 @@ describe("the workspace's Instructions and skills", () => {
     renderPage(mono);
     await settle();
     const m = body(mono);
-    expect(by(m, "workspace-instructions-reach").textContent).toBe("(starts a thread)");
+    expect(by(m, "workspace-edit-instructions").getAttribute("data-reach")).toBe("Starts a thread");
     fireEvent.click(by(m, "workspace-edit-instructions"));
     await settle();
     const started = lastInvocation("thread.new");
@@ -525,7 +592,7 @@ describe("the workspace's Instructions and skills", () => {
 
     // Again while that thread is still on its first turn: it is only shown, nothing is sent or started.
     addThreads(thread("s-new", { name: "s-new", projectId: "", projectIds: ["repo-dot"], workspaceId: mono, worktreePath: "/Users/dev/mono", state: "starting", status: "busy" }));
-    expect(by(m, "workspace-instructions-reach").textContent).toMatch(/^\(sends to /);
+    expect(by(m, "workspace-edit-instructions").getAttribute("data-reach")).toMatch(/^Sends to /);
     fireEvent.click(by(m, "workspace-edit-instructions"));
     await settle();
     expect(selection()).toEqual({ kind: "thread", id: "s-new" });
@@ -553,7 +620,7 @@ describe("the workspace's Instructions and skills", () => {
     addThreads(thread("s-driver", { name: "driver", projectId: "", projectIds: ["repo-dot"], workspaceId: mono, worktreePath: "/Users/dev/mono", state: "connected", status: "busy" }));
     renderPage(mono);
     await settle();
-    expect(by(body(mono), "workspace-instructions-reach").textContent).toBe("(sends to driver)");
+    expect(tooltipText(by(body(mono), "workspace-edit-instructions"))).toBe("Sends to driver");
     fireEvent.click(by(body(mono), "workspace-edit-instructions"));
     await settle();
     expect(selection()).toEqual({ kind: "thread", id: "s-driver" });
