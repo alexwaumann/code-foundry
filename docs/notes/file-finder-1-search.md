@@ -181,3 +181,11 @@ merged the same way; empty when every word matched the path.
   ghostty-playground's `src/tree.zig` first (project positions 0-6), then code-foundry's
   `docs/ghostty-tree.md`, then `src/subtree/x.zig`; `gh zig tree` both zig files with name
   positions 0-1; `readme gp` README.md with name positions 0 and 8; `code foundry` nothing.
+* Review of per-word matching: one-word queries checked against the code before the word
+  split (3,000 random searches over one to three sources, non-ASCII and spaces included):
+  the same order, path and name positions. Added the 8-word cap and the shared score for
+  repeated words, table tests for `comp COMP`, `tree tree`, `ghostty Ghostty tree`, a
+  check that RankSources' cached score is the best ScoreWords over Splits, and
+  `BenchmarkRankSources`. A scratch daemon (`CODE_FOUNDRY_HOME=/tmp/...`, one scratch repo
+  under home, curl over the socket): eight one-letter words find `src/index.ts`, nine are
+  InvalidArgument ("query has 9 words, at most 8"), `tree tree` as `tree`.
