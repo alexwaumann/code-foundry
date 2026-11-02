@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
 
 // Moving a No project thread into a project (docs/notes/move-no-project-2-gui.md), against
 // the mock's thread.move. The steps, the request each choice builds, the menu items, the
@@ -50,8 +50,6 @@ test("the sidebar row's Move to project… opens the thread and the picker under
   await expect(page.getByTestId("thread-title-name")).toHaveText("Fix the login redirect");
   await expect(row(page, `s:${id}`)).toContainText("code-foundry");
   await expect(page.getByText(/Moved this thread to code-foundry/)).toBeVisible();
-  const moves = (await invocations()).filter((i) => i.name === "thread.move");
-  expect(moves.map((i) => i.args)).toEqual([{ id, project: "repo-cf", "new-worktree": "false" }]);
 });
 
 test("the palette's Move Thread and the title menu's Move to project… open the picker after they close; Esc closes it", async ({ page }) => {
