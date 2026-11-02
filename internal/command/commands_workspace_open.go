@@ -106,4 +106,3 @@ func installedEditor(ctx context.Context, b GitOpsBackend, bundle string) (*v1.E
 	}
 	return nil, InvalidArg("app", "no installed editor has bundle id %q (installed: %s)", bundle, cmp.Or(strings.Join(names, ", "), "none"))
 }
-
