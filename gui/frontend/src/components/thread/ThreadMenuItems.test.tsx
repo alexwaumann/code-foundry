@@ -23,6 +23,7 @@ const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useWorkspacesStore } = await import("@/stores/workspaces");
+const { useMovePickerStore } = await import("@/stores/movePicker");
 
 const cmd = (name: string): CommandView => ({ name, title: name, description: "", category: "", args: [], keybindings: [], available: true });
 const thread = (o: Partial<ThreadView>) =>
@@ -36,6 +37,7 @@ const thread = (o: Partial<ThreadView>) =>
     checkoutPaths: [],
     branch: "",
     pendingWorktreePath: "",
+    pendingMove: null,
     pinned: false,
     archivedAtMs: null,
     snoozedUntilMs: null,
@@ -58,6 +60,7 @@ beforeEach(() => {
   useProjectsStore.setState({ byId: { web: PROJECT("web"), api: PROJECT("api") } as never, order: ["web", "api"] });
   useWorkspacesStore.setState({ byId: {}, order: [] });
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+  useMovePickerStore.setState({ open: null, sending: {} });
 });
 
 afterEach(() => {
@@ -102,9 +105,30 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "—", "Archive"]);
   });
 
-  it("a thread without a project: no second group", () => {
+  it("a thread without a project: Move to project… after the names, no second group", () => {
     setThread({ projectId: "", projectIds: [], worktreePath: "/Users/me" });
-    expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "Archive"]);
+    expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Move to project…", "—", "Pin", "Snooze", "—", "Archive"]);
+  });
+
+  it.each<[string, Partial<ThreadView>]>([
+    ["a project thread", {}],
+    ["a workspace folder thread", { projectId: "", projectIds: [], workspaceId: "w-docs", worktreePath: "/ws" }],
+    ["an archived thread without a project", { projectId: "", projectIds: [], worktreePath: "/Users/me", archivedAtMs: 1 }],
+    ["a thread without a project that is moving", { projectId: "", projectIds: [], worktreePath: "/Users/me", pendingMove: { projectId: "web", workspaceId: "", worktreePath: "", branch: "" } }],
+  ])("no Move to project… for %s", (_, o) => {
+    setThread(o);
+    expect(entries(openRowMenu())).not.toContain("Move to project…");
+  });
+
+  it("Move to project… from the sidebar row opens the thread and its move picker", async () => {
+    setThread({ projectId: "", projectIds: [], worktreePath: "/Users/me" });
+    useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });
+    const menu = openRowMenu();
+    fireEvent.click(within(menu).getByText("Move to project…"));
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
+    await waitFor(() => {
+      expect(useMovePickerStore.getState().open).toBe("s-1");
+    });
   });
 
   it("a thread in its workspace's folder: New thread on this branch, no Save as workspace; the same set outside the folder is offered it (composer-fixes.spec.ts)", () => {
