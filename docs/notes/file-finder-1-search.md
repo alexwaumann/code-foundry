@@ -168,3 +168,10 @@ merged the same way; empty when every word matched the path.
   built from slices of the sources' names and paths (641 searches used project words), plus
   20,000 random ScoreWords/PositionsWords cases: identical order, scores and positions
   everywhere. The four e2e specs above pass with it.
+* Per-word matching through a scratch daemon (`CODE_FOUNDRY_HOME=/tmp/...`, two scratch
+  repos named code-foundry and ghostty-playground, curl): `comp tsx` and `tsx   comp` find
+  `.../compose/Composer.tsx` first and `.../components/Thread.tsx` second, positions across
+  both words; `comp zzz` nothing; `composer` as before; `tree` unchanged; `ghostty tree`
+  ghostty-playground's `src/tree.zig` first (project positions 0-6), then code-foundry's
+  `docs/ghostty-tree.md`, then `src/subtree/x.zig`; `gh zig tree` both zig files with name
+  positions 0-1; `readme gp` README.md with name positions 0 and 8; `code foundry` nothing.
