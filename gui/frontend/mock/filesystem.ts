@@ -287,12 +287,12 @@ const MAX_SOURCES = 16;
 const BOUNDARY_BONUS = 4;
 const NONE = -(2 ** 30);
 
-/** Code points, each lower-cased on its own so indices stay those of the original (Go's unicode.ToLower). */
+/**
+ * Code points, each lower-cased on its own so indices stay those of the original (Go's
+ * unicode.ToLower). JavaScript lowers "İ" to "i" plus a combining dot; Go to "i", the first.
+ */
 function lowerRunes(s: string): string[] {
-  return Array.from(s, (c) => {
-    const l = c.toLowerCase();
-    return Array.from(l).length === 1 ? l : c;
-  });
+  return Array.from(s, (c) => Array.from(c.toLowerCase())[0] ?? c);
 }
 
 function isBoundary(c: string | undefined): boolean {
@@ -397,7 +397,16 @@ export async function searchFilesSlow(projects: ReadonlyMap<string, CompletionPr
   return searchFiles(projects, req);
 }
 
-const cmpStr = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+// Go compares paths as bytes: UTF-8 length for "shorter", byte (code point) order after.
+// JavaScript's .length and < count UTF-16 units, which disagree for non-ASCII paths.
+const utf8 = new TextEncoder();
+const byteLen = (s: string) => utf8.encode(s).length;
+function cmpStr(a: string, b: string): number {
+  const x = utf8.encode(a);
+  const y = utf8.encode(b);
+  for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return (x[i] ?? 0) - (y[i] ?? 0);
+  return x.length - y.length;
+}
 
 export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, req: SearchRequest): SearchInit {
   const { query, limit } = req;
@@ -432,7 +441,7 @@ export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, re
   hits.sort((a, b) =>
     (q === ""
       ? depth(a.path) - depth(b.path) || cmpStr(a.path, b.path)
-      : b.score - a.score || a.path.length - b.path.length || cmpStr(a.path, b.path)) || a.si - b.si,
+      : b.score - a.score || byteLen(a.path) - byteLen(b.path) || cmpStr(a.path, b.path)) || a.si - b.si,
   );
   const n = Math.min(limit === 0 ? DEFAULT_FILE_LIMIT : limit, MAX_FILE_LIMIT);
   return {

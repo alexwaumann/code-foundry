@@ -92,6 +92,14 @@ query matched the path.
   (it computes the alignment anyway for positions). The composer e2e specs still pass.
 * `checkout` is the source's path as named (cleaned), not the resolved directory, so the
   GUI can key a match by the checkout path it sent.
+* Review: the mock kept `İ` as is (JavaScript lowers it to `i` plus U+0307), Go lowers it to
+  `i`; the mock now takes the first code point. Go breaks ties by byte length and byte order,
+  the mock compared UTF-16 `.length` and `<`; it now compares UTF-8 bytes. A throwaway
+  cross-check (20,000 random Score/Positions cases, 3,000 random multi-source searches with
+  non-ASCII names, paths and multi-word queries) then agreed everywhere. The rest of the
+  per-code-point lowering differs only for letters newer than Go's Unicode tables.
+* Review: a failed listing names its checkout (`list <dir>: ...`); with several sources the
+  bare git or walk error didn't say which one.
 
 ## Verified
 
