@@ -29,10 +29,15 @@ function labels(items: Items): string[] {
   return items.map((it) => (it === "separator" ? "—" : it.badge === undefined ? it.label : `${it.label} ${String(it.badge)}`));
 }
 
-function item(items: Items, testId: string) {
+function item(items: readonly (Items[number] | { kind: string; testId: string })[], testId: string) {
   const it = items.find((x) => x !== "separator" && x.testId === testId);
-  if (!it || it === "separator") throw new Error(`no ${testId}`);
+  if (!it || it === "separator" || "kind" in it) throw new Error(`no ${testId}`);
   return it;
+}
+
+/** A workspace's menu as read: its split Open in Finder item says so with its ›. */
+function workspaceLabels(items: ReturnType<typeof workspaceMenu>): string[] {
+  return items.map((it) => (it === "separator" ? "—" : "kind" in it ? "Open in Finder ›" : it.label));
 }
 
 beforeEach(() => {
@@ -109,10 +114,16 @@ describe("projectMenu (an index row's context menu, the project page's ⋯)", ()
 
 describe("workspaceMenu (an index row's context menu, the workspace page's ⋯)", () => {
   it.each([
-    { folder: true, want: ["New thread", "New terminal", "Open in Finder", "—", "Rename", "Add project", "—", "Remove workspace"] },
-    { folder: false, want: ["New thread", "Open in Finder", "—", "Rename", "Add project", "—", "Remove workspace"] },
+    { folder: true, want: ["New thread", "New terminal", "Open in Finder ›", "—", "Rename", "Add project", "—", "Remove workspace"] },
+    { folder: false, want: ["New thread", "Open in Finder ›", "—", "Rename", "Add project", "—", "Remove workspace"] },
   ])("folder $folder", ({ folder, want }) => {
-    expect(labels(workspaceMenu("w-1", { folder }))).toEqual(want);
+    expect(workspaceLabels(workspaceMenu("w-1", { folder }))).toEqual(want);
+  });
+
+  it("Open in Finder is the split item for the workspace's folder; its list has Terminal only with a place for one", () => {
+    for (const folder of [true, false]) {
+      expect(workspaceMenu("w-1", { folder }).find((x) => x !== "separator" && "kind" in x)).toEqual({ kind: "workspace-open-in", testId: "workspace-menu-reveal", workspaceId: "w-1", terminal: folder });
+    }
   });
 
   it("Rename opens the editor, Add project shows the page with its list open, Remove workspace is destructive", () => {
@@ -249,7 +260,7 @@ it("no item ends in an ellipsis (the app's menu style)", () => {
     ...checkoutMenu({ projectId: "p-1", path: "/u/app", branch: "main", isMain: false, threads: [{ id: "s-1", name: "x", badge: "idle" }], changed: true, pr: { slug: "o/r", number: 1 }, actions: true }).flatMap((x) => (x === "separator" || !("kind" in x) ? [x] : [])),
     ...projectMenu("p-1", { kind: "git", step: "publish", cleanup: 1 }, { page: true }),
     ...projectMenu("p-1", { kind: "nogit", step: "init", cleanup: null }),
-    ...workspaceMenu("w-1", { folder: true }),
+    ...workspaceMenu("w-1", { folder: true }).flatMap((x) => (x === "separator" || !("kind" in x) ? [x] : [])),
   ];
   for (const it of all) if (it !== "separator") expect(it.label).not.toMatch(/(…|\.\.\.)$/);
 });

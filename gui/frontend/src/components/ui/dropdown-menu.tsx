@@ -85,7 +85,8 @@ function DropdownMenuSub({ ...props }: React.ComponentProps<typeof DropdownMenuP
   return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />
 }
 
-function DropdownMenuSubTrigger({ className, inset, children, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger> & { inset?: boolean }) {
+/** `chevron={false}` leaves the trailing chevron to the caller (a split item draws it in its own block). */
+function DropdownMenuSubTrigger({ className, inset, children, chevron = true, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger> & { inset?: boolean; chevron?: boolean }) {
   return (
     <DropdownMenuPrimitive.SubTrigger
       data-slot="dropdown-menu-sub-trigger"
@@ -97,7 +98,7 @@ function DropdownMenuSubTrigger({ className, inset, children, ...props }: React.
       {...props}
     >
       {children}
-      <ChevronRightIcon className="ml-auto size-4" />
+      {chevron && <ChevronRightIcon className="ml-auto size-4" />}
     </DropdownMenuPrimitive.SubTrigger>
   )
 }

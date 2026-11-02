@@ -4,6 +4,7 @@ import { MetaDot, TitleBlock, WorkspaceIcon } from "./bits";
 import { workspaceMenu } from "./menus";
 import { OverflowMenu } from "./OverflowMenu";
 import { useWorkspaceTerminal } from "./workspaceHooks";
+import { WORKSPACE_DROPDOWN_PARTS } from "./WorkspaceMenuParts";
 
 /**
  * A workspace page's title block (docs/notes/project-page-1-title-block.md): the Layers icon
@@ -38,7 +39,7 @@ export function WorkspaceTitle({ workspaceId, members }: { workspaceId: string; 
           )}
         </>
       }
-      right={<OverflowMenu label="More workspace actions" testId="workspace-page-more" size="md" items={workspaceMenu(workspaceId, { folder: terminal })} />}
+      right={<OverflowMenu label="More workspace actions" testId="workspace-page-more" size="md" items={workspaceMenu(workspaceId, { folder: terminal })} parts={WORKSPACE_DROPDOWN_PARTS} />}
     />
   );
 }

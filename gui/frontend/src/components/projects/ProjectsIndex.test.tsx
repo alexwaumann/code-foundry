@@ -469,7 +469,9 @@ describe("a workspace row's context menu", () => {
     await settle();
     const menu = openRowMenu(wsRow(shop.id), "workspace-row-menu");
     expect(menuEntries(menu, true)).toEqual(["New thread", "New terminal", "Open in Finder", "—", "Rename", "Add project", "—", "Remove workspace"]);
-    expect(menu.querySelectorAll("svg")).toHaveLength(0);
+    // Text only: the one glyph is the split Open in Finder's › (it opens the apps).
+    expect([...menu.querySelectorAll("svg")].filter((s) => !s.closest("[data-open-in-more]"))).toHaveLength(0);
+    expect(within(menu).getByTestId("workspace-menu-reveal-more")).toBeTruthy();
     expect(within(menu).getByTestId("workspace-menu-remove").getAttribute("data-variant")).toBe("destructive");
 
     // New terminal: in the workspace's own folder, owned by a member's main checkout.

@@ -9,6 +9,7 @@ import { openActionEditor } from "@/stores/actionDialog";
 import { useAction, useProjectActionIds } from "@/stores/actions";
 import { StatusDot } from "./bits";
 import type { CheckoutMenuPart, LeftoverMenuPart } from "./menus";
+import { checkoutOpenIn } from "./openIn";
 import { OpenInSplitItem } from "./OpenInMenuItem";
 import { RowMenuPickContext, type RowMenuParts } from "./rowMenu";
 import { openThread } from "./workspaceHooks";
@@ -101,7 +102,7 @@ function ActionsSub({ entry }: { entry: Part<"actions"> }) {
 }
 
 function OpenIn({ entry }: { entry: Part<"open-in"> }) {
-  return <OpenInSplitItem projectId={entry.projectId} path={entry.path} testId={entry.testId} />;
+  return <OpenInSplitItem target={checkoutOpenIn(entry.projectId, entry.path)} testId={entry.testId} />;
 }
 
 /** The parts of a checkout's right-click menu (menus.ts checkoutMenu), by kind. */
