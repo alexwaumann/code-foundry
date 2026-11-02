@@ -214,6 +214,55 @@ func isBoundary[T byte | rune](c T) bool {
 	return false
 }
 
+// Words splits a query into the words RankSources matches one by one: at whitespace.
+func Words(query string) []string { return strings.Fields(query) }
+
+// ScoreWords rates path against words that must all match it, each on its own (Score,
+// in any order, overlapping allowed). Zero when one doesn't; higher is better. The
+// weakest word's tier dominates, so a path where every word lands in the base name
+// beats one where any word matches only across directories; then the sum of the words'
+// tiers (more exact and prefix words); then the sum of their bonuses. One word ranks
+// paths exactly as Score does. No words match everything with score 1.
+func ScoreWords(path string, words []string) int {
+	return combine(len(words), func(i int) int { return Score(path, words[i]) })
+}
+
+// combine is ScoreWords over n word scores, read from score(i) in order and stopping at
+// the first zero. The parts are packed to stay exact in a float64 (the mock's number):
+// tier in bits 50-52, tier sum (capped) in 40-49, bonus sum (capped) in 0-39.
+func combine(n int, score func(i int) int) int {
+	if n == 0 {
+		return 1
+	}
+	minTier, tiers, bonus := tierBaseExact, 0, 0
+	for i := range n {
+		s := score(i)
+		if s == 0 {
+			return 0
+		}
+		minTier = min(minTier, s>>20)
+		tiers += s >> 20
+		bonus += s & (1<<20 - 1)
+	}
+	return minTier<<50 + min(tiers, 1<<10-1)<<40 + min(bonus, 1<<40-1)
+}
+
+// PositionsWords returns the rune indices of path that words match under ScoreWords:
+// every word's Positions, merged, ascending and without repeats. Nil when there are no
+// words or one does not match.
+func PositionsWords(path string, words []string) []int {
+	var all []int
+	for _, w := range words {
+		pos := Positions(path, w)
+		if pos == nil {
+			return nil
+		}
+		all = append(all, pos...)
+	}
+	slices.Sort(all)
+	return slices.Compact(all)
+}
+
 // Source is one candidate list for RankSources: a checkout's relative paths, and the
 // name of its project.
 type Source struct {
@@ -225,79 +274,89 @@ type Source struct {
 type Hit struct {
 	Source int // into the sources passed to RankSources
 	Index  int // into that source's Paths
-	Score  int
-	// PathPositions are the rune indices of the path the query matched, ascending; nil
-	// for an empty query.
+	Score  int // ScoreWords of the path words
+	// PathPositions are the rune indices of the path the query's path words matched,
+	// ascending; nil for an empty query.
 	PathPositions []int
-	// NamePositions are the rune indices of the source's Name that query words matched
-	// (see Splits), ascending; nil when the whole query matched the path.
+	// NamePositions are the rune indices of the source's Name that the query's project
+	// words matched (see Splits), ascending; nil when every word matched the path.
 	NamePositions []int
 }
 
-// Split is one way to share a query between a project name and a path: Path is
-// matched against the path as a one-source query, and the words of Name, joined
-// without spaces, as a subsequence of the project name (empty: the name is not used).
-type Split struct {
-	Path string
-	Name []string
-}
+// Split is one way to share a query's words between a project name and a path:
+// words[Lo:Hi] match the path, the words before Lo and from Hi on match the name.
+type Split struct{ Lo, Hi int }
 
-// Splits lists the ways query (already trimmed) may be shared with the project name.
-// One source (multi false) or an empty query: the query as typed, matched against
-// the path alone. Several sources: the query's whitespace-separated words, joined by
-// single spaces, against the path; then, for each run of words at the start or at the
-// end of the query that leaves at least one word for the path and whose words, in
-// order, are a case-insensitive subsequence of name, that run against the name and
-// the rest against the path. So one word never touches the name, and "ghostty tree"
-// matches tree files of a project named ghostty-playground. Splits with the same path
-// query are listed once; the order is the preference on equal scores (more of the query
-// on the path first).
-func Splits(query, name string, multi bool) []Split {
-	if !multi || query == "" {
-		return []Split{{Path: query}}
+// Splits lists the ways words (Words of the query) may be shared with the project name
+// name. First all of them on the path. Then, only with several sources (multi), each
+// run of words at the start or at the end of the query that leaves at least one word
+// for the path and whose every word is, on its own, a case-insensitive subsequence of
+// name: that run on the name, the rest on the path. So one word never touches the
+// name, and "ghostty tree" matches tree files of a project named ghostty-playground.
+// The order is the preference on equal scores: shorter runs first, a leading run before
+// a trailing one of the same length.
+func Splits(words []string, name string, multi bool) []Split {
+	n := len(words)
+	out := []Split{{0, n}}
+	if !multi || n < 2 {
+		return out
 	}
-	words := strings.Fields(query)
-	out := []Split{{Path: strings.Join(words, " ")}}
 	ln := strings.ToLower(name)
-	seen := map[string]bool{out[0].Path: true}
-	add := func(nameWords, rest []string) {
-		path := strings.Join(rest, " ")
-		if seen[path] {
-			return
-		}
-		if _, _, ok := subsequence(ln, strings.ToLower(strings.Join(nameWords, "")), false); ok {
-			seen[path] = true
-			out = append(out, Split{Path: path, Name: nameWords})
-		}
+	inName := func(w string) bool {
+		_, _, ok := subsequence(ln, strings.ToLower(w), false)
+		return ok
 	}
-	for k := 1; k < len(words); k++ {
-		add(words[:k], words[k:])
-		add(words[len(words)-k:], words[:len(words)-k])
+	lead, trail := true, true
+	for k := 1; k < n; k++ {
+		lead = lead && inName(words[k-1])
+		trail = trail && inName(words[n-k])
+		if lead {
+			out = append(out, Split{k, n})
+		}
+		if trail {
+			out = append(out, Split{0, n - k})
+		}
+		if !lead && !trail {
+			break
+		}
 	}
 	return out
 }
 
 // RankSources matches query against every path of every source and returns the
 // matches as one list, best first, at most limit (zero: all), and whether more
-// matched. With several sources, words of the query may match a source's name
-// instead of the path (Splits); a path's score is its best Score over its source's
+// matched. The query is split into words (Words), each of which must match the path
+// (ScoreWords). With several sources, leading or trailing words may match a source's
+// name instead (Splits); a path's score is its best ScoreWords over its source's
 // splits. Ties go to the shorter path, then the lexically smaller one, then the
 // earlier source. An empty query ranks by depth instead: top-level entries first, then
 // by path, then by source.
 func RankSources(sources []Source, query string, limit int) (hits []Hit, truncated bool) {
 	query = strings.TrimSpace(query)
+	words := Words(query)
 	type scored struct {
 		Hit
 		split int // into splits[Source]: the one that scored the path
 	}
 	splits := make([][]Split, len(sources))
+	scores := make([]int, len(words)) // per path: Score of each word, -1 until needed
 	var out []scored
 	for si, src := range sources {
-		splits[si] = Splits(query, src.Name, len(sources) > 1)
+		splits[si] = Splits(words, src.Name, len(sources) > 1)
 		for i, p := range src.Paths {
+			for w := range scores {
+				scores[w] = -1
+			}
 			best, which := 0, 0
 			for k, sp := range splits[si] {
-				if s := Score(p, sp.Path); s > best {
+				s := combine(sp.Hi-sp.Lo, func(j int) int {
+					w := sp.Lo + j
+					if scores[w] < 0 {
+						scores[w] = Score(p, words[w])
+					}
+					return scores[w]
+				})
+				if s > best {
 					best, which = s, k
 				}
 			}
@@ -323,10 +382,15 @@ func RankSources(sources []Source, query string, limit int) (hits []Hit, truncat
 	hits = make([]Hit, len(out))
 	for i, h := range out {
 		sp := splits[h.Source][h.split]
-		h.PathPositions = Positions(path(h), sp.Path)
-		if len(sp.Name) > 0 {
-			name, words := strings.ToLower(sources[h.Source].Name), strings.ToLower(strings.Join(sp.Name, ""))
-			_, h.NamePositions, _ = subsequence(name, words, true)
+		h.PathPositions = PositionsWords(path(h), words[sp.Lo:sp.Hi])
+		if nameWords := slices.Concat(words[:sp.Lo], words[sp.Hi:]); len(nameWords) > 0 {
+			name := strings.ToLower(sources[h.Source].Name)
+			for _, w := range nameWords {
+				_, pos, _ := subsequence(name, strings.ToLower(w), true)
+				h.NamePositions = append(h.NamePositions, pos...)
+			}
+			slices.Sort(h.NamePositions)
+			h.NamePositions = slices.Compact(h.NamePositions)
 		}
 		hits[i] = h.Hit
 	}

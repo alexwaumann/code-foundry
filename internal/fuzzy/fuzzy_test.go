@@ -1,6 +1,7 @@
 package fuzzy
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 	"testing"
@@ -202,33 +203,131 @@ func TestSplits(t *testing.T) {
 		multi                bool
 		want                 []Split
 	}{
-		{"one source: as typed", "ghostty  tree", "ghostty-playground", false, []Split{{Path: "ghostty  tree"}}},
-		{"empty query", "", "ghostty-playground", true, []Split{{Path: ""}}},
-		{"one word never takes the name", "ghostty", "ghostty-playground", true, []Split{{Path: "ghostty"}}},
-		{"leading word", "ghostty tree", "ghostty-playground", true,
-			[]Split{{Path: "ghostty tree"}, {Path: "tree", Name: []string{"ghostty"}}}},
-		{"trailing word", "tree gp", "ghostty-playground", true,
-			[]Split{{Path: "tree gp"}, {Path: "tree", Name: []string{"gp"}}}},
-		{"name words not in the name", "ghostty tree", "code-foundry", true, []Split{{Path: "ghostty tree"}}},
-		{"a run of words, joined", "code foundry readme", "code-foundry", true, []Split{
-			{Path: "code foundry readme"}, {Path: "foundry readme", Name: []string{"code"}},
-			{Path: "readme", Name: []string{"code", "foundry"}},
-		}},
-		{"a word in the middle stays on the path", "readme foundry tree", "code-foundry", true, []Split{{Path: "readme foundry tree"}}},
-		{"words out of the name's order", "foundry code readme", "code-foundry", true, []Split{
-			{Path: "foundry code readme"}, {Path: "code readme", Name: []string{"foundry"}},
-		}},
-		{"whitespace collapses", "  web\t index ", "web", true,
-			[]Split{{Path: "web index"}, {Path: "index", Name: []string{"web"}}}},
-		{"case-insensitive", "Ghostty tree", "ghostty-playground", true,
-			[]Split{{Path: "Ghostty tree"}, {Path: "tree", Name: []string{"Ghostty"}}}},
-		{"same path query listed once", "a a", "a", true, []Split{{Path: "a a"}, {Path: "a", Name: []string{"a"}}}},
+		{"one source: every word on the path", "ghostty  tree", "ghostty-playground", false, []Split{{0, 2}}},
+		{"empty query", "", "ghostty-playground", true, []Split{{0, 0}}},
+		{"one word never takes the name", "ghostty", "ghostty-playground", true, []Split{{0, 1}}},
+		{"leading word", "ghostty tree", "ghostty-playground", true, []Split{{0, 2}, {1, 2}}},
+		{"trailing word", "tree gp", "ghostty-playground", true, []Split{{0, 2}, {0, 1}}},
+		{"name words not in the name", "ghostty tree", "code-foundry", true, []Split{{0, 2}}},
+		{"a run of words", "code foundry readme", "code-foundry", true, []Split{{0, 3}, {1, 3}, {2, 3}}},
+		{"a word in the middle stays on the path", "readme foundry tree", "code-foundry", true, []Split{{0, 3}}},
+		// Each name word matches the name on its own, so their order doesn't matter.
+		{"words out of the name's order", "foundry code readme", "code-foundry", true, []Split{{0, 3}, {1, 3}, {2, 3}}},
+		{"a run stops at a word not in the name", "code src foundry", "code-foundry", true, []Split{{0, 3}, {1, 3}, {0, 2}}},
+		{"whitespace collapses", "  web\t index ", "web", true, []Split{{0, 2}, {1, 2}}},
+		{"case-insensitive", "Ghostty tree", "ghostty-playground", true, []Split{{0, 2}, {1, 2}}},
+		{"both ends", "a a", "a", true, []Split{{0, 2}, {1, 2}, {0, 1}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Splits(strings.TrimSpace(tt.query), tt.project, tt.multi)
-			if !slices.EqualFunc(got, tt.want, func(a, b Split) bool { return a.Path == b.Path && slices.Equal(a.Name, b.Name) }) {
-				t.Fatalf("Splits(%q, %q) = %q, want %q", tt.query, tt.project, got, tt.want)
+			got := Splits(Words(tt.query), tt.project, tt.multi)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("Splits(%q, %q) = %v, want %v", tt.query, tt.project, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestScoreWords(t *testing.T) {
+	// One word: the same order as Score, whatever the tier.
+	paths := []string{"src/index.ts", "src/components/Composer.tsx", "lib/composer.ts", "docs/notes/x.md", "a/b/c"}
+	for _, q := range []string{"index.ts", "comp", "cmpsr", "srccomp", "s", "x", "zz"} {
+		for _, a := range paths {
+			for _, b := range paths {
+				want := cmp.Compare(Score(a, q), Score(b, q))
+				if got := cmp.Compare(ScoreWords(a, []string{q}), ScoreWords(b, []string{q})); got != want {
+					t.Fatalf("%q: ScoreWords orders %q, %q as %d, Score as %d", q, a, b, got, want)
+				}
+			}
+		}
+	}
+	tests := []struct {
+		name          string
+		better, worse string
+		query         string
+	}{
+		// Composer.tsx: "comp" a base prefix, "tsx" a base subsequence. Thread.tsx: "comp"
+		// only across directories.
+		{"every word in the base name beats one in a directory", "x/compose/Composer.tsx", "src/components/Thread.tsx", "comp tsx"},
+		{"even an exact base word doesn't lift a directory-only word",
+			"x/y/Composer.tsx", "src/components/tsx", "comp tsx"},
+		{"then more exact and prefix words", "x/comp.tsx", "x/c-o-m-p.tsx", "comp tsx"},
+		{"then the bonus", "x/a-b.go", "x/xab.go", "a b"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, w := ScoreWords(tt.better, Words(tt.query)), ScoreWords(tt.worse, Words(tt.query))
+			if w == 0 || b <= w {
+				t.Fatalf("%q: %q scores %d, %q scores %d", tt.query, tt.better, b, tt.worse, w)
+			}
+		})
+	}
+}
+
+func TestPositionsWords(t *testing.T) {
+	tests := []struct {
+		name, path, query string
+		want              []int
+	}{
+		{"no words", "a/b.go", "", nil},
+		{"one word: Positions", "src/components/Composer.tsx", "cmpsr", []int{15, 17, 18, 20, 22}},
+		{"across words", "gui/compose/Composer.tsx", "comp tsx", []int{12, 13, 14, 15, 21, 22, 23}},
+		{"word order doesn't matter", "gui/compose/Composer.tsx", "tsx comp", []int{12, 13, 14, 15, 21, 22, 23}},
+		{"a directory word and a base word", "src/tree/x.zig", "tree zig", []int{4, 5, 6, 7, 11, 12, 13}},
+		{"overlapping words, merged", "src/index.ts", "ind index", []int{4, 5, 6, 7, 8}},
+		{"one word missing: no positions", "src/index.ts", "index zz", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := PositionsWords(tt.path, Words(tt.query)); !slices.Equal(got, tt.want) {
+				t.Fatalf("PositionsWords(%q, %q) = %v, want %v", tt.path, tt.query, got, tt.want)
+			}
+			if (ScoreWords(tt.path, Words(tt.query)) > 0) != (tt.want != nil || tt.query == "") {
+				t.Fatalf("ScoreWords(%q, %q) disagrees with PositionsWords", tt.path, tt.query)
+			}
+		})
+	}
+}
+
+func TestRankWords(t *testing.T) {
+	paths := []string{
+		"README.md", // 0
+		"gui/frontend/src/components/compose/Composer.tsx", // 1
+		"gui/frontend/src/components/Thread.tsx",           // 2
+		"gui/frontend/src/components/compose/Tags.ts",      // 3
+		"internal/compose/compose.go",                      // 4
+		"docs/notes/composer-tags-1.md",                    // 5
+	}
+	tests := []struct {
+		name  string
+		query string
+		want  []string
+	}{
+		{"comp tsx", "comp tsx", []string{
+			"gui/frontend/src/components/compose/Composer.tsx", // both words in the base name
+			"gui/frontend/src/components/Thread.tsx",           // "comp" only in a directory
+		}},
+		{"word order is irrelevant", "tsx comp", []string{
+			"gui/frontend/src/components/compose/Composer.tsx", "gui/frontend/src/components/Thread.tsx",
+		}},
+		{"a word that matches nowhere: no result", "comp zzz", nil},
+		{"base-name words beat directory-only words", "compose tags", []string{
+			"docs/notes/composer-tags-1.md",               // both in the base name
+			"gui/frontend/src/components/compose/Tags.ts", // "compose" a directory
+		}},
+		{"extra spaces are ignored", "  comp   tsx ", []string{
+			"gui/frontend/src/components/compose/Composer.tsx", "gui/frontend/src/components/Thread.tsx",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hits, _ := RankSources([]Source{{Name: "code-foundry", Paths: paths}}, tt.query, 0)
+			var got []string
+			for _, h := range hits {
+				got = append(got, paths[h.Index])
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("RankSources(%q) = %q, want %q", tt.query, got, tt.want)
 			}
 		})
 	}
@@ -242,6 +341,8 @@ func TestRankSources(t *testing.T) {
 		"README.md", "src/tree.zig", "src/subtree/x.zig", "build.zig",
 	}}
 	web := Source{Name: "web", Paths: []string{"src/index.ts", "src/app.tsx"}}
+	index := Source{Name: "index", Paths: []string{"src/index.ts"}}
+	src := Source{Name: "src", Paths: []string{"src/index.ts", "lib/index.ts"}}
 	type hit struct {
 		src       int
 		path      string
@@ -271,10 +372,61 @@ func TestRankSources(t *testing.T) {
 			name:    "a project word: that project's tree files first",
 			sources: []Source{cf, gh}, query: "ghostty tree",
 			want: []hit{
+				// Only "tree" is left for the path, a base prefix.
 				{src: 1, path: "src/tree.zig", pathPos: []int{4, 5, 6, 7}, namePos: []int{0, 1, 2, 3, 4, 5, 6}, pathPosOK: true},
-				// code-foundry has no "ghostty" in its name, so the whole query goes to the
-				// path, space included, and docs/ghostty-tree.md does not match it.
+				// code-foundry has no "ghostty" in its name, so both words match the path:
+				// both in the base name, but "tree" only as a subsequence.
+				{src: 0, path: "docs/ghostty-tree.md", pathPos: []int{5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16}, pathPosOK: true},
+				// "tree" only in a directory.
 				{src: 1, path: "src/subtree/x.zig", pathPos: []int{7, 8, 9, 10}, namePos: []int{0, 1, 2, 3, 4, 5, 6}, pathPosOK: true},
+			},
+		},
+		{
+			name:    "a project word and two path words, in any order",
+			sources: []Source{cf, gh}, query: "gh zig tree",
+			want: []hit{
+				{src: 1, path: "src/tree.zig", pathPos: []int{4, 5, 6, 7, 9, 10, 11}, namePos: []int{0, 1}, pathPosOK: true},
+				{src: 1, path: "src/subtree/x.zig", pathPos: []int{7, 8, 9, 10, 14, 15, 16}, namePos: []int{0, 1}, pathPosOK: true},
+			},
+		},
+		{
+			name:    "a word in the name and the base name stays on the path",
+			sources: []Source{cf, index}, query: "index ts",
+			// Moving "index" to the name would leave the weakest word ("ts", a base
+			// subsequence) where it is and drop a prefix word: worse.
+			want: []hit{
+				{src: 0, path: "src/index.ts", pathPos: []int{4, 5, 6, 7, 8, 10, 11}, pathPosOK: true},
+				{src: 1, path: "src/index.ts", pathPos: []int{4, 5, 6, 7, 8, 10, 11}, pathPosOK: true},
+			},
+		},
+		{
+			name:    "a word in the name and only a directory goes to the name",
+			sources: []Source{cf, src}, query: "src index",
+			// In the source named src, "src" on the path would be the weakest word (a
+			// directory); on the name, only the base prefix "index" is left.
+			want: []hit{
+				{src: 1, path: "lib/index.ts", pathPos: []int{4, 5, 6, 7, 8}, namePos: []int{0, 1, 2}, pathPosOK: true},
+				{src: 1, path: "src/index.ts", pathPos: []int{4, 5, 6, 7, 8}, namePos: []int{0, 1, 2}, pathPosOK: true},
+				{src: 0, path: "src/index.ts", pathPos: []int{0, 1, 2, 4, 5, 6, 7, 8}, pathPosOK: true},
+			},
+		},
+		{
+			name:    "a project word that is also in the path: the path keeps it when it is as strong",
+			sources: []Source{cf, gh}, query: "ghostty readme",
+			// code-foundry's docs/ghostty-tree.md has no "readme"; ghostty-playground's
+			// README.md has no "ghostty", so the name takes it.
+			want: []hit{{src: 1, path: "README.md", pathPos: []int{0, 1, 2, 3, 4, 5}, namePos: []int{0, 1, 2, 3, 4, 5, 6}, pathPosOK: true}},
+		},
+		{
+			name:    "every word in the name: one must still match the path",
+			sources: []Source{cf, gh}, query: "code foundry",
+		},
+		{
+			name:    "a run of project words, each on its own",
+			sources: []Source{cf, gh}, query: "foundry code tree",
+			want: []hit{
+				{src: 0, path: "internal/tree/tree.go", pathPos: []int{14, 15, 16, 17}, namePos: []int{0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11}, pathPosOK: true},
+				{src: 0, path: "docs/ghostty-tree.md"},
 			},
 		},
 		{
@@ -305,7 +457,7 @@ func TestRankSources(t *testing.T) {
 			wantTruncated: true,
 		},
 		{
-			name:    "one source: a space is part of the query, the name is not used",
+			name:    "one source: the name is not used, every word must match the path",
 			sources: []Source{gh}, query: "ghostty tree",
 		},
 	}
