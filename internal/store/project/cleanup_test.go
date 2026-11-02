@@ -171,9 +171,12 @@ func TestCleanupVerdictAbandoned(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			removable, reason := cleanupVerdict(tt.w, now, tt.abandoned)
+			removable, reason, kind := cleanupJudge(tt.w, now, tt.abandoned)
 			if removable != tt.removable || reason != tt.reason {
-				t.Errorf("cleanupVerdict = %v, %q; want %v, %q", removable, reason, tt.removable, tt.reason)
+				t.Errorf("cleanupJudge = %v, %q; want %v, %q", removable, reason, tt.removable, tt.reason)
+			}
+			if want := kindOf(reason, removable); kind != want {
+				t.Errorf("cleanupJudge kind = %v, want %v", kind, want)
 			}
 		})
 	}
@@ -407,37 +410,41 @@ func TestCleanupRealProject(t *testing.T) {
 	if _, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Path: filepath.Join(root, "nope")}); err == nil {
 		t.Errorf("cleanup of an unknown path succeeded")
 	}
-	for _, it := range res.Skipped {
-		if it.Uncommitted != (it.Worktree.Path == wt["dirty"]) {
-			t.Errorf("%s marked uncommitted = %v (only the dirty, otherwise removable one is)", it.Worktree.Path, it.Uncommitted)
-		}
+	// Removed items carry their kind.
+	kinds := map[string]CleanupKind{}
+	for _, it := range dry.Removed {
+		kinds[it.Worktree.Path] = it.Kind
+	}
+	if want := map[string]CleanupKind{wt["merged"]: KindMerged, wt["rebased"]: KindSquashMerged, wt["squashed"]: KindSquashMerged}; !maps.Equal(kinds, want) {
+		t.Errorf("removed kinds = %v, want %v", kinds, want)
 	}
 
-	// Removing the dirty worktree without force: git refuses and the error names the
+	// The dirty worktree stays on every cleanup, though its work is in the base: removing
+	// it is an explicit RemoveWorktree. Without force git refuses and the error names the
 	// work, with its status read again.
+	if _, err := os.Stat(wt["dirty"]); err != nil {
+		t.Fatalf("dirty worktree removed: %v", err)
+	}
 	var ue *UncommittedError
 	if err := h.store.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: wt["dirty"]}); !errors.As(err, &ue) ||
 		len(ue.Worktrees) != 1 || ue.Worktrees[0].Path != wt["dirty"] || ue.Worktrees[0].Status.Untracked != 1 {
 		t.Fatalf("remove dirty without force: %v", err)
 	}
+}
 
-	// Force removes it, deleting the scratch file; a dirty held worktree still stays.
-	writeFile(t, filepath.Join(wt["held"], "scratch.txt"), "wip\n")
-	forced, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Hold: hold, Force: true})
-	if err != nil {
-		t.Fatal(err)
+// kindOf is the kind a removable reason of cleanupJudge has.
+func kindOf(reason string, removable bool) CleanupKind {
+	switch {
+	case !removable:
+		return KindOther
+	case reason == AbandonedReason || reason == "no commits since it was made":
+		return KindNoCommits
+	case strings.HasPrefix(reason, "a rebased or squash-merged copy"):
+		return KindSquashMerged
+	case strings.HasPrefix(reason, "branch is in "):
+		return KindMerged
 	}
-	delete(wantKept, wt["dirty"])
-	check("forced cleanup", forced, map[string]string{wt["dirty"]: "branch is in origin/main"}, wantKept)
-	if len(forced.Removed) != 1 || !forced.Removed[0].Uncommitted {
-		t.Errorf("forced removal = %+v, want the dirty one marked uncommitted", forced.Removed)
-	}
-	if _, err := os.Stat(wt["dirty"]); !os.IsNotExist(err) {
-		t.Errorf("dirty worktree still on disk: %v", err)
-	}
-	if _, err := os.Stat(wt["held"]); err != nil {
-		t.Errorf("held worktree removed: %v", err)
-	}
+	return KindOther
 }
 
 // TestMadeWorktreeRecords: the record of a worktree the store made survives a restart;

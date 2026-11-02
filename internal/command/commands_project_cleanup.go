@@ -25,7 +25,8 @@ type ProjectCleanupDeps struct {
 	NotGit NotGitFunc
 }
 
-// cleanupConfirm is the prompt when the dry run failed (Run then reports why).
+// cleanupConfirm is the prompt when the dry run failed or named nothing (Run then
+// reports what it removed after the fetch).
 const cleanupConfirm = "Fetch {project} and remove the worktrees Code Foundry made whose work is already in the default branch? Branches are kept."
 
 // RegisterProjectCleanup registers project.worktree.cleanup: reclaim the disk space of
@@ -35,15 +36,12 @@ const cleanupConfirm = "Fetch {project} and remove the worktrees Code Foundry ma
 // untracked or conflicted files, not made in the last 10 minutes with no commit since,
 // its work is in origin/<default> (its branch is, or a rebased or squash-merged copy of
 // its changes is), and no thread (but an archived one), running terminal or workspace
-// holds it. The confirmation lists what would go and what stays, with why. It fetches
-// first and the daemon checks again after the fetch; removal is `git worktree remove`
-// without --force, and branches are never deleted.
-//
-// A worktree kept only for its uncommitted changes (every other condition passes) is
-// asked about: the first prompt lists it as removable if that work is deleted, and after
-// the run removed the others a second-stage confirmation names each with its counts and
-// re-runs with --force, which removes those too (`git worktree remove --force`). Declined
-// (or under --yes), the run's own result stands, as before.
+// holds it. The confirmation lists what would go, each with a short why; the result
+// names what went. Nothing about the worktrees kept: a worktree with uncommitted work is
+// never cleaned up (project.worktree.remove deletes it, asking first). It fetches first
+// and the daemon checks again after the fetch; removal is `git worktree remove` without
+// --force, and branches are never deleted. With a path, a worktree that stays fails the
+// command with why.
 func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 	projectB := d.Project
 	if projectB == nil {
@@ -56,7 +54,7 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 	notGit := d.NotGit.or()
 	cleanup := func(ctx context.Context, a Args, dry bool) (*v1.CleanupWorktreesResponse, error) {
 		res, err := projectB.CleanupWorktrees(ctx, connect.NewRequest(&v1.CleanupWorktreesRequest{
-			Project: a.String("project"), Path: a.Path("path"), DryRun: dry, Force: a.Bool("force"),
+			Project: a.String("project"), Path: a.Path("path"), DryRun: dry,
 		}))
 		if err != nil {
 			return nil, err
@@ -68,14 +66,13 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 		Title: "Clean Up Merged Worktrees",
 		Description: "Fetch, then remove the project's worktrees (or one) whose work is in origin/<default>: " +
 			"made by Code Foundry (not by hand), clean, merged (or a rebased/squashed copy), not new and empty (10 min), " +
-			"no thread (archived aside) with it as its cwd or a checkout of its projects, and no terminal in it. Without --yes: lists what goes and stays. Branches are kept. " +
-			"One kept only for uncommitted changes is asked about again, with its counts, before they are deleted; --yes does " +
-			"not answer that question (it is kept), --force does.",
+			"no thread (archived aside) with it as its cwd or a checkout of its projects, and no terminal in it. " +
+			"Without --yes: lists what goes. Reports only what it removed. Branches are kept. A worktree with uncommitted " +
+			"work is never cleaned up: remove it with project.worktree.remove.",
 		Category: "Project",
 		Args: []ArgSpec{
 			{Name: "project", Type: String, Required: true, Context: ContextProject, Positional: true, Description: "Project name or id"},
-			{Name: "path", Type: Path, Positional: true, Description: "One worktree (default: every merged one)"},
-			{Name: "force", Type: Bool, Description: "Also remove the ones kept only for uncommitted changes, deleting them (without it: asked)"},
+			{Name: "path", Type: Path, Positional: true, Description: "One worktree (default: every merged one); fails with why when it stays"},
 		},
 		When:           func(c Context) bool { return hasProject(c) && !notGit(c) },
 		WhyUnavailable: notGit.whyNotGit,
@@ -109,14 +106,7 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 			if err != nil {
 				return Result{}, err
 			}
-			done := Result{Message: cleanupMessage(res), JSON: res}
-			if dirty := uncommittedSkips(res); len(dirty) > 0 && !a.Bool("force") {
-				return Result{}, &ConfirmError{
-					Command: "project.worktree.cleanup", Title: deleteWorkTitle,
-					Message: cleanupForcePrompt(res, dirty, a.Path("path")), Args: forceArgs(), Declined: &done,
-				}
-			}
-			return done, nil
+			return Result{Message: cleanupMessage(res), JSON: res}, nil
 		},
 	})
 }
@@ -151,154 +141,61 @@ func worktreeLabel(w *v1.Worktree) string {
 	return filepath.Base(w.GetPath())
 }
 
-// cleanupPrompt is the confirm prompt from a dry run: every worktree that would be
-// removed and every one kept, each with its branch, path and why, so a user or an agent
-// sees the outcome before confirming. "" (the static prompt) when the dry run named
-// nothing.
+// cleanupKindLabel is a removed worktree's why in a few words ("merged",
+// "squash-merged", "no commits"), its reason for another rule.
+func cleanupKindLabel(r *v1.RemovedWorktree) string {
+	switch r.GetKind() {
+	case v1.CleanupKind_CLEANUP_KIND_MERGED:
+		return "merged"
+	case v1.CleanupKind_CLEANUP_KIND_SQUASH_MERGED:
+		return "squash-merged"
+	case v1.CleanupKind_CLEANUP_KIND_NO_COMMITS:
+		return "no commits"
+	}
+	return r.GetReason()
+}
+
+// cleanupBase is the branch the removed worktrees' work is in ("origin/main"), from the
+// first one's status, or "the default branch".
+func cleanupBase(rm []*v1.RemovedWorktree) string {
+	for _, r := range rm {
+		if b := r.GetWorktree().GetStatus().GetBaseRef(); b != "" {
+			return b
+		}
+	}
+	return "the default branch"
+}
+
+// cleanupPrompt is the confirm prompt from a dry run: the worktrees that would be
+// removed, each with a short why ("Remove 2 merged worktrees? …\n- cf/a (merged)"). ""
+// (the static prompt) when the dry run named nothing.
 func cleanupPrompt(res *v1.CleanupWorktreesResponse, path string) string {
-	rm, sk := res.GetRemoved(), res.GetSkipped()
-	if path != "" {
-		switch {
-		case len(rm) > 0 && rm[0].GetUncommitted():
-			w := rm[0].GetWorktree()
-			return fmt.Sprintf("Remove the worktree of %s at %s (%s) and delete its uncommitted work (%s) for good? The branch is kept. It is checked again after a fetch.",
-				worktreeLabel(w), w.GetPath(), rm[0].GetReason(), changeCounts(w.GetStatus()))
-		case len(rm) > 0:
-			w := rm[0].GetWorktree()
-			return fmt.Sprintf("Remove the worktree of %s at %s (%s)? The branch is kept. It is checked again after a fetch.",
-				worktreeLabel(w), w.GetPath(), rm[0].GetReason())
-		case len(sk) > 0 && sk[0].GetUncommitted():
-			w := sk[0].GetWorktree()
-			return fmt.Sprintf("Fetch and check the worktree of %s at %s again? Its work is otherwise removable, but it has uncommitted work (%s); you are asked again before that is deleted.",
-				worktreeLabel(w), w.GetPath(), changeCounts(w.GetStatus()))
-		case len(sk) > 0:
-			w := sk[0].GetWorktree()
-			return fmt.Sprintf("Fetch and check the worktree of %s at %s again? Right now it is kept: %s.",
-				worktreeLabel(w), w.GetPath(), sk[0].GetReason())
-		}
-		return ""
-	}
-	if len(rm)+len(sk) == 0 {
-		return ""
-	}
-	var b strings.Builder
+	rm := res.GetRemoved()
 	if len(rm) == 0 {
-		b.WriteString("Fetch and remove the worktrees Code Foundry made whose work is in the default branch? None would be removed now; each is checked again after the fetch.")
-	} else {
-		fmt.Fprintf(&b, "Fetch, then remove %s (branches are kept; each is checked again after the fetch):", plural(len(rm), "worktree"))
-		for _, r := range rm {
-			reason := r.GetReason()
-			if r.GetUncommitted() {
-				reason += "; deletes its " + changeCounts(r.GetWorktree().GetStatus())
-			}
-			writeCleanupLine(&b, r.GetWorktree(), reason)
-		}
+		return ""
 	}
-	var keep []*v1.SkippedWorktree
-	if dirty := uncommittedSkips(res); len(dirty) > 0 {
-		b.WriteString("\nAlso removable if their uncommitted work is deleted (you are asked again first):")
-		for _, w := range dirty {
-			writeWorkLine(&b, w)
-		}
-	}
-	for _, s := range sk {
-		if !s.GetUncommitted() {
-			keep = append(keep, s)
-		}
-	}
-	if len(keep) > 0 {
-		fmt.Fprintf(&b, "\nKeep %d:", len(keep))
-		for _, s := range keep {
-			writeCleanupLine(&b, s.GetWorktree(), s.GetReason())
-		}
-	}
-	return b.String()
-}
-
-// uncommittedSkips are the worktrees a cleanup kept only for their uncommitted changes.
-func uncommittedSkips(res *v1.CleanupWorktreesResponse) []*v1.Worktree {
-	var out []*v1.Worktree
-	for _, s := range res.GetSkipped() {
-		if s.GetUncommitted() {
-			out = append(out, s.GetWorktree())
-		}
-	}
-	return out
-}
-
-// cleanupForcePrompt is the second-stage confirmation after a cleanup run that kept
-// dirty worktrees whose work is otherwise in the default branch: what it removed, then
-// each kept one with its counts, and the question whether to delete that work.
-func cleanupForcePrompt(res *v1.CleanupWorktreesResponse, dirty []*v1.Worktree, path string) string {
-	if path != "" && len(dirty) == 1 {
-		w := dirty[0]
-		return fmt.Sprintf("The work of %s at %s is in the default branch, but the worktree has uncommitted work: %s.\n\n"+
-			"Remove the worktree and delete that work for good? The branch is kept.", worktreeLabel(w), w.GetPath(), changeCounts(w.GetStatus()))
+	base := cleanupBase(rm)
+	if path != "" || len(rm) == 1 {
+		return fmt.Sprintf("Remove the merged worktree %s? Its work is already in %s. The branch is kept.", worktreeLabel(rm[0].GetWorktree()), base)
 	}
 	var b strings.Builder
-	if rm := res.GetRemoved(); len(rm) > 0 {
-		names := make([]string, len(rm))
-		for i, r := range rm {
-			names[i] = worktreeLabel(r.GetWorktree())
-		}
-		fmt.Fprintf(&b, "Removed %s: %s.\n\n", plural(len(rm), "worktree"), strings.Join(names, ", "))
-	}
-	what := "worktree"
-	if len(res.GetRemoved()) > 0 {
-		what = "more worktree"
-	}
-	fmt.Fprintf(&b, "The work of %s is in the default branch, but %s uncommitted work:", plural(len(dirty), what), hasHave(len(dirty)))
-	for _, w := range dirty {
-		writeWorkLine(&b, w)
-	}
-	if len(dirty) == 1 {
-		b.WriteString("\n\nRemove it too and delete that work for good? Its branch is kept.")
-	} else {
-		b.WriteString("\n\nRemove them too and delete that work for good? Branches are kept.")
+	fmt.Fprintf(&b, "Remove %d merged worktrees? Their work is already in %s. Branches are kept.", len(rm), base)
+	for _, r := range rm {
+		fmt.Fprintf(&b, "\n- %s (%s)", worktreeLabel(r.GetWorktree()), cleanupKindLabel(r))
 	}
 	return b.String()
 }
 
-func hasHave(n int) string {
-	if n == 1 {
-		return "it has"
-	}
-	return "they have"
-}
-
-// writeCleanupLine adds "- cf/a at /path: reason" on its own line.
-func writeCleanupLine(b *strings.Builder, w *v1.Worktree, reason string) {
-	fmt.Fprintf(b, "\n- %s at %s: %s", worktreeLabel(w), w.GetPath(), reason)
-}
-
-// cleanupMessage says what a cleanup did: "Removed 2 worktrees: cf/a (branch is in
-// origin/main), cf/b (...); kept 1 worktree: cf/c (uncommitted changes)".
+// cleanupMessage says what a cleanup removed: "Removed 2 worktrees: cf/a, cf/b", or
+// "No merged worktrees to remove".
 func cleanupMessage(res *v1.CleanupWorktreesResponse) string {
-	var parts []string
-	if rm := res.GetRemoved(); len(rm) > 0 {
-		names := make([]string, len(rm))
-		for i, r := range rm {
-			reason := r.GetReason()
-			if r.GetUncommitted() {
-				reason += "; uncommitted changes deleted"
-			}
-			names[i] = worktreeLabel(r.GetWorktree()) + " (" + reason + ")"
-		}
-		parts = append(parts, "Removed "+plural(len(rm), "worktree")+": "+strings.Join(names, ", "))
+	rm := res.GetRemoved()
+	if len(rm) == 0 {
+		return "No merged worktrees to remove"
 	}
-	if sk := res.GetSkipped(); len(sk) > 0 {
-		kept := make([]string, len(sk))
-		for i, s := range sk {
-			kept[i] = worktreeLabel(s.GetWorktree()) + " (" + s.GetReason() + ")"
-		}
-		head := "kept " + plural(len(sk), "worktree")
-		if len(res.GetRemoved()) == 0 {
-			head = "Nothing removed; " + head
-		}
-		parts = append(parts, head+": "+strings.Join(kept, ", "))
+	names := make([]string, len(rm))
+	for i, r := range rm {
+		names[i] = worktreeLabel(r.GetWorktree())
 	}
-	if len(parts) == 0 {
-		return "No worktrees to clean up"
-	}
-	return strings.Join(parts, "; ")
+	return "Removed " + plural(len(rm), "worktree") + ": " + strings.Join(names, ", ")
 }

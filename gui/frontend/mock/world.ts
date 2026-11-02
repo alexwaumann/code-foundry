@@ -573,9 +573,15 @@ function verdictReason(w: MockWorktree): string {
   return removedReason(w);
 }
 
-/** Why the daemon's cleanup may remove w (the only reason the mock models). */
+/** Why the daemon's cleanup may remove w (merged or squash-merged; the mock does not model "no commits"). */
 function removedReason(w: MockWorktree): string {
-  return `branch is in ${w.status.baseRef ?? "origin/main"}`;
+  const base = w.status.baseRef ?? "origin/main";
+  return (w.status.baseAhead ?? 0) > 0 && w.baseMerged ? `a rebased or squash-merged copy is in ${base}` : `branch is in ${base}`;
+}
+
+/** removedReason's kind (CleanupKind: 1 merged, 2 squash-merged). */
+function removedKind(w: MockWorktree): number {
+  return (w.status.baseAhead ?? 0) > 0 && w.baseMerged ? 2 : 1;
 }
 
 /**
@@ -1163,6 +1169,18 @@ export class World {
       out.removed.push(w);
     }
     return out;
+  }
+
+  /**
+   * ProjectService.CleanupWorktrees as internal/api/project_cleanup.go: only what goes (or
+   * would), each with its kind; with a path, a real run that keeps it fails with why.
+   */
+  cleanupWorktreesMsg(projectRef: string, path: string, dry: boolean) {
+    const project = this.projectRef(projectRef);
+    const res = this.cleanupWorktrees(projectRef, path, dry);
+    const kept = res.skipped[0];
+    if (path && !dry && res.removed.length === 0 && kept) throw new ConnectError(`${kept.w.branch} was not removed: ${kept.reason}`, Code.FailedPrecondition);
+    return { projectId: project.id, removed: res.removed.map((w) => ({ worktree: this.worktreeMsg(project.id, w), reason: removedReason(w), kind: removedKind(w) })) };
   }
 
   /**
@@ -4465,7 +4483,7 @@ export class World {
           name: "project.worktree.cleanup",
           title: "Clean Up Merged Worktrees",
           category: "Project",
-          description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>. Branches are kept.",
+          description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>. Reports only what it removed. Branches are kept.",
           keybindings: [],
           args: [
             { name: "project", type: ArgType.STRING, required: true, description: "Project name or id" },
@@ -4473,30 +4491,21 @@ export class World {
           ],
           confirm: (ctx, args) => {
             const ref = args.project || ctx?.activeProjectId || "";
-            const { removed: rm, skipped: sk } = this.cleanupWorktrees(ref, args.path ?? "", true);
-            const line = (w: MockWorktree, reason: string) => `\n- ${w.branch} at ${w.path}: ${reason}`;
+            const rm = this.cleanupWorktrees(ref, args.path ?? "", true).removed;
+            const base = rm[0]?.status.baseRef ?? "origin/main";
             const r0 = rm[0];
-            const s0 = sk[0];
-            if (args.path && r0) return `Remove the worktree of ${r0.branch} at ${r0.path} (${removedReason(r0)})? The branch is kept. It is checked again after a fetch.`;
-            if (args.path && s0) return `Fetch and check the worktree of ${s0.w.branch} at ${s0.w.path} again? Right now it is kept: ${s0.reason}.`;
-            if (rm.length + sk.length === 0) return `Fetch ${ref} and remove the worktrees Code Foundry made whose work is already in the default branch? Branches are kept.`;
-            let msg =
-              rm.length === 0
-                ? "Fetch and remove the worktrees Code Foundry made whose work is in the default branch? None would be removed now; each is checked again after the fetch."
-                : `Fetch, then remove ${String(rm.length)} ${rm.length === 1 ? "worktree" : "worktrees"} (branches are kept; each is checked again after the fetch):` +
-                  rm.map((w) => line(w, removedReason(w))).join("");
-            if (sk.length > 0) msg += `\nKeep ${String(sk.length)}:` + sk.map((s) => line(s.w, s.reason)).join("");
-            return msg;
+            if (!r0) return `Fetch ${ref} and remove the worktrees Code Foundry made whose work is already in the default branch? Branches are kept.`;
+            if (args.path || rm.length === 1) return `Remove the merged worktree ${r0.branch}? Its work is already in ${base}. The branch is kept.`;
+            const label = (w: MockWorktree) => (removedKind(w) === 2 ? "squash-merged" : "merged");
+            return `Remove ${String(rm.length)} merged worktrees? Their work is already in ${base}. Branches are kept.` + rm.map((w) => `\n- ${w.branch} (${label(w)})`).join("");
           },
         },
         when: (ctx) => Boolean(ctx?.activeProjectId && this.projects.get(ctx.activeProjectId)?.git !== false),
         run: (ctx, args) => {
-          const res = this.cleanupWorktrees(args.project || ctx?.activeProjectId || "", args.path ?? "", false);
-          const parts: string[] = [];
-          const n = (k: number) => `${String(k)} ${k === 1 ? "worktree" : "worktrees"}`;
-          if (res.removed.length > 0) parts.push(`Removed ${n(res.removed.length)}: ${res.removed.map((w) => `${w.branch} (${removedReason(w)})`).join(", ")}`);
-          if (res.skipped.length > 0) parts.push(`${res.removed.length === 0 ? "Nothing removed; kept" : "kept"} ${n(res.skipped.length)}: ${res.skipped.map((s) => `${s.w.branch} (${s.reason})`).join(", ")}`);
-          return parts.join("; ") || "No worktrees to clean up";
+          const res = this.cleanupWorktreesMsg(args.project || ctx?.activeProjectId || "", args.path ?? "", false);
+          const names = res.removed.map((r) => r.worktree.branch);
+          const message = names.length === 0 ? "No merged worktrees to remove" : `Removed ${String(names.length)} ${names.length === 1 ? "worktree" : "worktrees"}: ${names.join(", ")}`;
+          return Promise.resolve({ message, resultJson: JSON.stringify({ projectId: res.projectId, removed: res.removed.map((r) => ({ worktree: { branch: r.worktree.branch, path: r.worktree.path }, reason: r.reason, kind: r.kind === 2 ? "CLEANUP_KIND_SQUASH_MERGED" : "CLEANUP_KIND_MERGED" })) }) });
         },
       },
       {

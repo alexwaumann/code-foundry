@@ -400,6 +400,7 @@ function routes(router: ConnectRouter): void {
     },
     refresh: () => ({}),
     listRefs: (req) => guard(() => world.listRefs(req.projectId)),
+    cleanupWorktrees: (req) => guard(() => world.cleanupWorktreesMsg(req.project, req.path, req.dryRun)),
     initGit: (req) => guard(() => ({ project: world.projectMsg(world.initGit(req.id)) })),
     rename: (req) =>
       guard(() => {

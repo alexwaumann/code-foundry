@@ -6,6 +6,7 @@
 import { startCommandNamed } from "@/keys/bindings";
 import { openAddProject } from "./addProject";
 import { newWorktreeTerminal } from "./bottomActions";
+import { toastCleanupResult } from "./cleanupWorktrees";
 import { runCommand, runCommandForResult } from "./commands";
 import { composeIn } from "./compose";
 import { projectContext, worktreeContext } from "./context";
@@ -42,20 +43,27 @@ export async function resumeWorktree(projectId: string, path: string, archivedTh
 }
 
 /**
- * project.worktree.cleanup for one worktree (confirmed; the daemon fetches, checks again and
- * removes it without touching its branch). The fetch reports through the gitops toasts,
- * the result ("Removed 1 worktree: …" or why it was kept) as a toast.
+ * project.worktree.cleanup for one worktree (confirmed in the cleanup dialog; the daemon
+ * fetches, checks again and removes it without touching its branch, or fails saying why it
+ * stays). The fetch reports through the gitops toasts, the result as "Removed 1 worktree".
  */
-export function cleanupWorktree(projectId: string, path: string): Promise<boolean> {
-  return runCommand("project.worktree.cleanup", { project: projectId, path }, worktreeContext(projectId, path));
+export async function cleanupWorktree(projectId: string, path: string): Promise<boolean> {
+  return reportCleanup(await runCommandForResult("project.worktree.cleanup", { project: projectId, path }, { ctx: worktreeContext(projectId, path), quiet: true }));
 }
 
 /**
- * project.worktree.cleanup for every merged, clean, unheld worktree of the project (confirmed; the prompt lists the
- * branches). Merged ones with uncommitted changes are asked about after, with their counts (a second question).
+ * project.worktree.cleanup for every merged, clean, unheld worktree of the project
+ * (confirmed in the cleanup dialog, which lists them). A worktree with uncommitted work is
+ * never part of it. The result toast names only what went.
  */
-export function cleanupMergedWorktrees(projectId: string): Promise<boolean> {
-  return runCommand("project.worktree.cleanup", { project: projectId }, projectContext(projectId));
+export async function cleanupMergedWorktrees(projectId: string): Promise<boolean> {
+  return reportCleanup(await runCommandForResult("project.worktree.cleanup", { project: projectId }, { ctx: projectContext(projectId), quiet: true }));
+}
+
+function reportCleanup(res: { resultJson: string } | null): boolean {
+  if (!res) return false;
+  toastCleanupResult(res.resultJson);
+  return true;
 }
 
 /** worktree.reveal on the project's main checkout (a folder without git: the folder). */

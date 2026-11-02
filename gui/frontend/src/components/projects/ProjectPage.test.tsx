@@ -4,12 +4,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/daemonFakes")).ghFakes }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
+// The cleanup dialog's dry run: the store's merged, clean worktrees (what the daemon's would list).
+vi.mock("@/api/project", async (orig) => ({
+  ...(await orig<typeof import("@/api/project")>()),
+  previewCleanup: async (project: string) => {
+    const { useProjectsStore } = await import("@/stores/projects");
+    const ws = useProjectsStore.getState().byId[project]?.worktrees ?? [];
+    return ws.filter((w) => w.mergedClean === true && !w.isMain).map((w) => ({ path: w.path, branch: w.branch, kind: "merged" as const, baseRef: "origin/main" }));
+  },
+}));
 vi.mock("@/api/gitops", async (orig) => ({ ...(await orig<typeof import("@/api/gitops")>()), ...(await import("@/test/cardFakes")).cardGitopsFakes }));
 const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/lib/clipboard", () => ({ copyText }));
 
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { RemoveWorktreeDialog } = await import("./RemoveWorktreeDialog");
+const { CleanupWorktreesDialog } = await import("./CleanupWorktreesDialog");
 const { ProjectsPage } = await import("./ProjectsPage");
 const { confirmFirst, daemon, invocationsOf, lastInvocation, needsConfirm, resetDaemon } = await import("@/test/daemonFakes");
 const { addLeftovers, addTerminal, addThreads, addWorktrees, fakeGitInit, panelActive, removeWorktrees, resetPanels, CF, COPY, FEAT, FIX, MERGED, SHADERS, SPIKE, menuEntries, seedWorld, status, texts, thread, updateProject, worktree } = await import("@/test/projectsWorld");
@@ -47,6 +57,7 @@ function renderPage(projectId: string) {
       <ProjectsPage />
       <ConfirmDialog />
       <RemoveWorktreeDialog />
+      <CleanupWorktreesDialog />
     </>,
   );
 }
@@ -394,15 +405,15 @@ describe("Clean up merged worktrees", () => {
       worktree("repo-cf", MERGED, "cf/usage-polish", { managed: true, landed: true, mergedClean: true }),
       worktree("repo-cf", `${MERGED}-docs`, "cf/old-docs", { managed: true, landed: true, mergedClean: true }),
     );
-    fakeCleanup("Fetch, then remove 2 worktrees whose branches are merged: cf/usage-polish, cf/old-docs?");
+    fakeCleanup("Remove 2 merged worktrees?");
     renderPage("repo-cf");
     await settle();
     const menu = openDropdown(screen.getByTestId("project-more"), "project-more-menu");
     expect(menuEntries(menu)).toEqual(["New thread", "New terminal", "Rename", "Clean up merged worktrees 2", "Remove project"]);
     await pick(menu, "project-cleanup");
-    const dialog = await screen.findByTestId("confirm-dialog");
-    expect(dialog.textContent).toContain("Fetch, then remove 2 worktrees");
-    fireEvent.click(within(dialog).getByTestId("confirm-ok"));
+    const dialog = await screen.findByTestId("cleanup-dialog");
+    expect(within(dialog).getAllByTestId("cleanup-branch").map((b) => b.textContent)).toEqual(["cf/usage-polish", "cf/old-docs"]);
+    fireEvent.click(within(dialog).getByTestId("cleanup-ok"));
     await settle();
     expect(invocationsOf("project.worktree.cleanup").map((i) => i.confirmed)).toEqual([false, true]);
     expect(lastInvocation("project.worktree.cleanup")?.args).toEqual({ project: "repo-cf" });
@@ -580,11 +591,13 @@ describe("Worktrees without threads", () => {
 
   it("Remove the N that are clean runs the cleanup after its confirm; with nothing kept the section says so in one line", async () => {
     addLeftovers(true);
-    fakeCleanup("Fetch, then remove 1 worktree whose branch is merged: cf/usage-polish?");
+    fakeCleanup("Remove the merged worktree cf/usage-polish?");
     const r = renderPage("repo-cf");
     await settle();
     fireEvent.click(screen.getByTestId("leftover-remove-clean"));
-    fireEvent.click(within(await screen.findByTestId("confirm-dialog")).getByTestId("confirm-ok"));
+    const dialog = await screen.findByTestId("cleanup-dialog");
+    expect(within(dialog).getAllByTestId("cleanup-branch").map((b) => b.textContent)).toEqual(["cf/usage-polish"]);
+    fireEvent.click(within(dialog).getByTestId("cleanup-ok"));
     await settle();
     expect(lastInvocation("project.worktree.cleanup")?.args).toEqual({ project: "repo-cf" });
     expect(lastInvocation("project.worktree.cleanup")?.confirmed).toBe(true);
