@@ -688,3 +688,56 @@ func TestSetCwdLostAnswer(t *testing.T) {
 		})
 	}
 }
+
+// The idle stop never cuts a move on its way: one being named (PendingMove), nor a
+// request still in the runner's channel when the idle check runs (taken first).
+func TestMoveHoldsTheIdleStop(t *testing.T) {
+	far := time.Now().Add(3 * time.Hour)
+	t.Run("naming", func(t *testing.T) {
+		e, n := newMoveEnv(t, "text-table")
+		n.gate = make(chan struct{})
+		s, _ := e.noProjectThread("check the slack thread", false)
+		errc := make(chan error, 1)
+		go func() {
+			_, err := e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true})
+			errc <- err
+		}()
+		e.waitFor(s.ID, "naming", func(s Thread) bool { return s.Naming })
+		if h := e.idleHold(s.ID, far); h != "message on its way" {
+			t.Errorf("idle hold while naming = %q", h)
+		}
+		close(n.gate)
+		if err := <-errc; err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := e.m.Get(e.ctx(), s.ID); got.ProjectID != "r1" || got.State != StateConnected {
+			t.Errorf("after = %+v", got)
+		}
+	})
+	t.Run("in the channel", func(t *testing.T) {
+		e, _ := newMoveEnv(t, "text-table")
+		s, _ := e.noProjectThread("check the slack thread", false)
+		r := e.runnerOf(s.ID)
+		for range 20 {
+			// The run loop is held inside a first idle check (it needs m.mu) while the
+			// request and a second check arrive, so both are ready together and the loop
+			// may take either first: the check must see the request either way.
+			e.m.mu.Lock()
+			first := make(chan string, 1)
+			r.idleReq <- idleCheck{now: time.Now(), done: first}
+			for len(r.idleReq) > 0 {
+				time.Sleep(time.Millisecond)
+			}
+			second := make(chan string, 1)
+			r.cdReq <- cdRequest{path: filepath.Join(t.TempDir(), "gone")}
+			r.idleReq <- idleCheck{now: far, done: second}
+			e.m.mu.Unlock()
+			<-first
+			if h := <-second; h != "message on its way" {
+				t.Fatalf("idle hold with a request in the channel = %q", h)
+			}
+			r.cdReq <- cdRequest{} // cancel it
+			e.waitFor(s.ID, "cancelled", func(Thread) bool { return e.idleHold(s.ID, time.Now()) != "message on its way" })
+		}
+	})
+}

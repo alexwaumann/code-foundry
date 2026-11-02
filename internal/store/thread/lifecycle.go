@@ -468,6 +468,7 @@ func (m *Manager) cacheTTLNow() time.Duration {
 // onIdleCheck stops the process gracefully (beginClose, disconnect reason ReasonIdle)
 // when nothing holds it (idleHold), and tells c.done the hold ("" when it stopped).
 func (r *runner) onIdleCheck(c idleCheck) {
+	r.takeCdReq() // a move queued just now holds it (messageOnItsWay)
 	hold := r.idleHold(c.now)
 	if hold == "" {
 		r.log().info("stopping idle thread at its prompt cache expiry", "idle", c.now.Sub(r.lastActive()).Round(time.Second).String())
@@ -551,11 +552,14 @@ func (r *runner) idleHold(now time.Time) string {
 func (r *runner) idleInputs(now time.Time) idleInputs {
 	st := r.st
 	s, _ := r.m.Snapshot().Thread(r.id)
+	// A queued move or Run in counts too, and a move being placed or named (PendingMove:
+	// it is about to queue, so a stop now would only fail it).
+	onItsWay := st.first != nil || len(st.queued) > 0 || len(st.held) > 0 || r.pendingCd != nil || s.PendingMove != nil
 	return idleInputs{
 		now:             now,
 		closing:         r.closing || r.finished,
 		starting:        !st.initialized || st.restart != restartNone,
-		messageOnItsWay: st.first != nil || len(st.queued) > 0 || len(st.held) > 0 || r.pendingCd != nil, // a queued move too
+		messageOnItsWay: onItsWay,
 		effortChange:    st.wantEffort != st.effort,
 		pendingRequest:  len(st.pending) > 0 || len(st.sd.pending) > 0,
 		atPrompt:        st.sd.AtPrompt(),
