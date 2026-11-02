@@ -229,8 +229,8 @@ type Source struct {
 	Dir string
 	// Git: list git's view (falling back to the walk when git ls-files fails), else walk.
 	Git bool
-	// Name is the checkout's project name, which query words may match instead of the
-	// path when a search has several sources (fuzzy.Splits).
+	// Name is the checkout's project name, which leading or trailing query words may
+	// match instead of the path when a search has several sources (fuzzy.Splits).
 	Name string
 }
 

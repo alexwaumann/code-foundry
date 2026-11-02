@@ -551,8 +551,8 @@ type SearchFilesRequest struct {
 	// Absolute path of the checkout to search (a worktree of the project). Empty: the
 	// project's main worktree. Unset when sources is set.
 	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	// Typed text after "@", or the file finder's query. Matched as a case-insensitive
-	// subsequence (see SearchFiles for project words).
+	// Typed text after "@", or the file finder's query. Its whitespace-separated words
+	// each match as a case-insensitive subsequence (see SearchFiles).
 	Query string `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
 	// Maximum matches across all sources. Zero means 50; at most 200.
 	Limit int32 `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
@@ -648,12 +648,13 @@ type FileMatch struct {
 	// Absolute path of the checkout path is relative to: the source's path as given
 	// (cleaned), or the project's main worktree.
 	Checkout string `protobuf:"bytes,4,opt,name=checkout,proto3" json:"checkout,omitempty"`
-	// Indices of the characters of path the query matched, ascending. Characters are
-	// Unicode code points (Go runes; in JavaScript the indices of Array.from(path)), not
-	// bytes. Empty for an empty query.
+	// Indices of the characters of path the query's path words matched, every word's,
+	// ascending and without repeats. Characters are Unicode code points (Go runes; in
+	// JavaScript the indices of Array.from(path)), not bytes. Empty for an empty query.
 	PathPositions []int32 `protobuf:"varint,5,rep,packed,name=path_positions,json=pathPositions,proto3" json:"path_positions,omitempty"`
 	// Indices (code points, as path_positions) of the characters of the project's name
-	// that query words matched; empty when the whole query matched the path.
+	// that project words matched, ascending and without repeats; empty when every word
+	// matched the path.
 	ProjectPositions []int32 `protobuf:"varint,6,rep,packed,name=project_positions,json=projectPositions,proto3" json:"project_positions,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache

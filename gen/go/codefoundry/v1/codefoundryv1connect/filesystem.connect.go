@@ -75,21 +75,26 @@ type FilesystemServiceClient interface {
 	// candidate list is cached for a few seconds per checkout. An empty query returns
 	// the shallowest entries.
 	//
-	// Ranking: exact base name > base-name prefix > base-name subsequence > whole-path
-	// subsequence (case-insensitive), then characters at segment starts and in runs, then
-	// the shorter path, then the path, then the earlier source.
+	// Words: the query is split at whitespace into words, and every word must match the
+	// path on its own, as a case-insensitive subsequence, in any order ("comp tsx" finds
+	// src/components/Composer.tsx). Each word gets a tier: exact base name > base-name
+	// prefix > base-name subsequence > whole-path subsequence; within a tier, characters
+	// at segment starts and in runs add a bonus.
 	//
-	// Project words, only with more than one source: the query is split into words at
-	// whitespace. A run of words at the start or at the end of the query, leaving at least
-	// one word, may be matched against the source's project name instead of the path: the
-	// run's words, in order and with their spaces dropped, must be a case-insensitive
-	// subsequence of the name. The remaining words, joined by single spaces, are matched
-	// against the path as a one-source query would be. A file matches when the whole
-	// query (words joined by single spaces) matches its path or some such split does,
-	// and ranks by its best path score. So a single word never touches the name, and
-	// "ghostty tree" ranks the tree files of a project named ghostty-playground as if
-	// "tree" had been typed there. With one source the query is matched as typed, as
-	// before.
+	// Ranking: the weakest word's tier first (so a file where every word lands in the
+	// base name beats any file where a word matches only across directories), then the
+	// sum of the words' tiers, then the sum of their bonuses, then the shorter path, then
+	// the path, then the earlier source. A one-word query ranks as before.
+	//
+	// Project words, only with more than one source: a run of words at the start or at
+	// the end of the query, leaving at least one word for the path, may match the
+	// source's project name instead of the path, each word on its own a case-insensitive
+	// subsequence of the name. A file ranks by its best split (all words on the path, or
+	// such a run on the name and the rest on the path), scored over its path words alone;
+	// on equal scores, the split with more words on the path. So a single word never
+	// touches the name, a word stays on the path unless moving it lifts the weakest path
+	// word, and "ghostty tree" ranks the tree files of a project named ghostty-playground
+	// as if "tree" had been typed there.
 	//
 	// An unknown project is NotFound; a path outside the home directory, a source without
 	// a project, both sources and project_id/path, or more than 16 sources is
@@ -222,21 +227,26 @@ type FilesystemServiceHandler interface {
 	// candidate list is cached for a few seconds per checkout. An empty query returns
 	// the shallowest entries.
 	//
-	// Ranking: exact base name > base-name prefix > base-name subsequence > whole-path
-	// subsequence (case-insensitive), then characters at segment starts and in runs, then
-	// the shorter path, then the path, then the earlier source.
+	// Words: the query is split at whitespace into words, and every word must match the
+	// path on its own, as a case-insensitive subsequence, in any order ("comp tsx" finds
+	// src/components/Composer.tsx). Each word gets a tier: exact base name > base-name
+	// prefix > base-name subsequence > whole-path subsequence; within a tier, characters
+	// at segment starts and in runs add a bonus.
 	//
-	// Project words, only with more than one source: the query is split into words at
-	// whitespace. A run of words at the start or at the end of the query, leaving at least
-	// one word, may be matched against the source's project name instead of the path: the
-	// run's words, in order and with their spaces dropped, must be a case-insensitive
-	// subsequence of the name. The remaining words, joined by single spaces, are matched
-	// against the path as a one-source query would be. A file matches when the whole
-	// query (words joined by single spaces) matches its path or some such split does,
-	// and ranks by its best path score. So a single word never touches the name, and
-	// "ghostty tree" ranks the tree files of a project named ghostty-playground as if
-	// "tree" had been typed there. With one source the query is matched as typed, as
-	// before.
+	// Ranking: the weakest word's tier first (so a file where every word lands in the
+	// base name beats any file where a word matches only across directories), then the
+	// sum of the words' tiers, then the sum of their bonuses, then the shorter path, then
+	// the path, then the earlier source. A one-word query ranks as before.
+	//
+	// Project words, only with more than one source: a run of words at the start or at
+	// the end of the query, leaving at least one word for the path, may match the
+	// source's project name instead of the path, each word on its own a case-insensitive
+	// subsequence of the name. A file ranks by its best split (all words on the path, or
+	// such a run on the name and the rest on the path), scored over its path words alone;
+	// on equal scores, the split with more words on the path. So a single word never
+	// touches the name, a word stays on the path unless moving it lifts the weakest path
+	// word, and "ghostty tree" ranks the tree files of a project named ghostty-playground
+	// as if "tree" had been typed there.
 	//
 	// An unknown project is NotFound; a path outside the home directory, a source without
 	// a project, both sources and project_id/path, or more than 16 sources is
