@@ -24,32 +24,38 @@ import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import type { AuthoredRow, AuthoredStatus, AuthoredStatusKind } from "./authoredStatus";
 import { prKey, repoName } from "./format";
-import { Age, ChecksBadge, PrStateIcon } from "./PrBits";
+import type { Cap, MergedRowModel, OtherRow, Section } from "./pageModel";
+import { Age, ChecksBadge, Diff, PrStateIcon } from "./PrBits";
 import { needsLabel, verdictLabel, type NeedsRow, type NeedsWhy, type ReviewedRow, type Verdict } from "./reviewQueue";
 import { RowList } from "./RowList";
 
 const ROW_H = 28;
 
-/** The page's sections, in keyboard order; each is a nav key prefix. */
-export type Section = "review" | "reviewed" | "authored" | "merged";
-
 // Flexible tracks only (fr with a floor): fixed maxima grow before an fr track gets any
-// room, which squeezed the title to nothing beside the side panel. Review and reviewed
-// share a template, so the reviewed sub-card's columns line up under the queue's.
-const REVIEW_COLS = "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(8.5rem,1.3fr)_minmax(6.5rem,1fr)_3rem]";
+// room, which squeezed the title to nothing beside the side panel. Review, reviewed and
+// everything else share a template, so their columns line up down the page.
+const SHARED_COLS = "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(8.5rem,1.3fr)_minmax(6.5rem,1fr)_minmax(4.5rem,0.6fr)_3rem]";
 const columns: Record<Section, string> = {
-  review: REVIEW_COLS,
-  reviewed: REVIEW_COLS,
-  authored: "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(6rem,2.4fr)_minmax(8.5rem,1.2fr)_minmax(6.5rem,1fr)_minmax(4.5rem,0.5fr)_3rem]",
-  merged: "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_3rem]",
+  review: SHARED_COLS,
+  reviewed: SHARED_COLS,
+  authored: "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(6rem,2.4fr)_minmax(8.5rem,1.2fr)_minmax(6.5rem,1fr)_minmax(4.5rem,0.5fr)_minmax(4.5rem,0.6fr)_3rem]",
+  else: SHARED_COLS,
+  merged: "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(4.5rem,0.6fr)_3.5rem]",
 };
 
 const headers: Record<Section, string[]> = {
-  review: ["Repository", "#", "Author", "Title", "Why", "Checks", "Age"],
-  reviewed: [],
-  authored: ["Repository", "#", "Title", "Status", "Checks", "Comments", "Age"],
-  merged: ["Repository", "#", "Author", "Title", "Merged"],
+  review: ["Repository", "#", "Author", "Title", "Why", "Checks", "Diff", "Age"],
+  reviewed: ["Repository", "#", "Author", "Title", "Your review", "Checks", "Diff", "Age"],
+  authored: ["Repository", "#", "Title", "Status", "Checks", "Comments", "Diff", "Age"],
+  else: ["Repository", "#", "Author", "Title", "Status", "Checks", "Diff", "Age"],
+  merged: ["Repository", "#", "Author", "Title", "Diff", "Merged"],
 };
+
+/** The right-aligned columns: Diff and the last (Age, Merged). */
+const RIGHT = new Set(["Diff", "Age", "Merged"]);
+
+/** Rows that do not involve the viewer now: dimmed until hovered or under the cursor. */
+const QUIET = "opacity-60 hover:opacity-100 aria-selected:opacity-100";
 
 const WHY_LOOK: Record<NeedsWhy, { icon: LucideIcon; cls: string }> = {
   requested: { icon: Eye, cls: "text-cf-text" },
@@ -155,6 +161,7 @@ export function NeedsReviewRow({ row, viewer }: { row: NeedsRow; viewer: string 
       <Title pr={pr} />
       <IconLabel icon={look.icon} cls={look.cls} label={needsLabel[why]} testId="prs-why" value={why} />
       <ChecksBadge checks={pr.checks} />
+      <Diff pr={pr} />
       <Age ms={pr.updatedAtMs} className="text-right" />
     </Row>
   );
@@ -164,13 +171,14 @@ export function ReviewedByYouRow({ row, viewer }: { row: ReviewedRow; viewer: st
   const { pr, verdict } = row;
   const look = VERDICT_LOOK[verdict];
   return (
-    // Waiting on the author: dimmed until hovered or under the cursor.
-    <Row section="reviewed" pr={pr} className="opacity-60 hover:opacity-100 aria-selected:opacity-100">
+    // Waiting on the author.
+    <Row section="reviewed" pr={pr} className={QUIET}>
       <Lead pr={pr} />
       <Author pr={pr} viewer={viewer} />
       <Title pr={pr} />
       <IconLabel icon={look.icon} cls={look.cls} label={verdictLabel[verdict]} testId="prs-verdict" value={verdict} />
       <ChecksBadge checks={pr.checks} />
+      <Diff pr={pr} />
       <Age ms={pr.updatedAtMs} className="text-right" />
     </Row>
   );
@@ -189,39 +197,73 @@ export function AuthoredPrRow({ row }: { row: AuthoredRow }) {
         <MessageCircle className="size-3.5 shrink-0" aria-hidden />
         {comments}
       </span>
+      <Diff pr={pr} />
       <Age ms={pr.updatedAtMs} className="text-right" />
     </Row>
   );
 }
 
-export function MergedRow({ pr, viewer }: { pr: PullRequestView; viewer: string }) {
+/** Someone else's open pull request in a tracked repository. */
+export function OtherPrRow({ row, viewer }: { row: OtherRow; viewer: string }) {
+  const { pr, status } = row;
   return (
-    <Row section="merged" pr={pr}>
+    <Row section="else" pr={pr}>
       <Lead pr={pr} />
       <Author pr={pr} viewer={viewer} />
       <Title pr={pr} />
+      <StatusPill status={status} />
+      <ChecksBadge checks={pr.checks} />
+      <Diff pr={pr} />
+      <Age ms={pr.updatedAtMs} className="text-right" />
+    </Row>
+  );
+}
+
+/** A merge this week; one not involving the viewer (the project-wide list only) is dimmed. */
+export function MergedRow({ row, viewer }: { row: MergedRowModel; viewer: string }) {
+  const { pr, involved } = row;
+  return (
+    <Row section="merged" pr={pr} className={involved ? undefined : QUIET}>
+      <Lead pr={pr} />
+      <Author pr={pr} viewer={viewer} />
+      <Title pr={pr} />
+      <Diff pr={pr} />
       <Age ms={pr.mergedAtMs} className="text-right" />
     </Row>
   );
 }
 
-/** A bordered table: the column header row (when the section has one) and the rows. */
-export function PrTable<T extends { pr: PullRequestView }>({ section, rows, render, className }: { section: Section; rows: readonly T[]; render: (row: T) => ReactNode; className?: string }) {
+/** A capped project-wide list's last line: how many of GitHub's matches show, and the search there. */
+function CapFooter({ cap }: { cap: Cap }) {
+  return (
+    <div className="flex items-center gap-1.5 border-t px-2.5 py-1.5 text-caption" data-testid="prs-cap">
+      <span className="tabular-nums">
+        Showing {cap.shown} of {cap.total}
+      </span>
+      <span aria-hidden>·</span>
+      <button type="button" className="text-link" onClick={() => void openUrl(cap.searchUrl)} data-testid="prs-cap-link">
+        See all on GitHub
+      </button>
+    </div>
+  );
+}
+
+/** A bordered table: the column header row, the rows, and the cap footer when GitHub matched more. */
+export function PrTable<T extends { pr: PullRequestView }>({ section, rows, render, cap, className }: { section: Section; rows: readonly T[]; render: (row: T) => ReactNode; cap?: Cap | null; className?: string }) {
   const head = headers[section];
   return (
     <div className={cn("rounded-lg border", className)}>
-      {head.length > 0 && (
-        <div className={cn("grid gap-3 border-b px-2 py-1 text-overline", columns[section])}>
-          {head.map((h, i) => (
-            <span key={h} className={cn(i === head.length - 1 && "text-right")}>
-              {h}
-            </span>
-          ))}
-        </div>
-      )}
+      <div className={cn("grid gap-3 border-b px-2 py-1 text-overline", columns[section])}>
+        {head.map((h) => (
+          <span key={h} className={cn(RIGHT.has(h) && "text-right")}>
+            {h}
+          </span>
+        ))}
+      </div>
       <div className="p-0.5">
         <RowList rows={rows} rowKey={(r) => prKey(section, r.pr)} rowHeight={ROW_H} render={render} />
       </div>
+      {cap && <CapFooter cap={cap} />}
     </div>
   );
 }

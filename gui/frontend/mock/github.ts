@@ -213,7 +213,7 @@ export class GhWorld {
     const repos = `(repo:${cf} OR repo:${gp})`; // github.com ANDs repeated repo: qualifiers
     const projectOpen = [
       this.pr(cf, 148, "feat(prs): per-project open pull requests", { author: "teammate-kim", headRef: "prs-per-project", reviewRequests: ["teammate-lee", "someone"], checks: rollup(CheckRollupState.SUCCESS, 30), additions: 412, deletions: 58, changedFiles: 14, commentCount: 3, reviewCount: 0, ageMs: 50 * MIN }),
-      this.pr(cf, 146, "feat(usage): weekly totals on the Usage page", { author: "teammate-kim", headRef: "usage-weekly", draft: true, checks: rollup(CheckRollupState.PENDING, 8, 0, 22), additions: 188, deletions: 20, changedFiles: 6, commentCount: 0, reviewCount: 0, ageMs: 4 * HOUR }),
+      this.pr(cf, 149, "feat(usage): weekly totals on the Usage page", { author: "teammate-kim", headRef: "usage-weekly", draft: true, checks: rollup(CheckRollupState.PENDING, 8, 0, 22), additions: 188, deletions: 20, changedFiles: 6, commentCount: 0, reviewCount: 0, ageMs: 4 * HOUR }),
       this.pr(gp, 16, "fix: font fallback on Linux", {
         author: "someone",
         headRef: "font-fallback",
@@ -230,7 +230,7 @@ export class GhWorld {
         ageMs: 6 * HOUR,
       }),
       this.pr(gp, 15, "docs: atlas layout notes", { author: "someone", headRef: "atlas-notes", reviewDecision: ReviewDecision.UNSPECIFIED, mergeStateStatus: MergeStateStatus.CLEAN, checks: rollup(CheckRollupState.UNSPECIFIED, 0), additions: 40, deletions: 0, changedFiles: 1, commentCount: 0, reviewCount: 0, ageMs: DAY }),
-      this.pr(cf, 131, "build(deps): bump vite from 7.1.4 to 7.2.0", { author: "dependabot", headRef: "dependabot/npm_and_yarn/vite-7.2.0", reviewDecision: ReviewDecision.UNSPECIFIED, checks: rollup(CheckRollupState.SUCCESS, 30), additions: 12, deletions: 12, changedFiles: 2, commentCount: 0, reviewCount: 0, ageMs: 2 * DAY }),
+      this.pr(cf, 144, "build(deps): bump vite from 7.1.4 to 7.2.0", { author: "dependabot", headRef: "dependabot/npm_and_yarn/vite-7.2.0", reviewDecision: ReviewDecision.UNSPECIFIED, checks: rollup(CheckRollupState.SUCCESS, 30), additions: 12, deletions: 12, changedFiles: 2, commentCount: 0, reviewCount: 0, ageMs: 2 * DAY }),
     ];
     const projectMerged = [
       merged138,

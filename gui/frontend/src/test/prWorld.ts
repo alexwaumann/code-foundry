@@ -325,10 +325,10 @@ function projectLists(t0: number, merged: PullRequestView[]): Pick<DashboardView
   const ours = (p: PullRequestView) => p.repoSlug === SLUG || p.repoSlug === GP_SLUG;
   const open = [
     pr(SLUG, 148, "feat(prs): per-project open pull requests", { author: "teammate-kim", headRef: "prs-per-project", reviewRequests: ["teammate-lee", "someone"], checks: rollup("success", 30), additions: 412, deletions: 58, changedFiles: 14, comments: 3, reviews: 0, ageMs: 50 * MIN }),
-    pr(SLUG, 146, "feat(usage): weekly totals on the Usage page", { author: "teammate-kim", headRef: "usage-weekly", draft: true, checks: rollup("pending", 8, 0, 22), additions: 188, deletions: 20, changedFiles: 6, comments: 0, reviews: 0, ageMs: 4 * HOUR }),
+    pr(SLUG, 149, "feat(usage): weekly totals on the Usage page", { author: "teammate-kim", headRef: "usage-weekly", draft: true, checks: rollup("pending", 8, 0, 22), additions: 188, deletions: 20, changedFiles: 6, comments: 0, reviews: 0, ageMs: 4 * HOUR }),
     pr(GP_SLUG, 16, "fix: font fallback on Linux", { author: "someone", headRef: "font-fallback", review: "approved", mergeState: "clean", headSha: "16".padEnd(40, "0"), latestReviews: [{ author: "teammate-kim", state: "approved", submittedAtMs: t0 - 7 * HOUR, commitSha: "16".padEnd(40, "0") }], checks: rollup("success", 9, 0, 0, 1), additions: 54, deletions: 9, changedFiles: 2, comments: 1, reviews: 1, ageMs: 6 * HOUR }),
     pr(GP_SLUG, 15, "docs: atlas layout notes", { author: "someone", headRef: "atlas-notes", review: null, mergeState: "clean", checks: rollup("none", 0), additions: 40, deletions: 0, changedFiles: 1, comments: 0, reviews: 0, ageMs: DAY }),
-    pr(SLUG, 131, "build(deps): bump vite from 7.1.4 to 7.2.0", { author: "dependabot", headRef: "dependabot/npm_and_yarn/vite-7.2.0", review: null, checks: rollup("success", 30), additions: 12, deletions: 12, changedFiles: 2, comments: 0, reviews: 0, ageMs: 2 * DAY }),
+    pr(SLUG, 144, "build(deps): bump vite from 7.1.4 to 7.2.0", { author: "dependabot", headRef: "dependabot/npm_and_yarn/vite-7.2.0", review: null, checks: rollup("success", 30), additions: 12, deletions: 12, changedFiles: 2, comments: 0, reviews: 0, ageMs: 2 * DAY }),
   ];
   const projectMerged = [
     ...merged.filter(ours),

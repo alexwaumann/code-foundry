@@ -4,7 +4,7 @@ import { useNow } from "@/lib/clock";
 import { slotColorVars, SWATCH_BG } from "@/lib/usage";
 import { useWidth } from "@/lib/useWidth";
 import { cn } from "@/lib/utils";
-import { axisLabel, chartMonths, countScale, labelledIndex, tickLabel, tooltipSide, type ActivityMonth } from "./activity";
+import { axisLabel, chartMonths, countScale, labelledIndexes, labelledTicks, tickLabel, tooltipSide, type ActivityMonth } from "./activity";
 import { monthName } from "./format";
 
 type SeriesKey = "merged" | "commits";
@@ -17,7 +17,8 @@ const SERIES: Record<SeriesKey, { label: string; unit: string; style: CSSPropert
 /** The tooltip lists both series, in this order, whichever card it is in. */
 const TOOLTIP_SERIES: readonly SeriesKey[] = ["commits", "merged"];
 
-const H = 170;
+/** Half the old height: the cards and lists below are the page's point. */
+const H = 92;
 const LEFT = 44;
 const RIGHT = 44;
 const TOP = 10;
@@ -90,8 +91,8 @@ function ActivityCard({
   const partialLast = months[n - 1]?.partial ?? false;
   const solid = partialLast ? pts.slice(0, -1) : pts;
   const beforeLast = pts[n - 2];
-  const labelled = labelledIndex(months);
-  const labelPt = pts[labelled];
+  const labelled = labelledIndexes(months);
+  const tickLabels = new Set(labelledTicks(ticks));
   const hi = hover?.index ?? null;
   const hovered = hi === null ? undefined : months[hi];
   const showTip = hover?.card === series && hovered !== undefined && hi !== null;
@@ -109,9 +110,11 @@ function ActivityCard({
             {ticks.map((v) => (
               <g key={v}>
                 <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className="stroke-cf-text/8" strokeWidth={1} />
-                <text x={LEFT - 8} y={y(v) + 4} textAnchor="end" className="fill-cf-text-muted text-caption-sm tabular-nums">
-                  {tickLabel(v)}
-                </text>
+                {tickLabels.has(v) && (
+                  <text x={LEFT - 8} y={y(v) + 4} textAnchor="end" className="fill-cf-text-muted text-caption-sm tabular-nums" data-testid="activity-tick">
+                    {tickLabel(v)}
+                  </text>
+                )}
               </g>
             ))}
           </g>
@@ -141,11 +144,22 @@ function ActivityCard({
               />
             );
           })}
-          {labelPt && (
-            <text x={labelPt[0] + 10} y={labelPt[1] + 4} className="fill-cf-text text-caption-sm font-semibold tabular-nums" data-testid="activity-value">
-              {tickLabel(values[labelled] ?? 0)}
-            </text>
-          )}
+          {labelled.map((i) => {
+            const p = pts[i];
+            if (!p) return null;
+            return (
+              <text
+                key={i}
+                x={p[0] + 10}
+                y={p[1] + 4}
+                className="fill-cf-text text-caption-sm font-semibold tabular-nums"
+                data-testid="activity-value"
+                data-partial={months[i]?.partial || undefined}
+              >
+                {tickLabel(values[i] ?? 0)}
+              </text>
+            );
+          })}
           {hi !== null && (
             <line x1={x(hi)} x2={x(hi)} y1={TOP} y2={H - BOTTOM} className="stroke-cf-text-muted" strokeWidth={1} strokeDasharray="2 3" data-testid="activity-crosshair" />
           )}

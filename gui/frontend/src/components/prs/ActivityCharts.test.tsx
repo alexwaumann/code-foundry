@@ -31,8 +31,8 @@ describe("ActivityCharts", () => {
       expect(card(k).queryAllByTestId("activity-marker")).toHaveLength(n);
       expect(card(k).queryAllByTestId("activity-month")).toHaveLength(n);
       expect(card(k).queryByTestId("activity-empty") !== null).toBe(n === 0);
-      // The newest closed month is labelled; with only the current month there is none.
-      expect(card(k).queryAllByTestId("activity-value")).toHaveLength(n >= 2 ? 1 : 0);
+      // The newest closed month and the current one are labelled (activity.test.ts: labelledIndexes).
+      expect(card(k).queryAllByTestId("activity-value")).toHaveLength(Math.min(n, 2));
     }
   });
 
@@ -42,10 +42,20 @@ describe("ActivityCharts", () => {
     expect(within(screen.getByTestId("activity-commits")).getByText("0")).toBeDefined();
   });
 
-  it("labels the last closed month and marks the current one partial", () => {
+  it("labels the last closed month and the current one, marked partial; the y axis only at 0 and the top", () => {
     render(<ActivityCharts months={SIX} />);
-    expect(card("merged").getByTestId("activity-value").textContent).toBe("38");
-    expect(card("commits").getByTestId("activity-value").textContent).toBe("463");
+    const values = (k: "merged" | "commits") => card(k).getAllByTestId("activity-value").map((v) => [v.textContent, v.hasAttribute("data-partial")]);
+    expect(values("merged")).toEqual([
+      ["38", false],
+      ["2", true],
+    ]);
+    expect(values("commits")).toEqual([
+      ["463", false],
+      ["16", true],
+    ]);
+    // Gridlines at 0, 200, 400, 600; labels at 0 and 600 only.
+    expect(card("commits").getAllByTestId("activity-tick").map((t) => t.textContent)).toEqual(["0", "600"]);
+    expect(card("merged").getAllByTestId("activity-tick").map((t) => t.textContent)).toEqual(["0", "40"]);
     const partial = card("commits")
       .getAllByTestId("activity-marker")
       .filter((m) => m.hasAttribute("data-partial"));
