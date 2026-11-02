@@ -4540,6 +4540,12 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread-info" } } }))}`,
       },
       {
+        // internal/command canFindFiles: a thread view with a project or workspace; the CLI always.
+        cmd: { name: "file.find", title: "Go to File…", category: "View", description: "Find a file in the thread's checkouts by name and open it in the thread's side panel (⌥⏎ puts it in the prompt as an @ file instead).", keybindings: ["cmd+p"], args: [] },
+        when: (ctx) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId) && Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find" } } }))}`,
+      },
+      {
         cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: panelThreadArgs },
         when: always,
         run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.expand", args),
