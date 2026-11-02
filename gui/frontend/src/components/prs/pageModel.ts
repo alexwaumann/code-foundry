@@ -35,7 +35,11 @@ export interface PageModel {
   /** Merged: the viewer's and the rest (counts.merged is their sum). */
   mergedInvolved: number;
   mergedMore: number;
-  /** A capped project-wide list: shown < total, and the search on GitHub. */
+  /**
+   * A section whose project-wide list GitHub capped: the rows the section shows, the
+   * count its title and card give (the same numbers as the table above the footer), and
+   * the search on GitHub. Null when the list is not capped.
+   */
   othersCap: Cap | null;
   mergedCap: Cap | null;
 }
@@ -46,13 +50,17 @@ export interface Cap {
   searchUrl: string;
 }
 
+/** The nav key of a section's cap footer: an option after its rows, so the keyboard reaches it too. */
+export const capKey = (section: Section): string => `cap:${section}`;
+
 export const prId = (p: Pick<PullRequestView, "repoSlug" | "number">): string => `${p.repoSlug.toLowerCase()}#${String(p.number)}`;
 
 /** The pull requests GitHub matched beyond the list it returned (0 when uncapped). */
 const hiddenCount = (l: ProjectPullRequestsView): number => Math.max(0, l.totalCount - l.pullRequests.length);
 
-function cap(l: ProjectPullRequestsView): Cap | null {
-  return l.pullRequests.length < l.totalCount ? { shown: l.pullRequests.length, total: l.totalCount, searchUrl: l.searchUrl } : null;
+/** The footer for a section built on `l`, when `l` is capped: what the section shows of what it counts. */
+function cap(l: ProjectPullRequestsView, shown: number, total: number): Cap | null {
+  return l.pullRequests.length < l.totalCount ? { shown, total, searchUrl: l.searchUrl } : null;
 }
 
 /**
@@ -130,6 +138,9 @@ export function pageModel(d: DashboardView): PageModel {
   const others = otherRows(d.projectOpen.pullRequests, mine);
   const merged = mergedRows(d.recentlyMerged, d.projectMerged.pullRequests);
   const m = mergedCounts(merged, d.projectMerged, d.trackedSlugs);
+  // Beyond the cap, the search's negations already left out the viewer's own.
+  const elseCount = others.length + hiddenCount(d.projectOpen);
+  const mergedCount = m.involved + m.more;
   return {
     needs: queue.needs,
     reviewed: queue.reviewed,
@@ -140,14 +151,13 @@ export function pageModel(d: DashboardView): PageModel {
       review: queue.needs.length,
       reviewed: queue.reviewed.length,
       authored: authored.length,
-      // Beyond the cap, the search's negations already left out the viewer's own.
-      else: others.length + hiddenCount(d.projectOpen),
-      merged: m.involved + m.more,
+      else: elseCount,
+      merged: mergedCount,
     },
     mergedInvolved: m.involved,
     mergedMore: m.more,
-    othersCap: cap(d.projectOpen),
-    mergedCap: cap(d.projectMerged),
+    othersCap: cap(d.projectOpen, others.length, elseCount),
+    mergedCap: cap(d.projectMerged, merged.length, mergedCount),
   };
 }
 

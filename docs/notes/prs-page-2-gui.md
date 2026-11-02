@@ -77,8 +77,12 @@ Every table has a header row. "Reviewed by you" is its own section now, with Rep
 share one grid template, so their columns line up down the page. Every table has a Diff
 column just before Age or Merged. It shows `+a −d` in text-code, tabular, with grouped
 thousands, in the success and error text tokens. It is empty for a `partial` row (0/0 is a
-real zero and shows). A capped list ends with "Showing X of Y · See all on GitHub", which
-opens `searchUrl` through `openUrl`.
+real zero and shows). A section whose project list is capped (`pullRequests.length <
+totalCount`) ends with "Showing X of Y · See all on GitHub", which opens `searchUrl`
+through `openUrl`. X and Y are the section's own numbers: the rows it shows and the count
+its title and card give. The project search's own numbers are not used, because the merged
+table is a union. With the merged list capped at 3 of 64, for example, the table shows 5
+rows and the title says 65, so the footer reads "Showing 5 of 65".
 
 Keyboard order is the order of the visible sections. A filter limits it to one section.
 
@@ -93,9 +97,13 @@ so they are renumbered #149 and #144 in mock/github.ts and src/test/prWorld.ts.
   virtualized by `RowList` inside its 520px scroll box, like any long section before.
 * The Diff column's floor (4.5rem) adds to the tables' minimum width. Beside the side
   panel the tables were already wider than the page, and they still are.
-* `SummaryCards` are buttons inside the page's `role="listbox"` root, as the charts
-  already were. The root's `onKeyDown` handles Escape for any target before it hands the
-  key to `useNav`. `useNav` ignores keys whose target is not the root.
+* The `role="listbox"` (focus on mount, `aria-activedescendant`, `useNav`'s keys) wraps
+  the sections only. The banners, charts and cards sit outside it. Each cap footer is a
+  `NavRow` option (`cap:<section>`) after its section's rows, not a button: j/k reach it,
+  and Enter, click and cmd+click open the search. No button is left inside the listbox.
+* Escape is handled on the wrapper around the whole body, so it works from the list or a
+  card. It is skipped when `defaultPrevented`: an open Radix tooltip or menu takes the
+  first Escape, and the second one clears the filter.
 
 ## Verification
 

@@ -164,7 +164,8 @@ describe("pageModel", () => {
     expect(m.counts.else).toBe(116);
     expect(m.othersCap).toEqual({ shown: 5, total: 116, searchUrl: d.projectOpen.searchUrl });
     // The first three project merges (138, 137, 136): #10 is the viewer's, tracked, not returned: it is among the 61 hidden.
-    expect(m.mergedCap?.shown).toBe(3);
+    // The footer counts what the section shows: the union's 5 rows of its 65, not the project search's 3 of 64.
+    expect(m.mergedCap).toEqual({ shown: 5, total: 65, searchUrl: d.projectMerged.searchUrl });
     expect([m.mergedInvolved, m.mergedMore]).toEqual([4, 1 + 61 - 1]);
     expect(m.counts.merged).toBe(4 + 61);
   });

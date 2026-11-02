@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import type { AuthoredRow, AuthoredStatus, AuthoredStatusKind } from "./authoredStatus";
 import { prKey, repoName } from "./format";
-import type { Cap, MergedRowModel, OtherRow, Section } from "./pageModel";
+import { capKey, type Cap, type MergedRowModel, type OtherRow, type Section } from "./pageModel";
 import { Age, ChecksBadge, Diff, PrStateIcon } from "./PrBits";
 import { needsLabel, verdictLabel, type NeedsRow, type NeedsWhy, type ReviewedRow, type Verdict } from "./reviewQueue";
 import { RowList } from "./RowList";
@@ -234,16 +234,22 @@ export function MergedRow({ row, viewer }: { row: MergedRowModel; viewer: string
 }
 
 /** A capped project-wide list's last line: how many of GitHub's matches show, and the search there. */
-function CapFooter({ cap }: { cap: Cap }) {
+/**
+ * An option of the page's listbox like the rows (no button inside it): Enter, click and
+ * cmd+click open the search on GitHub (the page's nav item does it).
+ */
+function CapFooter({ section, cap }: { section: Section; cap: Cap }) {
   return (
-    <div className="flex items-center gap-1.5 border-t px-2.5 py-1.5 text-caption" data-testid="prs-cap">
-      <span className="tabular-nums">
-        Showing {cap.shown} of {cap.total}
-      </span>
-      <span aria-hidden>·</span>
-      <button type="button" className="text-link" onClick={() => void openUrl(cap.searchUrl)} data-testid="prs-cap-link">
-        See all on GitHub
-      </button>
+    <div className="border-t p-0.5" data-testid="prs-cap">
+      <NavRow navKey={capKey(section)} activateOnClick onCmdClick={() => void openUrl(cap.searchUrl)} className="flex h-7 items-center gap-1.5 px-2 text-caption">
+        <span className="tabular-nums">
+          Showing {cap.shown} of {cap.total}
+        </span>
+        <span aria-hidden>·</span>
+        <span className="text-link" data-testid="prs-cap-link">
+          See all on GitHub
+        </span>
+      </NavRow>
     </div>
   );
 }
@@ -263,7 +269,7 @@ export function PrTable<T extends { pr: PullRequestView }>({ section, rows, rend
       <div className="p-0.5">
         <RowList rows={rows} rowKey={(r) => prKey(section, r.pr)} rowHeight={ROW_H} render={render} />
       </div>
-      {cap && <CapFooter cap={cap} />}
+      {cap && <CapFooter section={section} cap={cap} />}
     </div>
   );
 }

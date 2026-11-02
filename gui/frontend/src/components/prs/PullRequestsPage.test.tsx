@@ -202,6 +202,26 @@ describe("the Pull Requests page", () => {
     fireEvent.keyDown(list, { key: "Escape" });
     expect(sections()).toHaveLength(5);
     expect(card("merged").getAttribute("aria-pressed")).toBe("false");
+    // Escape on a card (outside the list) works too, and puts the keyboard back on the list.
+    fireEvent.click(card("authored"));
+    fireEvent.keyDown(card("authored"), { key: "Escape" });
+    expect(sections()).toHaveLength(5);
+    expect(document.activeElement).toBe(list);
+
+    // An open tooltip takes the first Escape (Radix prevents its default); the second clears the filter.
+    fireEvent.click(card("merged"));
+    const repo = rows("merged")[0]?.querySelector("span") as HTMLElement;
+    fireEvent.pointerMove(repo, { pointerType: "mouse" });
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("tooltip")?.textContent).toBe(SLUG);
+    });
+    fireEvent.keyDown(list, { key: "Escape" });
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+    expect(sections()).toEqual(["prs-merged"]);
+    fireEvent.keyDown(list, { key: "Escape" });
+    expect(sections()).toHaveLength(5);
 
     // The filtered section empties after a poll: the filter goes, and does not come back when it refills.
     fireEvent.click(card("reviewed"));
@@ -224,7 +244,9 @@ describe("the Pull Requests page", () => {
     await openPage();
     const cap = (s: string) => within(screen.getByTestId(`prs-${s}`)).getByTestId("prs-cap");
     expect(cap("else").textContent).toBe("Showing 5 of 116·See all on GitHub");
-    expect(cap("merged").textContent).toBe("Showing 3 of 64·See all on GitHub");
+    // The union's rows (the viewer's 4 and #137) of the title's 65.
+    expect(rows("merged")).toHaveLength(5);
+    expect(cap("merged").textContent).toBe("Showing 5 of 65·See all on GitHub");
     expect(within(screen.getByTestId("prs-card-else")).getByTestId("prs-card-count").textContent).toBe("116");
     // 4 the viewer's; #137 shown, and 61 beyond the cap less #10, the viewer's own among them.
     expect(within(screen.getByTestId("prs-card-merged")).getByTestId("prs-card-count").textContent).toBe("65");
@@ -232,6 +254,19 @@ describe("the Pull Requests page", () => {
     fireEvent.click(within(cap("merged")).getByTestId("prs-cap-link"));
     await settle();
     expect(invocationsOf("view.open.url").map((i) => i.args.url)).toEqual([d.projectMerged.searchUrl]);
+    // The footers are options of the list, after their section's rows: the keyboard reaches them; Enter opens the search.
+    const list = screen.getByTestId("prs-list");
+    const options = within(list).getAllByRole("option");
+    expect(options.at(-1)?.dataset.navKey).toBe("cap:merged");
+    expect(options[options.indexOf(rows("else").at(-1) as HTMLElement) + 1]?.dataset.navKey).toBe("cap:else");
+    fireEvent.keyDown(list, { key: "End" });
+    expect(options.at(-1)?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(list, { key: "Enter" });
+    await settle();
+    expect(invocationsOf("view.open.url").map((i) => i.args.url)).toEqual([d.projectMerged.searchUrl, d.projectMerged.searchUrl]);
+    // Nothing but options is interactive inside the list: the cards are outside it.
+    expect(within(list).queryAllByRole("button")).toHaveLength(0);
+    expect(list.contains(screen.getByTestId("prs-cards"))).toBe(false);
   });
 
   it("Enter and click open pull requests in the side panel; cmd+Enter and cmd+click open them on GitHub; keyboard order is page order", async () => {

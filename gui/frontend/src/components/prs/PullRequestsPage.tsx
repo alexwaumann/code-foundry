@@ -13,7 +13,7 @@ import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
 import { ActivityCharts } from "./ActivityCharts";
 import { prKey } from "./format";
-import { cards, liveFilter, mergedSubtitle, olderFreshness, pageModel, sectionRows, SECTIONS, type PageModel, type Section } from "./pageModel";
+import { capKey, cards, liveFilter, mergedSubtitle, olderFreshness, pageModel, sectionRows, SECTIONS, type PageModel, type Section } from "./pageModel";
 import { Freshness, SectionTitle } from "./PrBits";
 import { AuthoredPrRow, MergedRow, NeedsReviewRow, OtherPrRow, PrTable, ReviewedByYouRow } from "./PrRows";
 import { needsReviewCount } from "./reviewQueue";
@@ -56,15 +56,19 @@ function Body({ d }: { d: DashboardView }) {
   const shown = useMemo(() => SECTIONS.filter((s) => sectionRows(m, s) > 0 && (filter === null || filter === s)), [m, filter]);
   const items = useMemo<NavItem[]>(
     () =>
-      // Keyboard order is page order, over the sections shown.
-      shown.flatMap((s) =>
-        sectionPrs(m, s).map(({ pr: p }) => ({
+      // Keyboard order is page order, over the sections shown; a capped section's footer after its rows.
+      shown.flatMap((s): NavItem[] => {
+        const rows = sectionPrs(m, s).map(({ pr: p }) => ({
           key: prKey(s, p),
           // Enter and click open the pull request in the side panel; cmd+Enter and cmd+click on GitHub.
           activate: () => void openPullRequestInPanel({ slug: p.repoSlug, number: p.number }),
           secondary: () => void openUrl(p.url),
-        })),
-      ),
+        }));
+        const cap = s === "else" ? m.othersCap : s === "merged" ? m.mergedCap : null;
+        if (!cap) return rows;
+        const open = () => void openUrl(cap.searchUrl);
+        return [...rows, { key: capKey(s), activate: open, secondary: open }];
+      }),
     [m, shown],
   );
   const nav = useNav(items);
@@ -75,24 +79,16 @@ function Body({ d }: { d: DashboardView }) {
   const has = (s: Section) => shown.includes(s);
   return (
     <NavProvider value={nav.ctx}>
+      {/* Escape anywhere on the page (the list, a card) shows every section again, unless something
+          open on it (a tooltip, a menu) already took the key. */}
       <div
-        ref={rootRef}
-        tabIndex={0}
-        role="listbox"
-        aria-label="Pull requests"
-        aria-activedescendant={nav.activeDescendant}
-        className="flex flex-col gap-6 outline-none"
-        data-testid="prs-list"
-        data-focus-root
+        className="flex flex-col gap-6"
         onKeyDown={(e) => {
-          if (e.key === "Escape" && filter !== null && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-            e.preventDefault();
-            e.stopPropagation();
-            setPicked(null);
-            rootRef.current?.focus({ preventScroll: true });
-            return;
-          }
-          nav.onKeyDown(e);
+          if (e.key !== "Escape" || e.defaultPrevented || filter === null || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setPicked(null);
+          rootRef.current?.focus({ preventScroll: true });
         }}
       >
         {!d.authenticated && <Banner tone="warn">gh is not authenticated. Run `gh auth login`; the lists below are from the last successful poll.</Banner>}
@@ -112,47 +108,60 @@ function Body({ d }: { d: DashboardView }) {
             rootRef.current?.focus({ preventScroll: true });
           }}
         />
-        {has("review") && (
-          <section data-testid="prs-review">
-            <SectionTitle count={m.counts.review}>Needs your review</SectionTitle>
-            <PrTable section="review" rows={m.needs} render={(r) => <NeedsReviewRow row={r} viewer={viewer} />} />
-          </section>
-        )}
-        {has("reviewed") && (
-          <section data-testid="prs-reviewed">
-            <SectionTitle count={m.counts.reviewed} caption="open, waiting on the author">
-              Reviewed by you
-            </SectionTitle>
-            <PrTable section="reviewed" rows={m.reviewed} render={(r) => <ReviewedByYouRow row={r} viewer={viewer} />} />
-          </section>
-        )}
-        {has("authored") && (
-          <section data-testid="prs-authored">
-            <SectionTitle count={m.counts.authored}>Your open pull requests</SectionTitle>
-            <PrTable section="authored" rows={m.authored} render={(r) => <AuthoredPrRow row={r} />} />
-          </section>
-        )}
-        {has("else") && (
-          <section data-testid="prs-else">
-            <SectionTitle count={m.counts.else} caption="not yours, not waiting on you">
-              Everything else open in your projects
-            </SectionTitle>
-            <PrTable section="else" rows={m.others} cap={m.othersCap} render={(r) => <OtherPrRow row={r} viewer={viewer} />} />
-          </section>
-        )}
-        {has("merged") && (
-          <section data-testid="prs-merged">
-            <SectionTitle count={m.counts.merged} caption={mergedSubtitle(m.mergedInvolved, m.mergedMore, true)}>
-              Merged in the last 7 days
-            </SectionTitle>
-            <PrTable section="merged" rows={m.merged} cap={m.mergedCap} render={(r) => <MergedRow row={r} viewer={viewer} />} />
-          </section>
-        )}
-        {shown.length === 0 && (
-          <p className="px-0.5 text-body text-cf-text-muted" data-testid="prs-empty">
-            No open pull requests, and nothing merged this week.
-          </p>
-        )}
+        {/* The listbox holds the sections only: their rows and cap footers are its options. */}
+        <div
+          ref={rootRef}
+          tabIndex={0}
+          role="listbox"
+          aria-label="Pull requests"
+          aria-activedescendant={nav.activeDescendant}
+          className="flex flex-col gap-6 outline-none"
+          data-testid="prs-list"
+          data-focus-root
+          onKeyDown={nav.onKeyDown}
+        >
+          {has("review") && (
+            <section data-testid="prs-review">
+              <SectionTitle count={m.counts.review}>Needs your review</SectionTitle>
+              <PrTable section="review" rows={m.needs} render={(r) => <NeedsReviewRow row={r} viewer={viewer} />} />
+            </section>
+          )}
+          {has("reviewed") && (
+            <section data-testid="prs-reviewed">
+              <SectionTitle count={m.counts.reviewed} caption="open, waiting on the author">
+                Reviewed by you
+              </SectionTitle>
+              <PrTable section="reviewed" rows={m.reviewed} render={(r) => <ReviewedByYouRow row={r} viewer={viewer} />} />
+            </section>
+          )}
+          {has("authored") && (
+            <section data-testid="prs-authored">
+              <SectionTitle count={m.counts.authored}>Your open pull requests</SectionTitle>
+              <PrTable section="authored" rows={m.authored} render={(r) => <AuthoredPrRow row={r} />} />
+            </section>
+          )}
+          {has("else") && (
+            <section data-testid="prs-else">
+              <SectionTitle count={m.counts.else} caption="not yours, not waiting on you">
+                Everything else open in your projects
+              </SectionTitle>
+              <PrTable section="else" rows={m.others} cap={m.othersCap} render={(r) => <OtherPrRow row={r} viewer={viewer} />} />
+            </section>
+          )}
+          {has("merged") && (
+            <section data-testid="prs-merged">
+              <SectionTitle count={m.counts.merged} caption={mergedSubtitle(m.mergedInvolved, m.mergedMore, true)}>
+                Merged in the last 7 days
+              </SectionTitle>
+              <PrTable section="merged" rows={m.merged} cap={m.mergedCap} render={(r) => <MergedRow row={r} viewer={viewer} />} />
+            </section>
+          )}
+          {shown.length === 0 && (
+            <p className="px-0.5 text-body text-cf-text-muted" data-testid="prs-empty">
+              No open pull requests, and nothing merged this week.
+            </p>
+          )}
+        </div>
       </div>
     </NavProvider>
   );
