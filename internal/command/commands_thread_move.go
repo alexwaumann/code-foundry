@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -39,6 +40,14 @@ func threadMove(r *Registry, b ThreadBackend, idArg ArgSpec) Command {
 				return Result{}, err
 			}
 			res, err := b.Move(ctx, connect.NewRequest(req))
+			if to := strings.TrimSpace(a.String("to")); err != nil && connect.CodeOf(err) == connect.CodeNotFound &&
+				req.GetWorkspaceId() == "" && to != "" && !strings.Contains(err.Error(), "thread") {
+				// No project answers to it: a workspace (the daemon resolves workspace names).
+				req.ProjectId, req.WorkspaceId = "", to
+				if res, err = b.Move(ctx, connect.NewRequest(req)); connect.CodeOf(err) == connect.CodeNotFound && !strings.Contains(err.Error(), "thread") {
+					return Result{}, connect.NewError(connect.CodeNotFound, fmt.Errorf("no project or workspace %q (code-foundry project list, workspace list)", to))
+				}
+			}
 			if err != nil {
 				return Result{}, err
 			}
@@ -47,8 +56,8 @@ func threadMove(r *Registry, b ThreadBackend, idArg ArgSpec) Command {
 	}
 }
 
-// moveRequest is thread.move's request: to is a project unless no project answers to
-// it (then a workspace), or with workspace the primary.
+// moveRequest is thread.move's request: to is the project (Run tries it as a workspace
+// when no project answers to it), or with workspace the primary.
 func (r *Registry) moveRequest(ctx context.Context, a Args) (*v1.MoveThreadRequest, error) {
 	req := &v1.MoveThreadRequest{Id: a.String("id"), ProjectId: a.String("project"), WorkspaceId: a.String("workspace"), WorktreePath: a.Path("worktree")}
 	if to := strings.TrimSpace(a.String("to")); to != "" {
@@ -58,15 +67,15 @@ func (r *Registry) moveRequest(ctx context.Context, a Args) (*v1.MoveThreadReque
 		case req.WorkspaceId != "":
 			req.ProjectId = to // the workspace's primary
 		default:
+			// A project's name or path becomes its id; anything else goes as it is, and a
+			// project the daemon does not know is tried as a workspace (Run).
 			req.ProjectId = to
 			if res := r.refResolver(ProjectID); res != nil {
-				if id, err := res(ctx, "to", to); err == nil {
-					req.ProjectId = id
-				} else if connect.CodeOf(err) == connect.CodeNotFound {
-					req.ProjectId, req.WorkspaceId = "", to // not a project: a workspace (the daemon says when it is neither)
-				} else {
+				id, err := res(ctx, "to", to)
+				if err != nil {
 					return nil, err
 				}
+				req.ProjectId = id
 			}
 		}
 	}

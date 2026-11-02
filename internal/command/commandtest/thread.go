@@ -54,6 +54,8 @@ type Thread struct {
 	// Cascade is List's answer to a filter with archive_cascade_of, by that id (none
 	// when absent): the hidden threads archiving it takes along.
 	Cascade map[string][]*v1.Thread
+	// MoveErr, when set, is Move's error for a request (after it is recorded).
+	MoveErr func(*v1.MoveThreadRequest) error
 	// Placement, when set, gives Create's made_worktree, made_branch, existing_worktree, shared_with
 	// and worktree_mode_dropped (else made_worktree and made_branch are new_worktree's presence).
 	Placement *v1.CreateThreadResponse
@@ -274,6 +276,11 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 func (s *Thread) Move(_ context.Context, r *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
+	}
+	if s.MoveErr != nil {
+		if err := s.MoveErr(r.Msg); err != nil {
+			return nil, err
+		}
 	}
 	m := r.Msg
 	cur := &v1.Thread{State: v1.ThreadState_THREAD_STATE_DISCONNECTED}

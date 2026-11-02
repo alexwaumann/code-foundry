@@ -464,6 +464,7 @@ func (m *Manager) moveStopped(ctx context.Context, id string, job *moveJob) {
 	m.update(id, true, func(rec *record) {
 		rec.s = rec.s.withMove(job)
 		rec.moving = false
+		rec.namingTried = rec.namingTried || job.title != ""
 	})
 	m.log.Info("thread moved", "thread", id, "to", job.place, "cwd", job.placed.path)
 	m.noteMembers(ctx, id, movedNote(job), "")
@@ -479,6 +480,7 @@ func (r *runner) onMoved(job *moveJob, relocated bool) {
 	r.m.update(r.id, true, func(rec *record) {
 		rec.s = rec.s.withMove(job)
 		rec.moving = false
+		rec.namingTried = rec.namingTried || job.title != "" // a first-prompt namer not started yet never will
 		if job.restart && !job.started && rec.run == r { // a process started (or restarted) for the move has them
 			rec.run.dirsStale.Store(true) // the members as --add-dir (maybeRestart)
 		}

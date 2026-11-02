@@ -27,6 +27,9 @@ func TestThreadMove(t *testing.T) {
 		wantReq *v1.MoveThreadRequest
 		wantMsg string
 		wantErr error
+		// unknownProject: the daemon answers NOT_FOUND for the project; unknownWorkspace for
+		// the workspace too.
+		unknownProject, unknownWorkspace bool
 	}{
 		{name: "a project, default placement", ctx: command.Context{ActiveThreadID: "s-1"}, args: map[string]string{"to": "web"},
 			wantReq: &v1.MoveThreadRequest{Id: "s-1", ProjectId: "r-web"},
@@ -43,9 +46,11 @@ func TestThreadMove(t *testing.T) {
 		{name: "an existing checkout", args: map[string]string{"id": "s-1", "to": "web", "worktree": "/w/web-2"},
 			wantReq: &v1.MoveThreadRequest{Id: "s-1", ProjectId: "r-web", WorktreePath: "/w/web-2"},
 			wantMsg: "moved thread s-1 to web, in /w/web-2"},
-		{name: "not a project: a workspace", args: map[string]string{"id": "s-1", "to": "platform"},
+		{name: "not a project: a workspace", args: map[string]string{"id": "s-1", "to": "platform"}, unknownProject: true,
 			wantReq: &v1.MoveThreadRequest{Id: "s-1", WorkspaceId: "platform"},
 			wantMsg: "moved thread s-1 to workspace platform, in /projects/platform-1"},
+		{name: "neither", args: map[string]string{"id": "s-1", "to": "nowhere"}, unknownProject: true, unknownWorkspace: true,
+			wantErr: errors.New(`not_found: no project or workspace "nowhere" (code-foundry project list, workspace list)`)},
 		{name: "a workspace and its primary", args: map[string]string{"id": "s-1", "workspace": "platform", "to": "workspace"},
 			wantReq: &v1.MoveThreadRequest{Id: "s-1", WorkspaceId: "platform", ProjectId: "workspace"},
 			wantMsg: "moved thread s-1 to workspace platform, in /projects/workspace"},
@@ -65,15 +70,24 @@ func TestThreadMove(t *testing.T) {
 				if ref == "web" {
 					return "r-web", nil
 				}
-				return "", connect.NewError(connect.CodeNotFound, fmt.Errorf("no project %s", ref))
+				return ref, nil // as the registry's: an unknown ref goes as it is
 			})
+			b.MoveErr = func(req *v1.MoveThreadRequest) error {
+				switch {
+				case tt.unknownProject && req.GetProjectId() != "":
+					return connect.NewError(connect.CodeNotFound, fmt.Errorf("project %s is not registered", req.GetProjectId()))
+				case tt.unknownWorkspace && req.GetWorkspaceId() != "":
+					return connect.NewError(connect.CodeNotFound, fmt.Errorf("workspace %s not found", req.GetWorkspaceId()))
+				}
+				return nil
+			}
 			reg.SetProjectNames(func(context.Context) (map[string]string, error) { return map[string]string{"r-web": "web"}, nil })
 			if tt.current != nil {
 				b.Current = proto.CloneOf(tt.current)
 			}
 			res, err := reg.Invoke(context.Background(), tt.ctx, "thread.move", tt.args)
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
+				if !errors.Is(err, tt.wantErr) && (err == nil || err.Error() != tt.wantErr.Error()) {
 					t.Fatalf("err = %v, want %v", err, tt.wantErr)
 				}
 				return
@@ -84,7 +98,7 @@ func TestThreadMove(t *testing.T) {
 			if res.Message != tt.wantMsg {
 				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
 			}
-			if reqs := b.Requests(); len(reqs) != 1 || !proto.Equal(reqs[0], tt.wantReq) {
+			if reqs := b.Requests(); len(reqs) == 0 || !proto.Equal(reqs[len(reqs)-1], tt.wantReq) {
 				t.Errorf("requests = %v, want %v", reqs, tt.wantReq)
 			}
 		})
