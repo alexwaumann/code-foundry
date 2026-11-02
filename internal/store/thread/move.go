@@ -44,7 +44,8 @@ import (
 // it the call returns the thread with the move still queued.
 const moveWait = 45 * time.Second
 
-// moveJob is a placed move waiting for Claude's set_cwd (cdRequest.move).
+// moveJob is a placed move waiting for Claude's set_cwd (cdRequest.move). Once queued
+// on a runner, started, restart and retried are the run goroutine's.
 type moveJob struct {
 	placed placedThread
 	// title is the name the conversation gave; "" keeps the name.
@@ -406,10 +407,11 @@ func (m *Manager) runMove(ctx context.Context, id string, job *moveJob) (bool, e
 				dest := s.withMove(job)
 				job.restart = len(dest.Projects()) > 1 || dest.WorkspaceID != ""
 			}
+			wait := job.started || !busy // read before the runner owns job (streamCd may set started)
 			if !m.queueMove(id, live, job) {
 				continue // the runner changed meanwhile
 			}
-			return job.started || !busy, nil
+			return wait, nil
 		case closing != nil:
 			if err := waitDone(ctx, closing); err != nil {
 				return false, err
