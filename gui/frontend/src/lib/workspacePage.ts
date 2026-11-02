@@ -1,7 +1,7 @@
 /**
  * A workspace's page on the Projects view (docs/notes/projects-redesign-3-workspace-page.md):
  * which threads its Threads table lists, in what order, the section's caption, a member's
- * checkout for a thread, and a thread's Changes over them. Pure; inputs are the threads and
+ * checkout for a thread, where a thread runs, and a thread's Changes over them. Pure; inputs are the threads and
  * projects slices' shapes.
  */
 import type { GitStatusView } from "@/api/project";
@@ -53,6 +53,18 @@ export function memberCheckoutPath(t: Pick<ActivityThread, "projectId" | "projec
   const recorded = t.checkoutPaths.find((c) => c.projectId === projectId)?.path ?? "";
   if (recorded) return recorded;
   return t.projectId === projectId ? t.worktreePath : "";
+}
+
+/**
+ * Where a workspace's thread runs, its cwd (the Runs in column and the row menu's Open in):
+ * its primary project's checkout, or with no primary the workspace's own folder; null for a
+ * thread with neither (nothing to open).
+ */
+export type ThreadPlace = { kind: "checkout"; projectId: string; path: string } | { kind: "folder"; workspaceId: string };
+
+export function threadPlace(t: Pick<ActivityThread, "projectId" | "worktreePath" | "workspaceId">): ThreadPlace | null {
+  if (t.projectId) return t.worktreePath ? { kind: "checkout", projectId: t.projectId, path: t.worktreePath } : null;
+  return t.workspaceId ? { kind: "folder", workspaceId: t.workspaceId } : null;
 }
 
 type ChangesStatus = Pick<GitStatusView, "staged" | "modified" | "untracked" | "conflicted" | "dirty" | "baseAhead">;
