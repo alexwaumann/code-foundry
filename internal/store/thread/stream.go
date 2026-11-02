@@ -312,7 +312,10 @@ func (r *runner) run() {
 			if !st.initialized && !r.closing {
 				r.failStart(errors.New("no answer to the initialize handshake after a restart"))
 			}
-		case <-r.closeReq:
+		case why := <-r.closeReq:
+			if why != "" && !r.closing {
+				r.disconnectAs = why
+			}
 			r.beginClose()
 		case req := <-r.cdReq:
 			r.onCdRequest(req)

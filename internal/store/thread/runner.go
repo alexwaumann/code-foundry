@@ -15,14 +15,17 @@ const activityPersistGap = 30 * time.Second
 // runner owns one connected thread: its claude process over stdio (stream.go), the
 // transcript tailer, status publishing, RunIn and close. All fields below are touched
 // only by run (the goroutine), except closeReq, cdReq, stopReq and done, and st's
-// documented exceptions.
+// documented exceptions. startedFor is set once, at newRunner.
 type runner struct {
 	m      *Manager
 	id     string
 	cwd    string
 	launch launch
+	// startedFor is the move this process was started for (launch.move at spawn).
+	startedFor *moveJob
 
-	closeReq chan struct{}
+	// closeReq carries the disconnect reason of a close the daemon asks for ("": closed).
+	closeReq chan string
 	cdReq    chan cdRequest // RunIn; capacity 1, latest wins
 	stopReq  chan struct{}
 	idleReq  chan idleCheck // stopIdle; capacity 1 (lifecycle.go)
@@ -126,8 +129,8 @@ type runner struct {
 
 func newRunner(m *Manager, id, cwd string, l launch) *runner {
 	return &runner{
-		m: m, id: id, cwd: cwd, launch: l,
-		closeReq: make(chan struct{}, 1),
+		m: m, id: id, cwd: cwd, launch: l, startedFor: l.move,
+		closeReq: make(chan string, 1),
 		cdReq:    make(chan cdRequest, 1),
 		stopReq:  make(chan struct{}, 1),
 		idleReq:  make(chan idleCheck, 1),
@@ -138,9 +141,13 @@ func newRunner(m *Manager, id, cwd string, l launch) *runner {
 	}
 }
 
-func (r *runner) requestClose() {
+func (r *runner) requestClose() { r.requestCloseAs("") }
+
+// requestCloseAs asks for a graceful close recorded as reason (Thread.DisconnectReason);
+// a close already asked for or begun keeps its own.
+func (r *runner) requestCloseAs(reason string) {
 	select {
-	case r.closeReq <- struct{}{}:
+	case r.closeReq <- reason:
 	default:
 	}
 }

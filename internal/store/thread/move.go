@@ -165,7 +165,10 @@ func (m *Manager) Move(ctx context.Context, id string, o MoveOptions) (Thread, e
 			}
 		}
 	}
-	wait, err := m.runMove(ctx, id, job)
+	// The move goes on once it started, whether or not the caller still waits: runMove's
+	// waits are bounded (a start's handshake, a close), and a cancel there would fail a
+	// move whose Claude is already starting.
+	wait, err := m.runMove(context.WithoutCancel(ctx), id, job)
 	if err != nil {
 		m.failMove(ctx, id, job, err, false)
 		return Thread{}, err
@@ -549,17 +552,34 @@ func (r *runner) onMoveFailed(job *moveJob, why string) {
 // thread is as it was, and (unless noted already) the timeline says why. done gets err.
 func (m *Manager) failMove(ctx context.Context, id string, job *moveJob, err error, noted bool) {
 	m.log.Warn("thread move failed; it stays without a project", "thread", id, "to", job.place, "err", err)
+	ctx = context.WithoutCancel(ctx) // the caller may have stopped waiting; the cleanup still runs
+	m.stopMoveStart(id, job)
 	m.rollback(ctx, job.placed.made)
 	m.releaseMove(id)
 	m.update(id, false, func(rec *record) { rec.s.LastError = "move to " + job.place + ": " + err.Error() })
 	if !noted {
 		// The error's class is for callers, not the timeline.
 		why := strings.ReplaceAll(err.Error(), ErrFailedPrecondition.Error()+": ", "")
-		m.noteMembers(context.WithoutCancel(ctx), id, moveFailedNote(job, why), "")
+		m.noteMembers(ctx, id, moveFailedNote(job, why), "")
 	}
 	select {
 	case job.done <- err:
 	default:
+	}
+}
+
+// stopMoveStart stops the process started for job when it still runs: it has the
+// destination's folders as --add-dir, and nobody asked for it (closed as at its cache
+// expiry). A process started otherwise (a send) is left alone.
+func (m *Manager) stopMoveStart(id string, job *moveJob) {
+	m.mu.Lock()
+	var r *runner
+	if rec, err := m.record(id); err == nil {
+		r = rec.run
+	}
+	m.mu.Unlock()
+	if r != nil && r.startedFor == job {
+		r.requestCloseAs(ReasonIdle)
 	}
 }
 

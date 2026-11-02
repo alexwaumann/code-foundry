@@ -741,3 +741,76 @@ func TestMoveHoldsTheIdleStop(t *testing.T) {
 		}
 	})
 }
+
+// A caller that stops waiting once Claude is starting for the move does not fail it:
+// the move goes on and lands.
+func TestMoveOutlivesItsCaller(t *testing.T) {
+	gate := filepath.Join(t.TempDir(), "init")
+	if err := os.WriteFile(gate, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e, _ := newMoveEnv(t, "text-table", func(o *Options) { o.Env = append(o.Env, "CF_FAKE_CLAUDE_INIT_GATE="+gate) })
+	s, _ := e.noProjectThread("check the slack thread", true)
+	if err := os.Remove(gate); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(e.ctx())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = e.m.Move(ctx, s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true})
+	}()
+	e.waitFor(s.ID, "starting for the move", func(s Thread) bool { return s.State == StateStarting })
+	cancel()
+	time.Sleep(settle) // the caller is gone before Claude answers
+	if err := os.WriteFile(gate, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	got := e.waitFor(s.ID, "moved", func(s Thread) bool { return s.ProjectID == "r1" && s.PendingMove == nil })
+	if got.WorktreePath != e.wt || got.State != StateConnected {
+		t.Errorf("moved = %+v", got)
+	}
+}
+
+// A failed move stops the process started for it (it has the destination's folders),
+// recorded as an idle stop; a process started otherwise is left alone.
+func TestFailedMoveStopsItsStart(t *testing.T) {
+	for _, forMove := range []bool{true, false} {
+		t.Run(map[bool]string{true: "started for the move", false: "started by a send"}[forMove], func(t *testing.T) {
+			gate := filepath.Join(t.TempDir(), "init")
+			if err := os.WriteFile(gate, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			e, _ := newMoveEnv(t, "text-table", func(o *Options) { o.Env = append(o.Env, "CF_FAKE_CLAUDE_INIT_GATE="+gate) })
+			s, _ := e.noProjectThread("check the slack thread", true)
+			job := &moveJob{place: "repo", done: make(chan error, 1)}
+			if forMove {
+				if err := os.Remove(gate); err != nil {
+					t.Fatal(err)
+				}
+				go func() { _, _ = e.m.Move(e.ctx(), s.ID, MoveOptions{ProjectID: "r1", CheckoutMode: true}) }()
+				e.waitFor(s.ID, "starting for the move", func(s Thread) bool { return s.State == StateStarting })
+				job = e.runnerOf(s.ID).startedFor
+				if job == nil {
+					t.Fatal("the move's start does not know its move")
+				}
+				defer func() { _ = os.WriteFile(gate, nil, 0o644) }()
+			} else if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+				t.Fatal(err)
+			}
+			e.m.stopMoveStart(s.ID, job)
+			if forMove {
+				got := e.waitFor(s.ID, "stopped", func(s Thread) bool { return s.State == StateDisconnected && s.PendingMove == nil })
+				if got.DisconnectReason != ReasonIdle || got.ProjectID != "" {
+					t.Errorf("after = %+v", got)
+				}
+				return
+			}
+			time.Sleep(settle)
+			if got, _ := e.m.Get(e.ctx(), s.ID); got.State != StateConnected {
+				t.Errorf("a process started by a send stopped: %+v", got)
+			}
+		})
+	}
+}
