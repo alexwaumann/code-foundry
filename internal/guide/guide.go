@@ -123,10 +123,11 @@ var pluginThreadCommands = []string{"thread.flags", "thread.flag.clear"}
 // card's own toggle, view.thread-info, a window's view state like composer.history, and
 // thread.shell.stop, the card's stop square on a server row (docs/notes/thread-servers.md),
 // and thread.regenerate-name, the thread menu's Regenerate name (agents name a thread with
-// thread rename; docs/notes/regenerate-thread-name.md)
+// thread rename; docs/notes/regenerate-thread-name.md), and thread.move.open, the GUI's move
+// picker (agents call thread.move; docs/notes/move-no-project-2-gui.md)
 // (`code-foundry commands` and `help <command>` show them).
 var leftOut = []string{"pr.checks", "thread.restart", "thread.shell.stop", "thread.new-like", "thread.workspace", "thread.prompts", "composer.history",
-	"thread.placement.check", "action.last", "worktree.editors", "view.thread-info", "thread.regenerate-name"}
+	"thread.placement.check", "action.last", "worktree.editors", "view.thread-info", "thread.regenerate-name", "thread.move.open"}
 
 // LeftOut reports whether the guide leaves c out: the plugin namespace, the Skills
 // marketplace (skill.*: the user's settings, not an agent's work; docs/notes/
