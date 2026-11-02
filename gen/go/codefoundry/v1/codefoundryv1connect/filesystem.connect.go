@@ -67,13 +67,33 @@ type FilesystemServiceClient interface {
 	// project id, or with a path that is relative or outside the home directory, is
 	// InvalidArgument.
 	ListSkills(context.Context, *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error)
-	// SearchFiles fuzzy-matches query against the files and directories of one checkout
-	// (the composer's "@" completion). A git checkout lists tracked plus untracked, not
-	// ignored files (and their parent directories); a project without git is walked,
+	// SearchFiles fuzzy-matches query against the files and directories of one or more
+	// checkouts (the composer's "@" completion with one, the file finder with a thread's
+	// checkouts) and ranks them in one list. A git checkout lists tracked plus untracked,
+	// not ignored files (and their parent directories); a project without git is walked,
 	// skipping .git, node_modules and dot-directories, at most 50,000 entries. The
 	// candidate list is cached for a few seconds per checkout. An empty query returns
-	// the shallowest entries. An unknown project is NotFound; a path outside the home
-	// directory is InvalidArgument.
+	// the shallowest entries.
+	//
+	// Ranking: exact base name > base-name prefix > base-name subsequence > whole-path
+	// subsequence (case-insensitive), then characters at segment starts and in runs, then
+	// the shorter path, then the path, then the earlier source.
+	//
+	// Project words, only with more than one source: the query is split into words at
+	// whitespace. A run of words at the start or at the end of the query, leaving at least
+	// one word, may be matched against the source's project name instead of the path: the
+	// run's words, in order and with their spaces dropped, must be a case-insensitive
+	// subsequence of the name. The remaining words, joined by single spaces, are matched
+	// against the path as a one-source query would be. A file matches when the whole
+	// query (words joined by single spaces) matches its path or some such split does,
+	// and ranks by its best path score. So a single word never touches the name, and
+	// "ghostty tree" ranks the tree files of a project named ghostty-playground as if
+	// "tree" had been typed there. With one source the query is matched as typed, as
+	// before.
+	//
+	// An unknown project is NotFound; a path outside the home directory, a source without
+	// a project, both sources and project_id/path, or more than 16 sources is
+	// InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
 	// ReadFile reads one file for the file viewer. path is absolute, or relative to
 	// base_dir (a thread's worktree, or the home directory); "~/" is the home
@@ -194,13 +214,33 @@ type FilesystemServiceHandler interface {
 	// project id, or with a path that is relative or outside the home directory, is
 	// InvalidArgument.
 	ListSkills(context.Context, *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error)
-	// SearchFiles fuzzy-matches query against the files and directories of one checkout
-	// (the composer's "@" completion). A git checkout lists tracked plus untracked, not
-	// ignored files (and their parent directories); a project without git is walked,
+	// SearchFiles fuzzy-matches query against the files and directories of one or more
+	// checkouts (the composer's "@" completion with one, the file finder with a thread's
+	// checkouts) and ranks them in one list. A git checkout lists tracked plus untracked,
+	// not ignored files (and their parent directories); a project without git is walked,
 	// skipping .git, node_modules and dot-directories, at most 50,000 entries. The
 	// candidate list is cached for a few seconds per checkout. An empty query returns
-	// the shallowest entries. An unknown project is NotFound; a path outside the home
-	// directory is InvalidArgument.
+	// the shallowest entries.
+	//
+	// Ranking: exact base name > base-name prefix > base-name subsequence > whole-path
+	// subsequence (case-insensitive), then characters at segment starts and in runs, then
+	// the shorter path, then the path, then the earlier source.
+	//
+	// Project words, only with more than one source: the query is split into words at
+	// whitespace. A run of words at the start or at the end of the query, leaving at least
+	// one word, may be matched against the source's project name instead of the path: the
+	// run's words, in order and with their spaces dropped, must be a case-insensitive
+	// subsequence of the name. The remaining words, joined by single spaces, are matched
+	// against the path as a one-source query would be. A file matches when the whole
+	// query (words joined by single spaces) matches its path or some such split does,
+	// and ranks by its best path score. So a single word never touches the name, and
+	// "ghostty tree" ranks the tree files of a project named ghostty-playground as if
+	// "tree" had been typed there. With one source the query is matched as typed, as
+	// before.
+	//
+	// An unknown project is NotFound; a path outside the home directory, a source without
+	// a project, both sources and project_id/path, or more than 16 sources is
+	// InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
 	// ReadFile reads one file for the file viewer. path is absolute, or relative to
 	// base_dir (a thread's worktree, or the home directory); "~/" is the home

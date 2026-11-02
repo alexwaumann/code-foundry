@@ -23,13 +23,33 @@ service FilesystemService {
   // InvalidArgument.
   rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse) {}
 
-  // SearchFiles fuzzy-matches query against the files and directories of one checkout
-  // (the composer's "@" completion). A git checkout lists tracked plus untracked, not
-  // ignored files (and their parent directories); a project without git is walked,
+  // SearchFiles fuzzy-matches query against the files and directories of one or more
+  // checkouts (the composer's "@" completion with one, the file finder with a thread's
+  // checkouts) and ranks them in one list. A git checkout lists tracked plus untracked,
+  // not ignored files (and their parent directories); a project without git is walked,
   // skipping .git, node_modules and dot-directories, at most 50,000 entries. The
   // candidate list is cached for a few seconds per checkout. An empty query returns
-  // the shallowest entries. An unknown project is NotFound; a path outside the home
-  // directory is InvalidArgument.
+  // the shallowest entries.
+  //
+  // Ranking: exact base name > base-name prefix > base-name subsequence > whole-path
+  // subsequence (case-insensitive), then characters at segment starts and in runs, then
+  // the shorter path, then the path, then the earlier source.
+  //
+  // Project words, only with more than one source: the query is split into words at
+  // whitespace. A run of words at the start or at the end of the query, leaving at least
+  // one word, may be matched against the source's project name instead of the path: the
+  // run's words, in order and with their spaces dropped, must be a case-insensitive
+  // subsequence of the name. The remaining words, joined by single spaces, are matched
+  // against the path as a one-source query would be. A file matches when the whole
+  // query (words joined by single spaces) matches its path or some such split does,
+  // and ranks by its best path score. So a single word never touches the name, and
+  // "ghostty tree" ranks the tree files of a project named ghostty-playground as if
+  // "tree" had been typed there. With one source the query is matched as typed, as
+  // before.
+  //
+  // An unknown project is NotFound; a path outside the home directory, a source without
+  // a project, both sources and project_id/path, or more than 16 sources is
+  // InvalidArgument.
   rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse) {}
 
   // ReadFile reads one file for the file viewer. path is absolute, or relative to
@@ -124,26 +144,54 @@ message ListSkillsResponse {
   repeated Skill skills = 1;
 }
 
-message SearchFilesRequest {
+// FileSource is one checkout to search.
+message FileSource {
   // The registered project.
   string project_id = 1;
   // Absolute path of the checkout to search (a worktree of the project). Empty: the
   // project's main worktree.
   string path = 2;
-  // Typed text after "@". Matched as a case-insensitive subsequence.
+}
+
+message SearchFilesRequest {
+  // The registered project, for a one-checkout search. Unset when sources is set.
+  string project_id = 1;
+  // Absolute path of the checkout to search (a worktree of the project). Empty: the
+  // project's main worktree. Unset when sources is set.
+  string path = 2;
+  // Typed text after "@", or the file finder's query. Matched as a case-insensitive
+  // subsequence (see SearchFiles for project words).
   string query = 3;
-  // Maximum matches. Zero means 50; at most 200.
+  // Maximum matches across all sources. Zero means 50; at most 200.
   int32 limit = 4;
+  // The checkouts to search, in order (ties go to the earlier one; a thread sends its
+  // primary project first). At most 16; a checkout named twice is searched once.
+  // Empty: the one checkout of project_id and path.
+  repeated FileSource sources = 5;
+  // Drop directories from the candidates.
+  bool files_only = 6;
 }
 
 message FileMatch {
   // Relative to the checkout, forward slashes, no leading "./", no trailing "/".
   string path = 1;
   bool is_dir = 2;
+  // The project of the source this match is from.
+  string project_id = 3;
+  // Absolute path of the checkout path is relative to: the source's path as given
+  // (cleaned), or the project's main worktree.
+  string checkout = 4;
+  // Indices of the characters of path the query matched, ascending. Characters are
+  // Unicode code points (Go runes; in JavaScript the indices of Array.from(path)), not
+  // bytes. Empty for an empty query.
+  repeated int32 path_positions = 5;
+  // Indices (code points, as path_positions) of the characters of the project's name
+  // that query words matched; empty when the whole query matched the path.
+  repeated int32 project_positions = 6;
 }
 
 message SearchFilesResponse {
-  // Best match first.
+  // Best match first, across all sources.
   repeated FileMatch matches = 1;
   // More entries matched than were returned.
   bool truncated = 2;

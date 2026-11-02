@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/filesystem.proto.
  */
 export const file_codefoundry_v1_filesystem: GenFile = /*@__PURE__*/
-  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiVAoSU2VhcmNoRmlsZXNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCRINCgVxdWVyeRgDIAEoCRINCgVsaW1pdBgEIAEoBSIpCglGaWxlTWF0Y2gSDAoEcGF0aBgBIAEoCRIOCgZpc19kaXIYAiABKAgiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJECg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMitwEKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgiNAoSUHJldmlld0ZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkiRgoTUHJldmlld0ZpbGVSZXNwb25zZRILCgN1cmwYASABKAkSDQoFc2NvcGUYAiABKAkSEwoLc2luZ2xlX2ZpbGUYAyABKAgqWAoKU2tpbGxTY29wZRIbChdTS0lMTF9TQ09QRV9VTlNQRUNJRklFRBAAEhQKEFNLSUxMX1NDT1BFX1VTRVIQARIXChNTS0lMTF9TQ09QRV9QUk9KRUNUEAIy1QMKEUZpbGVzeXN0ZW1TZXJ2aWNlEmQKD0xpc3REaXJlY3RvcmllcxImLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXNwb25zZSIAElUKCkxpc3RTa2lsbHMSIS5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXNwb25zZSIAElgKC1NlYXJjaEZpbGVzEiIuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXNwb25zZSIAEk8KCFJlYWRGaWxlEh8uY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXNwb25zZSIAElgKC1ByZXZpZXdGaWxlEiIuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXNwb25zZSIAQscBChJjb20uY29kZWZvdW5kcnkudjFCD0ZpbGVzeXN0ZW1Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
+  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKCAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJECg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMitwEKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgiNAoSUHJldmlld0ZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkiRgoTUHJldmlld0ZpbGVSZXNwb25zZRILCgN1cmwYASABKAkSDQoFc2NvcGUYAiABKAkSEwoLc2luZ2xlX2ZpbGUYAyABKAgqWAoKU2tpbGxTY29wZRIbChdTS0lMTF9TQ09QRV9VTlNQRUNJRklFRBAAEhQKEFNLSUxMX1NDT1BFX1VTRVIQARIXChNTS0lMTF9TQ09QRV9QUk9KRUNUEAIy1QMKEUZpbGVzeXN0ZW1TZXJ2aWNlEmQKD0xpc3REaXJlY3RvcmllcxImLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXNwb25zZSIAElUKCkxpc3RTa2lsbHMSIS5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXNwb25zZSIAElgKC1NlYXJjaEZpbGVzEiIuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXNwb25zZSIAEk8KCFJlYWRGaWxlEh8uY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXNwb25zZSIAElgKC1ByZXZpZXdGaWxlEiIuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXNwb25zZSIAQscBChJjb20uY29kZWZvdW5kcnkudjFCD0ZpbGVzeXN0ZW1Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message codefoundry.v1.ListDirectoriesRequest
@@ -223,9 +223,11 @@ export const ListSkillsResponseSchema: GenMessage<ListSkillsResponse> = /*@__PUR
   messageDesc(file_codefoundry_v1_filesystem, 6);
 
 /**
- * @generated from message codefoundry.v1.SearchFilesRequest
+ * FileSource is one checkout to search.
+ *
+ * @generated from message codefoundry.v1.FileSource
  */
-export type SearchFilesRequest = Message<"codefoundry.v1.SearchFilesRequest"> & {
+export type FileSource = Message<"codefoundry.v1.FileSource"> & {
   /**
    * The registered project.
    *
@@ -240,20 +242,64 @@ export type SearchFilesRequest = Message<"codefoundry.v1.SearchFilesRequest"> & 
    * @generated from field: string path = 2;
    */
   path: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.FileSource.
+ * Use `create(FileSourceSchema)` to create a new message.
+ */
+export const FileSourceSchema: GenMessage<FileSource> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 7);
+
+/**
+ * @generated from message codefoundry.v1.SearchFilesRequest
+ */
+export type SearchFilesRequest = Message<"codefoundry.v1.SearchFilesRequest"> & {
+  /**
+   * The registered project, for a one-checkout search. Unset when sources is set.
+   *
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
 
   /**
-   * Typed text after "@". Matched as a case-insensitive subsequence.
+   * Absolute path of the checkout to search (a worktree of the project). Empty: the
+   * project's main worktree. Unset when sources is set.
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * Typed text after "@", or the file finder's query. Matched as a case-insensitive
+   * subsequence (see SearchFiles for project words).
    *
    * @generated from field: string query = 3;
    */
   query: string;
 
   /**
-   * Maximum matches. Zero means 50; at most 200.
+   * Maximum matches across all sources. Zero means 50; at most 200.
    *
    * @generated from field: int32 limit = 4;
    */
   limit: number;
+
+  /**
+   * The checkouts to search, in order (ties go to the earlier one; a thread sends its
+   * primary project first). At most 16; a checkout named twice is searched once.
+   * Empty: the one checkout of project_id and path.
+   *
+   * @generated from field: repeated codefoundry.v1.FileSource sources = 5;
+   */
+  sources: FileSource[];
+
+  /**
+   * Drop directories from the candidates.
+   *
+   * @generated from field: bool files_only = 6;
+   */
+  filesOnly: boolean;
 };
 
 /**
@@ -261,7 +307,7 @@ export type SearchFilesRequest = Message<"codefoundry.v1.SearchFilesRequest"> & 
  * Use `create(SearchFilesRequestSchema)` to create a new message.
  */
 export const SearchFilesRequestSchema: GenMessage<SearchFilesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 7);
+  messageDesc(file_codefoundry_v1_filesystem, 8);
 
 /**
  * @generated from message codefoundry.v1.FileMatch
@@ -278,6 +324,38 @@ export type FileMatch = Message<"codefoundry.v1.FileMatch"> & {
    * @generated from field: bool is_dir = 2;
    */
   isDir: boolean;
+
+  /**
+   * The project of the source this match is from.
+   *
+   * @generated from field: string project_id = 3;
+   */
+  projectId: string;
+
+  /**
+   * Absolute path of the checkout path is relative to: the source's path as given
+   * (cleaned), or the project's main worktree.
+   *
+   * @generated from field: string checkout = 4;
+   */
+  checkout: string;
+
+  /**
+   * Indices of the characters of path the query matched, ascending. Characters are
+   * Unicode code points (Go runes; in JavaScript the indices of Array.from(path)), not
+   * bytes. Empty for an empty query.
+   *
+   * @generated from field: repeated int32 path_positions = 5;
+   */
+  pathPositions: number[];
+
+  /**
+   * Indices (code points, as path_positions) of the characters of the project's name
+   * that query words matched; empty when the whole query matched the path.
+   *
+   * @generated from field: repeated int32 project_positions = 6;
+   */
+  projectPositions: number[];
 };
 
 /**
@@ -285,14 +363,14 @@ export type FileMatch = Message<"codefoundry.v1.FileMatch"> & {
  * Use `create(FileMatchSchema)` to create a new message.
  */
 export const FileMatchSchema: GenMessage<FileMatch> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 8);
+  messageDesc(file_codefoundry_v1_filesystem, 9);
 
 /**
  * @generated from message codefoundry.v1.SearchFilesResponse
  */
 export type SearchFilesResponse = Message<"codefoundry.v1.SearchFilesResponse"> & {
   /**
-   * Best match first.
+   * Best match first, across all sources.
    *
    * @generated from field: repeated codefoundry.v1.FileMatch matches = 1;
    */
@@ -311,7 +389,7 @@ export type SearchFilesResponse = Message<"codefoundry.v1.SearchFilesResponse"> 
  * Use `create(SearchFilesResponseSchema)` to create a new message.
  */
 export const SearchFilesResponseSchema: GenMessage<SearchFilesResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 9);
+  messageDesc(file_codefoundry_v1_filesystem, 10);
 
 /**
  * @generated from message codefoundry.v1.ReadFileRequest
@@ -347,7 +425,7 @@ export type ReadFileRequest = Message<"codefoundry.v1.ReadFileRequest"> & {
  * Use `create(ReadFileRequestSchema)` to create a new message.
  */
 export const ReadFileRequestSchema: GenMessage<ReadFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 10);
+  messageDesc(file_codefoundry_v1_filesystem, 11);
 
 /**
  * @generated from message codefoundry.v1.ReadFileResponse
@@ -425,7 +503,7 @@ export type ReadFileResponse = Message<"codefoundry.v1.ReadFileResponse"> & {
  * Use `create(ReadFileResponseSchema)` to create a new message.
  */
 export const ReadFileResponseSchema: GenMessage<ReadFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 11);
+  messageDesc(file_codefoundry_v1_filesystem, 12);
 
 /**
  * @generated from message codefoundry.v1.PreviewFileRequest
@@ -452,7 +530,7 @@ export type PreviewFileRequest = Message<"codefoundry.v1.PreviewFileRequest"> & 
  * Use `create(PreviewFileRequestSchema)` to create a new message.
  */
 export const PreviewFileRequestSchema: GenMessage<PreviewFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 12);
+  messageDesc(file_codefoundry_v1_filesystem, 13);
 
 /**
  * @generated from message codefoundry.v1.PreviewFileResponse
@@ -489,7 +567,7 @@ export type PreviewFileResponse = Message<"codefoundry.v1.PreviewFileResponse"> 
  * Use `create(PreviewFileResponseSchema)` to create a new message.
  */
 export const PreviewFileResponseSchema: GenMessage<PreviewFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 13);
+  messageDesc(file_codefoundry_v1_filesystem, 14);
 
 /**
  * @generated from enum codefoundry.v1.SkillScope
@@ -561,13 +639,33 @@ export const FilesystemService: GenService<{
     output: typeof ListSkillsResponseSchema;
   },
   /**
-   * SearchFiles fuzzy-matches query against the files and directories of one checkout
-   * (the composer's "@" completion). A git checkout lists tracked plus untracked, not
-   * ignored files (and their parent directories); a project without git is walked,
+   * SearchFiles fuzzy-matches query against the files and directories of one or more
+   * checkouts (the composer's "@" completion with one, the file finder with a thread's
+   * checkouts) and ranks them in one list. A git checkout lists tracked plus untracked,
+   * not ignored files (and their parent directories); a project without git is walked,
    * skipping .git, node_modules and dot-directories, at most 50,000 entries. The
    * candidate list is cached for a few seconds per checkout. An empty query returns
-   * the shallowest entries. An unknown project is NotFound; a path outside the home
-   * directory is InvalidArgument.
+   * the shallowest entries.
+   *
+   * Ranking: exact base name > base-name prefix > base-name subsequence > whole-path
+   * subsequence (case-insensitive), then characters at segment starts and in runs, then
+   * the shorter path, then the path, then the earlier source.
+   *
+   * Project words, only with more than one source: the query is split into words at
+   * whitespace. A run of words at the start or at the end of the query, leaving at least
+   * one word, may be matched against the source's project name instead of the path: the
+   * run's words, in order and with their spaces dropped, must be a case-insensitive
+   * subsequence of the name. The remaining words, joined by single spaces, are matched
+   * against the path as a one-source query would be. A file matches when the whole
+   * query (words joined by single spaces) matches its path or some such split does,
+   * and ranks by its best path score. So a single word never touches the name, and
+   * "ghostty tree" ranks the tree files of a project named ghostty-playground as if
+   * "tree" had been typed there. With one source the query is matched as typed, as
+   * before.
+   *
+   * An unknown project is NotFound; a path outside the home directory, a source without
+   * a project, both sources and project_id/path, or more than 16 sources is
+   * InvalidArgument.
    *
    * @generated from rpc codefoundry.v1.FilesystemService.SearchFiles
    */

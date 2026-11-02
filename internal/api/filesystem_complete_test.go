@@ -64,9 +64,9 @@ func completionHome(t *testing.T) (root, outside string, c codefoundryv1connect.
 	}
 
 	fake := projecttest.New(nil)
-	fake.Put(project.Project{ID: "p", Path: proj, Git: true, Worktrees: []project.Worktree{{ProjectID: "p", Path: proj, IsMain: true}}})
+	fake.Put(project.Project{ID: "p", Name: "proj", Path: proj, Git: true, Worktrees: []project.Worktree{{ProjectID: "p", Path: proj, IsMain: true}}})
 	plain := filepath.Join(root, "plain")
-	fake.Put(project.Project{ID: "n", Path: plain, Worktrees: []project.Worktree{{ProjectID: "n", Path: plain, IsMain: true}}})
+	fake.Put(project.Project{ID: "n", Name: "plain", Path: plain, Worktrees: []project.Worktree{{ProjectID: "n", Path: plain, IsMain: true}}})
 
 	route := NewFilesystem(root, fake, testGrants(root)).Route()
 	mux := http.NewServeMux()
@@ -220,6 +220,92 @@ func TestFilesystemSearchFiles(t *testing.T) {
 			}
 			if !slices.Equal(got, tt.want) {
 				t.Fatalf("matches = %q, want %q", got, tt.want)
+			}
+			if res.Msg.GetTruncated() != tt.wantTruncated {
+				t.Fatalf("truncated = %v, want %v", res.Msg.GetTruncated(), tt.wantTruncated)
+			}
+		})
+	}
+}
+
+func TestFilesystemSearchFilesSources(t *testing.T) {
+	root, outside, c := completionHome(t)
+	proj, plain := filepath.Join(root, "proj"), filepath.Join(root, "plain")
+	if err := os.WriteFile(filepath.Join(plain, "README.md"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(proj, filepath.Join(root, "projlink")); err != nil {
+		t.Fatal(err)
+	}
+	p := &v1.FileSource{ProjectId: "p"}
+	n := &v1.FileSource{ProjectId: "n"}
+	type match struct {
+		project, checkout, path string // "/" suffix for directories
+		pathPos, projectPos        []int32
+	}
+	tests := []struct {
+		name          string
+		req           *v1.SearchFilesRequest
+		want          []match
+		wantTruncated bool
+		code          connect.Code
+	}{
+		{name: "one checkout: project and checkout filled", req: &v1.SearchFilesRequest{ProjectId: "p", Query: "index"},
+			want: []match{{"p", proj, "src/index.ts", []int32{4, 5, 6, 7, 8}, nil}}},
+		{name: "one list across sources, ties to the first", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{n, p}, Query: "readme"},
+			want: []match{{"n", plain, "README.md", []int32{0, 1, 2, 3, 4, 5}, nil}, {"p", proj, "README.md", []int32{0, 1, 2, 3, 4, 5}, nil}}},
+		{name: "the other order", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, n}, Query: "readme"},
+			want: []match{{"p", proj, "README.md", nil, nil}, {"n", plain, "README.md", nil, nil}}},
+		{name: "a project word narrows to that project", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, n}, Query: "plain readme"},
+			want: []match{{"n", plain, "README.md", []int32{0, 1, 2, 3, 4, 5}, []int32{0, 1, 2, 3, 4}}}},
+		{name: "a trailing project word", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, n}, Query: "index pr"},
+			want: []match{{"p", proj, "src/index.ts", []int32{4, 5, 6, 7, 8}, []int32{0, 1}}}},
+		{name: "one source: a space is part of the query", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{n}, Query: "plain readme"}},
+		{name: "directories", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, n}, Query: "src"},
+			want: []match{{"p", proj, "src/", nil, nil}, {"p", proj, "src/index.ts", nil, nil}}},
+		{name: "files only", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, n}, Query: "src", FilesOnly: true},
+			want: []match{{"p", proj, "src/index.ts", []int32{0, 1, 2}, nil}}},
+		{name: "the limit spans sources", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{n, p}, Query: "readme", Limit: 1},
+			want: []match{{"n", plain, "README.md", nil, nil}}, wantTruncated: true},
+		{name: "checkout as named; the same checkout twice is searched once",
+			req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{{ProjectId: "p", Path: filepath.Join(root, "projlink") + "/"}, p}, Query: "readme"},
+			want: []match{{"p", filepath.Join(root, "projlink"), "README.md", nil, nil}}},
+		{name: "sources and project_id", req: &v1.SearchFilesRequest{ProjectId: "p", Sources: []*v1.FileSource{p}}, code: connect.CodeInvalidArgument},
+		{name: "sources and path", req: &v1.SearchFilesRequest{Path: proj, Sources: []*v1.FileSource{p}}, code: connect.CodeInvalidArgument},
+		{name: "a source without a project", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, {Path: proj}}}, code: connect.CodeInvalidArgument},
+		{name: "an unknown project", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, {ProjectId: "zz"}}}, code: connect.CodeNotFound},
+		{name: "a source outside home", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, {ProjectId: "n", Path: outside}}}, code: connect.CodeInvalidArgument},
+		{name: "a missing checkout", req: &v1.SearchFilesRequest{Sources: []*v1.FileSource{p, {ProjectId: "p", Path: filepath.Join(root, "gone")}}}, code: connect.CodeNotFound},
+		{name: "too many sources", req: &v1.SearchFilesRequest{Sources: slices.Repeat([]*v1.FileSource{p}, 17)}, code: connect.CodeInvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := c.SearchFiles(context.Background(), connect.NewRequest(tt.req))
+			if tt.code != 0 {
+				if connect.CodeOf(err) != tt.code {
+					t.Fatalf("err = %v, want code %v", err, tt.code)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			ms := res.Msg.GetMatches()
+			if len(ms) != len(tt.want) {
+				t.Fatalf("matches = %v, want %d", ms, len(tt.want))
+			}
+			for i, m := range ms {
+				w := tt.want[i]
+				path := m.GetPath()
+				if m.GetIsDir() {
+					path += "/"
+				}
+				if m.GetProjectId() != w.project || m.GetCheckout() != w.checkout || path != w.path {
+					t.Fatalf("match %d = %s %s %s, want %s %s %s", i, m.GetProjectId(), m.GetCheckout(), path, w.project, w.checkout, w.path)
+				}
+				if w.pathPos != nil && (!slices.Equal(m.GetPathPositions(), w.pathPos) || !slices.Equal(m.GetProjectPositions(), w.projectPos)) {
+					t.Fatalf("match %d positions = %v / %v, want %v / %v", i, m.GetPathPositions(), m.GetProjectPositions(), w.pathPos, w.projectPos)
+				}
 			}
 			if res.Msg.GetTruncated() != tt.wantTruncated {
 				t.Fatalf("truncated = %v, want %v", res.Msg.GetTruncated(), tt.wantTruncated)
