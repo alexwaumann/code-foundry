@@ -56,7 +56,7 @@ const home = (o: Partial<ThreadView> = {}) =>
     ...o,
   }) as ThreadView;
 
-const workspace: WorkspaceView = { id: "w-1", name: "platform", branch: "", members: [{ projectId: "api", worktreePath: "" }, { projectId: "web", worktreePath: "" }], createdAtMs: null } as WorkspaceView;
+const workspace: WorkspaceView = { id: "w-1", name: "platform", branch: "", members: [{ projectId: "api", worktreePath: "" }, { projectId: "web", worktreePath: "" }], createdAtMs: null };
 
 function setThread(o: Partial<ThreadView> = {}): void {
   act(() => {
@@ -195,7 +195,15 @@ describe("step 2: where it works there", () => {
 describe("Move", () => {
   it("Enter moves: thread.move with the choice, the picker closes, the crumb says Moving to … until the daemon answers", async () => {
     let answer: () => void = () => undefined;
-    daemon.handlers.set("thread.move", () => new Promise((r) => (answer = () => r({ message: "", resultJson: "" }))));
+    daemon.handlers.set(
+      "thread.move",
+      () =>
+        new Promise((r) => {
+          answer = () => {
+            r({ message: "", resultJson: "" });
+          };
+        }),
+    );
     openPicker();
     fireEvent.keyDown(pick("web"), { key: "Enter" });
     expect(invocationsOf("thread.move").map((i) => [i.args, i.context.activeThreadId])).toEqual([[{ id: "s-1", project: "web", "new-worktree": "true" }, "s-1"]]);

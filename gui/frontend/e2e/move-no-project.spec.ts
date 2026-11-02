@@ -26,8 +26,9 @@ test("the sidebar row's Move to project… opens the thread and the picker under
   const picker = page.getByTestId("move-picker");
   await expect(picker).toBeVisible();
   // Under the crumb, its left edge with the crumb's.
-  const place = (await page.getByTestId("thread-crumb-move").boundingBox())!;
-  const box = (await picker.boundingBox())!;
+  const place = await page.getByTestId("thread-crumb-move").boundingBox();
+  const box = await picker.boundingBox();
+  if (!place || !box) throw new Error("no layout");
   expect(box.y).toBeGreaterThan(place.y + place.height);
   expect(box.y).toBeLessThan(place.y + place.height + 16);
   expect(Math.abs(box.x - place.x)).toBeLessThan(12);

@@ -281,11 +281,6 @@ function PlacementStep({ threadId, target, onBack }: { threadId: string; target:
  */
 export function MovePicker({ threadId, children }: { threadId: string; children: ReactNode }) {
   const open = useMovePickerStore((s) => s.open === threadId);
-  const [target, setTarget] = useState<MoveTarget | null>(null);
-  // Every opening starts on the list.
-  useEffect(() => {
-    if (open) setTarget(null);
-  }, [open]);
   // Leaving the thread (its header unmounts) closes it, so coming back does not reopen it.
   useEffect(
     () => () => {
@@ -313,27 +308,35 @@ export function MovePicker({ threadId, children }: { threadId: string; children:
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className={cn("flex flex-col p-0", target ? "w-110" : "w-85")}
-        data-testid="move-picker"
-        data-step={target ? "2" : "1"}
+        className="w-auto p-0"
         onOpenAutoFocus={(e) => {
           // The step's own focus (the filter) takes the keyboard, not the popover.
           e.preventDefault();
         }}
       >
-        {target ? (
-          <PlacementStep
-            key={target.kind === "project" ? target.projectId : target.workspaceId}
-            threadId={threadId}
-            target={target}
-            onBack={() => {
-              setTarget(null);
-            }}
-          />
-        ) : (
-          <TargetList onPick={setTarget} />
-        )}
+        <MoveSteps threadId={threadId} />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** The popover's body, mounted with each opening (the content unmounts on close): it starts on the list. */
+function MoveSteps({ threadId }: { threadId: string }) {
+  const [target, setTarget] = useState<MoveTarget | null>(null);
+  return (
+    <div className={cn("flex flex-col", target ? "w-110" : "w-85")} data-testid="move-picker" data-step={target ? "2" : "1"}>
+      {target ? (
+        <PlacementStep
+          key={target.kind === "project" ? target.projectId : target.workspaceId}
+          threadId={threadId}
+          target={target}
+          onBack={() => {
+            setTarget(null);
+          }}
+        />
+      ) : (
+        <TargetList onPick={setTarget} />
+      )}
+    </div>
   );
 }
