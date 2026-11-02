@@ -1,6 +1,6 @@
 /**
  * "Worktrees without threads" on a project's page (components/projects/LeftoverWorktrees,
- * docs/notes/projects-redesign-2-leftovers.md): which worktrees are leftovers, whether one
+ * docs/notes/projects-redesign-2-leftovers.md, project-page-3-leftovers.md): which worktrees are leftovers, whether one
  * still holds work, and the plain-words sentence saying why it stayed. Pure; git facts come
  * from the daemon (status counts, landed, managed, the cleanup reason), never re-derived.
  */
@@ -32,10 +32,10 @@ export function uncommittedCount(st: Pick<GitStatusView, "staged" | "modified" |
 }
 
 /**
- * It still holds work (an amber dot, Show diff and Resume): uncommitted entries, or commits
- * whose work is not known to be in the default branch (landed false: commits ahead, no
- * remote default branch to compare with, or a failed status read). Clean means nothing
- * uncommitted and landed (a grey dot, New thread).
+ * It still holds work (an amber dot, Show diff and the menu's Show changes): uncommitted
+ * entries, or commits whose work is not known to be in the default branch (landed false:
+ * commits ahead, no remote default branch to compare with, or a failed status read). Clean
+ * means nothing uncommitted and landed (a grey dot).
  */
 export function holdsWork(wt: Pick<WorktreeView, "status" | "landed">): boolean {
   return uncommittedCount(wt.status) > 0 || wt.landed !== true;

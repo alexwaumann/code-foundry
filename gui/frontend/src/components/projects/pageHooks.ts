@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { checkoutRows } from "@/lib/leftovers";
+import { checkoutRows, isLeftover } from "@/lib/leftovers";
 import { checkoutThreads, sortCheckouts } from "@/lib/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { savedScrollTop, saveScrollTop } from "@/stores/projectsPage";
@@ -56,3 +56,12 @@ export function useCheckoutOrder(projectId: string): string[] {
   }, [rows, activity]);
 }
 
+
+/**
+ * "Worktrees without threads"' rows in the project's worktree order: every worktree that is not
+ * main and that no open thread is on (lib/leftovers.ts isLeftover; the Checkouts table has the rest).
+ */
+export function useLeftoverPaths(projectId: string): string[] {
+  const candidates = useProjectsStore(useShallow((s) => (s.byId[projectId]?.worktrees ?? []).filter((w) => !w.isMain).map((w) => w.path)));
+  return useThreadsStore(useShallow((s) => candidates.filter((p) => isLeftover({ path: p, isMain: false }, s))));
+}

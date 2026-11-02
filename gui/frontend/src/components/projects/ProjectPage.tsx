@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
-import { checkoutsHint, projectActivity, projectNextStep, PROJECT_NARROW_BELOW, PROJECT_TITLE_COMPACT_BELOW } from "@/lib/projects";
+import { checkoutsHint, projectActivity, projectNextStep, projectWorktreeKey, PROJECT_TITLE_COMPACT_BELOW } from "@/lib/projects";
 import { useWidth } from "@/lib/useWidth";
 import { composeIn } from "@/stores/compose";
 import { initGitIn, newTerminalIn, publishProject } from "@/stores/projectActions";
@@ -19,7 +19,7 @@ import { PROJECTS_INDEX, useUiStore } from "@/stores/ui";
 import { KindIcon, SectionHeader } from "./bits";
 import { CheckoutsTable } from "./CheckoutsTable";
 import { LeftoverWorktrees } from "./LeftoverWorktrees";
-import { useCheckoutOrder, usePageScroll } from "./pageHooks";
+import { useCheckoutOrder, useLeftoverPaths, usePageScroll } from "./pageHooks";
 import { ProjectsCrumb, PagePicker } from "./PagePicker";
 import { ProjectDetails } from "./ProjectDetails";
 import { ProjectNameEditor } from "./ProjectNameEditor";
@@ -75,9 +75,9 @@ function ThreadsBlock({ projectId, main }: { projectId: string; main: string }) 
  * (ProjectTitle: name, meta line, ⋯), a note for a repository without a remote or a folder
  * without git, the Checkouts table (main and the worktrees a thread is on; a row's right-click menu holds
  * what it does, and its columns drop by the table's own width), Worktrees without threads
- * (LeftoverWorktrees, every other worktree), and Details. Below PROJECT_NARROW_BELOW of
- * content width the leftover rows' Remove shows its icon only;
- * below PROJECT_TITLE_COMPACT_BELOW the slug drops and Open in Finder shows its icon only.
+ * (LeftoverWorktrees, every other worktree, its rows after the checkouts' on the keyboard
+ * list), and Details. Below PROJECT_TITLE_COMPACT_BELOW of content width the slug drops and
+ * Open in Finder shows its icon only.
  */
 export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey: string }) {
   const loaded = useProjectsStore((s) => s.loaded);
@@ -92,6 +92,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   const main = useProjectsStore((s) => mainWorktreePath(s, projectId));
   const working = useThreadsStore((s) => projectActivity(s, projectId).working);
   const paths = useCheckoutOrder(projectId);
+  const leftovers = useLeftoverPaths(projectId);
   const git = kind !== "nogit";
   const renaming = useProjectRenameStore((s) => s.renamingProjectId === projectId);
   // Leaving the page closes its editor (the field's blur has renamed by then).
@@ -107,10 +108,9 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
 
   // The content pane's width (the side panel takes from it): the scroll box's.
   const [widthRef, width] = useWidth(1200);
-  const narrow = width < PROJECT_NARROW_BELOW;
   const compact = width < PROJECT_TITLE_COMPACT_BELOW;
-  // A checkout row has no activation: its right-click menu (ContextMenu key, Shift+F10) holds what it does.
-  const navItems = useMemo<NavItem[]>(() => (git ? paths.map((p) => ({ key: `pw:${projectId}::${p}` })) : []), [git, paths, projectId]);
+  // A checkout's or a leftover's row has no activation: its right-click menu (ContextMenu key, Shift+F10) holds what it does.
+  const navItems = useMemo<NavItem[]>(() => (git ? [...paths, ...leftovers].map((p) => ({ key: projectWorktreeKey(projectId, p) })) : []), [git, paths, leftovers, projectId]);
   const nav = useNav(navItems);
   const reveal = useProjectsPageStore((s) => s.reveal);
   const setCursor = nav.ctx.setCursor;
@@ -126,7 +126,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   }, []);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label={name} data-testid="projects-page" data-page="project" data-project={projectId} data-kind={kind} data-narrow={narrow || undefined} data-compact={compact || undefined}>
+    <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label={name} data-testid="projects-page" data-page="project" data-project={projectId} data-kind={kind} data-compact={compact || undefined}>
       <PaneHeader className="gap-2 px-5">
         <ProjectsCrumb />
         {renaming ? (
@@ -206,7 +206,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
                 ) : (
                   <ThreadsBlock projectId={projectId} main={main} />
                 )}
-                {git && <LeftoverWorktrees projectId={projectId} narrow={narrow} />}
+                {git && <LeftoverWorktrees projectId={projectId} paths={leftovers} />}
                 <ProjectDetails projectId={projectId} compact={compact} />
               </>
             )}

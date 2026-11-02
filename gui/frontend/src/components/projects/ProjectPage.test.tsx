@@ -23,7 +23,7 @@ const { hoverTooltipText, tooltipText } = await import("@/test/tooltip");
 
 /**
  * A project's page (docs/notes/projects-redesign-1-index.md) and its Worktrees without threads
- * with the remove confirm (docs/notes/projects-redesign-2-leftovers.md), against the mock's world
+ * with the remove confirm (docs/notes/projects-redesign-2-leftovers.md, project-page-3-leftovers.md), against the mock's world
  * (src/test/projectsWorld.ts). What the daemon changes after a command (git init, a removal) is a
  * fake handler changing the store, and a tab a row opens is read off the panel store (panelActive).
  * e2e/projects.spec.ts keeps what needs the browser: the narrow layout (real width), the Changes tab
@@ -414,7 +414,14 @@ describe("Clean up merged worktrees", () => {
 });
 
 describe("Worktrees without threads", () => {
-  it("a row per leftover with why it stayed and its actions; a worktree shows once; the three cleanable counts agree", async () => {
+  const HINT = "a thread's worktree goes on its own once its work is on main";
+  const leftoverRow = (path: string) => document.querySelector<HTMLElement>(`[data-nav-key="pw:repo-cf::${path}"]`) as HTMLElement;
+  function openLeftoverMenu(path: string): HTMLElement {
+    fireEvent.contextMenu(leftoverRow(path));
+    return screen.getByTestId("leftover-menu");
+  }
+
+  it("a row per leftover: Branch | Why it stayed | icons; a worktree shows once; the three cleanable counts agree", async () => {
     addLeftovers(true);
     renderPage("repo-cf");
     await settle();
@@ -423,12 +430,14 @@ describe("Worktrees without threads", () => {
     fireEvent.keyDown(menu, { key: "Escape" });
     await settle();
 
-    expect(screen.getByTestId("leftover-title").textContent).toMatch(/Worktrees without threads\s*· 4 kept/);
+    // The index's title grammar: the count, the hint, the bulk button at the right.
+    expect(screen.getByTestId("leftover-title").textContent).toBe(`Worktrees without threads(4)· ${HINT}Remove the 1 that is clean`);
     expect(screen.getByTestId("leftover-remove-clean").textContent).toBe("Remove the 1 that is clean");
+    expect(screen.getByTestId("leftover-head").textContent).toBe("BranchWhy it stayed");
     // Threads hold feat/sidebar and fix/resize: not leftovers.
     expect(screen.getAllByTestId("leftover-row")).toHaveLength(4);
     expect(leftover(FEAT)).toBeNull();
-    // A worktree shows once: the table keeps main and the two held ones, the caption counts all seven.
+    // A worktree shows once: the table keeps main and the two held ones.
     expect(screen.getByTestId("checkouts-title").textContent).toBe("Checkouts(3)· 2 threads working");
     expect(screen.getAllByTestId("project-worktree")).toHaveLength(3);
     for (const path of [CF, FEAT, FIX]) expect(checkout(path)).not.toBeNull();
@@ -443,33 +452,51 @@ describe("Worktrees without threads", () => {
       const r = leftover(path);
       expect(inEl(r, "leftover-branch")?.textContent).toBe(branch);
       expect(inEl(r, "leftover-reason")?.textContent).toBe(reason);
-      // Holding work: Show diff and Resume; clean: New thread. Remove… on every row.
+      expect(inEl(r, "leftover-dot")?.className).toContain(work ? "bg-cf-warning" : "bg-cf-border-strong");
+      // Holding work: Show diff (icon only), else its slot stays empty so the icons line up; Remove on every row.
       expect(inEl(r, "leftover-show-diff") !== null).toBe(work);
-      expect(inEl(r, "leftover-resume") !== null).toBe(work);
-      expect(inEl(r, "leftover-new-thread") !== null).toBe(!work);
-      expect(inEl(r, "leftover-remove")?.textContent).toBe("Remove…");
+      expect(r?.lastElementChild?.children).toHaveLength(2);
+      expect(inEl(r, "leftover-remove")?.textContent).toBe("");
+      expect(inEl(r, "leftover-remove")?.getAttribute("aria-label")).toBe("Remove worktree");
       expect(r?.getAttribute("data-work")).toBe(work ? "true" : null);
     }
-    expect(screen.getByTestId("leftover-footer").textContent).toBe(
-      "Worktrees made for a thread go on their own once its last thread is archived and the work is on main. These stayed because they still hold something.",
-    );
+    for (const id of ["leftover-footer", "leftover-resume", "leftover-new-thread"]) expect(screen.queryByTestId(id)).toBeNull();
+    // The icons' and the branch's tooltips: what they hide.
+    expect(tooltipText(inEl(leftover(COPY), "leftover-show-diff") as HTMLElement)).toBe("Show diff");
+    expect(tooltipText(inEl(leftover(COPY), "leftover-remove") as HTMLElement)).toBe("Remove worktree");
+    expect(await hoverTooltipText(inEl(leftover(COPY), "leftover-branch") as HTMLElement)).toBe("~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy");
     // Details counts the worktrees Code Foundry made.
     expect(screen.getByTestId("details-worktrees-value").textContent).toContain("6 · 3 made by Code Foundry");
-    // Uncommitted files on a leftover show in its reason.
+    // Uncommitted files on a leftover show in its reason, and it holds work then.
     updateProject("repo-cf", (p) => ({ ...p, worktrees: p.worktrees.map((w) => (w.path === SHADERS ? { ...w, status: status({ upstream: "", baseRef: "origin/main", modified: 2, dirty: true }) } : w)) }));
     expect(inEl(leftover(SHADERS), "leftover-reason")?.textContent).toBe("made outside Code Foundry · 2 uncommitted files · merged otherwise");
+    expect(inEl(leftover(SHADERS), "leftover-show-diff")).not.toBeNull();
 
-    // Show diff: the worktree's Changes tab in this page's panel (the narrow layout it makes is e2e's).
+    // A row has no click: no tab opens, the cursor stays put. Show diff: the worktree's Changes tab in this page's panel.
+    fireEvent.click(leftoverRow(COPY));
+    fireEvent.doubleClick(leftoverRow(COPY));
+    expect(pagePanel()).toBeNull();
+    expect(leftoverRow(COPY).getAttribute("aria-selected")).toBe("false");
+    expect(leftoverRow(COPY).className).not.toContain("hover:");
     fireEvent.click(inEl(leftover(COPY), "leftover-show-diff") as HTMLElement);
     expect(pagePanel()).toMatchObject({ open: true, kind: "changes", params: { project: "repo-cf", path: COPY } });
     expect(page().getAttribute("data-project")).toBe("repo-cf");
   });
 
-  it("New thread on a clean one and Resume without an archived thread open the composer in that checkout; Resume with one unarchives and shows it", async () => {
+  it("the right-click menu: Resume by the archived thread's name, Show changes while it holds work; the keyboard reaches it after the checkouts", async () => {
     addLeftovers(true);
     renderPage("repo-cf");
     await settle();
-    fireEvent.click(inEl(leftover(MERGED), "leftover-new-thread") as HTMLElement);
+    let menu = openLeftoverMenu(SPIKE);
+    expect(menuEntries(menu, true)).toEqual(["Resume “Profile the renderer”", "New thread here", "New terminal here", "—", "Show changes", "—", "Open in Finder", "Copy path", "Copy branch name", "—", "Remove worktree"]);
+    // The row shows the cursor while its menu is open.
+    expect(leftoverRow(SPIKE).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(menu, { key: "Escape" });
+    await settle();
+    // Clean, nothing archived on it: no Resume, no Show changes.
+    menu = openLeftoverMenu(MERGED);
+    expect(menuEntries(menu, true)).toEqual(["New thread here", "New terminal here", "—", "Open in Finder", "Copy path", "Copy branch name", "—", "Remove worktree"]);
+    await pick(menu, "leftover-menu-new-thread");
     expect(selection()).toEqual({ kind: "compose", projectId: "repo-cf" });
     expect(useComposeStore.getState().drafts["repo-cf"]?.worktree).toEqual({ kind: "existing", path: MERGED });
 
@@ -477,25 +504,28 @@ describe("Worktrees without threads", () => {
       useUiStore.getState().select(projectPage("repo-cf"));
     });
     await settle();
-    fireEvent.click(inEl(leftover(SPIKE), "leftover-resume") as HTMLElement);
-    await settle();
+    await pick(openLeftoverMenu(COPY), "leftover-menu-changes");
+    expect(pagePanel()).toMatchObject({ open: true, kind: "changes", params: { project: "repo-cf", path: COPY } });
+    await pick(openLeftoverMenu(SPIKE), "leftover-menu-resume");
     const archive = lastInvocation("thread.archive");
     expect(archive?.args).toMatchObject({ archived: "false" });
     expect(archive?.context).toMatchObject({ activeThreadId: "s-lo-spike" });
     expect(selection()).toEqual({ kind: "thread", id: "s-lo-spike" });
 
-    // Resume with no archived thread there (exp/shaders, once it holds uncommitted files).
-    updateProject("repo-cf", (p) => ({ ...p, worktrees: p.worktrees.map((w) => (w.path === SHADERS ? { ...w, status: status({ upstream: "", baseRef: "origin/main", modified: 2, dirty: true }) } : w)) }));
+    // The keyboard: the leftovers follow the checkouts on the page's list; Shift+F10 opens the cursor row's menu.
     act(() => {
       useUiStore.getState().select(projectPage("repo-cf"));
     });
     await settle();
-    fireEvent.click(inEl(leftover(SHADERS), "leftover-resume") as HTMLElement);
-    expect(selection()).toEqual({ kind: "compose", projectId: "repo-cf" });
-    expect(useComposeStore.getState().drafts["repo-cf"]?.worktree).toEqual({ kind: "existing", path: SHADERS });
+    list().focus();
+    fireEvent.keyDown(list(), { key: "End" });
+    const last = [...document.querySelectorAll<HTMLElement>('[data-testid="leftover-row"]')].at(-1)?.getAttribute("data-path") ?? "";
+    expect(leftoverRow(last).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(list(), { key: "F10", shiftKey: true });
+    expect(menuEntries(screen.getByTestId("leftover-menu"))).toContain("Remove worktree");
   });
 
-  it("Remove…: the confirm names what goes and what stays; with uncommitted files it warns and lists them; Cancel keeps; one yes removes", async () => {
+  it("Remove: the confirm names what goes and what stays; with uncommitted files it warns and lists them; Cancel keeps; one yes removes", async () => {
     addLeftovers();
     fakeRemove();
     renderPage("repo-cf");
@@ -537,8 +567,8 @@ describe("Worktrees without threads", () => {
     // The daemon's removal: its row goes.
     expect(leftover(COPY)).toBeNull();
 
-    // Clean: no warning, no force.
-    fireEvent.click(inEl(leftover(SHADERS), "leftover-remove") as HTMLElement);
+    // Clean, from the menu: no warning, no force.
+    await pick(openLeftoverMenu(SHADERS), "leftover-menu-remove");
     expect((await screen.findByTestId("remove-worktree-title")).textContent).toBe("Remove the worktree on exp/shaders?");
     expect(screen.queryByTestId("remove-worktree-loss")).toBeNull();
     fireEvent.click(screen.getByTestId("remove-worktree-ok"));
@@ -546,10 +576,10 @@ describe("Worktrees without threads", () => {
     expect(lastInvocation("project.worktree.remove")?.args).toEqual({ path: SHADERS });
     expect(leftover(SHADERS)).toBeNull();
     expect(leftover(SPIKE)).not.toBeNull();
-    expect(screen.getByTestId("leftover-title").textContent).toContain("1 kept");
+    expect(within(screen.getByTestId("leftover-title")).getByTestId("section-count").textContent).toBe("(1)");
   });
 
-  it("Remove the N that are clean runs the cleanup after its confirm; with nothing kept the section says so", async () => {
+  it("Remove the N that are clean runs the cleanup after its confirm; with nothing kept the section says so in one line", async () => {
     addLeftovers(true);
     fakeCleanup("Fetch, then remove 1 worktree whose branch is merged: cf/usage-polish?");
     const r = renderPage("repo-cf");
@@ -571,9 +601,9 @@ describe("Worktrees without threads", () => {
     // ghostty-playground: nothing kept.
     renderPage("repo-gp");
     await settle();
-    expect(screen.getByTestId("leftover-title").textContent).toBe("Worktrees without threads");
-    expect(screen.getByTestId("leftover-empty").textContent).toBe("Nothing kept. Worktrees made for a thread go on their own once its last thread is archived and the work is on main.");
-    expect(screen.queryByTestId("leftover-footer")).toBeNull();
+    expect(screen.getByTestId("leftover-title").textContent).toBe(`Worktrees without threads(0)· ${HINT}`);
+    expect(screen.getByTestId("leftover-empty").textContent).toBe("Nothing kept. Every worktree here has a thread.");
+    expect(screen.queryByTestId("leftover-table")).toBeNull();
     expect(screen.queryByTestId("leftover-remove-clean")).toBeNull();
   });
 });
@@ -634,7 +664,7 @@ describe("a project's page and its threads", () => {
     addThreads(thread("s-new", { worktreePath: SPIKE, state: "connected", status: "busy" }));
     expect(leftover(SPIKE)).toBeNull();
     expect(checkout(SPIKE)).not.toBeNull();
-    expect(screen.getByTestId("leftover-title").textContent).toContain("2 kept");
+    expect(within(screen.getByTestId("leftover-title")).getByTestId("section-count").textContent).toBe("(2)");
     expect(page().getAttribute("data-project")).toBe("repo-cf");
   });
 });
