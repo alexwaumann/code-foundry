@@ -46,6 +46,17 @@ export interface BackgroundShellView {
   ports: number[];
 }
 
+/** Where a thread.move takes a thread (Thread.pending_move). */
+export interface ThreadMoveView {
+  /** The project it goes to (with a workspace, the primary member); "" for a workspace's folder. */
+  projectId: string;
+  /** The workspace it goes to; "" for a project. */
+  workspaceId: string;
+  /** The checkout it will run in, and a worktree's branch; "" until the placement is made. */
+  worktreePath: string;
+  branch: string;
+}
+
 /** View model for a thread (Claude Code session plus its worktree and status). Generated types stay inside src/api. */
 export interface ThreadView {
   id: string;
@@ -108,6 +119,12 @@ export interface ThreadView {
    * prompt; "" when nothing is queued. worktreePath changes when the move happens.
    */
   pendingWorktreePath: string;
+  /**
+   * A thread.move under way (Thread.pending_move): a thread without a project going into
+   * a project or a workspace, from the call until it lands or fails; null when none. Its
+   * projectId and workspaceId change only once it moved (docs/notes/move-no-project-1-daemon.md).
+   */
+  pendingMove: ThreadMoveView | null;
   /** The user pinned the thread (thread.pin): it sits in the sidebar's Pinned section. */
   pinned: boolean;
   /**
@@ -424,6 +441,7 @@ export function toThreadView(s: Thread): ThreadView {
     projectIds: [...s.projectIds],
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
+    pendingMove: s.pendingMove ? { projectId: s.pendingMove.projectId, workspaceId: s.pendingMove.workspaceId, worktreePath: s.pendingMove.worktreePath, branch: s.pendingMove.branch } : null,
     pinned: s.pinned,
     archivedAtMs: s.archivedAt ? timestampMs(s.archivedAt) : null,
     snoozedUntilMs: s.snoozedUntil ? timestampMs(s.snoozedUntil) : null,

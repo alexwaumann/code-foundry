@@ -38,6 +38,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     checkoutPaths: [],
     workspaceId: "",
     pendingWorktreePath: "",
+    pendingMove: null,
     pinned: false,
     archivedAtMs: null,
     snoozedUntilMs: null,

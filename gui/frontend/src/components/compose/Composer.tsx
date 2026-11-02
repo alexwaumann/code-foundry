@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, MapPin, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
-import { PROJECT_KIND_ICONS, useProjectKind } from "@/components/icons/projectKind";
-import { projectKind, type ProjectKind } from "@/lib/projects";
+import { ArrowUp, FolderGit2, Gauge, GitBranch, GitCommitHorizontal, Loader2, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { PdfTile } from "./attachmentFaces";
 import { attachLabel, useHostFiles } from "./useHostFiles";
 import { BranchIndicator } from "./BranchIndicator";
 import { CollisionBanner, CollisionTip } from "./CollisionBanner";
 import { ClaudeMarkBrand } from "@/components/icons/ClaudeMark";
-import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
+import { ComposerPicker } from "./ComposerPicker";
+import { placementCheckouts, usePlacement, usePlacementPickers, usePrimaryPicker, useProjectNames } from "./placement";
 import { CompletionCard } from "./CompletionCard";
 import { DictationMic, DictationNote } from "./DictationMic";
 import { useComposerDictation } from "./useComposerDictation";
@@ -28,37 +27,25 @@ import { ATTACHMENT_MIME_TYPES } from "@/api/threads";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { Tip } from "@/components/ui/tooltip";
 import { DragBand } from "@/components/window/DragBand";
-import { draftCheckouts, hintLine, mainCheckout, threadCheckouts, type HintProject } from "@/lib/collisionHints";
+import { hintLine, mainCheckout, threadCheckouts, type HintProject } from "@/lib/collisionHints";
 import {
-  BASE_FROM_ORIGIN_KEY,
-  baseRuleText,
-  baseText,
   choiceLabel,
-  commonBranches,
   DEFAULT_EFFORT,
   DEFAULT_MODEL,
-  defaultBranchLabel,
-  defaultWorktree,
   draftKey as keyOf,
   EFFORT_CHOICES,
-  FRESH_COPIES,
-  FRESH_COPY,
-  mergedBranches,
   previewLabel,
   PERMISSION_CHOICES,
   pickDefault,
   PROJECT_FOLDER,
   PROJECT_FOLDERS,
-  setWorkIn,
-  WORK_IN_SETTING_KEY,
-  workInText,
   type ComposePermission,
   type ComposeTarget,
   type WorktreeChoice,
 } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
-import { byName, primaryOptions, resolveSet, setName, WORKSPACE_FOLDER, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
+import { byName, resolveSet, setName, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
@@ -68,21 +55,17 @@ import {
   getDraft,
   isDraftEmpty,
   isSetEmpty,
-  loadBranches,
-  noGitCheckout,
   noteLikeSource,
   openPreview,
   removeAttachment,
   sendDraft,
   setPrimary,
   updateDraft,
-  useComposeStore,
   useDraft,
   type DraftAttachment,
   type DraftPhase,
 } from "@/stores/compose";
 import { requestConfirm } from "@/stores/confirm";
-import { usePlacementRefusals } from "@/stores/placementChecks";
 import { useProjectsStore } from "@/stores/projects";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
@@ -107,65 +90,6 @@ function useDefaults(): { model: string; effort: string } {
   const model = pickDefault(useModelChoices(), useSettingValue("threads.default_model"), DEFAULT_MODEL);
   const effort = pickDefault(EFFORT_CHOICES, useSettingValue("threads.default_effort"), DEFAULT_EFFORT);
   return useMemo(() => ({ model, effort }), [model, effort]);
-}
-
-interface WorktreeOption {
-  path: string;
-  /** "" when detached. */
-  branch: string;
-  head: string;
-  detached: boolean;
-  isMain: boolean;
-}
-
-/** The project's worktrees (main first), as a shallow-stable list that follows branch changes live. */
-function useWorktrees(projectId: string): WorktreeOption[] {
-  const keys = useProjectsStore(
-    useShallow((s) => (s.byId[projectId]?.worktrees ?? []).map((w) => [w.path, w.branch, w.head, w.detached ? "1" : "", w.isMain ? "1" : ""].join(SEP))),
-  );
-  return useMemo(
-    () =>
-      keys.map((k) => {
-        const [path = "", branch = "", head = "", detached = "", main = ""] = k.split(SEP);
-        return { path, branch, head, detached: detached === "1", isMain: main === "1" };
-      }),
-    [keys],
-  );
-}
-
-/**
- * A Work in row's value for an existing branch: a prefix no branch name, path or "new" /
- * "current" starts with, and that a search never types.
- */
-const BRANCH_VALUE = "⎇ ";
-/** Branch from's first row (the default branches; the draft keeps null). */
-const DEFAULT_BASE_VALUE = "⎇default";
-
-/**
- * The picker lists of the draft's git projects (ListRefs, loaded when a picker opens):
- * every project's branches newest first, the default branches, and the status line while
- * any is loading or failed ("" when all are ready).
- */
-function useBranchLists(gitIds: readonly string[], many: boolean): { lists: (readonly string[])[]; defaults: string[]; status: string } {
-  const states = useComposeStore(useShallow((s) => gitIds.map((id) => s.refs[id])));
-  return useMemo(() => {
-    const lists = states.map((r) => r?.branches ?? []);
-    const defaults = states.flatMap((r) => (r?.defaultBranch ? [r.defaultBranch] : []));
-    const failed = states.find((r) => r?.status === "error");
-    let status = "";
-    if (states.some((r) => !r || r.status === "loading")) status = "Loading branches…";
-    else if (failed) status = failed.outdated ? (failed.error ?? "") : `Cannot list branches: ${failed.error ?? "unknown error"}. ${many ? "The default branches are" : "The default branch is"} used.`;
-    return { lists, defaults, status };
-  }, [states, many]);
-}
-
-/** A single project's choice resolved: "current" is its main checkout; a worktree that is gone is a new one. */
-function resolveWorktree(choice: WorktreeChoice, worktrees: readonly WorktreeOption[]): WorktreeChoice {
-  if (choice.kind === "current") {
-    const main = worktrees.find((w) => w.isMain);
-    return main ? { kind: "existing", path: main.path } : { kind: "new" };
-  }
-  return choice.kind === "existing" && !worktrees.some((w) => w.path === choice.path) ? { kind: "new" } : choice;
 }
 
 /** What the send button says while busy: new worktrees (one per git project of a set), or starting. */
@@ -203,18 +127,6 @@ function useDraftSet(target: ComposeTarget, key: string): { set: ResolvedSet; wo
     });
     return { set, workspaceName: name };
   }, [target, projects, workspace, primary, known, wsId, wsKey, targetMembers, targetWs]);
-}
-
-/** A project's name (its id when the store does not know it), for labels built in hooks. */
-function useProjectNames(ids: readonly string[]): (id: string) => string {
-  const names = useProjectsStore(useShallow((s) => ids.map((id) => s.byId[id]?.name ?? id)));
-  return useCallback((id: string) => names[ids.indexOf(id)] ?? id, [ids, names]);
-}
-
-/** Each project's kind (projectKind), for the Run in picker's icons; "git" while unknown. */
-function useProjectKinds(ids: readonly string[]): (id: string) => ProjectKind {
-  const kinds = useProjectsStore(useShallow((s) => ids.map((id) => (s.byId[id] ? projectKind(s.byId[id]).kind : "git"))));
-  return useCallback((id: string) => kinds[ids.indexOf(id)] ?? "git", [ids, kinds]);
 }
 
 /** The chips of a set: one per project by id, by name only (the Work in and Run in pickers say the rest). */
@@ -341,20 +253,6 @@ function cycleStops(e: React.KeyboardEvent<HTMLElement>): void {
   next.focus();
 }
 
-/**
- * Work in: where a project's thread runs. The option titles are the pill's words
- * (lib/compose FRESH_COPY…); the copy is docs/notes/onboarding-3-work-in.md's.
- */
-const FRESH_COPY_DETAIL = "Edits land in a new branch with its own worktree. Multiple threads at a time is safe.";
-/**
- * A set's Work in choices: one new branch with a worktree in every repository, or every
- * project's own folder. Singular for a set of one project (a workspace with one member).
- */
-const FRESH_COPIES_DETAIL = "Edits land in a new branch with a worktree for every project. Multiple threads at a time is safe.";
-const FRESH_COPY_OF_ONE_DETAIL = "Edits land in a new branch with a worktree for the project. Multiple threads at a time is safe.";
-const PROJECT_FOLDERS_DETAIL = "Edits land in every project's checkout directly. One thread at a time is safest.";
-const PROJECT_FOLDER_OF_ONE_DETAIL = "Edits land in the project's checkout directly. One thread at a time is safest.";
-
 /** The send button with nothing to send: a neutral grey, not the faded accent. */
 export const SEND_DISABLED = "disabled:bg-cf-surface-sunken disabled:text-cf-text-muted";
 
@@ -394,7 +292,6 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   const phase = useDraft(draftKey, "phase");
   const error = useDraft(draftKey, "error");
   const notice = useDraft(draftKey, "notice");
-  const workInSetting = useSettingValue(WORK_IN_SETTING_KEY);
   const focusSeq = useUiStore((s) => s.composerFocusSeq);
   const editorRef = useRef<PromptEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -410,53 +307,24 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   // Where the thread runs: the set's primary, or a like draft's pick over its thread's own.
   const primary = like ? (primaryChoice && (primaryChoice === likeSrc.own || likeSrc.sorted.includes(primaryChoice) || (primaryChoice === WORKSPACE_PRIMARY && likeSrc.workspaceId)) ? primaryChoice : likeSrc.own) : set.primary;
   const primaryProject = primary === WORKSPACE_PRIMARY ? "" : primary;
-  const isSet = !like && set.isSet;
-  /** A set of more than one project: the Work in titles are plural. */
-  const many = isSet && set.projectIds.length > 1;
+  // Work in, Branch from and Run in (placement.ts, shared with the move picker); a like
+  // draft copies its thread's placement and no project has none.
+  const placement = usePlacement(like || home ? null : set, choice);
+  const { isSet, single, noGitPath, setGit, chosen, existingPath } = placement;
   // Every project of its workspace taken out: no set to send until one is picked.
   const empty = !home && !like && isSetEmpty(set);
-  const single = !like && !home && !set.isSet ? (set.projectIds[0] ?? "") : "";
-  const worktrees = useWorktrees(single);
-  const mainPath = worktrees.find((w) => w.isMain)?.path;
-  // A project without git runs threads in its folder only: In place, no base.
-  const noGitPath = useProjectsStore((s) => noGitCheckout(s.byId[single]));
-  const singleKind = useProjectKind(single);
-  // The draft's git projects (the set's, in its order, or the lone project): their branches fill the pickers.
-  const gitIds = useProjectsStore(useShallow((s) => (like || home ? [] : set.projectIds.filter((id) => s.byId[id]?.git === true))));
-  // A set without a git project (plain folders, or a workspace without projects) runs in place: nothing to make a worktree of.
-  const setGit = isSet ? gitIds.length : 0;
-  const setMode = setWorkIn(choice, workInSetting, setGit > 0);
-  const worktree: WorktreeChoice = like
-    ? likeSrc.worktreeMode
-      ? { kind: "new" }
-      : { kind: "current" }
-    : isSet
-      ? choice?.kind === "branch" && setGit > 0
-        ? choice
-        : { kind: setMode }
-      : noGitPath !== undefined
-        ? { kind: "existing", path: noGitPath }
-        : resolveWorktree(choice ?? defaultWorktree({ setting: workInSetting, mainPath }), worktrees);
-  const chosen = !isSet && worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
-  const projectNames = useProjectNames(like ? likeSrc.sorted : set.projectIds);
-  const projectKinds = useProjectKinds(like ? likeSrc.sorted : set.projectIds);
+  const worktree: WorktreeChoice = like ? (likeSrc.worktreeMode ? { kind: "new" } : { kind: "current" }) : placement.worktree;
   const newWorktrees = home || like || (worktree.kind !== "new" && worktree.kind !== "branch") ? 0 : isSet ? setGit : 1;
   const base = baseChoice ?? "";
   const canSend = !busy && !empty && (text.trim() !== "" || hasAttachments);
+  const pickers = usePlacementPickers(placement, { base, workInOpen: workInOpen && !like && !home });
   // Branch from: new worktrees on a new branch, in a draft with a git project.
-  const showBase = !like && worktree.kind === "new" && gitIds.length > 0;
-  /** More than one git project: "Default branches", "From defaults", "Each project …". */
-  const manyGit = gitIds.length > 1;
-  const branchLists = useBranchLists(gitIds, manyGit);
-  const ruleOn = useSettingValue(BASE_FROM_ORIGIN_KEY) !== "false";
-  const loadLists = useCallback(() => {
-    void loadBranches(gitIds);
-  }, [gitIds]);
+  const showBase = !like && pickers.base.show;
+  const loadLists = pickers.loadLists;
 
   // "/" and "@": the set's projects (the primary first), each read from the checkout the
   // thread will see: a lone project's chosen worktree, a like draft's thread's checkouts,
   // else the main worktree (new worktrees start from it).
-  const existingPath = !isSet && worktree.kind === "existing" ? worktree.path : "";
   const sourceIds = useMemo(() => {
     const ids = like ? likeSrc.sorted : set.projectIds;
     return primaryProject && ids.includes(primaryProject) ? [primaryProject, ...ids.filter((id) => id !== primaryProject)] : [...ids];
@@ -528,7 +396,6 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   const hintSetIds = like ? likeSrc.sorted : set.projectIds;
   const likeThreadId = like ? target.threadId : "";
   const likeKey = like ? [likeSrc.own, likeSrc.branch, likeSrc.worktreeMode ? "1" : ""].join(SEP) : "";
-  const pickedBranch = worktree.kind === "branch" ? worktree.name : "";
   const mine = useCallback(
     (projects: Readonly<Record<string, HintProject>>) => {
       if (home) return { checkouts: [], worktreeMode: false };
@@ -540,11 +407,9 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
         return { checkouts: threadCheckouts(t, projects), worktreeMode: wt === "1" };
       }
       // An existing branch: a worktree thread on it (its listed worktrees are shared).
-      const worktreeMode = worktree.kind === "new" || pickedBranch !== "";
-      if (single) return { checkouts: draftCheckouts({ projectIds: [single], primary: single, worktreeMode, primaryPath: existingPath, branch: pickedBranch }, projects), worktreeMode };
-      return { checkouts: draftCheckouts({ projectIds: hintSetIds, primary, worktreeMode, branch: pickedBranch }, projects), worktreeMode };
+      return placementCheckouts(placement, hintSetIds, primary, projects);
     },
-    [home, likeThreadId, likeKey, hintSetIds, likeSrc.paths, single, worktree.kind, pickedBranch, existingPath, primary],
+    [home, likeThreadId, likeKey, hintSetIds, likeSrc.paths, placement, primary],
   );
   const found = useCollisions(mine);
   // The banner's collisions in the daemon's words: the hints shown here are not toasted again after the create.
@@ -579,62 +444,8 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
     promptFocusRef.current = refocus;
   });
 
-  // Work in's existing branches (W2): every git project's, merged by name, newest first, minus the default branches.
-  const branchNames = useMemo(() => mergedBranches(branchLists.lists, branchLists.defaults), [branchLists]);
-  // A branch the Create would refuse (a main checkout on it, its worktree moved): greyed, the refusal as its tooltip.
-  const refusals = usePlacementRefusals(gitIds, branchNames, workInOpen && !like && !home);
-  const branchGroup = useMemo<PickerGroup>(
-    () => ({
-      options: branchNames.map((b) => ({ value: BRANCH_VALUE + b, label: b, icon: GitBranch, mono: true, unavailable: refusals[b] })),
-      status: branchLists.status || undefined,
-    }),
-    [branchNames, refusals, branchLists.status],
-  );
-  const worktreeGroups = useMemo<PickerGroup[]>(() => {
-    if (isSet) {
-      const inPlace = { value: "current", label: many ? PROJECT_FOLDERS : PROJECT_FOLDER, detail: many ? PROJECT_FOLDERS_DETAIL : PROJECT_FOLDER_OF_ONE_DETAIL, wrap: true };
-      // No git project: fresh copies would have nothing to copy (the note under the picker says so).
-      if (setGit === 0) return [{ heading: "Work in", options: [inPlace] }];
-      return [
-        {
-          heading: "Work in",
-          fixed: true,
-          options: [{ value: "new", label: many ? FRESH_COPIES : FRESH_COPY, detail: many ? FRESH_COPIES_DETAIL : FRESH_COPY_OF_ONE_DETAIL, wrap: true }, inPlace],
-        },
-        branchGroup,
-      ];
-    }
-    if (noGitPath !== undefined) {
-      return [{ heading: "Work in", options: [{ value: noGitPath, label: PROJECT_FOLDER, detail: PROJECT_FOLDER_OF_ONE_DETAIL, wrap: true }] }];
-    }
-    const main = worktrees.find((w) => w.isMain);
-    return [
-      {
-        heading: "Work in",
-        fixed: true,
-        options: [
-          { value: "new", label: FRESH_COPY, detail: FRESH_COPY_DETAIL, wrap: true },
-          ...(main ? [{ value: main.path, label: PROJECT_FOLDER, detail: PROJECT_FOLDER_OF_ONE_DETAIL, wrap: true }] : []),
-        ],
-      },
-      branchGroup,
-    ];
-  }, [isSet, many, setGit, worktrees, noGitPath, branchGroup]);
-  // The Work in row that is checked: a picked branch, or an existing worktree's branch (the sidebar's "+").
-  const worktreeValue = isSet
-    ? worktree.kind === "branch"
-      ? BRANCH_VALUE + worktree.name
-      : worktree.kind
-    : worktree.kind === "branch"
-      ? BRANCH_VALUE + worktree.name
-      : worktree.kind === "existing"
-        ? chosen && !chosen.isMain && chosen.branch
-          ? BRANCH_VALUE + chosen.branch
-          : worktree.path
-        : worktree.kind;
-  const hasBranchSearch = worktreeGroups.length > 1;
-
   // Chips in display order: by name (the set is sent by id).
+  const projectNames = useProjectNames(like ? likeSrc.sorted : set.projectIds);
   const chipIds = useMemo(() => byName(like ? likeSrc.sorted : set.projectIds, projectNames), [like, likeSrc.sorted, set.projectIds, projectNames]);
   const chips = useMemo<MemberChipModel[]>(
     () => (isSet || like ? setChips(chipIds, !like) : single ? [{ projectId: single, removable: false }] : []),
@@ -648,49 +459,13 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
       : likeSrc.sorted.length > 1
         ? PROJECT_FOLDERS
         : PROJECT_FOLDER
-    : workInText({ set: isSet, many, noGit: noGitPath !== undefined, worktree, chosen });
-  const worktreeIcon = like
-    ? likeSrc.worktreeMode
-      ? GitBranch
-      : FolderGit2
-    : noGitPath !== undefined
-      ? PROJECT_KIND_ICONS.nogit
-      : worktree.kind === "branch"
-        ? GitBranch
-        : isSet
-          ? worktree.kind === "new"
-            ? GitBranchPlus
-            : FolderGit2
-          : !chosen
-            ? GitBranchPlus
-            : chosen.isMain
-              ? PROJECT_KIND_ICONS[singleKind]
-              : GitBranch;
+    : pickers.workIn.text;
+  const worktreeIcon = like ? (likeSrc.worktreeMode ? GitBranch : FolderGit2) : pickers.workIn.icon;
 
-  // The primary picker: the workspace's folder (WORKSPACE_FOLDER) first when there is one, then the projects by name.
-  const primaryGroups = useMemo<PickerGroup[]>(() => {
-    const s = like ? { projectIds: likeSrc.sorted, workspaceId: likeSrc.workspaceId } : set;
-    const options = primaryOptions(s, like ? likeSrc.workspaceName : workspaceName, projectNames).map((o) => ({ ...o, icon: o.value === WORKSPACE_PRIMARY ? Layers : PROJECT_KIND_ICONS[projectKinds(o.value)] }));
-    return [{ heading: "Run in", options }];
-  }, [like, likeSrc.sorted, likeSrc.workspaceId, likeSrc.workspaceName, set, workspaceName, projectNames, projectKinds]);
-  const showPrimary = (isSet && (set.projectIds.length > 1 || set.workspaceId !== "")) || (like && (likeSrc.sorted.length > 1 || likeSrc.workspaceId !== ""));
-  const primaryText = primary === WORKSPACE_PRIMARY ? WORKSPACE_FOLDER : projectNames(primary);
-
-  // Branch from (B3): the default branch(es) first, then the branches every git project
-  // has (names only: the daemon picks origin's copy or the local one), newest first.
-  const baseGroups = useMemo<PickerGroup[]>(() => {
-    const branches = commonBranches(branchLists.lists, branchLists.defaults);
-    return [
-      {
-        heading: "Branch from",
-        options: [
-          { value: DEFAULT_BASE_VALUE, label: defaultBranchLabel(manyGit), icon: GitCommitHorizontal, mono: true },
-          ...branches.map((b) => ({ value: b, label: b, icon: GitBranch, mono: true })),
-        ],
-        status: branchLists.status || undefined,
-      },
-    ];
-  }, [branchLists, manyGit]);
+  // Run in (the primary): the set's, or a like draft's thread's.
+  const likeSet = useMemo(() => ({ projectIds: likeSrc.sorted, workspaceId: likeSrc.workspaceId }), [likeSrc.sorted, likeSrc.workspaceId]);
+  const primaryPicker = usePrimaryPicker(like ? likeSet : set, like ? likeSrc.workspaceName : workspaceName, primary);
+  const showPrimary = (isSet || like) && primaryPicker.show;
 
   return (
     <div ref={rootRef} onBlur={picker.onBlur}>
@@ -898,16 +673,15 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
                   label="Work in"
                   icon={worktreeIcon}
                   text={worktreeText}
-                  value={worktreeValue}
-                  groups={worktreeGroups}
+                  value={pickers.workIn.value}
+                  groups={pickers.workIn.groups}
                   onChange={(v) => {
-                    const next: WorktreeChoice =
-                      v === "new" || v === "current" ? { kind: v } : v.startsWith(BRANCH_VALUE) ? { kind: "branch", name: v.slice(BRANCH_VALUE.length) } : { kind: "existing", path: v };
+                    const next = pickers.workIn.choiceOf(v);
                     // The pick is this draft's alone; the next draft starts from the setting again.
                     updateDraft(draftKey, { worktree: next });
                   }}
-                  filterPlaceholder={hasBranchSearch ? "Find existing branch" : undefined}
-                  onOpen={hasBranchSearch ? loadLists : undefined}
+                  filterPlaceholder={pickers.workIn.hasBranchSearch ? "Find existing branch" : undefined}
+                  onOpen={pickers.workIn.hasBranchSearch ? loadLists : undefined}
                   onOpenChange={setWorkInOpen}
                   disabled={busy}
                   contentClassName="w-90"
@@ -922,15 +696,15 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
                 <ComposerPicker
                   label="Branch from"
                   icon={GitCommitHorizontal}
-                  text={baseText(base, manyGit)}
-                  value={base || DEFAULT_BASE_VALUE}
-                  groups={baseGroups}
+                  text={pickers.base.text}
+                  value={pickers.base.value}
+                  groups={pickers.base.groups}
                   onChange={(v) => {
-                    updateDraft(draftKey, { base: v === DEFAULT_BASE_VALUE ? null : v });
+                    updateDraft(draftKey, { base: pickers.base.baseOf(v) });
                   }}
                   filterPlaceholder="Filter branches…"
                   onOpen={loadLists}
-                  footer={ruleOn ? baseRuleText(manyGit) : undefined}
+                  footer={pickers.base.footer}
                   focusAfter={refocus}
                   disabled={busy}
                   contentClassName="w-72"
@@ -940,10 +714,10 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
               {showPrimary && (
                 <ComposerPicker
                   label="Run in"
-                  icon={primary === WORKSPACE_PRIMARY ? Layers : MapPin}
-                  text={primaryText}
+                  icon={primaryPicker.icon}
+                  text={primaryPicker.text}
                   value={primary}
-                  groups={primaryGroups}
+                  groups={primaryPicker.groups}
                   onChange={(v) => {
                     setPrimary(draftKey, v);
                   }}
