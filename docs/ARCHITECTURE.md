@@ -180,7 +180,7 @@ Services (v1):
 * `ThreadService`, the lifecycle — Create, Fork, List, Get, Rename, Remove (keeps a
   24 h in-memory tombstone: Get is NOT_FOUND with a `RemovedThread` detail, Wait answers
   `removed`, List adds them on `include_removed`, subscribers get a `removed` wake;
-  `docs/notes/removed-thread-signal.md`), RunIn,
+  `docs/notes/removed-thread-signal.md`), RunIn, Move,
   Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Archive (close,
   remove the thread's shells, unpin, stamp `archived_at`; pin and send
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
@@ -470,7 +470,10 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
 * A thread has a **project set** (`project_ids`, sorted by id; persisted as a JSON column)
   and one **primary** (`project_id`/`worktree_path`: the cwd); a thread without a project
   has an empty set, runs in the home directory (`Options.Home`), pre-trusted like any cwd,
-  and RunIn refuses it (`docs/notes/no-project-1-daemon.md`). The thread owns one
+  and RunIn refuses it (`docs/notes/no-project-1-daemon.md`); Move takes it into one
+  project or workspace, placed by Create's code, renamed from its conversation, through
+  Claude's `set_cwd` (started in home to do it when stopped;
+  `docs/notes/move-no-project-1-daemon.md`). The thread owns one
   **checkout** per member, by path (`checkout_paths`, the `checkouts` JSON column; the
   primary's is the cwd), and what a checkout has checked out (HEAD, detached, upstream
   ahead/behind, the operation in progress) is read from the project snapshot at that
