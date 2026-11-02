@@ -166,10 +166,11 @@ export function folderInfo(abs: string): { path: string; isRepo: boolean; childR
 // ?project=repo-cf&path=a.ts&project=repo-gh&path=b.zig; no path: an empty project), and
 // the project skills `review` and `deploy`; the user has `commit`. Ranking mirrors
 // internal/fuzzy: exact base name > base name prefix > base name subsequence > path
-// subsequence, then the boundary/run bonus, then shorter path, then path, then source
-// order; an empty query lists the shallowest first. Several sources are ranked in one list
-// and query words may match a project's name (fuzzy.Splits); positions are code-point
-// indices, like the daemon's.
+// subsequence per query word, then the weakest word's tier, the tier sum and the bonus sum
+// (fuzzy.ScoreWords), then shorter path, then path, then source order; an empty query lists
+// the shallowest first. Several sources are ranked in one list and leading or trailing query
+// words may match a project's name (fuzzy.Splits); positions are code-point indices, like
+// the daemon's.
 
 /** A project the completion RPCs can see: its id, name and main worktree (world.ts MockProject). */
 export interface CompletionProject {
@@ -360,29 +361,71 @@ export function fileScore(path: string, query: string): { score: number; pos: nu
   return { score: 0, pos: [] };
 }
 
-/** One way to share a query between a project name and a path (internal/fuzzy Split). */
-interface Split {
-  path: string;
-  name: string[];
+/**
+ * Go's unicode.IsSpace, which strings.Fields splits at. JavaScript's \s differs: it has
+ * U+FEFF and lacks U+0085.
+ */
+const SPACE = /[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/;
+
+/** internal/fuzzy Words: the query's words, split at whitespace. */
+export function queryWords(query: string): string[] {
+  return query.split(SPACE).filter((w) => w !== "");
 }
 
-/** internal/fuzzy Splits: the query on the path, then leading/trailing word runs on the name. */
-export function querySplits(query: string, name: string, multi: boolean): Split[] {
-  if (!multi || query === "") return [{ path: query, name: [] }];
-  const words = query.split(/\s+/).filter((w) => w !== "");
-  const out: Split[] = [{ path: words.join(" "), name: [] }];
-  const seen = new Set([out[0]?.path]);
+/**
+ * internal/fuzzy combine: zero when a word's score is zero, else the weakest tier, then the
+ * tier sum, then the bonus sum, packed below 2^53 so a number holds it exactly.
+ */
+function combine(scores: Iterable<number>): number {
+  let n = 0;
+  let minTier = 4;
+  let tiers = 0;
+  let bonus = 0;
+  for (const s of scores) {
+    if (s === 0) return 0;
+    n++;
+    const tier = Math.floor(s / 2 ** 20);
+    minTier = Math.min(minTier, tier);
+    tiers += tier;
+    bonus += s % 2 ** 20;
+  }
+  if (n === 0) return 1;
+  return minTier * 2 ** 50 + Math.min(tiers, 2 ** 10 - 1) * 2 ** 40 + Math.min(bonus, 2 ** 40 - 1);
+}
+
+/** internal/fuzzy ScoreWords and PositionsWords: every word on its own, positions merged. */
+export function wordsScore(path: string, words: readonly string[]): { score: number; pos: number[] } {
+  const each = words.map((w) => fileScore(path, w));
+  const score = combine(each.map((e) => e.score));
+  return { score, pos: score === 0 ? [] : merge(each.map((e) => e.pos)) };
+}
+
+/** Ascending, without repeats. */
+function merge(lists: readonly number[][]): number[] {
+  return [...new Set(lists.flat())].sort((a, b) => a - b);
+}
+
+/** internal/fuzzy Split: words[lo:hi] on the path, the rest on the project name. */
+interface Split {
+  lo: number;
+  hi: number;
+}
+
+/** internal/fuzzy Splits: all words on the path, then leading/trailing runs of name words. */
+export function querySplits(words: readonly string[], name: string, multi: boolean): Split[] {
+  const n = words.length;
+  const out: Split[] = [{ lo: 0, hi: n }];
+  if (!multi || n < 2) return out;
   const lname = lowerRunes(name);
-  const add = (nameWords: string[], rest: string[]) => {
-    const path = rest.join(" ");
-    if (seen.has(path)) return;
-    if (align(lname, lowerRunes(nameWords.join(""))) === undefined) return;
-    seen.add(path);
-    out.push({ path, name: nameWords });
-  };
-  for (let k = 1; k < words.length; k++) {
-    add(words.slice(0, k), words.slice(k));
-    add(words.slice(words.length - k), words.slice(0, words.length - k));
+  const inName = (w: string) => align(lname, lowerRunes(w)) !== undefined;
+  let lead = true;
+  let trail = true;
+  for (let k = 1; k < n; k++) {
+    lead = lead && inName(words[k - 1] ?? "");
+    trail = trail && inName(words[n - k] ?? "");
+    if (lead) out.push({ lo: k, hi: n });
+    if (trail) out.push({ lo: 0, hi: n - k });
+    if (!lead && !trail) break;
   }
   return out;
 }
@@ -422,37 +465,55 @@ export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, re
     if (!sources.some((s) => s.checkout === checkout)) sources.push({ project, checkout });
   }
   completionCalls.push(`search ${sources.map((s) => s.project.id).join(",")} ${query}`);
-  const q = query.trim();
+  const words = queryWords(query);
   const depth = (p: string) => p.split("/").length;
   const hits = sources.flatMap((src, si) => {
-    const splits = querySplits(q, src.project.name, sources.length > 1);
+    const splits = querySplits(words, src.project.name, sources.length > 1);
     return withParentDirs(filesByProject.get(src.project.id) ?? DEFAULT_FILES)
       .filter((e) => !req.filesOnly || !e.isDir)
       .map((e) => {
-        let best = { score: 0, pos: [] as number[], split: splits[0] };
+        const scores = new Map<number, number>();
+        const wordScore = (w: number) => {
+          let s = scores.get(w);
+          if (s === undefined) {
+            s = fileScore(e.path, words[w] ?? "").score;
+            scores.set(w, s);
+          }
+          return s;
+        };
+        let best = { score: 0, split: splits[0] ?? { lo: 0, hi: 0 } };
         for (const sp of splits) {
-          const s = fileScore(e.path, sp.path);
-          if (s.score > best.score) best = { ...s, split: sp };
+          const score = combine(
+            (function* () {
+              for (let w = sp.lo; w < sp.hi; w++) yield wordScore(w);
+            })(),
+          );
+          if (score > best.score) best = { score, split: sp };
         }
         return { ...e, si, src, ...best };
       })
       .filter((h) => h.score > 0);
   });
   hits.sort((a, b) =>
-    (q === ""
+    (words.length === 0
       ? depth(a.path) - depth(b.path) || cmpStr(a.path, b.path)
       : b.score - a.score || byteLen(a.path) - byteLen(b.path) || cmpStr(a.path, b.path)) || a.si - b.si,
   );
   const n = Math.min(limit === 0 ? DEFAULT_FILE_LIMIT : limit, MAX_FILE_LIMIT);
   return {
-    matches: hits.slice(0, n).map((h) => ({
-      path: h.path,
-      isDir: h.isDir,
-      projectId: h.src.project.id,
-      checkout: h.src.checkout,
-      pathPositions: h.pos,
-      projectPositions: h.split && h.split.name.length > 0 ? (align(lowerRunes(h.src.project.name), lowerRunes(h.split.name.join("")))?.pos ?? []) : [],
-    })),
+    matches: hits.slice(0, n).map((h) => {
+      const { lo, hi } = h.split;
+      const lname = lowerRunes(h.src.project.name);
+      const nameWords = [...words.slice(0, lo), ...words.slice(hi)];
+      return {
+        path: h.path,
+        isDir: h.isDir,
+        projectId: h.src.project.id,
+        checkout: h.src.checkout,
+        pathPositions: wordsScore(h.path, words.slice(lo, hi)).pos,
+        projectPositions: merge(nameWords.map((w) => align(lname, lowerRunes(w))?.pos ?? [])),
+      };
+    }),
     truncated: hits.length > n,
   };
 }
