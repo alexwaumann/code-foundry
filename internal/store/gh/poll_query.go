@@ -147,6 +147,9 @@ type pollPlan struct {
 	closed []*pollPlan
 	// statsOnly names the document PollStats: a closed-month stats request.
 	statsOnly bool
+	// projects names the document PollProjects: the project-wide searches
+	// (poll_projects.go), sections only.
+	projects bool
 }
 
 // repoAlias is the alias of plan.repos[i].
@@ -249,8 +252,11 @@ func (p *pollPlan) build() (string, map[string]any, error) {
 		}
 	}
 	head := "query Poll"
-	if p.statsOnly {
+	switch {
+	case p.statsOnly:
 		head = "query PollStats"
+	case p.projects:
+		head = "query PollProjects"
 	}
 	if len(decls) > 0 {
 		head += "(" + strings.Join(decls, ", ") + ")"

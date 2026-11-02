@@ -14,6 +14,7 @@ import (
 // gh_activity keys (schema.sql).
 const (
 	activityDashboard     = "dashboard"
+	activityProjects      = "projects"
 	activityStats         = "stats"
 	activityRepoStats     = "repo_stats:"
 	activityDefaultBranch = "default_branch:"
@@ -108,6 +109,10 @@ func (s *Store) loadActivityRows(ctx context.Context, snap *Snapshot) error {
 				stats := snap.Dashboard.Stats
 				snap.Dashboard = d
 				snap.Dashboard.Stats = stats
+			}
+		case key == activityProjects:
+			if p, ok := decodePayload[ProjectPullRequests](payload); ok {
+				snap.Projects = p
 			}
 		case key == activityPoll:
 			if p, ok := decodePayload[pollRow](payload); ok {

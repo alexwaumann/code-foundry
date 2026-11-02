@@ -501,8 +501,12 @@ func TestPollDashboardsDisabled(t *testing.T) {
 	if !d.Disabled || len(d.Authored) != 0 || len(d.RecentlyMerged) != 0 {
 		t.Errorf("dashboard = %+v, want disabled and empty", d)
 	}
-	if n := drain(dash); n != 1 {
-		t.Errorf("DashboardUpdated = %d, want 1", n)
+	// One for the dashboards, one for the project lists (cleared after the poll).
+	if n := drain(dash); n != 2 {
+		t.Errorf("DashboardUpdated = %d, want 2", n)
+	}
+	if p := s.Snapshot().Projects; len(p.Open.PullRequests) != 0 || p.Open.Query != "" || !p.FetchedAt.IsZero() {
+		t.Errorf("projects = %+v, want empty", p)
 	}
 }
 
