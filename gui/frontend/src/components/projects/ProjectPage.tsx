@@ -24,7 +24,7 @@ import { ProjectsCrumb, PagePicker } from "./PagePicker";
 import { ProjectDetails } from "./ProjectDetails";
 import { ProjectNameEditor } from "./ProjectNameEditor";
 import { ProjectTitle } from "./ProjectTitle";
-import { openCursorRowMenu } from "./RowContextMenu";
+import { openCursorRowMenu } from "./rowMenu";
 
 /** A note card at the top of a project page (no remote, no git) with its setup button. */
 function KindNote({ icon, children, action }: { icon: React.ReactNode; children: React.ReactNode; action: React.ReactNode }) {

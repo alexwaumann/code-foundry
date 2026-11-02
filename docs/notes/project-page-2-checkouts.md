@@ -28,7 +28,7 @@ renders with injected DOM.
   gets the selected tint, which a row also shows while its menu is open. The nav items have no
   `activate`, so Enter does nothing and the row's `openChangesTab` is gone.
 - **Keyboard path to the menu**: the ContextMenu key or Shift+F10 on the page's list
-  dispatches a `contextmenu` at the start of the cursor row (`RowContextMenu.tsx`
+  dispatches a `contextmenu` at the start of the cursor row (`rowMenu.ts`
   `openCursorRowMenu`, wired in ProjectPage's `onKeyDown`).
 - **Right-click menu** (`menus.ts` `checkoutMenu`, pure; the parts are in
   `CheckoutMenuParts.tsx`):
@@ -56,7 +56,8 @@ renders with injected DOM.
   so it is deleted. Its test became `CheckoutActions.test.tsx`, which drives the submenu.
 - **RowContextMenu parts**: entries are `OverflowItem` or a typed part `{ kind, testId, … }`
   drawn by a registry the caller passes (`RowMenuParts<P>`). Runs of text items still go
-  through `MenuItems`. A context (`RowMenuPickContext`) gives parts `pick` (run after the
+  through `MenuItems`. The types, the context and the keyboard helper live in `rowMenu.ts`
+  (a component file may export only components). A context (`RowMenuPickContext`) gives parts `pick` (run after the
   menu closes) and `close` (close from a non-item, then run).
 - `ContextMenuSubTrigger` takes `chevron={false}`. `BADGE_WORD` (the thread status words)
   moved to `lib/thread.ts`, shared with WorkspaceThreads.

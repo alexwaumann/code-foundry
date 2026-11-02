@@ -12,7 +12,7 @@ import { openWorkspaceAddProject } from "@/stores/workspaceAddProject";
 import { newWorkspaceTerminal, removeWorkspace, revealWorkspace } from "@/stores/workspaceActions";
 import { startWorkspaceRename } from "@/stores/workspaceRename";
 import type { OverflowItem } from "./OverflowMenu";
-import type { RowMenuEntry } from "./RowContextMenu";
+import type { RowMenuEntry } from "./rowMenu";
 import { openThread } from "./workspaceHooks";
 
 /** What a project's menu depends on (the rest is read when an item runs). */

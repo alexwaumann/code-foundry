@@ -106,14 +106,14 @@ describe("a row", () => {
     await settle();
     const main = within(cells(CF)).getByTestId("worktree-main-signal");
     expect(main.getAttribute("class")).toContain("size-3.5");
-    expect(await hoverTooltipText(main as unknown as HTMLElement)).toBe("Main checkout · the project folder, ~/src/code-foundry");
+    expect(await hoverTooltipText(main)).toBe("Main checkout · the project folder, ~/src/code-foundry");
     fireEvent.pointerLeave(main);
     const sig = within(cells(LOGIN)).getByTestId("worktree-workspace-signal");
     expect(sig.getAttribute("aria-label")).toBe("Workspace login-and-billing");
     cleanup();
     renderPage();
     await settle();
-    const wsCard = await hoverTooltipText(within(cells(LOGIN)).getByTestId("worktree-workspace-signal") as unknown as HTMLElement);
+    const wsCard = await hoverTooltipText(within(cells(LOGIN)).getByTestId("worktree-workspace-signal"));
     expect(wsCard).toBe("login-and-billingWorkspace · code-foundry, ghostty-playground1 thread · Login flow");
     for (const p of [FEAT, FIX]) {
       expect(within(cells(p)).queryByTestId("worktree-main-signal")).toBeNull();
@@ -128,7 +128,7 @@ describe("the right-click menu's parts", () => {
     await settle();
     const menu = openMenu(FEAT);
     const sub = openSub(within(menu).getByTestId("checkout-menu-threads"), "checkout-menu-threads-menu");
-    expect(within(sub).getAllByTestId("checkout-menu-thread").map((e) => `${e.querySelector(".truncate")?.textContent ?? ""} ${within(e).getByTestId("checkout-menu-thread-state").textContent ?? ""}`)).toEqual(["Investigate flaky e2e idle", "Write thread docs working"]);
+    expect(within(sub).getAllByTestId("checkout-menu-thread").map((e) => `${e.querySelector(".truncate")?.textContent ?? ""} ${within(e).getByTestId("checkout-menu-thread-state").textContent}`)).toEqual(["Investigate flaky e2e idle", "Write thread docs working"]);
     fireEvent.click(within(sub).getAllByTestId("checkout-menu-thread")[1] as HTMLElement);
     await settle();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-5" });

@@ -10,7 +10,7 @@ import { useAction, useProjectActionIds } from "@/stores/actions";
 import { StatusDot } from "./bits";
 import type { CheckoutMenuPart } from "./menus";
 import { OpenInSplitItem } from "./OpenInMenuItem";
-import { RowMenuPickContext, type RowMenuParts } from "./RowContextMenu";
+import { RowMenuPickContext, type RowMenuParts } from "./rowMenu";
 import { openThread } from "./workspaceHooks";
 
 type Part<K extends CheckoutMenuPart["kind"]> = Extract<CheckoutMenuPart, { kind: K }>;

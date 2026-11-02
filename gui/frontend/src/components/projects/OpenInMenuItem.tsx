@@ -6,7 +6,7 @@ import { worktreeContext } from "@/stores/context";
 import { useEditorApps } from "@/stores/threadInfo";
 import { OpenInList } from "./OpenInFinder";
 import type { MenuParts } from "./OverflowMenu";
-import { RowMenuPickContext } from "./RowContextMenu";
+import { RowMenuPickContext } from "./rowMenu";
 
 const CONTEXT_PARTS: MenuParts = { Item: ContextMenuItem, Separator: ContextMenuSeparator };
 
