@@ -48,6 +48,10 @@ type runner struct {
 	// Claude was last seen arriving at its prompt; zero while it is not there.
 	pendingCd     *cdRequest
 	atPromptSince time.Time
+	// moveRestart: a queued move waits for this restart (Claude asked for the folder's
+	// trust, which it reads at start; move.go); respawn gives the new process the move's
+	// folders and clears it.
+	moveRestart *moveJob
 
 	// reseedPending: a reseed waits to stop the process (reseed.go). seed is the prefix
 	// of this fresh session's first message, until it went out (sendMessage).

@@ -172,7 +172,7 @@ func (r *runner) tryCd() {
 	} else if r.atPromptSince.IsZero() {
 		r.atPromptSince = time.Now()
 	}
-	if r.pendingCd == nil || r.closing || r.state != StateConnected || r.restarting() ||
+	if r.pendingCd == nil || r.closing || r.state != StateConnected || r.restarting() || r.moveRestart != nil ||
 		r.atPromptSince.IsZero() || time.Since(r.atPromptSince) < cdSettle {
 		return
 	}

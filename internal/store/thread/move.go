@@ -55,6 +55,9 @@ type moveJob struct {
 	// --add-dir list); false: it was running already and restarts for the list when the
 	// destination has more folders (restart).
 	started, restart bool
+	// retried: Claude asked for the folder's trust once and was restarted to read it
+	// (streamCd); a second needs_trust fails the move.
+	retried bool
 	// done receives the outcome once: nil when Claude moved, else why not.
 	done chan error
 }
@@ -476,7 +479,7 @@ func (r *runner) onMoved(job *moveJob, relocated bool) {
 	r.m.update(r.id, true, func(rec *record) {
 		rec.s = rec.s.withMove(job)
 		rec.moving = false
-		if job.restart && rec.run == r {
+		if job.restart && !job.started && rec.run == r { // a process started (or restarted) for the move has them
 			rec.run.dirsStale.Store(true) // the members as --add-dir (maybeRestart)
 		}
 	})

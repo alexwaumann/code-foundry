@@ -845,6 +845,13 @@ func (r *runner) streamCd(req cdRequest) {
 	case err != nil:
 		fail(err.Error())
 		return
+	case res.Status == "needs_trust" && req.move != nil && !req.move.retried:
+		// Claude reads folder trust at start, and this one was trusted after (placeMove,
+		// above): restart it (resuming, with the destination's folders) and try once more.
+		req.move.retried, req.move.started = true, true
+		r.moveRestart, r.pendingCd = req.move, &req
+		r.log().info("claude needs the move's folder trusted; restarting it to read its config again", "path", req.path)
+		return
 	case res.Status != "ok":
 		fail(nonEmpty(res.Message, res.Status))
 		return

@@ -113,7 +113,7 @@ func (r *runner) maybeRestart() {
 		r.interruptForRestart()
 		return
 	case user:
-	case st.wantEffort == st.effort && !r.dirsStale.Load() || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending:
+	case st.wantEffort == st.effort && !r.dirsStale.Load() && r.moveRestart == nil || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending:
 		return
 	}
 	r.beginRestart(user)
@@ -183,8 +183,13 @@ func (r *runner) respawn() {
 	// The row's set as it is now goes to the new process; a change after this read sets the flag again.
 	st.dirsApplied = r.dirsStale.Swap(false)
 	forDirs := st.dirsApplied && st.wantEffort == st.effort
+	cs := s
+	if r.moveRestart != nil {
+		// A move's restart (move.go): the destination's folders, as a start for a move has.
+		cs, r.moveRestart = s.withMove(r.moveRestart), nil
+	}
 	// Never waits (the runner's goroutine): the plugins' current contributions as they are.
-	argv, env, extras, mem := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
+	argv, env, extras, mem := r.m.claudeCommand(context.Background(), cs, l, st.grants, false)
 	// A missing cwd fails as itself, not as exec's ENOENT (cwd.go); a worktree-mode worktree
 	// is made again at the next start (a message), as a cleanup's is.
 	var proc *claudestream.Process

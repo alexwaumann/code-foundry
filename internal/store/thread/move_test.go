@@ -420,3 +420,31 @@ func TestMoveQueuedLostWhenClaudeStops(t *testing.T) {
 		t.Error("set_cwd sent")
 	}
 }
+
+// A running Claude reads folder trust at start, so a folder trusted for the move after it
+// started answers needs_trust: Claude restarts (resuming, in home, with the destination's
+// folders), the move is tried once more and goes through, without a second restart.
+func TestMoveLiveRestartsForTrust(t *testing.T) {
+	flag := filepath.Join(t.TempDir(), "trusted")
+	e, _ := newMoveEnv(t, "text-table", func(o *Options) {
+		o.Env = append(o.Env, "CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE="+flag)
+	})
+	s, cid := e.noProjectThread("check the slack thread", false)
+	got, err := e.m.Move(e.ctx(), s.ID, MoveOptions{WorkspaceID: "login", CheckoutMode: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.WorkspaceID != "w-login" || got.ProjectID != "r1" || got.WorktreePath != e.wt {
+		t.Fatalf("moved = %+v", got)
+	}
+	argv := e.argvOf()
+	if argOf(argv, "--resume") != cid || !slices.Contains(addDirs(argv), e.wt2) {
+		t.Errorf("restart argv %q, want --resume %s and the api checkout", argv, cid)
+	}
+	pid := e.pid(s.ID)
+	time.Sleep(300 * time.Millisecond)
+	if e.pid(s.ID) != pid {
+		t.Error("restarted again after the move")
+	}
+	e.waitItems(s.ID, "the move note", hasNote("Moved this thread to workspace login"))
+}

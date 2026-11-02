@@ -40,7 +40,9 @@
 //
 // set_cwd: answered ok with transcript_relocated (Claude moves the transcript; the fake
 // writes none). With CF_FAKE_CLAUDE_SET_CWD_REFUSE=<message> it is refused with status
-// "error" and that message (a thread move's failure path).
+// "error" and that message (a thread move's failure path). With
+// CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE=<path> the first set_cwd (the one that creates <path>)
+// answers needs_trust, as a Claude started before the folder was trusted does.
 //
 // A stuck Claude: with CF_FAKE_CLAUDE_STALL set, the first user message starts its turn
 // (the turn's lines but its result), then the process stops reading stdin for good
@@ -296,6 +298,12 @@ func Run(fixture string) int {
 				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true, "transcript_relocated": true}
 				if msg := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_REFUSE"); msg != "" {
 					resp["response"] = map[string]any{"status": "error", "message": msg}
+				}
+				if p := os.Getenv("CF_FAKE_CLAUDE_SET_CWD_TRUST_ONCE"); p != "" {
+					if _, err := os.Stat(p); err != nil {
+						_ = os.WriteFile(p, nil, 0o644)
+						resp["response"] = map[string]any{"status": "needs_trust"}
+					}
 				}
 			case "mcp_status":
 				resp["response"] = map[string]any{"mcpServers": mcp.servers()}
