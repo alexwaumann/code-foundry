@@ -4,12 +4,12 @@
  * (components/palette/FileFinder.tsx) over the thread on screen. Enter opens the file as
  * a File tab in that thread's side panel; ⌥⏎ puts it in the thread's prompt as an @ file.
  */
+import { threadDraftKey } from "@/lib/threadDraft";
 import { isNoProject } from "@/lib/threadRow";
 import { insertTagInto } from "./cite";
 import { openFileInPanel } from "./filePanel";
 import { keyOf } from "./panel";
 import { useProjectsStore } from "./projects";
-import { threadDraftKey } from "./threadActions";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 

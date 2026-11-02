@@ -20,6 +20,7 @@ import { projectPrompt } from "@/lib/prompt";
 import { newCitationId } from "@/lib/citation";
 import { appendToDraft, draftOfSent, sentAttachmentNames, type SentMessage } from "@/lib/failedPrompt";
 import { sentComposerText } from "@/lib/userMessage";
+import { threadDraftKey } from "@/lib/threadDraft";
 import { readAttachmentFile } from "./attachments";
 import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useCommandsStore } from "./commands";
 import { addStagedAttachments, clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, putCitation, updateDraft } from "./compose";
@@ -112,10 +113,8 @@ export function runThreadIn(id: string, projectId: string): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.runIn, { project: projectId }, threadContext(id));
 }
 
-/** The compose store key of a thread's follow-up draft. */
-export function threadDraftKey(threadId: string): string {
-  return `thread:${threadId}`;
-}
+/** The compose store key of a thread's follow-up draft (lib/threadDraft.ts). */
+export { threadDraftKey };
 
 /**
  * Sends the thread's draft: stages its attachments, projects the prompt exactly like the
