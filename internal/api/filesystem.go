@@ -16,6 +16,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
+	"github.com/alexwaumann/code-foundry/internal/fuzzy"
 	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
@@ -113,16 +114,43 @@ func (h *Filesystem) ListSkills(_ context.Context, req *connect.Request[v1.ListS
 	return connect.NewResponse(out), nil
 }
 
-// SearchFiles fuzzy-matches a query against one checkout's files and directories.
+// SearchFiles fuzzy-matches a query against the files and directories of one or more
+// checkouts, ranked in one list. Every source must resolve: an unknown project or a bad
+// path fails the request (unlike ListSkills, which skips a gone one).
 func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
-	if req.Msg.GetLimit() < 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("limit %d is negative", req.Msg.GetLimit()))
+	msg := req.Msg
+	if msg.GetLimit() < 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("limit %d is negative", msg.GetLimit()))
 	}
-	dir, git, err := h.checkout(req.Msg.GetProjectId(), req.Msg.GetPath())
-	if err != nil {
-		return nil, err
+	named := msg.GetSources()
+	switch {
+	case len(named) == 0:
+		named = []*v1.FileSource{{ProjectId: msg.GetProjectId(), Path: msg.GetPath()}}
+	case msg.GetProjectId() != "" || msg.GetPath() != "":
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("set sources or project_id and path, not both"))
+	case len(named) > fsx.MaxSearchSources:
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%d sources, at most %d", len(named), fsx.MaxSearchSources))
 	}
-	matches, truncated, err := h.files.Search(ctx, dir, git, req.Msg.GetQuery(), int(req.Msg.GetLimit()))
+	if n := len(fuzzy.Words(msg.GetQuery())); n > fuzzy.MaxWords {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("query has %d words, at most %d", n, fuzzy.MaxWords))
+	}
+	type source struct{ projectID, checkout string }
+	var srcs []fsx.Source
+	var meta []source
+	seen := map[string]bool{}
+	for _, n := range named {
+		c, err := h.resolve(n.GetProjectId(), n.GetPath())
+		if err != nil {
+			return nil, err
+		}
+		if seen[c.dir] { // the same checkout twice (say, by a symlink): search it once
+			continue
+		}
+		seen[c.dir] = true
+		srcs = append(srcs, fsx.Source{Dir: c.dir, Git: c.git, Name: c.project.Name})
+		meta = append(meta, source{projectID: c.project.ID, checkout: c.named})
+	}
+	matches, truncated, err := h.files.SearchSources(ctx, srcs, msg.GetQuery(), int(msg.GetLimit()), msg.GetFilesOnly())
 	switch {
 	case err == nil:
 	case errors.Is(err, context.Canceled): // the client gave up; the listing goes on
@@ -134,50 +162,81 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 	}
 	out := &v1.SearchFilesResponse{Truncated: truncated, Matches: make([]*v1.FileMatch, len(matches))}
 	for i, m := range matches {
-		out.Matches[i] = &v1.FileMatch{Path: m.Path, IsDir: m.IsDir}
+		src := meta[m.Source]
+		out.Matches[i] = &v1.FileMatch{
+			Path: m.Path, IsDir: m.IsDir, ProjectId: src.projectID, Checkout: src.checkout,
+			PathPositions: int32s(m.PathPositions), ProjectPositions: int32s(m.NamePositions),
+		}
 	}
 	return connect.NewResponse(out), nil
 }
 
-// checkout resolves a request's checkout: path (absolute, symlinks resolved, under
+func int32s(xs []int) []int32 {
+	if len(xs) == 0 {
+		return nil
+	}
+	out := make([]int32, len(xs))
+	for i, x := range xs {
+		out[i] = int32(x)
+	}
+	return out
+}
+
+// resolvedCheckout is a request's checkout: its project, the path as named (cleaned;
+// the main worktree when the request named none), the directory it resolves to, and
+// whether to list it with git.
+type resolvedCheckout struct {
+	project project.Project
+	named   string
+	dir     string
+	git     bool
+}
+
+// checkout resolves a request's checkout to its directory (see resolve).
+func (h *Filesystem) checkout(projectID, path string) (dir string, git bool, err error) {
+	c, err := h.resolve(projectID, path)
+	return c.dir, c.git, err
+}
+
+// resolve resolves a request's checkout: path (absolute, symlinks resolved, under
 // home, an existing directory) or the project's main worktree, and whether to list it
 // with git. The project must be registered.
-func (h *Filesystem) checkout(projectID, path string) (dir string, git bool, err error) {
+func (h *Filesystem) resolve(projectID, path string) (resolvedCheckout, error) {
 	if projectID == "" {
-		return "", false, connect.NewError(connect.CodeInvalidArgument, errors.New("project_id is required"))
+		return resolvedCheckout{}, connect.NewError(connect.CodeInvalidArgument, errors.New("project_id is required"))
 	}
 	r, ok := h.projects.Snapshot().Project(projectID)
 	if !ok {
-		return "", false, connect.NewError(connect.CodeNotFound, fmt.Errorf("project %s not found", projectID))
+		return resolvedCheckout{}, connect.NewError(connect.CodeNotFound, fmt.Errorf("project %s not found", projectID))
 	}
-	dir = cmp.Or(path, r.Path)
+	dir := cmp.Or(path, r.Path)
 	if !filepath.IsAbs(dir) {
-		return "", false, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("path %q must be absolute", dir))
+		return resolvedCheckout{}, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("path %q must be absolute", dir))
 	}
 	real, err := filepath.EvalSymlinks(filepath.Clean(dir))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			if !fsx.Within(h.root, filepath.Clean(dir)) {
-				return "", false, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is outside your home directory", dir))
+				return resolvedCheckout{}, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is outside your home directory", dir))
 			}
-			return "", false, connect.NewError(connect.CodeNotFound, fmt.Errorf("checkout %s does not exist", dir))
+			return resolvedCheckout{}, connect.NewError(connect.CodeNotFound, fmt.Errorf("checkout %s does not exist", dir))
 		}
-		return "", false, connect.NewError(connect.CodeInternal, fmt.Errorf("checkout %s: %w", dir, err))
+		return resolvedCheckout{}, connect.NewError(connect.CodeInternal, fmt.Errorf("checkout %s: %w", dir, err))
 	}
 	if !fsx.Within(h.root, real) {
-		return "", false, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is outside your home directory", dir))
+		return resolvedCheckout{}, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is outside your home directory", dir))
 	}
 	if fi, err := os.Stat(real); err != nil || !fi.IsDir() {
-		return "", false, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is not a directory", dir))
+		return resolvedCheckout{}, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is not a directory", dir))
 	}
 	// A project without git has one checkout, its path; any other path is a worktree
 	// of a git repository (or, briefly, a project that just got .git).
-	git = r.Git
+	git := r.Git
 	if !git && path != "" && !strings.EqualFold(real, r.Path) {
 		_, statErr := os.Lstat(filepath.Join(real, ".git"))
 		git = statErr == nil
 	}
-	return real, git, nil
+	return resolvedCheckout{project: r, named: filepath.Clean(dir), dir: real, git: git}, nil
 }
 
 // ReadFile reads one file under home for the file viewer.

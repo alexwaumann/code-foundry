@@ -398,3 +398,105 @@ func TestFileIndexConcurrentCheckouts(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestFileIndexSearchSources(t *testing.T) {
+	app := gitRepo(t) // README.md, src/index.ts, src/components/Composer.tsx, ...
+	gh := realTemp(t)
+	for _, p := range []string{"README.md", "src/tree.zig", "src/components/x.zig"} {
+		mkdir(t, filepath.Dir(filepath.Join(gh, p)))
+		write(t, filepath.Join(gh, p), "x")
+	}
+	appSrc := Source{Dir: app, Git: true, Name: "app"}
+	ghSrc := Source{Dir: gh, Name: "ghostty-playground"}
+	type hit struct {
+		src     int
+		path    string // "/" suffix for directories
+		pathPos []int
+		namePos []int
+	}
+	tests := []struct {
+		name      string
+		sources   []Source
+		query     string
+		filesOnly bool
+		limit     int
+		want      []hit
+		wantTrunc bool
+	}{
+		{"one list, ties to the first source", []Source{appSrc, ghSrc}, "readme", false, 0,
+			[]hit{{0, "README.md", []int{0, 1, 2, 3, 4, 5}, nil}, {1, "README.md", []int{0, 1, 2, 3, 4, 5}, nil}}, false},
+		{"the other order", []Source{ghSrc, appSrc}, "readme", false, 0,
+			[]hit{{0, "README.md", []int{0, 1, 2, 3, 4, 5}, nil}, {1, "README.md", []int{0, 1, 2, 3, 4, 5}, nil}}, false},
+		{"directories and files", []Source{appSrc, ghSrc}, "components", false, 0,
+			// Composer.tsx's ".tsx" puts "ts" on a boundary, so it outscores x.zig.
+			[]hit{{0, "src/components/", nil, nil}, {1, "src/components/", nil, nil}, {0, "src/components/Composer.tsx", nil, nil},
+				{1, "src/components/x.zig", nil, nil}}, false},
+		{"files only", []Source{appSrc, ghSrc}, "components", true, 0,
+			[]hit{{0, "src/components/Composer.tsx", nil, nil}, {1, "src/components/x.zig", nil, nil}}, false},
+		{"files only, empty query", []Source{ghSrc}, "", true, 0,
+			[]hit{{0, "README.md", nil, nil}, {0, "src/tree.zig", nil, nil}, {0, "src/components/x.zig", nil, nil}}, false},
+		{"a project word", []Source{appSrc, ghSrc}, "ghostty tree", true, 0,
+			[]hit{{1, "src/tree.zig", []int{4, 5, 6, 7}, []int{0, 1, 2, 3, 4, 5, 6}}}, false},
+		{"the limit spans sources", []Source{appSrc, ghSrc}, "readme", false, 1,
+			[]hit{{0, "README.md", nil, nil}}, true},
+	}
+	x := NewFileIndex(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms, truncated, err := x.SearchSources(context.Background(), tt.sources, tt.query, tt.limit, tt.filesOnly)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []hit
+			for i, m := range ms {
+				p := m.Path
+				if m.IsDir {
+					p += "/"
+				}
+				got = append(got, hit{m.Source, p, nil, nil})
+				if i < len(tt.want) && tt.want[i].pathPos != nil {
+					if !slices.Equal(m.PathPositions, tt.want[i].pathPos) || !slices.Equal(m.NamePositions, tt.want[i].namePos) {
+						t.Fatalf("%q: positions %v / %v, want %v / %v", p, m.PathPositions, m.NamePositions, tt.want[i].pathPos, tt.want[i].namePos)
+					}
+				}
+			}
+			if !slices.EqualFunc(got, tt.want, func(a, b hit) bool { return a.src == b.src && a.path == b.path }) {
+				t.Fatalf("SearchSources(%q) = %v, want %v", tt.query, got, tt.want)
+			}
+			if truncated != tt.wantTrunc {
+				t.Fatalf("truncated = %v, want %v", truncated, tt.wantTrunc)
+			}
+		})
+	}
+}
+
+// The sources are listed at the same time, not one after another, and one failing
+// listing fails the search.
+func TestFileIndexSearchSourcesListsConcurrently(t *testing.T) {
+	x := NewFileIndex(nil)
+	var started sync.WaitGroup
+	started.Add(2)
+	x.list = func(_ context.Context, dir string, _ bool) ([]FileEntry, error) {
+		started.Done()
+		started.Wait() // both listings must be running for either to finish
+		if dir == "/bad" {
+			return nil, errors.New("boom")
+		}
+		return []FileEntry{{Path: "a.go"}}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, _, err := x.SearchSources(ctx, []Source{{Dir: "/a"}, {Dir: "/bad"}}, "", 0, false)
+	if err == nil || err.Error() != "list /bad: boom" {
+		t.Fatalf("err = %v, want list /bad: boom", err)
+	}
+	// The good source's list is cached; the bad one is listed again.
+	x.list = func(context.Context, string, bool) ([]FileEntry, error) { return []FileEntry{{Path: "b.go"}}, nil }
+	ms, _, err := x.SearchSources(ctx, []Source{{Dir: "/a"}, {Dir: "/bad"}}, "", 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ms) != 2 || ms[0].Path != "a.go" || ms[1].Path != "b.go" {
+		t.Fatalf("matches = %+v", ms)
+	}
+}

@@ -124,8 +124,9 @@
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
  *   POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
- *                                                 none; reset restores DEFAULT_FILES)
- *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project> <query>")
+ *                                                 none; reset restores DEFAULT_FILES; several
+ *                                                 projects: project=a&path=x&project=b&path=y)
+ *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project,…> <query>")
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
  *   FilesystemService.ReadFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
@@ -443,7 +444,7 @@ function routes(router: ConnectRouter): void {
       return listDirectories(req.prefix, registered);
     },
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
-    searchFiles: (req) => searchFilesSlow(world.projects, req.projectId, req.path, req.query, req.limit),
+    searchFiles: (req) => searchFilesSlow(world.projects, req),
     readFile: (req) => mockFiles.readFile(req.baseDir, req.path, req.maxBytes),
     previewFile: (req) => mockFiles.previewFile(req.baseDir, req.path),
   });
@@ -1650,13 +1651,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/files": {
-      const projectId = q.get("project") ?? "";
-      if (!world.projects.has(projectId)) {
-        json(res, 404, { error: `unknown project ${projectId}` });
+      // Each project= starts a group; the path= after it are that project's files.
+      const groups: { project: string; files: string[] }[] = [];
+      for (const [k, v] of q) {
+        if (k === "project") groups.push({ project: v, files: [] });
+        else if (k === "path") groups.at(-1)?.files.push(v);
+      }
+      const unknown = groups.find((g) => !world.projects.has(g.project)) ?? (groups.length === 0 ? { project: "" } : undefined);
+      if (unknown) {
+        json(res, 404, { error: `unknown project ${unknown.project}` });
         break;
       }
-      setMockFiles(projectId, q.getAll("path"));
-      json(res, 200, { project: projectId, files: q.getAll("path") });
+      for (const g of groups) setMockFiles(g.project, g.files);
+      json(res, 200, groups.length === 1 ? groups[0] : { projects: groups });
       break;
     }
     case "POST /__mock/files/search":

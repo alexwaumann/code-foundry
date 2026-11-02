@@ -159,17 +159,23 @@ export function folderInfo(abs: string): { path: string; isRepo: boolean; childR
   return { path: abs, isRepo: false, childRepos };
 }
 
-// ---- composer completion: ListSkills and SearchFiles -------------------------------------
+// ---- composer completion and the file finder: ListSkills and SearchFiles ---------------
 //
 // Every project has the same small file list unless a test sets its own
-// (POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts; no path: an empty project), and
+// (POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts, or several projects at once:
+// ?project=repo-cf&path=a.ts&project=repo-gh&path=b.zig; no path: an empty project), and
 // the project skills `review` and `deploy`; the user has `commit`. Ranking mirrors
 // internal/fuzzy: exact base name > base name prefix > base name subsequence > path
-// subsequence, then shorter path, then path; an empty query lists the shallowest first.
+// subsequence per query word, then the weakest word's tier, the tier sum and the bonus sum
+// (fuzzy.ScoreWords), then shorter path, then path, then source order; an empty query lists
+// the shallowest first. Several sources are ranked in one list and leading or trailing query
+// words may match a project's name (fuzzy.Splits); positions are code-point indices, like
+// the daemon's.
 
-/** A project the completion RPCs can see: its id and main worktree (world.ts MockProject). */
+/** A project the completion RPCs can see: its id, name and main worktree (world.ts MockProject). */
 export interface CompletionProject {
   id: string;
+  name: string;
   path: string;
 }
 
@@ -262,48 +268,255 @@ function withParentDirs(files: readonly string[]): { path: string; isDir: boolea
   return [...dirs.map((path) => ({ path, isDir: true })), ...files.map((path) => ({ path, isDir: false }))];
 }
 
-function isSubsequence(s: string, q: string): boolean {
-  let j = 0;
-  for (let i = 0; i < s.length && j < q.length; i++) if (s[i] === q[j]) j++;
-  return j === q.length;
+/** One checkout of a SearchFiles request. */
+export interface SearchSource {
+  projectId: string;
+  path: string;
 }
 
-/** 4 exact base name, 3 base prefix, 2 base subsequence, 1 path subsequence, 0 none. */
-export function fileTier(path: string, query: string): number {
-  if (query === "") return 1;
-  const p = path.toLowerCase();
-  const q = query.toLowerCase();
-  const base = p.slice(p.lastIndexOf("/") + 1);
-  if (base === q) return 4;
-  if (base.startsWith(q)) return 3;
-  if (isSubsequence(base, q)) return 2;
-  return isSubsequence(p, q) ? 1 : 0;
+/** The SearchFiles request fields the mock reads (SearchFilesRequest). */
+export interface SearchRequest {
+  projectId: string;
+  path: string;
+  query: string;
+  limit: number;
+  sources: readonly SearchSource[];
+  filesOnly: boolean;
+}
+
+const MAX_SOURCES = 16;
+/** internal/fuzzy MaxWords: a query of more words is InvalidArgument. */
+const MAX_WORDS = 8;
+const BOUNDARY_BONUS = 4;
+const NONE = -(2 ** 30);
+
+/**
+ * Code points, each lower-cased on its own so indices stay those of the original (Go's
+ * unicode.ToLower). JavaScript lowers "İ" to "i" plus a combining dot; Go to "i", the first.
+ */
+function lowerRunes(s: string): string[] {
+  return Array.from(s, (c) => Array.from(c.toLowerCase())[0] ?? c);
+}
+
+function isBoundary(c: string | undefined): boolean {
+  return c === "/" || c === "." || c === "-" || c === "_" || c === " ";
+}
+
+/**
+ * The best-bonus alignment of q in s (internal/fuzzy align): BOUNDARY_BONUS per character at
+ * the start or after a separator, 1 per character right after the previous one. Undefined
+ * when q is not a subsequence of s.
+ */
+function align(s: readonly string[], q: readonly string[]): { bonus: number; pos: number[] } | undefined {
+  const n = s.length;
+  const m = q.length;
+  if (m === 0) return { bonus: 0, pos: [] };
+  const bonusAt = (i: number) => (i === 0 || isBoundary(s[i - 1]) ? BOUNDARY_BONUS : 0);
+  const table: number[][] = [];
+  const best = new Array<number>(m).fill(NONE);
+  let at = new Array<number>(m).fill(NONE);
+  for (let i = 0; i < n; i++) {
+    const next = new Array<number>(m).fill(NONE);
+    for (let j = 0; j < m; j++) {
+      if (s[i] !== q[j]) continue;
+      if (j === 0) next[j] = bonusAt(i);
+      else if ((best[j - 1] ?? NONE) !== NONE) next[j] = bonusAt(i) + Math.max(best[j - 1] ?? NONE, (at[j - 1] ?? NONE) + 1);
+    }
+    for (let j = 0; j < m; j++) best[j] = Math.max(best[j] ?? NONE, next[j] ?? NONE);
+    table.push(next);
+    at = next;
+  }
+  const top = best[m - 1] ?? NONE;
+  if (top === NONE) return undefined;
+  const pos = new Array<number>(m).fill(0);
+  let i = table.findIndex((row) => row[m - 1] === top);
+  pos[m - 1] = i;
+  for (let j = m - 1; j > 0; j--) {
+    const want = (table[i]?.[j] ?? NONE) - bonusAt(i);
+    let k = i - 1;
+    for (; k >= 0; k--) {
+      let v = table[k]?.[j - 1] ?? NONE;
+      if (v === NONE) continue;
+      if (k === i - 1) v++;
+      if (v === want) break;
+    }
+    i = k;
+    pos[j - 1] = i;
+  }
+  return { bonus: top, pos };
+}
+
+/** Score and matched code-point positions of path against query (internal/fuzzy match); score 0: no match. */
+export function fileScore(path: string, query: string): { score: number; pos: number[] } {
+  if (query === "") return { score: 1, pos: [] };
+  const p = lowerRunes(path);
+  const q = lowerRunes(query);
+  const cut = p.lastIndexOf("/") + 1;
+  const base = p.slice(cut);
+  const tier = (t: number, bonus: number, pos: number[]) => ({ score: t * 2 ** 20 + Math.min(bonus, 2 ** 20 - 1), pos });
+  if (base.join("") === q.join("")) return tier(4, 0, q.map((_, i) => cut + i));
+  if (base.join("").startsWith(q.join(""))) return tier(3, 0, q.map((_, i) => cut + i));
+  const inBase = align(base, q);
+  if (inBase) return tier(2, inBase.bonus, inBase.pos.map((i) => cut + i));
+  const inPath = align(p, q);
+  if (inPath) return tier(1, inPath.bonus, inPath.pos);
+  return { score: 0, pos: [] };
+}
+
+/**
+ * Go's unicode.IsSpace, which strings.Fields splits at. JavaScript's \s differs: it has
+ * U+FEFF and lacks U+0085.
+ */
+const SPACE = /[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/;
+
+/** internal/fuzzy Words: the query's words, split at whitespace. */
+export function queryWords(query: string): string[] {
+  return query.split(SPACE).filter((w) => w !== "");
+}
+
+/**
+ * internal/fuzzy combine: zero when a word's score is zero, else the weakest tier, then the
+ * tier sum, then the bonus sum, packed below 2^53 so a number holds it exactly.
+ */
+function combine(scores: Iterable<number>): number {
+  let n = 0;
+  let minTier = 4;
+  let tiers = 0;
+  let bonus = 0;
+  for (const s of scores) {
+    if (s === 0) return 0;
+    n++;
+    const tier = Math.floor(s / 2 ** 20);
+    minTier = Math.min(minTier, tier);
+    tiers += tier;
+    bonus += s % 2 ** 20;
+  }
+  if (n === 0) return 1;
+  return minTier * 2 ** 50 + Math.min(tiers, 2 ** 10 - 1) * 2 ** 40 + Math.min(bonus, 2 ** 40 - 1);
+}
+
+/** internal/fuzzy ScoreWords and PositionsWords: every word on its own, positions merged. */
+export function wordsScore(path: string, words: readonly string[]): { score: number; pos: number[] } {
+  const each = words.map((w) => fileScore(path, w));
+  const score = combine(each.map((e) => e.score));
+  return { score, pos: score === 0 ? [] : merge(each.map((e) => e.pos)) };
+}
+
+/** Ascending, without repeats. */
+function merge(lists: readonly number[][]): number[] {
+  return [...new Set(lists.flat())].sort((a, b) => a - b);
+}
+
+/** internal/fuzzy Split: words[lo:hi] on the path, the rest on the project name. */
+interface Split {
+  lo: number;
+  hi: number;
+}
+
+/** internal/fuzzy Splits: all words on the path, then leading/trailing runs of name words. */
+export function querySplits(words: readonly string[], name: string, multi: boolean): Split[] {
+  const n = words.length;
+  const out: Split[] = [{ lo: 0, hi: n }];
+  if (!multi || n < 2) return out;
+  const lname = lowerRunes(name);
+  const inName = (w: string) => align(lname, lowerRunes(w)) !== undefined;
+  let lead = true;
+  let trail = true;
+  for (let k = 1; k < n; k++) {
+    lead = lead && inName(words[k - 1] ?? "");
+    trail = trail && inName(words[n - k] ?? "");
+    if (lead) out.push({ lo: k, hi: n });
+    if (trail) out.push({ lo: 0, hi: n - k });
+    if (!lead && !trail) break;
+  }
+  return out;
 }
 
 /** searchFiles as the router serves it: logged, then after searchMode.delayMs, failing when searchMode.fail. */
-export async function searchFilesSlow(projects: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): Promise<SearchInit> {
+export async function searchFilesSlow(projects: ReadonlyMap<string, CompletionProject>, req: SearchRequest): Promise<SearchInit> {
   if (searchMode.delayMs > 0) await new Promise((r) => setTimeout(r, searchMode.delayMs));
   if (searchMode.fail) {
-    completionCalls.push(`search ${projectId} ${query}`);
+    completionCalls.push(`search ${(req.sources.length > 0 ? req.sources : [req]).map((s) => s.projectId).join(",")} ${req.query}`);
     throw new ConnectError("search failed", Code.Internal);
   }
-  return searchFiles(projects, projectId, path, query, limit);
+  return searchFiles(projects, req);
 }
 
-export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): SearchInit {
+// Go compares paths as bytes: UTF-8 length for "shorter", byte (code point) order after.
+// JavaScript's .length and < count UTF-16 units, which disagree for non-ASCII paths.
+const utf8 = new TextEncoder();
+const byteLen = (s: string) => utf8.encode(s).length;
+function cmpStr(a: string, b: string): number {
+  const x = utf8.encode(a);
+  const y = utf8.encode(b);
+  for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return (x[i] ?? 0) - (y[i] ?? 0);
+  return x.length - y.length;
+}
+
+export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, req: SearchRequest): SearchInit {
+  const { query, limit } = req;
   if (limit < 0) throw invalid(`limit ${String(limit)} is negative`);
-  const project = completionCheckout(projects, projectId, path);
-  completionCalls.push(`search ${project.id} ${query}`);
-  const q = query.trim();
+  let named: readonly SearchSource[] = req.sources;
+  if (named.length === 0) named = [{ projectId: req.projectId, path: req.path }];
+  else if (req.projectId !== "" || req.path !== "") throw invalid("set sources or project_id and path, not both");
+  else if (named.length > MAX_SOURCES) throw invalid(`${String(named.length)} sources, at most ${String(MAX_SOURCES)}`);
+  const words = queryWords(query);
+  if (words.length > MAX_WORDS) throw invalid(`query has ${String(words.length)} words, at most ${String(MAX_WORDS)}`);
+  const sources: { project: CompletionProject; checkout: string }[] = [];
+  for (const n of named) {
+    const project = completionCheckout(projects, n.projectId, n.path);
+    const checkout = n.path === "" ? project.path : clean(n.path);
+    if (!sources.some((s) => s.checkout === checkout)) sources.push({ project, checkout });
+  }
+  completionCalls.push(`search ${sources.map((s) => s.project.id).join(",")} ${query}`);
   const depth = (p: string) => p.split("/").length;
-  const ranked = withParentDirs(filesByProject.get(project.id) ?? DEFAULT_FILES)
-    .map((e) => ({ ...e, tier: fileTier(e.path, q) }))
-    .filter((e) => e.tier > 0)
-    .sort((a, b) =>
-      q === ""
-        ? depth(a.path) - depth(b.path) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
-        : b.tier - a.tier || a.path.length - b.path.length || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
-    );
+  const hits = sources.flatMap((src, si) => {
+    const splits = querySplits(words, src.project.name, sources.length > 1);
+    return withParentDirs(filesByProject.get(src.project.id) ?? DEFAULT_FILES)
+      .filter((e) => !req.filesOnly || !e.isDir)
+      .map((e) => {
+        const scores = new Map<number, number>();
+        const wordScore = (w: number) => {
+          let s = scores.get(w);
+          if (s === undefined) {
+            s = fileScore(e.path, words[w] ?? "").score;
+            scores.set(w, s);
+          }
+          return s;
+        };
+        let best = { score: 0, split: splits[0] ?? { lo: 0, hi: 0 } };
+        for (const sp of splits) {
+          const score = combine(
+            (function* () {
+              for (let w = sp.lo; w < sp.hi; w++) yield wordScore(w);
+            })(),
+          );
+          if (score > best.score) best = { score, split: sp };
+        }
+        return { ...e, si, src, ...best };
+      })
+      .filter((h) => h.score > 0);
+  });
+  hits.sort((a, b) =>
+    (words.length === 0
+      ? depth(a.path) - depth(b.path) || cmpStr(a.path, b.path)
+      : b.score - a.score || byteLen(a.path) - byteLen(b.path) || cmpStr(a.path, b.path)) || a.si - b.si,
+  );
   const n = Math.min(limit === 0 ? DEFAULT_FILE_LIMIT : limit, MAX_FILE_LIMIT);
-  return { matches: ranked.slice(0, n).map(({ path, isDir }) => ({ path, isDir })), truncated: ranked.length > n };
+  return {
+    matches: hits.slice(0, n).map((h) => {
+      const { lo, hi } = h.split;
+      const lname = lowerRunes(h.src.project.name);
+      const nameWords = [...words.slice(0, lo), ...words.slice(hi)];
+      return {
+        path: h.path,
+        isDir: h.isDir,
+        projectId: h.src.project.id,
+        checkout: h.src.checkout,
+        pathPositions: wordsScore(h.path, words.slice(lo, hi)).pos,
+        projectPositions: merge(nameWords.map((w) => align(lname, lowerRunes(w))?.pos ?? [])),
+      };
+    }),
+    truncated: hits.length > n,
+  };
 }
