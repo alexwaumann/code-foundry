@@ -82,10 +82,56 @@ func TestDecodeRetiredKeys(t *testing.T) {
 	}
 }
 
+// A moved setting's old key reads as the new one, and the next save writes only the
+// new key.
+func TestDecodeMovedKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want map[string]string
+	}{
+		{name: "threads.naming_model becomes models.utility", in: "[threads]\nauto_name = false\nnaming_model = \"claude-4.5-haiku[1m]\"\n",
+			want: map[string]string{"threads.auto_name": "false", KeyUtilityModel: "claude-4.5-haiku[1m]"}},
+		{name: "the new key wins over the old", in: "[threads]\nnaming_model = \"claude-4.5-haiku[1m]\"\n[models]\nutility = \"claude-haiku-5-5[1m]\"\n",
+			want: map[string]string{KeyUtilityModel: "claude-haiku-5-5[1m]"}},
+		{name: "the new key alone", in: "[models]\nutility = \"claude-haiku-5-5[1m]\"\n",
+			want: map[string]string{KeyUtilityModel: "claude-haiku-5-5[1m]"}},
+		{name: "an invalid old value moves and is reported under the new key", in: "[threads]\nnaming_model = \"gpt-5\"\n",
+			want: map[string]string{KeyUtilityModel: "gpt-5"}},
+		{name: "naming_model in another table does not move", in: "[gitops]\nnaming_model = \"x\"\n",
+			want: map[string]string{"gitops.naming_model": "x"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := decode([]byte(tt.in))
+			if err != nil || !maps.Equal(raw, tt.want) {
+				t.Fatalf("decode = %v, %v; want %v", raw, err, tt.want)
+			}
+			r := resolve(raw, testCmds)
+			for _, is := range r.issues {
+				if is.Key == "threads.naming_model" {
+					t.Errorf("old key reported: %+v", is)
+				}
+			}
+			if _, gone := tt.want["gitops.naming_model"]; gone {
+				return
+			}
+			keep, _ := r.fileValues(raw)
+			out := string(render(keep, r.issues))
+			if strings.Contains(out, "naming_model") {
+				t.Errorf("rendered file still has the old key:\n%s", out)
+			}
+			if v := tt.want[KeyUtilityModel]; !strings.Contains(out, "[models]") || !strings.Contains(out, "\nutility = \""+v+"\"\n") {
+				t.Errorf("rendered file lacks utility = %q under [models]:\n%s", v, out)
+			}
+		})
+	}
+}
+
 func TestRenderRoundTrip(t *testing.T) {
 	accepted := map[string]string{
 		KeyAutoName:                   "false",
-		KeyNamingModel:                "claude-4.5-haiku[1m]",
+		KeyUtilityModel:               "claude-4.5-haiku[1m]",
 		KeyFontSize:                   "15",
 		KeyFontFamily:                 `Weird "Font" \ Name`,
 		KeybindingKey("thread.new"):   "cmd+shift+n",
@@ -94,7 +140,7 @@ func TestRenderRoundTrip(t *testing.T) {
 	out := render(accepted, nil)
 	text := string(out)
 	for _, want := range []string{
-		"[threads]\n", "auto_name = false\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
+		"[threads]\n", "auto_name = false\n", "[models]\n", "utility = \"claude-4.5-haiku[1m]\"\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
 		"# default_model = \"claude-sonnet-5[1m]\"\n", "# default_effort = \"medium\"\n", "# scrollback_lines = 10000\n", `"thread.new" = "cmd+shift+n"` + "\n",
 		"Applies after a daemon restart.",
 	} {

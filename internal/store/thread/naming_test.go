@@ -118,7 +118,7 @@ echo "API Error: 429 rate limited"; exit 1`,
 			bin, dir := fakeClaude(t, tt.body)
 			var logs bytes.Buffer
 			namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.NewTextHandler(&logs, nil)))
-			ctx := WithNamingModel(withNamingThread(context.Background(), "s123"), "claude-opus-4-8[1m]")
+			ctx := WithUtilityModel(withNamingThread(context.Background(), "s123"), "claude-opus-4-8[1m]")
 			for i := range 2 {
 				n, err := namer(ctx, NamingRequest{Message: "-fix the login bug"})
 				name := n.Title
@@ -191,8 +191,8 @@ func TestNamingArgs(t *testing.T) {
 	}{
 		{"hardened", "claude-opus-4-8[1m]", false, `-p --model claude-opus-4-8[1m] --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
 		{"minimal", "claude-opus-4-8[1m]", true, `-p --model claude-opus-4-8[1m] --effort low --no-session-persistence -- <prompt>`},
-		{"default model, hardened", model.NamingDefault, false, `-p --model claude-sonnet-4-6[1m] --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
-		{"default model, minimal", model.NamingDefault, true, `-p --model claude-sonnet-4-6[1m] --effort low --no-session-persistence -- <prompt>`},
+		{"default model, hardened", model.UtilityDefault, false, `-p --model claude-sonnet-4-6[1m] --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
+		{"default model, minimal", model.UtilityDefault, true, `-p --model claude-sonnet-4-6[1m] --effort low --no-session-persistence -- <prompt>`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -203,34 +203,34 @@ func TestNamingArgs(t *testing.T) {
 	}
 }
 
-func TestNamingModel(t *testing.T) {
+func TestUtilityModel(t *testing.T) {
 	tests := []struct {
 		name string
 		ctx  context.Context
 		want string
 	}{
 		{"unset", context.Background(), "claude-sonnet-4-6[1m]"},
-		{"empty", WithNamingModel(context.Background(), ""), "claude-sonnet-4-6[1m]"},
-		{"unknown", WithNamingModel(context.Background(), "gpt-5"), "claude-sonnet-4-6[1m]"},
-		{"retired alias", WithNamingModel(context.Background(), "haiku"), "claude-sonnet-4-6[1m]"},
-		{"set", WithNamingModel(context.Background(), "claude-4.5-haiku[1m]"), "claude-4.5-haiku[1m]"},
-		{"newest", WithNamingModel(context.Background(), "claude-haiku-5-5[1m]"), "claude-haiku-5-5[1m]"},
+		{"empty", WithUtilityModel(context.Background(), ""), "claude-sonnet-4-6[1m]"},
+		{"unknown", WithUtilityModel(context.Background(), "gpt-5"), "claude-sonnet-4-6[1m]"},
+		{"retired alias", WithUtilityModel(context.Background(), "haiku"), "claude-sonnet-4-6[1m]"},
+		{"set", WithUtilityModel(context.Background(), "claude-4.5-haiku[1m]"), "claude-4.5-haiku[1m]"},
+		{"newest", WithUtilityModel(context.Background(), "claude-haiku-5-5[1m]"), "claude-haiku-5-5[1m]"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NamingModel(tt.ctx); got != tt.want {
-				t.Errorf("NamingModel = %q, want %q", got, tt.want)
+			if got := UtilityModel(tt.ctx); got != tt.want {
+				t.Errorf("UtilityModel = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
 // TestClaudeNamerModel checks the model reaches the command per call: no
-// WithNamingModel names with the default, and a later call can pick another model.
+// WithUtilityModel names with the default, and a later call can pick another model.
 func TestClaudeNamerModel(t *testing.T) {
 	bin, dir := fakeClaude(t, `echo fix-login-bug`)
 	namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.DiscardHandler))
-	for _, ctx := range []context.Context{context.Background(), WithNamingModel(context.Background(), "claude-4.5-haiku[1m]")} {
+	for _, ctx := range []context.Context{context.Background(), WithUtilityModel(context.Background(), "claude-4.5-haiku[1m]")} {
 		if _, err := namer(ctx, NamingRequest{Message: "-fix the login bug"}); err != nil {
 			t.Fatal(err)
 		}

@@ -53,8 +53,8 @@ type Options struct {
 	// DefaultClaudePaths().
 	Paths ClaudePaths
 	// Namer names threads from their first user message. Default ClaudeNamer in
-	// /tmp, which names with model.NamingDefault unless the ctx carries
-	// WithNamingModel (the daemon's settingsNamer sets it per call).
+	// /tmp, which names with model.UtilityDefault unless the ctx carries
+	// WithUtilityModel (the daemon's settingsNamer sets it per call).
 	Namer Namer
 	// BranchNaming returns the branch naming settings, read at every new worktree or
 	// workspace (branchname.go). Default: DefaultBranchNaming.

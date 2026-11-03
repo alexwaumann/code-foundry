@@ -80,6 +80,7 @@ func decode(data []byte) (map[string]string, error) {
 		}
 		flatten(raw, group, tbl, group == GroupKeybindings)
 	}
+	renameMovedKeys(raw)
 	dropRetiredKeys(raw)
 	return raw, nil
 }
@@ -93,6 +94,29 @@ func decode(data []byte) (map[string]string, error) {
 var retiredKeys = []string{
 	GroupProjects + ".worktree_dir",
 	GroupThreads + ".show_created_threads",
+}
+
+// movedKeys are settings that took a new key: old key -> new key. A file that still sets
+// the old key reads as if it set the new one (unless it sets that too, which wins), and
+// the next save writes only the new key. threads.naming_model became models.utility when
+// the utility model became the model for all of the app's small jobs
+// (docs/notes/search-1-utility-model.md).
+var movedKeys = map[string]string{
+	GroupThreads + ".naming_model": KeyUtilityModel,
+}
+
+// renameMovedKeys moves raw's movedKeys to their new keys.
+func renameMovedKeys(raw map[string]string) {
+	for old, key := range movedKeys {
+		v, ok := raw[old]
+		if !ok {
+			continue
+		}
+		delete(raw, old)
+		if _, set := raw[key]; !set {
+			raw[key] = v
+		}
+	}
 }
 
 // dropRetiredKeys deletes raw's retiredKeys.

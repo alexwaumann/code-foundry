@@ -11,7 +11,7 @@ import (
 const RegeneratedName = "Regenerated name"
 
 // RegenerateName records "RegenerateName <id>" and names the thread RegeneratedName as
-// the naming model would (AutoNamed, not provisional). A resident thread is refused.
+// the utility model would (AutoNamed, not provisional). A resident thread is refused.
 func (f *Fake) RegenerateName(_ context.Context, id string) (thread.Thread, error) {
 	return f.mutate("RegenerateName "+id, id, func(s *thread.Thread) error {
 		if s.Kind == thread.KindResident {

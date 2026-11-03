@@ -22,7 +22,7 @@ import (
 //
 //   - prefix: <prefix>/<slug> (a bare slug when the prefix is empty).
 //   - semantic: <type>/<slug>, the type one of BranchTypes (anything else is chore).
-//   - custom: the naming model writes the whole branch from the user's instructions;
+//   - custom: the utility model writes the whole branch from the user's instructions;
 //     only whitespace is replaced and git check-ref-format checks the result.
 //
 // The slug comes from the namer's reply, which also carries the thread's title (one
@@ -58,7 +58,7 @@ type BranchNaming struct {
 	Mode string
 	// Prefix is prefix mode's first component, without a slash; "" gives a bare slug.
 	Prefix string
-	// Instructions are custom mode's, handed to the naming model verbatim.
+	// Instructions are custom mode's, handed to the utility model verbatim.
 	Instructions string
 }
 

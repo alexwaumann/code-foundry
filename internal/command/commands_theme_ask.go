@@ -40,7 +40,7 @@ const MaxThemeAskBytes = 4 << 10
 // system_prompt_append): where the user asked, the current slots, what to do and, for a
 // pair, which theme to pair and the free id to save it as. It stays out of the first
 // message, which is the user's words alone, so the bubble and the provisional name (the
-// first line, until the naming model names the thread) are theirs.
+// first line, until the utility model names the thread) are theirs.
 func ThemeAskContext(onPage bool, dark, light theme.Theme, pair *theme.File, pairID string) string {
 	where := "The user wants a colour theme for Code Foundry"
 	if onPage {

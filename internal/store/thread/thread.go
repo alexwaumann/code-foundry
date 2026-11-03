@@ -589,7 +589,7 @@ type Store interface {
 	Get(ctx context.Context, id string) (Thread, error)
 	// Rename sets a user-chosen name and disables auto-naming.
 	Rename(ctx context.Context, id, name string) (Thread, error)
-	// RegenerateName names the thread again with the naming model from its most recent
+	// RegenerateName names the thread again with the utility model from its most recent
 	// turns, replacing any name, and returns it renamed (regenerate.go). It ignores
 	// threads.auto_name. ErrFailedPrecondition for a resident thread, one with no user
 	// message, or one already being renamed.

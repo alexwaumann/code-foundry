@@ -386,7 +386,7 @@ func TestMoveWithoutConversation(t *testing.T) {
 	e.waitItems(s.ID, "the move note", hasNote("Moved this thread to repo (new worktree on cf/"+s.ID+")."))
 }
 
-// A failing naming model keeps the name and falls back to cf/<id>; the move goes on.
+// A failing utility model keeps the name and falls back to cf/<id>; the move goes on.
 func TestMoveNamingFails(t *testing.T) {
 	e, n := newMoveEnv(t, "text-table")
 	n.err = errors.New("model unavailable")

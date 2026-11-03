@@ -307,7 +307,7 @@ func (m *Manager) placeMove(ctx context.Context, id string, o MoveOptions, place
 	return job, nil
 }
 
-// moveNaming asks the naming model for the thread's title from its conversation and,
+// moveNaming asks the utility model for the thread's title from its conversation and,
 // with bc, the new branch's name in the projects.branch_naming mode, waiting at most
 // Options.SlugTimeout (as a new worktree's naming does). It is an explicit naming call
 // (threads.auto_name does not turn it off) and it never fails the move: without a

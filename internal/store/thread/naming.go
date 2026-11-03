@@ -130,23 +130,23 @@ func namingThread(ctx context.Context) string {
 	return id
 }
 
-// namingModelKey carries the naming model into the namer.
-type namingModelKey struct{}
+// utilityModelKey carries the utility model into the namer.
+type utilityModelKey struct{}
 
-// WithNamingModel returns ctx asking ClaudeNamer to name with model m (a model
-// registry value). The daemon sets it per call from threads.naming_model, so the setting
+// WithUtilityModel returns ctx asking ClaudeNamer to name with model m (a model
+// registry value). The daemon sets it per call from models.utility, so the setting
 // applies without a restart.
-func WithNamingModel(ctx context.Context, m string) context.Context {
-	return context.WithValue(ctx, namingModelKey{}, m)
+func WithUtilityModel(ctx context.Context, m string) context.Context {
+	return context.WithValue(ctx, utilityModelKey{}, m)
 }
 
-// NamingModel returns the model ClaudeNamer uses for a call with ctx: the
-// WithNamingModel value when the model registry lists it, else model.NamingDefault.
-func NamingModel(ctx context.Context) string {
-	if m, _ := ctx.Value(namingModelKey{}).(string); model.Known(m) {
+// UtilityModel returns the model ClaudeNamer uses for a call with ctx: the
+// WithUtilityModel value when the model registry lists it, else model.UtilityDefault.
+func UtilityModel(ctx context.Context) string {
+	if m, _ := ctx.Value(utilityModelKey{}).(string); model.Known(m) {
 		return m
 	}
-	return model.NamingDefault
+	return model.UtilityDefault
 }
 
 // namingPrompt asks for a title; the request (the first message) follows it.
@@ -231,8 +231,8 @@ func buildNamingPrompt(req NamingRequest) string {
 //	claude -p --model <model> --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>
 //
 // run in cwd (/tmp) so it never touches a project; see namingArgs for why each flag
-// is there. The model is NamingModel(ctx), read per call (model.NamingDefault unless
-// the caller set one with WithNamingModel); the effort is always low. When Claude
+// is there. The model is UtilityModel(ctx), read per call (model.UtilityDefault unless
+// the caller set one with WithUtilityModel); the effort is always low. When Claude
 // refuses one of the hardened flags (isFlagRefused: an organization's managed
 // settings, or an unknown option) the call is retried once as
 //
@@ -249,7 +249,7 @@ func ClaudeNamer(claude, cwd string, log *slog.Logger) Namer {
 	return func(ctx context.Context, req NamingRequest) (Naming, error) {
 		prompt := buildNamingPrompt(req)
 		thread := namingThread(ctx)
-		m := NamingModel(ctx)
+		m := UtilityModel(ctx)
 		args := namingArgs(m, minimal.Load())
 		out, err := runNaming(ctx, log, thread, claude, cwd, args, prompt)
 		if err != nil && !minimal.Load() && isFlagRefused(err) {
