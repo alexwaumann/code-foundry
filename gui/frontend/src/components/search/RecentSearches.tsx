@@ -3,7 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Loader2, SearchIcon, Sparkle, X } from "lucide-react";
 import type { SearchEntryView } from "@/api/search";
 import { Tip } from "@/components/ui/tooltip";
-import { recentMeta } from "@/lib/agentSearch";
+import { recentMeta, resultsWord, type UnseenCue } from "@/lib/agentSearch";
 import { cn } from "@/lib/utils";
 import { AnswerText, HitRow, SectionHeading, SummaryLine } from "./AgentParts";
 
@@ -141,6 +141,42 @@ export function RecentPreview({ entry }: { entry: SearchEntryView }) {
           <HitRow key={h.n} hit={h} selected={false} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A restored dialog's cue for a finished agent search it has not shown (unseen): "Finished:
+ * <query> · 3 results", with "+N more" when there are several (the newest is named). A
+ * click shows it, which marks it seen; the restored search stays until then.
+ */
+export function UnseenCueRow({ cue, onPick }: { cue: UnseenCue; onPick: (e: SearchEntryView) => void }) {
+  return (
+    <div className="px-2 pt-2">
+      <Tip label={cue.entry.query} whenTruncated maxLines={4}>
+        <button
+          type="button"
+          className="flex w-full items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-left text-body-sm text-cf-text outline-none hover:bg-cf-control-hover focus-visible:ring-2 focus-visible:ring-cf-focus/50"
+          onMouseDown={(e) => {
+            e.preventDefault();
+          }}
+          onClick={() => {
+            onPick(cue.entry);
+          }}
+          data-testid="search-unseen-cue"
+          data-id={cue.entry.id}
+        >
+          <Sparkle className="size-3.5 shrink-0 text-cf-icon-muted" aria-hidden />
+          <span className="shrink-0 text-cf-text-muted">Finished:</span>
+          <span className="min-w-0 truncate">{cue.entry.query}</span>
+          <span className="shrink-0 text-cf-text-muted">· {resultsWord(cue.entry)}</span>
+          {cue.more > 0 && (
+            <span className="ml-auto shrink-0 pl-2 text-caption text-cf-text-muted" data-testid="search-unseen-more">
+              +{cue.more} more
+            </span>
+          )}
+        </button>
+      </Tip>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import type { SearchEntryView } from "@/api/search";
 import type { ComposerDictation } from "@/components/compose/useComposerDictation";
-import type { SearchModeId, SearchSession } from "@/lib/agentSearch";
+import type { SearchModeId, SearchSession, UnseenCue } from "@/lib/agentSearch";
 import type { RecentApi } from "./RecentSearches";
 import type { WatchSearchFn } from "./useAgentSearch";
 import type { PreviewLoaders, SearchFn } from "./useSearch";
@@ -16,6 +16,8 @@ export interface RestoreInit {
 /** What the dialog shares with its modes (components/search/SearchDialog.tsx). */
 export interface SearchDialogApi {
   mode: SearchModeId;
+  /** How many modes the dialog has (the Tab hint shows only with more than one). */
+  modeCount: number;
   setMode: (m: SearchModeId) => void;
   query: string;
   setQuery: (q: string) => void;
@@ -35,6 +37,8 @@ export interface SearchDialogApi {
   /** What a reopen within RESTORE_MS restores (the mode reports its selection, opened hit and scroll). */
   report: (p: Partial<SearchSession>) => void;
   recent: RecentApi;
+  /** A restored dialog's finished searches it has not shown (the newest, and how many more); null for none. show() picks it. */
+  cue: UnseenCue | null;
   /** When the dialog opened (Recent searches' ages). */
   now: number;
   /** The Recent searches row selected (the first when none was picked). */

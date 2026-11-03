@@ -6,13 +6,13 @@ import { DictationMic } from "@/components/compose/DictationMic";
 import { useComposerDictation } from "@/components/compose/useComposerDictation";
 import { Segmented } from "@/components/usage/Segmented";
 import { chordFromEvent } from "@/keys/chord";
-import { restoreSelection, unseenToRestore, type SearchModeId, type SearchSession } from "@/lib/agentSearch";
+import { restoreSelection, unseenCue, unseenToRestore, type SearchModeId, type SearchSession } from "@/lib/agentSearch";
 import { phraseAtCaret } from "@/lib/dictation";
 import { imeKeyDown } from "@/lib/ime";
 import { clearSearches, forgetSearch, startAgent } from "@/stores/agentSearch";
 import { useCommandsStore } from "@/stores/commands";
 import { toggleDictation } from "@/stores/dictation";
-import { dropSearchSession, lastSearchMode, saveSearchSession, searchSessionAt, setSearchMode } from "@/stores/searchDialog";
+import { dropSearchSession, lastSearchMode, pendingSearchStart, saveSearchSession, searchSessionAt, setSearchMode, trackSearchStart } from "@/stores/searchDialog";
 import type { SearchDialogApi, SearchModeProps } from "./types";
 import { SEARCH_MODES, type SearchMode } from "./modes";
 import type { RecentApi } from "./RecentSearches";
@@ -79,11 +79,18 @@ function SearchHeader({
   );
 }
 
-/** What the dialog opens with: the session of a close within RESTORE_MS, else the last mode and an empty field. */
+/**
+ * What the dialog opens with: the session of a close within RESTORE_MS (and its question's
+ * start, when the dialog closed before StartAgent answered), else the last mode and an
+ * empty field.
+ */
 function openingState(now: number) {
   const s = searchSessionAt(now);
-  if (s) return { restored: true, mode: s.mode, query: s.query, entryId: s.entryId, restore: { selectedN: s.selectedN, openedN: s.openedN, scrollTop: s.scrollTop } };
-  return { restored: false, mode: lastSearchMode(), query: "", entryId: null, restore: null };
+  if (s) {
+    const pending = s.entryId === null ? pendingSearchStart(s.query.trim()) : null;
+    return { restored: true, mode: s.mode, query: s.query, entryId: s.entryId, restore: { selectedN: s.selectedN, openedN: s.openedN, scrollTop: s.scrollTop }, pending };
+  }
+  return { restored: false, mode: lastSearchMode(), query: "", entryId: null, restore: null, pending: null };
 }
 
 /**
@@ -109,7 +116,7 @@ export function SearchDialog({
   const [query, setQuery] = useState(init.query);
   const [shown, setShown] = useState<{ id: string; seed: SearchEntryView | null } | null>(init.entryId ? { id: init.entryId, seed: null } : null);
   const [restore, setRestore] = useState(init.restore);
-  const [starting, setStarting] = useState(false);
+  const [starting, setStarting] = useState(init.pending !== null);
   const [startError, setStartError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -156,15 +163,12 @@ export function SearchDialog({
     requestAnimationFrame(() => inputRef.current?.select());
   }, []);
 
-  const start = useCallback((question: string) => {
-    const q = question.trim();
-    if (q === "") return;
-    setModeId("agent");
-    setSearchMode("agent");
-    setStarting(true);
-    setStartError("");
-    startAgent(q).then(
+  // A start's answer: its search shown (and saved, should the dialog close before the
+  // effect that saves it runs; a close before the answer is the store's, trackSearchStart).
+  const awaitStart = useCallback((result: Promise<SearchEntryView>) => {
+    result.then(
       (e) => {
+        session.current = { ...session.current, entryId: e.id };
         setShown({ id: e.id, seed: e });
         setRestore(null);
         setStarting(false);
@@ -176,12 +180,34 @@ export function SearchDialog({
     );
   }, []);
 
-  // Recent searches: while the field is empty (both modes).
+  const start = useCallback(
+    (question: string) => {
+      const q = question.trim();
+      if (q === "") return;
+      setModeId("agent");
+      setSearchMode("agent");
+      setStarting(true);
+      setStartError("");
+      const result = startAgent(q);
+      trackSearchStart(q, result);
+      awaitStart(result);
+    },
+    [awaitStart],
+  );
+
+  // Reopened while the question it closed on was still starting: that start, not a second.
+  useEffect(() => {
+    if (init.pending) awaitStart(init.pending);
+  }, [init.pending, awaitStart]);
+
+  // Recent searches: while the field is empty (both modes); a restored dialog holds the
+  // list throughout, for the cue of finished searches it has not shown.
   const recentOn = query.trim() === "";
-  const list = useRecentSearches(recentOn, watchRecent);
+  const list = useRecentSearches(recentOn || init.restored, watchRecent);
   const [recentSel, setRecentSel] = useState<string | null>(null);
   const selectedRecent = list?.find((e) => e.id === recentSel) ?? list?.[0] ?? null;
-  // A finished search the dialog never showed: shown whatever the timer, once, unless the user typed first.
+  // A finished search the dialog never showed: shown whatever the timer, once, unless the
+  // user typed first. A restored dialog keeps what it restored and cues the unseen instead.
   const unseenChecked = useRef(init.restored);
   useEffect(() => {
     if (unseenChecked.current || !list) return;
@@ -203,6 +229,7 @@ export function SearchDialog({
     },
     [show, changeMode],
   );
+  const cue = init.restored && !recentOn ? unseenCue(list, shown?.id ?? null) : null;
   const recent: RecentApi = useMemo(
     () => ({
       list,
@@ -280,6 +307,7 @@ export function SearchDialog({
   const showMic = mode.id === "agent" || dictation.phase !== null;
   const api: SearchDialogApi = {
     mode: mode.id,
+    modeCount: modes.length,
     setMode: changeMode,
     query,
     setQuery: editQuery,
@@ -292,6 +320,7 @@ export function SearchDialog({
     restore,
     report,
     recent,
+    cue,
     now: openedAt,
     selectedRecent,
     dictation,

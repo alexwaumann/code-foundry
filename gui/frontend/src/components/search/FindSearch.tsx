@@ -7,7 +7,7 @@ import { imeKeyDown } from "@/lib/ime";
 import { findHitCount } from "@/lib/agentSearch";
 import { recordFind } from "@/stores/agentSearch";
 import { activateSearchRow } from "@/stores/threadSearch";
-import { RecentList, RecentPreview } from "./RecentSearches";
+import { RecentList, RecentPreview, UnseenCueRow } from "./RecentSearches";
 import { SearchList } from "./SearchList";
 import type { PreviewSubject } from "./preview";
 import { SearchPreview } from "./SearchPreview";
@@ -193,6 +193,7 @@ export function FindSearch({ query: raw, header, search, loaders, dialog }: Sear
       {header(caseBadge)}
       <div className="flex min-h-0 flex-1">
         <div className="flex w-[min(440px,45%)] shrink-0 flex-col border-r">
+          {dialog.cue && <UnseenCueRow cue={dialog.cue} onPick={dialog.show} />}
           {state.error && answered && (
             <p className="px-5 pt-3 text-caption text-cf-error-text" role="alert" data-testid="search-error">
               Cannot search: {state.error}
@@ -225,7 +226,7 @@ export function FindSearch({ query: raw, header, search, loaders, dialog }: Sear
           <div className="min-w-0 flex-1" data-testid="search-preview-none" />
         )}
       </div>
-      <Hints row={row} enter={query === "" ? (dialog.selectedRecent ? (dialog.selectedRecent.mode === "agent" ? "open saved results" : "search again") : "search") : answered && !hasRows && !state.error ? "try Agent search" : undefined} modes={dialog.mode === "find"} />
+      <Hints row={row} enter={query === "" ? (dialog.selectedRecent ? (dialog.selectedRecent.mode === "agent" ? "open saved results" : "search again") : "search") : answered && !hasRows && !state.error ? "try Agent search" : undefined} modes={dialog.modeCount > 1} />
     </div>
   );
 }

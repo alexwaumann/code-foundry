@@ -196,7 +196,7 @@ beforeEach(() => {
   resetDaemon();
   seedWorld();
   addThreads(thread("s-a", { name: "Poll checks by fingerprint" }), thread("s-b", { name: "gh granular events" }), thread("s-new", { name: "PR poller CI rerun refetch decision" }));
-  useSearchDialogStore.setState({ mode: "agent", session: null });
+  useSearchDialogStore.setState({ mode: "agent", session: null, pending: null });
   useCiteStore.setState({ flash: null, editing: null });
   watches.clear();
   startAgentSearch.mockReset();
@@ -409,7 +409,137 @@ describe("keys on results", () => {
   });
 });
 
+describe("Enter on a focused button", () => {
+  it("presses the button: no start, no hit opened, and the field's Enter still works", async () => {
+    await open();
+    await startShown(done({ steps: [{ index: 0, kind: "search", done: true, failed: false, text: "Searched a · 1 hit", query: "a", threadName: "" }] }));
+    const toggle = screen.getByTestId("agent-summary-toggle");
+    const marker = screen.getAllByTestId("agent-answer-ref")[0] as HTMLElement;
+    toggle.focus();
+    // Not prevented: the browser presses the focused button.
+    expect(fireEvent.keyDown(toggle, { key: "Enter" })).toBe(true);
+    marker.focus();
+    expect(fireEvent.keyDown(marker, { key: "Enter" })).toBe(true);
+    expect(fireEvent.keyDown(marker, { key: "Enter", metaKey: true })).toBe(true);
+    await settle(10);
+    expect(startAgentSearch).toHaveBeenCalledTimes(1);
+    expect(invocationsOf("search.promote")).toHaveLength(0);
+    expect(useUiStore.getState().palette.open).toBe(true);
+
+    // The empty state's Clear too.
+    await type("");
+    recent.push([done()]);
+    await settle(20);
+    const clear = screen.getByTestId("search-recent-clear");
+    clear.focus();
+    expect(fireEvent.keyDown(clear, { key: "Enter" })).toBe(true);
+    await settle(10);
+    expect(input().value).toBe("");
+    expect(startAgentSearch).toHaveBeenCalledTimes(1);
+
+    // The field's Enter is the dialog's.
+    await type("a new question");
+    startAgentSearch.mockResolvedValueOnce(entry({ id: "q-2", query: "a new question" }));
+    expect(fireEvent.keyDown(input(), { key: "Enter" })).toBe(false);
+    await settle(20);
+    expect(startAgentSearch).toHaveBeenLastCalledWith("a new question");
+  });
+});
+
 describe("restore and Recent searches", () => {
+  /** StartAgent held until the test answers it. */
+  function heldStart(): (e: SearchEntryView) => Promise<void> {
+    let answer: (e: SearchEntryView) => void = () => undefined;
+    startAgentSearch.mockReturnValueOnce(
+      new Promise((r) => {
+        answer = r;
+      }),
+    );
+    return async (e) => {
+      await act(async () => {
+        answer(e);
+        await Promise.resolve();
+      });
+      await settle(10);
+    };
+  }
+
+  it("closed while its search was starting: a reopen shows that search, and Enter does not ask again", async () => {
+    const answer = heldStart();
+    await open();
+    await type("where did we decide it?");
+    key("Enter");
+    await settle(10);
+    await close();
+    await answer(entry());
+    expect(useSearchDialogStore.getState().session?.entryId).toBe("q-1");
+
+    await open();
+    expect(input().value).toBe("where did we decide it?");
+    watchOf("q-1").push({ kind: "snapshot", version: 9, entry: done() });
+    await settle(20);
+    expect(hitRows()).toHaveLength(3);
+    key("Enter"); // the selected hit, not a second run
+    await settle(10);
+    expect(startAgentSearch).toHaveBeenCalledTimes(1);
+    expect(useUiStore.getState().palette.open).toBe(false);
+  });
+
+  it("reopened before the start answered: it waits for that start rather than asking again", async () => {
+    const answer = heldStart();
+    await open();
+    await type("where did we decide it?");
+    key("Enter");
+    await settle(10);
+    await close();
+    await open();
+    expect(screen.getByTestId("agent-hint").textContent).toBe("Starting…");
+    key("Enter");
+    await settle(10);
+    expect(startAgentSearch).toHaveBeenCalledTimes(1);
+    await answer(entry());
+    watchOf("q-1").push({ kind: "snapshot", version: 1, entry: entry() });
+    await settle(20);
+    expect(screen.getByTestId("agent-results").dataset.status).toBe("running");
+    await close();
+    expect(useSearchDialogStore.getState().session?.entryId).toBe("q-1");
+    expect(useSearchDialogStore.getState().pending).toBeNull();
+  });
+
+  it("restored: finished searches it has not shown are cued above it (the newest, +N more); the cue shows one and marks it seen", async () => {
+    const t0 = Date.now();
+    const now = vi.spyOn(Date, "now").mockReturnValue(t0);
+    await open();
+    await startShown(done());
+    await close();
+    now.mockReturnValue(t0 + 60_000);
+    await open();
+    recent.push([done({ id: "q-9", query: "what did we pin?", unseen: true, hits: [hit(1)] }), done({ id: "q-8", query: "the older one", unseen: true, status: "failed", hits: [] }), done()]);
+    await settle(20);
+    // The restored search stays.
+    expect(input().value).toBe("where did we decide it?");
+    let cue = screen.getByTestId("search-unseen-cue");
+    expect(cue.dataset.id).toBe("q-9");
+    expect(cue.textContent).toBe("Finished:what did we pin?· 1 result+1 more");
+    expect(invocationsOf("search.seen")).toHaveLength(0);
+
+    fireEvent.click(cue);
+    await settle(10);
+    expect(input().value).toBe("what did we pin?");
+    watchOf("q-9").push({ kind: "snapshot", version: 9, entry: done({ id: "q-9", query: "what did we pin?", unseen: true, hits: [hit(1)] }) });
+    await settle(20);
+    expect(hitRows()).toHaveLength(1);
+    expect(invocationsOf("search.seen").map((i) => i.args)).toEqual([{ id: "q-9" }]);
+    // The next one is cued, alone.
+    cue = screen.getByTestId("search-unseen-cue");
+    expect(cue.dataset.id).toBe("q-8");
+    expect(cue.textContent).toBe("Finished:the older one· failed");
+    recent.push([done({ id: "q-9", query: "what did we pin?", hits: [hit(1)] }), done({ id: "q-8", query: "the older one", status: "failed", hits: [] }), done()]);
+    await settle(20);
+    expect(screen.queryByTestId("search-unseen-cue")).toBeNull();
+  });
+
+
   it("reopened within 3 minutes: mode, query selected, results, and the next unopened hit after the one opened; after, empty with Recent", async () => {
     const t0 = Date.now();
     const now = vi.spyOn(Date, "now").mockReturnValue(t0);

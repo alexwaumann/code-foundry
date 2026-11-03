@@ -9,7 +9,7 @@ import { markSearchSeen, openAgentHit, promoteAgent, stopAgent } from "@/stores/
 import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { AnswerText, HitRow, SectionHeading, StepList, SummaryLine } from "./AgentParts";
 import { paintQuote, type PreviewSubject } from "./preview";
-import { RecentList, RecentPreview } from "./RecentSearches";
+import { RecentList, RecentPreview, UnseenCueRow } from "./RecentSearches";
 import { SearchPreview } from "./SearchPreview";
 import type { RestoreInit, SearchModeProps } from "./types";
 import { useSearchWatch } from "./useAgentSearch";
@@ -214,13 +214,17 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
       dialog.setQuery("");
       return;
     }
-    if (e.key !== "Enter") return;
-    e.preventDefault();
+    // Enter is the field's: on a focused button (×, Clear, a marker, the summary) it presses that.
+    if (e.key !== "Enter" || e.target !== dialog.inputRef.current) return;
     if (e.metaKey) {
-      if (entry && sameQuestion && searchEnded(entry)) void promoteAgent(entry);
+      if (entry && sameQuestion && searchEnded(entry)) {
+        e.preventDefault();
+        void promoteAgent(entry);
+      }
       return;
     }
     if (query === "" || dialog.starting) return;
+    e.preventDefault();
     if (!sameQuestion) {
       dialog.start(query);
       return;
@@ -284,7 +288,10 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown} data-testid="search-agent">
       {header(null)}
       <div className="flex min-h-0 flex-1">
-        <div className="flex w-[min(440px,45%)] shrink-0 flex-col border-r">{left}</div>
+        <div className="flex w-[min(440px,45%)] shrink-0 flex-col border-r">
+          {dialog.cue && <UnseenCueRow cue={dialog.cue} onPick={dialog.show} />}
+          {left}
+        </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {right}
           {resultsShown && running && (
@@ -323,7 +330,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
           <Hint k="⏎">{sameQuestion && searchEnded(entry) ? "search again" : "search"}</Hint>
         )}
         {canDictate && <Hint k="⌘⇧M">dictate</Hint>}
-        {running && sameQuestion ? <Hint k="esc">close · keeps running</Hint> : <Hint k="Tab">Find</Hint>}
+        {running && sameQuestion ? <Hint k="esc">close · keeps running</Hint> : dialog.modeCount > 1 && <Hint k="Tab">Find</Hint>}
         <span className="ml-auto" data-testid="search-model">
           {model}
         </span>

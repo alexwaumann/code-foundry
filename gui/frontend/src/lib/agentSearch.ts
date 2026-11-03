@@ -81,6 +81,19 @@ export function unseenToRestore(recent: readonly SearchEntryView[]): SearchEntry
   return recent.find((e) => e.mode === "agent" && e.unseen && searchEnded(e)) ?? null;
 }
 
+/** The cue a restored dialog shows for finished searches it has not shown (unseen): the newest, and how many more. */
+export interface UnseenCue {
+  entry: SearchEntryView;
+  more: number;
+}
+
+/** The unseen finished agent searches other than the one shown (`shownId`): the newest and the count of the rest; null for none. */
+export function unseenCue(recent: readonly SearchEntryView[] | null, shownId: string | null): UnseenCue | null {
+  const all = (recent ?? []).filter((e) => e.mode === "agent" && e.unseen && searchEnded(e) && e.id !== shownId);
+  const entry = all[0];
+  return entry ? { entry, more: all.length - 1 } : null;
+}
+
 /**
  * The hit selected on restore: the next unopened hit after the one opened (wrapping to the
  * first unopened one), else the opened one's next, else the first. Without an opened hit,
@@ -146,9 +159,13 @@ export function recentMeta(e: SearchEntryView, now: number): string {
   const age = relativeAge(e.createdAtMs, now);
   if (e.mode === "find") return e.findHits > 0 ? `${plural(e.findHits, "hit")} · ${age}` : age;
   if (e.status === "running") return `running · ${age}`;
+  return `${resultsWord(e)} · ${age}`;
+}
+
+/** An ended agent search's outcome in a word or two: "3 results", "failed", "stopped", "no results". */
+export function resultsWord(e: Pick<SearchEntryView, "status" | "hits">): string {
   const n = e.hits.length;
-  const what = n > 0 ? plural(n, "result") : e.status === "failed" ? "failed" : e.status === "stopped" ? "stopped" : "no results";
-  return `${what} · ${age}`;
+  return n > 0 ? plural(n, "result") : e.status === "failed" ? "failed" : e.status === "stopped" ? "stopped" : "no results";
 }
 
 /** A Find result's count for the history: thread names and message hits. */

@@ -8,10 +8,12 @@ import {
   moveHit,
   recentMeta,
   reduceSearch,
+  resultsWord,
   RESTORE_MS,
   restoreSelection,
   sessionToRestore,
   summaryLine,
+  unseenCue,
   unseenToRestore,
   type SearchSession,
 } from "./agentSearch";
@@ -124,6 +126,14 @@ describe("the restore rules", () => {
     expect(unseenToRestore(list)?.id).toBe("q-new");
     expect(unseenToRestore([entry({ status: "done" })])).toBeNull();
   });
+
+  it("a restored dialog's cue: the newest unseen finished agent search other than the shown one, and how many more", () => {
+    const list = [entry({ id: "q-run", unseen: true, status: "running" }), entry({ id: "q-find", mode: "find", unseen: true, status: "done" }), entry({ id: "q-new", unseen: true, status: "failed" }), entry({ id: "q-seen", status: "done" }), entry({ id: "q-old", unseen: true, status: "done" })];
+    expect(unseenCue(list, null)).toMatchObject({ entry: { id: "q-new" }, more: 1 });
+    expect(unseenCue(list, "q-new")).toMatchObject({ entry: { id: "q-old" }, more: 0 });
+    expect(unseenCue(list.slice(0, 2), null)).toBeNull();
+    expect(unseenCue(null, null)).toBeNull();
+  });
 });
 
 describe("restoreSelection", () => {
@@ -153,6 +163,17 @@ describe("restoreSelection", () => {
 });
 
 describe("texts", () => {
+  it.each([
+    [{ status: "done", hits: [hit(1), hit(2)] }, "2 results"],
+    [{ status: "done", hits: [hit(1)] }, "1 result"],
+    [{ status: "done", hits: [] }, "no results"],
+    [{ status: "failed", hits: [] }, "failed"],
+    [{ status: "stopped", hits: [] }, "stopped"],
+    [{ status: "stopped", hits: [hit(1)] }, "1 result"],
+  ] as const)("resultsWord(%o) is %s", (e, want) => {
+    expect(resultsWord({ status: e.status, hits: [...e.hits] })).toBe(want);
+  });
+
   it("answerPieces: [n], [1][2] and [1, 2] become references; the rest stays text, markdown and all", () => {
     expect(answerPieces("Kept **check-count** [1]. Again in [2][3], see [1, 4].")).toEqual([
       { kind: "text", text: "Kept **check-count** " },
