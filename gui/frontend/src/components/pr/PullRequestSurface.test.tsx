@@ -715,6 +715,20 @@ describe("the readiness box and the Overview", () => {
     }
   });
 
+  it("the Code tab keeps only the box's headline (the diff needs the height); Overview and Activity show it whole", async () => {
+    renderPrPanel();
+    await openPr(145);
+    fireEvent.click(byTestId("pr-tab-code"));
+    await settle();
+    expect(byTestId("pr-readiness").dataset.compact).toBe("true");
+    expect(byTestId("pr-ready-headline").textContent).toBe("Not ready to merge4 left");
+    expect(queryTestId("pr-ready-row")).toBeNull();
+    expect(queryTestId("pr-ready-footer")).toBeNull();
+    fireEvent.click(byTestId("pr-tab-activity"));
+    expect(byTestId("pr-readiness").dataset.compact).toBeUndefined();
+    expect(screen.getAllByTestId("pr-ready-row")).toHaveLength(5);
+  });
+
   it("a merged pull request's Overview has its labels but no reviewers row", async () => {
     renderPrPanel();
     await openPr(138);

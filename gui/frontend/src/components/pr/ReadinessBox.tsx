@@ -220,9 +220,10 @@ function CancelAutoMerge({ prRef }: { prRef: PrRef }) {
 /**
  * The readiness box under the header: a headline (ready, waiting, not ready · N left,
  * merged, …), a row per requirement, and the footer: Review ▾ at the left, Merge,
- * Auto-merge or Cancel auto-merge at the right. Built from readiness() (pure).
+ * Auto-merge or Cancel auto-merge at the right. Built from readiness() (pure). `compact`
+ * (the Code tab, whose diff needs the height) keeps the headline only.
  */
-export function ReadinessBox({ d, prRef, panelKey, tabKey, onReview }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; onReview: (v: Verdict) => void }) {
+export function ReadinessBox({ d, prRef, panelKey, tabKey, onReview, compact = false }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; onReview: (v: Verdict) => void; compact?: boolean }) {
   const viewer = useViewerLogin();
   const clock = useNow(30_000);
   const checksNow = useChecksClock(d.checks);
@@ -230,8 +231,8 @@ export function ReadinessBox({ d, prRef, panelKey, tabKey, onReview }: { d: Pull
   const HeadIcon = icons[r.headline.icon];
   const f = r.footer;
   return (
-    <section className="mx-4 mt-3 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised @max-[340px]:mx-3" data-testid="pr-readiness" aria-label="Merge readiness">
-      <div className="flex min-w-0 items-center gap-2 border-b border-cf-divider px-3 py-2" data-testid="pr-ready-headline" data-tone={r.headline.tone}>
+    <section className="mx-4 mt-3 shrink-0 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised @max-[340px]:mx-3" data-testid="pr-readiness" data-compact={compact || undefined} aria-label="Merge readiness">
+      <div className={cn("flex min-w-0 items-center gap-2 px-3 py-2", !compact && "border-b border-cf-divider")} data-testid="pr-ready-headline" data-tone={r.headline.tone}>
         <HeadIcon className={cn("size-3.5 shrink-0", tone(r.headline.tone))} aria-hidden />
         <span className="min-w-0 truncate text-body-sm font-medium text-cf-text">{r.headline.title}</span>
         {r.headline.meta && (
@@ -242,10 +243,9 @@ export function ReadinessBox({ d, prRef, panelKey, tabKey, onReview }: { d: Pull
           </Tip>
         )}
       </div>
-      {r.rows.map((row) => (
-        <Row key={row.id} row={row} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} now={row.id === "checks" ? checksNow : clock} />
-      ))}
-      {f && (f.review || f.merge) && (
+      {!compact &&
+        r.rows.map((row) => <Row key={row.id} row={row} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} now={row.id === "checks" ? checksNow : clock} />)}
+      {!compact && f && (f.review || f.merge) && (
         <div className="flex min-w-0 flex-wrap items-center gap-2 bg-cf-surface-sunken/60 px-3 py-2" data-testid="pr-ready-footer">
           {f.review && <ReviewButton prRef={prRef} detail={d} onChoose={onReview} primary={f.reviewPrimary} />}
           <span className="ml-auto flex min-w-0 items-center">

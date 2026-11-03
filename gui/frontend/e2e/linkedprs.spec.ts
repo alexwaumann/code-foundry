@@ -52,7 +52,7 @@ test("the sidebar tag opens its pull requests as tabs in the thread's panel, the
   await row(page, "s:s-2").getByTestId("row-linked-prs").click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
   await expect(page.getByTestId("pr-surface")).toBeVisible();
-  await expect(page.getByTestId("pr-repo-link")).toHaveText("alexwaumann/ghostty-playground#12");
+  await expect(page.getByTestId("pr-repo")).toHaveText("alexwaumann/ghostty-playground #12");
   await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveCount(2);
   await expect(card(page)).toHaveCount(0);
   // The row's own click did not run: the prompt does not take the keyboard.

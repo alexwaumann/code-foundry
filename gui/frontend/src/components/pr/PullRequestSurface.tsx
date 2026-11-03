@@ -195,7 +195,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
       ) : null}
       {d.lastError && !d.checksTruncated && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
-      <ReadinessBox d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} onReview={openComposer} />
+      <ReadinessBox d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} onReview={openComposer} compact={inner === "code"} />
       <InnerTabBar d={d} tabKey={tabKey} inner={inner} />
       {inner === "activity" ? (
         <PrTimeline d={d} tabKey={tabKey} />
