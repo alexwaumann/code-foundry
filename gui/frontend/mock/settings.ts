@@ -28,6 +28,7 @@ export const PATH = "/Users/dev/.code-foundry/settings.toml";
 
 export const groups: GroupInit[] = [
   { id: "threads", title: "Threads", description: "Defaults for new threads." },
+  { id: "models", title: "Models", description: "The models Code Foundry uses for its own jobs." },
   { id: "github", title: "GitHub", description: "Pull requests and checks, read with your gh login." },
   { id: "projects", title: "Projects", description: "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
@@ -200,14 +201,13 @@ const staticFields: FieldInit[] = [
   },
   { key: "threads.auto_name", group: "threads", page: "general", section: "threads", type: S.BOOL, title: "Name threads automatically", description: "Give each new thread a name based on its first message.", defaultValue: "true" },
   {
-    key: "threads.naming_model",
-    group: "threads",
+    key: "models.utility",
+    group: "models",
     page: "general",
     section: "textgen",
-    dependsOn: "threads.auto_name",
     type: S.ENUM,
-    title: "Naming model",
-    description: "Writes thread names. Always runs at low effort.",
+    title: "Utility model",
+    description: "The model Code Foundry uses for its own small jobs. Always runs at low effort.",
     enumValues: MODEL_VALUES,
     enumLabels: MODELS.map((m) => m.label),
     defaultValue: "claude-sonnet-4-6[1m]",
@@ -244,13 +244,13 @@ const staticFields: FieldInit[] = [
     type: S.ENUM,
     title: "Branch names",
     description:
-      "How a new worktree's branch is named. Type and slug: the naming model picks a type like feat or fix and a short slug. Prefix and slug: your branch prefix and a slug. Custom: the naming model follows your instructions. With automatic naming off, prefix mode uses the thread's name and the others use cf/<thread id>.",
+      "How a new worktree's branch is named. Type and slug: the utility model picks a type like feat or fix and a short slug. Prefix and slug: your branch prefix and a slug. Custom: the utility model follows your instructions. With automatic naming off, prefix mode uses the thread's name and the others use cf/<thread id>.",
     enumValues: ["semantic", "prefix", "custom"],
     enumLabels: ["Type and slug (feat/add-filter)", "Prefix and slug (cf/add-filter)", "Custom instructions"],
     defaultValue: "semantic",
   },
   { key: "projects.branch_prefix", group: "projects", page: "source", section: "projects", type: S.STRING, title: "Branch prefix", description: "For Prefix and slug: the part before the slash. none gives a bare slug.", defaultValue: "cf", placeholder: "cf" },
-  { key: "projects.branch_instructions", group: "projects", page: "source", section: "projects", type: S.STRING, title: "Branch instructions", description: "For Custom: how the naming model should write the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". Spaces become dashes; a name git refuses falls back to cf/<thread id>.", defaultValue: "", placeholder: "ab/<slug of 2 to 4 words>" },
+  { key: "projects.branch_instructions", group: "projects", page: "source", section: "projects", type: S.STRING, title: "Branch instructions", description: "For Custom: how the utility model should write the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". Spaces become dashes; a name git refuses falls back to cf/<thread id>.", defaultValue: "", placeholder: "ab/<slug of 2 to 4 words>" },
   { key: "projects.base_from_origin", group: "projects", page: "source", section: "projects", type: S.BOOL, title: "Branch from origin unless local is ahead", description: "Start a new worktree's branch from origin's copy of its base branch (the default branch when none is given), fetched first, unless the local branch is ahead of it or has diverged: then from the local branch. Off always starts from the local branch and never fetches. A remote branch, tag or commit given as the base is always used as is.", defaultValue: "true" },
   { key: "gitops.editor_command", group: "gitops", page: "source", section: "projects", type: S.STRING, title: "Editor command", description: "Command for Open in Editor, e.g. \"code\" or \"open -a Zed\". {path} stands for the worktree path; without it the path is appended. Empty picks an editor automatically.", defaultValue: "", placeholder: "auto-detect" },
   // General › Dictation (docs/notes/dictation-2-daemon.md); the rest of the section is DictationService's state.

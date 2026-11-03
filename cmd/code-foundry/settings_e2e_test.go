@@ -35,9 +35,9 @@ func TestCLISettings(t *testing.T) {
 	}{
 		{"get one", []string{"settings", "get", "appearance.font_size"}, nil, "13\n", ""},
 		{"get all", []string{"settings", "get"}, nil, `threads.auto_name = "true"`, ""},
-		{"naming model default", []string{"settings", "get", "threads.naming_model"}, nil, "claude-sonnet-4-6[1m]\n", ""},
-		{"set naming model", []string{"settings", "set", "threads.naming_model", "claude-4.5-haiku[1m]"}, nil, `threads.naming_model = "claude-4.5-haiku[1m]"`, ""},
-		{"invalid naming model", []string{"settings", "set", "threads.naming_model", "gpt-5"}, errAny, "", ""},
+		{"utility model default", []string{"settings", "get", "models.utility"}, nil, "claude-sonnet-4-6[1m]\n", ""},
+		{"set utility model", []string{"settings", "set", "models.utility", "claude-4.5-haiku[1m]"}, nil, `models.utility = "claude-4.5-haiku[1m]"`, ""},
+		{"invalid utility model", []string{"settings", "set", "models.utility", "gpt-5"}, errAny, "", ""},
 		{"set positional", []string{"settings", "set", "appearance.font_size", "15"}, nil, `appearance.font_size = "15"`, ""},
 		{"get after set", []string{"settings.get", "appearance.font_size"}, nil, "15\n", ""},
 		{"flags still work", []string{"settings", "set", "--key", "appearance.theme", "--value", "dark"}, nil, `appearance.theme = "dark"`, ""},

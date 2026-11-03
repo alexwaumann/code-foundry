@@ -49,10 +49,10 @@ const oneM = 1_000_000
 // Default is the model for new threads when the settings do not pick one.
 const Default = "claude-sonnet-5[1m]"
 
-// NamingDefault is the model of the claude -p call that names a new thread when the
-// settings (threads.naming_model) do not pick one. Sonnet 4.6: cheap and fast, and a
-// name is a few words.
-const NamingDefault = "claude-sonnet-4-6[1m]"
+// UtilityDefault is the model of Code Foundry's own small claude -p jobs (naming a
+// thread, naming a branch) when the settings (models.utility) do not pick one. Sonnet
+// 4.6: cheap and fast, and those jobs are a few words.
+const UtilityDefault = "claude-sonnet-4-6[1m]"
 
 // EmberDefault is the model of the resident agent Ember when the settings
 // (ember.model) do not pick one.

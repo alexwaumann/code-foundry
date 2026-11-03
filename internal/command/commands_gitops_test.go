@@ -3,6 +3,7 @@ package command_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -233,15 +234,19 @@ func TestGitOpsResults(t *testing.T) {
 	})
 }
 
-// The chords the 3c brief asked for, so a later edit does not drop them silently.
+// Default chords: fetch, pull and push have none (their chords were freed for thread
+// search; the palette and the CLI still run them), and the editor keeps its own.
 func TestGitOpsKeybindings(t *testing.T) {
 	reg, _ := newGitOpsRegistry(t)
-	for name, chord := range map[string]string{
-		"git.fetch": "cmd+shift+f", "git.pull": "cmd+shift+u", "git.push": "cmd+shift+k", "worktree.open.editor": "cmd+shift+o",
+	for name, want := range map[string][]string{
+		"git.fetch": nil, "git.pull": nil, "git.push": nil, "worktree.open.editor": {"cmd+shift+o"},
 	} {
-		c, _ := reg.Get(name)
-		if len(c.Keybindings) != 1 || c.Keybindings[0] != chord {
-			t.Errorf("%s keybindings = %v, want [%s]", name, c.Keybindings, chord)
+		c, ok := reg.Get(name)
+		if !ok {
+			t.Fatalf("%s not registered", name)
+		}
+		if !slices.Equal(c.Keybindings, want) {
+			t.Errorf("%s keybindings = %v, want %v", name, c.Keybindings, want)
 		}
 	}
 }

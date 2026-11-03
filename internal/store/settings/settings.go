@@ -27,6 +27,7 @@ const FileName = "settings.toml"
 // Settings is the typed view of the effective values.
 type Settings struct {
 	Threads    Threads
+	Models     Models
 	GitHub     GitHub
 	Projects   Projects
 	GitOps     GitOps
@@ -68,10 +69,16 @@ type Threads struct {
 	DefaultEffort     string // default "medium"
 	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer and by a thread move without a placement
 	AutoName          bool
-	NamingModel       string // default model.NamingDefault; the effort is always low
-	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600
+	CacheTTLSeconds   int // the API's prompt cache lifetime; default 3600
 	CloseGraceSeconds int
 	ScrollbackLines   int
+}
+
+// Models are the models Code Foundry runs for its own jobs.
+type Models struct {
+	// Utility runs the small claude -p jobs (naming a thread, naming a branch); default
+	// model.UtilityDefault, the effort always low.
+	Utility string
 }
 
 // GitHub configures the gh poller.
@@ -93,7 +100,7 @@ type Projects struct {
 	// BranchPrefix is prefix mode's first component; BranchPrefixNone for none
 	// (BranchPrefixValue reads it).
 	BranchPrefix string
-	// BranchInstructions are custom mode's instructions to the naming model.
+	// BranchInstructions are custom mode's instructions to the utility model.
 	BranchInstructions string
 	// BaseFromOrigin branches new worktrees from origin's copy of their base unless
 	// the local branch is ahead of it; off, from the local branch

@@ -59,20 +59,20 @@ const worktreeArg = { name: "worktree", type: ArgType.PATH, description: "Worktr
 
 const specs: Spec[] = [
   {
-    name: "git.fetch", title: "Git: Fetch", category: "Git", description: "Fetch from the remote and prune deleted branches", keybindings: ["cmd+shift+f"], kind: GitOpKind.FETCH, needsRemote: true,
+    name: "git.fetch", title: "Git: Fetch", category: "Git", description: "Fetch from the remote and prune deleted branches", keybindings: [], kind: GitOpKind.FETCH, needsRemote: true,
     label: (w) => `Fetch ${w?.branch ?? ""}`,
     ok: () => ({ summary: "fetched 2 updated refs", output: "$ git fetch --prune\nFrom github.com:alexwaumann/code-foundry\n   3c3c465..8d9e0f1  main       -> origin/main\n * [new branch]      feat/x     -> origin/feat/x\n" }),
     fail: () => ({ summary: "unable to access 'https://github.com/alexwaumann/code-foundry.git/': Could not resolve host: github.com", output: "$ git fetch --prune\nfatal: unable to access 'https://github.com/alexwaumann/code-foundry.git/': Could not resolve host: github.com\n(exit 128)\n" }),
   },
   {
-    name: "git.pull", title: "Git: Pull", category: "Git", description: "Pull the upstream branch (fast-forward only unless --rebase)", keybindings: ["cmd+shift+u"], kind: GitOpKind.PULL, needsRemote: true,
+    name: "git.pull", title: "Git: Pull", category: "Git", description: "Pull the upstream branch (fast-forward only unless --rebase)", keybindings: [], kind: GitOpKind.PULL, needsRemote: true,
     args: [{ name: "rebase", type: ArgType.BOOL, description: "Rebase instead of fast-forward" }],
     label: (w, a) => `Pull ${a.rebase === "true" ? "--rebase " : ""}${w?.branch ?? ""}`,
     ok: () => ({ summary: "fast-forwarded: 3 files changed, 12 insertions(+)", output: "$ git pull --ff-only\nUpdating 3c3c465..8d9e0f1\nFast-forward\n 3 files changed, 12 insertions(+)\n" }),
     fail: () => ({ summary: "Not possible to fast-forward, aborting.", output: "$ git pull --ff-only\nhint: Diverging branches can't be fast-forwarded, you need to either:\nhint:\nhint: \tgit merge --no-ff\nhint:\nhint: or:\nhint:\nhint: \tgit rebase\nfatal: Not possible to fast-forward, aborting.\n(exit 128)\n" }),
   },
   {
-    name: "git.push", title: "Git: Push", category: "Git", description: "Push the current branch (sets origin/<branch> as upstream if missing)", keybindings: ["cmd+shift+k"], kind: GitOpKind.PUSH, needsRemote: true,
+    name: "git.push", title: "Git: Push", category: "Git", description: "Push the current branch (sets origin/<branch> as upstream if missing)", keybindings: [], kind: GitOpKind.PUSH, needsRemote: true,
     args: [{ name: "force-with-lease", type: ArgType.BOOL, description: "Force, if the remote is where we last saw it" }],
     label: (w, a) => `${a["force-with-lease"] === "true" ? "Force-push" : "Push"} ${w?.branch ?? ""}`,
     ok: (w) => ({ summary: `pushed ${w?.branch ?? ""} to origin`, output: `$ git push\nTo github.com:alexwaumann/code-foundry.git\n   3c3c465..8d9e0f1  ${w?.branch ?? ""} -> ${w?.branch ?? ""}\n` }),

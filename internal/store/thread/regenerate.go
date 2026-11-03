@@ -10,7 +10,7 @@ import (
 
 // Regenerating a thread's name (docs/notes/regenerate-thread-name.md).
 //
-// RegenerateName asks the naming model for a title from the thread's most recent turns
+// RegenerateName asks the utility model for a title from the thread's most recent turns
 // (recentTurnsContext), so the name says what the thread is doing now rather than what
 // it was first asked. It is an explicit user action: it replaces any name, a hand-typed
 // one too, and runs whether or not threads.auto_name is on (WithExplicitNaming). The
@@ -82,7 +82,7 @@ func (m *Manager) RegenerateName(ctx context.Context, id string) (Thread, error)
 	start := time.Now()
 	n, err := m.regenerateCall(ctx, id, NamingRequest{Conversation: conv})
 	if err == nil && n.Title == "" {
-		err = fmt.Errorf("the naming model gave no title")
+		err = fmt.Errorf("the utility model gave no title")
 	}
 	var title string
 	if err == nil {

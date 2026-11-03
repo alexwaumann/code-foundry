@@ -115,6 +115,7 @@ const KeybindingNone = "none"
 // Group ids.
 const (
 	GroupThreads     = "threads"
+	GroupModels      = "models"
 	GroupGitHub      = "github"
 	GroupProjects    = "projects"
 	GroupGitOps      = "gitops"
@@ -182,6 +183,7 @@ var Pages = []Page{
 // Groups are the file's tables, in file order. The settings page follows Pages.
 var Groups = []Group{
 	{GroupThreads, "Threads", "Defaults for new threads."},
+	{GroupModels, "Models", "The models Code Foundry uses for its own jobs."},
 	{GroupGitHub, "GitHub", "Pull requests and checks, read with your gh login."},
 	{GroupProjects, "Projects", "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
@@ -201,7 +203,7 @@ const (
 	KeyDefaultEffort        = "threads.default_effort"
 	KeyDefaultWorktree      = "threads.default_worktree"
 	KeyAutoName             = "threads.auto_name"
-	KeyNamingModel          = "threads.naming_model"
+	KeyUtilityModel         = "models.utility"
 	KeyCacheTTL             = "threads.cache_ttl_seconds"
 	KeyCloseGrace           = "threads.close_grace_seconds"
 	KeyScrollback           = "threads.scrollback_lines"
@@ -370,10 +372,10 @@ var staticFields = []Field{
 	},
 	// General › Text generation.
 	{
-		Key: KeyNamingModel, Group: GroupThreads, Page: PageGeneral, Section: "textgen", DependsOn: KeyAutoName, Type: Enum, Title: "Naming model",
-		Description: "Writes thread names. Always runs at low effort.",
-		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.NamingDefault,
-		bind: func(s *Settings) any { return &s.Threads.NamingModel },
+		Key: KeyUtilityModel, Group: GroupModels, Page: PageGeneral, Section: "textgen", Type: Enum, Title: "Utility model",
+		Description: "The model Code Foundry uses for its own small jobs. Always runs at low effort.",
+		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.UtilityDefault,
+		bind: func(s *Settings) any { return &s.Models.Utility },
 	},
 	// General › Lifecycle.
 	{
@@ -538,8 +540,8 @@ var staticFields = []Field{
 		// Read by the thread store at every new worktree or workspace
 		// (internal/store/thread/branchname.go), live.
 		Key: KeyBranchNaming, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Enum, Title: "Branch names",
-		Description: "How a new worktree's branch is named. Type and slug: the naming model picks a type like feat or fix and a short slug. " +
-			"Prefix and slug: your branch prefix and a slug. Custom: the naming model follows your instructions. " +
+		Description: "How a new worktree's branch is named. Type and slug: the utility model picks a type like feat or fix and a short slug. " +
+			"Prefix and slug: your branch prefix and a slug. Custom: the utility model follows your instructions. " +
 			"With automatic naming off, prefix mode uses the thread's name and the others use cf/<thread id>.",
 		Enum:       []string{BranchNamingSemantic, BranchNamingPrefix, BranchNamingCustom},
 		EnumLabels: []string{"Type and slug (feat/add-filter)", "Prefix and slug (cf/add-filter)", "Custom instructions"},
@@ -554,7 +556,7 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyBranchInstructions, Group: GroupProjects, Page: PageSource, Section: "projects", Type: String, Title: "Branch instructions",
-		Description: "For Custom: how the naming model should write the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". " +
+		Description: "For Custom: how the utility model should write the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". " +
 			"Spaces become dashes; a name git refuses falls back to cf/<thread id>.",
 		Placeholder: "ab/<slug of 2 to 4 words>",
 		bind:        func(s *Settings) any { return &s.Projects.BranchInstructions },

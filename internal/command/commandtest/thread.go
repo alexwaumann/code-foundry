@@ -186,7 +186,7 @@ func (s *Thread) Rename(_ context.Context, r *connect.Request[v1.RenameThreadReq
 }
 
 // RegenerateName records the request and answers with the thread named
-// RegeneratedName, as the naming model would.
+// RegeneratedName, as the utility model would.
 func (s *Thread) RegenerateName(_ context.Context, r *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err

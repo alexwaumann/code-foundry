@@ -67,8 +67,8 @@ func TestSettingsService(t *testing.T) {
 	if f := byKey["threads.cache_ttl_seconds"]; f.GetUnit() != "s" || f.GetTitle() != "Prompt cache lifetime" {
 		t.Errorf("cache ttl field = %v", f)
 	}
-	if f := byKey["threads.naming_model"]; f.GetDependsOn() != "threads.auto_name" || f.GetSection() != "textgen" {
-		t.Errorf("naming model field = %v", f)
+	if f := byKey["models.utility"]; f.GetDependsOn() != "" || f.GetSection() != "textgen" || f.GetGroup() != "models" {
+		t.Errorf("utility model field = %v", f)
 	}
 	if m, e := byKey["threads.default_model"], byKey["threads.default_effort"]; m.GetRow() != "model" || e.GetRow() != "model" {
 		t.Errorf("model row = %q, effort row = %q", m.GetRow(), e.GetRow())

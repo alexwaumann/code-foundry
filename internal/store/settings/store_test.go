@@ -101,18 +101,18 @@ func TestUpdate(t *testing.T) {
 	s.OnChange(func(snap *Snapshot) { hooked = append(hooked, snap.Revision) })
 
 	snap, err := s.Update(context.Background(), map[string]string{
-		KeyFontSize: "16", KeyDefaultModel: "claude-opus-4-8[1m]", KeyNamingModel: "claude-4.5-haiku[1m]", KeybindingKey("project.refresh"): "cmd+alt+r",
+		KeyFontSize: "16", KeyDefaultModel: "claude-opus-4-8[1m]", KeyUtilityModel: "claude-4.5-haiku[1m]", KeybindingKey("project.refresh"): "cmd+alt+r",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if snap.Settings.Appearance.FontSize != 16 || snap.Settings.Threads.DefaultModel != "claude-opus-4-8[1m]" ||
-		snap.Settings.Threads.NamingModel != "claude-4.5-haiku[1m]" ||
+		snap.Settings.Models.Utility != "claude-4.5-haiku[1m]" ||
 		snap.Settings.Keybindings["project.refresh"] != "cmd+alt+r" {
 		t.Fatalf("settings = %+v", snap.Settings)
 	}
 	data, _ := os.ReadFile(path)
-	for _, want := range []string{"font_size = 16\n", "default_model = \"claude-opus-4-8[1m]\"\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", `"project.refresh" = "cmd+alt+r"`} {
+	for _, want := range []string{"font_size = 16\n", "default_model = \"claude-opus-4-8[1m]\"\n", "[models]\n", "utility = \"claude-4.5-haiku[1m]\"\n", `"project.refresh" = "cmd+alt+r"`} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("file lacks %q:\n%s", want, data)
 		}

@@ -47,7 +47,7 @@ func TestRegistry(t *testing.T) {
 	if len(Labels()) != len(Values()) || len(All()) != len(Values()) {
 		t.Fatalf("Labels/All not parallel to Values")
 	}
-	for _, v := range []string{Default, NamingDefault} {
+	for _, v := range []string{Default, UtilityDefault} {
 		if !Known(v) {
 			t.Errorf("default %q is not in the registry", v)
 		}

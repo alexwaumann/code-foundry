@@ -170,9 +170,9 @@ type ThreadServiceClient interface {
 	Wait(context.Context, *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the thread.
 	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
-	// RegenerateName names the thread again with the naming model, from its most recent
+	// RegenerateName names the thread again with the utility model, from its most recent
 	// turns (the last three user messages and the replies around them), replacing any
-	// name, a hand-typed one too. It ignores threads.auto_name; threads.naming_model
+	// name, a hand-typed one too. It ignores threads.auto_name; models.utility
 	// applies. Synchronous: it returns the renamed thread once the model answered, bounded
 	// by the naming timeout. While it runs the thread's naming flag is set. FAILED_PRECONDITION
 	// for a resident thread, a thread with no user message yet, or one already being
@@ -1074,9 +1074,9 @@ type ThreadServiceHandler interface {
 	Wait(context.Context, *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the thread.
 	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
-	// RegenerateName names the thread again with the naming model, from its most recent
+	// RegenerateName names the thread again with the utility model, from its most recent
 	// turns (the last three user messages and the replies around them), replacing any
-	// name, a hand-typed one too. It ignores threads.auto_name; threads.naming_model
+	// name, a hand-typed one too. It ignores threads.auto_name; models.utility
 	// applies. Synchronous: it returns the renamed thread once the model answered, bounded
 	// by the naming timeout. While it runs the thread's naming flag is set. FAILED_PRECONDITION
 	// for a resident thread, a thread with no user message yet, or one already being

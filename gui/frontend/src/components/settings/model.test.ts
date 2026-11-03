@@ -33,7 +33,7 @@ const schema: SettingsSchemaView = {
   fields: [
     field("threads.default_model", "general", "threads", { title: "Model", row: "model" }),
     field("threads.default_effort", "general", "threads", { title: "Effort", row: "model" }),
-    field("threads.auto_name", "general", "threads", { title: "Name threads automatically", description: "Uses the naming model." }),
+    field("threads.auto_name", "general", "threads", { title: "Name threads automatically", description: "Names new threads from their first message." }),
     field("threads.cache_ttl_seconds", "general", "lifecycle", { title: "Prompt cache lifetime" }),
     // Out of section order in the list: search still follows the page's sections.
     field("projects.fetch_interval_seconds", "source", "projects", { title: "Fetch interval" }),
@@ -48,13 +48,13 @@ describe("search", () => {
   });
 
   it.each([
-    ["title", ["model"], true],
-    ["description", ["naming"], true],
+    ["title", ["automatically"], true],
+    ["description", ["message"], true],
     ["key", ["auto_name"], true],
-    ["every word must match", ["naming", "zebra"], false],
+    ["every word must match", ["message", "zebra"], false],
     ["no words match everything", [], true],
   ])("matches a field by %s", (_name, words, want) => {
-    const f = field("threads.auto_name", "general", "threads", { title: "Name threads automatically", description: "Uses the naming model." });
+    const f = field("threads.auto_name", "general", "threads", { title: "Name threads automatically", description: "Names new threads from their first message." });
     expect(matchField(f, words)).toBe(want);
   });
 
@@ -135,7 +135,7 @@ describe("keybindings", () => {
     kb("thread.archive", "thread"),
     kb("view.settings", "view", "cmd+,"),
     kb("daemon.restart", "daemon"),
-    kb("git.fetch", "git", "cmd+shift+f"),
+    kb("git.fetch", "git", "cmd+alt+f"),
   ];
 
   it("knows a bound value", () => {

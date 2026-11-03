@@ -124,22 +124,22 @@ func TestSettingsNamer(t *testing.T) {
 	var models []string
 	namer := settingsNamer(st, func(ctx context.Context, _ thread.NamingRequest) (thread.Naming, error) {
 		calls++
-		models = append(models, thread.NamingModel(ctx))
+		models = append(models, thread.UtilityModel(ctx))
 		return thread.Naming{Title: "a-name"}, nil
 	})
 	hi := thread.NamingRequest{Message: "hi"}
 	if n, err := namer(context.Background(), hi); err != nil || n.Title != "a-name" {
 		t.Fatalf("namer = %+v, %v", n, err)
 	}
-	// The naming model is read per call: no restart, no new namer.
-	if _, err := st.Update(context.Background(), map[string]string{settings.KeyNamingModel: "claude-4.5-haiku[1m]"}); err != nil {
+	// The utility model is read per call: no restart, no new namer.
+	if _, err := st.Update(context.Background(), map[string]string{settings.KeyUtilityModel: "claude-4.5-haiku[1m]"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := namer(context.Background(), hi); err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"claude-sonnet-4-6[1m]", "claude-4.5-haiku[1m]"}; !slices.Equal(models, want) {
-		t.Errorf("naming models = %q, want %q", models, want)
+		t.Errorf("utility models = %q, want %q", models, want)
 	}
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyAutoName: "false"}); err != nil {
 		t.Fatal(err)
@@ -152,7 +152,7 @@ func TestSettingsNamer(t *testing.T) {
 		t.Fatalf("explicit namer with auto-naming off = %+v, %v, calls = %d", n, err, calls)
 	}
 	if got := models[len(models)-1]; got != "claude-4.5-haiku[1m]" {
-		t.Errorf("explicit naming model = %q", got)
+		t.Errorf("explicit utility model = %q", got)
 	}
 }
 

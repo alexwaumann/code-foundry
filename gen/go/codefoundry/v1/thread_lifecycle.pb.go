@@ -592,7 +592,7 @@ type Thread struct {
 	Name      string `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
 	AutoNamed bool   `protobuf:"varint,6,opt,name=auto_named,json=autoNamed,proto3" json:"auto_named,omitempty"`
 	// name is provisional: the daemon derived it from the first prompt (its first line or
-	// sentence, at most 48 characters) while the naming model works; the model's title
+	// sentence, at most 48 characters) while the utility model works; the model's title
 	// replaces it and clears this. A rename clears it too and is never replaced. False
 	// with an empty name (a prompt of only an image). Persisted.
 	NameProvisional bool `protobuf:"varint,53,opt,name=name_provisional,json=nameProvisional,proto3" json:"name_provisional,omitempty"`
@@ -2512,7 +2512,7 @@ type NewWorktree struct {
 	// Steers the branch. With a "/" it is the branch, verbatim; without one it is the
 	// slug the projects.branch_naming mode wraps (<prefix>/<slug>, <type>/<slug>, or a
 	// hint to custom instructions). An existing branch (local or on origin) is checked
-	// out rather than suffixed. Empty: generated from the naming model's reply, else
+	// out rather than suffixed. Empty: generated from the utility model's reply, else
 	// cf/<thread id>.
 	Branch string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
 	// Overrides projects.base_from_origin for this worktree, as

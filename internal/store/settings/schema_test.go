@@ -47,8 +47,8 @@ func TestFieldParse(t *testing.T) {
 		// Retired aliases and unsuffixed ids are rejected.
 		{key: KeyDefaultModel, in: "opus", err: `want one of "claude-opus-5-5[1m]", "claude-opus-4-8[1m]", "claude-opus-4-7[1m]", "claude-sonnet-5-5[1m]", "claude-sonnet-5[1m]", "claude-sonnet-4-6[1m]", "claude-haiku-5-5[1m]", "claude-4.5-haiku[1m]", got "opus"`},
 		{key: KeyDefaultModel, in: "claude-opus-4-8", err: `want one of "claude-opus-5-5[1m]", "claude-opus-4-8[1m]", "claude-opus-4-7[1m]", "claude-sonnet-5-5[1m]", "claude-sonnet-5[1m]", "claude-sonnet-4-6[1m]", "claude-haiku-5-5[1m]", "claude-4.5-haiku[1m]", got "claude-opus-4-8"`},
-		{key: KeyNamingModel, in: "claude-4.5-haiku[1m]", want: "claude-4.5-haiku[1m]"},
-		{key: KeyNamingModel, in: "claude-opus-4-8[1m]", want: "claude-opus-4-8[1m]"},
+		{key: KeyUtilityModel, in: "claude-4.5-haiku[1m]", want: "claude-4.5-haiku[1m]"},
+		{key: KeyUtilityModel, in: "claude-opus-4-8[1m]", want: "claude-opus-4-8[1m]"},
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
 		{key: KeyThemeDark, in: "dracula", want: "dracula"},
 		{key: KeyThemeLight, in: "rose-pine-dawn", want: "rose-pine-dawn"},
@@ -143,8 +143,8 @@ func TestEnumLabels(t *testing.T) {
 		{KeyDefaultModel, "claude-opus-4-8[1m]", "Opus 4.8"},
 		{KeyDefaultModel, "claude-sonnet-4-6[1m]", "Sonnet 4.6"},
 		{KeyDefaultModel, "claude-4.5-haiku[1m]", "Haiku 4.5"},
-		{KeyNamingModel, "claude-sonnet-5[1m]", "Sonnet 5"},
-		{KeyNamingModel, "claude-haiku-5-5[1m]", "Haiku 5.5"},
+		{KeyUtilityModel, "claude-sonnet-5[1m]", "Sonnet 5"},
+		{KeyUtilityModel, "claude-haiku-5-5[1m]", "Haiku 5.5"},
 		{KeyTheme, "system", "System"},
 		{KeyThemeDark, "github-dark", "GitHub Dark"},
 		{KeyThemeDark, "catppuccin-mocha", "Catppuccin Mocha"},
@@ -187,7 +187,7 @@ func TestNewThreadDefaults(t *testing.T) {
 	}{
 		{KeyDefaultModel, "claude-sonnet-5[1m]", d.Threads.DefaultModel},
 		{KeyDefaultEffort, "medium", d.Threads.DefaultEffort},
-		{KeyNamingModel, "claude-sonnet-4-6[1m]", d.Threads.NamingModel},
+		{KeyUtilityModel, "claude-sonnet-4-6[1m]", d.Models.Utility},
 		{KeyDefaultWorktree, WorktreeCurrent, d.Threads.DefaultWorktree},
 		{KeyDensity, "comfortable", d.Appearance.Density},
 	}
@@ -200,14 +200,14 @@ func TestNewThreadDefaults(t *testing.T) {
 	}
 }
 
-func TestNamingModelField(t *testing.T) {
-	f := field(t, KeyNamingModel)
-	if f.Group != GroupThreads || f.Restart || !slices.Equal(f.Enum, field(t, KeyDefaultModel).Enum) ||
+func TestUtilityModelField(t *testing.T) {
+	f := field(t, KeyUtilityModel)
+	if f.Group != GroupModels || f.Restart || f.DependsOn != "" || f.Title != "Utility model" || !slices.Equal(f.Enum, field(t, KeyDefaultModel).Enum) ||
 		!slices.Equal(f.EnumLabels, field(t, KeyDefaultModel).EnumLabels) {
-		t.Errorf("field = %+v, want a live Threads enum over the model registry", f)
+		t.Errorf("field = %+v, want a live Models enum over the model registry, usable with auto-naming off", f)
 	}
-	// Directly after "Name threads automatically".
-	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyAutoName }); staticFields[i+1].Key != KeyNamingModel {
+	// Directly after "Name threads automatically" (the start of General › Text generation).
+	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyAutoName }); staticFields[i+1].Key != KeyUtilityModel {
 		t.Errorf("field after %s = %s", KeyAutoName, staticFields[i+1].Key)
 	}
 	for _, in := range []string{"", "gpt-5", "Sonnet", "sonnet"} {
@@ -422,8 +422,8 @@ func TestCacheTTLField(t *testing.T) {
 	if got := Defaults(); got.Threads.CacheTTLSeconds != 3600 || got.CacheTTL() != time.Hour {
 		t.Errorf("Defaults() cache TTL = %d (%v)", got.Threads.CacheTTLSeconds, got.CacheTTL())
 	}
-	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyNamingModel }); staticFields[i+1].Key != KeyCacheTTL {
-		t.Errorf("field after %s = %s", KeyNamingModel, staticFields[i+1].Key)
+	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyUtilityModel }); staticFields[i+1].Key != KeyCacheTTL {
+		t.Errorf("field after %s = %s", KeyUtilityModel, staticFields[i+1].Key)
 	}
 	tests := []struct {
 		in string

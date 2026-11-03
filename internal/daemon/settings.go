@@ -20,7 +20,7 @@ import (
 //   - keybinding overrides and thread model/effort defaults -> command registry
 //     overrides (CommandService.List reports the effective values);
 //   - log level -> the log file handler's LevelVar;
-//   - auto-naming and the naming model -> a Namer that reads both per thread;
+//   - auto-naming and the utility model -> a Namer that reads both per thread;
 //   - threads.cache_ttl_seconds -> thread.Manager.SetCacheTTL on every change
 //     (applyCacheTTL), which republishes the threads whose cache expiry moved;
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
@@ -81,17 +81,17 @@ func logLevel(s string) slog.Level {
 // store leaves the thread unnamed and names a new worktree's branch without the model.
 var errAutoNameOff = fmt.Errorf("%w in settings (threads.auto_name)", thread.ErrNamingOff)
 
-// settingsNamer wraps next so threads.auto_name and threads.naming_model apply
+// settingsNamer wraps next so threads.auto_name and models.utility apply
 // without a restart: each call reads them and hands the model to next with
-// thread.WithNamingModel. A call the user asked for (thread.ExplicitNaming: Regenerate
-// Name) runs with auto-naming off too; only the naming model applies to it.
+// thread.WithUtilityModel. A call the user asked for (thread.ExplicitNaming: Regenerate
+// Name) runs with auto-naming off too; only the utility model applies to it.
 func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
 	return func(ctx context.Context, req thread.NamingRequest) (thread.Naming, error) {
-		s := st.Settings().Threads
-		if !s.AutoName && !thread.ExplicitNaming(ctx) {
+		s := st.Settings()
+		if !s.Threads.AutoName && !thread.ExplicitNaming(ctx) {
 			return thread.Naming{}, errAutoNameOff
 		}
-		return next(thread.WithNamingModel(ctx, s.NamingModel), req)
+		return next(thread.WithUtilityModel(ctx, s.Models.Utility), req)
 	}
 }
 
