@@ -67,6 +67,9 @@ const (
 	// ThreadServiceLinkPullRequestProcedure is the fully-qualified name of the ThreadService's
 	// LinkPullRequest RPC.
 	ThreadServiceLinkPullRequestProcedure = "/codefoundry.v1.ThreadService/LinkPullRequest"
+	// ThreadServicePullRequestOwnerProcedure is the fully-qualified name of the ThreadService's
+	// PullRequestOwner RPC.
+	ThreadServicePullRequestOwnerProcedure = "/codefoundry.v1.ThreadService/PullRequestOwner"
 	// ThreadServiceCheckoutsProcedure is the fully-qualified name of the ThreadService's Checkouts RPC.
 	ThreadServiceCheckoutsProcedure = "/codefoundry.v1.ThreadService/Checkouts"
 	// ThreadServiceCheckPlacementProcedure is the fully-qualified name of the ThreadService's
@@ -147,6 +150,8 @@ const (
 	ThreadServiceShowHtmlProcedure = "/codefoundry.v1.ThreadService/ShowHtml"
 	// ThreadServiceShowThemeProcedure is the fully-qualified name of the ThreadService's ShowTheme RPC.
 	ThreadServiceShowThemeProcedure = "/codefoundry.v1.ThreadService/ShowTheme"
+	// ThreadServiceAddNoteProcedure is the fully-qualified name of the ThreadService's AddNote RPC.
+	ThreadServiceAddNoteProcedure = "/codefoundry.v1.ThreadService/AddNote"
 	// ThreadServicePageStorageProcedure is the fully-qualified name of the ThreadService's PageStorage
 	// RPC.
 	ThreadServicePageStorageProcedure = "/codefoundry.v1.ThreadService/PageStorage"
@@ -240,6 +245,15 @@ type ThreadServiceClient interface {
 	// anything that is not a GitHub pull request. The thread is republished when the link
 	// is new. See docs/notes/pr-daemon-actions.md.
 	LinkPullRequest(context.Context, *connect.Request[v1.LinkThreadPullRequestRequest]) (*connect.Response[v1.LinkThreadPullRequestResponse], error)
+	// PullRequestOwner names the thread whose own link a thread's link to a pull request
+	// comes from: the thread itself when its link is its own (Claude's record, its branch,
+	// linked by hand) or it has none; for a link copied up from a created thread, the
+	// CreatedBy chain is followed down (each hop's via thread) to the thread whose link is
+	// not a copy. A removed hop, a cycle or a chain deeper than the lineage limit answers
+	// the thread itself. The pull request matches by number and any of repo_slugs, case
+	// aside. NOT_FOUND for an unknown thread (removed: as Get). pr.task --thread forwards
+	// a task with it (docs/notes/pr-task-forward.md).
+	PullRequestOwner(context.Context, *connect.Request[v1.PullRequestOwnerRequest]) (*connect.Response[v1.PullRequestOwnerResponse], error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
 	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
 	// at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
@@ -435,6 +449,10 @@ type ThreadServiceClient interface {
 	// runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
 	// file (InvalidArgument otherwise); nothing is written to the themes directory.
 	ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error)
+	// AddNote puts a note in a thread's conversation: a `note` item (a line the daemon
+	// adds, not Claude's) at the thread's current position, as ShowHtml places a page. It
+	// starts no turn and does not unarchive the thread. INVALID_ARGUMENT for empty text.
+	AddNote(context.Context, *connect.Request[v1.AddThreadNoteRequest]) (*connect.Response[v1.AddThreadNoteResponse], error)
 	// PageStorage returns what the thread's pages keep with the bridge's cf.storage: the
 	// GUI host hands it to a page as it loads (docs/notes/bridge-fix-storage.md). Kept by
 	// the daemon, one file per thread, because WebKit keeps a page frame's own
@@ -556,6 +574,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+ThreadServiceLinkPullRequestProcedure,
 			connect.WithSchema(threadServiceMethods.ByName("LinkPullRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		pullRequestOwner: connect.NewClient[v1.PullRequestOwnerRequest, v1.PullRequestOwnerResponse](
+			httpClient,
+			baseURL+ThreadServicePullRequestOwnerProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("PullRequestOwner")),
 			connect.WithClientOptions(opts...),
 		),
 		checkouts: connect.NewClient[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse](
@@ -762,6 +786,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("ShowTheme")),
 			connect.WithClientOptions(opts...),
 		),
+		addNote: connect.NewClient[v1.AddThreadNoteRequest, v1.AddThreadNoteResponse](
+			httpClient,
+			baseURL+ThreadServiceAddNoteProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("AddNote")),
+			connect.WithClientOptions(opts...),
+		),
 		pageStorage: connect.NewClient[v1.PageStorageRequest, v1.PageStorageResponse](
 			httpClient,
 			baseURL+ThreadServicePageStorageProcedure,
@@ -800,6 +830,7 @@ type threadServiceClient struct {
 	move              *connect.Client[v1.MoveThreadRequest, v1.MoveThreadResponse]
 	removeProject     *connect.Client[v1.RemoveThreadProjectRequest, v1.RemoveThreadProjectResponse]
 	linkPullRequest   *connect.Client[v1.LinkThreadPullRequestRequest, v1.LinkThreadPullRequestResponse]
+	pullRequestOwner  *connect.Client[v1.PullRequestOwnerRequest, v1.PullRequestOwnerResponse]
 	checkouts         *connect.Client[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse]
 	checkPlacement    *connect.Client[v1.CheckPlacementRequest, v1.CheckPlacementResponse]
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
@@ -834,6 +865,7 @@ type threadServiceClient struct {
 	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
 	showHtml          *connect.Client[v1.ShowThreadHtmlRequest, v1.ShowThreadHtmlResponse]
 	showTheme         *connect.Client[v1.ShowThreadThemeRequest, v1.ShowThreadThemeResponse]
+	addNote           *connect.Client[v1.AddThreadNoteRequest, v1.AddThreadNoteResponse]
 	pageStorage       *connect.Client[v1.PageStorageRequest, v1.PageStorageResponse]
 	setPageStorage    *connect.Client[v1.SetPageStorageRequest, v1.SetPageStorageResponse]
 	proxyFetch        *connect.Client[v1.ProxyFetchRequest, v1.ProxyFetchResponse]
@@ -912,6 +944,11 @@ func (c *threadServiceClient) RemoveProject(ctx context.Context, req *connect.Re
 // LinkPullRequest calls codefoundry.v1.ThreadService.LinkPullRequest.
 func (c *threadServiceClient) LinkPullRequest(ctx context.Context, req *connect.Request[v1.LinkThreadPullRequestRequest]) (*connect.Response[v1.LinkThreadPullRequestResponse], error) {
 	return c.linkPullRequest.CallUnary(ctx, req)
+}
+
+// PullRequestOwner calls codefoundry.v1.ThreadService.PullRequestOwner.
+func (c *threadServiceClient) PullRequestOwner(ctx context.Context, req *connect.Request[v1.PullRequestOwnerRequest]) (*connect.Response[v1.PullRequestOwnerResponse], error) {
+	return c.pullRequestOwner.CallUnary(ctx, req)
 }
 
 // Checkouts calls codefoundry.v1.ThreadService.Checkouts.
@@ -1084,6 +1121,11 @@ func (c *threadServiceClient) ShowTheme(ctx context.Context, req *connect.Reques
 	return c.showTheme.CallUnary(ctx, req)
 }
 
+// AddNote calls codefoundry.v1.ThreadService.AddNote.
+func (c *threadServiceClient) AddNote(ctx context.Context, req *connect.Request[v1.AddThreadNoteRequest]) (*connect.Response[v1.AddThreadNoteResponse], error) {
+	return c.addNote.CallUnary(ctx, req)
+}
+
 // PageStorage calls codefoundry.v1.ThreadService.PageStorage.
 func (c *threadServiceClient) PageStorage(ctx context.Context, req *connect.Request[v1.PageStorageRequest]) (*connect.Response[v1.PageStorageResponse], error) {
 	return c.pageStorage.CallUnary(ctx, req)
@@ -1181,6 +1223,15 @@ type ThreadServiceHandler interface {
 	// anything that is not a GitHub pull request. The thread is republished when the link
 	// is new. See docs/notes/pr-daemon-actions.md.
 	LinkPullRequest(context.Context, *connect.Request[v1.LinkThreadPullRequestRequest]) (*connect.Response[v1.LinkThreadPullRequestResponse], error)
+	// PullRequestOwner names the thread whose own link a thread's link to a pull request
+	// comes from: the thread itself when its link is its own (Claude's record, its branch,
+	// linked by hand) or it has none; for a link copied up from a created thread, the
+	// CreatedBy chain is followed down (each hop's via thread) to the thread whose link is
+	// not a copy. A removed hop, a cycle or a chain deeper than the lineage limit answers
+	// the thread itself. The pull request matches by number and any of repo_slugs, case
+	// aside. NOT_FOUND for an unknown thread (removed: as Get). pr.task --thread forwards
+	// a task with it (docs/notes/pr-task-forward.md).
+	PullRequestOwner(context.Context, *connect.Request[v1.PullRequestOwnerRequest]) (*connect.Response[v1.PullRequestOwnerResponse], error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
 	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
 	// at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
@@ -1376,6 +1427,10 @@ type ThreadServiceHandler interface {
 	// runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
 	// file (InvalidArgument otherwise); nothing is written to the themes directory.
 	ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error)
+	// AddNote puts a note in a thread's conversation: a `note` item (a line the daemon
+	// adds, not Claude's) at the thread's current position, as ShowHtml places a page. It
+	// starts no turn and does not unarchive the thread. INVALID_ARGUMENT for empty text.
+	AddNote(context.Context, *connect.Request[v1.AddThreadNoteRequest]) (*connect.Response[v1.AddThreadNoteResponse], error)
 	// PageStorage returns what the thread's pages keep with the bridge's cf.storage: the
 	// GUI host hands it to a page as it loads (docs/notes/bridge-fix-storage.md). Kept by
 	// the daemon, one file per thread, because WebKit keeps a page frame's own
@@ -1493,6 +1548,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		ThreadServiceLinkPullRequestProcedure,
 		svc.LinkPullRequest,
 		connect.WithSchema(threadServiceMethods.ByName("LinkPullRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServicePullRequestOwnerHandler := connect.NewUnaryHandler(
+		ThreadServicePullRequestOwnerProcedure,
+		svc.PullRequestOwner,
+		connect.WithSchema(threadServiceMethods.ByName("PullRequestOwner")),
 		connect.WithHandlerOptions(opts...),
 	)
 	threadServiceCheckoutsHandler := connect.NewUnaryHandler(
@@ -1699,6 +1760,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("ShowTheme")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceAddNoteHandler := connect.NewUnaryHandler(
+		ThreadServiceAddNoteProcedure,
+		svc.AddNote,
+		connect.WithSchema(threadServiceMethods.ByName("AddNote")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServicePageStorageHandler := connect.NewUnaryHandler(
 		ThreadServicePageStorageProcedure,
 		svc.PageStorage,
@@ -1749,6 +1816,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceRemoveProjectHandler.ServeHTTP(w, r)
 		case ThreadServiceLinkPullRequestProcedure:
 			threadServiceLinkPullRequestHandler.ServeHTTP(w, r)
+		case ThreadServicePullRequestOwnerProcedure:
+			threadServicePullRequestOwnerHandler.ServeHTTP(w, r)
 		case ThreadServiceCheckoutsProcedure:
 			threadServiceCheckoutsHandler.ServeHTTP(w, r)
 		case ThreadServiceCheckPlacementProcedure:
@@ -1817,6 +1886,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceShowHtmlHandler.ServeHTTP(w, r)
 		case ThreadServiceShowThemeProcedure:
 			threadServiceShowThemeHandler.ServeHTTP(w, r)
+		case ThreadServiceAddNoteProcedure:
+			threadServiceAddNoteHandler.ServeHTTP(w, r)
 		case ThreadServicePageStorageProcedure:
 			threadServicePageStorageHandler.ServeHTTP(w, r)
 		case ThreadServiceSetPageStorageProcedure:
@@ -1890,6 +1961,10 @@ func (UnimplementedThreadServiceHandler) RemoveProject(context.Context, *connect
 
 func (UnimplementedThreadServiceHandler) LinkPullRequest(context.Context, *connect.Request[v1.LinkThreadPullRequestRequest]) (*connect.Response[v1.LinkThreadPullRequestResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.LinkPullRequest is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestOwner(context.Context, *connect.Request[v1.PullRequestOwnerRequest]) (*connect.Response[v1.PullRequestOwnerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.PullRequestOwner is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error) {
@@ -2026,6 +2101,10 @@ func (UnimplementedThreadServiceHandler) ShowHtml(context.Context, *connect.Requ
 
 func (UnimplementedThreadServiceHandler) ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ShowTheme is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) AddNote(context.Context, *connect.Request[v1.AddThreadNoteRequest]) (*connect.Response[v1.AddThreadNoteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.AddNote is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) PageStorage(context.Context, *connect.Request[v1.PageStorageRequest]) (*connect.Response[v1.PageStorageResponse], error) {
