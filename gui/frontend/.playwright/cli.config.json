@@ -1,0 +1,13 @@
+{
+  "browser": {
+    "browserName": "webkit",
+    "isolated": true,
+    "launchOptions": { "headless": true },
+    "contextOptions": { "viewport": { "width": 1280, "height": 800 }, "colorScheme": "dark" }
+  },
+  "network": {
+    "allowedOrigins": ["http://127.0.0.1:*", "http://localhost:*"]
+  },
+  "outputDir": ".playwright/out",
+  "allowUnrestrictedFileAccess": false
+}

@@ -69,7 +69,7 @@ plugins:
 	done
 
 .PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps bun-version gui-dist-stub pagelib pagelib-check \
-        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp package release promote clean fuzz
+        dev drive gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp package release promote clean fuzz
 
 all: build
 
@@ -189,6 +189,12 @@ gui-build: build
 ## daemon. Not part of `check`: it needs the browser (`bunx --cwd gui/frontend playwright install webkit`).
 gui-e2e: frontend-deps
 	$(BUN) e2e
+
+## drive: serve the GUI for an agent to drive with `playwright cli` (.claude/skills/drive-app):
+## the mock daemon + Vite on free loopback ports, or DAEMON=dev for a real `daemon --dev` on a
+## scratch home (DRIVE_HOME, else a new /tmp dir). Foreground; prints the URL and writes gui/frontend/.playwright/drive.env.
+drive: frontend-deps $(if $(filter dev,$(DAEMON)),build)
+	scripts/drive.sh $(or $(DAEMON),mock)
 
 ## gui-mock: run the mock daemon on :7788 (token dev-mock-token); pair with `bun run dev:mock`.
 gui-mock: frontend-deps
