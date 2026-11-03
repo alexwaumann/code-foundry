@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/api"
+	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
@@ -164,7 +165,9 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	// starts, so before any stream can join.
 	pres := presence.New()
 	clients := api.NewClients(pres)
-	st, err := openStores(ctx, log, p, threadEnv(port, token), pres)
+	// Scoped tokens (agent search's runs) the loopback listener accepts beside token.
+	caps := capability.NewRegistry(nil)
+	st, err := openStores(ctx, log, p, threadEnv(port, token), loopbackURL(port), caps, pres)
 	if err != nil {
 		return err
 	}
@@ -202,6 +205,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	actionAPI := api.NewAction(st.action, events)
 	dictationAPI := api.NewDictation(st.dictation, events)
+	searchAPI := api.NewSearch(st.search, events)
 	grants := preview.NewGrants(preview.NewFloor(st.home, p))
 	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css),
 	// and its contrast reports on the user's themes (theme save, theme check).
@@ -293,6 +297,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Ember:             st.ember,
 		Dictation:         dictationAPI,
 		DictationStatus:   dictationAPI.Status,
+		Search:            searchAPI,
+		SearchWait:        searchAPI.Wait,
 		Memory:            st.memory,
 		Themes:            st.themes,
 		ThemeReports:      themeReports,
@@ -342,6 +348,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		api.NewTheme(st.themes, events).Route(),
 		api.NewEmber(st.ember, events).Route(),
 		dictationAPI.Route(),
+		searchAPI.Route(),
 		filesystemAPI.Route(),
 		eventsAPI.Route(),
 	}
@@ -385,7 +392,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
 	pageRoutes := newPageRoutes(grants, liveTheme, log)
 	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback",
-		loopbackHost(port, loopbackHandler(token, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux))))
+		loopbackHost(port, loopbackHandler(token, caps, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux))))
 	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", loopbackHost(pagesPort, pagesHandler(pageRoutes))))
 
 	errc := make(chan error, 3)

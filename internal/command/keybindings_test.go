@@ -20,6 +20,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"memory.show", "memory.add", "memory.remove", "memory.clear",
 		"plugin.act", "plugin.browse", "plugin.env", "plugin.list", "plugin.logs", "plugin.reload", "plugin.secrets.list", "plugin.surface", "plugin.terminals", "plugin.threads", "plugin.wakes",
 		"pr.checks", "project.list",
+		"search.agent", "search.clear", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.report", "search.seen", "search.stop",
 		"settings.get", "settings.path", "settings.reset", "settings.set",
 		"skill.browse",
 		"terminal.list", "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",

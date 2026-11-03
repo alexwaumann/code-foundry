@@ -146,6 +146,11 @@ func (p Paths) Claude() string { return filepath.Join(p.home, "claude") }
 // TMPDIR (internal/store/thread childcontext.go). Removed with the thread.
 func (p Paths) Tmp() string { return filepath.Join(p.home, "tmp") }
 
+// Search is agent search's directory (internal/store/search): cwd/, the empty directory
+// every hidden run starts in (its read-only shell commands see nothing), and tmp/<search
+// id>, each run's TMPDIR, removed with its history entry.
+func (p Paths) Search() string { return filepath.Join(p.home, "search") }
+
 // Pages holds one directory per thread, named by its id: where that thread writes the
 // HTML pages it shows (view.inline), given to its claude as EnvPages and --add-dir
 // (internal/store/thread childcontext.go). Removed with the thread. The preview route

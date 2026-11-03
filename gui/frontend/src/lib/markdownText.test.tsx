@@ -1,6 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { markdownText, streamingBlockCacheSize, streamingMarkdownText } from "./markdownText";
+import renderedTextFixture from "../../../../internal/store/thread/testdata/rendered_text.json?raw";
 
 vi.mock("@/stores/gh", () => ({ openUrl: vi.fn(() => Promise.resolve()) }));
 vi.mock("@/api/threads", () => ({ readAttachment: vi.fn(() => Promise.resolve(null)) }));
@@ -49,6 +50,29 @@ describe("markdownText", () => {
   it("is empty for empty markdown", () => {
     expect(markdownText("")).toBe("");
     expect(streamingMarkdownText("")).toBe("");
+  });
+});
+
+/**
+ * The rendered text fixture the daemon shares (docs/notes/search-5-agent-daemon.md): agent
+ * search stores a quote as the reply reads, and the daemon's renderedText
+ * (internal/store/thread/search_render.go) must read each case as markdownText does (its Go
+ * test checks the same file). scripts/renderedTextFixture.ts writes the texts.
+ */
+const shared = (JSON.parse(renderedTextFixture) as { name: string; markdown: string; text: string }[]).map((c): [string, string, string] => [
+  c.name,
+  c.markdown,
+  c.text,
+]);
+
+describe("the daemon's rendered text fixture", () => {
+  it("has the cases", () => {
+    expect(shared.length).toBeGreaterThan(50);
+  });
+
+  it.each(shared)("%s: markdownText and the thread's render read it as the fixture says", (_name, md, text) => {
+    expect(markdownText(md)).toBe(text);
+    expect(rendered(md)).toBe(text);
   });
 });
 

@@ -522,6 +522,14 @@ type CreateOptions struct {
 	// model that is not the user's words (theme.ask's), on every spawn. At most 64 KiB, no
 	// NUL.
 	SystemPromptAppend string
+	// ResumeSession, with NoProject, is a Claude session id the thread continues instead
+	// of starting a new conversation: claude --resume <id> --fork-session, so the thread
+	// has its own transcript and the session's stays as it was (agent search's Promote,
+	// docs/notes/search-5-agent-daemon.md). Its transcript must exist (in any project
+	// dir: Claude finds a session by id). The session must not have recorded its system
+	// prompt (it ran with --system-prompt-snapshot off), so the thread's own is rendered
+	// on its first request, the app memory included.
+	ResumeSession string
 
 	// naming, when set, replaces waitNaming for a new branch's name (Move names the
 	// branch and the title from the conversation: move.go).

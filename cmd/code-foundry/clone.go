@@ -25,6 +25,9 @@ var cliPresenters = map[string]cliPresenter{
 	// project.clone streams ProjectService.Clone so the clone's progress shows as it runs;
 	// Invoke would only answer once it is done.
 	"project.clone": presentClone,
+	// search.agent streams SearchService.Watch so the run's steps and hits show as they
+	// come (search.go).
+	"search.agent": presentAgentSearch,
 }
 
 // presentClone clones vals["repo"] (owner/repo or an https://github.com URL), printing

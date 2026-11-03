@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
@@ -26,6 +27,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/memory"
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/search"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/skill"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
@@ -68,6 +70,9 @@ type stores struct {
 	thread *thread.Manager
 	// ember is the resident agent's store (ember.go); closed before thread.
 	ember *ember.Store
+	// search is the search dialog's history and agent search's hidden runs
+	// (docs/notes/search-5-agent-daemon.md); closed before thread, stopping its runs.
+	search *search.Store
 	// memory is the app memory (<home>/memory/), the user's standing preferences:
 	// thread reads it at every spawn, the memory.* commands write it, MemoryService and
 	// EventService watch its snapshots. It holds no resources.
@@ -128,8 +133,11 @@ type stores struct {
 // error, whatever was started is closed again. threadEnv is added to every Claude
 // process's environment (see threadEnv in daemon.go). pres is the GUI presence: its
 // kind paces the GitHub poll (gh.Options.Presence), and whether it is attended decides
-// whether an open thread view counts as seen (thread.Options.Attended).
-func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string, pres *presence.Tracker) (_ *stores, err error) {
+// whether an open thread view counts as seen (thread.Options.Attended). Agent search's
+// runs get the loopback endpoint and a scoped token of caps instead of threadEnv
+// (internal/capability).
+func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string, endpoint string, caps *capability.Registry,
+	pres *presence.Tracker) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
 		if err != nil {
@@ -305,6 +313,23 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	if s.ember, err = openEmber(ctx, log.With("store", "ember"), p, s.db, s.bus, s.settings, s.thread, s.project, claude); err != nil {
 		return nil, err
 	}
+	// After thread: hits are verified against its items, and Promote makes a thread.
+	if s.search, err = search.New(ctx, search.Options{
+		DB: s.db, Threads: s.thread, Bus: s.bus, Log: log.With("store", "search"), Claude: claude,
+		// Not threadEnv: the run's CLI reaches the daemon with a token scoped to its
+		// search (thread.search, thread.read, its own search.report), never the daemon's.
+		Dir: p.Search(), Endpoint: endpoint, Credentials: caps,
+		// models.utility and the thread defaults, read at each run and each Promote.
+		UtilityModel: func() string {
+			return thread.UtilityModel(thread.WithUtilityModel(context.Background(), s.settings.Settings().Models.Utility))
+		},
+		ThreadDefaults: func() (string, string) {
+			t := s.settings.Settings().Threads
+			return t.DefaultModel, t.DefaultEffort
+		},
+	}); err != nil {
+		return nil, err
+	}
 	// After thread: the reaper's sweep asks it which threads exist.
 	if s.stopShells, err = startShellReaper(ctx, shellReaperOptions{
 		Log: log.With("store", "terminal"), Terminals: s.terminal, Bus: s.bus,
@@ -429,6 +454,9 @@ func (s *stores) close() error {
 	}
 	if s.stopBranchLinks != nil {
 		s.stopBranchLinks()
+	}
+	if s.search != nil {
+		s.search.Close()
 	}
 	if s.ember != nil {
 		s.ember.Close()

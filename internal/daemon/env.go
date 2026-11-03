@@ -52,10 +52,13 @@ func scrubClaudeEnv(log *slog.Logger) []string {
 // Unix socket (client.EndpointFromEnv), which sandboxed threads cannot connect to.
 func threadEnv(port int, token string) []string {
 	return []string{
-		paths.EnvEndpoint + "=http://127.0.0.1:" + strconv.Itoa(port),
+		paths.EnvEndpoint + "=" + loopbackURL(port),
 		paths.EnvToken + "=" + token,
 	}
 }
+
+// loopbackURL is the API's loopback endpoint (paths.EnvEndpoint's value).
+func loopbackURL(port int) string { return "http://127.0.0.1:" + strconv.Itoa(port) }
 
 // scrubEndpointEnv removes an inherited endpoint, token and thread id (a daemon
 // started by hand from inside a thread), so this daemon's plain terminals and action

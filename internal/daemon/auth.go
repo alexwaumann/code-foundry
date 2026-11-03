@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/alexwaumann/code-foundry/internal/capability"
 )
 
 // newToken returns 32 random bytes, hex encoded.
@@ -48,31 +50,42 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
-// requireBearer rejects requests whose Authorization header does not carry token.
-func requireBearer(token string, next http.Handler) http.Handler {
+// requireBearer rejects requests whose Authorization header carries neither token nor a
+// live scoped token of caps (internal/capability: agent search's run). A scoped token
+// reaches only the procedures its scope allows (403 for any other path), with the scope
+// in the request's context for the command handler's check.
+func requireBearer(token string, caps *capability.Registry, next http.Handler) http.Handler {
 	want := []byte(token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if !ok || subtle.ConstantTimeCompare([]byte(got), want) != 1 {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="code-foundry"`)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		if ok && subtle.ConstantTimeCompare([]byte(got), want) == 1 {
+			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
+		if s, live := caps.Lookup(got); ok && live {
+			if !s.AllowProcedure(r.URL.Path) {
+				http.Error(w, "forbidden: "+capability.ErrDenied.Error(), http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(capability.WithScope(r.Context(), s)))
+			return
+		}
+		w.Header().Set("WWW-Authenticate", `Bearer realm="code-foundry"`)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
 }
 
 // loopbackHandler is what the API's TCP listener serves: everything behind CORS and the
-// bearer token. The paths the pages listener serves (pagesHandler) are 404 here, token or
+// bearer token (or one of caps' scoped tokens, requireBearer). The paths the pages listener serves (pagesHandler) are 404 here, token or
 // not: a page loads them from its own origin, never the API's. pagesPort is that
 // listener's port, whose origin CORS refuses even when listed in devOrigins
 // (allowedOrigin).
-func loopbackHandler(token string, pagePrefixes []string, pagesPort int, devOrigins []string, rest http.Handler) http.Handler {
+func loopbackHandler(token string, caps *capability.Registry, pagePrefixes []string, pagesPort int, devOrigins []string, rest http.Handler) http.Handler {
 	m := http.NewServeMux()
 	for _, prefix := range pagePrefixes {
 		m.Handle(prefix, http.NotFoundHandler())
 	}
-	m.Handle("/", cors(pagesPort, devOrigins, requireBearer(token, rest)))
+	m.Handle("/", cors(pagesPort, devOrigins, requireBearer(token, caps, rest)))
 	return m
 }
 

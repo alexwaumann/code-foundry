@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
@@ -40,7 +41,14 @@ func (h *Command) List(_ context.Context, req *connect.Request[v1.ListCommandsRe
 }
 
 // Invoke runs a command.
+// A request made with a scoped token (agent search's run) may invoke only what its scope
+// allows (capability.Scope.AllowCommand); anything else is PermissionDenied.
 func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeCommandRequest]) (*connect.Response[v1.InvokeCommandResponse], error) {
+	if s, ok := capability.FromContext(ctx); ok {
+		if err := s.AllowCommand(req.Msg.GetName(), req.Msg.GetArgs()); err != nil {
+			return nil, connect.NewError(connect.CodePermissionDenied, err)
+		}
+	}
 	res, err := h.reg.Invoke(ctx, contextFromProto(req.Msg.GetContext()), req.Msg.GetName(), req.Msg.GetArgs(),
 		command.Confirmed(req.Msg.GetConfirmed()))
 	if err != nil {

@@ -67,6 +67,9 @@ type launch struct {
 	fork bool
 	// newID is passed as --session-id for new conversations and forks.
 	newID string
+	// freshPrompt: a resumed conversation that recorded no system prompt (Create's
+	// ResumeSession), so this spawn's is rendered on its first request as a new one's.
+	freshPrompt bool
 	// move is the Move this start is for (move.go): the process starts in the old cwd
 	// with the destination's --add-dir list, and set_cwd takes it there.
 	move *moveJob
@@ -186,6 +189,10 @@ func attachmentLine(a attachment) string {
 	}
 	return "Attached PDF: " + a.path + " (" + n + ", not sent inline); read it with the Read tool's pages parameter, at most 20 pages per call"
 }
+
+// SessionIDPattern is a Claude session id: a UUID in lower-case hex. The search store
+// checks a stored one against it before deleting files named by it.
+var SessionIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // newUUID returns a random (version 4) UUID string.
 func newUUID() (string, error) {

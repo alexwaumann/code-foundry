@@ -1,0 +1,372 @@
+[
+  {
+    "name": "relative link to a file",
+    "markdown": "See [run.go](internal/store/search/run.go) for it.",
+    "text": "See internal/store/search/run.go for it."
+  },
+  {
+    "name": "relative link with a line anchor",
+    "markdown": "Look at [the loop](internal/store/search/run.go#L12-L30) and [x](./docs/a.md#intro).",
+    "text": "Look at internal/store/search/run.go:12 and ./docs/a.md."
+  },
+  {
+    "name": "relative link that is no path",
+    "markdown": "Read [about](about) and [the guide](guide#setup).",
+    "text": "Read about and the guide."
+  },
+  {
+    "name": "absolute link",
+    "markdown": "Merged in [PR](https://github.com/alexwaumann/code-foundry/pull/503) yesterday.",
+    "text": "Merged in PR yesterday."
+  },
+  {
+    "name": "link with a title and emphasis",
+    "markdown": "See [the *note*](https://x.dev/y_z \"Title\") here and [a [nested] b](https://x.dev).",
+    "text": "See the note here and a [nested] b."
+  },
+  {
+    "name": "reference link",
+    "markdown": "See [the docs][d] first.\n\n[d]: https://example.com",
+    "text": "See the docs first."
+  },
+  {
+    "name": "brackets that are no link",
+    "markdown": "a [x] b (y) and [c](d",
+    "text": "a [x] b (y) and [c](d"
+  },
+  {
+    "name": "kbd pairs",
+    "markdown": "Press <kbd>Cmd</kbd>+<kbd>K</kbd> to open.",
+    "text": "Press Cmd+K to open."
+  },
+  {
+    "name": "mark sub sup",
+    "markdown": "A <mark>hot</mark> path, H<sub>2</sub>O and x<sup>2</sup>.",
+    "text": "A hot path, H2O and x2."
+  },
+  {
+    "name": "small ins s del u",
+    "markdown": "<small>fine print</small>, <ins>added</ins>, <s>old</s>, <del>gone</del> and <u>under</u>.",
+    "text": "fine print, added, old, gone and under."
+  },
+  {
+    "name": "html that stays text",
+    "markdown": "It returns Result<T, E>, <b>bold?</b>, <span class=\"x\">c</span> and <kbd>open.",
+    "text": "It returns Result<T, E>, <b>bold?</b>, <span class=\"x\">c</span> and <kbd>open."
+  },
+  {
+    "name": "br",
+    "markdown": "line<br>break and<br/>more",
+    "text": "linebreak andmore"
+  },
+  {
+    "name": "html comment",
+    "markdown": "before <!-- hidden --> after",
+    "text": "before <!-- hidden --> after"
+  },
+  {
+    "name": "html block",
+    "markdown": "<details>\n<summary>More</summary>\n\nBody text\n</details>",
+    "text": "<details>\n<summary>More</summary>\nBody text\n</details>"
+  },
+  {
+    "name": "kbd around emphasis",
+    "markdown": "Hit <kbd>**Esc**</kbd> twice.",
+    "text": "Hit Esc twice."
+  },
+  {
+    "name": "image",
+    "markdown": "![alt text](i.png) after",
+    "text": " after"
+  },
+  {
+    "name": "https image",
+    "markdown": "Look: ![shot](https://example.com/a.png) here",
+    "text": "Look:  here"
+  },
+  {
+    "name": "image in a link",
+    "markdown": "[![badge](https://x.dev/b.svg)](https://x.dev) build",
+    "text": " build"
+  },
+  {
+    "name": "entities",
+    "markdown": "Tom &amp; Jerry &lt;3 &copy; &#169; &#x41;&nbsp;b &notanentity; AT&T",
+    "text": "Tom & Jerry <3 © © A b &notanentity; AT&T"
+  },
+  {
+    "name": "entity in code stays",
+    "markdown": "`&amp;` and &amp;",
+    "text": "&amp; and &"
+  },
+  {
+    "name": "atx closing hashes",
+    "markdown": "## Title ##\n\n# Other #####\n\n### a # b\n\n#### c \\#",
+    "text": "Title\nOther\na # b\nc #"
+  },
+  {
+    "name": "hash that is no heading",
+    "markdown": "#12 is the item and ####### seven",
+    "text": "#12 is the item and ####### seven"
+  },
+  {
+    "name": "setext heading",
+    "markdown": "Title\n=====\n\nSub\n---\n\nbody",
+    "text": "Title\nSub\nbody"
+  },
+  {
+    "name": "number that is no list item",
+    "markdown": "We shipped it in\n2023. Then more.",
+    "text": "We shipped it in\n2023. Then more."
+  },
+  {
+    "name": "one interrupts a paragraph",
+    "markdown": "Steps:\n1. first\n2. second",
+    "text": "Steps:\nfirst\nsecond"
+  },
+  {
+    "name": "list starting at a year",
+    "markdown": "2023. Shipped the poller.",
+    "text": "Shipped the poller."
+  },
+  {
+    "name": "ten digits is no list",
+    "markdown": "1234567890. not a list",
+    "text": "1234567890. not a list"
+  },
+  {
+    "name": "lists",
+    "markdown": "- one\n* two\n+ three\n\n1. four\n10) five\n   - nested **six**",
+    "text": "one\ntwo\nthree\nfour\nfive\nnested six"
+  },
+  {
+    "name": "task boxes",
+    "markdown": "- [x] done\n- [ ] open\n* [X] caps\n- [x]not a box",
+    "text": " done\n open\n caps\n[x]not a box"
+  },
+  {
+    "name": "loose list",
+    "markdown": "- first\n\n  more of first\n\n- second",
+    "text": "\nfirst\n\nmore of first\n\n\nsecond\n\n"
+  },
+  {
+    "name": "strong around a star",
+    "markdown": "**foo*bar**",
+    "text": "foo*bar"
+  },
+  {
+    "name": "nested emphasis",
+    "markdown": "*foo **bar** baz* and **a *b* c** and ***both*** and ***a** b*",
+    "text": "foo bar baz and a b c and both and a b"
+  },
+  {
+    "name": "emphasis edge cases",
+    "markdown": "*foo**bar**baz* and foo**bar**baz and **foo \"*bar*\" foo** and **foo*",
+    "text": "foobarbaz and foobarbaz and foo \"bar\" foo and *foo"
+  },
+  {
+    "name": "underscores",
+    "markdown": "snake_case_name, _em_, __strong__, _foo_bar_, __a__b and a_ b",
+    "text": "snake_case_name, em, strong, foo_bar, _a__b and a b"
+  },
+  {
+    "name": "unpaired markers",
+    "markdown": "5 * 3 = 15, a * b * c, ** alone",
+    "text": "5 * 3 = 15, a * b * c, ** alone"
+  },
+  {
+    "name": "strikethrough",
+    "markdown": "~~gone~~ and ~one~ and ~~~three~~~",
+    "text": "gone and one and ~~~three~~~"
+  },
+  {
+    "name": "code spans with backticks",
+    "markdown": "``a ` b`` and `` `x` `` and ```c``d``` and `unclosed",
+    "text": "a ` b and `x` and c``d and `unclosed"
+  },
+  {
+    "name": "code span markers are literal",
+    "markdown": "use `a_b *c* [d](e) <kbd>f</kbd>` now",
+    "text": "use a_b *c* [d](e) <kbd>f</kbd> now"
+  },
+  {
+    "name": "code span that is a path",
+    "markdown": "Open `  src/a.ts:12  ` and ` spaced ` and `a\nb`.",
+    "text": "Open src/a.ts:12 and spaced and a b."
+  },
+  {
+    "name": "fenced code",
+    "markdown": "before\n```go\nx := a_b * c // **no** &amp;\n```\nafter",
+    "text": "before\nx := a_b * c // **no** &amp;\nafter"
+  },
+  {
+    "name": "tilde fence with html",
+    "markdown": "~~~\n<kbd>x</kbd>\n~~~",
+    "text": "<kbd>x</kbd>"
+  },
+  {
+    "name": "indented code",
+    "markdown": "para\n\n    code *here*\n    more\n\nafter",
+    "text": "para\ncode *here*\nmore\nafter"
+  },
+  {
+    "name": "unclosed fence",
+    "markdown": "```\nopen code",
+    "text": "open code"
+  },
+  {
+    "name": "escapes",
+    "markdown": "\\*not\\* \\_em\\_ \\# \\` \\\\ back \\[x\\](y) C:\\Users\\x",
+    "text": "*not* _em_ # ` \\ back [x](y) C:\\Users\\x"
+  },
+  {
+    "name": "hard breaks",
+    "markdown": "one  \ntwo\\\nthree",
+    "text": "one\ntwo\nthree"
+  },
+  {
+    "name": "cjk",
+    "markdown": "中文**強調**テキスト。これは**「強調」**です。",
+    "text": "中文強調テキスト。これは**「強調」**です。"
+  },
+  {
+    "name": "emoji",
+    "markdown": "Done ✅ 🚀 **ship** it 👍🏽 and 👨‍👩‍👧",
+    "text": "Done ✅ 🚀 ship it 👍🏽 and 👨‍👩‍👧"
+  },
+  {
+    "name": "autolinks",
+    "markdown": "At <https://x.dev/a_b>, <mailto:a@b.co>, <a@b.co> and https://x.dev/a_b_c or www.example.com/x_y.",
+    "text": "At https://x.dev/a_b, mailto:a@b.co, a@b.co and https://x.dev/a_b_c or www.example.com/x_y."
+  },
+  {
+    "name": "path in prose",
+    "markdown": "It lives in internal/store/pr/fingerprint.go and src/main.ts:12.",
+    "text": "It lives in internal/store/pr/fingerprint.go and src/main.ts:12."
+  },
+  {
+    "name": "block quotes",
+    "markdown": "> quoted **text**\n> > deeper\nlazy continuation\n\n> - a list\n> 1. in a quote",
+    "text": "quoted text\ndeeper\nlazy continuation\na list\nin a quote"
+  },
+  {
+    "name": "table",
+    "markdown": "| a | b_c |\n|---|:-:|\n| x\\|y | **z** |\n| `p\\|q` | [l](https://x) |",
+    "text": "a\nb_c\nx|y\nz\np|q\nl"
+  },
+  {
+    "name": "rules",
+    "markdown": "a\n\n---\n\n***\n\n_ _ _\n\nb",
+    "text": "a\nb"
+  },
+  {
+    "name": "pipe outside a table",
+    "markdown": "a | b and a > b",
+    "text": "a | b and a > b"
+  },
+  {
+    "name": "paragraphs",
+    "markdown": "The poller compared only the count.\n\nThe **fingerprint** now includes the *head SHA*.",
+    "text": "The poller compared only the count.\nThe fingerprint now includes the head SHA."
+  },
+  {
+    "name": "footnotes",
+    "markdown": "A claim.[^1] More[^n] and again[^1].\n\n[^1]: The source.\n[^n]: Second *one*.",
+    "text": "A claim.1 More2 and again1.\nFootnotes\n\nThe source. ↩ ↩2\n\n\nSecond one. ↩\n\n"
+  },
+  {
+    "name": "footnote without a definition",
+    "markdown": "No def[^x] here.",
+    "text": "No def[^x] here."
+  },
+  {
+    "name": "task boxes with nothing after",
+    "markdown": "- [x]\n- [ ]   \n- [x]\tdone\n- [x] ",
+    "text": "[x]\n[ ]\n done\n[x]"
+  },
+  {
+    "name": "code span spaces",
+    "markdown": "`` ` `` and ` a ` and `  `",
+    "text": "` and a and   "
+  },
+  {
+    "name": "html pairs across other tags",
+    "markdown": "a <kbd>x <mark>y</kbd> z</mark>",
+    "text": "a x <mark>y z</mark>"
+  },
+  {
+    "name": "html pair split by emphasis",
+    "markdown": "**<kbd>Cmd**</kbd>",
+    "text": "<kbd>Cmd</kbd>"
+  },
+  {
+    "name": "html tag case and spaces",
+    "markdown": "<KBD>Up</KBD> <kbd >s</kbd > <br />",
+    "text": "Up s "
+  },
+  {
+    "name": "link targets",
+    "markdown": "[x](<my file.md>) [y](a/b%2Fc.go) [z](docs/%E2%9C%85.md) [q](a/b.go?x=1#L5) [r](100%.md)",
+    "text": "x a/b/c.go z a/b.go:5 100%.md"
+  },
+  {
+    "name": "links without text and with an image",
+    "markdown": "[](src/a.go) and [![i](i.png)](src/b.go)",
+    "text": "src/a.go and src/b.go"
+  },
+  {
+    "name": "code in a link",
+    "markdown": "See [`run.go`](https://x.dev/run.go) and [`a.go`](src/a.go).",
+    "text": "See run.go and src/a.go."
+  },
+  {
+    "name": "escape in a link target",
+    "markdown": "[t](a\\_b.go) and [u](docs/a&amp;b.md)",
+    "text": "a_b.go and u"
+  },
+  {
+    "name": "reference link to a path",
+    "markdown": "See [the loop][l].\n\n[l]: internal/store/search/run.go",
+    "text": "See internal/store/search/run.go."
+  },
+  {
+    "name": "nested quote with code",
+    "markdown": "> text\n>\n> ```\n> code **x**\n> ```\n> > inner `c`",
+    "text": "text\ncode **x**\ninner c"
+  },
+  {
+    "name": "emphasis across a link",
+    "markdown": "*see [the **docs**](https://x.dev)*, _x_y_ and **[a](b)**",
+    "text": "see the docs, x_y and a"
+  },
+  {
+    "name": "headings with emphasis and code",
+    "markdown": "# The `thread_items` **table** #\n\nSetext *too*\n===",
+    "text": "The thread_items table\nSetext too"
+  },
+  {
+    "name": "long ordered list interrupt",
+    "markdown": "Version\n10. ten\n\n1) one\n2) two",
+    "text": "Version\n10. ten\none\ntwo"
+  },
+  {
+    "name": "bare urls and emails",
+    "markdown": "Mail a.b@example.com or see http://x.dev/a?b=c_d. Then (www.x.dev).",
+    "text": "Mail a.b@example.com or see http://x.dev/a?b=c_d. Then (www.x.dev)."
+  },
+  {
+    "name": "cjk punctuation and emphasis",
+    "markdown": "**中文**，*日本語*と`コード`。한국어 **강조**입니다.",
+    "text": "中文，日本語とコード。한국어 강조입니다."
+  },
+  {
+    "name": "emoji in emphasis and code",
+    "markdown": "**🚀 launch** `✅ ok` _🎉_",
+    "text": "🚀 launch ✅ ok 🎉"
+  },
+  {
+    "name": "hard break before html",
+    "markdown": "a\\\n<kbd>b</kbd>",
+    "text": "a\nb"
+  }
+]

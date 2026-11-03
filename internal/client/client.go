@@ -44,6 +44,8 @@ type Client struct {
 	// Dictation is for the Wails host, which streams the microphone with
 	// DictationService.Audio while Watch says LISTENING.
 	Dictation codefoundryv1connect.DictationServiceClient
+	// Search is for the CLI's `search agent`, which streams a search's progress.
+	Search codefoundryv1connect.SearchServiceClient
 
 	paths paths.Paths
 }
@@ -72,6 +74,7 @@ func newClient(p paths.Paths, hc *http.Client, baseURL string) *Client {
 		Events:    codefoundryv1connect.NewEventServiceClient(hc, baseURL),
 		Plugin:    codefoundryv1connect.NewPluginServiceClient(hc, baseURL),
 		Dictation: codefoundryv1connect.NewDictationServiceClient(hc, baseURL),
+		Search:    codefoundryv1connect.NewSearchServiceClient(hc, baseURL),
 		paths:     p,
 	}
 }
