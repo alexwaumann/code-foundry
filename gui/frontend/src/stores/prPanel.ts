@@ -263,11 +263,12 @@ export async function revertPullRequest(ref: PrRef, panel: PanelTarget): Promise
 export async function mergePullRequest(ref: PrRef, method: MergeMethodView, deleteBranch: boolean, headSha: string): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().merging[key]) return false;
-  rememberMergeMethod(ref.slug, method);
   usePrPanelStore.setState((s) => ({ merging: { ...s.merging, [key]: true } }));
   try {
     const res = await runCommandForResult("pr.merge", mergeArgs(ref, method, deleteBranch, headSha), { quiet: true });
     if (!res) return false;
+    // Only a merge that ran sets the default: a declined confirmation or a refusal does not.
+    rememberMergeMethod(ref.slug, method);
     const message = parseMergeResult(res.resultJson)?.message || res.message || `Merged #${String(ref.number)}`;
     const [title = message, ...rest] = message.split("; ");
     toast.success(title, rest.length > 0 ? { description: rest.join("; ") } : undefined);
@@ -354,11 +355,13 @@ export function autoMergeArgs(ref: PrRef, method: MergeMethodView | null, headSh
 
 /**
  * The footer's Auto-merge (a method: GitHub merges it once its requirements pass; the
- * daemon confirms first) and Cancel auto-merge (null).
+ * daemon confirms first) and Cancel auto-merge (null). The method becomes the
+ * repository's default only once auto-merge is on (not when declined or refused).
  */
-export function setAutoMerge(ref: PrRef, method: MergeMethodView | null, headSha: string): Promise<boolean> {
-  if (method !== null) rememberMergeMethod(ref.slug, method);
-  return changePullRequest(ref, "pr.auto-merge", autoMergeArgs(ref, method, headSha));
+export async function setAutoMerge(ref: PrRef, method: MergeMethodView | null, headSha: string): Promise<boolean> {
+  const ok = await changePullRequest(ref, "pr.auto-merge", autoMergeArgs(ref, method, headSha));
+  if (ok && method !== null) rememberMergeMethod(ref.slug, method);
+  return ok;
 }
 
 /** Menu → Link to this thread: thread.pr.link (a manual link; there is no unlink). */

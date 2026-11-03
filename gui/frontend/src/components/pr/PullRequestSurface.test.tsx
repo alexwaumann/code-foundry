@@ -820,10 +820,10 @@ describe("the merge button", () => {
     fireEvent.click(byTestId("confirm-cancel"));
     await settle();
     expect(queryTestId("confirm-dialog")).toBeNull();
-    // Declined: the button is idle again, its menu does not come back by itself, and the method chosen is the default now.
+    // Declined: the button is idle again, its menu does not come back by itself, and the default method is unchanged.
     expect(button().hasAttribute("aria-busy")).toBe(false);
     expect(queryTestId("pr-merge-button-menu")).toBeNull();
-    expect(button().textContent).toBe("Merge");
+    expect(button().textContent).toBe("Squash and merge");
     expect(merges().filter(([, confirmed]) => confirmed)).toEqual([]);
 
     // GitHub refuses (the head moved): toasted, still open, the button usable again.
@@ -845,6 +845,8 @@ describe("the merge button", () => {
     expect(button().hasAttribute("aria-disabled")).toBe(false);
     expect(byTestId("pr-state").textContent).toBe("Open");
     expect(merges().filter(([, confirmed]) => confirmed)).toEqual([[{ "repo-slug": SLUG, number: "142", method: "rebase", "delete-branch": "false", "head-sha": HEAD_142 }, true]]);
+    // Refused: the default is still the one before.
+    expect(button().textContent).toBe("Squash and merge");
   });
 
   it("#146 from a fork: the branch cannot be deleted, and a merge asking anyway toasts that it was kept", async () => {
@@ -891,6 +893,14 @@ describe("auto-merge", () => {
     await openPr(163);
     expect(byTestId("pr-ready-headline").textContent).toBe("Waiting on checks3 running");
     expect(queryTestId("pr-merge-button")).toBeNull();
+    // Declining the confirmation leaves the default method alone.
+    const label = byTestId("pr-auto-merge-button").textContent;
+    press(byTestId("pr-auto-merge-button-menu-button"));
+    await pick(byTestId("pr-auto-merge-method-merge"));
+    fireEvent.click(byTestId("confirm-cancel"));
+    await settle();
+    expect(byTestId("pr-auto-merge-button").textContent).toBe(label);
+    expect(autoMerges()).toEqual([[{ "repo-slug": SLUG, number: "163", method: "merge", "head-sha": head163 }, false]]);
     // A method from the menu: rebase.
     press(byTestId("pr-auto-merge-button-menu-button"));
     expect(menuItems(byTestId("pr-auto-merge-button-menu"))).toEqual([
@@ -903,7 +913,7 @@ describe("auto-merge", () => {
     fireEvent.click(byTestId("confirm-ok"));
     await settle(3);
     const args = { "repo-slug": SLUG, number: "163", method: "rebase", "head-sha": head163 };
-    expect(autoMerges()).toEqual([
+    expect(autoMerges().slice(1)).toEqual([
       [args, false],
       [args, true],
     ]);

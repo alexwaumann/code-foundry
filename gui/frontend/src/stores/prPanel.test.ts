@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({ toast }));
 
 const { pullRequestDetailResource, pullRequestKey } = await import("./gh");
 const { makeTab, closePanelTab, openSurface, usePanelStore } = await import("./panel");
-const { clearConfirmedRequests, prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
+const { clearConfirmedRequests, prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setAutoMerge, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
 
 const SLUG = "acme/repo";
 const view = (body: string, lastError = "") => ({ body, lastError }) as PullRequestDetailView;
@@ -30,7 +30,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, reviewing: {} });
+  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, reviewing: {}, changing: {}, mergeMethods: {} });
   usePanelStore.setState({ byKey: {} });
 });
 
@@ -229,6 +229,28 @@ describe("submitReview", () => {
   it("reviewArgs trims the body and leaves an empty one out", () => {
     expect(reviewArgs({ slug: "o/r", number: 7 }, "request-changes", "  Fix it\n")).toEqual({ "repo-slug": "o/r", number: "7", verdict: "request-changes", body: "Fix it" });
     expect(reviewArgs({ slug: "o/r", number: 7 }, "approve", " \n")).toEqual({ "repo-slug": "o/r", number: "7", verdict: "approve" });
+  });
+});
+
+describe("setAutoMerge", () => {
+  it("the method becomes the repository's default only once pr.auto-merge succeeds", async () => {
+    const ref = { slug: "Acme/Repo", number: 5 };
+    getPullRequestDetail.mockResolvedValue(view("d"));
+    invokeCommand.mockRejectedValueOnce(new ConnectError("failed precondition: the head moved", Code.FailedPrecondition));
+    await expect(setAutoMerge(ref, "rebase", "abc")).resolves.toBe(false);
+    expect(invokeCommand).toHaveBeenCalledWith("pr.auto-merge", expect.anything(), { "repo-slug": "Acme/Repo", number: "5", method: "rebase", "head-sha": "abc" });
+    expect(usePrPanelStore.getState().mergeMethods).toEqual({});
+
+    invokeCommand.mockResolvedValueOnce({ message: "Auto-merge on for #5", resultJson: "{}" });
+    await expect(setAutoMerge(ref, "rebase", "abc")).resolves.toBe(true);
+    expect(usePrPanelStore.getState().mergeMethods).toEqual({ "acme/repo": "rebase" });
+
+    // Cancel auto-merge changes no default.
+    invokeCommand.mockResolvedValueOnce({ message: "Auto-merge off for #5", resultJson: "{}" });
+    await expect(setAutoMerge(ref, null, "")).resolves.toBe(true);
+    expect(invokeCommand).toHaveBeenLastCalledWith("pr.auto-merge", expect.anything(), { "repo-slug": "Acme/Repo", number: "5", off: "true" });
+    expect(usePrPanelStore.getState().mergeMethods).toEqual({ "acme/repo": "rebase" });
+    getPullRequestDetail.mockReset();
   });
 });
 
