@@ -102,14 +102,18 @@ function Label({ l }: { l: PullRequestLabelView }) {
 /** How tall the description shows before it fades out behind Show all. */
 export const DESCRIPTION_FOLD_PX = 170;
 
-/** Whether the element's content is taller than limit (read on mount and on resize). */
+/**
+ * Whether the element is taller than limit (read on mount and on resize). Give it the
+ * unclipped content, not the folded wrapper: the wrapper stays at the fold whatever its
+ * content does, so it would never see a shrink back under the limit.
+ */
 function useTallerThan(limit: number): [(el: HTMLElement | null) => void, boolean] {
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [taller, setTaller] = useState(false);
   useLayoutEffect(() => {
     if (!el) return;
     const measure = () => {
-      setTaller(el.scrollHeight > limit + 24);
+      setTaller(el.offsetHeight > limit + 24);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -136,14 +140,10 @@ function Description({ d, tabKey }: { d: PullRequestDetailView; tabKey: string }
   if (!d.body.trim()) return <p className="text-caption italic">No description provided.</p>;
   return (
     <div className="flex flex-col">
-      <div
-        ref={ref}
-        className={cn("relative", folded && "overflow-hidden")}
-        style={folded ? { maxHeight: DESCRIPTION_FOLD_PX } : undefined}
-        data-testid="pr-description-body"
-        data-folded={folded}
-      >
-        <Markdown extras={extras}>{d.body}</Markdown>
+      <div className={cn("relative", folded && "overflow-hidden")} style={folded ? { maxHeight: DESCRIPTION_FOLD_PX } : undefined} data-testid="pr-description-body" data-folded={folded}>
+        <div ref={ref} data-testid="pr-description-content">
+          <Markdown extras={extras}>{d.body}</Markdown>
+        </div>
         {folded && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-b from-transparent to-cf-surface" aria-hidden />}
       </div>
       {taller && (

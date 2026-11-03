@@ -688,8 +688,8 @@ describe("the readiness box and the Overview", () => {
   });
 
   it("a long description fades out behind Show all, which shows it whole in place (Show less folds it again); a short one shows whole", async () => {
-    const tall = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
-      return this.dataset.testid === "pr-description-body" ? 600 : 0;
+    const tall = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === "pr-description-content" ? 600 : 0;
     });
     try {
       renderPrPanel();
@@ -712,6 +712,40 @@ describe("the readiness box and the Overview", () => {
       expect(queryTestId("pr-description-toggle")).toBeNull();
     } finally {
       tall.mockRestore();
+    }
+  });
+
+  it("a folded description that shrinks under the fold (an edited body) unfolds: its content is measured, not the clipped box", async () => {
+    let height = 600;
+    const observed: (() => void)[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private cb: () => void) {}
+        observe(el: Element): void {
+          if ((el as HTMLElement).dataset.testid === "pr-description-content") observed.push(this.cb);
+        }
+        unobserve(): void {}
+        disconnect(): void {}
+      },
+    );
+    const tall = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === "pr-description-content" ? height : 0;
+    });
+    try {
+      renderPrPanel();
+      await openPr(145);
+      expect(byTestId("pr-description-body").dataset.folded).toBe("true");
+      // 180px: over the 170px fold, under the 194px that is worth a Show all.
+      height = 180;
+      act(() => {
+        for (const cb of observed) cb();
+      });
+      expect(byTestId("pr-description-body").dataset.folded).toBe("false");
+      expect(queryTestId("pr-description-toggle")).toBeNull();
+    } finally {
+      tall.mockRestore();
+      vi.unstubAllGlobals();
     }
   });
 
