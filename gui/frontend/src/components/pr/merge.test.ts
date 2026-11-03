@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MergeableView, MergeMethodView, PrStateView, PullRequestDetailView } from "@/api/gh";
-import { branchDelete, mergeArgs, mergeAvailability, mergeMethodHint } from "./merge";
+import { branchDelete, defaultMergeMethod, mergeArgs, mergeAvailability, mergeMethodHint } from "./merge";
 
 interface Shape {
   state?: PrStateView;
@@ -9,7 +9,6 @@ interface Shape {
   mergeState?: string;
   viewerCanUpdate?: boolean;
   methods?: MergeMethodView[];
-  autoMerge?: boolean;
   fork?: boolean;
   headRef?: string;
   baseRef?: string;
@@ -30,7 +29,6 @@ function detail(s: Shape = {}): PullRequestDetailView {
     },
     viewerCanUpdate: s.viewerCanUpdate ?? true,
     mergeMethods: s.methods ?? ["merge", "squash", "rebase"],
-    autoMergeEnabled: s.autoMerge ?? false,
     defaultBranch: s.defaultBranch ?? "main",
   } as PullRequestDetailView;
 }
@@ -47,10 +45,9 @@ describe("mergeAvailability", () => {
     { name: "conflicting", d: { mergeable: "conflicting" }, visible: true, reason: "Resolve conflicts first" },
     { name: "dirty", d: { mergeState: "dirty" }, visible: true, reason: "Resolve conflicts first" },
     { name: "blocked", d: { mergeState: "blocked" }, visible: true, reason: "Blocked: required checks or reviews are missing" },
-    { name: "behind is allowed, with a note", d: { mergeState: "behind" }, visible: true, reason: null, notes: ["Behind main: it merges as is."] },
+    { name: "behind blocks (GitHub reports it only when up to date is required)", d: { mergeState: "behind" }, visible: true, reason: "Behind main: this repository merges only up-to-date branches" },
     { name: "unstable is allowed, with a note", d: { mergeState: "unstable" }, visible: true, reason: null, notes: ["Some checks that are not required are failing."] },
     { name: "mergeability not computed yet is allowed", d: { mergeable: "unknown", mergeState: "unknown" }, visible: true, reason: null },
-    { name: "auto-merge note", d: { autoMerge: true }, visible: true, reason: null, notes: ["Auto-merge is on: GitHub merges it once its requirements pass."] },
     { name: "methods unknown: all three", d: { methods: [] }, visible: true, reason: null, methods: ["merge", "squash", "rebase"] },
     { name: "has hooks is allowed, no note", d: { mergeState: "has_hooks" }, visible: true, reason: null, methods: ["merge", "squash", "rebase"] },
     { name: "methods in GitHub's order", d: { methods: ["rebase", "squash"] }, visible: true, reason: null, methods: ["squash", "rebase"] },
@@ -61,6 +58,17 @@ describe("mergeAvailability", () => {
     expect(a.reason).toBe(reason);
     if (methods) expect(a.methods).toEqual(methods);
     expect(a.notes).toEqual(notes ?? []);
+  });
+});
+
+describe("defaultMergeMethod", () => {
+  it.each([
+    { name: "last chosen, still allowed", methods: ["merge", "squash", "rebase"], last: "rebase", want: "rebase" },
+    { name: "last chosen, no longer allowed: squash", methods: ["merge", "squash"], last: "rebase", want: "squash" },
+    { name: "nothing chosen: squash", methods: ["merge", "squash", "rebase"], last: undefined, want: "squash" },
+    { name: "no squash: the first allowed", methods: ["merge", "rebase"], last: undefined, want: "merge" },
+  ] as const)("$name", ({ methods, last, want }) => {
+    expect(defaultMergeMethod(methods, last)).toBe(want);
   });
 });
 

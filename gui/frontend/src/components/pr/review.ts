@@ -98,11 +98,17 @@ export function disabledVerdicts(author: string, viewer: string): Partial<Record
 }
 
 /**
- * Whether the header offers Review: an open pull request (drafts too) whose repository the
- * viewer can write to, like the reviewer picker. Merged and closed ones get nothing.
+ * Whether the readiness box offers Review: an open pull request (drafts too) whose
+ * repository the viewer can write to, or whose review is requested from the viewer
+ * (GitHub takes reviews from read access too; Approve and Request changes still follow
+ * disabledVerdicts). Merged and closed ones get nothing.
  */
-export function reviewVisible(d: Pick<PullRequestDetailView, "viewerCanUpdate"> & { pullRequest: Pick<PullRequestDetailView["pullRequest"], "state"> }): boolean {
-  return d.viewerCanUpdate && d.pullRequest.state === "open";
+export function reviewVisible(
+  d: Pick<PullRequestDetailView, "viewerCanUpdate"> & { pullRequest: Pick<PullRequestDetailView["pullRequest"], "state">; reviewers: readonly Pick<PullRequestReviewerView, "login" | "isTeam" | "requested">[] },
+  viewer: string,
+): boolean {
+  if (d.pullRequest.state !== "open") return false;
+  return d.viewerCanUpdate || d.reviewers.some((r) => r.requested && !r.isTeam && sameLogin(r.login, viewer));
 }
 
 export type YourReview = "approved" | "changes_requested" | "commented";

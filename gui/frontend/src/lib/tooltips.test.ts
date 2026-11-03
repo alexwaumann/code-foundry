@@ -17,7 +17,7 @@ const sources = import.meta.glob<string>(["/src/**/*.tsx", "!/src/**/*.test.tsx"
 
 /** Components whose `title` prop is their own visible text, not a tooltip. */
 const OWN_TITLE: { file: string; component: string; why: string }[] = [
-  { file: "/src/components/pr/PrSummary.tsx", component: "Section", why: "the collapsible section's heading" },
+  { file: "/src/components/pr/PrOverview.tsx", component: "Section", why: "the collapsible section's heading" },
   { file: "/src/components/pr/PrMenu.tsx", component: "Item", why: "the menu item's label" },
   { file: "/src/components/pr/ReviewButton.tsx", component: "Item", why: "the Review menu item's label (PrMenu's Item)" },
   { file: "/src/components/pr/PullRequestSurface.tsx", component: "Centered", why: "the empty state's heading" },

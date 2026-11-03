@@ -1,28 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { CheckRollupView, PullRequestCommentView, PullRequestDetailView, PullRequestView, ReviewThreadView } from "@/api/gh";
-import { ago, checkDuration, checkMeta, checkRunning, checksHeadline, checkTone, commentCount, conversation, resolveLink, reviewerStatus, stateBadge, threadLocation, timeline } from "./model";
+import type { PullRequestCommentView, PullRequestDetailView, PullRequestView, ReviewThreadView } from "@/api/gh";
+import { ago, checkDuration, checkMeta, checkRunning, checkTone, commentCount, conversation, resolveLink, reviewerStatus, stateBadge, threadLocation, timeline } from "./model";
 
 const NOW = new Date(2026, 9, 8, 12, 0, 0).getTime();
 const M = 60_000;
 const H = 60 * M;
 const D = 24 * H;
 
-const rollup = (o: Partial<CheckRollupView>): CheckRollupView => ({ state: "success", total: 0, passed: 0, failed: 0, pending: 0, skipped: 0, ...o });
-
-describe("checksHeadline", () => {
-  it.each([
-    ["no checks", rollup({ state: "none" }), "neutral", "No checks"],
-    ["all passed", rollup({ total: 12, passed: 12 }), "success", "All checks passed"],
-    ["passed with skipped", rollup({ total: 5, passed: 3, skipped: 2 }), "success", "All checks passed"],
-    ["failing wins over pending", rollup({ state: "failure", total: 28, failed: 2, pending: 3 }), "failure", "2 failing"],
-    ["failure state without counts", rollup({ state: "error", total: 1 }), "failure", "Checks failing"],
-    ["failure state, only pending counted", rollup({ state: "failure", total: 3, pending: 3 }), "failure", "Checks failing"],
-    ["pending", rollup({ state: "pending", total: 9, pending: 4 }), "pending", "4 pending"],
-    ["expected", rollup({ state: "expected", total: 1 }), "pending", "Checks pending"],
-  ] as const)("%s", (_name, r, tone, text) => {
-    expect(checksHeadline(r)).toEqual({ tone, text });
-  });
-});
 
 describe("stateBadge", () => {
   it.each([

@@ -5,8 +5,8 @@ import { CF, invocations, mockPost, openApp, resetMock, row, selectWorktree } fr
  * The Pull request surface in the side panel, against the mock daemon's fixtures
  * (mock/prDetail.ts): #145 open with failing checks, threads, labels and reviewers;
  * #138 merged and revertable; #131 closed; #140 read-only; #142 mergeable; #146 from a
- * fork; #139 a teammate's, awaiting the viewer's review. Set SHOTS=<dir> to save
- * screenshots.
+ * fork; #139 a teammate's, awaiting the viewer's review; #160-#164 the readiness box's
+ * other states. Set SHOTS=<dir> to save screenshots.
  */
 
 const CFW = `${CF}.worktrees`;
@@ -86,20 +86,90 @@ function copied(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
 }
 
-// "a row on the Pull Requests page opens #145: header, reviewers, failing checks": src/components/pr/PullRequestSurface.test.tsx ("#145: header, reviewers, ...").
-test("summary (screenshot)", async ({ page }) => {
+// "a row on the Pull Requests page opens #145: header, readiness box, reviewers, …": src/components/pr/PullRequestSurface.test.tsx ("#145: header, readiness box, ...").
+// The readiness model: src/components/pr/readiness.test.ts.
+test("overview (screenshot)", async ({ page }) => {
   test.skip(!shots, "SHOTS=<dir> only: the screenshot is all it adds");
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
-  await expect(page.getByTestId("pr-checks-summary")).toHaveText("2 failing");
+  await expect(page.getByTestId("pr-ready-headline")).toHaveText("Not ready to merge4 left");
   await shot(page, "chunk3-summary");
+});
+
+/** No element of the readiness box sticks out of it, and no two of a row's or the footer's parts overlap. */
+async function boxFits(page: Page): Promise<void> {
+  const problems = await page.getByTestId("pr-surface").evaluate((surface) => {
+    const out: string[] = [];
+    const r = (e: Element) => e.getBoundingClientRect();
+    const within = (a: DOMRect, b: DOMRect) => a.left >= b.left - 1 && a.right <= b.right + 1;
+    const overlap = (a: DOMRect, b: DOMRect) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    const sr = r(surface);
+    for (const id of ["pr-header", "pr-readiness", "pr-inner-bar", "pr-overview"]) {
+      const el = surface.querySelector(`[data-testid="${id}"]`);
+      if (!el) continue;
+      if (el.scrollWidth > el.clientWidth) out.push(`${id} overflows by ${String(el.scrollWidth - el.clientWidth)}`);
+      if (!within(r(el), sr)) out.push(`${id} outside the surface`);
+    }
+    const box = surface.querySelector('[data-testid="pr-readiness"]');
+    if (!box) return ["no box"];
+    const br = r(box);
+    for (const el of box.querySelectorAll("button, [data-testid=pr-ready-title], [data-testid=pr-ready-lines]")) if (!within(r(el), br)) out.push(`${el.textContent} outside the box`);
+    const footer = box.querySelector('[data-testid="pr-ready-footer"]');
+    const parts = footer ? [...footer.querySelectorAll("button")] : [];
+    for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (overlap(r(parts[i] as Element), r(parts[j] as Element))) out.push(`footer: ${parts[i]?.textContent ?? ""} overlaps ${parts[j]?.textContent ?? ""}`);
+    // A row's button sits under its text, never beside or over it.
+    for (const row of box.querySelectorAll('[data-testid="pr-ready-row"]')) {
+      const title = row.querySelector('[data-testid="pr-ready-title"]');
+      for (const b of row.querySelectorAll("[data-slot=button]")) if (title && r(b).top < r(title).bottom - 1) out.push(`${b.textContent} is not under its row's text`);
+    }
+    return out;
+  });
+  expect(problems).toEqual([]);
+}
+
+// Which rows, headline and footer each state has: src/components/pr/readiness.test.ts; the buttons per
+// state and viewer: src/components/pr/PullRequestSurface.test.tsx ("the readiness box and the Overview", "the merge button", "auto-merge").
+test("the readiness box fits at 360, 420 and 560px in every state: nothing overflows or overlaps, actions under their row's text", async ({ page }) => {
+  await openPrPage(page);
+  for (const width of [360, 420, 560]) {
+    for (const n of [145, 160, 161, 162, 163, 164, 142, 139, 140, 131, 138]) {
+      await openPr(page, n);
+      await setPanelWidth(page, width);
+      await expect(page.getByTestId("pr-surface")).toHaveAttribute("data-pr", `${SLUG}#${String(n)}`);
+      await expect(page.getByTestId("pr-ready-headline")).toBeVisible();
+      await boxFits(page);
+    }
+  }
+});
+
+// Which controls the Code tab's compact box keeps: src/components/pr/PullRequestSurface.test.tsx ("the Code tab keeps ...").
+test("the Code tab's compact box: headline and footer on one line when the panel is wide enough, under it when not; the diff keeps the height", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await page.getByTestId("pr-tab-code").click();
+  await expect(page.getByTestId("pr-readiness")).toHaveAttribute("data-compact", "true");
+  for (const [width, oneLine] of [
+    [560, true],
+    [420, false],
+    [360, false],
+  ] as const) {
+    await setPanelWidth(page, width);
+    await boxFits(page);
+    const head = await boxOf(page, "pr-ready-headline");
+    const foot = await boxOf(page, "pr-ready-footer");
+    // One line: the controls sit beside the headline; else under it.
+    expect(foot.y < head.y + head.height).toBe(oneLine);
+    // At the 800px window the box stays small and the diff (the strip down to the window's foot) has most of the panel.
+    expect((await boxOf(page, "pr-readiness")).height).toBeLessThanOrEqual(oneLine ? 44 : 72);
+    expect(800 - (await boxOf(page, "pr-code-strip")).y).toBeGreaterThan(400);
+  }
 });
 
 // Timeline's entries, order, commit links and inner tabs per panel tab: src/components/pr/PullRequestSurface.test.tsx ("Timeline").
 test("Timeline at the default 420px: the counts end before the order toggle; the rail stops at the last entry's icon", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
-  await page.getByTestId("pr-tab-timeline").click();
+  await page.getByTestId("pr-tab-activity").click();
   const entries = page.getByTestId("pr-timeline-entry");
   await expect(entries).toHaveCount(10);
   // The counts' text fits their box, and that box ends before the toggle (its icon).
@@ -162,7 +232,7 @@ test("shift+cmd+c copies the link while the panel has focus", async ({ page }) =
 
 // "#138 (merged) offers Revert", "declining the revert's confirmation sends nothing" and "#140 (read
 // access) explains the picker and has no revert; #131 is closed; unknown numbers say not found":
-// src/components/pr/PullRequestSurface.test.tsx ("the ⋯ menu", "Summary").
+// src/components/pr/PullRequestSurface.test.tsx ("the ⋯ menu", "Overview").
 test("merged pull request menu (screenshot)", async ({ page }) => {
   test.skip(!shots, "SHOTS=<dir> only: the screenshot is all it adds");
   await openPrPage(page);
@@ -201,7 +271,7 @@ test("panel state is per selection; a thread or worktree on a PR branch enables 
   // Back on the Pull Requests page, its panel is as it was.
   await page.getByTestId("nav-pullrequests").click();
   await expect(tabs(page)).toHaveText(["#142"]);
-  await expect(page.getByTestId("pr-tab-summary")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("pr-tab-overview")).toHaveAttribute("aria-selected", "true");
 });
 
 test("light scheme", async ({ page }) => {
@@ -209,11 +279,11 @@ test("light scheme", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
-  await expect(page.getByTestId("pr-checks-summary")).toHaveText("2 failing");
+  await expect(page.getByTestId("pr-ready-headline")).toHaveText("Not ready to merge4 left");
   await shot(page, "chunk3-light-summary");
 });
 
-// Closing a tab drops its inner state (reopened, it starts on Summary): src/components/pr/PullRequestSurface.test.tsx ("closing a tab drops its inner state").
+// Closing a tab drops its inner state (reopened, it starts on Overview): src/components/pr/PullRequestSurface.test.tsx ("closing a tab drops its inner state").
 test("cmd+w from inside the surface closes its tab; the last tab gone, the panel hides", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
@@ -223,18 +293,16 @@ test("cmd+w from inside the surface closes its tab; the last tab gone, the panel
   await expect(panel(page)).toHaveCount(0);
 });
 
-test("at 280px nothing overflows: header, inner tab bar, logins, popups; the active tab is revealed", async ({ page }) => {
+test("at 280px nothing overflows: header, readiness box, inner tab bar, logins, popups; the active tab is revealed", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await setPanelWidth(page, 280);
   await expect(page.getByTestId("pr-surface")).toBeVisible();
 
-  // Summary: the headline keeps its icon and number inside the bar.
+  // Overview: the header, the box (its footer wraps) and the bar fit.
   expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
   expect(await overflowX(page, "pr-inner-bar")).toBeLessThanOrEqual(0);
-  await expect(page.getByTestId("pr-checks-summary")).toHaveText("2 failing");
-  expect(inside(await boxOf(page, "pr-checks-summary"), await boxOf(page, "pr-inner-bar"))).toBe(true);
-  // The repo link has its own row; the diffstat wraps under the branches.
+  await boxFits(page);
   expect(inside(await boxOf(page, "pr-diffstat"), await boxOf(page, "pr-header"))).toBe(true);
   expect(inside(await boxOf(page, "pr-reviewers"), await boxOf(page, "side-panel"))).toBe(true);
   // Comment authors are not cut before their verdict.
@@ -242,7 +310,7 @@ test("at 280px nothing overflows: header, inner tab bar, logins, popups; the act
   expect(cutComments).toEqual([]);
 
   // Timeline: the counts give way; the order toggle stays reachable.
-  await page.getByTestId("pr-tab-timeline").click();
+  await page.getByTestId("pr-tab-activity").click();
   expect(await overflowX(page, "pr-inner-bar")).toBeLessThanOrEqual(0);
   await expect(page.getByTestId("pr-timeline-counts")).toBeHidden();
   expect(inside(await boxOf(page, "pr-timeline-order"), await boxOf(page, "pr-inner-bar"))).toBe(true);
@@ -256,13 +324,15 @@ test("at 280px nothing overflows: header, inner tab bar, logins, popups; the act
   await expect(page.getByTestId("pr-menu")).toBeVisible();
   expect(inside(await boxOf(page, "pr-menu"), await boxOf(page, "side-panel"))).toBe(true);
   await page.keyboard.press("Escape");
-  await page.getByTestId("pr-tab-summary").click();
+  await page.getByTestId("pr-tab-overview").click();
   await page.getByTestId("pr-add-reviewer").click();
   await expect(page.getByTestId("pr-reviewer-picker")).toBeVisible();
   expect(inside(await boxOf(page, "pr-reviewer-picker"), await boxOf(page, "side-panel"))).toBe(true);
   await page.keyboard.press("Escape");
-  // Review keeps its icons (the label is for screen readers); its menu and composer fit.
-  expect((await boxOf(page, "pr-review-button")).width).toBeLessThan(48);
+  // Gone (its exit animation over): closing hands focus back to its button, which would
+  // otherwise take it from the composer opened next.
+  await expect(page.getByTestId("pr-reviewer-picker")).toHaveCount(0);
+  // Review's menu and composer fit.
   await expect(page.getByTestId("pr-review-button")).toHaveAccessibleName("Review");
   await page.getByTestId("pr-review-button").click();
   await expect(page.getByTestId("pr-review-menu")).toBeVisible();
@@ -270,6 +340,7 @@ test("at 280px nothing overflows: header, inner tab bar, logins, popups; the act
   await page.getByTestId("pr-review-comment").click();
   expect(await overflowX(page, "pr-review-composer")).toBeLessThanOrEqual(0);
   expect(inside(await boxOf(page, "pr-review-submit"), await boxOf(page, "side-panel"))).toBe(true);
+  await expect(page.getByTestId("pr-review-input")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
 
@@ -306,7 +377,7 @@ test("long conversations and timelines are virtualized in the panel's scroll", a
   await body.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.getByTestId("pr-tab-timeline").click();
+  await page.getByTestId("pr-tab-activity").click();
   await expect(page.getByTestId("pr-timeline-list")).toHaveAttribute("data-virtual", "true");
   await expect
     .poll(async () => {
@@ -461,10 +532,10 @@ test("#142 merges from a menu inside the side panel; the dashboard moves it to r
   await shotViewport(page);
   await openPrPage(page);
   await prRow(page, "authored", 142).click();
-  await page.getByTestId("pr-merge-button").click();
-  await expect(page.getByTestId("pr-merge-menu")).toBeVisible();
-  expect(inside(await boxOf(page, "pr-merge-menu"), await boxOf(page, "side-panel"))).toBe(true);
-  await settledAnimations(page, "pr-merge-menu");
+  await page.getByTestId("pr-merge-button-menu-button").click();
+  await expect(page.getByTestId("pr-merge-button-menu")).toBeVisible();
+  expect(inside(await boxOf(page, "pr-merge-button-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  await settledAnimations(page, "pr-merge-button-menu");
   await shot(page, "merge-button");
 
   await page.getByTestId("pr-merge-method-squash").click();
@@ -475,24 +546,20 @@ test("#142 merges from a menu inside the side panel; the dashboard moves it to r
   await expect(prRow(page, "authored", 142)).toHaveCount(0);
 });
 
-test("at 280px the merge button keeps its icons and its dropdown stays inside the panel", async ({ page }) => {
+test("at 280px the merge split button stays inside the box and its dropdown inside the panel", async ({ page }) => {
   await shotViewport(page);
   await openPrPage(page);
   await prRow(page, "authored", 142).click();
   await setPanelWidth(page, 280);
-  const button = page.getByTestId("pr-merge-button");
-  await expect(button).toBeVisible();
-  expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
-  // The label is for screen readers only; the icon and chevron stay.
-  expect((await boxOf(page, "pr-merge-button")).width).toBeLessThan(48);
-  await expect(button).toHaveAccessibleName("Merge");
-  expect(inside(await boxOf(page, "pr-actions"), await boxOf(page, "pr-header"))).toBe(true);
-  await button.click();
-  await expect(page.getByTestId("pr-merge-menu")).toBeVisible();
-  expect(inside(await boxOf(page, "pr-merge-menu"), await boxOf(page, "side-panel"))).toBe(true);
-  const cut = await page.getByTestId("pr-merge-menu").evaluate((el) => el.scrollWidth - el.clientWidth);
+  await expect(page.getByTestId("pr-merge-button")).toBeVisible();
+  await boxFits(page);
+  expect(inside(await boxOf(page, "pr-merge-button-split"), await boxOf(page, "pr-readiness"))).toBe(true);
+  await page.getByTestId("pr-merge-button-menu-button").click();
+  await expect(page.getByTestId("pr-merge-button-menu")).toBeVisible();
+  expect(inside(await boxOf(page, "pr-merge-button-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  const cut = await page.getByTestId("pr-merge-button-menu").evaluate((el) => el.scrollWidth - el.clientWidth);
   expect(cut).toBeLessThanOrEqual(0);
-  await settledAnimations(page, "pr-merge-menu");
+  await settledAnimations(page, "pr-merge-button-menu");
   await shot(page, "merge-button-280");
 });
 
@@ -500,12 +567,12 @@ test("at 280px the merge button keeps its icons and its dropdown stays inside th
 
 // The Review menu, the composer's label, hint and keys, pr.review's args, the toast, the chip, the
 // reviewer entry and the review in Comments: src/components/pr/PullRequestSurface.test.tsx ("Review ▾").
-test("Review on #139 sits left of Merge; its menu stays inside the panel", async ({ page }) => {
+test("Review on #139 sits left of Auto-merge in the box's footer; its menu stays inside the panel", async ({ page }) => {
   await shotViewport(page);
   await openPrPage(page);
   await prRow(page, "review", 139).click();
   await expect(page.getByTestId("pr-review-button")).toHaveText("Review");
-  expect((await boxOf(page, "pr-review-button")).x).toBeLessThan((await boxOf(page, "pr-merge-button")).x);
+  expect((await boxOf(page, "pr-review-button")).x).toBeLessThan((await boxOf(page, "pr-auto-merge-button")).x);
   await page.getByTestId("pr-review-button").click();
   await expect(page.getByTestId("pr-review-menu")).toBeVisible();
   expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, "side-panel"))).toBe(true);

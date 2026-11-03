@@ -111,8 +111,13 @@ func TestFullPullRequestCache(t *testing.T) {
 
 	clk.advance(2 * time.Hour)
 	g.failNext("PullRequestFull", errors.New("github graphql: boom"))
-	if d := read(false); d.LastError == "" || d.Body != "second body" {
-		t.Errorf("failed refresh: lastError %q body %q", d.LastError, d.Body)
+	if d := read(false); d.LastError == "" || !d.FetchFailed || d.Body != "second body" {
+		t.Errorf("failed refresh: lastError %q fetchFailed %v body %q", d.LastError, d.FetchFailed, d.Body)
+	}
+	// The flag is never cached: the next good fetch is fresh again.
+	clk.advance(2 * time.Hour)
+	if d := read(false); d.LastError != "" || d.FetchFailed {
+		t.Errorf("after recovery: lastError %q fetchFailed %v", d.LastError, d.FetchFailed)
 	}
 
 	if _, err := s.FullPullRequest(ctx, "o/r", 99, false); !errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), "Could not resolve") {
@@ -133,8 +138,8 @@ func TestFullPullRequestCache(t *testing.T) {
 	opts2.Now = clk.now
 	s2 := startStore(t, opts2)
 	d2, err := s2.FullPullRequest(ctx, "o/r", 1, false)
-	if err != nil || d2.Body != "second body" || d2.LastError == "" || d2.PullRequest.ID != "PR_a" {
-		t.Errorf("restart: err %v body %q lastError %q", err, d2.Body, d2.LastError)
+	if err != nil || d2.Body != "second body" || d2.LastError == "" || !d2.FetchFailed || d2.PullRequest.ID != "PR_a" {
+		t.Errorf("restart: err %v body %q lastError %q fetchFailed %v", err, d2.Body, d2.LastError, d2.FetchFailed)
 	}
 }
 

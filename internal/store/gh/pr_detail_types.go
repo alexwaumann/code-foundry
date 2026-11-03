@@ -63,9 +63,12 @@ type FullPullRequest struct {
 	// READ); empty if unknown.
 	ViewerPermission string    `json:"viewerPermission,omitempty"`
 	FetchedAt        time.Time `json:"fetchedAt"`
-	// LastError is set when a refresh failed and this is the cached copy, or when a
-	// page of checks beyond the first failed (ChecksTruncated).
+	// LastError is set when a refresh failed and this is the cached copy (FetchFailed),
+	// or when a page of checks beyond the first failed (ChecksTruncated).
 	LastError string `json:"-"`
+	// FetchFailed: this is the cached copy, served because the fetch failed. Never
+	// stored; it tells a stale copy from a fresh fetch whose LastError is about checks.
+	FetchFailed bool `json:"-"`
 }
 
 // ViewerCanUpdate reports write access: the viewer may request reviewers and revert.

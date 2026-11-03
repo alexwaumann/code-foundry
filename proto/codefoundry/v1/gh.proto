@@ -693,8 +693,8 @@ message PullRequestDetail {
   bool viewer_can_update = 16;
   // When this detail was fetched; unset if never.
   google.protobuf.Timestamp fetched_at = 17;
-  // The last fetch's error when this is the cached copy, or why checks is incomplete
-  // (a page of checks beyond the first failed).
+  // The last fetch's error when this is the cached copy (fetch_failed), or why checks
+  // is incomplete (a page of checks beyond the first failed).
   string last_error = 18;
   // The viewer's permission on the repository, lower case ("admin", "maintain",
   // "write", "triage", "read"); empty if unknown.
@@ -720,6 +720,9 @@ message PullRequestDetail {
   bool auto_merge_allowed = 26;
   // The merge method of the enabled auto-merge; UNSPECIFIED while auto-merge is off.
   PullRequestMergeMethod auto_merge_method = 27;
+  // This is the cached copy, served because fetching it from GitHub failed (last_error
+  // says why). False for a fresh fetch, also when last_error explains checks_truncated.
+  bool fetch_failed = 28;
 }
 
 message PullRequestLabel {

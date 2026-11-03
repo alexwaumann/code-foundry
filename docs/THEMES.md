@@ -118,7 +118,8 @@ app itself paints with, so an override shows in the app:
 - Interactive: `--cf-accent`, `--cf-accent-foreground`, `--cf-accent-surface`,
   `--cf-accent-surface-foreground`, `--cf-focus`, `--cf-input`, `--cf-control`,
   `--cf-control-hover`, `--cf-control-active`, `--cf-selection`
-- Status: `--cf-success`, `--cf-success-text`, `--cf-success-surface`, `--cf-warning`,
+- Status: `--cf-success`, `--cf-success-text`, `--cf-success-surface`,
+  `--cf-success-foreground`, `--cf-warning`,
   `--cf-warning-text`, `--cf-warning-surface`, `--cf-warning-foreground`, `--cf-error`,
   `--cf-error-text`, `--cf-error-surface`, `--cf-error-foreground`, `--cf-info`,
   `--cf-info-text`, `--cf-info-surface`, `--cf-highlight`, `--cf-highlight-text`,
@@ -133,7 +134,7 @@ app itself paints with, so an override shows in the app:
 
 Pages only (the app has no place for them yet; a page the model writes may use them):
 
-- `--cf-success-foreground`, `--cf-info-foreground`, `--cf-highlight-foreground`,
+- `--cf-info-foreground`, `--cf-highlight-foreground`,
   `--cf-update-foreground`, `--cf-chart-1`, `--cf-chart-2`, `--cf-chart-3`, `--cf-chart-4`,
   `--cf-chart-5`, `--cf-chart-6`
 

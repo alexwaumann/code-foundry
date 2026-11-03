@@ -1,6 +1,7 @@
-import { ArrowDownUp, Bot, Check, ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleMinus, CircleX, Clock, ExternalLink, FileCode2, FileDiff, MessageSquare, Users } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
-import type { CheckView, PullRequestCommentView, PullRequestDetailView, PullRequestReviewerView, ReviewThreadView } from "@/api/gh";
+import { ArrowDownUp, ChevronDown, ChevronRight, ChevronUp, ExternalLink, FileCode2 } from "lucide-react";
+import { useCallback, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import type { PullRequestCommentView, PullRequestDetailView, PullRequestLabelView, PullRequestReviewerView, ReviewThreadView } from "@/api/gh";
+import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,7 @@ import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { Markdown } from "./Markdown";
 import { usePanelMarkdownExtras } from "./prLinks";
-import { ago, checkMeta, checkRunning, checkTone, commentCount, conversation, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
+import { ago, commentCount, conversation, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
 import { ReviewerPicker } from "./ReviewerPicker";
 import { toneText } from "./tones";
 import { VirtualStack } from "./VirtualStack";
@@ -24,7 +25,7 @@ function Section({ tabKey, section, title, count, extra, children, testId }: { t
   const open = useSectionOpen(tabKey, section);
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
-    <section className="px-4 py-2" data-testid={testId} data-open={open}>
+    <section className="px-4 py-2 @max-[340px]:px-3" data-testid={testId} data-open={open}>
       <div className="flex h-7 items-center gap-2">
         <button
           type="button"
@@ -45,95 +46,124 @@ function Section({ tabKey, section, title, count, extra, children, testId }: { t
   );
 }
 
-const reviewerIcon: Record<ReviewerStatus, { icon: typeof Check; cls: string } | null> = {
-  approved: { icon: Check, cls: toneText.success },
-  changes_requested: { icon: FileDiff, cls: toneText.failure },
-  commented: { icon: MessageSquare, cls: "text-cf-text-muted" },
-  dismissed: { icon: CircleMinus, cls: "text-cf-text-muted" },
-  requested: { icon: Clock, cls: toneText.pending },
-  none: null,
+/** The ring round a reviewer's avatar: approved, changes requested, or still pending. */
+const reviewerRing: Partial<Record<ReviewerStatus, string>> = {
+  approved: "ring-cf-success",
+  changes_requested: "ring-cf-error",
+  requested: "ring-cf-warning",
 };
 
+/** A reviewer's avatar, ringed by outcome; the tooltip names them and their review (hidden: only the face shows). */
 function Reviewer({ r }: { r: PullRequestReviewerView }) {
   const { status, label } = reviewerStatus(r);
-  const icon = reviewerIcon[status];
-  // The review state is an icon on the chip: the tooltip names it.
+  // A re-requested reviewer is pending again, whatever they said before.
+  const ring = r.requested ? reviewerRing.requested : reviewerRing[status];
   return (
-    <Tip label={label ? `${r.login}: ${label}` : null}>
+    <Tip label={[r.login, r.isBot ? "bot" : "", label].filter(Boolean).join(" · ")}>
       <span
-        className={cn("inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-cf-border bg-cf-surface-sunken/40 pr-2 pl-0.5 text-body-sm", r.stale && "opacity-70")}
+        className={cn("inline-flex rounded-full ring-[1.5px] ring-offset-1 ring-offset-cf-surface", ring ?? "ring-transparent", r.stale && "opacity-70")}
         data-testid="pr-reviewer"
         data-login={r.login}
         data-status={status}
         data-stale={r.stale}
+        aria-label={[r.login, label].filter(Boolean).join(": ")}
+        role="img"
       >
-        <Avatar login={r.login} src={r.avatarUrl} size={18} />
-        <span className="max-w-36 min-w-0 truncate">{r.login}</span>
-        {r.isBot && <Bot className="size-3 shrink-0 text-cf-text-muted" aria-label="bot" />}
-        {icon && <icon.icon className={cn("size-3.5 shrink-0", icon.cls)} aria-label={label} />}
-        {r.requested && r.state !== "" && <Clock className={cn("size-3 shrink-0", toneText.pending)} aria-hidden />}
+        <Avatar login={r.login} src={r.avatarUrl} size={20} />
       </span>
     </Tip>
   );
 }
 
-/** "Reviewers  [chips]": the label beside the values, or above them in a narrow panel. */
-function Row({ icon: Icon, label, children, testId }: { icon: typeof Users; label: string; children: ReactNode; testId: string }) {
+/** "Reviewers  [faces] +": the label beside the values. */
+function Field({ label, children, testId }: { label: string; children: ReactNode; testId: string }) {
   return (
-    <div className="flex min-h-7 items-start gap-3 @max-[340px]:flex-col @max-[340px]:gap-0" data-testid={testId}>
-      <span className="flex h-7 w-24 shrink-0 items-center gap-2 text-caption">
-        <Icon className="size-4" aria-hidden />
-        {label}
-      </span>
+    <div className="flex min-h-7 min-w-0 items-start gap-3" data-testid={testId}>
+      <span className="flex h-7 w-16 shrink-0 items-center text-caption text-cf-text-muted">{label}</span>
       <div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-1.5">{children}</div>
     </div>
   );
 }
 
-const checkIcon = { success: CircleCheck, failure: CircleX, pending: CircleDot, skipped: CircleDashed } as const;
-
-function CheckRow({ c, now }: { c: CheckView; now: number }) {
-  const tone = checkTone(c);
-  const Icon = checkIcon[tone];
-  // The name and description (the row has no room for the latter; without one, only when
-  // the name is cut). On the item: a check without a URL is a disabled button (no pointer events).
+/** A label chip in the label's own colour (GitHub's hex). */
+function Label({ l }: { l: PullRequestLabelView }) {
+  const color = /^[0-9a-f]{6}$/i.test(l.color) ? `#${l.color}` : undefined;
   return (
-    <Tip label={[c.name, c.description].filter(Boolean).join("\n")} whenTruncated={!c.description} align="start">
-      <li>
-        <button
-          type="button"
-          disabled={!c.url}
-          className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-body-sm outline-none enabled:hover:bg-cf-control-hover/60 focus-visible:ring-1 focus-visible:ring-cf-focus disabled:cursor-default"
-          data-testid="pr-check"
-          data-tone={tone}
-          onClick={() => void openUrl(c.url)}
-        >
-          <Icon className={cn("size-3.5 shrink-0", toneText[tone], tone === "pending" && c.status === "in_progress" && "animate-pulse")} aria-label={tone} />
-          <span className="min-w-0 truncate">{c.name}</span>
-          {c.workflow && <span className="min-w-0 shrink truncate text-caption">{c.workflow}</span>}
-          <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="pr-check-meta">
-            {checkMeta(c, now)}
-          </span>
-          <ExternalLink className={cn("size-3 shrink-0 text-cf-text-muted opacity-0", c.url && "group-hover:opacity-100")} aria-hidden />
-        </button>
-      </li>
-    </Tip>
+    <span
+      className="inline-flex h-5 max-w-full min-w-0 items-center rounded-full border border-cf-border px-2 text-caption"
+      style={color ? { borderColor: `color-mix(in srgb, ${color} 55%, transparent)`, color: `color-mix(in srgb, ${color} 70%, var(--cf-text))` } : undefined}
+      data-testid="pr-label"
+    >
+      <span className="truncate">{l.name}</span>
+    </span>
   );
 }
 
-function Checks({ d }: { d: PullRequestDetailView }) {
-  // Tick every second only while a running check's duration grows.
-  const now = useNow(d.checks.some(checkRunning) ? 1000 : 30_000);
-  if (d.checks.length === 0) return <p className="text-caption">No checks on the head commit.</p>;
+/** How tall the description shows before it fades out behind Show all. */
+export const DESCRIPTION_FOLD_PX = 170;
+
+/**
+ * Whether the element is taller than limit (read on mount and on resize). Give it the
+ * unclipped content, not the folded wrapper: the wrapper stays at the fold whatever its
+ * content does, so it would never see a shrink back under the limit.
+ */
+function useTallerThan(limit: number): [(el: HTMLElement | null) => void, boolean] {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [taller, setTaller] = useState(false);
+  useLayoutEffect(() => {
+    if (!el) return;
+    const measure = () => {
+      setTaller(el.offsetHeight > limit + 24);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, [el, limit]);
+  return [useCallback((e: HTMLElement | null) => {
+    setEl(e);
+  }, []), taller];
+}
+
+/**
+ * The description: shown whole when short; otherwise cut at DESCRIPTION_FOLD_PX with a
+ * fade and a centred Show all, which shows it whole in place (Show less folds it again).
+ * Kept per panel tab.
+ */
+function Description({ d, tabKey }: { d: PullRequestDetailView; tabKey: string }) {
+  const extras = usePanelMarkdownExtras();
+  const full = useSectionOpen(tabKey, "fullDescription");
+  const [ref, taller] = useTallerThan(DESCRIPTION_FOLD_PX);
+  const folded = taller && !full;
+  if (!d.body.trim()) return <p className="text-caption italic">No description provided.</p>;
   return (
-    <>
-      <ul className="-mx-1.5 flex flex-col" data-testid="pr-checks-list">
-        {d.checks.map((c, i) => (
-          <CheckRow key={`${c.workflow}/${c.name}/${String(i)}`} c={c} now={now} />
-        ))}
-      </ul>
-      {d.checksTruncated && <Notice>Not every check could be listed{d.lastError ? `: ${d.lastError}` : "."} The rest are on GitHub.</Notice>}
-    </>
+    <div className="flex flex-col">
+      <div className={cn("relative", folded && "overflow-hidden")} style={folded ? { maxHeight: DESCRIPTION_FOLD_PX } : undefined} data-testid="pr-description-body" data-folded={folded}>
+        <div ref={ref} data-testid="pr-description-content">
+          <Markdown extras={extras}>{d.body}</Markdown>
+        </div>
+        {folded && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-b from-transparent to-cf-surface" aria-hidden />}
+      </div>
+      {taller && (
+        <div className={cn("relative flex justify-center", folded ? "-mt-3" : "mt-1.5")}>
+          <Button
+            variant="outline"
+            size="xs"
+            className="bg-cf-surface"
+            aria-expanded={!folded}
+            data-testid="pr-description-toggle"
+            onClick={() => {
+              toggleSection(tabKey, "fullDescription");
+            }}
+          >
+            {folded ? "Show all" : "Show less"}
+            {folded ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -283,28 +313,45 @@ function OrderToggle({ tabKey, which, compact = false }: { tabKey: string; which
 
 export { OrderToggle };
 
-/** Summary: reviewers, description, checks, and the conversation. */
-export function PrSummary({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
+/**
+ * Overview: reviewers (open pull requests: faces ringed by outcome, and the picker),
+ * labels, the description (faded out when long), and the conversation. The checks live
+ * in the readiness box above the tabs.
+ */
+export function PrOverview({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
   const order = usePrPanelStore((s) => s.byTab[tabKey]?.commentOrder ?? "newest");
   const items = useMemo(() => conversation(d, order), [d, order]);
-  const extras = usePanelMarkdownExtras();
+  const open = d.pullRequest.state === "open";
   return (
-    <div className="flex flex-col pb-6" data-testid="pr-summary">
-      <div className="flex flex-col gap-1 px-4 pt-3 pb-2">
-        <Row icon={Users} label="Reviewers" testId="pr-reviewers">
-          {d.reviewers.length === 0 && <span className="text-caption">None</span>}
-          {d.reviewers.map((r) => (
-            <Reviewer key={r.login} r={r} />
-          ))}
-          {d.reviewersTruncated && <span className="text-caption" data-testid="pr-truncated">and more on GitHub</span>}
-          <ReviewerPicker prRef={prRef} canUpdate={d.viewerCanUpdate} />
-        </Row>
-      </div>
+    <div className="flex flex-col pb-6" data-testid="pr-overview">
+      {(open || d.labels.length > 0) && (
+        <div className="flex flex-col gap-0.5 px-4 pt-3 pb-1 @max-[340px]:px-3">
+          {open && (
+            <Field label="Reviewers" testId="pr-reviewers">
+              {d.reviewers.length === 0 && <span className="text-caption">None</span>}
+              {d.reviewers.map((r) => (
+                <Reviewer key={r.login} r={r} />
+              ))}
+              {d.reviewersTruncated && (
+                <span className="text-caption" data-testid="pr-truncated">
+                  and more on GitHub
+                </span>
+              )}
+              <ReviewerPicker prRef={prRef} canUpdate={d.viewerCanUpdate} />
+            </Field>
+          )}
+          {d.labels.length > 0 && (
+            <Field label="Labels" testId="pr-labels">
+              {d.labels.map((l) => (
+                <Label key={l.name} l={l} />
+              ))}
+              {d.labelsTruncated && <span className="text-caption">and more on GitHub</span>}
+            </Field>
+          )}
+        </div>
+      )}
       <Section tabKey={tabKey} section="description" title="Description" testId="pr-description">
-        {d.body.trim() ? <Markdown extras={extras}>{d.body}</Markdown> : <p className="text-caption italic">No description provided.</p>}
-      </Section>
-      <Section tabKey={tabKey} section="checks" title="Checks" count={d.checks.length} testId="pr-checks">
-        <Checks d={d} />
+        <Description d={d} tabKey={tabKey} />
       </Section>
       <Section tabKey={tabKey} section="comments" title="Comments" count={commentCount(d)} extra={<OrderToggle tabKey={tabKey} which="commentOrder" />} testId="pr-comments">
         <Conversation items={items} />

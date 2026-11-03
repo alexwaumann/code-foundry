@@ -54,13 +54,18 @@ describe("disabledVerdicts", () => {
 });
 
 describe("reviewVisible", () => {
+  const asked = (login: string, isTeam = false) => ({ login, isTeam, requested: true });
   it.each([
-    [true, "open", true],
-    [false, "open", false],
-    [true, "merged", false],
-    [true, "closed", false],
-  ] as const)("write %s, %s → %s", (viewerCanUpdate, state, want) => {
-    expect(reviewVisible({ viewerCanUpdate, pullRequest: { state } })).toBe(want);
+    { name: "write, open", write: true, state: "open", reviewers: [], want: true },
+    { name: "read, open", write: false, state: "open", reviewers: [], want: false },
+    { name: "write, merged", write: true, state: "merged", reviewers: [], want: false },
+    { name: "write, closed", write: true, state: "closed", reviewers: [], want: false },
+    { name: "read, the viewer's review requested", write: false, state: "open", reviewers: [asked("Me")], want: true },
+    { name: "read, someone else's requested", write: false, state: "open", reviewers: [asked("kim")], want: false },
+    { name: "read, a team's requested (membership unknown)", write: false, state: "open", reviewers: [asked("me", true)], want: false },
+    { name: "read, requested, but merged", write: false, state: "merged", reviewers: [asked("me")], want: false },
+  ] as const)("$name → $want", ({ write, state, reviewers, want }) => {
+    expect(reviewVisible({ viewerCanUpdate: write, pullRequest: { state }, reviewers }, "me")).toBe(want);
   });
 });
 

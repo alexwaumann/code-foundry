@@ -325,8 +325,10 @@ export interface PullRequestDetailView {
   /** "admin" | "maintain" | "write" | "triage" | "read" | "". */
   viewerPermission: string;
   fetchedAtMs: number | null;
-  /** The last fetch's error when this is the cached copy, or why checks is incomplete. */
+  /** The last fetch's error when this is the cached copy (fetchFailed), or why checks is incomplete. */
   lastError: string;
+  /** The cached copy, served because the fetch from GitHub failed (lastError says why). */
+  fetchFailed: boolean;
 }
 
 /** pr.merge's method arg: a merge commit, squash, or rebase. */
@@ -649,6 +651,7 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
     viewerPermission: d.viewerPermission,
     fetchedAtMs: ms(d.fetchedAt),
     lastError: d.lastError,
+    fetchFailed: d.fetchFailed,
   };
 }
 

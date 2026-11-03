@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Check, Loader2, Search, UserPlus, X } from "lucide-react";
+import { Check, Loader2, Plus, Search, X } from "lucide-react";
 import type { ReviewerCandidateView } from "@/api/gh";
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -236,7 +236,7 @@ export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: 
             data-testid="pr-add-reviewer"
             className="flex size-6 shrink-0 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover"
           >
-            <UserPlus className="size-3.5" aria-hidden />
+            <Plus className="size-3.5" aria-hidden />
           </button>
         </PopoverTrigger>
       </Tip>
