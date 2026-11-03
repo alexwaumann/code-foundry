@@ -103,10 +103,16 @@ function Line({ line, now }: { line: SubLine; now: number }) {
           {line.items.map((it, i) => (
             <span key={`${it.path}/${String(i)}`} className="whitespace-nowrap">
               {i > 0 && <span aria-hidden>· </span>}
-              {/* The file name only: the tooltip has the path (hidden). */}
-              <Tip label={it.path === it.text ? null : it.path}>
+              {/* The file name only: the tooltip has the path (hidden), so it takes focus to show it from the keyboard. */}
+              {it.path === it.text ? (
                 <span>{it.text}</span>
-              </Tip>
+              ) : (
+                <Tip label={it.path}>
+                  <span tabIndex={0} className="rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-cf-focus" data-testid="pr-ready-location">
+                    {it.text}
+                  </span>
+                </Tip>
+              )}
               {it.outdated && <span className={toneText.pending}> (outdated)</span>}
             </span>
           ))}

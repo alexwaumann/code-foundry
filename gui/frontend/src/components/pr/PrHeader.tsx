@@ -62,9 +62,12 @@ export function PrHeader({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailVi
       </h2>
       <div className="flex min-w-0 items-center gap-1.5 text-body-sm">
         <Avatar login={pr.author} size={18} />
-        <span className="min-w-0 shrink-0 truncate font-medium" data-testid="pr-author">
-          {pr.author || "ghost"}
-        </span>
+        {/* Up to half the row, cut off beyond (a long bot login); the ages take the rest. */}
+        <Tip label={pr.author || "ghost"} whenTruncated>
+          <span className="max-w-1/2 min-w-0 shrink-0 truncate font-medium" data-testid="pr-author">
+            {pr.author || "ghost"}
+          </span>
+        </Tip>
         <Tip label={headerAges(d, now)} whenTruncated>
           <span className="min-w-0 truncate text-cf-text-muted" data-testid="pr-ages">
             · {headerAges(d, now)}

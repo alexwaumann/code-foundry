@@ -687,6 +687,15 @@ describe("the readiness box and the Overview", () => {
     expect(urlsOpened().at(-1)).toBe(`https://github.com/${SLUG}/pull/140`);
   });
 
+  it("#160: a conversation's file name takes focus and its tooltip has the full path", async () => {
+    renderPrPanel();
+    await openPr(160);
+    const locations = screen.getAllByTestId("pr-ready-location");
+    expect(locations.map((l) => l.textContent)).toEqual(["dashboard.go:88", "dashboard.go:140", "fingerprint.go:12"]);
+    expect(locations[0]?.tabIndex).toBe(0);
+    expect(tooltipText(locations[0] as HTMLElement)).toBe("internal/store/gh/dashboard.go:88");
+  });
+
   it("a long description fades out behind Show all, which shows it whole in place (Show less folds it again); a short one shows whole", async () => {
     const tall = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
       return this.dataset.testid === "pr-description-content" ? 600 : 0;

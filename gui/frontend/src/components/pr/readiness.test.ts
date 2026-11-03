@@ -450,6 +450,8 @@ describe("readiness rows in detail", () => {
     expect(r?.lines.map(lineText)).toEqual(["actor.go:142 · resize.go:37 (outdated) · c.go"]);
     expect(r?.lines[0]).toMatchObject({ items: [{ path: "internal/a/actor.go:142" }, { path: "b/resize.go:37" }, { path: "c.go" }] });
     expect(r?.task).toBe("conversations");
+    // One fetched of more: never the singular.
+    expect(rowOf(detail({ d: { reviewThreads: [thread("a.go", 1)], reviewThreadsTruncated: true } }), "conversations")?.title).toBe("1+ unresolved conversations");
   });
 
   it("conflicts and behind name the real base and carry their tasks", () => {
