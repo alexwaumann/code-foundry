@@ -34,9 +34,10 @@ export function timelineIn(pane: Element): HTMLElement | null {
 /**
  * Paints every match rendered under `scope`: the current one solid, the rest tinted. The
  * DOM is matched again (the same smart-case substring), so a row that just mounted is
- * painted; rows that do not render are not.
+ * painted; rows that do not render are not. Returns the painted ranges by match (paintedKey).
  */
-export function paintMatches(scope: Element | null, query: string, current: FindKey | null): void {
+export function paintMatches(scope: Element | null, query: string, current: FindKey | null): Map<string, Range> {
+  const painted = new Map<string, Range>();
   const all: Range[] = [];
   const cur: Range[] = [];
   const allRects: DOMRect[] = [];
@@ -49,6 +50,7 @@ export function paintMatches(scope: Element | null, query: string, current: Find
       matchOffsets(pt.text, query).forEach((m, nth) => {
         const r = rangeOf(pt, m.start, m.end);
         if (!r) return;
+        painted.set(`${id}\u0000${String(nth)}`, r);
         const isCurrent = current?.itemId === id && current.nth === nth;
         (isCurrent ? cur : all).push(r);
         if (overlay) (isCurrent ? curRects : allRects).push(...lineRects(pt, m.start, m.end));
@@ -57,6 +59,12 @@ export function paintMatches(scope: Element | null, query: string, current: Find
   }
   paintAll("cf-find", all, allRects);
   paintAll("cf-find-current", cur, curRects);
+  return painted;
+}
+
+/** A match's key in paintMatches' result. */
+export function paintedKey(m: FindKey): string {
+  return `${m.itemId}\u0000${String(m.nth)}`;
 }
 
 /** Clears the find's paint. */

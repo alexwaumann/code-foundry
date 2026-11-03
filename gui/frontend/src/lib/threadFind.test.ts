@@ -54,6 +54,11 @@ describe("findDoc: what find searches", () => {
     expect(doc).toEqual({ itemId: "t", kind: "text", text: "The head SHA is in query.graphql." });
   });
 
+  it("Ember's text without the task links its chat draws as pointer lines", () => {
+    const doc = findDoc(item({ id: "e", kind: "text", text: "Started a worker.\n\n[Fix the flaky test](cf-task://t-1a2b)\n\nI'll report **back**." }));
+    expect(doc?.text).toBe("Started a worker.\nI'll report back.");
+  });
+
   it("an answered question's questions and answers, one line each", () => {
     const q = fixStalePrBadge("idle").items.find((it) => it.kind === "question");
     expect(q && findDoc(q)).toEqual({ itemId: q?.id, kind: "question", text: "How should the poller notice a force-push?\nHead SHA in the fingerprint" });

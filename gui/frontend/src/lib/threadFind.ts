@@ -5,7 +5,8 @@
  *
  * What it searches is what stays on screen when a turn folds, plus answered questions:
  * the user's messages (steers included; the text the bubble shows, not its tags), every
- * text of Claude's (as rendered: lib/markdownText), and an AskUserQuestion's questions and
+ * text of Claude's (as rendered: lib/markdownText; Ember's task links, drawn as pointer
+ * lines, left out), and an AskUserQuestion's questions and
  * chosen answers (its expanded detail, where an answer counts once). Never tool calls,
  * their output, thinking, permission requests, notes, wakes or a subagent's items.
  *
@@ -13,6 +14,7 @@
  * substring: no regex, no whole word. Matches in one text do not overlap.
  */
 import type { ThreadItemView } from "@/api/thread";
+import { splitTaskLinks } from "./ember";
 import { markdownText } from "./markdownText";
 import { questionsOf } from "./threadRequest";
 import { parseUserMessage } from "./userMessage";
@@ -55,6 +57,18 @@ export function questionText(inputJson: string, answers: Readonly<Record<string,
     .join("\n");
 }
 
+/**
+ * Claude's (or Ember's) text as its row renders it: the markdown's text, without the task
+ * links Ember's chat draws as pointer lines (lib/ember splitTaskLinks; only Ember writes
+ * them), each markdown part a block of its own.
+ */
+export function answerText(text: string): string {
+  return splitTaskLinks(text)
+    .flatMap((p) => (p.kind === "md" ? [markdownText(p.text)] : []))
+    .filter((t) => t !== "")
+    .join("\n");
+}
+
 const docs = new WeakMap<ThreadItemView, FindDoc | null>();
 
 /** An item's searchable text, or null for an item find does not search. Items keep their identity while unchanged, so each is read once. */
@@ -72,7 +86,7 @@ function readDoc(it: ThreadItemView): FindDoc | null {
     case "user":
       return it.wake ? null : { itemId: it.id, kind: "user", text: userText(it.text, it.composerText, it.attachments) };
     case "text":
-      return it.apiError ? null : { itemId: it.id, kind: "text", text: markdownText(it.text) };
+      return it.apiError ? null : { itemId: it.id, kind: "text", text: answerText(it.text) };
     case "question": {
       // A pending question docks in the composer, not in the timeline.
       if (it.request.state === "pending") return null;

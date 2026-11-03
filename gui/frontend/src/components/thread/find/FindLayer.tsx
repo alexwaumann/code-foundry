@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { findDoc, matchIndex, matchRows, rowOrder, startIndex, type FindKey, type FindMatch } from "@/lib/threadFind";
 import { cn } from "@/lib/utils";
+import { zoomFactor } from "@/lib/zoom";
 import { getTimeline } from "@/stores/cite";
 import { useThreadStore } from "@/stores/thread";
 import { setThreadFindCurrent, useThreadFindAim, useThreadFindCurrent, useThreadFindMatches, useThreadFindOpen, useThreadFindQuery
 , useThreadFindRevealSeq } from "@/stores/threadFind";
-import { clearMatches, openFor, paintMatches, putBack, revealMatch, timelineIn, type Opened } from "./findDom";
+import { clearMatches, openFor, paintedKey, paintMatches, putBack, revealMatch, timelineIn, type Opened } from "./findDom";
 import "./find.css";
 
 /**
@@ -68,9 +69,9 @@ function Layer({ threadId, paneRef }: { threadId: string; paneRef: RefObject<HTM
     const run = () => {
       raf = 0;
       const l = latest.current;
-      paintMatches(scroller, l.query, l.current);
+      const painted = paintMatches(scroller, l.query, l.current);
       setTicks((prev) => {
-        const next = ticksOf(threadId, l.matches, l.current, scroller);
+        const next = ticksOf(threadId, l.matches, l.current, scroller, painted);
         return sameTicks(prev, next) ? prev : next;
       });
     };
@@ -145,16 +146,24 @@ function topOrder(threadId: string, order: ReadonlyMap<string, number>): number 
   return order.size;
 }
 
-/** The match map's ticks: each match at its row's place in the list (measured, else estimated), one tick per spot. */
-function ticksOf(threadId: string, matches: readonly FindMatch[], current: FindKey | null, scroller: HTMLElement): Tick[] {
+/**
+ * The match map's ticks, one per spot: a painted match where its text is in the list, any
+ * other at its row's place (measured, else estimated).
+ */
+function ticksOf(threadId: string, matches: readonly FindMatch[], current: FindKey | null, scroller: HTMLElement, painted: ReadonlyMap<string, Range>): Tick[] {
   const tl = getTimeline(threadId);
   const total = scroller.scrollHeight;
   if (!tl || total <= 0 || matches.length === 0) return [];
   const order = useThreadStore.getState().logs[threadId]?.order ?? [];
   const rows = matchRows(order, tl.rowKeys(), matches);
   const spots = new Map<number, Tick>();
+  // Client rects are in zoomed px (lib/zoom), offsets in the list in CSS px.
+  const z = zoomFactor();
+  const top = scroller.getBoundingClientRect().top;
   matches.forEach((m, i) => {
-    const at = Math.min(1, (tl.rowStart(rows[i] ?? 0) ?? 0) / total);
+    const range = painted.get(paintedKey(m));
+    const offset = range ? scroller.scrollTop + (range.getBoundingClientRect().top - top) / z : (tl.rowStart(rows[i] ?? 0) ?? 0);
+    const at = Math.max(0, Math.min(1, offset / total));
     const isCurrent = current?.itemId === m.itemId && current.nth === m.nth;
     // One tick per spot (a quarter of a percent): the current one wins its spot.
     const spot = Math.round(at * 400);
