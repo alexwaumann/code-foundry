@@ -25,7 +25,7 @@ func TestVerifyQuote(t *testing.T) {
 		Item{ID: "sub", Kind: KindAssistantText, Text: "a subagent says do not refetch", ParentToolUseID: "toolu_1"},
 		Item{ID: "wake", Kind: KindUserMessage, Text: "a wake about refetching", Origin: OriginWake},
 		Item{ID: "pr", Kind: KindAssistantText, Text: "Merged in [PR](https://github.com/alexwaumann/code-foundry/pull/503) yesterday, after review."},
-		Item{ID: "chip", Kind: KindAssistantText, Text: "See [run.go](internal/store/search/run.go) for the loop."},
+		Item{ID: "chip", Kind: KindAssistantText, Text: "The loop lives in [run.go](internal/store/search/run.go) for now; the key is <kbd>check_count</kbd> &amp; the SHA."},
 		Item{ID: "ok", Kind: KindAssistantText, Text: "**OK.**"},
 	)
 	e.putItems(child.ID, Item{ID: "child-u", Kind: KindUserMessage, Text: "the child says do not refetch"})
@@ -79,8 +79,14 @@ func TestVerifyQuote(t *testing.T) {
 			words: `reads only "PR"`},
 		{name: "a whole raw link and more", thread: top.ID, item: "pr", quote: "in [PR](https://github.com/alexwaumann/code-foundry/pull/503) yesterday, after", quoted: "in PR yesterday, after"},
 		{name: "the reply as shown", thread: top.ID, item: "pr", quote: "Merged in PR yesterday", quoted: "Merged in PR yesterday"},
-		{name: "a path chip as shown", thread: top.ID, item: "chip", quote: "See internal/store/search/run.go for the loop", quoted: "See internal/store/search/run.go for the loop"},
-		{name: "a path chip by its link text", thread: top.ID, item: "chip", quote: "See run.go for the loop", quoted: "See internal/store/search/run.go for the loop"},
+		{name: "a path chip as shown", thread: top.ID, item: "chip", quote: "The loop lives in internal/store/search/run.go for now", quoted: "The loop lives in internal/store/search/run.go for now"},
+		{name: "a path chip by its link text", thread: top.ID, item: "chip", quote: "loop lives in run.go for now", quoted: "loop lives in internal/store/search/run.go for now"},
+		{name: "ending at a path chip's link text", thread: top.ID, item: "chip", quote: "The loop lives in run.go", quoted: "The loop lives in internal/store/search/run.go"},
+		{name: "a path chip's part", thread: top.ID, item: "chip", quote: "lives in internal/store", quoted: "lives in internal/store/search/run.go"},
+		{name: "html and entities as shown", thread: top.ID, item: "chip", quote: "the key is check_count & the SHA", quoted: "the key is check_count & the SHA"},
+		// A refusal shows the reply as it reads, the words to copy.
+		{name: "a refused reply shows its rendered text", thread: top.ID, item: "chip", quote: "lives in run.go and the key is check_count & the SHA", want: ErrInvalidArgument,
+			words: `The message begins: "The loop lives in internal/store/search/run.go for now; the key is check_count & the SHA."`},
 		{name: "a whole short reply", thread: top.ID, item: "ok", quote: "OK.", quoted: "OK."},
 		{name: "too long", thread: top.ID, item: "md", quote: strings.Repeat("x", MaxQuoteRunes+1), want: ErrInvalidArgument, words: "at most"},
 	}

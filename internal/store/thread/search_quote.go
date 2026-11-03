@@ -82,10 +82,15 @@ func (m *Manager) VerifyQuote(ctx context.Context, threadID, item, quote string)
 		return QuotedItem{}, fmt.Errorf("%w: #%d is a %s, not a message: quote a user message, Claude's reply or a question", ErrInvalidArgument, it.Ordinal, kindWords(it.Kind))
 	}
 	src, markdown := []rune(raw), it.Kind == KindAssistantText
+	// reads is the message as shown: a reply rendered, the rest as typed.
+	reads := text
+	if markdown {
+		reads = squeeze(renderedText(src)).String()
+	}
 	from, to, found := quoteSpan(src, q, markdown)
 	if !found {
-		return QuotedItem{}, fmt.Errorf("%w: the quote does not occur in #%d of thread %s; copy it exactly from that message (white space may differ). The message begins: %q",
-			ErrInvalidArgument, it.Ordinal, t.ID, quoteHead(text))
+		return QuotedItem{}, fmt.Errorf("%w: the quote does not occur in #%d of thread %s; copy it exactly from that message as it reads (white space may differ). The message begins: %q",
+			ErrInvalidArgument, it.Ordinal, t.ID, quoteHead(reads))
 	}
 	if utf8.RuneCountInString(q) < MinQuoteRunes && quoteForm(q) != quoteForm(text) {
 		return QuotedItem{}, fmt.Errorf("%w: the quote is too short to show what answers; quote at least %d characters (or the whole message)", ErrInvalidArgument, MinQuoteRunes)
@@ -94,10 +99,6 @@ func (m *Manager) VerifyQuote(ctx context.Context, threadID, item, quote string)
 	// that matched only markup (a link's hidden target) reads as little or nothing, or
 	// not as one run of the message's words: the model quotes again.
 	stored := renderedQuote(src, from, to, markdown)
-	reads := text
-	if markdown {
-		reads = squeeze(renderedText(src)).String()
-	}
 	switch {
 	case stored == "" || !strings.Contains(reads, stored):
 		return QuotedItem{}, fmt.Errorf("%w: the quote's words are not what #%d of thread %s shows (a link's target or markup is not shown); quote the words as they read rendered. The message reads: %q",

@@ -816,7 +816,7 @@ func TestPromoteTwice(t *testing.T) {
 func TestPromptTexts(t *testing.T) {
 	p := systemPrompt("q-0123456789ab", 8)
 	for _, w := range []string{fmt.Sprintf("%d to %d characters", thread.MinQuoteRunes, thread.MaxQuoteRunes), "as they read rendered",
-		"no backticks", "--search q-0123456789ab", "At most 8 reports"} {
+		"no backticks", "a link to a file as its path", "--search q-0123456789ab", "At most 8 reports"} {
 		if !strings.Contains(p, w) {
 			t.Errorf("system prompt lacks %q", w)
 		}

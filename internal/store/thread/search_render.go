@@ -424,25 +424,26 @@ func (w *walker) codeSpan(n *ast.CodeSpan) {
 }
 
 // link reads a link as its text, or, when its target is relative and reads as a path
-// (linkPath), as the path chip's text, placed on the target's source (an inline link's)
-// or at the end of its text (a reference link's, whose target is elsewhere).
+// (linkPath), as the path chip's text, placed on the link text's last rune: a quote that
+// takes in the link's text, as written or as shown, takes in the whole chip.
 func (w *walker) link(n *ast.Link) {
 	path, ok := linkPath(unescape(n.Destination))
 	if !ok {
 		w.inlines(n)
 		return
 	}
+	before := w.at
 	w.skipNode(n)
-	// An inline link's target follows its text: "](" then the target.
-	dest, end, inline := w.at, w.at+1, false
+	at := w.at
+	if at > before {
+		at-- // the text's last byte
+	}
+	for _, r := range path {
+		w.emit(r, at)
+	}
+	// An inline link's target follows its text ("](" then the target): read past it.
 	if i := bytes.Index(w.src[w.at:], n.Destination); i >= 0 && i <= 8 {
-		dest, end, inline = w.at+i, w.at+i+len(n.Destination), true
-	}
-	for i, r := range path {
-		w.emit(r, min(dest+i, end-1))
-	}
-	if inline {
-		w.at = max(w.at, end)
+		w.at += i + len(n.Destination)
 	}
 }
 
