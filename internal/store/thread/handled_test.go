@@ -2,6 +2,8 @@ package thread
 
 import (
 	"os"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,4 +69,91 @@ func TestHandledThroughPublished(t *testing.T) {
 	e.waitFor(s.ID, "the second turn handled", func(s Thread) bool {
 		return s.HandledThrough == it.Ordinal && s.Status == StatusNeedsAttention && s.StatusReason == "finished"
 	})
+}
+
+// A message sent while the thread starts waits for the handshake behind the first
+// prompt. Its item is queued until it goes out, and goes out queued (Claude works on the
+// first prompt), so the first prompt's turn end does not count it handled: a forward's
+// wake on it does not fire then (the capture has no turn for it, so it never is).
+func TestHandledThroughHeldWhileStarting(t *testing.T) {
+	gate := initGate(t)
+	e := newFixtureEnvAt(t, fixturePath("write-allow"), []string{"CF_FAKE_CLAUDE_INIT_GATE=" + gate.path})
+	t.Cleanup(gate.open) // before the env's shutdown (cleanups run last first)
+	s := e.create(CreateOptions{PermissionMode: PermissionSupervised, InitialPrompt: "write"})
+	held, err := e.m.Send(e.ctx(), s.ID, Message{Text: "forwarded task"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := e.snapshot(s.ID); got.State != StateStarting || !held.Queued {
+		t.Fatalf("state %v, held item %+v: want starting, queued", got.State, held)
+	}
+	gate.open()
+	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
+	parent := e.stopped("parent")
+	if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: s.ID, AfterOrdinal: held.Ordinal, Note: "forwarded"}); err != nil {
+		t.Fatal(err)
+	}
+	e.waitItems(s.ID, "the held message still queued once sent", func(items []Item) bool {
+		return slices.ContainsFunc(items, func(x Item) bool { return x.ID == held.ID && x.Queued })
+	})
+	p := e.items(s.ID).Pending
+	if _, err := e.m.Respond(e.ctx(), s.ID, p[0].RequestID, Decision{Allow: true}); err != nil {
+		t.Fatal(err)
+	}
+	first := e.items(s.ID).Items[0]
+	got := e.waitFor(s.ID, "the first prompt's turn handled", func(s Thread) bool { return s.HandledThrough >= first.Ordinal && s.StatusReason == "finished" })
+	if got.HandledThrough >= held.Ordinal {
+		t.Errorf("handled through %d after the first prompt's turn, past the held message (%d)", got.HandledThrough, held.Ordinal)
+	}
+	time.Sleep(100 * time.Millisecond) // a wake would be queued within the commit
+	if w := wakes(e.items(parent.ID).Items); len(w) != 0 {
+		t.Errorf("woken by the first prompt's turn: %+v", w)
+	}
+}
+
+// A message sent during a busy restart is held for the new process; the interrupted
+// turn's end does not count it, the new process's turn that reads it does, and only
+// then does a forward's wake on it fire.
+func TestHandledThroughHeldByRestart(t *testing.T) {
+	re := newFixtureEnv(t, "interrupt-pending")
+	parent := re.stopped("parent")
+	s := re.create(CreateOptions{PermissionMode: PermissionSupervised, InitialPrompt: "write"})
+	re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
+	cid := argOf(re.argvOf(), "--session-id")
+	re.writeTranscript(cid, userLine("write"))
+	if _, restarted, err := re.m.Restart(re.ctx(), s.ID); err != nil || !restarted {
+		t.Fatalf("restart: %v %v", restarted, err)
+	}
+	re.waitSent("interrupt", func(m map[string]any) bool {
+		r, _ := m["request"].(map[string]any)
+		return r["subtype"] == "interrupt"
+	})
+	if _, err := re.m.Send(re.ctx(), s.ID, Message{Text: "forwarded task"}); err != nil {
+		t.Fatalf("send during the restart: %v", err)
+	}
+	items := re.waitItems(s.ID, "the held message written", func(items []Item) bool {
+		return slices.ContainsFunc(items, func(x Item) bool { return x.Kind == KindUserMessage && x.Text == "forwarded task" })
+	})
+	held := items[slices.IndexFunc(items, func(x Item) bool { return x.Kind == KindUserMessage && x.Text == "forwarded task" })]
+	// The new process replays the capture's turn for it, which stops at a permission
+	// prompt: the turn that reads it has not ended.
+	got := re.waitFor(s.ID, "the new turn's permission", func(s Thread) bool {
+		return s.State == StateConnected && strings.HasPrefix(s.StatusReason, "permission:")
+	})
+	if got.HandledThrough >= held.Ordinal {
+		t.Fatalf("handled through %d before the turn reading the held message (%d) ended", got.HandledThrough, held.Ordinal)
+	}
+	if _, err := re.m.Subscribe(re.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: s.ID, AfterOrdinal: held.Ordinal, Note: "forwarded"}); err != nil {
+		t.Fatal(err)
+	}
+	if w := wakes(re.items(parent.ID).Items); len(w) != 0 {
+		t.Fatalf("woken before the turn ended: %+v", w)
+	}
+	var p []PendingRequest
+	re.waitItems(s.ID, "the new request", func([]Item) bool { p = re.items(s.ID).Pending; return len(p) > 0 })
+	if _, err := re.m.Respond(re.ctx(), s.ID, p[0].RequestID, Decision{Allow: true}); err != nil {
+		t.Fatal(err)
+	}
+	re.waitFor(s.ID, "the turn that read it handled", func(s Thread) bool { return s.HandledThrough >= held.Ordinal })
+	re.waitItems(parent.ID, "one wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 }
