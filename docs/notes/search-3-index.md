@@ -44,10 +44,15 @@ calls `thread.search`) build on it. Needs a daemon restart (migration 0054, new 
   inside a thread too. A chunk holds the write lock for about 100 ms however long the
   thread: one transaction per thread would hold it past the 5 s busy timeout for a thread
   of about 25k indexed items (Ember's chat), and a live `saveItem` that times out is only
-  logged, so that item would never reach the database. A thread that fails (a row whose
-  `data` is not JSON) is logged and dropped from the list, and the others go on: the
-  backfill runs once, and one bad thread must not keep the most recent ones (last in the
-  list) unindexed on every start. Threads go least recently active first, so the most
+  logged, so that item would never reach the database. Errors split two ways. A row whose
+  `data` cannot be decoded (`decodeItem`'s only error, `errBadItem`) is logged and
+  skipped, and `next_ordinal` still moves past it: it would fail every start, and the
+  thread's good items, before and after it, are indexed. Any other error (a busy timeout
+  while a fork's `saveItems` indexes a large thread, I/O, a full disk) stops the run with
+  the thread's row kept at the chunk that failed, so the next start retries; the failed
+  chunk keeps nothing. An earlier version dropped the whole thread from the list on any
+  error, which left a thread unindexed for good after a transient one. Threads go least
+  recently active first, so the most
   recent ones get the highest rowids (see "Reading at most 5,000 matches"). Only the
   indexed kinds are read (`kind IN (...)`): tool calls are most of the bytes, and reading
   them made the backfill twice as slow.
@@ -100,7 +105,9 @@ must be cheap; a thread not in the snapshot yet is indexed.
   short or long.
 * **Text check**: every candidate's own text (the holder's copy, through the extractor) is
   matched in Go. That covers case, short terms,
-  and a document saved from another copy of the item (see Gotchas).
+  and a document saved from another copy of the item (see Gotchas). A holder whose row
+  cannot be decoded is logged and is no hit, like a holder whose text does not match: one
+  bad row must not fail every search that reaches its document.
 * **Scope** (default = what the sidebar can show): threads no plugin owns that are in the
   sidebar (`InSidebar`: no creator, or a creator that is gone), archived and snoozed ones,
   Ember's chat (a top-level thread with no creator), and their own items, not their
@@ -153,9 +160,11 @@ total_hits, total_threads, truncated}`.
 * `SearchHit{thread_id, item_id, ordinal, speaker (USER/ASSISTANT/QUESTION), created_at,
   snippet, ranges, parent_tool_use_id}`.
 * `ranges` are `[start, end)` in **code points** (like the file finder's positions), into
-  `snippet` or `name`. The snippet is the item's text on one line, cut to about 160 code
-  points starting up to 48 before the first match, at word boundaries, with `…` where it
-  was cut.
+  `snippet` or `name`, and **only there**. The snippet is the item's indexed text
+  (`itemSearchText`), not its stored `Item.Text`: on one line, tags shown as their labels,
+  a question joined to its answer, cut to about 160 code points starting up to 48 before
+  the first match, at word boundaries, with `…` where it was cut. The ranges do not map to
+  `Item.Text`.
 * To show the whole item (PR 4's preview): `ListItems(thread_id, query{since: ordinal-1,
   last: 1})`, or find `item_id` in the thread's snapshot. A subagent hit (only with
   SUBAGENTS) has its `parent_tool_use_id`.
@@ -166,7 +175,8 @@ total_hits, total_threads, truncated}`.
   [--project p,…] [--limit 50] [--per-thread 5] [--json]`. The text output lists thread
   names, then per thread `#<ordinal> <you|claude|question> <age> <snippet>` and a
   `thread read --since` hint. `thread.search` is in the guide (Thread commands are
-  detailed; the guide ratchet went to 26,500 bytes) and not in the palette.
+  detailed; after the rebase over `pr.task` and the pull request verbs the guide is 26,700
+  bytes and its ratchet 26,750) and not in the palette.
 
 ## Measurements
 
@@ -210,7 +220,13 @@ because it read the newest 5,000 of everything and then found almost nothing in 
 Two traps measured on the way: without the unary `+` on `thread_id`, SQLite probed the
 `(thread_id, item_id)` unique index once per thread of the scope for every match (53 s for
 `the`); and with `thread_items_item_id` on `item_id` alone, the narrow scope took
-0.36–0.82 s (table row reads). Names-only queries (`ui`) are unchanged (1 ms).
+0.36–0.82 s (table row reads). `TestSearchQueryPlan` holds the plan: the query is the
+const `searchHitsSQL`, and `EXPLAIN QUERY PLAN` must show `ti` and `h` probing
+`thread_items_item_id (item_id=?)` and no `sqlite_autoindex_thread_items_*`. The unique
+index is `_2` (`_1` is the `(thread_id, ordinal)` primary key). With the covering index,
+dropping the `+` no longer picks the autoindex but probes `(item_id=? AND thread_id=?)`,
+the same per-thread probing, so the test pins `(item_id=?)` exactly. The schema test
+pins the index's columns (`item_id, thread_id, parent_tool_use_id`). Names-only queries (`ui`) are unchanged (1 ms).
 
 Where the time went before the cap: the FTS lookup itself is cheap (all 154k rowids of
 `the` in 36 ms; a two-term AND in 140 ms). bm25 `rank` added about 300 ms, and joining
@@ -252,6 +268,9 @@ problem.
   snapshot.
 * **(PR 4)** Match ranges are code points; the TS side must convert them to UTF-16 before
   slicing (an emoji or any astral character before a match shifts them).
+* **(PR 4)** The ranges point into the snippet only (one line, tags as labels, a question
+  joined to its answer), not into the stored `Item.Text`. The preview of the whole item
+  must match the query again itself (same smart case and terms) rather than reuse them.
 
 ## Verification
 
@@ -278,4 +297,20 @@ problem.
   `"bravo charlie"` (both items); `NEAR(` and `"unbalanced` returned no matches, not an
   error. With the documents deleted and the thread listed in `search_backfill` again, a
   restart logged `indexed threads for search threads=1 failed=0 items=2`, emptied the list
-  and found both again. (That run caught the log's `failed` and `items` swapped.)
+  and found both again. (That run caught the log's `failed` and `items` swapped; the field is `skipped` now.)
+* After the re-check review (rebased onto main after #498): the backfill error split, the
+  bad holder skip, the plan test and the schema assertion are unit tests
+  (`TestSearchBackfillSkipsABadRow`, `TestSearchBackfillKeepsTheRowOnADatabaseError`,
+  where a trigger refusing one document's insert stands in for a busy timeout or a full
+  disk, `TestSearchSkipsABadHolderRow`, `TestSearchQueryPlan`). I checked the plan test
+  fails when the `+` is dropped. Migration 0054 stays 0054 (main's last is 0053).
+* End to end in a new scratch home (two real Sonnet 5.5 medium threads without a project,
+  "quokka harbour" and "quokka lantern"): with the documents deleted, both threads listed
+  in `search_backfill`, the first thread's prompt row corrupted and a trigger refusing the
+  second thread's reply document, a start logged `index an item for search: skipped` for
+  the bad row, then `index threads for search; the next start retries threads=1 of=2`
+  with the disk-full error. The first thread was done (its reply found), the second kept
+  its row at ordinal 0 and had no documents. With the trigger dropped, the next start
+  logged `indexed threads for search threads=1 skipped=0 items=2` and emptied the list.
+  With the second thread's indexed prompt row then corrupted, `thread search quokka`
+  returned both replies and logged `search: skipped an item`, not an error.
