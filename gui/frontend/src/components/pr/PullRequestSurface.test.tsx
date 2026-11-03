@@ -16,6 +16,7 @@ const { runCommandForResult } = await import("@/stores/commands");
 const { closePanelTab, usePanelStore } = await import("@/stores/panel");
 const { mergePullRequest } = await import("@/stores/prPanel");
 const { useUiStore } = await import("@/stores/ui");
+const { useThreadsStore } = await import("@/stores/threads");
 const { PREPARING_TOAST_DELAY_MS } = await import("@/stores/prThreads");
 
 /**
@@ -75,32 +76,44 @@ function openMenu(): HTMLElement {
 /** Which region holds focus ([data-region]). */
 const focusedRegion = () => document.activeElement?.closest("[data-region]")?.getAttribute("data-region");
 
-describe("Summary", () => {
-  it("#145: header, reviewers, description, checks failed first, comments newest first with threads; links open through view.open.url", async () => {
+describe("Overview", () => {
+  it("#145: header, readiness box, reviewers, description, checks unfold from the box, comments newest first with threads; links open through view.open.url", async () => {
     renderPrPanel();
     await openPr(145);
     expect(prTabs()).toEqual(["#145"]);
-    expect(byTestId("pr-repo-link").textContent).toBe(`${SLUG}#145`);
+    expect(byTestId("pr-repo").textContent).toBe(`${SLUG} #145`);
     expect(byTestId("pr-title").textContent).toBe("fix(terminal): resize race between attach and first output");
     expect(byTestId("pr-author").textContent).toBe("alexwaumann");
-    expect(byTestId("pr-updated").textContent).toBe("updated 5h ago");
+    expect(byTestId("pr-ages").textContent).toMatch(/^· opened \d+[a-z]+ ago · updated 5h ago$/);
     expect(byTestId("pr-branches").textContent).toMatch(/main\s*fix\/resize/);
     expect(byTestId("pr-diffstat").textContent).toContain("3 files");
     expect(byTestId("pr-diffstat").textContent).toContain("+1,450");
     expect(byTestId("pr-state").textContent).toBe("Draft");
-    expect(byTestId("pr-checks-summary").textContent).toBe("2 failing");
-    expect(byTestId("pr-checks-summary").dataset.tone).toBe("failure");
+    // The header no longer carries the comment count, Review or Merge.
+    expect(within(byTestId("pr-header")).queryByTestId("pr-review-button")).toBeNull();
+    expect(within(byTestId("pr-header")).queryByTestId("pr-merge-button")).toBeNull();
+
+    // The box: every blocker, in order.
+    expect(byTestId("pr-ready-headline").textContent).toBe("Not ready to merge4 left");
+    expect(screen.getAllByTestId("pr-ready-row").map((r) => r.dataset.row)).toEqual(["draft", "checks", "review", "conversations", "mergeable"]);
+    expect(texts("pr-ready-title")[1]).toBe("2 checks failing · 2 running · 2 passed · 1 skipped");
+    expect(texts("pr-ready-check")).toEqual([expect.stringContaining("test (macos-15)") as string, expect.stringContaining("lint") as string]);
+    // The issue rows carry pr.task's kind for the thread buttons.
+    expect(screen.getAllByTestId("pr-ready-row").map((r) => r.dataset.task ?? "")).toEqual(["", "checks", "review", "conversations", ""]);
 
     const reviewers = screen.getAllByTestId("pr-reviewer");
     expect(reviewers).toHaveLength(4);
     expect(reviewers[0]?.dataset).toMatchObject({ login: "teammate-kim", status: "changes_requested", stale: "true" });
     expect(byTestId("pr-reviewers").textContent).toContain("and more on GitHub");
+    expect(texts("pr-label")).toEqual(["bug", "terminal"]);
 
     // The description renders markdown: a heading and a task list.
     expect(within(byTestId("pr-description")).getByRole("heading", { name: "Test plan" })).toBeTruthy();
     expect(byTestId("pr-description").querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
 
-    // Every check, failed first, with its tone.
+    // The checks row unfolds every check, failed first, with its tone.
+    expect(queryTestId("pr-check")).toBeNull();
+    fireEvent.click(byTestId("pr-ready-checks-toggle"));
     const checks = screen.getAllByTestId("pr-check");
     expect(checks).toHaveLength(7);
     expect(checks[0]?.textContent).toContain("test (macos-15)");
@@ -111,6 +124,8 @@ describe("Summary", () => {
     fireEvent.click(checks[0] as HTMLElement);
     await settle();
     expect(urlsOpened().at(-1)).toBe("https://github.com/alexwaumann/code-foundry/actions/runs/1/job/11");
+    fireEvent.click(byTestId("pr-ready-checks-toggle"));
+    expect(queryTestId("pr-check")).toBeNull();
 
     // Comments: newest first; threads grouped with their location and badges.
     expect(byTestId("pr-comments").textContent).toContain("Comments(9)");
@@ -127,8 +142,9 @@ describe("Summary", () => {
     expect(children("pr-comments-list")[0]?.textContent).toContain("Why remove the size check?");
     expect(children("pr-comments-list")[1]?.textContent).toContain("Walkthrough");
 
-    // The header link opens the pull request on GitHub.
-    fireEvent.click(byTestId("pr-repo-link"));
+    // Open on GitHub (icon only: its name is its tooltip).
+    expect(byTestId("pr-open-github").getAttribute("aria-label")).toBe("Open on GitHub");
+    fireEvent.click(byTestId("pr-open-github"));
     await settle();
     expect(urlsOpened().at(-1)).toBe(`https://github.com/${SLUG}/pull/145`);
   });
@@ -150,7 +166,7 @@ describe("Summary", () => {
     expect(within(menu).getByTestId("pr-menu-open")).toBeTruthy();
     expect(within(menu).queryByTestId("pr-menu-revert")).toBeNull();
     fireEvent.keyDown(menu, { key: "Escape" });
-    fireEvent.click(byTestId("pr-tab-timeline"));
+    fireEvent.click(byTestId("pr-tab-activity"));
     expect(screen.getAllByTestId("pr-timeline-entry")[0]?.dataset.kind).toBe("closed");
 
     await openPr(9999);
@@ -158,11 +174,11 @@ describe("Summary", () => {
   });
 });
 
-describe("Timeline", () => {
+describe("Activity", () => {
   it("lists commits, reviews and the end state; the order toggles; a commit opens on GitHub; inner tabs stay per panel tab", async () => {
     renderPrPanel();
     await openPr(145);
-    fireEvent.click(byTestId("pr-tab-timeline"));
+    fireEvent.click(byTestId("pr-tab-activity"));
     const entries = () => screen.getAllByTestId("pr-timeline-entry");
     // 4 commits, 3 issue comments, 2 reviews, opened.
     expect(entries()).toHaveLength(10);
@@ -183,25 +199,25 @@ describe("Timeline", () => {
     await settle();
     expect(urlsOpened().at(-1)).toMatch(/\/commit\/8d4b3f6/);
 
-    // Another tab starts on Summary; coming back finds Timeline still selected.
+    // Another tab starts on Overview; coming back finds Activity still selected.
     await openPr(138);
     expect(prTabs()).toEqual(["#145", "#138"]);
-    expect(byTestId("pr-tab-summary").getAttribute("aria-selected")).toBe("true");
+    expect(byTestId("pr-tab-overview").getAttribute("aria-selected")).toBe("true");
     // Merged: the timeline starts with the merge.
-    fireEvent.click(byTestId("pr-tab-timeline"));
+    fireEvent.click(byTestId("pr-tab-activity"));
     expect(entries()[0]?.dataset.kind).toBe("merged");
-    fireEvent.click(byTestId("pr-tab-summary"));
+    fireEvent.click(byTestId("pr-tab-overview"));
     selectPanelTab("#145");
     await settle();
-    expect(byTestId("pr-tab-timeline").getAttribute("aria-selected")).toBe("true");
+    expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
     expect(byTestId("pr-timeline").dataset.order).toBe("oldest");
     expect((byTestId("pr-tab-code") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("closing a tab drops its inner state: reopened, it starts on Summary with the timeline newest first", async () => {
+  it("closing a tab drops its inner state: reopened, it starts on Overview with the activity newest first", async () => {
     renderPrPanel();
     await openPr(145);
-    fireEvent.click(byTestId("pr-tab-timeline"));
+    fireEvent.click(byTestId("pr-tab-activity"));
     fireEvent.click(byTestId("pr-timeline-order"));
     expect(byTestId("pr-timeline").dataset.order).toBe("oldest");
     const key = Object.keys(usePanelStore.getState().byKey)[0] ?? "";
@@ -211,8 +227,8 @@ describe("Timeline", () => {
     });
     expect(queryTestId("pr-surface")).toBeNull();
     await openPr(145);
-    expect(byTestId("pr-tab-summary").getAttribute("aria-selected")).toBe("true");
-    fireEvent.click(byTestId("pr-tab-timeline"));
+    expect(byTestId("pr-tab-overview").getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(byTestId("pr-tab-activity"));
     expect(byTestId("pr-timeline").dataset.order).toBe("newest");
   });
 });
@@ -400,7 +416,7 @@ describe("the ⋯ menu", () => {
     await pick(byTestId("pr-menu-refresh"));
     await expectToast("Refresh Pull Request failed");
     expect(byTestId("pr-refresh-error").textContent).toContain("502 Bad Gateway");
-    expect(screen.getAllByTestId("pr-check")).toHaveLength(7);
+    expect(screen.getAllByTestId("pr-ready-row")).toHaveLength(5);
 
     await pick(byTestId("pr-menu-copy"));
     expect(queryTestId("pr-menu")).toBeNull();
@@ -416,9 +432,16 @@ describe("the ⋯ menu", () => {
     renderPrPanel();
     await openPr(138);
     expect(byTestId("pr-state").textContent).toBe("Merged");
-    expect(byTestId("pr-checks-summary").textContent).toBe("All checks passed");
+    expect(byTestId("pr-ready-headline").textContent).toBe("Merged");
+    expect(texts("pr-ready-title")).toEqual(["Merged into main by alexwaumann 1d ago"]);
+    expect(byTestId("pr-ready-commit").textContent).toBe("3c3c465");
+    // No footer once merged; the box's Revert runs the same flow as the menu's.
+    expect(queryTestId("pr-ready-footer")).toBeNull();
     openMenu();
-    await pick(byTestId("pr-menu-revert"));
+    expect(byTestId("pr-menu-revert")).toBeTruthy();
+    fireEvent.keyDown(byTestId("pr-menu"), { key: "Escape" });
+    fireEvent.click(byTestId("pr-revert"));
+    await settle();
     expect(byTestId("confirm-dialog").textContent).toContain("This opens a new pull request that reverses the changes merged by #138.");
     fireEvent.click(byTestId("confirm-ok"));
     await settle(3);
@@ -640,18 +663,85 @@ describe("threads about a pull request", () => {
   });
 });
 
+describe("the readiness box and the Overview", () => {
+  it("#139 (your review requested): headline, the row, and Review ▾ as the primary button", async () => {
+    renderPrPanel();
+    await openPr(139);
+    expect(byTestId("pr-ready-headline").textContent).toBe("Waiting on your review");
+    const row = byTestId("pr-readiness").querySelector<HTMLElement>('[data-row="review-request"]');
+    expect(row?.textContent).toContain("teammate-kim asked for your review");
+    expect(row?.dataset.task).toBe("review-request");
+    expect(byTestId("pr-review-button").dataset.primary).toBe("true");
+    // #142: nobody asked the viewer; Review is the plain button.
+    await openPr(142);
+    expect(byTestId("pr-review-button").dataset.primary).toBeUndefined();
+  });
+
+  it("#140: a workflow waiting for approval has its own row whose Approve on GitHub leaves the app", async () => {
+    renderPrPanel();
+    await openPr(140);
+    expect(screen.getAllByTestId("pr-ready-row").map((r) => r.dataset.row)).toEqual(["workflow-approval", "review", "mergeable"]);
+    expect(texts("pr-ready-title")[0]).toBe("1 workflow waiting for approval");
+    fireEvent.click(byTestId("pr-approve-workflow"));
+    await settle();
+    expect(urlsOpened().at(-1)).toBe(`https://github.com/${SLUG}/pull/140`);
+  });
+
+  it("a long description fades out behind Show all, which shows it whole in place (Show less folds it again); a short one shows whole", async () => {
+    const tall = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === "pr-description-body" ? 600 : 0;
+    });
+    try {
+      renderPrPanel();
+      await openPr(145);
+      const body = () => byTestId("pr-description-body");
+      expect(body().dataset.folded).toBe("true");
+      expect(body().style.maxHeight).toBe("170px");
+      expect(byTestId("pr-description-toggle").textContent).toBe("Show all");
+      fireEvent.click(byTestId("pr-description-toggle"));
+      expect(body().dataset.folded).toBe("false");
+      expect(body().style.maxHeight).toBe("");
+      expect(byTestId("pr-description-toggle").textContent).toBe("Show less");
+      expect(byTestId("pr-description-toggle").getAttribute("aria-expanded")).toBe("true");
+      fireEvent.click(byTestId("pr-description-toggle"));
+      expect(body().dataset.folded).toBe("true");
+      tall.mockReturnValue(0);
+      // Another tab whose description fits: no fade, no button.
+      await openPr(138);
+      expect(body().dataset.folded).toBe("false");
+      expect(queryTestId("pr-description-toggle")).toBeNull();
+    } finally {
+      tall.mockRestore();
+    }
+  });
+
+  it("a merged pull request's Overview has its labels but no reviewers row", async () => {
+    renderPrPanel();
+    await openPr(138);
+    expect(queryTestId("pr-reviewers")).toBeNull();
+    expect(texts("pr-label")).toEqual(["chore"]);
+    await openPr(142);
+    expect(byTestId("pr-reviewers")).toBeTruthy();
+    expect(queryTestId("pr-labels")).toBeNull();
+  });
+});
+
 describe("the merge button", () => {
   const button = () => byTestId("pr-merge-button");
+  const chevron = () => byTestId("pr-merge-button-menu-button");
   const merges = () => invocationsOf("pr.merge").map((i) => [i.args, i.confirmed]);
 
-  it("#142 merges: Squash and merge confirms, runs pr.merge with squash, the head and the branch deleted; the state turns Merged", async () => {
+  it("#142 merges: the main part squashes (the default) after the confirmation, with the head and the branch deleted; the box turns Merged", async () => {
     renderPrPanel();
     await openPr(142);
     expect(byTestId("pr-state").textContent).toBe("Open");
-    expect(button().textContent).toBe("Merge");
+    expect(byTestId("pr-ready-headline").textContent).toBe("Ready to merge");
+    expect(button().textContent).toBe("Squash and merge");
     expect(button().hasAttribute("aria-disabled")).toBe(false);
-    press(button());
-    const menu = byTestId("pr-merge-menu");
+    // The chevron is icon-only: its name is its tooltip.
+    expect(chevron().getAttribute("aria-label")).toBe("Merge options");
+    press(chevron());
+    const menu = byTestId("pr-merge-button-menu");
     const items = menuItems(menu);
     expect(items).toHaveLength(3);
     [/^Create a merge commit/, /^Squash and merge/, /^Rebase and merge/].forEach((re, i) => {
@@ -659,8 +749,10 @@ describe("the merge button", () => {
     });
     expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("true");
     expect(byTestId("pr-merge-delete-branch-note").textContent).toBe("Deletes origin/feat/sidebar; local branches and worktrees are untouched");
+    fireEvent.keyDown(menu, { key: "Escape" });
 
-    await pick(byTestId("pr-merge-method-squash"));
+    fireEvent.click(button());
+    await settle();
     expect(byTestId("confirm-dialog").textContent).toContain(`Merge #142 “feat(gui): virtualized sidebar tree with thread rows” into main in ${SLUG} with squash? Branch origin/feat/sidebar is deleted afterwards.`);
     fireEvent.click(byTestId("confirm-ok"));
     await settle(3);
@@ -674,48 +766,56 @@ describe("the merge button", () => {
       expect(byTestId("pr-state").textContent).toBe("Merged");
     });
     expect(queryTestId("pr-merge-button")).toBeNull();
+    expect(queryTestId("pr-ready-footer")).toBeNull();
     await expectToast("Merged #142 (e2e0142)");
     await expectToast("deleted origin/feat/sidebar");
   });
 
-  it("draft, read-only and merged pull requests; unchecking the branch, declining, a spinner, a refusal", async () => {
+  it("draft, read-only and merged pull requests; a method from the menu becomes the default; unchecking the branch, declining, a spinner, a refusal", async () => {
     renderPrPanel();
-    // #145 is a draft: disabled with the reason, and a press opens nothing.
+    // #145 is a draft: disabled with the reason; a click sends nothing; the menu says why and offers nothing.
     await openPr(145);
     expect(button().getAttribute("aria-disabled")).toBe("true");
     expect(tooltipText(button())).toBe("Draft pull requests cannot be merged");
     expect(document.getElementById(button().getAttribute("aria-describedby") ?? "")?.textContent).toBe("Draft pull requests cannot be merged");
-    press(button());
-    expect(queryTestId("pr-merge-menu")).toBeNull();
+    fireEvent.click(button());
+    await settle();
+    expect(queryTestId("confirm-dialog")).toBeNull();
+    press(chevron());
+    expect(texts("pr-merge-note")).toEqual(["Draft pull requests cannot be merged"]);
+    expect(byTestId("pr-merge-method-squash").hasAttribute("data-disabled")).toBe(true);
+    fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
     // #138 is merged: no button.
     await openPr(138);
     expect(byTestId("pr-state").textContent).toBe("Merged");
     expect(queryTestId("pr-merge-button")).toBeNull();
-    // #140: read access only.
+    // #140: read access only: no merge controls at all.
     await openPr(140);
-    expect(tooltipText(button())).toBe("Merging needs write access");
+    expect(queryTestId("pr-merge-button")).toBeNull();
+    expect(queryTestId("pr-auto-merge-button")).toBeNull();
 
     // #142: keep the branch, then decline: nothing is sent.
     await openPr(142);
-    press(button());
+    press(chevron());
     fireEvent.click(byTestId("pr-merge-delete-branch"));
     expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
-    expect(byTestId("pr-merge-menu")).toBeTruthy();
+    expect(byTestId("pr-merge-button-menu")).toBeTruthy();
     await pick(byTestId("pr-merge-method-merge"));
     expect(byTestId("confirm-dialog").textContent).toContain(`Merge #142 “feat(gui): virtualized sidebar tree with thread rows” into main in ${SLUG} with a merge commit?`);
     expect(byTestId("confirm-dialog").textContent).not.toContain("deleted afterwards");
     fireEvent.click(byTestId("confirm-cancel"));
     await settle();
     expect(queryTestId("confirm-dialog")).toBeNull();
-    // Declined: the button is idle again and its menu does not come back by itself.
+    // Declined: the button is idle again, its menu does not come back by itself, and the method chosen is the default now.
     expect(button().hasAttribute("aria-busy")).toBe(false);
-    expect(queryTestId("pr-merge-menu")).toBeNull();
+    expect(queryTestId("pr-merge-button-menu")).toBeNull();
+    expect(button().textContent).toBe("Merge");
     expect(merges().filter(([, confirmed]) => confirmed)).toEqual([]);
 
     // GitHub refuses (the head moved): toasted, still open, the button usable again.
     world.failNext.add("pr.merge");
     const release = world.hold("pr.merge");
-    press(button());
+    press(chevron());
     expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
     await pick(byTestId("pr-merge-method-rebase"));
     fireEvent.click(byTestId("confirm-ok"));
@@ -737,12 +837,12 @@ describe("the merge button", () => {
     renderPrPanel();
     await openPr(146);
     expect(byTestId("pr-state").textContent).toBe("Open");
-    press(button());
+    press(chevron());
     expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
     expect(byTestId("pr-merge-delete-branch").getAttribute("data-disabled")).toBe("");
     expect(byTestId("pr-merge-delete-branch-note").textContent).toBe("The branch is in a fork");
-    fireEvent.keyDown(byTestId("pr-merge-menu"), { key: "Escape" });
-    expect(queryTestId("pr-merge-menu")).toBeNull();
+    fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
+    expect(queryTestId("pr-merge-button-menu")).toBeNull();
 
     // pr.merge with delete-branch on (as the CLI can): the daemon's answer says it kept the branch.
     void mergePullRequest({ slug: SLUG, number: 146 }, "squash", true, "f04c146000000000000000000000000000000000");
@@ -753,6 +853,159 @@ describe("the merge button", () => {
       expect(byTestId("pr-state").textContent).toBe("Merged");
     });
     await expectToast("kept patch-1: it is in a fork");
+  });
+
+  it("#162 behind (GitHub reports BEHIND): the row says the repository wants it up to date; Merge is disabled and Auto-merge offered", async () => {
+    renderPrPanel();
+    await openPr(162);
+    expect(screen.getAllByTestId("pr-ready-row").map((r) => r.dataset.row)).toEqual(["checks", "review", "behind", "mergeable"]);
+    expect(texts("pr-ready-title")[2]).toBe("Behind main");
+    const behind = byTestId("pr-readiness").querySelector<HTMLElement>('[data-row="behind"]');
+    expect(behind?.textContent).toContain("This repository only merges branches that are up to date with main.");
+    expect(behind?.dataset.task).toBe("behind");
+    expect(queryTestId("pr-merge-button")).toBeNull();
+    expect(byTestId("pr-auto-merge-button").textContent).toBe("Auto-merge");
+  });
+});
+
+describe("auto-merge", () => {
+  const autoMerges = () => invocationsOf("pr.auto-merge").map((i) => [i.args, i.confirmed]);
+  const head163 = "163c0ffee".padEnd(40, "0");
+
+  it("#163 (checks running, approved): Auto-merge confirms and runs pr.auto-merge with the method and the head; the box then says Auto-merge on and Cancel turns it off", async () => {
+    renderPrPanel();
+    await openPr(163);
+    expect(byTestId("pr-ready-headline").textContent).toBe("Waiting on checks3 running");
+    expect(queryTestId("pr-merge-button")).toBeNull();
+    // A method from the menu: rebase.
+    press(byTestId("pr-auto-merge-button-menu-button"));
+    expect(menuItems(byTestId("pr-auto-merge-button-menu"))).toEqual([
+      "Create a merge commitGitHub merges it with a merge commit once its required checks and reviews pass.",
+      "Squash and mergeGitHub merges it as one commit once its required checks and reviews pass.",
+      "Rebase and mergeGitHub merges it by rebasing once its required checks and reviews pass.",
+    ]);
+    await pick(byTestId("pr-auto-merge-method-rebase"));
+    expect(byTestId("confirm-dialog").textContent).toContain("Turn on auto-merge for #163 with rebase?");
+    fireEvent.click(byTestId("confirm-ok"));
+    await settle(3);
+    const args = { "repo-slug": SLUG, number: "163", method: "rebase", "head-sha": head163 };
+    expect(autoMerges()).toEqual([
+      [args, false],
+      [args, true],
+    ]);
+    await vi.waitFor(() => {
+      expect(byTestId("pr-ready-headline").textContent).toBe("Auto-merge onrebase");
+    });
+    expect(queryTestId("pr-auto-merge-button")).toBeNull();
+    fireEvent.click(byTestId("pr-cancel-auto-merge"));
+    await settle(3);
+    expect(autoMerges().at(-1)).toEqual([{ "repo-slug": SLUG, number: "163", off: "true" }, false]);
+    await vi.waitFor(() => {
+      expect(byTestId("pr-auto-merge-button")).toBeTruthy();
+    });
+    // The main part uses the method chosen last in this repository.
+    fireEvent.click(byTestId("pr-auto-merge-button"));
+    await settle();
+    expect(autoMerges().at(-1)).toEqual([{ "repo-slug": SLUG, number: "163", method: "rebase", "head-sha": head163 }, false]);
+  });
+
+  it("#164 (auto-merge on): headline with the method, Cancel auto-merge only", async () => {
+    renderPrPanel();
+    await openPr(164);
+    expect(byTestId("pr-ready-headline").textContent).toBe("Auto-merge onsquash");
+    expect(byTestId("pr-ready-headline").dataset.tone).toBe("info");
+    expect(queryTestId("pr-merge-button")).toBeNull();
+    expect(byTestId("pr-cancel-auto-merge").textContent).toBe("Cancel auto-merge");
+  });
+
+  it("a repository without auto-merge keeps Merge disabled with a note in its menu; a stale copy says nothing about auto-merge", async () => {
+    world.update(163, (d) => ({ ...d, autoMergeAllowed: false }));
+    renderPrPanel();
+    await openPr(163);
+    expect(queryTestId("pr-auto-merge-button")).toBeNull();
+    expect(byTestId("pr-merge-button").getAttribute("aria-disabled")).toBe("true");
+    press(byTestId("pr-merge-button-menu-button"));
+    expect(texts("pr-merge-note")).toEqual(["Blocked: required checks or reviews are missing", "Auto-merge is off for this repository"]);
+    fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
+
+    // The copy served after a failed fetch may predate autoMergeAllowed: no note, no Auto-merge.
+    world.update(162, (d) => ({ ...d, autoMergeAllowed: false, lastError: "github graphql: 502 Bad Gateway" }));
+    await openPr(162);
+    expect(queryTestId("pr-auto-merge-button")).toBeNull();
+    press(byTestId("pr-merge-button-menu-button"));
+    expect(texts("pr-merge-note")).toEqual(["Behind main: this repository merges only up-to-date branches"]);
+  });
+});
+
+describe("draft and links", () => {
+  it("#145's Ready for review runs pr.ready; the draft row goes; ⋯ → Convert to draft runs pr.draft and it comes back", async () => {
+    renderPrPanel();
+    await openPr(145);
+    // A draft is never offered Convert to draft.
+    openMenu();
+    expect(queryTestId("pr-menu-draft")).toBeNull();
+    fireEvent.keyDown(byTestId("pr-menu"), { key: "Escape" });
+    fireEvent.click(byTestId("pr-ready-for-review"));
+    await settle(3);
+    expect(invocationsOf("pr.ready").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "145" }]);
+    await vi.waitFor(() => {
+      expect(byTestId("pr-state").textContent).toBe("Open");
+    });
+    expect(screen.getAllByTestId("pr-ready-row").map((r) => r.dataset.row)).not.toContain("draft");
+    await expectToast("Marked #145 ready for review");
+
+    openMenu();
+    await pick(byTestId("pr-menu-draft"));
+    await settle(2);
+    expect(invocationsOf("pr.draft").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "145" }]);
+    await vi.waitFor(() => {
+      expect(byTestId("pr-state").textContent).toBe("Draft");
+    });
+  });
+
+  it("Convert to draft needs write access or authorship; merged pull requests have none", async () => {
+    renderPrPanel();
+    await openPr(140);
+    openMenu();
+    expect(queryTestId("pr-menu-draft")).toBeNull();
+    fireEvent.keyDown(byTestId("pr-menu"), { key: "Escape" });
+    await openPr(138);
+    openMenu();
+    expect(queryTestId("pr-menu-draft")).toBeNull();
+  });
+
+  it("Link to this thread: only from a thread that does not list it (any case); thread.pr.link with the thread and the pull request; gone once linked", async () => {
+    // From the Pull Requests page: no thread, no item.
+    renderPrPanel();
+    await openPr(142);
+    openMenu();
+    expect(queryTestId("pr-menu-link")).toBeNull();
+    cleanup();
+
+    seedWorld();
+    resetPrStores({ kind: "thread", id: "s-1" });
+    const setLinks = (links: { slug: string; number: number }[]) => {
+      act(() => {
+        useThreadsStore.setState((s) => {
+          const t = s.byId["s-1"];
+          if (!t) throw new Error("no s-1");
+          return { byId: { ...s.byId, "s-1": { ...t, linkedPullRequests: links.map((l) => ({ ...l, url: `https://github.com/${l.slug}/pull/${String(l.number)}`, linkedAt: null })) } } };
+        });
+      });
+    };
+    setLinks([{ slug: SLUG, number: 145 }]);
+    renderPrPanel();
+    await openPr(142);
+    openMenu();
+    await pick(byTestId("pr-menu-link"));
+    expect(invocationsOf("thread.pr.link").map((i) => i.args)).toEqual([{ id: "s-1", pr: `${SLUG}#142` }]);
+    // The daemon publishes the thread with the link (in GitHub's case or another): the item goes.
+    setLinks([
+      { slug: SLUG, number: 145 },
+      { slug: SLUG.toUpperCase(), number: 142 },
+    ]);
+    openMenu();
+    expect(queryTestId("pr-menu-link")).toBeNull();
   });
 });
 
@@ -952,10 +1205,11 @@ describe("Review ▾", () => {
     });
     await expectToast("Review Can not approve your own pull request");
 
-    // Read access only: no Review. Merged: none either.
+    // Read access only: no Review (and no merge controls). Merged: none either.
     await openPr(140);
     expect(byTestId("pr-author").textContent).toBe("outside-contrib");
-    expect(byTestId("pr-merge-button")).toBeTruthy();
+    expect(byTestId("pr-ready-headline").textContent).toBe("You can't merge thisread access");
+    expect(queryTestId("pr-ready-footer")).toBeNull();
     expect(queryTestId("pr-review-button")).toBeNull();
     expect(queryTestId("pr-your-review")).toBeNull();
     await openPr(138);
@@ -968,8 +1222,8 @@ describe("Review ▾", () => {
     await openPr(142);
     await chooseVerdict("comment");
     fireEvent.change(reviewInput(), { target: { value: "Looks done." } });
-    press(byTestId("pr-merge-button"));
-    await pick(byTestId("pr-merge-method-squash"));
+    fireEvent.click(byTestId("pr-merge-button"));
+    await settle();
     fireEvent.click(byTestId("confirm-ok"));
     await settle(3);
     await vi.waitFor(() => {

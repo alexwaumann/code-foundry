@@ -99,7 +99,7 @@ test("summary (screenshot)", async ({ page }) => {
 test("Timeline at the default 420px: the counts end before the order toggle; the rail stops at the last entry's icon", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
-  await page.getByTestId("pr-tab-timeline").click();
+  await page.getByTestId("pr-tab-activity").click();
   const entries = page.getByTestId("pr-timeline-entry");
   await expect(entries).toHaveCount(10);
   // The counts' text fits their box, and that box ends before the toggle (its icon).
@@ -201,7 +201,7 @@ test("panel state is per selection; a thread or worktree on a PR branch enables 
   // Back on the Pull Requests page, its panel is as it was.
   await page.getByTestId("nav-pullrequests").click();
   await expect(tabs(page)).toHaveText(["#142"]);
-  await expect(page.getByTestId("pr-tab-summary")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("pr-tab-overview")).toHaveAttribute("aria-selected", "true");
 });
 
 test("light scheme", async ({ page }) => {
@@ -242,7 +242,7 @@ test("at 280px nothing overflows: header, inner tab bar, logins, popups; the act
   expect(cutComments).toEqual([]);
 
   // Timeline: the counts give way; the order toggle stays reachable.
-  await page.getByTestId("pr-tab-timeline").click();
+  await page.getByTestId("pr-tab-activity").click();
   expect(await overflowX(page, "pr-inner-bar")).toBeLessThanOrEqual(0);
   await expect(page.getByTestId("pr-timeline-counts")).toBeHidden();
   expect(inside(await boxOf(page, "pr-timeline-order"), await boxOf(page, "pr-inner-bar"))).toBe(true);
@@ -256,7 +256,7 @@ test("at 280px nothing overflows: header, inner tab bar, logins, popups; the act
   await expect(page.getByTestId("pr-menu")).toBeVisible();
   expect(inside(await boxOf(page, "pr-menu"), await boxOf(page, "side-panel"))).toBe(true);
   await page.keyboard.press("Escape");
-  await page.getByTestId("pr-tab-summary").click();
+  await page.getByTestId("pr-tab-overview").click();
   await page.getByTestId("pr-add-reviewer").click();
   await expect(page.getByTestId("pr-reviewer-picker")).toBeVisible();
   expect(inside(await boxOf(page, "pr-reviewer-picker"), await boxOf(page, "side-panel"))).toBe(true);
@@ -306,7 +306,7 @@ test("long conversations and timelines are virtualized in the panel's scroll", a
   await body.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.getByTestId("pr-tab-timeline").click();
+  await page.getByTestId("pr-tab-activity").click();
   await expect(page.getByTestId("pr-timeline-list")).toHaveAttribute("data-virtual", "true");
   await expect
     .poll(async () => {

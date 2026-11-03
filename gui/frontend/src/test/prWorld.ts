@@ -2,8 +2,9 @@
  * The mock daemon's pull request world (mock/prDetail.ts, mock/github.ts) as view models, for
  * component tests of the Pull request surface and the Pull Requests page: the details of #145
  * (open, draft, failing checks, threads, reviewers), #138 (merged, revertable), #131 (closed),
- * #140 (read access only), #142 (mergeable), #146 (from a fork) and #139 (a teammate's,
- * awaiting the viewer's review), the reviewer candidates, the dashboard, and the pr.* commands
+ * #140 (read access only), #142 (mergeable), #146 (from a fork), #139 (a teammate's,
+ * awaiting the viewer's review) and the readiness states #160-#164 (changes requested,
+ * conflicts, behind, checks running, auto-merge on), the reviewer candidates, the dashboard, and the pr.* commands
  * changing them the way the mock does. Pair with src/test/daemonFakes.ts:
  *
  *   vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
@@ -281,6 +282,28 @@ function forkDetail(t0: number): PullRequestDetailView {
   };
 }
 
+/** #160-#164: the readiness box's states (the mock's states()), each approved unless said otherwise. */
+function stateDetails(t0: number): PullRequestDetailView[] {
+  const passing = ["build", "lint", "vet", "test (macos-15)", "test (ubuntu-24.04)", "e2e (webkit)", "frontend test"].map((n) => check(t0, n, "CI", "completed", "success", { startedAgo: 50 * MIN, completedAgo: 45 * MIN }));
+  const running = [...passing.slice(0, 4), check(t0, "e2e (webkit)", "CI", "in_progress", "", { startedAgo: 6 * MIN }), check(t0, "test (macos-15)", "CI", "in_progress", "", { startedAgo: 4 * MIN }), check(t0, "release-notes", "Release", "queued", "")];
+  const approved = [reviewer("teammate-kim", { state: "approved", submittedAtMs: t0 - HOUR })];
+  const make = (n: number, title: string, o: Partial<PullRequestView>, d: Partial<PullRequestDetailView> = {}): PullRequestDetailView => {
+    const pr = prSummary(t0, SLUG, n, title, { headRef: `cf/state-${String(n)}`, headSha: `${String(n)}c0ffee`.padEnd(40, "0"), review: "approved", mergeState: "blocked", checks: rollup("success", 7), ...o });
+    return { ...detailBase(pr, t0), reviewers: approved, checks: passing, ...d };
+  };
+  const thread = (id: string, path: string, line: number, isOutdated = false): ReviewThreadView => ({ id, path, line, side: "right", isResolved: false, isOutdated, comments: [comment(t0, 160, "review_comment", `${id}_c`, "teammate-ana", "Batch it.", 3 * HOUR, { path })], commentsTruncated: false });
+  return [
+    make(160, "feat(gh): batch the dashboard query per viewer", { review: "changes_requested" }, {
+      reviewers: [reviewer("teammate-ana", { state: "changes_requested", submittedAtMs: t0 - 3 * HOUR }), reviewer("teammate-lee", { requested: true })],
+      reviewThreads: [thread("PRRT_160a", "internal/store/gh/dashboard.go", 88), thread("PRRT_160b", "internal/store/gh/dashboard.go", 140), thread("PRRT_160c", "internal/store/gh/fingerprint.go", 12, true)],
+    }),
+    make(161, "refactor(panel): move tab state into the panel store", { mergeable: "conflicting", mergeState: "dirty" }),
+    make(162, "feat(prs): needs-review queue on the PRs page", { mergeState: "behind" }),
+    make(163, "fix(sidebar): keep the selected row in view on resize", { checks: rollup("pending", 4, 0, 3) }, { checks: running }),
+    make(164, "fix(sidebar): scroll the new thread into view", { checks: rollup("pending", 4, 0, 3) }, { checks: running, autoMergeEnabled: true, autoMergeMethod: "squash" }),
+  ];
+}
+
 /** A minimal detail from a listed pull request's summary (the mock's fromSummary). */
 function fromSummary(t0: number, pr: PullRequestView): PullRequestDetailView {
   return {
@@ -402,6 +425,10 @@ const titles: Record<string, string> = {
   "pr.ask": "Ask About Pull Request",
   "pr.explain": "Explain Pull Request",
   "pr.fix.findings": "Fix Pull Request Findings",
+  "pr.ready": "Mark Pull Request Ready for Review",
+  "pr.draft": "Convert Pull Request to Draft",
+  "pr.auto-merge": "Auto-merge Pull Request",
+  "thread.pr.link": "Link Pull Request to Thread",
 };
 
 /** The pr.* commands as CommandService.List returns them (their titles name a failure's toast). */
@@ -471,6 +498,7 @@ export class PrWorld {
     set(forkDetail(t0));
     if (pr142) set(fromSummary(t0, pr142));
     if (pr139) set({ ...fromSummary(t0, pr139), reviewers: [reviewer(VIEWER, { requested: true })], viewerCanUpdate: true, viewerPermission: "write" });
+    for (const d of stateDetails(t0)) set(d);
     this.candidates.set(key(SLUG, 145), [
       { kind: "team", login: "acme/core", name: "Core", isRequested: true },
       { kind: "user", login: "teammate-ana", name: "Ana", isRequested: true },
@@ -575,7 +603,7 @@ export class PrWorld {
 
   /** Registers the pr.* commands' handlers and their titles in daemonFakes' daemon. */
   install(): void {
-    daemon.commands = [...daemon.commands.filter((c) => !c.name.startsWith("pr.")), ...PR_COMMANDS];
+    daemon.commands = [...daemon.commands.filter((c) => !c.name.startsWith("pr.") && c.name !== "thread.pr.link"), ...PR_COMMANDS];
     const h = daemon.handlers;
     h.set("pr.refresh", (inv) => {
       const [, n, d] = this.target(inv);
@@ -677,6 +705,27 @@ export class PrWorld {
     h.set("pr.ask", startThread("pr.ask"));
     h.set("pr.explain", startThread("pr.explain"));
     h.set("pr.fix.findings", startThread("pr.fix.findings"));
+    for (const name of ["pr.ready", "pr.draft"]) {
+      h.set(name, (inv) => {
+        const [slug, n, d] = this.target(inv);
+        const draft = name === "pr.draft";
+        if (d.pullRequest.state !== "open") throw this.refuse(`pull request #${String(n)} is ${d.pullRequest.state}, not open`);
+        if (d.pullRequest.draft === draft) throw this.refuse(`pull request #${String(n)} is already ${draft ? "a draft" : "ready for review"}`);
+        this.details.set(key(slug, n), { ...d, pullRequest: { ...d.pullRequest, draft, mergeState: draft ? "draft" : "blocked" }, fetchedAtMs: Date.now() });
+        return { message: draft ? `Converted #${String(n)} to a draft` : `Marked #${String(n)} ready for review`, resultJson: "" };
+      });
+    }
+    h.set("pr.auto-merge", (inv) => {
+      const [slug, n, d] = this.target(inv);
+      const off = inv.args.off === "true";
+      const method = inv.args.method as PullRequestDetailView["autoMergeMethod"];
+      if (!off && !inv.confirmed) throw needsConfirm({ command: "pr.auto-merge", title: titles["pr.auto-merge"], message: `Turn on auto-merge for #${String(n)} with ${methodWords[method ?? ""] ?? ""}?` });
+      if (off && !d.autoMergeEnabled) throw this.refuse(`pull request #${String(n)} does not have auto-merge on`);
+      if (!off && d.pullRequest.mergeState === "clean") throw this.refuse(`pull request #${String(n)} can be merged now, so GitHub will not wait to auto-merge it; merge it instead`);
+      this.details.set(key(slug, n), { ...d, autoMergeEnabled: !off, autoMergeMethod: off ? null : method, fetchedAtMs: Date.now() });
+      return { message: off ? `Auto-merge off for #${String(n)}` : `Auto-merge on for #${String(n)}`, resultJson: "" };
+    });
+    h.set("thread.pr.link", () => OK);
     h.set("view.open.url", () => OK);
   }
 }
