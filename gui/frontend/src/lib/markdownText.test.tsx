@@ -1,19 +1,25 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { markdownText } from "./markdownText";
+import { markdownText, streamingMarkdownText } from "./markdownText";
 
 vi.mock("@/stores/gh", () => ({ openUrl: vi.fn(() => Promise.resolve()) }));
 vi.mock("@/api/threads", () => ({ readAttachment: vi.fn(() => Promise.resolve(null)) }));
 
-const { ThreadMarkdown } = await import("@/components/thread/Code");
-const { plainText } = await import("@/components/thread/cite/citeDom");
+const { StreamingMarkdown, ThreadMarkdown } = await import("@/components/thread/Code");
+const { findText } = await import("@/components/thread/find/findDom");
 
 afterEach(cleanup);
 
-/** What the cite layer reads from the rendered answer (TextRow's element). */
+/** What the find layer reads from the rendered answer (TextRow's element: citeDom plainText less FIND_SKIP). */
 function rendered(md: string): string {
   const { container } = render(<ThreadMarkdown>{md}</ThreadMarkdown>);
-  return plainText(container).text;
+  return findText(container).text;
+}
+
+/** The same while the answer streams (StreamingMarkdown: block by block). */
+function renderedStreaming(md: string): string {
+  const { container } = render(<StreamingMarkdown text={md} threadId="s-1" />);
+  return findText(container).text;
 }
 
 const cases: [string, string][] = [
@@ -29,6 +35,10 @@ const cases: [string, string][] = [
   ["task list", "- [x] done\n- [ ] open"],
   ["hard breaks and rules", "one  \ntwo\n\n---\n\nthree"],
   ["an https image", "Look: ![shot](https://example.com/a.png) here"],
+  ["a local image's chip", "Before ![the shot](shots/a.png) after"],
+  ["a path in prose", "It lives in internal/store/pr/fingerprint.go and src/main.ts:12."],
+  ["a reference link", "See [the docs][d] first.\n\n[d]: https://example.com"],
+  ["a footnote", "A claim.[^1]\n\n[^1]: The source."],
 ];
 
 describe("markdownText", () => {
@@ -38,5 +48,23 @@ describe("markdownText", () => {
 
   it("is empty for empty markdown", () => {
     expect(markdownText("")).toBe("");
+    expect(streamingMarkdownText("")).toBe("");
+  });
+});
+
+describe("streamingMarkdownText", () => {
+  it.each(cases)("%s: the text the streaming answer renders (block by block)", (_name, md) => {
+    expect(streamingMarkdownText(md)).toBe(renderedStreaming(md));
+  });
+
+  it("a reference link is literal while streaming and a link once whole, as on screen", () => {
+    const md = "See [the docs][d] first.\n\n[d]: https://example.com";
+    expect(streamingMarkdownText(md)).toBe("See [the docs][d] first.");
+    expect(markdownText(md)).toBe("See the docs first.");
+  });
+
+  it("a growing answer: each prefix reads as its render", () => {
+    const md = cases.map(([, m]) => m).join("\n\n");
+    for (const n of [40, 200, 420, md.length]) expect(streamingMarkdownText(md.slice(0, n))).toBe(renderedStreaming(md.slice(0, n)));
   });
 });

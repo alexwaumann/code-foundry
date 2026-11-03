@@ -1,11 +1,8 @@
 import { memo, useMemo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
-import remarkGfm from "remark-gfm";
 import { Tip } from "@/components/ui/tooltip";
-import { INLINE_HTML_TAGS, rehypeInlineHtml } from "@/lib/inlineHtml";
-import { CHIP_PROP, isRelativeHref, matchPath, rehypePathChips, type PathMatch } from "@/lib/pathChips";
+import { rehypePluginsFor, remarkPlugins } from "@/lib/markdownPlugins";
+import { CHIP_PROP, isRelativeHref, matchPath, type PathMatch } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
@@ -62,38 +59,6 @@ const baseComponents: Components = {
   a: ({ href, children, title }) => <Link href={href} tip={title}>{children}</Link>,
   img: ({ src, alt }) => (typeof src === "string" && /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : null),
 };
-
-/**
- * What a body may contain after raw HTML is parsed: the elements markdown and GFM produce
- * (tables, task lists, footnotes), plus a few HTML tags GitHub bodies use (images,
- * collapsible details, line breaks, sub/superscript, keys, fine print, highlights, inserted
- * and struck text). Everything else, script and style included, is dropped. Attributes and URL schemes follow GitHub's own schema
- * (rehype-sanitize's defaultSchema), except that images load only over https.
- */
-/** What markdown and GFM produce themselves. */
-const markdownTags = [
-  "a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "img", "input", "li", "ol", "p", "pre",
-  "section", "strong", "table", "tbody", "td", "th", "thead", "tr", "ul",
-];
-
-const markdownSchema: SanitizeSchema = {
-  ...defaultSchema,
-  tagNames: [...markdownTags, "details", "summary", "sub", "sup", "kbd", "small", "mark", "ins", "s", "u"],
-  protocols: { ...defaultSchema.protocols, src: ["https"] },
-};
-
-/** Without raw HTML (a thread): markdown's own elements and the inline tags lib/inlineHtml builds, nothing else. */
-const inlineSchema: SanitizeSchema = { ...markdownSchema, tagNames: [...new Set([...markdownTags, ...INLINE_HTML_TAGS])] };
-
-const remarkPlugins = [remarkGfm];
-type RehypePlugins = NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
-const rehypePlugins = [rehypeRaw, [rehypeSanitize, markdownSchema]] as RehypePlugins;
-/**
- * Without raw HTML: HTML in the source shows as text, except matched pairs of a few inline
- * tags (small, mark, sub, sup, kbd, ins, s, del, u) and br, which render
- * (lib/inlineHtml). Never stripped silently. Still sanitized.
- */
-const rehypePluginsNoHtml = [rehypeInlineHtml, [rehypeSanitize, inlineSchema]] as RehypePlugins;
 
 /** Optional renderers a surface adds (a thread: highlighted code, attachment images). */
 export interface MarkdownExtras {
@@ -174,10 +139,9 @@ function withExtras(extras: MarkdownExtras): Components {
   };
 }
 
-/** The rehype plugins for a set of extras: raw HTML or not, then the prose path pass. */
-function rehypeFor(extras: MarkdownExtras | undefined): RehypePlugins {
-  const base = extras?.html === false ? rehypePluginsNoHtml : rehypePlugins;
-  return extras?.pathChip ? [...base, rehypePathChips] : base;
+/** The rehype plugins for a set of extras (lib/markdownPlugins): raw HTML or not, then the prose path pass. */
+function rehypeFor(extras: MarkdownExtras | undefined) {
+  return rehypePluginsFor({ html: extras?.html !== false, pathChips: extras?.pathChip !== undefined });
 }
 
 /**
