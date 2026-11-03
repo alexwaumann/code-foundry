@@ -93,9 +93,10 @@ The GUI PR that follows builds on these and on the mock.
 - The code-foundry repository itself has "Allow auto-merge" off on GitHub (checked with
   a GraphQL read): its detail reports `auto_merge_allowed` false, so the GUI should say
   why there is no Auto-merge rather than hide it silently.
-- The guide's soft size limit (`internal/guide/topics_test.go`) went from 25,650 to
-  25,900 bytes: three `pr.*` names in the topic list plus `thread.pr.link`, which the
-  guide lists in full with the other Thread verbs. Its description was cut short for it.
+- The guide's soft size limit (`internal/guide/topics_test.go`) went from 25,700 to
+  25,950 bytes (25,888 used, on top of main's pr.task): three `pr.*` names in the topic
+  list plus `thread.pr.link`, which the guide lists in full with the other Thread verbs.
+  Its description was cut short for it.
 
 ## Verification
 
