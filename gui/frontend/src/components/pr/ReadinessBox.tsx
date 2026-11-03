@@ -37,6 +37,8 @@ import { checkIcon, useChecksClock } from "./checkIcons";
 import { CheckList } from "./PrChecks";
 import { detailFresh, readiness, type ReadinessRow, type ReadyIcon, type ReadyTone, type RowAction, type SubLine } from "./readiness";
 import { ReviewButton } from "./ReviewButton";
+import { TaskButton } from "./TaskButton";
+import { taskVerb } from "./taskRouting";
 import type { Verdict } from "./review";
 import { toneText } from "./tones";
 
@@ -155,11 +157,13 @@ function ActionButton({ action, prRef, panelKey }: { action: RowAction; prRef: P
 /**
  * One requirement: its icon, title (and muted counts), the lines under it, and its button
  * under the text. The checks row's title unfolds the full check list (per panel tab). An
- * issue row carries `data-task` (pr.task's kind) for the thread buttons that join it.
+ * issue row carries `data-task` (pr.task's kind) and, when the viewer may hand it to a
+ * thread (taskVerb), its TaskButton ("Fix in this thread") under the text.
  */
-function Row({ row, d, prRef, panelKey, tabKey, now }: { row: ReadinessRow; d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; now: number }) {
+function Row({ row, d, prRef, panelKey, tabKey, now, viewer }: { row: ReadinessRow; d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; now: number; viewer: string }) {
   const open = usePrPanelStore((s) => s.byTab[tabKey]?.open.checks ?? false) && row.expandable;
   const Icon = icons[row.icon];
+  const verb = taskVerb(row.task, d, viewer);
   const Chevron = open ? ChevronDown : ChevronRight;
   const title = (
     <>
@@ -204,9 +208,10 @@ function Row({ row, d, prRef, panelKey, tabKey, now }: { row: ReadinessRow; d: P
             </div>
           )
         )}
-        {row.action && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-2">
-            <ActionButton action={row.action} prRef={prRef} panelKey={panelKey} />
+        {(row.action || (row.task && verb)) && (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 pt-2">
+            {row.action && <ActionButton action={row.action} prRef={prRef} panelKey={panelKey} />}
+            {row.task && verb && <TaskButton kind={row.task} verb={verb} prRef={prRef} detail={d} />}
           </div>
         )}
       </div>
@@ -280,7 +285,7 @@ export function ReadinessBox({ d, prRef, panelKey, tabKey, onReview, compact = f
         <>
           {headline}
           {r.rows.map((row) => (
-            <Row key={row.id} row={row} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} now={row.id === "checks" ? checksNow : clock} />
+            <Row key={row.id} row={row} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} now={row.id === "checks" ? checksNow : clock} viewer={viewer} />
           ))}
           {controls && (
             <div className="flex min-w-0 flex-wrap items-center gap-2 bg-cf-surface-sunken/60 px-3 py-2" data-testid="pr-ready-footer">
