@@ -223,14 +223,17 @@ func searchHits(ctx context.Context, db *sql.DB, sq searchQuery, scope map[strin
 	if err != nil {
 		return nil, false, fmt.Errorf("thread: search: %w", err)
 	}
+	// The unary + keeps thread_id from choosing the (thread_id, item_id) index: with it,
+	// SQLite probes once per thread of scope for every match (53 s for "the" on the
+	// 400k-item database); through thread_items_item_id it is one probe per holder.
 	rows, err := db.QueryContext(ctx, `SELECT d.id, ti.thread_id, ti.item_id, ti.ordinal, ti.kind, ti.parent_tool_use_id,
 			ti.created_at, ti.updated_at, ti.data
 		FROM search_docs d
 		JOIN thread_items ti ON ti.item_id = d.item_id
-		WHERE ti.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR ti.parent_tool_use_id = '')
+		WHERE +ti.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR ti.parent_tool_use_id = '')
 		AND d.id IN (SELECT search_fts.rowid FROM search_fts WHERE search_fts MATCH ?1
 			AND EXISTS (SELECT 1 FROM search_docs s JOIN thread_items h ON h.item_id = s.item_id
-				WHERE s.id = search_fts.rowid AND h.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR h.parent_tool_use_id = ''))
+				WHERE s.id = search_fts.rowid AND +h.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR h.parent_tool_use_id = ''))
 			ORDER BY search_fts.rowid DESC LIMIT ?4)`,
 		sq.fts, string(scopeJSON), subagents, maxSearchCandidates+1)
 	if err != nil {

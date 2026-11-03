@@ -19,8 +19,9 @@ CREATE TABLE search_docs (
 -- names and partial words match.
 CREATE VIRTUAL TABLE search_fts USING fts5 (text, content = '', contentless_delete = 1, tokenize = 'trigram');
 
--- A query finds an item's holders by id; the trigger below checks for one left.
-CREATE INDEX thread_items_item_id ON thread_items (item_id);
+-- A query finds an item's holders by id and checks each against its scope (thread and
+-- subagent) from the index alone; the trigger below checks for a holder left.
+CREATE INDEX thread_items_item_id ON thread_items (item_id, thread_id, parent_tool_use_id);
 
 -- A document goes with its last holder: removing a thread (its items cascade) drops the
 -- documents of items no other thread holds; a fork's copies keep the rest.
