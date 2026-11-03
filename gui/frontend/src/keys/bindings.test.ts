@@ -428,6 +428,16 @@ describe("handleKeyDown precedence", () => {
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
+  it("search.open's cmd+shift+f leaves a text field (a find bar, a settings search) and opens the Find dialog", async () => {
+    useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: "search.open", keybindings: ["cmd+shift+f"] })] }));
+    input.focus();
+    const e = press(input, { key: "f", code: "KeyF", metaKey: true, shiftKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    await Promise.resolve();
+    expect(useUiStore.getState().palette).toMatchObject({ open: true, page: "search" });
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
   it("view.back's chord does not leave the palette's input", () => {
     useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: "view.back", keybindings: ["cmd+["] })] }));
     useUiStore.setState({ palette: { open: true, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "view", name: "projects" }, history: [HOME, { kind: "view", name: "projects" }], historyIndex: 1 });
