@@ -9,6 +9,7 @@ import { sectionOpenByDefault, toggleOrder, toggleSection, usePrPanelStore, type
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { Markdown } from "./Markdown";
+import { usePanelMarkdownExtras } from "./prLinks";
 import { ago, checkMeta, checkRunning, checkTone, commentCount, conversation, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
 import { ReviewerPicker } from "./ReviewerPicker";
 import { toneText } from "./tones";
@@ -178,6 +179,7 @@ function CommentHeader({ c, now, verb }: { c: PullRequestCommentView; now: numbe
 const verdictTone = { approved: toneText.success, changes_requested: toneText.failure } as Partial<Record<string, string>>;
 
 function Comment({ c, now }: { c: PullRequestCommentView; now: number }) {
+  const extras = usePanelMarkdownExtras();
   const verb =
     c.kind === "review" ? (
       <span className={cn("whitespace-nowrap", verdictTone[c.reviewState] ?? "text-cf-text-muted")} data-testid="pr-review-verdict">
@@ -188,7 +190,7 @@ function Comment({ c, now }: { c: PullRequestCommentView; now: number }) {
     <article className="group flex flex-col gap-1.5 py-2" data-testid="pr-comment" data-kind={c.kind}>
       <CommentHeader c={c} now={now} verb={verb} />
       {c.path && <span className="pl-[26px] text-caption font-mono">{c.path}</span>}
-      {c.body ? <Markdown className="pl-[26px]">{c.body}</Markdown> : <p className="pl-[26px] text-caption italic">No comment.</p>}
+      {c.body ? <Markdown className="pl-[26px]" extras={extras}>{c.body}</Markdown> : <p className="pl-[26px] text-caption italic">No comment.</p>}
     </article>
   );
 }
@@ -212,6 +214,7 @@ const dirOf = (path: string): string => path.slice(0, path.lastIndexOf("/") + 1)
 const baseOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
 
 function Thread({ t, now }: { t: ReviewThreadView; now: number }) {
+  const extras = usePanelMarkdownExtras();
   return (
     <article className={cn("my-1.5 rounded-lg border border-cf-border", t.isResolved && "opacity-75")} data-testid="pr-thread" data-resolved={t.isResolved} data-outdated={t.isOutdated}>
       <header className="flex items-center gap-2 border-b border-cf-border px-2.5 py-1.5 text-body-sm">
@@ -232,7 +235,7 @@ function Thread({ t, now }: { t: ReviewThreadView; now: number }) {
         {t.comments.map((c) => (
           <div key={c.id} className="group flex flex-col gap-1.5 py-2" data-testid="pr-thread-comment">
             <CommentHeader c={c} now={now} />
-            {c.body && <Markdown className="pl-[26px]">{c.body}</Markdown>}
+            {c.body && <Markdown className="pl-[26px]" extras={extras}>{c.body}</Markdown>}
           </div>
         ))}
         {t.commentsTruncated && <p className="py-1.5 text-caption">More replies on GitHub.</p>}
@@ -284,6 +287,7 @@ export { OrderToggle };
 export function PrSummary({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
   const order = usePrPanelStore((s) => s.byTab[tabKey]?.commentOrder ?? "newest");
   const items = useMemo(() => conversation(d, order), [d, order]);
+  const extras = usePanelMarkdownExtras();
   return (
     <div className="flex flex-col pb-6" data-testid="pr-summary">
       <div className="flex flex-col gap-1 px-4 pt-3 pb-2">
@@ -297,7 +301,7 @@ export function PrSummary({ d, prRef, tabKey }: { d: PullRequestDetailView; prRe
         </Row>
       </div>
       <Section tabKey={tabKey} section="description" title="Description" testId="pr-description">
-        {d.body.trim() ? <Markdown>{d.body}</Markdown> : <p className="text-caption italic">No description provided.</p>}
+        {d.body.trim() ? <Markdown extras={extras}>{d.body}</Markdown> : <p className="text-caption italic">No description provided.</p>}
       </Section>
       <Section tabKey={tabKey} section="checks" title="Checks" count={d.checks.length} testId="pr-checks">
         <Checks d={d} />
