@@ -56,6 +56,8 @@ type Fake struct {
 	placement *thread.PlacementReport
 	// prompts back ListPrompts (prompts.go).
 	prompts []thread.SentPrompt
+	// search backs Search (search.go).
+	search *thread.SearchResult
 }
 
 var _ thread.Store = (*Fake)(nil)

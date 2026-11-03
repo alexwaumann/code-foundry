@@ -254,7 +254,7 @@ func TestRestartClosesTheLostTurn(t *testing.T) {
 			if err := saveThread(ctx, e.m.opts.DB, row); err != nil {
 				t.Fatal(err)
 			}
-			if err := saveItems(ctx, e.m.opts.DB, s.ID, tt.items); err != nil {
+			if err := saveItems(ctx, e.m.opts.DB, s.ID, tt.items, searchIndex{}); err != nil {
 				t.Fatal(err)
 			}
 			e.open()

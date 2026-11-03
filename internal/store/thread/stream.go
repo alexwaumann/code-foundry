@@ -223,7 +223,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 }
 
 func (m *Manager) saveItem(id string, it Item) {
-	if err := saveItem(context.Background(), m.opts.DB, id, it); err != nil {
+	if err := saveItem(context.Background(), m.opts.DB, id, it, m.searchIndexFor(id)); err != nil {
 		m.log.Error("persist thread item", "thread", id, "item", it.ID, "err", err)
 	}
 }
