@@ -80,10 +80,12 @@ message SearchHit {
   int64 ordinal = 3;
   SearchSpeaker speaker = 4;
   google.protobuf.Timestamp created_at = 5;
-  // The item's text on one line (white space runs as one space), cut to about 160 code
-  // points around its first match, with "…" where it was cut.
+  // The item's indexed text on one line (white space runs as one space; tags read as
+  // their labels; a question joined to its answer), cut to about 160 code points around
+  // its first match, with "…" where it was cut. Not the item's stored text.
   string snippet = 6;
-  // The matches in snippet.
+  // The matches in snippet, and only there: they do not map to the item's stored text. A
+  // view of the whole item matches the query again itself.
   repeated SearchMatchRange ranges = 7;
   // The Agent call a subagent's item belongs to; empty for the thread's own (only with
   // SEARCH_INCLUDE_SUBAGENTS).

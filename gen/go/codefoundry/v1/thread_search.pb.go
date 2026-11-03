@@ -362,10 +362,12 @@ type SearchHit struct {
 	Ordinal   int64                  `protobuf:"varint,3,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
 	Speaker   SearchSpeaker          `protobuf:"varint,4,opt,name=speaker,proto3,enum=codefoundry.v1.SearchSpeaker" json:"speaker,omitempty"`
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	// The item's text on one line (white space runs as one space), cut to about 160 code
-	// points around its first match, with "…" where it was cut.
+	// The item's indexed text on one line (white space runs as one space; tags read as
+	// their labels; a question joined to its answer), cut to about 160 code points around
+	// its first match, with "…" where it was cut. Not the item's stored text.
 	Snippet string `protobuf:"bytes,6,opt,name=snippet,proto3" json:"snippet,omitempty"`
-	// The matches in snippet.
+	// The matches in snippet, and only there: they do not map to the item's stored text. A
+	// view of the whole item matches the query again itself.
 	Ranges []*SearchMatchRange `protobuf:"bytes,7,rep,name=ranges,proto3" json:"ranges,omitempty"`
 	// The Agent call a subagent's item belongs to; empty for the thread's own (only with
 	// SEARCH_INCLUDE_SUBAGENTS).

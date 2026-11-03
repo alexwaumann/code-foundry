@@ -163,15 +163,17 @@ export type SearchHit = Message<"codefoundry.v1.SearchHit"> & {
   createdAt?: Timestamp | undefined;
 
   /**
-   * The item's text on one line (white space runs as one space), cut to about 160 code
-   * points around its first match, with "…" where it was cut.
+   * The item's indexed text on one line (white space runs as one space; tags read as
+   * their labels; a question joined to its answer), cut to about 160 code points around
+   * its first match, with "…" where it was cut. Not the item's stored text.
    *
    * @generated from field: string snippet = 6;
    */
   snippet: string;
 
   /**
-   * The matches in snippet.
+   * The matches in snippet, and only there: they do not map to the item's stored text. A
+   * view of the whole item matches the query again itself.
    *
    * @generated from field: repeated codefoundry.v1.SearchMatchRange ranges = 7;
    */
