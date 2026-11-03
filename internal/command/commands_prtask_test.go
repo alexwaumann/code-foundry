@@ -55,6 +55,7 @@ func TestPullRequestTask(t *testing.T) {
 		wantMsg      string
 		wantJSON     command.PRTaskResult
 		wantFocus    bool
+		wantExit     int
 		wantErr      error
 		wantCode     connect.Code
 		wantErrMsg   string
@@ -169,6 +170,15 @@ func TestPullRequestTask(t *testing.T) {
 			wantReq:    []proto.Message{detail("o/r", true)},
 			wantThread: []proto.Message{&v1.GetThreadRequest{Id: "s-gone"}},
 			wantCode:   connect.CodeNotFound, wantErrMsg: "find thread s-gone: no thread s-gone"},
+		{name: "thread: a removed thread says so and exits 1, as thread.send",
+			args: args("o/r", "checks", "thread", "s-gone0000001"),
+			setup: func(f *prThreadFixture) {
+				f.thread.Err = removedErr(t, &v1.RemovedThread{Id: "s-gone0000001", Name: "Gone"})
+			},
+			wantReq:    []proto.Message{detail("o/r", true)},
+			wantThread: []proto.Message{&v1.GetThreadRequest{Id: "s-gone0000001"}},
+			wantMsg:    "thread Gone (s-gone0000001) was removed\nno report\ncost: $0.00",
+			wantExit:   1},
 		{name: "worktree: used as is, even for a repository that is no project, nothing cloned",
 			args:       args("a/b", "checks", "worktree", "/some/where/"),
 			wantReq:    []proto.Message{detail("a/b", true), list},
@@ -302,9 +312,27 @@ func TestPullRequestTask(t *testing.T) {
 			if res.Message != tt.wantMsg {
 				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
 			}
+			if res.ExitCode != tt.wantExit {
+				t.Errorf("exit code = %d, want %d", res.ExitCode, tt.wantExit)
+			}
+			if tt.wantExit != 0 {
+				return
+			}
 			if got, ok := res.JSON.(command.PRTaskResult); !ok || got != tt.wantJSON {
 				t.Errorf("JSON = %#v, want %#v", res.JSON, tt.wantJSON)
 			}
 		})
 	}
+}
+
+// removedErr is the NOT_FOUND error the thread service answers a removed thread with.
+func removedErr(t *testing.T, r *v1.RemovedThread) error {
+	t.Helper()
+	err := connect.NewError(connect.CodeNotFound, errors.New("thread "+r.GetId()+" was removed"))
+	d, derr := connect.NewErrorDetail(r)
+	if derr != nil {
+		t.Fatal(derr)
+	}
+	err.AddDetail(d)
+	return err
 }

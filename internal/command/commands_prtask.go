@@ -127,6 +127,9 @@ func (d PullRequestThreadDeps) sendPRTask(ctx context.Context, uctx Context, id 
 		return Result{}, err
 	}
 	got, err := d.Thread.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: id}))
+	if r, ok := removedFrom(err); ok {
+		return removedWaitResult(r, ""), nil // exit 1, as thread.send
+	}
 	if err != nil {
 		return Result{}, wrapStep("find thread "+id, err)
 	}
