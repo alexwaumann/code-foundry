@@ -271,3 +271,26 @@ func TestPRTaskPromptsWorstCase(t *testing.T) {
 		}
 	}
 }
+
+// A check's log line names the repository its run URL is in, which need not be the pull
+// request's; a URL whose owner or name has characters GitHub's do not gets no log line.
+func TestChecksPromptRunRepository(t *testing.T) {
+	check := func(url string) *v1.CheckRun {
+		return &v1.CheckRun{Name: "test", Conclusion: v1.CheckConclusion_CHECK_CONCLUSION_FAILURE, Url: url}
+	}
+	tests := []struct {
+		url, want string
+	}{
+		{"https://github.com/o/r/actions/runs/123/job/456", ">   log: `gh run view 123 --log-failed --repo o/r`"},
+		{"https://github.com/ci-org/ci.repo_x/actions/runs/9", ">   log: `gh run view 9 --log-failed --repo ci-org/ci.repo_x`"},
+		{"https://github.com/o`x/r/actions/runs/9", ""},
+		{"https://github.com/o/r/actions/runs/9x", ""},
+	}
+	for _, tt := range tests {
+		got := ChecksPRTaskPrompt(&v1.PullRequestDetail{PullRequest: taskPR(), Checks: []*v1.CheckRun{check(tt.url)}}, PRTaskOptions{})
+		has := strings.Contains(got, ">   log:")
+		if tt.want == "" && has || tt.want != "" && !strings.Contains(got, tt.want+"\n") {
+			t.Errorf("url %q: prompt = %q, want log line %q", tt.url, got, tt.want)
+		}
+	}
+}

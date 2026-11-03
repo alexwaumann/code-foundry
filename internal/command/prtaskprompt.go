@@ -87,8 +87,11 @@ func appendFindings(lines []string, heading string, fs []finding) []string {
 	return lines
 }
 
-// actionsRun matches a GitHub Actions job URL's run id.
-var actionsRun = regexp.MustCompile(`^https://github\.com/[^/]+/[^/]+/actions/runs/(\d+)(?:/|$)`)
+// actionsRun matches a GitHub Actions job URL: its repository (owner, name) and run id.
+// The repository is the URL's, not the pull request's: a check can run in another one,
+// and `gh run view --repo` must name the repository the run is in. Owner and name are
+// held to GitHub's characters, so they are safe in a code span.
+var actionsRun = regexp.MustCompile(`^https://github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9._-]+)/actions/runs/(\d+)(?:/|$)`)
 
 // ChecksPRTaskPrompt is pr.task checks: fix the failing (and cancelled, timed out, ...)
 // checks of the head commit, newest first.
@@ -117,7 +120,7 @@ func ChecksPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 			f.at = tsNanos(c.GetStartedAt())
 		}
 		if m := actionsRun.FindStringSubmatch(c.GetUrl()); m != nil {
-			f.lines = append(f.lines, ">   log: `gh run view "+m[1]+" --log-failed --repo "+slug+"`")
+			f.lines = append(f.lines, ">   log: `gh run view "+m[3]+" --log-failed --repo "+m[1]+"/"+m[2]+"`")
 		}
 		fs = append(fs, f)
 	}
