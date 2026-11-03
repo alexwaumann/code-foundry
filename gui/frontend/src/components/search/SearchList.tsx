@@ -119,7 +119,10 @@ export function SearchList({ rows, selected, onSelect, onActivate }: { rows: rea
     if (i < 0) return;
     // The thread's header above its first hit comes into view with it.
     const prev = rows[i - 1];
-    v.scrollToIndex(prev?.kind === "group" || prev?.kind === "section" ? i - 1 : i, { align: "auto" });
+    const to = prev?.kind === "group" || prev?.kind === "section" ? i - 1 : i;
+    // The first row: the very top, its padding included (wrapping back from the last row lands here).
+    if (to === 0) v.scrollToOffset(0);
+    else v.scrollToIndex(to, { align: "auto" });
   }, [selected, rows, v]);
   return (
     <div ref={ref} className="min-h-0 flex-1 overflow-y-auto px-2" role="listbox" aria-label="Results" data-testid="search-list">

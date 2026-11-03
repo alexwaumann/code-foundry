@@ -17,7 +17,7 @@ vi.mock("@tanstack/react-virtual", () => ({
       items.push({ index: i, key: o.getItemKey(i), start: at, size, end: at + size });
       at += size;
     }
-    return { getVirtualItems: () => items, getTotalSize: () => at, measure: () => undefined, scrollToIndex: () => undefined };
+    return { getVirtualItems: () => items, getTotalSize: () => at, measure: () => undefined, scrollToIndex: () => undefined, scrollToOffset: () => undefined };
   },
 }));
 
