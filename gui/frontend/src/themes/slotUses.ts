@@ -43,7 +43,7 @@ export const SLOT_USES: Readonly<Record<string, string>> = {
       [`--cf-${t}-text`, `${t} text: chips, banners, a sidebar row's status line`],
     ]),
   ),
-  "--cf-success-foreground": PAGES_ONLY,
+  "--cf-success-foreground": "the Merge button's label on its green fill",
   "--cf-warning-foreground": "the sidebar's attention badge digits",
   "--cf-error-foreground": "a destructive button's label",
   "--cf-info-foreground": PAGES_ONLY,
