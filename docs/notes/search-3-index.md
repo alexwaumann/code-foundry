@@ -273,3 +273,9 @@ problem.
   5. With the original archived, the hits stayed under it, marked archived. Once it was
      removed they moved to the fork's own copies (#1, #2), with no re-indexing. The
      documents matched the distinct indexed item ids (13).
+* After the review fixes, end to end in a new scratch home: a thread whose prompt and
+  reply hold "alpha bravo" and "charlie delta" on two lines was found live by
+  `"bravo charlie"` (both items); `NEAR(` and `"unbalanced` returned no matches, not an
+  error. With the documents deleted and the thread listed in `search_backfill` again, a
+  restart logged `indexed threads for search threads=1 failed=0 items=2`, emptied the list
+  and found both again. (That run caught the log's `failed` and `items` swapped.)

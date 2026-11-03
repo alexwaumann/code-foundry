@@ -138,7 +138,7 @@ func (m *Manager) startSearchBackfill(ctx context.Context) {
 	go func() {
 		defer m.wg.Done()
 		start := time.Now()
-		n, items, failed, err := m.backfillSearch(m.ctx, ids)
+		n, failed, items, err := m.backfillSearch(m.ctx, ids)
 		if err != nil && m.ctx.Err() == nil {
 			m.log.Error("index threads for search", "threads", n, "of", len(ids), "err", err)
 			return
