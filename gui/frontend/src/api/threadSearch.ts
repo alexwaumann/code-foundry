@@ -168,18 +168,41 @@ export async function readHitItem(threadId: string, itemId: string, ordinal: num
   return items.find((it) => it.id === itemId) ?? null;
 }
 
-/**
- * The user's message before an item (the prompt Claude's text answers): the thread's own
- * user messages (role USER: wakes left out), the last one before `ordinal`; null for none.
- */
-export async function readPromptBefore(threadId: string, ordinal: number, conn: DaemonConnection = daemon): Promise<ThreadItemView | null> {
-  const items = await readPage(threadId, { role: ThreadItemRole.USER }, conn);
+/** How many items before a hit the preview reads first, looking for the prompt it answers. */
+export const PROMPT_WINDOW = 40;
+
+/** Per thread, its own user messages (role USER), read once for the dialog's life. */
+export type PromptCache = Map<string, Promise<readonly ThreadItemView[]>>;
+
+/** The last of items that is the thread's own user message (not a wake, not a subagent's) before ordinal; null for none. */
+function lastPromptBefore(items: readonly ThreadItemView[], ordinal: number): ThreadItemView | null {
   let best: ThreadItemView | null = null;
   for (const it of items) {
-    if (it.kind !== "user" || it.parentToolUseId !== "" || it.ordinal >= ordinal) continue;
+    if (it.kind !== "user" || it.wake || it.parentToolUseId !== "" || it.ordinal >= ordinal) continue;
     if (!best || it.ordinal > best.ordinal) best = it;
   }
   return best;
+}
+
+/**
+ * The user's message before an item (the prompt Claude's text answers): the thread's own
+ * last user message before `ordinal`; null for none. First the PROMPT_WINDOW items just
+ * before it (any role: the prompt is usually a few steps back); only when that window has
+ * none and does not reach the thread's start, the thread's user messages, read once per
+ * thread into `cache` (the API has no "before" query, and a long thread has thousands).
+ */
+export async function readPromptBefore(threadId: string, ordinal: number, cache: PromptCache = new Map(), conn: DaemonConnection = daemon): Promise<ThreadItemView | null> {
+  const from = ordinal - PROMPT_WINDOW - 1;
+  const near = lastPromptBefore(await readPage(threadId, { since: String(Math.max(0, from)), last: PROMPT_WINDOW }, conn), ordinal);
+  if (near || from <= 0) return near;
+  let users = cache.get(threadId);
+  if (!users) {
+    users = readPage(threadId, { role: ThreadItemRole.USER }, conn);
+    cache.set(threadId, users);
+    // A failed read is not kept: the next row asks again.
+    users.catch(() => cache.delete(threadId));
+  }
+  return lastPromptBefore(await users, ordinal);
 }
 
 /**

@@ -1,10 +1,10 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it, vi } from "vitest";
-import { ListThreadItemsResponseSchema, ThreadItemRole, type ListThreadItemsRequest } from "@/gen/codefoundry/v1/thread_pb";
+import { ListThreadItemsResponseSchema, MessageOrigin, ThreadItemRole, type ListThreadItemsRequest } from "@/gen/codefoundry/v1/thread_pb";
 import { SearchSpeaker, SearchThreadsResponseSchema } from "@/gen/codefoundry/v1/thread_search_pb";
 import type { DaemonConnection } from "./endpoint";
-import { codePointRanges, readHitItem, readLastReply, readPromptBefore, searchThreads, toSearchResultView } from "./threadSearch";
+import { codePointRanges, PROMPT_WINDOW, readHitItem, readLastReply, readPromptBefore, searchThreads, toSearchResultView, type PromptCache } from "./threadSearch";
 
 describe("codePointRanges", () => {
   it("shifts every range after an astral character by one UTF-16 unit per character", () => {
@@ -96,11 +96,33 @@ describe("reading for the preview", () => {
     expect(await readHitItem("s-1", "i-other", 7, conn)).toBeNull();
   });
 
-  it("readPromptBefore takes the thread's own last user message before the ordinal", async () => {
-    const { conn, listItems } = fakeConn(() => [user("u-1", 1, "first"), user("u-sub", 4, "a subagent's", "toolu_1"), user("u-3", 3, "second"), user("u-9", 9, "later")]);
-    expect((await readPromptBefore("s-1", 7, conn))?.id).toBe("u-3");
-    expect(listItems.mock.calls[0]?.[0].query?.role).toBe(ThreadItemRole.USER);
-    expect(await readPromptBefore("s-1", 1, conn)).toBeNull();
+  it("readPromptBefore reads the items just before the hit first, any role, and takes the thread's own last user message", async () => {
+    const wake = { ...user("w-66", 66, "[code-foundry wake] done"), payload: { case: "userMessage", value: { text: "x", attachments: [], origin: MessageOrigin.WAKE } } };
+    const { conn, listItems } = fakeConn(() => [user("u-63", 63, "second"), user("u-sub", 64, "a subagent's", "toolu_1"), reply("a-65", 65, "step"), wake, user("u-69", 69, "later")]);
+    expect((await readPromptBefore("s-1", 68, new Map(), conn))?.id).toBe("u-63");
+    expect(listItems).toHaveBeenCalledTimes(1);
+    expect(listItems).toHaveBeenCalledWith({ threadId: "s-1", query: { since: String(68 - PROMPT_WINDOW - 1), last: PROMPT_WINDOW, role: ThreadItemRole.UNSPECIFIED } });
+  });
+
+  it("readPromptBefore near the thread's start: a window from the start, no second read when it has none", async () => {
+    const { conn, listItems } = fakeConn(() => [reply("a-1", 1, "hello")]);
+    expect(await readPromptBefore("s-1", 2, new Map(), conn)).toBeNull();
+    expect(listItems).toHaveBeenCalledTimes(1);
+    expect(listItems.mock.calls[0]?.[0].query).toMatchObject({ since: "0", last: PROMPT_WINDOW });
+  });
+
+  it("readPromptBefore falls back to the thread's user messages once per thread when the window has none", async () => {
+    const { conn, listItems } = fakeConn((req) =>
+      req.query?.role === ThreadItemRole.USER ? [user("u-1", 1, "first"), user("u-3", 3, "second"), user("u-900", 900, "later")] : [reply("a-850", 850, "a long turn")],
+    );
+    const cache: PromptCache = new Map();
+    expect((await readPromptBefore("s-1", 860, cache, conn))?.id).toBe("u-3");
+    expect((await readPromptBefore("s-1", 870, cache, conn))?.id).toBe("u-3");
+    expect((await readPromptBefore("s-1", 1000, cache, conn))?.id).toBe("u-900");
+    // Three windows; the user messages read once for the thread.
+    const roles = listItems.mock.calls.map((c) => c[0].query?.role);
+    expect(roles.filter((r) => r === ThreadItemRole.USER)).toHaveLength(1);
+    expect(roles.filter((r) => r === ThreadItemRole.UNSPECIFIED)).toHaveLength(3);
   });
 
   it("readLastReply skips a subagent's text", async () => {

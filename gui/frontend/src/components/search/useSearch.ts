@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { errorMessage, isAbort } from "@/api/stream";
 import type { ThreadItemView } from "@/api/thread";
-import { readHitItem, readLastReply, readPromptBefore, searchThreads, type SearchResultView } from "@/api/threadSearch";
+import { readHitItem, readLastReply, readPromptBefore, searchThreads, type PromptCache, type SearchResultView } from "@/api/threadSearch";
 
 /** How long typing pauses before the dialog searches. */
 export const SEARCH_DEBOUNCE_MS = 90;
@@ -70,11 +70,15 @@ export interface PreviewLoaders {
   lastReply: (threadId: string) => Promise<ThreadItemView | null>;
 }
 
-const daemonLoaders: PreviewLoaders = {
-  hitItem: (threadId, itemId, ordinal) => readHitItem(threadId, itemId, ordinal),
-  promptBefore: (threadId, ordinal) => readPromptBefore(threadId, ordinal),
-  lastReply: (threadId) => readLastReply(threadId),
-};
+/** The daemon's reads, with one cache of threads' user messages for as long as the dialog is open. */
+function daemonLoaders(): PreviewLoaders {
+  const prompts: PromptCache = new Map();
+  return {
+    hitItem: (threadId, itemId, ordinal) => readHitItem(threadId, itemId, ordinal),
+    promptBefore: (threadId, ordinal) => readPromptBefore(threadId, ordinal, prompts),
+    lastReply: (threadId) => readLastReply(threadId),
+  };
+}
 
 export function previewKey(t: PreviewTarget): string {
   return t.kind === "hit" ? `hit:${t.threadId}:${t.itemId}` : `thread:${t.threadId}`;
@@ -91,7 +95,9 @@ async function loadPreview(t: PreviewTarget, l: PreviewLoaders): Promise<Omit<Pr
  * visited again shows at once). Moving on drops an answer for the row left behind. Until
  * the row's data arrives the previous row's stays (`key` says whose it is).
  */
-export function useSearchPreview(target: PreviewTarget | null, loaders: PreviewLoaders = daemonLoaders): PreviewData | null {
+export function useSearchPreview(target: PreviewTarget | null, given?: PreviewLoaders): PreviewData | null {
+  const [own] = useState(daemonLoaders);
+  const loaders = given ?? own;
   const cache = useRef(new Map<string, PreviewData>());
   const [data, setData] = useState<PreviewData | null>(null);
   const key = target ? previewKey(target) : "";
