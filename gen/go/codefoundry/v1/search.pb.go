@@ -494,8 +494,11 @@ type SearchEntry struct {
 	Version uint64 `protobuf:"varint,18,opt,name=version,proto3" json:"version,omitempty"`
 	// The thread a Promote made (the latest one).
 	PromotedThreadId string `protobuf:"bytes,19,opt,name=promoted_thread_id,json=promotedThreadId,proto3" json:"promoted_thread_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// A Find entry's result count when it was recorded (thread names and message hits);
+	// 0 when not known.
+	FindHits      int32 `protobuf:"varint,20,opt,name=find_hits,json=findHits,proto3" json:"find_hits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SearchEntry) Reset() {
@@ -659,6 +662,13 @@ func (x *SearchEntry) GetPromotedThreadId() string {
 		return x.PromotedThreadId
 	}
 	return ""
+}
+
+func (x *SearchEntry) GetFindHits() int32 {
+	if x != nil {
+		return x.FindHits
+	}
+	return 0
 }
 
 type StartAgentSearchRequest struct {
@@ -1608,8 +1618,11 @@ func (x *MarkSearchSeenResponse) GetEntry() *SearchEntry {
 }
 
 type RecordFindSearchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Query string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	// How many results the query found (thread names and message hits), shown in Recent
+	// searches as "N hits"; 0 when not known.
+	Hits          int32 `protobuf:"varint,2,opt,name=hits,proto3" json:"hits,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1649,6 +1662,13 @@ func (x *RecordFindSearchRequest) GetQuery() string {
 		return x.Query
 	}
 	return ""
+}
+
+func (x *RecordFindSearchRequest) GetHits() int32 {
+	if x != nil {
+		return x.Hits
+	}
+	return 0
 }
 
 type RecordFindSearchResponse struct {
@@ -2110,7 +2130,7 @@ const file_codefoundry_v1_search_proto_rawDesc = "" +
 	"\n" +
 	"to_ordinal\x18\n" +
 	" \x01(\x03R\ttoOrdinal\x12\x16\n" +
-	"\x06failed\x18\v \x01(\bR\x06failed\"\xc7\x05\n" +
+	"\x06failed\x18\v \x01(\bR\x06failed\"\xe4\x05\n" +
 	"\vSearchEntry\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12.\n" +
 	"\x04mode\x18\x02 \x01(\x0e2\x1a.codefoundry.v1.SearchModeR\x04mode\x12\x14\n" +
@@ -2134,7 +2154,8 @@ const file_codefoundry_v1_search_proto_rawDesc = "" +
 	"durationMs\x12\x16\n" +
 	"\x06unseen\x18\x11 \x01(\bR\x06unseen\x12\x18\n" +
 	"\aversion\x18\x12 \x01(\x04R\aversion\x12,\n" +
-	"\x12promoted_thread_id\x18\x13 \x01(\tR\x10promotedThreadId\"5\n" +
+	"\x12promoted_thread_id\x18\x13 \x01(\tR\x10promotedThreadId\x12\x1b\n" +
+	"\tfind_hits\x18\x14 \x01(\x05R\bfindHits\"5\n" +
 	"\x17StartAgentSearchRequest\x12\x1a\n" +
 	"\bquestion\x18\x01 \x01(\tR\bquestion\"M\n" +
 	"\x18StartAgentSearchResponse\x121\n" +
@@ -2184,9 +2205,10 @@ const file_codefoundry_v1_search_proto_rawDesc = "" +
 	"\x15MarkSearchSeenRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"K\n" +
 	"\x16MarkSearchSeenResponse\x121\n" +
-	"\x05entry\x18\x01 \x01(\v2\x1b.codefoundry.v1.SearchEntryR\x05entry\"/\n" +
+	"\x05entry\x18\x01 \x01(\v2\x1b.codefoundry.v1.SearchEntryR\x05entry\"C\n" +
 	"\x17RecordFindSearchRequest\x12\x14\n" +
-	"\x05query\x18\x01 \x01(\tR\x05query\"M\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x12\x12\n" +
+	"\x04hits\x18\x02 \x01(\x05R\x04hits\"M\n" +
 	"\x18RecordFindSearchResponse\x121\n" +
 	"\x05entry\x18\x01 \x01(\v2\x1b.codefoundry.v1.SearchEntryR\x05entry\"%\n" +
 	"\x13ForgetSearchRequest\x12\x0e\n" +

@@ -23,7 +23,7 @@ type SearchStore interface {
 	Get(id string) (search.Entry, error)
 	OpenHit(ctx context.Context, id string, n int) (search.Entry, error)
 	MarkSeen(ctx context.Context, id string) (search.Entry, error)
-	RecordFind(ctx context.Context, query string) (search.Entry, error)
+	RecordFind(ctx context.Context, query string, hits int) (search.Entry, error)
 	Forget(ctx context.Context, id string) error
 	Clear(ctx context.Context) (int, error)
 	Promote(ctx context.Context, id string) (string, error)
@@ -273,7 +273,7 @@ func (h *Search) MarkSeen(ctx context.Context, req *connect.Request[v1.MarkSearc
 
 // RecordFind records a Find entry.
 func (h *Search) RecordFind(ctx context.Context, req *connect.Request[v1.RecordFindSearchRequest]) (*connect.Response[v1.RecordFindSearchResponse], error) {
-	e, err := h.store.RecordFind(ctx, req.Msg.GetQuery())
+	e, err := h.store.RecordFind(ctx, req.Msg.GetQuery(), int(req.Msg.GetHits()))
 	if err != nil {
 		return nil, searchError(err)
 	}
@@ -368,7 +368,8 @@ func SearchEntryToProto(e search.Entry) *v1.SearchEntry {
 		FinishedAt: optTime(e.FinishedAt), Status: searchStatuses[e.Status], Error: e.Error, Answer: e.Answer,
 		Hits: make([]*v1.AgentSearchHit, len(e.Hits)), Steps: make([]*v1.AgentSearchStep, len(e.Steps)),
 		Searches: int32(e.Searches()), ThreadsRead: int32(e.ThreadsRead()), ClaudeSessionId: e.ClaudeSessionID, Model: e.Model,
-		CostUsd: e.CostUSD, DurationMs: e.Duration.Milliseconds(), Unseen: e.Unseen, Version: e.Version, PromotedThreadId: e.PromotedThreadID}
+		CostUsd: e.CostUSD, DurationMs: e.Duration.Milliseconds(), Unseen: e.Unseen, Version: e.Version, PromotedThreadId: e.PromotedThreadID,
+		FindHits: int32(e.FindHits)}
 	for i, h := range e.Hits {
 		out.Hits[i] = searchHitToProto(h)
 	}

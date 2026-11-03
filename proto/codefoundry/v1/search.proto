@@ -173,6 +173,9 @@ message SearchEntry {
   uint64 version = 18;
   // The thread a Promote made (the latest one).
   string promoted_thread_id = 19;
+  // A Find entry's result count when it was recorded (thread names and message hits);
+  // 0 when not known.
+  int32 find_hits = 20;
 }
 
 message StartAgentSearchRequest {
@@ -264,6 +267,9 @@ message MarkSearchSeenResponse {
 
 message RecordFindSearchRequest {
   string query = 1;
+  // How many results the query found (thread names and message hits), shown in Recent
+  // searches as "N hits"; 0 when not known.
+  int32 hits = 2;
 }
 
 message RecordFindSearchResponse {
