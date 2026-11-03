@@ -92,3 +92,40 @@ async function marked(page: Page, name: string): Promise<string[]> {
     return h ? [...h].map((r) => r.toString()) : [];
   }, name);
 }
+
+/** SHOTS=<dir>: the done layout (markers against their punctuation) and a restored dialog's cue, in both schemes. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`agent search screenshots (${scheme})`, async ({ page }) => {
+    const dir = process.env.SHOTS;
+    test.skip(!dir, "SHOTS=<dir> only");
+    await mockPost("search/seed");
+    await page.emulateMedia({ colorScheme: scheme });
+    await openApp(page);
+    await page.keyboard.press("Meta+Shift+F");
+    await page.keyboard.type("where did we decide the badge fix?");
+    await page.keyboard.press("Enter");
+    await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
+    await expect.poll(() => marked(page, "cf-search-quote")).not.toEqual([]);
+    await page.screenshot({ path: `${dir ?? ""}/done-${scheme}.png` });
+
+    // A second question left running while the first is shown again, then closed.
+    await mockPost("search?stepMs=300");
+    await page.keyboard.press("Meta+Backspace");
+    await page.keyboard.type("why did the PR badge stay green after a force-push?");
+    await page.keyboard.press("Enter");
+    await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "running");
+    await page.keyboard.press("Meta+Backspace");
+    await dialog(page).locator('[data-testid="search-recent-row"]', { hasText: "where did we decide the badge fix?" }).click();
+    await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
+    await page.keyboard.press("Escape");
+    await expect(dialog(page)).toBeHidden();
+    await expect
+      .poll(async () => ((await (await fetch(`${mockUrl}/__mock/search`)).json()) as { entries: { query: string; status: number }[] }).entries.find((e) => e.query.startsWith("why did the PR badge"))?.status, { timeout: 15_000 })
+      .not.toBe(1);
+    await page.keyboard.press("Meta+Shift+F");
+    await expect(dialog(page).getByTestId("search-unseen-cue")).toBeVisible();
+    await expect.poll(() => marked(page, "cf-search-quote")).not.toEqual([]);
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${dir ?? ""}/cue-${scheme}.png` });
+  });
+}

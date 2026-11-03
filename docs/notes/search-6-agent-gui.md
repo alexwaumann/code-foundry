@@ -26,7 +26,9 @@ Find entries without "N hits").
   shift+Tab) in the field switches and keeps the query; the switch's buttons keep the focus
   in the field. The header icon is a sparkle in Agent mode, the placeholder "Ask about your
   threads…".
-* **Agent mode is Enter only.** Typing never starts a run. Enter with a question that is not
+* **Agent mode is Enter only.** Typing never starts a run. Enter is the field's: on a
+  focused button (×, Clear, an [n] marker, the summary) it presses that button (nothing is
+  prevented before the guards). Enter with a question that is not
   the shown search's starts one (StartAgent); with the shown question it opens the selected
   hit; an ended search with nothing selected runs again ("search again"). ⌘⌫ clears for a
   new search; an empty field always shows Recent searches.
@@ -40,7 +42,11 @@ Find entries without "N hits").
   applies only past the shown version (step upsert by index, hit by n, answer, status). The
   stream reconnects only while the search runs: the end rule reads the entry folded in the
   stream's own closure, not React state (a ref written in a state updater was still RUNNING
-  when the stream ended, and it reconnected). NOT_FOUND shows "This search was forgotten."
+  when the stream ended, and it reconnected). Every attempt folds from scratch: a restarted
+  daemon numbers versions from 1 again and marks the run it lost FAILED, so its snapshot (v2
+  FAILED) must replace the old v5 RUNNING, or the dialog stays "running" and reconnects about
+  4 times a second (the backoff resets on every message). NOT_FOUND shows "This search was
+  forgotten."
 * **While running**: "Searching" steps (✓ done, spinner while not done, ✗ failed; every
   not-done step spins, as parallel searches run together), the query in code and a read's
   thread name stressed when the step's text has them; "Found so far" hits as they arrive,
@@ -48,7 +54,8 @@ Find entries without "N hits").
   "esc close · keeps running". No keyword section.
 * **Done**: the answer as plain text (`answerPieces`: `[n]`, `[1][2]`, `[1, 2]` become small
   numbered buttons that select that hit; nothing else is parsed, so markdown and links in
-  the model's text show as typed), the summary line "2 searches · read 3 threads · 21s"
+  the model's text show as typed; a marker sits against punctuation after it, "spot 1."),
+  the summary line "2 searches · read 3 threads · 21s"
   (hidden when there are no steps) that opens the steps, then the hits: number, thread
   name, project (`useThreadPlace`), archived, day; the quote under a warning rule; why.
   Opened hits say "✓ opened" and are dimmed. FAILED: "Agent search failed: <error>.";
@@ -73,7 +80,17 @@ Find entries without "N hits").
   unopened hit after the one opened (wrapping, `restoreSelection`). Later it opens empty on
   Recent searches, in the last mode. **Unseen**: when the first Recent list arrives and the
   field is still empty, the newest finished agent search with `unseen` is shown whatever
-  the timer; any finished search shown unseen gets `search.seen`.
+  the timer; any finished search shown unseen gets `search.seen`. A restored dialog keeps what
+  it restored and cues the rest instead: while its field has text, a row at the top of the
+  left column (both modes) says "Finished: <query> · 3 results" for the newest unseen
+  finished search other than the shown one, "+N more" when there are several; a click shows
+  it (and so marks it seen), and the next one takes the row. A restored dialog holds
+  WatchRecent throughout for it.
+* **A start in flight survives a close.** `stores/searchDialog` keeps the pending StartAgent
+  by its question (`trackSearchStart`). When it answers after the dialog closed, the saved
+  session with that question and no search takes the entry's id, so a reopen shows it (and
+  Enter opens a hit, not a second run). Reopened before it answered, the dialog shows
+  "Starting…" and waits for that start (`pendingSearchStart`).
 * **Recent searches** (both modes' empty state): WatchRecent while the field is empty (an
   "inline" slot), virtualized 32px rows: sparkle + query + "3 results · 1h" (or "failed",
   "stopped", "running") for agent entries, search icon + "14 hits · yesterday" for Find
@@ -88,6 +105,8 @@ Find entries without "N hits").
   `DictationMic`; the pill sits left of the mode switch, the idle mic shows in Agent mode.
   The palette looks up no chords while open, so the dialog handles the `dictation.toggle`
   chord itself in its key capture; phrases land at the field's caret (`phraseAtCaret`).
+* **Tab hints** (Agent's "Tab Find", Find's "Tab Agent search") show only with more than one
+  mode (`SearchDialogApi.modeCount`).
 * **Footer** right side: "Utility model · <label> · low": the shown search's model, else the
   `models.utility` setting, named by `canonicalModelName`.
 
@@ -115,6 +134,18 @@ from before show their age alone.
 * Dictation in the browser against a real daemon is not possible (the host captures the
   microphone), so the dictating screenshots are on the mock.
 
+## Review fixes
+
+An independent review found: the Watch fold surviving reconnects (a daemon restart left a
+running search "running" and reconnecting); a close during StartAgent losing the search
+(and Enter on the reopen running it twice); unseen results hidden behind a restored
+session (now the cue); Enter swallowed on focused buttons; and nits (Recent's preview showed
+"0 searches · read 0 threads" for a run that failed early, the mock's seeded search had no
+read step, a gap between a marker and its punctuation, `quoteItemSelector` now built from
+`findItemSelector`). Each has a vitest test (`useAgentSearch.test.tsx` restart, `AgentSearch.test.tsx`
+"Enter on a focused button", the two close-during-start tests and the cue test,
+`AgentParts.test.tsx`, `lib/agentSearch.test.ts` cue and `resultsWord`, the mock's seed test).
+
 ## Tests
 
 * vitest: `lib/agentSearch.test.ts` (the documented event order, old versions, duplicate
@@ -131,7 +162,8 @@ from before show their age alone.
   (reveal waits for the log, question expanded, timeout; promote result; mode merge guard),
   `mock/agentSearch.test.ts` (the mock's Watch order, NOT_FOUND, Find replace). Go:
   `TestSearchFindHits`, the store's persistence test keeps `FindHits`.
-* WebKit e2e `e2e/agent-search.spec.ts`: the chord and Tab between modes with the focus
+* WebKit e2e `e2e/agent-search.spec.ts`: `SHOTS=<dir>` makes the PR's Done and cue shots
+  on the mock (skipped otherwise); the chord and Tab between modes with the focus
   kept; ⌘⇧M dictating into the dialog's field (one pill, in the header); Enter on a hit
   landing in s-r1 with `cf-cite-mark` on the quote, on screen, then gone after a key.
 
