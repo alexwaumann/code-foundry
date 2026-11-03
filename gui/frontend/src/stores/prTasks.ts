@@ -24,14 +24,24 @@ export const usePrTasksStore = create<PrTasksState>()(() => ({ running: {} }));
 
 export const taskKey = (ref: PrRef, kind: TaskKind): string => `${pullRequestKey(ref.slug, ref.number)}\u0000${kind}`;
 
-/** The thread pr.task's result JSON names (PRTaskResult.threadId); null when none. */
-export function parseTaskResult(resultJson: string): string | null {
+/** The thread pr.task's result JSON names (PRTaskResult.threadId, empty when none) and whether the task was sent into it. */
+export function parseTaskResult(resultJson: string): { threadId: string; sent: boolean } {
   try {
-    const v = JSON.parse(resultJson) as { threadId?: unknown } | null;
-    return typeof v?.threadId === "string" && v.threadId !== "" ? v.threadId : null;
+    const v = JSON.parse(resultJson) as { threadId?: unknown; sent?: unknown } | null;
+    return { threadId: typeof v?.threadId === "string" ? v.threadId : "", sent: v?.sent === true };
   } catch {
-    return null;
+    return { threadId: "", sent: false };
   }
+}
+
+/**
+ * The toast's text: the daemon's message, without a send's "; <next>" (thread.send's
+ * "thread wait <id> --after N" line, for an agent on the CLI, not for the window).
+ */
+export function taskToast(message: string, sent: boolean): string {
+  // "Sent to <label> (#N); <next>": cut after the ordinal, as a thread's name may hold "; ".
+  const m = sent ? /^(.*?\(#\d+\)); /s.exec(message) : null;
+  return m?.[1] ?? message;
 }
 
 const selectedThread = (): string | null => {
@@ -54,7 +64,8 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
   try {
     const res = await runCommandForResult("pr.task", prTaskArgs(ref, kind, target), { quiet: true });
     if (!res) return null;
-    const id = parseTaskResult(res.resultJson) ?? target.threadId ?? "";
+    const out = parseTaskResult(res.resultJson);
+    const id = out.threadId || (target.threadId ?? "");
     if (res.message) {
       const open = id !== "" && selectedThread() !== id;
       const action = {
@@ -63,7 +74,7 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
           openStartedThread(id);
         },
       };
-      toast.success(res.message, open ? { action } : undefined);
+      toast.success(taskToast(res.message, out.sent), open ? { action } : undefined);
     }
     return id;
   } finally {

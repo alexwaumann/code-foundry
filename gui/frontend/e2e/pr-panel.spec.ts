@@ -120,7 +120,7 @@ async function boxFits(page: Page): Promise<void> {
     // A row's button sits under its text, never beside or over it.
     for (const row of box.querySelectorAll('[data-testid="pr-ready-row"]')) {
       const title = row.querySelector('[data-testid="pr-ready-title"]');
-      for (const b of row.querySelectorAll("[data-slot=button]")) if (title && r(b).top < r(title).bottom - 1) out.push(`${b.textContent} is not under its row's text`);
+      for (const b of row.querySelectorAll("[data-slot=button], [data-testid^=pr-task-]")) if (title && r(b).top < r(title).bottom - 1) out.push(`${b.textContent} is not under its row's text`);
     }
     return out;
   });

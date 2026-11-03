@@ -130,6 +130,8 @@ describe("running pr.task", () => {
     await settle();
     expect(tasks()).toEqual([{ "repo-slug": SLUG, number: "145", kind: "checks", thread: "s-1" }]);
     await expectToast("Sent to s-1 (#7)");
+    // The CLI's wait hint is for agents, not the window.
+    expect(toastTexts().join(" ")).not.toContain("thread wait");
     expect(toastOpen("Sent to s-1")).toBeNull();
   });
 
