@@ -330,7 +330,7 @@ function MadeByThreadGlyph({ id }: { id: string }) {
  * out from the status line and from each other (docs/notes/sidebar-row-emphasis.md). It
  * keeps the row's colour (text-inherit: the role's own foreground would drop the row's
  * sidebar and selection tokens). The id stands in, muted, while there is no name; a
- * provisional name (the daemon's cut of the first prompt, until the naming model's title
+ * provisional name (the daemon's cut of the first prompt, until the utility model's title
  * lands) is muted and italic.
  *
  * A quiet row (Archived, Snoozed) keeps the size but not the weight or the row's colour:

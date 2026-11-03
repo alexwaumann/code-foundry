@@ -65,7 +65,7 @@ export interface ThreadView {
   worktreePath: string;
   name: string;
   autoNamed: boolean;
-  /** name is provisional: the daemon took it from the first prompt; the naming model's title replaces it. Shown muted and italic. */
+  /** name is provisional: the daemon took it from the first prompt; the utility model's title replaces it. Shown muted and italic. */
   nameProvisional: boolean;
   /** A naming call the user asked for (thread.regenerate-name) is in flight: the name shows muted and italic, as a provisional one, until it lands. Not persisted. */
   naming: boolean;

@@ -487,9 +487,9 @@ const enc = new TextEncoder();
 
 /** How long a new shell takes to print its prompt before terminal.new --run types into it. */
 const RUN_PROMPT_MS = 150;
-/** thread.regenerate-name: how long "the naming model" takes, and the title it gives. */
+/** thread.regenerate-name: how long "the utility model" takes, and the title it gives. */
 export const REGENERATE_NAME_MS = 400;
-/** thread.move: how long the move takes (placing, naming, set_cwd), and the title "the naming model" gives it. */
+/** thread.move: how long the move takes (placing, naming, set_cwd), and the title "the utility model" gives it. */
 export const MOVE_MS = 600;
 export const MOVED_NAME = "Fix the login redirect";
 export const REGENERATED_NAME = "Regenerated thread name";

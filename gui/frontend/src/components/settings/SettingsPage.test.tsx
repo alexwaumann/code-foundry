@@ -54,7 +54,9 @@ const fields: SettingFieldView[] = [
   f("threads.default_effort", "Effort", "enum", "general", "threads", { enumValues: ["low", "medium", "high"], defaultValue: "medium", row: "model", description: "The default effort for new threads." }),
   f("threads.default_worktree", "New threads work in", "enum", "general", "threads", { enumValues: ["worktree", "current"], enumLabels: ["A fresh copy of the project", "The project folder itself"], defaultValue: "current" }),
   f("threads.auto_name", "Name threads automatically", "bool", "general", "threads", { defaultValue: "true" }),
-  f("threads.naming_model", "Naming model", "enum", "general", "textgen", { ...models, defaultValue: "claude-sonnet-5[1m]", dependsOn: "threads.auto_name" }),
+  f("models.utility", "Utility model", "enum", "general", "textgen", { ...models, defaultValue: "claude-sonnet-5[1m]" }),
+  // A field in another section that depends on a toggle (no real one does today).
+  f("threads.name_style", "Name style", "enum", "general", "textgen", { enumValues: ["short", "long"], defaultValue: "short", dependsOn: "threads.auto_name" }),
   f("threads.cache_ttl_seconds", "Prompt cache lifetime", "int", "general", "lifecycle", { defaultValue: "3600", unit: "s", min: 60, max: 86400 }),
   f("appearance.font_family", "Terminal font", "string", "appearance", "terminal", { defaultValue: "" }),
   f("appearance.font_size", "Terminal font size", "int", "appearance", "terminal", { defaultValue: "13", unit: "pt", min: 9, max: 28 }),
@@ -196,7 +198,7 @@ describe("the settings page", () => {
     open();
     expect(within(row("threads.cache_ttl_seconds")).getByTestId("setting-unit").textContent).toBe("s");
     expect(spin("threads.cache_ttl_seconds").value).toBe("3600");
-    expect(within(row("threads.naming_model")).queryByTestId("restart-hint")).toBeNull();
+    expect(within(row("models.utility")).queryByTestId("restart-hint")).toBeNull();
     fireEvent.click(nav("appearance"));
     expect(spin("appearance.font_size").value).toBe("13");
     expect(within(row("appearance.font_size")).getByTestId("setting-unit").textContent).toBe("pt");
@@ -207,13 +209,14 @@ describe("the settings page", () => {
 
   it("a dependent row dims while its toggle is off (its editor still works); across sections it says why", () => {
     open();
-    const naming = () => row("threads.naming_model");
+    const naming = () => row("threads.name_style");
     expect(naming().dataset.dimmed).toBeUndefined();
     fireEvent.click(within(row("threads.auto_name")).getByRole("switch"));
     expect(save.fn).toHaveBeenCalledWith({ "threads.auto_name": "false" });
     expect(naming().dataset.dimmed).toBe("true");
     expect(naming().textContent).toContain("Not used while Name threads automatically is off.");
-    expect((trigger("threads.naming_model") as HTMLButtonElement).disabled).toBe(false);
+    expect((trigger("threads.name_style") as HTMLButtonElement).disabled).toBe(false);
+    expect(row("models.utility").dataset.dimmed).toBeUndefined();
 
     // Right under its toggle: dimmed, no sentence; on again, not dimmed.
     fireEvent.click(nav("notifications"));

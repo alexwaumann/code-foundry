@@ -434,7 +434,7 @@ describe("SidebarRow hover actions", () => {
 describe("SidebarRow provisional name", () => {
   it.each([
     ["provisional: the name, muted and italic", { name: "fix the login redirect", nameProvisional: true }, "fix the login redirect", true, true],
-    ["the naming model's title: plain", { name: "Fix the login redirect", nameProvisional: false }, "Fix the login redirect", false, false],
+    ["the utility model's title: plain", { name: "Fix the login redirect", nameProvisional: false }, "Fix the login redirect", false, false],
     ["unnamed: the id, muted, not italic", { name: "", nameProvisional: false }, "s-1", true, false],
     ["being regenerated: the name, muted and italic", { name: "Fix the login redirect", nameProvisional: false, naming: true }, "Fix the login redirect", true, true],
   ])("%s", (_name, o, text, muted, italic) => {
@@ -461,7 +461,7 @@ describe("SidebarRow rename field", () => {
     return screen.getByTestId<HTMLInputElement>("rename-input");
   }
 
-  it("the naming model's title landing while it is open: an untouched commit keeps the title", () => {
+  it("the utility model's title landing while it is open: an untouched commit keeps the title", () => {
     const input = openRename({ name: "fix the login redirect", nameProvisional: true });
     act(() => {
       useThreadsStore.setState({ byId: { "s-1": thread({ name: "Fix login redirect loop", nameProvisional: false }) } });
