@@ -1,5 +1,7 @@
 # PR panel redesign, PR D2: the readiness rows hand their issue to a thread
 
+(The menu's rules below were replaced in PR E; see `pr-task-forward.md`.)
+
 The readiness box's issue rows (D1, `pr-panel-readiness.md`) now carry their thread task:
 "Fix in this thread", "Address in new thread", "Resolve in <thread>", "Update in …",
 "Review in new thread". They run `pr.task` (#497, `pr-tasks.md`) through the command
@@ -69,15 +71,12 @@ registry.
   conversations) with fix.findings' prompt, while each row hands over one issue and can
   target an existing thread. Removing it would make "fix everything" five presses into
   possibly five threads.
-- Ember's thread is never a target: not the default, not "this thread" (with Ember's chat
-  selected the default is a new thread and the menu has no "In this thread"), not among
-  the others. A thread's linked pull requests include its created threads' (transitively),
-  and Ember creates every worker, so it links every pull request they open; Ember only
-  splits and assigns work. Identified by `resident === "ember"` (stores/ember.ts).
-- The others rank threads with the head branch checked out first: a checkout of the thread
-  (its worktree or any member's) is a worktree, in a project of the pull request's
-  repository, on `headRef`. Not for a fork's pull request (`isCrossRepository`): a local
-  branch of that name is another branch. Then the most recent activity; the cap stays 3.
+- Superseded by PR E (`pr-task-forward.md`): the targets are the user's own threads that
+  link the pull request (sidebar threads and Ember's, never a child thread whose creator is
+  alive), the selection first and the default when it is one of them, the others by
+  activity with no cap, then "In a new thread"; no "In this thread" for a thread that does
+  not link it. D2's Ember exclusion and head-branch ranking are gone (a parent's task is
+  forwarded by the daemon to the thread that owns the link instead).
 - The routing is read once per box (`useTaskRouting`) as string keys with `useShallow`, so
   a thread elsewhere changing, or a field routing does not read (status, reason), re-renders
   nothing; a test pins it.
