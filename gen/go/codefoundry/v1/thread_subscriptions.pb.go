@@ -412,14 +412,21 @@ type SubscribeThreadRequest struct {
 	// INVALID_ARGUMENT), carried by its wake (a timer's header and JSON, the others'
 	// JSON) and listed. Subscribing again with a note replaces the note.
 	Note string `protobuf:"bytes,14,opt,name=note,proto3" json:"note,omitempty"`
-	// A thread target only (INVALID_ARGUMENT otherwise): the target meets the condition
-	// only once its status changed at or after this time, so a status from before it (a
-	// send's busy status follows a debounce) never fires, and one changed since fires, at
-	// once when it already did. The same subscription (subscriber, target, condition)
-	// existing is returned unchanged (existed): its repeat and note stay. Not kept across a
-	// daemon restart (the subscription then fires on the next transition). pr.task's
-	// forward uses it (docs/notes/pr-task-forward.md).
-	After         *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=after,proto3" json:"after,omitempty"`
+	// A thread target only (INVALID_ARGUMENT otherwise; before_send and after_ordinal
+	// exclusive). pr.task's forward (docs/notes/pr-task-forward.md) subscribes before it
+	// sends, so a refusal is known before the message promises a wake, then arms the
+	// subscription with the sent message's ordinal. before_send: the subscription never
+	// fires until a Subscribe with the same subscriber, target and condition gives
+	// after_ordinal. after_ordinal: the target meets the condition only once a turn that
+	// took in the message with this ordinal (or a later one) ended (Thread's handled
+	// ordinal), or on a pending request asked after it; at once when that already
+	// happened. The same subscription existing: before_send leaves it unchanged; an
+	// unarmed one is armed; an armed one waits for the later ordinal; any other keeps its
+	// repeat flag and gate, and the note goes on its next wake only (added to that wake's
+	// note, not stored). Neither is kept across a daemon restart (the subscription then
+	// fires on the next transition).
+	BeforeSend    bool  `protobuf:"varint,15,opt,name=before_send,json=beforeSend,proto3" json:"before_send,omitempty"`
+	AfterOrdinal  int64 `protobuf:"varint,16,opt,name=after_ordinal,json=afterOrdinal,proto3" json:"after_ordinal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -531,11 +538,18 @@ func (x *SubscribeThreadRequest) GetNote() string {
 	return ""
 }
 
-func (x *SubscribeThreadRequest) GetAfter() *timestamppb.Timestamp {
+func (x *SubscribeThreadRequest) GetBeforeSend() bool {
 	if x != nil {
-		return x.After
+		return x.BeforeSend
 	}
-	return nil
+	return false
+}
+
+func (x *SubscribeThreadRequest) GetAfterOrdinal() int64 {
+	if x != nil {
+		return x.AfterOrdinal
+	}
+	return 0
 }
 
 type SubscribeThreadResponse struct {
@@ -858,7 +872,7 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\x04note\x18\x15 \x01(\tR\x04note\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8c\x05\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa0\x05\n" +
 	"\x16SubscribeThreadRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\x12(\n" +
 	"\x10target_thread_id\x18\x02 \x01(\tR\x0etargetThreadId\x12\"\n" +
@@ -871,8 +885,10 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\tcondition\x18\x04 \x01(\x0e2+.codefoundry.v1.ThreadSubscriptionConditionR\tcondition\x12\x16\n" +
 	"\x06repeat\x18\x05 \x01(\bR\x06repeat\x12D\n" +
 	"\x04args\x18\v \x03(\v20.codefoundry.v1.SubscribeThreadRequest.ArgsEntryR\x04args\x12\x12\n" +
-	"\x04note\x18\x0e \x01(\tR\x04note\x120\n" +
-	"\x05after\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x05after\x1a7\n" +
+	"\x04note\x18\x0e \x01(\tR\x04note\x12\x1f\n" +
+	"\vbefore_send\x18\x0f \x01(\bR\n" +
+	"beforeSend\x12#\n" +
+	"\rafter_ordinal\x18\x10 \x01(\x03R\fafterOrdinal\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x91\x01\n" +
@@ -963,15 +979,14 @@ var file_codefoundry_v1_thread_subscriptions_proto_depIdxs = []int32{
 	12, // 6: codefoundry.v1.SubscribeThreadRequest.target_every:type_name -> google.protobuf.Duration
 	1,  // 7: codefoundry.v1.SubscribeThreadRequest.condition:type_name -> codefoundry.v1.ThreadSubscriptionCondition
 	10, // 8: codefoundry.v1.SubscribeThreadRequest.args:type_name -> codefoundry.v1.SubscribeThreadRequest.ArgsEntry
-	11, // 9: codefoundry.v1.SubscribeThreadRequest.after:type_name -> google.protobuf.Timestamp
-	2,  // 10: codefoundry.v1.SubscribeThreadResponse.subscription:type_name -> codefoundry.v1.ThreadSubscription
-	2,  // 11: codefoundry.v1.UnsubscribeThreadResponse.removed:type_name -> codefoundry.v1.ThreadSubscription
-	2,  // 12: codefoundry.v1.ListThreadSubscriptionsResponse.subscriptions:type_name -> codefoundry.v1.ThreadSubscription
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	2,  // 9: codefoundry.v1.SubscribeThreadResponse.subscription:type_name -> codefoundry.v1.ThreadSubscription
+	2,  // 10: codefoundry.v1.UnsubscribeThreadResponse.removed:type_name -> codefoundry.v1.ThreadSubscription
+	2,  // 11: codefoundry.v1.ListThreadSubscriptionsResponse.subscriptions:type_name -> codefoundry.v1.ThreadSubscription
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_thread_subscriptions_proto_init() }

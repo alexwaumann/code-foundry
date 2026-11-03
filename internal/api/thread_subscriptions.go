@@ -87,9 +87,7 @@ func (h *Thread) Subscribe(ctx context.Context, req *connect.Request[v1.Subscrib
 	if m.GetTargetAt() != nil {
 		o.TargetAt = m.GetTargetAt().AsTime()
 	}
-	if m.GetAfter() != nil {
-		o.After = m.GetAfter().AsTime()
-	}
+	o.BeforeSend, o.AfterOrdinal = m.GetBeforeSend(), m.GetAfterOrdinal()
 	if m.GetTargetEvery() != nil {
 		o.TargetEvery = m.GetTargetEvery().AsDuration()
 	}

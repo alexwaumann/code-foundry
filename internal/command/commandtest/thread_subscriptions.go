@@ -15,12 +15,19 @@ import (
 // Subscribe echoes the request as subscription "sub-1" (condition unspecified becomes
 // settled for a thread, finished for a run, checks_done for a pull request, which is
 // kept as given, fired for a plugin, whose args it keeps, and a timer, "at:<UTC>" or
-// "every:<interval>"), with its note and Fired and Existed as set.
+// "every:<interval>"), with its note and Fired and Existed as set; SubscribeErr and
+// SubscribeErrAfter refuse it.
 func (s *Thread) Subscribe(_ context.Context, r *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
 	m := r.Msg
+	if err := s.SubscribeErr; err != nil {
+		return nil, err
+	}
+	if err := s.SubscribeErrAfter; err != nil && m.GetAfterOrdinal() > 0 {
+		return nil, err
+	}
 	sub := &v1.ThreadSubscription{Id: "sub-1", SubscriberThreadId: m.GetSubscriberThreadId(), Repeat: m.GetRepeat(), Condition: m.GetCondition(),
 		Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD, TargetId: m.GetTargetThreadId(), Note: m.GetNote()}
 	if m.GetTargetRunId() != "" {

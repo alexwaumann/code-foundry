@@ -209,15 +209,21 @@ type SubscribeOptions struct {
 	// Note says why (at most MaxNote characters, kept on one line): the wake carries
 	// it, the listings show it. Subscribing again with a note replaces the note.
 	Note string
-	// After (thread targets only): the target counts as meeting the condition only once
-	// its status changed at or after this time (StatusChangedAt), so a status from before
-	// it, still published while a message just sent waits for the status debounce, never
-	// fires; one that changed since fires, at once when it already did (a turn that ended
-	// before the subscription). pr.task's forward wakes its sender with it when the thread
-	// it sent the task to settles from the task. An existing subscription to the same
-	// target and condition is returned unchanged (Existed): its repeat flag and note stay.
-	// Not persisted: after a daemon restart it is an ordinary edge-triggered one.
-	After time.Time
+	// BeforeSend and AfterOrdinal (thread targets only, not both) tie a subscription to a
+	// message sent to the target: pr.task's forward wakes its sender once the turn that
+	// handled the task ended (docs/notes/pr-task-forward.md). It subscribes BeforeSend,
+	// so a refusal is known before the message promises a wake; such a subscription never
+	// fires until armed. Then it subscribes again with the sent message's ordinal,
+	// AfterOrdinal: the target meets the condition only once its HandledThrough reached
+	// it (a turn that took the message in ended), or on a pending request asked after the
+	// arming (a permission prompt the sender may answer); at once when that already
+	// happened. With the same subscription (subscriber, target, condition) existing,
+	// BeforeSend leaves it as it is; AfterOrdinal arms an unarmed one, makes an armed one
+	// wait for the later message, and leaves any other's repeat flag, note and gate
+	// alone. The gate is not persisted: after a daemon restart the subscription fires on
+	// the next transition, as any does.
+	BeforeSend   bool
+	AfterOrdinal int64
 }
 
 // SubscribeResult is Store.Subscribe's answer.
@@ -295,14 +301,30 @@ type subRec struct {
 	sat     bool
 	req     string
 	retryAt time.Time
-	// after is SubscribeOptions.After (zero for none), to the millisecond.
-	after time.Time
+	// The send gate (SubscribeOptions.BeforeSend, AfterOrdinal), in memory: unarmed never
+	// meets the condition; through > 0 meets it once the target's HandledThrough reached
+	// through, or on a pending request other than armReq (the one pending when armed).
+	unarmed bool
+	through int64
+	armReq  string
 }
 
-// meets is Meets for r's condition, gated by r.after: a status that last changed before
-// it does not count.
+// sendGate is a Subscribe's BeforeSend and AfterOrdinal.
+type sendGate struct {
+	before bool
+	after  int64
+}
+
+// meets is Meets for r's condition, through r's send gate.
 func (r *subRec) meets(t Thread) bool {
-	return Meets(r.s.Condition, t) && (r.after.IsZero() || !t.StatusChangedAt.Before(r.after))
+	if !Meets(r.s.Condition, t) || r.unarmed {
+		return false
+	}
+	if r.through == 0 {
+		return true
+	}
+	req := requestKey(t)
+	return t.HandledThrough >= r.through || (req != "" && req != r.armReq)
 }
 
 // requestKey names the pending request (permission prompt or question) a running
@@ -403,8 +425,12 @@ func subscribeTarget(o SubscribeOptions) (TargetKind, string, Condition, error) 
 	switch {
 	case n != 1:
 		return "", "", "", fmt.Errorf("%w: give exactly one target: a thread, an action run, a pull request, a plugin's wake source or a timer", ErrInvalidArgument)
-	case !o.After.IsZero() && thread == "":
-		return "", "", "", fmt.Errorf("%w: after is for a thread target", ErrInvalidArgument)
+	case (o.BeforeSend || o.AfterOrdinal != 0) && thread == "":
+		return "", "", "", fmt.Errorf("%w: before_send and after_ordinal are for a thread target", ErrInvalidArgument)
+	case o.BeforeSend && o.AfterOrdinal != 0:
+		return "", "", "", fmt.Errorf("%w: give before_send or after_ordinal, not both", ErrInvalidArgument)
+	case o.AfterOrdinal < 0:
+		return "", "", "", fmt.Errorf("%w: after_ordinal %d is not an ordinal", ErrInvalidArgument, o.AfterOrdinal)
 	case plugin == "" && len(o.Args) > 0:
 		return "", "", "", fmt.Errorf("%w: args are for a plugin's wake source", ErrInvalidArgument)
 	case timer:
@@ -496,7 +522,7 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 	res, err := m.subscribe(Subscription{
 		ID: id, SubscriberID: subscriber, TargetKind: kind, TargetID: target, Condition: cond, Args: args,
 		Repeat: repeat, Note: note, CreatedAt: now,
-	}, run, pr, o.After.Truncate(time.Millisecond))
+	}, run, pr, sendGate{before: o.BeforeSend, after: o.AfterOrdinal})
 	if err == nil {
 		m.rewait(subscriber) // it may wait on the target now (waiting.go)
 	}
@@ -526,10 +552,10 @@ func (m *Manager) actionRun(ctx context.Context, id string) (ActionRun, error) {
 // subscribe validates sub against the threads and the other subscriptions and keeps
 // it, under m.mu and the subscriptions' lock: it fires at once when its target already
 // meets the condition (a run: already finished, given as run; a pull request: as the
-// GitHub store's cache has it, pr, nil when unknown there). With after (non-zero) a
-// thread target meets the condition only with a status changed since (subRec.meets) and
-// an existing same subscription is returned unchanged.
-func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo, after time.Time) (SubscribeResult, error) {
+// GitHub store's cache has it, pr, nil when unknown there). A thread target's send gate
+// is g (SubscribeOptions.BeforeSend, AfterOrdinal; subRec.meets); with it, an existing
+// same subscription is left as it is, or armed (armLocked).
+func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo, g sendGate) (SubscribeResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -567,7 +593,13 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	for _, r := range s.byID {
 		if r.s.SubscriberID == sub.SubscriberID && r.s.TargetKind == sub.TargetKind && r.s.TargetID == sub.TargetID && r.s.Condition == sub.Condition &&
 			maps.Equal(r.s.Args, sub.Args) {
-			if after.IsZero() && (r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note)) {
+			switch {
+			case g.before:
+				return SubscribeResult{Subscription: r.s, Existed: true}, nil
+			case g.after > 0:
+				return m.armLocked(r, target, g.after), nil
+			}
+			if r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note) {
 				r.s.Repeat = sub.Repeat
 				r.s.Note = cmp.Or(sub.Note, r.s.Note)
 				if err := saveSubscription(context.Background(), s.db, r.s); err != nil {
@@ -578,7 +610,10 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 			return SubscribeResult{Subscription: r.s, Existed: true}, nil
 		}
 	}
-	r := &subRec{s: sub, after: after}
+	r := &subRec{s: sub, unarmed: g.before, through: g.after}
+	if g.after > 0 {
+		r.armReq = requestKey(target)
+	}
 	fired := false
 	switch sub.TargetKind {
 	case TargetThread:
@@ -611,6 +646,29 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	m.log.Info("wake subscription added", "subscription", sub.ID, "subscriber", sub.SubscriberID, "target_kind", sub.TargetKind,
 		"target", sub.TargetID, "condition", sub.Condition, "repeat", sub.Repeat, "fired", fired)
 	return SubscribeResult{Subscription: r.s, Fired: fired}, nil
+}
+
+// armLocked is a Subscribe with AfterOrdinal ordinal finding r, the same subscription:
+// an unarmed one is armed with it, an armed one waits for the later of the two messages,
+// any other keeps its gate. r fires at once when its target, as it is, now meets the
+// condition and did not before (a turn that handled the message already ended).
+// Callers hold m.mu and m.subs.mu.
+func (m *Manager) armLocked(r *subRec, target Thread, ordinal int64) SubscribeResult {
+	switch {
+	case r.unarmed:
+		r.unarmed, r.through, r.armReq = false, ordinal, requestKey(target)
+	case r.through > 0:
+		r.through = max(r.through, ordinal)
+	}
+	was := r.sat
+	r.sat, r.req = r.meets(target), requestKey(target)
+	if !r.sat || was || !m.fireThreadLocked(r, target) {
+		return SubscribeResult{Subscription: r.s, Existed: true}
+	}
+	out := r.s
+	m.subs.firedLocked(r)
+	m.log.Info("wake subscription fired as it was armed", "subscription", r.s.ID, "subscriber", r.s.SubscriberID, "target", r.s.TargetID)
+	return SubscribeResult{Subscription: out, Existed: true, Fired: true}
 }
 
 // observeLocked is the commit hook: t was just published. An archived thread's

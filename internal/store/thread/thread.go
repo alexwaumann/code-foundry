@@ -173,6 +173,12 @@ type Thread struct {
 	// otherwise and once the process is gone. Two requests in a row can read the same
 	// reason: wake subscriptions tell them apart by it (subscriptions.go). Not persisted.
 	PendingRequestID string
+	// HandledThrough is the highest ordinal of a message a turn that ended took in
+	// (handled.go): every message up to it was read by a turn that is over. Published
+	// with the status while the thread runs and when its process ends; not persisted
+	// (zero after a daemon restart until it runs). pr.task's forward wakes its sender on
+	// it (SubscribeOptions.AfterOrdinal).
+	HandledThrough int64
 	// StatusChangedAt is when Status or StatusReason last changed. Persisted; zero if
 	// never known.
 	StatusChangedAt time.Time

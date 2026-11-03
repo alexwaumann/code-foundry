@@ -80,6 +80,7 @@ func (t *threadLog) consume(id string, place bool) (Item, bool) {
 	}
 	it.UpdatedAt = t.now()
 	t.items[i] = it
+	t.noteHandledLocked(it) // read now (or never: dropped, it waits on no turn)
 	if it.PlacedAfter > 0 {
 		t.reorderLocked()
 	}

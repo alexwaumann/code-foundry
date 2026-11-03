@@ -30,16 +30,24 @@ type PRTaskOptions struct {
 	// (the GUI), not an agent's CLI.
 	ForwardedFrom   string
 	ForwardedByUser bool
+	// ForwardedNoWake: the sending thread cannot be woken by this one (its subscription
+	// was refused), so the line promises no wake.
+	ForwardedNoWake bool
 }
 
 // forwardedLine is the line a forwarded task carries after its first: who sent it from
-// which thread, and that the thread is woken with this thread's report.
+// which thread, and that the thread is woken with this thread's report (unless it
+// cannot be: ForwardedNoWake).
 func forwardedLine(o PRTaskOptions) string {
 	who := "This task was sent"
 	if o.ForwardedByUser {
 		who = "The user sent this task"
 	}
-	return who + " from thread `" + sanitizePRCode(o.ForwardedFrom) + "`, which has this PR through you; it is woken with your report when you finish, so end with `code-foundry thread report` as usual."
+	line := who + " from thread `" + sanitizePRCode(o.ForwardedFrom) + "`, which has this PR through you"
+	if o.ForwardedNoWake {
+		return line + "."
+	}
+	return line + "; it is woken with your report when you finish, so end with `code-foundry thread report` as usual."
 }
 
 // prTaskHeader is the lines every pr.task prompt starts with: what to do and which pull

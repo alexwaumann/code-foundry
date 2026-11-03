@@ -2,12 +2,12 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -50,41 +50,94 @@ func (d PullRequestThreadDeps) prTaskOwner(ctx context.Context, th *v1.Thread, s
 	return got.Msg.GetThread()
 }
 
-// forwardPRTask sends the task into owner for th, then notes it in th and subscribes
-// th, one-shot, to owner settling after the send. sent is false (and nothing happened) when owner was removed
-// since it was read: the caller sends to th instead. The note and the wake are best
-// effort: the task went out, so their failure is logged, not returned.
+// forwardPRTask sends the task into owner for th, then notes it in th. th is subscribed,
+// one-shot, to owner settling from the task before the send, so the prompt and the note
+// promise a wake only when there will be one (an archived th, or a subscription that
+// would wake the two in a loop, is refused: the prompt then says nothing of a wake, and
+// the note and the message say why). After the send the subscription is armed with the
+// message's ordinal: it fires once a turn of owner's that took the message in ended
+// (SubscribeThreadRequest.after_ordinal). sent is false (and nothing is left behind)
+// when owner was removed since it was read: the caller sends to th instead. The note and
+// the arming are best effort: the task went out, so their failure is logged, not
+// returned.
 func (d PullRequestThreadDeps) forwardPRTask(ctx context.Context, uctx Context, th, owner *v1.Thread, n int, task prTask, detail *v1.PullRequestDetail) (Result, bool, error) {
-	prompt := task.prompt(detail, PRTaskOptions{FollowUp: true, ForwardedFrom: threadLabel(th), ForwardedByUser: uctx.ActiveView != ""})
-	if err := checkPRPromptSize(n, prompt); err != nil {
+	opts := PRTaskOptions{FollowUp: true, ForwardedFrom: threadLabel(th), ForwardedByUser: uctx.ActiveView != ""}
+	// The prompt that promises the wake is the longer one: it bounds both.
+	if err := checkPRPromptSize(n, task.prompt(detail, opts)); err != nil {
 		return Result{}, false, err
 	}
-	// The owner counts as settled from the task once its status changed since now: a
-	// status from before the send never wakes th (SubscribeThreadRequest.after).
-	sentAt := time.Now()
-	ordinal, removed, err := d.sendPRTaskTo(ctx, uctx, owner, prompt)
-	switch {
-	case removed != nil:
-		return Result{}, false, nil
-	case err != nil:
+	note := forwardWakeNote(task, detail, n)
+	wake := v1.SubscribeThreadRequest{SubscriberThreadId: th.GetId(), TargetThreadId: owner.GetId(),
+		Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED, Note: note}
+	before := proto.CloneOf(&wake)
+	before.BeforeSend = true
+	var made string // the subscription made for this forward ("" when one existed)
+	noWake := ""
+	if res, err := d.Thread.Subscribe(ctx, connect.NewRequest(before)); err != nil {
+		noWake = errMessage(err)
+		slog.Info("pr.task: the sending thread cannot be woken by the forward's owner", "thread", th.GetId(), "owner", owner.GetId(), "err", err)
+	} else if !res.Msg.GetExisted() {
+		made = res.Msg.GetSubscription().GetId()
+	}
+	opts.ForwardedNoWake = noWake != ""
+	ordinal, removed, err := d.sendPRTaskTo(ctx, uctx, owner, task.prompt(detail, opts))
+	if removed != nil || err != nil {
+		d.dropForwardWake(ctx, th, made)
+		if removed != nil {
+			return Result{}, false, nil
+		}
 		return Result{}, false, err
 	}
-	if _, err := d.Thread.AddNote(ctx, connect.NewRequest(&v1.AddThreadNoteRequest{ThreadId: th.GetId(), Text: forwardNote(owner, task, n)})); err != nil {
+	if noWake == "" {
+		armed := proto.CloneOf(&wake)
+		armed.AfterOrdinal = max(ordinal, 1)
+		if _, err := d.Thread.Subscribe(ctx, connect.NewRequest(armed)); err != nil {
+			// The prompt went out promising the wake: the note and the message say it
+			// will not come.
+			slog.Warn("pr.task: arm the sending thread's wake on the owner", "thread", th.GetId(), "owner", owner.GetId(), "err", err)
+			d.dropForwardWake(ctx, th, made)
+			noWake = errMessage(err)
+		}
+	}
+	if _, err := d.Thread.AddNote(ctx, connect.NewRequest(&v1.AddThreadNoteRequest{ThreadId: th.GetId(), Text: forwardNote(owner, task, n, noWake)})); err != nil {
 		slog.Warn("pr.task: note the forward in the sending thread", "thread", th.GetId(), "owner", owner.GetId(), "err", err)
 	}
-	if _, err := d.Thread.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{
-		SubscriberThreadId: th.GetId(), TargetThreadId: owner.GetId(), After: timestamppb.New(sentAt),
-		Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
-		Note:      forwardWakeNote(task, detail, n),
-	})); err != nil {
-		slog.Warn("pr.task: wake the sending thread when the owner settles", "thread", th.GetId(), "owner", owner.GetId(), "err", err)
+	res := d.sentPRTask(ctx, uctx, owner, th, ordinal)
+	if noWake != "" {
+		res.Message += "; " + threadLabel(th) + " will not be woken: " + noWake
 	}
-	return d.sentPRTask(ctx, uctx, owner, th, ordinal), true, nil
+	return res, true, nil
 }
 
-// forwardNote is the sender's note: "Sent to <owner>: <task> (#N)".
-func forwardNote(owner *v1.Thread, task prTask, n int) string {
-	return fmt.Sprintf("Sent to %s: %s (#%d)", threadLabel(owner), task.title, n)
+// dropForwardWake removes the subscription a forward made before a send that did not
+// happen (id "" for none).
+func (d PullRequestThreadDeps) dropForwardWake(ctx context.Context, th *v1.Thread, id string) {
+	if id == "" {
+		return
+	}
+	if _, err := d.Thread.Unsubscribe(ctx, connect.NewRequest(&v1.UnsubscribeThreadRequest{SubscriptionId: id})); err != nil {
+		slog.Warn("pr.task: drop the forward's wake", "thread", th.GetId(), "subscription", id, "err", err)
+	}
+}
+
+// errMessage is err's message without its code (a connect error's), for a line a
+// person reads.
+func errMessage(err error) string {
+	var ce *connect.Error
+	if errors.As(err, &ce) {
+		return ce.Message()
+	}
+	return err.Error()
+}
+
+// forwardNote is the sender's note: "Sent to <owner>: <task> (#N)", and why it will not
+// be woken when it will not (noWake).
+func forwardNote(owner *v1.Thread, task prTask, n int, noWake string) string {
+	out := fmt.Sprintf("Sent to %s: %s (#%d)", threadLabel(owner), task.title, n)
+	if noWake != "" {
+		out += "; it will not wake this thread: " + noWake
+	}
+	return out
 }
 
 // forwardWakeNote is the sender's subscription note, which its wake carries: the task

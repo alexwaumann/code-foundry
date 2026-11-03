@@ -34,6 +34,9 @@ type Thread struct {
 	// ListSubscriptions returns and Unsubscribe removes from (thread_subscriptions.go).
 	Fired, Existed bool
 	Subscriptions  []*v1.ThreadSubscription
+	// SubscribeErr is Subscribe's error (after the call is recorded); SubscribeErrAfter
+	// its error for a request with after_ordinal only.
+	SubscribeErr, SubscribeErrAfter error
 	// Reused is Create's answer flag (a repeated request_id); Hints its collision hints.
 	Reused bool
 	Hints  []string
