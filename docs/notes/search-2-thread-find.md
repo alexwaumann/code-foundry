@@ -13,8 +13,8 @@ the rows render.
   GUI presents them in the window (`keys/bindings.ts` → `stores/threadFind.ts`
   `presentThreadFind`); the CLI's ShowView reaches every window (`stores/views.ts`).
   cmd+g and cmd+shift+g were free. They stay in the palette (they have chords). The guide's
-  size margin moved to 26,000 for the three names (25,947 bytes with them, after pr.task and
-  the pr-daemon-actions verbs) (`internal/guide/topics_test.go`).
+  size margin moved from 26,750 to 26,800 for the three names (26,759 bytes with them, after
+  thread.search from search-3-index) (`internal/guide/topics_test.go`).
 - The daemon needs a restart to list them (the GUI has no other change that needs one).
 
 ## Focus: who gets cmd+f
