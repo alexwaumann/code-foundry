@@ -1,11 +1,18 @@
 /**
  * ThreadService.Search (docs/notes/search-3-index.md) and ListItems' pages over the
  * world's threads, for the Find dialog (docs/notes/search-4-find-dialog.md). The daemon's
- * rules, simplified and without an index: the threads the sidebar can show (no plugin's,
- * archived and snoozed included), their own user messages (wakes left out), Claude's
- * texts and answered questions. Every term must occur; smart case over the whole query; a
- * query of terms under three characters searches names only. Hits per thread: the newest
- * per_thread, in conversation order; groups by their newest hit. Ranges in code points.
+ * rules without an index: the threads the sidebar can show (no plugin's, archived and
+ * snoozed included), their own user messages (wakes left out), Claude's texts and answered
+ * questions. Every term must occur; smart case over the whole query; a query of terms
+ * under three characters searches names only. Hits per thread: the newest per_thread, in
+ * conversation order; groups by their newest hit. Ranges in code points. Snippets are cut
+ * by the daemon's rule (snippetOf).
+ *
+ * Known simplifications (the daemon's rules in internal/store/thread/search*.go):
+ * - no hit tiers: a whole-word match does not rank above one inside a word;
+ * - lower case is JavaScript's toLowerCase, not Go's per-rune unicode.ToLower (`İ` differs);
+ * - API-error texts are indexed like any of Claude's texts;
+ * - a fork's copied items are not deduped against its parent's.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -106,21 +113,33 @@ function indexed(it: ItemInit, name: (id: string) => string | undefined): { text
   }
 }
 
-/** The snippet around the first match, cut at word boundaries, "…" where cut; the ranges shifted into it. */
-function snippetOf(text: string, ranges: readonly Range[]): { snippet: string; ranges: Range[] } {
-  const cps = Array.from(text);
-  const first = ranges[0]?.start ?? 0;
-  let from = Math.max(0, first - BEFORE);
-  while (from > 0 && from < first && cps[from - 1] !== " ") from++;
-  let to = Math.min(cps.length, from + SNIPPET);
-  while (to < cps.length && to > from && cps[to] !== " ") to--;
-  if (to <= first) to = Math.min(cps.length, from + SNIPPET);
-  const head = from > 0 ? "…" : "";
-  const tail = to < cps.length ? "…" : "";
-  const shift = head.length - from;
+/**
+ * The daemon's cutSnippet (internal/store/thread/search_match.go): a text of at most
+ * SNIPPET code points whole; else up to BEFORE before the first match, moved on to the
+ * next word while that keeps the match; SNIPPET long, the start moved back when the end
+ * runs out (so near the text's end the match can sit up to about 150 in, what the GUI's
+ * fitSnippet exists for); the end back to the last space after the first match. "…" where
+ * cut (one code point); the ranges inside it, shifted onto it.
+ */
+export function snippetOf(text: string, ranges: readonly Range[]): { snippet: string; ranges: Range[] } {
+  const r = Array.from(text);
+  const first = ranges[0];
+  if (r.length <= SNIPPET || !first) return { snippet: text, ranges: [...ranges] };
+  let start = Math.max(0, first.start - BEFORE);
+  if (start > 0) {
+    const i = r.slice(start, first.start).indexOf(" ");
+    if (i >= 0) start += i + 1;
+  }
+  let end = Math.min(r.length, start + SNIPPET);
+  if (end - start < SNIPPET) start = Math.max(0, end - SNIPPET);
+  if (end < r.length) {
+    const i = r.slice(first.end, end).lastIndexOf(" ");
+    if (i >= 0) end = first.end + i;
+  }
+  const off = start > 0 ? 1 : 0;
   return {
-    snippet: head + cps.slice(from, to).join("") + tail,
-    ranges: ranges.filter((r) => r.start >= from && r.end <= to).map((r) => ({ start: r.start + shift, end: r.end + shift })),
+    snippet: (start > 0 ? "…" : "") + r.slice(start, end).join("") + (end < r.length ? "…" : ""),
+    ranges: ranges.filter((m) => m.start >= start && m.end <= end).map((m) => ({ start: m.start - start + off, end: m.end - start + off })),
   };
 }
 
