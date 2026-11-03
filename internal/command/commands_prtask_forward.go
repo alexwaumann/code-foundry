@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -120,14 +121,14 @@ func (d PullRequestThreadDeps) dropForwardWake(ctx context.Context, th *v1.Threa
 	}
 }
 
-// errMessage is err's message without its code (a connect error's), for a line a
-// person reads.
+// errMessage is err's message without its code (a connect error's, and the store's
+// "failed precondition: " in front), for a line a person reads.
 func errMessage(err error) string {
 	var ce *connect.Error
-	if errors.As(err, &ce) {
-		return ce.Message()
+	if !errors.As(err, &ce) {
+		return err.Error()
 	}
-	return err.Error()
+	return strings.TrimPrefix(ce.Message(), strings.ReplaceAll(ce.Code().String(), "_", " ")+": ")
 }
 
 // forwardNote is the sender's note: "Sent to <owner>: <task> (#N)", and why it will not

@@ -381,7 +381,7 @@ func TestPullRequestTask(t *testing.T) {
 			setup: func(f *prThreadFixture) {
 				f.thread.Others = []*v1.Thread{{Id: "s-lead0000001", Name: "Lead"}, {Id: "s-kid00000001", Name: "Kid"}}
 				f.thread.Owners, f.thread.SentOrdinal = map[string]string{"s-lead0000001": "s-kid00000001"}, 4
-				f.thread.SubscribeErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("thread s-lead0000001 is archived; unarchive it to subscribe it"))
+				f.thread.SubscribeErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("failed precondition: thread s-lead0000001 is archived; unarchive it to subscribe it"))
 			},
 			wantReq: []proto.Message{detail("o/r", true)},
 			wantThread: []proto.Message{
