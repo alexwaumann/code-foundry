@@ -129,16 +129,18 @@ test("a checkout menu's Open in Finder hovers as two blocks: text bright with �
 
 // Refresh (fetch then refresh, spinning) and a failed refresh in the title block: unit-tested in src/components/projects/ProjectPage.test.tsx ("Refresh fetches…", "a failed refresh turns…").
 
-// whenTruncated's slack (components/ui/tooltip.tsx truncated): under a page zoom WebKit rounds
-// scroll* and client* apart, so a value that fits reads a pixel over its box. Which values open
-// on a real cut, and which do not without clipping: tooltip.test.tsx.
+// whenTruncated's slack (components/ui/tooltip.tsx truncated): under a page zoom WebKit can round
+// scroll* and client* apart, so a value that fits reads a pixel over its box (Playwright's WebKit
+// 2359 did; 2370 does not, the system WKWebView may). Which values open on a real cut, and which do
+// not without clipping: tooltip.test.tsx.
 test("at 110% zoom the title meta and Details values fit and hovering them opens no tooltip", async ({ page }) => {
   await openApp(page);
   await page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(110))`);
   await openProjectPage(page, "repo-cf");
   const remote = page.getByTestId("details-remote-value");
-  // The trap is there: the value fits, yet reads a pixel taller than its box.
-  await expect.poll(() => remote.evaluate((el) => el.scrollHeight - el.clientHeight)).toBe(1);
+  // The value fits; where the engine has the trap it reads a pixel taller than its box.
+  await expect(remote).toBeVisible();
+  expect(await remote.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
   // Something with a tooltip first: the next one would open at once (the provider's skip delay).
   await page.getByTestId("details-copy-path").hover();
   await expect(page.getByRole("tooltip")).toHaveText("Copy path");

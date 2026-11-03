@@ -57,6 +57,10 @@ cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-sta
 - A test mixing both is split: the logic goes in vitest and a short e2e test keeps only the
   browser part. Never repeat in e2e an assertion a unit test already makes.
 - Daemon rules (refusals, git detection) are tested in Go, not through the mock.
+- Playwright browsers (e2e, sketches, `playwright cli`) load localhost only: the mock, Vite, a
+  `--dev` daemon. Never browse the public web with them; their builds lag security fixes. WebKit
+  is the only engine installed (`bunx --cwd gui/frontend playwright install webkit`); never install
+  Chromium.
 
 ## Verification
 
