@@ -17,6 +17,8 @@ func TestVerifyQuote(t *testing.T) {
 	owned := e.connected(CreateOptions{Name: "Owned", Owner: "plugin:demo"})
 	e.putItems(top.ID,
 		Item{ID: "md", Kind: KindAssistantText, Text: "We decided:\n\n**Do not refetch** on CI reruns; see [the note](https://x/y).\n\n`poll.go` keeps the `etag`."},
+		Item{ID: "ident", Kind: KindAssistantText, Text: "## Storage\n\n- The `thread_items` table keeps *each* item; see [search_quote.go](https://x/a_b.go).\n- snake_case_names stay as they are."},
+		Item{ID: "raw-user", Kind: KindUserMessage, Text: "please keep **bold** and `ticks` as typed"},
 		Item{ID: "user", Kind: KindUserMessage, Text: "should the   poller\nrefetch on reruns?"},
 		Item{ID: "short", Kind: KindUserMessage, Text: "yes"},
 		Item{ID: "tool", Kind: KindToolCall, Tool: &ToolCall{Name: "Bash", InputJSON: `{"command":"echo Do not refetch"}`, Status: ToolDone, Output: "Do not refetch"}},
@@ -35,7 +37,17 @@ func TestVerifyQuote(t *testing.T) {
 		words                     string
 		quoted                    string
 	}{
-		{name: "exact raw markdown", thread: top.ID, item: "md", quote: "**Do not refetch** on CI reruns", quoted: "**Do not refetch** on CI reruns"},
+		// Stored as the reply reads rendered, whichever form the quote came in.
+		{name: "exact raw markdown", thread: top.ID, item: "md", quote: "**Do not refetch** on CI reruns", quoted: "Do not refetch on CI reruns"},
+		{name: "raw link", thread: top.ID, item: "md", quote: "reruns; see [the note](https://x/y).", quoted: "reruns; see the note."},
+		{name: "half a bold", thread: top.ID, item: "md", quote: "refetch** on CI reruns", quoted: "refetch on CI reruns"},
+		{name: "identifier in code, rendered", thread: top.ID, item: "ident", quote: "The thread_items table keeps each item", quoted: "The thread_items table keeps each item"},
+		{name: "identifier in code, raw", thread: top.ID, item: "ident", quote: "The `thread_items` table keeps *each* item", quoted: "The thread_items table keeps each item"},
+		{name: "identifier without its underscore", thread: top.ID, item: "ident", quote: "The threaditems table keeps each item", quoted: "The thread_items table keeps each item"},
+		{name: "link text with underscores", thread: top.ID, item: "ident", quote: "each item; see search_quote.go.", quoted: "each item; see search_quote.go."},
+		{name: "across list items and a heading", thread: top.ID, item: "ident", quote: "Storage The thread_items table", quoted: "Storage The thread_items table"},
+		{name: "snake case in prose", thread: top.ID, item: "ident", quote: "snake_case_names stay as they are", quoted: "snake_case_names stay as they are"},
+		{name: "a user's text as typed", thread: top.ID, item: "raw-user", quote: "keep bold and ticks as typed", quoted: "keep **bold** and `ticks` as typed"},
 		{name: "rendered markdown", thread: top.ID, item: "md", quote: "Do not refetch on CI reruns; see the note.", quoted: "Do not refetch on CI reruns; see the note."},
 		{name: "inline code without backticks", thread: top.ID, item: "md", quote: "poll.go keeps the etag", quoted: "poll.go keeps the etag"},
 		{name: "white space and line breaks", thread: top.ID, item: "user", quote: "should the poller refetch\n on reruns", quoted: "should the poller refetch on reruns"},

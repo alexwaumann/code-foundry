@@ -24,6 +24,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -31,6 +32,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -220,6 +222,13 @@ type Threads interface {
 
 var _ Threads = (*thread.Manager)(nil)
 
+// Credentials issues scoped tokens (*capability.Registry).
+type Credentials interface {
+	Issue(scope capability.Scope, ttl time.Duration) (token string, revoke func(), err error)
+}
+
+var _ Credentials = (*capability.Registry)(nil)
+
 // Options configures a Store. DB and Threads are required.
 type Options struct {
 	DB      *sql.DB
@@ -234,8 +243,14 @@ type Options struct {
 	// Dir is the store's directory (paths.Search): cwd/ is every run's working directory,
 	// tmp/<id> its TMPDIR. Required for agent searches.
 	Dir string
-	// Env entries ("KEY=VALUE") are added to every run's environment: the daemon's
-	// loopback endpoint and token, so the CLI inside reaches it.
+	// Endpoint is the daemon's loopback endpoint (paths.EnvEndpoint's value), and
+	// Credentials issues each run a token scoped to its search (*capability.Registry):
+	// the CLI inside a run reaches the daemon with that token, never the daemon's.
+	// Both are required for agent searches.
+	Endpoint    string
+	Credentials Credentials
+	// Env entries ("KEY=VALUE") are added to every run's environment (tests); a token
+	// or endpoint among them is ignored (runEnv).
 	Env []string
 	// UtilityModel is the model a run uses, read at its start (models.utility). Default
 	// thread.UtilityModel's default.
@@ -268,8 +283,8 @@ type Store struct {
 	runs    map[string]*run
 	closed  bool
 	wg      sync.WaitGroup
-	// minimal: claude refused a hardened flag once; later runs leave them out.
-	minimal bool
+	// promoteMu makes Promote one at a time, so two at once make one thread.
+	promoteMu sync.Mutex
 }
 
 // New opens the store: it reads the history and ends any run a previous daemon left
@@ -521,22 +536,33 @@ func (s *Store) Clear(ctx context.Context) (int, error) {
 	return n, nil
 }
 
-// removeFiles deletes what an agent search left on disk: its transcript (and the
-// session's directory beside it) wherever Claude wrote it, and its TMPDIR.
-func (s *Store) removeFiles(e Entry) {
+// idPattern is a search id (newID).
+var idPattern = regexp.MustCompile(`^q-[0-9a-f]{12}$`)
+
+// removablePaths are the files an agent search left on disk, by pattern: its transcript
+// (and the session's directory beside it) wherever Claude wrote it, and its TMPDIR. A
+// stored session id that is not a UUID (thread.SessionIDPattern) or an id that is not a
+// search id names nothing: a "." or ".." from a damaged row must not widen a delete.
+func (s *Store) removablePaths(e Entry) []string {
 	if e.Mode != ModeAgent {
-		return
+		return nil
 	}
 	var paths []string
-	if e.ClaudeSessionID != "" && s.opts.ClaudeDir != "" && !strings.ContainsAny(e.ClaudeSessionID, `/\*?[`) {
+	if s.opts.ClaudeDir != "" && thread.SessionIDPattern.MatchString(e.ClaudeSessionID) {
 		for _, pat := range []string{e.ClaudeSessionID + ".jsonl", e.ClaudeSessionID} {
 			m, _ := filepath.Glob(filepath.Join(s.opts.ClaudeDir, "projects", "*", pat))
 			paths = append(paths, m...)
 		}
 	}
-	if s.opts.Dir != "" {
+	if s.opts.Dir != "" && idPattern.MatchString(e.ID) {
 		paths = append(paths, s.tmpDir(e.ID))
 	}
+	return paths
+}
+
+// removeFiles deletes removablePaths.
+func (s *Store) removeFiles(e Entry) {
+	paths := s.removablePaths(e)
 	for _, p := range paths {
 		if err := os.RemoveAll(p); err != nil {
 			s.log.Warn("search: remove a run's file", "id", e.ID, "path", p, "err", err)

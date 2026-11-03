@@ -49,6 +49,10 @@ type SearchDeps struct {
 
 const searchCategory = "Search"
 
+// searchQuoteRange is how long search.report's quote may be: thread.MinQuoteRunes to
+// thread.MaxQuoteRunes (commands_search_test.go keeps them equal).
+const searchQuoteRange = "12 to 300"
+
 // RegisterSearch registers the search.* commands.
 func RegisterSearch(r *Registry, d SearchDeps) error {
 	b := d.Search
@@ -243,7 +247,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 				{Name: "search", Type: String, Required: true, Description: "The search's id"},
 				{Name: "thread", Type: String, Required: true, Description: "The thread's id"},
 				{Name: "item", Type: String, Required: true, Description: "The message: #N as thread search and thread read print it, or its item id"},
-				{Name: "quote", Type: String, Required: true, Description: "Words copied exactly from the message (10 to 300 characters)"},
+				{Name: "quote", Type: String, Required: true, Description: "The message's words exactly as they read rendered, without markdown markers, backticks or link targets (" + searchQuoteRange + " characters)"},
 				{Name: "why", Type: String, Required: true, Description: "One short line: why it answers the question"},
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {

@@ -720,7 +720,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		if !o.NoProject {
 			return Thread{}, fmt.Errorf("%w: resume_session is for a thread without a project", ErrInvalidArgument)
 		}
-		if !uuidPattern.MatchString(o.ResumeSession) {
+		if !SessionIDPattern.MatchString(o.ResumeSession) {
 			return Thread{}, fmt.Errorf("%w: resume_session %q is not a Claude session id", ErrInvalidArgument, o.ResumeSession)
 		}
 		if _, ok := m.opts.Paths.transcriptPath(m.opts.Home, o.ResumeSession); !ok {

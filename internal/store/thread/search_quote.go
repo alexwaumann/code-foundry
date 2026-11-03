@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -22,8 +21,9 @@ import (
 // whole text: a word or two would match almost any message.
 const MinQuoteRunes = 12
 
-// MaxQuoteRunes bounds a quote: a hit quotes the part that answers, not the message.
-const MaxQuoteRunes = 600
+// MaxQuoteRunes bounds a quote: a hit quotes the part that answers, not the message. The
+// run's prompt and search.report's help say the same range.
+const MaxQuoteRunes = 300
 
 // QuotedItem is the message a verified quote is from.
 type QuotedItem struct {
@@ -33,15 +33,18 @@ type QuotedItem struct {
 	Kind      ItemKind
 	Speaker   Speaker
 	CreatedAt time.Time
-	// Quote is the quote as given, trimmed, white space runs as one space and without
-	// the quote marks or ellipses around it.
+	// Quote is the quoted part of the message as it reads: for Claude's reply its
+	// rendered markdown (no markers, backticks or link targets; renderedQuote), what the
+	// GUI's citation finds in the reply; the text itself for the rest. White space runs
+	// are one space.
 	Quote string
 }
 
 // VerifyQuote checks a reported hit: thread threadID is in the default search scope,
 // item (its id, or its ordinal "#12"/"12") is one of the thread's own indexed messages,
-// and quote occurs in its searchable text, either as it is or with markdown markers left
-// out of both (quoteForm). Every refusal is ErrInvalidArgument (ErrNotFound for an
+// and quote occurs in its searchable text, either as it is, with markdown markers left
+// out of both (quoteForm), or, for Claude's reply, in its rendered text (quoteSpan). The
+// quote it returns is the matched part as it reads (renderedQuote). Every refusal is ErrInvalidArgument (ErrNotFound for an
 // unknown thread or item) with words a model can act on.
 func (m *Manager) VerifyQuote(ctx context.Context, threadID, item, quote string) (QuotedItem, error) {
 	q := cleanQuote(quote)
@@ -70,18 +73,26 @@ func (m *Manager) VerifyQuote(ctx context.Context, threadID, item, quote string)
 	if it.ParentToolUseID != "" {
 		return QuotedItem{}, fmt.Errorf("%w: #%d is a subagent's message, which search does not cover: report the thread's own message", ErrInvalidArgument, it.Ordinal)
 	}
-	text, sp, indexed := itemSearchText(it)
+	raw, sp, indexed := itemRawSearchText(it)
+	text := strings.Join(strings.Fields(raw), " ")
 	if !indexed || text == "" {
 		return QuotedItem{}, fmt.Errorf("%w: #%d is a %s, not a message: quote a user message, Claude's reply or a question", ErrInvalidArgument, it.Ordinal, kindWords(it.Kind))
 	}
-	if !quoteOccurs(text, q) {
+	src, markdown := []rune(raw), it.Kind == KindAssistantText
+	from, to, found := quoteSpan(src, q, markdown)
+	if !found {
 		return QuotedItem{}, fmt.Errorf("%w: the quote does not occur in #%d of thread %s; copy it exactly from that message (white space may differ). The message begins: %q",
 			ErrInvalidArgument, it.Ordinal, t.ID, quoteHead(text))
 	}
 	if utf8.RuneCountInString(q) < MinQuoteRunes && quoteForm(q) != quoteForm(text) {
 		return QuotedItem{}, fmt.Errorf("%w: the quote is too short to show what answers; quote at least %d characters (or the whole message)", ErrInvalidArgument, MinQuoteRunes)
 	}
-	return QuotedItem{Thread: t, ItemID: it.ID, Ordinal: it.Ordinal, Kind: it.Kind, Speaker: sp, CreatedAt: it.CreatedAt, Quote: q}, nil
+	// Stored as it reads: the matched part of the message, rendered for a reply.
+	stored := renderedQuote(src, from, to, markdown)
+	if stored == "" {
+		stored = q
+	}
+	return QuotedItem{Thread: t, ItemID: it.ID, Ordinal: it.Ordinal, Kind: it.Kind, Speaker: sp, CreatedAt: it.CreatedAt, Quote: stored}, nil
 }
 
 // findItem reads thread id's item by its id, or by its ordinal ("#12" or "12").
@@ -149,32 +160,11 @@ func lastRune(s string) rune {
 	return r
 }
 
-// quoteOccurs reports whether q (cleanQuote'd) occurs in text (itemSearchText's), as it
-// is or in quoteForm on both sides.
-func quoteOccurs(text, q string) bool {
-	if strings.Contains(text, q) {
-		return true
-	}
-	f := quoteForm(q)
-	return f != "" && strings.Contains(quoteForm(text), f)
-}
-
-// markdownLink is [text](target): quoteForm keeps the text.
-var markdownLink = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
-
-// quoteForm is s as a model may quote rendered markdown: links as their text, without
-// the markers * _ ` # > and white space runs as one space. Applied to both the quote and
-// the text, so a quote with the markers matches too.
-func quoteForm(s string) string {
-	s = markdownLink.ReplaceAllString(s, "$1")
-	s = strings.Map(func(r rune) rune {
-		if strings.ContainsRune("*_`#>", r) {
-			return -1
-		}
-		return r
-	}, s)
-	return strings.Join(strings.Fields(s), " ")
-}
+// quoteForm is s as a model may quote rendered markdown: links ([text](target), no ] in
+// the text, no ) in the target) as their text, without the markers * _ ` # > and white
+// space runs as one space (formMapped). Applied to both the quote and the text, so a quote
+// with the markers matches too.
+func quoteForm(s string) string { return formMapped(identity([]rune(s))).String() }
 
 // quoteHead is the start of a message's text for a refusal, so the model sees what the
 // message says.

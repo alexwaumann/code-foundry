@@ -134,7 +134,7 @@ func TestWriteFileAtomicPerms(t *testing.T) {
 
 func TestLoopbackHandlerServesNoPageRoutes(t *testing.T) {
 	rest := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	h := loopbackHandler("secret", []string{"/preview/", "/cf/", "/cf/bridge.js"}, 4242, nil, rest)
+	h := loopbackHandler("secret", nil, []string{"/preview/", "/cf/", "/cf/bridge.js"}, 4242, nil, rest)
 	tests := []struct {
 		name, path, auth string
 		want             int
@@ -207,8 +207,8 @@ func TestRequireBearerAndCORS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prod := loopbackHandler("secret", []string{"/preview/"}, 9300, nil, ok)
-	dev := loopbackHandler("secret", []string{"/preview/"}, 9300, devOrigins, ok)
+	prod := loopbackHandler("secret", nil, []string{"/preview/"}, 9300, nil, ok)
+	dev := loopbackHandler("secret", nil, []string{"/preview/"}, 9300, devOrigins, ok)
 	preflight := func(origin string) map[string]string {
 		return map[string]string{"Origin": origin, "Access-Control-Request-Method": "POST"}
 	}
@@ -328,7 +328,7 @@ func TestParseDevOrigins(t *testing.T) {
 func TestPageLibraryRoutes(t *testing.T) {
 	routes := newPageRoutes(preview.NewGrants(preview.Floor{}), theme.NewLive(), slog.New(slog.DiscardHandler))
 	pages := pagesHandler(routes)
-	api := loopbackHandler("secret", slices.Collect(maps.Keys(routes)), 4242, nil,
+	api := loopbackHandler("secret", nil, slices.Collect(maps.Keys(routes)), 4242, nil,
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
 	tests := []struct {
 		name, path string

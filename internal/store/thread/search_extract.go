@@ -40,11 +40,18 @@ var searchTexts = map[ItemKind]searchText{
 // are one space (searchLine; a phrase across a line break matches), and a thread tag reads
 // as its stored label, not the thread's current name (storedLabel).
 func itemSearchText(it Item) (text string, sp Speaker, ok bool) {
+	raw, sp, ok := itemRawSearchText(it)
+	return strings.Join(strings.Fields(raw), " "), sp, ok
+}
+
+// itemRawSearchText is itemSearchText before white space runs become one space: line
+// breaks kept, so markdown's line markup still reads (renderedQuote).
+func itemRawSearchText(it Item) (text string, sp Speaker, ok bool) {
 	e, ok := searchTexts[it.Kind]
 	if !ok {
 		return "", "", false
 	}
-	return strings.Join(strings.Fields(e.text(it)), " "), e.speaker, true
+	return e.text(it), e.speaker, true
 }
 
 // storedLabel is promptText's thread name lookup for search: none, so a thread tag reads

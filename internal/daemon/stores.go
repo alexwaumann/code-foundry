@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
@@ -132,8 +133,11 @@ type stores struct {
 // error, whatever was started is closed again. threadEnv is added to every Claude
 // process's environment (see threadEnv in daemon.go). pres is the GUI presence: its
 // kind paces the GitHub poll (gh.Options.Presence), and whether it is attended decides
-// whether an open thread view counts as seen (thread.Options.Attended).
-func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string, pres *presence.Tracker) (_ *stores, err error) {
+// whether an open thread view counts as seen (thread.Options.Attended). Agent search's
+// runs get the loopback endpoint and a scoped token of caps instead of threadEnv
+// (internal/capability).
+func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string, endpoint string, caps *capability.Registry,
+	pres *presence.Tracker) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
 		if err != nil {
@@ -312,7 +316,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	// After thread: hits are verified against its items, and Promote makes a thread.
 	if s.search, err = search.New(ctx, search.Options{
 		DB: s.db, Threads: s.thread, Bus: s.bus, Log: log.With("store", "search"), Claude: claude,
-		Dir: p.Search(), Env: threadEnv,
+		// Not threadEnv: the run's CLI reaches the daemon with a token scoped to its
+		// search (thread.search, thread.read, its own search.report), never the daemon's.
+		Dir: p.Search(), Endpoint: endpoint, Credentials: caps,
 		// models.utility and the thread defaults, read at each run and each Promote.
 		UtilityModel: func() string {
 			return thread.UtilityModel(thread.WithUtilityModel(context.Background(), s.settings.Settings().Models.Utility))

@@ -190,8 +190,9 @@ func attachmentLine(a attachment) string {
 	return "Attached PDF: " + a.path + " (" + n + ", not sent inline); read it with the Read tool's pages parameter, at most 20 pages per call"
 }
 
-// uuidPattern is a Claude session id: a UUID in lower-case hex.
-var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+// SessionIDPattern is a Claude session id: a UUID in lower-case hex. The search store
+// checks a stored one against it before deleting files named by it.
+var SessionIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // newUUID returns a random (version 4) UUID string.
 func newUUID() (string, error) {

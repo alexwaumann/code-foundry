@@ -19,20 +19,84 @@ import (
 // fakeSearchStore answers Get with its entry; the rest is unused.
 type fakeSearchStore struct {
 	SearchStore
-	mu sync.Mutex
-	e  search.Entry
+	mu  sync.Mutex
+	e   search.Entry
+	err error
 }
 
 func (f *fakeSearchStore) Get(string) (search.Entry, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.e, nil
+	return f.e, f.err
 }
 
 func (f *fakeSearchStore) set(e search.Entry) {
 	f.mu.Lock()
 	f.e = e
 	f.mu.Unlock()
+}
+
+func watchServer(t *testing.T, h *Search) codefoundryv1connect.SearchServiceClient {
+	t.Helper()
+	route := h.Route()
+	mux := http.NewServeMux()
+	mux.Handle(route.Path, route.Handler)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	return codefoundryv1connect.NewSearchServiceClient(srv.Client(), srv.URL)
+}
+
+// The bus dropped the run's last events (the status among them): the next heartbeat
+// reads the entry, sends it as a snapshot and ends the stream; a search forgotten
+// meanwhile ends it NOT_FOUND.
+func TestSearchWatchLostEnd(t *testing.T) {
+	st := &fakeSearchStore{e: search.Entry{ID: "q-1", Mode: search.ModeAgent, Status: search.StatusRunning, Version: 3}}
+	h := NewSearch(st, bus.New())
+	h.beat = 50 * time.Millisecond
+	cl := watchServer(t, h)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stream, err := cl.Watch(ctx, connect.NewRequest(&v1.WatchSearchRequest{Id: "q-1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stream.Receive() || stream.Msg().GetSnapshot() == nil {
+		t.Fatalf("first = %v, %v", stream.Msg(), stream.Err())
+	}
+	// A quiet beat first: a heartbeat, nothing moved.
+	if !stream.Receive() || stream.Msg().GetHeartbeat() == nil {
+		t.Fatalf("second = %v, %v", stream.Msg(), stream.Err())
+	}
+	// Ended with nothing published.
+	st.set(search.Entry{ID: "q-1", Mode: search.ModeAgent, Status: search.StatusDone, Version: 6, Answer: "A"})
+	var last *v1.SearchWatchEvent
+	n := 0
+	for stream.Receive() {
+		last = stream.Msg()
+		n++
+	}
+	if stream.Err() != nil || last.GetSnapshot().GetStatus() != v1.SearchStatus_SEARCH_STATUS_DONE || last.GetVersion() != 6 {
+		t.Fatalf("end = %v after %d, %v", last, n, stream.Err())
+	}
+
+	st.set(search.Entry{ID: "q-1", Mode: search.ModeAgent, Status: search.StatusRunning, Version: 3})
+	stream, err = cl.Watch(ctx, connect.NewRequest(&v1.WatchSearchRequest{Id: "q-1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stream.Receive() {
+		t.Fatal(stream.Err())
+	}
+	st.mu.Lock()
+	st.err = search.ErrNotFound
+	st.mu.Unlock()
+	for stream.Receive() {
+	}
+	if connect.CodeOf(stream.Err()) != connect.CodeNotFound {
+		t.Errorf("forgotten = %v", stream.Err())
+	}
 }
 
 // Watch: the snapshot, then each event in version order; a gap (a dropped event) sends a

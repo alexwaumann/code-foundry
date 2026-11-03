@@ -71,7 +71,10 @@ func (h *Search) StartAgent(ctx context.Context, req *connect.Request[v1.StartAg
 	return connect.NewResponse(&v1.StartAgentSearchResponse{Entry: SearchEntryToProto(e)}), nil
 }
 
-// Watch sends the entry, then its changes, until the run ends.
+// Watch sends the entry, then its changes, until the run ends. The bus may drop an event
+// (a full buffer), the run's last one too: after a drop and at every heartbeat the entry
+// is read again, and a version the stream has not sent comes as a snapshot, which ends
+// the stream when the search has ended (or NOT_FOUND once it is forgotten).
 func (h *Search) Watch(ctx context.Context, req *connect.Request[v1.WatchSearchRequest], stream *connect.ServerStream[v1.SearchWatchEvent]) error {
 	id := req.Msg.GetId()
 	sub := bus.Subscribe[search.Changed](h.bus, watchBuffer)
@@ -90,6 +93,26 @@ func (h *Search) Watch(ctx context.Context, req *connect.Request[v1.WatchSearchR
 		return nil
 	}
 	last := e.Version
+	// resync sends the entry as it is now when its version moved past last; end is true
+	// once the stream is over (the search ended or is gone, or the send failed).
+	resync := func() (sent, end bool, err error) {
+		now, err := h.store.Get(id)
+		if err != nil {
+			if errors.Is(err, search.ErrNotFound) {
+				return false, true, connect.NewError(connect.CodeNotFound, errors.New("the search was forgotten"))
+			}
+			return false, true, searchError(err)
+		}
+		if now.Version == last {
+			return false, now.Status.Ended(), nil
+		}
+		if err := sendSnapshot(now); err != nil {
+			return false, true, err
+		}
+		last = now.Version
+		return true, now.Status.Ended(), nil
+	}
+	var dropped uint64
 	beat := newHeartbeat(h.beat)
 	defer beat.Stop()
 	for {
@@ -98,12 +121,27 @@ func (h *Search) Watch(ctx context.Context, req *connect.Request[v1.WatchSearchR
 			return nil
 		case <-beat.C():
 			beat.Reset()
+			sent, end, err := resync()
+			if end || err != nil {
+				return err
+			}
+			if sent {
+				continue
+			}
 			if err := stream.Send(&v1.SearchWatchEvent{Event: &v1.SearchWatchEvent_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
 				return err
 			}
 		case c, ok := <-sub.C():
 			if !ok {
 				return nil
+			}
+			if d := sub.Dropped(); d != dropped {
+				// Something was lost, maybe this search's last event: read it again.
+				dropped = d
+				beat.Reset()
+				if _, end, err := resync(); end || err != nil {
+					return err
+				}
 			}
 			if c.ID != id || (c.Version <= last && c.Kind != search.EventRemoved) {
 				continue
@@ -116,16 +154,9 @@ func (h *Search) Watch(ctx context.Context, req *connect.Request[v1.WatchSearchR
 			// A gap (the bus dropped an event) or a change only a snapshot says: the
 			// entry as it is now.
 			if ev == nil || c.Version != last+1 {
-				now, err := h.store.Get(id)
-				if err != nil {
-					return searchError(err)
-				}
-				if err := sendSnapshot(now); err != nil {
+				_, end, err := resync()
+				if end || err != nil {
 					return err
-				}
-				last = now.Version
-				if now.Status.Ended() {
-					return nil
 				}
 				continue
 			}

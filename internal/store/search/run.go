@@ -12,7 +12,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -30,7 +32,7 @@ var allowedCommands = []string{
 	"Bash(" + cliName + " search report *)",
 }
 
-// runArgs is the run's claude command line. The hardened flags (minimal false) are
+// runArgs is the run's claude command line. The hardened flags are
 //
 //	--safe-mode                    no CLAUDE.md, skills, plugins, hooks or MCP servers
 //	--tools Bash                   no built-in tool but Bash (no Read, Edit, Write, WebFetch, Agent…)
@@ -39,19 +41,39 @@ var allowedCommands = []string{
 //	--system-prompt-snapshot off   nothing recorded, so a promoted thread renders its own
 //
 // the same flags a managed laptop lets naming use (no hooks, no --strict-mcp-config, no
-// --mcp-config). minimal drops --safe-mode and --system-prompt-snapshot, the flags an
-// older Claude or an organization's settings may refuse; the tool limits stay.
-func runArgs(claude, sessionID, model, prompt string, minimal bool) []string {
+// --mcp-config). The user's settings files still load: they may hold the Bedrock env and
+// credentials setup (docs/notes/search-5-agent-daemon.md). An allow rule there can widen
+// what the run may run; the daemon's side of that is the scoped token runEnv gives its CLI.
+func runArgs(claude, sessionID, model, prompt string) []string {
 	argv := []string{claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
 		"--session-id", sessionID, "--model", model, "--effort", runEffort,
-		"--tools", "Bash", "--permission-mode", "dontAsk"}
-	if !minimal {
-		argv = append(argv, "--safe-mode", "--system-prompt-snapshot", "off")
-	}
-	argv = append(argv, "--append-system-prompt", prompt)
+		"--tools", "Bash", "--permission-mode", "dontAsk",
+		"--safe-mode", "--system-prompt-snapshot", "off",
+		"--append-system-prompt", prompt}
 	// Variadic: last.
 	return append(append(argv, "--allowedTools"), allowedCommands...)
 }
+
+// runEnv is the run's environment over the daemon's: o.Env (tests), its TMPDIR, the
+// daemon's loopback endpoint and token, a token scoped to this search
+// (internal/capability), never the daemon's own, and no thread or pages variable. With
+// the endpoint set, the CLI never falls back to the Unix socket or the token file.
+func runEnv(o Options, searchID, token string) []string {
+	env := make([]string, 0, len(o.Env)+6)
+	for _, kv := range o.Env {
+		k, _, _ := strings.Cut(kv, "=")
+		if k != paths.EnvToken && k != paths.EnvEndpoint {
+			env = append(env, kv)
+		}
+	}
+	return append(env, paths.EnvThread, paths.EnvPages, // bare: removed
+		"TMPDIR="+filepath.Join(o.Dir, "tmp", searchID),
+		paths.EnvEndpoint+"="+o.Endpoint, paths.EnvToken+"="+token)
+}
+
+// credentialTTL is how long past WallTime a run's scoped token lives at the most; it is
+// revoked as soon as the run ends.
+const credentialTTL = time.Minute
 
 // stopReason is why a run was asked to stop.
 type stopReason int
@@ -63,14 +85,32 @@ const (
 
 // run is one agent search's process and loop.
 type run struct {
-	id   string
-	stop chan stopReason // buffered 1: the first request wins
-	done chan struct{}
-	once sync.Once
+	id      string
+	stopped chan struct{} // closed by the first requestStop, why set before
+	why     stopReason
+	done    chan struct{}
+	once    sync.Once
+}
+
+func newRun(id string) *run {
+	return &run{id: id, stopped: make(chan struct{}), done: make(chan struct{})}
 }
 
 func (r *run) requestStop(why stopReason) {
-	r.once.Do(func() { r.stop <- why })
+	r.once.Do(func() {
+		r.why = why
+		close(r.stopped)
+	})
+}
+
+// stopWhy is why the run was asked to stop; 0 when it was not.
+func (r *run) stopWhy() stopReason {
+	select {
+	case <-r.stopped:
+		return r.why
+	default:
+		return 0
+	}
 }
 
 func (s *Store) cwd() string             { return filepath.Join(s.opts.Dir, "cwd") }
@@ -88,6 +128,10 @@ func (s *Store) StartAgent(ctx context.Context, question string) (Entry, error) 
 		return Entry{}, fmt.Errorf("%w: the question is %d characters; at most %d", ErrInvalidArgument, utf8.RuneCountInString(question), MaxQuestionRunes)
 	case s.opts.Dir == "":
 		return Entry{}, fmt.Errorf("%w: agent search has no directory", ErrFailedPrecondition)
+	case s.opts.Endpoint == "" || s.opts.Credentials == nil:
+		// Without both, the run's CLI would have no way in but the Unix socket, which
+		// asks for no token: refuse rather than run unscoped.
+		return Entry{}, fmt.Errorf("%w: agent search has no scoped endpoint", ErrFailedPrecondition)
 	}
 	id, err := newID()
 	if err != nil {
@@ -104,7 +148,7 @@ func (s *Store) StartAgent(ctx context.Context, question string) (Entry, error) 
 	}
 	e := &Entry{ID: id, Mode: ModeAgent, Query: question, CreatedAt: s.opts.Now().Truncate(time.Millisecond), Status: StatusRunning,
 		ClaudeSessionID: sid, Model: s.opts.UtilityModel(), Version: 1}
-	r := &run{id: id, stop: make(chan stopReason, 1), done: make(chan struct{})}
+	r := newRun(id)
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -116,7 +160,6 @@ func (s *Store) StartAgent(ctx context.Context, question string) (Entry, error) 
 	}
 	s.entries[id] = e
 	s.runs[id] = r
-	minimal := s.minimal
 	s.wg.Add(1)
 	c := e.clone()
 	s.mu.Unlock()
@@ -125,7 +168,7 @@ func (s *Store) StartAgent(ctx context.Context, question string) (Entry, error) 
 	go func() {
 		defer s.wg.Done()
 		defer close(r.done)
-		s.runAgent(r, c, minimal)
+		s.runAgent(r, c)
 	}()
 	return c, nil
 }
@@ -166,20 +209,19 @@ func (s *Store) Wait(ctx context.Context, id string) (Entry, error) {
 }
 
 // runAgent runs search e's claude until it answers, fails, is stopped or runs out of
-// time, and records the end. A start whose hardened flags claude refuses is tried once
-// more without them, and later runs leave them out.
-func (s *Store) runAgent(r *run, e Entry, minimal bool) {
+// time, and records the end. Its CLI holds a token scoped to e (runEnv), revoked when the
+// run ends. A start whose hardened flags claude refuses fails: the run never starts
+// without them.
+func (s *Store) runAgent(r *run, e Entry) {
 	log := s.log.With("search", e.ID)
 	start := time.Now()
-	l := newLoop(s, r, e)
-	end := l.run(minimal)
-	if end.refused && !minimal {
-		log.Warn("claude refused a search flag; retrying with the minimal command for this daemon run", "err", end.err)
-		s.mu.Lock()
-		s.minimal = true
-		s.mu.Unlock()
-		l = newLoop(s, r, e)
-		end = l.run(true)
+	var end runEnd
+	token, revoke, err := s.opts.Credentials.Issue(capability.Scope{Search: e.ID}, s.opts.WallTime+credentialTTL)
+	if err != nil {
+		end = runEnd{status: StatusFailed, note: "no credential for the run: " + err.Error(), err: err}
+	} else {
+		end = newLoop(s, r, e).run(runEnv(s.opts, e.ID, token))
+		revoke()
 	}
 	s.finish(e.ID, end, time.Since(start))
 	got, _ := s.Get(e.ID)
@@ -189,16 +231,18 @@ func (s *Store) runAgent(r *run, e Entry, minimal bool) {
 
 // runEnd is how a run ended.
 type runEnd struct {
-	status  Status
-	answer  string
-	note    string // the entry's error: why it failed, or how it ended
-	cost    float64
-	err     error // for the log
-	refused bool  // claude refused a flag before it started
+	status Status
+	answer string
+	note   string // the entry's error: why it failed, or how it ended
+	cost   float64
+	err    error // for the log
+	// byUser: the user stopped it (Stop, Forget), so it is not unseen.
+	byUser bool
 }
 
 // finish records a run's end and forgets its process: the answer first (its own
-// version, EventAnswer), then the status (EventStatus), so a watcher sees both.
+// version, EventAnswer), then the status (EventStatus), so a watcher sees both. A run
+// that ended on its own (done, failed) is unseen; one the user stopped is not.
 func (s *Store) finish(id string, end runEnd, took time.Duration) {
 	ctx := context.Background()
 	defer func() {
@@ -219,7 +263,7 @@ func (s *Store) finish(id string, end runEnd, took time.Duration) {
 	}
 	e, _, err := s.update(ctx, id, func(e *Entry) bool {
 		e.Status, e.Error, e.FinishedAt = end.status, end.note, s.opts.Now().Truncate(time.Millisecond)
-		e.CostUSD, e.Duration, e.Unseen = end.cost, took, true
+		e.CostUSD, e.Duration, e.Unseen = end.cost, took, !end.byUser
 		for i := range e.Steps {
 			if !e.Steps[i].Done {
 				e.Steps[i] = completeStep(e.Steps[i], "", true)
@@ -259,11 +303,45 @@ func (l *loop) hits() int {
 	return len(got.Hits)
 }
 
-// run starts claude and drives it to the end.
-func (l *loop) run(minimal bool) runEnd {
+// ctx is a context for one exchange with claude: it ends after d or once the run is
+// asked to stop, so a stop never waits for a slow handshake.
+func (l *loop) ctx(d time.Duration) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	go func() {
+		select {
+		case <-l.r.stopped:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
+}
+
+// refusedFlag names the hardened flag claude's start error refuses.
+func refusedFlag(detail string) string {
+	for _, f := range []string{"--safe-mode", "--system-prompt-snapshot", "--tools", "--permission-mode", "--allowedTools", "--effort"} {
+		if strings.Contains(detail, f) {
+			return f
+		}
+	}
+	return "a flag of the search's command"
+}
+
+// stoppedEnd is the end of a run asked to stop: STOPPED with the hits it has, or FAILED
+// at daemon shutdown.
+func (l *loop) stoppedEnd() runEnd {
+	if l.r.stopWhy() == stopShutdown {
+		return l.cut(StatusFailed, "the daemon stopped while it ran")
+	}
+	end := l.cut(StatusStopped, "")
+	end.byUser = true
+	return end
+}
+
+// run starts claude with env and drives it to the end.
+func (l *loop) run(env []string) runEnd {
 	s, e := l.s, l.e
-	env := append(append([]string{}, s.opts.Env...), "TMPDIR="+s.tmpDir(e.ID))
-	argv := runArgs(s.opts.Claude, e.ClaudeSessionID, e.Model, systemPrompt(e.ID, s.opts.MaxHits), minimal)
+	argv := runArgs(s.opts.Claude, e.ClaudeSessionID, e.Model, systemPrompt(e.ID, s.opts.MaxHits))
 	proc, err := claudestream.Start(claudestream.Spec{Argv: argv, Env: env, Dir: s.cwd(),
 		Conn: claudestream.Options{Log: s.log.With("search", e.ID)}})
 	if err != nil {
@@ -272,21 +350,30 @@ func (l *loop) run(minimal bool) runEnd {
 	defer proc.CloseOutput()
 	conn := proc.Conn()
 	defer conn.Close()
-	ictx, cancel := context.WithTimeout(context.Background(), s.opts.StartTimeout)
+	ictx, cancel := l.ctx(s.opts.StartTimeout)
 	_, err = conn.Initialize(ictx)
 	cancel()
+	if l.r.stopWhy() != 0 {
+		kill(proc, s.opts.KillGrace)
+		return l.stoppedEnd()
+	}
 	if err != nil {
 		kill(proc, s.opts.KillGrace)
 		detail := strings.TrimSpace(proc.Stderr())
 		ferr := fmt.Errorf("%w: %s", err, detail)
 		if thread.IsFlagRefused(ferr) {
-			return runEnd{status: StatusFailed, refused: true, note: "Claude refused a flag: " + lastLine(detail), err: ferr}
+			// Fail closed: the run never starts without its hardened flags.
+			return runEnd{status: StatusFailed, note: "Claude refused " + refusedFlag(detail) + ": " + lastLine(detail), err: ferr}
 		}
 		return runEnd{status: StatusFailed, note: "Claude did not start: " + cmpOr(lastLine(detail), err.Error()), err: ferr}
 	}
-	sctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	sctx, cancel := l.ctx(30 * time.Second)
 	err = conn.Send(sctx, claudestream.UserMessage{Blocks: []claudestream.ContentBlock{claudestream.TextBlock(e.Query)}})
 	cancel()
+	if l.r.stopWhy() != 0 {
+		kill(proc, s.opts.KillGrace)
+		return l.stoppedEnd()
+	}
 	if err != nil {
 		kill(proc, s.opts.KillGrace)
 		return runEnd{status: StatusFailed, note: "Claude did not take the question: " + err.Error(), err: err}
@@ -311,12 +398,9 @@ func (l *loop) run(minimal bool) runEnd {
 		case <-deadline.C:
 			kill(proc, s.opts.KillGrace)
 			return l.cut(StatusDone, "stopped at the "+s.opts.WallTime.String()+" limit")
-		case why := <-l.r.stop:
+		case <-l.r.stopped:
 			kill(proc, s.opts.KillGrace)
-			if why == stopShutdown {
-				return l.cut(StatusFailed, "the daemon stopped while it ran")
-			}
-			return l.cut(StatusStopped, "")
+			return l.stoppedEnd()
 		}
 	}
 }
@@ -344,7 +428,7 @@ func (l *loop) wrapUp(conn *claudestream.Conn) {
 		return
 	}
 	l.wrapping = true
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := l.ctx(10 * time.Second)
 	defer cancel()
 	if err := conn.Interrupt(ctx); err != nil {
 		l.s.log.Warn("search: interrupt for the answer", "search", l.e.ID, "err", err)
@@ -384,10 +468,17 @@ func (l *loop) event(conn *claudestream.Conn, ev claudestream.Event) (runEnd, bo
 		}
 	case *claudestream.Result:
 		l.cost = ev.TotalCostUSD
-		if l.wrapping && !l.wrapSent {
+		answer := strings.TrimSpace(ev.Result)
+		if answer == "" {
+			answer = l.lastText
+		}
+		// The model may have finished just before the interrupt landed: a turn that
+		// ended on its own with text is the answer, and no wrap-up goes.
+		finished := !ev.IsError && !ev.Interrupted() && answer != ""
+		if l.wrapping && !l.wrapSent && !finished {
 			// The interrupted turn ended: ask for the answer.
 			l.wrapSent = true
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := l.ctx(30 * time.Second)
 			defer cancel()
 			if err := conn.Send(ctx, claudestream.UserMessage{Blocks: []claudestream.ContentBlock{claudestream.TextBlock(wrapUpMessage)}}); err != nil {
 				return runEnd{status: StatusFailed, note: "Claude did not take the wrap-up: " + err.Error(), cost: l.cost, err: err}, true
@@ -403,10 +494,6 @@ func (l *loop) event(conn *claudestream.Conn, ev claudestream.Event) (runEnd, bo
 				return runEnd{status: StatusDone, note: "Claude failed before it answered: " + why, cost: l.cost, err: errors.New(why)}, true
 			}
 			return runEnd{status: StatusFailed, note: why, cost: l.cost, err: errors.New(why)}, true
-		}
-		answer := strings.TrimSpace(ev.Result)
-		if answer == "" {
-			answer = l.lastText
 		}
 		return runEnd{status: StatusDone, answer: answer, cost: l.cost}, true
 	}
@@ -555,10 +642,20 @@ func (s *Store) Report(ctx context.Context, searchID, threadID, item, quote, why
 // Promote makes a thread without a project that continues search id's conversation, on
 // the user's default model and effort, its first message the question with the hits as
 // citation links (promoteMessage). It returns the new thread's id.
+//
+// Promote is idempotent: once the entry has a promoted thread that still exists, it
+// returns that thread instead of making another (two clicks, or the GUI and the CLI).
 func (s *Store) Promote(ctx context.Context, id string) (string, error) {
+	s.promoteMu.Lock()
+	defer s.promoteMu.Unlock()
 	e, err := s.Get(id)
 	if err != nil {
 		return "", err
+	}
+	if e.PromotedThreadID != "" {
+		if _, ok := s.opts.Threads.Snapshot().Thread(e.PromotedThreadID); ok {
+			return e.PromotedThreadID, nil
+		}
 	}
 	switch {
 	case e.Mode != ModeAgent:

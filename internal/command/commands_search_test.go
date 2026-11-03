@@ -2,6 +2,7 @@ package command_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // searchBackend answers StartAgent and Report, recording the report.
@@ -74,5 +76,21 @@ func TestSearchCommands(t *testing.T) {
 	if _, err := r.Invoke(ctx, command.Context{}, "search.report", map[string]string{"search": "q-1", "thread": "s-b", "item": "#12", "quote": "x"}); err == nil ||
 		!strings.Contains(err.Error(), "why") {
 		t.Errorf("report without --why = %v", err)
+	}
+}
+
+// search.report's help names the quote lengths VerifyQuote enforces (and the run's
+// prompt, which reads the constants).
+func TestSearchReportQuoteRange(t *testing.T) {
+	r := command.NewRegistry()
+	if err := command.RegisterSearch(r, command.SearchDeps{}); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := r.Get("search.report")
+	want := fmt.Sprintf("(%d to %d characters)", thread.MinQuoteRunes, thread.MaxQuoteRunes)
+	for _, a := range c.Args {
+		if a.Name == "quote" && !strings.Contains(a.Description, want) {
+			t.Errorf("--quote help = %q, want %q", a.Description, want)
+		}
 	}
 }
