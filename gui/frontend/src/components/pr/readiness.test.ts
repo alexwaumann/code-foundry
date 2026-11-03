@@ -247,6 +247,13 @@ describe("readiness: headline, rows and footer", () => {
       footer: { review: false, merge: null },
     },
     {
+      name: "read access, your review requested: Review ▾ (primary), no merge controls",
+      s: { pr: { author: "kim", review: "review_required", mergeState: "blocked" }, d: { viewerCanUpdate: false, viewerPermission: "read", reviewers: [reviewer(VIEWER, { requested: true })] } },
+      headline: "Waiting on your review",
+      rows: ["checks success: All 2 checks passed", "review-request pending: Your review is requested", "mergeable success: No conflicts with trunk"],
+      footer: { review: true, reviewPrimary: true, merge: null },
+    },
+    {
       name: "no checks at all",
       s: { d: { checks: [] }, pr: { checks: { state: "none", total: 0, passed: 0, failed: 0, pending: 0, skipped: 0 } } },
       headline: "Ready to merge",

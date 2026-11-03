@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
-import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
+import { pullRequestDetailResource, pullRequestKey, useViewerLogin } from "@/stores/gh";
 import { useCurrentPanelKey } from "@/stores/panel";
 import { prTabKey, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
@@ -143,6 +143,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   const d = pullRequestDetailResource.store((s) => s.entries[key]?.data ?? null);
   const error = pullRequestDetailResource.store((s) => s.entries[key]?.error ?? null);
   const inner = usePrPanelStore((s) => s.byTab[tabKey]?.inner ?? "overview");
+  const viewer = useViewerLogin();
   // The composer under the header: Ask a question, or a review with its verdict (one at a time).
   const [composer, setComposer] = useState<"ask" | Verdict | null>(null);
   // Bumped each time Ask or a verdict is chosen: the composer (re)takes focus.
@@ -154,9 +155,9 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   const closeComposer = () => {
     setComposer(null);
   };
-  // The pull request stopped taking reviews here (merged, closed, write access lost):
+  // The pull request stopped taking reviews here (merged, closed, write access and the request gone):
   // Review ▾ is gone, and so is its composer (adjusted during render, not in an effect).
-  if (composer !== null && composer !== "ask" && d && !reviewVisible(d)) setComposer(null);
+  if (composer !== null && composer !== "ask" && d && !reviewVisible(d, viewer)) setComposer(null);
 
   if (!d) {
     if (isNotFoundMessage(error)) {

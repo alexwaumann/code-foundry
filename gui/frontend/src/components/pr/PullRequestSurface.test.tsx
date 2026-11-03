@@ -1231,6 +1231,23 @@ describe("Review ▾", () => {
     expect(queryTestId("pr-review-button")).toBeNull();
   });
 
+  it("read access with the viewer's review requested: Review ▾ (primary) and its verdicts, no merge controls", async () => {
+    world.update(140, (d) => ({ ...d, reviewers: [...d.reviewers, { login: "alexwaumann", isTeam: false, isBot: false, avatarUrl: "", state: "", submittedAtMs: null, requested: true, stale: false }] }));
+    renderPrPanel();
+    await openPr(140);
+    expect(byTestId("pr-ready-headline").textContent).toBe("Waiting on your review");
+    expect(byTestId("pr-review-button").dataset.primary).toBe("true");
+    expect(queryTestId("pr-merge-button")).toBeNull();
+    expect(queryTestId("pr-auto-merge-button")).toBeNull();
+    press(byTestId("pr-review-button"));
+    // Not the author: GitHub takes every verdict from a read-access reviewer.
+    for (const v of ["approve", "request-changes", "comment"]) expect(byTestId(`pr-review-${v}`).hasAttribute("data-disabled")).toBe(false);
+    await pick(byTestId("pr-review-approve"));
+    fireEvent.keyDown(reviewInput(), { key: "Enter", metaKey: true });
+    await settle(3);
+    expect(reviews()).toEqual([{ "repo-slug": SLUG, number: "140", verdict: "approve" }]);
+  });
+
   it("the composer closes when the pull request stops taking reviews (merged meanwhile)", async () => {
     renderPrPanel();
     await openPr(142);

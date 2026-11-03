@@ -40,7 +40,7 @@ export function ReviewButton({ prRef, detail, onChoose, primary = false }: { prR
   const { ref, boundary } = usePanelBoundary();
   // A chosen verdict hands focus to the composer, so the menu must not take it back.
   const keepFocus = useRef(false);
-  if (!reviewVisible(detail)) return null;
+  if (!reviewVisible(detail, viewer)) return null;
   const mine = primary ? null : yourReview(detail.reviewers, viewer);
   const disabled = disabledVerdicts(detail.pullRequest.author, viewer);
   const Icon = mine ? yourReviewIcon[mine] : Eye;

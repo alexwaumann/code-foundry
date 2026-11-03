@@ -387,9 +387,9 @@ export function mergeableNow(d: PullRequestDetailView): boolean {
 }
 
 /** The footer of an open pull request: Review ▾, and Merge, Auto-merge or Cancel auto-merge. */
-function openFooter(d: PullRequestDetailView, fresh: boolean, reviewPrimary: boolean): ReadinessFooter {
+function openFooter(d: PullRequestDetailView, viewer: string, fresh: boolean, reviewPrimary: boolean): ReadinessFooter {
   const pr = d.pullRequest;
-  const review = reviewVisible(d);
+  const review = reviewVisible(d, viewer);
   const out = (merge: FooterMerge | null, mergeNote: string | null = null): ReadinessFooter => ({ review, reviewPrimary: review && reviewPrimary, merge, mergeNote });
   if (!d.viewerCanUpdate) return out(null);
   if (d.autoMergeEnabled) return out("cancel-auto-merge");
@@ -467,5 +467,5 @@ export function readiness(d: PullRequestDetailView, viewer: string, fresh: boole
   }
   if (pr.state !== "open") return { headline: { icon: "none", tone: "neutral", title: "Unknown state", meta: "" }, rows: [], footer: null };
   const rows = openRows(d, viewer, now);
-  return { headline: openHeadline(d, rows), rows, footer: openFooter(d, fresh, rows.some((r) => r.id === "review-request")) };
+  return { headline: openHeadline(d, rows), rows, footer: openFooter(d, viewer, fresh, rows.some((r) => r.id === "review-request")) };
 }
