@@ -295,3 +295,13 @@ with `via`, as the daemon does; without `up`, nothing changes for existing tests
   In a new thread" (the child not listed). "In this thread" toasted "Sent to Add retry to
   login redirect for this thread" with Open, and the note showed in the parent's
   conversation. Open selected `s-l-child`. Dark and light screenshots are in the PR.
+- Second review round, scratch daemon (`CODE_FOUNDRY_HOME=/tmp/cf-fwd3-home`, the same
+  slowed fakeclaude wrapper; no real Claude ran): no-project "Parent lead" and "Child
+  worker" (`--created-by` parent), #493 linked to the child, the child archived. `pr task
+  … conversations --thread <parent> --json` printed `{"threadId":"<child>",
+  "viaThreadId":"<parent>","sent":true,"ordinal":5}` with no "will not be woken"; the
+  child was unarchived and ran the task; the parent's note read "Sent to Child worker
+  (…): Address the unresolved conversations (#493)" and it got one wake, after the
+  child's turn end, carrying the forward's note, with no subscription left. (The child's
+  restarted fakeclaude replays turn 0's ids, so that turn's items are rewritten in place
+  rather than appended, as noted above.)
