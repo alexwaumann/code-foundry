@@ -943,7 +943,7 @@ describe("auto-merge", () => {
     fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
 
     // The copy served after a failed fetch may predate autoMergeAllowed: no note, no Auto-merge.
-    world.update(162, (d) => ({ ...d, autoMergeAllowed: false, lastError: "github graphql: 502 Bad Gateway" }));
+    world.update(162, (d) => ({ ...d, autoMergeAllowed: false, lastError: "github graphql: 502 Bad Gateway", fetchFailed: true }));
     await openPr(162);
     expect(queryTestId("pr-auto-merge-button")).toBeNull();
     press(byTestId("pr-merge-button-menu-button"));

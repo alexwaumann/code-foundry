@@ -162,7 +162,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
             void refreshPullRequest(prRef);
           }}
         >
-          <Item title="Refresh" hint={<RefreshHint fetchedAtMs={detail.fetchedAtMs} lastError={detail.lastError} busy={busy} />} />
+          <Item title="Refresh" hint={<RefreshHint fetchedAtMs={detail.fetchedAtMs} lastError={detail.fetchFailed ? detail.lastError : ""} busy={busy} />} />
         </DropdownMenuItem>
         <DropdownMenuItem
           data-testid="pr-menu-ask"

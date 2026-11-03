@@ -108,13 +108,14 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${String(n
 const baseOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
 
 /**
- * Whether the detail was fetched from GitHub on this read, not a cached copy served after a
- * failed fetch (that copy may predate fields such as autoMergeAllowed, which then read
- * false: never treat false as final for it). A failed checks page leaves lastError set on
- * a fresh fetch, with checksTruncated.
+ * Whether the detail is not the cached copy served after a failed fetch (the daemon's
+ * fetchFailed): that copy may predate fields such as autoMergeAllowed, which then read
+ * false, so never treat false as final for it. lastError alone cannot tell: a fresh fetch
+ * whose checks page failed sets it too (checksTruncated), and a stale copy may carry a
+ * stored checksTruncated.
  */
-export function detailFresh(d: Pick<PullRequestDetailView, "lastError" | "checksTruncated">): boolean {
-  return d.lastError === "" || d.checksTruncated;
+export function detailFresh(d: Pick<PullRequestDetailView, "fetchFailed">): boolean {
+  return !d.fetchFailed;
 }
 
 /**

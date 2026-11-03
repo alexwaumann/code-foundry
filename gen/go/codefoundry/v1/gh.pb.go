@@ -3365,8 +3365,8 @@ type PullRequestDetail struct {
 	ViewerCanUpdate bool `protobuf:"varint,16,opt,name=viewer_can_update,json=viewerCanUpdate,proto3" json:"viewer_can_update,omitempty"`
 	// When this detail was fetched; unset if never.
 	FetchedAt *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
-	// The last fetch's error when this is the cached copy, or why checks is incomplete
-	// (a page of checks beyond the first failed).
+	// The last fetch's error when this is the cached copy (fetch_failed), or why checks
+	// is incomplete (a page of checks beyond the first failed).
 	LastError string `protobuf:"bytes,18,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
 	// The viewer's permission on the repository, lower case ("admin", "maintain",
 	// "write", "triage", "read"); empty if unknown.
@@ -3392,8 +3392,11 @@ type PullRequestDetail struct {
 	AutoMergeAllowed bool `protobuf:"varint,26,opt,name=auto_merge_allowed,json=autoMergeAllowed,proto3" json:"auto_merge_allowed,omitempty"`
 	// The merge method of the enabled auto-merge; UNSPECIFIED while auto-merge is off.
 	AutoMergeMethod PullRequestMergeMethod `protobuf:"varint,27,opt,name=auto_merge_method,json=autoMergeMethod,proto3,enum=codefoundry.v1.PullRequestMergeMethod" json:"auto_merge_method,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// This is the cached copy, served because fetching it from GitHub failed (last_error
+	// says why). False for a fresh fetch, also when last_error explains checks_truncated.
+	FetchFailed   bool `protobuf:"varint,28,opt,name=fetch_failed,json=fetchFailed,proto3" json:"fetch_failed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PullRequestDetail) Reset() {
@@ -3613,6 +3616,13 @@ func (x *PullRequestDetail) GetAutoMergeMethod() PullRequestMergeMethod {
 		return x.AutoMergeMethod
 	}
 	return PullRequestMergeMethod_PULL_REQUEST_MERGE_METHOD_UNSPECIFIED
+}
+
+func (x *PullRequestDetail) GetFetchFailed() bool {
+	if x != nil {
+		return x.FetchFailed
+	}
+	return false
 }
 
 type PullRequestLabel struct {
@@ -6142,8 +6152,7 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x18\n" +
 	"\arefresh\x18\x03 \x01(\bR\arefresh\"Y\n" +
 	"\x1cGetPullRequestDetailResponse\x129\n" +
-	"\x06detail\x18\x01 \x01(\v2!.codefoundry.v1.PullRequestDetailR\x06detail\"\xf5\n" +
-	"\n" +
+	"\x06detail\x18\x01 \x01(\v2!.codefoundry.v1.PullRequestDetailR\x06detail\"\x98\v\n" +
 	"\x11PullRequestDetail\x12>\n" +
 	"\fpull_request\x18\x01 \x01(\v2\x1b.codefoundry.v1.PullRequestR\vpullRequest\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x128\n" +
@@ -6174,7 +6183,8 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x12auto_merge_enabled\x18\x18 \x01(\bR\x10autoMergeEnabled\x12%\n" +
 	"\x0edefault_branch\x18\x19 \x01(\tR\rdefaultBranch\x12,\n" +
 	"\x12auto_merge_allowed\x18\x1a \x01(\bR\x10autoMergeAllowed\x12R\n" +
-	"\x11auto_merge_method\x18\x1b \x01(\x0e2&.codefoundry.v1.PullRequestMergeMethodR\x0fautoMergeMethod\"<\n" +
+	"\x11auto_merge_method\x18\x1b \x01(\x0e2&.codefoundry.v1.PullRequestMergeMethodR\x0fautoMergeMethod\x12!\n" +
+	"\ffetch_failed\x18\x1c \x01(\bR\vfetchFailed\"<\n" +
 	"\x10PullRequestLabel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05color\x18\x02 \x01(\tR\x05color\"\xab\x02\n" +

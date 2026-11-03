@@ -48,7 +48,7 @@ export function CheckList({ d }: { d: PullRequestDetailView }) {
       </ul>
       {d.checksTruncated && (
         <p className="mt-1.5 text-caption" data-testid="pr-truncated">
-          Not every check could be listed{d.lastError ? `: ${d.lastError}` : "."} The rest are on GitHub.
+          Not every check could be listed{d.lastError && !d.fetchFailed ? `: ${d.lastError}` : "."} The rest are on GitHub.
         </p>
       )}
     </>

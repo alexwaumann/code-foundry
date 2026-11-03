@@ -189,7 +189,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
       />
       {/* Ask's composer under the header, where its ⋯ menu is. */}
       {composer === "ask" && <PrAskComposer key="ask" prRef={prRef} focusRequest={composerFocus} onClose={closeComposer} />}
-      {d.lastError && !d.checksTruncated && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
+      {d.fetchFailed && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
       <ReadinessBox d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} onReview={openComposer} compact={inner === "code"} />
       {/* The review composer under the box, below Review ▾: nothing above the menu's button

@@ -117,6 +117,7 @@ func fullPullRequestToProto(slug string, d *gh.FullPullRequest) *v1.PullRequestD
 		ViewerPermission:       strings.ToLower(d.ViewerPermission),
 		FetchedAt:              timestamp(d.FetchedAt),
 		LastError:              d.LastError,
+		FetchFailed:            d.FetchFailed,
 		LabelsTruncated:        d.LabelsTruncated,
 		ReviewersTruncated:     d.ReviewersTruncated,
 		ChecksTruncated:        d.ChecksTruncated,

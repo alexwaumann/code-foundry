@@ -101,6 +101,7 @@ function detail(s: Shape = {}): PullRequestDetailView {
     viewerPermission: "write",
     fetchedAtMs: NOW,
     lastError: "",
+    fetchFailed: false,
     ...s.d,
   };
 }
@@ -203,7 +204,7 @@ describe("readiness: headline, rows and footer", () => {
     },
     {
       name: "a stale copy (failed fetch) says nothing about auto-merge",
-      s: { pr: { mergeState: "blocked" }, d: { checks: [running("e2e")], autoMergeAllowed: false, lastError: "offline" } },
+      s: { pr: { mergeState: "blocked" }, d: { checks: [running("e2e")], autoMergeAllowed: false, lastError: "offline", fetchFailed: true } },
       fresh: false,
       headline: "Waiting on checks · 1 running",
       rows: ["checks pending: 1 check running", "review success: Approved", "mergeable success: No conflicts with trunk"],
@@ -211,7 +212,7 @@ describe("readiness: headline, rows and footer", () => {
     },
     {
       name: "a stale copy that allows auto-merge offers none either",
-      s: { pr: { mergeState: "blocked" }, d: { checks: [running("e2e")], lastError: "offline" } },
+      s: { pr: { mergeState: "blocked" }, d: { checks: [running("e2e")], lastError: "offline", fetchFailed: true } },
       fresh: false,
       headline: "Waiting on checks · 1 running",
       rows: ["checks pending: 1 check running", "review success: Approved", "mergeable success: No conflicts with trunk"],
@@ -426,11 +427,11 @@ describe("readiness rows in detail", () => {
 
 describe("detailFresh and awaitingApproval", () => {
   it.each([
-    { lastError: "", checksTruncated: false, want: true },
-    { lastError: "offline", checksTruncated: false, want: false },
-    { lastError: "checks after the first 100: boom", checksTruncated: true, want: true },
-  ])("fresh: $lastError / $checksTruncated", ({ lastError, checksTruncated, want }) => {
-    expect(detailFresh({ lastError, checksTruncated })).toBe(want);
+    { fetchFailed: false, want: true },
+    // A stale copy is stale whatever it carries (a stored checksTruncated included).
+    { fetchFailed: true, want: false },
+  ])("fresh: fetchFailed $fetchFailed", ({ fetchFailed, want }) => {
+    expect(detailFresh({ fetchFailed })).toBe(want);
   });
 
   it.each([

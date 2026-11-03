@@ -115,6 +115,7 @@ function detailBase(pr: PullRequestView, t0: number): PullRequestDetailView {
     viewerPermission: "admin",
     fetchedAtMs: t0 - 20_000,
     lastError: "",
+    fetchFailed: false,
   };
 }
 

@@ -289,6 +289,7 @@ func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, re
 		if ok && ctx.Err() == nil {
 			cached := e.d
 			cached.LastError = err.Error()
+			cached.FetchFailed = true
 			return cached, nil
 		}
 		return FullPullRequest{}, err
