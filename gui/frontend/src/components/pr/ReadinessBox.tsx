@@ -37,6 +37,9 @@ import { checkIcon, useChecksClock } from "./checkIcons";
 import { CheckList } from "./PrChecks";
 import { detailFresh, readiness, type ReadinessRow, type ReadyIcon, type ReadyTone, type RowAction, type SubLine } from "./readiness";
 import { ReviewButton } from "./ReviewButton";
+import { TaskButton } from "./TaskButton";
+import { taskVerb, type TaskRouting } from "./taskRouting";
+import { useTaskRouting } from "./useTaskRouting";
 import type { Verdict } from "./review";
 import { toneText } from "./tones";
 
@@ -155,11 +158,13 @@ function ActionButton({ action, prRef, panelKey }: { action: RowAction; prRef: P
 /**
  * One requirement: its icon, title (and muted counts), the lines under it, and its button
  * under the text. The checks row's title unfolds the full check list (per panel tab). An
- * issue row carries `data-task` (pr.task's kind) for the thread buttons that join it.
+ * issue row carries `data-task` (pr.task's kind) and, when the viewer may hand it to a
+ * thread (taskVerb), its TaskButton ("Fix in this thread") under the text.
  */
-function Row({ row, d, prRef, panelKey, tabKey, now }: { row: ReadinessRow; d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; now: number }) {
+function Row({ row, d, prRef, panelKey, tabKey, now, viewer, routing }: { row: ReadinessRow; d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; now: number; viewer: string; routing: TaskRouting }) {
   const open = usePrPanelStore((s) => s.byTab[tabKey]?.open.checks ?? false) && row.expandable;
   const Icon = icons[row.icon];
+  const verb = taskVerb(row.task, d, viewer);
   const Chevron = open ? ChevronDown : ChevronRight;
   const title = (
     <>
@@ -204,9 +209,10 @@ function Row({ row, d, prRef, panelKey, tabKey, now }: { row: ReadinessRow; d: P
             </div>
           )
         )}
-        {row.action && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-2">
-            <ActionButton action={row.action} prRef={prRef} panelKey={panelKey} />
+        {(row.action || (row.task && verb)) && (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 pt-2">
+            {row.action && <ActionButton action={row.action} prRef={prRef} panelKey={panelKey} />}
+            {row.task && verb && <TaskButton kind={row.task} verb={verb} prRef={prRef} routing={routing} />}
           </div>
         )}
       </div>
@@ -221,6 +227,12 @@ function CancelAutoMerge({ prRef }: { prRef: PrRef }) {
       Cancel auto-merge
     </Button>
   );
+}
+
+/** The rows, with the task buttons' routing read once for all of them (useTaskRouting). */
+function Rows({ rows, d, prRef, panelKey, tabKey, clock, checksNow, viewer }: { rows: readonly ReadinessRow[]; d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; clock: number; checksNow: number; viewer: string }) {
+  const routing = useTaskRouting(prRef, d.pullRequest);
+  return rows.map((row) => <Row key={row.id} row={row} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} now={row.id === "checks" ? checksNow : clock} viewer={viewer} routing={routing} />);
 }
 
 /**
@@ -279,9 +291,7 @@ export function ReadinessBox({ d, prRef, panelKey, tabKey, onReview, compact = f
       ) : (
         <>
           {headline}
-          {r.rows.map((row) => (
-            <Row key={row.id} row={row} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} now={row.id === "checks" ? checksNow : clock} />
-          ))}
+          <Rows rows={r.rows} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} clock={clock} checksNow={checksNow} viewer={viewer} />
           {controls && (
             <div className="flex min-w-0 flex-wrap items-center gap-2 bg-cf-surface-sunken/60 px-3 py-2" data-testid="pr-ready-footer">
               {controls}

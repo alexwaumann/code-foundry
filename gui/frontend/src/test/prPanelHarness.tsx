@@ -15,6 +15,7 @@ import { dashboardResource, pullRequestDetailResource, viewerResource } from "@/
 import { usePanelStore } from "@/stores/panel";
 import { openPullRequestInPanel, reviewerCandidatesResource, usePrPanelStore } from "@/stores/prPanel";
 import { usePrThreadsStore } from "@/stores/prThreads";
+import { usePrTasksStore } from "@/stores/prTasks";
 import { useReviewerRecentsStore } from "@/stores/reviewerRecents";
 import { useUiStore, type Selection } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
@@ -32,6 +33,7 @@ export function resetPrStores(selection: Selection = PR_PAGE): void {
   viewerResource.store.setState({ entries: {} });
   usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, mergeMethods: {} });
   usePrThreadsStore.setState({ starting: {} });
+  usePrTasksStore.setState({ running: {} });
   useReviewerRecentsStore.setState({ bySlug: {} });
   usePanelStore.setState({ byKey: {} });
   useConfirmStore.setState({ pending: null });
