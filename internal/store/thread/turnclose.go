@@ -1,6 +1,9 @@
 package thread
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Closing a turn whose process ended without a result (docs/notes/thread-fold-1-daemon.md).
 //
@@ -32,18 +35,20 @@ func (t *threadLog) openTurn() (start Item, last time.Time, ok bool) {
 }
 
 // openTurn finds the turn items end in while it has no turn end. The turn is the
-// top-level items after the last turn end or note (the GUI's turn grouping, where a
-// note stands alone and closes what came before it; a fork's copied history ends with
-// one). It starts at the first of them that starts a turn (startsTurn): errors alone (a
-// failed start) are not a turn, nor are the daemon's own lines appended between turns
-// (a page view.inline showed, "Set effort to high"), and a message sent while Claude
-// works is part of the running turn. ok is false when there is no such turn. last is the latest time any item after
-// the boundary was created or changed.
+// top-level items after the last turn end or fork note (the GUI's turn grouping,
+// buildTurns: a fork's copied history ends with its note, which closes what came
+// before it). It starts at the first of them that starts a turn (startsTurn): errors
+// alone (a failed start) are not a turn, nor are the daemon's own lines appended between
+// turns (a note, a page view.inline showed, "Set effort to high"), and a message sent
+// while Claude works is part of the running turn. A note that arrives while a turn is
+// open (a background shell stopped, an agent's note, pr.task's forward) stays inside
+// it: it ends nothing. ok is false when there is no such turn. last is the latest time
+// any item after the boundary was created or changed.
 func openTurn(items []Item) (start Item, last time.Time, ok bool) {
 	from := len(items)
 	for i := len(items) - 1; i >= 0; i-- {
 		it := items[i]
-		if it.ParentToolUseID == "" && (it.Kind == KindTurnEnd || it.Kind == KindNote) {
+		if it.ParentToolUseID == "" && (it.Kind == KindTurnEnd || isForkNote(it)) {
 			break
 		}
 		from = i
@@ -57,14 +62,21 @@ func openTurn(items []Item) (start Item, last time.Time, ok bool) {
 	return Item{}, time.Time{}, false
 }
 
-// startsTurn reports whether an item of kind k can be a turn's first: not an error, an
-// html or theme item or a command output. Those are what the daemon appends on its own,
-// outside a turn too: an html or theme item a verb put in an idle thread (inline-html-2-fixes.md),
-// an effort restart's "Set effort to …" and "Restarted Claude". Alone they are no turn,
-// so a process ending after them writes no "Interrupted" turn end; inside a turn they
-// follow its first message. A local command's output comes after the message that ran it.
+// isForkNote reports whether it is the note a fork's copied history ends with
+// (forkItems): a turn boundary, as a turn end is (the GUI's isForkNote).
+func isForkNote(it Item) bool {
+	return it.Kind == KindNote && strings.HasPrefix(it.ID, forkNotePrefix)
+}
+
+// startsTurn reports whether an item of kind k can be a turn's first: not an error, a
+// note, an html or theme item or a command output. Those are what the daemon appends on
+// its own, outside a turn too: a note, an html or theme item a verb put in an idle thread
+// (inline-html-2-fixes.md), an effort restart's "Set effort to …" and "Restarted
+// Claude". Alone they are no turn, so a process ending after them writes no
+// "Interrupted" turn end; inside a turn they follow its first message. A local command's
+// output comes after the message that ran it.
 func startsTurn(k ItemKind) bool {
-	return k != KindError && k != KindHTML && k != KindTheme && k != KindCommandOutput
+	return k != KindError && k != KindNote && k != KindHTML && k != KindTheme && k != KindCommandOutput
 }
 
 func latest(ts ...time.Time) time.Time {

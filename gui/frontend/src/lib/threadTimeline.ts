@@ -68,7 +68,7 @@ export type WorkNode =
   | { type: "note"; key: string; id: string; kind: "error" | "compaction" | "commandOutput" }
   /** A user message sent while the turn ran (a steer); it stays visible when the turn folds. */
   | { type: "steer"; key: string; id: string }
-  /** A system note on its own line between turns (an item of kind "note"). */
+  /** A system note (an item of kind "note"): on its own line between turns, or in the open turn it arrived in. */
   | { type: "system"; key: string; id: string }
   /**
    * An HTML page the model showed inline (code-foundry view.inline): its "Showed <file>" row
@@ -231,7 +231,7 @@ function markFinal(body: WorkNode[], ended: boolean): void {
   for (let i = body.length - 1; i >= 0; i--) {
     const n = body[i];
     if (n?.type === "text") from = i;
-    else if (n?.type !== "thinking") break;
+    else if (n?.type !== "thinking" && n?.type !== "system") break; // a note after the answer, mid-turn
   }
   const ids = body.slice(from).flatMap((n) => (n.type === "text" ? [n.id] : []));
   const answer = ended ? ids.join("\n") : "";
@@ -261,6 +261,17 @@ function foldsAway(n: WorkNode): boolean {
  */
 function isAside(t: { user: readonly string[]; items: readonly TimelineItem[] }): boolean {
   return t.user.length === 0 && t.items.every((x) => x.kind === "commandOutput" || x.kind === "html" || x.kind === "theme");
+}
+
+/** The note a fork's copied history ends with (fork.go forkNotePrefix): a turn boundary. */
+function isForkNote(it: TimelineItem): boolean {
+  return it.id.startsWith("note-fork-");
+}
+
+/** The last item that is not a system note, if any. */
+function lastWork(items: readonly TimelineItem[]): TimelineItem | undefined {
+  for (let i = items.length - 1; i >= 0; i--) if (items[i]?.kind !== "note") return items[i];
+  return undefined;
 }
 
 /** The thread's items (top level, in order) as turns. */
@@ -298,9 +309,10 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
       // after the daemon's own notes with no user message before them ("Restarted
       // Claude", "Set effort to high": a restart between turns) or a page a verb showed
       // between turns (view.inline from a terminal or a child): no turn runs there.
-      const last = cur?.items[cur.items.length - 1];
+      // A system note inside the turn (it ended nothing) does not count as its last item.
+      const last = cur ? lastWork(cur.items) : undefined;
       const notesOnly = cur !== null && isAside(cur);
-      if (cur && last && last.kind !== "error" && !notesOnly) {
+      if (cur && cur.items.length > 0 && last?.kind !== "error" && !notesOnly) {
         cur.items.push(it);
         continue;
       }
@@ -313,7 +325,14 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
       continue;
     }
     if (it.kind === "note") {
-      // A system note is a turn of its own: what came before it is done with.
+      // A system note that arrives while a turn is open (a background shell stopped, an
+      // agent's note, pr.task's forward) stays in that turn's body: it ends nothing, and
+      // system rows never fold away. The daemon's openTurn (turnclose.go) agrees. Between
+      // turns, and a fork's note (which ends the copied history), it is a turn of its own.
+      if (cur && !isForkNote(it) && !isAside(cur)) {
+        cur.items.push(it);
+        continue;
+      }
       close();
       turns.push({ key: it.id, user: [], body: workNodes([it], children, permissions), end: "" });
       continue;

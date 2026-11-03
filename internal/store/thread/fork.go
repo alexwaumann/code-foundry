@@ -14,6 +14,10 @@ import (
 // forkWhy is why a copied tool call or request stopped: the fork's Claude never runs it.
 const forkWhy = "the thread was forked before it finished"
 
+// forkNotePrefix starts the id of the note that ends a fork's copied history (then the
+// parent's id): a turn boundary in the daemon (isForkNote) and the GUI.
+const forkNotePrefix = "note-fork-"
+
 // forkNoteText is the note that ends a fork's copied history, naming the parent as it
 // was called at fork time (the row outlives a rename or removal of the parent).
 func forkNoteText(parent Thread) string {
@@ -64,7 +68,7 @@ func (m *Manager) forkLog(ctx context.Context, parent Thread, newID string) ([]I
 	if err != nil {
 		return nil, fmt.Errorf("thread: fork %s: %w", parent.ID, err)
 	}
-	items := forkItems(plog.snapshot().Items, "note-fork-"+parent.ID, forkNoteText(parent), m.opts.Now())
+	items := forkItems(plog.snapshot().Items, forkNotePrefix+parent.ID, forkNoteText(parent), m.opts.Now())
 	m.tmu.Lock()
 	m.threads[newID] = newThreadLog(newID, m.opts.Bus, m.opts.Now, items)
 	m.tmu.Unlock()
