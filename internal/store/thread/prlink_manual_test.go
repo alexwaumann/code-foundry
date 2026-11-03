@@ -1,9 +1,11 @@
 package thread
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -95,6 +97,106 @@ func TestLinkPullRequestByHand(t *testing.T) {
 	}
 	if _, _, _, err := e.m.LinkPullRequest(e.ctx(), "s-nope", "o/r#1"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown thread: %v; want ErrNotFound", err)
+	}
+}
+
+// TestLinksIgnoreURLCase: a pull request is one link whatever case its URL is in and
+// whichever source comes first (a manual link typed in another case, Claude's record,
+// the daemon's branch match), on the thread and on its creator, live and after a
+// restart. The first source wins.
+func TestLinksIgnoreURLCase(t *testing.T) {
+	type step string // "manual", "claude", "branch"
+	tests := []struct {
+		order []step
+		c, p  string // the one link's facts on the thread (c) and its creator (p)
+	}{
+		{[]step{"manual", "claude", "branch"}, "#5 manual", "#5 child c"},
+		{[]step{"manual", "branch", "claude"}, "#5 manual", "#5 child c"},
+		{[]step{"claude", "manual", "branch"}, "#5 claude", "#5 child c"},
+		{[]step{"claude", "branch", "manual"}, "#5 claude", "#5 child c"},
+		{[]step{"branch", "manual", "claude"}, "#5 branch", "#5 child c"},
+		{[]step{"branch", "claude", "manual"}, "#5 branch", "#5 child c"},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprint(tt.order), func(t *testing.T) {
+			e := newEnv(t)
+			ids, names := lineage(e, [][2]string{{"p", ""}, {"c", "p"}})
+			c := ids["c"]
+			for _, st := range tt.order {
+				switch st {
+				case "manual":
+					if _, _, _, err := e.m.LinkPullRequest(e.ctx(), c, "AlexWaumann/Code-Foundry#5"); err != nil {
+						t.Fatal(err)
+					}
+				case "claude":
+					l := childLink(5)
+					l.Slug, l.URL = "alexwaumann/code-foundry", "https://github.com/alexwaumann/code-foundry/pull/5"
+					e.m.linkPullRequests(c, []LinkedPullRequest{l})
+				case "branch":
+					l := childLink(5)
+					l.Slug, l.URL, l.Head = "alexwaumann/code-foundry", "https://github.com/alexwaumann/code-foundry/pull/5", "cf/x"
+					e.m.LinkBranchPullRequests(c, []LinkedPullRequest{l})
+				}
+			}
+			check := func(when string) {
+				t.Helper()
+				for n, w := range map[string]string{"c": tt.c, "p": tt.p} {
+					got, err := e.m.Get(e.ctx(), ids[n])
+					if err != nil {
+						t.Fatal(err)
+					}
+					if facts := linkSources(got.LinkedPullRequests, names); !slices.Equal(facts, []string{w}) {
+						t.Errorf("%s: %s links = %q; want [%q]", when, n, facts, w)
+					}
+				}
+			}
+			check("live")
+			e.restart()
+			check("after restart")
+		})
+	}
+}
+
+// TestManualLinkKeepsGitHubsSlug: with the GitHub store's cache holding the pull
+// request, a manual link has GitHub's URL and slug, whatever case it was typed in; a
+// pull request the cache does not hold keeps the slug as written.
+func TestManualLinkKeepsGitHubsSlug(t *testing.T) {
+	e := newEnv(t, func(o *Options) {
+		o.PullRequest = func(_ context.Context, target string) (PullRequestInfo, bool) {
+			if strings.EqualFold(target, "o/r#1") {
+				return PullRequestInfo{Slug: "o/r", Number: 1, URL: "https://github.com/Own/Repo/pull/1"}, true
+			}
+			return PullRequestInfo{}, false
+		}
+	})
+	s := e.connected(CreateOptions{Name: "t"})
+	_, l, _, err := e.m.LinkPullRequest(e.ctx(), s.ID, "O/R#1")
+	if err != nil || l.Slug != "Own/Repo" || l.URL != "https://github.com/Own/Repo/pull/1" {
+		t.Errorf("cached: %+v %v; want GitHub's slug and URL", l, err)
+	}
+	_, l, _, err = e.m.LinkPullRequest(e.ctx(), s.ID, "https://github.com/X/Y/pull/2")
+	if err != nil || l.Slug != "X/Y" || l.URL != "https://github.com/X/Y/pull/2" {
+		t.Errorf("not cached: %+v %v; want the slug as written", l, err)
+	}
+}
+
+// TestLoadLinksIgnoresCaseDuplicates: rows saved before links were compared ignoring
+// case may hold one pull request twice; the first row is the link.
+func TestLoadLinksIgnoresCaseDuplicates(t *testing.T) {
+	e := newEnv(t)
+	s := e.connected(CreateOptions{Name: "t"})
+	a, b := childLink(1), childLink(1)
+	b.URL, b.Source = "https://github.com/O/R/pull/1", LinkBranch
+	if err := saveLinks(e.ctx(), e.m.opts.DB, s.ID, []LinkedPullRequest{a, b, childLink(2)}); err != nil {
+		t.Fatal(err)
+	}
+	e.restart()
+	got, err := e.m.Get(e.ctx(), s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts := linkSources(got.LinkedPullRequests, nil); !slices.Equal(facts, []string{"#1 claude", "#2 claude"}) {
+		t.Errorf("links = %q; want one #1 (the first row)", facts)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -18,8 +19,8 @@ import (
 //
 // The record is re-emitted at nearly every turn boundary for the rest of the session
 // and tracks the latest pull request seen, so it can flip back to an earlier one. A
-// thread's links are therefore every distinct URL, deduplicated by URL, in first-seen
-// order, and never removed.
+// thread's links are therefore every distinct URL, deduplicated by URL ignoring case
+// (SamePullRequestURL), in first-seen order, and never removed.
 //
 // A thread also has every link of the threads it created, transitively
 // (prlink_children.go): a link is copied up the CreatedBy chain as it arrives. And the
@@ -82,11 +83,18 @@ func parsePRLink(line []byte) (LinkedPullRequest, bool) {
 	return l, true
 }
 
-// mergeLinks appends the links in add whose URL is not in cur (nor earlier in add).
-// It never writes into cur's backing array: snapshots share it. added is what was new.
+// SamePullRequestURL reports whether two links' URLs are the same pull request. GitHub
+// owner and repository names are case-insensitive, and the sources do not agree on
+// case (a link typed by hand, Claude's record, the GitHub store's URL), so every place
+// that deduplicates links compares with it, never with ==.
+func SamePullRequestURL(a, b string) bool { return strings.EqualFold(a, b) }
+
+// mergeLinks appends the links in add whose URL is not in cur (nor earlier in add),
+// URLs compared by SamePullRequestURL. It never writes into cur's backing array:
+// snapshots share it. added is what was new.
 func mergeLinks(cur, add []LinkedPullRequest) (merged, added []LinkedPullRequest) {
 	for _, l := range add {
-		dup := func(x LinkedPullRequest) bool { return x.URL == l.URL }
+		dup := func(x LinkedPullRequest) bool { return SamePullRequestURL(x.URL, l.URL) }
 		if slices.ContainsFunc(cur, dup) || slices.ContainsFunc(added, dup) {
 			continue
 		}

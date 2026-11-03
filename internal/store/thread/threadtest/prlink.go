@@ -31,7 +31,7 @@ func (f *Fake) LinkPullRequest(_ context.Context, id, ref string) (thread.Thread
 		return thread.Thread{}, thread.LinkedPullRequest{}, false, err
 	}
 	l := thread.LinkedPullRequest{Slug: slug, Number: n, URL: "https://github.com/" + slug + "/pull/" + strconv.Itoa(n), Source: thread.LinkManual}
-	if i := slices.IndexFunc(s.LinkedPullRequests, func(x thread.LinkedPullRequest) bool { return strings.EqualFold(x.URL, l.URL) }); i >= 0 {
+	if i := slices.IndexFunc(s.LinkedPullRequests, func(x thread.LinkedPullRequest) bool { return thread.SamePullRequestURL(x.URL, l.URL) }); i >= 0 {
 		f.mu.Unlock()
 		return s, s.LinkedPullRequests[i], false, nil
 	}

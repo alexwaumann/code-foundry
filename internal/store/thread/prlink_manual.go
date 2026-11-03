@@ -10,20 +10,23 @@ import (
 
 // Manual links (docs/notes/pr-daemon-actions.md): a pull request the user (or an agent)
 // links to a thread by hand, from the pull request panel or `thread pr link`. Stored and
-// merged like every other link (LinkManual): deduplicated by URL, first source wins (a
-// pull request the thread already has keeps its row and source), copied up the
-// CreatedBy chain, and never removed (there is no unlink).
+// merged like every other link (LinkManual): deduplicated by URL ignoring case
+// (SamePullRequestURL), first source wins, copied up the CreatedBy chain, and never
+// removed (there is no unlink).
 
 // LinkPullRequest links the pull request ref names (a GitHub pull request URL or
-// "owner/name#123") to thread id by hand. It returns the thread, the link as the thread
-// has it, and whether it was new: a pull request the thread already has (its URL
-// compared case-insensitively) is a quiet success that changes nothing. Any state.
-// ErrInvalidArgument for anything that is not a GitHub pull request.
-func (m *Manager) LinkPullRequest(_ context.Context, id, ref string) (Thread, LinkedPullRequest, bool, error) {
+// "owner/name#123") to thread id by hand. The link has GitHub's URL (and the slug in
+// it) when the GitHub store's cache holds the pull request (Options.PullRequest), else
+// the slug as written. It returns the thread, the link as the thread has it, and
+// whether it was new: a pull request the thread already has is a quiet success that
+// changes nothing. Any state. ErrInvalidArgument for anything that is not a GitHub pull
+// request.
+func (m *Manager) LinkPullRequest(ctx context.Context, id, ref string) (Thread, LinkedPullRequest, bool, error) {
 	slug, number, err := ParsePullRequestLink(ref)
 	if err != nil {
 		return Thread{}, LinkedPullRequest{}, false, err
 	}
+	slug = m.canonicalPullRequestSlug(ctx, slug, number)
 	l := LinkedPullRequest{Slug: slug, Number: number, URL: pullRequestURL(slug, number), Source: LinkManual}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -31,7 +34,7 @@ func (m *Manager) LinkPullRequest(_ context.Context, id, ref string) (Thread, Li
 	if err != nil {
 		return Thread{}, LinkedPullRequest{}, false, err
 	}
-	if i := slices.IndexFunc(rec.s.LinkedPullRequests, func(x LinkedPullRequest) bool { return strings.EqualFold(x.URL, l.URL) }); i >= 0 {
+	if i := slices.IndexFunc(rec.s.LinkedPullRequests, func(x LinkedPullRequest) bool { return SamePullRequestURL(x.URL, l.URL) }); i >= 0 {
 		return rec.s, rec.s.LinkedPullRequests[i], false, nil
 	}
 	l.LinkedAt = m.opts.Now()
@@ -39,6 +42,23 @@ func (m *Manager) LinkPullRequest(_ context.Context, id, ref string) (Thread, Li
 	m.propagateLinksLocked(id, added)
 	m.log.Info("pull request linked by hand", "thread", id, "pr", l.URL)
 	return rec.s, l, true, nil
+}
+
+// canonicalPullRequestSlug is the slug in GitHub's URL for the pull request when the
+// GitHub store's cache holds it (GitHub's case, and its current name after a rename),
+// else slug. Never asks GitHub.
+func (m *Manager) canonicalPullRequestSlug(ctx context.Context, slug string, number int) string {
+	if m.opts.PullRequest == nil {
+		return slug
+	}
+	p, ok := m.opts.PullRequest(ctx, slug+"#"+strconv.Itoa(number))
+	if !ok || p.URL == "" {
+		return slug
+	}
+	if s, n, err := ParsePullRequestLink(p.URL); err == nil && n == number {
+		return s
+	}
+	return slug
 }
 
 // ParsePullRequestLink reads "owner/name#123" or a GitHub pull request URL (with or
