@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -49,7 +51,7 @@ func (d PullRequestThreadDeps) prTaskOwner(ctx context.Context, th *v1.Thread, s
 }
 
 // forwardPRTask sends the task into owner for th, then notes it in th and subscribes
-// th to owner's next settle. sent is false (and nothing happened) when owner was removed
+// th, one-shot, to owner settling after the send. sent is false (and nothing happened) when owner was removed
 // since it was read: the caller sends to th instead. The note and the wake are best
 // effort: the task went out, so their failure is logged, not returned.
 func (d PullRequestThreadDeps) forwardPRTask(ctx context.Context, uctx Context, th, owner *v1.Thread, n int, task prTask, detail *v1.PullRequestDetail) (Result, bool, error) {
@@ -57,6 +59,9 @@ func (d PullRequestThreadDeps) forwardPRTask(ctx context.Context, uctx Context, 
 	if err := checkPRPromptSize(n, prompt); err != nil {
 		return Result{}, false, err
 	}
+	// The owner counts as settled from the task once its status changed since now: a
+	// status from before the send never wakes th (SubscribeThreadRequest.after).
+	sentAt := time.Now()
 	ordinal, removed, err := d.sendPRTaskTo(ctx, uctx, owner, prompt)
 	switch {
 	case removed != nil:
@@ -68,7 +73,7 @@ func (d PullRequestThreadDeps) forwardPRTask(ctx context.Context, uctx Context, 
 		slog.Warn("pr.task: note the forward in the sending thread", "thread", th.GetId(), "owner", owner.GetId(), "err", err)
 	}
 	if _, err := d.Thread.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{
-		SubscriberThreadId: th.GetId(), TargetThreadId: owner.GetId(), Next: true,
+		SubscriberThreadId: th.GetId(), TargetThreadId: owner.GetId(), After: timestamppb.New(sentAt),
 		Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
 		Note:      forwardWakeNote(task, detail, n),
 	})); err != nil {

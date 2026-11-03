@@ -209,12 +209,15 @@ type SubscribeOptions struct {
 	// Note says why (at most MaxNote characters, kept on one line): the wake carries
 	// it, the listings show it. Subscribing again with a note replaces the note.
 	Note string
-	// Next (thread targets only): fire on the target's next transition into the
-	// condition, never at once, even when it meets it now (pr.task's forward wakes its
-	// sender when the thread it sent to settles from the task, whose busy status may not
-	// be published yet). An existing subscription to the same target and condition is
-	// returned unchanged (Existed): its repeat flag and note stay.
-	Next bool
+	// After (thread targets only): the target counts as meeting the condition only once
+	// its status changed at or after this time (StatusChangedAt), so a status from before
+	// it, still published while a message just sent waits for the status debounce, never
+	// fires; one that changed since fires, at once when it already did (a turn that ended
+	// before the subscription). pr.task's forward wakes its sender with it when the thread
+	// it sent the task to settles from the task. An existing subscription to the same
+	// target and condition is returned unchanged (Existed): its repeat flag and note stay.
+	// Not persisted: after a daemon restart it is an ordinary edge-triggered one.
+	After time.Time
 }
 
 // SubscribeResult is Store.Subscribe's answer.
@@ -292,6 +295,14 @@ type subRec struct {
 	sat     bool
 	req     string
 	retryAt time.Time
+	// after is SubscribeOptions.After (zero for none), to the millisecond.
+	after time.Time
+}
+
+// meets is Meets for r's condition, gated by r.after: a status that last changed before
+// it does not count.
+func (r *subRec) meets(t Thread) bool {
+	return Meets(r.s.Condition, t) && (r.after.IsZero() || !t.StatusChangedAt.Before(r.after))
 }
 
 // requestKey names the pending request (permission prompt or question) a running
@@ -392,8 +403,8 @@ func subscribeTarget(o SubscribeOptions) (TargetKind, string, Condition, error) 
 	switch {
 	case n != 1:
 		return "", "", "", fmt.Errorf("%w: give exactly one target: a thread, an action run, a pull request, a plugin's wake source or a timer", ErrInvalidArgument)
-	case o.Next && thread == "":
-		return "", "", "", fmt.Errorf("%w: next is for a thread target", ErrInvalidArgument)
+	case !o.After.IsZero() && thread == "":
+		return "", "", "", fmt.Errorf("%w: after is for a thread target", ErrInvalidArgument)
 	case plugin == "" && len(o.Args) > 0:
 		return "", "", "", fmt.Errorf("%w: args are for a plugin's wake source", ErrInvalidArgument)
 	case timer:
@@ -485,7 +496,7 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 	res, err := m.subscribe(Subscription{
 		ID: id, SubscriberID: subscriber, TargetKind: kind, TargetID: target, Condition: cond, Args: args,
 		Repeat: repeat, Note: note, CreatedAt: now,
-	}, run, pr, o.Next)
+	}, run, pr, o.After.Truncate(time.Millisecond))
 	if err == nil {
 		m.rewait(subscriber) // it may wait on the target now (waiting.go)
 	}
@@ -515,9 +526,10 @@ func (m *Manager) actionRun(ctx context.Context, id string) (ActionRun, error) {
 // subscribe validates sub against the threads and the other subscriptions and keeps
 // it, under m.mu and the subscriptions' lock: it fires at once when its target already
 // meets the condition (a run: already finished, given as run; a pull request: as the
-// GitHub store's cache has it, pr, nil when unknown there). With next a thread target
-// never fires at once and an existing same subscription is returned unchanged.
-func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo, next bool) (SubscribeResult, error) {
+// GitHub store's cache has it, pr, nil when unknown there). With after (non-zero) a
+// thread target meets the condition only with a status changed since (subRec.meets) and
+// an existing same subscription is returned unchanged.
+func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo, after time.Time) (SubscribeResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -555,7 +567,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	for _, r := range s.byID {
 		if r.s.SubscriberID == sub.SubscriberID && r.s.TargetKind == sub.TargetKind && r.s.TargetID == sub.TargetID && r.s.Condition == sub.Condition &&
 			maps.Equal(r.s.Args, sub.Args) {
-			if !next && (r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note)) {
+			if after.IsZero() && (r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note)) {
 				r.s.Repeat = sub.Repeat
 				r.s.Note = cmp.Or(sub.Note, r.s.Note)
 				if err := saveSubscription(context.Background(), s.db, r.s); err != nil {
@@ -566,12 +578,12 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 			return SubscribeResult{Subscription: r.s, Existed: true}, nil
 		}
 	}
-	r := &subRec{s: sub}
+	r := &subRec{s: sub, after: after}
 	fired := false
 	switch sub.TargetKind {
 	case TargetThread:
-		r.sat, r.req = Meets(sub.Condition, target), requestKey(target)
-		if r.sat && !next {
+		r.sat, r.req = r.meets(target), requestKey(target)
+		if r.sat {
 			fired = m.fireThreadLocked(r, target)
 		}
 	case TargetActionRun:
@@ -637,7 +649,7 @@ func (m *Manager) observeLocked(t Thread) {
 	})
 	req := requestKey(t)
 	for _, r := range hit {
-		now := Meets(r.s.Condition, t)
+		now := r.meets(t)
 		was, wasReq := r.sat, r.req
 		r.sat, r.req = now, req
 		newRequest := was && firesOnRequest(r.s.Condition) && req != "" && req != wasReq

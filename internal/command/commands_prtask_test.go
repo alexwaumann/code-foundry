@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -279,7 +280,7 @@ func TestPullRequestTask(t *testing.T) {
 				&v1.GetThreadRequest{Id: "s-kid00000001"},
 				&v1.SendThreadMessageRequest{ThreadId: "s-kid00000001"},
 				&v1.AddThreadNoteRequest{ThreadId: "s-lead0000001", Text: "Sent to Kid (s-kid00000001): Fix the failing checks (#7)"},
-				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001", Next: true,
+				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001",
 					Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
 					Note:      "pr.task forwarded from you: Fix the failing checks on o/r#7"},
 				&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: "s-lead0000001"},
@@ -301,7 +302,7 @@ func TestPullRequestTask(t *testing.T) {
 				&v1.GetThreadRequest{Id: "s-kid00000001"},
 				&v1.SendThreadMessageRequest{ThreadId: "s-kid00000001", ByThreadId: "s-ember000001"},
 				&v1.AddThreadNoteRequest{ThreadId: "s-lead0000001", Text: "Sent to s-kid00000001: Review it (read-only) (#7)"},
-				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001", Next: true,
+				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001",
 					Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
 					Note:      "pr.task forwarded from you: Review it (read-only) on o/r#7"},
 			},
@@ -463,6 +464,12 @@ func TestPullRequestTask(t *testing.T) {
 					prompt, m.InitialPrompt = m.GetInitialPrompt(), ""
 				case *v1.SendThreadMessageRequest:
 					prompt, m.Text = m.GetText(), ""
+				case *v1.SubscribeThreadRequest:
+					// after is the time just before the send.
+					if at := m.GetAfter().AsTime(); m.GetAfter() == nil || time.Since(at) < 0 || time.Since(at) > time.Minute {
+						t.Errorf("subscribe after = %v, want the send's time", m.GetAfter())
+					}
+					m.After, hasPrompt = nil, false
 				default:
 					hasPrompt = false
 				}

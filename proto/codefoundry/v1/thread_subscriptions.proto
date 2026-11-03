@@ -148,12 +148,14 @@ message SubscribeThreadRequest {
   // INVALID_ARGUMENT), carried by its wake (a timer's header and JSON, the others'
   // JSON) and listed. Subscribing again with a note replaces the note.
   string note = 14;
-  // A thread target only (INVALID_ARGUMENT otherwise): fire on the target's next
-  // transition into the condition, never at once even when it meets it now (a send's
-  // busy status follows a debounce). The same subscription (subscriber, target,
-  // condition) existing is returned unchanged (existed): its repeat and note stay.
-  // pr.task's forward uses it (docs/notes/pr-task-forward.md).
-  bool next = 15;
+  // A thread target only (INVALID_ARGUMENT otherwise): the target meets the condition
+  // only once its status changed at or after this time, so a status from before it (a
+  // send's busy status follows a debounce) never fires, and one changed since fires, at
+  // once when it already did. The same subscription (subscriber, target, condition)
+  // existing is returned unchanged (existed): its repeat and note stay. Not kept across a
+  // daemon restart (the subscription then fires on the next transition). pr.task's
+  // forward uses it (docs/notes/pr-task-forward.md).
+  google.protobuf.Timestamp after = 15;
 }
 
 message SubscribeThreadResponse {

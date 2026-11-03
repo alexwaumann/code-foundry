@@ -82,10 +82,13 @@ func (h *Thread) Subscribe(ctx context.Context, req *connect.Request[v1.Subscrib
 	o := thread.SubscribeOptions{
 		SubscriberID: m.GetSubscriberThreadId(), TargetThreadID: m.GetTargetThreadId(), TargetRunID: m.GetTargetRunId(),
 		TargetPullRequest: m.GetTargetPullRequest(), TargetPlugin: m.GetTargetPlugin(), Args: m.GetArgs(),
-		Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(), Note: m.GetNote(), Next: m.GetNext(),
+		Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(), Note: m.GetNote(),
 	}
 	if m.GetTargetAt() != nil {
 		o.TargetAt = m.GetTargetAt().AsTime()
+	}
+	if m.GetAfter() != nil {
+		o.After = m.GetAfter().AsTime()
 	}
 	if m.GetTargetEvery() != nil {
 		o.TargetEvery = m.GetTargetEvery().AsDuration()
