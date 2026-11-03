@@ -32,10 +32,12 @@ BEGIN
 END;
 
 -- The threads whose items are not indexed yet: every thread that exists now. The thread
--- store indexes them at startup in the background, one thread per transaction, and
--- deletes each row once done, so an interrupted backfill resumes. New items are indexed
--- as they are written.
+-- store indexes them at startup in the background, a few hundred items per transaction,
+-- keeping in next_ordinal the first item it has not done yet, and deletes each row once
+-- done, so an interrupted backfill resumes where it was. New items are indexed as they
+-- are written.
 CREATE TABLE search_backfill (
-    thread_id TEXT PRIMARY KEY REFERENCES threads (id) ON DELETE CASCADE
+    thread_id    TEXT PRIMARY KEY REFERENCES threads (id) ON DELETE CASCADE,
+    next_ordinal INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 INSERT INTO search_backfill (thread_id) SELECT id FROM threads;

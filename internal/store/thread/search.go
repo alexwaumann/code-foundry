@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -21,9 +22,10 @@ import (
 // SearchQuery widens it. A thread Options.Unindexed keeps out is never in it.
 //
 // Forks: a fork's copies of its parent's items keep their ids, and the index has one
-// document per id. A hit is attributed to the oldest thread in scope holding the item
-// (by CreatedAt), so a forked conversation is found once, under the original while it
-// exists (archived counts) and under the fork once it is gone, with nothing re-indexed.
+// document per id. A hit is attributed to the oldest thread in scope whose copy of the
+// item matches (by CreatedAt), so a forked conversation is found once, under the original
+// while it exists (archived counts) and under the fork once it is gone, with nothing
+// re-indexed.
 
 // Search sizes.
 const (
@@ -75,8 +77,9 @@ type SearchResult struct {
 	// Limit and PerThread.
 	TotalHits    int
 	TotalThreads int
-	// Truncated: more than maxSearchCandidates items matched in the index; the hits and
-	// totals are those among the newest that many (a common word: refine the query).
+	// Truncated: more than maxSearchCandidates documents in scope matched in the index;
+	// the hits and totals are those among the newest that many (a common word: refine the
+	// query).
 	Truncated bool
 }
 
@@ -145,11 +148,7 @@ func (m *Manager) Search(ctx context.Context, q SearchQuery) (SearchResult, erro
 	if res.NamesOnly || len(scope) == 0 {
 		return res, nil
 	}
-	name := func(id string) (string, bool) {
-		t, ok := snap.Thread(id)
-		return t.Name, ok
-	}
-	hits, truncated, err := searchHits(ctx, m.opts.DB, sq, scope, q.Subagents, name)
+	hits, truncated, err := searchHits(ctx, m.opts.DB, sq, scope, q.Subagents)
 	if err != nil {
 		return SearchResult{}, err
 	}
@@ -209,53 +208,73 @@ func nameMatches(scope map[string]Thread, sq searchQuery, limit int) []ThreadNam
 }
 
 // searchHits returns the items the index matches among the newest maxSearchCandidates
-// matching documents (a document's rowid grows with its first save; truncated says
-// more matched), one per item id, each attributed to the oldest thread of scope that
-// holds it, its own text matching sq (smart case, short terms; a holder whose text no
-// longer matches, its document being from another save, is no hit); subagent items only
-// with subagents.
-func searchHits(ctx context.Context, db *sql.DB, sq searchQuery, scope map[string]Thread, subagents bool,
-	name func(string) (string, bool)) (hits []SearchHit, truncated bool, err error) {
+// matching documents in scope (a document's rowid grows with its first save; truncated
+// says more matched), one per item id. The scope is applied inside the capped subquery: a
+// document counts only when a thread of scope holds it (its own item, or a subagent's with
+// subagents), so text out of scope never takes a place. Each hit goes to the oldest
+// thread of scope whose own copy of the item matches sq (smart case, short terms; a
+// holder whose text does not match, its document being from another copy, is no hit).
+func searchHits(ctx context.Context, db *sql.DB, sq searchQuery, scope map[string]Thread, subagents bool) (hits []SearchHit, truncated bool, err error) {
+	ids := make([]string, 0, len(scope))
+	for id := range scope {
+		ids = append(ids, id)
+	}
+	scopeJSON, err := json.Marshal(ids)
+	if err != nil {
+		return nil, false, fmt.Errorf("thread: search: %w", err)
+	}
 	rows, err := db.QueryContext(ctx, `SELECT d.id, ti.thread_id, ti.item_id, ti.ordinal, ti.kind, ti.parent_tool_use_id,
 			ti.created_at, ti.updated_at, ti.data
 		FROM search_docs d
 		JOIN thread_items ti ON ti.item_id = d.item_id
-		WHERE d.id IN (SELECT rowid FROM search_fts WHERE search_fts MATCH ? ORDER BY rowid DESC LIMIT ?)`,
-		sq.fts, maxSearchCandidates+1)
+		WHERE ti.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR ti.parent_tool_use_id = '')
+		AND d.id IN (SELECT search_fts.rowid FROM search_fts WHERE search_fts MATCH ?1
+			AND EXISTS (SELECT 1 FROM search_docs s JOIN thread_items h ON h.item_id = s.item_id
+				WHERE s.id = search_fts.rowid AND h.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR h.parent_tool_use_id = ''))
+			ORDER BY search_fts.rowid DESC LIMIT ?4)`,
+		sq.fts, string(scopeJSON), subagents, maxSearchCandidates+1)
 	if err != nil {
 		return nil, false, fmt.Errorf("thread: search: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	type held struct {
-		hit  SearchHit
-		data string
-		upd  int64
-	}
-	byItem := map[string]held{}
+	byItem := map[string]SearchHit{}
 	docs := map[int64]bool{}
 	var oldest int64 = -1
 	for rows.Next() {
-		var h held
-		var doc, created int64
-		var kind string
-		if err := rows.Scan(&doc, &h.hit.ThreadID, &h.hit.ItemID, &h.hit.Ordinal, &kind, &h.hit.ParentToolUseID,
-			&created, &h.upd, &h.data); err != nil {
+		var h SearchHit
+		var doc, created, updated int64
+		var kind, data string
+		if err := rows.Scan(&doc, &h.ThreadID, &h.ItemID, &h.Ordinal, &kind, &h.ParentToolUseID,
+			&created, &updated, &data); err != nil {
 			return nil, false, fmt.Errorf("thread: search: %w", err)
 		}
 		docs[doc] = true
 		if oldest < 0 || doc < oldest {
 			oldest = doc
 		}
-		h.hit.doc = doc
-		t, ok := scope[h.hit.ThreadID]
-		if !ok || (h.hit.ParentToolUseID != "" && !subagents) {
+		t, ok := scope[h.ThreadID]
+		if !ok || (h.ParentToolUseID != "" && !subagents) {
 			continue
 		}
-		h.hit.Kind, h.hit.CreatedAt = ItemKind(kind), fromMillis(created)
-		if prev, ok := byItem[h.hit.ItemID]; ok && !olderThread(t, scope[prev.hit.ThreadID]) {
+		if prev, ok := byItem[h.ItemID]; ok && !olderThread(t, scope[prev.ThreadID]) {
 			continue
 		}
-		byItem[h.hit.ItemID] = h
+		// Match this holder's own copy before it can take the hit: an older holder whose
+		// copy differs (a question answered in only one of them) must not hide a younger
+		// one whose copy matches.
+		it, err := decodeItem(h.ItemID, h.Ordinal, kind, h.ParentToolUseID, created, updated, data)
+		if err != nil {
+			return nil, false, fmt.Errorf("thread: search: %w", err)
+		}
+		text, sp, _ := itemSearchText(it)
+		line := []rune(text)
+		ranges := sq.matchRunes(line)
+		if ranges == nil {
+			continue
+		}
+		h.doc, h.Kind, h.CreatedAt, h.Speaker, h.line, h.Ranges = doc, it.Kind, it.CreatedAt, sp, line, ranges
+		h.tier = sq.tier(line)
+		byItem[h.ItemID] = h
 	}
 	if err := rows.Err(); err != nil {
 		return nil, false, fmt.Errorf("thread: search: %w", err)
@@ -263,22 +282,10 @@ func searchHits(ctx context.Context, db *sql.DB, sq searchQuery, scope map[strin
 	truncated = len(docs) > maxSearchCandidates
 	out := make([]SearchHit, 0, len(byItem))
 	for _, h := range byItem {
-		if truncated && h.hit.doc == oldest {
+		if truncated && h.doc == oldest {
 			continue // the one past the limit, read to tell
 		}
-		it, err := decodeItem(h.hit.ItemID, h.hit.Ordinal, string(h.hit.Kind), h.hit.ParentToolUseID, millis(h.hit.CreatedAt), h.upd, h.data)
-		if err != nil {
-			return nil, false, fmt.Errorf("thread: search: %w", err)
-		}
-		text, sp, _ := itemSearchText(it, name)
-		line := searchLine(text)
-		ranges := sq.matchRunes(line)
-		if ranges == nil {
-			continue
-		}
-		h.hit.Speaker, h.hit.line, h.hit.Ranges = sp, line, ranges
-		h.hit.tier = sq.tier(line)
-		out = append(out, h.hit)
+		out = append(out, h)
 	}
 	return out, truncated, nil
 }

@@ -98,3 +98,29 @@ func column(t *testing.T, db *sql.DB, query string) []string {
 	}
 	return out
 }
+
+// After every migration, thread_items still has what thread search needs: a later
+// migration that rebuilds thread_items (create, copy, drop, rename) drops its triggers and
+// indexes, and must make these again.
+func TestThreadSearchSchemaAfterAllMigrations(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(ctx, filepath.Join(t.TempDir(), "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	for _, want := range []struct{ typ, name string }{
+		{"trigger", "thread_items_search_gone"},
+		{"index", "thread_items_item_id"},
+	} {
+		got := column(t, db, `SELECT tbl_name FROM sqlite_master WHERE type = '`+want.typ+`' AND name = '`+want.name+`'`)
+		if !slices.Equal(got, []string{"thread_items"}) {
+			t.Errorf("%s %s on %q, want on thread_items", want.typ, want.name, got)
+		}
+	}
+	for _, table := range []string{"search_docs", "search_fts", "search_backfill"} {
+		if got := column(t, db, `SELECT name FROM sqlite_master WHERE name = '`+table+`'`); len(got) != 1 {
+			t.Errorf("table %s missing", table)
+		}
+	}
+}

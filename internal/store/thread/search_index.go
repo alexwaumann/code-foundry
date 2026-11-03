@@ -28,32 +28,17 @@ import (
 type searchIndex struct {
 	// off: the thread is not indexed (Options.Unindexed).
 	off bool
-	// name returns a thread's current name, for the thread tags of a user message; nil
-	// falls back to the tag's label.
-	name func(id string) (string, bool)
 }
 
-// names returns ix.name, or a resolver that knows no thread.
-func (ix searchIndex) names() func(string) (string, bool) {
-	if ix.name != nil {
-		return ix.name
-	}
-	return func(string) (string, bool) { return "", false }
-}
-
-// searchIndexFor is the index thread id's saves use: names from the current snapshot, off
-// when Options.Unindexed says so. A thread not in the snapshot yet is indexed.
+// searchIndexFor is the index thread id's saves use: off when Options.Unindexed says so.
+// A thread not in the snapshot yet is indexed.
 func (m *Manager) searchIndexFor(id string) searchIndex {
-	snap := m.Snapshot()
 	if f := m.opts.Unindexed; f != nil {
-		if t, ok := snap.Thread(id); ok && f(t) {
+		if t, ok := m.Snapshot().Thread(id); ok && f(t) {
 			return searchIndex{off: true}
 		}
 	}
-	return searchIndex{name: func(ref string) (string, bool) {
-		t, ok := snap.Thread(ref)
-		return t.Name, ok
-	}}
+	return searchIndex{}
 }
 
 // txer is a *sql.Tx: what indexing needs.
@@ -67,7 +52,7 @@ func indexItem(ctx context.Context, tx txer, it Item, ix searchIndex) error {
 	if ix.off || it.Streaming {
 		return nil
 	}
-	text, _, ok := itemSearchText(it, ix.names())
+	text, _, ok := itemSearchText(it)
 	if !ok {
 		return nil
 	}
@@ -128,11 +113,18 @@ func putSearchDoc(ctx context.Context, tx txer, itemID, text string) error {
 	return err
 }
 
+// searchBackfillChunk is how many items of an indexed kind one backfill transaction
+// indexes at most: about 100 ms of the write lock on the measured laptop, far inside the
+// other writers' busy timeout (db.BusyTimeout) however long the thread. A variable for
+// tests.
+var searchBackfillChunk = 500
+
 // startSearchBackfill indexes, in the background, the threads search_backfill lists (the
-// threads that existed when migration 0054 ran), one transaction per thread, deleting each
-// row once its thread is done; a daemon stop resumes at the next start. Searches meanwhile
-// see what is indexed so far. Nothing starts when the list is empty (every start after
-// the first).
+// threads that existed when migration 0054 ran), searchBackfillChunk items per
+// transaction, recording how far each thread got (next_ordinal) and deleting its row once
+// done, so a daemon stop resumes at the next start where it left off. A thread that fails
+// is logged and dropped from the list, and the others go on. Searches meanwhile see what
+// is indexed so far. Nothing starts when the list is empty (every start after the first).
 func (m *Manager) startSearchBackfill(ctx context.Context) {
 	ids, err := searchBackfillPending(ctx, m.opts.DB)
 	if err != nil {
@@ -146,29 +138,42 @@ func (m *Manager) startSearchBackfill(ctx context.Context) {
 	go func() {
 		defer m.wg.Done()
 		start := time.Now()
-		n, items, err := m.backfillSearch(m.ctx, ids)
+		n, items, failed, err := m.backfillSearch(m.ctx, ids)
 		if err != nil && m.ctx.Err() == nil {
 			m.log.Error("index threads for search", "threads", n, "of", len(ids), "err", err)
 			return
 		}
-		m.log.Info("indexed threads for search", "threads", n, "items", items, "took", time.Since(start).Round(time.Millisecond).String())
+		m.log.Info("indexed threads for search", "threads", n, "failed", failed, "items", items,
+			"took", time.Since(start).Round(time.Millisecond).String())
 	}()
 }
 
 // backfillSearch indexes the threads ids (from search_backfill) and returns how many
-// threads and items of an indexed kind it did.
-func (m *Manager) backfillSearch(ctx context.Context, ids []string) (threads, items int, err error) {
+// threads it did, how many failed, and how many items of an indexed kind it indexed. A
+// thread that fails while ctx is live is logged and dropped from search_backfill (its
+// documents so far stay), so one bad thread never holds back the rest, the most recent
+// last; it returns an error only when ctx ends or the list cannot be written.
+func (m *Manager) backfillSearch(ctx context.Context, ids []string) (threads, failed, items int, err error) {
 	for _, id := range ids {
 		if err := ctx.Err(); err != nil {
-			return threads, items, err
+			return threads, failed, items, err
 		}
 		n, err := m.backfillThread(ctx, id)
+		items += n
 		if err != nil {
-			return threads, items, err
+			if ctx.Err() != nil {
+				return threads, failed, items, ctx.Err()
+			}
+			m.log.Error("index a thread for search", "thread", id, "err", err)
+			if _, err := m.opts.DB.ExecContext(ctx, `DELETE FROM search_backfill WHERE thread_id = ?`, id); err != nil {
+				return threads, failed, items, fmt.Errorf("thread: search backfill of %s: %w", id, err)
+			}
+			failed++
+			continue
 		}
-		threads, items = threads+1, items+n
+		threads++
 	}
-	return threads, items, nil
+	return threads, failed, items, nil
 }
 
 // searchBackfillPending lists search_backfill, the least recently active thread first: a
@@ -195,43 +200,71 @@ func searchBackfillPending(ctx context.Context, db *sql.DB) ([]string, error) {
 	return ids, nil
 }
 
-// backfillThread indexes one thread's saved items and removes it from search_backfill, in
-// one transaction; it returns how many of its items are of an indexed kind. The items are
-// read from the table, not the thread's log: what is indexed is what is saved. The
-// transaction holds the write lock for the thread's indexed items only (about 30 ms for
-// 160 on the measured laptop), well inside the other writers' busy timeout.
+// backfillThread indexes one thread's saved items, a chunk per transaction
+// (backfillChunk), until its search_backfill row is gone; it returns how many items of an
+// indexed kind it indexed.
 func (m *Manager) backfillThread(ctx context.Context, id string) (int, error) {
+	total := 0
+	for {
+		n, done, err := m.backfillChunk(ctx, id)
+		total += n
+		if err != nil || done {
+			return total, err
+		}
+	}
+}
+
+// backfillChunk indexes the next searchBackfillChunk items of an indexed kind of thread
+// id, from its search_backfill row's next_ordinal, and moves next_ordinal past them, or
+// deletes the row when they were the last; one transaction. done: the thread has no row
+// left. The items are read from the table, not the thread's log (what is indexed is what
+// is saved), and in the transaction: a save meanwhile indexes after it, never under it.
+// Only the indexed kinds are read: tool calls hold most of the bytes.
+func (m *Manager) backfillChunk(ctx context.Context, id string) (n int, done bool, err error) {
 	ix := m.searchIndexFor(id)
 	tx, err := m.opts.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, fmt.Errorf("thread: search backfill of %s: %w", id, err)
+		return 0, false, fmt.Errorf("thread: search backfill of %s: %w", id, err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	// Read in the transaction: a save meanwhile indexes after it, never under it. Only
-	// the indexed kinds: tool calls hold most of the bytes.
-	args := make([]any, 0, len(searchTexts)+1)
-	args = append(args, id)
-	for k := range searchTexts {
-		args = append(args, string(k))
+	var next int64
+	switch err := tx.QueryRowContext(ctx, `SELECT next_ordinal FROM search_backfill WHERE thread_id = ?`, id).Scan(&next); {
+	case errors.Is(err, sql.ErrNoRows):
+		return 0, true, nil // removed meanwhile
+	case err != nil:
+		return 0, false, fmt.Errorf("thread: search backfill of %s: %w", id, err)
 	}
-	items, err := scanItems(ctx, tx, id, `SELECT ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data
-		FROM thread_items WHERE thread_id = ? AND kind IN (?`+strings.Repeat(", ?", len(searchTexts)-1)+`) ORDER BY ordinal`, args...)
-	if err != nil {
-		return 0, err
-	}
-	if ix.off {
-		items = nil
+	var items []Item
+	if !ix.off {
+		args := make([]any, 0, len(searchTexts)+3)
+		args = append(args, id, next)
+		for k := range searchTexts {
+			args = append(args, string(k))
+		}
+		args = append(args, searchBackfillChunk)
+		items, err = scanItems(ctx, tx, id, `SELECT ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data
+			FROM thread_items WHERE thread_id = ? AND ordinal >= ? AND kind IN (?`+strings.Repeat(", ?", len(searchTexts)-1)+`)
+			ORDER BY ordinal LIMIT ?`, args...)
+		if err != nil {
+			return 0, false, err
+		}
 	}
 	for _, it := range items {
 		if err := indexItem(ctx, tx, it, ix); err != nil {
-			return 0, err
+			return 0, false, err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM search_backfill WHERE thread_id = ?`, id); err != nil {
-		return 0, fmt.Errorf("thread: search backfill of %s: %w", id, err)
+	done = len(items) < searchBackfillChunk
+	if done {
+		_, err = tx.ExecContext(ctx, `DELETE FROM search_backfill WHERE thread_id = ?`, id)
+	} else {
+		_, err = tx.ExecContext(ctx, `UPDATE search_backfill SET next_ordinal = ? WHERE thread_id = ?`, items[len(items)-1].Ordinal+1, id)
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("thread: search backfill of %s: %w", id, err)
 	}
 	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("thread: search backfill of %s: %w", id, err)
+		return 0, false, fmt.Errorf("thread: search backfill of %s: %w", id, err)
 	}
-	return len(items), nil
+	return len(items), done, nil
 }

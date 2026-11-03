@@ -7,14 +7,9 @@ import (
 	"testing"
 )
 
-// The registry: what each kind indexes, and what is never indexed.
+// The registry: what each kind indexes, and what is never indexed. The text is on one
+// line, and a thread tag reads as its stored label (whatever the thread is called now).
 func TestItemSearchText(t *testing.T) {
-	names := func(id string) (string, bool) {
-		if id == "s-1" {
-			return "Fix race", true
-		}
-		return "", false
-	}
 	questions := `{"questions":[{"question":"Which database?","header":"DB","options":[{"label":"SQLite"},{"label":"Postgres"}]},` +
 		`{"question":"Run migrations?","options":[{"label":"Yes"}]}]}`
 	tests := []struct {
@@ -25,9 +20,11 @@ func TestItemSearchText(t *testing.T) {
 		wantOK bool
 	}{
 		{"a user message as typed", Item{Kind: KindUserMessage, Text: "  fix the login redirect \n"}, "fix the login redirect", SpeakerUser, true},
-		{"a user message's tags as their chips read", Item{Kind: KindUserMessage, Text: "x",
-			ComposerText: "see [a.ts](cf-file://r-1/src/a.ts) and [old](cf-thread://s-1) ![p.png](cf-attachment://0)"},
+		{"a user message's tags as their chips read, a thread by its stored label", Item{Kind: KindUserMessage, Text: "x",
+			ComposerText: "see [a.ts](cf-file://r-1/src/a.ts) and [Fix race](cf-thread://s-1) ![p.png](cf-attachment://0)"},
 			"see src/a.ts and Fix race", SpeakerUser, true},
+		{"white space runs are one space", Item{Kind: KindAssistantText, Text: "## Plan\n\n1. the  login\tpage"},
+			"## Plan 1. the login page", SpeakerAssistant, true},
 		{"a steer is a user message", Item{Kind: KindUserMessage, Text: "also the tests", Queued: true}, "also the tests", SpeakerUser, true},
 		{"a message another thread sent", Item{Kind: KindUserMessage, Text: "do the docs", SentBy: "s-lead"}, "do the docs", SpeakerUser, true},
 		{"a wake is a note, not a message", Item{Kind: KindUserMessage, Text: "[wake] ...", Origin: OriginWake, WakeTitle: "Woken"}, "", SpeakerUser, true},
@@ -35,9 +32,9 @@ func TestItemSearchText(t *testing.T) {
 		{"an API error is not a reply", Item{Kind: KindAssistantText, Text: "Invalid API key", APIError: true}, "", SpeakerAssistant, true},
 		{"a question and its answers", Item{Kind: KindQuestion, Request: &Request{InputJSON: questions, State: RequestAllowed,
 			Answers: map[string]string{"Which database?": "SQLite", "Run migrations?": "Yes"}}},
-			"Which database?\nSQLite\nRun migrations?\nYes", SpeakerQuestion, true},
+			"Which database? SQLite Run migrations? Yes", SpeakerQuestion, true},
 		{"an unanswered question", Item{Kind: KindQuestion, Request: &Request{InputJSON: questions, State: RequestPending}},
-			"Which database?\nRun migrations?", SpeakerQuestion, true},
+			"Which database? Run migrations?", SpeakerQuestion, true},
 		{"a question without a request", Item{Kind: KindQuestion}, "", SpeakerQuestion, true},
 		{"tool calls are not indexed", Item{Kind: KindToolCall, Tool: &ToolCall{Name: "Bash", InputJSON: `{"command":"grep login"}`, Output: "login"}}, "", "", false},
 		{"thinking is not indexed", Item{Kind: KindThinking, Text: "login"}, "", "", false},
@@ -50,7 +47,7 @@ func TestItemSearchText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, sp, ok := itemSearchText(tt.it, names)
+			got, sp, ok := itemSearchText(tt.it)
 			if got != tt.want || sp != tt.wantSp || ok != tt.wantOK {
 				t.Errorf("itemSearchText = %q, %q, %v; want %q, %q, %v", got, sp, ok, tt.want, tt.wantSp, tt.wantOK)
 			}

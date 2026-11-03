@@ -63,7 +63,9 @@ func parseSearch(q string) searchQuery {
 }
 
 // splitTerms splits q at white space outside double quotes; a quoted run is one term
-// (an unclosed quote runs to the end). Terms are trimmed; empty ones are dropped.
+// (an unclosed quote runs to the end). Terms are trimmed; empty ones are dropped. Other
+// control characters (a NUL, an escape) are dropped: FTS5 refuses a NUL in a string, and
+// indexed text never holds one that a user could mean.
 func splitTerms(q string) []string {
 	var out []string
 	var b strings.Builder
@@ -81,6 +83,10 @@ func splitTerms(q string) []string {
 			quoted = !quoted
 		case unicode.IsSpace(r) && !quoted:
 			flush()
+		case unicode.IsSpace(r):
+			b.WriteRune(' ') // inside a phrase; flush makes a run one space
+		case unicode.IsControl(r):
+			// dropped
 		default:
 			b.WriteRune(r)
 		}

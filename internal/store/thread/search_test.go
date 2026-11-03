@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -459,7 +460,241 @@ func TestSearchBackfill(t *testing.T) {
 		t.Errorf("documents %d, want 2 (the tool call is not indexed)", n)
 	}
 	// Indexing again changes nothing.
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `INSERT INTO search_backfill (thread_id) VALUES (?)`, a.ID); err != nil {
+		t.Fatal(err)
+	}
 	if n, err := e.m.backfillThread(e.ctx(), a.ID); err != nil || n != 1 || e.countDocs() != 2 {
 		t.Errorf("a second backfill: %d, %v, %d documents", n, err, e.countDocs())
+	}
+}
+
+// saveUnindexed saves items as before migration 0054 (no documents), ordinals from 1.
+func (e *env) saveUnindexed(threadID string, items ...Item) {
+	e.t.Helper()
+	for i, it := range items {
+		it.Ordinal, it.CreatedAt, it.UpdatedAt = int64(i+1), time.Now(), time.Now()
+		if err := saveItem(e.ctx(), e.m.opts.DB, threadID, it, searchIndex{off: true}); err != nil {
+			e.t.Fatal(err)
+		}
+	}
+}
+
+// backfillLeft is search_backfill: thread id → next_ordinal.
+func (e *env) backfillLeft() map[string]int64 {
+	e.t.Helper()
+	rows, err := e.m.opts.DB.QueryContext(e.ctx(), `SELECT thread_id, next_ordinal FROM search_backfill`)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[string]int64{}
+	for rows.Next() {
+		var id string
+		var next int64
+		if err := rows.Scan(&id, &next); err != nil {
+			e.t.Fatal(err)
+		}
+		out[id] = next
+	}
+	return out
+}
+
+// The backfill goes a chunk of items per transaction and records how far it got, so a
+// long thread never holds the write lock for long and a stop resumes inside the thread.
+func TestSearchBackfillResumesInsideAThread(t *testing.T) {
+	defer func(n int) { searchBackfillChunk = n }(searchBackfillChunk)
+	searchBackfillChunk = 2
+	e := newEnv(t)
+	s := e.connected(CreateOptions{Name: "Long"})
+	var items []Item
+	for i := range 5 {
+		items = append(items, Item{ID: fmt.Sprintf("u%d", i+1), Kind: KindUserMessage, Text: fmt.Sprintf("needle %d", i+1)},
+			Item{ID: fmt.Sprintf("t%d", i+1), Kind: KindToolCall, Tool: &ToolCall{Name: "Bash", Output: "needle"}})
+	}
+	e.saveUnindexed(s.ID, items...) // u1 at 1, t1 at 2, u2 at 3, …, u5 at 9
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `INSERT INTO search_backfill (thread_id) VALUES (?)`, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	// One chunk, as if the daemon stopped after it: u1 and u2 done, the row says u3 next.
+	n, done, err := e.m.backfillChunk(e.ctx(), s.ID)
+	if err != nil || n != 2 || done {
+		t.Fatalf("first chunk: %d items, done %v, %v; want 2, not done", n, done, err)
+	}
+	if got := e.backfillLeft(); got[s.ID] != 4 || e.countDocs() != 2 {
+		t.Fatalf("after one chunk: %v, %d documents; want next_ordinal 4 and 2 documents", got, e.countDocs())
+	}
+	// The next start resumes there.
+	threads, failed, indexed, err := e.m.backfillSearch(e.ctx(), []string{s.ID})
+	if err != nil || threads != 1 || failed != 0 || indexed != 3 {
+		t.Fatalf("resumed: %d threads, %d failed, %d items, %v; want the last 3 items", threads, failed, indexed, err)
+	}
+	if left := e.backfillLeft(); len(left) != 0 || e.countDocs() != 5 {
+		t.Errorf("after the resume: %v left, %d documents; want none, 5", left, e.countDocs())
+	}
+	if res := e.search(SearchQuery{Query: "needle"}); res.TotalHits != 5 {
+		t.Errorf("hits %d, want 5", res.TotalHits)
+	}
+}
+
+// A thread that cannot be indexed (a row whose data is not JSON) is logged and dropped from
+// the list; the threads after it, the most recent, are still indexed.
+func TestSearchBackfillSkipsABadThread(t *testing.T) {
+	e := newEnv(t)
+	old := e.connected(CreateOptions{Name: "Old"})
+	bad := e.connected(CreateOptions{Name: "Bad"})
+	recent := e.connected(CreateOptions{Name: "Recent"})
+	e.saveUnindexed(old.ID, Item{ID: "o1", Kind: KindUserMessage, Text: "an old needle"})
+	e.saveUnindexed(recent.ID, Item{ID: "r1", Kind: KindUserMessage, Text: "a recent needle"})
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `INSERT INTO thread_items (thread_id, ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data)
+		VALUES (?, 1, 'b1', 'user_message', '', 1, 1, '{"text": "a broken needle')`, bad.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `INSERT INTO search_backfill (thread_id) VALUES (?), (?), (?)`, old.ID, bad.ID, recent.ID); err != nil {
+		t.Fatal(err)
+	}
+	threads, failed, items, err := e.m.backfillSearch(e.ctx(), []string{old.ID, bad.ID, recent.ID})
+	if err != nil || threads != 2 || failed != 1 || items != 2 {
+		t.Fatalf("backfill: %d threads, %d failed, %d items, %v; want 2, 1, 2, no error", threads, failed, items, err)
+	}
+	if left := e.backfillLeft(); len(left) != 0 {
+		t.Errorf("left %v: the bad thread stays listed and would fail every start", left)
+	}
+	if got := sortedHits(e.search(SearchQuery{Query: "needle"})); !slices.Equal(got, []string{"Old:o1", "Recent:r1"}) {
+		t.Errorf("hits %q", got)
+	}
+}
+
+// The cap counts documents in scope only: newer subagent and child text never takes the
+// places of the user's own older hit, and truncated is set only when more documents in
+// scope matched.
+func TestSearchCapCountsScopeOnly(t *testing.T) {
+	defer func(n int) { maxSearchCandidates = n }(maxSearchCandidates)
+	maxSearchCandidates = 2
+	e := newEnv(t)
+	top := e.connected(CreateOptions{Name: "Top"})
+	child := e.connected(CreateOptions{Name: "Child", CreatedBy: top.ID})
+	e.putItems(top.ID, Item{ID: "own", Kind: KindUserMessage, Text: "the needle, mine"})
+	e.putItems(top.ID,
+		Item{ID: "sub1", Kind: KindAssistantText, Text: "a subagent's needle", ParentToolUseID: "toolu_a"},
+		Item{ID: "sub2", Kind: KindAssistantText, Text: "another subagent's needle", ParentToolUseID: "toolu_a"},
+	)
+	e.putItems(child.ID,
+		Item{ID: "c1", Kind: KindUserMessage, Text: "a child's needle"},
+		Item{ID: "c2", Kind: KindAssistantText, Text: "a child's needle again"},
+	)
+	res := e.search(SearchQuery{Query: "needle"})
+	if got := hitsOf(res); res.Truncated || !slices.Equal(got, []string{"Top:own"}) {
+		t.Errorf("default scope: %q, truncated %v; want own, not truncated", got, res.Truncated)
+	}
+	res = e.search(SearchQuery{Query: "needle", Subagents: true})
+	if got := sortedHits(res); !res.Truncated || !slices.Equal(got, []string{"Top:sub1", "Top:sub2"}) {
+		t.Errorf("with subagents: %q, truncated %v; want the two newest in scope, truncated", got, res.Truncated)
+	}
+	res = e.search(SearchQuery{Query: "needle", Children: true})
+	if got := sortedHits(res); !res.Truncated || !slices.Equal(got, []string{"Child:c1", "Child:c2"}) {
+		t.Errorf("with children: %q, truncated %v; want the child's two, truncated", got, res.Truncated)
+	}
+}
+
+// The index holds the text on one line, like the query side: a phrase across a line
+// break or a run of spaces is found (markdown; a question and its answer).
+func TestSearchPhraseAcrossLines(t *testing.T) {
+	e := newEnv(t)
+	s := e.connected(CreateOptions{Name: "Lines"})
+	questions := `{"questions":[{"question":"Which database?","options":[{"label":"SQLite"}]}]}`
+	e.putItems(s.ID,
+		Item{ID: "a1", Kind: KindAssistantText, Text: "## Plan\n\n1. fix the  login\n   redirect"},
+		Item{ID: "q1", Kind: KindQuestion, Request: &Request{RequestID: "r1", InputJSON: questions, State: RequestAllowed,
+			Answers: map[string]string{"Which database?": "SQLite"}}},
+	)
+	for q, want := range map[string]string{`"plan 1. fix"`: "Lines:a1", `"login redirect"`: "Lines:a1", `"database? sqlite"`: "Lines:q1"} {
+		if got := hitsOf(e.search(SearchQuery{Query: q})); !slices.Equal(got, []string{want}) {
+			t.Errorf("%s: %q, want %s", q, got, want)
+		}
+	}
+}
+
+// Queries that look like FTS5 syntax, or hold control characters, are plain text: never an
+// error, and found where the text has them.
+func TestSearchOperatorLikeQueries(t *testing.T) {
+	e := newEnv(t)
+	s := e.connected(CreateOptions{Name: "Ops"})
+	e.putItems(s.ID, Item{ID: "o1", Kind: KindAssistantText,
+		Text: `NOT this OR that NEAR(a b) glob* -flag ^caret col:value say "hi" and the needle`})
+	tests := []struct {
+		q     string
+		found bool
+	}{
+		{"NOT", true}, {"OR that", true}, {"AND", false}, {"NEAR(", true}, {"NEAR(a b)", true}, {"glob*", true}, {"*", false},
+		{"-flag", true}, {"-", false}, {"^caret", true}, {"col:value", true}, {"col:", true}, {`"hi"`, false},
+		{"nee\x00dle", true}, {"\x00needle\x1b", true}, {"needle\x7f", true}, {`say "hi`, true}, {`"unbalanced`, false},
+		{`a"b"c`, false}, {`""needle""`, true}, {"(needle)", false}, {"{needle}", false}, {"needle:", false}, {`'needle'`, false},
+	}
+	for _, tt := range tests {
+		res, err := e.m.Search(e.ctx(), SearchQuery{Query: tt.q})
+		if err != nil {
+			t.Errorf("%q: %v", tt.q, err)
+			continue
+		}
+		if found := len(res.Groups) > 0; found != tt.found {
+			t.Errorf("%q: found %v, want %v", tt.q, found, tt.found)
+		}
+	}
+	// Only control characters: no query.
+	if _, err := e.m.Search(e.ctx(), SearchQuery{Query: "\x00\x01"}); !errors.Is(err, ErrInvalidArgument) {
+		t.Errorf("control characters only: err %v, want ErrInvalidArgument", err)
+	}
+}
+
+// Ember's chat (a resident thread, no creator) is in the default scope; the workers it
+// creates are its hidden children.
+func TestSearchEmberChat(t *testing.T) {
+	e := newEnv(t)
+	ember, _, err := e.m.EnsureResident(e.ctx(), "ember", ResidentOptions{Cwd: filepath.Join(e.home, "residents", "ember"), DisplayName: "Ember"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker := e.connected(CreateOptions{Name: "Worker", CreatedBy: ember.ID})
+	e.putItems(ember.ID, Item{ID: "e1", Kind: KindUserMessage, Text: "ember, find the needle"})
+	e.putItems(worker.ID, Item{ID: "w1", Kind: KindUserMessage, Text: "the worker's needle"})
+	if got := hitsOf(e.search(SearchQuery{Query: "needle"})); !slices.Equal(got, []string{"Ember:e1"}) {
+		t.Errorf("default scope: %q, want Ember's chat only", got)
+	}
+}
+
+// A hit goes to the oldest holder whose own copy matches: an older copy that differs (a
+// question answered only in the fork) does not hide the younger one's match.
+func TestSearchForkAttributionMatchesFirst(t *testing.T) {
+	e := newEnv(t)
+	orig := e.connected(CreateOptions{Name: "Original"})
+	fork := e.connected(CreateOptions{Name: "Fork"})
+	questions := `{"questions":[{"question":"Which colour?","options":[{"label":"Amber"}]}]}`
+	e.putItems(orig.ID, Item{ID: "q1", Kind: KindQuestion, Request: &Request{RequestID: "r1", InputJSON: questions, State: RequestDenied}})
+	e.putItems(fork.ID, Item{ID: "q1", Kind: KindQuestion, Request: &Request{RequestID: "r1", InputJSON: questions, State: RequestAllowed,
+		Answers: map[string]string{"Which colour?": "Amber"}}})
+	if got := hitsOf(e.search(SearchQuery{Query: "amber"})); !slices.Equal(got, []string{"Fork:q1"}) {
+		t.Errorf("amber: %q, want the fork's copy", got)
+	}
+	if got := hitsOf(e.search(SearchQuery{Query: "colour"})); !slices.Equal(got, []string{"Original:q1"}) {
+		t.Errorf("colour: %q, want the original (both match, it is older)", got)
+	}
+}
+
+// A thread tag is indexed and matched as the label it was sent with: renaming the tagged
+// thread changes neither.
+func TestSearchThreadTagKeepsItsLabel(t *testing.T) {
+	e := newEnv(t)
+	tagged := e.connected(CreateOptions{Name: "Provisional name"})
+	s := e.connected(CreateOptions{Name: "Asker"})
+	e.putItems(s.ID, Item{ID: "u1", Kind: KindUserMessage, Text: "x",
+		ComposerText: "carry on from [Provisional name](cf-thread://" + tagged.ID + ")"})
+	if _, err := e.m.Rename(e.ctx(), tagged.ID, "Fix the login race"); err != nil {
+		t.Fatal(err)
+	}
+	if got := hitsOf(e.search(SearchQuery{Query: "provisional"})); !slices.Equal(got, []string{"Asker:u1"}) {
+		t.Errorf("by the label: %q", got)
+	}
+	if got := hitsOf(e.search(SearchQuery{Query: "carry provisional"})); !slices.Equal(got, []string{"Asker:u1"}) {
+		t.Errorf("by the label beside another term: %q", got)
 	}
 }
