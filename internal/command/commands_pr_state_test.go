@@ -66,7 +66,7 @@ func TestPullRequestStateCommands(t *testing.T) {
 			backend: func(g *commandtest.Gh) {
 				g.Err = connect.NewError(connect.CodeFailedPrecondition, errors.New("pull request #142 can be merged now; merge it instead"))
 			},
-			wantReq: &v1.SetPullRequestAutoMergeRequest{RepoSlug: "o/r", Number: 142, Enabled: true, Method: v1.PullRequestMergeMethod_PULL_REQUEST_MERGE_METHOD_REBASE},
+			wantReq:  &v1.SetPullRequestAutoMergeRequest{RepoSlug: "o/r", Number: 142, Enabled: true, Method: v1.PullRequestMergeMethod_PULL_REQUEST_MERGE_METHOD_REBASE},
 			wantCode: connect.CodeFailedPrecondition},
 	}
 	for _, tt := range tests {
