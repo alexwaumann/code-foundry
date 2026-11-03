@@ -3,7 +3,7 @@ import { matchIndex, matchRows, nearestInItem, rowOrder, startIndex, warmFind, t
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { getTimeline } from "@/stores/cite";
-import { getThreadItems, useThreadStore } from "@/stores/thread";
+import { getThreadItems, useThreadStore, useThreadSynced } from "@/stores/thread";
 import {
   openThreadFindItem,
   putBackThreadFind,
@@ -55,17 +55,30 @@ function Layer({ threadId, paneRef }: { threadId: string; paneRef: RefObject<HTM
   // Where the current match was in the last count it was in: a re-pick when it went away stays near it.
   const lastPlace = useRef<FindPlace | null>(null);
 
-  // Pick the current match: when the query changed (or a hand-off named an item), and when
-  // the current one went away (its item changed under it). Not before the log has loaded:
-  // the aim (a hand-off's item) waits for it.
+  // Pick the current match: when the query changed (or a hand-off named an item), when the
+  // current one went away (its item changed under it), and when matches arrive for a query
+  // that had none (text streaming in, a log catching up). Not before the log has loaded:
+  // the aim (a hand-off's item) waits for it. A hand-off's item missing from a log kept from
+  // an earlier visit waits for the Watch's snapshot (the search that named it is newer).
+  const synced = useThreadSynced(threadId);
+  const lastCount = useRef(0);
   useEffect(() => {
     if (!loaded) return;
+    const had = lastCount.current;
+    lastCount.current = loaded.length;
     const at = matchIndex(loaded, current);
     if (current && at >= 0) {
       lastPlace.current = { itemId: current.itemId, start: loaded[at]?.start ?? 0 };
       if (!aim) return;
     }
-    if (!aim && !current) return;
+    if (aim?.kind === "item" && !synced && !useThreadStore.getState().logs[threadId]?.byId[aim.itemId]) return;
+    if (!aim && !current) {
+      // "0 of N": matches arrived with none current. The first at or below the top, in place.
+      if (had > 0 || loaded.length === 0) return;
+      const m = loaded[pickCurrent(threadId, loaded, { kind: "view" }, null).index];
+      if (m) setThreadFindCurrent(threadId, { itemId: m.itemId, nth: m.nth }, { reveal: false });
+      return;
+    }
     if (loaded.length === 0) {
       setThreadFindCurrent(threadId, null);
       return;
@@ -73,10 +86,12 @@ function Layer({ threadId, paneRef }: { threadId: string; paneRef: RefObject<HTM
     const pick = pickCurrent(threadId, loaded, aim, current ? lastPlace.current : null);
     const m = loaded[pick.index];
     setThreadFindCurrent(threadId, m ? { itemId: m.itemId, nth: m.nth } : null, { reveal: pick.reveal });
-  }, [threadId, aim, loaded, current]);
+  }, [threadId, aim, loaded, current, synced]);
 
-  // Read the thread's texts ahead in idle slices, so the first keystroke counts without parsing them all.
-  useEffect(() => idleWarm(threadId), [threadId]);
+  // Read the thread's texts ahead in idle slices, so the first keystroke counts without
+  // parsing them all; once the log is there (the bar may open before it loads).
+  const hasLog = loaded !== null;
+  useEffect(() => (hasLog ? idleWarm(threadId) : undefined), [threadId, hasLog]);
 
   // Paint what renders; again when rows mount or text changes (one frame later), and, for
   // the overlay fallback, as the list scrolls (Custom Highlights move with their text).

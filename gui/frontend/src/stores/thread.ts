@@ -56,6 +56,11 @@ export interface ThreadState {
   pending: Readonly<Record<string, ThreadPendingListView>>;
   /** The open Watches, by thread (one per thread however many views show it). */
   watches: Readonly<Record<string, ThreadWatchState>>;
+  /**
+   * Threads whose open Watch has delivered a snapshot: their log is current. A log kept from
+   * an earlier visit (KEPT_LOGS) shows at once but may be behind until then.
+   */
+  synced: Readonly<Record<string, true>>;
   /** Turns the user folded (true) or unfolded (false), by thread and turn key; absent: the default. */
   folds: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
   /** Rows the user expanded (true) or collapsed (false), by thread and row key; absent: the row's default. */
@@ -99,7 +104,7 @@ export interface ThreadWatchState {
   error: string | null;
 }
 
-export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watches: {}, folds: {}, expanded: {}, deferred: {}, answering: {}, pageModals: {}, pageFlash: {} }));
+export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watches: {}, synced: {}, folds: {}, expanded: {}, deferred: {}, answering: {}, pageModals: {}, pageFlash: {} }));
 
 function sameArray<T>(a: readonly T[], b: readonly T[], eq: (x: T, y: T) => boolean = Object.is): boolean {
   return a === b || (a.length === b.length && a.every((x, i) => eq(x, b[i] as T)));
@@ -286,10 +291,18 @@ export function applyThreadEvents(log: ThreadLog | undefined, events: readonly T
 /** Applies a batch of Watch events to one thread's log in a single store update. */
 export function applyWatchBatch(threadId: string, events: readonly ThreadEventView[]): void {
   if (events.length === 0) return;
+  const snapshot = events.some((ev) => ev.kind === "snapshot");
   useThreadStore.setState((s) => {
     const log = applyThreadEvents(s.logs[threadId], events);
-    return log === s.logs[threadId] || !log ? s : { logs: { ...s.logs, [threadId]: log } };
+    const sync = snapshot && log && !s.synced[threadId] ? { synced: { ...s.synced, [threadId]: true as const } } : undefined;
+    if (log === s.logs[threadId] || !log) return sync ?? s;
+    return { logs: { ...s.logs, [threadId]: log }, ...sync };
   });
+}
+
+/** Whether the thread's open Watch has delivered a snapshot (its log is current, not one kept from an earlier visit). */
+export function useThreadSynced(threadId: string): boolean {
+  return useThreadStore((s) => threadId in s.synced);
 }
 
 /** How long Watch events wait to be applied together (about a frame). */
@@ -389,9 +402,10 @@ function openThreadWatch(threadId: string, priority: () => StreamPriority): () =
     clearTimeout(timer);
     flush();
     useThreadStore.setState((s) => {
-      if (!(threadId in s.watches)) return s;
+      if (!(threadId in s.watches) && !(threadId in s.synced)) return s;
       const { [threadId]: _gone, ...watches } = s.watches;
-      return { watches };
+      const { [threadId]: _was, ...synced } = s.synced;
+      return { watches, synced };
     });
   };
 }

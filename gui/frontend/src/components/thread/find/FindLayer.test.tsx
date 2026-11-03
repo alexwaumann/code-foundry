@@ -2,12 +2,19 @@ import { act, cleanup, render } from "@testing-library/react";
 import { useEffect, useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
+import { warmFind } from "@/lib/threadFind";
 import { buildTurns, foldingTurn } from "@/lib/threadTimeline";
 import { registerTimeline } from "@/stores/cite";
 import { getThreadItems, setTurnFolded, structOf, useThreadStore } from "@/stores/thread";
-import { closeThreadFind, getThreadFindMatches, holdThreadPane, openThreadFind, setThreadFindCurrent, useThreadFindStore } from "@/stores/threadFind";
+import { closeThreadFind, getThreadFindMatches, holdThreadPane, openThreadFind, setThreadFindCurrent, setThreadFindQuery, useThreadFindStore } from "@/stores/threadFind";
 import { fixStalePrBadge, publishThread } from "@/test/threadWorld";
 import { FindLayer } from "./FindLayer";
+
+// The layer's idle warm-up, counted (and still run).
+vi.mock("@/lib/threadFind", async (load) => {
+  const mod = await load<typeof import("@/lib/threadFind")>();
+  return { ...mod, warmFind: vi.fn(mod.warmFind) };
+});
 
 /**
  * The find layer's picking and putting back over the store (no list renders here: what
@@ -59,8 +66,20 @@ afterEach(() => {
   cleanup();
   unregister();
   useThreadFindStore.setState({ byThread: {} });
-  useThreadStore.setState({ logs: {}, folds: {}, expanded: {} });
+  useThreadStore.setState({ logs: {}, synced: {}, folds: {}, expanded: {} });
+  vi.mocked(warmFind).mockClear();
 });
+
+/** Lets timers and idle slices run. */
+const tick = () => act(() => new Promise((r) => setTimeout(r, 5)));
+
+/** The items' text with `edit` applied to one text item, published as the log (a streaming change). */
+function editText(itemId: string, edit: (text: string) => string): void {
+  const log = useThreadStore.getState().logs[T];
+  const it = log?.byId[itemId];
+  if (!log || it?.kind !== "text") return;
+  useThreadStore.setState((s) => ({ logs: { ...s.logs, [T]: { ...log, byId: { ...log.byId, [itemId]: { ...it, text: edit(it.text) } } } } }));
+}
 
 describe("FindLayer picks the current match", () => {
   it("a hand-off before the thread's log loaded keeps its item until the log comes, then picks in it", () => {
@@ -74,6 +93,74 @@ describe("FindLayer picks the current match", () => {
     });
     expect(session()?.current).toEqual({ itemId: later, nth: 0 });
     expect(session()?.aim).toBeNull();
+  });
+
+  it("a hand-off's item missing from a log kept from an earlier visit waits for the Watch's snapshot, then picks in it", () => {
+    const w = fixStalePrBadge("idle");
+    const later = w.items.filter((it) => it.kind === "text")[1]?.id ?? "";
+    // The log as the last visit left it: the item the search found is not in it yet, and no snapshot since.
+    const old = w.items.slice(0, w.items.findIndex((it) => it.id === later));
+    useThreadStore.setState((s) => ({ logs: { ...s.logs, [T]: { seq: old.length, byId: Object.fromEntries(old.map((it) => [it.id, it])), order: old.map((it) => it.id), pending: [], mcp: null, commands: [], agents: [] } } }));
+    openThreadFind(T, "f", { itemId: later });
+    render(<Pane />);
+    expect(getThreadFindMatches(T).length).toBeGreaterThan(0);
+    expect(session()).toMatchObject({ current: null, aim: { kind: "item", itemId: later } });
+    act(() => {
+      publishThread(T, w);
+    });
+    expect(session()?.current).toEqual({ itemId: later, nth: 0 });
+  });
+
+  it("a hand-off's item missing from a current log (the snapshot came) falls back to the top of the list", () => {
+    publishThread(T, fixStalePrBadge("idle"));
+    openThreadFind(T, "head sha", { itemId: "no-such-item" });
+    render(<Pane />);
+    expect(session()?.current).toEqual({ itemId: getThreadFindMatches(T)[0]?.itemId, nth: 0 });
+  });
+
+  it("an edit through no match (a letter typed, then Backspace) goes on from the same match", () => {
+    publishThread(T, fixStalePrBadge("idle"));
+    openThreadFind(T, "f");
+    render(<Pane />);
+    const ms = getThreadFindMatches(T);
+    const mid = ms[Math.floor(ms.length * 0.7)];
+    act(() => {
+      if (mid) setThreadFindCurrent(T, { itemId: mid.itemId, nth: mid.nth });
+    });
+    act(() => {
+      setThreadFindQuery(T, "fqqzx");
+    });
+    expect(session()).toMatchObject({ current: null, aim: null });
+    act(() => {
+      setThreadFindQuery(T, "f");
+    });
+    expect(session()?.current).toEqual({ itemId: mid?.itemId, nth: mid?.nth });
+  });
+
+  it("matches that arrive for a query with none (text streaming in) make the first at or below the top current, in place", () => {
+    publishThread(T, fixStalePrBadge("idle"));
+    openThreadFind(T, "zebra crossing");
+    render(<Pane />);
+    expect(session()).toMatchObject({ current: null, aim: null });
+    const seq = session()?.revealSeq;
+    const text = idOf("text", 1);
+    act(() => {
+      editText(text, (t) => `${t} A zebra crossing.`);
+    });
+    expect(session()?.current).toEqual({ itemId: text, nth: 0 });
+    expect(session()?.revealSeq).toBe(seq);
+  });
+
+  it("the idle warm-up runs once the log arrives when the bar opened before it", async () => {
+    openThreadFind(T);
+    render(<Pane />);
+    await tick();
+    expect(vi.mocked(warmFind).mock.calls.some(([items]) => items.length > 0)).toBe(false);
+    act(() => {
+      publishThread(T, fixStalePrBadge("idle"));
+    });
+    await tick();
+    expect(vi.mocked(warmFind).mock.calls.some(([items]) => items.length > 0)).toBe(true);
   });
 
   it("a new query starts at the first match at or below the list's top", () => {

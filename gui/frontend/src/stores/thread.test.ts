@@ -291,6 +291,21 @@ describe("startThreadWatch", () => {
     expect(watched.opened).toBe(1);
   });
 
+  it("marks a thread synced once its Watch's snapshot arrives, even one equal to the kept log, and unmarks it when the Watch ends", async () => {
+    const kept: ThreadLog = { seq: 1, byId: { a: text("a", 1, "hi") }, order: ["a"], pending: [], mcp: null, commands: [], agents: [] };
+    useThreadStore.setState({ logs: { s: kept }, synced: {} });
+    watched.events = [snapshot(1, [text("a", 1, "hi")])];
+    const stop = startThreadWatch("s");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(useThreadStore.getState().synced.s).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(WATCH_BATCH_MS);
+    expect(useThreadStore.getState().synced.s).toBe(true);
+    stop();
+    expect(useThreadStore.getState().synced.s).toBeUndefined();
+    // The log stays kept for a later visit, which is behind until its own snapshot.
+    expect(useThreadStore.getState().logs.s).toBeDefined();
+  });
+
   it("opens one Watch per thread on screen: a second view of it shares it, another thread gets its own", async () => {
     watched.events = [];
     const main = startThreadWatch("s");
