@@ -90,9 +90,6 @@ func threadSearch(b SearchBackend) Command {
 	}
 }
 
-// searchSnippetWidth is how many characters of a snippet a line shows.
-const searchSnippetWidth = 120
-
 // FormatSearch renders thread.search: the matching thread names, then each thread's hits
 // under a line naming it, and how to read around a hit.
 func FormatSearch(res *v1.SearchThreadsResponse, now time.Time) string {
@@ -133,7 +130,7 @@ func FormatSearch(res *v1.SearchThreadsResponse, now time.Time) string {
 	for _, g := range res.GetGroups() {
 		shown += len(g.GetHits())
 	}
-	fmt.Fprintf(&sb, "Messages: %d in %d threads", res.GetTotalHits(), res.GetTotalThreads())
+	fmt.Fprintf(&sb, "Messages: %d in %s", res.GetTotalHits(), plural(int(res.GetTotalThreads()), "thread"))
 	if shown < int(res.GetTotalHits()) {
 		fmt.Fprintf(&sb, " (%d shown)", shown)
 	}
@@ -142,19 +139,15 @@ func FormatSearch(res *v1.SearchThreadsResponse, now time.Time) string {
 	}
 	sb.WriteString("\n")
 	for _, g := range res.GetGroups() {
-		hits := "hit"
-		if g.GetTotalHits() != 1 {
-			hits = "hits"
-		}
-		fmt.Fprintf(&sb, "\n%s  (%d %s)\n", threadName(g.GetThreadId(), g.GetThreadName(), g.GetArchived()), g.GetTotalHits(), hits)
+		fmt.Fprintf(&sb, "\n%s  (%s)\n", threadName(g.GetThreadId(), g.GetThreadName(), g.GetArchived()), plural(int(g.GetTotalHits()), "hit"))
 		tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
 		for _, h := range g.GetHits() {
 			who := searchSpeakerWords[h.GetSpeaker()]
 			if h.GetParentToolUseId() != "" {
 				who = "subagent " + who
 			}
-			fmt.Fprintf(tw, "  #%d\t%s\t%s\t%s\n", h.GetOrdinal(), who, age(h.GetCreatedAt().AsTime(), now),
-				truncateRunes(h.GetSnippet(), searchSnippetWidth))
+			// The snippet whole: the daemon cut it around its matches already.
+			fmt.Fprintf(tw, "  #%d\t%s\t%s\t%s\n", h.GetOrdinal(), who, age(h.GetCreatedAt().AsTime(), now), h.GetSnippet())
 		}
 		_ = tw.Flush()
 	}

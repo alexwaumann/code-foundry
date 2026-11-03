@@ -151,7 +151,7 @@ func (m *Manager) startSearchBackfill(ctx context.Context) {
 			m.log.Error("index threads for search", "threads", n, "of", len(ids), "err", err)
 			return
 		}
-		m.log.Info("indexed threads for search", "threads", n, "items", items, "took", time.Since(start).Round(time.Millisecond))
+		m.log.Info("indexed threads for search", "threads", n, "items", items, "took", time.Since(start).Round(time.Millisecond).String())
 	}()
 }
 

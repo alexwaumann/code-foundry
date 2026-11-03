@@ -83,7 +83,7 @@ Messages: 9 in 2 threads (3 shown)
 
 s-1  Fix the login redirect  (7 hits)
   #3   you     5m  the login page
-  #12  claude  4m  ` + strings.Repeat("x", 119) + `…
+  #12  claude  4m  ` + strings.Repeat("x", 130) + `
 
 s-22  (unnamed) (archived)  (1 hit)
   #40  subagent question  3h  Which login? Email

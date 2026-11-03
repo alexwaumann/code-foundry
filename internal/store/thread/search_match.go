@@ -13,8 +13,8 @@ import (
 // its spaces. Every term must occur in the text, in any order, as a substring. Smart case:
 // the match ignores case unless the query has an upper-case letter, and then it is exact.
 // The index (trigram, case-insensitive) finds the candidates by the terms of three
-// characters and more; the store checks each candidate's own text here when the query is
-// case-sensitive or has a shorter term. A query whose terms are all shorter than three
+// characters and more; the store checks each candidate's own text here (case, shorter
+// terms, and a document saved from another copy of the item). A query whose terms are all shorter than three
 // characters matches thread names only.
 
 // minIndexedTerm is the trigram tokenizer's shortest searchable term, in characters.
@@ -31,7 +31,7 @@ type searchQuery struct {
 	// fts is the FTS5 expression of the terms of minIndexedTerm characters and more
 	// ("" when there is none: names only).
 	fts string
-	// short: some term is shorter than minIndexedTerm (the index cannot check it).
+	// short: some term is shorter than minIndexedTerm (only the text check sees it).
 	short bool
 }
 
@@ -88,10 +88,6 @@ func splitTerms(q string) []string {
 	flush()
 	return out
 }
-
-// needsCheck reports whether the index's candidates must be checked against their text
-// to be hits: the index ignores case and cannot see short terms.
-func (q searchQuery) needsCheck() bool { return q.caseSensitive || q.short }
 
 // MatchRange is a match in a text: [Start, End) in code points (runes), not bytes.
 type MatchRange struct {
