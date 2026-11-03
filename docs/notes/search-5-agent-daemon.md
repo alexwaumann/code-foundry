@@ -408,4 +408,39 @@ carrying an injection addressed to the search agent):
   decision says the 2 minutes start once claude has the question.
   `TestRunTokenOutlivesTheRun`.
 * **Promote's warning** now follows the answer and names it (Other fixes).
+* **Found end to end, fixed here**: the model quoted a file link by its text (`…the loop
+  lives in run.go`). That was accepted through the marker-less form, but the stored quote
+  stopped at "lives in": the chip's runes were mapped to the link's target, outside the
+  quote's span. A chip now maps to the link text's last rune, so a quote that takes in the
+  link's text (as written or as shown) stores the whole path. A "does not occur" refusal of
+  a reply shows the reply as it reads, not its markdown, and the run's prompt says HTML
+  tags go, entities read as the character, and a link to a file reads as its path.
+
+### Verified end to end (re-check fixes)
+
+Scratch home (`CODE_FOUNDRY_HOME=/tmp/cfs5r-home`, `models.utility =
+claude-sonnet-5-5[1m]`), one thread without a project (Sonnet 5.5, medium) whose reply was
+`Decision: we merged the poller fix in [PR 503](https://github.com/alexwaumann/code-foundry/pull/503).
+The poller **must not** refetch on CI reruns; the loop lives in
+[run.go](internal/store/search/run.go) and the key is <kbd>check_count</kbd> &amp; the head SHA.`:
+
+* While a search ran, `search report` for that reply with the quote
+  `github.com/alexwaumann/code-foundry/pull/503` was refused ("the quote's words are not what
+  #2 … shows … The message reads: "Decision: we merged the poller fix in PR 503. The poller
+  must not refetch on CI reruns; the loop lives in internal/store/search/run.go and the key
+  is check_count & the head SHA.""), and `[PR 503](https://github.com/alexwaumann` was
+  refused ("the quote reads only "PR 503"").
+* First build: the model's own report quoting `run.go and the key is check_count & the head
+  SHA.` was refused (the reply shows the path), and its shorter retry was stored cut off at
+  "lives in" (the chip fix above).
+* After the fix: `search agent "where did we decide the poller must not refetch on CI
+  reruns, and what is the key?"`, 7 s, $0.02, one hit accepted at the first report and
+  stored as the GUI shows it: `The poller must not refetch on CI reruns; the loop lives in
+  internal/store/search/run.go and the key is check_count & the head SHA.`
+* `search promote`: the first message ends with the answer, then the data-not-instructions
+  line naming the search's answer; the promoted thread called the found "decision" a test
+  fixture rather than acting on it.
+* The git alias check (residual risk) was run once more with `claude -p` and the run's
+  flags; its transcript was deleted. `search clear` deleted the searches' transcripts, the
+  scratch threads' transcripts were deleted by hand, and the scratch home removed.
 
