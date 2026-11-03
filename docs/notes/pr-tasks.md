@@ -28,29 +28,51 @@ Code: `internal/command/commands_prtask.go` (the command and its routing),
 * `pr.task` is in `threadStarters` (`internal/daemon/settings.go`): model and effort
   default from the thread settings, as for its siblings. The guide lists it on its own
   (the guide size check moved to 25,700 bytes).
-* Result JSON (`PRTaskResult`): `{threadId, sent, projectId?, worktreePath?,
-  createdWorktree?, cloned?}`. Messages: `Sent to <thread label>`, `Started thread <label>
-  for PR #N`, or `Cloned <slug> and started thread <label> for PR #N`.
+* Result JSON (`PRTaskResult`): `{threadId, sent, ordinal?, projectId?, worktreePath?,
+  createdWorktree?, cloned?}`. Messages: `Sent to <thread label> (#N); <next>` where
+  `<next>` is thread.send's `sendNext` (the `thread wait <id> --after N` line, or "you are
+  subscribed (...): end your turn" when the caller holds a wake subscription on that
+  thread), `Started thread <label> for PR #N`, or `Cloned <slug> and started thread <label>
+  for PR #N`.
+* Argument combinations are checked before the pull request is read (no GitHub refresh
+  for a refused call): `--worktree`, `--model`, `--effort` and `--focus` shape a new thread
+  only, so each is InvalidArgument together with `--thread` rather than silently
+  ignored. (Settings defaults for model and effort are not "given" and do not count.)
 
 ## Routing
 
 * `--thread <id>` (routing rule 1, and the ▾ of rule 2): `Thread.Get` (an unknown id fails
-  with NotFound before anything is sent), then `Thread.Send` with the follow-up prompt,
+  with NotFound before anything is sent; a removed one answers as thread.send does, the
+  removed line with its last report and cost and exit 1, also when it is removed between
+  the Get and the Send), then `Thread.Send` with the follow-up prompt,
   exactly thread.send's path: delivered mid-turn when the thread works, a stopped thread
   starts with it. No focus intent: the window keeps its selection. From a thread's CLI
   the message carries `by_thread_id` (the caller), so the user's prompt history leaves it
   out, as thread.send's `--by`; from the GUI it is the user's own message.
-* No `--thread` (rule 3): the projects are listed; a clone of the slug runs the task in
+* No `--thread` (rule 3): the projects are listed; a clone of the slug (the argument, or
+  GitHub's current name for the repository from the detail's `repo_slug`, so a renamed
+  or transferred repository still finds its clone) runs the task in
   the worktree on the head (`headWorktree`, the same match as fix.findings: a
   same-repository head by branch name, a fork's by commit or by a non-origin upstream),
   else creates one with `createPRWorktree` (fetch `origin/<head>` in the main worktree,
   `CreateWorktree` on the existing branch; a concurrent create re-lists and reuses).
 * Rule 4: no project is a clone of the slug, so it is cloned first with the same
   `CloneFunc` as project.clone (`~/.code-foundry/projects/<owner>/<repo>`; the daemon
-  wires `projectAPI.CloneRef`), no prompt and no confirmation. A clone the store returns
-  without a slug gets the slug that was cloned. Before cloning, the placement is tried on
-  a stand-in clone with no worktrees: a push task on a fork's pull request (or one with no
-  head branch) is refused there, since a fresh clone could not place it either.
+  wires `projectAPI.CloneRef`), no prompt and no confirmation. GitHub's current name is
+  what is cloned. A clone the store returns without a slug gets the slug that was cloned.
+  Before cloning, a push task that a fresh clone could not place either is refused: no
+  head branch ("#N has no head branch to check out: pass --worktree"), or a fork's head
+  ("#N comes from a fork and o/r is not a project yet: clone it, check out the head there,
+  and pass --worktree").
+* Also before cloning: a project whose origin path ends in `/<owner>/<repo>`
+  (case-insensitive, with or without `.git`) but whose `github_slug` does not match is
+  refused (FailedPrecondition, advice: pass `--worktree`, or point origin at github.com).
+  That is an SSH host alias (`git@github-work:org/repo.git`, which `parseGitHubSlug`
+  deliberately does not guess) or another host, and cloning would silently make a second
+  copy. `Project.origin_path` (new) carries origin's path for it: path only, never the
+  host or user, so an https origin's token does not leave the project store.
+* A step that fails after the clone (fetch, worktree create, thread start) keeps its code
+  and says "cloned o/r into <path>, which stays a project: ...": a retry finds the clone.
 * A clone that fails (the destination folder exists but is not registered, gh fails)
   keeps its Connect code with the step named: `clone o/r: ...`. Not registering an
   existing folder automatically was deliberate: the folder may be something else.
@@ -86,8 +108,10 @@ Code: `internal/command/commands_prtask.go` (the command and its routing),
   `git branch --show-current`, switch if needed, and ask the user rather than move
   unrelated uncommitted work.
 * `checks`: each failing check newest first with workflow, conclusion, description and
-  URL; a GitHub Actions job URL (`.../actions/runs/<id>/...`) adds
-  `gh run view <id> --log-failed --repo slug`. Flaky or unrelated failures are re-run,
+  URL; a GitHub Actions job URL (`github.com/<owner>/<repo>/actions/runs/<id>/...`) adds
+  `gh run view <id> --log-failed --repo <owner>/<repo>`, the URL's repository rather than
+  the pull request's (a check may run elsewhere), owner and name held to GitHub's
+  characters. Flaky or unrelated failures are re-run,
   not "fixed".
 * `review`: one entry per reviewer whose latest review requests changes (from
   `reviewers`), with that reviewer's latest CHANGES_REQUESTED summary and its inline
@@ -116,6 +140,11 @@ through the mock's thread.send path (a user message then a short reply), otherwi
 head's worktree is reused or created, or the repository cloned first (into
 `~/.code-foundry/projects/...` via `world.addClone`; `octo-org/already-here` is
 AlreadyExists). New threads get the one-line stand-in prompt as their first message.
+It mirrors the daemon's refusals and result shape: new-thread args with `--thread`,
+`--thread` by a unique 4+ character id suffix (the registry's `ResolveID`), the ordinal
+and wait hint after a send, omitted empty fields, "read #N: ..." for a failed read and
+NotFound for a missing pull request, and the no-head-branch and not-a-project refusals.
+Mock projects all have GitHub origins, so the origin-path refusal is daemon-only.
 `POST /__mock/gh/pr-fail?command=pr.task` fails the next run with the fork refusal and
 `pr-delay` delays it. A pull request in a repository that is no project:
 `POST /__mock/gh/branch-pr?slug=octo-org/Hello-World&head=fix/typo&number=3`. Kept in its
