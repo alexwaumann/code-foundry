@@ -38,7 +38,10 @@ would make it do the work itself or re-delegate by hand. The daemon now does the
   note is in the open turn's body (a `system` row, which never folds away; a final
   answer before it stays final, `markFinal` skips it), a message after it is a steer,
   and it starts no turn of its own (`startsTurn`). Between turns it stands alone as
-  before. The one note that still ends a turn is a fork's (`note-fork-<parent>`,
+  before, also after an error alone (a process that ended after its turn): the
+  daemon's `startsTurn` and the GUI's `holdsTurn` agree that errors, notes, pages,
+  themes and command output alone are no turn (`[user, turnEnd, error, note]` is the
+  turn, the error, then the note on its own). The one note that still ends a turn is a fork's (`note-fork-<parent>`,
   `forkNotePrefix`, `isForkNote` on both sides): it ends the copied history, which may
   stop mid-turn.
 - `Thread.HandledThrough` (`handled.go`): the highest ordinal of a message that a turn
@@ -49,23 +52,46 @@ would make it do the work itself or re-delegate by hand. The daemon now does the
   had, "finished" then "finished", publishes it alone) and when the process ends
   (`finish`, after `cutTurn`'s synthetic turn end). In memory: zero after a daemon
   restart until the thread runs.
+- A message sent while the thread starts (`runner.queue`, held for the handshake behind
+  the first prompt) is written `Queued` and stays so until it goes out; `sendMessage`
+  then sets the flag to what Claude does with it (queued when it works on the first
+  prompt, taken in at once otherwise). Before, it was written not queued, so it counted
+  as taken at once and the first prompt's turn end moved `HandledThrough` past it: a
+  forward to a starting owner woke the sender before the owner read the task. A send
+  during a restart is held unwritten and written when the new process takes it
+  (`onRestarted`), so the interrupted turn's end never counted it.
 - `SubscribeThreadRequest.before_send` and `after_ordinal`, thread targets only, not
   both (in memory, as `subRec.unarmed`, `through`, `armReq`):
   - `before_send` makes a subscription that never fires until armed. With the same
     subscription (subscriber, target, condition) existing, it leaves that one as it is
-    (existed).
+    (existed). Its target may be archived: the send unarchives it (an archived owner is
+    still the owner). Before, it was refused ("thread X is archived"), so the forward
+    promised no wake for a reason the send itself made untrue. Should the owner stay
+    archived (the send failed), the arming is refused as before. An archived target's
+    publish drops subscriptions to it (`observeLocked`); should one between the
+    subscription and the send drop it, the arming makes a new one.
   - `after_ordinal` (the sent message's ordinal) arms an unarmed one, or makes one: the
     target meets the condition only once its `HandledThrough` reached the ordinal, or
     when it waits on a pending request other than the one pending at the arming. It
     fires at once when that already happened (a turn that ended before the arming).
     With an armed one existing (another forward's), it waits for the later of the two
     messages. With any other existing (a `--notify` repeat one), the repeat flag, note
-    and gate stay; the arming's note goes on that subscription's next wake only
-    (`subRec.extra`, joined after the stored note with "; "), and two forwards close
-    together put both notes on it. A held lead wake (`subscriptions_hold.go`) keeps
-    those notes when a new fire replaces it.
+    and gate stay; the arming's note goes on one wake only (`subRec.extra`, joined after
+    the stored note with "; "): the first whose target's `HandledThrough` reached the
+    arming's ordinal (`extraNote.through`, `dueExtra`), so it does not ride on an
+    earlier wake about a turn from before the task; two forwards close together put
+    both notes on the wake after both were handled, each on its own wake otherwise. The
+    same note armed twice waits for the later ordinal. A held lead wake
+    (`subscriptions_hold.go`) keeps those notes when a new fire replaces it, handed on
+    one by one (`Subscription.wakeExtra`, in memory) so a note said again is not
+    repeated.
   - Not persisted: after a daemon restart the subscription fires on the next
-    transition, as any subscription does.
+    transition, as any subscription does. So one left unarmed (the daemon stopped
+    between the subscription and the send, or between the send and the arming) or
+    gated (the task not handled yet) becomes an ordinary one-shot settled subscription:
+    it can fire on the owner's next transition even though the owner never handled the
+    task, or never got it (the send did not happen). The wake then reads as any
+    settled wake with the forward's note; the sender can check the owner's timeline.
 - `pr.task --thread T` (`commands_prtask.go`, `commands_prtask_forward.go`):
   1. Get T (removed: thread.send's removed answer, as before), then PullRequestOwner. An
      error there, or an owner that cannot be read, sends to T (logged).
@@ -82,9 +108,11 @@ would make it do the work itself or re-delegate by hand. The daemon now does the
      before). If the owner was removed between the read and the send, the subscription
      made in step 2 is dropped (not one that existed) and the task goes to T instead,
      with no note and no wake.
-  4. Arm the subscription with the message's ordinal (`after_ordinal`; 1 when the send
-     answered none). If that fails, the subscription made in step 2 is dropped and the
-     note and the message say no wake comes (the prompt already went out).
+  4. Arm the subscription with the message's ordinal (`after_ordinal`). If that fails,
+     or the send answered no ordinal (a real send always does; arming on 1 instead, as
+     before, would have fired on whatever turn ended first), the subscription made in
+     step 2 is dropped and the note and the message say no wake comes ("the send did
+     not say which message to wait for"; the prompt already went out).
   5. Note in T: `Sent to <owner name> (<owner id>): <task title> (#N)`, N the pull
      request, then `; it will not wake this thread: <why>` when there is no wake.
   6. Result `{threadId: owner, viaThreadId: T, sent, ordinal}`, message
@@ -195,14 +223,29 @@ with `via`, as the daemon does; without `up`, nothing changes for existing tests
   at the arming and a still working target do not; a turn already over at the arming,
   "finished" twice, a new prompt do), `TestSubscribeSendGateUnarmed`,
   `TestSubscribeSendGateExisting` (a `--notify` repeat one: two forwards' notes on its
-  next wake only, the stored one unchanged; another forward's one-shot waits for the
+  first wake after both were handled only, the stored one unchanged; another forward's one-shot waits for the
   later message and carries both notes), `TestSubscribeSendGateRefused`,
   `TestLeadWakeHeldKeepsForwardNote`, and `TestPullRequestTask` cases: forward from the
-  GUI, forward from an agent's CLI (no ordinal: armed on 1), unreadable owner, owner
+  GUI, forward from an agent's CLI, a send answering no ordinal (no wake, why in the
+  note and the message), unreadable owner, owner
   removed before the send (the subscription made for it dropped; one that existed
   kept), a sender that cannot be woken, arming that fails after the send, both slugs.
   Also `TestPRTaskPromptForwarded` (every kind; backticks and `@` neutralized in the
   name; the no-wake line).
+- Second review round: `TestSubscribeSendGateArchivedTarget` (an archived owner: before
+  the send accepted, armed refused without a send, the send revives it, one wake after
+  the turn that read it, nothing left), `TestHandledThroughHeldWhileStarting` (a message
+  sent during StateStarting behind a first prompt is queued until delivered and still
+  queued once sent; the first prompt's turn end leaves `HandledThrough` below it and
+  wakes no forward), `TestHandledThroughHeldByRestart` (a send during a busy restart:
+  not counted while the new process's turn that reads it waits on a permission prompt,
+  counted and one wake after it ends), `TestSubscribeSendGateExisting` (a `--notify`
+  wake from a turn before the forward has the stored note alone, the wake after the
+  child handled both forwards has both notes, the next one the stored note alone),
+  `TestLeadWakeHeldKeepsForwardNote` (the held wake's note handed on to the replacing
+  fire once, with a second forward's note, the same task forwarded again not
+  repeated), `threadTimeline.test.ts` (`[user, text, turnEnd, error, note, user]`: the
+  note stands alone).
 - Vitest: `threadTimeline.test.ts` (`[user, tool, note, tool, text, turnEnd]` is one
   turn with the note in its body, kept when folded, the answer final; a note after the
   answer; a note keeps a running turn open and a message after it is a steer; a note
