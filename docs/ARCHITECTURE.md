@@ -124,6 +124,9 @@ internal/
                            resumed download, sha256-pinned), the code-foundry-dictate engine
                            process (stdio JSON), one session at a time, unload while away
                            (docs/notes/dictation-2-daemon.md)
+    search/                the search dialog's history and Agent search's hidden runs
+                           (claude over stream-json, not threads), quote-verified hits, Promote
+                           (docs/notes/search-5-agent-daemon.md)
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
   dictate/                 the dictation engine's protocol, phrase segmentation and output
                            filters (pure Go); dictate/whisper is the cgo model actor
@@ -416,6 +419,12 @@ Services (v1):
   Session (one session's levels, phrases and end), Audio (the Wails host's microphone
   client stream), MicDenied: voice dictation into the composers, transcribed on this Mac
   by the code-foundry-dictate engine the daemon runs (`docs/notes/dictation-2-daemon.md`).
+* `SearchService` — StartAgent, Watch (server stream: the entry, then its steps, hits,
+  answer and end), WatchRecent, Stop, ListRecent, Get, OpenHit, MarkSeen, RecordFind, Forget,
+  Clear, Promote, Report: the search dialog's history (the last 50 searches) and Agent
+  search, a hidden claude -p run on the utility model that searches the user's threads with
+  the CLI and reports quote-verified hits; Promote continues it as a thread
+  (`docs/notes/search-5-agent-daemon.md`).
 * `HealthService` — Ping, Version.
 
 Rules:

@@ -128,8 +128,6 @@ type Step struct {
 	To         int64    `json:"to,omitempty"`
 	// Detail names an OTHER step: the call's description, else its command's start.
 	Detail string `json:"detail,omitempty"`
-
-	toolUseID string
 }
 
 // Entry is one search of the history.
