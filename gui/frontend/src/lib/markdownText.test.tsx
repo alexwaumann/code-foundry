@@ -1,6 +1,6 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { markdownText, streamingMarkdownText } from "./markdownText";
+import { markdownText, streamingBlockCacheSize, streamingMarkdownText } from "./markdownText";
 
 vi.mock("@/stores/gh", () => ({ openUrl: vi.fn(() => Promise.resolve()) }));
 vi.mock("@/api/threads", () => ({ readAttachment: vi.fn(() => Promise.resolve(null)) }));
@@ -66,5 +66,16 @@ describe("streamingMarkdownText", () => {
   it("a growing answer: each prefix reads as its render", () => {
     const md = cases.map(([, m]) => m).join("\n\n");
     for (const n of [40, 200, 420, md.length]) expect(streamingMarkdownText(md.slice(0, n))).toBe(renderedStreaming(md.slice(0, n)));
+  });
+
+  it("caches finished blocks only: a long last block streaming in many batches adds nothing per batch", () => {
+    const head = "A paragraph before the code.\n\n";
+    const code = "```ts\n" + Array.from({ length: 200 }, (_, i) => `const line${String(i)} = ${String(i)};`).join("\n") + "\n```";
+    streamingMarkdownText(head + code.slice(0, 10));
+    const size = streamingBlockCacheSize();
+    for (let n = 20; n <= code.length; n += 20) streamingMarkdownText(head + code.slice(0, n));
+    // The paragraph is cached once; the code block, the last one, never.
+    expect(streamingBlockCacheSize()).toBe(size);
+    expect(streamingMarkdownText(head + code)).toContain("const line199 = 199;");
   });
 });

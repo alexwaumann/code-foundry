@@ -120,7 +120,12 @@ export function joinBlocks(texts: readonly string[]): string {
   return out;
 }
 
-/** Each streaming block's text by its source, most recently used last (a finished block is parsed once; the growing last one each time). */
+/**
+ * Each finished streaming block's text by its source, most recently used last: a finished
+ * block is parsed once. The last block is still growing and is parsed each time without
+ * being kept (each batch's copy would be a new entry, megabytes for a long code block,
+ * and would push the finished ones out).
+ */
 const blockTexts = new Map<string, string>();
 const BLOCK_CACHE = 2000;
 
@@ -144,5 +149,11 @@ function blockText(block: string): string {
  */
 export function streamingMarkdownText(markdown: string): string {
   if (markdown === "") return "";
-  return joinBlocks(markdownBlocks(markdown).map(blockText));
+  const blocks = markdownBlocks(markdown);
+  return joinBlocks(blocks.map((b, i) => (i === blocks.length - 1 ? markdownText(b) : blockText(b))));
+}
+
+/** How many finished blocks' texts are cached (tests). */
+export function streamingBlockCacheSize(): number {
+  return blockTexts.size;
 }
