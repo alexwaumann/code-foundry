@@ -1,0 +1,41 @@
+/*
+ * The in-thread find (docs/notes/search-2-thread-find.md): every match tinted, the current
+ * one solid, painted with the CSS Custom Highlight API like the cite layer's ranges
+ * (cite/cite.css), whose overlay is the fallback where ::highlight is missing. The match
+ * map's ticks sit along the list's scrollbar edge.
+ */
+::highlight(cf-find) {
+  background-color: color-mix(in oklab, var(--cf-warning) 26%, transparent);
+}
+::highlight(cf-find-current) {
+  background-color: var(--cf-warning);
+  color: var(--cf-warning-foreground);
+}
+.cite-overlay[data-cite-overlay="cf-find"] > div {
+  background: color-mix(in oklab, var(--cf-warning) 26%, transparent);
+}
+.cite-overlay[data-cite-overlay="cf-find-current"] > div {
+  background: color-mix(in oklab, var(--cf-warning) 60%, transparent);
+}
+
+.find-map {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  right: 3px;
+  width: 6px;
+  pointer-events: none;
+  z-index: 20;
+}
+.find-map > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  margin-top: -1px;
+  background: color-mix(in oklab, var(--cf-warning) 55%, transparent);
+}
+.find-map > span.current {
+  background: var(--cf-warning);
+  z-index: 1;
+}

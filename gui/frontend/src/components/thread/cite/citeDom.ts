@@ -27,10 +27,11 @@ export interface PlainText {
   segments: readonly { node: Text; at: number }[];
 }
 
-/** Text the user cannot select as part of the answer: buttons (Copy, Run), hidden helpers. */
-function skipped(node: Text, root: Element): boolean {
+/** Text the user cannot select as part of the answer: buttons (Copy, Run), hidden helpers; and elements matching `skip`. */
+function skipped(node: Text, root: Element, skip: string | undefined): boolean {
   for (let el = node.parentElement; el && el !== root; el = el.parentElement) {
     if (el.tagName === "BUTTON" || el.hasAttribute("data-cite-skip") || el.getAttribute("aria-hidden") === "true") return true;
+    if (skip !== undefined && el.matches(skip)) return true;
   }
   return false;
 }
@@ -40,15 +41,15 @@ function blockOf(node: Text, root: Element): Element {
   return root;
 }
 
-/** The rendered plain text of an answer's element. */
-export function plainText(root: Element): PlainText {
+/** The rendered plain text of an answer's element. `skip`: a selector for more elements whose text is left out (a user bubble's tags, for find). */
+export function plainText(root: Element, skip?: string): PlainText {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let text = "";
   const segments: { node: Text; at: number }[] = [];
   let block: Element | null = null;
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const t = n as Text;
-    if (t.data === "" || skipped(t, root)) continue;
+    if (t.data === "" || skipped(t, root, skip)) continue;
     const parent = t.parentElement;
     if (/^\s*$/.test(t.data) && (parent === root || (parent !== null && CONTAINERS.has(parent.tagName)))) continue;
     const b = blockOf(t, root);
@@ -165,8 +166,8 @@ export function lineRects(pt: PlainText, start: number, end: number): DOMRect[] 
   return out;
 }
 
-/** The painted ranges: the selection kept while the comment field has the keyboard, and a cited quote. */
-export type CitePaint = "cf-cite-held" | "cf-cite-mark";
+/** The painted ranges: the selection kept while the comment field has the keyboard, and a cited quote; the find bar's matches and its current one. */
+export type CitePaint = "cf-cite-held" | "cf-cite-mark" | "cf-find" | "cf-find-current";
 
 interface HighlightRegistryLike {
   set(name: string, h: unknown): void;
@@ -201,13 +202,18 @@ function overlay(name: CitePaint, rects: readonly DOMRect[]): void {
 
 /** Paints a range in one of the cite tints (null clears it). `rects`: its line boxes, for the overlay. */
 export function paint(name: CitePaint, range: Range | null, rects: readonly DOMRect[] = []): void {
+  paintAll(name, range ? [range] : [], rects);
+}
+
+/** Paints ranges in one tint (none clears it). `rects`: their line boxes, for the overlay. */
+export function paintAll(name: CitePaint, ranges: readonly Range[], rects: readonly DOMRect[] = []): void {
   const reg = registry();
   if (reg) {
-    if (range) {
+    if (ranges.length > 0) {
       const H = (globalThis as unknown as { Highlight: new (...r: Range[]) => unknown }).Highlight;
-      reg.set(name, new H(range));
+      reg.set(name, new H(...ranges));
     } else reg.delete(name);
     return;
   }
-  overlay(name, range ? rects : []);
+  overlay(name, ranges.length > 0 ? rects : []);
 }

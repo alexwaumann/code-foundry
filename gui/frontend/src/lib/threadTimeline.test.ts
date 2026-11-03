@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, buildTurns, decodeTimelineKey, groupLabel, linkRepeatShows, stripRuns, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
+import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, groupLabel, linkRepeatShows, stripRuns, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
 
 let n = 0;
 function item(kind: TimelineItem["kind"], over: Partial<TimelineItem> = {}): TimelineItem {
@@ -600,5 +600,17 @@ describe("inline pages (html items)", () => {
   it("shown between turns while a new one starts: the live header follows the page", () => {
     const items = [user("u1"), end("e1"), item("html", { id: "h" })];
     expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded 0)", "html:h", "live(,0)"]);
+  });
+});
+
+describe("foldingTurn", () => {
+  it("names the turn whose fold hides a question's row; text, steers and other turns' items are never hidden", () => {
+    const q = item("question", { id: "q1", name: "AskUserQuestion", requestState: "allowed" });
+    const turns = buildTurns([user("u1"), text("t1"), q, text("t2"), end("e1"), user("u2"), text("t3"), end("e2")]);
+    expect(foldingTurn(turns, "q1")).toBe("u1");
+    expect(foldingTurn(turns, "t1")).toBe("");
+    expect(foldingTurn(turns, "t3")).toBe("");
+    expect(foldingTurn(turns, "u2")).toBe("");
+    expect(foldingTurn(turns, "nope")).toBe("");
   });
 });

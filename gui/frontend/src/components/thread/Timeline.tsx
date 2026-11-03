@@ -1,8 +1,8 @@
 import { type ReactNode, type SyntheticEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
-import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/lib/threadTimeline";
-import { deferTurnFolds, foldDeferredTurns, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
+import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, type TimelineRow } from "@/lib/threadTimeline";
+import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, structOf, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
 import { registerTimeline } from "@/stores/cite";
 import { heldScroll, spacerAfterGrowth } from "@/lib/timelineHold";
 import { scrollIntent, type ScrollSample } from "@/lib/scrollIntent";
@@ -112,7 +112,34 @@ export function Timeline({
     (o: TimelineOverlay<TimelineRow>) => <PromptRail threadId={threadId} list={o.list} rows={o.rows} bottomInset={o.bottomInset} />,
     [threadId],
   );
-  return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns inset={inset} overlay={rail ? overlay : undefined} pinnedLayer={pinnedLayer} />;
+  const unfold = useMemo(() => unfoldTurnOf(threadId), [threadId]);
+  return (
+    <TimelineList
+      threadId={threadId}
+      rows={rows}
+      bottomInset={bottomInset}
+      renderRow={renderTimelineRow}
+      turns
+      unfold={unfold}
+      inset={inset}
+      overlay={rail ? overlay : undefined}
+      pinnedLayer={pinnedLayer}
+    />
+  );
+}
+
+/**
+ * Unfolds the turn whose fold hides an item (an answered question's row, for the find
+ * bar); false when no fold hides it. Read from the items, not the rows on screen, so it
+ * holds right after a fold changed in the same tick.
+ */
+function unfoldTurnOf(threadId: string): (rows: readonly TimelineRow[], itemId: string) => boolean {
+  return (_rows, itemId) => {
+    const turn = foldingTurn(buildTurns(getThreadItems(threadId).map(structOf)), itemId);
+    if (turn === "") return false;
+    setTurnFolded(threadId, turn, false);
+    return true;
+  };
 }
 
 function renderTimelineRow(row: TimelineRow) {
@@ -169,7 +196,7 @@ export function TimelineList<R extends ListRow>({
   turns?: boolean;
   /** The cite layer can bring its rows into view (stores/cite registerTimeline): the thread's own timeline (turns) and Ember's chat. */
   citable?: boolean;
-  /** Opens what folds the item away (Ember's work row), for the cite layer; without it, the turn the item is in unfolds. */
+  /** Opens what folds the item away (Ember's work row, a thread's folded turn), for the cite layer and the find bar; false when nothing hides it. */
   unfold?: (rows: readonly R[], itemId: string) => boolean;
   /** The rows' left and right inset in px (40 in the content pane, less in a narrow side panel). */
   inset?: number | undefined;
@@ -310,6 +337,9 @@ export function TimelineList<R extends ListRow>({
         pinned.current = false;
       },
       unfold: unfoldRef.current ? (itemId) => unfoldRef.current?.(rowsRef.current, itemId) ?? false : undefined,
+      rowKeys: () => rowsRef.current.map((r) => r.key),
+      rowStart: (index) => v.measurementsCache[index]?.start,
+      topRow: () => v.getVirtualItemForOffset(el.scrollTop)?.index ?? 0,
     });
   }, [threadId, citable, v]);
 

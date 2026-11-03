@@ -421,6 +421,35 @@ export function setRowExpanded(threadId: string, rowKey: string, expanded: boole
   useThreadStore.setState((s) => ({ expanded: { ...s.expanded, [threadId]: { ...s.expanded[threadId], [rowKey]: expanded } } }));
 }
 
+/** A thread's fold and expand choices: the user's (and a reveal's), by turn key and row key. */
+export interface TurnView {
+  folds: Readonly<Record<string, boolean>>;
+  expanded: Readonly<Record<string, boolean>>;
+}
+
+/** A thread's fold and expand choices as they are now (what a reveal compares against to put them back). */
+export function getTurnView(threadId: string): TurnView {
+  const s = useThreadStore.getState();
+  return { folds: s.folds[threadId] ?? NO_FOLDS, expanded: s.expanded[threadId] ?? NO_EXPANDED };
+}
+
+/** Sets turn folds and row expansions of a thread; undefined drops the choice (the default again). */
+export function putTurnView(threadId: string, folds: Readonly<Record<string, boolean | undefined>>, expanded: Readonly<Record<string, boolean | undefined>>): void {
+  const merge = (cur: Readonly<Record<string, boolean>> | undefined, put: Readonly<Record<string, boolean | undefined>>) => {
+    const out = new Map(Object.entries(cur ?? {}));
+    for (const [k, v] of Object.entries(put)) {
+      if (v === undefined) out.delete(k);
+      else out.set(k, v);
+    }
+    return Object.fromEntries(out);
+  };
+  if (Object.keys(folds).length === 0 && Object.keys(expanded).length === 0) return;
+  useThreadStore.setState((s) => ({
+    folds: Object.keys(folds).length > 0 ? { ...s.folds, [threadId]: merge(s.folds[threadId], folds) } : s.folds,
+    expanded: Object.keys(expanded).length > 0 ? { ...s.expanded, [threadId]: merge(s.expanded[threadId], expanded) } : s.expanded,
+  }));
+}
+
 /** Leaves the turns that just ended (their turn_end ids) open: the timeline is scrolled up (TimelineOptions.deferred). */
 export function deferTurnFolds(threadId: string, turnEndIds: readonly string[]): void {
   if (turnEndIds.length === 0) return;
@@ -545,6 +574,7 @@ export function watchTurnEnds(threadId: string, onEnd: (turnEndIds: string[]) =>
 
 const NO_FOLDS: Readonly<Record<string, boolean>> = {};
 const NO_DEFERRED: Readonly<Record<string, true>> = {};
+const NO_EXPANDED: Readonly<Record<string, boolean>> = {};
 const NO_PENDING: readonly ThreadPendingView[] = [];
 
 /** The user's fold choices for a thread's turns. */

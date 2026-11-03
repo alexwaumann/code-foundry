@@ -179,6 +179,7 @@ export const UserBubble = memo(function UserBubble({
   queued = false,
   label,
   testId,
+  findItem,
 }: {
   text: string;
   composerText: string;
@@ -189,6 +190,8 @@ export const UserBubble = memo(function UserBubble({
   /** A small muted line inside the bubble, above the text (a subagent's "Prompt from <parent>"). */
   label?: ReactNode;
   testId?: string;
+  /** The item id the find bar searches the bubble's text under (components/thread/find); absent: not searched (a subagent's prompt). */
+  findItem?: string | undefined;
 }) {
   const pieces = useMemo(() => parseUserMessage(text, composerText, attachments), [text, composerText, attachments]);
   const inline = useMemo(() => inlineAttachmentPaths(pieces), [pieces]);
@@ -203,7 +206,7 @@ export const UserBubble = memo(function UserBubble({
         </ul>
       )}
       {pieces.length > 0 && (
-        <div className={cn("bubble selectable", steer && "max-w-[72%] rounded-lg px-3 py-1.5 text-body-sm")}>
+        <div className={cn("bubble selectable", steer && "max-w-[72%] rounded-lg px-3 py-1.5 text-body-sm")} data-find-item={findItem}>
           {label && (
             <span className="mb-0.5 flex items-center gap-1.5 text-caption whitespace-normal select-none" data-testid="thread-user-label">
               {label}

@@ -404,6 +404,7 @@ const TextRow = memo(function TextRow({ id, final, answer }: { id: string; final
       data-final={final || undefined}
       data-streaming={it.streaming || undefined}
       data-cite-item={citable ? it.id : undefined}
+      data-find-item={citable && !it.apiError ? it.id : undefined}
     >
       {md}
       {answer && <CopyAnswer answer={answer} />}
@@ -461,7 +462,8 @@ const QuestionRow = memo(function QuestionRow({ id }: { id: string }) {
         testId="thread-question-row"
       />
       {open && (
-        <dl className="detail grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body-sm selectable">
+        // The find bar searches this detail (an answer counts here, not in the summary that repeats it).
+        <dl className="detail grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body-sm selectable" data-find-item={it.parentToolUseId === "" ? it.id : undefined}>
           {questions.map((q) => (
             <div key={q.question} className="contents">
               <dt className="text-cf-text-muted">{q.question}</dt>
@@ -854,7 +856,15 @@ const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boole
   const msg = it.wake ? (
     <WakeNotes wake={it.wake} atMs={it.createdAtMs} queued={it.queued === true} />
   ) : (
-    <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} steer={steer} queued={it.queued === true} />
+    <UserBubble
+      text={it.text}
+      composerText={it.composerText}
+      attachments={it.attachments}
+      createdAtMs={it.createdAtMs}
+      steer={steer}
+      queued={it.queued === true}
+      findItem={it.parentToolUseId === "" ? it.id : undefined}
+    />
   );
   if (!it.resumeNote) return msg;
   return (

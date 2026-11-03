@@ -20,6 +20,7 @@ import { jumpToNeighbour } from "./threadNeighbours";
 import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
 import { presentFileFinder } from "./fileFinder";
+import { presentThreadFind } from "./threadFind";
 import { presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";
 import { openMovePicker } from "./movePicker";
@@ -200,6 +201,13 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
     case "file.find":
       // file.find: the palette's file finder over the selected thread (nothing on a page).
       return presentFileFinder();
+    case "thread.find":
+      // thread.find: the find bar of the thread in the content pane (nothing on a page).
+      return presentThreadFind("open");
+    case "thread.find.next":
+      return presentThreadFind("next");
+    case "thread.find.previous":
+      return presentThreadFind("previous");
     case "project.add":
       // project.add without a folder from the CLI or a page: the Add Project dialog, which
       // leaves the window where it is once the project is added (a page asked for it).

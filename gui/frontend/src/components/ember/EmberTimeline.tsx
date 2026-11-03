@@ -1,4 +1,4 @@
-import { memo, useContext, useMemo } from "react";
+import { memo, useContext, useMemo, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ChevronRight, GitBranch, LoaderCircle, RotateCcw, SquareKanban } from "lucide-react";
 import type { ThreadItemView } from "@/api/thread";
@@ -134,12 +134,12 @@ function unfoldIn(threadId: string): (rows: readonly EmberRow[], itemId: string)
  * its thread's only body (ThreadPane routes Ember's thread here, never to ThreadBody), so
  * it is the one list the cite layer finds for the thread.
  */
-export function EmberTimeline({ threadId, working, bottomInset }: { threadId: string; working: boolean; bottomInset: number }) {
+export function EmberTimeline({ threadId, working, bottomInset, pinnedLayer }: { threadId: string; working: boolean; bottomInset: number; pinnedLayer?: ReactNode }) {
   const rows = useEmberRows(threadId, working);
   const unfold = useMemo(() => unfoldIn(threadId), [threadId]);
   return (
     <TextMarkdownContext.Provider value={emberMarkdown}>
-      <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderRow} estimateRow={estimate} citable unfold={unfold} />
+      <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderRow} estimateRow={estimate} citable unfold={unfold} pinnedLayer={pinnedLayer} />
     </TextMarkdownContext.Provider>
   );
 }

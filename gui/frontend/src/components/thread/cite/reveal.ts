@@ -35,8 +35,8 @@ export function hasItem(threadId: string, itemId: string): boolean {
   return useThreadStore.getState().logs[threadId]?.byId[itemId] !== undefined;
 }
 
-/** Scrolls the timeline so the quote's lines sit in the middle of its visible part (top-aligned when taller), unless they are in view. */
-function scrollToQuote(threadId: string, pane: HTMLElement, pt: PlainText, at: { start: number; end: number }): void {
+/** Scrolls the timeline so the quote's lines sit in the middle of its visible part (top-aligned when taller), unless they are in view (the find bar's matches too). */
+export function scrollToQuote(threadId: string, pane: HTMLElement, pt: PlainText, at: { start: number; end: number }): void {
   const tl = getTimeline(threadId);
   const rects = lineRects(pt, at.start, at.end);
   const first = rects[0];
