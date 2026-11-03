@@ -284,7 +284,7 @@ func TestReportRefusals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	find, err := h.s.RecordFind(context.Background(), "words")
+	find, err := h.s.RecordFind(context.Background(), "words", 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -423,7 +423,7 @@ func TestHistoryCapForgetAndClear(t *testing.T) {
 	clock := time.Now()
 	h.s.opts.Now = func() time.Time { clock = clock.Add(time.Second); return clock }
 	for _, q := range []string{"one", "two", "one"} {
-		if _, err := h.s.RecordFind(ctx, q); err != nil {
+		if _, err := h.s.RecordFind(ctx, q, 0); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -438,7 +438,7 @@ func TestHistoryCapForgetAndClear(t *testing.T) {
 		t.Fatalf("history = %q", got)
 	}
 	// A fourth pushes the oldest, the agent search, out: its files go.
-	if _, err := h.s.RecordFind(ctx, "three"); err != nil {
+	if _, err := h.s.RecordFind(ctx, "three", 14); err != nil {
 		t.Fatal(err)
 	}
 	if got := queries(); !slices.Equal(got, []string{"three", "one", "two"}) {
@@ -459,6 +459,10 @@ func TestHistoryCapForgetAndClear(t *testing.T) {
 	}
 	if len(s2.List()) != 3 {
 		t.Errorf("reopened history has %d", len(s2.List()))
+	}
+	// A Find entry keeps its result count.
+	if got := s2.List()[0]; got.Query != "three" || got.FindHits != 14 {
+		t.Errorf("reopened find entry = %q with %d hits, want three with 14", got.Query, got.FindHits)
 	}
 	one := h.s.List()[1]
 	if err := h.s.Forget(ctx, one.ID); err != nil {
@@ -549,7 +553,7 @@ func TestPromote(t *testing.T) {
 	if got.PromotedThreadID != "s-promoted" || got.Unseen {
 		t.Errorf("entry after promote = %+v", got)
 	}
-	find, _ := h.s.RecordFind(ctx, "words")
+	find, _ := h.s.RecordFind(ctx, "words", 0)
 	if _, err := h.s.Promote(ctx, find.ID); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("promote a find = %v", err)
 	}

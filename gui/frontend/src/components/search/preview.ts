@@ -6,6 +6,7 @@
 import type { ThreadItemView } from "@/api/thread";
 import { highlightsSupported, lineRects, paintAll, rangeOf } from "@/components/thread/cite/citeDom";
 import { findText } from "@/components/thread/find/findDom";
+import { locateQuote } from "@/lib/citation";
 import { findDoc } from "@/lib/threadFind";
 import { currentMatchIndex, handoffMatches, handoffQuery, queryMatches } from "@/lib/threadSearch";
 
@@ -75,8 +76,37 @@ export function paintPreview(root: HTMLElement | null, query: string): void {
   }
 }
 
+/**
+ * Marks an agent search hit's quote in the preview's message as a citation is marked
+ * (cf-search-quote, the cite layer's cf-cite-mark look), found in the rendered text with
+ * the citation layer's locateQuote (white space aside), and scrolls it into view.
+ */
+export function paintQuote(root: HTMLElement | null, quote: string): void {
+  const ranges: Range[] = [];
+  const rects: DOMRect[] = [];
+  const overlay = !highlightsSupported();
+  const el = root?.querySelector<HTMLElement>(`[${DOC_ATTR}="hit"]`);
+  if (el && quote.trim() !== "") {
+    const pt = findText(el);
+    const at = locateQuote(pt.text, { text: quote, start: -1, end: -1, prefix: "", suffix: "" });
+    const r = at && rangeOf(pt, at.start, at.end);
+    if (at && r) {
+      ranges.push(r);
+      if (overlay) rects.push(...lineRects(pt, at.start, at.end));
+    }
+  }
+  paintAll("cf-search-quote", ranges, rects);
+  const first = ranges[0];
+  if (root && first) {
+    const box = first.getBoundingClientRect();
+    const view = root.getBoundingClientRect();
+    if (box.top < view.top || box.bottom > view.bottom) root.scrollTop += box.top - view.top - Math.min(view.height / 3, 80);
+  }
+}
+
 /** Clears the preview's paint (the dialog closes). */
 export function clearPreviewPaint(): void {
   paintAll("cf-search", []);
   paintAll("cf-search-current", []);
+  paintAll("cf-search-quote", []);
 }

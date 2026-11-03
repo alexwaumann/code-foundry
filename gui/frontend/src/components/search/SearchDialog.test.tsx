@@ -33,11 +33,22 @@ vi.mock("@/api/threadSearch", async (orig) => ({
   readLastReply: (t: string) => lastReply(t),
 }));
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
+// No history: Recent searches stay empty (components/search/AgentSearch.test.tsx covers them).
+vi.mock("@/api/search", async (orig) => ({
+  ...(await orig<typeof import("@/api/search")>()),
+  watchRecentSearches: async function* (signal: AbortSignal) {
+    yield [];
+    await new Promise((r) => {
+      signal.addEventListener("abort", r);
+    });
+  },
+}));
 
 const { handleKeyDown } = await import("@/keys/bindings");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useThreadFindStore } = await import("@/stores/threadFind");
 const { useUiStore } = await import("@/stores/ui");
+const { useSearchDialogStore } = await import("@/stores/searchDialog");
 const { resetDaemon } = await import("@/test/daemonFakes");
 const { addThreads, seedWorld, thread } = await import("@/test/projectsWorld");
 const { CommandPalette } = await import("@/components/palette/CommandPalette");
@@ -88,6 +99,8 @@ beforeEach(() => {
   addThreads(thread("s-a", { name: "Badge fingerprint" }), thread("s-b", { name: "Fix stale PR badge" }));
   useCommandsStore.setState({ commands: [SEARCH_OPEN], loading: false, error: null, contextKey: "" });
   useThreadFindStore.setState({ byThread: {} });
+  // These are the Find mode's: the dialog opens on it (it remembers the last mode).
+  useSearchDialogStore.setState({ mode: "find", session: null });
   search.mockReset();
   search.mockImplementation((q) => Promise.resolve(answer(q)));
   hitItem.mockReset();

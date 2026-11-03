@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-// The history table is search_history (migration 0055): one row per entry, hits and steps
+// The history table is search_history (migrations 0055, 0056): one row per entry, hits and steps
 // as JSON arrays.
 
 const entryCols = `id, mode, query, created_at, finished_at, status, error, answer, hits, steps,
-	claude_session_id, model, cost_usd, duration_ms, unseen, promoted_thread_id`
+	claude_session_id, model, cost_usd, duration_ms, unseen, promoted_thread_id, find_hits`
 
 // loadEntries reads every entry.
 func loadEntries(ctx context.Context, db *sql.DB) ([]Entry, error) {
@@ -28,7 +28,7 @@ func loadEntries(ctx context.Context, db *sql.DB) ([]Entry, error) {
 		var created, finished, dur int64
 		var unseen int
 		if err := rows.Scan(&e.ID, &mode, &e.Query, &created, &finished, &status, &e.Error, &e.Answer, &hits, &steps,
-			&e.ClaudeSessionID, &e.Model, &e.CostUSD, &dur, &unseen, &e.PromotedThreadID); err != nil {
+			&e.ClaudeSessionID, &e.Model, &e.CostUSD, &dur, &unseen, &e.PromotedThreadID, &e.FindHits); err != nil {
 			return nil, fmt.Errorf("search: load history: %w", err)
 		}
 		e.Mode, e.Status, e.Unseen = Mode(mode), Status(status), unseen != 0
@@ -59,9 +59,9 @@ func saveEntry(ctx context.Context, db *sql.DB, e Entry) error {
 		unseen = 1
 	}
 	if _, err := db.ExecContext(ctx, `INSERT OR REPLACE INTO search_history (`+entryCols+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID, string(e.Mode), e.Query, toMillis(e.CreatedAt), toMillis(e.FinishedAt), string(e.Status), e.Error, e.Answer,
-		string(hits), string(steps), e.ClaudeSessionID, e.Model, e.CostUSD, e.Duration.Milliseconds(), unseen, e.PromotedThreadID); err != nil {
+		string(hits), string(steps), e.ClaudeSessionID, e.Model, e.CostUSD, e.Duration.Milliseconds(), unseen, e.PromotedThreadID, e.FindHits); err != nil {
 		return fmt.Errorf("search: save %s: %w", e.ID, err)
 	}
 	return nil

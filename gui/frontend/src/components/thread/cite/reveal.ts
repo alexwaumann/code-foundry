@@ -1,7 +1,7 @@
 import { CITE_EDGE, locateQuote, type CitationBody } from "@/lib/citation";
 import { getTimeline } from "@/stores/cite";
 import { useThreadStore } from "@/stores/thread";
-import { citeItemSelector, lineRects, plainText, type PlainText } from "./citeDom";
+import { lineRects, plainText, quoteItemSelector, type PlainText } from "./citeDom";
 
 /** The next animation frame. */
 export function frame(): Promise<void> {
@@ -85,7 +85,7 @@ export async function revealQuote(threadId: string, pane: HTMLElement, cite: Cit
     if (!tl.showRow(cite.itemId)) return null;
   }
   for (let i = 0; i < 60; i++) {
-    const root = pane.querySelector(citeItemSelector(cite.itemId));
+    const root = pane.querySelector(quoteItemSelector(cite.itemId));
     if (root) {
       // The virtualizer measures the rows it just mounted: settle, then place the quote.
       await frame();
@@ -94,7 +94,7 @@ export async function revealQuote(threadId: string, pane: HTMLElement, cite: Cit
       if (!at) return null;
       scrollToQuote(threadId, pane, pt, at);
       await frame();
-      scrollToQuote(threadId, pane, plainText(pane.querySelector(citeItemSelector(cite.itemId)) ?? root), at);
+      scrollToQuote(threadId, pane, plainText(pane.querySelector(quoteItemSelector(cite.itemId)) ?? root), at);
       return at;
     }
     await frame();

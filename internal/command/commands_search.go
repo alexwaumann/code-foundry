@@ -178,9 +178,12 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 			Description:  "Record a Find search in the history (the search dialog does when you open one of its results); the same query again moves it to the top.",
 			Category:     searchCategory,
 			NoKeybinding: true,
-			Args:         []ArgSpec{{Name: "query", Type: String, Required: true, Positional: true, Rest: true, Description: "The query"}},
+			Args: []ArgSpec{
+				{Name: "query", Type: String, Required: true, Positional: true, Rest: true, Description: "The query"},
+				{Name: "hits", Type: Int, Description: "How many results it found (thread names and message hits), shown in Recent searches"},
+			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.RecordFind(ctx, connect.NewRequest(&v1.RecordFindSearchRequest{Query: a.String("query")}))
+				res, err := b.RecordFind(ctx, connect.NewRequest(&v1.RecordFindSearchRequest{Query: a.String("query"), Hits: int32(a.Int("hits"))}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -299,7 +302,11 @@ func FormatSearchHistory(list []*v1.SearchEntry, now time.Time) string {
 	var b strings.Builder
 	for _, e := range list {
 		if e.GetMode() == v1.SearchMode_SEARCH_MODE_FIND {
-			fmt.Fprintf(&b, "%s  find    %-8s  %s\n", e.GetId(), age(e.GetCreatedAt().AsTime(), now), e.GetQuery())
+			fmt.Fprintf(&b, "%s  find    %-8s  %s", e.GetId(), age(e.GetCreatedAt().AsTime(), now), e.GetQuery())
+			if e.GetFindHits() > 0 {
+				fmt.Fprintf(&b, " (%s)", plural(int(e.GetFindHits()), "hit"))
+			}
+			b.WriteString("\n")
 			continue
 		}
 		status := searchStatusWords[e.GetStatus()]

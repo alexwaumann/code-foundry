@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -92,5 +94,56 @@ func TestSearchReportQuoteRange(t *testing.T) {
 		if a.Name == "quote" && !strings.Contains(a.Description, want) {
 			t.Errorf("--quote help = %q, want %q", a.Description, want)
 		}
+	}
+}
+
+// recordBackend records RecordFind's request.
+type recordBackend struct {
+	codefoundryv1connect.UnimplementedSearchServiceHandler
+	got *v1.RecordFindSearchRequest
+}
+
+func (b *recordBackend) RecordFind(_ context.Context, req *connect.Request[v1.RecordFindSearchRequest]) (*connect.Response[v1.RecordFindSearchResponse], error) {
+	b.got = req.Msg
+	return connect.NewResponse(&v1.RecordFindSearchResponse{Entry: &v1.SearchEntry{Id: "q-2", Mode: v1.SearchMode_SEARCH_MODE_FIND, Query: req.Msg.GetQuery(), FindHits: req.Msg.GetHits()}}), nil
+}
+
+// search.find passes --hits; search.recent shows a Find entry's count when it has one.
+func TestSearchFindHits(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		args map[string]string
+		hits int32
+	}{
+		{"with hits", map[string]string{"query": "fingerprint", "hits": "14"}, 14},
+		{"without", map[string]string{"query": "fingerprint"}, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &recordBackend{}
+			r := command.NewRegistry()
+			if err := command.RegisterSearch(r, command.SearchDeps{Search: b}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := r.Invoke(context.Background(), command.Context{}, "search.find", tt.args); err != nil {
+				t.Fatal(err)
+			}
+			if b.got.GetQuery() != "fingerprint" || b.got.GetHits() != tt.hits {
+				t.Errorf("RecordFind got %+v, want hits %d", b.got, tt.hits)
+			}
+		})
+	}
+	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	list := []*v1.SearchEntry{
+		{Id: "q-1", Mode: v1.SearchMode_SEARCH_MODE_FIND, Query: "fingerprint", CreatedAt: timestamppb.New(now.Add(-time.Hour)), FindHits: 14},
+		{Id: "q-2", Mode: v1.SearchMode_SEARCH_MODE_FIND, Query: "older", CreatedAt: timestamppb.New(now.Add(-time.Hour))},
+	}
+	got := command.FormatSearchHistory(list, now)
+	for _, w := range []string{"fingerprint (14 hits)\n", "older"} {
+		if !strings.Contains(got, w) {
+			t.Errorf("history lacks %q:\n%s", w, got)
+		}
+	}
+	if strings.Contains(got, "older (") {
+		t.Errorf("an entry without a count shows one:\n%s", got)
 	}
 }

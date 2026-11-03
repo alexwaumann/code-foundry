@@ -13,8 +13,11 @@ import type { PromptTag } from "@/lib/prompt";
 export interface CiteState {
   /** The composer chip whose comment the cite layer edits (the chip gets a ring). */
   editing: { draftKey: string; citationId: string } | null;
-  /** A sent chip's "Go to source": the cite layer scrolls to the quote and flashes it. */
-  flash: { threadId: string; cite: CitationBody; seq: number } | null;
+  /**
+   * A sent chip's "Go to source": the cite layer scrolls to the quote and flashes it.
+   * `hold` (the search dialog's hit) keeps the mark until the next click or key.
+   */
+  flash: { threadId: string; cite: CitationBody; seq: number; hold?: boolean } | null;
 }
 
 export const useCiteStore = create<CiteState>()(() => ({ editing: null, flash: null }));
@@ -35,9 +38,12 @@ export function useEditingCitation(draftKey: string, citationId: string): boolea
 
 let flashSeq = 0;
 
-/** Go to source: the visible thread's cite layer scrolls to the quote and flashes it. */
-export function requestFlash(threadId: string, cite: CitationBody): void {
-  useCiteStore.setState({ flash: { threadId, cite, seq: ++flashSeq } });
+/**
+ * Go to source: the visible thread's cite layer scrolls to the quote and flashes it.
+ * `hold`: the mark stays until the next click or key (an agent search's hit, opened).
+ */
+export function requestFlash(threadId: string, cite: CitationBody, opts: { hold?: boolean } = {}): void {
+  useCiteStore.setState({ flash: { threadId, cite, seq: ++flashSeq, ...(opts.hold ? { hold: true } : {}) } });
 }
 
 /** The cite layer acts on a Go to source request: forget it, so it is not replayed when a layer mounts again. */

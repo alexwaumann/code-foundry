@@ -42,6 +42,9 @@ test("cmd+shift+f opens the dialog anywhere; arrows move through hits; Enter ope
   await expect(dialog(page)).toBeVisible();
   await expect(input(page)).toBeFocused();
   await shot(page, "search-empty");
+  // It opens in Agent search (docs/notes/search-6-agent-gui.md): Tab to Find.
+  await page.keyboard.press("Tab");
+  await expect(dialog(page)).toHaveAttribute("data-mode", "find");
 
   await page.keyboard.type("fingerprint");
   const hits = dialog(page).locator('[data-testid="search-row"][data-kind="hit"][data-thread="s-r1"]');
@@ -95,6 +98,8 @@ test("a long list keeps the selected row on screen, past the fold and when it wr
   await mockPost("threads?project=repo-cf&count=30&status=idle&prefix=Fingerprint");
   await openApp(page);
   await page.keyboard.press("Meta+Shift+F");
+  await page.keyboard.press("Tab");
+  await expect(dialog(page)).toHaveAttribute("data-mode", "find");
   await page.keyboard.type("fingerprint");
   const list = dialog(page).getByTestId("search-list");
   await expect(selected(page)).toHaveCount(1);

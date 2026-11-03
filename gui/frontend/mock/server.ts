@@ -220,6 +220,11 @@
  *   POST /__mock/dictation/script?phrases=One.|Two.[&gap=1000][&flush=Tail.][&loadMs=800][&silence=1]
  *   POST /__mock/dictation/end?reason=silence|stopped|disabled|error   (the open session ends)
  *   GET  /__mock/dictation                        ({ state, enabled, downloaded, session, micDenied, calls })
+ *   SearchService and search.* (mock/agentSearch.ts): the history and a scripted agent run over the world's
+ *        threads (steps, hits, answer, status, stepMs apart).
+ *   POST /__mock/search?stepMs=350&fail=1&hits=2  (the next runs' pace, a FAILED end, a hit cap)
+ *   POST /__mock/search/seed                      (a history for Recent searches)
+ *   GET  /__mock/search                           ({ entries, calls })
  *   GET  /__mock/ember                            (the board: status and tasks, as JSON)
  *   POST /__mock/ember?enabled=true|false         (sets ember.enabled, as the settings page would)
  *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…][&branch=…][&title=…]
@@ -257,6 +262,7 @@ import { ThemeService } from "../src/gen/codefoundry/v1/theme_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { EmberService, type EmberTaskState } from "../src/gen/codefoundry/v1/ember_pb";
 import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
+import { SearchService } from "../src/gen/codefoundry/v1/search_pb";
 import { emberStateNames } from "./ember";
 import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
@@ -775,6 +781,25 @@ function routes(router: ConnectRouter): void {
     micDenied: (req) => (world.dictation.setMicDenied(req.denied), {}),
   });
 
+  // Agent search and the history (mock/agentSearch.ts).
+  router.service(SearchService, {
+    startAgent: (req) => guard(() => ({ entry: world.searches.startAgent(req.question) })),
+    watch: (req, ctx) => tracked("SearchService/Watch", guardStream(() => world.searches.watch(req.id, ctx.signal))),
+    watchRecent: (_req, ctx) => tracked("SearchService/WatchRecent", world.searches.watchRecent(ctx.signal)),
+    stop: (req) => guard(() => ({ entry: world.searches.stop(req.id) })),
+    listRecent: () => ({ entries: world.searches.list() }),
+    get: (req) => guard(() => ({ entry: world.searches.getMsg(req.id) })),
+    openHit: (req) => guard(() => ({ entry: world.searches.openHit(req.id, req.n) })),
+    markSeen: (req) => guard(() => ({ entry: world.searches.markSeen(req.id) })),
+    recordFind: (req) => guard(() => ({ entry: world.searches.recordFind(req.query, req.hits) })),
+    forget: (req) => (world.searches.forget(req.id), {}),
+    clear: () => ({ removed: world.searches.clear() }),
+    promote: (req) => guard(() => ({ threadId: world.searches.promote(req.id) })),
+    report: () => {
+      throw new ConnectError("the mock's agent search reports its own hits", Code.Unimplemented);
+    },
+  });
+
   router.service(EventService, {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
@@ -1166,6 +1191,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
   const actionCtl = /^\/__mock\/action\/([a-z]+)$/.exec(path);
   if (req.method === "POST" && actionCtl?.[1]) {
     actionControl(res, actionCtl[1], q);
+    return;
+  }
+  const searchCtl = /^\/__mock\/search(|\/seed)$/.exec(path);
+  if (searchCtl) {
+    if (req.method === "GET" && searchCtl[1] === "") json(res, 200, world.searches.json());
+    else if (req.method === "POST") json(res, 200, searchCtl[1] === "/seed" ? world.searches.seed() : world.searches.control(q));
+    else json(res, 405, { error: "method" });
     return;
   }
   const dictation = /^\/__mock\/dictation(|\/script|\/end)$/.exec(path);

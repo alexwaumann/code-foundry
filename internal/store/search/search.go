@@ -151,6 +151,8 @@ type Entry struct {
 	Duration         time.Duration
 	Unseen           bool
 	PromotedThreadID string
+	// FindHits is a Find entry's result count when recorded (0: not known).
+	FindHits int
 	// Version grows with every change (not stored: it restarts at 1 with the daemon).
 	Version uint64
 }
@@ -421,9 +423,9 @@ func liveHits(snap *thread.Snapshot, hits []Hit) []Hit {
 }
 
 // RecordFind records a Find entry for query (the GUI's keyword mode, when the user
-// opens a result). An earlier Find entry with the same query goes, so it moves to the
-// top.
-func (s *Store) RecordFind(ctx context.Context, query string) (Entry, error) {
+// opens a result) with the count of results it found (hits; 0 when not known). An
+// earlier Find entry with the same query goes, so it moves to the top.
+func (s *Store) RecordFind(ctx context.Context, query string, hits int) (Entry, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return Entry{}, fmt.Errorf("%w: a query is required", ErrInvalidArgument)
@@ -446,7 +448,7 @@ func (s *Store) RecordFind(ctx context.Context, query string) (Entry, error) {
 			dup = append(dup, e.ID)
 		}
 	}
-	e := &Entry{ID: id, Mode: ModeFind, Query: query, CreatedAt: s.opts.Now().Truncate(time.Millisecond), Version: 1}
+	e := &Entry{ID: id, Mode: ModeFind, Query: query, CreatedAt: s.opts.Now().Truncate(time.Millisecond), FindHits: max(0, hits), Version: 1}
 	if err := saveEntry(ctx, s.opts.DB, *e); err != nil {
 		s.mu.Unlock()
 		return Entry{}, err
