@@ -87,12 +87,16 @@ const selectedThread = (): string | null => {
  * the daemon's message toasts with an Open action that selects the thread, unless that
  * thread is already selected (a send into this thread, or a new thread the daemon's
  * FocusThread has selected already). A forwarded task's toast names the owner and the
- * sender (forwardToast); Open selects the owner (a child thread opens like one picked in
+ * sender (forwardToast; "this thread" is the one selected when the task was run, not
+ * when the answer came); Open selects the owner (a child thread opens like one picked in
  * the thread info card's lineage group).
  */
 export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget): Promise<string | null> {
   const key = taskKey(ref, kind);
   if (usePrTasksStore.getState().running[key]) return null;
+  // The thread the button was pressed in: "for this thread" means it, whatever is
+  // selected by the time the daemon answers.
+  const pressedIn = selectedThread();
   usePrTasksStore.setState((s) => ({ running: { ...s.running, [key]: true } }));
   try {
     const res = await runCommandForResult("pr.task", prTaskArgs(ref, kind, target), { quiet: true });
@@ -111,7 +115,7 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
           openStartedThread(id);
         },
       };
-      const text = out.viaThreadId && id ? forwardToast(id, out.viaThreadId, selectedThread()) : taskToast(res.message, out.sent);
+      const text = out.viaThreadId && id ? forwardToast(id, out.viaThreadId, pressedIn) : taskToast(res.message, out.sent);
       toast.success(text, open ? { action } : undefined);
     }
     return id;
