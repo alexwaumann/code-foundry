@@ -52,9 +52,10 @@ function LocalImage({ src, alt }: { src: string; alt: string }) {
   const { url, loading } = useAttachmentUrl(src);
   if (url) return <img src={url} alt={alt} />;
   return (
-    // The path, when the chip shows the alt text or "Loading image…" instead.
+    // The path, when the chip shows the alt text or "Loading image…" instead. Find skips the
+    // chip's text (data-find-skip): the answer's data counts no text for an image.
     <Tip label={loading || alt ? src : null}>
-      <span className="inline-flex items-center gap-1 rounded-sm border px-1.5 text-caption">
+      <span className="inline-flex items-center gap-1 rounded-sm border px-1.5 text-caption" data-find-skip>
         <ImageIcon className="size-3" aria-hidden />
         {loading ? "Loading image…" : alt || src}
       </span>

@@ -10,8 +10,8 @@ const OWNS_ESCAPE = 'input, textarea, select, [contenteditable=""], [contentedit
 /**
  * The thread info card while the pane has no room for its column
  * (docs/notes/thread-info-overlay.md): the same content in a floating box at the top right
- * of the thread body, over the conversation (which does not reflow), as wide as the inline
- * card and inset by the same gap, scrolling inside. A non-modal region: Escape (outside a
+ * of the thread body (under the find bar while it is open), over the conversation (which
+ * does not reflow), as wide as the inline card and inset by the same gap, scrolling inside. A non-modal region: Escape (outside a
  * field or menu), a press outside it, another thread or room again hide it.
  */
 export function ThreadInfoOverlay({ threadId }: { threadId: string }) {
@@ -60,7 +60,7 @@ function Overlay({ threadId }: { threadId: string }) {
       ref={ref}
       tabIndex={-1}
       aria-label="Thread info"
-      className="absolute top-3 right-3 z-30 flex max-h-[calc(100%-1.5rem)] w-77 flex-col overflow-y-auto rounded-lg border bg-cf-sidebar shadow-lg outline-none"
+      className="absolute top-[calc(0.75rem+var(--ti-find,0px))] right-3 z-30 flex max-h-[calc(100%-1.5rem-var(--ti-find,0px))] w-77 flex-col overflow-y-auto rounded-lg border bg-cf-sidebar shadow-lg outline-none"
       data-testid="thread-info-overlay"
       onPointerDownCapture={() => {
         inside.current = true;

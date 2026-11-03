@@ -15,6 +15,7 @@ import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
 import { presentPromptHistory } from "@/stores/historyComposers";
 import { presentFileFinder } from "@/stores/fileFinder";
+import { presentThreadFind } from "@/stores/threadFind";
 import { presentDictationToggle } from "@/stores/dictation";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
@@ -358,6 +359,11 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Window-local: the palette's file finder over the selected thread (stores/fileFinder.ts).
   // The CLI's reaches every window through ShowView.
   "file.find": () => presentFileFinder(),
+  // Window-local: the find bar of the thread in the content pane, or a step through its
+  // matches (stores/threadFind.ts). The CLI's reach every window through ShowView.
+  "thread.find": () => presentThreadFind("open") || true,
+  "thread.find.next": () => presentThreadFind("next") || true,
+  "thread.find.previous": () => presentThreadFind("previous") || true,
   // Window-local: dictation into the focused composer, else the one dictating (it stops),
   // else the content pane's (stores/dictation.ts). The CLI's reaches every window through ShowView.
   "dictation.toggle": () => presentDictationToggle(),

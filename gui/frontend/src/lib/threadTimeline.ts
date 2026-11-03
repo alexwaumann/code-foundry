@@ -335,6 +335,15 @@ function stepCount(body: readonly WorkNode[]): number {
   return body.filter(foldsAway).length;
 }
 
+/**
+ * The turn whose fold hides an item's row (a question or tool row of its top-level work),
+ * by turn key; "" when no fold hides it (Claude's text, a steer, a page show).
+ */
+export function foldingTurn(turns: readonly TimelineTurn[], itemId: string): string {
+  for (const t of turns) if (t.body.some((n) => foldsAway(n) && "id" in n && n.id === itemId)) return t.key;
+  return "";
+}
+
 export interface TimelineOptions {
   /** The user's fold choice for a turn, by its key; undefined: the default. */
   fold: (turnKey: string) => boolean | undefined;

@@ -291,6 +291,8 @@ export function fixStalePrBadge(state: ThreadWorldState, now = Date.now()): Thre
 export function publishThread(threadId: string, w: ThreadWorld): void {
   useThreadStore.setState((s) => ({
     logs: { ...s.logs, [threadId]: { seq: w.items.length, byId: Object.fromEntries(w.items.map((it) => [it.id, it])), order: w.items.map((it) => it.id), pending: w.pending, mcp: null, commands: [], agents: [] } },
+    // As a Watch's snapshot: the log is current.
+    synced: { ...s.synced, [threadId]: true },
   }));
 }
 

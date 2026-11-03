@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Eye, Loader2 } from "lucide-react";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { AgentsStrip } from "@/components/thread/AgentsStrip";
 import { CiteLayer } from "@/components/thread/cite/CiteLayer";
+import { FindBar } from "@/components/thread/find/FindBar";
+import { FindLayer } from "@/components/thread/find/FindLayer";
 import { useElementHeight, useThreadActivity } from "@/components/thread/activity";
 import { PathPlaceContext, ThreadContext } from "@/components/thread/context";
 import { ThreadComposer } from "@/components/thread/ThreadComposer";
@@ -15,6 +17,7 @@ import { clearWorkRowChoices, holdEmberBoard, useEmberEnabled, useFlameState, us
 import { toggleEmberBoard, useEmberBoardShown } from "@/stores/emberPanel";
 import { keyOf } from "@/stores/panel";
 import { useProjectsStore } from "@/stores/projects";
+import { useThreadFindOpen } from "@/stores/threadFind";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { PaneOverlay } from "@/components/thread/InlineHtml";
@@ -128,6 +131,7 @@ export function EmberBody({ threadId }: { threadId: string }) {
   const [dockRef, dockHeight] = useElementHeight();
   const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
+  const findOpen = useThreadFindOpen(threadId);
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Ember" data-thread-id={threadId} data-testid="ember-pane" data-region="content">
@@ -141,12 +145,12 @@ export function EmberBody({ threadId }: { threadId: string }) {
             <HeaderActions threadId={threadId} />
           </span>
         </PaneHeader>
-        <div className="relative flex min-h-0 flex-1 flex-col" ref={bodyRef}>
+        <div className="relative flex min-h-0 flex-1 flex-col" ref={bodyRef} style={findOpen ? ({ "--ti-find": "var(--ti-find-open)" } as CSSProperties) : undefined}>
           {/* A page Ember showed expands over this body only (InlineHtml PaneOverlay). */}
           <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
             {loaded && catchingUp && (
               <div
-                className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
+                className="pointer-events-none absolute top-[calc(0.5rem+var(--ti-find))] right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
                 data-testid="thread-catching-up"
               >
                 <Loader2 className="size-3 animate-spin" />
@@ -161,7 +165,7 @@ export function EmberBody({ threadId }: { threadId: string }) {
               </div>
             )}
             <EmberPathPlace>
-              <EmberTimeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={dockHeight} />
+              <EmberTimeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={dockHeight} pinnedLayer={findOpen ? <FindBar threadId={threadId} /> : undefined} />
             </EmberPathPlace>
             <div className="dock" ref={dockRef}>
               <AgentsStrip threadId={threadId} />
@@ -169,6 +173,8 @@ export function EmberBody({ threadId }: { threadId: string }) {
             </div>
             {/* Ember's reply can be quoted into the composer, as a thread's answer can (docs/notes/citations.md). */}
             <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
+            {/* The find bar searches the chat as it does a thread, opening the work row a match is folded in. */}
+            <FindLayer key={`find:${threadId}`} threadId={threadId} paneRef={bodyRef} />
           </PaneOverlay>
         </div>
       </section>

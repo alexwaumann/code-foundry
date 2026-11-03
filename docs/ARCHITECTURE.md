@@ -790,7 +790,11 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   cited into the composer with a comment: an amber `cf-cite://` chip whose body the draft
   keeps, sent as a self-contained `[Assistant quote](cf-cite://v1/…)` link the bubble
   reads back, painted over the answer with the CSS Custom Highlight API; GUI only, no
-  command (`components/thread/cite`, `docs/notes/citations.md`).
+  command (`components/thread/cite`, `docs/notes/citations.md`). cmd+f (`thread.find`, with
+  cmd+g / cmd+shift+g) opens a find bar over the card's column: matches counted from the
+  items (messages, Claude's rendered text, answered questions), painted the same way where
+  rows render, ticks along the scrollbar, a folded question opened and put back
+  (`components/thread/find`, `docs/notes/search-2-thread-find.md`).
 * Only visible views are watched or attached: one Watch per thread on screen
   (`stores/thread.ts` `startThreadWatch` counts its holders), one Attach per terminal
   view (a plugin terminal shown in the bottom panel is not attached in its node too).

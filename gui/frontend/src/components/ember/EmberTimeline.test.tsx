@@ -5,17 +5,40 @@ import type { ThreadItemView } from "@/api/thread";
 import type { ThreadView } from "@/api/threads";
 
 // The list is the thread timeline's virtualized one (Timeline.tsx); here every row renders.
-vi.mock("@/components/thread/Timeline", () => ({
-  TimelineList: ({ rows, renderRow }: { rows: { key: string; type: string }[]; renderRow: (r: never) => ReactNode }) => (
-    <div data-testid="ember-list">
-      {rows.map((r) => (
-        <div key={r.key} data-row-type={r.type}>
-          {renderRow(r as never)}
+// It registers its unfold as the real list does (stores/cite), for the find bar and cite layer.
+vi.mock("@/components/thread/Timeline", async () => {
+  const { useEffect, useRef } = await import("react");
+  const { registerTimeline } = await import("@/stores/cite");
+  type Row = { key: string; type: string };
+  return {
+    TimelineList: ({ threadId, rows, renderRow, unfold }: { threadId: string; rows: Row[]; renderRow: (r: never) => ReactNode; unfold?: (rows: readonly Row[], itemId: string) => boolean }) => {
+      const latest = useRef(rows);
+      latest.current = rows;
+      useEffect(
+        () =>
+          registerTimeline(threadId, {
+            scroller: document.createElement("div"),
+            showRow: () => true,
+            unpin: () => undefined,
+            unfold: unfold ? (id) => unfold(latest.current, id) : undefined,
+            rowKeys: () => latest.current.map((r) => r.key),
+            rowStart: () => undefined,
+            topRow: () => 0,
+          }),
+        [threadId, unfold],
+      );
+      return (
+        <div data-testid="ember-list">
+          {rows.map((r) => (
+            <div key={r.key} data-row-type={r.type}>
+              {renderRow(r as never)}
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
-  ),
-}));
+      );
+    },
+  };
+});
 const { openFileInPanel } = vi.hoisted(() => ({ openFileInPanel: vi.fn<(target: string, file: object) => boolean>(() => true) }));
 vi.mock("@/stores/filePanel", () => ({ openFileInPanel }));
 vi.mock("@/stores/ember", async (orig) => ({ ...(await orig<typeof import("@/stores/ember")>()), holdEmberBoard: () => () => undefined }));
@@ -29,6 +52,7 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { seedWorld } = await import("@/test/projectsWorld");
 const { EMBER_THREAD, EmberWorld, putEmberThread, setEmberEnabled } = await import("@/test/emberBoard");
+const { closeThreadFind, openThreadFind, openThreadFindItem, useThreadFindStore } = await import("@/stores/threadFind");
 
 /**
  * Ember's chat (EmberTimeline: lib/ember buildEmberRows drawn with the thread's rows) over
@@ -142,5 +166,40 @@ describe("EmberTimeline", () => {
     expect(screen.getByTestId("ember-row-status").textContent).not.toBe("Interrupted");
     expect(line()).toHaveLength(1);
     expect([...screen.getByTestId("ember-list").children].map((r) => r.getAttribute("data-row-type"))).toEqual(["user", "work", "restart", "work"]);
+  });
+
+  it("find: a match in a text folded into the work row opens the row, and moving on or closing puts it back", () => {
+    setLog([
+      user("u1", "Validate the notes API input."),
+      text("t1", "Checking the handler first."),
+      bash("b1", "rg handler"),
+      text("t2", "Done: the handler validates now."),
+      end("e1"),
+    ]);
+    show();
+    const work = () => String(screen.getByTestId("ember-work").getAttribute("data-expanded") === "true");
+    const folded = () => !texts().some((t) => t.textContent.includes("Checking the handler"));
+    expect(work()).toBe("false");
+    expect(folded()).toBe(true);
+    openThreadFind(EMBER_THREAD, "handler");
+    act(() => {
+      openThreadFindItem(EMBER_THREAD, "t1");
+    });
+    expect(work()).toBe("true");
+    expect(folded()).toBe(false);
+    // On to the reply, which shows anyway: the work row folds again.
+    act(() => {
+      openThreadFindItem(EMBER_THREAD, "t2");
+    });
+    expect(work()).toBe("false");
+    act(() => {
+      openThreadFindItem(EMBER_THREAD, "t1");
+    });
+    expect(work()).toBe("true");
+    act(() => {
+      closeThreadFind(EMBER_THREAD);
+    });
+    expect(work()).toBe("false");
+    expect(useThreadFindStore.getState().byThread[EMBER_THREAD]).toBeUndefined();
   });
 });

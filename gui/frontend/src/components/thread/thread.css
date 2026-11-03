@@ -72,6 +72,9 @@ html[data-thread-width="full"] {
   --ti-gutter: 12px;
   /* ThreadPane's body sets it while the card shows; a thread view nested in one starts clear. */
   --ti-inset: 0px;
+  /* The find bar (components/thread/find/FindBar.tsx, 38px tall) and its gap: what the card moves down by while the bar is open (--ti-find). */
+  --ti-find-open: 46px;
+  --ti-find: 0px;
 }
 .cf-thread .scroller {
   padding-right: var(--ti-inset, 0px);

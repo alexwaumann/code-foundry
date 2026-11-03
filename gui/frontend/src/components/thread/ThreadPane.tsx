@@ -9,7 +9,8 @@ import { ThreadInfoCard } from "@/components/threadinfo/ThreadInfoCard";
 import { ThreadInfoOverlay } from "@/components/threadinfo/ThreadInfoOverlay";
 import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
-import { forgetTurnView, startThreadWatch } from "@/stores/thread";
+import { startThreadWatch } from "@/stores/thread";
+import { holdThreadPane, useThreadFindOpen } from "@/stores/threadFind";
 import { useShownRun } from "@/stores/subagentView";
 import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
@@ -18,6 +19,8 @@ import { useWidth } from "@/lib/useWidth";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { AgentsStrip } from "./AgentsStrip";
 import { CiteLayer } from "./cite/CiteLayer";
+import { FindBar } from "./find/FindBar";
+import { FindLayer } from "./find/FindLayer";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
@@ -67,9 +70,11 @@ export function ThreadPane({ threadId }: { threadId: string }) {
 function WatchedThread({ threadId }: { threadId: string }) {
   useEffect(() => {
     const stop = startThreadWatch(threadId);
+    // Leaving the thread closes its find and forgets its fold choices (a tick later, so StrictMode's replay is not a leave).
+    const release = holdThreadPane(threadId);
     return () => {
       stop();
-      forgetTurnView(threadId);
+      release();
     };
   }, [threadId]);
   const runId = useShownRun(threadId);
@@ -85,6 +90,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   const infoOpen = useUiStore((s) => s.threadInfoOpen);
+  const findOpen = useThreadFindOpen(threadId);
   // The card shows inline only while the conversation keeps CONVERSATION_MIN beside it; else the toggle floats it (ThreadInfoOverlay).
   const [rowRef, rowWidth] = useWidth(1280);
   const infoFits = cardFits(rowWidth);
@@ -111,7 +117,14 @@ function ThreadBody({ threadId }: { threadId: string }) {
             <HeaderActions />
           </span>
         </PaneHeader>
-        <div className="relative flex min-h-0 flex-1" ref={rowRef} data-testid="thread-pane-body" data-info-room={infoFits ? "" : undefined}>
+        {/* The find bar (thread.find) sits where the card starts, which moves down under it (--ti-find), inline or floating. */}
+        <div
+          className="relative flex min-h-0 flex-1"
+          ref={rowRef}
+          data-testid="thread-pane-body"
+          data-info-room={infoFits ? "" : undefined}
+          style={findOpen ? ({ "--ti-find": "var(--ti-find-open)" } as CSSProperties) : undefined}
+        >
           {/* The card lays over this column's right side (inside the list's scroller): the list, the dock, the chips and the page modal keep clear of it (--ti-inset) and the list's scrollbar stays at the pane's edge. */}
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef} style={{ "--ti-inset": infoOpen && infoFits ? "var(--ti-card)" : "0px" } as CSSProperties}>
             {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
@@ -119,7 +132,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
               {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
               {loaded && catchingUp && (
                 <div
-                  className="pointer-events-none absolute top-2 right-[calc(var(--ti-inset)+1rem)] z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
+                  className="pointer-events-none absolute top-[calc(0.5rem+var(--ti-find))] right-[calc(var(--ti-inset)+1rem)] z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
                   data-testid="thread-catching-up"
                 >
                   <Loader2 className="size-3 animate-spin" />
@@ -141,13 +154,21 @@ function ThreadBody({ threadId }: { threadId: string }) {
                 strips={timelineStrips}
                 bottomInset={dockHeight}
                 rail
-                pinnedLayer={infoOpen && infoFits ? <ThreadInfoCard threadId={threadId} /> : undefined}
+                pinnedLayer={
+                  findOpen || (infoOpen && infoFits) ? (
+                    <>
+                      <FindBar threadId={threadId} narrow={!infoFits} />
+                      {infoOpen && infoFits && <ThreadInfoCard threadId={threadId} />}
+                    </>
+                  ) : undefined
+                }
               />
               <div className="dock" ref={dockRef}>
                 <AgentsStrip threadId={threadId} />
                 <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
               </div>
               <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
+              <FindLayer key={`find:${threadId}`} threadId={threadId} paneRef={bodyRef} />
             </PaneOverlay>
           </div>
           {/* Without room, the card floats over the conversation instead: no --ti-inset, the conversation does not reflow under it. */}

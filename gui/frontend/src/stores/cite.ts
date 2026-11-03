@@ -4,7 +4,7 @@
  * React tree: the thread's cite layer inserts a new citation into the composer
  * (registerCiteTarget), a composer chip or a sent chip asks the cite layer to go to the
  * quote's source (requestEdit, requestFlash), and the cite layer asks the timeline to
- * bring the quoted item's row into view (registerTimeline).
+ * bring the quoted item's row into view (registerTimeline; the find bar's layer uses it too).
  */
 import { create } from "zustand";
 import type { CitationBody } from "@/lib/citation";
@@ -97,8 +97,18 @@ export interface TimelineHandle {
   showRow(key: string, align?: "center" | "start"): boolean;
   /** Stops following the bottom, before a scroll of the cite layer's own. */
   unpin(): void;
-  /** Opens the row that folds an item away (Ember's work row); false when none does. Unset (a thread's timeline, whose fold never hides text): nothing to open. */
+  /**
+   * Opens what folds an item away (Ember's work row; a thread's folded turn, whose fold
+   * never hides text but hides an answered question's row); false when nothing does. Unset:
+   * nothing to open.
+   */
   unfold?: ((itemId: string) => boolean) | undefined;
+  /** The rows' keys, top to bottom (the find bar's match map places its ticks by them). */
+  rowKeys(): readonly string[];
+  /** A row's top as an offset in the list (measured, else estimated); undefined for no such row. */
+  rowStart(index: number): number | undefined;
+  /** The index of the row at the list's top edge. */
+  topRow(): number;
 }
 
 const timelines = new Map<string, TimelineHandle>();
