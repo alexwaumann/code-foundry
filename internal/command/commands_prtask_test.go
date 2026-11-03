@@ -87,8 +87,10 @@ func TestPullRequestTask(t *testing.T) {
 			wantMsg:    "Cloned a/b and started thread s1 for PR #7",
 			wantJSON:   command.PRTaskResult{ThreadID: "s1", ProjectID: "p-new", WorktreePath: "/wt/fix/it", CreatedWorktree: true, Cloned: true}},
 		{name: "not a project: a failed clone keeps its code and starts nothing",
-			args:       args("a/b", "checks"),
-			setup:      func(f *prThreadFixture) { f.cloneErr = connect.NewError(connect.CodeAlreadyExists, errors.New("destination exists")) },
+			args: args("a/b", "checks"),
+			setup: func(f *prThreadFixture) {
+				f.cloneErr = connect.NewError(connect.CodeAlreadyExists, errors.New("destination exists"))
+			},
 			wantReq:    []proto.Message{detail("a/b", true), list},
 			wantCloned: []string{"a/b"},
 			wantCode:   connect.CodeAlreadyExists, wantErrMsg: "clone a/b: destination exists"},
@@ -135,9 +137,9 @@ func TestPullRequestTask(t *testing.T) {
 			wantJSON:     command.PRTaskResult{ThreadID: "s1", ProjectID: "r1", WorktreePath: "/wt/fix/it", CreatedWorktree: true},
 			wantFocus:    true},
 		{name: "thread: sent into it as a follow-up, nothing listed, created or focused",
-			args:  args("o/r", "checks", "thread", "s-lead0000001"),
-			uctx:  command.Context{ActiveView: "thread", ActiveThreadID: "s-lead0000001"},
-			setup: func(f *prThreadFixture) { f.thread.Others = []*v1.Thread{{Id: "s-lead0000001", Name: "Lead"}} },
+			args:    args("o/r", "checks", "thread", "s-lead0000001"),
+			uctx:    command.Context{ActiveView: "thread", ActiveThreadID: "s-lead0000001"},
+			setup:   func(f *prThreadFixture) { f.thread.Others = []*v1.Thread{{Id: "s-lead0000001", Name: "Lead"}} },
 			wantReq: []proto.Message{detail("o/r", true)},
 			wantThread: []proto.Message{
 				&v1.GetThreadRequest{Id: "s-lead0000001"},
@@ -148,8 +150,8 @@ func TestPullRequestTask(t *testing.T) {
 			wantMsg:      "Sent to Lead (s-lead0000001)",
 			wantJSON:     command.PRTaskResult{ThreadID: "s-lead0000001", Sent: true}},
 		{name: "thread: from a thread's CLI the message is that thread's",
-			args:  args("o/r", "review-request", "thread", "s-other000001"),
-			uctx:  command.Context{ActiveThreadID: "s-lead0000001"},
+			args:    args("o/r", "review-request", "thread", "s-other000001"),
+			uctx:    command.Context{ActiveThreadID: "s-lead0000001"},
 			wantReq: []proto.Message{detail("o/r", false)},
 			wantThread: []proto.Message{
 				&v1.GetThreadRequest{Id: "s-other000001"},
