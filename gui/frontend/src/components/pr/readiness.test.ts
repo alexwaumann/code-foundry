@@ -274,6 +274,41 @@ describe("readiness: headline, rows and footer", () => {
       footer: { review: true, merge: "merge" },
     },
     {
+      name: "UNSTABLE: an optional check fails, GitHub merges anyway",
+      s: { pr: { mergeState: "unstable" }, d: { checks: [failed("lint"), check("build")] } },
+      headline: "Ready to merge · 1 optional check failing",
+      rows: ["checks failure: 1 check failing · 1 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
+      footer: { review: true, merge: "merge" },
+    },
+    {
+      name: "CLEAN with checks still running (none required)",
+      s: { d: { checks: [running("e2e"), check("build")] } },
+      headline: "Ready to merge · 1 running",
+      rows: ["checks pending: 1 check running · 1 passed", "review success: Approved", "mergeable success: No conflicts with trunk"],
+      footer: { review: true, merge: "merge" },
+    },
+    {
+      name: "CLEAN with unresolved conversations (resolving them is not required)",
+      s: { d: { reviewThreads: [thread("x.go", 3)] } },
+      headline: "Ready to merge · 1 unresolved conversation",
+      rows: ["checks success: All 2 checks passed", "review success: Approved", "conversations pending: 1 unresolved conversation", "mergeable success: No conflicts with trunk"],
+      footer: { review: true, merge: "merge" },
+    },
+    {
+      name: "HAS_HOOKS with a failing check and a conversation",
+      s: { pr: { mergeState: "has_hooks" }, d: { checks: [failed("lint"), failed("vet")], reviewThreads: [thread("x.go", 3), thread("y.go", 4)] } },
+      headline: "Ready to merge · 2 optional checks failing · 2 unresolved conversations",
+      rows: ["checks failure: 2 checks failing", "review success: Approved", "conversations pending: 2 unresolved conversations", "mergeable success: No conflicts with trunk"],
+      footer: { review: true, merge: "merge" },
+    },
+    {
+      name: "BLOCKED with unresolved conversations: they count",
+      s: { pr: { mergeState: "blocked" }, d: { reviewThreads: [thread("x.go", 3)] } },
+      headline: "Not ready to merge · 1 left",
+      rows: ["checks success: All 2 checks passed", "review success: Approved", "conversations pending: 1 unresolved conversation", "mergeable success: No conflicts with trunk"],
+      footer: { review: true, merge: "auto-merge" },
+    },
+    {
       name: "merged: one row, no footer",
       s: { pr: { state: "merged", mergedAtMs: NOW - 24 * HOUR }, d: { mergedBy: "kim", mergeCommitSha: "3f9c2ab".padEnd(40, "0") } },
       headline: "Merged",
@@ -311,14 +346,17 @@ describe("readiness rows in detail", () => {
   });
 
   it("failing checks: named first three, the rest counted; the task slot is checks; expandable", () => {
-    const d = detail({ d: { checks: [failed("a"), failed("b"), failed("c"), failed("d"), check("ok")] } });
+    const d = detail({ pr: { mergeState: "blocked" }, d: { checks: [failed("a"), failed("b"), failed("c"), failed("d"), check("ok")] } });
     const r = rowOf(d, "checks");
     expect(r?.lines.map(lineText)).toEqual(["check a", "check b", "check c", "and 1 more"]);
     expect(r).toMatchObject({ task: "checks", blocking: true, expandable: true });
+    // Optional (UNSTABLE): not blocking, still a task for the thread.
+    expect(rowOf({ ...d, pullRequest: { ...d.pullRequest, mergeState: "unstable" } }, "checks")).toMatchObject({ task: "checks", blocking: false });
   });
 
   it("running checks are named; passing rows hand nothing to a thread", () => {
-    expect(rowOf(detail({ d: { checks: [running("e2e"), check("ok")] } }), "checks")).toMatchObject({ lines: [{ kind: "check", check: { name: "e2e" } }], task: null, blocking: true });
+    expect(rowOf(detail({ pr: { mergeState: "blocked" }, d: { checks: [running("e2e"), check("ok")] } }), "checks")).toMatchObject({ lines: [{ kind: "check", check: { name: "e2e" } }], task: null, blocking: true });
+    expect(rowOf(detail({ pr: { mergeState: "clean" }, d: { checks: [running("e2e"), check("ok")] } }), "checks")).toMatchObject({ task: null, blocking: false });
     expect(rowOf(detail(), "checks")).toMatchObject({ task: null, blocking: false, lines: [] });
   });
 
@@ -345,13 +383,13 @@ describe("readiness rows in detail", () => {
   });
 
   it("review required with one approval in: more approvals required", () => {
-    const d = detail({ pr: { review: "review_required" }, d: { reviewers: [reviewer("kim", { state: "approved", submittedAtMs: NOW - HOUR }), reviewer("ana", { requested: true })] } });
+    const d = detail({ pr: { review: "review_required", mergeState: "blocked" }, d: { reviewers: [reviewer("kim", { state: "approved", submittedAtMs: NOW - HOUR }), reviewer("ana", { requested: true })] } });
     expect(rowOf(d, "review")).toMatchObject({ title: "More approvals required", tone: "pending", blocking: true });
     expect(rowOf(d, "review")?.lines.map(lineText)).toEqual(["person kim approved 1h ago", "Waiting on ana"]);
   });
 
   it("your review is requested: who asked, the review-request task", () => {
-    const d = detail({ pr: { author: "kim", review: "review_required" }, d: { reviewers: [reviewer(VIEWER, { requested: true })] } });
+    const d = detail({ pr: { author: "kim", review: "review_required", mergeState: "blocked" }, d: { reviewers: [reviewer(VIEWER, { requested: true })] } });
     expect(rowOf(d, "review-request")).toMatchObject({ lines: [{ kind: "text", text: "kim asked for your review" }], task: "review-request", blocking: true });
   });
 
