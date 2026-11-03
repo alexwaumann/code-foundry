@@ -160,9 +160,9 @@
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts;
  *        "ListReviewerCandidates query" counts the searches)
  *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
- *        also pr.ask, pr.explain, pr.fix.findings, pr.merge as a moved head, and
- *        pr.review as unconfirmed)
- *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.merge, pr.review take 800ms)
+ *        also pr.ask, pr.explain, pr.fix.findings, pr.task (the fork refusal), pr.merge
+ *        as a moved head, and pr.review as unconfirmed)
+ *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.task, pr.merge, pr.review take 800ms)
  *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
  *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,
  *        #138 merged, #131 closed, #140 read-only, #142 mergeable, #146 from a fork, #147 open
