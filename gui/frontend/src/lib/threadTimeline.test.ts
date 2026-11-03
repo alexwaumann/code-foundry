@@ -281,6 +281,16 @@ describe("buildTurns / buildRows", () => {
     ]);
   });
 
+  it("a note after an error that follows a finished turn is not in a turn (the daemon's openTurn agrees): it stands alone", () => {
+    const items = [user("u1"), text("a"), end("e1"), item("error", { id: "err" }), item("note", { id: "n" }), user("u2"), text("b")];
+    expect(buildTurns(items).map((t) => [t.key, t.user, t.body.length])).toEqual([
+      ["u1", ["u1"], 1],
+      ["err", [], 1],
+      ["n", [], 1],
+      ["u2", ["u2"], 1],
+    ]);
+  });
+
   it("a message sent while the turn runs is a steer inside it: one turn, one header, the steer stays when it folds", () => {
     const items = [user("u1"), tool("Bash"), user("s1"), tool("Bash"), text("a"), end("e1")];
     const turns = buildTurns(items);

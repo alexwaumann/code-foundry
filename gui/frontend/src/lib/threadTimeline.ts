@@ -263,6 +263,18 @@ function isAside(t: { user: readonly string[]; items: readonly TimelineItem[] })
   return t.user.length === 0 && t.items.every((x) => x.kind === "commandOutput" || x.kind === "html" || x.kind === "theme");
 }
 
+/** Kinds the daemon appends on its own, outside a turn too: alone they are no turn (turnclose.go startsTurn). */
+const NOT_TURN: ReadonlySet<TimelineItem["kind"]> = new Set<TimelineItem["kind"]>(["error", "note", "html", "theme", "commandOutput"]);
+
+/**
+ * Whether a group holds a turn, as the daemon's openTurn has it: a message, or an item
+ * that starts a turn. Errors alone (a process that ended after its turn, a failed start)
+ * and asides are none, so a note after them is not in a turn.
+ */
+function holdsTurn(t: { user: readonly string[]; items: readonly TimelineItem[] }): boolean {
+  return t.user.length > 0 || t.items.some((x) => !NOT_TURN.has(x.kind));
+}
+
 /** The note a fork's copied history ends with (fork.go forkNotePrefix): a turn boundary. */
 function isForkNote(it: TimelineItem): boolean {
   return it.id.startsWith("note-fork-");
@@ -328,8 +340,9 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
       // A system note that arrives while a turn is open (a background shell stopped, an
       // agent's note, pr.task's forward) stays in that turn's body: it ends nothing, and
       // system rows never fold away. The daemon's openTurn (turnclose.go) agrees. Between
-      // turns, and a fork's note (which ends the copied history), it is a turn of its own.
-      if (cur && !isForkNote(it) && !isAside(cur)) {
+      // turns (after asides or errors alone too), and a fork's note (which ends the copied
+      // history), it is a turn of its own.
+      if (cur && !isForkNote(it) && holdsTurn(cur)) {
         cur.items.push(it);
         continue;
       }
