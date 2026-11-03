@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isSearchGone, watchRecentSearches, watchSearch, type SearchEntryView, type SearchWatchEventView } from "@/api/search";
 import { runStream, type Heartbeat } from "@/api/stream";
@@ -24,28 +24,25 @@ export interface WatchedSearch {
  */
 export function useSearchWatch(id: string | null, seed: SearchEntryView | null, watch: WatchSearchFn = watchSearch): WatchedSearch {
   const [state, setState] = useState<{ id: string | null; entry: SearchEntryView | null; gone: boolean }>({ id, entry: seed?.id === id ? seed : null, gone: false });
-  // The entry as last folded, for the stream's end rule (read outside render only).
-  const latest = useRef(state.entry);
   if (state.id !== id) {
     // A new search shown: its seed until its snapshot.
     setState({ id, entry: seed?.id === id ? seed : null, gone: false });
   }
   useEffect(() => {
     if (!id) return;
-    latest.current = null;
+    // The entry as folded from this stream (events arrive in order; the seed only shows).
+    let cur: SearchEntryView | null = null;
     return runStream<SearchWatchEventView>({
       open: (signal) => watch(id, signal),
       slot: { label: "search:watch", priority: "core" },
       onEvent: (ev) => {
-        setState((s) => {
-          if (s.id !== id) return s;
-          const entry = reduceSearch(s.entry, ev);
-          latest.current = entry;
-          return entry === s.entry ? s : { ...s, entry };
-        });
+        const next = reduceSearch(cur, ev);
+        if (next === cur) return;
+        cur = next;
+        setState((s) => (s.id === id ? { ...s, entry: next } : s));
       },
       // Ended after the status (or a finished entry's snapshot): nothing more will come.
-      shouldReconnectOnEnd: () => !(latest.current && searchEnded(latest.current)),
+      shouldReconnectOnEnd: () => !(cur && searchEnded(cur)),
       onError: (err) => {
         if (isSearchGone(err)) {
           setState((s) => (s.id === id ? { ...s, gone: true } : s));

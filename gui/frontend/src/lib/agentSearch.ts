@@ -158,7 +158,7 @@ export function findHitCount(r: { threads: readonly unknown[]; totalHits: number
 
 /** How a search that did not finish says so above its results. */
 export function endedNote(e: Pick<SearchEntryView, "status" | "error" | "hits">): string {
-  if (e.status === "failed") return `Agent search failed: ${e.error || "it ended without an answer"}.`;
+  if (e.status === "failed") return `Agent search failed: ${(e.error || "it ended without an answer").replace(/[.\s]+$/, "")}.`;
   if (e.status === "stopped") return e.hits.length > 0 ? `Stopped. ${plural(e.hits.length, "result")} found before it stopped.` : "Stopped before it found anything.";
   if (e.status === "done" && e.hits.length === 0) return "No messages answer it.";
   return "";

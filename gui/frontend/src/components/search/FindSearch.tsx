@@ -225,7 +225,7 @@ export function FindSearch({ query: raw, header, search, loaders, dialog }: Sear
           <div className="min-w-0 flex-1" data-testid="search-preview-none" />
         )}
       </div>
-      <Hints row={row} enter={query === "" ? (dialog.selectedRecent ? (dialog.selectedRecent.mode === "agent" ? "open saved results" : "search again") : "search") : answered && !hasRows && !state.error ? "Agent search" : undefined} modes={dialog.mode === "find"} />
+      <Hints row={row} enter={query === "" ? (dialog.selectedRecent ? (dialog.selectedRecent.mode === "agent" ? "open saved results" : "search again") : "search") : answered && !hasRows && !state.error ? "try Agent search" : undefined} modes={dialog.mode === "find"} />
     </div>
   );
 }
