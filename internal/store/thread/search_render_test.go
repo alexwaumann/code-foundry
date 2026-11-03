@@ -1,50 +1,78 @@
 package thread
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
+	"testing"
+)
 
-// renderedText: a reply's markdown as its rendered plain text reads (white space aside),
-// what the GUI's citation finds a quote in.
-func TestRenderedText(t *testing.T) {
-	tests := []struct{ name, md, want string }{
-		{"plain", "just words", "just words"},
-		{"strong and emphasis", "**bold** and *it* and __b__ and _i_", "bold and it and b and i"},
-		{"intraword underscores stay", "snake_case and a_b_c", "snake_case and a_b_c"},
-		{"unpaired markers stay", "5 * 3 = 15 and a_ b", "5 * 3 = 15 and a_ b"},
-		{"strikethrough", "~~gone~~ here", "gone here"},
-		{"code span is literal", "use `a_b *c*` now", "use a_b *c* now"},
-		{"double ticks", "``a ` b`` c", "a ` b c"},
-		{"unclosed tick stays", "a ` b", "a ` b"},
-		{"link", "see [the *note*](https://x/y_z) here", "see the note here"},
-		{"image", "![alt text](i.png) after", "alt text after"},
-		{"brackets that are no link", "a [x] b (y)", "a [x] b (y)"},
-		{"autolink", "at <https://x.dev/a_b> now", "at https://x.dev/a_b now"},
-		{"escapes", `a \*star\* and \_u\_`, "a *star* and _u_"},
-		{"heading", "## Title\nbody", "Title\nbody"},
-		{"hash that is no heading", "#12 is the item", "#12 is the item"},
-		{"block quote", "> quoted\n> > deeper", "quoted\ndeeper"},
-		{"lists", "- one\n* two\n1. three\n2) four\n- [x] done", "one\ntwo\nthree\nfour\ndone"},
-		{"fenced code is literal", "before\n```go\nx := a_b * c // **no**\n```\nafter", "before\n\nx := a_b * c // **no**\n\nafter"},
-		{"rule", "a\n\n---\n\nb", "a\n\n\n\nb"},
-		{"setext", "Title\n=====\nbody", "Title\n\nbody"},
-		{"table", "| a | b_c |\n|---|:-:|\n| x\\|y | **z** |", " a  b_c \n\n x|y  z "},
-		{"pipe outside a table", "a | b", "a | b"},
-		{"greater than mid line", "a > b", "a > b"},
+// renderedCase is one case of testdata/rendered_text.json: markdown and the text the GUI's
+// markdownText reads from it (gui/frontend/scripts/renderedTextFixture.ts writes the file;
+// src/lib/markdownText.test.tsx checks it against the GUI).
+type renderedCase struct {
+	Name     string `json:"name"`
+	Markdown string `json:"markdown"`
+	Text     string `json:"text"`
+}
+
+func renderedCases(t *testing.T) []renderedCase {
+	t.Helper()
+	b, err := os.ReadFile("testdata/rendered_text.json")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := renderedText([]rune(tt.md)).String(); got != tt.want {
-				t.Errorf("renderedText(%q) = %q, want %q", tt.md, got, tt.want)
+	var cases []renderedCase
+	if err := json.Unmarshal(b, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("no cases")
+	}
+	return cases
+}
+
+// renderedText reads every shared case as the GUI does, white space runs aside (the
+// verifier and the GUI's locateQuote both ignore them).
+func TestRenderedTextMatchesTheGUI(t *testing.T) {
+	for _, c := range renderedCases(t) {
+		t.Run(c.Name, func(t *testing.T) {
+			got := squeeze(renderedText([]rune(c.Markdown))).String()
+			want := strings.Join(strings.Fields(c.Text), " ")
+			if got != want {
+				t.Errorf("renderedText(%q)\n got %q\nwant %q (the GUI's)", c.Markdown, got, want)
 			}
 		})
 	}
 }
 
-// The map points every rendered rune at the rune it came from.
+// The map points every rendered rune that has a source rune at one that comes from it:
+// the rune itself, or (an entity, an escape, a path chip, a footnote) its place.
 func TestRenderedTextMap(t *testing.T) {
-	src := []rune("x **bold** `c_d` [l](u)")
+	for _, c := range renderedCases(t) {
+		src := []rune(c.Markdown)
+		m := renderedText(src)
+		last := -1
+		for i, r := range m.r {
+			at := m.at[i]
+			if at < 0 || at > len(src) {
+				t.Errorf("%s: rune %d %q maps to %d, outside the source", c.Name, i, r, at)
+				continue
+			}
+			// In source order, but for the footnotes moved to the end.
+			if at < last && !strings.Contains(c.Markdown, "[^") {
+				t.Errorf("%s: rune %d %q maps to %d, before %d", c.Name, i, r, at, last)
+			}
+			last = at
+		}
+	}
+	src := []rune("x **bold** `c_d` [l](u) <kbd>k</kbd> a\\*b")
 	m := renderedText(src)
 	for i, r := range m.r {
-		if src[m.at[i]] != r {
+		if r != '\n' && src[m.at[i]] != r {
 			t.Errorf("rune %d %q maps to %q", i, r, src[m.at[i]])
 		}
 	}
@@ -59,6 +87,71 @@ func TestQuoteForm(t *testing.T) {
 	} {
 		if got := quoteForm(in); got != want {
 			t.Errorf("quoteForm(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// Path chips: the code strictness of pathChips.ts matchPath and linkPath.
+func TestMatchAndLinkPath(t *testing.T) {
+	paths := []struct {
+		token string
+		ok    bool
+	}{
+		{"src/a.ts", true}, {"src/a.ts:12", true}, {"src/a.ts:12:5", true}, {"src/a.ts:0", false},
+		{"README.md", true}, {"Makefile", true}, {"Node.js", false}, {"main.go", true}, {"run", false},
+		{"docs/", true}, {"internal/store", true}, {"origin/main", false}, {"application/json", false},
+		{"/compact", false}, {"/usr/bin", true}, {"/a.go", true}, {"~/x", true}, {"~", false}, {"./...", false},
+		{"main..cf/x", false}, {"github.com/a/b", false}, {"https://x.dev/a.go", false}, {"-flag", false},
+		{"@scope/pkg", false}, {"1/2", false}, {"a*b.go", false}, {"docs/my report.pdf", true},
+		{"cat docs/a.md", false}, {"screen shot.png", false}, {"/a/report (1).pdf", true},
+	}
+	for _, p := range paths {
+		if text, ok := matchPath(p.token); ok != p.ok || ok && text != p.token {
+			t.Errorf("matchPath(%q) = %q, %v; want %v", p.token, text, ok, p.ok)
+		}
+	}
+	links := []struct{ href, want string }{
+		{"internal/store/search/run.go", "internal/store/search/run.go"},
+		{"internal/a.go#L12-L30", "internal/a.go:12"},
+		{"./docs/a.md#intro", "./docs/a.md"},
+		{"a/b.go?x=1#L5", "a/b.go:5"},
+		{"a/b%2Fc.go", "a/b/c.go"},
+		{"100%.md", "100%.md"},
+		{"about", ""}, {"#top", ""}, {"//x.dev/a.go", ""}, {"https://x.dev/a.go", ""}, {"mailto:a@b.co", ""},
+		{"docs/%E2%9C%85.md", ""}, {"a/%FF.go", ""},
+	}
+	for _, l := range links {
+		got, ok := linkPath(l.href)
+		if ok != (l.want != "") || got != l.want {
+			t.Errorf("linkPath(%q) = %q, %v; want %q", l.href, got, ok, l.want)
+		}
+	}
+}
+
+// The extension, name and head lists are pathChips.ts's.
+func TestPathChipListsMatchTheGUI(t *testing.T) {
+	b, err := os.ReadFile("../../../gui/frontend/src/lib/pathChips.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	words := regexp.MustCompile(`"([^"]+)"`)
+	for name, set := range map[string]map[string]bool{"EXTENSIONS": pathExtensions, "NAMES": pathNames, "REF_HEADS": refHeads, "MIME_HEADS": mimeHeads} {
+		m := regexp.MustCompile(`(?s)const ` + name + `: ReadonlySet<string> = new Set\(\[(.*?)\]\);`).FindSubmatch(b)
+		if m == nil {
+			t.Errorf("%s not found in pathChips.ts", name)
+			continue
+		}
+		var gui, ours []string
+		for _, w := range words.FindAllSubmatch(m[1], -1) {
+			gui = append(gui, string(w[1]))
+		}
+		for w := range set {
+			ours = append(ours, w)
+		}
+		sort.Strings(gui)
+		sort.Strings(ours)
+		if !slices.Equal(gui, ours) {
+			t.Errorf("%s: pathChips.ts has %q, search_paths.go %q", name, gui, ours)
 		}
 	}
 }

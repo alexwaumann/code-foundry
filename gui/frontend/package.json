@@ -15,6 +15,7 @@
     "mock:emit": "tsx mock/emit.ts",
     "themes": "tsx themes/convert.ts",
     "themes:check": "tsx themes/check.ts",
+    "rendered-text-fixture": "tsx scripts/renderedTextFixture.ts",
     "pagelib": "vite build -c vite.pagelib.config.ts --mode modules && vite build -c vite.pagelib.config.ts --mode scripts",
     "dev:mock": "vite --mode mock",
     "e2e": "playwright test",

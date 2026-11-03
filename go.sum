@@ -46,6 +46,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/wailsapp/wails/v3 v3.0.0-beta.34 h1:3p/s+rk6olaquzaDWWowVTJ1ZMIBDHEsTUqxsffR4Zw=
 github.com/wailsapp/wails/v3 v3.0.0-beta.34/go.mod h1:Tk3i8pyehpIdV4aS9GfpgGjk7eOjuSpCrpyJXpS6y64=
+github.com/yuin/goldmark v1.7.17 h1:p36OVWwRb246iHxA/U4p8OPEpOTESm4n+g+8t0EE5uA=
+github.com/yuin/goldmark v1.7.17/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
 go.mitchellh.com/libghostty v0.0.0-20261007030428-8812ad0e0f79 h1:zpRj42oTcn+DbQOgtdWvQ2LLYr9VPv87mNk2Xn9KkTU=
 go.mitchellh.com/libghostty v0.0.0-20261007030428-8812ad0e0f79/go.mod h1:sx8yDvnDrQC/PzsrFfYx7ROmH8my91nz7lOxQb6sbo0=
 golang.org/x/exp/typeparams v0.0.0-20260112195511-716be5621a96 h1:RMc8anw0hCPcg5CZYN2PEQ8nMwosk461R6vFwPrCFVg=

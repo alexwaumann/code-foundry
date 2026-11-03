@@ -18,6 +18,8 @@ require (
 	modernc.org/sqlite v1.60.1
 )
 
+require github.com/yuin/goldmark v1.7.17
+
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/alexwaumann/code-foundry/pluginsdk v0.0.0-00010101000000-000000000000

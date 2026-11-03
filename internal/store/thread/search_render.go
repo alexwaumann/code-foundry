@@ -1,19 +1,30 @@
 package thread
 
 import (
+	"bytes"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
+
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	east "github.com/yuin/goldmark/extension/ast"
+	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
 // Rendered text for agent search's quotes (docs/notes/search-5-agent-daemon.md): a hit's
 // quote is stored as the words read in the rendered reply, the plain text the GUI's
 // locateQuote anchors a citation in (gui/frontend/src/lib/citation.ts; white space aside),
-// not as the raw markdown thread read --full prints. renderedText is a small CommonMark +
-// GFM reading of a reply, enough for the constructs Claude writes: fences, headings,
-// quotes, lists, task boxes, tables, rules, code spans, links, autolinks, escapes and
-// emphasis. Each output rune keeps the index of the source rune it came from, so the part
-// of the source a quote matched can be read rendered.
+// not as the raw markdown thread read --full prints. renderedText reads a reply as
+// gui/frontend/src/lib/markdownText does: the same CommonMark + GFM parse (goldmark here,
+// remark there) and the same reading of the tree. testdata/rendered_text.json, written by
+// the GUI's markdownText, holds the cases both sides' tests check. Each output rune keeps
+// the index of the source rune it came from, so the part of the source a quote matched
+// can be read rendered.
 
 // mapped is text with, for each rune, the index of the source rune it came from.
 type mapped struct {
@@ -154,331 +165,398 @@ func renderedQuote(src []rune, from, to int, markdown bool) string {
 	return strings.Join(strings.Fields(b.String()), " ")
 }
 
-var (
-	fenceLine     = regexp.MustCompile("^ {0,3}(```+|~~~+)")
-	ruleLine      = regexp.MustCompile(`^ {0,3}([-*_])( *[-*_]){2,} *$`)
-	setextLine    = regexp.MustCompile(`^ {0,3}=+ *$`)
-	tableSepLine  = regexp.MustCompile(`^ *\|? *:?-+:? *(\| *:?-+:? *)*\|? *$`)
-	headingPrefix = regexp.MustCompile(`^ {0,3}#{1,6}( +|$)`)
-	quotePrefix   = regexp.MustCompile(`^ {0,3}> ?`)
-	listPrefix    = regexp.MustCompile(`^ *([-*+]|[0-9]{1,9}[.)]) +(\[[ xX]\] +)?`)
-)
+// replyMarkdown parses a reply as the GUI's renderer does (gui/frontend/src/lib/markdownPlugins:
+// CommonMark and GFM with remark-gfm's tables, strikethrough, literal autolinks and
+// footnotes). Task boxes are read by renderedText itself: goldmark's take a box with no
+// space after it, remark's do not.
+var replyMarkdown = goldmark.New(goldmark.WithExtensions(extension.Table, extension.Strikethrough, extension.Linkify, extension.Footnote))
 
-// tok is a source rune on its way to the rendered text.
-type tok struct {
-	r    rune
-	at   int
-	drop bool // markup: not in the rendered text
-	lit  bool // literal: code or escaped, never markup
-}
-
-// renderedText is src (markdown) as its rendered plain text reads, mapped.
+// renderedText is src (a reply's markdown) as its rendered plain text reads, mapped: the
+// text gui/frontend/src/lib/markdownText gives (white space runs aside;
+// testdata/rendered_text.json holds both sides' reading). Text as the thread draws it:
+// escapes and entities decoded; code and fenced blocks as they are; links as their text,
+// but a relative link that reads as a path as the path (a path chip); images, task boxes
+// and rules as nothing; HTML as text, except a bare matched pair of a few inline tags
+// (htmlElements), which renders as its contents, and br; footnote references as their
+// numbers, the footnotes at the end under "Footnotes", each with a ↩. A new block starts
+// on a new line.
 func renderedText(src []rune) mapped {
-	toks := blockPass(src)
-	inlinePass(toks)
-	emphasisPass(toks)
-	var out mapped
-	for _, t := range toks {
-		if !t.drop {
-			out.add(t.r, t.at)
+	s := string(src)
+	b := []byte(s)
+	w := &walker{src: b, runeAt: make([]int, len(b)+1), skipFrom: -1}
+	k := 0
+	for i := range s {
+		for j := i; j < len(b) && (j == i || !utf8.RuneStart(b[j])); j++ {
+			w.runeAt[j] = k
 		}
+		k++
 	}
-	return out
+	w.runeAt[len(b)] = k
+	w.block(replyMarkdown.Parser().Parse(text.NewReader(b)))
+	return w.out
 }
 
-// blockPass drops line markup: fences, rules, setext underlines, table separators and
-// pipes, and the heading, quote and list markers starting a line. A fence's lines are
-// literal.
-func blockPass(src []rune) []tok {
-	var toks []tok
-	lines := strings.Split(string(src), "\n")
-	table := tableLines(lines)
-	at := 0
-	fence := ""
-	for li, line := range lines {
-		lr := []rune(line)
-		start := at
-		at += len(lr) + 1
-		emit := func(from int, lit bool) {
-			for i := from; i < len(lr); i++ {
-				toks = append(toks, tok{r: lr[i], at: start + i, lit: lit})
-			}
+// walker reads a parsed reply into its rendered text. Positions are byte offsets into
+// src until emit maps them to runes.
+type walker struct {
+	src    []byte
+	runeAt []int // byte offset -> rune index
+	out    mapped
+	// newline: a block starts, so the next rune goes on a new line.
+	newline bool
+	// at: the source just read, the place of what has no source of its own.
+	at int
+	// skipFrom, skipTo: a task box's source, left out.
+	skipFrom, skipTo int
+}
+
+// emit adds rune r from source byte at.
+func (w *walker) emit(r rune, at int) {
+	if at >= w.skipFrom && at < w.skipTo {
+		return
+	}
+	at = min(max(at, 0), len(w.src))
+	if w.newline {
+		if len(w.out.r) > 0 {
+			w.out.add('\n', w.runeAt[at])
 		}
-		if li > 0 {
-			toks = append(toks, tok{r: '\n', at: start - 1})
+		w.newline = false
+	}
+	w.out.add(r, w.runeAt[at])
+}
+
+// raw adds src[from:to] as it is.
+func (w *walker) raw(from, to int) {
+	for i, r := range string(w.src[from:to]) {
+		w.emit(r, from+i)
+	}
+	w.at = max(w.at, to)
+}
+
+// text adds src[from:to] with backslash escapes and entity references decoded.
+func (w *walker) text(from, to int) {
+	s := w.src[from:to]
+	for i := 0; i < len(s); {
+		if s[i] == '\\' && i+1 < len(s) && isASCIIPunct(rune(s[i+1])) {
+			w.emit(rune(s[i+1]), from+i+1)
+			i += 2
+			continue
 		}
-		if m := fenceLine.FindStringSubmatch(line); m != nil {
-			switch {
-			case fence == "":
-				fence = m[1][:1]
+		if s[i] == '&' {
+			if n, val := entityAt(s[i:]); n > 0 {
+				for _, r := range val {
+					w.emit(r, from+i)
+				}
+				i += n
 				continue
-			case strings.HasPrefix(m[1], fence) && strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), fence)) == "":
-				fence = ""
+			}
+		}
+		r, size := utf8.DecodeRune(s[i:])
+		w.emit(r, from+i)
+		i += size
+	}
+	w.at = max(w.at, to)
+}
+
+// synth adds s, text the renderer adds (a footnote's number), at the source just read.
+func (w *walker) synth(s string) {
+	for _, r := range s {
+		w.emit(r, w.at)
+	}
+}
+
+func (w *walker) lines(n ast.Node) {
+	l := n.Lines()
+	for i := 0; i < l.Len(); i++ {
+		seg := l.At(i)
+		w.raw(seg.Start, seg.Stop)
+	}
+}
+
+func (w *walker) children(n ast.Node) {
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		w.block(c)
+	}
+}
+
+// block reads a block node.
+func (w *walker) block(n ast.Node) {
+	switch n := n.(type) {
+	case *ast.Paragraph, *ast.TextBlock, *ast.Heading, *east.TableCell:
+		w.newline = true
+		w.inlines(n)
+	case *ast.CodeBlock, *ast.FencedCodeBlock:
+		w.newline = true
+		w.lines(n)
+	case *ast.HTMLBlock:
+		w.newline = true
+		w.lines(n)
+		if n.HasClosure() {
+			w.raw(n.ClosureLine.Start, n.ClosureLine.Stop)
+		}
+	case *ast.ThematicBreak:
+	case *ast.ListItem:
+		w.taskBox(n)
+		w.children(n)
+	case *east.FootnoteList:
+		w.newline = true
+		w.synth("Footnotes")
+		w.children(n)
+	default:
+		w.children(n)
+	}
+}
+
+// taskBoxLine is a GFM task box starting a list item's first paragraph: [ ], [x] or [X],
+// then white space and more on the line.
+var taskBoxLine = regexp.MustCompile(`^\[[ xX]\][ \t]+[^ \t\r\n]`)
+
+// taskBox leaves out item's task box, if it has one.
+func (w *walker) taskBox(item *ast.ListItem) {
+	first := item.FirstChild()
+	if first == nil || first.Kind() != ast.KindParagraph && first.Kind() != ast.KindTextBlock || first.Lines().Len() == 0 {
+		return
+	}
+	at := first.Lines().At(0).Start
+	if taskBoxLine.Match(w.src[at:]) {
+		w.skipFrom, w.skipTo = at, at+3
+	}
+}
+
+// inlines reads an inline container's children.
+func (w *walker) inlines(parent ast.Node) {
+	elements := htmlElements(parent, w.src)
+	for c := parent.FirstChild(); c != nil; c = c.NextSibling() {
+		w.inline(c, elements)
+	}
+}
+
+// inline reads an inline node; elements are its parent's raw HTML tags that render as
+// elements (no text).
+func (w *walker) inline(n ast.Node, elements map[ast.Node]bool) {
+	switch n := n.(type) {
+	case *ast.Text:
+		w.text(n.Segment.Start, n.Segment.Stop)
+		if n.SoftLineBreak() || n.HardLineBreak() {
+			w.emit('\n', n.Segment.Stop)
+		}
+	case *ast.String:
+		w.synth(string(n.Value))
+	case *ast.CodeSpan:
+		w.codeSpan(n)
+	case *ast.Image:
+		// Nothing: a loaded image has no text, an unloaded one's chip is not read.
+		w.skipNode(n)
+	case *ast.Link:
+		w.link(n)
+	case *ast.AutoLink:
+		label := n.Label(w.src)
+		if i := bytes.Index(w.src[w.at:], label); i >= 0 {
+			w.raw(w.at+i, w.at+i+len(label))
+		} else {
+			w.synth(string(label))
+		}
+	case *ast.RawHTML:
+		for i := 0; i < n.Segments.Len(); i++ {
+			seg := n.Segments.At(i)
+			if elements[n] {
+				w.at = max(w.at, seg.Stop)
+			} else {
+				w.raw(seg.Start, seg.Stop)
+			}
+		}
+	case *east.FootnoteLink:
+		w.synth(strconv.Itoa(n.Index))
+	case *east.FootnoteBacklink:
+		// After the paragraph's last rune, so a quote ending there leaves it out.
+		w.at++
+		w.synth(" ↩")
+		if n.RefIndex > 0 {
+			w.synth(strconv.Itoa(n.RefIndex + 1))
+		}
+	default:
+		w.inlines(n)
+	}
+}
+
+// skipNode moves past n's source, reading nothing.
+func (w *walker) skipNode(n ast.Node) {
+	_ = ast.Walk(n, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
+		if t, ok := c.(*ast.Text); ok && entering {
+			w.at = max(w.at, t.Segment.Stop)
+		}
+		return ast.WalkContinue, nil
+	})
+}
+
+// codeSpan reads an inline code span as it is (line endings as spaces); one that reads
+// as a path is the chip's trimmed path.
+func (w *walker) codeSpan(n *ast.CodeSpan) {
+	var m mapped
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		t, ok := c.(*ast.Text)
+		if !ok {
+			continue
+		}
+		for i, r := range string(t.Segment.Value(w.src)) {
+			if r == '\n' {
+				r = ' '
+			}
+			m.add(r, t.Segment.Start+i)
+		}
+		w.at = max(w.at, t.Segment.Stop)
+	}
+	from, to := 0, len(m.r)
+	if trimmed := strings.TrimSpace(string(m.r)); trimmed != "" {
+		if _, ok := matchPath(trimmed); ok {
+			for from < to && unicode.IsSpace(m.r[from]) {
+				from++
+			}
+			for to > from && unicode.IsSpace(m.r[to-1]) {
+				to--
+			}
+		}
+	}
+	for i := from; i < to; i++ {
+		w.emit(m.r[i], m.at[i])
+	}
+}
+
+// link reads a link as its text, or, when its target is relative and reads as a path
+// (linkPath), as the path chip's text, placed on the target's source (an inline link's)
+// or at the end of its text (a reference link's, whose target is elsewhere).
+func (w *walker) link(n *ast.Link) {
+	path, ok := linkPath(unescape(n.Destination))
+	if !ok {
+		w.inlines(n)
+		return
+	}
+	w.skipNode(n)
+	// An inline link's target follows its text: "](" then the target.
+	dest, end, inline := w.at, w.at+1, false
+	if i := bytes.Index(w.src[w.at:], n.Destination); i >= 0 && i <= 8 {
+		dest, end, inline = w.at+i, w.at+i+len(n.Destination), true
+	}
+	for i, r := range path {
+		w.emit(r, min(dest+i, end-1))
+	}
+	if inline {
+		w.at = max(w.at, end)
+	}
+}
+
+// unescape is b with backslash escapes and entity references decoded (a link target as
+// the GUI's URL reads before it is percent-decoded).
+func unescape(b []byte) string {
+	var out strings.Builder
+	for i := 0; i < len(b); {
+		if b[i] == '\\' && i+1 < len(b) && isASCIIPunct(rune(b[i+1])) {
+			out.WriteByte(b[i+1])
+			i += 2
+			continue
+		}
+		if b[i] == '&' {
+			if n, val := entityAt(b[i:]); n > 0 {
+				out.WriteString(val)
+				i += n
 				continue
 			}
 		}
-		if fence != "" {
-			emit(0, true)
-			continue
-		}
-		if ruleLine.MatchString(line) || table[li] && tableSepLine.MatchString(line) ||
-			setextLine.MatchString(line) && li > 0 && strings.TrimSpace(lines[li-1]) != "" {
-			continue
-		}
-		from := 0
-		for {
-			rest := string(lr[from:])
-			loc := quotePrefix.FindStringIndex(rest)
-			if loc == nil {
-				loc = listPrefix.FindStringIndex(rest)
-			}
-			if loc == nil {
-				loc = headingPrefix.FindStringIndex(rest)
-			}
-			if loc == nil || loc[1] == 0 {
-				break
-			}
-			from += len([]rune(rest[:loc[1]]))
-		}
-		if table[li] {
-			for i := from; i < len(lr); i++ {
-				toks = append(toks, tok{r: lr[i], at: start + i, drop: lr[i] == '|' && (i == 0 || lr[i-1] != '\\')})
-			}
-			continue
-		}
-		emit(from, false)
+		out.WriteByte(b[i])
+		i++
 	}
-	return toks
+	return out.String()
 }
 
-// tableLines marks a GFM table's lines: a row with a pipe followed by a separator line,
-// and the rows after it up to a line without a pipe.
-func tableLines(lines []string) []bool {
-	out := make([]bool, len(lines))
-	for i := 0; i+1 < len(lines); i++ {
-		if !strings.Contains(lines[i], "|") || !strings.Contains(lines[i+1], "-") || !tableSepLine.MatchString(lines[i+1]) {
-			continue
-		}
-		out[i], out[i+1] = true, true
-		j := i + 2
-		for ; j < len(lines) && strings.Contains(lines[j], "|"); j++ {
-			out[j] = true
-		}
-		i = j - 1
-	}
-	return out
-}
+// inlineTagRE is a raw HTML node that is exactly one tag without attributes
+// (gui/frontend/src/lib/inlineHtml inlineTag).
+var inlineTagRE = regexp.MustCompile(`^<(/?)([a-zA-Z]+)\s*(/?)>$`)
 
-// inlinePass drops inline markup but emphasis: escapes, code spans (their text literal),
-// links and images (their text kept) and autolinks.
-func inlinePass(toks []tok) {
-	n := len(toks)
-	next := func(i int) int { // the next live token after i
-		for i++; i < n && toks[i].drop; i++ {
-		}
-		return i
+// pairedTags render in a thread's answer as a matched pair (inlineHtml INLINE_HTML_TAGS
+// but br, which renders alone).
+var pairedTags = map[string]bool{"small": true, "mark": true, "sub": true, "sup": true, "kbd": true, "ins": true, "s": true, "del": true, "u": true}
+
+// htmlElements is which of parent's raw HTML children render as elements (no text):
+// matched pairs of pairedTags among its children and br, as inlineHtml buildInline makes
+// them. Every other raw node renders as its text.
+func htmlElements(parent ast.Node, src []byte) map[ast.Node]bool {
+	var out map[ast.Node]bool
+	type open struct {
+		name string
+		node ast.Node
 	}
-	for i := 0; i < n; i = next(i) {
-		t := &toks[i]
-		if t.lit {
+	var stack []open
+	for c := parent.FirstChild(); c != nil; c = c.NextSibling() {
+		h, ok := c.(*ast.RawHTML)
+		if !ok {
 			continue
+		}
+		var raw []byte
+		for i := 0; i < h.Segments.Len(); i++ {
+			seg := h.Segments.At(i)
+			raw = append(raw, seg.Value(src)...)
+		}
+		m := inlineTagRE.FindSubmatch(raw)
+		if m == nil {
+			continue
+		}
+		closing, name, self := len(m[1]) > 0, strings.ToLower(string(m[2])), len(m[3]) > 0
+		if out == nil {
+			out = map[ast.Node]bool{}
 		}
 		switch {
-		case t.r == '\\':
-			if j := next(i); j < n && !toks[j].lit && (isASCIIPunct(toks[j].r) || toks[j].r == '\n') {
-				t.drop = true
-				if toks[j].r != '\n' {
-					toks[j].lit = true
-				}
+		case name == "br":
+			if !closing {
+				out[c] = true
 			}
-		case t.r == '`':
-			ticks := 1
-			for i+ticks < n && toks[i+ticks].r == '`' && !toks[i+ticks].lit {
-				ticks++
+		case !pairedTags[name] || self:
+		case !closing:
+			stack = append(stack, open{name, c})
+		default:
+			i := len(stack) - 1
+			for i >= 0 && stack[i].name != name {
+				i--
 			}
-			if end := closingTicks(toks, i+ticks, ticks); end >= 0 {
-				for j := i; j < i+ticks; j++ {
-					toks[j].drop = true
-				}
-				for j := i + ticks; j < end; j++ {
-					toks[j].lit = true
-				}
-				for j := end; j < end+ticks; j++ {
-					toks[j].drop = true
-				}
-				i = end + ticks - 1
+			if i < 0 {
 				continue
 			}
-			for j := i; j < i+ticks; j++ {
-				toks[j].lit = true
-			}
-			i += ticks - 1
-		case t.r == '[':
-			if close, end, ok := linkToks(toks, i); ok {
-				t.drop = true
-				if i > 0 && toks[i-1].r == '!' && !toks[i-1].lit {
-					toks[i-1].drop = true
-				}
-				for j := close; j < end; j++ {
-					toks[j].drop = true
-				}
-			}
-		case t.r == '<':
-			if end := autolinkEnd(toks, i); end > 0 {
-				t.drop, toks[end].drop = true, true
-				for j := i + 1; j < end; j++ {
-					toks[j].lit = true
-				}
-			}
+			// Tags opened inside the pair and never closed stay text.
+			out[stack[i].node], out[c] = true, true
+			stack = stack[:i]
 		}
 	}
+	return out
 }
 
-// closingTicks is the start of the run of exactly n backticks closing a code span opened
-// before from; -1 when none.
-func closingTicks(toks []tok, from, n int) int {
-	for i := from; i < len(toks); i++ {
-		if toks[i].r != '`' || toks[i].lit {
-			continue
-		}
-		j := i
-		for j < len(toks) && toks[j].r == '`' {
-			j++
-		}
-		if j-i == n {
-			return i
-		}
-		i = j - 1
-	}
-	return -1
-}
+// entityRef is an HTML entity or numeric character reference.
+var entityRef = regexp.MustCompile(`^&(?:#[xX]([0-9a-fA-F]{1,6})|#([0-9]{1,7})|([A-Za-z][A-Za-z0-9]{1,31}));`)
 
-// linkToks reads [text](target) at toks[i], the text's brackets balanced and the target
-// on one line: the closing ] and the link's end.
-func linkToks(toks []tok, i int) (close, end int, ok bool) {
-	depth := 0
-	j := i
-	for ; j < len(toks); j++ {
-		if toks[j].lit {
-			continue
-		}
-		if toks[j].r == '[' {
-			depth++
-		} else if toks[j].r == ']' {
-			if depth--; depth == 0 {
-				break
-			}
-		}
+// entityAt decodes the entity reference b starts with: its length and text; 0 when none.
+func entityAt(b []byte) (int, string) {
+	m := entityRef.FindSubmatch(b)
+	if m == nil {
+		return 0, ""
 	}
-	if j+1 >= len(toks) || toks[j+1].r != '(' {
-		return 0, 0, false
-	}
-	depth = 0
-	for k := j + 1; k < len(toks); k++ {
-		switch toks[k].r {
-		case '\n':
-			return 0, 0, false
-		case '(':
-			depth++
-		case ')':
-			if depth--; depth == 0 {
-				return j, k + 1, true
-			}
+	switch {
+	case m[1] != nil, m[2] != nil:
+		base, digits := 16, m[1]
+		if m[2] != nil {
+			base, digits = 10, m[2]
 		}
-	}
-	return 0, 0, false
-}
-
-// autolinkEnd is the > closing an autolink <scheme:…> or <a@b.c> at toks[i]; 0 when none.
-func autolinkEnd(toks []tok, i int) int {
-	var b strings.Builder
-	for j := i + 1; j < len(toks); j++ {
-		r := toks[j].r
-		if r == '>' {
-			s := b.String()
-			if (strings.Contains(s, "://") || strings.HasPrefix(s, "mailto:") || strings.Contains(s, "@")) && !strings.ContainsAny(s, " \n<") {
-				return j
-			}
-			return 0
+		v, err := strconv.ParseInt(string(digits), base, 32)
+		if err != nil || v > unicode.MaxRune {
+			v = utf8.RuneError
 		}
-		if unicode.IsSpace(r) || r == '<' {
-			return 0
+		return len(m[0]), string(util.ToValidRune(rune(v)))
+	default:
+		e, ok := util.LookUpHTML5EntityByName(string(m[3]))
+		if !ok {
+			return 0, ""
 		}
-		b.WriteRune(r)
+		return len(m[0]), string(e.Characters)
 	}
-	return 0
 }
 
 func isASCIIPunct(r rune) bool {
-	return r < 128 && unicode.IsPunct(r) || r < 128 && unicode.IsSymbol(r)
+	return r < 128 && (unicode.IsPunct(r) || unicode.IsSymbol(r))
 }
-
-// delim is a run of * _ or ~ that may open or close emphasis.
-type delim struct {
-	ch          rune
-	from, n     int // toks[from:from+n], live ones
-	open, close bool
-}
-
-// emphasisPass drops the emphasis and strikethrough delimiters that pair up (CommonMark's
-// flanking rules, `_` not inside a word); an unpaired one stays as text.
-func emphasisPass(toks []tok) {
-	var runs []delim
-	for i := 0; i < len(toks); i++ {
-		t := toks[i]
-		if t.drop || t.lit || (t.r != '*' && t.r != '_' && t.r != '~') {
-			continue
-		}
-		j := i
-		for j < len(toks) && toks[j].r == t.r && !toks[j].drop && !toks[j].lit {
-			j++
-		}
-		before, after := neighbour(toks, i, -1), neighbour(toks, j-1, 1)
-		left := !isSpace(after) && (!isPunct(after) || isSpace(before) || isPunct(before))
-		right := !isSpace(before) && (!isPunct(before) || isSpace(after) || isPunct(after))
-		d := delim{ch: t.r, from: i, n: j - i, open: left, close: right}
-		if t.r == '_' {
-			d.open = left && (!right || isPunct(before))
-			d.close = right && (!left || isPunct(after))
-		}
-		runs = append(runs, d)
-		i = j - 1
-	}
-	for c := range runs {
-		if !runs[c].close {
-			continue
-		}
-		for o := c - 1; o >= 0 && runs[c].n > 0; o-- {
-			if runs[o].ch != runs[c].ch || !runs[o].open || runs[o].n == 0 {
-				continue
-			}
-			k := min(runs[o].n, runs[c].n)
-			// The opener's inner end and the closer's inner start pair up.
-			for x := 0; x < k; x++ {
-				toks[runs[o].from+runs[o].n-1-x].drop = true
-				toks[runs[c].from+x].drop = true
-			}
-			runs[o].n -= k
-			runs[c].from += k
-			runs[c].n -= k
-			// Openers between the pair cannot close anything any more.
-			for m := o + 1; m < c; m++ {
-				runs[m].open = false
-			}
-		}
-	}
-}
-
-// neighbour is the rune next to toks[i] in direction dir (-1, 1), skipping dropped
-// markup; ' ' at the text's ends.
-func neighbour(toks []tok, i, dir int) rune {
-	for j := i + dir; j >= 0 && j < len(toks); j += dir {
-		if !toks[j].drop {
-			return toks[j].r
-		}
-	}
-	return ' '
-}
-
-func isSpace(r rune) bool { return unicode.IsSpace(r) }
-func isPunct(r rune) bool { return unicode.IsPunct(r) || unicode.IsSymbol(r) }
