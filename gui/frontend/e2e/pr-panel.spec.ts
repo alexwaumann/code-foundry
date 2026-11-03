@@ -306,6 +306,9 @@ test("at 280px nothing overflows: header, readiness box, inner tab bar, logins, 
   await expect(page.getByTestId("pr-reviewer-picker")).toBeVisible();
   expect(inside(await boxOf(page, "pr-reviewer-picker"), await boxOf(page, "side-panel"))).toBe(true);
   await page.keyboard.press("Escape");
+  // Gone (its exit animation over): closing hands focus back to its button, which would
+  // otherwise take it from the composer opened next.
+  await expect(page.getByTestId("pr-reviewer-picker")).toHaveCount(0);
   // Review's menu and composer fit.
   await expect(page.getByTestId("pr-review-button")).toHaveAccessibleName("Review");
   await page.getByTestId("pr-review-button").click();
@@ -314,6 +317,7 @@ test("at 280px nothing overflows: header, readiness box, inner tab bar, logins, 
   await page.getByTestId("pr-review-comment").click();
   expect(await overflowX(page, "pr-review-composer")).toBeLessThanOrEqual(0);
   expect(inside(await boxOf(page, "pr-review-submit"), await boxOf(page, "side-panel"))).toBe(true);
+  await expect(page.getByTestId("pr-review-input")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
 
