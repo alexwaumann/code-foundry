@@ -368,13 +368,20 @@ function openFooter(d: PullRequestDetailView, fresh: boolean, reviewPrimary: boo
   return d.autoMergeAllowed ? out("auto-merge") : out("merge", AUTO_MERGE_OFF_NOTE);
 }
 
-function openHeadline(d: PullRequestDetailView, rows: ReadinessRow[]): Readiness["headline"] {
+/** GitHub has computed neither mergeability nor the merge state yet. */
+function computingMergeability(d: PullRequestDetailView): boolean {
   const pr = d.pullRequest;
+  return (pr.mergeable === "unknown" || pr.mergeable === null) && (pr.mergeState === "unknown" || pr.mergeState === "");
+}
+
+function openHeadline(d: PullRequestDetailView, rows: ReadinessRow[]): Readiness["headline"] {
   if (d.autoMergeEnabled) return { icon: "auto-merge", tone: "info", title: "Auto-merge on", meta: d.autoMergeMethod ? METHOD_WORDS[d.autoMergeMethod] : "" };
   if (rows.some((r) => r.id === "review-request")) return { icon: "eye", tone: "pending", title: "Waiting on your review", meta: "" };
   if (!d.viewerCanUpdate) return { icon: "lock", tone: "neutral", title: "You can't merge this", meta: d.viewerPermission ? `${d.viewerPermission} access` : "" };
   const blocking = rows.filter((r) => r.blocking);
   if (blocking.length === 0) {
+    // GitHub is still computing (just after a push): say so, not "Ready". Merge stays as GitHub allows.
+    if (computingMergeability(d)) return { icon: "clock", tone: "neutral", title: "Checking mergeability", meta: "" };
     if (mergeAvailability(d).reason === null) {
       // What still shows but does not block: "1 optional check failing · 1 unresolved conversation".
       const meta = rows.map((r) => r.summary ?? "").filter(Boolean).join(" · ");

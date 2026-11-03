@@ -267,9 +267,9 @@ describe("readiness: headline, rows and footer", () => {
       footer: { review: true, merge: "auto-merge" },
     },
     {
-      name: "mergeability not computed yet",
+      name: "mergeability not computed yet: checking, no conflict row, Merge as GitHub allows",
       s: { pr: { mergeable: "unknown", mergeState: "unknown" } },
-      headline: "Ready to merge",
+      headline: "Checking mergeability",
       rows: ["checks success: All 2 checks passed", "review success: Approved"],
       footer: { review: true, merge: "merge" },
     },
