@@ -191,7 +191,10 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 	if canon := detail.GetPullRequest().GetRepoSlug(); len(clonesOf(projects, s)) == 0 && len(clonesOf(projects, canon)) > 0 {
 		match = canon
 	}
-	var cloned bool
+	var (
+		cloned   bool
+		clonedAt string
+	)
 	if explicit == "" && len(clonesOf(projects, match)) == 0 {
 		canon := detail.GetPullRequest().GetRepoSlug()
 		// A project whose origin names the repository but is not recognised as GitHub
@@ -201,7 +204,7 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 		}
 		// Refuse what a fresh clone could not place (a fork's head to push to, no head
 		// branch) before cloning: the clone would not help.
-		if _, err := pickPRWorktree(kind, []*v1.Project{{GithubSlug: canon}}, canon, n, head, "", ""); err != nil {
+		if err := uncloneablePRTask(task, canon, n, head); err != nil {
 			return Result{}, err
 		}
 		p, err := d.Clone(ctx, canon, nil)
@@ -213,10 +216,18 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 			p.GithubSlug = canon
 		}
 		projects, cloned, match = []*v1.Project{p}, true, p.GetGithubSlug()
+		clonedAt = cmp.Or(p.GetPath(), "the projects folder")
+	}
+	// A step that fails after a clone says the clone stays a project: a retry finds it.
+	afterClone := func(err error) error {
+		if !cloned {
+			return err
+		}
+		return wrapStep(fmt.Sprintf("cloned %s into %s, which stays a project", match, clonedAt), err)
 	}
 	pick, err := pickPRWorktree(kind, projects, match, n, head, explicit, "")
 	if err != nil {
-		return Result{}, err
+		return Result{}, afterClone(err)
 	}
 	if explicit != "" {
 		// A review there reads off the head unless the worktree is known to be on it.
@@ -227,7 +238,7 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 	if pick.Create {
 		wt, err := createPRWorktree(ctx, d, pick, match, head)
 		if err != nil {
-			return Result{}, err
+			return Result{}, afterClone(err)
 		}
 		pick.ProjectID, pick.Path, status = cmp.Or(wt.GetProjectId(), pick.ProjectID), wt.GetPath(), wt.GetStatus()
 	}
@@ -236,7 +247,7 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 		InitialPrompt: task.prompt(detail, PRTaskOptions{Checkout: prCheckoutOf(status), OffHead: pick.OffHead}),
 	}))
 	if err != nil {
-		return Result{}, wrapStep("start thread", err)
+		return Result{}, afterClone(wrapStep("start thread", err))
 	}
 	th := created.Msg.GetThread()
 	focusCreated(d.Emitter, a, th.GetId())
@@ -279,4 +290,21 @@ func originNames(origin, slug string) bool {
 		return false
 	}
 	return o == slug || strings.HasSuffix(o, "/"+slug)
+}
+
+// uncloneablePRTask refuses (FailedPrecondition), before slug is cloned as a project, a
+// push task that a fresh clone could not place either: no head branch, or a fork's head
+// (a new clone has no worktree with it checked out). A review-request always fits.
+func uncloneablePRTask(task prTask, slug string, n int, head prHead) error {
+	switch {
+	case !task.push:
+		return nil
+	case head.Ref == "":
+		return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("#%d has no head branch to check out: pass --worktree", n))
+	case head.Cross:
+		return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
+			"#%d comes from a fork and %s is not a project yet: clone it (`code-foundry project clone %s`), check out the head in a worktree there (`gh pr checkout %d`), and pass --worktree",
+			n, slug, slug, n))
+	}
+	return nil
 }

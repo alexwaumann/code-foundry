@@ -138,7 +138,51 @@ func TestPullRequestTask(t *testing.T) {
 			args:     args("a/b", "conversations"),
 			setup:    fork,
 			wantReq:  []proto.Message{detail("a/b", true), list},
-			wantCode: connect.CodeFailedPrecondition, wantErrMsg: "comes from a fork and no worktree of a/b has its head checked out"},
+			wantCode: connect.CodeFailedPrecondition, wantErrMsg: "#7 comes from a fork and a/b is not a project yet: clone it (`code-foundry project clone a/b`)"},
+		{name: "not a project: a push task without a head branch is refused before cloning",
+			args:     args("a/b", "checks"),
+			setup:    func(f *prThreadFixture) { f.gh.Detail.PullRequest.HeadRef = "" },
+			wantReq:  []proto.Message{detail("a/b", true), list},
+			wantCode: connect.CodeFailedPrecondition, wantErrMsg: "#7 has no head branch to check out: pass --worktree"},
+		{name: "not a project: a step failing after the clone says the clone stays",
+			args: args("a/b", "checks"),
+			setup: func(f *prThreadFixture) {
+				f.clone = &v1.Project{Id: "p-new", Path: "/cf/projects/a/b"}
+				f.gitops.Err = connect.NewError(connect.CodeUnavailable, errors.New("network down"))
+			},
+			wantReq:    []proto.Message{detail("a/b", true), list, fetch("/cf/projects/a/b")},
+			wantCloned: []string{"a/b"},
+			wantCode:   connect.CodeUnavailable,
+			wantErrMsg: "cloned a/b into /cf/projects/a/b, which stays a project: fetch origin/fix/it: network down"},
+		{name: "not a project: a failed thread start after the clone says the clone stays",
+			args: args("a/b", "review-request"),
+			setup: func(f *prThreadFixture) {
+				fork(f)
+				f.clone = &v1.Project{Id: "p-new", Path: "/cf/projects/a/b"}
+				f.thread.Err = connect.NewError(connect.CodeResourceExhausted, errors.New("too many threads"))
+			},
+			wantReq:    []proto.Message{detail("a/b", false), list},
+			wantCloned: []string{"a/b"},
+			wantThread: []proto.Message{&v1.CreateThreadRequest{ProjectId: "p-new", WorktreePath: "/cf/projects/a/b"}},
+			wantPrompt: "Review PR `a/b#7`",
+			wantCode:   connect.CodeResourceExhausted,
+			wantErrMsg: "cloned a/b into /cf/projects/a/b, which stays a project: start thread: too many threads"},
+		{name: "not a project: a fork's review-request clones, then reads off the head in the main worktree",
+			args: args("a/b", "review-request"),
+			setup: func(f *prThreadFixture) {
+				fork(f)
+				f.clone = &v1.Project{Id: "p-new", Path: "/cf/projects/a/b", GithubSlug: "a/b", Worktrees: []*v1.Worktree{
+					{Path: "/cf/projects/a/b", Branch: "main", IsMain: true},
+				}}
+			},
+			wantReq:      []proto.Message{detail("a/b", false), list},
+			wantCloned:   []string{"a/b"},
+			wantThread:   []proto.Message{&v1.CreateThreadRequest{ProjectId: "p-new", WorktreePath: "/cf/projects/a/b"}},
+			wantPrompt:   "Review PR `a/b#7`",
+			wantInPrompt: []string{"This checkout is not on the PR's branch; do not switch it.", "`git fetch origin pull/7/head`"},
+			wantMsg:      "Cloned a/b and started thread s1 for PR #7",
+			wantJSON:     command.PRTaskResult{ThreadID: "s1", ProjectID: "p-new", WorktreePath: "/cf/projects/a/b", Cloned: true},
+			wantFocus:    true},
 		{name: "fork: a push task without the head checked out is refused, as fix.findings",
 			args:     args("o/r", "review"),
 			setup:    fork,

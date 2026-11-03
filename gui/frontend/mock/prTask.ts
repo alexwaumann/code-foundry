@@ -214,7 +214,12 @@ export function prTaskCommand(d: PrTaskDeps): Command {
       if (clones.length === 0) {
         // Refused before cloning when a fresh clone could not place it either.
         if (push && head === "") throw noHeadRefusal(n);
-        if (push && cross) throw forkRefusal(n, canon);
+        if (push && cross) {
+          throw new ConnectError(
+            `#${String(n)} comes from a fork and ${canon} is not a project yet: clone it (\`code-foundry project clone ${canon}\`), check out the head in a worktree there (\`gh pr checkout ${String(n)}\`), and pass --worktree`,
+            Code.FailedPrecondition,
+          );
+        }
         const [owner = "", name = ""] = canon.split("/");
         const path = `${PROJECTS}/${owner}/${name}`;
         if (cloneExists(path) || d.projects().some((p) => p.path.toLowerCase() === path.toLowerCase())) {
