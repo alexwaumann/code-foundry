@@ -93,6 +93,28 @@ describe("useSearchWatch", () => {
     unmount();
   });
 
+  it("a daemon restart while it runs: the reconnect's snapshot (versions from 1 again) replaces the old entry, and the ended search is not watched again", async () => {
+    const { watch, opens } = scripted([
+      {
+        events: [
+          { kind: "snapshot", version: 1, entry: entry() },
+          { kind: "hit", version: 2, hit: hit(1) },
+          { kind: "answer", version: 3, text: "Partly [1]." },
+        ],
+        then: new Error("network"),
+      },
+      { events: [{ kind: "snapshot", version: 2, entry: entry({ version: 2, status: "failed", error: "daemon restarted", hits: [hit(1)] }) }], then: "end" },
+      { events: [{ kind: "snapshot", version: 9, entry: entry({ version: 9 }) }], then: "hold" },
+    ]);
+    const { result, unmount } = renderHook(() => useSearchWatch("q-1", null, watch));
+    await wait(700);
+    expect(result.current.entry).toMatchObject({ status: "failed", error: "daemon restarted", version: 2 });
+    await wait(1200);
+    expect(opens.n).toBe(2);
+    expect(result.current.entry?.status).toBe("failed");
+    unmount();
+  });
+
   it("a forgotten search (NOT_FOUND) is gone and not watched again", async () => {
     const { watch, opens } = scripted([{ events: [{ kind: "snapshot", version: 1, entry: entry() }], then: new ConnectError("no search q-1", Code.NotFound) }]);
     const { result } = renderHook(() => useSearchWatch("q-1", null, watch));

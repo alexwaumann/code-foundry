@@ -30,10 +30,15 @@ export function useSearchWatch(id: string | null, seed: SearchEntryView | null, 
   }
   useEffect(() => {
     if (!id) return;
-    // The entry as folded from this stream (events arrive in order; the seed only shows).
+    // The entry as folded from this attempt (events arrive in order; the seed only shows).
+    // Every attempt starts from scratch: a restarted daemon numbers versions from 1 again
+    // (and marks the run it lost FAILED), so its snapshot must not lose to the old versions.
     let cur: SearchEntryView | null = null;
     return runStream<SearchWatchEventView>({
-      open: (signal) => watch(id, signal),
+      open: (signal) => {
+        cur = null;
+        return watch(id, signal);
+      },
       slot: { label: "search:watch", priority: "core" },
       onEvent: (ev) => {
         const next = reduceSearch(cur, ev);
