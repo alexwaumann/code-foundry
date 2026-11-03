@@ -244,10 +244,7 @@ func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFil
 	m := req.Msg
 	f, err := fsx.ReadFile(h.root, m.GetBaseDir(), m.GetPath(), m.GetMaxBytes())
 	if err != nil {
-		if errors.Is(err, fsx.ErrInvalidArgument) {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, readFileError(err)
 	}
 	out := &v1.ReadFileResponse{
 		Contents: f.Contents, Size: f.Size, Truncated: f.Truncated, Binary: f.Binary, MimeType: f.MIMEType,
@@ -259,6 +256,17 @@ func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFil
 	return connect.NewResponse(out), nil
 }
 
+// readFileError is fsx.ReadFile's error as a Connect error.
+func readFileError(err error) error {
+	switch {
+	case errors.Is(err, fsx.ErrInvalidArgument):
+		return connect.NewError(connect.CodeInvalidArgument, err)
+	case errors.Is(err, fsx.ErrNotPermitted):
+		return connect.NewError(connect.CodePermissionDenied, err)
+	}
+	return connect.NewError(connect.CodeInternal, err)
+}
+
 // PreviewFile grants the HTML preview a URL for one file (see package preview): the
 // grant's scope is the registered checkout holding the file, else its directory, else
 // (home itself, an ancestor of the config home) the file alone. A file in a guarded
@@ -267,10 +275,7 @@ func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.Prev
 	m := req.Msg
 	f, err := fsx.ReadFile(h.root, m.GetBaseDir(), m.GetPath(), 1)
 	if err != nil {
-		if errors.Is(err, fsx.ErrInvalidArgument) {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, h.previewReadError(m.GetBaseDir(), m.GetPath(), err)
 	}
 	switch {
 	case f.NotFound:
@@ -278,10 +283,8 @@ func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.Prev
 	case f.IsDir:
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is a directory", f.Path))
 	}
-	// The file, or where its symlinks lead, may be guarded; the route would 404 it.
-	if real, err := filepath.EvalSymlinks(f.Path); h.grants.Guarded(f.Path) || (err == nil && h.grants.Guarded(real)) {
-		return nil, connect.NewError(connect.CodeInvalidArgument,
-			fmt.Errorf("%s is in a protected folder (Code Foundry's own data, credentials or ~/Library), so it cannot be previewed", f.Path))
+	if h.previewGuarded(f.Path) {
+		return nil, previewGuardedError(f.Path)
 	}
 	scope, single := h.previewScope(f.Path)
 	var grant, rel string
@@ -296,6 +299,29 @@ func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.Prev
 	}
 	url := h.pagesOrigin + preview.URL(grant, filepath.ToSlash(rel))
 	return connect.NewResponse(&v1.PreviewFileResponse{Url: url, Scope: scope, SingleFile: single}), nil
+}
+
+// previewGuarded reports whether the file at p, or where its symlinks lead, is guarded;
+// the route would 404 it.
+func (h *Filesystem) previewGuarded(p string) bool {
+	real, err := filepath.EvalSymlinks(p)
+	return h.grants.Guarded(p) || (err == nil && h.grants.Guarded(real))
+}
+
+func previewGuardedError(p string) error {
+	return connect.NewError(connect.CodeInvalidArgument,
+		fmt.Errorf("%s is in a protected folder (Code Foundry's own data, credentials or ~/Library), so it cannot be previewed", p))
+}
+
+// previewReadError is PreviewFile's error for a failed read of path. A guarded file macOS
+// also refused says it is guarded: allowing it in System Settings would not help.
+func (h *Filesystem) previewReadError(baseDir, path string, err error) error {
+	if errors.Is(err, fsx.ErrNotPermitted) {
+		if p, perr := fsx.ResolveReadPath(h.root, baseDir, path); perr == nil && h.previewGuarded(p) {
+			return previewGuardedError(p)
+		}
+	}
+	return readFileError(err)
 }
 
 // previewScope is what a preview of file may read: the deepest registered project or

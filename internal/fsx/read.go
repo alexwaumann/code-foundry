@@ -50,8 +50,9 @@ type FileContents struct {
 // MaxReadBytes and any other file at MaxBinaryReadBytes. path is absolute, "~" or
 // "~/..." (under root), or relative to baseDir, which must then be absolute. The path, and the file its symlinks lead to, must be under
 // root (a resolved root, see ResolveRoot); otherwise, and for a path that is not a
-// regular file or directory, the error wraps ErrInvalidArgument. A missing file is
-// NotFound and a directory IsDir, not errors.
+// regular file or directory, the error wraps ErrInvalidArgument. A file macOS's privacy
+// protection keeps closed is an ErrNotPermitted error that says where to allow it. A
+// missing file is NotFound and a directory IsDir, not errors.
 func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) {
 	if maxBytes < 0 {
 		return FileContents{}, fmt.Errorf("%w: max_bytes %d is negative", ErrInvalidArgument, maxBytes)
@@ -59,7 +60,7 @@ func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) 
 	if maxBytes == 0 {
 		maxBytes = MaxReadBytes
 	}
-	p, err := resolveReadPath(root, baseDir, path)
+	p, err := ResolveReadPath(root, baseDir, path)
 	if err != nil {
 		return FileContents{}, err
 	}
@@ -95,6 +96,9 @@ func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) 
 		if errors.Is(err, fs.ErrNotExist) { // removed since the stat
 			return FileContents{Path: p, NotFound: true}, nil
 		}
+		if isPrivacyDenial(err) { // TCC lets a stat through and refuses the open
+			return FileContents{}, notPermitted(root, p, real, err)
+		}
 		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
 	}
 	defer func() { _ = f.Close() }()
@@ -129,8 +133,8 @@ func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) 
 	return out, nil
 }
 
-// resolveReadPath makes path absolute and clean.
-func resolveReadPath(root, baseDir, path string) (string, error) {
+// ResolveReadPath makes path absolute and clean, as ReadFile does (see its doc).
+func ResolveReadPath(root, baseDir, path string) (string, error) {
 	switch {
 	case path == "":
 		return "", fmt.Errorf("%w: path is required", ErrInvalidArgument)

@@ -11,7 +11,7 @@
 #   dist/checksums.txt                      sha256 of the above
 #
 # No .app bundle: managed Macs often block unsigned bundles but allow bare executables.
-# All three executables are ad-hoc signed.
+# All three executables are ad-hoc signed; the GUI and the CLI with a fixed identity.
 set -euo pipefail
 
 VERSION="${VERSION:-}"
@@ -69,10 +69,24 @@ printf '%s\n' "$VERSION" >"$STAGE/VERSION"
 chmod 755 "$STAGE/code-foundry" "$STAGE/code-foundry-dictate" "$STAGE/$GUI"
 chmod 644 "$STAGE/VERSION"
 xattr -c "$STAGE/code-foundry" "$STAGE/code-foundry-dictate" "$STAGE/$GUI" 2>/dev/null || true
-for bin in code-foundry code-foundry-dictate "$GUI"; do
-	codesign --force --sign - "$STAGE/$bin"
-	codesign --verify --strict "$STAGE/$bin" || die "$bin: signature does not verify"
-done
+# macOS privacy grants (TCC) are stored against a designated requirement. An ad-hoc
+# signature's default one is its cdhash, so every release would lose them. The GUI and
+# the CLI, the two executables TCC can check for the daemon, get a fixed identifier as
+# their requirement instead, and the same one: the daemon outlives the GUI, and a grant
+# given while the GUI was responsible must still hold once it is the daemon's own
+# (docs/notes/tcc-read-errors.md).
+sign_fixed() { # <file> <identifier>
+	codesign --force --sign - --identifier "$2" --requirements "=designated => identifier \"$2\"" "$1"
+	codesign --verify --strict -R "=identifier \"$2\"" "$1" || die "$1: does not meet its fixed requirement"
+	case "$(codesign --display --requirements - "$1" 2>&1)" in
+	*"designated => identifier \"$2\""*) ;;
+	*) die "$1: its designated requirement is not the identifier $2" ;;
+	esac
+}
+sign_fixed "$STAGE/$GUI" dev.alexwaumann.codefoundry
+sign_fixed "$STAGE/code-foundry" dev.alexwaumann.codefoundry
+codesign --force --sign - "$STAGE/code-foundry-dictate"
+codesign --verify --strict "$STAGE/code-foundry-dictate" || die "code-foundry-dictate: signature does not verify"
 
 cli_version="$("$STAGE/code-foundry" version)"
 case "$cli_version" in
