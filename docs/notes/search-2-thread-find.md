@@ -13,7 +13,8 @@ the rows render.
   GUI presents them in the window (`keys/bindings.ts` → `stores/threadFind.ts`
   `presentThreadFind`); the CLI's ShowView reaches every window (`stores/views.ts`).
   cmd+g and cmd+shift+g were free. They stay in the palette (they have chords). The guide's
-  size margin moved from 25,700 to 25,750 for the three names (25,716 bytes with them, after pr.task) (`internal/guide/topics_test.go`).
+  size margin moved to 26,000 for the three names (25,947 bytes with them, after pr.task and
+  the pr-daemon-actions verbs) (`internal/guide/topics_test.go`).
 - The daemon needs a restart to list them (the GUI has no other change that needs one).
 
 ## Focus: who gets cmd+f
@@ -48,7 +49,10 @@ Each item's text and its lower-case form are cached by item identity (items keep
 while unchanged). A streaming answer is a new item every batch, so it is read the way
 StreamingMarkdown draws it: cut into blocks (`lib/markdownBlocks`), each block's text
 cached by its source (`streamingMarkdownText`), so a batch parses only the growing last
-block (a 26 KB answer: 45 ms a batch before, 0.6 ms now). That is also what the DOM shows
+block (a 26 KB answer: 45 ms a batch before, 0.6 ms now). Only finished blocks are cached:
+the last block is parsed each batch and not kept. Caching it kept a copy per batch (a 68 KB
+code block streamed in 1000 batches retained 77.7 MB) and pushed finished blocks out of the
+2000-entry cache. That is also what the DOM shows
 while streaming: a reference link or footnote stays literal until the answer ends and
 renders whole (it was counted resolved before, a mismatch). In Ember's chat a streaming
 reply's task links count as text, as StreamingMarkdown draws them until the reply ends.
@@ -57,7 +61,8 @@ The count is computed once per log and query and shared (`threadFindMatches`): t
 the layer and a step read the same array. When the bar opens, the layer reads the thread's
 texts ahead in 8 ms idle slices (`warmFind`; a timer slice in WebKit, which has no
 `requestIdleCallback`), so the first keystroke does not parse every answer (500 answers
-cold took about 2.7 s in the bar's render).
+cold took about 2.7 s in the bar's render). A bar opened before the log loads starts the
+warm-up when the log arrives (it used to run once over no items and stop).
 
 ## Rendered text without a DOM (lib/markdownText.ts)
 
@@ -118,7 +123,20 @@ so its text is neither matched nor shifts the later matches' order in the item.
   the first match at or after that place, as a browser's find does, so typing neither
   jumps back to the top nor to the first match of a long answer); a hand-off's item
   (below) takes that item's first match. Nothing is picked before the thread's log has
-  loaded: the aim waits for it (a hand-off to a thread not yet cached).
+  loaded: the aim waits for it (a hand-off to a thread not yet cached). A hand-off's item
+  missing from a log kept from an earlier visit (`KEPT_LOGS`) also waits, until the
+  thread's Watch delivers its first snapshot since it opened (`synced` in the thread
+  store, set by `applyWatchBatch` on a snapshot, cleared when the Watch ends): the search
+  that named the item read the daemon's index, newer than the kept log, which gave "0 of
+  1" with nothing current. A store field, not a module flag, because a snapshot equal to
+  the kept log changes no log and would re-render nothing.
+- The anchor: each edit of the query records where it went on from (`anchor`, the then
+  current match's item and offset), and it outlives a null current. An edit through "no
+  match" (at 21 of 29 a letter makes it 0 of 0, Backspace) goes on from the anchor
+  (`s.current ?? s.anchor`) and lands on 21 again, not 1. A hand-off with a query drops it.
+- Matches that arrive later (a query with none, then text streaming in or a log catching
+  up: "0 of N"): when there is no current match and the count goes from 0 to more, the
+  first match at or below the top of the list becomes current, in place (no scroll).
 - Bringing it into view (`revealMatch`): the list unpins (stops following the bottom);
   a row already rendered is placed by its match's lines (cite `scrollToQuote`: the middle
   of the visible part, between the list's top and the composer's top, unless already in
@@ -143,17 +161,27 @@ happen in one tick and are read from the store, not the rows on screen, so a tur
 need is never folded and unfolded on screen. While a new query waits for its first match,
 nothing is put back yet (the same question again would flicker).
 
-A choice the user changes while the bar is open is theirs: a watch on the thread store
-drops it from `opened` on any change away from the value find set (collapsing the row and
-expanding it again counts: comparing values at put-back time alone would miss it), and a
+A change the user makes to any choice find opened for the current item, while the bar is
+open, makes the whole item theirs (decided): a watch on the thread store sees any change
+away from a value find set (collapsing the row and expanding it again counts: comparing
+values at put-back time alone would miss it) and empties that item's `opened`, so nothing
+of it is put back, the turn's fold included (else the turn re-folded over the question the
+user had just re-expanded). The item stays recorded, so find opens nothing again for it. A
 put-back writes a choice only while the store still holds `set`.
 
-`closeThreadFind` puts back synchronously, from the session. Leaving the thread runs
-WatchedThread's cleanup (close the find, then forget the fold choices) before the layer's
-own unmount, which only puts back what a still-open session holds (nothing by then): the
-layer used to put back from a ref after the choices were forgotten, writing them again. A
-visit to a subagent run unmounts the layer with the session open: what it opened goes back
-and opens again on return.
+`closeThreadFind` puts back synchronously, from the session. Leaving the thread is
+`holdThreadPane` (stores/threadFind), held by WatchedThread's effect: when the last holder
+releases, a tick later and only if no view holds the thread again, it closes the find, then
+forgets the fold choices. The tick is for StrictMode (main.tsx), which in dev builds,
+the e2e build included, runs an effect's cleanup and the effect again on mount: closing in
+the cleanup itself wiped a hand-off made before the row click. The layer's own unmount puts
+back what the still-open session holds, so by the deferred close there is nothing left to
+put back (the layer used to put back from a ref after the choices were forgotten, writing
+them again). A visit to a subagent run unmounts the layer with the session open: what it
+opened goes back and opens again on return.
+
+In vitest, an inline `<StrictMode>` element does not replay effects under RTL 16 and React
+19.3; `render(…, { reactStrictMode: true })` does (the StrictMode test uses it).
 
 ## Layout
 
@@ -186,7 +214,8 @@ current once the thread's layer has the matches, which waits for the thread's lo
 is not loaded yet (falls back to the first match at or below the top of the list when the
 item has none). The thread must be the one in the content
 pane for the bar to show; call it before or after selecting the thread (the session lives
-by thread id until the thread leaves the content pane). `openThreadFind(threadId)` without
+by thread id until the thread leaves the content pane; StrictMode's replay is not a leave).
+An item missing from a log kept from an earlier visit waits for the thread's snapshot. `openThreadFind(threadId)` without
 a query opens the bar keeping what it had. Other exports: `closeThreadFind`,
 `stepThreadFind`, `setThreadFindQuery`, and `lib/threadFind` `findMatches(items, query)`
 for counting a thread's matches from its items.
@@ -199,13 +228,17 @@ for counting a thread's matches from its items.
   text = rendered text, whole and streaming), `lib/markdownDeps.test.ts` (one copy of the
   parse packages), `stores/threadFind.test.ts` (session, typing on from the match's offset,
   shared count, steps, presenter), `stores/threadFindFolds.test.ts` (open and put back
-  folds and expansions, user changes kept, close then forget leaves nothing),
-  `find/FindLayer.test.tsx` (a hand-off before the log loads, picks from the top, a stale
-  current match staying in its item or moving on, leaving the thread, closing),
+  folds and expansions, a user change taking the whole item, close then forget leaves nothing),
+  `find/FindLayer.test.tsx` (a hand-off before the log loads, against a stale kept log, with
+  a missing item, through StrictMode's replay; picks from the top, an edit through no
+  match, matches arriving later, the warm-up once the log arrives, a stale current match
+  staying in its item or moving on, leaving the thread, closing), `stores/thread.test.ts`
+  (`synced`), `lib/markdownText.test.tsx` (the block cache does not grow with batches),
   `find/FindBar.test.tsx` (count, Aa, keys, close), `cite/reveal.test.ts` (the bar's area
   not visible), `ember/EmberTimeline.test.tsx` (a work row opened and put back),
   `lib/threadTimeline.test.ts` (`foldingTurn`), Go `commands_view_thread_find_test.go`.
 - WebKit e2e `e2e/thread-find.spec.ts`: cmd+f from the prompt and the bar beside the card,
   painted ranges and the map, scroll to an off-screen match and unpin, the current tick at
   its text before and after a wheel scroll, a folded question unfolding, moving on and
-  Escape putting it back.
+  Escape putting it back, a hand-off (`openThreadFind` through `__cfModule`) before the row
+  click surviving StrictMode.
