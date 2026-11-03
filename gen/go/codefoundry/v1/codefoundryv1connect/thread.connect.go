@@ -111,6 +111,8 @@ const (
 	// ThreadServiceListPromptsProcedure is the fully-qualified name of the ThreadService's ListPrompts
 	// RPC.
 	ThreadServiceListPromptsProcedure = "/codefoundry.v1.ThreadService/ListPrompts"
+	// ThreadServiceSearchProcedure is the fully-qualified name of the ThreadService's Search RPC.
+	ThreadServiceSearchProcedure = "/codefoundry.v1.ThreadService/Search"
 	// ThreadServiceWatchThreadProcedure is the fully-qualified name of the ThreadService's WatchThread
 	// RPC.
 	ThreadServiceWatchThreadProcedure = "/codefoundry.v1.ThreadService/WatchThread"
@@ -332,6 +334,12 @@ type ThreadServiceClient interface {
 	// for PROJECT and ALL, hidden child threads. Archived threads count. See
 	// docs/notes/prompt-history-1-daemon.md.
 	ListPrompts(context.Context, *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error)
+	// Search finds threads by name and items by the text that stays visible when a turn
+	// folds (user messages, Claude's text, questions and answers), from the daemon's
+	// full-text index: the user's threads by default (what the sidebar can show, archived
+	// included), wider with include. Read-only. See thread_search.proto and
+	// docs/notes/search-3-index.md.
+	Search(context.Context, *connect.Request[v1.SearchThreadsRequest]) (*connect.Response[v1.SearchThreadsResponse], error)
 	// WatchThread streams one thread: a snapshot first, then appended/updated items, text
 	// deltas and pending-request changes. While a WatchThread is open the thread counts as
 	// looked at: a finished turn is seen at once. Apply only
@@ -658,6 +666,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("ListPrompts")),
 			connect.WithClientOptions(opts...),
 		),
+		search: connect.NewClient[v1.SearchThreadsRequest, v1.SearchThreadsResponse](
+			httpClient,
+			baseURL+ThreadServiceSearchProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Search")),
+			connect.WithClientOptions(opts...),
+		),
 		watchThread: connect.NewClient[v1.WatchThreadRequest, v1.ThreadEvent](
 			httpClient,
 			baseURL+ThreadServiceWatchThreadProcedure,
@@ -804,6 +818,7 @@ type threadServiceClient struct {
 	readAttachment    *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
 	listItems         *connect.Client[v1.ListThreadItemsRequest, v1.ListThreadItemsResponse]
 	listPrompts       *connect.Client[v1.ListPromptsRequest, v1.ListPromptsResponse]
+	search            *connect.Client[v1.SearchThreadsRequest, v1.SearchThreadsResponse]
 	watchThread       *connect.Client[v1.WatchThreadRequest, v1.ThreadEvent]
 	send              *connect.Client[v1.SendThreadMessageRequest, v1.SendThreadMessageResponse]
 	respond           *connect.Client[v1.RespondThreadRequest, v1.RespondThreadResponse]
@@ -987,6 +1002,11 @@ func (c *threadServiceClient) ListItems(ctx context.Context, req *connect.Reques
 // ListPrompts calls codefoundry.v1.ThreadService.ListPrompts.
 func (c *threadServiceClient) ListPrompts(ctx context.Context, req *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error) {
 	return c.listPrompts.CallUnary(ctx, req)
+}
+
+// Search calls codefoundry.v1.ThreadService.Search.
+func (c *threadServiceClient) Search(ctx context.Context, req *connect.Request[v1.SearchThreadsRequest]) (*connect.Response[v1.SearchThreadsResponse], error) {
+	return c.search.CallUnary(ctx, req)
 }
 
 // WatchThread calls codefoundry.v1.ThreadService.WatchThread.
@@ -1255,6 +1275,12 @@ type ThreadServiceHandler interface {
 	// for PROJECT and ALL, hidden child threads. Archived threads count. See
 	// docs/notes/prompt-history-1-daemon.md.
 	ListPrompts(context.Context, *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error)
+	// Search finds threads by name and items by the text that stays visible when a turn
+	// folds (user messages, Claude's text, questions and answers), from the daemon's
+	// full-text index: the user's threads by default (what the sidebar can show, archived
+	// included), wider with include. Read-only. See thread_search.proto and
+	// docs/notes/search-3-index.md.
+	Search(context.Context, *connect.Request[v1.SearchThreadsRequest]) (*connect.Response[v1.SearchThreadsResponse], error)
 	// WatchThread streams one thread: a snapshot first, then appended/updated items, text
 	// deltas and pending-request changes. While a WatchThread is open the thread counts as
 	// looked at: a finished turn is seen at once. Apply only
@@ -1577,6 +1603,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("ListPrompts")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceSearchHandler := connect.NewUnaryHandler(
+		ThreadServiceSearchProcedure,
+		svc.Search,
+		connect.WithSchema(threadServiceMethods.ByName("Search")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceWatchThreadHandler := connect.NewServerStreamHandler(
 		ThreadServiceWatchThreadProcedure,
 		svc.WatchThread,
@@ -1753,6 +1785,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceListItemsHandler.ServeHTTP(w, r)
 		case ThreadServiceListPromptsProcedure:
 			threadServiceListPromptsHandler.ServeHTTP(w, r)
+		case ThreadServiceSearchProcedure:
+			threadServiceSearchHandler.ServeHTTP(w, r)
 		case ThreadServiceWatchThreadProcedure:
 			threadServiceWatchThreadHandler.ServeHTTP(w, r)
 		case ThreadServiceSendProcedure:
@@ -1928,6 +1962,10 @@ func (UnimplementedThreadServiceHandler) ListItems(context.Context, *connect.Req
 
 func (UnimplementedThreadServiceHandler) ListPrompts(context.Context, *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ListPrompts is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Search(context.Context, *connect.Request[v1.SearchThreadsRequest]) (*connect.Response[v1.SearchThreadsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Search is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error {

@@ -179,7 +179,7 @@ func TestListPromptsScopes(t *testing.T) {
 		t.Helper()
 		at := t0.Add(time.Duration(n) * time.Minute)
 		it := Item{ID: s.ID + "-p" + text, Ordinal: int64(100 + n), Kind: KindUserMessage, Text: text, CreatedAt: at, UpdatedAt: at}
-		if err := saveItem(e.ctx(), e.m.opts.DB, s.ID, it); err != nil {
+		if err := saveItem(e.ctx(), e.m.opts.DB, s.ID, it, searchIndex{}); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -6,6 +6,7 @@ import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/theme.proto";
 import "codefoundry/v1/thread_lifecycle.proto";
 import "codefoundry/v1/thread_prompts.proto";
+import "codefoundry/v1/thread_search.proto";
 import "codefoundry/v1/thread_subscriptions.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -192,6 +193,12 @@ service ThreadService {
   // for PROJECT and ALL, hidden child threads. Archived threads count. See
   // docs/notes/prompt-history-1-daemon.md.
   rpc ListPrompts(ListPromptsRequest) returns (ListPromptsResponse) {}
+  // Search finds threads by name and items by the text that stays visible when a turn
+  // folds (user messages, Claude's text, questions and answers), from the daemon's
+  // full-text index: the user's threads by default (what the sidebar can show, archived
+  // included), wider with include. Read-only. See thread_search.proto and
+  // docs/notes/search-3-index.md.
+  rpc Search(SearchThreadsRequest) returns (SearchThreadsResponse) {}
   // WatchThread streams one thread: a snapshot first, then appended/updated items, text
   // deltas and pending-request changes. While a WatchThread is open the thread counts as
   // looked at: a finished turn is seen at once. Apply only

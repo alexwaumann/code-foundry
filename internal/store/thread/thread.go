@@ -721,6 +721,10 @@ type Store interface {
 	// (prompts.go). A THREAD or anchor id that names nothing is ErrNotFound; a missing
 	// scope or thread id, or a project ref that names nothing, ErrInvalidArgument.
 	ListPrompts(ctx context.Context, q PromptQuery) ([]SentPrompt, error)
+	// Search finds threads by name and items by their visible text (search.go): the
+	// user's threads by default, wider with SearchQuery's flags. An empty query, or a
+	// project ref that names nothing, is ErrInvalidArgument.
+	Search(ctx context.Context, q SearchQuery) (SearchResult, error)
 	// Send sends a user message (also while a turn runs: Claude picks it up mid-turn,
 	// inside the running turn). A thread that is not running starts with it as its first prompt; its item is
 	// returned at once, and a start that fails is told in the timeline (lifecycle.go).

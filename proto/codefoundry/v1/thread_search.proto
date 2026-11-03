@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Thread search (ThreadService.Search): thread names, and the text of thread items that
+// stays visible when a turn folds (user messages, Claude's text, Claude's questions and
+// the answers), from the daemon's full-text index. See docs/notes/search-3-index.md.
+//
+// The query: terms separated by white space, all of which must occur, in any order, as
+// substrings; "a phrase" in double quotes is one term. Smart case: matching ignores case
+// unless the query has an upper-case letter, then it is exact. Messages need a term of
+// three characters or more (the index's trigrams); a query with only shorter terms
+// matches thread names only (SearchThreadsResponse.names_only).
+
+// SearchInclude widens the default scope: the user's threads, what the sidebar can show
+// (top-level threads, archived and snoozed ones, Ember's chat, and child threads whose
+// creator is gone), and their own items.
+enum SearchInclude {
+  SEARCH_INCLUDE_UNSPECIFIED = 0;
+  // Child threads whose creator still exists (hidden from the sidebar).
+  SEARCH_INCLUDE_CHILDREN = 1;
+  // The items of the threads' subagents.
+  SEARCH_INCLUDE_SUBAGENTS = 2;
+  // Threads a plugin owns.
+  SEARCH_INCLUDE_OWNED = 3;
+}
+
+message SearchThreadsRequest {
+  // Required (INVALID_ARGUMENT when it has no term).
+  string query = 1;
+  repeated SearchInclude include = 2;
+  // Only threads whose project set has one of these (ids, names when unique, or paths
+  // inside a project); empty: every thread, with or without a project.
+  repeated string project_ids = 3;
+  // At most this many message hits in all, and this many thread names (default 50 when 0
+  // or less, capped at 500).
+  int32 limit = 4;
+  // At most this many hits per thread (default 5 when 0 or less, capped at limit).
+  int32 per_thread = 5;
+}
+
+// SearchMatchRange is one match in a text: [start, end) in code points (not UTF-16
+// units or bytes).
+message SearchMatchRange {
+  int32 start = 1;
+  int32 end = 2;
+}
+
+// SearchSpeaker is whose text a hit is.
+enum SearchSpeaker {
+  SEARCH_SPEAKER_UNSPECIFIED = 0;
+  // A user message (a steer included; a message another thread sent too).
+  SEARCH_SPEAKER_USER = 1;
+  // Claude's text.
+  SEARCH_SPEAKER_ASSISTANT = 2;
+  // Claude's question (AskUserQuestion) and the answers: the item's question text, each
+  // followed by its answer once answered.
+  SEARCH_SPEAKER_QUESTION = 3;
+}
+
+// SearchThreadName is a thread whose name matches.
+message SearchThreadName {
+  string thread_id = 1;
+  string name = 2;
+  // The matches in name.
+  repeated SearchMatchRange ranges = 3;
+  bool archived = 4;
+  google.protobuf.Timestamp last_activity_at = 5;
+}
+
+// SearchHit is one item that matches. A preview fetches the whole item with
+// ListItems(thread_id, query {since: ordinal - 1, last: 1}) or finds item_id in the
+// thread's snapshot.
+message SearchHit {
+  string thread_id = 1;
+  string item_id = 2;
+  // The item's ordinal in thread_id's log (a fork's copy has its own).
+  int64 ordinal = 3;
+  SearchSpeaker speaker = 4;
+  google.protobuf.Timestamp created_at = 5;
+  // The item's indexed text on one line (white space runs as one space; tags read as
+  // their labels; a question joined to its answer), cut to about 160 code points around
+  // its first match, with "…" where it was cut. Not the item's stored text.
+  string snippet = 6;
+  // The matches in snippet, and only there: they do not map to the item's stored text. A
+  // view of the whole item matches the query again itself.
+  repeated SearchMatchRange ranges = 7;
+  // The Agent call a subagent's item belongs to; empty for the thread's own (only with
+  // SEARCH_INCLUDE_SUBAGENTS).
+  string parent_tool_use_id = 8;
+}
+
+// SearchThreadGroup is one thread's message hits.
+message SearchThreadGroup {
+  string thread_id = 1;
+  // The thread's current name; "" when it has none yet.
+  string thread_name = 2;
+  bool archived = 3;
+  // How many of the thread's items match (hits has at most per_thread).
+  int32 total_hits = 4;
+  // The thread's best hits (every term a whole word, then at the start of a word, then
+  // inside one; then the newest), in conversation order.
+  repeated SearchHit hits = 5;
+}
+
+message SearchThreadsResponse {
+  // The threads in scope whose name matches, most recently active first.
+  repeated SearchThreadName threads = 1;
+  // The message hits by thread, the thread with the best hit first (by its tier, then
+  // the newest such hit). A forked conversation's copied items are found once, under the
+  // oldest thread in scope that holds them (the original while it exists, archived
+  // included, else the fork).
+  repeated SearchThreadGroup groups = 2;
+  // The query has an upper-case letter: matches are exact.
+  bool case_sensitive = 3;
+  // Every term is shorter than three characters: only thread names were searched.
+  bool names_only = 4;
+  // Every hit and every thread with one, beyond limit and per_thread.
+  int32 total_hits = 5;
+  int32 total_threads = 6;
+  // More items matched than a search reads (5000): the hits and totals are those among
+  // the most recently indexed. A narrower query finds the rest.
+  bool truncated = 7;
+}

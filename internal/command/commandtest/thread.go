@@ -43,6 +43,8 @@ type Thread struct {
 	PlacementResp *v1.CheckPlacementResponse
 	// Prompts is ListPrompts' answer.
 	Prompts []*v1.SentPrompt
+	// SearchResp is Search's answer (nil: an empty one).
+	SearchResp *v1.SearchThreadsResponse
 	// PageShown makes ShowHtml answer reused (the page's card is still live) unless the
 	// request has again.
 	PageShown bool
@@ -112,6 +114,17 @@ func (s *Thread) ListPrompts(_ context.Context, r *connect.Request[v1.ListPrompt
 		return nil, err
 	}
 	return connect.NewResponse(&v1.ListPromptsResponse{Prompts: s.Prompts}), nil
+}
+
+// Search records the request and returns SearchResp.
+func (s *Thread) Search(_ context.Context, r *connect.Request[v1.SearchThreadsRequest]) (*connect.Response[v1.SearchThreadsResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if s.SearchResp == nil {
+		return connect.NewResponse(&v1.SearchThreadsResponse{}), nil
+	}
+	return connect.NewResponse(s.SearchResp), nil
 }
 
 // Checkouts returns CheckoutsResp (an empty answer for the requested thread when nil).

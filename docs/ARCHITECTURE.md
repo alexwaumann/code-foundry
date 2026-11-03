@@ -649,6 +649,17 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   project's GitHub repository: the daemon matches them against the GitHub store's cached
   lists (dashboards and branch lists, no new polling) and pushes them to the thread
   store as `branch` links (`docs/notes/linked-prs-branch.md`).
+* **Search** (`search*.go`, migration 0054): an FTS5 trigram index (contentless, one
+  document per item id, so a fork's copies are indexed once) over the text that stays
+  visible when a turn folds: user messages, assistant text, questions and their answers
+  (a registry of extractors by item kind, `searchTexts`). Every item save writes its
+  document in the same transaction; a trigger drops a document with the last row holding
+  its id; threads from before the index are backfilled at startup in the background.
+  `ThreadService.Search` (`thread.search`): smart case, all words, names only under three
+  characters; the user's threads by default (the sidebar's, archived included), wider with
+  include flags; a hit goes to the oldest thread in scope holding the item; at most the
+  5,000 most recently indexed matches are read. `Options.Unindexed` keeps a thread out
+  (`docs/notes/search-3-index.md`).
 * **Hidden children** (`sidebar.go`): a thread another thread created is its creator's to
   manage and is not shown in the sidebar while its creator exists (removed, not
   archived, shows it); nothing overrides that, and nothing is stored: `InSidebar` is the

@@ -135,6 +135,13 @@ type Options struct {
 	// thread's worktree-mode worktrees nobody else has from it, as for an archive
 	// (docs/notes/remove-cleans-worktrees.md).
 	Removed func(t Thread)
+	// Unindexed, when set, keeps a thread out of thread search (search_index.go): its
+	// items get no search document and queries never attribute a hit to it. For a thread
+	// the user should never find, such as a hidden utility run made as a thread; it is
+	// asked with the thread as the snapshot has it (a thread not in it yet is indexed),
+	// on every save, so it must be cheap and must not call back into the store. Nil:
+	// every thread is indexed.
+	Unindexed func(t Thread) bool
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().
 	Home string
@@ -497,6 +504,8 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	}
 	// Rows from before threads.branch get theirs from the project store (recreate.go).
 	m.startBackfill()
+	// Threads from before the search index get their documents (search_index.go).
+	m.startSearchBackfill(ctx)
 	// Snoozes that ended while the daemon was stopped wake now, then the clock is
 	// checked on every tick (snooze.go).
 	m.wakeSnoozed()

@@ -28,7 +28,7 @@ func TestItemsDBRoundTrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			want := tt.item
 			want.Ordinal, want.CreatedAt, want.UpdatedAt = int64(1000+i), at, at
-			if err := saveItem(context.Background(), e.m.opts.DB, s.ID, want); err != nil {
+			if err := saveItem(context.Background(), e.m.opts.DB, s.ID, want, searchIndex{}); err != nil {
 				t.Fatal(err)
 			}
 			items, err := loadItems(context.Background(), e.m.opts.DB, s.ID)

@@ -86,6 +86,8 @@ type ThreadBackend interface {
 	PlacementBackend
 	// PromptsBackend backs thread.prompts (commands_thread_prompts.go).
 	PromptsBackend
+	// SearchBackend backs thread.search (commands_thread_search.go).
+	SearchBackend
 }
 
 var (
