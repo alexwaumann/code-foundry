@@ -61,6 +61,12 @@ func TestPullRequestStateCommands(t *testing.T) {
 			wantReq: &v1.SetPullRequestAutoMergeRequest{RepoSlug: "o/r", Number: 142}, wantMsg: "Auto-merge off for #142"},
 		{name: "auto-merge needs a method or --off, without asking", cmd: "pr.auto-merge", args: args(), wantErr: command.ErrInvalidArgs},
 		{name: "--off takes no method", cmd: "pr.auto-merge", args: args("off", "true", "method", "squash"), wantErr: command.ErrInvalidArgs},
+		{name: "a head that is not a full SHA is refused without asking", cmd: "pr.auto-merge", args: args("method", "squash", "head-sha", "abc"),
+			wantErr: command.ErrInvalidArgs},
+		{name: "a short head is refused, confirmed too", cmd: "pr.auto-merge", args: args("method", "squash", "head-sha", head[:12]), confirmed: true,
+			wantErr: command.ErrInvalidArgs},
+		{name: "auto-merge with a full head asks first", cmd: "pr.auto-merge", args: args("method", "squash", "head-sha", head),
+			wantAsk: "Turn on auto-merge for #142 in o/r? GitHub merges it with squash once its required checks and reviews pass."},
 		{name: "unknown method", cmd: "pr.auto-merge", args: args("method", "octopus"), confirmed: true, wantErr: command.ErrInvalidArgs},
 		{name: "GitHub's clean status passes through", cmd: "pr.auto-merge", args: args("method", "rebase"), confirmed: true,
 			backend: func(g *commandtest.Gh) {

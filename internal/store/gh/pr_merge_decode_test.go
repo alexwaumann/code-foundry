@@ -89,8 +89,8 @@ func TestIsCommitSHA(t *testing.T) {
 		strings.Repeat("g", 40): false,
 		"":                      false,
 	} {
-		if got := isCommitSHA(s); got != want {
-			t.Errorf("isCommitSHA(%q) = %t, want %t", s, got, want)
+		if got := IsCommitSHA(s); got != want {
+			t.Errorf("IsCommitSHA(%q) = %t, want %t", s, got, want)
 		}
 	}
 }

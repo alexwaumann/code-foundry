@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
 )
 
 // stateCommands are the pull request panel's direct state changes
@@ -72,7 +73,7 @@ func autoMergeCommand(b GhBackend, slug, number ArgSpec) Command {
 		// Only a request Run would send asks: a bad one is refused without a question.
 		ConfirmIf: func(_ context.Context, _ Context, a Args) bool {
 			_, ok := mergeMethods[a.String("method")]
-			return ok && !a.Bool("off") && checkPullRequestArgs(a) == nil
+			return ok && !a.Bool("off") && checkPullRequestArgs(a) == nil && checkHeadSHA(a) == nil
 		},
 		DynamicConfirm: func(_ context.Context, _ Context, a Args) string {
 			words, ok := mergeMethodWords[a.String("method")]
@@ -98,6 +99,9 @@ func autoMergeCommand(b GhBackend, slug, number ArgSpec) Command {
 				if !ok {
 					return Result{}, InvalidArg("method", "method must be merge, squash, or rebase")
 				}
+				if err := checkHeadSHA(a); err != nil {
+					return Result{}, err
+				}
 				req.Enabled, req.Method, req.ExpectedHeadSha = true, method, a.String("head-sha")
 			}
 			res, err := b.SetPullRequestAutoMerge(ctx, connect.NewRequest(req))
@@ -107,4 +111,13 @@ func autoMergeCommand(b GhBackend, slug, number ArgSpec) Command {
 			return Result{Message: res.Msg.GetMessage(), JSON: res.Msg}, nil
 		},
 	}
+}
+
+// checkHeadSHA refuses a --head-sha that is not a full commit SHA, as the daemon does
+// (gh.IsCommitSHA), so a request it would refuse is neither confirmed nor sent.
+func checkHeadSHA(a Args) error {
+	if sha := a.String("head-sha"); sha != "" && !gh.IsCommitSHA(sha) {
+		return InvalidArg("head-sha", "head-sha must be a full commit SHA")
+	}
+	return nil
 }

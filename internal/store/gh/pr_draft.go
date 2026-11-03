@@ -110,7 +110,7 @@ func (s *Store) SetPullRequestAutoMerge(ctx context.Context, slug string, number
 		default:
 			return AutoMergeResult{}, fmt.Errorf("%w: merge method %q", ErrInvalidArgument, r.Method)
 		}
-		if r.ExpectedHeadSHA != "" && !isCommitSHA(r.ExpectedHeadSHA) {
+		if r.ExpectedHeadSHA != "" && !IsCommitSHA(r.ExpectedHeadSHA) {
 			return AutoMergeResult{}, fmt.Errorf("%w: expected head %q is not a full commit SHA", ErrInvalidArgument, r.ExpectedHeadSHA)
 		}
 	} else {
