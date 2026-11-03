@@ -19,6 +19,8 @@ type fakeDetail struct {
 	revertRefusal string
 	// merge is the merge button's state (fakegithub_merge_test.go).
 	merge fakeMerge
+	// state is the draft and auto-merge state (fakegithub_draft_test.go).
+	state fakeState
 }
 
 func (g *fakeGitHub) refuseReverts(errType string) {
