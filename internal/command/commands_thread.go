@@ -72,6 +72,8 @@ type ThreadBackend interface {
 	// ProjectSetBackend backs thread.project.add and thread.project.remove
 	// (commands_thread_project.go).
 	ProjectSetBackend
+	// PullRequestLinkBackend backs thread.pr.link (commands_thread_prlink.go).
+	PullRequestLinkBackend
 	// ReseedBackend backs thread.reseed (commands_thread_reseed.go).
 	ReseedBackend
 	// HTMLShower backs view.inline (commands_view_inline.go).

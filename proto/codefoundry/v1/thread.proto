@@ -90,6 +90,13 @@ service ThreadService {
   // docs/notes/move-no-project-1-daemon.md.
   rpc Move(MoveThreadRequest) returns (MoveThreadResponse) {}
   rpc RemoveProject(RemoveThreadProjectRequest) returns (RemoveThreadProjectResponse) {}
+  // LinkPullRequest links a GitHub pull request to a thread by hand (source manual),
+  // named by URL or "owner/name#123". Linked like every link: deduplicated by URL (case
+  // aside), first source wins, copied up the CreatedBy chain, never removed; linking one
+  // the thread has is a quiet success (linked false). Any state. INVALID_ARGUMENT for
+  // anything that is not a GitHub pull request. The thread is republished when the link
+  // is new. See docs/notes/pr-daemon-actions.md.
+  rpc LinkPullRequest(LinkThreadPullRequestRequest) returns (LinkThreadPullRequestResponse) {}
   // Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
   // cwd, the deepest winning) and lists one checkout per project in its set: the primary
   // at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain

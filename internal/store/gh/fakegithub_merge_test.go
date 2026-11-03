@@ -49,11 +49,10 @@ func (g *fakeGitHub) mergeSettings(repo map[string]any) {
 	repo["mergeCommitAllowed"] = !d[MergeCommit]
 	repo["squashMergeAllowed"] = !d[MergeSquash]
 	repo["rebaseMergeAllowed"] = !d[MergeRebase]
+	repo["autoMergeAllowed"] = !g.detail.state.autoMergeOff
 	if pr, ok := repo["pullRequest"].(map[string]any); ok {
-		pr["autoMergeRequest"] = nil
-		if id, _ := pr["id"].(string); g.detail.merge.autoMerge[id] {
-			pr["autoMergeRequest"] = map[string]any{"enabledAt": "2026-10-08T12:00:00Z"}
-		}
+		id, _ := pr["id"].(string)
+		pr["autoMergeRequest"] = g.autoMergeJSON(id) // fakegithub_draft_test.go
 	}
 }
 

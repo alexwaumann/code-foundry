@@ -1,0 +1,6 @@
+# Converts an open pull request to a draft (SetPullRequestDraft with draft true).
+mutation ConvertToDraft($id: ID!) {
+  convertPullRequestToDraft(input: { pullRequestId: $id }) {
+    pullRequest { isDraft }
+  }
+}

@@ -43,7 +43,7 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 	default:
 		return MergeResult{}, fmt.Errorf("%w: merge method %q", ErrInvalidArgument, r.Method)
 	}
-	if r.ExpectedHeadSHA != "" && !isCommitSHA(r.ExpectedHeadSHA) {
+	if r.ExpectedHeadSHA != "" && !IsCommitSHA(r.ExpectedHeadSHA) {
 		return MergeResult{}, fmt.Errorf("%w: expected head %q is not a full commit SHA", ErrInvalidArgument, r.ExpectedHeadSHA)
 	}
 	unlock, err := s.full.mergeLocks.lock(ctx, k)
@@ -227,8 +227,8 @@ func headDiffers(d *FullPullRequest, r MergeRequest) bool {
 	return r.ExpectedHeadSHA != "" && !strings.EqualFold(d.PullRequest.HeadSHA, r.ExpectedHeadSHA)
 }
 
-// isCommitSHA reports whether s is a full hex commit id (SHA-1 or SHA-256).
-func isCommitSHA(s string) bool {
+// IsCommitSHA reports whether s is a full hex commit id (SHA-1 or SHA-256).
+func IsCommitSHA(s string) bool {
 	if len(s) != 40 && len(s) != 64 {
 		return false
 	}

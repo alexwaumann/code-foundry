@@ -3,7 +3,8 @@
 # reviewed, pending review requests, the last 100 commits, the last 100 issue comments
 # and reviews, the last 50 review threads (first 20 comments each, with the review each
 # belongs to), the first page of head commit checks, and what the merge button needs
-# (the repository's allowed merge methods and default branch, auto-merge). Fetched on demand by GetPullRequestDetail and cached per pull
+# (the repository's allowed merge methods, whether it allows auto-merge, its default
+# branch, and the pull request's auto-merge request). Fetched on demand by GetPullRequestDetail and cached per pull
 # request (docs/notes/gh-pr-detail.md); never polled.
 #
 # Fields that PullRequestDetail selects with other arguments are aliased (GraphQL
@@ -16,10 +17,11 @@ query PullRequestFull($owner: String!, $name: String!, $number: Int!) {
     mergeCommitAllowed
     squashMergeAllowed
     rebaseMergeAllowed
+    autoMergeAllowed
     defaultBranchRef { name }
     pullRequest(number: $number) {
       ...PullRequestDetail
-      autoMergeRequest { enabledAt }
+      autoMergeRequest { enabledAt mergeMethod }
       body
       closedAt
       mergeCommit { oid }

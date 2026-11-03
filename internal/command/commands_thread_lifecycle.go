@@ -392,6 +392,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		threadWorkspaceCmd(b, idArg),
 		threadProjectAdd(b, idArg),
 		threadProjectRemove(b, idArg),
+		threadPRLink(b, idArg),
 		threadReseedCmd(b, idArg),
 	)
 }

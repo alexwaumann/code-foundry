@@ -109,7 +109,7 @@ func (s *Store) PullRequestFile(ctx context.Context, slug, ref, filePath string)
 	if err != nil {
 		return PullRequestFile{}, err
 	}
-	if !isCommitSHA(ref) {
+	if !IsCommitSHA(ref) {
 		return PullRequestFile{}, fmt.Errorf("%w: ref %q is not a full commit SHA", ErrInvalidArgument, ref)
 	}
 	clean := path.Clean(filePath)

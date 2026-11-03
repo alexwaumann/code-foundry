@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -226,6 +227,16 @@ func saveLinkHeads(ctx context.Context, db *sql.DB, threadID string, heads map[s
 	return nil
 }
 
+// saveLinkSource makes thread threadID's link to url a link of source with no via
+// thread and no head (a manual link over a branch or child row: prlink_manual.go).
+func saveLinkSource(ctx context.Context, db *sql.DB, threadID, url string, source LinkSource) error {
+	if _, err := db.ExecContext(ctx, `UPDATE thread_pull_requests SET source = ?, via_thread_id = '', head = '' WHERE thread_id = ? AND url = ?`,
+		string(source), threadID, url); err != nil {
+		return fmt.Errorf("thread: save source of link %s of %s: %w", url, threadID, err)
+	}
+	return nil
+}
+
 // deleteLinks removes thread threadID's links to urls (a member removed: members.go; a
 // default-branch link dropped: prlink_branch.go).
 func deleteLinks(ctx context.Context, db *sql.DB, threadID string, urls []string) error {
@@ -238,7 +249,9 @@ func deleteLinks(ctx context.Context, db *sql.DB, threadID string, urls []string
 }
 
 // loadLinks returns every thread's linked pull requests in first-seen (insertion)
-// order.
+// order, one per URL ignoring case (SamePullRequestURL): rows saved before links were
+// compared that way may hold the same pull request twice in two cases, and the first
+// row is the link. The later row stays on disk, unread.
 func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest, error) {
 	rows, err := db.QueryContext(ctx, `SELECT thread_id, slug, number, url, linked_at, source, via_thread_id, head
 		FROM thread_pull_requests ORDER BY thread_id, rowid`)
@@ -256,6 +269,9 @@ func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest,
 			return nil, fmt.Errorf("thread: load links: %w", err)
 		}
 		l.LinkedAt, l.Source = fromMillis(at), LinkSource(source)
+		if slices.ContainsFunc(out[id], func(x LinkedPullRequest) bool { return SamePullRequestURL(x.URL, l.URL) }) {
+			continue
+		}
 		out[id] = append(out[id], l)
 	}
 	if err := rows.Err(); err != nil {

@@ -169,6 +169,11 @@ func TestBranchLinksFor(t *testing.T) {
 				{ID: "t2", ProjectID: "p-api", WorktreePath: "/wt/api-x", LinkedPullRequests: []thread.LinkedPullRequest{link("o/api", 1), link("o/api", 2)}}},
 			prs:  []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/api", 2, "cf/x")},
 			want: []string{"t1: o/api#2@2"}},
+		{name: "a url linked in another case (by hand) is not offered again",
+			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", WorktreePath: "/wt/api-x", LinkedPullRequests: []thread.LinkedPullRequest{
+				{Slug: "O/Api", Number: 1, URL: "https://github.com/O/Api/pull/1", Source: thread.LinkManual}}}},
+			prs:  []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/api", 2, "cf/x")},
+			want: []string{"t: o/api#2@2"}},
 		{name: "the default branch's pull requests are not linked",
 			threads: []thread.Thread{
 				{ID: "t1", ProjectID: "p-def", WorktreePath: "/def", CreatedAt: branchT0},
@@ -233,7 +238,7 @@ func (f *fakeBranchLinker) LinkBranchPullRequests(id string, links []thread.Link
 		cur := slices.Clip(f.threads[i].LinkedPullRequests)
 		for _, l := range links {
 			call += fmt.Sprintf(" #%d", l.Number)
-			if !slices.ContainsFunc(cur, func(x thread.LinkedPullRequest) bool { return x.URL == l.URL }) {
+			if !slices.ContainsFunc(cur, func(x thread.LinkedPullRequest) bool { return thread.SamePullRequestURL(x.URL, l.URL) }) {
 				cur = append(cur, l)
 				added++
 			}

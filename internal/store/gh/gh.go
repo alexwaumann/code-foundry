@@ -79,6 +79,15 @@ type Service interface {
 	// AddPullRequestComment posts a comment on a pull request's conversation as the
 	// viewer. Errors as for SubmitPullRequestReview.
 	AddPullRequestComment(ctx context.Context, slug string, number int, body string) (PostedComment, error)
+	// SetPullRequestDraft marks an open draft ready for review (draft false) or converts
+	// an open pull request to a draft (ErrFailedPrecondition when it is not open or
+	// already so; GitHub's refusals relayed) (pr_draft.go).
+	SetPullRequestDraft(ctx context.Context, slug string, number int, draft bool) (DraftResult, error)
+	// SetPullRequestAutoMerge enables GitHub's auto-merge with a method, guarded by the
+	// head like MergePullRequest, or disables it (ErrFailedPrecondition when the pull
+	// request is not open, auto-merge is already so, the repository disallows it or the
+	// method, or GitHub refuses) (pr_draft.go).
+	SetPullRequestAutoMerge(ctx context.Context, slug string, number int, r AutoMergeChange) (AutoMergeResult, error)
 	// PullRequestDiff returns a pull request's unified diff, at most PullRequestDiffMax,
 	// cached per pull request and head commit (pr_files.go).
 	PullRequestDiff(ctx context.Context, slug string, number int, refresh bool) (PullRequestDiff, error)

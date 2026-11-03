@@ -211,6 +211,8 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 		g.detailOp(op, vars, data, &errs) // fakegithub_detail_test.go
 	case "MergePullRequest":
 		g.mergeOp(vars, data, &errs) // fakegithub_merge_test.go
+	case "MarkReadyForReview", "ConvertToDraft", "EnableAutoMerge", "DisableAutoMerge":
+		g.stateOp(op, vars, data, &errs) // fakegithub_draft_test.go
 	case "AddPullRequestReview", "AddComment":
 		g.reviewOp(op, vars, data, &errs) // fakegithub_review_test.go
 	case "SearchRepositories", "LookupRepository":

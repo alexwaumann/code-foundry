@@ -317,11 +317,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		p.SnoozedUntil = timestamppb.New(s.SnoozedUntil)
 	}
 	for _, l := range s.LinkedPullRequests {
-		lp := &v1.LinkedPullRequest{Slug: l.Slug, Number: int32(l.Number), Url: l.URL}
-		if !l.LinkedAt.IsZero() {
-			lp.LinkedAt = timestamppb.New(l.LinkedAt)
-		}
-		p.LinkedPullRequests = append(p.LinkedPullRequests, lp)
+		p.LinkedPullRequests = append(p.LinkedPullRequests, linkedPullRequestToProto(l))
 	}
 	p.Usage, p.CostUsd, p.Unpriced = usageToProto(s.Usage)
 	p.AgentRuns = agentRunsToProto(s.AgentRuns)

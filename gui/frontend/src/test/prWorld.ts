@@ -108,6 +108,8 @@ function detailBase(pr: PullRequestView, t0: number): PullRequestDetailView {
     viewerCanUpdate: true,
     mergeMethods: ["merge", "squash", "rebase"],
     autoMergeEnabled: false,
+    autoMergeMethod: null,
+    autoMergeAllowed: true,
     defaultBranch: "main",
     viewerPermission: "admin",
     fetchedAtMs: t0 - 20_000,

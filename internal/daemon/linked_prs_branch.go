@@ -129,7 +129,7 @@ func branchLinksFor(threads *thread.Snapshot, projects *project.Snapshot,
 		var links []thread.LinkedPullRequest
 		for _, k := range threadBranches(th, projects) {
 			for _, p := range idx[k] {
-				has := func(l thread.LinkedPullRequest) bool { return l.URL == p.URL }
+				has := func(l thread.LinkedPullRequest) bool { return thread.SamePullRequestURL(l.URL, p.URL) }
 				if slices.ContainsFunc(th.LinkedPullRequests, has) || slices.ContainsFunc(links, has) {
 					continue
 				}

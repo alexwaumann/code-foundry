@@ -77,6 +77,12 @@ const (
 	// GhServiceAddPullRequestCommentProcedure is the fully-qualified name of the GhService's
 	// AddPullRequestComment RPC.
 	GhServiceAddPullRequestCommentProcedure = "/codefoundry.v1.GhService/AddPullRequestComment"
+	// GhServiceSetPullRequestDraftProcedure is the fully-qualified name of the GhService's
+	// SetPullRequestDraft RPC.
+	GhServiceSetPullRequestDraftProcedure = "/codefoundry.v1.GhService/SetPullRequestDraft"
+	// GhServiceSetPullRequestAutoMergeProcedure is the fully-qualified name of the GhService's
+	// SetPullRequestAutoMerge RPC.
+	GhServiceSetPullRequestAutoMergeProcedure = "/codefoundry.v1.GhService/SetPullRequestAutoMerge"
 	// GhServiceGetPullRequestDiffProcedure is the fully-qualified name of the GhService's
 	// GetPullRequestDiff RPC.
 	GhServiceGetPullRequestDiffProcedure = "/codefoundry.v1.GhService/GetPullRequestDiff"
@@ -163,6 +169,22 @@ type GhServiceClient interface {
 	// viewer (an issue comment, not a review). The body is trimmed, required, and at most
 	// 65536 bytes. Errors and the event as for SubmitPullRequestReview.
 	AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error)
+	// SetPullRequestDraft marks an open draft pull request ready for review (draft false,
+	// GitHub's markPullRequestReadyForReview) or converts an open one to a draft (draft
+	// true, convertPullRequestToDraft). FAILED_PRECONDITION when it is not open or already
+	// in that state (after a fresh look); GitHub's refusals keep their kind (no permission
+	// is PERMISSION_DENIED) or are FAILED_PRECONDITION with its message. The detail is
+	// invalidated and pull_request_detail_updated is sent.
+	SetPullRequestDraft(context.Context, *connect.Request[v1.SetPullRequestDraftRequest]) (*connect.Response[v1.SetPullRequestDraftResponse], error)
+	// SetPullRequestAutoMerge enables GitHub's auto-merge on an open pull request with a
+	// merge method (enablePullRequestAutoMerge: GitHub merges once the branch protection
+	// requirements pass), guarded like MergePullRequest by expected_head_sha or else the
+	// head the daemon last fetched; or disables it (disablePullRequestAutoMerge).
+	// FAILED_PRECONDITION when the pull request is not open, auto-merge is already in the
+	// requested state, the repository does not allow auto-merge or the method, or GitHub
+	// refuses (a pull request it could merge now is in "clean status": merge it instead).
+	// The detail is invalidated and pull_request_detail_updated is sent.
+	SetPullRequestAutoMerge(context.Context, *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error)
 	// GetPullRequestDiff returns a pull request's unified diff as GitHub renders it
 	// (REST pulls/{n} with Accept: application/vnd.github.v3.diff; the base side is the
 	// merge base, and a cross-repository pull request works the same). Cached in memory
@@ -292,6 +314,18 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(ghServiceMethods.ByName("AddPullRequestComment")),
 			connect.WithClientOptions(opts...),
 		),
+		setPullRequestDraft: connect.NewClient[v1.SetPullRequestDraftRequest, v1.SetPullRequestDraftResponse](
+			httpClient,
+			baseURL+GhServiceSetPullRequestDraftProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("SetPullRequestDraft")),
+			connect.WithClientOptions(opts...),
+		),
+		setPullRequestAutoMerge: connect.NewClient[v1.SetPullRequestAutoMergeRequest, v1.SetPullRequestAutoMergeResponse](
+			httpClient,
+			baseURL+GhServiceSetPullRequestAutoMergeProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("SetPullRequestAutoMerge")),
+			connect.WithClientOptions(opts...),
+		),
 		getPullRequestDiff: connect.NewClient[v1.GetPullRequestDiffRequest, v1.GetPullRequestDiffResponse](
 			httpClient,
 			baseURL+GhServiceGetPullRequestDiffProcedure,
@@ -326,6 +360,8 @@ type ghServiceClient struct {
 	mergePullRequest        *connect.Client[v1.MergePullRequestRequest, v1.MergePullRequestResponse]
 	submitPullRequestReview *connect.Client[v1.SubmitPullRequestReviewRequest, v1.SubmitPullRequestReviewResponse]
 	addPullRequestComment   *connect.Client[v1.AddPullRequestCommentRequest, v1.AddPullRequestCommentResponse]
+	setPullRequestDraft     *connect.Client[v1.SetPullRequestDraftRequest, v1.SetPullRequestDraftResponse]
+	setPullRequestAutoMerge *connect.Client[v1.SetPullRequestAutoMergeRequest, v1.SetPullRequestAutoMergeResponse]
 	getPullRequestDiff      *connect.Client[v1.GetPullRequestDiffRequest, v1.GetPullRequestDiffResponse]
 	getPullRequestFile      *connect.Client[v1.GetPullRequestFileRequest, v1.GetPullRequestFileResponse]
 }
@@ -413,6 +449,16 @@ func (c *ghServiceClient) SubmitPullRequestReview(ctx context.Context, req *conn
 // AddPullRequestComment calls codefoundry.v1.GhService.AddPullRequestComment.
 func (c *ghServiceClient) AddPullRequestComment(ctx context.Context, req *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error) {
 	return c.addPullRequestComment.CallUnary(ctx, req)
+}
+
+// SetPullRequestDraft calls codefoundry.v1.GhService.SetPullRequestDraft.
+func (c *ghServiceClient) SetPullRequestDraft(ctx context.Context, req *connect.Request[v1.SetPullRequestDraftRequest]) (*connect.Response[v1.SetPullRequestDraftResponse], error) {
+	return c.setPullRequestDraft.CallUnary(ctx, req)
+}
+
+// SetPullRequestAutoMerge calls codefoundry.v1.GhService.SetPullRequestAutoMerge.
+func (c *ghServiceClient) SetPullRequestAutoMerge(ctx context.Context, req *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error) {
+	return c.setPullRequestAutoMerge.CallUnary(ctx, req)
 }
 
 // GetPullRequestDiff calls codefoundry.v1.GhService.GetPullRequestDiff.
@@ -503,6 +549,22 @@ type GhServiceHandler interface {
 	// viewer (an issue comment, not a review). The body is trimmed, required, and at most
 	// 65536 bytes. Errors and the event as for SubmitPullRequestReview.
 	AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error)
+	// SetPullRequestDraft marks an open draft pull request ready for review (draft false,
+	// GitHub's markPullRequestReadyForReview) or converts an open one to a draft (draft
+	// true, convertPullRequestToDraft). FAILED_PRECONDITION when it is not open or already
+	// in that state (after a fresh look); GitHub's refusals keep their kind (no permission
+	// is PERMISSION_DENIED) or are FAILED_PRECONDITION with its message. The detail is
+	// invalidated and pull_request_detail_updated is sent.
+	SetPullRequestDraft(context.Context, *connect.Request[v1.SetPullRequestDraftRequest]) (*connect.Response[v1.SetPullRequestDraftResponse], error)
+	// SetPullRequestAutoMerge enables GitHub's auto-merge on an open pull request with a
+	// merge method (enablePullRequestAutoMerge: GitHub merges once the branch protection
+	// requirements pass), guarded like MergePullRequest by expected_head_sha or else the
+	// head the daemon last fetched; or disables it (disablePullRequestAutoMerge).
+	// FAILED_PRECONDITION when the pull request is not open, auto-merge is already in the
+	// requested state, the repository does not allow auto-merge or the method, or GitHub
+	// refuses (a pull request it could merge now is in "clean status": merge it instead).
+	// The detail is invalidated and pull_request_detail_updated is sent.
+	SetPullRequestAutoMerge(context.Context, *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error)
 	// GetPullRequestDiff returns a pull request's unified diff as GitHub renders it
 	// (REST pulls/{n} with Accept: application/vnd.github.v3.diff; the base side is the
 	// merge base, and a cross-repository pull request works the same). Cached in memory
@@ -628,6 +690,18 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(ghServiceMethods.ByName("AddPullRequestComment")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ghServiceSetPullRequestDraftHandler := connect.NewUnaryHandler(
+		GhServiceSetPullRequestDraftProcedure,
+		svc.SetPullRequestDraft,
+		connect.WithSchema(ghServiceMethods.ByName("SetPullRequestDraft")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ghServiceSetPullRequestAutoMergeHandler := connect.NewUnaryHandler(
+		GhServiceSetPullRequestAutoMergeProcedure,
+		svc.SetPullRequestAutoMerge,
+		connect.WithSchema(ghServiceMethods.ByName("SetPullRequestAutoMerge")),
+		connect.WithHandlerOptions(opts...),
+	)
 	ghServiceGetPullRequestDiffHandler := connect.NewUnaryHandler(
 		GhServiceGetPullRequestDiffProcedure,
 		svc.GetPullRequestDiff,
@@ -676,6 +750,10 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 			ghServiceSubmitPullRequestReviewHandler.ServeHTTP(w, r)
 		case GhServiceAddPullRequestCommentProcedure:
 			ghServiceAddPullRequestCommentHandler.ServeHTTP(w, r)
+		case GhServiceSetPullRequestDraftProcedure:
+			ghServiceSetPullRequestDraftHandler.ServeHTTP(w, r)
+		case GhServiceSetPullRequestAutoMergeProcedure:
+			ghServiceSetPullRequestAutoMergeHandler.ServeHTTP(w, r)
 		case GhServiceGetPullRequestDiffProcedure:
 			ghServiceGetPullRequestDiffHandler.ServeHTTP(w, r)
 		case GhServiceGetPullRequestFileProcedure:
@@ -755,6 +833,14 @@ func (UnimplementedGhServiceHandler) SubmitPullRequestReview(context.Context, *c
 
 func (UnimplementedGhServiceHandler) AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.AddPullRequestComment is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) SetPullRequestDraft(context.Context, *connect.Request[v1.SetPullRequestDraftRequest]) (*connect.Response[v1.SetPullRequestDraftResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.SetPullRequestDraft is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) SetPullRequestAutoMerge(context.Context, *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.SetPullRequestAutoMerge is not implemented"))
 }
 
 func (UnimplementedGhServiceHandler) GetPullRequestDiff(context.Context, *connect.Request[v1.GetPullRequestDiffRequest]) (*connect.Response[v1.GetPullRequestDiffResponse], error) {

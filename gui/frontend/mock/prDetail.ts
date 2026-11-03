@@ -1,7 +1,7 @@
 /**
  * Mock GhService pull request detail panel: GetPullRequestDetail, ListReviewerCandidates,
  * SetReviewRequest, RevertPullRequest, MergePullRequest, SubmitPullRequestReview,
- * AddPullRequestComment. Two rich fixtures on alexwaumann/code-foundry, and the
+ * AddPullRequestComment, SetPullRequestDraft, SetPullRequestAutoMerge. Two rich fixtures on alexwaumann/code-foundry, and the
  * mergeable one:
  *
  *   #145 open, draft, failing, in-progress and queued checks, changes requested by a
@@ -25,7 +25,7 @@
  * the GUI shows can open the panel.
  *
  * The panel's actions are commands (pr.revert, pr.merge, pr.review.request, pr.review,
- * pr.comment, pr.refresh; see commands()), like the daemon's; the RPCs they wrap are served too. Every open pull
+ * pr.comment, pr.refresh, pr.ready, pr.draft, pr.auto-merge; see commands()), like the daemon's; the RPCs they wrap are served too. Every open pull
  * request allows all three merge methods; every repository's default branch is main.
  * pr.merge refuses a head-sha other than the fixture's head. pr.refresh answers
  * with the detail (protojson), as the daemon does. POST /__mock/gh/pr-fail?command=pr.refresh
@@ -36,6 +36,17 @@
  * reviewer entry takes the review's state (its request is answered), and updated_at
  * moves. Approving or requesting changes on the viewer's own pull request is refused
  * with GitHub's message, as the daemon relays it (FAILED_PRECONDITION).
+ *
+ * Draft and auto-merge (pr.ready, pr.draft, pr.auto-merge; SetPullRequestDraft and
+ * SetPullRequestAutoMerge), with the daemon's refusals (FAILED_PRECONDITION; no write
+ * access is PERMISSION_DENIED): not open, already so, a draft with auto-merge, a method
+ * the repository disallows, a head-sha other than the fixture's head. Every repository
+ * allows auto-merge (auto_merge_allowed) except other-org/lib (#77, #81): turning it on
+ * there is refused as the repository not allowing it. A pull request whose merge state
+ * is clean (#142, #146) is refused like GitHub's "clean status" (merge it instead);
+ * #145 is a draft, so it needs pr.ready first; #147 (checks failing, blocked) takes
+ * auto-merge. A change flips the fixture (draft, auto_merge_enabled and
+ * auto_merge_method) and announces it.
  */
 import { create, toJson, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
@@ -57,6 +68,8 @@ import {
   PullRequestMergeMethod,
   AddPullRequestCommentResponseSchema,
   SubmitPullRequestReviewResponseSchema,
+  SetPullRequestAutoMergeResponseSchema,
+  SetPullRequestDraftResponseSchema,
   MergeStateStatus,
   Mergeable,
   type ReviewerCandidateSchema,
@@ -169,6 +182,13 @@ function keepBranch(pr: { headRef?: string; baseRef?: string; isCrossRepository?
 const avatar = (login: string) => `https://avatars.example.com/${login.replace("/", "-")}.png`;
 const key = (slug: string, number: number) => `${slug.toLowerCase()}#${String(number)}`;
 
+/** Repositories whose "Allow auto-merge" setting is off. */
+const AUTO_MERGE_OFF = new Set(["other-org/lib"]);
+const autoMergeAllowed = (slug: string) => !AUTO_MERGE_OFF.has(slug.toLowerCase());
+
+/** A pull request state as the daemon's refusals say it ("merged", "closed"). */
+const stateWord = (s: PullRequestState | undefined) => (s === PullRequestState.MERGED ? "merged" : s === PullRequestState.CLOSED ? "closed" : "open");
+
 /** ListReviewerCandidates returns at most this many matches, as GitHub's search does (first: 20). */
 const CANDIDATE_SEARCH_LIMIT = 20;
 
@@ -269,6 +289,7 @@ export class PrDetailWorld {
       this.details.set(key(CF, 139), d);
     }
     for (const d of this.details.values()) d.defaultBranch = "main";
+    for (const [k, d] of this.details) d.autoMergeAllowed = autoMergeAllowed(k.split("#")[0] ?? "");
     this.candidates.set(key(CF, 145), [
       { id: "T_core", kind: ReviewerKind.TEAM, login: "acme/core", name: "Core", avatarUrl: avatar("acme/core"), isRequested: true },
       { id: "U_ana", kind: ReviewerKind.USER, login: "teammate-ana", name: "Ana", avatarUrl: avatar("teammate-ana"), isRequested: true },
@@ -585,6 +606,7 @@ export class PrDetailWorld {
       mergedBy: pr.state === PullRequestState.MERGED ? pr.author : "",
       closedAt: pr.mergedAt,
       defaultBranch: "main",
+      autoMergeAllowed: autoMergeAllowed(pr.repoSlug),
       fetchedAt: this.at(20_000),
     };
   }
@@ -838,6 +860,59 @@ export class PrDetailWorld {
           return out(`Commented on #${String(n)}`, toJson(AddPullRequestCommentResponseSchema, create(AddPullRequestCommentResponseSchema, r)));
         },
       },
+      ...(["pr.ready", "pr.draft"] as const).map((name) => ({
+        cmd: {
+          name, noPalette: true,
+          title: name === "pr.ready" ? "Mark Pull Request Ready for Review" : "Convert Pull Request to Draft",
+          category: "Pull Request",
+          description:
+            name === "pr.ready"
+              ? "Mark a draft pull request ready for review (GitHub's Ready for review button)."
+              : "Convert an open pull request to a draft; reviewers are not asked again until it is marked ready.",
+          keybindings: [],
+          args: [slugArg, numberArg],
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const r = prDetailCall(() => this.setDraft(slug, n, name === "pr.draft"));
+          return out(r.message, toJson(SetPullRequestDraftResponseSchema, create(SetPullRequestDraftResponseSchema, r)));
+        },
+      })),
+      {
+        cmd: {
+          name: "pr.auto-merge", noPalette: true,
+          title: "Auto-merge Pull Request",
+          category: "Pull Request",
+          description:
+            "Turn on GitHub's auto-merge for an open pull request (--method: it merges by itself once its required checks and reviews pass; the repository must allow auto-merge), or turn it off (--off).",
+          keybindings: [],
+          args: [
+            slugArg,
+            numberArg,
+            { name: "method", type: ArgType.ENUM, required: false, description: "How GitHub merges it once the requirements pass: a merge commit, squash, or rebase (required unless --off)", enumValues: ["merge", "squash", "rebase"] },
+            { name: "off", type: ArgType.BOOL, required: false, description: "Turn auto-merge off instead" },
+            { name: "head-sha", type: ArgType.STRING, required: false, description: "Turn it on only if the head is still this commit (full SHA): refused when the pull request changed since you looked" },
+          ],
+          // Like the daemon: only a request it would send asks (turning it on with a method).
+          confirmIf: (_ctx: UiContext | undefined, args: Record<string, string>) => args.off !== "true" && methodNames[args.method ?? ""] !== undefined,
+          confirm: (_ctx: UiContext | undefined, args: Record<string, string>) =>
+            `Turn on auto-merge for #${args.number ?? ""} in ${args["repo-slug"] ?? ""}? GitHub merges it with ${methodWords[args.method ?? ""] ?? args.method ?? ""} once its required checks and reviews pass.`,
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const off = args.off === "true";
+          const m = args.method ?? "";
+          if (off && (m || args["head-sha"])) throw new ConnectError("--off takes no --method or --head-sha", Code.InvalidArgument);
+          if (!off && !m) throw new ConnectError("method is required to turn auto-merge on (merge, squash, or rebase), or --off to turn it off", Code.InvalidArgument);
+          const method = off ? PullRequestMergeMethod.UNSPECIFIED : methodNames[m];
+          if (method === undefined) throw new ConnectError("method must be merge, squash, or rebase", Code.InvalidArgument);
+          const r = prDetailCall(() => this.setAutoMerge(slug, n, !off, method, args["head-sha"] ?? ""));
+          // The daemon's result is protojson of the response.
+          return out(r.message, toJson(SetPullRequestAutoMergeResponseSchema, create(SetPullRequestAutoMergeResponseSchema, r)));
+        },
+      },
       {
         cmd: {
           name: "pr.refresh", noPalette: true,
@@ -955,6 +1030,70 @@ export class PrDetailWorld {
     this.merges.set(k, { res, deleteAsked: deleteBranch });
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
     return res;
+  }
+
+  /**
+   * Marks a draft ready for review or converts an open pull request to a draft
+   * (SetPullRequestDraft, pr.ready, pr.draft), refused like the daemon: not open, already
+   * so, no write access. The fixture flips (and the dashboards' row with a summary-built
+   * detail) and it is announced.
+   */
+  setDraft(slug: string, number: number, draft: boolean): { draft: boolean; message: string } {
+    this.h.count("SetPullRequestDraft");
+    const d = this.detailOf(slug, number);
+    const pr = d.pullRequest;
+    if (!pr) throw new PrDetailError("not_found", `Could not resolve to a PullRequest with the number of ${String(number)}.`);
+    const refuse = (why: string) => new PrDetailError("failed_precondition", `failed precondition: pull request #${String(number)} ${why}`);
+    if (pr.state !== PullRequestState.OPEN) throw refuse(`is ${stateWord(pr.state)}, not open`);
+    if (draft && pr.draft) throw refuse("is already a draft");
+    if (!draft && !pr.draft) throw refuse("is already ready for review");
+    if (!d.viewerCanUpdate) throw new PrDetailError("permission_denied", "permission denied on github: Resource not accessible by integration");
+    pr.draft = draft;
+    this.touch(d, timestampFromDate(new Date()));
+    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+    return { draft, message: draft ? `Converted #${String(number)} to a draft` : `Marked #${String(number)} ready for review` };
+  }
+
+  /**
+   * Turns GitHub's auto-merge on with a method, or off (SetPullRequestAutoMerge,
+   * pr.auto-merge), refused like the daemon: not open, already so (or on with another
+   * method), a draft, the repository disallowing auto-merge or the method, another head
+   * than expectedHeadSha, a clean pull request (GitHub's "clean status"), no write access.
+   */
+  setAutoMerge(slug: string, number: number, enabled: boolean, method: PullRequestMergeMethod, expectedHeadSha = "") {
+    this.h.count("SetPullRequestAutoMerge");
+    if (enabled && method === PullRequestMergeMethod.UNSPECIFIED) throw new PrDetailError("invalid_argument", "method is required to enable auto-merge: merge, squash, or rebase");
+    const d = this.detailOf(slug, number);
+    const pr = d.pullRequest;
+    if (!pr) throw new PrDetailError("not_found", `Could not resolve to a PullRequest with the number of ${String(number)}.`);
+    const n = String(number);
+    const refuse = (why: string) => new PrDetailError("failed_precondition", `failed precondition: pull request #${n} ${why}`);
+    const words = (m: PullRequestMergeMethod | undefined) => methodWords[PullRequestMergeMethod[m ?? PullRequestMergeMethod.MERGE].toLowerCase()] ?? "a merge commit";
+    if (pr.state !== PullRequestState.OPEN) throw refuse(`is ${stateWord(pr.state)}, not open`);
+    if (!enabled && !d.autoMergeEnabled) throw refuse("does not have auto-merge on");
+    if (enabled && d.autoMergeEnabled) {
+      if (d.autoMergeMethod === method) throw refuse(`already has auto-merge on with ${words(method)}`);
+      throw refuse(`already has auto-merge on with ${words(d.autoMergeMethod)}; turn it off first to merge with ${words(method)}`);
+    }
+    if (enabled) {
+      if (pr.draft) throw refuse("is a draft; mark it ready for review first");
+      if (!d.autoMergeAllowed) throw refuse("cannot use auto-merge: the repository does not allow it (its settings' Allow auto-merge)");
+      if (!(d.mergeMethodsAllowed ?? []).includes(method)) throw refuse(`cannot be merged with ${words(method)}: the repository does not allow it`);
+      const head = pr.headSha ?? "";
+      if (expectedHeadSha && expectedHeadSha.toLowerCase() !== head.toLowerCase()) {
+        throw refuse(`changed since it was shown (head ${head.slice(0, 7)}, shown ${expectedHeadSha.slice(0, 7)}); refresh and try again`);
+      }
+    }
+    if (!d.viewerCanUpdate) throw new PrDetailError("permission_denied", "permission denied on github: Resource not accessible by integration");
+    if (enabled && pr.mergeStateStatus === MergeStateStatus.CLEAN) {
+      throw refuse(`can be merged now, so GitHub will not wait to auto-merge it (Pull request Pull request is in clean status); merge it instead`);
+    }
+    d.autoMergeEnabled = enabled;
+    d.autoMergeMethod = enabled ? method : PullRequestMergeMethod.UNSPECIFIED;
+    this.touch(d, timestampFromDate(new Date()));
+    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+    const message = enabled ? `Auto-merge on for #${n}: GitHub merges it with ${words(method)} once its requirements pass` : `Auto-merge off for #${n}`;
+    return { enabled, method: d.autoMergeMethod, message };
   }
 
   /**

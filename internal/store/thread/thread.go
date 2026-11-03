@@ -618,6 +618,11 @@ type Store interface {
 	// for its new --add-dir list once it is quiet (members.go).
 	AddProject(ctx context.Context, id, ref string) (Thread, error)
 	RemoveProject(ctx context.Context, id, ref string) (Thread, error)
+	// LinkPullRequest links a GitHub pull request (a URL or "owner/name#123") to the
+	// thread by hand (LinkManual): deduplicated by URL like every link, copied up the
+	// CreatedBy chain, never removed. It returns the link as the thread has it and
+	// whether it was new; one the thread has is a quiet success (prlink_manual.go).
+	LinkPullRequest(ctx context.Context, id, ref string) (Thread, LinkedPullRequest, bool, error)
 	// Move takes a thread without a project into a project or a workspace (move.go): it
 	// is placed as Create would place a new thread there, named again from its
 	// conversation (a new branch too), and Claude moves with set_cwd, started in the old

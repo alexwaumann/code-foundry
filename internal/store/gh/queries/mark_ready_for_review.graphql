@@ -1,0 +1,6 @@
+# Marks a draft pull request ready for review (SetPullRequestDraft with draft false).
+mutation MarkReadyForReview($id: ID!) {
+  markPullRequestReadyForReview(input: { pullRequestId: $id }) {
+    pullRequest { isDraft }
+  }
+}

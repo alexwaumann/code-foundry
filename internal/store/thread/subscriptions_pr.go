@@ -152,19 +152,11 @@ var (
 // ParsePullRequestTarget normalises "owner/name#123" or a GitHub pull request URL to
 // "owner/name#123" with the slug in lower case.
 func ParsePullRequestTarget(s string) (string, error) {
-	s = strings.TrimSpace(s)
-	m := prRefRE.FindStringSubmatch(s)
-	if m == nil {
-		m = prURLRE.FindStringSubmatch(s)
+	slug, n, err := ParsePullRequestLink(s)
+	if err != nil {
+		return "", err
 	}
-	if m == nil || m[2] == "." || m[2] == ".." {
-		return "", fmt.Errorf("%w: pull request %q (want owner/name#123 or a github.com pull request URL)", ErrInvalidArgument, s)
-	}
-	n, err := strconv.Atoi(m[3])
-	if err != nil || n <= 0 {
-		return "", fmt.Errorf("%w: pull request number in %q", ErrInvalidArgument, s)
-	}
-	return strings.ToLower(m[1]+"/"+m[2]) + "#" + strconv.Itoa(n), nil
+	return strings.ToLower(slug) + "#" + strconv.Itoa(n), nil
 }
 
 // checksMeet reports whether a rollup meets a checks condition.

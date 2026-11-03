@@ -236,7 +236,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { durationFromMs } from "@bufbuild/protobuf/wkt";
+import { durationFromMs, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { CommandService, ConfirmationRequiredSchema } from "../src/gen/codefoundry/v1/command_pb";
 import { SettingsService, SettingsValidationErrorsSchema } from "../src/gen/codefoundry/v1/settings_pb";
 import { EventService, EventSource } from "../src/gen/codefoundry/v1/events_pb";
@@ -473,6 +473,9 @@ function routes(router: ConnectRouter): void {
     mergePullRequest: (req) => prDetailCall(() => world.gh.prDetails.merge(req.repoSlug, req.number, req.method, req.deleteBranch, req.expectedHeadSha)),
     submitPullRequestReview: (req) => prDetailCall(() => world.gh.prDetails.submitReview(req.repoSlug, req.number, req.event, req.body)),
     addPullRequestComment: (req) => prDetailCall(() => world.gh.prDetails.postComment(req.repoSlug, req.number, req.body)),
+    setPullRequestDraft: (req) => prDetailCall(() => world.gh.prDetails.setDraft(req.repoSlug, req.number, req.draft)),
+    setPullRequestAutoMerge: (req) =>
+      prDetailCall(() => world.gh.prDetails.setAutoMerge(req.repoSlug, req.number, req.enabled, req.enabled ? req.method : 0, req.enabled ? req.expectedHeadSha : "")),
     getPullRequestDiff: (req) => world.gh.prDiffs.diff(req.repoSlug, req.number, req.refresh),
     getPullRequestFile: (req) => world.gh.prDiffs.file(req.repoSlug, req.ref, req.path),
   });
@@ -542,6 +545,11 @@ function routes(router: ConnectRouter): void {
   router.service(ThreadService, {
     list: () => ({ threads: [...world.threads.values()].map((s) => world.threadMsg(s)), retiredUsage: retiredUsage() }),
     get: (req) => guard(() => ({ thread: world.threadMsg(world.thread(req.id)) })),
+    linkPullRequest: (req) =>
+      guard(() => {
+        const r = world.linkPullRequestByHand(req.id, req.pullRequest);
+        return { thread: world.threadMsg(world.thread(req.id)), linked: r.linked, link: { slug: r.link.slug, number: r.link.number, url: r.link.url, linkedAt: timestampFromDate(r.link.linkedAt) } };
+      }),
     create: () => {
       throw new ConnectError("use the thread.new command in the mock", Code.Unimplemented);
     },

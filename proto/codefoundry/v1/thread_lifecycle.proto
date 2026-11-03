@@ -1026,6 +1026,21 @@ message AddThreadProjectResponse {
   Thread thread = 1;
 }
 
+message LinkThreadPullRequestRequest {
+  string id = 1;
+  // A GitHub pull request URL (https://github.com/owner/name/pull/123, anything after
+  // the number ignored) or "owner/name#123".
+  string pull_request = 2;
+}
+
+message LinkThreadPullRequestResponse {
+  Thread thread = 1;
+  // The link is new; false when the thread already had it.
+  bool linked = 2;
+  // The link as the thread has it (the existing one when linked is false).
+  LinkedPullRequest link = 3;
+}
+
 message RemoveThreadProjectRequest {
   string id = 1;
   // The member to drop: its project id or name.

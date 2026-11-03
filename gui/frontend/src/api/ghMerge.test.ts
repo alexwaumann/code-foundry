@@ -17,6 +17,14 @@ describe("merge fields", () => {
     expect(toPullRequestDetailView(create(PullRequestDetailSchema, {}))).toMatchObject({ mergeMethods: [], autoMergeEnabled: false, defaultBranch: "" });
   });
 
+  it("maps auto-merge's method and whether the repository allows it", () => {
+    const on = create(PullRequestDetailSchema, { autoMergeEnabled: true, autoMergeMethod: PullRequestMergeMethod.SQUASH, autoMergeAllowed: true });
+    expect(toPullRequestDetailView(on)).toMatchObject({ autoMergeEnabled: true, autoMergeMethod: "squash", autoMergeAllowed: true });
+    // A method without auto-merge on (never sent) and an unknown setting read as off.
+    const off = create(PullRequestDetailSchema, { autoMergeMethod: PullRequestMergeMethod.REBASE });
+    expect(toPullRequestDetailView(off)).toMatchObject({ autoMergeEnabled: false, autoMergeMethod: null, autoMergeAllowed: false });
+  });
+
   it.each([
     ['{"merged":true,"sha":"abc","message":"Merged #1 (abc)","branchDeleted":true}', { merged: true, sha: "abc", message: "Merged #1 (abc)", branchDeleted: true }],
     ['{"merged":true}', { merged: true, sha: "", message: "", branchDeleted: false }],

@@ -1,0 +1,6 @@
+# Disables auto-merge on a pull request (SetPullRequestAutoMerge with enabled false).
+mutation DisableAutoMerge($id: ID!) {
+  disablePullRequestAutoMerge(input: { pullRequestId: $id }) {
+    pullRequest { autoMergeRequest { enabledAt mergeMethod } }
+  }
+}
