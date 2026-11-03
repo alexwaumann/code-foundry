@@ -64,6 +64,9 @@ const (
 	// ThreadServiceRemoveProjectProcedure is the fully-qualified name of the ThreadService's
 	// RemoveProject RPC.
 	ThreadServiceRemoveProjectProcedure = "/codefoundry.v1.ThreadService/RemoveProject"
+	// ThreadServiceLinkPullRequestProcedure is the fully-qualified name of the ThreadService's
+	// LinkPullRequest RPC.
+	ThreadServiceLinkPullRequestProcedure = "/codefoundry.v1.ThreadService/LinkPullRequest"
 	// ThreadServiceCheckoutsProcedure is the fully-qualified name of the ThreadService's Checkouts RPC.
 	ThreadServiceCheckoutsProcedure = "/codefoundry.v1.ThreadService/Checkouts"
 	// ThreadServiceCheckPlacementProcedure is the fully-qualified name of the ThreadService's
@@ -228,6 +231,13 @@ type ThreadServiceClient interface {
 	// docs/notes/move-no-project-1-daemon.md.
 	Move(context.Context, *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error)
 	RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error)
+	// LinkPullRequest links a GitHub pull request to a thread by hand (source manual),
+	// named by URL or "owner/name#123". Linked like every link: deduplicated by URL (case
+	// aside), first source wins, copied up the CreatedBy chain, never removed; linking one
+	// the thread has is a quiet success (linked false). Any state. INVALID_ARGUMENT for
+	// anything that is not a GitHub pull request. The thread is republished when the link
+	// is new. See docs/notes/pr-daemon-actions.md.
+	LinkPullRequest(context.Context, *connect.Request[v1.LinkThreadPullRequestRequest]) (*connect.Response[v1.LinkThreadPullRequestResponse], error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
 	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
 	// at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
@@ -534,6 +544,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("RemoveProject")),
 			connect.WithClientOptions(opts...),
 		),
+		linkPullRequest: connect.NewClient[v1.LinkThreadPullRequestRequest, v1.LinkThreadPullRequestResponse](
+			httpClient,
+			baseURL+ThreadServiceLinkPullRequestProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("LinkPullRequest")),
+			connect.WithClientOptions(opts...),
+		),
 		checkouts: connect.NewClient[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse](
 			httpClient,
 			baseURL+ThreadServiceCheckoutsProcedure,
@@ -769,6 +785,7 @@ type threadServiceClient struct {
 	addProject        *connect.Client[v1.AddThreadProjectRequest, v1.AddThreadProjectResponse]
 	move              *connect.Client[v1.MoveThreadRequest, v1.MoveThreadResponse]
 	removeProject     *connect.Client[v1.RemoveThreadProjectRequest, v1.RemoveThreadProjectResponse]
+	linkPullRequest   *connect.Client[v1.LinkThreadPullRequestRequest, v1.LinkThreadPullRequestResponse]
 	checkouts         *connect.Client[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse]
 	checkPlacement    *connect.Client[v1.CheckPlacementRequest, v1.CheckPlacementResponse]
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
@@ -875,6 +892,11 @@ func (c *threadServiceClient) Move(ctx context.Context, req *connect.Request[v1.
 // RemoveProject calls codefoundry.v1.ThreadService.RemoveProject.
 func (c *threadServiceClient) RemoveProject(ctx context.Context, req *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error) {
 	return c.removeProject.CallUnary(ctx, req)
+}
+
+// LinkPullRequest calls codefoundry.v1.ThreadService.LinkPullRequest.
+func (c *threadServiceClient) LinkPullRequest(ctx context.Context, req *connect.Request[v1.LinkThreadPullRequestRequest]) (*connect.Response[v1.LinkThreadPullRequestResponse], error) {
+	return c.linkPullRequest.CallUnary(ctx, req)
 }
 
 // Checkouts calls codefoundry.v1.ThreadService.Checkouts.
@@ -1132,6 +1154,13 @@ type ThreadServiceHandler interface {
 	// docs/notes/move-no-project-1-daemon.md.
 	Move(context.Context, *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error)
 	RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error)
+	// LinkPullRequest links a GitHub pull request to a thread by hand (source manual),
+	// named by URL or "owner/name#123". Linked like every link: deduplicated by URL (case
+	// aside), first source wins, copied up the CreatedBy chain, never removed; linking one
+	// the thread has is a quiet success (linked false). Any state. INVALID_ARGUMENT for
+	// anything that is not a GitHub pull request. The thread is republished when the link
+	// is new. See docs/notes/pr-daemon-actions.md.
+	LinkPullRequest(context.Context, *connect.Request[v1.LinkThreadPullRequestRequest]) (*connect.Response[v1.LinkThreadPullRequestResponse], error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
 	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
 	// at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
@@ -1434,6 +1463,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("RemoveProject")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceLinkPullRequestHandler := connect.NewUnaryHandler(
+		ThreadServiceLinkPullRequestProcedure,
+		svc.LinkPullRequest,
+		connect.WithSchema(threadServiceMethods.ByName("LinkPullRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceCheckoutsHandler := connect.NewUnaryHandler(
 		ThreadServiceCheckoutsProcedure,
 		svc.Checkouts,
@@ -1680,6 +1715,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceMoveHandler.ServeHTTP(w, r)
 		case ThreadServiceRemoveProjectProcedure:
 			threadServiceRemoveProjectHandler.ServeHTTP(w, r)
+		case ThreadServiceLinkPullRequestProcedure:
+			threadServiceLinkPullRequestHandler.ServeHTTP(w, r)
 		case ThreadServiceCheckoutsProcedure:
 			threadServiceCheckoutsHandler.ServeHTTP(w, r)
 		case ThreadServiceCheckPlacementProcedure:
@@ -1815,6 +1852,10 @@ func (UnimplementedThreadServiceHandler) Move(context.Context, *connect.Request[
 
 func (UnimplementedThreadServiceHandler) RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.RemoveProject is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) LinkPullRequest(context.Context, *connect.Request[v1.LinkThreadPullRequestRequest]) (*connect.Response[v1.LinkThreadPullRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.LinkPullRequest is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error) {

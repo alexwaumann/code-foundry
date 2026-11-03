@@ -24,7 +24,7 @@ import (
 // A thread also has every link of the threads it created, transitively
 // (prlink_children.go): a link is copied up the CreatedBy chain as it arrives. And the
 // daemon links the pull requests whose head is a branch the thread works on
-// (prlink_branch.go).
+// (prlink_branch.go), and a user or agent may link one by hand (prlink_manual.go).
 
 // LinkSource is where a thread's link came from. Stored, not yet on the API.
 type LinkSource string
@@ -33,6 +33,7 @@ const (
 	LinkClaude LinkSource = "claude" // a pr-link record in the thread's own transcript
 	LinkChild  LinkSource = "child"  // copied from a thread this thread created
 	LinkBranch LinkSource = "branch" // a pull request whose head is a branch the thread works on
+	LinkManual LinkSource = "manual" // linked by hand (thread.pr.link; prlink_manual.go)
 )
 
 // LinkedPullRequest is a pull request linked to the thread.

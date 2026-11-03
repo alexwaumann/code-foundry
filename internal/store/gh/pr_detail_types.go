@@ -49,8 +49,13 @@ type FullPullRequest struct {
 	// (merge commit, squash, rebase); empty if unknown (a row cached before they were
 	// fetched).
 	MergeMethods []MergeMethod `json:"mergeMethods,omitempty"`
-	// AutoMerge: auto-merge is enabled on the pull request.
-	AutoMerge bool `json:"autoMerge,omitempty"`
+	// AutoMerge: auto-merge is enabled on the pull request; AutoMergeMethod is the
+	// method GitHub merges it with then ("" while it is off).
+	AutoMerge       bool        `json:"autoMerge,omitempty"`
+	AutoMergeMethod MergeMethod `json:"autoMergeMethod,omitempty"`
+	// AutoMergeAllowed: the repository allows auto-merge ("Allow auto-merge"); false
+	// when it does not, or for a row cached before it was fetched.
+	AutoMergeAllowed bool `json:"autoMergeAllowed,omitempty"`
 	// DefaultBranch is the repository's default branch; empty if unknown (a row cached
 	// before it was fetched). A merge never deletes it.
 	DefaultBranch string `json:"defaultBranch,omitempty"`

@@ -1,0 +1,9 @@
+# Enables auto-merge on an open pull request (SetPullRequestAutoMerge): GitHub merges it
+# with $method once its branch protection requirements pass. expectedHeadOid is the head
+# the store last fetched (or the client showed), as for MergePullRequest: GitHub refuses
+# when the branch moved since, so commits nobody saw never merge by themselves.
+mutation EnableAutoMerge($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {
+  enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $method, expectedHeadOid: $head }) {
+    pullRequest { autoMergeRequest { enabledAt mergeMethod } }
+  }
+}

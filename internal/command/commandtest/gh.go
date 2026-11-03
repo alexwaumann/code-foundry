@@ -24,6 +24,10 @@ type Gh struct {
 	Merge   *v1.MergePullRequestResponse
 	Review  *v1.SubmitPullRequestReviewResponse
 	Comment *v1.AddPullRequestCommentResponse
+	// Draft and AutoMerge are SetPullRequestDraft's and SetPullRequestAutoMerge's
+	// answers (defaults: see those).
+	Draft     *v1.SetPullRequestDraftResponse
+	AutoMerge *v1.SetPullRequestAutoMergeResponse
 }
 
 var _ command.GhBackend = (*Gh)(nil)
@@ -121,4 +125,38 @@ func (f *Gh) AddPullRequestComment(_ context.Context, r *connect.Request[v1.AddP
 	return connect.NewResponse(&v1.AddPullRequestCommentResponse{
 		Id: "IC_1", Url: "https://github.com/o/r/pull/" + strconv.Itoa(int(r.Msg.GetNumber())) + "#issuecomment-1",
 	}), nil
+}
+
+// SetPullRequestDraft implements command.GhBackend: the requested state and the
+// daemon's message for it (Draft, when set, replaces the answer).
+func (f *Gh) SetPullRequestDraft(_ context.Context, r *connect.Request[v1.SetPullRequestDraftRequest]) (*connect.Response[v1.SetPullRequestDraftResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	if f.Draft != nil {
+		return connect.NewResponse(proto.CloneOf(f.Draft)), nil
+	}
+	msg := "Marked #" + strconv.Itoa(int(r.Msg.GetNumber())) + " ready for review"
+	if r.Msg.GetDraft() {
+		msg = "Converted #" + strconv.Itoa(int(r.Msg.GetNumber())) + " to a draft"
+	}
+	return connect.NewResponse(&v1.SetPullRequestDraftResponse{Draft: r.Msg.GetDraft(), Message: msg}), nil
+}
+
+// SetPullRequestAutoMerge implements command.GhBackend: the requested state and a
+// message for it (AutoMerge, when set, replaces the answer).
+func (f *Gh) SetPullRequestAutoMerge(_ context.Context, r *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	if f.AutoMerge != nil {
+		return connect.NewResponse(proto.CloneOf(f.AutoMerge)), nil
+	}
+	n := strconv.Itoa(int(r.Msg.GetNumber()))
+	if !r.Msg.GetEnabled() {
+		return connect.NewResponse(&v1.SetPullRequestAutoMergeResponse{Message: "Auto-merge off for #" + n}), nil
+	}
+	return connect.NewResponse(&v1.SetPullRequestAutoMergeResponse{Enabled: true, Method: r.Msg.GetMethod(), Message: "Auto-merge on for #" + n}), nil
 }

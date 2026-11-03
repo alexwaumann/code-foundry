@@ -121,11 +121,12 @@ func fullPullRequestToProto(slug string, d *gh.FullPullRequest) *v1.PullRequestD
 		ReviewersTruncated:     d.ReviewersTruncated,
 		ChecksTruncated:        d.ChecksTruncated,
 		AutoMergeEnabled:       d.AutoMerge,
+		AutoMergeAllowed:       d.AutoMergeAllowed,
+		AutoMergeMethod:        mergeMethodToProto(d.AutoMergeMethod),
 		DefaultBranch:          d.DefaultBranch,
 	}
 	for _, m := range d.MergeMethods {
-		out.MergeMethodsAllowed = append(out.MergeMethodsAllowed,
-			enumOf[v1.PullRequestMergeMethod](v1.PullRequestMergeMethod_value, "PULL_REQUEST_MERGE_METHOD_", string(m)))
+		out.MergeMethodsAllowed = append(out.MergeMethodsAllowed, mergeMethodToProto(m))
 	}
 	for _, l := range d.Labels {
 		out.Labels = append(out.Labels, &v1.PullRequestLabel{Name: l.Name, Color: l.Color})

@@ -10,7 +10,8 @@ import (
 )
 
 // JSON shapes of pull_request_full.graphql, reviewer_candidates.graphql,
-// revert_pull_request.graphql, and merge_pull_request.graphql, and their mapping to the domain types.
+// revert_pull_request.graphql, merge_pull_request.graphql, and the draft and auto-merge
+// mutations (pr_draft.go), and their mapping to the domain types.
 
 type actorJSON struct {
 	Typename  string `json:"__typename"`
@@ -69,10 +70,8 @@ type pullRequestFullJSON struct {
 	MergeCommit *oidJSON   `json:"mergeCommit"`
 	MergedBy    *loginJSON `json:"mergedBy"`
 	// AutoMergeRequest is non-null while auto-merge is enabled.
-	AutoMergeRequest *struct {
-		EnabledAt time.Time `json:"enabledAt"`
-	} `json:"autoMergeRequest"`
-	Labels *struct {
+	AutoMergeRequest *autoMergeRequestJSON `json:"autoMergeRequest"`
+	Labels           *struct {
 		TotalCount int     `json:"totalCount"`
 		Nodes      []Label `json:"nodes"`
 	} `json:"labels"`
@@ -108,6 +107,13 @@ type pullRequestFullJSON struct {
 	} `json:"reviewThreads"`
 }
 
+// autoMergeRequestJSON is a pull request's autoMergeRequest, non-null while auto-merge
+// is enabled.
+type autoMergeRequestJSON struct {
+	EnabledAt   time.Time `json:"enabledAt"`
+	MergeMethod string    `json:"mergeMethod"`
+}
+
 type pullRequestFullData struct {
 	RateLimit  *rateLimitJSON `json:"rateLimit"`
 	Repository *struct {
@@ -116,6 +122,7 @@ type pullRequestFullData struct {
 		MergeCommitAllowed *bool `json:"mergeCommitAllowed"`
 		SquashMergeAllowed *bool `json:"squashMergeAllowed"`
 		RebaseMergeAllowed *bool `json:"rebaseMergeAllowed"`
+		AutoMergeAllowed   bool  `json:"autoMergeAllowed"`
 		DefaultBranchRef   *struct {
 			Name string `json:"name"`
 		} `json:"defaultBranchRef"`
@@ -140,6 +147,10 @@ func decodeFullPullRequest(data []byte) (FullPullRequest, checksPage, error) {
 		ClosedAt:         p.ClosedAt,
 		ViewerPermission: d.Repository.ViewerPermission,
 		AutoMerge:        p.AutoMergeRequest != nil,
+		AutoMergeAllowed: d.Repository.AutoMergeAllowed,
+	}
+	if a := p.AutoMergeRequest; a != nil {
+		out.AutoMergeMethod = MergeMethod(a.MergeMethod)
 	}
 	if r := d.Repository.DefaultBranchRef; r != nil {
 		out.DefaultBranch = r.Name
