@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +14,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
@@ -94,5 +97,24 @@ func TestProjectRegisterOutsideHome(t *testing.T) {
 	_, err := c.Register(context.Background(), connect.NewRequest(&v1.RegisterProjectRequest{Path: "/opt/proj"}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("Register outside home err = %v, want InvalidArgument", err)
+	}
+}
+
+func TestReadFileErrorCodes(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want connect.Code
+	}{
+		{"outside home", fmt.Errorf("%w: /etc/hosts is outside your home directory", fsx.ErrInvalidArgument), connect.CodeInvalidArgument},
+		{"macOS privacy", fmt.Errorf("wrapped: %w", fsx.ErrNotPermitted), connect.CodePermissionDenied},
+		{"anything else", errors.New("fsx: read /x: input/output error"), connect.CodeInternal},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := connect.CodeOf(readFileError(tt.err)); got != tt.want {
+				t.Errorf("code = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

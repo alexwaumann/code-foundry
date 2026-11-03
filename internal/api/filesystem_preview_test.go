@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +17,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -192,5 +195,32 @@ func TestFilesystemPreviewFilePagesOrigin(t *testing.T) {
 	defer func() { _ = r.Body.Close() }()
 	if r.StatusCode != http.StatusOK {
 		t.Errorf("GET %s: %d", url, r.StatusCode)
+	}
+}
+
+func TestPreviewReadError(t *testing.T) {
+	root := t.TempDir()
+	h := NewFilesystem(root, projecttest.New(nil), testGrants(root))
+	refused := fmt.Errorf("wrapped: %w", fsx.ErrNotPermitted)
+	tests := []struct {
+		name, path string
+		err        error
+		want       connect.Code
+		wantMsg    string
+	}{
+		{"refused in ~/Library: guarded, System Settings would not help", "~/Library/Safari/page.html", refused, connect.CodeInvalidArgument, "protected folder"},
+		{"refused in Documents: the privacy message", "~/Documents/page.html", refused, connect.CodePermissionDenied, "not permitted"},
+		{"any other failure in ~/Library", "~/Library/Safari/page.html", errors.New("boom"), connect.CodeInternal, "boom"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := h.previewReadError("", tt.path, tt.err)
+			if got := connect.CodeOf(err); got != tt.want {
+				t.Errorf("code = %v, want %v", got, tt.want)
+			}
+			if !strings.Contains(err.Error(), tt.wantMsg) {
+				t.Errorf("error %q does not hold %q", err, tt.wantMsg)
+			}
+		})
 	}
 }
