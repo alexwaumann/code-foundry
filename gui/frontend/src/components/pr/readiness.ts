@@ -309,7 +309,7 @@ function openRows(d: PullRequestDetailView, viewer: string, now: number): Readin
       icon: "approval",
       title: `${plural(approval.length, "workflow")} waiting for approval`,
       meta: "",
-      lines: [{ kind: "text", text: "A maintainer has to approve the run (a first-time contributor's, or a protected environment's)." }],
+      lines: [{ kind: "text", text: "A maintainer has to approve the run before it starts." }],
       action: { kind: "approve-workflow", url: approval.find((a) => a.url)?.url || pr.url },
       task: null,
       blocking: true,

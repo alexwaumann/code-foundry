@@ -19,8 +19,18 @@
  *        admin: merging never deletes its branch
  *   #139 teammate-kim's, awaiting the viewer's review (requested), the viewer has write
  *        access: the Review menu's main fixture
+ *   #160 open (not a draft), changes requested by teammate-ana with teammate-lee still
+ *        pending, three unresolved review threads, checks passing, blocked
+ *   #161 open, approved, checks passing, conflicting with main (dirty)
+ *   #162 open, approved, checks passing, behind main (merge state BEHIND)
+ *   #163 open, approved, three checks running and four passed, blocked: Auto-merge
+ *   #164 #163's twin with auto-merge on (squash): Cancel auto-merge
  *
- * #131, #140 and #146 are on no dashboard: open them by number. Every other pull request the
+ * The readiness box's states (docs/notes/pr-panel-readiness.md) are #145 (draft with
+ * blockers), #160, #161, #162, #163, #164, #142 (ready), #139 (your review), #140 (read
+ * access, a workflow awaiting approval), #131 (closed) and #138 (merged).
+ *
+ * #131, #140, #146 and #160-#164 are on no dashboard: open them by number. Every other pull request the
  * dashboards or branches list gets a minimal detail built from its summary, so any row
  * the GUI shows can open the panel.
  *
@@ -288,6 +298,7 @@ export class PrDetailWorld {
       d.viewerPermission = "write";
       this.details.set(key(CF, 139), d);
     }
+    for (const d of this.states()) this.details.set(key(CF, d.pullRequest?.number ?? 0), d);
     for (const d of this.details.values()) d.defaultBranch = "main";
     for (const [k, d] of this.details) d.autoMergeAllowed = autoMergeAllowed(k.split("#")[0] ?? "");
     this.candidates.set(key(CF, 145), [
@@ -591,6 +602,105 @@ export class PrDetailWorld {
       viewerPermission: "admin",
       fetchedAt: this.at(20_000),
     };
+  }
+
+  /**
+   * #160-#164: the readiness box's other states, each the viewer's open pull request on
+   * no dashboard with seven checks, an approval (or changes requested) and a description
+   * long enough to fold.
+   */
+  private states(): DetailInit[] {
+    const run = (n: number, j: number) => `https://github.com/${CF}/actions/runs/${String(n)}/job/${String(j)}`;
+    const ok = (n: number, name: string, j: number) => ({ name, workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SUCCESS, url: run(n, j), startedAt: this.at(50 * MIN), completedAt: this.at(50 * MIN - (2 + j) * 30_000) });
+    const passing = (n: number) => ["build", "lint", "vet", "test (macos-15)", "test (ubuntu-24.04)", "e2e (webkit)", "frontend test"].map((name, j) => ok(n, name, j + 1));
+    const approved = (agoMs: number) => [{ login: "teammate-kim", state: PullRequestReviewState.APPROVED, submittedAt: this.at(agoMs), avatarUrl: avatar("teammate-kim") }];
+    const body = (what: string) =>
+      [
+        "## Summary",
+        "",
+        `${what}. The change keeps the existing behaviour for every caller that already passes a context and moves the rest onto the new path, so nothing changes for threads started before the upgrade.`,
+        "",
+        "## What changed",
+        "",
+        "- The store owns the lifecycle now; handlers only read snapshots.",
+        "- Table tests for each branch, fakes under the package's test dir.",
+        "- A step note with the decisions and gotchas.",
+        "",
+        "## Test plan",
+        "",
+        "- [x] make check",
+        "- [x] exercised end to end against a scratch daemon",
+      ].join("\n");
+    const make = (n: number, title: string, head: string, o: Partial<PrInit> & { ageMs?: number }, d: Partial<Omit<DetailInit, "$typeName" | "$unknown">>): DetailInit => {
+      const headSha = `${String(n)}c0ffee`.padEnd(40, "0");
+      const pr = this.h.makePr(CF, n, title, { headRef: head, headSha, reviewDecision: ReviewDecision.APPROVED, checks: { state: CheckRollupState.SUCCESS, total: 7, passed: 7, failed: 0, pending: 0, skipped: 0 }, ...o });
+      return {
+        pullRequest: pr,
+        body: body(title.replace(/^[a-z]+(\([^)]*\))?: /, "").replace(/^./, (c) => c.toUpperCase())),
+        reviewers: approved(HOUR),
+        commits: [{ sha: headSha, headline: title, authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(2 * HOUR) }],
+        commitCount: 1,
+        checks: passing(n),
+        nodeId: `PR_kwMock${String(n)}`,
+        mergeMethodsAllowed: ALL_METHODS,
+        viewerCanUpdate: true,
+        viewerPermission: "admin",
+        fetchedAt: this.at(20_000),
+        ...d,
+      };
+    };
+    const c = this.mkComment.bind(this);
+    const thread = (id: string, path: string, line: number, text: string, outdated = false) => ({
+      id,
+      path,
+      line,
+      side: DiffSide.RIGHT,
+      isResolved: false,
+      isOutdated: outdated,
+      comments: [c(PullRequestCommentKind.REVIEW_COMMENT, `${id}_c`, "teammate-ana", text, 3 * HOUR, { path, reviewId: "PRR_ana160", url: `https://github.com/${CF}/pull/160#${id}` })],
+    });
+    const running = (n: number) => [
+      ...passing(n).slice(0, 4),
+      { name: "e2e (webkit)", workflow: "CI", status: CheckStatus.IN_PROGRESS, url: run(n, 5), startedAt: this.at(6 * MIN) },
+      { name: "test (macos-15)", workflow: "CI", status: CheckStatus.IN_PROGRESS, url: run(n, 6), startedAt: this.at(4 * MIN) },
+      { name: "release-notes", workflow: "Release", status: CheckStatus.QUEUED, url: run(n, 7) },
+    ];
+    const runningRollup = { state: CheckRollupState.PENDING, total: 7, passed: 4, failed: 0, pending: 3, skipped: 0 };
+    return [
+      make(
+        160,
+        "feat(gh): batch the dashboard query per viewer",
+        "cf/gh-batch",
+        { reviewDecision: ReviewDecision.CHANGES_REQUESTED, ageMs: 40 * MIN },
+        {
+          reviewers: [
+            { login: "teammate-ana", state: PullRequestReviewState.CHANGES_REQUESTED, submittedAt: this.at(3 * HOUR), avatarUrl: avatar("teammate-ana") },
+            { login: "teammate-lee", requested: true, avatarUrl: avatar("teammate-lee") },
+          ],
+          comments: [
+            c(PullRequestCommentKind.REVIEW, "PRR_ana160", "teammate-ana", "The fingerprint misses check reruns, so a rerun never wakes anyone.", 3 * HOUR, {
+              reviewState: PullRequestReviewState.CHANGES_REQUESTED,
+              url: `https://github.com/${CF}/pull/160#PRR_ana160`,
+            }),
+          ],
+          reviewThreads: [
+            thread("PRRT_160a", "internal/store/gh/dashboard.go", 88, "This query runs per project; batch it per viewer."),
+            thread("PRRT_160b", "internal/store/gh/dashboard.go", 140, "Same here."),
+            thread("PRRT_160c", "internal/store/gh/fingerprint.go", 12, "A rerun keeps the check count: fingerprint the run ids.", true),
+          ],
+        },
+      ),
+      make(161, "refactor(panel): move tab state into the panel store", "cf/panel-tabs", { mergeable: Mergeable.CONFLICTING, mergeStateStatus: MergeStateStatus.DIRTY, ageMs: DAY }, { reviewers: approved(DAY) }),
+      make(162, "feat(prs): needs-review queue on the PRs page", "cf/prs-queue", { mergeStateStatus: MergeStateStatus.BEHIND, ageMs: 3 * HOUR }, { reviewers: approved(2 * HOUR) }),
+      make(163, "fix(sidebar): keep the selected row in view on resize", "cf/sidebar-scroll", { checks: runningRollup, ageMs: 4 * MIN }, { reviewers: approved(10 * MIN), checks: running(163) }),
+      make(
+        164,
+        "fix(sidebar): scroll the new thread into view",
+        "cf/sidebar-new-row",
+        { checks: runningRollup, ageMs: 2 * MIN },
+        { reviewers: approved(10 * MIN), checks: running(164), autoMergeEnabled: true, autoMergeMethod: PullRequestMergeMethod.SQUASH },
+      ),
+    ];
   }
 
   /** A minimal detail from a listed pull request's summary. */
@@ -1001,6 +1111,7 @@ export class PrDetailWorld {
     }
     if (pr.mergeable === Mergeable.CONFLICTING) throw refuse("Pull Request is not mergeable");
     if (pr.mergeStateStatus === MergeStateStatus.BLOCKED) throw refuse("At least 1 approving review is required by reviewers with write access.");
+    if (pr.mergeStateStatus === MergeStateStatus.BEHIND) throw refuse("Head branch is out of date. Review and try the merge again.");
     const now = timestampFromDate(new Date());
     const sha = `e2e${String(number).padStart(4, "0")}${"0".repeat(33)}`;
     pr.state = PullRequestState.MERGED;

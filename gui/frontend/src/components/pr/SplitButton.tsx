@@ -47,9 +47,11 @@ export function SplitButton({
   const { ref, boundary } = usePanelBoundary();
   const reasonId = useId();
   const blocked = reason !== null || busy;
+  // A blocked merge is greyed, not green: it is not the next step.
+  const look = tones[reason !== null ? "neutral" : tone];
   const part = "flex h-7 shrink-0 items-center border text-label shadow-xs outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-cf-focus/60";
   return (
-    <span ref={ref} className={cn("flex min-w-0 shrink-0", reason !== null && "opacity-50")} data-testid={`${testId}-split`}>
+    <span ref={ref} className={cn("flex min-w-0 shrink-0", reason !== null && "text-cf-text-muted")} data-testid={`${testId}-split`}>
       <Tip label={reason}>
         <button
           type="button"
@@ -58,7 +60,7 @@ export function SplitButton({
           aria-busy={busy || undefined}
           aria-describedby={reason ? reasonId : undefined}
           data-reason={reason ?? undefined}
-          className={cn(part, tones[tone], "min-w-0 gap-1.5 rounded-l-md px-2", blocked && "cursor-default")}
+          className={cn(part, look, "min-w-0 gap-1.5 rounded-l-md px-2", blocked && "cursor-default")}
           onClick={() => {
             if (!blocked) onRun();
           }}
@@ -86,7 +88,7 @@ export function SplitButton({
               aria-label={menuLabel}
               aria-disabled={busy || undefined}
               data-testid={`${testId}-menu-button`}
-              className={cn(part, tones[tone], "-ml-px w-6 justify-center rounded-r-md border-l-current/25", busy && "cursor-default")}
+              className={cn(part, look, "-ml-px w-6 justify-center rounded-r-md border-l-current/25", busy && "cursor-default")}
             >
               <ChevronDown className="size-3.5 opacity-80" aria-hidden />
             </button>
