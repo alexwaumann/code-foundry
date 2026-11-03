@@ -716,6 +716,17 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if o.Cwd != "" && !o.NoProject {
 		return Thread{}, fmt.Errorf("%w: cwd is for a thread without a project (a project's thread runs in its worktree)", ErrInvalidArgument)
 	}
+	if o.ResumeSession != "" {
+		if !o.NoProject {
+			return Thread{}, fmt.Errorf("%w: resume_session is for a thread without a project", ErrInvalidArgument)
+		}
+		if !uuidPattern.MatchString(o.ResumeSession) {
+			return Thread{}, fmt.Errorf("%w: resume_session %q is not a Claude session id", ErrInvalidArgument, o.ResumeSession)
+		}
+		if _, ok := m.opts.Paths.transcriptPath(m.opts.Home, o.ResumeSession); !ok {
+			return Thread{}, ErrTranscriptMissing
+		}
+	}
 	if o.NoProject && (o.ProjectID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" ||
 		len(o.ProjectIDs) > 0 || o.Like != "" || o.NewBranch || o.CheckoutMode) {
 		return Thread{}, fmt.Errorf("%w: no_project excludes a project, projects, worktree, new worktree, like and workspace", ErrInvalidArgument)
@@ -797,7 +808,11 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		}
 		note = &it
 	}
-	if err := m.spawn(ctx, id, launch{newID: cid}); err != nil {
+	l := launch{newID: cid}
+	if o.ResumeSession != "" {
+		l = launch{resume: o.ResumeSession, fork: true, newID: cid, freshPrompt: true}
+	}
+	if err := m.spawn(ctx, id, l); err != nil {
 		drop()
 		m.rollback(ctx, made)
 		return Thread{}, err

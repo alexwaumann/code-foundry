@@ -1,0 +1,2 @@
+{"type": "system", "subtype": "init", "session_id": "00000000-0000-4000-8000-000000000001", "cwd": "/tmp", "model": "claude-sonnet-5-5", "tools": ["Bash"], "permissionMode": "dontAsk"}
+{"type": "result", "subtype": "error_during_execution", "session_id": "00000000-0000-4000-8000-000000000001", "is_error": true, "result": "", "errors": ["API Error: 500 overloaded"], "total_cost_usd": 0}

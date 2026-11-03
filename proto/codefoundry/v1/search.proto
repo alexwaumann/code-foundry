@@ -1,0 +1,308 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "codefoundry/v1/heartbeat.proto";
+import "codefoundry/v1/thread_search.proto";
+import "google/protobuf/timestamp.proto";
+
+// SearchService is the search dialog's history and its Agent mode
+// (docs/notes/search-5-agent-daemon.md). Keyword search itself is ThreadService.Search.
+//
+// Agent search: the user asks a question in their own words; a hidden one-shot Claude
+// run on the utility model (models.utility, low effort) searches their threads with
+// `code-foundry thread search` and `thread read`, and reports each message that answers
+// it with `search report`: the daemon accepts a hit only when its quote occurs in that
+// message's searchable text. The run ends with a short answer that refers to the hits by
+// number. It is no thread: it never shows in the sidebar, thread lists, search results,
+// notifications, the index or Usage. Its cost is on its history entry.
+//
+// History: the last 50 searches of both modes (Agent runs and the Find entries the GUI
+// records when the user opens a keyword result), newest first.
+service SearchService {
+  // StartAgent starts an agent search for question and returns its entry (RUNNING).
+  // It keeps running whether or not a client watches. INVALID_ARGUMENT for an empty
+  // question.
+  rpc StartAgent(StartAgentSearchRequest) returns (StartAgentSearchResponse) {}
+  // Watch sends the entry (snapshot) first, then every change to it as an event (step,
+  // hit, answer, status), each with a version greater than the snapshot's, then ends
+  // after the status that finishes the run. A finished entry: the snapshot alone, then
+  // the stream ends. A heartbeat after 5 s of silence. NOT_FOUND for an unknown id.
+  rpc Watch(WatchSearchRequest) returns (stream SearchWatchEvent) {}
+  // WatchRecent sends ListRecent's answer now and again after every change to the
+  // history (an entry added, changed, removed), and a heartbeat after 5 s of silence.
+  rpc WatchRecent(WatchRecentSearchesRequest) returns (stream WatchRecentSearchesEvent) {}
+  // Stop stops a running agent search: the run ends STOPPED with the hits it reported.
+  // A finished one is left as it is (not an error).
+  rpc Stop(StopSearchRequest) returns (StopSearchResponse) {}
+  // ListRecent is the history, newest first.
+  rpc ListRecent(ListRecentSearchesRequest) returns (ListRecentSearchesResponse) {}
+  // Get is one entry. NOT_FOUND for an unknown id.
+  rpc Get(GetSearchRequest) returns (GetSearchResponse) {}
+  // OpenHit marks hit n of an agent search opened (the user followed its link).
+  rpc OpenHit(OpenSearchHitRequest) returns (OpenSearchHitResponse) {}
+  // MarkSeen clears an agent search's unseen flag: the GUI showed its finished result.
+  rpc MarkSeen(MarkSearchSeenRequest) returns (MarkSearchSeenResponse) {}
+  // RecordFind records a Find entry (the GUI's keyword mode, when the user opens a
+  // result): the query only. The same query again moves its entry to the top.
+  rpc RecordFind(RecordFindSearchRequest) returns (RecordFindSearchResponse) {}
+  // Forget removes one entry. An agent search's is stopped first, and its run's Claude
+  // transcript and scratch directory are deleted. Unknown is not an error.
+  rpc Forget(ForgetSearchRequest) returns (ForgetSearchResponse) {}
+  // Clear forgets every entry.
+  rpc Clear(ClearSearchesRequest) returns (ClearSearchesResponse) {}
+  // Promote turns a finished agent search into a normal thread without a project (in
+  // the sidebar, full tools, the user's default model and effort) that continues the
+  // run's Claude conversation, so it keeps everything the search read. Its first
+  // message carries the question and the hits as citation links. FAILED_PRECONDITION
+  // while it runs, or when it has no conversation to continue.
+  rpc Promote(PromoteSearchRequest) returns (PromoteSearchResponse) {}
+  // Report is the run's own verb (`code-foundry search report`): one message that
+  // answers the question. INVALID_ARGUMENT with why when it is refused (the quote does
+  // not occur in the message, the thread is not one of the user's, a duplicate, the cap
+  // reached), so the model can fix it; FAILED_PRECONDITION once the run has ended.
+  rpc Report(ReportSearchHitRequest) returns (ReportSearchHitResponse) {}
+}
+
+enum SearchMode {
+  SEARCH_MODE_UNSPECIFIED = 0;
+  SEARCH_MODE_AGENT = 1;
+  SEARCH_MODE_FIND = 2;
+}
+
+enum SearchStatus {
+  SEARCH_STATUS_UNSPECIFIED = 0;
+  // An agent search under way. A Find entry has no status (UNSPECIFIED).
+  SEARCH_STATUS_RUNNING = 1;
+  // It ended with an answer (or with its hits when the model wrote none).
+  SEARCH_STATUS_DONE = 2;
+  // It could not run or broke off (error says why): Claude did not start, exited, the
+  // daemon stopped.
+  SEARCH_STATUS_FAILED = 3;
+  // The user stopped it.
+  SEARCH_STATUS_STOPPED = 4;
+}
+
+// AgentSearchHit is one message the run reported, accepted by the daemon.
+message AgentSearchHit {
+  // n is the hit's number, 1 up, in report order; the answer refers to hits as [n].
+  int32 n = 1;
+  string thread_id = 2;
+  // The thread's current name.
+  string thread_name = 3;
+  bool archived = 4;
+  string item_id = 5;
+  // The item's ordinal in thread_id's log (#N in thread read).
+  int64 ordinal = 6;
+  SearchSpeaker speaker = 7;
+  // When the message was written.
+  google.protobuf.Timestamp item_created_at = 8;
+  // The quote as reported, white space runs as one space. It occurs in the message's
+  // searchable text (ThreadService.Search's snippet text), either as is or with markdown
+  // markers (* _ ` # >) and link targets left out on both sides.
+  string quote = 9;
+  // Why it answers the question, one line from the model.
+  string why = 10;
+  // The user opened it (OpenHit).
+  bool opened = 11;
+  google.protobuf.Timestamp reported_at = 12;
+}
+
+enum AgentSearchStepKind {
+  AGENT_SEARCH_STEP_KIND_UNSPECIFIED = 0;
+  // `thread search <words>`: query, and hits once done.
+  AGENT_SEARCH_STEP_KIND_SEARCH = 1;
+  // `thread read <thread>`: thread_id, thread_name, and once done the ordinals read
+  // (from_ordinal..to_ordinal; 0 when it printed none).
+  AGENT_SEARCH_STEP_KIND_READ = 2;
+  // Any other tool call (a refused command). A report is no step: its hit shows.
+  AGENT_SEARCH_STEP_KIND_OTHER = 3;
+}
+
+// AgentSearchStep is one of the run's tool calls, as the dialog shows progress.
+message AgentSearchStep {
+  // index is the step's place, 0 up. A later event with the same index replaces it (a
+  // step is sent when its call starts, and again when its result arrives).
+  int32 index = 1;
+  AgentSearchStepKind kind = 2;
+  // done: its result arrived. The last step not done is the current one.
+  bool done = 3;
+  // text is the step in words: "Searching login redirect…", "Searched login redirect ·
+  // 4 hits", "Reading Fix the login redirect…", "Read Fix the login redirect · #12–#20".
+  string text = 4;
+  string query = 5;
+  // Total message hits the search printed (its "Messages: N in M threads"); 0 for none.
+  int32 hits = 6;
+  string thread_id = 7;
+  string thread_name = 8;
+  int64 from_ordinal = 9;
+  int64 to_ordinal = 10;
+  // failed: the call returned an error (a refused command, a bad id).
+  bool failed = 11;
+}
+
+// SearchEntry is one search of the history.
+message SearchEntry {
+  string id = 1;
+  SearchMode mode = 2;
+  // The question (agent) or the query (find).
+  string query = 3;
+  google.protobuf.Timestamp created_at = 4;
+  // Agent only from here on.
+  google.protobuf.Timestamp finished_at = 5;
+  SearchStatus status = 6;
+  // Why it failed, or a note on how it ended ("stopped at the 2-minute limit").
+  string error = 7;
+  // The answer: 1-3 sentences referring to hits as [n]; "" when the model wrote none.
+  string answer = 8;
+  // The accepted hits, by n. Hits whose thread has been removed are left out.
+  repeated AgentSearchHit hits = 9;
+  repeated AgentSearchStep steps = 10;
+  // How many searches it made and how many distinct threads it read.
+  int32 searches = 11;
+  int32 threads_read = 12;
+  // The run's Claude conversation (Promote continues it).
+  string claude_session_id = 13;
+  // The utility model it ran on.
+  string model = 14;
+  double cost_usd = 15;
+  int64 duration_ms = 16;
+  // unseen: it finished and the GUI has not shown its result yet (MarkSeen).
+  bool unseen = 17;
+  // version grows with every change; Watch's events carry theirs.
+  uint64 version = 18;
+  // The thread a Promote made (the latest one).
+  string promoted_thread_id = 19;
+}
+
+message StartAgentSearchRequest {
+  string question = 1;
+}
+
+message StartAgentSearchResponse {
+  SearchEntry entry = 1;
+}
+
+message WatchSearchRequest {
+  string id = 1;
+}
+
+// SearchAnswer is the run's answer.
+message SearchAnswer {
+  string text = 1;
+}
+
+// SearchStatusChange is the run's end: the status with the entry's final fields.
+message SearchStatusChange {
+  SearchStatus status = 1;
+  string error = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  double cost_usd = 4;
+  int64 duration_ms = 5;
+  bool unseen = 6;
+}
+
+message SearchWatchEvent {
+  // The entry's version after this event (the snapshot's own; none on a heartbeat).
+  uint64 version = 1;
+  oneof event {
+    SearchEntry snapshot = 2;
+    AgentSearchStep step = 3;
+    AgentSearchHit hit = 4;
+    SearchAnswer answer = 5;
+    SearchStatusChange status = 6;
+    StreamHeartbeat heartbeat = 7;
+  }
+}
+
+message WatchRecentSearchesRequest {}
+
+message WatchRecentSearchesEvent {
+  // The history now; absent on a heartbeat.
+  repeated SearchEntry entries = 1;
+  StreamHeartbeat heartbeat = 2;
+}
+
+message StopSearchRequest {
+  string id = 1;
+}
+
+message StopSearchResponse {
+  SearchEntry entry = 1;
+}
+
+message ListRecentSearchesRequest {}
+
+message ListRecentSearchesResponse {
+  repeated SearchEntry entries = 1;
+}
+
+message GetSearchRequest {
+  string id = 1;
+}
+
+message GetSearchResponse {
+  SearchEntry entry = 1;
+}
+
+message OpenSearchHitRequest {
+  string id = 1;
+  int32 n = 2;
+}
+
+message OpenSearchHitResponse {
+  SearchEntry entry = 1;
+}
+
+message MarkSearchSeenRequest {
+  string id = 1;
+}
+
+message MarkSearchSeenResponse {
+  SearchEntry entry = 1;
+}
+
+message RecordFindSearchRequest {
+  string query = 1;
+}
+
+message RecordFindSearchResponse {
+  SearchEntry entry = 1;
+}
+
+message ForgetSearchRequest {
+  string id = 1;
+}
+
+message ForgetSearchResponse {}
+
+message ClearSearchesRequest {}
+
+message ClearSearchesResponse {
+  // How many entries went.
+  int32 removed = 1;
+}
+
+message PromoteSearchRequest {
+  string id = 1;
+}
+
+message PromoteSearchResponse {
+  string thread_id = 1;
+}
+
+message ReportSearchHitRequest {
+  string search_id = 1;
+  string thread_id = 2;
+  // The message: its item id, or its ordinal as thread search and thread read print it
+  // ("#12" or "12").
+  string item = 3;
+  string quote = 4;
+  string why = 5;
+}
+
+message ReportSearchHitResponse {
+  AgentSearchHit hit = 1;
+  // How many more hits the run may report.
+  int32 left = 2;
+}

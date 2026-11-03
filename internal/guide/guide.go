@@ -132,9 +132,12 @@ var leftOut = []string{"pr.checks", "thread.restart", "thread.shell.stop", "thre
 // LeftOut reports whether the guide leaves c out: the plugin namespace, the Skills
 // marketplace (skill.*: the user's settings, not an agent's work; docs/notes/
 // skills-2-lifecycle.md), dictation (dictation.*: the user's microphone;
-// docs/notes/dictation-2-daemon.md) and leftOut.
+// docs/notes/dictation-2-daemon.md), the search dialog's history and agent search
+// (search.*: the user's; the hidden run gets its own verbs in its prompt;
+// docs/notes/search-5-agent-daemon.md) and leftOut.
 func LeftOut(c *v1.Command) bool {
 	return InPluginNamespace(c) || strings.HasPrefix(c.GetName(), "skill.") || strings.HasPrefix(c.GetName(), "dictation.") ||
+		strings.HasPrefix(c.GetName(), "search.") ||
 		slices.Contains(leftOut, c.GetName())
 }
 

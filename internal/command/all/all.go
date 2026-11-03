@@ -87,6 +87,10 @@ type Deps struct {
 	// unavailable).
 	Dictation       command.DictationBackend
 	DictationStatus func() *v1.DictationSnapshot
+	// Search backs search.* (the search dialog's history and agent search); SearchWait
+	// lets search.agent wait for its answer.
+	Search     command.SearchServiceBackend
+	SearchWait func(ctx context.Context, id string) (*v1.SearchEntry, error)
 	// Memory backs memory.* (the app memory; add, remove and clear also use Thread and
 	// Emitter: a change from a thread is checked and shown). Nil registers them failing with
 	// Unimplemented.
@@ -204,6 +208,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterSkill(r, command.SkillDeps{Skills: d.Skills, Terminal: d.Terminal, Project: d.Project, Thread: d.Thread}),
 		command.RegisterEmber(r, command.EmberDeps{Ember: d.Ember, Settings: d.Settings, Thread: d.Thread}),
 		command.RegisterDictation(r, command.DictationDeps{Dictation: d.Dictation, Status: d.DictationStatus, Emitter: d.Emitter}),
+		command.RegisterSearch(r, command.SearchDeps{Search: d.Search, Wait: d.SearchWait}),
 		command.RegisterMemory(r, command.MemoryDeps{Memory: d.Memory, Threads: d.Thread, Emitter: d.Emitter}),
 		command.RegisterCapabilities(r, command.CapabilitiesDeps{
 			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,

@@ -88,6 +88,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"memory.show", "memory.add", "memory.remove", "memory.clear",
 		"dictation.toggle", "dictation.start", "dictation.stop", "dictation.download", "dictation.download.cancel", "dictation.remove", "dictation.status",
 		"daemon.capabilities",
+		"search.agent", "search.stop", "search.recent", "search.get", "search.open-hit", "search.seen", "search.find", "search.forget", "search.clear", "search.promote", "search.report",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {

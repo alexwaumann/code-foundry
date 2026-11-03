@@ -87,7 +87,7 @@ type spawnMemory struct {
 // hash is had (the row's), so when mem differs its next message carries the new list.
 // A memory that could not be read (ok false) changes nothing on a resumed one.
 func memorySpawned(l launch, had string, mem []string, ok bool) spawnMemory {
-	sm := spawnMemory{entries: mem, fresh: l.resume == "", hash: memoryHash(mem)}
+	sm := spawnMemory{entries: mem, fresh: l.resume == "" || l.freshPrompt, hash: memoryHash(mem)}
 	if !sm.fresh && ok && sm.hash != had {
 		sm.note = memoryRefresh(mem)
 	}
