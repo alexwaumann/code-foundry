@@ -25,25 +25,26 @@ vi.mock("@tanstack/react-virtual", () => ({
 class Feed<T> {
   private queue: (T | Heartbeat)[] = [];
   private wake: (() => void) | null = null;
-  private ended = false;
-  private failure: unknown = null;
+  private state: { ended: boolean; failure: Error | null } = { ended: false, failure: null };
   opens = 0;
   push(...vs: T[]): void {
     this.queue.push(...vs);
     this.wake?.();
   }
   end(): void {
-    this.ended = true;
+    this.state.ended = true;
     this.wake?.();
   }
-  fail(err: unknown): void {
-    this.failure = err;
+  fail(err: Error): void {
+    this.state.failure = err;
     this.wake?.();
+  }
+  private now(): { ended: boolean; failure: Error | null } {
+    return this.state;
   }
   async *open(signal: AbortSignal): AsyncGenerator<T | Heartbeat> {
     this.opens++;
-    this.ended = false;
-    this.failure = null;
+    this.state = { ended: false, failure: null };
     yield HEARTBEAT;
     while (!signal.aborted) {
       const v = this.queue.shift();
@@ -51,8 +52,9 @@ class Feed<T> {
         yield v;
         continue;
       }
-      if (this.failure) throw this.failure;
-      if (this.ended) return;
+      const st = this.now();
+      if (st.failure) throw st.failure;
+      if (st.ended) return;
       await new Promise<void>((r) => {
         this.wake = r;
         signal.addEventListener("abort", () => {
@@ -168,7 +170,7 @@ async function close(): Promise<void> {
 }
 
 const dialog = () => screen.getByTestId("search-dialog");
-const input = () => screen.getByTestId("search-input") as HTMLInputElement;
+const input = (): HTMLInputElement => screen.getByTestId<HTMLInputElement>("search-input");
 const key = (k: string, init: KeyboardEventInit = {}) => {
   fireEvent.keyDown(input(), { key: k, ...init });
 };

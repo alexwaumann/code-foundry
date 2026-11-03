@@ -38,7 +38,9 @@ vi.mock("@/api/search", async (orig) => ({
   ...(await orig<typeof import("@/api/search")>()),
   watchRecentSearches: async function* (signal: AbortSignal) {
     yield [];
-    await new Promise((r) => signal.addEventListener("abort", r));
+    await new Promise((r) => {
+      signal.addEventListener("abort", r);
+    });
   },
 }));
 

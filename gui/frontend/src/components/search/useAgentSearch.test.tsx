@@ -43,7 +43,10 @@ function scripted(attempts: { events: SearchWatchEventView[]; then: "end" | "hol
     yield HEARTBEAT;
     for (const ev of a.events) yield ev;
     if (a.then instanceof Error) throw a.then;
-    if (a.then === "hold") await new Promise((r) => signal.addEventListener("abort", r));
+    if (a.then === "hold")
+      await new Promise((r) => {
+        signal.addEventListener("abort", r);
+      });
   };
   return { watch, opens };
 }

@@ -379,25 +379,21 @@ export class MockSearches {
     }
     // Subscribed before the snapshot goes (a generator starts on its first next()), so no event falls between.
     const sub = e.events.subscribe(signal);
-    let next = sub.next();
+    const first = sub.next();
     yield snapshot;
-    for (let r = await next; !r.done; r = await next) {
+    for (let r = await first; !r.done; r = await sub.next()) {
       const ev = r.value;
       if (ev === "gone") throw new CommandError("notfound", `no search ${id}`);
       yield ev;
       if (ev.event?.case === "status") return;
-      next = sub.next();
     }
   }
 
   async *watchRecent(signal: AbortSignal): AsyncGenerator<{ entries: EntryInit[] }> {
     const sub = this.recent.subscribe(signal);
-    let next = sub.next();
+    const first = sub.next();
     yield { entries: this.list() };
-    for (let r = await next; !r.done; r = await next) {
-      yield { entries: this.list() };
-      next = sub.next();
-    }
+    for (let r = await first; !r.done; r = await sub.next()) yield { entries: this.list() };
   }
 
   stop(id: string): EntryInit {

@@ -93,7 +93,7 @@ function Results({
             </p>
           )}
           {entry.answer && <AnswerText answer={entry.answer} onRef={onSelect} />}
-          <SummaryLine entry={entry} />
+          {entry.steps.length > 0 && <SummaryLine entry={entry} />}
           {entry.hits.length > 0 && <div className="mx-1 mt-1 mb-1 border-t" />}
         </>
       )}
@@ -320,7 +320,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
             <Hint k="⌘⌫">new search</Hint>
           </>
         ) : (
-          <Hint k="⏎">search</Hint>
+          <Hint k="⏎">{sameQuestion && searchEnded(entry) ? "search again" : "search"}</Hint>
         )}
         {canDictate && <Hint k="⌘⇧M">dictate</Hint>}
         {running && sameQuestion ? <Hint k="esc">close · keeps running</Hint> : <Hint k="Tab">Find</Hint>}
