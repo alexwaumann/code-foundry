@@ -8,7 +8,7 @@ vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 const { seedPrWorld, SLUG } = await import("@/test/prWorld");
 const { openPr, pick, press, renderPrPanel, resetPrStores, settle, toastTexts } = await import("@/test/prPanelHarness");
-const { seedWorld } = await import("@/test/projectsWorld");
+const { addThreads, seedWorld, thread } = await import("@/test/projectsWorld");
 const { useProjectsStore } = await import("@/stores/projects");
 const { usePrTasksStore } = await import("@/stores/prTasks");
 const { useThreadsStore } = await import("@/stores/threads");
@@ -135,7 +135,7 @@ describe("running pr.task", () => {
     expect(toastOpen("Sent to s-1")).toBeNull();
   });
 
-  it("an unrelated pull request: new thread by default; the menu lists this thread and a thread that links it; picking that one sends there, Open selects it", async () => {
+  it("an unrelated pull request: new thread by default (listed last); the menu lists the threads that link it, not this one; picking one sends there, Open selects it", async () => {
     fromThread("s-1");
     link("s-1", [145]);
     link("s-3", [161]);
@@ -146,23 +146,46 @@ describe("running pr.task", () => {
     const menu = openTargets("conflicts");
     expect(within(menu).getByText("Resolve the conflicts")).toBeTruthy();
     expect(targets(menu)).toEqual([
-      { text: "In a new thread", default: true },
-      { text: "In this thread", default: false },
       { text: "In Fix resize race", default: false },
+      { text: "In a new thread", default: true },
     ]);
-    await pick(within(menu).getAllByTestId("pr-task-target")[2] as HTMLElement);
+    await pick(within(menu).getAllByTestId("pr-task-target")[0] as HTMLElement);
     expect(tasks()).toEqual([{ "repo-slug": SLUG, number: "161", kind: "conflicts", thread: "s-3" }]);
     await expectToast("Sent to s-3");
     fireEvent.click(toastOpen("Sent to s-3") as HTMLElement);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-3" });
   });
 
-  it("this thread from the menu when it does not link the pull request", async () => {
+  it("forwarded: a thread that links it through its child sends the task there; the toast names the child for this thread, Open selects the child", async () => {
+    fromThread("s-1");
+    addThreads(thread("s-kid", { name: "Port the fix", createdBy: "s-1", lastActivityAtMs: Date.now() }));
+    link("s-1", [145]);
+    link("s-kid", [145]);
+    world.forwards.set("s-1", "s-kid");
+    renderPrPanel();
+    await openPr(145);
+    // The child is its creator's, not a target of its own.
+    expect(targets(openTargets("checks"))).toEqual([
+      { text: "In this thread", default: true },
+      { text: "In a new thread", default: false },
+    ]);
+    act(() => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    });
+    fireEvent.click(byTestId("pr-task-checks"));
+    await settle();
+    expect(tasks()).toEqual([{ "repo-slug": SLUG, number: "145", kind: "checks", thread: "s-1" }]);
+    await expectToast("Sent to Port the fix for this thread");
+    expect(toastTexts().join(" ")).not.toContain("thread wait");
+    fireEvent.click(toastOpen("Sent to Port the fix for this thread") as HTMLElement);
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-kid" });
+  });
+
+  it("no this thread in the menu when the selection does not link the pull request", async () => {
     fromThread("s-1");
     renderPrPanel();
     await openPr(162);
-    await pick(within(openTargets("behind")).getByText("In this thread"));
-    expect(tasks()).toEqual([{ "repo-slug": SLUG, number: "162", kind: "behind", thread: "s-1" }]);
+    expect(targets(openTargets("behind"))).toEqual([{ text: "In a new thread", default: true }]);
   });
 
   it("a new thread: no --thread; Started thread … with Open", async () => {
@@ -186,8 +209,7 @@ describe("running pr.task", () => {
     renderPrPanel();
     await openPr(161);
     const items = within(openTargets("conflicts")).getAllByTestId("pr-task-target");
-    expect(items[0]?.textContent).toBe(`In a new threadClones ${SLUG} first`);
-    expect(items[1]?.textContent).toBe("In this thread");
+    expect(items.map((i) => i.textContent)).toEqual([`In a new threadClones ${SLUG} first`]);
   });
 
   it("busy: spinner, aria-disabled; a second press sends nothing; the other rows stay free", async () => {

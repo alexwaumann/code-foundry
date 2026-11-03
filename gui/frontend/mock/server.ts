@@ -1374,9 +1374,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/link-pr":
       // thread=s-1&slug=owner/name&number=12: a pr-link record; the thread is republished if the URL is new.
+      // up=1 copies it up the creator chain (child copies with via, as the daemon).
       try {
         const id = q.get("thread") ?? "";
-        const added = world.linkPullRequest(id, q.get("slug") ?? "", Number(q.get("number") ?? ""), Number(q.get("ago") ?? "0"));
+        const added = world.linkPullRequest(id, q.get("slug") ?? "", Number(q.get("number") ?? ""), Number(q.get("ago") ?? "0"), q.get("up") === "1");
         json(res, 200, { added, ...threadSummary(id) });
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });

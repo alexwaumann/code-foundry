@@ -3,14 +3,15 @@
  * pure data: the row's verb, the default target and the ▾ menu's targets. Table-tested in
  * taskRouting.test.ts.
  *
- * Routing (agreed): (1) the selection is a thread that links this pull request → that
- * thread (pr.task --thread). Otherwise a new thread (no --thread): the daemon reuses or
- * creates the worktree on the head branch (2, 3), cloning the repository first when it is
- * no project (4). The menu adds "this thread" (any selected thread, linked or not) and up
- * to OTHER_THREADS other non-archived threads that link it: those with the head branch
- * checked out first, then the most recently active. Ember's thread is never a target: it
- * creates every worker, so it links all their pull requests, and it only splits and
- * assigns work.
+ * Routing (agreed; docs/notes/pr-task-forward.md): the targets are the user's own threads
+ * that link this pull request (userThread: sidebar threads and Ember's, never a child
+ * thread whose creator is alive), then a new thread. The selection is first and the
+ * default when it is one of them (pr.task --thread); otherwise the default is a new thread
+ * (no --thread: the daemon reuses or creates the worktree on the head branch, cloning the
+ * repository first when it is no project). The others follow by most recent activity,
+ * uncapped; archived ones are left out unless selected. A parent links its created
+ * threads' pull requests, so the daemon forwards a task sent to it to the thread whose
+ * own link it is.
  */
 import type { PullRequestDetailView } from "@/api/gh";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
@@ -38,9 +39,6 @@ export const TASK_TITLES: Readonly<Record<TaskKind, string>> = {
   "review-request": "Review it (read-only, nothing is submitted)",
 };
 
-/** The menu lists at most this many other threads that link the pull request. */
-export const OTHER_THREADS = 3;
-
 /** A task that pushes to the head branch: every kind but review-request. */
 export const pushes = (kind: TaskKind): boolean => kind !== "review-request";
 
@@ -64,13 +62,11 @@ export interface TaskThread {
   activity: number;
   /** Its linked pull requests include this one (linksPullRequest). */
   links: boolean;
-  /** One of its checkouts, in a project of the pull request's repository, has the head branch checked out. */
-  onHead: boolean;
-  /** Ember's resident thread: never a target. */
-  ember: boolean;
+  /** One of the user's own threads (userThread): in the sidebar, or Ember's. */
+  user: boolean;
 }
 
-/** Where a task goes: the selected thread, a new thread, or another thread that links the pull request. */
+/** Where a task goes: the selected thread, another thread that links the pull request, or a new thread. */
 export type TaskTarget =
   | { kind: "this"; threadId: string }
   | { kind: "new"; threadId: null; /** The repository is no project: the daemon clones it first ("Clones o/r first"). */ clones: string }
@@ -102,23 +98,20 @@ export function isProjectRepo(projectSlugs: readonly string[], ...slugs: readonl
 /**
  * The routing for ref. `selection` is the selected thread's id (null for a page, a
  * composer, or a thread the threads store does not know); `threads` the threads that may
- * be targets (the selection's included); `isProject` whether a project is a clone of the
- * repository.
+ * be targets (those that link ref; others are ignored); `isProject` whether a project is
+ * a clone of the repository.
  */
 export function taskRouting(input: { selection: string | null; ref: PrRef; threads: readonly TaskThread[]; isProject: boolean }): TaskRouting {
   const { selection, ref, threads, isProject } = input;
-  const found = selection === null ? undefined : threads.find((t) => t.id === selection);
-  // Ember's chat selected: as a page, a new thread by default and no "this thread".
-  const selected = found?.ember ? undefined : found;
   const fresh: TaskTarget = { kind: "new", threadId: null, clones: isProject ? "" : ref.slug };
-  const here: TaskTarget | null = selected ? { kind: "this", threadId: selected.id } : null;
+  const target = (t: TaskThread): boolean => t.user && t.links;
+  const selected = selection === null ? undefined : threads.find((t) => t.id === selection && target(t));
+  const here: TaskTarget[] = selected ? [{ kind: "this", threadId: selected.id }] : [];
   const others: TaskTarget[] = threads
-    .filter((t) => t.id !== found?.id && !t.archived && !t.ember && t.links)
-    .sort((a, b) => Number(b.onHead) - Number(a.onHead) || b.activity - a.activity || a.id.localeCompare(b.id))
-    .slice(0, OTHER_THREADS)
+    .filter((t) => t.id !== selection && target(t) && !t.archived)
+    .sort((a, b) => b.activity - a.activity || a.id.localeCompare(b.id))
     .map((t) => ({ kind: "other", threadId: t.id, name: threadName(t) }));
-  if (here && selected?.links) return { default: here, targets: [here, fresh, ...others] };
-  return { default: fresh, targets: here ? [fresh, here, ...others] : [fresh, ...others] };
+  return { default: here[0] ?? fresh, targets: [...here, ...others, fresh] };
 }
 
 /** The button: "Fix in this thread", "Fix in new thread", "Fix in <name>". */

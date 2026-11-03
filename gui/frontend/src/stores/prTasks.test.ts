@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { parseTaskResult, taskToast, taskWentNowhere } from "./prTasks";
+import { forwardToast, parseTaskResult, taskToast, taskWentNowhere } from "./prTasks";
+import { thread } from "@/test/projectsWorld";
+import { useThreadsStore } from "./threads";
 
 describe("parseTaskResult", () => {
   it.each([
-    ['{"threadId":"s-3","sent":true,"ordinal":4}', { threadId: "s-3", sent: true }],
-    ['{"threadId":"s-9","sent":false,"cloned":true}', { threadId: "s-9", sent: false }],
-    ['{"sent":false}', { threadId: "", sent: false }],
-    ["", { threadId: "", sent: false }],
-    ["not json", { threadId: "", sent: false }],
+    ['{"threadId":"s-3","sent":true,"ordinal":4}', { threadId: "s-3", sent: true, viaThreadId: "" }],
+    ['{"threadId":"s-kid","viaThreadId":"s-3","sent":true}', { threadId: "s-kid", sent: true, viaThreadId: "s-3" }],
+    ['{"threadId":"s-9","sent":false,"cloned":true}', { threadId: "s-9", sent: false, viaThreadId: "" }],
+    ['{"sent":false}', { threadId: "", sent: false, viaThreadId: "" }],
+    ["", { threadId: "", sent: false, viaThreadId: "" }],
+    ["not json", { threadId: "", sent: false, viaThreadId: "" }],
   ])("%s", (json, want) => {
     expect(parseTaskResult(json)).toEqual(want);
   });
@@ -37,5 +40,17 @@ describe("taskWentNowhere", () => {
     ['{"threadId":"s-9","sent":false}', false],
   ])("%s → %s", (json, want) => {
     expect(taskWentNowhere(parseTaskResult(json))).toBe(want);
+  });
+});
+
+describe("forwardToast", () => {
+  it.each([
+    { name: "sent from the selected thread", via: "s-3", selected: "s-3", want: "Sent to Port the fix for this thread" },
+    { name: "sent from another thread (the menu)", via: "s-3", selected: "s-1", want: "Sent to Port the fix for Fix resize race" },
+    { name: "from a page", via: "s-3", selected: null, want: "Sent to Port the fix for Fix resize race" },
+    { name: "unnamed or unknown threads by id", via: "s-gone", selected: null, owner: "s-anon", want: "Sent to s-anon for s-gone" },
+  ])("$name", ({ via, selected, owner, want }) => {
+    useThreadsStore.setState({ byId: { "s-3": thread("s-3", { name: "Fix resize race" }), "s-kid": thread("s-kid", { name: "Port the fix" }), "s-anon": thread("s-anon", { name: " " }) } });
+    expect(forwardToast(owner ?? "s-kid", via, selected)).toBe(want);
   });
 });

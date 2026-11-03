@@ -458,6 +458,8 @@ export class PrWorld {
   readonly failNext = new Set<string>();
   /** Threads pr.task --thread finds removed (the daemon's removedWaitResult: exit 1, no thread id, nothing sent). */
   readonly removedThreads = new Set<string>();
+  /** pr.task --thread's forward (the daemon's PullRequestOwner): the thread a task sent to the key goes to instead, with viaThreadId. */
+  readonly forwards = new Map<string, string>();
   private readonly holds = new Map<string, Promise<void>>();
   private readonly memos = new Map<string, ConnectError | true>();
   private readonly reverts = new Map<string, number>();
@@ -716,6 +718,8 @@ export class PrWorld {
       if (this.failNext.delete("pr.task")) throw this.refuse(`#${String(n)} comes from a fork and no worktree of ${slug} has its head checked out: check it out and pass --worktree`);
       const to = inv.args.thread ?? "";
       if (this.removedThreads.has(to)) return { message: `thread ${to} was removed at 2026-11-03 10:00\ncost: $0.42`, resultJson: JSON.stringify({ id: to, status: "removed", removed: true }) };
+      const owner = this.forwards.get(to);
+      if (owner) return { message: `Sent to ${owner} for ${to} (#7); wait with: code-foundry thread wait ${owner} --after 7`, resultJson: JSON.stringify({ threadId: owner, viaThreadId: to, sent: true, ordinal: 7 }) };
       if (to) return { message: `Sent to ${to} (#7); wait with: code-foundry thread wait ${to} --after 7`, resultJson: JSON.stringify({ threadId: to, sent: true, ordinal: 7 }) };
       const id = `s-new-${String(this.nextThread++)}`;
       return { message: `Started thread ${id} for PR #${String(n)}`, resultJson: JSON.stringify({ threadId: id, sent: false }) };

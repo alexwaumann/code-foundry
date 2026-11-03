@@ -8,6 +8,13 @@
  * JSON is the daemon's PRTaskResult. The prompt is a one-line stand-in for the daemon's
  * (prtaskprompt.go); the mock's threads never read it.
  *
+ * With thread, a link the thread has through a thread it created (a child copy: `via`)
+ * is forwarded as the daemon does (docs/notes/pr-task-forward.md): the task goes to the
+ * owner (via hop by hop, a gone hop or a cycle sends to the thread itself), the thread
+ * gets a "Sent to <owner>: <task> (#N)" note, and the result names it (viaThreadId). The
+ * one wake when the owner settles is not mirrored: the mock's threads never settle from a
+ * task. POST /__mock/link-pr?…&up=1 copies a link up the creator chain with via.
+ *
  * Kept apart from world.ts's pr.ask/pr.explain/pr.fix.findings so a change to those does
  * not touch this. POST /__mock/gh/pr-fail?command=pr.task fails the next run with the
  * daemon's fork refusal; POST /__mock/gh/pr-delay?ms=… delays it too.
@@ -21,6 +28,16 @@ import { MODEL_VALUES } from "./settings";
 
 /** pr.task's kinds, as the daemon's PRTaskKinds. */
 export const PR_TASK_KINDS = ["checks", "review", "conversations", "conflicts", "behind", "review-request"] as const;
+
+/** The task in a few words, for a forward's note (the daemon's prTask.title). */
+const TITLES: Readonly<Record<(typeof PR_TASK_KINDS)[number], string>> = {
+  checks: "Fix the failing checks",
+  review: "Address the requested changes",
+  conversations: "Address the unresolved conversations",
+  conflicts: "Resolve the conflicts",
+  behind: "Bring the branch up to date",
+  "review-request": "Review it (read-only)",
+};
 
 /** The stand-in prompt's lead per kind (the daemon's prTaskHeader leads). */
 const LEADS: Readonly<Record<(typeof PR_TASK_KINDS)[number], string>> = {
@@ -70,7 +87,9 @@ export interface PrTaskDeps {
   addClone(owner: string, name: string, path: string): TaskProject;
   /** Creates the head branch's worktree in project, tracking origin/<head>. */
   addWorktree(project: TaskProject, branch: string, head: string): TaskWorktree;
-  thread(id: string): { id: string; name: string } | undefined;
+  thread(id: string): { id: string; name: string; linkedPullRequests: readonly TaskLink[] } | undefined;
+  /** A note in the thread's conversation (no turn). */
+  addNote(id: string, text: string): void;
   /** Every thread's id, for the daemon's id-suffix resolution. */
   threadIds(): string[];
   /** Starts a thread with prompt as its first message (no focus). */
@@ -84,9 +103,35 @@ export interface PrTaskDeps {
   delayMs(): number;
 }
 
+/** A thread's link as pr.task's forward reads it: via is the direct child a copy came through. */
+export interface TaskLink {
+  slug: string;
+  number: number;
+  via?: string;
+}
+
+/**
+ * The daemon's thread.LinkOwner: the thread whose own link start's link to slug#n is,
+ * following child copies' via hop by hop; start itself when its link is its own, it has
+ * none, or the chain breaks (a hop gone or without the link, a cycle, more than 8 hops).
+ */
+export function linkOwner(start: string, slugs: readonly string[], n: number, links: (id: string) => readonly TaskLink[] | undefined): string {
+  const want = new Set(slugs.filter(Boolean).map((x) => x.toLowerCase()));
+  const seen = new Set([start]);
+  for (let cur = start, hops = 0; ; hops++) {
+    const l = links(cur)?.find((x) => x.number === n && want.has(x.slug.toLowerCase()));
+    if (!l) return start;
+    if (!l.via) return cur;
+    if (seen.has(l.via) || hops >= 8) return start;
+    seen.add(l.via);
+    cur = l.via;
+  }
+}
+
 /** The daemon's PRTaskResult (protojson-style names). */
 export interface PrTaskResult {
   threadId: string;
+  viaThreadId?: string;
   sent: boolean;
   ordinal?: number;
   projectId?: string;
@@ -173,19 +218,24 @@ export function prTaskCommand(d: PrTaskDeps): Command {
       const cross = pr.isCrossRepository ?? false;
       // GitHub's current name for the repository; clones match it too.
       const canon = pr.repoSlug || slug;
-      const prompt = (followUp: boolean): string => {
+      const prompt = (followUp: boolean, from = ""): string => {
         const lead = followUp ? `Follow-up task: ${LEADS[kind].charAt(0).toLowerCase()}${LEADS[kind].slice(1)}` : LEADS[kind];
-        return `${lead} PR \`${canon}#${String(n)}\` (branch \`${head}\`).`;
+        const forwarded = from ? ` The user sent this task from thread \`${from}\`.` : "";
+        return `${lead} PR \`${canon}#${String(n)}\` (branch \`${head}\`).${forwarded}`;
       };
 
-      // --thread: a follow-up message, no focus.
+      // --thread: a follow-up message, no focus; forwarded to the link's owner.
       if (threadId) {
         const t = d.thread(threadId);
         if (!t) throw new ConnectError(`find thread ${threadId}: thread ${threadId} not found`, Code.NotFound);
-        const ordinal = d.send(t.id, prompt(true));
-        const result: PrTaskResult = { threadId: t.id, sent: true, ...(ordinal > 0 ? { ordinal } : {}) };
-        const next = ordinal > 0 ? ` (#${String(ordinal)}); wait with: code-foundry thread wait ${t.id} --after ${String(ordinal)}` : "";
-        return { message: `Sent to ${label(t)}${next}`, resultJson: JSON.stringify(result) };
+        const ownerId = linkOwner(t.id, [slug, canon], n, (id) => d.thread(id)?.linkedPullRequests);
+        const owner = ownerId === t.id ? undefined : d.thread(ownerId);
+        const to = owner ?? t;
+        const ordinal = d.send(to.id, prompt(true, owner ? label(t) : ""));
+        if (owner) d.addNote(t.id, `Sent to ${label(owner)}: ${TITLES[kind]} (#${String(n)})`);
+        const result: PrTaskResult = { threadId: to.id, ...(owner ? { viaThreadId: t.id } : {}), sent: true, ...(ordinal > 0 ? { ordinal } : {}) };
+        const next = ordinal > 0 ? ` (#${String(ordinal)}); wait with: code-foundry thread wait ${to.id} --after ${String(ordinal)}` : "";
+        return { message: `Sent to ${label(to)}${owner ? ` for ${label(t)}` : ""}${next}`, resultJson: JSON.stringify(result) };
       }
 
       // A new thread on the head (checkedOutIn: a same-repository head by branch name, a
