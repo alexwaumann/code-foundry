@@ -758,7 +758,7 @@ describe("the readiness box and the Overview", () => {
     }
   });
 
-  it("the Code tab keeps only the box's headline (the diff needs the height); Overview and Activity show it whole", async () => {
+  it("the Code tab keeps the box's headline and its Review ▾ and Merge, not the rows (the diff needs the height); Overview and Activity show it whole", async () => {
     renderPrPanel();
     await openPr(145);
     fireEvent.click(byTestId("pr-tab-code"));
@@ -766,7 +766,13 @@ describe("the readiness box and the Overview", () => {
     expect(byTestId("pr-readiness").dataset.compact).toBe("true");
     expect(byTestId("pr-ready-headline").textContent).toBe("Not ready to merge4 left");
     expect(queryTestId("pr-ready-row")).toBeNull();
-    expect(queryTestId("pr-ready-footer")).toBeNull();
+    const footer = byTestId("pr-ready-footer");
+    expect(within(footer).getByTestId("pr-review-button")).toBeTruthy();
+    expect(within(footer).getByTestId("pr-merge-button")).toBeTruthy();
+    // Review ▾ still opens its composer from there.
+    press(byTestId("pr-review-button"));
+    await pick(byTestId("pr-review-comment"));
+    expect(byTestId("pr-review-composer").dataset.verdict).toBe("comment");
     fireEvent.click(byTestId("pr-tab-activity"));
     expect(byTestId("pr-readiness").dataset.compact).toBeUndefined();
     expect(screen.getAllByTestId("pr-ready-row")).toHaveLength(5);

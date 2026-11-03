@@ -142,6 +142,29 @@ test("the readiness box fits at 360, 420 and 560px in every state: nothing overf
   }
 });
 
+// Which controls the Code tab's compact box keeps: src/components/pr/PullRequestSurface.test.tsx ("the Code tab keeps ...").
+test("the Code tab's compact box: headline and footer on one line when the panel is wide enough, under it when not; the diff keeps the height", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await page.getByTestId("pr-tab-code").click();
+  await expect(page.getByTestId("pr-readiness")).toHaveAttribute("data-compact", "true");
+  for (const [width, oneLine] of [
+    [560, true],
+    [420, false],
+    [360, false],
+  ] as const) {
+    await setPanelWidth(page, width);
+    await boxFits(page);
+    const head = await boxOf(page, "pr-ready-headline");
+    const foot = await boxOf(page, "pr-ready-footer");
+    // One line: the controls sit beside the headline; else under it.
+    expect(foot.y < head.y + head.height).toBe(oneLine);
+    // At the 800px window the box stays small and the diff (the strip down to the window's foot) has most of the panel.
+    expect((await boxOf(page, "pr-readiness")).height).toBeLessThanOrEqual(oneLine ? 44 : 72);
+    expect(800 - (await boxOf(page, "pr-code-strip")).y).toBeGreaterThan(400);
+  }
+});
+
 // Timeline's entries, order, commit links and inner tabs per panel tab: src/components/pr/PullRequestSurface.test.tsx ("Timeline").
 test("Timeline at the default 420px: the counts end before the order toggle; the rail stops at the last entry's icon", async ({ page }) => {
   await openPrPage(page);
