@@ -317,7 +317,12 @@ type Project struct {
 	// The project is a git repository. A project without git has one synthetic main
 	// worktree at path with empty branch and head and a zero status, no remotes and no
 	// default branch; worktree, ref, detail and git operations are unavailable for it.
-	Git           bool `protobuf:"varint,10,opt,name=git,proto3" json:"git,omitempty"`
+	Git bool `protobuf:"varint,10,opt,name=git,proto3" json:"git,omitempty"`
+	// The origin remote's path with its host, user and any credentials dropped:
+	// "org/repo.git" for git@github-work:org/repo.git or https://host/org/repo.git, a
+	// local origin's path as it is. Empty without an origin. pr.task uses it to tell a
+	// clone whose origin is not recognised as GitHub (an SSH host alias) from no clone.
+	OriginPath    string `protobuf:"bytes,11,opt,name=origin_path,json=originPath,proto3" json:"origin_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -420,6 +425,13 @@ func (x *Project) GetGit() bool {
 		return x.Git
 	}
 	return false
+}
+
+func (x *Project) GetOriginPath() string {
+	if x != nil {
+		return x.OriginPath
+	}
+	return ""
 }
 
 type Worktree struct {
@@ -4347,7 +4359,7 @@ var File_codefoundry_v1_project_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/project.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc4\x02\n" +
+	"\x1ccodefoundry/v1/project.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe5\x02\n" +
 	"\aProject\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +
@@ -4360,7 +4372,9 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\x05error\x18\b \x01(\tR\x05error\x12\x18\n" +
 	"\aremotes\x18\t \x03(\tR\aremotes\x12\x10\n" +
 	"\x03git\x18\n" +
-	" \x01(\bR\x03git\"\xcd\x02\n" +
+	" \x01(\bR\x03git\x12\x1f\n" +
+	"\vorigin_path\x18\v \x01(\tR\n" +
+	"originPath\"\xcd\x02\n" +
 	"\bWorktree\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +

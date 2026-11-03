@@ -104,6 +104,24 @@ func TestPickPRWorktree(t *testing.T) {
 		{name: "fix: no head branch",
 			args:     args{kind: prThreadFix, projects: projects, head: same("")},
 			wantCode: connect.CodeFailedPrecondition, wantMsg: "#7 has no head branch to check out: pass --worktree"},
+		{name: "review: the active worktree does not count, the head's does",
+			args: args{kind: prThreadReview, projects: projects, head: same("feat/foo"), active: "/wt/r/topic"},
+			want: prWorktreePick{ProjectID: "r2", Path: "/wt/r2/feat-foo"}},
+		{name: "review: a fork's head by commit",
+			args: args{kind: prThreadReview, projects: projects, head: fork("topic", "f00d")},
+			want: prWorktreePick{ProjectID: "r2", Path: "/wt/r2/at-sha"}},
+		{name: "review: no worktree, same repository: create in the first clone",
+			args: args{kind: prThreadReview, projects: projects, head: same("new/branch")},
+			want: prWorktreePick{ProjectID: "r1", Create: true, MainPath: "/src/r"}},
+		{name: "review: no worktree, fork: the main worktree, off the head",
+			args: args{kind: prThreadReview, projects: projects, head: fork("new/branch", "beef")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/src/r", OffHead: true}},
+		{name: "review: no head branch: the main worktree, off the head",
+			args: args{kind: prThreadReview, projects: projects, head: same("")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/src/r", OffHead: true}},
+		{name: "review: no clone",
+			args:     args{kind: prThreadReview, head: same("x")},
+			wantCode: connect.CodeFailedPrecondition},
 		{name: "fix: no clone",
 			args:     args{kind: prThreadFix, head: same("x")},
 			wantCode: connect.CodeFailedPrecondition},
@@ -125,5 +143,29 @@ func TestPickPRWorktree(t *testing.T) {
 				t.Errorf("got %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestOriginNames(t *testing.T) {
+	tests := []struct {
+		origin, slug string
+		want         bool
+	}{
+		{"org/repo.git", "org/repo", true},          // git@github-work:org/repo.git
+		{"/org/repo", "org/repo", true},             // https://host/org/repo
+		{"/Org/Repo.GIT/", "org/repo", true},        // case and a trailing slash
+		{"/group/org/repo.git", "ORG/repo", true},   // another host's nested path
+		{"/srv/git/org/repo.git", "org/repo", true}, // a local mirror
+		{"/myorg/repo.git", "org/repo", false},      // not a path segment
+		{"/org/repo-two.git", "org/repo", false},    // another repository
+		{"/org/repo.git.bak", "org/repo", false},
+		{"", "org/repo", false},
+		{"/org/repo", "repo", false}, // not owner/name
+		{"/org/repo", "", false},
+	}
+	for _, tt := range tests {
+		if got := originNames(tt.origin, tt.slug); got != tt.want {
+			t.Errorf("originNames(%q, %q) = %v, want %v", tt.origin, tt.slug, got, tt.want)
+		}
 	}
 }

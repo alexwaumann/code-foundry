@@ -15,6 +15,7 @@ import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
 import { EDITOR_APPS, MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
+import { prTaskCommand } from "./prTask";
 import { GhWorld, ghEvent, viewCommands } from "./github";
 import { bridgeCommands } from "./bridgeCommands";
 import { cloneExists } from "./clone";
@@ -4712,6 +4713,27 @@ export class World {
       }),
       ...this.gh.prDetails.commands(),
       ...this.prThreadCommands(),
+      prTaskCommand({
+        pullRequest: (slug, n, refresh) => prDetailCall(() => this.gh.prDetails.get(slug, n, refresh)).pullRequest,
+        projects: () => [...this.projects.values()],
+        addClone: (owner, name, path) => this.addClone(owner, name, path),
+        addWorktree: (project, branch, head) => {
+          const p = this.projects.get(project.id);
+          if (!p) throw new CommandError("notfound", `project ${project.id} not found`);
+          const w: MockWorktree = { path: `${HOME}/.code-foundry/worktrees/${p.githubSlug}/${branch.replace(/\//g, "-")}`, branch, head, isMain: false, status: clean({ upstream: `origin/${branch}`, baseRef: "" }) };
+          p.worktrees.push(w);
+          this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(p.id, w) } });
+          return w;
+        },
+        thread: (id) => this.threads.get(id),
+        threadIds: () => [...this.threads.keys()],
+        startThread: (projectId, path, model, effort, text) => this.createThread(projectId, path, model, effort, { firstMessage: { text, attachments: [], composerText: "" } }),
+        send: (id, text) => Number(this.logs.send(id, text, []).ordinal ?? 0n),
+        focusThread: (id) => this.focusThread(id),
+        defaults: () => this.threadDefaults(),
+        failNext: this.gh.prDetails.failNext,
+        delayMs: () => this.gh.prDetails.threadDelayMs,
+      }),
       ...projectCommands(this),
       ...renameCommands(this),
       {
@@ -4936,7 +4958,7 @@ export class World {
     const entries = this.registry();
     const kb = this.settings.keybindings();
     const defaults: Record<string, string> = this.threadDefaults();
-    const startsThread = new Set(["thread.new", "thread.new-like", "pr.ask", "pr.explain", "pr.fix.findings", "theme.ask"]);
+    const startsThread = new Set(["thread.new", "thread.new-like", "pr.ask", "pr.explain", "pr.fix.findings", "pr.task", "theme.ask"]);
     return entries.map((e) => ({
       ...e,
       cmd: {

@@ -304,6 +304,25 @@ func parseGitHubSlug(remote string) string {
 	return owner + "/" + name
 }
 
+// originPath is the path of a remote URL with its host, user and any credentials
+// dropped: "org/repo.git" for git@github-work:org/repo.git or
+// https://user:token@host/org/repo.git, "/srv/git/repo.git" for a local path or a
+// file:// URL. "" for an empty remote.
+func originPath(remote string) string {
+	remote = strings.TrimSpace(remote)
+	if remote == "" {
+		return ""
+	}
+	if u, err := url.Parse(remote); err == nil && u.Scheme != "" && (u.Host != "" || u.Scheme == "file") {
+		return u.Path
+	}
+	// scp-like: [user@]host:path. A "/" before the ":" (or no ":") means a local path.
+	if colon := strings.Index(remote, ":"); colon >= 0 && !strings.Contains(remote[:colon], "/") {
+		return remote[colon+1:]
+	}
+	return remote
+}
+
 // worktreeDirName maps a branch to a directory name: "alex/fix-x" -> "alex-fix-x".
 func worktreeDirName(branch string) string {
 	return strings.ReplaceAll(branch, "/", "-")

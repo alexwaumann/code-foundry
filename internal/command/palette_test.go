@@ -33,7 +33,7 @@ var noPalette = []string{
 	"plugin.secrets.delete", "plugin.secrets.list", "plugin.surface", "plugin.terminals",
 	"plugin.threads", "plugin.uninstall", "plugin.wakes", "pr.ask", "pr.checks", "pr.comment",
 	"pr.explain", "pr.fix.findings", "pr.merge", "pr.refresh", "pr.revert", "pr.review",
-	"pr.review.request", "project.branch.delete", "project.list", "settings.get", "settings.path",
+	"pr.review.request", "pr.task", "project.branch.delete", "project.list", "settings.get", "settings.path",
 	"settings.reset", "settings.set", "skill.browse", "skill.disable", "skill.enable",
 	"skill.install", "skill.remove", "skill.setup", "skill.uninstall", "terminal.list",
 	"theme.check", "theme.list", "theme.restore", "theme.save", "theme.show", "thread.agent.open",

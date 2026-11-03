@@ -359,8 +359,8 @@ func (g *Git) buildLocked() *Snapshot {
 		m := st.meta.Load()
 		r := Project{
 			ID: m.ID, Path: m.Path, Name: m.Name, RegisteredAt: m.RegisteredAt,
-			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Remotes: m.Remotes, Git: m.Git, Error: m.Error,
-			Worktrees: make([]Worktree, 0, len(st.wts)),
+			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, OriginPath: originPath(m.OriginURL),
+			Remotes: m.Remotes, Git: m.Git, Error: m.Error, Worktrees: make([]Worktree, 0, len(st.wts)),
 		}
 		for _, slot := range st.wts {
 			w := *slot.cur.Load()
