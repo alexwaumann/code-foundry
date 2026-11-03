@@ -90,14 +90,21 @@ func (d PullRequestThreadDeps) forwardPRTask(ctx context.Context, uctx Context, 
 		return Result{}, false, err
 	}
 	if noWake == "" {
-		armed := proto.CloneOf(&wake)
-		armed.AfterOrdinal = max(ordinal, 1)
-		if _, err := d.Thread.Subscribe(ctx, connect.NewRequest(armed)); err != nil {
-			// The prompt went out promising the wake: the note and the message say it
-			// will not come.
-			slog.Warn("pr.task: arm the sending thread's wake on the owner", "thread", th.GetId(), "owner", owner.GetId(), "err", err)
+		// The prompt went out promising the wake: when it cannot be armed, the note and
+		// the message say it will not come.
+		if ordinal <= 0 {
+			// Nothing to wait for: arming on another message would wake on the wrong turn.
+			slog.Warn("pr.task: the send answered no message ordinal; the sending thread is not woken", "thread", th.GetId(), "owner", owner.GetId())
 			d.dropForwardWake(ctx, th, made)
-			noWake = errMessage(err)
+			noWake = "the send did not say which message to wait for"
+		} else {
+			armed := proto.CloneOf(&wake)
+			armed.AfterOrdinal = ordinal
+			if _, err := d.Thread.Subscribe(ctx, connect.NewRequest(armed)); err != nil {
+				slog.Warn("pr.task: arm the sending thread's wake on the owner", "thread", th.GetId(), "owner", owner.GetId(), "err", err)
+				d.dropForwardWake(ctx, th, made)
+				noWake = errMessage(err)
+			}
 		}
 	}
 	if _, err := d.Thread.AddNote(ctx, connect.NewRequest(&v1.AddThreadNoteRequest{ThreadId: th.GetId(), Text: forwardNote(owner, task, n, noWake)})); err != nil {

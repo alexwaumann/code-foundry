@@ -297,7 +297,7 @@ func TestPullRequestTask(t *testing.T) {
 			args: args("o/r", "review-request", "thread", "s-lead0000001"),
 			uctx: command.Context{ActiveThreadID: "s-ember000001"},
 			setup: func(f *prThreadFixture) {
-				f.thread.Owners = map[string]string{"s-lead0000001": "s-kid00000001"}
+				f.thread.Owners, f.thread.SentOrdinal = map[string]string{"s-lead0000001": "s-kid00000001"}, 6
 			},
 			wantReq: []proto.Message{detail("o/r", false)},
 			wantThread: []proto.Message{
@@ -308,16 +308,36 @@ func TestPullRequestTask(t *testing.T) {
 					Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
 					Note:      "pr.task forwarded from you: Review it (read-only) on o/r#7"},
 				&v1.SendThreadMessageRequest{ThreadId: "s-kid00000001", ByThreadId: "s-ember000001"},
-				// No ordinal in the answer: armed on the first message.
-				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001", AfterOrdinal: 1,
+				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001", AfterOrdinal: 6,
 					Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
 					Note:      "pr.task forwarded from you: Review it (read-only) on o/r#7"},
 				&v1.AddThreadNoteRequest{ThreadId: "s-lead0000001", Text: "Sent to s-kid00000001: Review it (read-only) (#7)"},
+				&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: "s-ember000001"},
 			},
 			wantPrompt:   "Follow-up task: review PR `o/r#7`",
 			wantInPrompt: []string{"\nThis task was sent from thread `s-lead0000001`"},
-			wantMsg:      "Sent to s-kid00000001 for s-lead0000001",
-			wantJSON:     command.PRTaskResult{ThreadID: "s-kid00000001", ViaThreadID: "s-lead0000001", Sent: true}},
+			wantMsg:      "Sent to s-kid00000001 for s-lead0000001 (#6); wait with: code-foundry thread wait s-kid00000001 --after 6",
+			wantJSON:     command.PRTaskResult{ThreadID: "s-kid00000001", ViaThreadID: "s-lead0000001", Sent: true, Ordinal: 6}},
+		{name: "thread: a send that answers no ordinal: nothing to wait for, the subscription made for it is dropped, the note and the message say no wake comes",
+			args: args("o/r", "checks", "thread", "s-lead0000001"),
+			setup: func(f *prThreadFixture) {
+				f.thread.Owners = map[string]string{"s-lead0000001": "s-kid00000001"}
+			},
+			wantReq: []proto.Message{detail("o/r", true)},
+			wantThread: []proto.Message{
+				&v1.GetThreadRequest{Id: "s-lead0000001"},
+				&v1.PullRequestOwnerRequest{Id: "s-lead0000001", RepoSlugs: []string{"o/r"}, Number: 7},
+				&v1.GetThreadRequest{Id: "s-kid00000001"},
+				&v1.SubscribeThreadRequest{SubscriberThreadId: "s-lead0000001", TargetThreadId: "s-kid00000001", BeforeSend: true,
+					Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
+					Note:      "pr.task forwarded from you: Fix the failing checks on o/r#7"},
+				&v1.SendThreadMessageRequest{ThreadId: "s-kid00000001"},
+				&v1.UnsubscribeThreadRequest{SubscriptionId: "sub-1"},
+				&v1.AddThreadNoteRequest{ThreadId: "s-lead0000001", Text: "Sent to s-kid00000001: Fix the failing checks (#7); it will not wake this thread: the send did not say which message to wait for"},
+			},
+			wantPrompt: "Follow-up task: fix the failing checks on PR `o/r#7`",
+			wantMsg:    "Sent to s-kid00000001 for s-lead0000001; s-lead0000001 will not be woken: the send did not say which message to wait for",
+			wantJSON:   command.PRTaskResult{ThreadID: "s-kid00000001", ViaThreadID: "s-lead0000001", Sent: true}},
 		{name: "thread: an owner that cannot be read: the task goes to the thread itself",
 			args: args("o/r", "checks", "thread", "s-lead0000001"),
 			setup: func(f *prThreadFixture) {
