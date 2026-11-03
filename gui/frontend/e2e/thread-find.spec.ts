@@ -150,3 +150,19 @@ test("a match in a folded question unfolds its turn and opens the row; moving on
   await expect(threadPrompt(page)).toBeFocused();
   expect(await painted(page)).toEqual({ "cf-find": [], "cf-find-current": [] });
 });
+
+test("a hand-off before the thread is selected (openThreadFind, then the row click) opens the bar on that item's match", async ({ page }) => {
+  // The question's item id, read on a first load; a reload starts the stores afresh (no cached log).
+  await openThread(page);
+  const question = await page.evaluate(`__cfModule("/src/stores/thread.ts").then((m) => m.getThreadItems("s-r1").find((it) => it.kind === "question")?.id ?? "")`);
+  expect(question).not.toBe("");
+  await openApp(page);
+  await page.evaluate(`__cfModule("/src/stores/threadFind.ts").then((m) => m.openThreadFind("s-r1", "head sha", { itemId: ${JSON.stringify(question)} }))`);
+  await row(page, "s:s-r1").click();
+  // StrictMode replays WatchedThread's effect on mount: the session must outlive that.
+  await expect(bar(page)).toBeVisible();
+  await expect(field(page)).toHaveValue("head sha");
+  await expect(count(page)).toHaveText("2 of 3");
+  await expect(page.locator('[data-testid="thread-pane"] dl[data-find-item]')).toBeVisible();
+  await expect.poll(async () => (await painted(page))["cf-find-current"]).toEqual(["Head SHA"]);
+});

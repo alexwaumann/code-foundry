@@ -6,7 +6,8 @@
  * picks the first current match, scrolls to it and paints what is on screen.
  *
  * A session lives while its thread is in the content pane: leaving the thread forgets it
- * (ThreadPane's WatchedThread), a visit to one of its subagent runs does not.
+ * (holdThreadPane, from ThreadPane's WatchedThread), a visit to one of its subagent runs
+ * does not.
  *
  * The session also holds what the current match opened (a folded question's row and turn,
  * Ember's work row) so closing it puts that back at once, before anything else forgets
@@ -17,7 +18,7 @@ import { create } from "zustand";
 import { findDoc, findMatches, matchIndex, stepIndex, type FindKey, type FindMatch, type FindPlace } from "@/lib/threadFind";
 import { getTimeline } from "./cite";
 import { getViewing } from "./subagentView";
-import { getTurnView, putTurnView, setRowExpanded, useThreadStore, type ThreadLog, type TurnView } from "./thread";
+import { forgetTurnView, getTurnView, putTurnView, setRowExpanded, useThreadStore, type ThreadLog, type TurnView } from "./thread";
 import { useUiStore } from "./ui";
 
 /** Where the next current match is picked when the matches are known (the find layer does it). */
@@ -88,6 +89,37 @@ export function openThreadFind(threadId: string, query?: string, opts: { itemId?
     if (query === undefined) return { ...base, focusSeq, aim: s ? base.aim : { kind: "view" } };
     return { ...base, query, current: null, aim: opts.itemId !== undefined ? { kind: "item", itemId: opts.itemId } : { kind: "view" }, focusSeq };
   });
+}
+
+/** How many content-pane views hold each thread (holdThreadPane). */
+const paneHolds = new Map<string, number>();
+
+/**
+ * The thread is in the content pane until the returned release runs. When the last holder
+ * releases, a tick later and only if no view took the thread again, its find closes (what
+ * it opened is put back) and then its fold choices are forgotten. The tick is for React's
+ * StrictMode, which runs an effect's cleanup and the effect again on mount: a hand-off
+ * (openThreadFind before the thread is selected) survives that replay.
+ */
+export function holdThreadPane(threadId: string): () => void {
+  paneHolds.set(threadId, (paneHolds.get(threadId) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const n = (paneHolds.get(threadId) ?? 1) - 1;
+    if (n > 0) {
+      paneHolds.set(threadId, n);
+      return;
+    }
+    paneHolds.delete(threadId);
+    window.setTimeout(() => {
+      if (paneHolds.has(threadId)) return;
+      // The find first: what it opened is put back before the choices go.
+      closeThreadFind(threadId);
+      forgetTurnView(threadId);
+    }, 0);
+  };
 }
 
 /** Closes a thread's find bar and forgets its query; what it opened is put back first, in the same tick. */

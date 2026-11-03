@@ -1,11 +1,11 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { useEffect, useRef } from "react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import { buildTurns, foldingTurn } from "@/lib/threadTimeline";
 import { registerTimeline } from "@/stores/cite";
-import { forgetTurnView, getThreadItems, setTurnFolded, structOf, useThreadStore } from "@/stores/thread";
-import { closeThreadFind, getThreadFindMatches, openThreadFind, setThreadFindCurrent, useThreadFindStore } from "@/stores/threadFind";
+import { getThreadItems, setTurnFolded, structOf, useThreadStore } from "@/stores/thread";
+import { closeThreadFind, getThreadFindMatches, holdThreadPane, openThreadFind, setThreadFindCurrent, useThreadFindStore } from "@/stores/threadFind";
 import { fixStalePrBadge, publishThread } from "@/test/threadWorld";
 import { FindLayer } from "./FindLayer";
 
@@ -27,15 +27,9 @@ function Pane() {
   );
 }
 
-/** ThreadPane's WatchedThread on leaving the thread: its find closes, then its fold choices go. */
+/** ThreadPane's WatchedThread: holds the thread in the pane; leaving it closes its find, then its fold choices go. */
 function Watched() {
-  useEffect(
-    () => () => {
-      closeThreadFind(T);
-      forgetTurnView(T);
-    },
-    [],
-  );
+  useEffect(() => holdThreadPane(T), []);
   return null;
 }
 
@@ -154,9 +148,36 @@ describe("FindLayer opens and puts back", () => {
     );
     expect(session()?.current?.itemId).toBe(question);
     expect(useThreadStore.getState().expanded[T]).toEqual({ [question]: true });
-    view.unmount();
+    vi.useFakeTimers();
+    try {
+      view.unmount();
+      // A tick later (StrictMode's replay of the cleanup is not a leave).
+      vi.runAllTimers();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(session()).toBeUndefined();
     expect(useThreadStore.getState().folds[T]).toBeUndefined();
     expect(useThreadStore.getState().expanded[T]).toBeUndefined();
+  });
+
+  it("a hand-off made before the thread mounts survives StrictMode's effect replay", async () => {
+    publishThread(T, fixStalePrBadge("idle"));
+    const question = idOf("question");
+    openThreadFind(T, "f", { itemId: question });
+    // As main.tsx renders the app: effects run, their cleanups run, and they run again.
+    render(
+      <>
+        <Watched />
+        <Pane />
+      </>,
+      { reactStrictMode: true },
+    );
+    // The replayed cleanup's deferred leave finds the thread held again and does nothing.
+    await act(() => new Promise((r) => setTimeout(r, 5)));
+    expect(session()?.query).toBe("f");
+    expect(session()?.current?.itemId).toBe(question);
+    expect(useThreadStore.getState().expanded[T]).toEqual({ [question]: true });
   });
 
   it("closing the bar puts back what the current match opened", () => {

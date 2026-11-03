@@ -9,8 +9,8 @@ import { ThreadInfoCard } from "@/components/threadinfo/ThreadInfoCard";
 import { ThreadInfoOverlay } from "@/components/threadinfo/ThreadInfoOverlay";
 import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
-import { forgetTurnView, startThreadWatch } from "@/stores/thread";
-import { closeThreadFind, useThreadFindOpen } from "@/stores/threadFind";
+import { startThreadWatch } from "@/stores/thread";
+import { holdThreadPane, useThreadFindOpen } from "@/stores/threadFind";
 import { useShownRun } from "@/stores/subagentView";
 import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
@@ -70,11 +70,11 @@ export function ThreadPane({ threadId }: { threadId: string }) {
 function WatchedThread({ threadId }: { threadId: string }) {
   useEffect(() => {
     const stop = startThreadWatch(threadId);
+    // Leaving the thread closes its find and forgets its fold choices (a tick later, so StrictMode's replay is not a leave).
+    const release = holdThreadPane(threadId);
     return () => {
       stop();
-      // Its find bar closes first: what it opened is put back before the choices go.
-      closeThreadFind(threadId);
-      forgetTurnView(threadId);
+      release();
     };
   }, [threadId]);
   const runId = useShownRun(threadId);
