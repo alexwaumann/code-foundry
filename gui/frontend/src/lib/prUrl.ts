@@ -9,9 +9,12 @@
 export interface PullRequestUrl {
   slug: string;
   number: number;
+  /** The link points into the page: a tab (`/files`, …) or a fragment (a comment, a diff line). */
+  anchored: boolean;
 }
 
-// GitHub owners: alphanumerics and single hyphens, up to 39 (lib/githubRef); names also allow . and _.
+// GitHub owners: alphanumerics and hyphens, starting alphanumeric, up to 39 (lib/githubRef, looser than
+// GitHub's no-double-hyphen rule; harmless here); names also allow . and _.
 const ownerRE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const nameRE = /^[A-Za-z0-9._-]{1,100}$/;
 const numberRE = /^[1-9][0-9]{0,9}$/;
@@ -36,5 +39,5 @@ export function parsePullRequestUrl(href: string): PullRequestUrl | null {
   if (tail.length > 1 || (tail.length === 1 && !TABS.has(tail[0] ?? ""))) return null;
   const number = Number(num);
   if (!Number.isSafeInteger(number)) return null;
-  return { slug: `${owner}/${name}`, number };
+  return { slug: `${owner}/${name}`, number, anchored: tail.length === 1 || u.hash.length > 1 };
 }

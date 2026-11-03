@@ -13,7 +13,8 @@ Every other link still opens the browser, and there is no setting for it.
   is matched in any case. Owners and names must pass the same rules as `lib/githubRef`.
   Issues, commits, compare views, other hosts, ports, credentials, leading zeros and
   numbers past 10 digits all return null. The slug keeps the case it was written in, as
-  every other `openPullRequestInPanel` caller passes it.
+  every other `openPullRequestInPanel` caller passes it. `anchored` says the link points
+  into the page (a tab segment or a fragment).
 - The routing is opt-in: `MarkdownExtras.openLink(url) => boolean`. The `Markdown` link
   calls it only for a plain click (main button, no cmd or ctrl). If it returns false, the
   browser opens the link (`openUrl`) as before. It handles a middle click (`auxclick`
@@ -22,6 +23,10 @@ Every other link still opens the browser, and there is no setting for it.
 - `components/pr/prLinks.ts` provides two things:
   - `openPullRequestLink(target)`: parse the URL, then `openPullRequestInPanel(ref, target)`.
     That returns false when nothing is selected, and the click then falls back to the browser.
+    GitHub slugs are case-insensitive but tab ids are not, so a link reuses a PR tab the
+    panel already holds whatever the case (`Octo/Hello#1` → the `octo/hello#1` tab). An
+    anchored link (a comment, a diff line) to the PR its group already shows goes to the
+    browser: the panel would land on the same tab and lose the anchor.
   - `usePanelMarkdownExtras()` for the PR surface: the target is the panel key from
     `PanelKeyContext`, so the tab opens in the panel that holds the surface. A split
     group's pointer-down already makes it the focused group, so the new tab lands in the
@@ -31,8 +36,9 @@ Every other link still opens the browser, and there is no setting for it.
   `openLink`. In a PR body, a relative `/owner/repo/pull/N` resolves against github.com
   first (`resolveLink`), so it opens in the panel too.
 - "Not in tool output": raw tool output renders as plain text (`ToolDetail` `Output`), so
-  it has no links. A subagent's handed-back report and a compaction summary are model
-  markdown through `ThreadMarkdown`, and they route like messages.
+  it has no links. A subagent's handed-back report sits inside the folded Agent tool row,
+  so it counts as tool output: `ThreadMarkdown browserLinks` drops `openLink` there. A
+  compaction summary is a thread row of its own and routes like a message.
 - The tooltip didn't change. It still shows the URL, which isn't visible on screen.
 
 ## Verification

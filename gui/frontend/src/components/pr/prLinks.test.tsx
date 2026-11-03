@@ -10,12 +10,21 @@ const { Markdown } = await import("./Markdown");
 const { openPullRequestLink, usePanelMarkdownExtras } = await import("./prLinks");
 const { ThreadMarkdown } = await import("@/components/thread/Code");
 const { PanelKeyContext } = await import("@/components/panel/panelKeyContext");
+const { AgentReport } = await import("@/components/thread/ToolDetail");
+const { usePanelStore, makeTab } = await import("@/stores/panel");
+
+/** Puts pull request tabs into a panel's one group, the active one first given. */
+function seedPanel(key: string, refs: { slug: string; number: number }[], active: number): void {
+  const tabs = refs.map((r) => makeTab("pullrequest", `#${String(r.number)}`, { slug: r.slug, number: String(r.number) }));
+  usePanelStore.setState((s) => ({ byKey: { ...s.byKey, [key]: { open: true, groups: [{ tabs, activeTabId: tabs[active]?.id ?? null }], focused: 0 } } }));
+}
 
 afterEach(() => {
   cleanup();
   openUrl.mockClear();
   openPullRequestInPanel.mockClear();
   openPullRequestInPanel.mockImplementation(() => true);
+  usePanelStore.setState({ byKey: {} });
 });
 
 const PR = "https://github.com/octo/hello/pull/42/files#discussion_r7";
@@ -36,6 +45,24 @@ describe("openPullRequestLink", () => {
   it("declines with no panel to open (nothing selected), so the browser opens it", () => {
     openPullRequestInPanel.mockImplementation(() => false);
     expect(openPullRequestLink("current")(PR)).toBe(false);
+  });
+
+  it("reuses the panel's tab for the same pull request in another letter case", () => {
+    seedPanel("thread:t1", [{ slug: "octo/hello", number: 42 }], 0);
+    expect(openPullRequestLink("thread:t1")("https://github.com/Octo/Hello/pull/42")).toBe(true);
+    expect(openPullRequestInPanel).toHaveBeenCalledWith(REF, "thread:t1");
+  });
+
+  it("sends a link into the page of the pull request already showing to the browser", () => {
+    seedPanel("thread:t1", [{ slug: "octo/hello", number: 42 }], 0);
+    expect(openPullRequestLink("thread:t1")(PR)).toBe(false);
+    expect(openPullRequestInPanel).not.toHaveBeenCalled();
+  });
+
+  it("opens an anchored link of a pull request that is open but not showing", () => {
+    seedPanel("thread:t1", [{ slug: "octo/other", number: 1 }, { slug: "octo/hello", number: 42 }], 0);
+    expect(openPullRequestLink("thread:t1")(PR)).toBe(true);
+    expect(openPullRequestInPanel).toHaveBeenCalledWith(REF, "thread:t1");
   });
 
   it("declines any other link without touching the panel", () => {
@@ -114,6 +141,15 @@ describe("a pull request's description and comments", () => {
     ).container;
     fireEvent.click(link(c));
     expect(openPullRequestInPanel).toHaveBeenCalledWith({ slug: "octo/hello", number: 41 }, "view:pullrequests");
+  });
+});
+
+describe("a subagent's report in a tool row", () => {
+  it("opens a pull request link in the browser (tool output)", () => {
+    const c = render(<AgentReport text={`Opened [the PR](${PR}).`} />).container;
+    fireEvent.click(link(c));
+    expect(openUrl).toHaveBeenCalledWith(PR);
+    expect(openPullRequestInPanel).not.toHaveBeenCalled();
   });
 });
 

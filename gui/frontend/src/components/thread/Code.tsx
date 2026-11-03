@@ -85,10 +85,14 @@ const threadExtras: MarkdownExtras = {
   ),
 };
 
+/** Inside a tool row (a subagent's report): tool output, so every link opens in the browser. */
+const { openLink: _panelLinks, ...toolExtrasRest } = threadExtras;
+const toolExtras: MarkdownExtras = toolExtrasRest;
+
 /** Markdown as the thread shows it: the PR surface's renderer with highlighted code, attachment images and path chips. */
-export function ThreadMarkdown({ children, className }: { children: string; className?: string }) {
+export function ThreadMarkdown({ children, className, browserLinks = false }: { children: string; className?: string; browserLinks?: boolean }) {
   return (
-    <Markdown className={className} extras={threadExtras}>
+    <Markdown className={className} extras={browserLinks ? toolExtras : threadExtras}>
       {children}
     </Markdown>
   );

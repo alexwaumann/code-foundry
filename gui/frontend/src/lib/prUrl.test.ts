@@ -1,23 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { parsePullRequestUrl, type PullRequestUrl } from "./prUrl";
 
-const pr = (slug: string, number: number): PullRequestUrl => ({ slug, number });
+const pr = (slug: string, number: number, anchored = false): PullRequestUrl => ({ slug, number, anchored });
 
 describe("parsePullRequestUrl", () => {
   const cases: [string, PullRequestUrl | null][] = [
     // The page and its tabs.
     ["https://github.com/owner/repo/pull/12", pr("owner/repo", 12)],
     ["https://github.com/owner/repo/pull/12/", pr("owner/repo", 12)],
-    ["https://github.com/owner/repo/pull/12/files", pr("owner/repo", 12)],
-    ["https://github.com/owner/repo/pull/12/files/", pr("owner/repo", 12)],
-    ["https://github.com/owner/repo/pull/12/commits", pr("owner/repo", 12)],
-    ["https://github.com/owner/repo/pull/12/checks", pr("owner/repo", 12)],
-    ["https://github.com/owner/repo/pull/12/changes", pr("owner/repo", 12)],
+    ["https://github.com/owner/repo/pull/12/files", pr("owner/repo", 12, true)],
+    ["https://github.com/owner/repo/pull/12/files/", pr("owner/repo", 12, true)],
+    ["https://github.com/owner/repo/pull/12/commits", pr("owner/repo", 12, true)],
+    ["https://github.com/owner/repo/pull/12/checks", pr("owner/repo", 12, true)],
+    ["https://github.com/owner/repo/pull/12/changes", pr("owner/repo", 12, true)],
     // Query and fragment.
-    ["https://github.com/owner/repo/pull/12#discussion_r123", pr("owner/repo", 12)],
-    ["https://github.com/owner/repo/pull/12#issuecomment-456789", pr("owner/repo", 12)],
-    ["https://github.com/owner/repo/pull/12/files?w=1#diff-abc", pr("owner/repo", 12)],
+    ["https://github.com/owner/repo/pull/12#discussion_r123", pr("owner/repo", 12, true)],
+    ["https://github.com/owner/repo/pull/12#issuecomment-456789", pr("owner/repo", 12, true)],
+    ["https://github.com/owner/repo/pull/12/files?w=1#diff-abc", pr("owner/repo", 12, true)],
     ["https://github.com/owner/repo/pull/12?notification_referrer_id=x", pr("owner/repo", 12)],
+    ["https://github.com/owner/repo/pull/12#", pr("owner/repo", 12)],
     // Hosts, schemes and the slug's case (kept as written).
     ["https://www.github.com/owner/repo/pull/3", pr("owner/repo", 3)],
     ["HTTPS://GitHub.COM/Octo-Org/Hello.World/pull/3", pr("Octo-Org/Hello.World", 3)],
