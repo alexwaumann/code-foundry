@@ -490,6 +490,10 @@ export class MockSearches {
         { index: 0, kind: AgentSearchStepKind.SEARCH, done: true, failed: false, text: "Searched resize race · 2 hits", query: "resize race", hits: 2, threadId: "", threadName: "" },
         { index: 1, kind: AgentSearchStepKind.SEARCH, done: true, failed: false, text: "Searched sidebar virtualized · 1 hit", query: "sidebar virtualized", hits: 1, threadId: "", threadName: "" },
       ];
+      // A read of the first hit's thread, so the summary says "read 1 thread".
+      const read = e.hits[0];
+      const name = read ? this.deps.thread(read.threadId)?.name : undefined;
+      if (read && name) e.steps.push({ index: 2, kind: AgentSearchStepKind.READ, done: true, failed: false, text: `Read ${name} · #1–#4`, query: "", hits: 0, threadId: read.threadId, threadName: name });
       e.answer = answer;
       e.status = SearchStatus.DONE;
       e.finishedAt = new Date(now - agoMs + 21_000);

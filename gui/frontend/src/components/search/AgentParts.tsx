@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Check, ChevronRight, Loader2, X } from "lucide-react";
 import type { AgentHitView, AgentStepView, SearchEntryView } from "@/api/search";
 import { useThreadPlace } from "@/components/thread/useThreadPlace";
-import { answerPieces, summaryLine } from "@/lib/agentSearch";
+import { answerPieces, summaryLine, type AnswerPiece } from "@/lib/agentSearch";
 import { dayLabel } from "@/lib/threadSearch";
 import { cn } from "@/lib/utils";
 
@@ -54,18 +54,24 @@ export function StepList({ steps }: { steps: readonly AgentStepView[] }) {
   );
 }
 
+/** Whether a marker's next piece starts with punctuation, which then sits against it. */
+function beforePunctuation(next: AnswerPiece | undefined): boolean {
+  return next?.kind === "text" && /^[.,;:!?)\]}…]/.test(next.text);
+}
+
 /** The answer: plain text (the model's, never markdown or links), its [n] references as small numbered markers that select that hit. */
 export function AnswerText({ answer, onRef }: { answer: string; onRef?: (n: number) => void }) {
   return (
     <p className="px-3 pt-3 pb-1 text-body whitespace-pre-wrap text-cf-text" data-testid="agent-answer">
-      {answerPieces(answer).map((p, i) =>
+      {answerPieces(answer).map((p, i, all) =>
         p.kind === "text" ? (
           <span key={i}>{p.text}</span>
         ) : (
           <button
             key={i}
             type="button"
-            className="mx-px rounded-sm px-0.5 text-caption text-cf-warning-text outline-none hover:bg-cf-control-hover"
+            // No gap before punctuation ("spot 1."); one between a word or marker and the next.
+            className={cn("rounded-sm text-caption text-cf-warning-text outline-none hover:bg-cf-control-hover", beforePunctuation(all[i + 1]) ? "ml-px pl-0.5" : "mx-px px-0.5")}
             aria-label={`Result ${String(p.n)}`}
             data-testid="agent-answer-ref"
             onMouseDown={(e) => {

@@ -41,4 +41,12 @@ describe("MockSearches", () => {
     s.recordFind("fingerprint", 14);
     expect(s.list().map((x) => [x.query, x.findHits])).toEqual([["fingerprint", 14]]);
   });
+
+  it("seed: an agent entry with hits reads its first hit's thread, so its summary counts the read", () => {
+    const s = world();
+    s.seed();
+    const resize = s.list().find((x) => x.query === "why did the terminal resize race?");
+    expect(resize).toMatchObject({ searches: 2, threadsRead: 1 });
+    expect(resize?.steps?.at(-1)).toMatchObject({ threadId: "s-3", threadName: "Fix resize race", done: true });
+  });
 });

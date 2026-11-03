@@ -1,4 +1,5 @@
 import { zoomFactor } from "@/lib/zoom";
+import { findItemSelector } from "../find/findDom";
 
 /**
  * The DOM side of citations (docs/notes/citations.md): an assistant answer's rendered
@@ -21,7 +22,7 @@ export function citeItemSelector(itemId: string): string {
  * attribute), so an agent search's hit on any of them can be revealed.
  */
 export function quoteItemSelector(itemId: string): string {
-  return `${citeItemSelector(itemId)}, [data-find-item="${CSS.escape(itemId)}"]`;
+  return `${citeItemSelector(itemId)}, ${findItemSelector(itemId)}`;
 }
 
 /** Elements that start a new line in the plain text. */
