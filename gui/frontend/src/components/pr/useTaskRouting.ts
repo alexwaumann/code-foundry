@@ -69,7 +69,7 @@ export function useTaskRouting(ref: PrRef, pr: Head): TaskRouting {
       const onHead = new Set(heads);
       const out: string[] = [];
       for (const t of Object.values(s.byId)) {
-        const links = linksPullRequest(t.linkedPullRequests, ref);
+        const links = linksPullRequest(t.linkedPullRequests, ref, pr.repoSlug);
         if (!links && t.id !== selection) continue;
         const head = onHead.size > 0 && (onHead.has(t.worktreePath) || t.checkoutPaths.some((c) => onHead.has(c.path)));
         out.push(encodeTaskThread(t, links, head));

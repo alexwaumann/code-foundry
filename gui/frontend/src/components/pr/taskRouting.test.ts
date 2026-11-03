@@ -128,13 +128,16 @@ describe("taskRouting", () => {
 describe("linksPullRequest", () => {
   const l = (slug: string, number: number) => ({ slug, number });
   it.each([
-    { name: "same slug and number", linked: [l(REF.slug, 145)], want: true },
-    { name: "slug case aside", linked: [l("AlexWaumann/Code-Foundry", 145)], want: true },
-    { name: "same slug, other number", linked: [l(REF.slug, 146)], want: false },
-    { name: "other repository, same number", linked: [l("other/repo", 145)], want: false },
+    { name: "same slug and number", linked: [l(REF.slug, 145)], repoSlug: "", want: true },
+    { name: "slug case aside", linked: [l("AlexWaumann/Code-Foundry", 145)], repoSlug: "", want: true },
+    { name: "same slug, other number", linked: [l(REF.slug, 146)], repoSlug: "", want: false },
+    { name: "other repository, same number", linked: [l("other/repo", 145)], repoSlug: "", want: false },
+    // The thread linked it under the repository's new name; the panel was opened on the old one.
+    { name: "renamed: GitHub's current name", linked: [l("alexwaumann/foundry", 145)], repoSlug: "AlexWaumann/Foundry", want: true },
+    { name: "renamed: current name, other number", linked: [l("alexwaumann/foundry", 7)], repoSlug: "alexwaumann/foundry", want: false },
     { name: "none", linked: [], repoSlug: REF.slug, want: false },
-  ])("$name", ({ linked, want }) => {
-    expect(linksPullRequest(linked, REF)).toBe(want);
+  ])("$name", ({ linked, repoSlug, want }) => {
+    expect(linksPullRequest(linked, REF, repoSlug)).toBe(want);
   });
 });
 

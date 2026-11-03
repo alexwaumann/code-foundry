@@ -82,9 +82,12 @@ export interface TaskRouting {
   targets: TaskTarget[];
 }
 
-/** Whether linked (a thread's linked pull requests) holds ref: slug (case aside) and number. */
-export function linksPullRequest(linked: readonly { slug: string; number: number }[], ref: PrRef): boolean {
-  return linked.some((l) => samePullRequest(l, ref));
+/**
+ * Whether linked (a thread's linked pull requests) holds ref: its number, and the slug as
+ * the panel names it or as GitHub does now (`repoSlug`, after a rename), case aside.
+ */
+export function linksPullRequest(linked: readonly { slug: string; number: number }[], ref: PrRef, repoSlug: string): boolean {
+  return linked.some((l) => samePullRequest(l, ref) || (repoSlug !== "" && samePullRequest(l, { slug: repoSlug, number: ref.number })));
 }
 
 /** A thread's name as the menu shows it: its id when it has none. */

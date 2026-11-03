@@ -48,6 +48,7 @@ describe("useTaskRouting", () => {
       thread("t-head", { worktreePath: FIX, lastActivityAtMs: 10, linkedPullRequests: [LINK] }),
       thread("t-recent", { worktreePath: FEAT, lastActivityAtMs: 90, linkedPullRequests: [LINK] }),
       thread("t-ember", { lastActivityAtMs: 99, resident: "ember", linkedPullRequests: [LINK] }),
+      thread("t-renamed", { worktreePath: FEAT, lastActivityAtMs: 5, linkedPullRequests: [{ ...LINK, slug: "alexwaumann/foundry" }] }),
     );
     act(() => {
       useUiStore.getState().select({ kind: "thread", id: "t-here" });
@@ -56,9 +57,9 @@ describe("useTaskRouting", () => {
 
   const ids = (r: ReturnType<typeof useTaskRouting>) => r.targets.map((t) => (t.threadId === null ? "new" : `${t.kind}:${t.threadId}`));
 
-  it("ranks the head branch's thread first and leaves Ember out", () => {
-    const { result } = renderHook(() => useTaskRouting(REF, PR));
-    expect(ids(result.current)).toEqual(["new", "this:t-here", "other:t-head", "other:t-recent"]);
+  it("ranks the head branch's thread first, leaves Ember out, matches a renamed repository", () => {
+    const { result } = renderHook(() => useTaskRouting(REF, { ...PR, repoSlug: "alexwaumann/foundry" }));
+    expect(ids(result.current)).toEqual(["new", "this:t-here", "other:t-head", "other:t-recent", "other:t-renamed"]);
   });
 
   it("keeps its result while a thread it does not read changes, or a field routing does not read", () => {
