@@ -138,9 +138,11 @@ func TestPullRequestTask(t *testing.T) {
 			wantJSON:     command.PRTaskResult{ThreadID: "s1", ProjectID: "r1", WorktreePath: "/wt/fix/it", CreatedWorktree: true},
 			wantFocus:    true},
 		{name: "thread: sent into it as a follow-up, nothing listed, created or focused",
-			args:    args("o/r", "checks", "thread", "s-lead0000001"),
-			uctx:    command.Context{ActiveView: "thread", ActiveThreadID: "s-lead0000001"},
-			setup:   func(f *prThreadFixture) { f.thread.Others = []*v1.Thread{{Id: "s-lead0000001", Name: "Lead"}} },
+			args: args("o/r", "checks", "thread", "s-lead0000001"),
+			uctx: command.Context{ActiveView: "thread", ActiveThreadID: "s-lead0000001"},
+			setup: func(f *prThreadFixture) {
+				f.thread.Others, f.thread.SentOrdinal = []*v1.Thread{{Id: "s-lead0000001", Name: "Lead"}}, 12
+			},
 			wantReq: []proto.Message{detail("o/r", true)},
 			wantThread: []proto.Message{
 				&v1.GetThreadRequest{Id: "s-lead0000001"},
@@ -148,20 +150,36 @@ func TestPullRequestTask(t *testing.T) {
 			},
 			wantPrompt:   "Follow-up task: fix the failing checks on PR `o/r#7`",
 			wantInPrompt: []string{"check that it is on `fix/it` (`git branch --show-current`)"},
-			wantMsg:      "Sent to Lead (s-lead0000001)",
-			wantJSON:     command.PRTaskResult{ThreadID: "s-lead0000001", Sent: true}},
-		{name: "thread: from a thread's CLI the message is that thread's",
-			args:    args("o/r", "review-request", "thread", "s-other000001"),
-			uctx:    command.Context{ActiveThreadID: "s-lead0000001"},
+			wantMsg:      "Sent to Lead (s-lead0000001) (#12); wait with: code-foundry thread wait s-lead0000001 --after 12",
+			wantJSON:     command.PRTaskResult{ThreadID: "s-lead0000001", Sent: true, Ordinal: 12}},
+		{name: "thread: from a thread's CLI the message is that thread's, and its subscription is the hint",
+			args: args("o/r", "review-request", "thread", "s-other000001"),
+			uctx: command.Context{ActiveThreadID: "s-lead0000001"},
+			setup: func(f *prThreadFixture) {
+				f.thread.SentOrdinal = 3
+				f.thread.Subscriptions = []*v1.ThreadSubscription{{
+					Id: "w-1", SubscriberThreadId: "s-lead0000001", TargetId: "s-other000001",
+					Target:    v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD,
+					Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
+				}}
+			},
 			wantReq: []proto.Message{detail("o/r", false)},
 			wantThread: []proto.Message{
 				&v1.GetThreadRequest{Id: "s-other000001"},
 				&v1.SendThreadMessageRequest{ThreadId: "s-other000001", ByThreadId: "s-lead0000001"},
+				&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: "s-lead0000001"},
 			},
 			wantPrompt:   "Follow-up task: review PR `o/r#7`",
 			wantInPrompt: []string{"Do not switch this thread's checkout to the PR's branch."},
-			wantMsg:      "Sent to s-other000001",
-			wantJSON:     command.PRTaskResult{ThreadID: "s-other000001", Sent: true}},
+			wantMsg:      "Sent to s-other000001 (#3); you are subscribed (w-1): end your turn; it wakes you",
+			wantJSON:     command.PRTaskResult{ThreadID: "s-other000001", Sent: true, Ordinal: 3}},
+		{name: "thread: without an ordinal there is no wait hint",
+			args:       args("o/r", "checks", "thread", "s-lead0000001"),
+			wantReq:    []proto.Message{detail("o/r", true)},
+			wantThread: []proto.Message{&v1.GetThreadRequest{Id: "s-lead0000001"}, &v1.SendThreadMessageRequest{ThreadId: "s-lead0000001"}},
+			wantPrompt: "Follow-up task: fix the failing checks on PR `o/r#7`",
+			wantMsg:    "Sent to s-lead0000001",
+			wantJSON:   command.PRTaskResult{ThreadID: "s-lead0000001", Sent: true}},
 		{name: "thread: an unknown thread keeps its code and sends nothing",
 			args: args("o/r", "checks", "thread", "s-gone"),
 			setup: func(f *prThreadFixture) {

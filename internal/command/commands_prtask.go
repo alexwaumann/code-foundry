@@ -49,6 +49,9 @@ type PRTaskResult struct {
 	// Sent: the task went into an existing thread as a message; false when a thread was
 	// started for it.
 	Sent bool `json:"sent"`
+	// Ordinal is the sent message's item ordinal (thread wait --after takes it); 0 when
+	// a thread was started.
+	Ordinal int64 `json:"ordinal,omitempty"`
 	// ProjectID and WorktreePath are where a new thread runs (empty when Sent).
 	ProjectID    string `json:"projectId,omitempty"`
 	WorktreePath string `json:"worktreePath,omitempty"`
@@ -140,10 +143,19 @@ func (d PullRequestThreadDeps) sendPRTask(ctx context.Context, uctx Context, id 
 	if uctx.ActiveView == "" {
 		by = uctx.CallerThreadID
 	}
-	if _, err := d.Thread.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: th.GetId(), Text: prompt, ByThreadId: by})); err != nil {
+	res, err := d.Thread.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: th.GetId(), Text: prompt, ByThreadId: by}))
+	if r, ok := removedFrom(err); ok {
+		return removedWaitResult(r, ""), nil // removed since the Get
+	}
+	if err != nil {
 		return Result{}, wrapStep("send to thread "+threadLabel(th), err)
 	}
-	return Result{Message: "Sent to " + threadLabel(th), JSON: PRTaskResult{ThreadID: th.GetId(), Sent: true}}, nil
+	// As thread.send: the message's ordinal and how to wait for the answer.
+	msg, ordinal := "Sent to "+threadLabel(th), res.Msg.GetItem().GetOrdinal()
+	if ordinal > 0 {
+		msg += fmt.Sprintf(" (#%d); %s", ordinal, sendNext(ctx, d.Thread, uctx.CallerThreadID, th.GetId(), ordinal))
+	}
+	return Result{Message: msg, JSON: PRTaskResult{ThreadID: th.GetId(), Sent: true, Ordinal: ordinal}}, nil
 }
 
 // startPRTask starts a thread for the task (routing rules 3 and 4 of the pull request
