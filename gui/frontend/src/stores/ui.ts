@@ -84,9 +84,10 @@ export type FocusRegion = "sidebar" | "content" | "palette" | "panel" | "bottom"
  * What the palette dialog shows: the command list (and arg prompts), the project picker,
  * the member picker of "Run in…" (for `palette.threadId`), the previous prompts
  * (composer.history; components/palette/PromptsPicker.tsx), or the file finder over
- * `palette.threadId` (file.find; components/palette/FileFinder.tsx).
+ * `palette.threadId` (file.find; components/palette/FileFinder.tsx), or the Find dialog
+ * over every thread (search.open; components/search/SearchDialog.tsx).
  */
-export type PalettePage = "commands" | "projects" | "runin" | "prompts" | "files";
+export type PalettePage = "commands" | "projects" | "runin" | "prompts" | "files" | "search";
 
 /**
  * The sidebar band must fit the 80px traffic-light gutter and the app name
@@ -247,6 +248,8 @@ interface UiState {
   openPromptsPalette: () => void;
   /** Opens the palette on the file finder over a thread (file.find's presenter). */
   openFilesPalette: (threadId: string) => void;
+  /** Opens the palette on the Find dialog over every thread (search.open's presenter). */
+  openSearchPalette: () => void;
   closePalette: () => void;
   focusComposer: () => void;
   setRenaming: (threadId: string | null) => void;
@@ -488,6 +491,9 @@ export const useUiStore = create<UiState>()(
       },
       openFilesPalette: (threadId) => {
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "files", threadId, returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
+      },
+      openSearchPalette: () => {
+        set((s) => ({ palette: { open: true, query: "", commandName: null, page: "search", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       focusComposer: () => {
         set((s) => ({ composerFocusSeq: s.composerFocusSeq + 1 }));

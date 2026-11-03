@@ -32,6 +32,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "thread.find", view: command.ViewThreadFind},
 		{command: "thread.find.next", view: command.ViewThreadFindNext},
 		{command: "thread.find.previous", view: command.ViewThreadFindPrevious},
+		{command: "search.open", view: command.ViewSearch},
 	}
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {

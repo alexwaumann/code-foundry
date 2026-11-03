@@ -167,7 +167,7 @@ export function lineRects(pt: PlainText, start: number, end: number): DOMRect[] 
 }
 
 /** The painted ranges: the selection kept while the comment field has the keyboard, and a cited quote; the find bar's matches and its current one. */
-export type CitePaint = "cf-cite-held" | "cf-cite-mark" | "cf-find" | "cf-find-current";
+export type CitePaint = "cf-cite-held" | "cf-cite-mark" | "cf-find" | "cf-find-current" | "cf-search" | "cf-search-current";
 
 interface HighlightRegistryLike {
   set(name: string, h: unknown): void;

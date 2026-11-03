@@ -1,0 +1,24 @@
+/*
+ * The Find dialog (docs/notes/search-4-find-dialog.md): matches in the list's names and
+ * snippets are tinted spans (.search-hit); the preview paints its message with the CSS
+ * Custom Highlight API like the in-thread find (thread/find/find.css), every match tinted
+ * and the one the thread's find bar will make current solid. The cite layer's overlay is
+ * the fallback where ::highlight is missing.
+ */
+.search-hit {
+  background-color: color-mix(in oklab, var(--cf-warning) 32%, transparent);
+  color: var(--cf-text);
+}
+::highlight(cf-search) {
+  background-color: color-mix(in oklab, var(--cf-warning) 32%, transparent);
+}
+::highlight(cf-search-current) {
+  background-color: var(--cf-warning);
+  color: var(--cf-warning-foreground);
+}
+.cite-overlay[data-cite-overlay="cf-search"] > div {
+  background: color-mix(in oklab, var(--cf-warning) 32%, transparent);
+}
+.cite-overlay[data-cite-overlay="cf-search-current"] > div {
+  background: color-mix(in oklab, var(--cf-warning) 60%, transparent);
+}

@@ -276,6 +276,7 @@ import { ageMcp, keepMcpServers, reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
 import { pageStorageOf, resetPageStorage, setPageStorage } from "./pageStorage";
 import { listPrompts } from "./prompts";
+import { listItems, searchThreads } from "./search";
 import { mockFetches, mockProxyFetch, resetFetches } from "./proxyFetch";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
@@ -603,7 +604,10 @@ function routes(router: ConnectRouter): void {
     checkPlacement: (req) => world.checkPlacement(req.projectIds, req.branch, req.checkoutMode),
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
-    listItems: (req) => guard(() => ({ snapshot: world.logs.snapshotValue(req.threadId) })),
+    // A page with a query (thread read, the Find dialog's preview; mock/search.ts).
+    listItems: (req) => guard(() => listItems(world, req)),
+    // ThreadService.Search: thread names and messages (mock/search.ts).
+    search: (req) => guard(() => searchThreads(world, req)),
     // ThreadService.ListPrompts: the user's sent prompts (mock/prompts.ts).
     listPrompts: (req) => guard(() => listPrompts(world, req)),
     watchThread: (req, ctx) => tracked("ThreadService/WatchThread", guard(() => world.logs.watch(req.threadId, ctx.signal))),

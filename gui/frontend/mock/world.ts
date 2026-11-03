@@ -4820,6 +4820,12 @@ export class World {
         when: (ctx) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId) && Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find" } } }))}`,
       },
+      {
+        // internal/command search.open: from anywhere.
+        cmd: { name: "search.open", title: "Search Threads", category: "View", description: "Find threads by name and messages across every thread (archived ones too), with a preview; Enter opens the message in its thread with the find bar on the match.", keybindings: ["cmd+shift+f"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "search.open" } } }))}`,
+      },
       // internal/command canFindInThread: a thread view; the CLI always.
       ...(
         [
