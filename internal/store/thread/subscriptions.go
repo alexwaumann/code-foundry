@@ -213,8 +213,9 @@ type SubscribeOptions struct {
 	// message sent to the target: pr.task's forward wakes its sender once the turn that
 	// handled the task ended (docs/notes/pr-task-forward.md). It subscribes BeforeSend,
 	// so a refusal is known before the message promises a wake; such a subscription never
-	// fires until armed. Then it subscribes again with the sent message's ordinal,
-	// AfterOrdinal: the target meets the condition only once its HandledThrough reached
+	// fires until armed, and its target may be archived (the send unarchives it). Then it
+	// subscribes again with the sent message's ordinal, AfterOrdinal: the target meets
+	// the condition only once its HandledThrough reached
 	// it (a turn that took the message in ended), or on a pending request asked after the
 	// arming (a permission prompt the sender may answer); at once when that already
 	// happened. With the same subscription (subscriber, target, condition) existing,
@@ -606,7 +607,9 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 			return SubscribeResult{}, fmt.Errorf("%w: thread %s cannot subscribe to itself", ErrFailedPrecondition, sub.TargetID)
 		case !ok:
 			return SubscribeResult{}, fmt.Errorf("target thread: %w", m.notFound(sub.TargetID))
-		case !trec.s.ArchivedAt.IsZero():
+		case !trec.s.ArchivedAt.IsZero() && !g.before:
+			// Before a send (BeforeSend) an archived target is fine: the send unarchives it.
+			// Should it stay archived (the send fails), the arming is refused.
 			return SubscribeResult{}, fmt.Errorf("%w: thread %s is archived", ErrFailedPrecondition, sub.TargetID)
 		}
 		for _, r := range s.byID {

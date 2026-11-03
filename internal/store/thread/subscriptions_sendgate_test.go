@@ -211,3 +211,42 @@ func TestSubscribeSendGateRefused(t *testing.T) {
 		}
 	}
 }
+
+// An archived target (a forward's owner the user archived): subscribing before the send
+// is fine, the send revives it, and the arming then gates the wake as for any owner: one
+// wake, after the turn that read the message. Without a send it stays refused once armed.
+func TestSubscribeSendGateArchivedTarget(t *testing.T) {
+	e := newFixtureEnv(t, "text-table")
+	parent := e.stopped("parent")
+	child := e.create(CreateOptions{InitialPrompt: "first"})
+	e.waitFor(child.ID, "the first turn", func(s Thread) bool { return s.StatusReason == "finished" })
+	if _, err := e.m.Archive(e.ctx(), child.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	e.waitFor(child.ID, "archived and stopped", func(s Thread) bool { return !s.ArchivedAt.IsZero() && stopped(s) })
+	if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, AfterOrdinal: 3}); err == nil {
+		t.Error("armed on an archived target without a send")
+	}
+	before, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, BeforeSend: true, Note: "forwarded"})
+	if err != nil || before.Fired {
+		t.Fatalf("before the send = %+v, %v", before, err)
+	}
+	it, err := e.m.Send(e.ctx(), child.ID, Message{Text: "the task"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := e.snapshot(child.ID); !got.ArchivedAt.IsZero() {
+		t.Fatalf("the send left the owner archived: %+v", got.ArchivedAt)
+	}
+	if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, AfterOrdinal: it.Ordinal, Note: "forwarded"}); err != nil {
+		t.Fatalf("arm: %v", err)
+	}
+	e.waitFor(child.ID, "the task handled", func(s Thread) bool { return s.HandledThrough >= it.Ordinal })
+	items := e.waitItems(parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) >= 1 })
+	if w := wakes(items); len(w) != 1 || !strings.Contains(w[0].WakeJSON, "forwarded") {
+		t.Errorf("wakes = %+v", w)
+	}
+	if subs, _ := e.m.Subscriptions(e.ctx(), parent.ID); len(subs) != 0 {
+		t.Errorf("left: %+v", subs)
+	}
+}
