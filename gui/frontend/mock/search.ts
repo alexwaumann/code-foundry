@@ -91,7 +91,7 @@ function indexed(it: ItemInit, name: (id: string) => string | undefined): { text
       return { text: oneLine(p.value.text ?? ""), speaker: SearchSpeaker.ASSISTANT };
     case "question": {
       if (p.value.state === ThreadRequestState.PENDING) return null;
-      let qs: { question?: string }[] = [];
+      let qs: { question?: string }[];
       try {
         qs = ((JSON.parse(p.value.inputJson ?? "{}") as { questions?: { question?: string }[] }).questions ?? []).filter((q) => typeof q.question === "string");
       } catch {

@@ -76,7 +76,7 @@ const Row = memo(function Row({ row, selected }: { row: SearchRow; selected: boo
       return (
         <div className={cn(base, "cursor-default text-body-sm text-cf-text-muted")} data-testid="search-row" data-kind="more" data-thread={row.group.threadId}>
           <span className="w-12 shrink-0" />
-          {moreLabel(row.count)}
+          <span>{moreLabel(row.count)}</span>
         </div>
       );
     case "note":
