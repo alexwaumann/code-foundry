@@ -29,6 +29,9 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "composer.history", view: command.ViewComposerHistory},
 		{command: "view.thread-info", view: command.ViewThreadInfo},
 		{command: "file.find", view: command.ViewFileFind},
+		{command: "thread.find", view: command.ViewThreadFind},
+		{command: "thread.find.next", view: command.ViewThreadFindNext},
+		{command: "thread.find.previous", view: command.ViewThreadFindPrevious},
 	}
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {

@@ -4820,6 +4820,18 @@ export class World {
         when: (ctx) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId) && Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find" } } }))}`,
       },
+      // internal/command canFindInThread: a thread view; the CLI always.
+      ...(
+        [
+          ["thread.find", "Find in Thread", "Find text in the thread's conversation: your messages, Claude's text and answered questions (case-sensitive once the query has a capital letter).", "cmd+f"],
+          ["thread.find.next", "Find Next", "Go to the next match of the thread's find bar (opens the bar when it is closed).", "cmd+g"],
+          ["thread.find.previous", "Find Previous", "Go to the previous match of the thread's find bar (opens the bar when it is closed).", "cmd+shift+g"],
+        ] as const
+      ).map(([name, title, description, chord]) => ({
+        cmd: { name, title, category: "View", description, keybindings: [chord], args: [] },
+        when: (ctx: UiContext | undefined) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId)),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`,
+      })),
       {
         cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: panelThreadArgs },
         when: always,
