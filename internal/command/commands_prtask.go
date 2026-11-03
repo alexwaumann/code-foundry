@@ -85,20 +85,38 @@ func prTaskCommand(d PullRequestThreadDeps, slug, number, worktree, model, effor
 			if !ok {
 				return Result{}, InvalidArg("kind", "kind must be one of %s", strings.Join(PRTaskKinds, ", "))
 			}
+			id := a.String("thread")
+			if err := checkPRTaskArgs(a, id != ""); err != nil {
+				return Result{}, err
+			}
 			s, n := strings.TrimSpace(a.String("repo-slug")), a.Int("number")
 			detail, err := d.readPR(ctx, s, n, task.push)
 			if err != nil {
 				return Result{}, err
 			}
-			if id := a.String("thread"); id != "" {
-				if a.Given("worktree") {
-					return Result{}, InvalidArg("worktree", "worktree is where a new thread starts; with thread the task goes into that thread")
-				}
+			if id != "" {
 				return d.sendPRTask(ctx, uctx, id, n, task, detail)
 			}
 			return d.startPRTask(ctx, a, s, n, task, detail)
 		},
 	}
+}
+
+// prTaskNewThreadArgs are pr.task's args that only a new thread uses.
+var prTaskNewThreadArgs = []string{"worktree", "model", "effort", "focus"}
+
+// checkPRTaskArgs refuses, before anything is read, an arg that only a new thread uses
+// given together with thread: it would be ignored.
+func checkPRTaskArgs(a Args, toThread bool) error {
+	if !toThread {
+		return nil
+	}
+	for _, name := range prTaskNewThreadArgs {
+		if a.Given(name) {
+			return InvalidArg(name, "%s is for a new thread; with thread the task goes into that thread as it is", name)
+		}
+	}
+	return nil
 }
 
 // sendPRTask sends the task into thread id as a follow-up message. The window keeps its

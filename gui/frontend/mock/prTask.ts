@@ -32,6 +32,9 @@ const LEADS: Readonly<Record<(typeof PR_TASK_KINDS)[number], string>> = {
   "review-request": "Review",
 };
 
+/** pr.task's args that only a new thread uses (the daemon's prTaskNewThreadArgs). */
+const NEW_THREAD_ARGS = ["worktree", "model", "effort", "focus"] as const;
+
 /** The worktree shape pr.task reads (world.ts's MockWorktree). */
 interface TaskWorktree {
   path: string;
@@ -132,6 +135,12 @@ export function prTaskCommand(d: PrTaskDeps): Command {
       if (!slug) throw new CommandError("invalid", "repo-slug is required");
       if (!Number.isInteger(n) || n <= 0) throw new CommandError("invalid", "number must be a positive pull request number");
       if (!PR_TASK_KINDS.includes(kind)) throw new CommandError("invalid", `kind must be one of ${PR_TASK_KINDS.join(", ")}`);
+      // Args only a new thread uses are refused with thread before anything is read.
+      const threadId = args.thread ?? "";
+      if (threadId) {
+        const extra = NEW_THREAD_ARGS.find((a) => args[a] !== undefined);
+        if (extra) throw new CommandError("invalid", `${extra} is for a new thread; with thread the task goes into that thread as it is`);
+      }
       if (d.failNext.delete("pr.task")) throw forkRefusal(n, slug);
       const push = kind !== "review-request";
       const pr = d.pullRequest(slug, n, push);
@@ -143,8 +152,6 @@ export function prTaskCommand(d: PrTaskDeps): Command {
       };
 
       // --thread: a follow-up message, no focus.
-      const threadId = args.thread ?? "";
-      if (threadId && args.worktree) throw new CommandError("invalid", "worktree is where a new thread starts; with thread the task goes into that thread");
       if (threadId) {
         const t = d.thread(threadId);
         if (!t) throw new ConnectError(`find thread ${threadId}: thread ${threadId} not found`, Code.NotFound);

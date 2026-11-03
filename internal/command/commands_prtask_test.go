@@ -199,8 +199,14 @@ func TestPullRequestTask(t *testing.T) {
 			wantMsg:      "Started thread s1 for PR #7",
 			wantJSON:     command.PRTaskResult{ThreadID: "s1", WorktreePath: "/wt/fix-it"},
 			wantFocus:    true},
-		{name: "worktree and thread together", args: args("o/r", "checks", "thread", "s-lead0000001", "worktree", "/wt/topic"),
-			wantReq: []proto.Message{detail("o/r", true)}, wantErr: command.ErrInvalidArgs},
+		{name: "worktree and thread together, refused before the read", args: args("o/r", "checks", "thread", "s-lead0000001", "worktree", "/wt/topic"),
+			wantReq: []proto.Message{}, wantErr: command.ErrInvalidArgs, wantErrMsg: "worktree is for a new thread"},
+		{name: "model and thread together", args: args("o/r", "checks", "thread", "s-lead0000001", "model", "claude-4.5-haiku[1m]"),
+			wantReq: []proto.Message{}, wantErr: command.ErrInvalidArgs, wantErrMsg: "model is for a new thread"},
+		{name: "effort and thread together", args: args("o/r", "checks", "thread", "s-lead0000001", "effort", "low"),
+			wantReq: []proto.Message{}, wantErr: command.ErrInvalidArgs, wantErrMsg: "effort is for a new thread"},
+		{name: "focus and thread together", args: args("o/r", "review-request", "thread", "s-lead0000001", "focus", "false"),
+			wantReq: []proto.Message{}, wantErr: command.ErrInvalidArgs, wantErrMsg: "focus is for a new thread"},
 		{name: "an unknown kind", args: args("o/r", "rebase"), wantReq: []proto.Message{}, wantErr: command.ErrInvalidArgs},
 		{name: "a bad number", args: map[string]string{"repo-slug": "o/r", "number": "0", "kind": "checks"},
 			wantReq: []proto.Message{}, wantErr: command.ErrInvalidArgs},
@@ -273,8 +279,8 @@ func TestPullRequestTask(t *testing.T) {
 			}
 			switch {
 			case tt.wantErr != nil:
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("err = %v, want %v", err, tt.wantErr)
+				if !errors.Is(err, tt.wantErr) || !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Fatalf("err = %v, want %v containing %q", err, tt.wantErr, tt.wantErrMsg)
 				}
 			case tt.wantCode != 0:
 				if connect.CodeOf(err) != tt.wantCode {
