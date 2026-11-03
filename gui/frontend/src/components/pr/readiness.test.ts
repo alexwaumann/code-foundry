@@ -407,8 +407,22 @@ describe("readiness rows in detail", () => {
     expect(rowOf(d, "review")?.task).toBe("review");
   });
 
-  it("approved: who and when", () => {
+  it("approved: who and when; an approval before the last push says so", () => {
     expect(rowOf(detail(), "review")?.lines.map(lineText)).toEqual(["person kim approved 1h ago"]);
+    const stale = detail({ d: { reviewers: [reviewer("kim", { state: "approved", submittedAtMs: NOW - HOUR, stale: true })] } });
+    expect(rowOf(stale, "review")?.lines.map(lineText)).toEqual(["person kim approved 1h ago · on an older commit"]);
+  });
+
+  it("approved with reviewers still requested: who is pending; under BLOCKED that is the blocker", () => {
+    const reviewers = [reviewer("kim", { state: "approved", submittedAtMs: NOW - HOUR }), reviewer("acme/owners", { requested: true }), reviewer(VIEWER, { requested: true })];
+    const clean = detail({ pr: { author: "kim" }, d: { reviewers } });
+    expect(rowOf(clean, "review", "other")).toMatchObject({ tone: "success", blocking: false });
+    expect(rowOf(clean, "review", "other")?.lines.map(lineText)).toEqual(["person kim approved 1h ago", "Still waiting on acme/owners, me"]);
+    const blocked = detail({ pr: { mergeState: "blocked" }, d: { reviewers: reviewers.slice(0, 2) } });
+    expect(rowOf(blocked, "review")).toMatchObject({ tone: "pending", icon: "clock", blocking: true });
+    const r = readiness(blocked, VIEWER, true, NOW);
+    expect(r.headline).toMatchObject({ title: "Not ready to merge", meta: "1 left" });
+    expect(r.rows.some((x) => x.id === "blocked")).toBe(false);
   });
 
   it("review required with one approval in: more approvals required", () => {

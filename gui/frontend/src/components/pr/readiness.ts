@@ -256,7 +256,8 @@ function reviewRows(d: PullRequestDetailView, viewer: string, now: number): Read
     login: r.login,
     avatarUrl: r.avatarUrl,
     tone: "success",
-    text: `${r.login} approved${r.submittedAtMs === null ? "" : ` ${ago(r.submittedAtMs, now)}`}`,
+    // As reviewerStatus says it: commits landed after the approval.
+    text: `${r.login} approved${r.submittedAtMs === null ? "" : ` ${ago(r.submittedAtMs, now)}`}${r.stale ? " · on an older commit" : ""}`,
   }));
   if (changes.length > 0 || pr.review === "changes_requested") {
     const who = [names(changes), waiting.length > 0 ? `still waiting on ${names(waiting)}` : ""].filter(Boolean).join(" · ");
@@ -270,7 +271,10 @@ function reviewRows(d: PullRequestDetailView, viewer: string, now: number): Read
     return rows;
   }
   if (approvals.length > 0 || pr.review === "approved") {
-    rows.push({ ...base, id: "review", tone: "success", icon: "success", title: "Approved", meta: "", lines: approvals, task: null, blocking: false });
+    // Reviewers still requested (a code-owner team, say): when GitHub reports BLOCKED, they are why.
+    const still: SubLine[] = waiting.length > 0 ? [{ kind: "text", text: `Still waiting on ${names(waiting)}` }] : [];
+    const held = waiting.length > 0 && pr.mergeState === "blocked";
+    rows.push({ ...base, id: "review", tone: held ? "pending" : "success", icon: held ? "clock" : "success", title: "Approved", meta: "", lines: [...approvals, ...still], task: null, blocking: held, summary: held ? `waiting on ${names(waiting)}` : "" });
     return rows;
   }
   // Reviews are not required here.
