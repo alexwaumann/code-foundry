@@ -58,7 +58,9 @@ row go there.
   run); the list cuts the head to about 24 units before the first match, at a word start,
   with "…". Tints are `<mark class="search-hit">`, `color-mix(in oklab, var(--cf-warning) 32%, transparent)`.
 - Virtualized (TanStack Virtual) with fixed row heights per kind (`SEARCH_ROW_HEIGHT`), so
-  sizes are exact; the selected row scrolls into view with its thread header.
+  sizes are exact; the selected row scrolls into view with its thread header. The first row
+  scrolls to offset 0, so wrapping back from the last row shows the list's top padding too
+  (`scrollToIndex(0)` stopped 4px down).
 - Selection: only name and hit rows take it. ↑/↓ (and ctrl+n/p) move and wrap like the
   palette; a pointer that moves over a row selects it (pointermove, so rows scrolling under
   a still pointer do not). A new query starts at its first row; the same query answered
@@ -66,6 +68,13 @@ row go there.
 - Enter before the typed query is answered waits for the answer and opens its first row
   (like the file finder), so typing and pressing Enter at once never opens the previous
   query's row.
+- The rows on screen answer `state.answered`, which lags the typed query while a newer
+  search is out. A click hands `state.answered` to `activateSearchRow`, and the preview
+  paints and counts with it, so typing more does not repaint the old row with text it was
+  not found for (it had flickered to "0 matches", and a click opened the bar at "0 of 0").
+- Keys an input method takes are ignored (`lib/ime.ts imeKeyDown`, shared with the PR
+  composers): WebKit fires compositionend before the Enter that confirms a candidate, so
+  that keydown has `isComposing` false and keyCode 229.
 
 ## Ranges
 
@@ -77,11 +86,15 @@ The test uses emoji before and as a match.
 
 - Crumb "project › thread name", the time (`sentTime`) and "archived".
 - A hit: `ListItems(thread, {since: ordinal-1, last: 1})` for the item (its id checked);
-  for Claude's text and questions also `ListItems(thread, {role: USER})` and the thread's
-  own last user message before the ordinal, drawn dimmed above (the API has no "before"
-  query; user messages are small). Both run together; results are cached per row for the
-  dialog's life, and a row is read only after the selection rests 40 ms (holding an arrow
-  key loads nothing in between).
+  for Claude's text and questions also the thread's own last user message before the
+  ordinal, drawn dimmed above. The API has no "before" query: first the `PROMPT_WINDOW`
+  (40) items just before the hit, any role (`since: ordinal-41, last: 40`); only when that
+  window has no user message and does not reach the thread's start, `ListItems(thread,
+  {role: USER})`, read once per thread for the dialog's life (`PromptCache`, made with the
+  dialog's loaders; a failed read is not kept). Ember's chat has 25k items, so reading
+  every user message per row was thousands of messages each. Both reads run together;
+  results are cached per row for the dialog's life, and a row is read only after the
+  selection rests 40 ms (holding an arrow key loads nothing in between).
 - Drawn with the timeline's parts: `UserBubble`, `ThreadMarkdown` in `.cf-thread .a-md`, a
   question as its question/answer lines (`questionText`). `ThreadContext` gives path chips
   the thread's cwd.
@@ -92,7 +105,9 @@ The test uses emoji before and as a match.
   warning, warning foreground), so they never fight the find bar's `cf-find`. Cleared when
   the preview unmounts. The current match is scrolled into view in the preview.
 - The caption counts from the data (`findDoc(item).text`, the same text the timeline and
-  find use): "N matches in this message · opening it keeps “term” in the thread's find bar".
+  find use), and only the handed-over word with the bar's own matching (`handoffMatches`),
+  so its number is the bar's "of M" for that message: `3 matches of “fingerprint” · opening
+  keeps it in the thread's find bar`. The paint still tints every term.
 - A name row: the thread's latest text from Claude (`role: ASSISTANT, last: 8`, the last
   one that is the thread's own and not an API error), under "Latest from Claude"; nothing painted.
 
@@ -108,7 +123,11 @@ The test uses emoji before and as a match.
   "0 of 0". One term or one phrase goes over as typed (quotes dropped); several terms hand
   over the longest (the first of equals). The preview's solid match is that term's first
   match in the message, so the preview shows where the bar will land. Smart case then
-  follows that term alone in the bar.
+  follows that term alone in the bar, so a case-sensitive query (a capital anywhere) hands
+  over the longest term with a capital of its own: `HeadOid fingerprint` hands over
+  `HeadOid`, as `fingerprint` would be searched without case in the bar and land on a
+  `Fingerprint` the preview did not paint. `currentMatchIndex` uses the bar's matching
+  (`matchOffsets`, smart case over the term).
 - Thread name: select it with its prompt focused; no find bar.
 - A thread's header or "N more" under Messages (click only; not keyboard stops): the thread
   with the find bar on the query and no item (it starts at the top of what the list shows).
@@ -117,9 +136,13 @@ The test uses emoji before and as a match.
 ## Mock
 
 `mock/search.ts`: the daemon's rules without an index (terms, smart case, names only under
-three characters, every term must occur, snippets cut around the first match, ranges in
-code points, groups by their newest hit, hits newest-first then in conversation order,
-`limit` across groups). `ListItems` now honours a query (since an id or ordinal, last,
+three characters, every term must occur, ranges in code points, groups by their newest hit,
+hits newest-first then in conversation order, `limit` across groups). Snippets follow the
+daemon's `cutSnippet` exactly: a text of at most 160 code points whole; near the text's end
+the start moves back so the match can sit about 150 in (the case `fitSnippet` exists for).
+`mock/search.test.ts` repeats the Go test's cases (vitest now includes `mock/**/*.test.ts`).
+Known simplifications, listed in the file: no hit tiers, JavaScript lower case (`İ`
+differs), API-error texts indexed, no fork dedupe. `ListItems` now honours a query (since an id or ordinal, last,
 role), like `internal/api/thread_read.go`. The scripted s-r1 "Fix stale PR badge" gives
 "fingerprint" hits.
 
@@ -139,20 +162,28 @@ role), like `internal/api/thread_read.go`. The scripted s-r1 "Fix stale PR badge
 - The sketch's "Claude · after 9 steps" in the preview's speaker line needs the turn's
   steps; not built.
 - Filters (project, archived) are not exposed; the request supports `project_ids`.
+- Snippets show raw markdown (`## Fixed:`, backticks): the daemon indexes and cuts the
+  message's source text. A daemon-side follow-up (strip markdown in the indexed text or the
+  snippet), not the GUI's.
 
 ## Tests
 
 - vitest: `api/threadSearch.test.ts` (code points with emoji, mapping, the reads' queries
-  and picks), `lib/threadSearch.test.ts` (terms, hand-off, smart-case re-matching, current
-  match, `fitSnippet`, rows and notes, selection and wrap, `dayLabel`),
-  `components/search/SearchDialog.test.tsx` (the chord through the keymap from a page,
-  rows and tints, a late answer dropped, arrows and the preview's reads and caption, Enter
-  on a hit / name, a header click, Enter before the answer, Aa / names-only note / no
-  results), Go `commands_view_search_test.go` and the ShowView table.
-- WebKit e2e `e2e/thread-search.spec.ts`: cmd+shift+f from the home page, typing, arrows
-  through hits with the preview's current match painted, Enter landing in s-r1 with the
-  find bar focused on the same query and its current match inside the selected item, on
-  screen, and the dialog's paint gone.
+  and picks, the prompt window, its fallback read once per thread),
+  `lib/threadSearch.test.ts` (terms, hand-off incl. the case-sensitive pick,
+  `handoffMatches`, smart-case re-matching, current match, `fitSnippet`, rows and notes,
+  selection and wrap, `dayLabel`), `components/search/SearchDialog.test.tsx` (the chord
+  through the keymap from a page, rows and tints, a late answer dropped, arrows and the
+  preview's reads and caption, the caption counting the bar's word, a click while a newer
+  query is out, an IME's keyCode 229 Enter, Enter on a hit / name, a header click, Enter
+  before the answer, Aa / names-only note / no results), `keys/bindings.test.ts`
+  (cmd+shift+f from a focused `<input>`), `mock/search.test.ts` (the daemon's snippet
+  cut), Go `commands_view_search_test.go` and the ShowView table.
+- WebKit e2e `e2e/thread-search.spec.ts`: cmd+shift+f from the home page, typing, the
+  preview's current match painted, Enter landing in s-r1 with the find bar focused on the
+  same query and its current match inside the selected item, on screen, and the dialog's
+  paint gone; a long list (30 matching thread names, mock `threads?count=30`) keeping the
+  selected row on screen past the fold, and wrapping back to scroll offset 0.
 
 ## Verification
 
