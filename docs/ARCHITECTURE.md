@@ -127,6 +127,9 @@ internal/
     search/                the search dialog's history and Agent search's hidden runs
                            (claude over stream-json, not threads), quote-verified hits, Promote
                            (docs/notes/search-5-agent-daemon.md)
+  capability/              scoped bearer tokens (Agent search's run): the RPCs and commands a
+                           scope allows, issue/revoke/expiry; the loopback auth and the
+                           command handler check them
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
   dictate/                 the dictation engine's protocol, phrase segmentation and output
                            filters (pure Go); dictate/whisper is the cgo model actor
@@ -168,6 +171,7 @@ Transport:
 | CLI, Wails host | Unix socket `$CONFIG/daemon.sock` | filesystem permissions (0600) |
 | Frontend | `http://127.0.0.1:<random port>` | bearer token from `$CONFIG/daemon.token` (0600) |
 | CLI inside a thread | `CODE_FOUNDRY_ENDPOINT` (the loopback listener) | `CODE_FOUNDRY_TOKEN`; both set in every thread's Claude env, never auto-starts a daemon |
+| CLI inside Agent search's hidden run | `CODE_FOUNDRY_ENDPOINT` | `CODE_FOUNDRY_TOKEN` is a token scoped to that search (`internal/capability`): `thread.search`, `thread.read` and its own `search.report` only, revoked when the run ends (`docs/notes/search-5-agent-daemon.md`) |
 
 Every Claude process also gets `CODE_FOUNDRY_THREAD=<its thread id>`, which the CLI sends
 as its default `--context-thread`: an agent's `code-foundry terminal new` or `action run`
