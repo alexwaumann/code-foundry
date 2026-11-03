@@ -71,9 +71,19 @@ func runEnv(o Options, searchID, token string) []string {
 		paths.EnvEndpoint+"="+o.Endpoint, paths.EnvToken+"="+token)
 }
 
-// credentialTTL is how long past WallTime a run's scoped token lives at the most; it is
-// revoked as soon as the run ends.
+// credentialTTL is how long past the run's longest life a run's scoped token lives at
+// the most; it is revoked as soon as the run ends.
 const credentialTTL = time.Minute
+
+// sendTimeout bounds sending claude a message (the question, the wrap-up).
+const sendTimeout = 30 * time.Second
+
+// tokenTTL is a run's scoped token's lifetime: the run's longest life (the handshake, the
+// question's send, then WallTime, which starts once claude has the question) and
+// credentialTTL to spare. The token is issued before the handshake.
+func tokenTTL(o Options) time.Duration {
+	return o.StartTimeout + sendTimeout + o.WallTime + credentialTTL
+}
 
 // stopReason is why a run was asked to stop.
 type stopReason int
@@ -216,7 +226,7 @@ func (s *Store) runAgent(r *run, e Entry) {
 	log := s.log.With("search", e.ID)
 	start := time.Now()
 	var end runEnd
-	token, revoke, err := s.opts.Credentials.Issue(capability.Scope{Search: e.ID}, s.opts.WallTime+credentialTTL)
+	token, revoke, err := s.opts.Credentials.Issue(capability.Scope{Search: e.ID}, tokenTTL(s.opts))
 	if err != nil {
 		end = runEnd{status: StatusFailed, note: "no credential for the run: " + err.Error(), err: err}
 	} else {
@@ -317,6 +327,24 @@ func (l *loop) ctx(d time.Duration) (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
+// send sends claude a user message (sendTimeout). A stop meanwhile closes claude's stdin,
+// which ends a write that is waiting on a full pipe at once; the caller checks stopWhy.
+func (l *loop) send(conn *claudestream.Conn, text string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	go func() {
+		select {
+		case <-l.r.stopped:
+			_ = conn.CloseStdin()
+		case <-ctx.Done():
+		}
+	}()
+	return conn.Send(ctx, claudestream.UserMessage{Blocks: []claudestream.ContentBlock{claudestream.TextBlock(text)}})
+}
+
+// beforeWrapUpSend, when set (tests), runs just before the wrap-up message is sent.
+var beforeWrapUpSend func(conn *claudestream.Conn, r *run)
+
 // refusedFlag names the hardened flag claude's start error refuses.
 func refusedFlag(detail string) string {
 	for _, f := range []string{"--safe-mode", "--system-prompt-snapshot", "--tools", "--permission-mode", "--allowedTools", "--effort"} {
@@ -367,9 +395,7 @@ func (l *loop) run(env []string) runEnd {
 		}
 		return runEnd{status: StatusFailed, note: "Claude did not start: " + cmpOr(lastLine(detail), err.Error()), err: ferr}
 	}
-	sctx, cancel := l.ctx(30 * time.Second)
-	err = conn.Send(sctx, claudestream.UserMessage{Blocks: []claudestream.ContentBlock{claudestream.TextBlock(e.Query)}})
-	cancel()
+	err = l.send(conn, e.Query)
 	if l.r.stopWhy() != 0 {
 		kill(proc, s.opts.KillGrace)
 		return l.stoppedEnd()
@@ -389,8 +415,12 @@ func (l *loop) run(env []string) runEnd {
 				return l.exited(proc)
 			}
 			if end, over := l.event(conn, ev); over {
-				_ = conn.CloseStdin()
-				waitExit(proc, s.opts.KillGrace)
+				if l.r.stopWhy() != 0 {
+					kill(proc, s.opts.KillGrace)
+				} else {
+					_ = conn.CloseStdin()
+					waitExit(proc, s.opts.KillGrace)
+				}
 				return end
 			}
 		case <-wrapAt.C:
@@ -478,9 +508,14 @@ func (l *loop) event(conn *claudestream.Conn, ev claudestream.Event) (runEnd, bo
 		if l.wrapping && !l.wrapSent && !finished {
 			// The interrupted turn ended: ask for the answer.
 			l.wrapSent = true
-			ctx, cancel := l.ctx(30 * time.Second)
-			defer cancel()
-			if err := conn.Send(ctx, claudestream.UserMessage{Blocks: []claudestream.ContentBlock{claudestream.TextBlock(wrapUpMessage)}}); err != nil {
+			if beforeWrapUpSend != nil {
+				beforeWrapUpSend(conn, l.r)
+			}
+			if err := l.send(conn, wrapUpMessage); err != nil {
+				if l.r.stopWhy() != 0 {
+					// Stopped while it went (the stop closed claude's stdin).
+					return l.stoppedEnd(), true
+				}
 				return runEnd{status: StatusFailed, note: "Claude did not take the wrap-up: " + err.Error(), cost: l.cost, err: err}, true
 			}
 			return runEnd{}, false
