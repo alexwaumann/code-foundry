@@ -8,7 +8,7 @@ import { zoomFactor } from "@/lib/zoom";
 import { findCitation, putCitation } from "@/stores/compose";
 import { endEdit, focusCiteTarget, insertCite, takeFlash, useCiteStore } from "@/stores/cite";
 import { threadDraftKey } from "@/stores/threadActions";
-import { CITE_ITEM_ATTR, citeItemSelector, clampToRoot, highlightsSupported, lineRects, offsetOf, paint, plainText, rangeOf, type CitePaint } from "./citeDom";
+import { CITE_ITEM_ATTR, citeItemSelector, clampToRoot, quoteItemSelector, highlightsSupported, lineRects, offsetOf, paint, plainText, rangeOf, type CitePaint } from "./citeDom";
 import { dockTop, frame, paneBox, revealQuote } from "./reveal";
 import "./cite.css";
 
@@ -39,10 +39,12 @@ function itemOf(node: Node | null, timeline: Element): string | null {
   return item && timeline.contains(item) ? item.getAttribute(CITE_ITEM_ATTR) : null;
 }
 
-/** A Go to source in progress: live until the next one or the unmount; the timer ends its flash. */
+/** A Go to source in progress: live until the next one or the unmount; the timer (or a held mark's next click or key) ends its flash. */
 interface FlashRun {
   live: boolean;
   timer: ReturnType<typeof setTimeout> | undefined;
+  /** Removes a held mark's listeners. */
+  unlisten?: () => void;
 }
 
 const sameRange = (a: Range, b: Range) => a.startContainer === b.startContainer && a.startOffset === b.startOffset && a.endContainer === b.endContainer && a.endOffset === b.endOffset;
@@ -51,6 +53,7 @@ function cancelFlash(run: FlashRun | null): void {
   if (!run) return;
   run.live = false;
   clearTimeout(run.timer);
+  run.unlisten?.();
 }
 
 const HIDDEN: CitePlacement = { left: -10_000, top: -10_000, side: "below", visible: false, room: 0 };
@@ -203,13 +206,29 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
     void revealQuote(threadId, pane, flash.cite).then(async (at) => {
       if (!alive() || !at) return;
       await frame();
-      const root = pane.querySelector(citeItemSelector(flash.cite.itemId));
+      const root = pane.querySelector(quoteItemSelector(flash.cite.itemId));
       if (!root || !alive()) return;
       const pt = plainText(root);
       paint("cf-cite-mark", rangeOf(pt, at.start, at.end), lineRects(pt, at.start, at.end));
-      run.timer = setTimeout(() => {
+      const unmark = () => {
         if (!openRef.current) paint("cf-cite-mark", null);
-      }, 1600);
+      };
+      if (flash.hold) {
+        // Held (an agent search's hit): until the user clicks or types.
+        const end = () => {
+          run.unlisten?.();
+          unmark();
+        };
+        window.addEventListener("pointerdown", end, true);
+        window.addEventListener("keydown", end, true);
+        run.unlisten = () => {
+          window.removeEventListener("pointerdown", end, true);
+          window.removeEventListener("keydown", end, true);
+          run.unlisten = undefined;
+        };
+        return;
+      }
+      run.timer = setTimeout(unmark, 1600);
     });
   }, [flash, threadId, paneRef]);
 

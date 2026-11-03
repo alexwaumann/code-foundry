@@ -22,3 +22,18 @@
 .cite-overlay[data-cite-overlay="cf-search-current"] > div {
   background: color-mix(in oklab, var(--cf-warning) 60%, transparent);
 }
+/* An agent search hit's quote in the preview: marked as a citation is (thread/cite/cite.css cf-cite-mark). */
+::highlight(cf-search-quote) {
+  background-color: color-mix(in oklab, var(--cf-warning) 20%, transparent);
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in oklab, var(--cf-warning) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+.dark ::highlight(cf-search-quote) {
+  background-color: color-mix(in oklab, var(--cf-warning) 18%, transparent);
+}
+.cite-overlay[data-cite-overlay="cf-search-quote"] > div {
+  background: color-mix(in oklab, var(--cf-warning) 20%, transparent);
+  box-shadow: inset 0 -1.5px 0 color-mix(in oklab, var(--cf-warning) 70%, transparent);
+}

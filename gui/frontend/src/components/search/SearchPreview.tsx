@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { ThreadItemView } from "@/api/thread";
 import { ThreadMarkdown } from "@/components/thread/Code";
@@ -51,7 +51,21 @@ function speakerLine(s: PreviewSubject): string {
  * matches painted (Claude's text under the prompt it answers, dimmed); a caption with the
  * match count. A thread-name row shows the thread's latest text from Claude.
  */
-export function SearchPreview({ subject, data, query }: { subject: PreviewSubject; data: PreviewData | null; query: string }) {
+export function SearchPreview({
+  subject,
+  data,
+  query,
+  paint,
+  caption,
+}: {
+  subject: PreviewSubject;
+  data: PreviewData | null;
+  query: string;
+  /** Paints the message instead of the query's matches (an agent search's quote; keep it stable). */
+  paint?: (root: HTMLElement | null) => void;
+  /** The line under the message instead of the match count; null for none. */
+  caption?: ReactNode;
+}) {
   const place = useThreadPlace(subject.threadId);
   const cwd = useThreadsStore((s) => s.byId[subject.threadId]?.worktreePath ?? "");
   const ctx = useMemo(() => ({ threadId: subject.threadId, cwd }), [subject.threadId, cwd]);
@@ -60,8 +74,9 @@ export function SearchPreview({ subject, data, query }: { subject: PreviewSubjec
   const prompt = data?.prompt ?? null;
   const paintQuery = subject.kind === "hit" ? query : "";
   useLayoutEffect(() => {
-    paintPreview(bodyRef.current, paintQuery);
-  }, [item, prompt, paintQuery]);
+    if (paint) paint(bodyRef.current);
+    else paintPreview(bodyRef.current, paintQuery);
+  }, [item, prompt, paintQuery, paint]);
   useLayoutEffect(() => clearPreviewPaint, []);
   const count = item && subject.kind === "hit" ? messageMatchCount(item, query) : 0;
   const project = place.set ?? place.project;
@@ -96,11 +111,14 @@ export function SearchPreview({ subject, data, query }: { subject: PreviewSubjec
           ) : null}
         </div>
       </ThreadContext.Provider>
-      {subject.kind === "hit" && item && (
-        <div className="mx-5 shrink-0 border-t py-2 text-caption text-cf-text-muted" data-testid="search-preview-caption">
-          {previewCaption(count, query)}
-        </div>
-      )}
+      {caption !== undefined
+        ? caption
+        : subject.kind === "hit" &&
+          item && (
+            <div className="mx-5 shrink-0 border-t py-2 text-caption text-cf-text-muted" data-testid="search-preview-caption">
+              {previewCaption(count, query)}
+            </div>
+          )}
     </div>
   );
 }

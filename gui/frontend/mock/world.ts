@@ -41,6 +41,7 @@ import { MockThemes } from "./userThemes";
 import { MockSkills } from "./skills";
 import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { MockDictation } from "./dictation";
+import { MockSearches } from "./agentSearch";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
 import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
@@ -822,6 +823,15 @@ export class World {
       this.dictation.settingsChanged();
     },
   );
+  /** Agent search and the search history (mock/agentSearch.ts; SearchService). */
+  readonly searches = new MockSearches({
+    thread: (id) => {
+      const t = this.threads.get(id);
+      return t ? { name: t.name, archived: t.archivedAt !== null } : undefined;
+    },
+    items: (id) => (this.threads.has(id) ? this.logs.snapshotValue(id).items : []),
+    promote: (question, firstMessage) => this.createThread("", HOME, "opus", "", { name: "", autoNamed: true, nameIn: 2, pendingName: question.slice(0, 40), firstMessage: { text: firstMessage, attachments: [], composerText: "" } }).id,
+  });
   /** Dictation (mock/dictation.ts; DictationService): enabled is dictation.enabled, the rest scripted. */
   readonly dictation = new MockDictation({
     enabled: () => this.settings.value("dictation.enabled") === "true",
@@ -1022,6 +1032,7 @@ export class World {
     this.actions.reset();
     this.update.reset();
     this.dictation.reset();
+    this.searches.reset();
     this.emberSettings = this.emberSettingsKey();
     this.ember.reset();
   }
@@ -5006,6 +5017,7 @@ export class World {
       },
       ...this.update.commands(),
       ...this.dictation.commands(),
+      ...this.searches.commands(),
     ];
   }
 

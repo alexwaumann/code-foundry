@@ -1,22 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Sparkle } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { firstSelectable, keepSelection, moveSelection, searchRows, selectable, type SearchRow } from "@/lib/threadSearch";
 import { imeKeyDown } from "@/lib/ime";
+import { findHitCount } from "@/lib/agentSearch";
+import { recordFind } from "@/stores/agentSearch";
 import { activateSearchRow } from "@/stores/threadSearch";
+import { RecentList, RecentPreview } from "./RecentSearches";
 import { SearchList } from "./SearchList";
 import type { PreviewSubject } from "./preview";
 import { SearchPreview } from "./SearchPreview";
-import { previewKey, useSearchPreview, useThreadSearch, type PreviewLoaders, type PreviewTarget, type SearchFn } from "./useSearch";
-
-/** What a mode gets from the dialog: the query and the header to draw (the shared field, with what the mode puts beside it). */
-export interface SearchModeProps {
-  query: string;
-  header: (badges: ReactNode) => ReactNode;
-  /** Test seams: the daemon's Search and the preview's reads. */
-  search?: SearchFn;
-  loaders?: PreviewLoaders;
-}
+import type { SearchDialogApi, SearchModeProps } from "./types";
+import { previewKey, useSearchPreview, useThreadSearch, type PreviewTarget } from "./useSearch";
 
 function previewOf(row: SearchRow | undefined): { target: PreviewTarget; subject: PreviewSubject } | null {
   if (row?.kind === "hit") {
@@ -33,13 +29,13 @@ function previewOf(row: SearchRow | undefined): { target: PreviewTarget; subject
   return null;
 }
 
-/** The footer's key hints; Enter's words follow the selected row. */
-function Hints({ row }: { row: SearchRow | undefined }) {
+/** The footer's key hints; Enter's words follow the selected row (a Recent searches row while the field is empty). */
+function Hints({ row, enter, modes }: { row: SearchRow | undefined; enter?: string; modes: boolean }) {
   return (
     <div className="flex shrink-0 items-center gap-4 border-t px-4 py-2 text-caption text-cf-text-muted" data-testid="search-hints">
       <span className="flex items-center gap-1.5">
         <Kbd size="sm">⏎</Kbd>
-        {row?.kind === "name" ? "open thread" : "open at message"}
+        {enter ?? (row?.kind === "name" ? "open thread" : "open at message")}
       </span>
       <span className="flex items-center gap-1.5">
         <Kbd size="sm">↑</Kbd>
@@ -50,25 +46,63 @@ function Hints({ row }: { row: SearchRow | undefined }) {
         <Kbd size="sm">esc</Kbd>
         close
       </span>
+      {modes && (
+        <span className="flex items-center gap-1.5">
+          <Kbd size="sm">Tab</Kbd>
+          Agent search
+        </span>
+      )}
     </div>
   );
 }
 
 /**
- * Before a query, or when nothing matches: a short hint. (PR 6 adds Recent searches to
- * the empty state and a "Try Agent search" row to no results, here.)
+ * Before a query: a short hint and Recent searches. When nothing matches: says so, with a
+ * "Try Agent search" row that asks the same words as a question (Enter does too).
  */
-function SearchEmpty({ query, searching }: { query: string; searching: boolean }) {
-  const text =
-    query === ""
-      ? "Search every thread's name and messages: yours, Claude's text and answered questions. A capital letter makes it case-sensitive."
-      : searching
-        ? "Searching…"
-        : `No threads or messages match “${query}”.`;
+function SearchEmpty({ query, searching, dialog }: { query: string; searching: boolean; dialog: SearchDialogApi }) {
+  if (query === "") {
+    return (
+      <>
+        <p className="px-5 py-6 text-body-sm text-cf-text-muted" data-testid="search-empty">
+          Search every thread's name and messages: yours, Claude's text and answered questions. A capital letter makes it case-sensitive.
+        </p>
+        <RecentList recent={dialog.recent} now={dialog.now} />
+      </>
+    );
+  }
+  if (searching) {
+    return (
+      <p className="px-5 py-6 text-body-sm text-cf-text-muted" data-testid="search-empty">
+        Searching…
+      </p>
+    );
+  }
   return (
-    <p className="px-5 py-6 text-body-sm text-cf-text-muted" data-testid="search-empty">
-      {text}
-    </p>
+    <div className="flex flex-col">
+      <p className="px-5 pt-6 pb-3 text-body-sm text-cf-text-muted" data-testid="search-empty">
+        No threads or messages match “{query}”.
+      </p>
+      <div className="px-2">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-md bg-cf-control-hover px-3 py-2 text-left text-body-sm text-cf-text outline-none"
+          onMouseDown={(e) => {
+            e.preventDefault();
+          }}
+          onClick={() => {
+            dialog.start(query);
+          }}
+          data-testid="search-try-agent"
+        >
+          <Sparkle className="size-3.5 shrink-0 text-cf-icon-muted" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">
+            Try Agent search: “{query}”
+          </span>
+          <Kbd size="sm">⏎</Kbd>
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -79,7 +113,7 @@ function SearchEmpty({ query, searching }: { query: string; searching: boolean }
  * Enter opens the selected one: a hit in its thread with the thread's find bar on the same
  * match. Enter before the typed query's answer waits for it, then opens its first row.
  */
-export function FindSearch({ query: raw, header, search, loaders }: SearchModeProps) {
+export function FindSearch({ query: raw, header, search, loaders, dialog }: SearchModeProps) {
   const query = raw.trim();
   const state = useThreadSearch(query, search);
   const answered = state.answered === query;
@@ -99,6 +133,12 @@ export function FindSearch({ query: raw, header, search, loaders }: SearchModePr
   // Until the row's data arrives the preview shows its crumb and nothing under it.
   const shownData = data && preview && data.key === previewKey(preview.target) ? data : null;
 
+  // Opening a result records the query in the history (Recent searches), with its result count.
+  const activate = (r: SearchRow, q: string) => {
+    if (r.kind !== "section" && r.kind !== "note") recordFind(q, findHitCount(state.result));
+    activateSearchRow(r, q);
+  };
+
   // Enter while the typed query is not answered yet: opens the answer's first row when it arrives.
   const pending = useRef<string | null>(null);
   useEffect(() => {
@@ -111,7 +151,8 @@ export function FindSearch({ query: raw, header, search, loaders }: SearchModePr
     if (!answered) return;
     pending.current = null;
     const first = rows.find((r) => r.key === firstSelectable(rows));
-    if (first) activateSearchRow(first, query);
+    if (first) activate(first, query);
+    // oxlint-disable-next-line react/exhaustive-deps -- activate reads the answer these name.
   }, [answered, rows, query]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -129,7 +170,9 @@ export function FindSearch({ query: raw, header, search, loaders }: SearchModePr
         pending.current = query;
         return;
       }
-      if (row && selectable(row)) activateSearchRow(row, query);
+      if (row && selectable(row)) activate(row, query);
+      // Nothing matched: the same words as an agent search.
+      else if (rows.every((r) => r.kind === "note") && !state.error) dialog.start(query);
     }
   };
 
@@ -162,11 +205,11 @@ export function FindSearch({ query: raw, header, search, loaders }: SearchModePr
               onSelect={setSelected}
               onActivate={(r) => {
                 // The rows answer state.answered, which lags the typed query while a newer search is out.
-                activateSearchRow(r, state.answered);
+                activate(r, state.answered);
               }}
             />
           ) : (
-            !state.error && <SearchEmpty query={query} searching={query !== "" && !answered} />
+            !state.error && <SearchEmpty query={query} searching={query !== "" && !answered} dialog={dialog} />
           )}
           {note && (
             <p className="px-5 text-caption text-cf-text-muted" data-testid="search-note">
@@ -174,9 +217,15 @@ export function FindSearch({ query: raw, header, search, loaders }: SearchModePr
             </p>
           )}
         </div>
-        {preview ? <SearchPreview subject={preview.subject} data={shownData} query={state.answered} /> : <div className="min-w-0 flex-1" data-testid="search-preview-none" />}
+        {query === "" && dialog.selectedRecent ? (
+          <RecentPreview entry={dialog.selectedRecent} />
+        ) : preview ? (
+          <SearchPreview subject={preview.subject} data={shownData} query={state.answered} />
+        ) : (
+          <div className="min-w-0 flex-1" data-testid="search-preview-none" />
+        )}
       </div>
-      <Hints row={row} />
+      <Hints row={row} enter={query === "" ? (dialog.selectedRecent ? (dialog.selectedRecent.mode === "agent" ? "open saved results" : "search again") : "search") : answered && !hasRows && !state.error ? "Agent search" : undefined} modes={dialog.mode === "find"} />
     </div>
   );
 }

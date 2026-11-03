@@ -21,7 +21,7 @@ export function presentSearch(): boolean {
 }
 
 /** Closes the palette without handing the keyboard back: what opens next takes it. */
-function closeQuietly(): void {
+export function closeQuietly(): void {
   useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "palette" } }));
   useUiStore.getState().closePalette();
 }

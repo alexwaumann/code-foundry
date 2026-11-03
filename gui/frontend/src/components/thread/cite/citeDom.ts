@@ -15,6 +15,15 @@ export function citeItemSelector(itemId: string): string {
   return `[${CITE_ITEM_ATTR}="${CSS.escape(itemId)}"]`;
 }
 
+/**
+ * The element whose text holds an item's quote: a citable answer, else the item's find
+ * text (a user bubble, an answered question's lines; data-find-item, the in-thread find's
+ * attribute), so an agent search's hit on any of them can be revealed.
+ */
+export function quoteItemSelector(itemId: string): string {
+  return `${citeItemSelector(itemId)}, [data-find-item="${CSS.escape(itemId)}"]`;
+}
+
 /** Elements that start a new line in the plain text. */
 const BLOCKS = new Set(["P", "LI", "PRE", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "TR", "TD", "TH", "UL", "OL", "TABLE", "DIV", "DD", "DT", "HR"]);
 /** Containers whose whitespace-only text nodes sit between blocks and do not render. */
@@ -167,7 +176,7 @@ export function lineRects(pt: PlainText, start: number, end: number): DOMRect[] 
 }
 
 /** The painted ranges: the selection kept while the comment field has the keyboard, and a cited quote; the find bar's matches and its current one. */
-export type CitePaint = "cf-cite-held" | "cf-cite-mark" | "cf-find" | "cf-find-current" | "cf-search" | "cf-search-current";
+export type CitePaint = "cf-cite-held" | "cf-cite-mark" | "cf-find" | "cf-find-current" | "cf-search" | "cf-search-current" | "cf-search-quote";
 
 interface HighlightRegistryLike {
   set(name: string, h: unknown): void;
