@@ -117,6 +117,7 @@ export function prTaskCommand(d: PrTaskDeps): Command {
         { name: "number", type: ArgType.INT, required: true, description: "Pull request number" },
         { name: "kind", type: ArgType.ENUM, required: true, description: "The task", enumValues: [...PR_TASK_KINDS] },
         { name: "thread", type: ArgType.STRING, required: false, description: "Send the task into this thread instead of starting one" },
+        { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree to start the thread in (default: the pull request's branch in a clone of repo-slug)" },
         { name: "model", type: ArgType.ENUM, required: false, description: "Model (default: settings threads.default_model, else Claude's default)", enumValues: MODEL_VALUES },
         { name: "effort", type: ArgType.ENUM, required: false, description: "Effort level (default: settings threads.default_effort, else Claude's default)", enumValues: ["low", "medium", "high", "xhigh", "max"] },
         { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window" },
@@ -143,6 +144,7 @@ export function prTaskCommand(d: PrTaskDeps): Command {
 
       // --thread: a follow-up message, no focus.
       const threadId = args.thread ?? "";
+      if (threadId && args.worktree) throw new CommandError("invalid", "worktree is where a new thread starts; with thread the task goes into that thread");
       if (threadId) {
         const t = d.thread(threadId);
         if (!t) throw new ConnectError(`find thread ${threadId}: thread ${threadId} not found`, Code.NotFound);
@@ -160,6 +162,15 @@ export function prTaskCommand(d: PrTaskDeps): Command {
         const remote = w.status.upstream.slice(0, -head.length - 1);
         return remote !== "" && remote !== "origin";
       };
+      // An explicit worktree is used as is (the daemon resolves its project).
+      if (args.worktree) {
+        const owner = d.projects().find((p) => p.worktrees.some((w) => w.path === args.worktree));
+        const defaults = d.defaults();
+        const t = d.startThread(owner?.id ?? "", args.worktree, args.model ?? defaults.model, args.effort ?? defaults.effort, prompt(false));
+        if (args.focus !== "false") d.focusThread(t.id);
+        const result: PrTaskResult = { threadId: t.id, sent: false, projectId: owner?.id ?? "", worktreePath: args.worktree, createdWorktree: false, cloned: false };
+        return { message: `Started thread ${label(t)} for PR #${String(n)}`, resultJson: JSON.stringify(result) };
+      }
       let clones = d.projects().filter((p) => p.githubSlug !== "" && p.githubSlug.toLowerCase() === slug.toLowerCase());
       let cloned = false;
       if (clones.length === 0) {

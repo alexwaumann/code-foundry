@@ -110,17 +110,22 @@ func headWorktree(clones []*v1.Project, h prHead) *v1.Worktree {
 	return nil
 }
 
-// worktreeStatus is the status of the registered worktree at path, or nil.
-func worktreeStatus(projects []*v1.Project, path string) *v1.GitStatus {
+// registeredWorktree is the registered worktree at path, or nil.
+func registeredWorktree(projects []*v1.Project, path string) *v1.Worktree {
 	path = filepath.Clean(path)
 	for _, r := range projects {
 		for _, wt := range r.GetWorktrees() {
 			if filepath.Clean(wt.GetPath()) == path {
-				return wt.GetStatus()
+				return wt
 			}
 		}
 	}
 	return nil
+}
+
+// worktreeStatus is the status of the registered worktree at path, or nil.
+func worktreeStatus(projects []*v1.Project, path string) *v1.GitStatus {
+	return registeredWorktree(projects, path).GetStatus()
 }
 
 // prWorktreePick is where a pull request thread runs.
@@ -246,7 +251,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 	number := ArgSpec{Name: "number", Type: Int, Required: true, Positional: true, Description: "Pull request number"}
 	// Not context-bound: an explicit worktree must be told apart from the active one,
 	// which pr.ask and pr.explain use only when it is a clone of the slug and
-	// pr.fix.findings ignores.
+	// pr.fix.findings and pr.task ignore.
 	worktree := ArgSpec{Name: "worktree", Type: Path, Description: "Worktree to start the thread in (default: picked from the registered clones of repo-slug and the pull request's branch)"}
 	model := ArgSpec{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model, else Claude's default)"}
 	effort := ArgSpec{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort, else Claude's default)"}
@@ -350,7 +355,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 				return start(ctx, uctx, a, prThreadFix, FixFindingsPRPrompt)
 			},
 		},
-		prTaskCommand(d, slug, number, model, effort),
+		prTaskCommand(d, slug, number, worktree, model, effort),
 	)
 }
 

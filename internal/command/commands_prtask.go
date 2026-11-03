@@ -59,7 +59,7 @@ type PRTaskResult struct {
 }
 
 // prTaskCommand is pr.task, registered with the other pull request thread commands.
-func prTaskCommand(d PullRequestThreadDeps, slug, number, model, effort ArgSpec) Command {
+func prTaskCommand(d PullRequestThreadDeps, slug, number, worktree, model, effort ArgSpec) Command {
 	return Command{
 		Name:      "pr.task",
 		NoPalette: true,
@@ -67,14 +67,14 @@ func prTaskCommand(d PullRequestThreadDeps, slug, number, model, effort ArgSpec)
 		Description: "Have a thread handle one of a pull request's open items: fix failing checks, address requested changes " +
 			"or unresolved conversations, resolve conflicts, bring the branch up to date, or review someone's pull request (read-only). " +
 			"With thread it is sent into that thread like thread.send; otherwise a thread starts in the worktree on the pull request's " +
-			"branch (created if needed), cloning the repository as a project first when none is.",
+			"branch (created if needed), cloning the repository as a project first when none is, or in the given worktree.",
 		Category: "Pull Request",
 		Args: []ArgSpec{slug, number,
 			{Name: "kind", Type: Enum, Enum: PRTaskKinds, Required: true, Positional: true,
 				Description: "checks, review (requested changes), conversations (unresolved review threads), conflicts, behind (update with the base), or review-request (review it, read-only)"},
 			{Name: "thread", Type: String, ID: ThreadID,
 				Description: "Send the task into this thread (as thread.send: mid-turn while it works) instead of starting one" + IDHelp},
-			model, effort, createdFocusArg,
+			worktree, model, effort, createdFocusArg,
 		},
 		When: hasPullRequest,
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -91,6 +91,9 @@ func prTaskCommand(d PullRequestThreadDeps, slug, number, model, effort ArgSpec)
 				return Result{}, err
 			}
 			if id := a.String("thread"); id != "" {
+				if a.Given("worktree") {
+					return Result{}, InvalidArg("worktree", "worktree is where a new thread starts; with thread the task goes into that thread")
+				}
 				return d.sendPRTask(ctx, uctx, id, n, task, detail)
 			}
 			return d.startPRTask(ctx, a, s, n, task, detail)
@@ -126,7 +129,8 @@ func (d PullRequestThreadDeps) sendPRTask(ctx context.Context, uctx Context, id 
 // panel): in the worktree on the pull request's head branch, reused or created, after
 // cloning the repository as a project when none is a clone of it. A push task on a
 // fork's pull request needs a worktree with its head checked out (as pr.fix.findings);
-// a review-request without one runs off the head in the main worktree.
+// a review-request without one runs off the head in the main worktree. An explicit
+// worktree is used as is (nothing is cloned or created).
 func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string, n int, task prTask, detail *v1.PullRequestDetail) (Result, error) {
 	// The worst-case checkout bounds the prompt, whatever the worktree turns out to be.
 	worst := PRCheckout{Behind: math.MaxInt32, Dirty: true}
@@ -140,13 +144,16 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 		kind = prThreadFix
 	}
 	head := prHeadOf(detail.GetPullRequest())
-	list, err := d.Project.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
-	if err != nil {
+	explicit := a.Path("worktree")
+	var projects []*v1.Project
+	switch list, err := d.Project.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{})); {
+	case err == nil:
+		projects = list.Msg.GetProjects()
+	case explicit == "":
 		return Result{}, wrapStep("list projects", err)
-	}
-	projects := list.Msg.GetProjects()
+	} // An explicit worktree only loses its status line in the prompt.
 	var cloned bool
-	if len(clonesOf(projects, s)) == 0 {
+	if explicit == "" && len(clonesOf(projects, s)) == 0 {
 		// Refuse what a fresh clone could not place (a fork's head to push to, no head
 		// branch) before cloning: the clone would not help.
 		if _, err := pickPRWorktree(kind, []*v1.Project{{GithubSlug: s}}, s, n, head, "", ""); err != nil {
@@ -162,9 +169,14 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 		}
 		projects, cloned = []*v1.Project{p}, true
 	}
-	pick, err := pickPRWorktree(kind, projects, s, n, head, "", "")
+	pick, err := pickPRWorktree(kind, projects, s, n, head, explicit, "")
 	if err != nil {
 		return Result{}, err
+	}
+	if explicit != "" {
+		// A review there reads off the head unless the worktree is known to be on it.
+		wt := registeredWorktree(projects, pick.Path)
+		pick.OffHead = wt == nil || !head.checkedOutIn(wt)
 	}
 	status := worktreeStatus(projects, pick.Path)
 	if pick.Create {
