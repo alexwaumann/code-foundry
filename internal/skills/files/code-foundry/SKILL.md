@@ -35,6 +35,7 @@ Never tell the user skill or command names: say what you will do, not which comm
 | The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
 | To be told or reminded later, or something done on a schedule ("tell me when #4 passes", "every hour…", "keep an eye on…") | `code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`, `--at 2h`, `--thread <id> --until attention`, `--note`): the app wakes you, even stopped; never Claude Code's cron or a background `--watch`, which die when the app stops this idle thread |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
+| Something said, decided or done in an earlier thread ("where did we…", "the thread that fixed…") | `code-foundry thread search <words>` (`--include children` for threads other threads made), then `thread read --id <thread> --since <#N-3>`; never grep ~/.claude |
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
 | To build, debug or publish a plugin | the code-foundry-plugin skill |
 | To know what exists here | `code-foundry daemon.capabilities`, then `--group <name>` (build, commands, pages, panel, rendering, skills, plugins, settings, memory, presence; `--json`): it reads the running app |

@@ -141,7 +141,9 @@ func TestRender(t *testing.T) {
 		// 85, and a description up to 420, for the thread row (orch-removed-panels-check):
 		// with the Usage, Worktree, Agents, Threads and Linked PRs tabs gone, asking is the
 		// path, and models read uncommitted work as all that changed and found no PR verb.
-		{skills.Entry, "false", 420, 85},
+		// 86 for the earlier-thread row (search-3-index): thread.search over the app's index,
+		// not a grep of Claude's transcripts.
+		{skills.Entry, "false", 420, 86},
 		// Its routing and the app's description moved to the entry skill (control-4);
 		// the cap came down from 120 with them. 109 for the workspaces answer path
 		// (workspaces-v2-5-skills): what a workspace is, its card, where its files go.
