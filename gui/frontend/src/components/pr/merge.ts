@@ -14,6 +14,23 @@ export const MERGE_METHOD_LABELS: Record<MergeMethodView, string> = {
 
 export const MERGE_METHOD_ORDER: readonly MergeMethodView[] = ["merge", "squash", "rebase"];
 
+/** The split button's label for a method (the menu keeps GitHub's longer ones). */
+export const MERGE_BUTTON_LABELS: Record<MergeMethodView, string> = {
+  merge: "Merge",
+  squash: "Squash and merge",
+  rebase: "Rebase and merge",
+};
+
+/**
+ * The split button's method: the one last chosen in this repository when it is still
+ * allowed, else squash when allowed, else the first allowed.
+ */
+export function defaultMergeMethod(methods: readonly MergeMethodView[], last: MergeMethodView | undefined): MergeMethodView {
+  if (last && methods.includes(last)) return last;
+  if (methods.includes("squash")) return "squash";
+  return methods[0] ?? "squash";
+}
+
 export interface MergeAvailability {
   /** Shown only for an open pull request. */
   visible: boolean;
@@ -27,8 +44,9 @@ export interface MergeAvailability {
 
 /**
  * Whether the merge button shows and works for d. The daemon and GitHub check again; this
- * only keeps the button from offering what GitHub refuses. Behind the base branch is
- * allowed (GitHub merges it as is), as is mergeability GitHub has not computed yet.
+ * only keeps the button from offering what GitHub refuses. GitHub reports BEHIND only when
+ * the repository requires up-to-date branches, so it blocks; mergeability GitHub has not
+ * computed yet is allowed.
  */
 export function mergeAvailability(d: PullRequestDetailView): MergeAvailability {
   const pr = d.pullRequest;
@@ -36,14 +54,13 @@ export function mergeAvailability(d: PullRequestDetailView): MergeAvailability {
   // allows one): offer all three and let the daemon refuse.
   const methods = d.mergeMethods.length === 0 ? [...MERGE_METHOD_ORDER] : MERGE_METHOD_ORDER.filter((m) => d.mergeMethods.includes(m));
   const notes: string[] = [];
-  if (d.autoMergeEnabled) notes.push("Auto-merge is on: GitHub merges it once its requirements pass.");
-  if (pr.mergeState === "behind") notes.push(`Behind ${pr.baseRef || "the base branch"}: it merges as is.`);
   if (pr.mergeState === "unstable") notes.push("Some checks that are not required are failing.");
   const out = (reason: string | null): MergeAvailability => ({ visible: pr.state === "open", reason, methods, notes });
   if (pr.state !== "open") return out(null);
   if (pr.draft || pr.mergeState === "draft") return out("Draft pull requests cannot be merged");
   if (!d.viewerCanUpdate) return out("Merging needs write access");
   if (pr.mergeable === "conflicting" || pr.mergeState === "dirty") return out("Resolve conflicts first");
+  if (pr.mergeState === "behind") return out(`Behind ${pr.baseRef || "the base branch"}: this repository merges only up-to-date branches`);
   if (pr.mergeState === "blocked") return out("Blocked: required checks or reviews are missing");
   return out(null);
 }
