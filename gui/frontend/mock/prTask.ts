@@ -71,10 +71,12 @@ export interface PrTaskDeps {
   /** Creates the head branch's worktree in project, tracking origin/<head>. */
   addWorktree(project: TaskProject, branch: string, head: string): TaskWorktree;
   thread(id: string): { id: string; name: string } | undefined;
+  /** Every thread's id, for the daemon's id-suffix resolution. */
+  threadIds(): string[];
   /** Starts a thread with prompt as its first message (no focus). */
   startThread(projectId: string, path: string, model: string, effort: string, prompt: string): { id: string; name: string };
-  /** thread.send's path. */
-  send(id: string, text: string): void;
+  /** thread.send's path; the message item's ordinal. */
+  send(id: string, text: string): number;
   focusThread(id: string): void;
   defaults(): { model: string; effort: string };
   /** POST /__mock/gh/pr-fail and pr-delay. */
@@ -86,6 +88,7 @@ export interface PrTaskDeps {
 export interface PrTaskResult {
   threadId: string;
   sent: boolean;
+  ordinal?: number;
   projectId?: string;
   worktreePath?: string;
   createdWorktree?: boolean;
@@ -99,6 +102,18 @@ const forkRefusal = (n: number, slug: string): ConnectError =>
     `#${String(n)} comes from a fork and no worktree of ${slug} has its head checked out: check it out (for example \`gh pr checkout ${String(n)}\` in a worktree) and pass --worktree`,
     Code.FailedPrecondition,
   );
+
+/** The daemon's refusal of a push task without a head branch (pickPRWorktree). */
+const noHeadRefusal = (n: number): ConnectError => new ConnectError(`#${String(n)} has no head branch to check out: pass --worktree`, Code.FailedPrecondition);
+
+/** The registry's thread id resolution (command.ResolveID): the id, else the one id ending in a 4+ character suffix. */
+function resolveThreadId(ref: string, ids: string[]): string {
+  if (ref.length < 4 || ref.startsWith("s-") || ids.includes(ref)) return ref;
+  const matches = ids.filter((id) => id.endsWith(ref)).sort();
+  if (matches.length === 1) return matches[0] ?? ref;
+  if (matches.length === 0) throw new ConnectError(`no thread id ends in "${ref}"`, Code.NotFound);
+  throw new CommandError("invalid", `"${ref}" is ambiguous: ${String(matches.length)} thread ids end in it (${matches.join(", ")}); give more characters`);
+}
 
 /** A registry entry, as world.ts's registry() takes them. */
 interface Command {
@@ -138,35 +153,46 @@ export function prTaskCommand(d: PrTaskDeps): Command {
       if (!Number.isInteger(n) || n <= 0) throw new CommandError("invalid", "number must be a positive pull request number");
       if (!PR_TASK_KINDS.includes(kind)) throw new CommandError("invalid", `kind must be one of ${PR_TASK_KINDS.join(", ")}`);
       // Args only a new thread uses are refused with thread before anything is read.
-      const threadId = args.thread ?? "";
+      const threadId = args.thread ? resolveThreadId(args.thread, d.threadIds()) : "";
       if (threadId) {
         const extra = NEW_THREAD_ARGS.find((a) => args[a] !== undefined);
         if (extra) throw new CommandError("invalid", `${extra} is for a new thread; with thread the task goes into that thread as it is`);
       }
       if (d.failNext.delete("pr.task")) throw forkRefusal(n, slug);
       const push = kind !== "review-request";
-      const pr = d.pullRequest(slug, n, push);
-      const head = pr?.headRef ?? "";
-      const cross = pr?.isCrossRepository ?? false;
+      // readPR: a failed read keeps its code under "read #N"; no pull request is NotFound.
+      let pr: TaskPullRequest | undefined;
+      try {
+        pr = d.pullRequest(slug, n, push);
+      } catch (err) {
+        const ce = ConnectError.from(err);
+        throw new ConnectError(`read #${String(n)}: ${ce.rawMessage}`, ce.code);
+      }
+      if (!pr) throw new ConnectError(`pull request ${slug}#${String(n)} was not returned`, Code.NotFound);
+      const head = pr.headRef ?? "";
+      const cross = pr.isCrossRepository ?? false;
+      // GitHub's current name for the repository; clones match it too.
+      const canon = pr.repoSlug || slug;
       const prompt = (followUp: boolean): string => {
         const lead = followUp ? `Follow-up task: ${LEADS[kind].charAt(0).toLowerCase()}${LEADS[kind].slice(1)}` : LEADS[kind];
-        return `${lead} PR \`${slug}#${String(n)}\` (branch \`${head}\`).`;
+        return `${lead} PR \`${canon}#${String(n)}\` (branch \`${head}\`).`;
       };
 
       // --thread: a follow-up message, no focus.
       if (threadId) {
         const t = d.thread(threadId);
         if (!t) throw new ConnectError(`find thread ${threadId}: thread ${threadId} not found`, Code.NotFound);
-        d.send(t.id, prompt(true));
-        const result: PrTaskResult = { threadId: t.id, sent: true };
-        return { message: `Sent to ${label(t)}`, resultJson: JSON.stringify(result) };
+        const ordinal = d.send(t.id, prompt(true));
+        const result: PrTaskResult = { threadId: t.id, sent: true, ...(ordinal > 0 ? { ordinal } : {}) };
+        const next = ordinal > 0 ? ` (#${String(ordinal)}); wait with: code-foundry thread wait ${t.id} --after ${String(ordinal)}` : "";
+        return { message: `Sent to ${label(t)}${next}`, resultJson: JSON.stringify(result) };
       }
 
       // A new thread on the head (checkedOutIn: a same-repository head by branch name, a
       // fork's by commit or by an upstream on a remote other than origin).
       const onHead = (w: TaskWorktree): boolean => {
         if (!cross) return head !== "" && w.branch === head;
-        if (pr?.headSha && w.head.toLowerCase() === pr.headSha.toLowerCase()) return true;
+        if (pr.headSha && w.head.toLowerCase() === pr.headSha.toLowerCase()) return true;
         if (!head || !w.status.upstream.endsWith(`/${head}`)) return false;
         const remote = w.status.upstream.slice(0, -head.length - 1);
         return remote !== "" && remote !== "origin";
@@ -177,17 +203,18 @@ export function prTaskCommand(d: PrTaskDeps): Command {
         const defaults = d.defaults();
         const t = d.startThread(owner?.id ?? "", args.worktree, args.model ?? defaults.model, args.effort ?? defaults.effort, prompt(false));
         if (args.focus !== "false") d.focusThread(t.id);
-        const result: PrTaskResult = { threadId: t.id, sent: false, projectId: owner?.id ?? "", worktreePath: args.worktree, createdWorktree: false, cloned: false };
+        // As the daemon's PRTaskResult, empty and false fields are left out.
+        const result: PrTaskResult = { threadId: t.id, sent: false, ...(owner ? { projectId: owner.id } : {}), worktreePath: args.worktree };
         return { message: `Started thread ${label(t)} for PR #${String(n)}`, resultJson: JSON.stringify(result) };
       }
       // Clones match the argument or GitHub's current name (a renamed repository).
-      const canon = pr?.repoSlug || slug;
       const clonesOf = (s: string) => d.projects().filter((p) => p.githubSlug !== "" && p.githubSlug.toLowerCase() === s.toLowerCase());
       let clones = clonesOf(slug).length > 0 ? clonesOf(slug) : clonesOf(canon);
       let cloned = false;
       if (clones.length === 0) {
         // Refused before cloning when a fresh clone could not place it either.
-        if (push && (head === "" || cross)) throw forkRefusal(n, canon);
+        if (push && head === "") throw noHeadRefusal(n);
+        if (push && cross) throw forkRefusal(n, canon);
         const [owner = "", name = ""] = canon.split("/");
         const path = `${PROJECTS}/${owner}/${name}`;
         if (cloneExists(path) || d.projects().some((p) => p.path.toLowerCase() === path.toLowerCase())) {
@@ -208,10 +235,10 @@ export function prTaskCommand(d: PrTaskDeps): Command {
       let createdWorktree = false;
       if (!target && first) {
         if (head !== "" && !cross) {
-          target = { projectId: first.id, path: d.addWorktree(first, head, pr?.headSha ?? "c0ffee00").path };
+          target = { projectId: first.id, path: d.addWorktree(first, head, pr.headSha ?? "c0ffee00").path };
           createdWorktree = true;
         } else if (push) {
-          throw forkRefusal(n, slug);
+          throw head === "" ? noHeadRefusal(n) : forkRefusal(n, first.githubSlug);
         } else {
           target = { projectId: first.id, path: first.worktrees.find((w) => w.isMain)?.path ?? first.path };
         }
@@ -220,7 +247,7 @@ export function prTaskCommand(d: PrTaskDeps): Command {
       const defaults = d.defaults();
       const t = d.startThread(target.projectId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort, prompt(false));
       if (args.focus !== "false") d.focusThread(t.id);
-      const result: PrTaskResult = { threadId: t.id, sent: false, projectId: target.projectId, worktreePath: target.path, createdWorktree, cloned };
+      const result: PrTaskResult = { threadId: t.id, sent: false, projectId: target.projectId, worktreePath: target.path, ...(createdWorktree ? { createdWorktree } : {}), ...(cloned ? { cloned } : {}) };
       const started = `started thread ${label(t)} for PR #${String(n)}`;
       return { message: cloned ? `Cloned ${canon} and ${started}` : `S${started.slice(1)}`, resultJson: JSON.stringify(result) };
     },

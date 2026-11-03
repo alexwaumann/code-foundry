@@ -4726,8 +4726,9 @@ export class World {
           return w;
         },
         thread: (id) => this.threads.get(id),
+        threadIds: () => [...this.threads.keys()],
         startThread: (projectId, path, model, effort, text) => this.createThread(projectId, path, model, effort, { firstMessage: { text, attachments: [], composerText: "" } }),
-        send: (id, text) => this.logs.send(id, text, []),
+        send: (id, text) => Number(this.logs.send(id, text, []).ordinal ?? 0n),
         focusThread: (id) => this.focusThread(id),
         defaults: () => this.threadDefaults(),
         failNext: this.gh.prDetails.failNext,
