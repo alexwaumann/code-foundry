@@ -2,7 +2,8 @@
  * The Pull request surface's state and actions (components/pr). Inner view state lives
  * per panel tab, keyed by panel key + tab id, so switching panel tabs (or selections)
  * keeps it, and closing the tab drops it. Actions are registry commands (pr.refresh,
- * pr.review.request, pr.review, pr.revert, pr.merge) or existing store actions (openUrl, copyText); components
+ * pr.review.request, pr.review, pr.revert, pr.merge, pr.ready, pr.draft, pr.auto-merge, thread.pr.link)
+ * or existing store actions (openUrl, copyText); components
  * call these, never RPCs.
  */
 import { toast } from "sonner";
@@ -17,10 +18,13 @@ import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
 import { allTabs, openSurface, usePanelStore, type PanelState, type PanelTarget } from "./panel";
 import { createResource, type Resource } from "./resource";
 
-export type PrInnerTab = "summary" | "timeline" | "code";
+export type PrInnerTab = "overview" | "activity" | "code";
 export type SortOrder = "newest" | "oldest";
-/** Collapsible sections: the summary's, and the Code tab's file list. */
-export type PrSection = "description" | "checks" | "comments" | "files";
+/**
+ * Collapsible sections: the Overview's, the readiness box's checks row (its full list),
+ * the description shown whole (it fades out until Show all), and the Code tab's file list.
+ */
+export type PrSection = "description" | "fullDescription" | "checks" | "comments" | "files";
 
 export interface PrTabState {
   inner: PrInnerTab;
@@ -30,10 +34,10 @@ export interface PrTabState {
   open: Readonly<Partial<Record<PrSection, boolean>>>;
 }
 
-export const defaultPrTabState: PrTabState = { inner: "summary", commentOrder: "newest", timelineOrder: "newest", open: {} };
+export const defaultPrTabState: PrTabState = { inner: "overview", commentOrder: "newest", timelineOrder: "newest", open: {} };
 
 /** Sections shown unfolded until the user folds them. */
-export const sectionOpenByDefault: Record<PrSection, boolean> = { description: true, checks: true, comments: true, files: true };
+export const sectionOpenByDefault: Record<PrSection, boolean> = { description: true, fullDescription: false, checks: false, comments: true, files: true };
 
 interface PrPanelState {
   /** By prTabKey(panelKey, tabId). */
@@ -53,9 +57,13 @@ interface PrPanelState {
   merging: Readonly<Record<string, boolean>>;
   /** pullRequestKey → a pr.review in flight (until the detail shows it). */
   reviewing: Readonly<Record<string, boolean>>;
+  /** pullRequestKey → a pr.ready, pr.draft or pr.auto-merge in flight (until the detail shows it). */
+  changing: Readonly<Record<string, boolean>>;
+  /** Lower-case repository slug → the merge method last chosen there (the split button's default). */
+  mergeMethods: Readonly<Record<string, MergeMethodView>>;
 }
 
-export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {} }));
+export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, mergeMethods: {} }));
 
 export const prTabKey = (panelKey: string, tabId: string): string => `${panelKey}\u0000${tabId}`;
 
@@ -255,6 +263,7 @@ export async function revertPullRequest(ref: PrRef, panel: PanelTarget): Promise
 export async function mergePullRequest(ref: PrRef, method: MergeMethodView, deleteBranch: boolean, headSha: string): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().merging[key]) return false;
+  rememberMergeMethod(ref.slug, method);
   usePrPanelStore.setState((s) => ({ merging: { ...s.merging, [key]: true } }));
   try {
     const res = await runCommandForResult("pr.merge", mergeArgs(ref, method, deleteBranch, headSha), { quiet: true });
@@ -299,6 +308,62 @@ export async function submitReview(ref: PrRef, verdict: Verdict, body: string): 
       return { reviewing: rest };
     });
   }
+}
+
+/** Remembers the merge method chosen in slug's repository: the split buttons' default there. */
+export function rememberMergeMethod(slug: string, method: MergeMethodView): void {
+  const k = slug.toLowerCase();
+  if (usePrPanelStore.getState().mergeMethods[k] === method) return;
+  usePrPanelStore.setState((s) => ({ mergeMethods: { ...s.mergeMethods, [k]: method } }));
+}
+
+/**
+ * Runs one of the pull request's state changes (pr.ready, pr.draft, pr.auto-merge), the
+ * daemon's message toasted. Busy (`changing`) until the detail is read again, so the box
+ * shows the new state when its button comes back; a failure frees it at once. A second
+ * call while one runs sends nothing.
+ */
+async function changePullRequest(ref: PrRef, command: string, args: Record<string, string>): Promise<boolean> {
+  const key = pullRequestKey(ref.slug, ref.number);
+  if (usePrPanelStore.getState().changing[key]) return false;
+  usePrPanelStore.setState((s) => ({ changing: { ...s.changing, [key]: true } }));
+  let ok = false;
+  try {
+    ok = await runCommand(command, args);
+    return ok;
+  } finally {
+    pullRequestDetailResource.invalidate(key);
+    if (ok) await settled(pullRequestDetailResource, (k) => k === key);
+    usePrPanelStore.setState((s) => {
+      const { [key]: _done, ...rest } = s.changing;
+      return { changing: rest };
+    });
+  }
+}
+
+/** The draft row's Ready for review (pr.ready) and the menu's Convert to draft (pr.draft). */
+export function setPullRequestDraft(ref: PrRef, draft: boolean): Promise<boolean> {
+  return changePullRequest(ref, draft ? "pr.draft" : "pr.ready", prArgs(ref));
+}
+
+/** pr.auto-merge's args: on with a method and the head shown (refused if it moved), or --off. */
+export function autoMergeArgs(ref: PrRef, method: MergeMethodView | null, headSha: string): Record<string, string> {
+  if (method === null) return { ...prArgs(ref), off: "true" };
+  return { ...prArgs(ref), method, ...(headSha ? { "head-sha": headSha } : {}) };
+}
+
+/**
+ * The footer's Auto-merge (a method: GitHub merges it once its requirements pass; the
+ * daemon confirms first) and Cancel auto-merge (null).
+ */
+export function setAutoMerge(ref: PrRef, method: MergeMethodView | null, headSha: string): Promise<boolean> {
+  if (method !== null) rememberMergeMethod(ref.slug, method);
+  return changePullRequest(ref, "pr.auto-merge", autoMergeArgs(ref, method, headSha));
+}
+
+/** Menu → Link to this thread: thread.pr.link (a manual link; there is no unlink). */
+export function linkPullRequestToThread(threadId: string, ref: PrRef): Promise<boolean> {
+  return runCommand("thread.pr.link", { id: threadId, pr: `${ref.slug}#${String(ref.number)}` });
 }
 
 /** Menu → Copy link (and shift+cmd+c in the panel). */

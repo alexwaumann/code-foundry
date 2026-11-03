@@ -111,3 +111,9 @@ export function mergeMethodHint(method: MergeMethodView, commitCount: number, ba
       return `Replays ${commits} onto ${base}.`;
   }
 }
+
+/** The line under a method in the Auto-merge menu. */
+export function autoMergeHint(method: MergeMethodView): string {
+  const how = method === "merge" ? "with a merge commit" : method === "squash" ? "as one commit" : "by rebasing";
+  return `GitHub merges it ${how} once its required checks and reviews pass.`;
+}

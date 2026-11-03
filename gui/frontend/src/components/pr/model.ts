@@ -1,8 +1,8 @@
 /**
- * Pure view logic of the Pull request surface: state badge, checks headline, check
+ * Pure view logic of the Pull request surface: state badge, check
  * tones and durations, reviewer status, the summary's conversation and the timeline.
  */
-import type { CheckRollupView, CheckView, PullRequestCommentView, PullRequestCommitView, PullRequestDetailView, PullRequestReviewerView, PullRequestView, ReviewThreadView } from "@/api/gh";
+import type { CheckView, PullRequestCommentView, PullRequestCommitView, PullRequestDetailView, PullRequestReviewerView, PullRequestView, ReviewThreadView } from "@/api/gh";
 import { shortAge } from "@/components/prs/format";
 import { formatUptime } from "@/lib/format";
 import type { SortOrder } from "@/stores/prPanel";
@@ -21,19 +21,6 @@ export function stateBadge(pr: Pick<PullRequestView, "state" | "draft">): { labe
     default:
       return { label: "Unknown", tone: "neutral" };
   }
-}
-
-/**
- * The header's checks line from the rollup: "All checks passed", "2 failing", "3 pending",
- * "No checks". A failing or pending state without a count says so without a number.
- */
-export function checksHeadline(c: CheckRollupView): { tone: Tone; text: string } {
-  if (c.total === 0 && c.state === "none") return { tone: "neutral", text: "No checks" };
-  if (c.failed > 0) return { tone: "failure", text: `${String(c.failed)} failing` };
-  if (c.state === "failure" || c.state === "error") return { tone: "failure", text: "Checks failing" };
-  if (c.pending > 0) return { tone: "pending", text: `${String(c.pending)} pending` };
-  if (c.state === "pending" || c.state === "expected") return { tone: "pending", text: "Checks pending" };
-  return { tone: "success", text: "All checks passed" };
 }
 
 const failing = new Set(["failure", "timed_out", "cancelled", "action_required", "startup_failure", "error"]);
@@ -204,4 +191,19 @@ export function resolveLink(href: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** "opened 2d ago · updated 5h ago", or merged / closed for those. */
+export function headerAges(d: Pick<PullRequestDetailView, "pullRequest" | "closedAtMs">, now: number): string {
+  const pr = d.pullRequest;
+  const parts = [`opened ${ago(pr.createdAtMs, now) || "—"}`];
+  if (pr.state === "merged") parts.push(`merged ${ago(pr.mergedAtMs ?? d.closedAtMs, now) || "—"}`);
+  else if (pr.state === "closed") parts.push(`closed ${ago(d.closedAtMs, now) || "—"}`);
+  else parts.push(`updated ${ago(pr.updatedAtMs, now) || "—"}`);
+  return parts.join(" · ");
+}
+
+/** Same pull request: the slug ignoring case (GitHub's names are), and the number. */
+export function samePullRequest(a: { slug: string; number: number }, b: { slug: string; number: number }): boolean {
+  return a.number === b.number && a.slug.toLowerCase() === b.slug.toLowerCase();
 }

@@ -15,15 +15,16 @@ import { toneBadge } from "./tones";
 
 
 /**
- * The header's Review ▾, left of Merge: a menu of Approve, Request changes and Comment.
+ * The readiness box's Review ▾, at its footer's left: a menu of Approve, Request changes and Comment.
  * Choosing one opens the surface's review composer with that verdict (onChoose); focus
  * goes there, not back to this button. On the viewer's own pull request Approve and
  * Request changes are disabled (GitHub refuses them), with the reason as a tooltip.
  * Once the viewer has reviewed, the button is a chip saying so ("You approved"), still
- * opening the menu: GitHub takes another review. Shown only on open pull requests the
- * viewer can write to (like the reviewer picker); below 340px only the icons stay.
+ * opening the menu: GitHub takes another review. `primary` (the viewer's review is
+ * requested, again too) makes it the box's primary button, saying Review. Shown only on
+ * open pull requests the viewer can write to (like the reviewer picker).
  */
-export function ReviewButton({ prRef, detail, onChoose }: { prRef: PrRef; detail: PullRequestDetailView; onChoose: (v: Verdict) => void }) {
+export function ReviewButton({ prRef, detail, onChoose, primary = false }: { prRef: PrRef; detail: PullRequestDetailView; onChoose: (v: Verdict) => void; primary?: boolean }) {
   const viewer = useViewerLogin();
   const busy = usePrPanelStore((s) => s.reviewing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   const [open, setOpen] = useState(false);
@@ -40,7 +41,7 @@ export function ReviewButton({ prRef, detail, onChoose }: { prRef: PrRef; detail
   // A chosen verdict hands focus to the composer, so the menu must not take it back.
   const keepFocus = useRef(false);
   if (!reviewVisible(detail)) return null;
-  const mine = yourReview(detail.reviewers, viewer);
+  const mine = primary ? null : yourReview(detail.reviewers, viewer);
   const disabled = disabledVerdicts(detail.pullRequest.author, viewer);
   const Icon = mine ? yourReviewIcon[mine] : Eye;
   return (
@@ -59,23 +60,26 @@ export function ReviewButton({ prRef, detail, onChoose }: { prRef: PrRef; detail
           type="button"
           data-testid={mine ? "pr-your-review" : "pr-review-button"}
           data-review={mine ?? undefined}
+          data-primary={primary || undefined}
           aria-disabled={busy || undefined}
           aria-busy={busy || undefined}
           className={cn(
             "flex h-7 shrink-0 items-center gap-1 rounded-md border text-label shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/60",
             mine
-              ? cn("px-2 @max-[340px]:px-1.5", toneBadge[YOUR_REVIEW_SPECS[mine].tone], "hover:brightness-110 aria-expanded:brightness-110")
-              : "bg-cf-canvas pr-1.5 pl-2 hover:bg-cf-control-hover aria-expanded:bg-cf-control-hover @max-[340px]:pl-1.5 dark:border-cf-input dark:bg-cf-input/30 dark:hover:bg-cf-input/50 dark:aria-expanded:bg-cf-input/50",
+              ? cn("px-2", toneBadge[YOUR_REVIEW_SPECS[mine].tone], "hover:brightness-110 aria-expanded:brightness-110")
+              : primary
+                ? "border-transparent bg-cf-accent pr-1.5 pl-2 text-cf-accent-foreground hover:bg-cf-accent/90 aria-expanded:bg-cf-accent/90"
+                : "bg-cf-canvas pr-1.5 pl-2 hover:bg-cf-control-hover aria-expanded:bg-cf-control-hover dark:border-cf-input dark:bg-cf-input/30 dark:hover:bg-cf-input/50 dark:aria-expanded:bg-cf-input/50",
             busy && "cursor-default",
           )}
         >
           {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Icon className="size-3.5" aria-hidden />}
-          <span className="whitespace-nowrap @max-[340px]:sr-only">{mine ? YOUR_REVIEW_SPECS[mine].label : "Review"}</span>
+          <span className="whitespace-nowrap">{mine ? YOUR_REVIEW_SPECS[mine].label : "Review"}</span>
           {!mine && <ChevronDown className="size-3.5 opacity-70" aria-hidden />}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        align="end"
+        align="start"
         collisionBoundary={boundary}
         collisionPadding={POPUP_COLLISION_PADDING}
         className={cn("w-80", POPUP_FIT)}

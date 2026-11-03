@@ -30,7 +30,7 @@ export function resetPrStores(selection: Selection = PR_PAGE): void {
   reviewerCandidatesResource.store.setState({ entries: {} });
   dashboardResource.store.setState({ entries: {} });
   viewerResource.store.setState({ entries: {} });
-  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {} });
+  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, mergeMethods: {} });
   usePrThreadsStore.setState({ starting: {} });
   useReviewerRecentsStore.setState({ bySlug: {} });
   usePanelStore.setState({ byKey: {} });

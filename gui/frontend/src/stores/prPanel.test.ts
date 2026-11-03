@@ -254,8 +254,8 @@ describe("inner state per tab", () => {
     const tab = makeTab("pullrequest", "#7", { slug: SLUG, number: "7" });
     openSurface("thread:a", tab);
     openSurface("thread:b", tab);
-    setInnerTab(prTabKey("thread:a", tab.id), "timeline");
-    setInnerTab(prTabKey("thread:b", tab.id), "timeline");
+    setInnerTab(prTabKey("thread:a", tab.id), "activity");
+    setInnerTab(prTabKey("thread:b", tab.id), "activity");
 
     closePanelTab("thread:a", tab.id);
     expect(Object.keys(usePrPanelStore.getState().byTab)).toEqual([prTabKey("thread:b", tab.id)]);

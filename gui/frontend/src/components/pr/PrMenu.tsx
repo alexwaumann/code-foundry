@@ -7,9 +7,13 @@ import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
-import { openUrl, pullRequestKey, useFreshness } from "@/stores/gh";
-import { copyPullRequestLink, refreshPullRequest, revertPullRequest, usePrPanelStore } from "@/stores/prPanel";
+import { openUrl, pullRequestKey, useFreshness, useViewerLogin } from "@/stores/gh";
+import { copyPullRequestLink, linkPullRequestToThread, refreshPullRequest, revertPullRequest, setPullRequestDraft, usePrPanelStore } from "@/stores/prPanel";
 import { startingKey, startPrThread, usePrThreadsStore, type PrThreadKind } from "@/stores/prThreads";
+import { useThreadsStore } from "@/stores/threads";
+import { useUiStore } from "@/stores/ui";
+import { samePullRequest } from "./model";
+import { sameLogin } from "./review";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { COPY_LINK_CHORD, POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 
@@ -51,6 +55,16 @@ function useStarting(prRef: PrRef, kind: PrThreadKind): boolean {
 }
 
 /**
+ * The selected thread when it does not list ref among its linked pull requests (Link to
+ * this thread); null otherwise (no thread selected, or linked already).
+ */
+function useLinkableThread(ref: PrRef): string | null {
+  const id = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : null));
+  const linked = useThreadsStore((s) => (id === null ? true : (s.byId[id]?.linkedPullRequests ?? []).some((l) => samePullRequest(l, ref))));
+  return linked ? null : id;
+}
+
+/**
  * The header's ⋯ menu, in T3 Code's order. Every action is a registry command or a store
  * action. Ask a question opens the surface's composer (onAsk), or focuses it again when it
  * is open; Explain and Fix findings start their thread at once, keeping the menu
@@ -58,6 +72,7 @@ function useStarting(prRef: PrRef, kind: PrThreadKind): boolean {
  * focusable; a second select sends nothing) wherever the pull request is shown.
  */
 export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detail: PullRequestDetailView; panelKey: string; onAsk: () => void }) {
+  const viewer = useViewerLogin();
   const busy = usePrPanelStore((s) => s.refreshing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   const explaining = useStarting(prRef, "explain");
   const fixing = useStarting(prRef, "fix");
@@ -72,6 +87,9 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
   const pr = detail.pullRequest;
   const url = pr.url || `https://github.com/${prRef.slug}/pull/${String(prRef.number)}`;
   const canRevert = pr.state === "merged" && detail.viewerCanUpdate;
+  // GitHub lets the author or anyone with write access convert an open pull request.
+  const canDraft = pr.state === "open" && !pr.draft && (detail.viewerCanUpdate || sameLogin(pr.author, viewer));
+  const linkThread = useLinkableThread(prRef);
   const { ref: boundaryRef, boundary } = usePanelBoundary();
   const trigger = useRef<HTMLButtonElement | null>(null);
   // The last press outside the menu was on the ⋯ button (see onPointerDownOutside).
@@ -178,6 +196,17 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         >
           <Item busy={fixing} title="Fix findings in a thread" />
         </DropdownMenuItem>
+        {(canDraft || linkThread !== null) && <DropdownMenuSeparator />}
+        {canDraft && (
+          <DropdownMenuItem data-testid="pr-menu-draft" onSelect={() => void setPullRequestDraft(prRef, true)}>
+            <Item title="Convert to draft" hint="Reviewers are not asked again until it is marked ready." />
+          </DropdownMenuItem>
+        )}
+        {linkThread !== null && (
+          <DropdownMenuItem data-testid="pr-menu-link" onSelect={() => void linkPullRequestToThread(linkThread, prRef)}>
+            <Item title="Link to this thread" hint="Lists it with the thread's pull requests." />
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem data-testid="pr-menu-open" onSelect={() => void openUrl(url)}>
           <Item title="Open on GitHub" />
