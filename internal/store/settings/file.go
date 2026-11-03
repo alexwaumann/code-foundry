@@ -113,7 +113,8 @@ func renameMovedKeys(raw map[string]string) {
 			continue
 		}
 		delete(raw, old)
-		if _, set := raw[key]; !set {
+		// An empty new key means unset, so it does not override the old value.
+		if cur, set := raw[key]; !set || cur == "" {
 			raw[key] = v
 		}
 	}

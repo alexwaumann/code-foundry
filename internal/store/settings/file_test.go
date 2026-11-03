@@ -94,6 +94,8 @@ func TestDecodeMovedKeys(t *testing.T) {
 			want: map[string]string{"threads.auto_name": "false", KeyUtilityModel: "claude-4.5-haiku[1m]"}},
 		{name: "the new key wins over the old", in: "[threads]\nnaming_model = \"claude-4.5-haiku[1m]\"\n[models]\nutility = \"claude-haiku-5-5[1m]\"\n",
 			want: map[string]string{KeyUtilityModel: "claude-haiku-5-5[1m]"}},
+		{name: "an empty new key: the old value moves", in: "[threads]\nnaming_model = \"claude-haiku-5-5[1m]\"\n[models]\nutility = \"\"\n",
+			want: map[string]string{KeyUtilityModel: "claude-haiku-5-5[1m]"}},
 		{name: "the new key alone", in: "[models]\nutility = \"claude-haiku-5-5[1m]\"\n",
 			want: map[string]string{KeyUtilityModel: "claude-haiku-5-5[1m]"}},
 		{name: "an invalid old value moves and is reported under the new key", in: "[threads]\nnaming_model = \"gpt-5\"\n",
