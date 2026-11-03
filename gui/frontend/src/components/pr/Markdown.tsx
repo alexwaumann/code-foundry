@@ -10,8 +10,13 @@ import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
 
-/** A link: through openUrl (resolveLink: relative ones are github.com paths), or plain text when it goes nowhere. */
-function Link({ href, children, tip }: { href?: string | undefined; children?: ReactNode; tip?: string | undefined }) {
+/**
+ * A link: through openUrl (resolveLink: relative ones are github.com paths), or plain text
+ * when it goes nowhere. With `open` (MarkdownExtras.openLink), a plain click asks it first
+ * and opens the browser only when it declines; a cmd, ctrl or middle click always opens the
+ * browser.
+ */
+function Link({ href, children, tip, open }: { href?: string | undefined; children?: ReactNode; tip?: string | undefined; open?: ((url: string) => boolean) | undefined }) {
   const url = resolveLink(href);
   // A link whose target was stripped (javascript:, an anchor) is plain text: no href,
   // no pointer, nothing to click.
@@ -29,13 +34,28 @@ function Link({ href, children, tip }: { href?: string | undefined; children?: R
         onClick={(e) => {
           // Never navigate the app's own webview: links open in the browser.
           e.preventDefault();
+          if (open && isPlainClick(e) && open(url)) return;
           void openUrl(url);
         }}
+        onAuxClick={
+          open &&
+          ((e) => {
+            // A middle click is "somewhere else": the browser, as cmd+click.
+            if (e.button !== 1) return;
+            e.preventDefault();
+            void openUrl(url);
+          })
+        }
       >
         {children}
       </a>
     </Tip>
   );
+}
+
+/** A click with the main button and no cmd or ctrl (which mean "in the browser"). */
+function isPlainClick(e: Pick<MouseEvent, "button" | "metaKey" | "ctrlKey">): boolean {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey;
 }
 
 const baseComponents: Components = {
@@ -100,18 +120,25 @@ export interface MarkdownExtras {
    * thread's answer, where `[main.go](src/main.go)` means a file).
    */
   link?: (href: string, children: ReactNode) => ReactNode;
+  /**
+   * A plain click on a link that goes somewhere (its resolved URL): true when the surface
+   * opened it itself (a GitHub pull request in the side panel: components/pr/prLinks.ts),
+   * false to open the browser. Cmd, ctrl and middle clicks always open the browser. Without
+   * it, every link opens the browser.
+   */
+  openLink?: (url: string) => boolean;
 }
 
 function withExtras(extras: MarkdownExtras): Components {
-  const { code, image, table, pathChip, link } = extras;
+  const { code, image, table, pathChip, link, openLink } = extras;
   return {
     ...baseComponents,
-    ...(link && {
+    ...((link || openLink) && {
       a: ({ href, children, title }) =>
-        typeof href === "string" && isRelativeHref(href) ? (
+        link && typeof href === "string" && isRelativeHref(href) ? (
           <>{link(href, children)}</>
         ) : (
-          <Link href={href} tip={title}>
+          <Link href={href} tip={title} open={openLink}>
             {children}
           </Link>
         ),
@@ -157,7 +184,7 @@ function rehypeFor(extras: MarkdownExtras | undefined): RehypePlugins {
  * GitHub-flavoured markdown (tables, task lists, strikethrough, autolinks) with the raw
  * HTML GitHub bodies use, sanitized by markdownSchema; react-markdown's URL transform also
  * strips unsafe schemes, so a body cannot inject markup or script. Links open through
- * openUrl (view.open.url). `extras` adds renderers and can turn raw HTML off (pass a
+ * openUrl (view.open.url), unless extras.openLink takes a plain click. `extras` adds renderers and can turn raw HTML off (pass a
  * stable object).
  */
 export const Markdown = memo(function Markdown({ children, className, extras }: { children: string; className?: string; extras?: MarkdownExtras }) {

@@ -171,7 +171,7 @@ export function AgentReport({ text }: { text: string }) {
   if (!text) return null;
   return (
     <div className="subresult selectable" data-testid="thread-agent-report">
-      <ThreadMarkdown>{text}</ThreadMarkdown>
+      <ThreadMarkdown browserLinks>{text}</ThreadMarkdown>
     </div>
   );
 }

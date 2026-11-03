@@ -8,6 +8,7 @@ import { openUrl } from "@/stores/gh";
 import { usePrPanelStore } from "@/stores/prPanel";
 import { Avatar } from "./Avatar";
 import { Markdown } from "./Markdown";
+import { usePanelMarkdownExtras } from "./prLinks";
 import { ago, reviewVerb, timeline, type TimelineEntry } from "./model";
 import { toneText } from "./tones";
 import { VirtualStack } from "./VirtualStack";
@@ -55,6 +56,7 @@ function Meta({ children }: { children: ReactNode }) {
 }
 
 function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: number; pos: RailPos }) {
+  const extras = usePanelMarkdownExtras();
   switch (e.kind) {
     case "merged":
       return (
@@ -115,7 +117,7 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
             <span className={cn("whitespace-nowrap", e.kind === "review" ? tone : "text-cf-text-muted")}>{verdict}</span>
             <span className="text-caption whitespace-nowrap">{ago(e.atMs, now)}</span>
           </span>
-          {c.body && <Markdown className="line-clamp-4">{c.body}</Markdown>}
+          {c.body && <Markdown className="line-clamp-4" extras={extras}>{c.body}</Markdown>}
         </Entry>
       );
     }
