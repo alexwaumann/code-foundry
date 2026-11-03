@@ -411,7 +411,13 @@ type SubscribeThreadRequest struct {
 	// Why: kept on the subscription (on one line, at most 200 characters; longer is
 	// INVALID_ARGUMENT), carried by its wake (a timer's header and JSON, the others'
 	// JSON) and listed. Subscribing again with a note replaces the note.
-	Note          string `protobuf:"bytes,14,opt,name=note,proto3" json:"note,omitempty"`
+	Note string `protobuf:"bytes,14,opt,name=note,proto3" json:"note,omitempty"`
+	// A thread target only (INVALID_ARGUMENT otherwise): fire on the target's next
+	// transition into the condition, never at once even when it meets it now (a send's
+	// busy status follows a debounce). The same subscription (subscriber, target,
+	// condition) existing is returned unchanged (existed): its repeat and note stay.
+	// pr.task's forward uses it (docs/notes/pr-task-forward.md).
+	Next          bool `protobuf:"varint,15,opt,name=next,proto3" json:"next,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -521,6 +527,13 @@ func (x *SubscribeThreadRequest) GetNote() string {
 		return x.Note
 	}
 	return ""
+}
+
+func (x *SubscribeThreadRequest) GetNext() bool {
+	if x != nil {
+		return x.Next
+	}
+	return false
 }
 
 type SubscribeThreadResponse struct {
@@ -843,7 +856,7 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\x04note\x18\x15 \x01(\tR\x04note\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xda\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xee\x04\n" +
 	"\x16SubscribeThreadRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\x12(\n" +
 	"\x10target_thread_id\x18\x02 \x01(\tR\x0etargetThreadId\x12\"\n" +
@@ -856,7 +869,8 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\tcondition\x18\x04 \x01(\x0e2+.codefoundry.v1.ThreadSubscriptionConditionR\tcondition\x12\x16\n" +
 	"\x06repeat\x18\x05 \x01(\bR\x06repeat\x12D\n" +
 	"\x04args\x18\v \x03(\v20.codefoundry.v1.SubscribeThreadRequest.ArgsEntryR\x04args\x12\x12\n" +
-	"\x04note\x18\x0e \x01(\tR\x04note\x1a7\n" +
+	"\x04note\x18\x0e \x01(\tR\x04note\x12\x12\n" +
+	"\x04next\x18\x0f \x01(\bR\x04next\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x91\x01\n" +
