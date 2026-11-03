@@ -227,6 +227,16 @@ func saveLinkHeads(ctx context.Context, db *sql.DB, threadID string, heads map[s
 	return nil
 }
 
+// saveLinkSource makes thread threadID's link to url a link of source with no via
+// thread and no head (a manual link over a branch or child row: prlink_manual.go).
+func saveLinkSource(ctx context.Context, db *sql.DB, threadID, url string, source LinkSource) error {
+	if _, err := db.ExecContext(ctx, `UPDATE thread_pull_requests SET source = ?, via_thread_id = '', head = '' WHERE thread_id = ? AND url = ?`,
+		string(source), threadID, url); err != nil {
+		return fmt.Errorf("thread: save source of link %s of %s: %w", url, threadID, err)
+	}
+	return nil
+}
+
 // deleteLinks removes thread threadID's links to urls (a member removed: members.go; a
 // default-branch link dropped: prlink_branch.go).
 func deleteLinks(ctx context.Context, db *sql.DB, threadID string, urls []string) error {

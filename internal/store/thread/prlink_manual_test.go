@@ -103,7 +103,8 @@ func TestLinkPullRequestByHand(t *testing.T) {
 // TestLinksIgnoreURLCase: a pull request is one link whatever case its URL is in and
 // whichever source comes first (a manual link typed in another case, Claude's record,
 // the daemon's branch match), on the thread and on its creator, live and after a
-// restart. The first source wins.
+// restart. The first source wins, except that a manual link over a branch row makes it
+// manual.
 func TestLinksIgnoreURLCase(t *testing.T) {
 	type step string // "manual", "claude", "branch"
 	tests := []struct {
@@ -114,8 +115,8 @@ func TestLinksIgnoreURLCase(t *testing.T) {
 		{[]step{"manual", "branch", "claude"}, "#5 manual", "#5 child c"},
 		{[]step{"claude", "manual", "branch"}, "#5 claude", "#5 child c"},
 		{[]step{"claude", "branch", "manual"}, "#5 claude", "#5 child c"},
-		{[]step{"branch", "manual", "claude"}, "#5 branch", "#5 child c"},
-		{[]step{"branch", "claude", "manual"}, "#5 branch", "#5 child c"},
+		{[]step{"branch", "manual", "claude"}, "#5 manual", "#5 child c"},
+		{[]step{"branch", "claude", "manual"}, "#5 manual", "#5 child c"},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprint(tt.order), func(t *testing.T) {
@@ -177,6 +178,50 @@ func TestManualLinkKeepsGitHubsSlug(t *testing.T) {
 	_, l, _, err = e.m.LinkPullRequest(e.ctx(), s.ID, "https://github.com/X/Y/pull/2")
 	if err != nil || l.Slug != "X/Y" || l.URL != "https://github.com/X/Y/pull/2" {
 		t.Errorf("not cached: %+v %v; want the slug as written", l, err)
+	}
+}
+
+// TestManualLinkOverBranchLinkStays: linking by hand a pull request the thread has as a
+// branch link (or a child copy of one) makes the row manual, persisted and without a
+// publish, so neither SettleBranchLinks nor a member's removal drops it.
+func TestManualLinkOverBranchLinkStays(t *testing.T) {
+	e := newEnv(t)
+	ids, names := lineage(e, [][2]string{{"p", ""}, {"c", "p"}})
+	c, p := ids["c"], ids["p"]
+	// Unsettled branch links (no Head): #1 on c (copied to p), #2 on c too.
+	e.m.LinkBranchPullRequests(c, childLinks(1, 2))
+	drainEvents(e)
+
+	_, l, linked, err := e.m.LinkPullRequest(e.ctx(), c, "O/R#1")
+	if err != nil || linked || l.Source != LinkManual || l.URL != "https://github.com/o/r/pull/1" {
+		t.Fatalf("link over a branch row: %+v linked=%t %v; want the row, now manual", l, linked, err)
+	}
+	if _, l, _, err := e.m.LinkPullRequest(e.ctx(), p, "o/r#2"); err != nil || l.Source != LinkManual {
+		t.Fatalf("link over a child copy: %+v %v", l, err)
+	}
+	if n := drainEvents(e); n != 0 {
+		t.Errorf("upgrading a row published %d events; want none", n)
+	}
+	if got := linkSources(e.m.Snapshot().Threads[1].LinkedPullRequests, names); !slices.Equal(got, []string{"#1 manual", "#2 branch"}) {
+		t.Errorf("snapshot of c = %q; want the upgrade in it", got)
+	}
+	e.restart()
+	// The default-branch settle drops both URLs: only the branch row #2 (and p's copy
+	// of #2, now manual) are candidates; #1 is manual on c.
+	e.m.SettleBranchLinks(c, nil, []string{"https://github.com/o/r/pull/1", "https://github.com/o/r/pull/2"})
+	for n, w := range map[string][]string{"c": {"#1 manual"}, "p": {"#1 child c", "#2 manual"}} {
+		got, err := e.m.Get(e.ctx(), ids[n])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if facts := linkSources(got.LinkedPullRequests, names); !slices.Equal(facts, w) {
+			t.Errorf("%s links = %q; want %q", n, facts, w)
+		}
+		if n == "c" {
+			if kept, _ := dropBranchLinks(got.LinkedPullRequests, "o/r", nil); len(kept) != 1 {
+				t.Errorf("a member's removal drops the manual link: %+v", kept)
+			}
+		}
 	}
 }
 
