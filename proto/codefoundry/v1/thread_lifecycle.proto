@@ -1041,6 +1041,19 @@ message LinkThreadPullRequestResponse {
   LinkedPullRequest link = 3;
 }
 
+message PullRequestOwnerRequest {
+  string id = 1;
+  // The pull request's repository as the caller names it and as GitHub does now (a
+  // renamed repository); any matches, case aside.
+  repeated string repo_slugs = 2;
+  int32 number = 3;
+}
+
+message PullRequestOwnerResponse {
+  // The owner: id itself when the link is its own, it has none, or the chain broke.
+  string owner_thread_id = 1;
+}
+
 message RemoveThreadProjectRequest {
   string id = 1;
   // The member to drop: its project id or name.

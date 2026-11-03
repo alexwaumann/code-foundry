@@ -49,6 +49,12 @@ Code: `internal/command/commands_prtask.go` (the command and its routing),
   starts with it. No focus intent: the window keeps its selection. From a thread's CLI
   the message carries `by_thread_id` (the caller), so the user's prompt history leaves it
   out, as thread.send's `--by`; from the GUI it is the user's own message.
+* Forwarding (PR E, `pr-task-forward.md`): when the `--thread` thread's link to the pull
+  request is a copy from a thread it created, the task goes to the thread that owns the
+  link (`ThreadService.PullRequestOwner`), with a line saying who sent it from where; the
+  `--thread` thread gets a note and one wake once the owner's turn that handled the task
+  ended (when it can be woken: else the prompt, the note and the message say so). The result gains
+  `viaThreadId` and the message reads `Sent to <owner> for <thread> (#N); <next>`.
 * No `--thread` (rule 3): the projects are listed; a clone of the slug (the argument, or
   GitHub's current name for the repository from the detail's `repo_slug`, so a renamed
   or transferred repository still finds its clone) runs the task in

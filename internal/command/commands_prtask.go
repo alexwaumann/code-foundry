@@ -23,6 +23,9 @@ import (
 // prTask is one pr.task kind.
 type prTask struct {
 	prompt func(*v1.PullRequestDetail, PRTaskOptions) string
+	// title is the task in a few words, for a forward's note and wake ("Fix the
+	// failing checks").
+	title string
 	// push: the task changes the branch and pushes it (placement prThreadFix: a fork's
 	// head must already be checked out somewhere); otherwise it only reads
 	// (prThreadReview). Push tasks also refresh the detail first.
@@ -31,12 +34,12 @@ type prTask struct {
 
 // prTasks are pr.task's kinds by name; PRTaskKinds lists them in help order.
 var prTasks = map[string]prTask{
-	"checks":         {prompt: ChecksPRTaskPrompt, push: true},
-	"review":         {prompt: ReviewPRTaskPrompt, push: true},
-	"conversations":  {prompt: ConversationsPRTaskPrompt, push: true},
-	"conflicts":      {prompt: ConflictsPRTaskPrompt, push: true},
-	"behind":         {prompt: BehindPRTaskPrompt, push: true},
-	"review-request": {prompt: ReviewRequestPRTaskPrompt},
+	"checks":         {prompt: ChecksPRTaskPrompt, title: "Fix the failing checks", push: true},
+	"review":         {prompt: ReviewPRTaskPrompt, title: "Address the requested changes", push: true},
+	"conversations":  {prompt: ConversationsPRTaskPrompt, title: "Address the unresolved conversations", push: true},
+	"conflicts":      {prompt: ConflictsPRTaskPrompt, title: "Resolve the conflicts", push: true},
+	"behind":         {prompt: BehindPRTaskPrompt, title: "Bring the branch up to date", push: true},
+	"review-request": {prompt: ReviewRequestPRTaskPrompt, title: "Review it (read-only)"},
 }
 
 // PRTaskKinds are pr.task's kind values.
@@ -44,8 +47,12 @@ var PRTaskKinds = []string{"checks", "review", "conversations", "conflicts", "be
 
 // PRTaskResult is pr.task's result JSON.
 type PRTaskResult struct {
-	// ThreadID is the thread the task went to: the --thread one, or the new one.
+	// ThreadID is the thread the task went to: the --thread one (or the thread its link
+	// to the pull request came through, ViaThreadID), or the new one.
 	ThreadID string `json:"threadId"`
+	// ViaThreadID is the --thread thread when the task was forwarded from it to the
+	// thread that owns its link to the pull request (ThreadID; docs/notes/pr-task-forward.md).
+	ViaThreadID string `json:"viaThreadId,omitempty"`
 	// Sent: the task went into an existing thread as a message; false when a thread was
 	// started for it.
 	Sent bool `json:"sent"`
@@ -76,7 +83,9 @@ func prTaskCommand(d PullRequestThreadDeps, slug, number, worktree, model, effor
 			{Name: "kind", Type: Enum, Enum: PRTaskKinds, Required: true, Positional: true,
 				Description: "checks, review (requested changes), conversations (unresolved review threads), conflicts, behind (update with the base), or review-request (review it, read-only)"},
 			{Name: "thread", Type: String, ID: ThreadID,
-				Description: "Send the task into this thread (as thread.send: mid-turn while it works) instead of starting one" + IDHelp},
+				Description: "Send the task into this thread (as thread.send: mid-turn while it works) instead of starting one. " +
+					"When its link to the pull request came from a thread it created, the task goes to that thread instead, " +
+					"and this one gets a note and one wake when that thread settles" + IDHelp},
 			worktree, model, effort, createdFocusArg,
 		},
 		When: hasPullRequest,
@@ -98,7 +107,7 @@ func prTaskCommand(d PullRequestThreadDeps, slug, number, worktree, model, effor
 				return Result{}, err
 			}
 			if id != "" {
-				return d.sendPRTask(ctx, uctx, id, n, task, detail)
+				return d.sendPRTask(ctx, uctx, id, prTaskSlugs(s, detail.GetPullRequest().GetRepoSlug()), n, task, detail)
 			}
 			return d.startPRTask(ctx, a, s, n, task, detail)
 		},
@@ -122,9 +131,10 @@ func checkPRTaskArgs(a Args, toThread bool) error {
 	return nil
 }
 
-// sendPRTask sends the task into thread id as a follow-up message. The window keeps its
-// selection.
-func (d PullRequestThreadDeps) sendPRTask(ctx context.Context, uctx Context, id string, n int, task prTask, detail *v1.PullRequestDetail) (Result, error) {
+// sendPRTask sends the task into thread id as a follow-up message, or, when id's link
+// to the pull request (number, any of slugs) came through a thread it created, into the
+// thread that owns the link (forwardPRTask). The window keeps its selection.
+func (d PullRequestThreadDeps) sendPRTask(ctx context.Context, uctx Context, id string, slugs []string, n int, task prTask, detail *v1.PullRequestDetail) (Result, error) {
 	prompt := task.prompt(detail, PRTaskOptions{FollowUp: true})
 	if err := checkPRPromptSize(n, prompt); err != nil {
 		return Result{}, err
@@ -137,25 +147,68 @@ func (d PullRequestThreadDeps) sendPRTask(ctx context.Context, uctx Context, id 
 		return Result{}, wrapStep("find thread "+id, err)
 	}
 	th := got.Msg.GetThread()
-	// From a thread's CLI the message is that thread's, as thread.send's --by: the
-	// user's prompt history leaves it out.
-	var by string
-	if uctx.ActiveView == "" {
-		by = uctx.CallerThreadID
+	if owner := d.prTaskOwner(ctx, th, slugs, n); owner != nil {
+		if res, sent, err := d.forwardPRTask(ctx, uctx, th, owner, n, task, detail); sent || err != nil {
+			return res, err
+		}
+		// The owner was removed since: the task goes to th, which can delegate.
 	}
-	res, err := d.Thread.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: th.GetId(), Text: prompt, ByThreadId: by}))
-	if r, ok := removedFrom(err); ok {
-		return removedWaitResult(r, ""), nil // removed since the Get
+	ordinal, removed, err := d.sendPRTaskTo(ctx, uctx, th, prompt)
+	if removed != nil {
+		return removedWaitResult(removed, ""), nil // removed since the Get
 	}
 	if err != nil {
-		return Result{}, wrapStep("send to thread "+threadLabel(th), err)
+		return Result{}, err
 	}
-	// As thread.send: the message's ordinal and how to wait for the answer.
-	msg, ordinal := "Sent to "+threadLabel(th), res.Msg.GetItem().GetOrdinal()
+	return d.sentPRTask(ctx, uctx, th, nil, ordinal), nil
+}
+
+// prTaskSlugs are the names a thread's link to the pull request may have: the argument
+// and GitHub's current one (a renamed repository), once each, case aside.
+func prTaskSlugs(arg, canon string) []string {
+	if canon == "" || strings.EqualFold(arg, canon) {
+		return []string{arg}
+	}
+	return []string{arg, canon}
+}
+
+// prTaskBy is the sending thread of a pr.task message: from a thread's CLI the message
+// is that thread's, as thread.send's --by (the user's prompt history leaves it out);
+// from the GUI it is the user's own.
+func prTaskBy(uctx Context) string {
+	if uctx.ActiveView == "" {
+		return uctx.CallerThreadID
+	}
+	return ""
+}
+
+// sendPRTaskTo sends prompt into th, as thread.send, and returns the message's ordinal;
+// removed when th was removed since it was read.
+func (d PullRequestThreadDeps) sendPRTaskTo(ctx context.Context, uctx Context, th *v1.Thread, prompt string) (int64, *v1.RemovedThread, error) {
+	res, err := d.Thread.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: th.GetId(), Text: prompt, ByThreadId: prTaskBy(uctx)}))
+	if r, ok := removedFrom(err); ok {
+		return 0, r, nil
+	}
+	if err != nil {
+		return 0, nil, wrapStep("send to thread "+threadLabel(th), err)
+	}
+	return res.Msg.GetItem().GetOrdinal(), nil, nil
+}
+
+// sentPRTask is pr.task's answer for a task sent into th as its message ordinal, from
+// via when it was forwarded (nil otherwise): "Sent to <th> [for <via>] (#N); <next>",
+// next as thread.send's.
+func (d PullRequestThreadDeps) sentPRTask(ctx context.Context, uctx Context, th, via *v1.Thread, ordinal int64) Result {
+	msg := "Sent to " + threadLabel(th)
+	out := PRTaskResult{ThreadID: th.GetId(), Sent: true, Ordinal: ordinal}
+	if via != nil {
+		msg += " for " + threadLabel(via)
+		out.ViaThreadID = via.GetId()
+	}
 	if ordinal > 0 {
 		msg += fmt.Sprintf(" (#%d); %s", ordinal, sendNext(ctx, d.Thread, uctx.CallerThreadID, th.GetId(), ordinal))
 	}
-	return Result{Message: msg, JSON: PRTaskResult{ThreadID: th.GetId(), Sent: true, Ordinal: ordinal}}, nil
+	return Result{Message: msg, JSON: out}
 }
 
 // startPRTask starts a thread for the task (routing rules 3 and 4 of the pull request

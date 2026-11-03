@@ -411,7 +411,22 @@ type SubscribeThreadRequest struct {
 	// Why: kept on the subscription (on one line, at most 200 characters; longer is
 	// INVALID_ARGUMENT), carried by its wake (a timer's header and JSON, the others'
 	// JSON) and listed. Subscribing again with a note replaces the note.
-	Note          string `protobuf:"bytes,14,opt,name=note,proto3" json:"note,omitempty"`
+	Note string `protobuf:"bytes,14,opt,name=note,proto3" json:"note,omitempty"`
+	// A thread target only (INVALID_ARGUMENT otherwise; before_send and after_ordinal
+	// exclusive). pr.task's forward (docs/notes/pr-task-forward.md) subscribes before it
+	// sends, so a refusal is known before the message promises a wake, then arms the
+	// subscription with the sent message's ordinal. before_send: the subscription never
+	// fires until a Subscribe with the same subscriber, target and condition gives
+	// after_ordinal. after_ordinal: the target meets the condition only once a turn that
+	// took in the message with this ordinal (or a later one) ended (Thread's handled
+	// ordinal), or on a pending request asked after it; at once when that already
+	// happened. The same subscription existing: before_send leaves it unchanged; an
+	// unarmed one is armed; an armed one waits for the later ordinal; any other keeps its
+	// repeat flag and gate, and the note goes on its next wake only (added to that wake's
+	// note, not stored). Neither is kept across a daemon restart (the subscription then
+	// fires on the next transition).
+	BeforeSend    bool  `protobuf:"varint,15,opt,name=before_send,json=beforeSend,proto3" json:"before_send,omitempty"`
+	AfterOrdinal  int64 `protobuf:"varint,16,opt,name=after_ordinal,json=afterOrdinal,proto3" json:"after_ordinal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -521,6 +536,20 @@ func (x *SubscribeThreadRequest) GetNote() string {
 		return x.Note
 	}
 	return ""
+}
+
+func (x *SubscribeThreadRequest) GetBeforeSend() bool {
+	if x != nil {
+		return x.BeforeSend
+	}
+	return false
+}
+
+func (x *SubscribeThreadRequest) GetAfterOrdinal() int64 {
+	if x != nil {
+		return x.AfterOrdinal
+	}
+	return 0
 }
 
 type SubscribeThreadResponse struct {
@@ -843,7 +872,7 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\x04note\x18\x15 \x01(\tR\x04note\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xda\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa0\x05\n" +
 	"\x16SubscribeThreadRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\x12(\n" +
 	"\x10target_thread_id\x18\x02 \x01(\tR\x0etargetThreadId\x12\"\n" +
@@ -856,7 +885,10 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\tcondition\x18\x04 \x01(\x0e2+.codefoundry.v1.ThreadSubscriptionConditionR\tcondition\x12\x16\n" +
 	"\x06repeat\x18\x05 \x01(\bR\x06repeat\x12D\n" +
 	"\x04args\x18\v \x03(\v20.codefoundry.v1.SubscribeThreadRequest.ArgsEntryR\x04args\x12\x12\n" +
-	"\x04note\x18\x0e \x01(\tR\x04note\x1a7\n" +
+	"\x04note\x18\x0e \x01(\tR\x04note\x12\x1f\n" +
+	"\vbefore_send\x18\x0f \x01(\bR\n" +
+	"beforeSend\x12#\n" +
+	"\rafter_ordinal\x18\x10 \x01(\x03R\fafterOrdinal\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x91\x01\n" +

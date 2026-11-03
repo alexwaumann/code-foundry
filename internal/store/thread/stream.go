@@ -449,6 +449,8 @@ func (r *runner) deliver(o *outgoing) bool {
 	if _, err := r.sendMessage(o); err != nil {
 		r.log().warn("send a message that waited for the handshake", "err", err)
 		if o.itemID != "" {
+			// Written queued (queue): Claude will never read it, so it is not queued any more.
+			r.st.proj.w.change(o.itemID, func(x *Item) { x.Queued = false })
 			r.st.proj.w.add(Item{ID: r.st.proj.nextID("err"), Kind: KindError, Text: "Claude did not get this message: " + err.Error()})
 		}
 		return false
@@ -459,7 +461,9 @@ func (r *runner) deliver(o *outgoing) bool {
 // queue takes a message that came before the handshake (a send to a starting thread):
 // its item goes into the timeline now, after the first prompt's (written first so the
 // order holds), and it goes out once Claude answers (onInitialized). It never fails for
-// the handshake's sake: a start that fails is told in the timeline.
+// the handshake's sake: a start that fails is told in the timeline. The item is Queued
+// until it goes out (sendMessage sets the flag to what Claude does with it): Claude has
+// not taken it in, so the first prompt's turn end must not count it handled (handled.go).
 func (r *runner) queue(o *outgoing) (Item, error) {
 	st := r.st
 	if f := st.first; f != nil && f.itemID == "" {
@@ -470,10 +474,14 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 			r.m.setPendingFirstItem(r.id, f.itemID) // the next start must not write it again
 		}
 	}
-	it, err := recordUser(st.proj.w, o)
+	id, err := newUUID()
 	if err != nil {
 		return Item{}, err
 	}
+	o.itemID = id
+	u := userItem(id, o)
+	u.Queued = true
+	it := st.proj.w.add(u)
 	st.queued = append(st.queued, o)
 	st.sd.waiting = true
 	r.checkStatus()
@@ -630,13 +638,16 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 		u := userItem(id, o)
 		u.Queued, u.SeedPrefix, u.MemoryNote = queued, seed, memNote
 		it = st.proj.w.add(u)
-	} else if queued || seed != "" || memNote != "" {
+	} else if cur, _ := st.log.get(id); cur.Queued != queued || seed != "" || memNote != "" {
+		// Written before the handshake (queue: Queued until now, or the first prompt): it
+		// is queued only when Claude works as it arrives. Taken in at once, it counts
+		// toward the turn that reads it now (handled.go).
 		it, _ = st.proj.w.change(id, func(x *Item) {
-			x.Queued = x.Queued || queued
+			x.Queued = queued
 			x.SeedPrefix, x.MemoryNote = seed, memNote
 		})
 	} else {
-		it, _ = st.log.get(id)
+		it = cur
 	}
 	if o.note != "" {
 		r.m.clearResumeNote(r.id, o.resume)

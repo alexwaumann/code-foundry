@@ -4,8 +4,8 @@ import { buttonLabel, isProjectRepo, linksPullRequest, menuHint, menuLabel, prTa
 
 const REF = { slug: "alexwaumann/code-foundry", number: 145 };
 
-function thread(id: string, o: { name?: string; links?: boolean; activity?: number; archived?: boolean; onHead?: boolean; ember?: boolean } = {}): TaskThread {
-  return { id, name: o.name ?? `Thread ${id}`, archived: o.archived ?? false, activity: o.activity ?? 0, links: o.links ?? false, onHead: o.onHead ?? false, ember: o.ember ?? false };
+function thread(id: string, o: { name?: string; links?: boolean; activity?: number; archived?: boolean; user?: boolean } = {}): TaskThread {
+  return { id, name: o.name ?? `Thread ${id}`, archived: o.archived ?? false, activity: o.activity ?? 0, links: o.links ?? false, user: o.user ?? true };
 }
 
 const linked = (id: string, o: Parameters<typeof thread>[1] = {}) => thread(id, { links: true, ...o });
@@ -14,40 +14,40 @@ const linked = (id: string, o: Parameters<typeof thread>[1] = {}) => thread(id, 
 function route(selection: string | null, threads: TaskThread[], isProject = true) {
   const r = taskRouting({ selection, ref: REF, threads, isProject });
   const s = (t: (typeof r.targets)[number]) => (t.kind === "new" ? `new${t.clones ? `(${t.clones})` : ""}` : `${t.kind}:${t.threadId}`);
-  return { default: s(r.default), menu: r.targets.map(s), defaultFirst: r.targets[0] === r.default };
+  return { default: s(r.default), menu: r.targets.map(s) };
 }
 
 describe("taskRouting", () => {
   it.each([
     {
-      name: "rule 1: the selected thread links the pull request → this thread, then new, then others",
+      name: "the selected thread links the pull request: first and the default, then the others, then a new thread",
       selection: "a",
       threads: [linked("a"), linked("b", { activity: 5 })],
-      want: { default: "this:a", menu: ["this:a", "new", "other:b"] },
+      want: { default: "this:a", menu: ["this:a", "other:b", "new"] },
     },
     {
-      name: "rule 2: another thread links it → new thread by default, that thread in the menu, this thread offered",
+      name: "the selected thread does not link it: a new thread by default, listed last, and no this thread",
       selection: "a",
       threads: [thread("a"), linked("b")],
-      want: { default: "new", menu: ["new", "this:a", "other:b"] },
+      want: { default: "new", menu: ["other:b", "new"] },
     },
     {
-      name: "no thread selected (a page): new thread and the linking threads",
+      name: "no thread selected (a page): the linking threads, then a new thread (the default)",
       selection: null,
       threads: [linked("b")],
-      want: { default: "new", menu: ["new", "other:b"] },
+      want: { default: "new", menu: ["other:b", "new"] },
     },
     {
       name: "a selection the store does not know: no this thread",
       selection: "gone",
       threads: [linked("b")],
-      want: { default: "new", menu: ["new", "other:b"] },
+      want: { default: "new", menu: ["other:b", "new"] },
     },
     {
       name: "archived threads are left out of the others",
       selection: null,
       threads: [linked("b", { archived: true }), linked("c")],
-      want: { default: "new", menu: ["new", "other:c"] },
+      want: { default: "new", menu: ["other:c", "new"] },
     },
     {
       name: "an archived selected thread that links it is still this thread",
@@ -56,22 +56,28 @@ describe("taskRouting", () => {
       want: { default: "this:a", menu: ["this:a", "new"] },
     },
     {
-      name: "others: most recently active first, at most three",
+      name: "others: most recently active first, no cap",
       selection: null,
       threads: [linked("b", { activity: 10 }), linked("c", { activity: 40 }), linked("d", { activity: 30 }), linked("e", { activity: 20 }), linked("f", { activity: 1 })],
-      want: { default: "new", menu: ["new", "other:c", "other:d", "other:e"] },
+      want: { default: "new", menu: ["other:c", "other:d", "other:e", "other:b", "other:f", "new"] },
     },
     {
-      name: "others: the head branch checked out first, then the most recently active",
+      name: "the same activity: by id",
       selection: null,
-      threads: [linked("b", { activity: 50 }), linked("c", { activity: 10, onHead: true }), linked("d", { activity: 40 }), linked("e", { activity: 20, onHead: true }), linked("f", { activity: 30 })],
-      want: { default: "new", menu: ["new", "other:e", "other:c", "other:b"] },
+      threads: [linked("c"), linked("b")],
+      want: { default: "new", menu: ["other:b", "other:c", "new"] },
     },
     {
-      name: "the head branch alone does not make a thread a target",
+      name: "a child thread whose creator is alive is never a target, however recent",
       selection: null,
-      threads: [thread("b", { onHead: true }), linked("c")],
-      want: { default: "new", menu: ["new", "other:c"] },
+      threads: [linked("child", { user: false, activity: 99 }), linked("parent", { activity: 1 })],
+      want: { default: "new", menu: ["other:parent", "new"] },
+    },
+    {
+      name: "a child thread selected (opened from its creator): not this thread",
+      selection: "child",
+      threads: [linked("child", { user: false }), linked("parent")],
+      want: { default: "new", menu: ["other:parent", "new"] },
     },
     {
       name: "unrelated threads never show",
@@ -80,47 +86,41 @@ describe("taskRouting", () => {
       want: { default: "new", menu: ["new"] },
     },
     {
-      name: "Ember is never among the others, however recent",
+      name: "Ember's thread links it: among the others by activity",
       selection: "a",
-      threads: [linked("a"), linked("ember", { ember: true, activity: 99, onHead: true }), linked("b", { activity: 5 })],
-      want: { default: "this:a", menu: ["this:a", "new", "other:b"] },
+      threads: [linked("a"), linked("ember", { activity: 99 }), linked("b", { activity: 5 })],
+      want: { default: "this:a", menu: ["this:a", "other:ember", "other:b", "new"] },
     },
     {
-      name: "Ember's chat selected and linking it: a new thread, no this thread",
+      name: "Ember's chat selected and linking it: this thread",
       selection: "ember",
-      threads: [linked("ember", { ember: true }), linked("b")],
-      want: { default: "new", menu: ["new", "other:b"] },
+      threads: [linked("ember"), linked("b")],
+      want: { default: "this:ember", menu: ["this:ember", "other:b", "new"] },
     },
     {
-      name: "Ember's chat selected, not linking it: a new thread, no this thread",
-      selection: "ember",
-      threads: [thread("ember", { ember: true })],
-      want: { default: "new", menu: ["new"] },
-    },
-    {
-      name: "rule 4: the repository is no project → the new thread clones it first",
+      name: "the repository is no project: the new thread clones it first",
       selection: "a",
       threads: [thread("a")],
       isProject: false,
-      want: { default: `new(${REF.slug})`, menu: [`new(${REF.slug})`, "this:a"] },
+      want: { default: `new(${REF.slug})`, menu: [`new(${REF.slug})`] },
     },
   ])("$name", ({ selection, threads, isProject, want }) => {
-    expect(route(selection, threads, isProject)).toEqual({ ...want, defaultFirst: true });
+    expect(route(selection, threads, isProject)).toEqual(want);
   });
 
   it("labels: button, menu item, hint", () => {
-    const r = taskRouting({ selection: "a", ref: REF, threads: [thread("a"), linked("b", { name: "Fix the resize race" }), linked("c", { name: "  " })], isProject: false });
-    expect(r.targets.map((t) => buttonLabel("Fix", t))).toEqual(["Fix in new thread", "Fix in this thread", "Fix in Fix the resize race", "Fix in c"]);
-    expect(r.targets.map(menuLabel)).toEqual(["In a new thread", "In this thread", "In Fix the resize race", "In c"]);
-    expect(r.targets.map(menuHint)).toEqual([`Clones ${REF.slug} first`, "", "", ""]);
+    const r = taskRouting({ selection: "a", ref: REF, threads: [linked("a"), linked("b", { name: "Fix the resize race", activity: 2 }), linked("c", { name: "  ", activity: 1 })], isProject: false });
+    expect(r.targets.map((t) => buttonLabel("Fix", t))).toEqual(["Fix in this thread", "Fix in Fix the resize race", "Fix in c", "Fix in new thread"]);
+    expect(r.targets.map(menuLabel)).toEqual(["In this thread", "In Fix the resize race", "In c", "In a new thread"]);
+    expect(r.targets.map(menuHint)).toEqual(["", "", "", `Clones ${REF.slug} first`]);
   });
 
   it("args: --thread for a thread, none for a new thread", () => {
     const r = taskRouting({ selection: "a", ref: REF, threads: [linked("a"), linked("b")], isProject: true });
     expect(r.targets.map((t) => prTaskArgs(REF, "checks", t))).toEqual([
       { "repo-slug": REF.slug, number: "145", kind: "checks", thread: "a" },
-      { "repo-slug": REF.slug, number: "145", kind: "checks" },
       { "repo-slug": REF.slug, number: "145", kind: "checks", thread: "b" },
+      { "repo-slug": REF.slug, number: "145", kind: "checks" },
     ]);
   });
 });

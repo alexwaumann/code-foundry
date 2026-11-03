@@ -98,6 +98,15 @@ service ThreadService {
   // anything that is not a GitHub pull request. The thread is republished when the link
   // is new. See docs/notes/pr-daemon-actions.md.
   rpc LinkPullRequest(LinkThreadPullRequestRequest) returns (LinkThreadPullRequestResponse) {}
+  // PullRequestOwner names the thread whose own link a thread's link to a pull request
+  // comes from: the thread itself when its link is its own (Claude's record, its branch,
+  // linked by hand) or it has none; for a link copied up from a created thread, the
+  // CreatedBy chain is followed down (each hop's via thread) to the thread whose link is
+  // not a copy. A removed hop, a cycle or a chain deeper than the lineage limit answers
+  // the thread itself. The pull request matches by number and any of repo_slugs, case
+  // aside. NOT_FOUND for an unknown thread (removed: as Get). pr.task --thread forwards
+  // a task with it (docs/notes/pr-task-forward.md).
+  rpc PullRequestOwner(PullRequestOwnerRequest) returns (PullRequestOwnerResponse) {}
   // Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
   // cwd, the deepest winning) and lists one checkout per project in its set: the primary
   // at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
@@ -294,6 +303,10 @@ service ThreadService {
   // runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
   // file (InvalidArgument otherwise); nothing is written to the themes directory.
   rpc ShowTheme(ShowThreadThemeRequest) returns (ShowThreadThemeResponse) {}
+  // AddNote puts a note in a thread's conversation: a `note` item (a line the daemon
+  // adds, not Claude's) at the thread's current position, as ShowHtml places a page. It
+  // starts no turn and does not unarchive the thread. INVALID_ARGUMENT for empty text.
+  rpc AddNote(AddThreadNoteRequest) returns (AddThreadNoteResponse) {}
   // PageStorage returns what the thread's pages keep with the bridge's cf.storage: the
   // GUI host hands it to a page as it loads (docs/notes/bridge-fix-storage.md). Kept by
   // the daemon, one file per thread, because WebKit keeps a page frame's own
@@ -1068,6 +1081,16 @@ message ShowThreadHtmlResponse {
   // When a card was added: an older card of the same page in the thread (shown before
   // the last user message), which reloaded with the edit too; "" when none.
   string earlier_item_id = 3;
+}
+
+message AddThreadNoteRequest {
+  string thread_id = 1;
+  // The note's text, on one line (newlines become spaces).
+  string text = 2;
+}
+
+message AddThreadNoteResponse {
+  ThreadItem item = 1;
 }
 
 message ShowThreadThemeRequest {

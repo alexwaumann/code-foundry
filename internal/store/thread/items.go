@@ -436,6 +436,9 @@ type threadLog struct {
 	saveMcp      func(*McpStatus)
 	// saveMu orders the MCP saves (persistMcp); taken without mu.
 	saveMu sync.Mutex
+	// taken and handled: the highest ordinal of a top-level message Claude took in, and
+	// that ordinal as of the last top-level turn end (handled.go).
+	taken, handled int64
 }
 
 func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *threadLog {
@@ -447,6 +450,9 @@ func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *th
 		}
 	}
 	t.reorderLocked() // a placed message (queued.go) sits after its anchor, not at its ordinal
+	for _, it := range t.items {
+		t.noteHandledLocked(it)
+	}
 	return t
 }
 
@@ -487,6 +493,7 @@ func (t *threadLog) append(it Item) Item {
 		it.Ordinal, it.CreatedAt, it.PlacedAfter = t.items[i].Ordinal, t.items[i].CreatedAt, t.items[i].PlacedAfter
 		it.UpdatedAt = t.now()
 		t.items[i] = it
+		t.noteHandledLocked(it)
 		t.publishLocked(func(seq uint64) ThreadEvent { return ItemUpdated{ThreadID: t.id, Seq: seq, Item: it} }, it.Kind)
 		return it
 	}
@@ -495,6 +502,7 @@ func (t *threadLog) append(it Item) Item {
 	t.nextOrd++
 	t.byID[it.ID] = len(t.items)
 	t.items = append(t.items, it)
+	t.noteHandledLocked(it)
 	t.publishLocked(func(seq uint64) ThreadEvent { return ItemAppended{ThreadID: t.id, Seq: seq, Item: it} }, it.Kind)
 	return it
 }
@@ -511,6 +519,7 @@ func (t *threadLog) update(id string, fn func(*Item)) (Item, bool) {
 	fn(&it)
 	it.UpdatedAt = t.now()
 	t.items[i] = it
+	t.noteHandledLocked(it) // a queued message the process left unread is done with too (closeUnfinished)
 	t.publishLocked(func(seq uint64) ThreadEvent { return ItemUpdated{ThreadID: t.id, Seq: seq, Item: it} }, it.Kind)
 	return it, true
 }

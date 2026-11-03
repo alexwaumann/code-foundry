@@ -181,7 +181,8 @@ interface MockThread {
   /** Mock-only: what runs once a started thread is up (a message that started it: its reply). */
   onReady: (() => void)[];
   /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
-  linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
+  /** via: the direct child a copy came through (the daemon's LinkChild); absent for the thread's own link. */
+  linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date; via?: string }[];
   /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
   usage: MockUsage[];
   /** The thread's context totals (mock/context.ts). */
@@ -2337,14 +2338,29 @@ export class World {
    * unless its URL is already linked, like the daemon. agoMs backdates linkedAt (the
    * record's timestamp). Returns whether it was new.
    */
-  linkPullRequest(id: string, slug: string, number: number, agoMs = 0): boolean {
+  linkPullRequest(id: string, slug: string, number: number, agoMs = 0, up = false): boolean {
     const s = this.thread(id);
     if (!/^[^/\s]+\/[^/\s]+$/.test(slug) || !Number.isInteger(number) || number <= 0) throw new CommandError("invalid", "slug must be owner/name and number a positive integer");
     if (!Number.isFinite(agoMs) || agoMs < 0) throw new CommandError("invalid", "ago must be a non-negative number of milliseconds");
     const url = `https://github.com/${slug}/pull/${String(number)}`;
     if (s.linkedPullRequests.some((l) => l.url === url)) return false;
-    s.linkedPullRequests = [...s.linkedPullRequests, { slug, number, url, linkedAt: new Date(Date.now() - agoMs) }];
+    const linkedAt = new Date(Date.now() - agoMs);
+    s.linkedPullRequests = [...s.linkedPullRequests, { slug, number, url, linkedAt }];
     this.publishThread(s);
+    // up: copied up the creator chain as the daemon does (prlink_children.go), via the
+    // direct child at each hop; a creator that has the URL keeps its row.
+    const seen = new Set([id]);
+    let child = s;
+    while (up) {
+      const p = this.threads.get(child.createdBy);
+      if (!p || seen.has(p.id)) break;
+      seen.add(p.id);
+      if (!p.linkedPullRequests.some((l) => l.url.toLowerCase() === url.toLowerCase())) {
+        p.linkedPullRequests = [...p.linkedPullRequests, { slug, number, url, linkedAt, via: child.id }];
+        this.publishThread(p);
+      }
+      child = p;
+    }
     return true;
   }
 
@@ -4785,6 +4801,9 @@ export class World {
           return w;
         },
         thread: (id) => this.threads.get(id),
+        addNote: (id, text) => {
+          this.logs.addNote(id, text);
+        },
         threadIds: () => [...this.threads.keys()],
         startThread: (projectId, path, model, effort, text) => this.createThread(projectId, path, model, effort, { firstMessage: { text, attachments: [], composerText: "" } }),
         send: (id, text) => Number(this.logs.send(id, text, []).ordinal ?? 0n),

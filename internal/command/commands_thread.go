@@ -74,6 +74,8 @@ type ThreadBackend interface {
 	ProjectSetBackend
 	// PullRequestLinkBackend backs thread.pr.link (commands_thread_prlink.go).
 	PullRequestLinkBackend
+	// PullRequestTaskBackend backs pr.task's forward (commands_prtask_forward.go).
+	PullRequestTaskBackend
 	// ReseedBackend backs thread.reseed (commands_thread_reseed.go).
 	ReseedBackend
 	// HTMLShower backs view.inline (commands_view_inline.go).

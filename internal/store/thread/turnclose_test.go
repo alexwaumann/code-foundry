@@ -47,6 +47,12 @@ func TestOpenTurn(t *testing.T) {
 		{"a page inside the turn", []Item{user("u"), tool("t"), page("p")}, "u"},
 		{"a theme card between turns", []Item{user("u"), end("e"), card("c")}, ""},
 		{"a theme card inside the turn", []Item{user("u"), tool("t"), card("c")}, "u"},
+		{"a note mid-turn stays in the turn", []Item{user("u"), tool("t"), note("n"), tool("t2"), text("a")}, "u"},
+		{"a note right after the message", []Item{user("u"), note("n")}, "u"},
+		{"a note between turns", []Item{user("u"), end("e"), note("n")}, ""},
+		{"a note, then a message", []Item{user("u"), end("e"), note("n"), user("u2"), tool("t")}, "u2"},
+		{"a note before Claude starts a turn itself", []Item{user("u"), end("e"), note("n"), text("w")}, "w"},
+		{"a fork's note after an open copied turn", []Item{user("u"), tool("t"), note("note-fork-p"), note("n")}, ""},
 		{"a page before Claude starts a turn itself", []Item{user("u"), end("e"), page("p"), text("w")}, "w"},
 	}
 	for _, tt := range tests {
@@ -81,6 +87,10 @@ func TestCloseOpenTurn(t *testing.T) {
 	w.add(Item{ID: "u2", Kind: KindUserMessage, Text: "second"})
 	now = t0.Add(time.Minute + 2*time.Second)
 	w.add(Item{ID: "tool", Kind: KindToolCall, Tool: &ToolCall{Name: "Bash", Status: ToolError}})
+	now = t0.Add(time.Minute + 5*time.Second)
+	// A note arriving mid-turn (a background shell stopped, pr.task's forward) ends
+	// nothing: the turn closed below is still u2's, after the note.
+	w.add(Item{ID: "note-1", Kind: KindNote, Text: "Sent to worker: Fix the failing checks (#7)"})
 	now = t0.Add(time.Minute + 12500*time.Millisecond)
 	n := len(saved)
 	it, ok := closeOpenTurn(w, now)

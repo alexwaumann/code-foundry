@@ -173,6 +173,12 @@ type Thread struct {
 	// otherwise and once the process is gone. Two requests in a row can read the same
 	// reason: wake subscriptions tell them apart by it (subscriptions.go). Not persisted.
 	PendingRequestID string
+	// HandledThrough is the highest ordinal of a message a turn that ended took in
+	// (handled.go): every message up to it was read by a turn that is over. Published
+	// with the status while the thread runs and when its process ends; not persisted
+	// (zero after a daemon restart until it runs). pr.task's forward wakes its sender on
+	// it (SubscribeOptions.AfterOrdinal).
+	HandledThrough int64
 	// StatusChangedAt is when Status or StatusReason last changed. Persisted; zero if
 	// never known.
 	StatusChangedAt time.Time
@@ -631,6 +637,11 @@ type Store interface {
 	// CreatedBy chain, never removed. It returns the link as the thread has it and
 	// whether it was new; one the thread has is a quiet success (prlink_manual.go).
 	LinkPullRequest(ctx context.Context, id, ref string) (Thread, LinkedPullRequest, bool, error)
+	// PullRequestOwner is the thread whose own link the thread's link to the pull
+	// request (number, any of slugs) is: id itself when the link is its own, it has
+	// none, or the chain of child copies breaks; else the created thread the copies lead
+	// down to (prlink_owner.go).
+	PullRequestOwner(ctx context.Context, id string, slugs []string, number int) (string, error)
 	// Move takes a thread without a project into a project or a workspace (move.go): it
 	// is placed as Create would place a new thread there, named again from its
 	// conversation (a new branch too), and Claude moves with set_cwd, started in the old
@@ -785,6 +796,9 @@ type Store interface {
 	// last user message is not added twice (ShowHTMLOptions): Reused, and the item is
 	// that card's.
 	ShowHTML(ctx context.Context, id, path, title string, o ShowHTMLOptions) (ShowHTMLResult, error)
+	// AddNote puts a note item in the conversation at the thread's current position
+	// (note.go): no turn starts. ErrInvalidArgument for empty text.
+	AddNote(ctx context.Context, id, text string) (Item, error)
 	// ShowTheme puts a theme card in the conversation (theme.go), where ShowHTML puts a
 	// page: the file as the thread saved it (ErrInvalidArgument when it does not
 	// validate), whether the save applied it, and the slot's theme before.

@@ -148,6 +148,21 @@ message SubscribeThreadRequest {
   // INVALID_ARGUMENT), carried by its wake (a timer's header and JSON, the others'
   // JSON) and listed. Subscribing again with a note replaces the note.
   string note = 14;
+  // A thread target only (INVALID_ARGUMENT otherwise; before_send and after_ordinal
+  // exclusive). pr.task's forward (docs/notes/pr-task-forward.md) subscribes before it
+  // sends, so a refusal is known before the message promises a wake, then arms the
+  // subscription with the sent message's ordinal. before_send: the subscription never
+  // fires until a Subscribe with the same subscriber, target and condition gives
+  // after_ordinal. after_ordinal: the target meets the condition only once a turn that
+  // took in the message with this ordinal (or a later one) ended (Thread's handled
+  // ordinal), or on a pending request asked after it; at once when that already
+  // happened. The same subscription existing: before_send leaves it unchanged; an
+  // unarmed one is armed; an armed one waits for the later ordinal; any other keeps its
+  // repeat flag and gate, and the note goes on its next wake only (added to that wake's
+  // note, not stored). Neither is kept across a daemon restart (the subscription then
+  // fires on the next transition).
+  bool before_send = 15;
+  int64 after_ordinal = 16;
 }
 
 message SubscribeThreadResponse {

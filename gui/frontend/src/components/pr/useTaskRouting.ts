@@ -1,78 +1,63 @@
 /**
  * The threads a readiness box's task buttons route between (taskRouting), read once per
- * box: the selected thread and every thread that links the pull request, as the few
- * fields routing reads (TaskThread). The selectors return string keys compared with
- * useShallow, so a thread elsewhere changing, or a field routing does not read, re-renders
- * nothing. docs/notes/pr-panel-tasks.md.
+ * box: every thread that links the pull request, as the few fields routing reads
+ * (TaskThread). The selectors return string keys compared with useShallow, so a thread
+ * elsewhere changing, or a field routing does not read, re-renders nothing.
+ * docs/notes/pr-panel-tasks.md, docs/notes/pr-task-forward.md.
  */
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { PullRequestDetailView } from "@/api/gh";
-import type { ProjectView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
+import { inSidebar, type ThreadsById } from "@/lib/inSidebar";
 import { EMBER_RESIDENT } from "@/stores/ember";
-import { useProjectsStore, type ProjectsData } from "@/stores/projects";
-import { useThreadsStore } from "@/stores/threads";
+import { useProjectsStore } from "@/stores/projects";
+import { isOwned, useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { isProjectRepo, linksPullRequest, taskRouting, type TaskRouting, type TaskThread } from "./taskRouting";
 
 const SEP = "\u0000";
-const NONE: readonly string[] = [];
 
-type Head = Pick<PullRequestDetailView["pullRequest"], "repoSlug" | "headRef" | "isCrossRepository">;
-
-/** The projects that are clones of the pull request's repository (isProjectRepo). */
-function repoProjects(p: ProjectsData, ref: PrRef, repoSlug: string): ProjectView[] {
-  return p.order.flatMap((id) => {
-    const x = p.byId[id];
-    return x && isProjectRepo([x.githubSlug], ref.slug, repoSlug) ? [x] : [];
-  });
-}
+type Repo = Pick<PullRequestDetailView["pullRequest"], "repoSlug">;
 
 /**
- * The checkouts with the pull request's head branch checked out, in a clone of its
- * repository. None for a fork's pull request: its head branch is in another repository,
- * and a local branch of that name is another branch.
+ * Whether a thread is one of the user's own: Ember's, or a thread the sidebar lists (the
+ * sidebar's rules: not a plugin's or a resident's (isOwned), and not a child whose creator
+ * is alive (inSidebar)).
  */
-export function headPaths(p: ProjectsData, ref: PrRef, pr: Head): string[] {
-  if (pr.isCrossRepository || pr.headRef === "") return [];
-  return repoProjects(p, ref, pr.repoSlug).flatMap((x) => x.worktrees.filter((w) => !w.detached && w.branch === pr.headRef).map((w) => w.path));
+export function userThread(t: Pick<ThreadView, "createdBy" | "owner" | "resident">, byId: ThreadsById): boolean {
+  return t.resident === EMBER_RESIDENT || (!isOwned(t) && inSidebar(t, byId));
 }
 
 /** A thread's TaskThread as a key (decodeTaskThreads reads it back). */
-export function encodeTaskThread(t: ThreadView, links: boolean, onHead: boolean): string {
+export function encodeTaskThread(t: ThreadView, links: boolean, user: boolean): string {
   const activity = t.lastActivityAtMs ?? t.createdAtMs ?? 0;
   const flag = (b: boolean) => (b ? "1" : "");
-  return [t.id, flag(t.archivedAtMs !== null), String(activity), flag(links), flag(onHead), flag(t.resident === EMBER_RESIDENT), t.name].join(SEP);
+  return [t.id, flag(t.archivedAtMs !== null), String(activity), flag(links), flag(user), t.name].join(SEP);
 }
 
 export function decodeTaskThreads(keys: readonly string[]): TaskThread[] {
   return keys.map((k) => {
-    const [id = "", archived = "", activity = "0", links = "", onHead = "", ember = "", ...name] = k.split(SEP);
-    return { id, archived: archived === "1", activity: Number(activity), links: links === "1", onHead: onHead === "1", ember: ember === "1", name: name.join(SEP) };
+    const [id = "", archived = "", activity = "0", links = "", user = "", ...name] = k.split(SEP);
+    return { id, archived: archived === "1", activity: Number(activity), links: links === "1", user: user === "1", name: name.join(SEP) };
   });
 }
 
 /**
- * The routing for ref's task buttons: the selection, the candidate threads (the selected
- * one and those linking ref, matched on the panel's slug or GitHub's current one) and
- * whether the repository is a project (true until projects have loaded: no clone hint on
- * a guess).
+ * The routing for ref's task buttons: the selection, the threads that link ref (matched
+ * on the panel's slug or GitHub's current one) and whether the repository is a project
+ * (true until projects have loaded: no clone hint on a guess).
  */
-export function useTaskRouting(ref: PrRef, pr: Head): TaskRouting {
+export function useTaskRouting(ref: PrRef, pr: Repo): TaskRouting {
   const selection = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : null));
-  const isProject = useProjectsStore((s) => !s.loaded || repoProjects(s, ref, pr.repoSlug).length > 0);
-  const heads = useProjectsStore(useShallow((s) => (s.loaded ? headPaths(s, ref, pr) : NONE)));
+  const isProject = useProjectsStore((s) => !s.loaded || s.order.some((id) => isProjectRepo([s.byId[id]?.githubSlug ?? ""], ref.slug, pr.repoSlug)));
   const keys = useThreadsStore(
     useShallow((s) => {
-      const onHead = new Set(heads);
       const out: string[] = [];
       for (const t of Object.values(s.byId)) {
-        const links = linksPullRequest(t.linkedPullRequests, ref, pr.repoSlug);
-        if (!links && t.id !== selection) continue;
-        const head = onHead.size > 0 && (onHead.has(t.worktreePath) || t.checkoutPaths.some((c) => onHead.has(c.path)));
-        out.push(encodeTaskThread(t, links, head));
+        if (!linksPullRequest(t.linkedPullRequests, ref, pr.repoSlug)) continue;
+        out.push(encodeTaskThread(t, true, userThread(t, s.byId)));
       }
       return out;
     }),

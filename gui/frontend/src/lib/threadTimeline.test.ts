@@ -245,12 +245,50 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(turns, { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded 1)", "final:a", "system:n", "user:u2", "live(u2,0)", "final:b"]);
   });
 
-  it("a system note ends a turn that was cut short; a fork with nothing else shows the note (no header of its own), then a live header while it starts", () => {
-    const cut = [user("u1"), tool("Bash"), item("note", { id: "n" })];
-    expect(buildTurns(cut).map((t) => t.key)).toEqual(["u1", "n"]);
-    expect(shape(buildRows(buildTurns(cut), open))).toEqual(["user:u1", "tool:Bash", "system:n"]);
+  it("a fork's note ends the copied turn that was cut short; a fork with nothing else shows the note (no header of its own), then a live header while it starts", () => {
+    const cut = [user("u1"), tool("Bash"), item("note", { id: "note-fork-p" })];
+    expect(buildTurns(cut).map((t) => t.key)).toEqual(["u1", "note-fork-p"]);
+    expect(shape(buildRows(buildTurns(cut), open))).toEqual(["user:u1", "tool:Bash", "system:note-fork-p"]);
     expect(shape(buildRows(buildTurns([item("note", { id: "n" })]), open))).toEqual(["system:n"]);
     expect(shape(buildRows(buildTurns([item("note", { id: "n" })]), { fold: () => undefined, working: true }))).toEqual(["system:n", "live(,0)"]);
+  });
+
+  it("a note that arrives mid-turn stays in that turn's body: one turn, the note kept when it folds, the answer still final", () => {
+    const items = [user("u1"), tool("Bash"), item("note", { id: "n" }), tool("Edit"), text("a"), end("e1")];
+    const turns = buildTurns(items);
+    expect(turns.map((t) => [t.key, t.user, t.end])).toEqual([["u1", ["u1"], "e1"]]);
+    expect(shape(buildRows(turns, expanded))).toEqual(["user:u1", "header", "tool:Bash", "system:n", "tool:Edit", "final:a"]);
+    expect(shape(buildRows(turns, open))).toEqual(["user:u1", "header(folded 2)", "system:n", "final:a"]);
+    // After the answer (a forward noted while Claude wraps up): the answer stays final.
+    const late = buildRows(buildTurns([user("u1"), tool("Bash"), text("a"), item("note", { id: "n" }), end("e1")]), open);
+    expect(shape(late)).toEqual(["user:u1", "header(folded 1)", "final:a", "system:n"]);
+    expect(late.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["a"]]);
+  });
+
+  it("while the turn runs, a note keeps it open: the live header stays, and a message after the note is a steer", () => {
+    const items = [user("u1"), tool("Bash"), item("note", { id: "n" }), user("s1")];
+    expect(buildTurns(items).map((t) => [t.key, t.user])).toEqual([["u1", ["u1"]]]);
+    expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "live(u1,1)", "tool:Bash", "system:n", "steer:s1"]);
+    // A note right after the message (nothing else yet) is in the turn too.
+    expect(shape(buildRows(buildTurns([user("u1"), item("note", { id: "n" }), user("s1")]), { fold: () => undefined, working: true }))).toEqual(["user:u1", "live(u1,0)", "system:n", "steer:s1"]);
+  });
+
+  it("a note after a process that ended (an error) is in that turn; the next message starts a turn", () => {
+    const items = [user("u1"), item("error", { id: "err" }), item("note", { id: "n" }), user("u2"), text("b")];
+    expect(buildTurns(items).map((t) => [t.key, t.user])).toEqual([
+      ["u1", ["u1"]],
+      ["u2", ["u2"]],
+    ]);
+  });
+
+  it("a note after an error that follows a finished turn is not in a turn (the daemon's openTurn agrees): it stands alone", () => {
+    const items = [user("u1"), text("a"), end("e1"), item("error", { id: "err" }), item("note", { id: "n" }), user("u2"), text("b")];
+    expect(buildTurns(items).map((t) => [t.key, t.user, t.body.length])).toEqual([
+      ["u1", ["u1"], 1],
+      ["err", [], 1],
+      ["n", [], 1],
+      ["u2", ["u2"], 1],
+    ]);
   });
 
   it("a message sent while the turn runs is a steer inside it: one turn, one header, the steer stays when it folds", () => {
@@ -310,14 +348,14 @@ describe("buildTurns / buildRows", () => {
     expect(shape(late)).toEqual(["user:u1", "header(folded 1)", "text:a", "steer:s1"]);
   });
 
-  it("a message after a turn_end, a system note or a process that ended (an error) starts a turn", () => {
+  it("a message after a turn_end, a fork's note or a process that ended (an error) starts a turn", () => {
     const items = [
       user("u1"),
       text("a"),
       end("e1"),
       user("u2"),
       tool("Bash"),
-      item("note", { id: "n" }),
+      item("note", { id: "note-fork-p" }),
       user("u3"),
       tool("Bash"),
       item("error", { id: "err" }),
@@ -327,7 +365,7 @@ describe("buildTurns / buildRows", () => {
     expect(buildTurns(items).map((t) => [t.key, t.user])).toEqual([
       ["u1", ["u1"]],
       ["u2", ["u2"]],
-      ["n", []],
+      ["note-fork-p", []],
       ["u3", ["u3"]],
       ["u4", ["u4"]],
     ]);

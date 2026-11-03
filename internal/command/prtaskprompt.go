@@ -24,6 +24,30 @@ type PRTaskOptions struct {
 	// OffHead: a new review-request thread runs in a checkout that is not on the head
 	// (a fork's pull request with no worktree on it).
 	OffHead bool
+	// ForwardedFrom is, for a follow-up forwarded to the thread that owns the link
+	// (docs/notes/pr-task-forward.md), the thread it was sent to: its name and id. ""
+	// when the task was sent to this thread itself. ForwardedByUser: the user sent it
+	// (the GUI), not an agent's CLI.
+	ForwardedFrom   string
+	ForwardedByUser bool
+	// ForwardedNoWake: the sending thread cannot be woken by this one (its subscription
+	// was refused), so the line promises no wake.
+	ForwardedNoWake bool
+}
+
+// forwardedLine is the line a forwarded task carries after its first: who sent it from
+// which thread, and that the thread is woken with this thread's report (unless it
+// cannot be: ForwardedNoWake).
+func forwardedLine(o PRTaskOptions) string {
+	who := "This task was sent"
+	if o.ForwardedByUser {
+		who = "The user sent this task"
+	}
+	line := who + " from thread `" + sanitizePRCode(o.ForwardedFrom) + "`, which has this PR through you"
+	if o.ForwardedNoWake {
+		return line + "."
+	}
+	return line + "; it is woken with your report when you finish, so end with `code-foundry thread report` as usual."
 }
 
 // prTaskHeader is the lines every pr.task prompt starts with: what to do and which pull
@@ -40,7 +64,11 @@ func prTaskHeader(pr *v1.PullRequest, o PRTaskOptions, lead, purpose string, pus
 		lead = "Follow-up task: " + strings.ToLower(lead[:1]) + lead[1:]
 	}
 	first := lead + " PR `" + sanitizePRCode(info.Slug) + "#" + n + "`, titled `" + sanitizePRCode(info.Title) + "`, at `" + sanitizePRCode(info.URL) + "`."
-	lines := []string{first, "The PR branch is `" + head + "` targeting `" + base + "`."}
+	lines := []string{first}
+	if o.ForwardedFrom != "" {
+		lines = append(lines, forwardedLine(o))
+	}
+	lines = append(lines, "The PR branch is `"+head+"` targeting `"+base+"`.")
 	checkout := "`gh pr checkout " + n + " --repo " + sanitizePRCode(info.Slug) + "`"
 	switch {
 	case !push:
