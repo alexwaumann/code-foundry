@@ -346,29 +346,37 @@ func TestLeadSubscribedToWorkers(t *testing.T) {
 	}
 }
 
-// A forward's note on the top thread's repeat subscription (its next wake only) rides on
-// the held wake, and on the one that replaces it.
+// A forward's note on the top thread's repeat subscription (the wake after the lead
+// handled the task only) rides on the held wake, and on the one that replaces it, each
+// note once: the held wake's notes are handed on one by one, so a forward of the same
+// task again does not repeat its note, and another forward's note joins them.
 func TestLeadWakeHeldKeepsForwardNote(t *testing.T) {
 	l := newLeadEnv(t)
-	for _, o := range []SubscribeOptions{
-		{SubscriberID: l.top.ID, TargetThreadID: l.lead.ID, BeforeSend: true, Note: "forwarded"},
-		{SubscriberID: l.top.ID, TargetThreadID: l.lead.ID, AfterOrdinal: 1, Note: "forwarded"},
-	} {
-		if res, err := l.m.Subscribe(l.ctx(), o); err != nil || !res.Existed {
-			t.Fatalf("Subscribe(%+v) = %+v, %v", o, res, err)
+	arm := func(note string, ordinal int64) {
+		t.Helper()
+		for _, o := range []SubscribeOptions{
+			{SubscriberID: l.top.ID, TargetThreadID: l.lead.ID, BeforeSend: true, Note: note},
+			{SubscriberID: l.top.ID, TargetThreadID: l.lead.ID, AfterOrdinal: ordinal, Note: note},
+		} {
+			if res, err := l.m.Subscribe(l.ctx(), o); err != nil || !res.Existed {
+				t.Fatalf("Subscribe(%+v) = %+v, %v", o, res, err)
+			}
 		}
 	}
-	l.setStep(l.lead.ID, finished)
+	arm("forwarded", 1)
+	l.handledStep(l.lead.ID, finished, 1)
 	l.settled(1)
 	if !l.held() {
 		t.Fatal("not held")
 	}
-	l.setStep(l.lead.ID, busy)
+	arm("forwarded", 2) // the same task again
+	arm("another", 2)
+	l.handledStep(l.lead.ID, busy, 1)
 	l.report(ReportDone)
-	l.setStep(l.lead.ID, finished)
+	l.handledStep(l.lead.ID, finished, 2)
 	l.settled(2)
 	items := l.waitItems(l.top.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
-	if w := wakes(items)[0].WakeJSON; !strings.Contains(w, "forwarded") {
-		t.Errorf("wake = %s, want the forward's note", w)
+	if w := wakes(items)[0].WakeJSON; !strings.Contains(w, `"forwarded; another"`) {
+		t.Errorf("wake = %s, want each forward's note once", w)
 	}
 }

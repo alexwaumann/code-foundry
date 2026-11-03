@@ -164,6 +164,11 @@ type Subscription struct {
 	// for a one-shot), filled by Subscriptions (DescribeTimer); zero for the others.
 	NextAt time.Time
 	Every  time.Duration
+
+	// wakeExtra are the extra notes (subRec.extra) a fired wake's Note carries after the
+	// stored one, so a held wake replaced by a new fire hands them on one by one. Set on
+	// a wake's copy only.
+	wakeExtra []string
 }
 
 // MaxNote is the longest SubscribeOptions.Note, in characters.
@@ -221,8 +226,8 @@ type SubscribeOptions struct {
 	// happened. With the same subscription (subscriber, target, condition) existing,
 	// BeforeSend leaves it as it is; AfterOrdinal arms an unarmed one, makes an armed one
 	// wait for the later message, and leaves any other's repeat flag and gate alone. Its
-	// note then goes on the subscription's next wake only (subRec.extra), added to the
-	// stored note, which is unchanged. The gate is not persisted: after a daemon restart
+	// note then goes on one wake only (subRec.extra), the first whose target handled the
+	// message, added to the stored note, which is unchanged. The gate is not persisted: after a daemon restart
 	// the subscription fires on the next transition, as any does.
 	BeforeSend   bool
 	AfterOrdinal int64
@@ -309,9 +314,18 @@ type subRec struct {
 	unarmed bool
 	through int64
 	armReq  string
-	// extra are notes for the next wake only (a forward onto an existing subscription),
-	// after the stored note; in memory.
-	extra []string
+	// extra are notes for one wake only (a forward onto an existing subscription), after
+	// the stored note; in memory. Each goes on the first wake whose target handled the
+	// message it is about (extraNote.through).
+	extra []extraNote
+}
+
+// extraNote is a note for one wake only: the first wake whose target's HandledThrough
+// reached through (the forwarded message's ordinal; 0: the next wake) carries it, so it
+// does not ride on an earlier wake about something else (a --notify subscription's).
+type extraNote struct {
+	text    string
+	through int64
 }
 
 // sendGate is a Subscribe's BeforeSend and AfterOrdinal.
@@ -332,9 +346,17 @@ func (r *subRec) meets(t Thread) bool {
 	return t.HandledThrough >= r.through || (req != "" && req != r.armReq)
 }
 
-// wakeNote is the note r's next wake carries: the stored one, then the extra ones.
-func (r *subRec) wakeNote() string {
-	return joinNotes(r.s.Note, r.extra)
+// dueExtra splits r's extra notes for a wake about a target handled through handled:
+// the ones it carries, and the ones still waiting for a later wake.
+func (r *subRec) dueExtra(handled int64) (due []string, rest []extraNote) {
+	for _, x := range r.extra {
+		if handled >= x.through {
+			due = append(due, x.text)
+		} else {
+			rest = append(rest, x)
+		}
+	}
+	return due, rest
 }
 
 // joinNotes joins a note and extra ones with "; ", leaving out empty ones.
@@ -348,11 +370,18 @@ func joinNotes(note string, extra []string) string {
 	return strings.Join(parts, "; ")
 }
 
-// addExtraLocked puts note on r's next wake, unless r's note or an extra one says it.
-func (r *subRec) addExtraLocked(note string) {
-	if note != "" && note != r.s.Note && !slices.Contains(r.extra, note) {
-		r.extra = append(r.extra, note)
+// addExtraLocked puts note on r's first wake about a target that handled through
+// (0: the next wake), unless r's note says it. An extra note saying it already waits
+// for the later of the two.
+func (r *subRec) addExtraLocked(note string, through int64) {
+	if note == "" || note == r.s.Note {
+		return
 	}
+	if i := slices.IndexFunc(r.extra, func(x extraNote) bool { return x.text == note }); i >= 0 {
+		r.extra[i].through = max(r.extra[i].through, through)
+		return
+	}
+	r.extra = append(r.extra, extraNote{text: note, through: through})
 }
 
 // requestKey names the pending request (permission prompt or question) a running
@@ -680,9 +709,10 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 
 // armLocked is a Subscribe with AfterOrdinal ordinal (and note) finding r, the same
 // subscription: an unarmed one is armed with it, an armed one waits for the later of the
-// two messages, any other keeps its gate; the note goes on r's next wake only. r fires
-// at once when its target, as it is, now meets the condition and did not before (a turn
-// that handled the message already ended). Callers hold m.mu and m.subs.mu.
+// two messages, any other keeps its gate; the note goes on r's first wake once the
+// target handled ordinal. r fires at once when its target, as it is, now meets the
+// condition and did not before (a turn that handled the message already ended). Callers
+// hold m.mu and m.subs.mu.
 func (m *Manager) armLocked(r *subRec, target Thread, ordinal int64, note string) SubscribeResult {
 	switch {
 	case r.unarmed:
@@ -690,7 +720,7 @@ func (m *Manager) armLocked(r *subRec, target Thread, ordinal int64, note string
 	case r.through > 0:
 		r.through = max(r.through, ordinal)
 	}
-	r.addExtraLocked(note)
+	r.addExtraLocked(note, ordinal)
 	was := r.sat
 	r.sat, r.req = r.meets(target), requestKey(target)
 	if !r.sat || was || !m.fireThreadLocked(r, target) {

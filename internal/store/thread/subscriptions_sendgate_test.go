@@ -126,8 +126,9 @@ func TestSubscribeSendGateUnarmed(t *testing.T) {
 }
 
 // Over an existing subscription (thread.new --notify's repeat one): before the send it
-// is left as it is; the arming leaves its repeat flag, note and gate, and its next wake
-// only carries the forward's note, two forwards' both. A reused one-shot (another
+// is left as it is; the arming leaves its repeat flag, note and gate, and only its first
+// wake after the child handled the forwarded message carries the forward's note (two
+// forwards' both), not an earlier wake about a turn from before. A reused one-shot (another
 // forward's) waits for the later message and carries both notes once.
 func TestSubscribeSendGateExisting(t *testing.T) {
 	t.Run("a repeat --notify subscription", func(t *testing.T) {
@@ -151,16 +152,24 @@ func TestSubscribeSendGateExisting(t *testing.T) {
 		if got, _ := e.subscription(first.Subscription.ID); !got.Repeat || got.Note != "notify" {
 			t.Errorf("stored = %+v, want repeat with its note", got)
 		}
-		e.handledStep(child.ID, finished, 0) // its own gate: none, so this fires
+		// Its own gate is none, so an earlier turn's end wakes the parent: not about the
+		// forwards, which the child has not handled (through 3, the messages are at 4).
+		e.handledStep(child.ID, finished, 3)
 		items := e.waitItems(parent.ID, "the first wake", func(items []Item) bool { return len(wakes(items)) == 1 })
-		if w := wakes(items)[0].WakeJSON; !strings.Contains(w, "notify; forward one; forward two") {
-			t.Errorf("first wake = %s", w)
+		if w := wakes(items)[0].WakeJSON; !strings.Contains(w, `"notify"`) || strings.Contains(w, "forward") {
+			t.Errorf("first wake = %s, want the stored note alone", w)
 		}
-		e.handledStep(child.ID, busy, 0)
-		e.handledStep(child.ID, finished, 0)
+		e.handledStep(child.ID, busy, 3)
+		e.handledStep(child.ID, finished, 4)
 		items = e.waitItems(parent.ID, "the second wake", func(items []Item) bool { return len(wakes(items)) == 2 })
-		if w := wakes(items)[1].WakeJSON; !strings.Contains(w, `"notify"`) || strings.Contains(w, "forward") {
-			t.Errorf("second wake = %s, want the stored note alone", w)
+		if w := wakes(items)[1].WakeJSON; !strings.Contains(w, "notify; forward one; forward two") {
+			t.Errorf("second wake = %s, want the forwards' notes", w)
+		}
+		e.handledStep(child.ID, busy, 4)
+		e.handledStep(child.ID, finished, 5)
+		items = e.waitItems(parent.ID, "the third wake", func(items []Item) bool { return len(wakes(items)) == 3 })
+		if w := wakes(items)[2].WakeJSON; !strings.Contains(w, `"notify"`) || strings.Contains(w, "forward") {
+			t.Errorf("third wake = %s, want the stored note alone", w)
 		}
 	})
 	t.Run("another forward's one-shot", func(t *testing.T) {

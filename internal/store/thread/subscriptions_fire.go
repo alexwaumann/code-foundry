@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -96,7 +96,7 @@ type delivery struct {
 // down) leaves r as it was. Callers hold m.mu and
 // m.subs.mu, and keep or remove r themselves (firedLocked).
 func (m *Manager) fireLocked(r *subRec, build func(Subscription, time.Time) Message) bool {
-	return m.fireLaterLocked(r, func(s Subscription, at time.Time) delivery {
+	return m.fireLaterLocked(r, math.MaxInt64, func(s Subscription, at time.Time) delivery {
 		msg := build(s, at)
 		return delivery{msg: func(context.Context) Message { return msg }}
 	})
@@ -106,13 +106,21 @@ func (m *Manager) fireLocked(r *subRec, build func(Subscription, time.Time) Mess
 // children counted now, and the detail its items hold (wakeDetailOf) read when the wake
 // is sent (the items are not read under m.mu). Callers hold m.mu and m.subs.mu.
 func (m *Manager) fireThreadLocked(r *subRec, t Thread) bool {
-	if h, ok := m.subs.held[t.ID][r.s.ID]; ok && h.Note != r.s.Note {
-		// The held wake's extra notes (a forward's) go on this one.
-		r.extra = slices.Insert(r.extra, 0, strings.TrimPrefix(h.Note, r.s.Note+"; "))
+	if h, ok := m.subs.held[t.ID][r.s.ID]; ok && len(h.wakeExtra) > 0 {
+		// The held wake's extra notes (a forward's) go on this one, each kept as itself
+		// so one said again is not repeated (addExtraLocked), ahead of the newer ones.
+		later := r.extra
+		r.extra = nil
+		for _, n := range h.wakeExtra {
+			r.addExtraLocked(n, 0)
+		}
+		for _, x := range later {
+			r.addExtraLocked(x.text, x.through)
+		}
 	}
 	m.subs.unholdLocked(t.ID, r.s.ID) // this fire replaces a held one (subscriptions_hold.go)
 	kids := m.childrenLocked(t.ID)
-	return m.fireLaterLocked(r, func(s Subscription, at time.Time) delivery {
+	return m.fireLaterLocked(r, t.HandledThrough, func(s Subscription, at time.Time) delivery {
 		return delivery{thread: func(ctx context.Context) threadWakePart { return m.threadPart(ctx, s, t, at, kids) }}
 	})
 }
@@ -149,8 +157,9 @@ func (m *Manager) childrenLocked(id string) wakeChildren {
 
 // fireLaterLocked is fireLocked with the delivery build makes. A thread wake that will
 // join one already waiting for the subscriber (joinsBatchLocked) takes no wake limit
-// slot: a batch counts as one wake.
-func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time) delivery) bool {
+// slot: a batch counts as one wake. handled is a thread target's HandledThrough: the
+// wake carries the extra notes it reached (subRec.dueExtra).
+func (m *Manager) fireLaterLocked(r *subRec, handled int64, build func(Subscription, time.Time) delivery) bool {
 	s := m.subs
 	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
 	subscriber := r.s.SubscriberID
@@ -162,7 +171,9 @@ func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time)
 		return false
 	}
 	sub := r.s
-	sub.Note = r.wakeNote() // with the notes for this wake only (subRec.extra)
+	due, rest := r.dueExtra(handled)
+	sub.Note = joinNotes(r.s.Note, due) // with the notes for this wake only (subRec.extra)
+	sub.wakeExtra = due
 	d := build(sub, now)
 	joins := d.thread != nil && m.joinsBatchLocked(subscriber)
 	if !joins && !s.allowLocked(subscriber, now, m.opts.WakeLimit) {
@@ -181,7 +192,7 @@ func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time)
 		d.slot = now
 	}
 	m.enqueueLocked(subscriber, d)
-	r.extra = nil
+	r.extra = rest
 	m.log.Info("wake subscription fired", "subscription", r.s.ID, "subscriber", subscriber, "target", r.s.TargetID,
 		"condition", r.s.Condition, "fired_count", r.s.FiredCount, "joins_batch", joins)
 	return true
