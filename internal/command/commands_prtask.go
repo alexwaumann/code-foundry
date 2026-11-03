@@ -185,24 +185,36 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 	case explicit == "":
 		return Result{}, wrapStep("list projects", err)
 	} // An explicit worktree only loses its status line in the prompt.
+	// Clones match the argument or GitHub's current name for the repository (renamed or
+	// transferred since the argument was taken).
+	match := s
+	if canon := detail.GetPullRequest().GetRepoSlug(); len(clonesOf(projects, s)) == 0 && len(clonesOf(projects, canon)) > 0 {
+		match = canon
+	}
 	var cloned bool
-	if explicit == "" && len(clonesOf(projects, s)) == 0 {
-		// Refuse what a fresh clone could not place (a fork's head to push to, no head
-		// branch) before cloning: the clone would not help.
-		if _, err := pickPRWorktree(kind, []*v1.Project{{GithubSlug: s}}, s, n, head, "", ""); err != nil {
+	if explicit == "" && len(clonesOf(projects, match)) == 0 {
+		canon := detail.GetPullRequest().GetRepoSlug()
+		// A project whose origin names the repository but is not recognised as GitHub
+		// (an SSH host alias) is most likely a clone: refuse rather than clone it again.
+		if err := unrecognisedClone(projects, s, canon); err != nil {
 			return Result{}, err
 		}
-		p, err := d.Clone(ctx, s, nil)
+		// Refuse what a fresh clone could not place (a fork's head to push to, no head
+		// branch) before cloning: the clone would not help.
+		if _, err := pickPRWorktree(kind, []*v1.Project{{GithubSlug: canon}}, canon, n, head, "", ""); err != nil {
+			return Result{}, err
+		}
+		p, err := d.Clone(ctx, canon, nil)
 		if err != nil {
-			return Result{}, wrapStep("clone "+s, err)
+			return Result{}, wrapStep("clone "+canon, err)
 		}
 		if p.GetGithubSlug() == "" {
 			p = proto.CloneOf(p)
-			p.GithubSlug = s
+			p.GithubSlug = canon
 		}
-		projects, cloned = []*v1.Project{p}, true
+		projects, cloned, match = []*v1.Project{p}, true, p.GetGithubSlug()
 	}
-	pick, err := pickPRWorktree(kind, projects, s, n, head, explicit, "")
+	pick, err := pickPRWorktree(kind, projects, match, n, head, explicit, "")
 	if err != nil {
 		return Result{}, err
 	}
@@ -213,7 +225,7 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 	}
 	status := worktreeStatus(projects, pick.Path)
 	if pick.Create {
-		wt, err := createPRWorktree(ctx, d, pick, s, head)
+		wt, err := createPRWorktree(ctx, d, pick, match, head)
 		if err != nil {
 			return Result{}, err
 		}
@@ -230,10 +242,41 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 	focusCreated(d.Emitter, a, th.GetId())
 	msg := fmt.Sprintf("Started thread %s for PR #%d", threadLabel(th), n)
 	if cloned {
-		msg = fmt.Sprintf("Cloned %s and started thread %s for PR #%d", s, threadLabel(th), n)
+		msg = fmt.Sprintf("Cloned %s and started thread %s for PR #%d", match, threadLabel(th), n)
 	}
 	return Result{Message: msg, JSON: PRTaskResult{
 		ThreadID: th.GetId(), ProjectID: th.GetProjectId(), WorktreePath: th.GetWorktreePath(),
 		CreatedWorktree: pick.Create, Cloned: cloned,
 	}}, nil
+}
+
+// unrecognisedClone refuses (FailedPrecondition) when a project's origin path names one
+// of slugs, ending in /<owner>/<repo> (case-insensitively, with or without .git), though
+// its github_slug does not: an origin on an SSH host alias (git@github-work:org/repo.git)
+// or another host. Cloning would make a second copy of what is most likely a clone.
+func unrecognisedClone(projects []*v1.Project, slugs ...string) error {
+	for _, p := range projects {
+		for _, slug := range slugs {
+			if !originNames(p.GetOriginPath(), slug) {
+				continue
+			}
+			return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
+				"project %s looks like a clone of %s (its origin is …/%s) but its origin is not a github.com URL, so it is not used and no second clone is made: "+
+					"pass --worktree with one of its worktrees, or point its origin at github.com (`git remote set-url origin git@github.com:%s.git`)",
+				cmp.Or(p.GetName(), p.GetPath()), slug, strings.TrimLeft(p.GetOriginPath(), "/"), slug))
+		}
+	}
+	return nil
+}
+
+// originNames reports whether origin, a remote URL's path, names the repository slug:
+// it is <owner>/<repo> or ends in /<owner>/<repo>, case-insensitively, with or without
+// a trailing .git or slash.
+func originNames(origin, slug string) bool {
+	o := strings.TrimSuffix(strings.Trim(strings.ToLower(origin), "/"), ".git")
+	slug = strings.ToLower(strings.TrimSpace(slug))
+	if o == "" || strings.Count(slug, "/") != 1 {
+		return false
+	}
+	return o == slug || strings.HasSuffix(o, "/"+slug)
 }

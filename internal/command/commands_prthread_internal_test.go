@@ -145,3 +145,27 @@ func TestPickPRWorktree(t *testing.T) {
 		})
 	}
 }
+
+func TestOriginNames(t *testing.T) {
+	tests := []struct {
+		origin, slug string
+		want         bool
+	}{
+		{"org/repo.git", "org/repo", true},          // git@github-work:org/repo.git
+		{"/org/repo", "org/repo", true},             // https://host/org/repo
+		{"/Org/Repo.GIT/", "org/repo", true},        // case and a trailing slash
+		{"/group/org/repo.git", "ORG/repo", true},   // another host's nested path
+		{"/srv/git/org/repo.git", "org/repo", true}, // a local mirror
+		{"/myorg/repo.git", "org/repo", false},      // not a path segment
+		{"/org/repo-two.git", "org/repo", false},    // another repository
+		{"/org/repo.git.bak", "org/repo", false},
+		{"", "org/repo", false},
+		{"/org/repo", "repo", false}, // not owner/name
+		{"/org/repo", "", false},
+	}
+	for _, tt := range tests {
+		if got := originNames(tt.origin, tt.slug); got != tt.want {
+			t.Errorf("originNames(%q, %q) = %v, want %v", tt.origin, tt.slug, got, tt.want)
+		}
+	}
+}

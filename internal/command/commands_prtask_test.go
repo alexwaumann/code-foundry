@@ -87,6 +87,45 @@ func TestPullRequestTask(t *testing.T) {
 			wantPrompt: "Bring the branch up to date with its base on PR `a/b#7`",
 			wantMsg:    "Cloned a/b and started thread s1 for PR #7",
 			wantJSON:   command.PRTaskResult{ThreadID: "s1", ProjectID: "p-new", WorktreePath: "/wt/fix/it", CreatedWorktree: true, Cloned: true}},
+		{name: "renamed: GitHub's current name finds the clone, nothing cloned",
+			args: args("old/r", "checks"),
+			setup: func(f *prThreadFixture) {
+				f.gh.Detail.PullRequest.RepoSlug = "o/r"
+				addWorktree(&v1.Worktree{Path: "/wt/fix-it", Branch: "fix/it"})(f)
+			},
+			wantReq:    []proto.Message{detail("old/r", true), list},
+			wantThread: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/wt/fix-it"}},
+			wantPrompt: "Fix the failing checks on PR `o/r#7`",
+			wantMsg:    "Started thread s1 for PR #7",
+			wantJSON:   command.PRTaskResult{ThreadID: "s1", ProjectID: "r1", WorktreePath: "/wt/fix-it"},
+			wantFocus:  true},
+		{name: "renamed and not a project: GitHub's current name is cloned",
+			args: args("old/b", "behind", "focus", "false"),
+			setup: func(f *prThreadFixture) {
+				f.gh.Detail.PullRequest.RepoSlug = "a/b"
+				f.clone = &v1.Project{Id: "p-new", Path: "/cf/projects/a/b", GithubSlug: "a/b"}
+			},
+			wantReq:    []proto.Message{detail("old/b", true), list, fetch("/cf/projects/a/b"), create("p-new")},
+			wantCloned: []string{"a/b"},
+			wantThread: []proto.Message{&v1.CreateThreadRequest{ProjectId: "p-new", WorktreePath: "/wt/fix/it"}},
+			wantPrompt: "Bring the branch up to date with its base on PR `a/b#7`",
+			wantMsg:    "Cloned a/b and started thread s1 for PR #7",
+			wantJSON:   command.PRTaskResult{ThreadID: "s1", ProjectID: "p-new", WorktreePath: "/wt/fix/it", CreatedWorktree: true, Cloned: true}},
+		{name: "not recognised: an origin on an SSH host alias is refused, not cloned again",
+			args: args("A/B", "checks"),
+			setup: func(f *prThreadFixture) {
+				f.project.Projects = append(f.project.Projects, &v1.Project{Id: "p-b", Name: "b", Path: "/src/b", OriginPath: "a/b.git"})
+			},
+			wantReq:  []proto.Message{detail("A/B", true), list},
+			wantCode: connect.CodeFailedPrecondition, wantErrMsg: "project b looks like a clone of A/B (its origin is …/a/b.git) but its origin is not a github.com URL"},
+		{name: "not recognised: an origin naming GitHub's current name is refused too",
+			args: args("old/b", "review-request"),
+			setup: func(f *prThreadFixture) {
+				f.gh.Detail.PullRequest.RepoSlug = "a/b"
+				f.project.Projects = append(f.project.Projects, &v1.Project{Id: "p-b", Path: "/src/b", OriginPath: "/git/a/b"})
+			},
+			wantReq:  []proto.Message{detail("old/b", false), list},
+			wantCode: connect.CodeFailedPrecondition, wantErrMsg: "project /src/b looks like a clone of a/b"},
 		{name: "not a project: a failed clone keeps its code and starts nothing",
 			args: args("a/b", "checks"),
 			setup: func(f *prThreadFixture) {

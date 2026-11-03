@@ -135,6 +135,11 @@ message Project {
   // worktree at path with empty branch and head and a zero status, no remotes and no
   // default branch; worktree, ref, detail and git operations are unavailable for it.
   bool git = 10;
+  // The origin remote's path with its host, user and any credentials dropped:
+  // "org/repo.git" for git@github-work:org/repo.git or https://host/org/repo.git, a
+  // local origin's path as it is. Empty without an origin. pr.task uses it to tell a
+  // clone whose origin is not recognised as GitHub (an SSH host alias) from no clone.
+  string origin_path = 11;
 }
 
 message Worktree {

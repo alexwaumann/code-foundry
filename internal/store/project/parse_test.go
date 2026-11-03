@@ -226,6 +226,25 @@ func TestParseGitHubSlug(t *testing.T) {
 	}
 }
 
+func TestOriginPath(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"git@github-work:org/repo.git", "org/repo.git"}, // ssh host alias
+		{"github.com:owner/name", "owner/name"},
+		{"ssh://git@ssh.github.com:443/owner/name.git", "/owner/name.git"},
+		{"https://x-access-token:abc@github.com/owner/name.git", "/owner/name.git"}, // no credentials
+		{"https://gitlab.example/group/sub/name.git/\n", "/group/sub/name.git/"},
+		{"file:///srv/git/owner/name.git", "/srv/git/owner/name.git"},
+		{"/private/tmp/bare", "/private/tmp/bare"},
+		{"../bare.git", "../bare.git"},
+		{" ", ""},
+	}
+	for _, tt := range tests {
+		if got := originPath(tt.in); got != tt.want {
+			t.Errorf("originPath(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestParseRemotes(t *testing.T) {
 	tests := []struct {
 		in   string

@@ -54,6 +54,8 @@ interface TaskProject {
 
 /** The pull request fields pr.task reads. */
 interface TaskPullRequest {
+  /** GitHub's current name for the repository. */
+  repoSlug?: string;
   headRef?: string;
   headSha?: string;
   isCrossRepository?: boolean;
@@ -178,15 +180,18 @@ export function prTaskCommand(d: PrTaskDeps): Command {
         const result: PrTaskResult = { threadId: t.id, sent: false, projectId: owner?.id ?? "", worktreePath: args.worktree, createdWorktree: false, cloned: false };
         return { message: `Started thread ${label(t)} for PR #${String(n)}`, resultJson: JSON.stringify(result) };
       }
-      let clones = d.projects().filter((p) => p.githubSlug !== "" && p.githubSlug.toLowerCase() === slug.toLowerCase());
+      // Clones match the argument or GitHub's current name (a renamed repository).
+      const canon = pr?.repoSlug || slug;
+      const clonesOf = (s: string) => d.projects().filter((p) => p.githubSlug !== "" && p.githubSlug.toLowerCase() === s.toLowerCase());
+      let clones = clonesOf(slug).length > 0 ? clonesOf(slug) : clonesOf(canon);
       let cloned = false;
       if (clones.length === 0) {
         // Refused before cloning when a fresh clone could not place it either.
-        if (push && (head === "" || cross)) throw forkRefusal(n, slug);
-        const [owner = "", name = ""] = slug.split("/");
+        if (push && (head === "" || cross)) throw forkRefusal(n, canon);
+        const [owner = "", name = ""] = canon.split("/");
         const path = `${PROJECTS}/${owner}/${name}`;
         if (cloneExists(path) || d.projects().some((p) => p.path.toLowerCase() === path.toLowerCase())) {
-          throw new ConnectError(`clone ${slug}: ${path} already exists`, Code.AlreadyExists);
+          throw new ConnectError(`clone ${canon}: ${path} already exists`, Code.AlreadyExists);
         }
         clones = [d.addClone(owner, name, path)];
         cloned = true;
@@ -217,7 +222,7 @@ export function prTaskCommand(d: PrTaskDeps): Command {
       if (args.focus !== "false") d.focusThread(t.id);
       const result: PrTaskResult = { threadId: t.id, sent: false, projectId: target.projectId, worktreePath: target.path, createdWorktree, cloned };
       const started = `started thread ${label(t)} for PR #${String(n)}`;
-      return { message: cloned ? `Cloned ${slug} and ${started}` : `S${started.slice(1)}`, resultJson: JSON.stringify(result) };
+      return { message: cloned ? `Cloned ${canon} and ${started}` : `S${started.slice(1)}`, resultJson: JSON.stringify(result) };
     },
   };
 }
