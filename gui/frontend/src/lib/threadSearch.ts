@@ -118,6 +118,24 @@ export function textRuns(text: string, ranges: readonly TextRange[]): TextRun[] 
   return out;
 }
 
+/** How much text a hit row keeps before its first match (UTF-16 units, about four words). */
+export const SNIPPET_LEAD = 24;
+
+/**
+ * A snippet fitted to one narrow row: the daemon starts it up to 48 code points before the
+ * first match, which a 440px row cuts off at its end, so the text before the first match is
+ * cut to about `lead` units, at a word start, with "…" in front; the ranges move with it.
+ */
+export function fitSnippet(snippet: string, ranges: readonly TextRange[], lead: number = SNIPPET_LEAD): { text: string; ranges: TextRange[] } {
+  const first = ranges[0]?.start ?? 0;
+  if (first <= lead + 1) return { text: snippet, ranges: [...ranges] };
+  let from = first - lead;
+  // Forward to the start of a word (never inside an emoji, which follows no space), but never past the match.
+  while (from < first && snippet[from - 1] !== " ") from++;
+  const shift = 1 - from;
+  return { text: `…${snippet.slice(from)}`, ranges: ranges.map((r) => ({ start: r.start + shift, end: r.end + shift })) };
+}
+
 /** A hit's speaker column: "You" for the user's message, else "Claude" (a question is Claude's too). */
 export function speakerLabel(s: SearchSpeakerView): string {
   return s === "user" ? "You" : "Claude";

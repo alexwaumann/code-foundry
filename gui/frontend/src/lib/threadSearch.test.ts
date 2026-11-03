@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SearchGroupView, SearchHitView, SearchResultView } from "@/api/threadSearch";
-import { currentMatchIndex, dayLabel, firstSelectable, handoffQuery, keepSelection, messagesLabel, moveSelection, queryMatches, searchRows, searchTerms, textRuns } from "./threadSearch";
+import { currentMatchIndex, dayLabel, fitSnippet, firstSelectable, handoffQuery, keepSelection, messagesLabel, moveSelection, queryMatches, searchRows, searchTerms, textRuns } from "./threadSearch";
 
 describe("searchTerms", () => {
   it.each([
@@ -48,6 +48,26 @@ describe("queryMatches (the preview matches the whole message again)", () => {
     // "stale" is longer: the bar takes "stale", whose first match is the second range.
     expect(currentMatchIndex(t, ms, "stale badge")).toBe(1);
     expect(currentMatchIndex(t, ms, "zzz")).toBe(-1);
+  });
+});
+
+describe("fitSnippet", () => {
+  it("cuts the text before the first match to a few words, at a word start, and moves the ranges", () => {
+    const snippet = "…whether to refresh a PR's badge by comparing a fingerprint built from";
+    const at = snippet.indexOf("fingerprint");
+    const fit = fitSnippet(snippet, [{ start: at, end: at + 11 }]);
+    expect(fit.text).toBe("…badge by comparing a fingerprint built from");
+    expect(fit.ranges.map((r) => fit.text.slice(r.start, r.end))).toEqual(["fingerprint"]);
+  });
+  it("keeps a snippet whose match is near its start", () => {
+    expect(fitSnippet("The fingerprint is", [{ start: 4, end: 15 }])).toEqual({ text: "The fingerprint is", ranges: [{ start: 4, end: 15 }] });
+  });
+  it("never starts inside an emoji: it moves on to the next word", () => {
+    const snippet = `${"x".repeat(14)}🐛${"y".repeat(10)} so 🐛 bug`;
+    const at = snippet.indexOf("bug");
+    const fit = fitSnippet(snippet, [{ start: at, end: at + 3 }], 18);
+    expect(fit.text).toBe("…so 🐛 bug");
+    expect(fit.ranges.map((r) => fit.text.slice(r.start, r.end))).toEqual(["bug"]);
   });
 });
 

@@ -1,8 +1,8 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { TextRange } from "@/api/threadSearch";
 import { useThreadPlace } from "@/components/thread/useThreadPlace";
-import { dayLabel, moreLabel, SEARCH_ROW_HEIGHT, speakerLabel, textRuns, type SearchRow } from "@/lib/threadSearch";
+import { dayLabel, fitSnippet, moreLabel, SEARCH_ROW_HEIGHT, speakerLabel, textRuns, type SearchRow } from "@/lib/threadSearch";
 import { cn } from "@/lib/utils";
 
 /** Text with its matches tinted (search.css .search-hit). */
@@ -20,6 +20,12 @@ function Marked({ text, ranges }: { text: string; ranges: readonly TextRange[] }
       )}
     </>
   );
+}
+
+/** A hit's snippet, cut in front so its first match shows in the row (lib/threadSearch fitSnippet). */
+function Snippet({ text, ranges }: { text: string; ranges: readonly TextRange[] }) {
+  const fit = useMemo(() => fitSnippet(text, ranges), [text, ranges]);
+  return <Marked text={fit.text} ranges={fit.ranges} />;
 }
 
 /** "project · archived" after a thread's name. */
@@ -68,7 +74,7 @@ const Row = memo(function Row({ row, selected }: { row: SearchRow; selected: boo
             {speakerLabel(row.hit.speaker)}
           </span>
           <span className="min-w-0 flex-1 truncate text-body-sm text-cf-text-secondary">
-            <Marked text={row.hit.snippet} ranges={row.hit.ranges} />
+            <Snippet text={row.hit.snippet} ranges={row.hit.ranges} />
           </span>
         </div>
       );
