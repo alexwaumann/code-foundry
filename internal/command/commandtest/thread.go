@@ -64,6 +64,11 @@ type Thread struct {
 	// Placement, when set, gives Create's made_worktree, made_branch, existing_worktree, shared_with
 	// and worktree_mode_dropped (else made_worktree and made_branch are new_worktree's presence).
 	Placement *v1.CreateThreadResponse
+	// Owners is PullRequestOwner's answer by thread id (absent: the thread itself).
+	Owners map[string]string
+	// GetErrs and SendErrs are Get's and Send's errors by thread id (after the call is
+	// recorded).
+	GetErrs, SendErrs map[string]error
 }
 
 var _ command.ThreadBackend = (*Thread)(nil)
@@ -182,6 +187,9 @@ func (s *Thread) Send(_ context.Context, r *connect.Request[v1.SendThreadMessage
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
+	if err := s.SendErrs[r.Msg.GetThreadId()]; err != nil {
+		return nil, err
+	}
 	return connect.NewResponse(&v1.SendThreadMessageResponse{Item: &v1.ThreadItem{Id: "i-sent", Ordinal: s.SentOrdinal}}), nil
 }
 
@@ -189,6 +197,9 @@ func (s *Thread) Send(_ context.Context, r *connect.Request[v1.SendThreadMessage
 // with that id, if any.
 func (s *Thread) Get(_ context.Context, r *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if err := s.GetErrs[r.Msg.GetId()]; err != nil {
 		return nil, err
 	}
 	cur := &v1.Thread{State: v1.ThreadState_THREAD_STATE_CONNECTED}

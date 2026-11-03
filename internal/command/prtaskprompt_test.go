@@ -294,3 +294,36 @@ func TestChecksPromptRunRepository(t *testing.T) {
 		}
 	}
 }
+
+// A forwarded task says, second, who sent it from which thread (the name in a code
+// span, backticks neutralized) and that the sender is woken with the report; every kind.
+func TestPRTaskPromptForwarded(t *testing.T) {
+	tests := []struct {
+		name string
+		o    PRTaskOptions
+		want string // the second line; "" for no forwarded line
+	}{
+		{name: "not forwarded", o: PRTaskOptions{FollowUp: true}},
+		{name: "by the user", o: PRTaskOptions{FollowUp: true, ForwardedFrom: "Lead (s-1)", ForwardedByUser: true},
+			want: "The user sent this task from thread `Lead (s-1)`, which has this PR through you; it is woken with your report when you finish, so end with `code-foundry thread report` as usual."},
+		{name: "by an agent, a name with backticks", o: PRTaskOptions{FollowUp: true, ForwardedFrom: "Fix `x` @here (s-1)"},
+			want: "This task was sent from thread `Fix 'x' ＠here (s-1)`, which has this PR through you; it is woken with your report when you finish, so end with `code-foundry thread report` as usual."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, kind := range PRTaskKinds {
+				lines := strings.Split(prTasks[kind].prompt(taskDetail(), tt.o), "\n")
+				got := lines[1]
+				if tt.want == "" {
+					if strings.Contains(strings.Join(lines, "\n"), "sent this task") || strings.Contains(strings.Join(lines, "\n"), "task was sent") {
+						t.Errorf("%s: a forwarded line without a forward: %q", kind, lines[1])
+					}
+					continue
+				}
+				if got != tt.want {
+					t.Errorf("%s: line 2 = %q\nwant %q", kind, got, tt.want)
+				}
+			}
+		})
+	}
+}
