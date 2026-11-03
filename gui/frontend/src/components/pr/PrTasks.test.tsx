@@ -209,6 +209,19 @@ describe("running pr.task", () => {
     expect(byTestId("pr-task-checks").getAttribute("aria-disabled")).toBeNull();
   });
 
+  it("a thread removed since: the daemon's message as an error, no Open", async () => {
+    fromThread("s-1");
+    link("s-1", [145]);
+    world.removedThreads.add("s-1");
+    renderPrPanel();
+    await openPr(145);
+    fireEvent.click(byTestId("pr-task-checks"));
+    await expectToast("thread s-1 was removed");
+    const t = [...document.querySelectorAll<HTMLElement>("[data-sonner-toast]")].find((el) => el.textContent.includes("was removed"));
+    expect(t?.dataset.type).toBe("error");
+    expect(toastOpen("was removed")).toBeNull();
+  });
+
   it("a refusal toasts the daemon's error", async () => {
     world.failNext.add("pr.task");
     resetPrStores();

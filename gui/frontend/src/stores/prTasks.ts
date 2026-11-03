@@ -36,13 +36,21 @@ export function parseTaskResult(resultJson: string): { threadId: string; sent: b
 
 /**
  * The toast's text: the daemon's message, without a send's "; <next>" (thread.send's
- * "thread wait <id> --after N" line, for an agent on the CLI, not for the window).
+ * "wait with: code-foundry thread wait <id> --after N" or "you are subscribed …", for an
+ * agent on the CLI, not for the window).
  */
 export function taskToast(message: string, sent: boolean): string {
-  // "Sent to <label> (#N); <next>": cut after the ordinal, as a thread's name may hold "; ".
-  const m = sent ? /^(.*?\(#\d+\)); /s.exec(message) : null;
+  // "Sent to <label> (#N); <next>": cut at the ordinal followed by one of the two hints,
+  // so a thread name holding "(#N); " is kept.
+  const m = sent ? /^(.*\(#\d+\)); (?:wait with:|you are subscribed)/s.exec(message) : null;
   return m?.[1] ?? message;
 }
+
+/**
+ * Whether a result is the daemon's answer for a removed thread (removedWaitResult, exit
+ * 1): no thread id and nothing sent. The task went nowhere.
+ */
+export const taskWentNowhere = (out: { threadId: string; sent: boolean }): boolean => out.threadId === "" && !out.sent;
 
 const selectedThread = (): string | null => {
   const sel = useUiStore.getState().selection;
@@ -50,12 +58,13 @@ const selectedThread = (): string | null => {
 };
 
 /**
- * Runs pr.task for kind into target. Resolves the thread's id (an empty string when the
- * result names none), or null when it failed (toasted by runCommandForResult with the
- * daemon's error) or the same task for this pull request is already running (a second
- * press sends nothing). The daemon's message toasts; it has an Open action that selects
- * the thread unless that thread is already selected (a send into this thread, or a new
- * thread the daemon's FocusThread has selected already).
+ * Runs pr.task for kind into target. Resolves the thread's id, or null when it failed
+ * (toasted by runCommandForResult with the daemon's error), went nowhere (the target
+ * thread was removed: the daemon's message toasts as an error, without Open), or the same
+ * task for this pull request is already running (a second press sends nothing). Otherwise
+ * the daemon's message toasts with an Open action that selects the thread, unless that
+ * thread is already selected (a send into this thread, or a new thread the daemon's
+ * FocusThread has selected already).
  */
 export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget): Promise<string | null> {
   const key = taskKey(ref, kind);
@@ -65,6 +74,10 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
     const res = await runCommandForResult("pr.task", prTaskArgs(ref, kind, target), { quiet: true });
     if (!res) return null;
     const out = parseTaskResult(res.resultJson);
+    if (taskWentNowhere(out)) {
+      toast.error(res.message || "The thread was removed: nothing was sent");
+      return null;
+    }
     const id = out.threadId || (target.threadId ?? "");
     if (res.message) {
       const open = id !== "" && selectedThread() !== id;
