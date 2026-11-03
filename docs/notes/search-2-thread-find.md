@@ -45,32 +45,52 @@ What stays on screen when a turn folds, plus answered questions:
 Smart case (`\p{Lu}` in the query → case-sensitive), plain substring, non-overlapping.
 Lower-casing keeps UTF-16 offsets (a letter whose lower case is longer, `İ`, stays as is).
 Each item's text and its lower-case form are cached by item identity (items keep identity
-while unchanged), so a streaming answer re-reads only itself.
+while unchanged). A streaming answer is a new item every batch, so it is read the way
+StreamingMarkdown draws it: cut into blocks (`lib/markdownBlocks`), each block's text
+cached by its source (`streamingMarkdownText`), so a batch parses only the growing last
+block (a 26 KB answer: 45 ms a batch before, 0.6 ms now). That is also what the DOM shows
+while streaming: a reference link or footnote stays literal until the answer ends and
+renders whole (it was counted resolved before, a mismatch). In Ember's chat a streaming
+reply's task links count as text, as StreamingMarkdown draws them until the reply ends.
+
+The count is computed once per log and query and shared (`threadFindMatches`): the bar,
+the layer and a step read the same array. When the bar opens, the layer reads the thread's
+texts ahead in 8 ms idle slices (`warmFind`; a timer slice in WebKit, which has no
+`requestIdleCallback`), so the first keystroke does not parse every answer (500 answers
+cold took about 2.7 s in the bar's render).
 
 ## Rendered text without a DOM (lib/markdownText.ts)
 
 The count must equal what the DOM shows, so the k-th match in the data is the k-th match
-in the row's DOM text. `markdownText` runs the renderer's parse (remark-parse, GFM,
-remark-rehype with raw HTML kept, `rehypeInlineHtml`) and walks the hast tree the way
-`citeDom.plainText` walks the DOM: text nodes in order, a newline when the block changes,
-whitespace between blocks dropped. It reads the tree as the thread's components draw it:
-a fenced block's code without its last newline, an inline code span or relative link that
-is a path as the chip's text, images and task-list checkboxes as nothing. The sanitizer and
-the prose path pass change no text, so they are left out. `unified`, `remark-parse` and
+in the row's DOM text. `markdownText` runs the renderer's parse and walks the hast tree the
+way `citeDom.plainText` walks the DOM: text nodes in order, a newline when the block
+changes, whitespace between blocks dropped. The parse's plugin lists live in
+`lib/markdownPlugins` and both `components/pr/Markdown` and `markdownText` use them
+(remark-parse, GFM, remark-rehype with raw HTML kept, `rehypeInlineHtml`, the sanitizer,
+the prose path pass), so a plugin added to the renderer is in find's text too. They moved
+to lib rather than being exported from the component, so lib does not import a component.
+It reads the tree as the thread's components draw it: a fenced block's code without its
+last newline, an inline code span, relative link or prose token that is a path as the
+chip's text, images and task-list checkboxes as nothing. `unified`, `remark-parse` and
 `remark-rehype` became direct dependencies at the versions react-markdown already pulled
 in (bun's isolated install does not expose transitive ones); no bundle growth.
+`lib/markdownDeps.test.ts` fails when package.json pins a version other than the one
+react-markdown resolves in bun's store (`node_modules/.bun/react-markdown@*/node_modules`),
+so a react-markdown bump cannot ship two copies.
 
-`markdownText.test.tsx` renders `ThreadMarkdown` in jsdom for a dozen shapes (paragraphs,
-lists, loose lists, code, tables, headings, quotes, links, path chips, inline HTML, task
-lists, breaks, images) and compares with `plainText`. In the browser, every rendered item
+`markdownText.test.tsx` renders `ThreadMarkdown` and `StreamingMarkdown` in jsdom for
+sixteen shapes (paragraphs, lists, loose lists, code, tables, headings, quotes, links, path
+chips in code and prose, inline HTML, task lists, breaks, images, an unloaded local image,
+a reference link, a footnote) and compares with find's DOM text (`findText`). In the browser, every rendered item
 of the mock threads (the thread and Ember's chat) compared equal.
 
 Ember's chat draws `[Title](cf-task://…)` lines as pointer rows, not text: the data drops
 them too (`answerText`, Ember's own `splitTaskLinks`). In an ordinary thread such a line
 would render as text and not count; only Ember writes them.
 
-A local image that has not loaded shows a chip with its alt text; the data counts no text
-for images. A match there is painted but not counted. Accepted.
+A local image that has not loaded shows a chip with its alt text (or "Loading image…");
+the data counts no text for images. The chip is `data-find-skip`, in find's skip selector,
+so its text is neither matched nor shifts the later matches' order in the item.
 
 ## Painting and the DOM (components/thread/find)
 
@@ -82,39 +102,58 @@ for images. A match there is painted but not counted. Accepted.
   cite layer's `paintAll` (new, many ranges per highlight), whose overlay is the fallback
   (the overlay's current box is 60% warning, not solid: it sits over the text).
 - The layer repaints one frame after a mutation in the list (rows mounting, text
-  streaming), a resize or a scroll.
+  streaming) or a resize; on scroll only for the overlay fallback (no Custom Highlights):
+  a highlight moves with its text, and a tick's place is in the list's own coordinates.
 - Counts come from the data only; painting never counts.
 
 ## Navigation
 
 - The current match is a key, `{ itemId, nth }`, so text streaming after it does not move
-  it. When its item no longer has that match it is picked again.
+  it. When its item no longer has that match (text changed under it), the nearest match in
+  the same item to where it was becomes current, in place (no scroll: `setThreadFindCurrent`
+  `reveal: false`); when the item has none left, the first match after it, revealed.
 - Picking (the layer, `aim`): opening or typing on an empty session takes the first match
   at or after the top row of the list (the row's item by log order, `rowOrder`); editing
-  the query goes on from the current match's item (as a browser's find does, so typing
-  does not jump back to the top after the first letter scrolled); a hand-off's item
-  (below) takes that item's first match.
+  the query goes on from the current match, its item and its start offset (`aim.from`:
+  the first match at or after that place, as a browser's find does, so typing neither
+  jumps back to the top nor to the first match of a long answer); a hand-off's item
+  (below) takes that item's first match. Nothing is picked before the thread's log has
+  loaded: the aim waits for it (a hand-off to a thread not yet cached).
 - Bringing it into view (`revealMatch`): the list unpins (stops following the bottom);
   a row already rendered is placed by its match's lines (cite `scrollToQuote`: the middle
   of the visible part, between the list's top and the composer's top, unless already in
-  view), else the row is scrolled in first (`showRow`), then placed.
+  view), else the row is scrolled in first (`showRow`), then placed. Where the bar lies
+  over the lines (the card closed or floating), the visible part starts under the bar
+  (`visibleTop`); beside an inline card the bar is over the card's column and does not count.
 - Live threads: the count follows streaming text; nothing scrolls unless the current match
   changes.
 
 ## Folded questions: open and put back
 
 An answered question is a step row inside the fold; its text is in its expanded detail.
-When the current match is in it, `openFor` expands the row (`setRowExpanded`) and asks the
-timeline to unfold what hides it (`TimelineHandle.unfold`): the thread's timeline now has
-one (`foldingTurn` in lib/threadTimeline: the turn whose fold hides a question or tool
-row; a text is never hidden), Ember's already opened the work row. It records the choices
-it changed with their values before (`getTurnView` diff) and, when the current match moves
-to another item or the bar closes, puts exactly those back (`putTurnView`: a choice that
-was the default is dropped again). Putting back the last item's and opening the next one
+When the current match is in it, `openThreadFindItem` (stores/threadFind) expands the row
+(`setRowExpanded`) and asks the timeline to unfold what hides it
+(`TimelineHandle.unfold`): the thread's timeline now has one (`foldingTurn` in
+lib/threadTimeline: the turn whose fold hides a question or tool row; a text is never
+hidden), Ember's opens the work row. It records each choice it changed as `{ before, set }`
+in the find session (`opened`) and, when the current match moves to another item, the
+query finds nothing or the bar closes, puts those back (`putTurnView`: a choice that was
+the default is dropped again). Putting back the last item's and opening the next one
 happen in one tick and are read from the store, not the rows on screen, so a turn both
 need is never folded and unfolded on screen. While a new query waits for its first match,
-nothing is put back yet (the same question again would flicker). Leaving the thread closes
-its find first (WatchedThread), then forgets its fold choices as before.
+nothing is put back yet (the same question again would flicker).
+
+A choice the user changes while the bar is open is theirs: a watch on the thread store
+drops it from `opened` on any change away from the value find set (collapsing the row and
+expanding it again counts: comparing values at put-back time alone would miss it), and a
+put-back writes a choice only while the store still holds `set`.
+
+`closeThreadFind` puts back synchronously, from the session. Leaving the thread runs
+WatchedThread's cleanup (close the find, then forget the fold choices) before the layer's
+own unmount, which only puts back what a still-open session holds (nothing by then): the
+layer used to put back from a ref after the choices were forgotten, writing them again. A
+visit to a subagent run unmounts the layer with the session open: what it opened goes back
+and opens again on return.
 
 ## Layout
 
@@ -143,8 +182,9 @@ openThreadFind(threadId, query, { itemId });
 ```
 
 Opens (or refocuses) that thread's bar with `query` and makes the first match in `itemId`
-current once the thread's layer has the matches (falls back to the first match at or below
-the top of the list when the item has none). The thread must be the one in the content
+current once the thread's layer has the matches, which waits for the thread's log when it
+is not loaded yet (falls back to the first match at or below the top of the list when the
+item has none). The thread must be the one in the content
 pane for the bar to show; call it before or after selecting the thread (the session lives
 by thread id until the thread leaves the content pane). `openThreadFind(threadId)` without
 a query opens the bar keeping what it had. Other exports: `closeThreadFind`,
@@ -154,11 +194,18 @@ for counting a thread's matches from its items.
 ## Tests
 
 - vitest: `lib/threadFind.test.ts` (smart case, substring rules, which kinds count, question
-  counted once, Ember task lines, streaming recount, step/start/count, match map rows),
-  `lib/markdownText.test.tsx` (data text = rendered text), `stores/threadFind.test.ts`
-  (session, from-item typing, steps, presenter), `find/findDom.test.ts` (open and put back
-  folds and expansions), `find/FindBar.test.tsx` (count, Aa, keys, close),
+  counted once, Ember task lines, streaming recount and block-by-block text, warm slices,
+  step/start (offset)/nearest/count, match map rows), `lib/markdownText.test.tsx` (data
+  text = rendered text, whole and streaming), `lib/markdownDeps.test.ts` (one copy of the
+  parse packages), `stores/threadFind.test.ts` (session, typing on from the match's offset,
+  shared count, steps, presenter), `stores/threadFindFolds.test.ts` (open and put back
+  folds and expansions, user changes kept, close then forget leaves nothing),
+  `find/FindLayer.test.tsx` (a hand-off before the log loads, picks from the top, a stale
+  current match staying in its item or moving on, leaving the thread, closing),
+  `find/FindBar.test.tsx` (count, Aa, keys, close), `cite/reveal.test.ts` (the bar's area
+  not visible), `ember/EmberTimeline.test.tsx` (a work row opened and put back),
   `lib/threadTimeline.test.ts` (`foldingTurn`), Go `commands_view_thread_find_test.go`.
 - WebKit e2e `e2e/thread-find.spec.ts`: cmd+f from the prompt and the bar beside the card,
-  painted ranges and the map, scroll to an off-screen match and unpin, a folded question
-  unfolding, moving on and Escape putting it back.
+  painted ranges and the map, scroll to an off-screen match and unpin, the current tick at
+  its text before and after a wheel scroll, a folded question unfolding, moving on and
+  Escape putting it back.
