@@ -2,7 +2,7 @@ import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
-import { caseSensitive, countLabel, matchIndex } from "@/lib/threadFind";
+import { caseSensitive, countLabel, matchIndex, type FindMatch } from "@/lib/threadFind";
 import { cn } from "@/lib/utils";
 import { chordFromEvent, normalizeChord } from "@/keys/chord";
 import { useCommandsStore } from "@/stores/commands";
@@ -24,6 +24,8 @@ const BAR_COMMANDS: Readonly<Record<string, (threadId: string) => void>> = {
   "thread.find.next": (id) => void stepThreadFind(id, 1),
   "thread.find.previous": (id) => void stepThreadFind(id, -1),
 };
+
+const NO_MATCHES: readonly FindMatch[] = [];
 
 /** The command a chord is bound to, of the find verbs (the user's bindings, as the keymap has them). */
 function barCommand(e: KeyboardEvent): string | undefined {
@@ -48,7 +50,7 @@ export function FindBar({ threadId, narrow = false }: { threadId: string; narrow
 function Bar({ threadId, narrow }: { threadId: string; narrow: boolean }) {
   const query = useThreadFindQuery(threadId);
   const focusSeq = useThreadFindFocusSeq(threadId);
-  const matches = useThreadFindMatches(threadId, query);
+  const matches = useThreadFindMatches(threadId, query) ?? NO_MATCHES;
   const current = useThreadFindCurrent(threadId);
   const index = matchIndex(matches, current);
   const inputRef = useRef<HTMLInputElement>(null);

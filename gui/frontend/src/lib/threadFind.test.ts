@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import { fixStalePrBadge, request } from "@/test/threadWorld";
-import { caseSensitive, countLabel, findDoc, findMatches, matchIndex, matchOffsets, matchRows, rowOrder, startIndex, stepIndex, type FindMatch } from "./threadFind";
+import { caseSensitive, countLabel, findDoc, findMatches, matchIndex, matchOffsets, matchRows, nearestInItem, rowOrder, startIndex, stepIndex, warmFind, type FindMatch } from "./threadFind";
 
 const base = { ordinal: 1, parentToolUseId: "", createdAtMs: null, updatedAtMs: null, streaming: false };
 const item = (x: Record<string, unknown>) => ({ ...base, ...x }) as unknown as ThreadItemView;
@@ -109,6 +109,26 @@ describe("findMatches", () => {
     const b = { ...a, text: "one fin, two fin" } as ThreadItemView;
     expect(findMatches([b], "fin")).toHaveLength(2);
   });
+
+  it("reads a streaming answer block by block, as StreamingMarkdown draws it: a reference link resolves once it ends", () => {
+    const md = "See [the docs][d] first.\n\n[d]: https://example.com";
+    const live = item({ id: "a", kind: "text", text: md, streaming: true });
+    expect(findDoc(live)?.text).toBe("See [the docs][d] first.");
+    expect(findMatches([live], "[d]")).toHaveLength(1);
+    const done = { ...live, streaming: false } as ThreadItemView;
+    expect(findDoc(done)?.text).toBe("See the docs first.");
+    expect(findMatches([done], "[d]")).toHaveLength(0);
+  });
+
+  it("warms the items' texts in slices: up to the budget, then on from where it stopped", () => {
+    const items = ["a", "b", "c"].map((id) => item({ id, kind: "text", text: `${id} text` }));
+    let t = 0;
+    // Each look at the clock is 5 ms later: two reads fit in 8 ms.
+    const now = () => (t += 5);
+    expect(warmFind(items, 0, 8, now)).toBe(2);
+    expect(warmFind(items, 2, 100, now)).toBe(3);
+    expect(warmFind(items, 3, 8, now)).toBe(3);
+  });
 });
 
 describe("navigation", () => {
@@ -144,6 +164,22 @@ describe("navigation", () => {
     expect(startIndex(ms, order, { fromOrder: 1 })).toBe(2);
     expect(startIndex(ms, order, { fromOrder: 3 })).toBe(2);
     expect(startIndex([], order, {})).toBe(-1);
+  });
+
+  it("an edited query goes on from the last current match: in its item at or after its offset, else in the items after", () => {
+    expect(startIndex(ms, order, { from: { itemId: "a", start: 2 } })).toBe(1);
+    expect(startIndex(ms, order, { from: { itemId: "a", start: 1 } })).toBe(1);
+    expect(startIndex(ms, order, { from: { itemId: "a", start: 3 } })).toBe(2);
+    expect(startIndex(ms, order, { from: { itemId: "b", start: 40 } })).toBe(2);
+    // An item no longer in the log: from the list's top.
+    expect(startIndex(ms, order, { from: { itemId: "gone", start: 0 }, fromOrder: 0 })).toBe(0);
+  });
+
+  it("the nearest match in an item to an offset (a current match its streaming text moved)", () => {
+    expect(nearestInItem(ms, "a", 0)).toBe(0);
+    expect(nearestInItem(ms, "a", 9)).toBe(1);
+    expect(nearestInItem(ms, "a", 1)).toBe(0);
+    expect(nearestInItem(ms, "b", 0)).toBe(-1);
   });
 
   it("labels the count", () => {

@@ -53,6 +53,20 @@ async function currentBox(page: Page): Promise<{ top: number; bottom: number; li
   });
 }
 
+/** The current tick's place along the map and its text's place in the list (fractions of the list's height). */
+async function currentTick(page: Page): Promise<{ tick: number; text: number } | null> {
+  return page.evaluate(() => {
+    const h = (CSS as unknown as { highlights: Map<string, Set<Range>> }).highlights.get("cf-find-current");
+    const r = h ? [...h][0] : undefined;
+    const list = document.querySelector<HTMLElement>('[data-testid="thread-pane"] [data-testid="thread-timeline"]');
+    const tick = document.querySelector<HTMLElement>('[data-testid="thread-find-map"] [data-current]');
+    if (!r || !list || !tick) return null;
+    const zoom = list.getBoundingClientRect().height / list.offsetHeight || 1;
+    const text = (list.scrollTop + (r.getBoundingClientRect().top - list.getBoundingClientRect().top) / zoom) / list.scrollHeight;
+    return { tick: parseFloat(tick.style.top) / 100, text };
+  });
+}
+
 test("cmd+f from the prompt opens the bar over the card's column; matches paint, the card moves under it", async ({ page }) => {
   await openThread(page);
   await page.keyboard.press("Meta+Shift+I");
@@ -99,6 +113,12 @@ test("a match off screen scrolls to the middle of the visible part and the list 
     return b ? Math.abs((b.top + b.bottom) / 2 - (b.listTop + b.dockTop) / 2) < 40 || b.top - b.listTop < 60 : false;
   }).toBe(true);
   await expect(timeline(page)).not.toHaveAttribute("data-at-bottom", "true");
+  // The current tick is at its text, and stays there as the list scrolls (no repaint on scroll where highlights work).
+  const near = (t: { tick: number; text: number } | null) => (t ? Math.abs(t.tick - t.text) < 0.01 : false);
+  await expect.poll(async () => near(await currentTick(page))).toBe(true);
+  await timeline(page).hover();
+  await page.mouse.wheel(0, 400);
+  await expect.poll(async () => near(await currentTick(page))).toBe(true);
 });
 
 test("a match in a folded question unfolds its turn and opens the row; moving on or Escape puts them back", async ({ page }) => {

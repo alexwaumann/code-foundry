@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fixStalePrBadge, publishThread } from "@/test/threadWorld";
 import { useSubagentViewStore } from "./subagentView";
 import { useThreadStore } from "./thread";
-import { closeThreadFind, openThreadFind, presentThreadFind, setThreadFindCurrent, setThreadFindQuery, stepThreadFind, useThreadFindStore } from "./threadFind";
+import { closeThreadFind, getThreadFindMatches, openThreadFind, presentThreadFind, setThreadFindCurrent, setThreadFindQuery, stepThreadFind, useThreadFindStore } from "./threadFind";
 import { useUiStore } from "./ui";
 
 const T = "s-1";
@@ -33,16 +33,41 @@ describe("the find session", () => {
     expect(session()).toMatchObject({ query: "fingerprint", current: null, aim: { kind: "item", itemId: "i20" } });
   });
 
-  it("an edited query searches on from the current match's item", () => {
+  it("an edited query searches on from the current match: its item and where it starts", () => {
     openThreadFind(T);
     setThreadFindQuery(T, "f");
     expect(session()?.aim).toEqual({ kind: "view" });
-    setThreadFindCurrent(T, { itemId: "i14", nth: 2 });
+    const third = getThreadFindMatches(T).filter((m) => m.itemId === "i13")[2];
+    expect(third?.start).toBeGreaterThan(0);
+    setThreadFindCurrent(T, { itemId: "i13", nth: 2 });
     setThreadFindQuery(T, "fi");
-    expect(session()).toMatchObject({ current: null, aim: { kind: "view", fromItem: "i14" } });
+    expect(session()).toMatchObject({ current: null, aim: { kind: "view", from: { itemId: "i13", start: third?.start } } });
     // Typed again before the layer picked one: still from there.
     setThreadFindQuery(T, "fin");
-    expect(session()?.aim).toEqual({ kind: "view", fromItem: "i14" });
+    expect(session()?.aim).toEqual({ kind: "view", from: { itemId: "i13", start: third?.start } });
+  });
+
+  it("a hand-off's item is where an edited query goes on from, before a match is picked", () => {
+    openThreadFind(T, "fingerprint", { itemId: "i20" });
+    setThreadFindQuery(T, "fingerprints");
+    expect(session()?.aim).toEqual({ kind: "view", from: { itemId: "i20", start: 0 } });
+  });
+
+  it("the bar, the layer and a step share one count per log and query", () => {
+    openThreadFind(T, "head sha");
+    const a = getThreadFindMatches(T);
+    expect(getThreadFindMatches(T)).toBe(a);
+    publishThread(T, fixStalePrBadge("idle"));
+    expect(getThreadFindMatches(T)).not.toBe(a);
+    expect(getThreadFindMatches(T)).toEqual(a);
+  });
+
+  it("a pick that keeps a match in place does not bring it into view", () => {
+    openThreadFind(T, "head sha");
+    setThreadFindCurrent(T, { itemId: "i14", nth: 0 });
+    const seq = session()?.revealSeq;
+    setThreadFindCurrent(T, { itemId: "i14", nth: 1 }, { reveal: false });
+    expect(session()?.revealSeq).toBe(seq);
   });
 
   it("steps through the matches from the items, wrapping, and bumps the reveal each time", () => {

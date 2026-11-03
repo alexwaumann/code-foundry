@@ -15,7 +15,7 @@
  */
 import type { ThreadItemView } from "@/api/thread";
 import { splitTaskLinks } from "./ember";
-import { markdownText } from "./markdownText";
+import { markdownText, streamingMarkdownText } from "./markdownText";
 import { questionsOf } from "./threadRequest";
 import { parseUserMessage } from "./userMessage";
 
@@ -71,7 +71,12 @@ export function answerText(text: string): string {
 
 const docs = new WeakMap<ThreadItemView, FindDoc | null>();
 
-/** An item's searchable text, or null for an item find does not search. Items keep their identity while unchanged, so each is read once. */
+/**
+ * An item's searchable text, or null for an item find does not search. Items keep their
+ * identity while unchanged, so each is read once; a streaming answer is a new item per
+ * delta, and is read block by block as it renders (lib/markdownText
+ * streamingMarkdownText: its finished blocks are parsed once).
+ */
 export function findDoc(it: ThreadItemView): FindDoc | null {
   const hit = docs.get(it);
   if (hit !== undefined) return hit;
@@ -86,7 +91,8 @@ function readDoc(it: ThreadItemView): FindDoc | null {
     case "user":
       return it.wake ? null : { itemId: it.id, kind: "user", text: userText(it.text, it.composerText, it.attachments) };
     case "text":
-      return it.apiError ? null : { itemId: it.id, kind: "text", text: answerText(it.text) };
+      // While it streams the row draws StreamingMarkdown over the whole text (Ember's task links as text too).
+      return it.apiError ? null : { itemId: it.id, kind: "text", text: it.streaming ? streamingMarkdownText(it.text) : answerText(it.text) };
     case "question": {
       // A pending question docks in the composer, not in the timeline.
       if (it.request.state === "pending") return null;
@@ -129,6 +135,15 @@ export function matchOffsets(text: string, query: string, folded?: string): { st
 /** Each searchable text in lower case, kept with it (a streaming answer's changes with its item). */
 const foldedDocs = new WeakMap<FindDoc, string>();
 
+function foldedOf(doc: FindDoc): string {
+  let lower = foldedDocs.get(doc);
+  if (lower === undefined) {
+    lower = fold(doc.text);
+    foldedDocs.set(doc, lower);
+  }
+  return lower;
+}
+
 /** Every match in the items, in their order. */
 export function findMatches(items: readonly ThreadItemView[], query: string): FindMatch[] {
   if (query === "") return [];
@@ -136,14 +151,27 @@ export function findMatches(items: readonly ThreadItemView[], query: string): Fi
   for (const it of items) {
     const doc = findDoc(it);
     if (!doc) continue;
-    let lower = foldedDocs.get(doc);
-    if (lower === undefined) {
-      lower = fold(doc.text);
-      foldedDocs.set(doc, lower);
-    }
-    matchOffsets(doc.text, query, lower).forEach((m, nth) => out.push({ itemId: doc.itemId, nth, ...m }));
+    matchOffsets(doc.text, query, foldedOf(doc)).forEach((m, nth) => out.push({ itemId: doc.itemId, nth, ...m }));
   }
   return out;
+}
+
+/**
+ * Reads items' searchable texts ahead of a query (the find bar warms them in idle slices
+ * as it opens, so the first keystroke does not parse every answer): from index `from`
+ * until `budgetMs` has passed. Returns the index to go on from (items.length when done).
+ */
+export function warmFind(items: readonly ThreadItemView[], from: number, budgetMs: number, now: () => number = () => performance.now()): number {
+  const until = now() + budgetMs;
+  let i = from;
+  while (i < items.length) {
+    const it = items[i];
+    i++;
+    const doc = it ? findDoc(it) : null;
+    if (doc) foldedOf(doc);
+    if (now() >= until) break;
+  }
+  return i;
 }
 
 /** A match's index in the list; -1 when it is not there. */
@@ -162,20 +190,44 @@ export function stepIndex(count: number, from: number, dir: 1 | -1): number {
   return (from + dir + count) % count;
 }
 
+/** A place in a thread's text: an item and an offset in its searchable text. */
+export interface FindPlace {
+  itemId: string;
+  start: number;
+}
+
 /**
  * The match to start on: the first in `itemId` when given and it has one; else the first
- * whose item is at or after `fromOrder` (the item order of the first row on screen); else
- * the last. -1 when there are none.
+ * at or after `from` (the match that was current while the query was edited: its item and
+ * where it started, so typing goes on from that very match) when its item is in the log;
+ * else the first whose item is at or after `fromOrder` (the item order of the first row on
+ * screen); else the last. -1 when there are none.
  */
-export function startIndex(matches: readonly FindMatch[], order: ReadonlyMap<string, number>, opts: { itemId?: string; fromOrder?: number }): number {
+export function startIndex(matches: readonly FindMatch[], order: ReadonlyMap<string, number>, opts: { itemId?: string; from?: FindPlace; fromOrder?: number }): number {
   if (matches.length === 0) return -1;
   if (opts.itemId !== undefined) {
     const i = matches.findIndex((m) => m.itemId === opts.itemId);
     if (i >= 0) return i;
   }
-  const from = opts.fromOrder ?? 0;
-  const i = matches.findIndex((m) => (order.get(m.itemId) ?? 0) >= from);
+  const at = opts.from ? order.get(opts.from.itemId) : undefined;
+  const fromStart = opts.from?.start ?? 0;
+  const from = at ?? opts.fromOrder ?? 0;
+  const i = matches.findIndex((m) => {
+    const o = order.get(m.itemId) ?? 0;
+    return o > from || (o === from && (at === undefined || m.start >= fromStart));
+  });
   return i >= 0 ? i : matches.length - 1;
+}
+
+/** The match in `itemId` nearest to offset `start` (the one before wins a tie); -1 when the item has none. */
+export function nearestInItem(matches: readonly FindMatch[], itemId: string, start: number): number {
+  let best = -1;
+  matches.forEach((m, i) => {
+    if (m.itemId !== itemId) return;
+    const b = matches[best];
+    if (!b || Math.abs(m.start - start) < Math.abs(b.start - start)) best = i;
+  });
+  return best;
 }
 
 /** The count the find bar shows: "n of m", "0 of m" before a match is current. Empty for no query. */

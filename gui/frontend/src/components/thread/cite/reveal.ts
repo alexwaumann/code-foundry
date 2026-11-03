@@ -35,6 +35,19 @@ export function hasItem(threadId: string, itemId: string): boolean {
   return useThreadStore.getState().logs[threadId]?.byId[itemId] !== undefined;
 }
 
+/**
+ * The top of the timeline's visible part for lines in `rects`: the list's top, or below the
+ * find bar where the bar lies over them (the info card closed or floating: the bar sits
+ * over the conversation; beside an inline card it is over the card's column, not the text).
+ */
+export function visibleTop(pane: HTMLElement, scroller: HTMLElement, rects: readonly DOMRect[]): number {
+  const top = scroller.getBoundingClientRect().top;
+  const bar = pane.querySelector('[data-testid="thread-find"]')?.getBoundingClientRect();
+  if (!bar || bar.height === 0) return top;
+  const under = rects.some((r) => r.left < bar.right && r.right > bar.left);
+  return under ? Math.max(top, bar.bottom) : top;
+}
+
 /** Scrolls the timeline so the quote's lines sit in the middle of its visible part (top-aligned when taller), unless they are in view (the find bar's matches too). */
 export function scrollToQuote(threadId: string, pane: HTMLElement, pt: PlainText, at: { start: number; end: number }): void {
   const tl = getTimeline(threadId);
@@ -42,7 +55,7 @@ export function scrollToQuote(threadId: string, pane: HTMLElement, pt: PlainText
   const first = rects[0];
   const last = rects[rects.length - 1];
   if (!tl || !first || !last) return;
-  const top = tl.scroller.getBoundingClientRect().top + CITE_EDGE;
+  const top = visibleTop(pane, tl.scroller, rects) + CITE_EDGE;
   const bottom = dockTop(pane) - CITE_EDGE;
   if (first.top >= top && last.bottom <= bottom) return;
   const height = last.bottom - first.top;

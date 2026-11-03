@@ -7,24 +7,42 @@
  *
  * A session lives while its thread is in the content pane: leaving the thread forgets it
  * (ThreadPane's WatchedThread), a visit to one of its subagent runs does not.
+ *
+ * The session also holds what the current match opened (a folded question's row and turn,
+ * Ember's work row) so closing it puts that back at once, before anything else forgets
+ * the thread's fold choices.
  */
 import { useMemo } from "react";
 import { create } from "zustand";
-import { findMatches, matchIndex, stepIndex, type FindKey, type FindMatch } from "@/lib/threadFind";
+import { findDoc, findMatches, matchIndex, stepIndex, type FindKey, type FindMatch, type FindPlace } from "@/lib/threadFind";
+import { getTimeline } from "./cite";
 import { getViewing } from "./subagentView";
-import { getThreadItems, useThreadStore } from "./thread";
+import { getTurnView, putTurnView, setRowExpanded, useThreadStore, type ThreadLog, type TurnView } from "./thread";
 import { useUiStore } from "./ui";
 
 /** Where the next current match is picked when the matches are known (the find layer does it). */
 export type FindAim =
   /**
-   * The first match at or after `fromItem` (the match that was current while the query
-   * was edited: typing on searches on from there, as a browser's find does), else at or
-   * below the top of what the list shows (opening).
+   * The first match at or after `from` (the match that was current while the query was
+   * edited, its item and offset: typing on searches on from there, as a browser's find
+   * does), else at or below the top of what the list shows (opening).
    */
-  | { kind: "view"; fromItem?: string }
+  | { kind: "view"; from?: FindPlace }
   /** The first match in this item (openThreadFind's itemId), else as "view". */
   | { kind: "item"; itemId: string };
+
+/** A fold or expand choice the find changed: the value before (undefined: none) and the one it set. */
+export interface OpenedChoice {
+  before: boolean | undefined;
+  set: boolean | undefined;
+}
+
+/** What the current match opened, by turn key (folds) and row key (expanded). */
+export interface Opened {
+  itemId: string;
+  folds: Readonly<Record<string, OpenedChoice>>;
+  expanded: Readonly<Record<string, OpenedChoice>>;
+}
 
 export interface FindSession {
   query: string;
@@ -33,8 +51,10 @@ export interface FindSession {
   aim: FindAim | null;
   /** Bumped when the bar should take the keyboard and select its query (open, cmd+f again). */
   focusSeq: number;
-  /** Bumped when the current match should be brought into view again (a step that lands on the same match). */
+  /** Bumped when the current match should be brought into view (a pick or a step, also onto the same match). */
   revealSeq: number;
+  /** What the current match's item opened, to put back (openThreadFindItem). */
+  opened: Opened | null;
 }
 
 export interface ThreadFindState {
@@ -63,37 +83,142 @@ function update(threadId: string, f: (s: FindSession | undefined) => FindSession
  */
 export function openThreadFind(threadId: string, query?: string, opts: { itemId?: string } = {}): void {
   update(threadId, (s) => {
-    const base: FindSession = s ?? { query: "", current: null, aim: null, focusSeq: 0, revealSeq: 0 };
+    const base: FindSession = s ?? { query: "", current: null, aim: null, focusSeq: 0, revealSeq: 0, opened: null };
     const focusSeq = base.focusSeq + 1;
     if (query === undefined) return { ...base, focusSeq, aim: s ? base.aim : { kind: "view" } };
     return { ...base, query, current: null, aim: opts.itemId !== undefined ? { kind: "item", itemId: opts.itemId } : { kind: "view" }, focusSeq };
   });
 }
 
-/** Closes a thread's find bar and forgets its query. */
+/** Closes a thread's find bar and forgets its query; what it opened is put back first, in the same tick. */
 export function closeThreadFind(threadId: string): void {
+  putBackThreadFind(threadId);
+  counted.delete(threadId);
   update(threadId, () => undefined);
 }
 
-/** The bar's query changed: the current match is picked again, from the last current one's item on (else from what the list shows). */
+/** The bar's query changed: the current match is picked again, from the last current one on (else from what the list shows). */
 export function setThreadFindQuery(threadId: string, query: string): void {
-  update(threadId, (s) => {
-    if (!s) return s;
-    const fromItem = s.current?.itemId ?? (s.aim?.kind === "item" ? s.aim.itemId : s.aim?.fromItem);
-    return { ...s, query, current: null, aim: fromItem === undefined ? { kind: "view" } : { kind: "view", fromItem } };
-  });
+  const s = useThreadFindStore.getState().byThread[threadId];
+  if (!s) return;
+  let from: FindPlace | undefined;
+  if (s.current) {
+    // The current match's offset under the old query: the new one goes on from there.
+    const matches = getThreadFindMatches(threadId);
+    const m = matches[matchIndex(matches, s.current)];
+    from = { itemId: s.current.itemId, start: m?.start ?? 0 };
+  } else if (s.aim?.kind === "item") from = { itemId: s.aim.itemId, start: 0 };
+  else from = s.aim?.from;
+  update(threadId, (cur) => (cur ? { ...cur, query, current: null, aim: from === undefined ? { kind: "view" } : { kind: "view", from } } : cur));
 }
 
-/** The find layer picked the current match (or none). */
-export function setThreadFindCurrent(threadId: string, current: FindKey | null): void {
-  update(threadId, (s) => (s ? { ...s, current, aim: null, revealSeq: s.revealSeq + 1 } : s));
+/** The find layer picked the current match (or none). `reveal: false`: the match is not brought into view (a re-pick as text streams). */
+export function setThreadFindCurrent(threadId: string, current: FindKey | null, opts: { reveal?: boolean } = {}): void {
+  const reveal = opts.reveal ?? true;
+  update(threadId, (s) => (s ? { ...s, current, aim: null, revealSeq: reveal ? s.revealSeq + 1 : s.revealSeq } : s));
+}
+
+/** The last matches counted per thread: the bar, the layer and a step share them (one count per log and query). */
+const counted = new Map<string, { log: ThreadLog; query: string; matches: FindMatch[] }>();
+
+/** A thread's matches for a query in its log as given; counted once per log and query. */
+export function threadFindMatches(threadId: string, log: ThreadLog, query: string): FindMatch[] {
+  const hit = counted.get(threadId);
+  if (hit?.log === log && hit.query === query) return hit.matches;
+  const matches = findMatches(
+    log.order.flatMap((id) => (log.byId[id] ? [log.byId[id]] : [])),
+    query,
+  );
+  counted.set(threadId, { log, query, matches });
+  return matches;
 }
 
 /** The thread's matches for the session's query, from the items as they are now. */
 export function getThreadFindMatches(threadId: string): FindMatch[] {
   const q = useThreadFindStore.getState().byThread[threadId]?.query ?? "";
-  return findMatches(getThreadItems(threadId), q);
+  const log = useThreadStore.getState().logs[threadId];
+  return log && q !== "" ? threadFindMatches(threadId, log, q) : [];
 }
+
+/** Set while the find writes fold choices itself, so the watch below does not take them for the user's. */
+let writing = false;
+
+function ownWrite(f: () => void): void {
+  writing = true;
+  try {
+    f();
+  } finally {
+    writing = false;
+  }
+}
+
+function changed(before: Readonly<Record<string, boolean>>, after: Readonly<Record<string, boolean>>): Record<string, OpenedChoice> {
+  const out: Record<string, OpenedChoice> = {};
+  for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) if (before[k] !== after[k]) out[k] = { before: before[k], set: after[k] };
+  return out;
+}
+
+/** Each choice's value before, for the choices the store still holds as the find set them (one the user changed since stays theirs). */
+function restore(choices: Readonly<Record<string, OpenedChoice>>, now: Readonly<Record<string, boolean>>): Record<string, boolean | undefined> {
+  const out: Record<string, boolean | undefined> = {};
+  for (const [k, c] of Object.entries(choices)) if (now[k] === c.set) out[k] = c.before;
+  return out;
+}
+
+function putBackOpened(threadId: string, opened: Opened | null): void {
+  if (!opened) return;
+  const now: TurnView = getTurnView(threadId);
+  ownWrite(() => {
+    putTurnView(threadId, restore(opened.folds, now.folds), restore(opened.expanded, now.expanded));
+  });
+}
+
+/** Puts back what the current match opened (the match left its item, the query found nothing, the bar closes). */
+export function putBackThreadFind(threadId: string): void {
+  const s = useThreadFindStore.getState().byThread[threadId];
+  if (!s?.opened) return;
+  putBackOpened(threadId, s.opened);
+  update(threadId, (cur) => (cur ? { ...cur, opened: null } : cur));
+}
+
+/**
+ * Opens what hides an item for the current match in it, after putting back what the last
+ * item opened: a question's row expands (its detail holds the text) and the fold around
+ * it opens (a thread's folded turn, Ember's work row; TimelineHandle.unfold). All in one
+ * tick and from the store, not the rows on screen, so a choice both need is never toggled
+ * on screen. What it changed is kept in the session; nothing again for the same item.
+ */
+export function openThreadFindItem(threadId: string, itemId: string): void {
+  const s = useThreadFindStore.getState().byThread[threadId];
+  if (!s || s.opened?.itemId === itemId) return;
+  putBackOpened(threadId, s.opened);
+  const it = useThreadStore.getState().logs[threadId]?.byId[itemId];
+  const kind = it ? findDoc(it)?.kind : undefined;
+  const before = getTurnView(threadId);
+  ownWrite(() => {
+    if (kind === "question") setRowExpanded(threadId, itemId, true);
+    getTimeline(threadId)?.unfold?.(itemId);
+  });
+  const after = getTurnView(threadId);
+  const opened: Opened = { itemId, folds: changed(before.folds, after.folds), expanded: changed(before.expanded, after.expanded) };
+  update(threadId, (cur) => (cur ? { ...cur, opened } : cur));
+}
+
+// A choice the find opened that the user (or the timeline) changes while the bar is open
+// is theirs from then on: it is not put back, even if it later holds the find's value again.
+useThreadStore.subscribe((st, prev) => {
+  if (writing || (st.folds === prev.folds && st.expanded === prev.expanded)) return;
+  for (const [threadId, s] of Object.entries(useThreadFindStore.getState().byThread)) {
+    const o = s.opened;
+    if (!o) continue;
+    const keep = (choices: Readonly<Record<string, OpenedChoice>>, now: Readonly<Record<string, boolean>> | undefined) =>
+      Object.fromEntries(Object.entries(choices).filter(([k, c]) => now?.[k] === c.set));
+    const folds = keep(o.folds, st.folds[threadId]);
+    const expanded = keep(o.expanded, st.expanded[threadId]);
+    if (Object.keys(folds).length === Object.keys(o.folds).length && Object.keys(expanded).length === Object.keys(o.expanded).length) continue;
+    update(threadId, (cur) => (cur ? { ...cur, opened: { ...o, folds, expanded } } : cur));
+  }
+});
 
 /**
  * Goes to the next (1) or previous (-1) match, wrapping (Enter, shift+Enter, the bar's
@@ -140,16 +265,21 @@ export function useThreadFindRevealSeq(threadId: string): number {
   return useThreadFindStore((s) => s.byThread[threadId]?.revealSeq ?? 0);
 }
 
+const NO_MATCHES: FindMatch[] = [];
+const LOADED = "loaded";
+
 /**
  * The thread's matches for a query, recounted as its items change (a streaming answer
- * included); each item's text is read once (lib/threadFind findDoc).
+ * included; each item's text is read once, lib/threadFind findDoc) and shared by every
+ * caller (threadFindMatches). Null while the thread's log has not loaded.
  */
-export function useThreadFindMatches(threadId: string, query: string): FindMatch[] {
-  const log = useThreadStore((s) => (query === "" ? undefined : s.logs[threadId]));
+export function useThreadFindMatches(threadId: string, query: string): FindMatch[] | null {
+  // Without a query only whether the log is there matters: no re-render per streaming delta.
+  const log = useThreadStore((s) => (query === "" ? (threadId in s.logs ? LOADED : undefined) : s.logs[threadId]));
   return useMemo(() => {
-    if (!log || query === "") return [];
-    return findMatches(log.order.flatMap((id) => (log.byId[id] ? [log.byId[id]] : [])), query);
-  }, [log, query]);
+    if (!log) return null;
+    return log === LOADED ? NO_MATCHES : threadFindMatches(threadId, log, query);
+  }, [threadId, log, query]);
 }
 
 /**
