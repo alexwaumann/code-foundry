@@ -118,6 +118,10 @@ func TestThreadSearchSchemaAfterAllMigrations(t *testing.T) {
 			t.Errorf("%s %s on %q, want on thread_items", want.typ, want.name, got)
 		}
 	}
+	// The search query's plan depends on these columns, in this order (thread.TestSearchQueryPlan).
+	if got := column(t, db, `SELECT name FROM pragma_index_info('thread_items_item_id') ORDER BY seqno`); !slices.Equal(got, []string{"item_id", "thread_id", "parent_tool_use_id"}) {
+		t.Errorf("thread_items_item_id columns %q, want item_id, thread_id, parent_tool_use_id", got)
+	}
 	for _, table := range []string{"search_docs", "search_fts", "search_backfill"} {
 		if got := column(t, db, `SELECT name FROM sqlite_master WHERE name = '`+table+`'`); len(got) != 1 {
 			t.Errorf("table %s missing", table)

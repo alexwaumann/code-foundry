@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -128,11 +129,16 @@ func scanItems(ctx context.Context, db querier, threadID, query string, args ...
 	return out, nil
 }
 
-// decodeItem is one thread_items row as an item.
+// errBadItem is decodeItem's error for a row whose data cannot be decoded: the row is
+// bad, not the database, so a reader that can go on without it (the search backfill, a
+// search) skips it.
+var errBadItem = errors.New("undecodable item")
+
+// decodeItem is one thread_items row as an item. Its only error wraps errBadItem.
 func decodeItem(itemID string, ordinal int64, kind, parent string, created, updated int64, data string) (Item, error) {
 	var d itemData
 	if err := json.Unmarshal([]byte(data), &d); err != nil {
-		return Item{}, fmt.Errorf("item %s: %w", itemID, err)
+		return Item{}, fmt.Errorf("item %s: %w: %w", itemID, errBadItem, err)
 	}
 	it := Item{ID: itemID, Ordinal: ordinal, Kind: ItemKind(kind), ParentToolUseID: parent, CreatedAt: fromMillis(created), UpdatedAt: fromMillis(updated)}
 	it.ComposerText = d.Composer

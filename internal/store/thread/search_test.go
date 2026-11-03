@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -463,7 +464,7 @@ func TestSearchBackfill(t *testing.T) {
 	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `INSERT INTO search_backfill (thread_id) VALUES (?)`, a.ID); err != nil {
 		t.Fatal(err)
 	}
-	if n, err := e.m.backfillThread(e.ctx(), a.ID); err != nil || n != 1 || e.countDocs() != 2 {
+	if _, _, n, err := e.m.backfillSearch(e.ctx(), []string{a.ID}); err != nil || n != 1 || e.countDocs() != 2 {
 		t.Errorf("a second backfill: %d, %v, %d documents", n, err, e.countDocs())
 	}
 }
@@ -516,7 +517,7 @@ func TestSearchBackfillResumesInsideAThread(t *testing.T) {
 		t.Fatal(err)
 	}
 	// One chunk, as if the daemon stopped after it: u1 and u2 done, the row says u3 next.
-	n, done, err := e.m.backfillChunk(e.ctx(), s.ID)
+	n, _, done, err := e.m.backfillChunk(e.ctx(), s.ID)
 	if err != nil || n != 2 || done {
 		t.Fatalf("first chunk: %d items, done %v, %v; want 2, not done", n, done, err)
 	}
@@ -524,9 +525,9 @@ func TestSearchBackfillResumesInsideAThread(t *testing.T) {
 		t.Fatalf("after one chunk: %v, %d documents; want next_ordinal 4 and 2 documents", got, e.countDocs())
 	}
 	// The next start resumes there.
-	threads, failed, indexed, err := e.m.backfillSearch(e.ctx(), []string{s.ID})
-	if err != nil || threads != 1 || failed != 0 || indexed != 3 {
-		t.Fatalf("resumed: %d threads, %d failed, %d items, %v; want the last 3 items", threads, failed, indexed, err)
+	threads, skipped, indexed, err := e.m.backfillSearch(e.ctx(), []string{s.ID})
+	if err != nil || threads != 1 || skipped != 0 || indexed != 3 {
+		t.Fatalf("resumed: %d threads, %d skipped, %d items, %v; want the last 3 items", threads, skipped, indexed, err)
 	}
 	if left := e.backfillLeft(); len(left) != 0 || e.countDocs() != 5 {
 		t.Errorf("after the resume: %v left, %d documents; want none, 5", left, e.countDocs())
@@ -536,31 +537,141 @@ func TestSearchBackfillResumesInsideAThread(t *testing.T) {
 	}
 }
 
-// A thread that cannot be indexed (a row whose data is not JSON) is logged and dropped from
-// the list; the threads after it, the most recent, are still indexed.
-func TestSearchBackfillSkipsABadThread(t *testing.T) {
+// A row that cannot be decoded (data that is not JSON) is logged and skipped, and
+// next_ordinal moves past it: the thread's good items, before and after it, are indexed,
+// and so are the threads after it, the most recent.
+func TestSearchBackfillSkipsABadRow(t *testing.T) {
+	defer func(n int) { searchBackfillChunk = n }(searchBackfillChunk)
+	searchBackfillChunk = 2 // the bad row ends the first chunk of its thread
 	e := newEnv(t)
 	old := e.connected(CreateOptions{Name: "Old"})
 	bad := e.connected(CreateOptions{Name: "Bad"})
 	recent := e.connected(CreateOptions{Name: "Recent"})
 	e.saveUnindexed(old.ID, Item{ID: "o1", Kind: KindUserMessage, Text: "an old needle"})
-	e.saveUnindexed(recent.ID, Item{ID: "r1", Kind: KindUserMessage, Text: "a recent needle"})
-	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `INSERT INTO thread_items (thread_id, ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data)
-		VALUES (?, 1, 'b1', 'user_message', '', 1, 1, '{"text": "a broken needle')`, bad.ID); err != nil {
+	e.saveUnindexed(bad.ID,
+		Item{ID: "b1", Kind: KindUserMessage, Text: "a needle before"},
+		Item{ID: "b2", Kind: KindAssistantText, Text: "broken below"},
+		Item{ID: "b3", Kind: KindAssistantText, Text: "a needle after"},
+	)
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `UPDATE thread_items SET data = '{"text": "a broken needle' WHERE item_id = 'b2'`); err != nil {
 		t.Fatal(err)
 	}
+	e.saveUnindexed(recent.ID, Item{ID: "r1", Kind: KindUserMessage, Text: "a recent needle"})
 	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `INSERT INTO search_backfill (thread_id) VALUES (?), (?), (?)`, old.ID, bad.ID, recent.ID); err != nil {
 		t.Fatal(err)
 	}
-	threads, failed, items, err := e.m.backfillSearch(e.ctx(), []string{old.ID, bad.ID, recent.ID})
-	if err != nil || threads != 2 || failed != 1 || items != 2 {
-		t.Fatalf("backfill: %d threads, %d failed, %d items, %v; want 2, 1, 2, no error", threads, failed, items, err)
+	threads, skipped, items, err := e.m.backfillSearch(e.ctx(), []string{old.ID, bad.ID, recent.ID})
+	if err != nil || threads != 3 || skipped != 1 || items != 4 {
+		t.Fatalf("backfill: %d threads, %d skipped, %d items, %v; want 3, 1, 4, no error", threads, skipped, items, err)
 	}
 	if left := e.backfillLeft(); len(left) != 0 {
-		t.Errorf("left %v: the bad thread stays listed and would fail every start", left)
+		t.Errorf("left %v: a bad row must not keep its thread listed (it would fail every start)", left)
 	}
-	if got := sortedHits(e.search(SearchQuery{Query: "needle"})); !slices.Equal(got, []string{"Old:o1", "Recent:r1"}) {
+	if got := sortedHits(e.search(SearchQuery{Query: "needle"})); !slices.Equal(got, []string{"Bad:b1", "Bad:b3", "Old:o1", "Recent:r1"}) {
 		t.Errorf("hits %q", got)
+	}
+}
+
+// Any other error (here a write the database refuses, as a busy timeout or a full disk
+// would) stops the backfill with the thread's row left in place, at the chunk it failed
+// in, so the next start retries it; nothing of the failed chunk is kept.
+func TestSearchBackfillKeepsTheRowOnADatabaseError(t *testing.T) {
+	defer func(n int) { searchBackfillChunk = n }(searchBackfillChunk)
+	searchBackfillChunk = 2
+	e := newEnv(t)
+	a := e.connected(CreateOptions{Name: "A"})
+	b := e.connected(CreateOptions{Name: "B"})
+	e.saveUnindexed(a.ID,
+		Item{ID: "a1", Kind: KindUserMessage, Text: "needle one"},
+		Item{ID: "a2", Kind: KindAssistantText, Text: "needle two"},
+		Item{ID: "a3", Kind: KindUserMessage, Text: "needle three"},
+	)
+	e.saveUnindexed(b.ID, Item{ID: "b1", Kind: KindUserMessage, Text: "needle in B"})
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `INSERT INTO search_backfill (thread_id) VALUES (?), (?)`, a.ID, b.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `CREATE TRIGGER fail_a3 BEFORE INSERT ON search_docs
+		WHEN NEW.item_id = 'a3' BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END`); err != nil {
+		t.Fatal(err)
+	}
+	threads, skipped, items, err := e.m.backfillSearch(e.ctx(), []string{a.ID, b.ID})
+	if err == nil || threads != 0 || skipped != 0 || items != 2 {
+		t.Fatalf("backfill: %d threads, %d skipped, %d items, %v; want 0, 0, 2 and the error", threads, skipped, items, err)
+	}
+	if left := e.backfillLeft(); len(left) != 2 || left[a.ID] != 3 || left[b.ID] != 0 {
+		t.Errorf("left %v; want A at ordinal 3 (its second chunk) and B untouched", left)
+	}
+	if n := e.countDocs(); n != 2 {
+		t.Errorf("documents %d, want a1 and a2", n)
+	}
+	// The next start, with the database fine again, finishes both.
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `DROP TRIGGER fail_a3`); err != nil {
+		t.Fatal(err)
+	}
+	threads, skipped, items, err = e.m.backfillSearch(e.ctx(), []string{a.ID, b.ID})
+	if err != nil || threads != 2 || skipped != 0 || items != 2 {
+		t.Fatalf("retry: %d threads, %d skipped, %d items, %v; want 2, 0, 2", threads, skipped, items, err)
+	}
+	if left := e.backfillLeft(); len(left) != 0 {
+		t.Errorf("left %v after the retry", left)
+	}
+	if res := e.search(SearchQuery{Query: "needle"}); res.TotalHits != 4 {
+		t.Errorf("hits %d, want 4", res.TotalHits)
+	}
+}
+
+// A holder whose row cannot be decoded is no hit, and the search goes on: another holder of
+// the same item and other documents are still found.
+func TestSearchSkipsABadHolderRow(t *testing.T) {
+	e := newEnv(t)
+	older := e.connected(CreateOptions{Name: "Older"})
+	younger := e.connected(CreateOptions{Name: "Younger"})
+	e.putItems(older.ID, Item{ID: "shared", Kind: KindUserMessage, Text: "a shared needle"},
+		Item{ID: "own", Kind: KindAssistantText, Text: "another needle"})
+	e.putItems(younger.ID, Item{ID: "shared", Kind: KindUserMessage, Text: "a shared needle"})
+	if _, err := e.m.opts.DB.ExecContext(e.ctx(), `UPDATE thread_items SET data = '{"text": "a shared needle' WHERE thread_id = ? AND item_id = 'shared'`, older.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := sortedHits(e.search(SearchQuery{Query: "needle"})); !slices.Equal(got, []string{"Older:own", "Younger:shared"}) {
+		t.Errorf("hits %q; want the younger copy and the older thread's other item", got)
+	}
+}
+
+// The search query probes thread_items_item_id on item id alone (one probe per holder) for
+// both thread_items lookups, and never through the table's autoindexes: without the unary
+// + on thread_id, SQLite probes (thread_id, item_id) once per thread of scope for every
+// match, through sqlite_autoindex_thread_items_2 (the UNIQUE) or through this index
+// (item_id=? AND thread_id=?); that took 53 s for "the" on the 400k-item database
+// (docs/notes/search-3-index.md).
+func TestSearchQueryPlan(t *testing.T) {
+	e := newEnv(t)
+	rows, err := e.m.opts.DB.QueryContext(e.ctx(), `EXPLAIN QUERY PLAN `+searchHitsSQL, `"needle"`, `["a","b"]`, false, 5001)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var plan []string
+	for rows.Next() {
+		var id, parent, unused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		plan = append(plan, detail)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	all := strings.Join(plan, "\n")
+	for _, alias := range []string{"ti", "h"} {
+		if !slices.ContainsFunc(plan, func(d string) bool {
+			return strings.HasPrefix(d, "SEARCH "+alias+" USING ") && strings.HasSuffix(d, "INDEX thread_items_item_id (item_id=?)")
+		}) {
+			t.Errorf("%s does not probe thread_items_item_id on item_id alone:\n%s", alias, all)
+		}
+	}
+	if strings.Contains(all, "sqlite_autoindex_thread_items_") {
+		t.Errorf("the plan uses an autoindex of thread_items:\n%s", all)
 	}
 }
 

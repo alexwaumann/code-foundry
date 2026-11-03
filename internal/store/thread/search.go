@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -111,8 +112,9 @@ type SearchHit struct {
 	// ParentToolUseID is the Agent call a subagent's item belongs to; "" for the thread's own.
 	ParentToolUseID string
 	CreatedAt       time.Time
-	// Snippet is the item's text on one line, cut around its first match; Ranges are the
-	// matches in it.
+	// Snippet is the item's indexed text (itemSearchText: tags as labels, a question with
+	// its answer) on one line, cut around its first match; Ranges are the matches in it and
+	// do not map to Item.Text.
 	Snippet string
 	Ranges  []MatchRange
 	// doc is the item's search document; line its text on one line (searchLine), which
@@ -148,7 +150,7 @@ func (m *Manager) Search(ctx context.Context, q SearchQuery) (SearchResult, erro
 	if res.NamesOnly || len(scope) == 0 {
 		return res, nil
 	}
-	hits, truncated, err := searchHits(ctx, m.opts.DB, sq, scope, q.Subagents)
+	hits, truncated, err := searchHits(ctx, m.log, m.opts.DB, sq, scope, q.Subagents)
 	if err != nil {
 		return SearchResult{}, err
 	}
@@ -207,14 +209,31 @@ func nameMatches(scope map[string]Thread, sq searchQuery, limit int) []ThreadNam
 	return out[:min(len(out), limit)]
 }
 
+// searchHitsSQL is searchHits' query: ?1 the FTS5 query, ?2 the scope's thread ids (a JSON
+// array), ?3 whether subagent items count, ?4 the candidate cap (+1). Both thread_items
+// lookups (ti, h) must go through thread_items_item_id (item id, thread, subagent), a
+// covering probe per holder; the unary + on thread_id keeps SQLite off the (thread_id,
+// item_id) unique index, which it otherwise probes once per thread of scope for every match
+// (53 s for "the" on the 400k-item database). TestSearchQueryPlan holds the plan.
+const searchHitsSQL = `SELECT d.id, ti.thread_id, ti.item_id, ti.ordinal, ti.kind, ti.parent_tool_use_id,
+		ti.created_at, ti.updated_at, ti.data
+	FROM search_docs d
+	JOIN thread_items ti ON ti.item_id = d.item_id
+	WHERE +ti.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR ti.parent_tool_use_id = '')
+	AND d.id IN (SELECT search_fts.rowid FROM search_fts WHERE search_fts MATCH ?1
+		AND EXISTS (SELECT 1 FROM search_docs s JOIN thread_items h ON h.item_id = s.item_id
+			WHERE s.id = search_fts.rowid AND +h.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR h.parent_tool_use_id = ''))
+		ORDER BY search_fts.rowid DESC LIMIT ?4)`
+
 // searchHits returns the items the index matches among the newest maxSearchCandidates
 // matching documents in scope (a document's rowid grows with its first save; truncated
 // says more matched), one per item id. The scope is applied inside the capped subquery: a
 // document counts only when a thread of scope holds it (its own item, or a subagent's with
 // subagents), so text out of scope never takes a place. Each hit goes to the oldest
 // thread of scope whose own copy of the item matches sq (smart case, short terms; a
-// holder whose text does not match, its document being from another copy, is no hit).
-func searchHits(ctx context.Context, db *sql.DB, sq searchQuery, scope map[string]Thread, subagents bool) (hits []SearchHit, truncated bool, err error) {
+// holder whose text does not match, its document being from another copy, is no hit; a
+// holder whose row cannot be decoded is logged and is no hit either).
+func searchHits(ctx context.Context, log *slog.Logger, db *sql.DB, sq searchQuery, scope map[string]Thread, subagents bool) (hits []SearchHit, truncated bool, err error) {
 	ids := make([]string, 0, len(scope))
 	for id := range scope {
 		ids = append(ids, id)
@@ -223,19 +242,7 @@ func searchHits(ctx context.Context, db *sql.DB, sq searchQuery, scope map[strin
 	if err != nil {
 		return nil, false, fmt.Errorf("thread: search: %w", err)
 	}
-	// The unary + keeps thread_id from choosing the (thread_id, item_id) index: with it,
-	// SQLite probes once per thread of scope for every match (53 s for "the" on the
-	// 400k-item database); through thread_items_item_id it is one probe per holder.
-	rows, err := db.QueryContext(ctx, `SELECT d.id, ti.thread_id, ti.item_id, ti.ordinal, ti.kind, ti.parent_tool_use_id,
-			ti.created_at, ti.updated_at, ti.data
-		FROM search_docs d
-		JOIN thread_items ti ON ti.item_id = d.item_id
-		WHERE +ti.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR ti.parent_tool_use_id = '')
-		AND d.id IN (SELECT search_fts.rowid FROM search_fts WHERE search_fts MATCH ?1
-			AND EXISTS (SELECT 1 FROM search_docs s JOIN thread_items h ON h.item_id = s.item_id
-				WHERE s.id = search_fts.rowid AND +h.thread_id IN (SELECT value FROM json_each(?2)) AND (?3 OR h.parent_tool_use_id = ''))
-			ORDER BY search_fts.rowid DESC LIMIT ?4)`,
-		sq.fts, string(scopeJSON), subagents, maxSearchCandidates+1)
+	rows, err := db.QueryContext(ctx, searchHitsSQL, sq.fts, string(scopeJSON), subagents, maxSearchCandidates+1)
 	if err != nil {
 		return nil, false, fmt.Errorf("thread: search: %w", err)
 	}
@@ -267,7 +274,9 @@ func searchHits(ctx context.Context, db *sql.DB, sq searchQuery, scope map[strin
 		// one whose copy matches.
 		it, err := decodeItem(h.ItemID, h.Ordinal, kind, h.ParentToolUseID, created, updated, data)
 		if err != nil {
-			return nil, false, fmt.Errorf("thread: search: %w", err)
+			// Only errBadItem: one bad row must not fail every search that reaches it.
+			log.Error("search: skipped an item", "thread", h.ThreadID, "ordinal", h.Ordinal, "err", err)
+			continue
 		}
 		text, sp, _ := itemSearchText(it)
 		line := []rune(text)
