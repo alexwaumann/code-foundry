@@ -57,7 +57,13 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
     const id = parseTaskResult(res.resultJson) ?? target.threadId ?? "";
     if (res.message) {
       const open = id !== "" && selectedThread() !== id;
-      toast.success(res.message, open ? { action: { label: "Open", onClick: () => openStartedThread(id) } } : undefined);
+      const action = {
+        label: "Open",
+        onClick: () => {
+          openStartedThread(id);
+        },
+      };
+      toast.success(res.message, open ? { action } : undefined);
     }
     return id;
   } finally {

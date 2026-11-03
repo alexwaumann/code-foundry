@@ -430,6 +430,7 @@ const titles: Record<string, string> = {
   "pr.draft": "Convert Pull Request to Draft",
   "pr.auto-merge": "Auto-merge Pull Request",
   "thread.pr.link": "Link Pull Request to Thread",
+  "pr.task": "Hand Pull Request Task to Thread",
 };
 
 /** The pr.* commands as CommandService.List returns them (their titles name a failure's toast). */
@@ -706,6 +707,16 @@ export class PrWorld {
     h.set("pr.ask", startThread("pr.ask"));
     h.set("pr.explain", startThread("pr.explain"));
     h.set("pr.fix.findings", startThread("pr.fix.findings"));
+    // pr.task (stores/prTasks.ts): --thread sends into that thread, else a new thread starts.
+    h.set("pr.task", async (inv) => {
+      const [slug, n] = this.target(inv);
+      await this.gate("pr.task");
+      if (this.failNext.delete("pr.task")) throw this.refuse(`#${String(n)} comes from a fork and no worktree of ${slug} has its head checked out: check it out and pass --worktree`);
+      const to = inv.args.thread ?? "";
+      if (to) return { message: `Sent to ${to} (#7); wait with: code-foundry thread wait ${to} --after 7`, resultJson: JSON.stringify({ threadId: to, sent: true, ordinal: 7 }) };
+      const id = `s-new-${String(this.nextThread++)}`;
+      return { message: `Started thread ${id} for PR #${String(n)}`, resultJson: JSON.stringify({ threadId: id, sent: false }) };
+    });
     for (const name of ["pr.ready", "pr.draft"]) {
       h.set(name, (inv) => {
         const [slug, n, d] = this.target(inv);
