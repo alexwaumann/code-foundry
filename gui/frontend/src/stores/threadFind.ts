@@ -56,6 +56,12 @@ export interface FindSession {
   revealSeq: number;
   /** What the current match's item opened, to put back (openThreadFindItem). */
   opened: Opened | null;
+  /**
+   * Where the last edit of the query went on from (the then current match's item and
+   * offset). It outlives a null current: an edit through "no match" (a letter typed, then
+   * Backspace) goes on from the same place, not from the top.
+   */
+  anchor?: FindPlace;
 }
 
 export interface ThreadFindState {
@@ -87,7 +93,8 @@ export function openThreadFind(threadId: string, query?: string, opts: { itemId?
     const base: FindSession = s ?? { query: "", current: null, aim: null, focusSeq: 0, revealSeq: 0, opened: null };
     const focusSeq = base.focusSeq + 1;
     if (query === undefined) return { ...base, focusSeq, aim: s ? base.aim : { kind: "view" } };
-    return { ...base, query, current: null, aim: opts.itemId !== undefined ? { kind: "item", itemId: opts.itemId } : { kind: "view" }, focusSeq };
+    const { anchor: _anchor, ...rest } = base;
+    return { ...rest, query, current: null, aim: opts.itemId !== undefined ? { kind: "item", itemId: opts.itemId } : { kind: "view" }, focusSeq };
   });
 }
 
@@ -129,7 +136,10 @@ export function closeThreadFind(threadId: string): void {
   update(threadId, () => undefined);
 }
 
-/** The bar's query changed: the current match is picked again, from the last current one on (else from what the list shows). */
+/**
+ * The bar's query changed: the current match is picked again, from the last current one on
+ * (else from where the last edit went on from, the anchor, else from what the list shows).
+ */
 export function setThreadFindQuery(threadId: string, query: string): void {
   const s = useThreadFindStore.getState().byThread[threadId];
   if (!s) return;
@@ -140,8 +150,12 @@ export function setThreadFindQuery(threadId: string, query: string): void {
     const m = matches[matchIndex(matches, s.current)];
     from = { itemId: s.current.itemId, start: m?.start ?? 0 };
   } else if (s.aim?.kind === "item") from = { itemId: s.aim.itemId, start: 0 };
-  else from = s.aim?.from;
-  update(threadId, (cur) => (cur ? { ...cur, query, current: null, aim: from === undefined ? { kind: "view" } : { kind: "view", from } } : cur));
+  else from = s.aim?.from ?? s.anchor;
+  update(threadId, (cur) => {
+    if (!cur) return cur;
+    if (from === undefined) return { ...cur, query, current: null, aim: { kind: "view" } };
+    return { ...cur, query, current: null, aim: { kind: "view", from }, anchor: from };
+  });
 }
 
 /** The find layer picked the current match (or none). `reveal: false`: the match is not brought into view (a re-pick as text streams). */
@@ -236,19 +250,20 @@ export function openThreadFindItem(threadId: string, itemId: string): void {
   update(threadId, (cur) => (cur ? { ...cur, opened } : cur));
 }
 
-// A choice the find opened that the user (or the timeline) changes while the bar is open
-// is theirs from then on: it is not put back, even if it later holds the find's value again.
+// A change by the user (or the timeline) to any choice the find opened for the current
+// item, while the bar is open, makes the whole item theirs: nothing of it is put back (the
+// turn's fold included: collapsing the question's row and expanding it again must not have
+// the find fold the turn over it later), even if a choice later holds the find's value again.
 useThreadStore.subscribe((st, prev) => {
   if (writing || (st.folds === prev.folds && st.expanded === prev.expanded)) return;
   for (const [threadId, s] of Object.entries(useThreadFindStore.getState().byThread)) {
     const o = s.opened;
     if (!o) continue;
-    const keep = (choices: Readonly<Record<string, OpenedChoice>>, now: Readonly<Record<string, boolean>> | undefined) =>
-      Object.fromEntries(Object.entries(choices).filter(([k, c]) => now?.[k] === c.set));
-    const folds = keep(o.folds, st.folds[threadId]);
-    const expanded = keep(o.expanded, st.expanded[threadId]);
-    if (Object.keys(folds).length === Object.keys(o.folds).length && Object.keys(expanded).length === Object.keys(o.expanded).length) continue;
-    update(threadId, (cur) => (cur ? { ...cur, opened: { ...o, folds, expanded } } : cur));
+    const moved = (choices: Readonly<Record<string, OpenedChoice>>, now: Readonly<Record<string, boolean>> | undefined) =>
+      Object.entries(choices).some(([k, c]) => now?.[k] !== c.set);
+    if (!moved(o.folds, st.folds[threadId]) && !moved(o.expanded, st.expanded[threadId])) continue;
+    // The item stays recorded (openThreadFindItem opens nothing again for it), with nothing to put back.
+    update(threadId, (cur) => (cur ? { ...cur, opened: { itemId: o.itemId, folds: {}, expanded: {} } } : cur));
   }
 });
 

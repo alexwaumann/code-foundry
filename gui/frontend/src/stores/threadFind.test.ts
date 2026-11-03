@@ -47,6 +47,20 @@ describe("the find session", () => {
     expect(session()?.aim).toEqual({ kind: "view", from: { itemId: "i13", start: third?.start } });
   });
 
+  it("an edit after no match goes on from where the last edit did (the anchor outlives a null current); a hand-off drops it", () => {
+    openThreadFind(T);
+    setThreadFindQuery(T, "f");
+    const third = getThreadFindMatches(T).filter((m) => m.itemId === "i13")[2];
+    setThreadFindCurrent(T, { itemId: "i13", nth: 2 });
+    setThreadFindQuery(T, "fq");
+    // The layer found nothing for "fq".
+    setThreadFindCurrent(T, null);
+    setThreadFindQuery(T, "f");
+    expect(session()?.aim).toEqual({ kind: "view", from: { itemId: "i13", start: third?.start } });
+    openThreadFind(T, "fingerprint");
+    expect(session()?.anchor).toBeUndefined();
+  });
+
   it("a hand-off's item is where an edited query goes on from, before a match is picked", () => {
     openThreadFind(T, "fingerprint", { itemId: "i20" });
     setThreadFindQuery(T, "fingerprints");

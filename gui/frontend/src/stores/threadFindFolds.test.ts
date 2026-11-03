@@ -43,7 +43,7 @@ beforeEach(() => {
 afterEach(() => {
   unregister();
   useThreadFindStore.setState({ byThread: {} });
-  useThreadStore.setState({ logs: {}, folds: {}, expanded: {} });
+  useThreadStore.setState({ logs: {}, synced: {}, folds: {}, expanded: {} });
 });
 
 describe("opening what hides a match, and putting it back", () => {
@@ -85,22 +85,29 @@ describe("opening what hides a match, and putting it back", () => {
     expect(opened()).toBe(first);
   });
 
-  it("a choice the user changes while find is open stays theirs, even when it holds the find's value again", () => {
+  it("a user change to any choice the find opened for an item makes the whole item theirs, the turn's fold included", () => {
     openThreadFindItem(T, question);
-    // Collapsed by hand and expanded again: the row is the user's now.
+    // Collapsed by hand and expanded again: the item is the user's now, even holding the find's value again.
     setRowExpanded(T, question, false);
     setRowExpanded(T, question, true);
-    expect(opened()?.expanded).toEqual({});
-    // The turn the find opened, untouched, still goes back.
+    expect(opened()).toEqual({ itemId: question, folds: {}, expanded: {} });
+    // Nothing of it goes back: the turn stays open, so the question does not vanish under a fold.
     openThreadFindItem(T, text);
-    expect(view()).toEqual({ folds: {}, expanded: { [question]: true } });
+    expect(view()).toEqual({ folds: { i1: false }, expanded: { [question]: true } });
   });
 
-  it("a choice set to another value is not overwritten", () => {
+  it("a choice set to another value is not overwritten, and the item's other choices stay too", () => {
     openThreadFindItem(T, question);
     setTurnFolded(T, "i1", true);
     closeThreadFind(T);
-    expect(view()).toEqual({ folds: { i1: true }, expanded: {} });
+    expect(view()).toEqual({ folds: { i1: true }, expanded: { [question]: true } });
+  });
+
+  it("the same item after a user change opens nothing again", () => {
+    openThreadFindItem(T, question);
+    setRowExpanded(T, question, false);
+    openThreadFindItem(T, question);
+    expect(view().expanded).toEqual({ [question]: false });
   });
 
   it("closing puts back at once, so leaving the thread (close, then forget its choices) leaves nothing behind", () => {
