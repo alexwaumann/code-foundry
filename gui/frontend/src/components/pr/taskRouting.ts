@@ -7,10 +7,12 @@
  * thread (pr.task --thread). Otherwise a new thread (no --thread): the daemon reuses or
  * creates the worktree on the head branch (2, 3), cloning the repository first when it is
  * no project (4). The menu adds "this thread" (any selected thread, linked or not) and up
- * to OTHER_THREADS other non-archived threads that link it, most recently active first.
+ * to OTHER_THREADS other non-archived threads that link it: those with the head branch
+ * checked out first, then the most recently active. Ember's thread is never a target: it
+ * creates every worker, so it links all their pull requests, and it only splits and
+ * assigns work.
  */
 import type { PullRequestDetailView } from "@/api/gh";
-import type { ThreadView } from "@/api/threads";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { samePullRequest } from "./model";
 import type { TaskKind } from "./readiness";
@@ -53,7 +55,20 @@ export function taskVerb(task: TaskKind | null, d: Pick<PullRequestDetailView, "
   return TASK_VERBS[task];
 }
 
-export type TaskThread = Pick<ThreadView, "id" | "name" | "archivedAtMs" | "lastActivityAtMs" | "createdAtMs" | "linkedPullRequests">;
+/** What routing reads of a thread (useTaskThreads derives it from the stores). */
+export interface TaskThread {
+  id: string;
+  name: string;
+  archived: boolean;
+  /** Its last activity, else its creation, epoch ms; 0 when neither is known. */
+  activity: number;
+  /** Its linked pull requests include this one (linksPullRequest). */
+  links: boolean;
+  /** One of its checkouts, in a project of the pull request's repository, has the head branch checked out. */
+  onHead: boolean;
+  /** Ember's resident thread: never a target. */
+  ember: boolean;
+}
 
 /** Where a task goes: the selected thread, a new thread, or another thread that links the pull request. */
 export type TaskTarget =
@@ -67,7 +82,10 @@ export interface TaskRouting {
   targets: TaskTarget[];
 }
 
-const links = (t: TaskThread, ref: PrRef): boolean => t.linkedPullRequests.some((l) => samePullRequest(l, ref));
+/** Whether linked (a thread's linked pull requests) holds ref: slug (case aside) and number. */
+export function linksPullRequest(linked: readonly { slug: string; number: number }[], ref: PrRef): boolean {
+  return linked.some((l) => samePullRequest(l, ref));
+}
 
 /** A thread's name as the menu shows it: its id when it has none. */
 export const threadName = (t: Pick<TaskThread, "id" | "name">): string => t.name.trim() || t.id;
@@ -80,22 +98,23 @@ export function isProjectRepo(projectSlugs: readonly string[], ...slugs: readonl
 
 /**
  * The routing for ref. `selection` is the selected thread's id (null for a page, a
- * composer, or a thread the threads store does not know); `threads` every thread the
- * store holds (the selection's included); `isProject` whether a project is a clone of
- * the repository.
+ * composer, or a thread the threads store does not know); `threads` the threads that may
+ * be targets (the selection's included); `isProject` whether a project is a clone of the
+ * repository.
  */
 export function taskRouting(input: { selection: string | null; ref: PrRef; threads: readonly TaskThread[]; isProject: boolean }): TaskRouting {
   const { selection, ref, threads, isProject } = input;
-  const selected = selection === null ? undefined : threads.find((t) => t.id === selection);
+  const found = selection === null ? undefined : threads.find((t) => t.id === selection);
+  // Ember's chat selected: as a page, a new thread by default and no "this thread".
+  const selected = found?.ember ? undefined : found;
   const fresh: TaskTarget = { kind: "new", threadId: null, clones: isProject ? "" : ref.slug };
   const here: TaskTarget | null = selected ? { kind: "this", threadId: selected.id } : null;
-  const activity = (t: TaskThread): number => t.lastActivityAtMs ?? t.createdAtMs ?? 0;
   const others: TaskTarget[] = threads
-    .filter((t) => t.id !== selected?.id && t.archivedAtMs === null && links(t, ref))
-    .sort((a, b) => activity(b) - activity(a) || a.id.localeCompare(b.id))
+    .filter((t) => t.id !== found?.id && !t.archived && !t.ember && t.links)
+    .sort((a, b) => Number(b.onHead) - Number(a.onHead) || b.activity - a.activity || a.id.localeCompare(b.id))
     .slice(0, OTHER_THREADS)
     .map((t) => ({ kind: "other", threadId: t.id, name: threadName(t) }));
-  if (here && selected && links(selected, ref)) return { default: here, targets: [here, fresh, ...others] };
+  if (here && selected?.links) return { default: here, targets: [here, fresh, ...others] };
   return { default: fresh, targets: here ? [fresh, here, ...others] : [fresh, ...others] };
 }
 

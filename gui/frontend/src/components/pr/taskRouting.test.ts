@@ -1,21 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { TaskKind } from "./readiness";
-import { buttonLabel, isProjectRepo, menuHint, menuLabel, prTaskArgs, taskRouting, taskVerb, type TaskThread } from "./taskRouting";
+import { buttonLabel, isProjectRepo, linksPullRequest, menuHint, menuLabel, prTaskArgs, taskRouting, taskVerb, type TaskThread } from "./taskRouting";
 
 const REF = { slug: "alexwaumann/code-foundry", number: 145 };
 
-function thread(id: string, o: { name?: string; links?: [string, number][]; activity?: number | null; created?: number | null; archived?: boolean } = {}): TaskThread {
-  return {
-    id,
-    name: o.name ?? `Thread ${id}`,
-    archivedAtMs: o.archived ? 1 : null,
-    lastActivityAtMs: o.activity === undefined ? 0 : o.activity,
-    createdAtMs: o.created ?? null,
-    linkedPullRequests: (o.links ?? []).map(([slug, number]) => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt: null })),
-  };
+function thread(id: string, o: { name?: string; links?: boolean; activity?: number; archived?: boolean; onHead?: boolean; ember?: boolean } = {}): TaskThread {
+  return { id, name: o.name ?? `Thread ${id}`, archived: o.archived ?? false, activity: o.activity ?? 0, links: o.links ?? false, onHead: o.onHead ?? false, ember: o.ember ?? false };
 }
 
-const linked = (id: string, o: Parameters<typeof thread>[1] = {}) => thread(id, { links: [[REF.slug, REF.number]], ...o });
+const linked = (id: string, o: Parameters<typeof thread>[1] = {}) => thread(id, { links: true, ...o });
 
 /** The routing as "kind:id" strings: the default, then the menu in order. */
 function route(selection: string | null, threads: TaskThread[], isProject = true) {
@@ -31,18 +24,6 @@ describe("taskRouting", () => {
       selection: "a",
       threads: [linked("a"), linked("b", { activity: 5 })],
       want: { default: "this:a", menu: ["this:a", "new", "other:b"] },
-    },
-    {
-      name: "rule 1 compares slug case-insensitively",
-      selection: "a",
-      threads: [thread("a", { links: [["AlexWaumann/Code-Foundry", 145]] })],
-      want: { default: "this:a", menu: ["this:a", "new"] },
-    },
-    {
-      name: "same slug, other number: not linked",
-      selection: "a",
-      threads: [thread("a", { links: [[REF.slug, 146]] })],
-      want: { default: "new", menu: ["new", "this:a"] },
     },
     {
       name: "rule 2: another thread links it → new thread by default, that thread in the menu, this thread offered",
@@ -75,15 +56,45 @@ describe("taskRouting", () => {
       want: { default: "this:a", menu: ["this:a", "new"] },
     },
     {
-      name: "others: most recently active first (created when never active), at most three",
+      name: "others: most recently active first, at most three",
       selection: null,
-      threads: [linked("b", { activity: 10 }), linked("c", { activity: 40 }), linked("d", { activity: null, created: 30 }), linked("e", { activity: 20 }), linked("f", { activity: 1 })],
+      threads: [linked("b", { activity: 10 }), linked("c", { activity: 40 }), linked("d", { activity: 30 }), linked("e", { activity: 20 }), linked("f", { activity: 1 })],
       want: { default: "new", menu: ["new", "other:c", "other:d", "other:e"] },
+    },
+    {
+      name: "others: the head branch checked out first, then the most recently active",
+      selection: null,
+      threads: [linked("b", { activity: 50 }), linked("c", { activity: 10, onHead: true }), linked("d", { activity: 40 }), linked("e", { activity: 20, onHead: true }), linked("f", { activity: 30 })],
+      want: { default: "new", menu: ["new", "other:e", "other:c", "other:b"] },
+    },
+    {
+      name: "the head branch alone does not make a thread a target",
+      selection: null,
+      threads: [thread("b", { onHead: true }), linked("c")],
+      want: { default: "new", menu: ["new", "other:c"] },
     },
     {
       name: "unrelated threads never show",
       selection: null,
-      threads: [thread("b"), thread("c", { links: [["other/repo", 145]] })],
+      threads: [thread("b"), thread("c")],
+      want: { default: "new", menu: ["new"] },
+    },
+    {
+      name: "Ember is never among the others, however recent",
+      selection: "a",
+      threads: [linked("a"), linked("ember", { ember: true, activity: 99, onHead: true }), linked("b", { activity: 5 })],
+      want: { default: "this:a", menu: ["this:a", "new", "other:b"] },
+    },
+    {
+      name: "Ember's chat selected and linking it: a new thread, no this thread",
+      selection: "ember",
+      threads: [linked("ember", { ember: true }), linked("b")],
+      want: { default: "new", menu: ["new", "other:b"] },
+    },
+    {
+      name: "Ember's chat selected, not linking it: a new thread, no this thread",
+      selection: "ember",
+      threads: [thread("ember", { ember: true })],
       want: { default: "new", menu: ["new"] },
     },
     {
@@ -111,6 +122,19 @@ describe("taskRouting", () => {
       { "repo-slug": REF.slug, number: "145", kind: "checks" },
       { "repo-slug": REF.slug, number: "145", kind: "checks", thread: "b" },
     ]);
+  });
+});
+
+describe("linksPullRequest", () => {
+  const l = (slug: string, number: number) => ({ slug, number });
+  it.each([
+    { name: "same slug and number", linked: [l(REF.slug, 145)], want: true },
+    { name: "slug case aside", linked: [l("AlexWaumann/Code-Foundry", 145)], want: true },
+    { name: "same slug, other number", linked: [l(REF.slug, 146)], want: false },
+    { name: "other repository, same number", linked: [l("other/repo", 145)], want: false },
+    { name: "none", linked: [], repoSlug: REF.slug, want: false },
+  ])("$name", ({ linked, want }) => {
+    expect(linksPullRequest(linked, REF)).toBe(want);
   });
 });
 
