@@ -8,6 +8,9 @@ import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } f
 /** A split button's colour: the merge's success fill, or the neutral control. */
 export type SplitTone = "success" | "neutral";
 
+/** A blocked main part: the neutral control without its hover (it runs nothing). */
+const blockedLook = "border-cf-border bg-cf-canvas dark:border-cf-input dark:bg-cf-input/30";
+
 const tones: Record<SplitTone, string> = {
   success: "border-transparent bg-cf-success text-cf-success-foreground enabled:hover:bg-cf-success/90 aria-expanded:bg-cf-success/90",
   neutral: "border-cf-border bg-cf-canvas enabled:hover:bg-cf-control-hover aria-expanded:bg-cf-control-hover dark:border-cf-input dark:bg-cf-input/30 dark:enabled:hover:bg-cf-input/50 dark:aria-expanded:bg-cf-input/50",
@@ -15,10 +18,12 @@ const tones: Record<SplitTone, string> = {
 
 /**
  * The readiness box's Merge and Auto-merge: the main part runs the default method, the
- * chevron opens the menu of methods (`children`, given a close function). A blocked main
- * part stays focusable and says why in its tooltip (aria-disabled, not disabled); the
- * chevron still opens the menu, which explains it. While busy both parts are inert and
- * the icon spins.
+ * chevron opens the menu of methods (`children`, given a close function). A blocked
+ * split button is grey at the app's disabled opacity (Button's disabled:opacity-50), both
+ * parts, so it never reads like the Review button beside it; the main part stays
+ * focusable and says why in its tooltip (aria-disabled, not disabled), and the chevron
+ * still opens the menu, which explains it. While busy both parts are inert and the icon
+ * spins.
  */
 export function SplitButton({
   icon: Icon,
@@ -51,7 +56,7 @@ export function SplitButton({
   const look = tones[reason !== null ? "neutral" : tone];
   const part = "flex h-7 shrink-0 items-center border text-label shadow-xs outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-cf-focus/60";
   return (
-    <span ref={ref} className={cn("flex min-w-0 shrink-0", reason !== null && "text-cf-text-muted")} data-testid={`${testId}-split`}>
+    <span ref={ref} className="flex min-w-0 shrink-0" data-testid={`${testId}-split`} data-blocked={reason !== null || undefined}>
       <Tip label={reason}>
         <button
           type="button"
@@ -60,7 +65,7 @@ export function SplitButton({
           aria-busy={busy || undefined}
           aria-describedby={reason ? reasonId : undefined}
           data-reason={reason ?? undefined}
-          className={cn(part, look, "min-w-0 gap-1.5 rounded-l-md px-2", blocked && "cursor-default")}
+          className={cn(part, reason !== null ? blockedLook : look, "min-w-0 gap-1.5 rounded-l-md px-2", reason !== null && "opacity-50", blocked && "cursor-default")}
           onClick={() => {
             if (!blocked) onRun();
           }}
@@ -88,7 +93,7 @@ export function SplitButton({
               aria-label={menuLabel}
               aria-disabled={busy || undefined}
               data-testid={`${testId}-menu-button`}
-              className={cn(part, look, "-ml-px w-6 justify-center rounded-r-md border-l-current/25", busy && "cursor-default")}
+              className={cn(part, look, "-ml-px w-6 justify-center rounded-r-md border-l-current/25", reason !== null && "opacity-50", busy && "cursor-default")}
             >
               <ChevronDown className="size-3.5 opacity-80" aria-hidden />
             </button>

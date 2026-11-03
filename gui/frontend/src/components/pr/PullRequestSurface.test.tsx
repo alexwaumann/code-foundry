@@ -833,6 +833,9 @@ describe("the merge button", () => {
     // #145 is a draft: disabled with the reason; a click sends nothing; the menu says why and offers nothing.
     await openPr(145);
     expect(button().getAttribute("aria-disabled")).toBe("true");
+    // Visibly disabled, both parts (the app's disabled opacity), never like Review beside it.
+    expect(byTestId("pr-merge-button-split").dataset.blocked).toBe("true");
+    for (const part of [button(), chevron()]) expect(part.classList.contains("opacity-50")).toBe(true);
     expect(tooltipText(button())).toBe("Draft pull requests cannot be merged");
     expect(document.getElementById(button().getAttribute("aria-describedby") ?? "")?.textContent).toBe("Draft pull requests cannot be merged");
     fireEvent.click(button());
@@ -853,6 +856,8 @@ describe("the merge button", () => {
 
     // #142: keep the branch, then decline: nothing is sent.
     await openPr(142);
+    expect(byTestId("pr-merge-button-split").dataset.blocked).toBeUndefined();
+    for (const part of [button(), chevron()]) expect(part.classList.contains("opacity-50")).toBe(false);
     press(chevron());
     fireEvent.click(byTestId("pr-merge-delete-branch"));
     expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
