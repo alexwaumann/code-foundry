@@ -136,12 +136,15 @@ interface CheckCounts {
   failing: boolean;
 }
 
-/** The checks' counts: from the list (approval runs left out), else from the rollup (a detail built from a summary lists none). */
+/**
+ * The checks' counts: from the list (approval runs left out), else from the rollup (a
+ * detail built from a summary lists none). A truncated list counts the larger of the
+ * rollup's and the list's per state: neither alone sees every check.
+ */
 function checkCounts(d: PullRequestDetailView, checks: CheckView[]): CheckCounts {
-  if (d.checks.length === 0) {
-    const r = d.pullRequest.checks;
-    return { failed: r.failed, running: r.pending, passed: r.passed, skipped: r.skipped, failing: r.failed === 0 && (r.state === "failure" || r.state === "error") };
-  }
+  const r = d.pullRequest.checks;
+  const rollupFailing = r.state === "failure" || r.state === "error";
+  if (d.checks.length === 0) return { failed: r.failed, running: r.pending, passed: r.passed, skipped: r.skipped, failing: r.failed === 0 && rollupFailing };
   const n = { failed: 0, running: 0, passed: 0, skipped: 0, failing: false };
   for (const c of checks) {
     const t = checkTone(c);
@@ -150,7 +153,9 @@ function checkCounts(d: PullRequestDetailView, checks: CheckView[]): CheckCounts
     else if (t === "success") n.passed++;
     else n.skipped++;
   }
-  return n;
+  if (!d.checksTruncated) return n;
+  const failed = Math.max(n.failed, r.failed);
+  return { failed, running: Math.max(n.running, r.pending), passed: Math.max(n.passed, r.passed), skipped: Math.max(n.skipped, r.skipped), failing: failed === 0 && rollupFailing };
 }
 
 const named = (checks: CheckView[]): SubLine[] => {
@@ -175,12 +180,13 @@ function checksRow(d: PullRequestDetailView, checks: CheckView[], open: boolean)
     // Failing checks are a task even when they do not block (optional ones): PR D2 offers "Fix in …".
     task: tone === "failure" && open ? "checks" : null,
     blocking: blocking && open,
-    summary: tone === "failure" ? (n.failed > 0 ? `${plural(n.failed, "optional check")} failing` : "optional checks failing") : tone === "pending" ? `${String(n.running)} running` : "",
+    summary: tone === "failure" ? (n.failed > 0 ? `${plural(n.failed, "optional check")} failing` : "optional checks failing") : tone === "pending" ? (n.running > 0 ? `${String(n.running)} running` : "checks running") : "",
     expandable: d.checks.length > 0,
   });
   const running = n.running > 0 ? `${String(n.running)} running` : "";
   const passed = n.passed > 0 ? `${String(n.passed)} passed` : "";
   const skipped = n.skipped > 0 ? `${String(n.skipped)} skipped` : "";
+  if (d.checksTruncated) return truncatedChecksRow(d, checks, n, row, [running, passed, skipped]);
   if (n.failed > 0) {
     return row("failure", "failure", `${plural(n.failed, "check")} failing`, [running, passed, skipped], named(checks.filter((c) => checkTone(c) === "failure")), true);
   }
@@ -192,6 +198,27 @@ function checksRow(d: PullRequestDetailView, checks: CheckView[], open: boolean)
   if (n.passed === 0) return row("neutral", "none", `${plural(n.skipped, "check")} skipped`, [], [], false);
   const title = n.passed === 1 && n.skipped === 0 ? "1 check passed" : open ? `All ${plural(n.passed, "check")} passed` : `${plural(n.passed, "check")} passed`;
   return row("success", "success", title, [skipped], open ? [] : [{ kind: "text", text: "on the last push" }], false);
+}
+
+/**
+ * The checks row when not every check was fetched: "120+ checks · 50 failing · 3 running".
+ * "All N passed" only when the rollup (which sees every check) says success.
+ */
+function truncatedChecksRow(
+  d: PullRequestDetailView,
+  checks: CheckView[],
+  n: CheckCounts,
+  row: (tone: ReadyTone, icon: ReadyIcon, title: string, meta: string[], lines: SubLine[], blocking: boolean) => ReadinessRow,
+  [running, passed, skipped]: readonly [string, string, string],
+): ReadinessRow {
+  const r = d.pullRequest.checks;
+  const total = Math.max(r.total, checks.length, n.failed + n.running + n.passed + n.skipped);
+  const title = `${String(total)}+ checks`;
+  const failing = n.failed > 0 ? `${String(n.failed)} failing` : n.failing ? "failing" : "";
+  if (failing) return row("failure", "failure", title, [failing, running, passed, skipped], named(checks.filter((c) => checkTone(c) === "failure")), true);
+  if (n.running > 0 || r.state === "pending" || r.state === "expected") return row("pending", "running", title, [running || "running", passed, skipped], named(checks.filter((c) => checkTone(c) === "pending")), true);
+  if (r.state === "success") return row("success", "success", `All ${plural(total, "check")} passed`, [skipped], [], false);
+  return row("neutral", "none", title, [passed, skipped], [], false);
 }
 
 const names = (rs: readonly PullRequestReviewerView[]): string => rs.map((r) => r.login).join(", ");
