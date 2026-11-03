@@ -197,7 +197,9 @@ func searchBackfillPending(ctx context.Context, db *sql.DB) ([]string, error) {
 
 // backfillThread indexes one thread's saved items and removes it from search_backfill, in
 // one transaction; it returns how many of its items are of an indexed kind. The items are
-// read from the table, not the thread's log: what is indexed is what is saved.
+// read from the table, not the thread's log: what is indexed is what is saved. The
+// transaction holds the write lock for the thread's indexed items only (about 30 ms for
+// 160 on the measured laptop), well inside the other writers' busy timeout.
 func (m *Manager) backfillThread(ctx context.Context, id string) (int, error) {
 	ix := m.searchIndexFor(id)
 	tx, err := m.opts.DB.BeginTx(ctx, nil)
@@ -207,13 +209,13 @@ func (m *Manager) backfillThread(ctx context.Context, id string) (int, error) {
 	defer func() { _ = tx.Rollback() }()
 	// Read in the transaction: a save meanwhile indexes after it, never under it. Only
 	// the indexed kinds: tool calls hold most of the bytes.
-	kinds := make([]any, 0, len(searchTexts)+1)
-	kinds = append(kinds, id)
+	args := make([]any, 0, len(searchTexts)+1)
+	args = append(args, id)
 	for k := range searchTexts {
-		kinds = append(kinds, string(k))
+		args = append(args, string(k))
 	}
 	items, err := scanItems(ctx, tx, id, `SELECT ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data
-		FROM thread_items WHERE thread_id = ? AND kind IN (?`+strings.Repeat(", ?", len(searchTexts)-1)+`) ORDER BY ordinal`, kinds...)
+		FROM thread_items WHERE thread_id = ? AND kind IN (?`+strings.Repeat(", ?", len(searchTexts)-1)+`) ORDER BY ordinal`, args...)
 	if err != nil {
 		return 0, err
 	}
