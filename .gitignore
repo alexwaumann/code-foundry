@@ -19,3 +19,7 @@ node_modules/
 
 # Step notes are text; screenshots go in the PR body, not the repo.
 docs/notes/**/*.png
+
+# playwright cli (scripts/drive.sh, .claude/skills/drive-app): only the config is committed
+gui/frontend/.playwright/*
+!gui/frontend/.playwright/cli.config.json
