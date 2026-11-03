@@ -38,6 +38,7 @@ const (
 // PRPromptInfo is what every PR prompt says about the pull request. Fields are raw;
 // the builders sanitize them.
 type PRPromptInfo struct {
+	Slug    string // "owner/name"
 	Number  int
 	Title   string
 	URL     string
@@ -48,7 +49,7 @@ type PRPromptInfo struct {
 // prPromptInfo extracts PRPromptInfo from a pull request summary.
 func prPromptInfo(pr *v1.PullRequest) PRPromptInfo {
 	return PRPromptInfo{
-		Number: int(pr.GetNumber()), Title: pr.GetTitle(), URL: pr.GetUrl(),
+		Slug: pr.GetRepoSlug(), Number: int(pr.GetNumber()), Title: pr.GetTitle(), URL: pr.GetUrl(),
 		HeadRef: pr.GetHeadRef(), BaseRef: pr.GetBaseRef(),
 	}
 }
@@ -199,6 +200,51 @@ func loginOr(login string) string {
 	return "ghost" // GitHub's name for a deleted account
 }
 
+// threadLocation is a review thread's "path:line" with its "(before)" and
+// "(outdated)" marks.
+func threadLocation(t *v1.PullRequestReviewThread) string {
+	loc := sanitizePRText(t.GetPath())
+	if t.GetLine() > 0 {
+		loc += ":" + strconv.Itoa(int(t.GetLine()))
+	}
+	if t.GetSide() == v1.DiffSide_DIFF_SIDE_LEFT {
+		loc += " (before)"
+	}
+	if t.GetIsOutdated() {
+		loc += " (outdated)"
+	}
+	return loc
+}
+
+// threadFinding is one review thread as quoted lines: "> <location> — <author>: <body>"
+// per comment, keeping the first threadHead and last threadTail comments of a long one.
+// prefix, when set, is a line put before them (pr.task's thread id). ok is false when no
+// comment has a body.
+func threadFinding(t *v1.PullRequestReviewThread, prefix string) (f finding, ok bool) {
+	loc := threadLocation(t)
+	var lines []string
+	for _, c := range t.GetComments() {
+		body := sanitizePRText(c.GetBody())
+		if body == "" {
+			continue
+		}
+		lines = append(lines, "> "+loc+" — "+loginOr(c.GetAuthor())+": "+body)
+		f.at = max(f.at, tsNanos(c.GetCreatedAt()))
+	}
+	if len(lines) == 0 {
+		return finding{}, false
+	}
+	if n := len(lines); n > threadHead+threadTail {
+		more := "> " + loc + " — … " + plural(n-threadHead-threadTail, "more comment")
+		lines = slices.Concat(lines[:threadHead], []string{more}, lines[n-threadTail:])
+	}
+	if prefix != "" {
+		lines = append([]string{prefix}, lines...)
+	}
+	f.lines = lines
+	return f, true
+}
+
 // fixFindings gathers the failing checks, unresolved review threads, and review
 // remarks of d, newest first within each kind. truncated reports that GitHub held back
 // comments or threads (or a thread's later comments).
@@ -217,37 +263,10 @@ func fixFindings(d *v1.PullRequestDetail) (checks, threads, remarks []finding, t
 		if t.GetIsResolved() {
 			continue
 		}
-		loc := sanitizePRText(t.GetPath())
-		if t.GetLine() > 0 {
-			loc += ":" + strconv.Itoa(int(t.GetLine()))
+		if f, ok := threadFinding(t, ""); ok {
+			truncated = truncated || t.GetCommentsTruncated()
+			threads = append(threads, f)
 		}
-		if t.GetSide() == v1.DiffSide_DIFF_SIDE_LEFT {
-			loc += " (before)"
-		}
-		if t.GetIsOutdated() {
-			loc += " (outdated)"
-		}
-		var (
-			lines []string
-			at    int64
-		)
-		for _, c := range t.GetComments() {
-			body := sanitizePRText(c.GetBody())
-			if body == "" {
-				continue
-			}
-			lines = append(lines, "> "+loc+" — "+loginOr(c.GetAuthor())+": "+body)
-			at = max(at, tsNanos(c.GetCreatedAt()))
-		}
-		if len(lines) == 0 {
-			continue
-		}
-		if n := len(lines); n > threadHead+threadTail {
-			more := "> " + loc + " — … " + plural(n-threadHead-threadTail, "more comment")
-			lines = slices.Concat(lines[:threadHead], []string{more}, lines[n-threadTail:])
-		}
-		truncated = truncated || t.GetCommentsTruncated()
-		threads = append(threads, finding{lines: lines, at: at})
 	}
 	// Remarks: inline comments outside a thread, and review summaries. A review that
 	// approved or was dismissed has nothing to fix, and only each reviewer's latest

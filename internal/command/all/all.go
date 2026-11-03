@@ -177,7 +177,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),
 		command.RegisterPullRequestThreads(r, command.PullRequestThreadDeps{
-			Gh: d.Gh, Project: d.Project, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
+			Gh: d.Gh, Project: d.Project, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter, Clone: d.Clone,
 		}),
 		command.RegisterSettings(r, d.Settings, d.Reveal),
 		command.RegisterNotifications(r, d.Settings, d.Emitter),

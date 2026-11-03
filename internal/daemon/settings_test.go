@@ -30,7 +30,7 @@ func TestRegistryOverridesThreadStarters(t *testing.T) {
 	var s settings.Settings
 	s.Threads.DefaultModel, s.Threads.DefaultEffort = "claude-haiku-5-5[1m]", "low"
 	defs := registryOverrides(s).ArgDefaults
-	for _, name := range []string{"thread.new", "thread.new-like", "pr.ask", "pr.explain", "pr.fix.findings", "theme.ask"} {
+	for _, name := range []string{"thread.new", "thread.new-like", "pr.ask", "pr.explain", "pr.fix.findings", "pr.task", "theme.ask"} {
 		if got := defs[name]; got["model"] != "claude-haiku-5-5[1m]" || got["effort"] != "low" {
 			t.Errorf("%s defaults = %v", name, got)
 		}
@@ -93,7 +93,7 @@ func TestApplySettings(t *testing.T) {
 		t.Errorf("thread.new = defaults %q/%q keybindings %v", c.Args[0].Default, c.Args[1].Default, c.Keybindings)
 	}
 	// The pull request thread commands start threads too, with the same defaults.
-	for _, name := range []string{"pr.ask", "pr.explain", "pr.fix.findings"} {
+	for _, name := range []string{"pr.ask", "pr.explain", "pr.fix.findings", "pr.task"} {
 		c, _ := reg.Get(name)
 		if m, e := argDefault(c, "model"), argDefault(c, "effort"); m != "claude-opus-4-8[1m]" || e != "high" {
 			t.Errorf("%s defaults = %q/%q, want opus/high", name, m, e)

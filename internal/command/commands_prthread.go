@@ -16,8 +16,8 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// PullRequestThreadDeps are the dependencies of pr.ask, pr.explain and
-// pr.fix.findings: commands that start a thread about a pull request. Nil
+// PullRequestThreadDeps are the dependencies of pr.ask, pr.explain, pr.fix.findings
+// and pr.task: commands that start a thread about a pull request. Nil
 // backends register the commands against the Unimplemented handlers.
 type PullRequestThreadDeps struct {
 	// Gh reads the pull request (GetPullRequestDetail).
@@ -27,8 +27,11 @@ type PullRequestThreadDeps struct {
 	Project ProjectBackend
 	// Thread starts the thread (Create with an initial prompt).
 	Thread ThreadBackend
-	// GitOps fetches origin before pr.fix.findings creates a worktree.
+	// GitOps fetches origin before pr.fix.findings and pr.task create a worktree.
 	GitOps GitOpsBackend
+	// Clone clones a repository that no project is a clone of, for pr.task (as
+	// project.clone). Nil: pr.task fails there with Unimplemented.
+	Clone CloneFunc
 	// Emitter focuses the new thread, as thread.new does. Required.
 	Emitter Emitter
 }
@@ -43,6 +46,10 @@ const (
 	// prThreadFix (fix.findings): explicit worktree, else the head's worktree, else a
 	// new worktree for the head branch (same-repository pull requests only).
 	prThreadFix
+	// prThreadReview (pr.task review-request): the head's worktree, else a new worktree
+	// for the head branch (same-repository pull requests), else the main worktree, off
+	// the head (a fork's, or one without a head branch): the review only reads.
+	prThreadReview
 )
 
 // prHead is the pull request's head as the worktree rules need it.
@@ -127,6 +134,8 @@ type prWorktreePick struct {
 	Create bool
 	// MainPath is ProjectID's main worktree (Create fetches there).
 	MainPath string
+	// OffHead: prThreadReview's fallback, a worktree that is not on the head.
+	OffHead bool
 }
 
 // pickPRWorktree chooses the worktree for a pull request thread. repos are the
@@ -165,6 +174,9 @@ func pickPRWorktree(kind prThreadKind, projects []*v1.Project, slug string, numb
 	}
 	if kind == prThreadRead {
 		return prWorktreePick{ProjectID: clones[0].GetId(), Path: main(clones[0])}, nil
+	}
+	if kind == prThreadReview && (head.Ref == "" || head.Cross) {
+		return prWorktreePick{ProjectID: clones[0].GetId(), Path: main(clones[0]), OffHead: true}, nil
 	}
 	switch {
 	case head.Ref == "":
@@ -205,9 +217,10 @@ func wrapStep(step string, err error) error {
 	return fmt.Errorf("%s: %w", step, err)
 }
 
-// RegisterPullRequestThreads registers pr.ask, pr.explain and pr.fix.findings. Each
-// reads the pull request, picks (or, for fix.findings, creates) a worktree, starts a
-// thread there with a prompt about the pull request, and focuses it.
+// RegisterPullRequestThreads registers pr.ask, pr.explain, pr.fix.findings and pr.task
+// (commands_prtask.go). Each reads the pull request, picks (or, for fix.findings and
+// pr.task, creates) a worktree, starts a thread there with a prompt about the pull
+// request, and focuses it; pr.task can instead send its prompt into a thread.
 func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 	if d.Emitter == nil {
 		return errors.New("register pull request threads: Emitter is required")
@@ -224,6 +237,11 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 	if d.GitOps == nil {
 		d.GitOps = codefoundryv1connect.UnimplementedGitOpsServiceHandler{}
 	}
+	if d.Clone == nil {
+		d.Clone = func(context.Context, string, func(*v1.CloneProgress)) (*v1.Project, error) {
+			return nil, connect.NewError(connect.CodeUnimplemented, errors.New("clone is not configured"))
+		}
+	}
 	slug := ArgSpec{Name: "repo-slug", Type: String, Required: true, Positional: true, Description: `GitHub repository, "owner/name"`}
 	number := ArgSpec{Name: "number", Type: Int, Required: true, Positional: true, Description: "Pull request number"}
 	// Not context-bound: an explicit worktree must be told apart from the active one,
@@ -238,22 +256,15 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			return Result{}, err
 		}
 		s, n := strings.TrimSpace(a.String("repo-slug")), a.Int("number")
-		res, err := d.Gh.GetPullRequestDetail(ctx, connect.NewRequest(&v1.GetPullRequestDetailRequest{
-			RepoSlug: s, Number: int32(n), Refresh: kind == prThreadFix,
-		}))
+		detail, err := d.readPR(ctx, s, n, kind == prThreadFix)
 		if err != nil {
-			return Result{}, wrapStep(fmt.Sprintf("read #%d", n), err)
+			return Result{}, err
 		}
-		detail := res.Msg.GetDetail()
 		pr := detail.GetPullRequest()
-		if pr == nil {
-			return Result{}, connect.NewError(connect.CodeNotFound, fmt.Errorf("pull request %s#%d was not returned", s, n))
-		}
 		// Check the size before anything changes on disk. The worst-case checkout bounds
 		// the prompt built below, whatever the worktree's state turns out to be.
-		if p := prompt(detail, PRCheckout{Behind: math.MaxInt32, Dirty: true}); len(p) > MaxPRPromptBytes {
-			return Result{}, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(
-				"the prompt for #%d would be %d KiB, over the %d KiB a thread can start with", n, (len(p)+1023)>>10, MaxPRPromptBytes>>10))
+		if err := checkPRPromptSize(n, prompt(detail, PRCheckout{Behind: math.MaxInt32, Dirty: true})); err != nil {
+			return Result{}, err
 		}
 		explicit := a.Path("worktree")
 		var projects []*v1.Project
@@ -339,7 +350,37 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 				return start(ctx, uctx, a, prThreadFix, FixFindingsPRPrompt)
 			},
 		},
+		prTaskCommand(d, slug, number, model, effort),
 	)
+}
+
+// readPR reads pull request slug#n (refreshed when refresh). The detail's pull request
+// is never nil and names its repository.
+func (d PullRequestThreadDeps) readPR(ctx context.Context, slug string, n int, refresh bool) (*v1.PullRequestDetail, error) {
+	res, err := d.Gh.GetPullRequestDetail(ctx, connect.NewRequest(&v1.GetPullRequestDetailRequest{
+		RepoSlug: slug, Number: int32(n), Refresh: refresh,
+	}))
+	if err != nil {
+		return nil, wrapStep(fmt.Sprintf("read #%d", n), err)
+	}
+	detail := res.Msg.GetDetail()
+	if detail.GetPullRequest() == nil {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("pull request %s#%d was not returned", slug, n))
+	}
+	if detail.GetPullRequest().GetRepoSlug() == "" {
+		detail = proto.CloneOf(detail)
+		detail.PullRequest.RepoSlug = slug
+	}
+	return detail, nil
+}
+
+// checkPRPromptSize refuses a prompt over MaxPRPromptBytes (InvalidArgument).
+func checkPRPromptSize(n int, p string) error {
+	if len(p) <= MaxPRPromptBytes {
+		return nil
+	}
+	return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(
+		"the prompt for #%d would be %d KiB, over the %d KiB a thread can start with", n, (len(p)+1023)>>10, MaxPRPromptBytes>>10))
 }
 
 // createPRWorktree fetches the head branch from origin in the repository's main
