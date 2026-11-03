@@ -43,9 +43,12 @@ type QuotedItem struct {
 // VerifyQuote checks a reported hit: thread threadID is in the default search scope,
 // item (its id, or its ordinal "#12"/"12") is one of the thread's own indexed messages,
 // and quote occurs in its searchable text, either as it is, with markdown markers left
-// out of both (quoteForm), or, for Claude's reply, in its rendered text (quoteSpan). The
-// quote it returns is the matched part as it reads (renderedQuote). Every refusal is ErrInvalidArgument (ErrNotFound for an
-// unknown thread or item) with words a model can act on.
+// out of both (quoteForm), or, for Claude's reply, in its rendered text, tried first
+// (quoteSpan). The quote it returns is the matched part as it reads (renderedQuote), and
+// that must read in the message as shown, at least MinQuoteRunes long unless it is the
+// whole message: a quote of a link's hidden target matches the source but shows nothing.
+// Every refusal is ErrInvalidArgument (ErrNotFound for an unknown thread or item) with
+// words a model can act on.
 func (m *Manager) VerifyQuote(ctx context.Context, threadID, item, quote string) (QuotedItem, error) {
 	q := cleanQuote(quote)
 	switch {
@@ -87,10 +90,21 @@ func (m *Manager) VerifyQuote(ctx context.Context, threadID, item, quote string)
 	if utf8.RuneCountInString(q) < MinQuoteRunes && quoteForm(q) != quoteForm(text) {
 		return QuotedItem{}, fmt.Errorf("%w: the quote is too short to show what answers; quote at least %d characters (or the whole message)", ErrInvalidArgument, MinQuoteRunes)
 	}
-	// Stored as it reads: the matched part of the message, rendered for a reply.
+	// Stored as it reads: the matched part of the message, rendered for a reply. A quote
+	// that matched only markup (a link's hidden target) reads as little or nothing, or
+	// not as one run of the message's words: the model quotes again.
 	stored := renderedQuote(src, from, to, markdown)
-	if stored == "" {
-		stored = q
+	reads := text
+	if markdown {
+		reads = squeeze(renderedText(src)).String()
+	}
+	switch {
+	case stored == "" || !strings.Contains(reads, stored):
+		return QuotedItem{}, fmt.Errorf("%w: the quote's words are not what #%d of thread %s shows (a link's target or markup is not shown); quote the words as they read rendered. The message reads: %q",
+			ErrInvalidArgument, it.Ordinal, t.ID, quoteHead(reads))
+	case utf8.RuneCountInString(stored) < MinQuoteRunes && stored != reads:
+		return QuotedItem{}, fmt.Errorf("%w: as #%d of thread %s shows it, the quote reads only %q (a link's target or markup is not shown); quote at least %d characters of the words as they read rendered (or the whole message)",
+			ErrInvalidArgument, it.Ordinal, t.ID, stored, MinQuoteRunes)
 	}
 	return QuotedItem{Thread: t, ItemID: it.ID, Ordinal: it.Ordinal, Kind: it.Kind, Speaker: sp, CreatedAt: it.CreatedAt, Quote: stored}, nil
 }

@@ -24,6 +24,9 @@ func TestVerifyQuote(t *testing.T) {
 		Item{ID: "tool", Kind: KindToolCall, Tool: &ToolCall{Name: "Bash", InputJSON: `{"command":"echo Do not refetch"}`, Status: ToolDone, Output: "Do not refetch"}},
 		Item{ID: "sub", Kind: KindAssistantText, Text: "a subagent says do not refetch", ParentToolUseID: "toolu_1"},
 		Item{ID: "wake", Kind: KindUserMessage, Text: "a wake about refetching", Origin: OriginWake},
+		Item{ID: "pr", Kind: KindAssistantText, Text: "Merged in [PR](https://github.com/alexwaumann/code-foundry/pull/503) yesterday, after review."},
+		Item{ID: "chip", Kind: KindAssistantText, Text: "See [run.go](internal/store/search/run.go) for the loop."},
+		Item{ID: "ok", Kind: KindAssistantText, Text: "**OK.**"},
 	)
 	e.putItems(child.ID, Item{ID: "child-u", Kind: KindUserMessage, Text: "the child says do not refetch"})
 	e.putItems(owned.ID, Item{ID: "owned-u", Kind: KindUserMessage, Text: "the plugin says do not refetch"})
@@ -68,6 +71,17 @@ func TestVerifyQuote(t *testing.T) {
 		{name: "unknown thread", thread: "s-nope", item: "md", quote: "Do not refetch on CI reruns", want: ErrNotFound, words: "no thread"},
 		{name: "no quote", thread: top.ID, item: "md", quote: " \"\" ", want: ErrInvalidArgument, words: "a quote is required"},
 		{name: "no item", thread: top.ID, item: "", quote: "Do not refetch on CI reruns", want: ErrInvalidArgument, words: "an item is required"},
+		// Only the shown words: a quote of a link's hidden target matches the source but
+		// reads as nothing, or as too little, in the reply as shown.
+		{name: "a link's target alone", thread: top.ID, item: "pr", quote: "github.com/alexwaumann/code-foundry/pull/503", want: ErrInvalidArgument,
+			words: `not what #`},
+		{name: "a link's text and part of its target", thread: top.ID, item: "pr", quote: "[PR](https://github.com/alexwaumann", want: ErrInvalidArgument,
+			words: `reads only "PR"`},
+		{name: "a whole raw link and more", thread: top.ID, item: "pr", quote: "in [PR](https://github.com/alexwaumann/code-foundry/pull/503) yesterday, after", quoted: "in PR yesterday, after"},
+		{name: "the reply as shown", thread: top.ID, item: "pr", quote: "Merged in PR yesterday", quoted: "Merged in PR yesterday"},
+		{name: "a path chip as shown", thread: top.ID, item: "chip", quote: "See internal/store/search/run.go for the loop", quoted: "See internal/store/search/run.go for the loop"},
+		{name: "a path chip by its link text", thread: top.ID, item: "chip", quote: "See run.go for the loop", quoted: "See internal/store/search/run.go for the loop"},
+		{name: "a whole short reply", thread: top.ID, item: "ok", quote: "OK.", quoted: "OK."},
 		{name: "too long", thread: top.ID, item: "md", quote: strings.Repeat("x", MaxQuoteRunes+1), want: ErrInvalidArgument, words: "at most"},
 	}
 	for _, tt := range tests {

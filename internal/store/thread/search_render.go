@@ -128,18 +128,19 @@ outer:
 }
 
 // quoteSpan is where quote q (cleanQuote'd) is in src, the item's text as the extractor
-// gives it (line breaks kept), as source rune indices [from, to): found as it is (white
-// space aside), else in quoteForm on both sides, else (markdown, a reply) in the rendered
-// text. ok is false when it is in none.
+// gives it (line breaks kept), as source rune indices [from, to): (markdown, a reply) in
+// the rendered text first, else as it is (white space aside), else in quoteForm on both
+// sides. ok is false when it is in none.
 func quoteSpan(src []rune, q string, markdown bool) (from, to int, ok bool) {
 	flat := squeeze(identity(src))
-	tries := []func() (mapped, []rune){
-		func() (mapped, []rune) { return flat, []rune(q) },
-		func() (mapped, []rune) { return formMapped(flat), []rune(quoteForm(q)) },
-	}
+	var tries []func() (mapped, []rune)
 	if markdown {
 		tries = append(tries, func() (mapped, []rune) { return squeeze(renderedText(src)), []rune(q) })
 	}
+	tries = append(tries,
+		func() (mapped, []rune) { return flat, []rune(q) },
+		func() (mapped, []rune) { return formMapped(flat), []rune(quoteForm(q)) },
+	)
 	for _, try := range tries {
 		m, want := try()
 		if k := indexRunes(m.r, want); k >= 0 {
