@@ -203,6 +203,32 @@ func TestSubscribeSendGateExisting(t *testing.T) {
 			t.Error("the one-shot was kept after it fired")
 		}
 	})
+	t.Run("an ungated one-shot", func(t *testing.T) {
+		// The parent's own one-shot settled subscription keeps its (empty) gate, so it can
+		// fire before the child handled the forward; the forward's note then rides on that
+		// one wake instead of going with the subscription.
+		e := newEnv(t)
+		parent, child := e.stopped("parent"), e.stopped("child")
+		e.handledStep(child.ID, busy, 0)
+		first, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, Note: "mine"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, BeforeSend: true, Note: "forward"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, AfterOrdinal: 4, Note: "forward"}); err != nil {
+			t.Fatal(err)
+		}
+		e.handledStep(child.ID, finished, 3) // settles before reading the forward
+		items := e.waitItems(parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+		if w := wakes(items)[0].WakeJSON; !strings.Contains(w, "mine; forward") {
+			t.Errorf("wake = %s, want the forward's note on the one-shot's only wake", w)
+		}
+		if _, kept := e.subscription(first.Subscription.ID); kept {
+			t.Error("the one-shot was kept after it fired")
+		}
+	})
 }
 
 // The gate is for thread targets, one of the two at a time.

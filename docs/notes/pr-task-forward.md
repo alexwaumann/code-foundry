@@ -59,7 +59,10 @@ would make it do the work itself or re-delegate by hand. The daemon now does the
   as taken at once and the first prompt's turn end moved `HandledThrough` past it: a
   forward to a starting owner woke the sender before the owner read the task. A send
   during a restart is held unwritten and written when the new process takes it
-  (`onRestarted`), so the interrupted turn's end never counted it.
+  (`onRestarted`), so the interrupted turn's end never counted it. A held message that
+  fails to go out (`deliver`'s failure branch) is no longer queued: Claude will never
+  read it, and the bubble should not say "queued" next to "Claude did not get this
+  message".
 - `SubscribeThreadRequest.before_send` and `after_ordinal`, thread targets only, not
   both (in memory, as `subRec.unarmed`, `through`, `armReq`):
   - `before_send` makes a subscription that never fires until armed. With the same
@@ -190,6 +193,11 @@ with `via`, as the daemon does; without `up`, nothing changes for existing tests
 - A one-shot settled wake also fires on the owner's first permission prompt or question
   asked after the arming: the parent may then step in (answer it, or tell the user). The
   owner's next turn end does not wake the parent again; the one-shot is gone.
+- A one-shot that fires before its forward's message was handled (the parent's own
+  ungated settled one-shot the forward joined, or an armed one firing on a permission
+  prompt) carries every waiting note on that wake: it is the subscription's last, so a
+  note held back for a later wake would vanish with it (`fireLocked`; covered by
+  `TestSubscribeSendGateExisting` "an ungated one-shot").
 - A deeper chain can wake the lead twice. Lead → sub-lead → worker, the worker owning
   the link: the lead's forward wakes the lead when the worker's turn ends, and the
   sub-lead's own `--notify` on the worker wakes the sub-lead, whose turn end then wakes

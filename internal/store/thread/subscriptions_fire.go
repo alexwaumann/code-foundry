@@ -172,6 +172,14 @@ func (m *Manager) fireLaterLocked(r *subRec, handled int64, build func(Subscript
 	}
 	sub := r.s
 	due, rest := r.dueExtra(handled)
+	if !r.s.Repeat {
+		// A one-shot goes with this wake (firedLocked): a note still waiting for its
+		// message rides on it rather than vanishing with the subscription.
+		for _, x := range rest {
+			due = append(due, x.text)
+		}
+		rest = nil
+	}
 	sub.Note = joinNotes(r.s.Note, due) // with the notes for this wake only (subRec.extra)
 	sub.wakeExtra = due
 	d := build(sub, now)

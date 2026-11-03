@@ -449,6 +449,8 @@ func (r *runner) deliver(o *outgoing) bool {
 	if _, err := r.sendMessage(o); err != nil {
 		r.log().warn("send a message that waited for the handshake", "err", err)
 		if o.itemID != "" {
+			// Written queued (queue): Claude will never read it, so it is not queued any more.
+			r.st.proj.w.change(o.itemID, func(x *Item) { x.Queued = false })
 			r.st.proj.w.add(Item{ID: r.st.proj.nextID("err"), Kind: KindError, Text: "Claude did not get this message: " + err.Error()})
 		}
 		return false
