@@ -316,6 +316,10 @@ export interface PullRequestDetailView {
   mergeMethods: MergeMethodView[];
   /** Auto-merge is enabled: GitHub merges it once its requirements pass. */
   autoMergeEnabled: boolean;
+  /** The enabled auto-merge's method; null while auto-merge is off. */
+  autoMergeMethod: MergeMethodView | null;
+  /** The repository allows auto-merge (its "Allow auto-merge" setting); false if unknown. */
+  autoMergeAllowed: boolean;
   /** The repository's default branch; "" if unknown. A merge never deletes it. */
   defaultBranch: string;
   /** "admin" | "maintain" | "write" | "triage" | "read" | "". */
@@ -639,6 +643,8 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
     viewerCanUpdate: d.viewerCanUpdate,
     mergeMethods: d.mergeMethodsAllowed.map((m) => mergeMethodViews[m]).filter((m): m is MergeMethodView => m !== null),
     autoMergeEnabled: d.autoMergeEnabled,
+    autoMergeMethod: d.autoMergeEnabled ? mergeMethodViews[d.autoMergeMethod] : null,
+    autoMergeAllowed: d.autoMergeAllowed,
     defaultBranch: d.defaultBranch,
     viewerPermission: d.viewerPermission,
     fetchedAtMs: ms(d.fetchedAt),

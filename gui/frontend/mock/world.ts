@@ -2338,6 +2338,32 @@ export class World {
   }
 
   /**
+   * A pull request linked to the thread by hand (thread.pr.link, ThreadService.LinkPullRequest):
+   * a GitHub pull request URL or owner/name#N, appended unless its URL (case aside) is
+   * linked already, like the daemon (which also copies it up the creator chain; the mock
+   * does not). Anything else is refused as not a pull request.
+   */
+  linkPullRequestByHand(id: string, ref: string): { linked: boolean; link: MockThread["linkedPullRequests"][number] } {
+    const s = this.thread(id);
+    const t = ref.trim();
+    const owner = "([A-Za-z0-9][A-Za-z0-9_-]{0,38})";
+    const name = "([A-Za-z0-9._-]{1,100})";
+    const m = new RegExp(`^${owner}/${name}#([0-9]{1,9})$`).exec(t) ?? new RegExp(`^(?:https?://)?(?:www\\.)?github\\.com/${owner}/${name}/pull/([0-9]{1,9})(?:[/?#].*)?$`).exec(t);
+    const number = Number(m?.[3] ?? "0");
+    if (!m || m[2] === "." || m[2] === ".." || number <= 0) {
+      throw new CommandError("invalid", `invalid argument: "${t}" is not a GitHub pull request (want a https://github.com/owner/name/pull/123 URL or owner/name#123)`);
+    }
+    const slug = `${m[1] ?? ""}/${m[2] ?? ""}`;
+    const url = `https://github.com/${slug}/pull/${String(number)}`;
+    const had = s.linkedPullRequests.find((l) => l.url.toLowerCase() === url.toLowerCase());
+    if (had) return { linked: false, link: had };
+    const link = { slug, number, url, linkedAt: new Date() };
+    s.linkedPullRequests = [...s.linkedPullRequests, link];
+    this.publishThread(s);
+    return { linked: true, link };
+  }
+
+  /**
    * Claude made requests: adds counters to the thread's (model, day) bucket, or a new
    * bucket, and republishes the thread (the daemon's live fold, coarser).
    */
@@ -4020,6 +4046,28 @@ export class World {
         run: (ctx, args) => {
           const s = this.addThreadProject(this.thread(args.id || (ctx?.activeThreadId ?? "")), args.project ?? "");
           return `added ${args.project ?? ""} to thread ${s.name ? `${s.name} (${s.id})` : s.id} (${String(this.projectIdsOf(s).length)} projects)`;
+        },
+      },
+      {
+        cmd: {
+          name: "thread.pr.link", noPalette: true,
+          title: "Link Pull Request to Thread",
+          category: "Thread",
+          description: "Link a GitHub pull request to a thread by hand, like Claude's links (never removed).",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "pr", type: ArgType.STRING, required: true, description: "The pull request: its GitHub URL or owner/name#123" },
+          ],
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const id = args.id || (ctx?.activeThreadId ?? "");
+          const r = this.linkPullRequestByHand(id, args.pr ?? "");
+          const s = this.thread(id);
+          const label = s.name ? `${s.name} (${s.id})` : s.id;
+          const pr = `${r.link.slug}#${String(r.link.number)}`;
+          return r.linked ? `linked ${pr} to thread ${label}` : `thread ${label} already has ${pr} linked`;
         },
       },
       {
