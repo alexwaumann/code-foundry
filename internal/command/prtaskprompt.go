@@ -28,7 +28,8 @@ type PRTaskOptions struct {
 
 // prTaskHeader is the lines every pr.task prompt starts with: what to do and which pull
 // request (slug#N, title, URL, head → base), then where the checkout stands. lead is
-// the task as an imperative ("Fix the failing checks"); purpose ends the untrusted-data
+// the task as an imperative up to the pull request ("Fix the failing checks on");
+// purpose ends the untrusted-data
 // notice ("diagnosing and fixing the failures"). push says the task changes the branch,
 // so the checkout must be on the head and current.
 func prTaskHeader(pr *v1.PullRequest, o PRTaskOptions, lead, purpose string, push bool) []string {
@@ -38,7 +39,7 @@ func prTaskHeader(pr *v1.PullRequest, o PRTaskOptions, lead, purpose string, pus
 	if o.FollowUp {
 		lead = "Follow-up task: " + strings.ToLower(lead[:1]) + lead[1:]
 	}
-	first := lead + " on PR `" + sanitizePRCode(info.Slug) + "#" + n + "`, titled `" + sanitizePRCode(info.Title) + "`, at `" + sanitizePRCode(info.URL) + "`."
+	first := lead + " PR `" + sanitizePRCode(info.Slug) + "#" + n + "`, titled `" + sanitizePRCode(info.Title) + "`, at `" + sanitizePRCode(info.URL) + "`."
 	lines := []string{first, "The PR branch is `" + head + "` targeting `" + base + "`."}
 	checkout := "`gh pr checkout " + n + " --repo " + sanitizePRCode(info.Slug) + "`"
 	switch {
@@ -94,7 +95,7 @@ var actionsRun = regexp.MustCompile(`^https://github\.com/[^/]+/[^/]+/actions/ru
 func ChecksPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 	pr := d.GetPullRequest()
 	slug, n := sanitizePRCode(pr.GetRepoSlug()), strconv.Itoa(int(pr.GetNumber()))
-	lines := prTaskHeader(pr, o, "Fix the failing checks", "diagnosing and fixing the failures", true)
+	lines := prTaskHeader(pr, o, "Fix the failing checks on", "diagnosing and fixing the failures", true)
 	var fs []finding
 	for _, c := range d.GetChecks() {
 		if !slices.Contains(failingConclusions, c.GetConclusion()) {
@@ -142,7 +143,7 @@ func ChecksPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 func ReviewPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 	pr := d.GetPullRequest()
 	slug, n := sanitizePRCode(pr.GetRepoSlug()), strconv.Itoa(int(pr.GetNumber()))
-	lines := prTaskHeader(pr, o, "Address the requested changes", "addressing the review", true)
+	lines := prTaskHeader(pr, o, "Address the requested changes on", "addressing the review", true)
 	// The latest CHANGES_REQUESTED review of each reviewer still requesting changes.
 	latest := map[string]*v1.PullRequestComment{}
 	for _, c := range d.GetComments() {
@@ -164,18 +165,35 @@ func ReviewPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 		if body := sanitizePRText(review.GetBody()); body != "" {
 			f.lines = append(f.lines, "> "+body)
 		}
-		if review.GetId() != "" {
-			for _, t := range d.GetReviewThreads() {
-				loc := threadLocation(t)
-				if t.GetIsResolved() {
-					loc += " (resolved)"
+		// One review can carry any number of inline comments: the first maxFindings in
+		// maxFindingsBytes (the first always), then how many more there are.
+		kept, more, used := 0, 0, 0
+		for _, t := range d.GetReviewThreads() {
+			loc := ""
+			for _, c := range t.GetComments() {
+				if review.GetId() == "" || c.GetReviewId() != review.GetId() {
+					continue
 				}
-				for _, c := range t.GetComments() {
-					if body := sanitizePRText(c.GetBody()); c.GetReviewId() == review.GetId() && body != "" {
-						f.lines = append(f.lines, "> "+loc+" — "+body)
+				body := sanitizePRText(c.GetBody())
+				if body == "" {
+					continue
+				}
+				if loc == "" {
+					loc = threadLocation(t)
+					if t.GetIsResolved() {
+						loc += " (resolved)"
 					}
 				}
+				line := "> " + loc + " — " + body
+				if more > 0 || kept == maxFindings || (kept > 0 && used+len(line)+1 > maxFindingsBytes) {
+					more++
+					continue
+				}
+				f.lines, kept, used = append(f.lines, line), kept+1, used+len(line)+1
 			}
+		}
+		if more > 0 {
+			f.lines = append(f.lines, "> … "+plural(more, "more inline comment"))
 		}
 		if len(f.lines) == 1 {
 			f.lines = append(f.lines, "> (no summary or inline comments were returned)")
@@ -201,7 +219,7 @@ func ReviewPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 // thread, then reply on it (and resolve it when the change settles it).
 func ConversationsPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 	pr := d.GetPullRequest()
-	lines := prTaskHeader(pr, o, "Address the unresolved review conversations", "addressing the review", true)
+	lines := prTaskHeader(pr, o, "Address the unresolved review conversations on", "addressing the review", true)
 	var (
 		fs        []finding
 		truncated = d.GetReviewThreadsTruncated()
@@ -246,7 +264,7 @@ func updateBranchLines(pr *v1.PullRequest) []string {
 // but not which files, so the agent finds them by updating the branch.
 func ConflictsPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 	pr := d.GetPullRequest()
-	lines := prTaskHeader(pr, o, "Resolve the merge conflicts", "resolving the conflicts", true)
+	lines := prTaskHeader(pr, o, "Resolve the merge conflicts on", "resolving the conflicts", true)
 	lines = append(lines, "GitHub reports that the branch conflicts with `"+sanitizePRCode(pr.GetBaseRef())+"`; it does not say which files.")
 	lines = append(lines, updateBranchLines(pr)...)
 	return strings.Join(append(lines,
@@ -258,7 +276,7 @@ func ConflictsPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 // date with the base before merging, and this one is not.
 func BehindPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 	pr := d.GetPullRequest()
-	lines := prTaskHeader(pr, o, "Bring the branch up to date with its base", "updating the branch", true)
+	lines := prTaskHeader(pr, o, "Bring the branch up to date with its base on", "updating the branch", true)
 	lines = append(lines, "GitHub reports that the branch is behind `"+sanitizePRCode(pr.GetBaseRef())+"`, and the repository requires branches to be up to date before merging. It has no conflicts.")
 	lines = append(lines, updateBranchLines(pr)...)
 	return strings.Join(append(lines,
@@ -271,11 +289,10 @@ func BehindPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 func ReviewRequestPRTaskPrompt(d *v1.PullRequestDetail, o PRTaskOptions) string {
 	pr := d.GetPullRequest()
 	slug, n := sanitizePRCode(pr.GetRepoSlug()), strconv.Itoa(int(pr.GetNumber()))
-	lead := "Review the pull request"
+	lines := prTaskHeader(pr, o, "Review", "reviewing it", false)
 	if a := sanitizePRCode(pr.GetAuthor()); a != "" {
-		lead = "Review the pull request by `" + a + "`"
+		lines = slices.Insert(lines, 2, "It was opened by `"+a+"`.")
 	}
-	lines := prTaskHeader(pr, o, lead, "reviewing it", false)
 	lines = append(lines, "Read it with `gh pr view "+n+" --repo "+slug+"` and `gh pr diff "+n+" --repo "+slug+"`, and read the surrounding code wherever the diff alone does not settle a question.")
 	fetch := "To read a file as the PR has it, fetch the head without checking it out (`git fetch origin pull/" + n + "/head`, then `git show FETCH_HEAD:<path>`)."
 	switch {

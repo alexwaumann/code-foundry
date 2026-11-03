@@ -56,6 +56,9 @@ type Thread struct {
 	Cascade map[string][]*v1.Thread
 	// MoveErr, when set, is Move's error for a request (after it is recorded).
 	MoveErr func(*v1.MoveThreadRequest) error
+	// SentOrdinal is the ordinal of the item Send answers with (the message's item
+	// "i-sent").
+	SentOrdinal int64
 	// Placement, when set, gives Create's made_worktree, made_branch, existing_worktree, shared_with
 	// and worktree_mode_dropped (else made_worktree and made_branch are new_worktree's presence).
 	Placement *v1.CreateThreadResponse
@@ -159,6 +162,14 @@ func (s *Thread) List(_ context.Context, r *connect.Request[v1.ListThreadsReques
 		res.Removed = s.Removed
 	}
 	return connect.NewResponse(res), nil
+}
+
+// Send records the request and answers with the message's item.
+func (s *Thread) Send(_ context.Context, r *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&v1.SendThreadMessageResponse{Item: &v1.ThreadItem{Id: "i-sent", Ordinal: s.SentOrdinal}}), nil
 }
 
 // Get returns Current with the requested id; without Current, the thread in Others

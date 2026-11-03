@@ -22,6 +22,11 @@ type prThreadFixture struct {
 	thread  *commandtest.Thread
 	gitops  *commandtest.GitOps
 	emit    *commandtest.Emitter
+	// cloned are the refs pr.task cloned; clone is what the clone returns (cloneErr
+	// fails it).
+	cloned   []string
+	clone    *v1.Project
+	cloneErr error
 }
 
 func newPRThreadFixture(t *testing.T) *prThreadFixture {
@@ -43,6 +48,10 @@ func newPRThreadFixture(t *testing.T) *prThreadFixture {
 	f.gh.Shared, f.project.Shared, f.gitops.Shared = f.log, f.log, f.log
 	if err := command.RegisterPullRequestThreads(f.reg, command.PullRequestThreadDeps{
 		Gh: f.gh, Project: f.project, Thread: f.thread, GitOps: f.gitops, Emitter: f.emit,
+		Clone: func(_ context.Context, ref string, _ func(*v1.CloneProgress)) (*v1.Project, error) {
+			f.cloned = append(f.cloned, ref)
+			return f.clone, f.cloneErr
+		},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +60,7 @@ func newPRThreadFixture(t *testing.T) *prThreadFixture {
 
 func TestPullRequestThreadCommandsRegistered(t *testing.T) {
 	f := newPRThreadFixture(t)
-	for _, name := range []string{"pr.ask", "pr.explain", "pr.fix.findings"} {
+	for _, name := range []string{"pr.ask", "pr.explain", "pr.fix.findings", "pr.task"} {
 		c, ok := f.reg.Get(name)
 		if !ok {
 			t.Fatalf("%s not registered", name)
