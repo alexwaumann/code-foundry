@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -105,6 +106,10 @@ func (m *Manager) fireLocked(r *subRec, build func(Subscription, time.Time) Mess
 // children counted now, and the detail its items hold (wakeDetailOf) read when the wake
 // is sent (the items are not read under m.mu). Callers hold m.mu and m.subs.mu.
 func (m *Manager) fireThreadLocked(r *subRec, t Thread) bool {
+	if h, ok := m.subs.held[t.ID][r.s.ID]; ok && h.Note != r.s.Note {
+		// The held wake's extra notes (a forward's) go on this one.
+		r.extra = slices.Insert(r.extra, 0, strings.TrimPrefix(h.Note, r.s.Note+"; "))
+	}
 	m.subs.unholdLocked(t.ID, r.s.ID) // this fire replaces a held one (subscriptions_hold.go)
 	kids := m.childrenLocked(t.ID)
 	return m.fireLaterLocked(r, func(s Subscription, at time.Time) delivery {
@@ -156,7 +161,9 @@ func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time)
 		m.suppressLocked(r, now)
 		return false
 	}
-	d := build(r.s, now)
+	sub := r.s
+	sub.Note = r.wakeNote() // with the notes for this wake only (subRec.extra)
+	d := build(sub, now)
 	joins := d.thread != nil && m.joinsBatchLocked(subscriber)
 	if !joins && !s.allowLocked(subscriber, now, m.opts.WakeLimit) {
 		m.log.Warn("wake dropped: the subscriber reached the wake limit", "thread", subscriber, "subscription", r.s.ID,
@@ -174,6 +181,7 @@ func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time)
 		d.slot = now
 	}
 	m.enqueueLocked(subscriber, d)
+	r.extra = nil
 	m.log.Info("wake subscription fired", "subscription", r.s.ID, "subscriber", subscriber, "target", r.s.TargetID,
 		"condition", r.s.Condition, "fired_count", r.s.FiredCount, "joins_batch", joins)
 	return true

@@ -125,6 +125,77 @@ func TestSubscribeSendGateUnarmed(t *testing.T) {
 	e.waitItems(parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 }
 
+// Over an existing subscription (thread.new --notify's repeat one): before the send it
+// is left as it is; the arming leaves its repeat flag, note and gate, and its next wake
+// only carries the forward's note, two forwards' both. A reused one-shot (another
+// forward's) waits for the later message and carries both notes once.
+func TestSubscribeSendGateExisting(t *testing.T) {
+	t.Run("a repeat --notify subscription", func(t *testing.T) {
+		e := newEnv(t)
+		parent, child := e.stopped("parent"), e.stopped("child")
+		e.handledStep(child.ID, busy, 0)
+		first, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, Repeat: true, Note: "notify"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, note := range []string{"forward one", "forward two"} {
+			before, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, BeforeSend: true, Note: note})
+			if err != nil || !before.Existed || before.Subscription.ID != first.Subscription.ID {
+				t.Fatalf("before the send = %+v, %v", before, err)
+			}
+			armed, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, AfterOrdinal: 4, Note: note})
+			if err != nil || !armed.Existed || armed.Fired {
+				t.Fatalf("arm = %+v, %v", armed, err)
+			}
+		}
+		if got, _ := e.subscription(first.Subscription.ID); !got.Repeat || got.Note != "notify" {
+			t.Errorf("stored = %+v, want repeat with its note", got)
+		}
+		e.handledStep(child.ID, finished, 0) // its own gate: none, so this fires
+		items := e.waitItems(parent.ID, "the first wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+		if w := wakes(items)[0].WakeJSON; !strings.Contains(w, "notify; forward one; forward two") {
+			t.Errorf("first wake = %s", w)
+		}
+		e.handledStep(child.ID, busy, 0)
+		e.handledStep(child.ID, finished, 0)
+		items = e.waitItems(parent.ID, "the second wake", func(items []Item) bool { return len(wakes(items)) == 2 })
+		if w := wakes(items)[1].WakeJSON; !strings.Contains(w, `"notify"`) || strings.Contains(w, "forward") {
+			t.Errorf("second wake = %s, want the stored note alone", w)
+		}
+	})
+	t.Run("another forward's one-shot", func(t *testing.T) {
+		e := newEnv(t)
+		parent, child := e.stopped("parent"), e.stopped("child")
+		e.handledStep(child.ID, busy, 0)
+		res, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, BeforeSend: true, Note: "forward one"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, AfterOrdinal: 4, Note: "forward one"}); err != nil {
+			t.Fatal(err)
+		}
+		if again, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, BeforeSend: true, Note: "forward two"}); err != nil || !again.Existed {
+			t.Fatalf("second forward before its send = %+v, %v", again, err)
+		}
+		if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, AfterOrdinal: 8, Note: "forward two"}); err != nil {
+			t.Fatal(err)
+		}
+		e.handledStep(child.ID, finished, 4) // the first task handled, not the second
+		if w := wakes(e.items(parent.ID).Items); len(w) != 0 {
+			t.Fatalf("woken before the second task was handled: %+v", w)
+		}
+		e.handledStep(child.ID, busy, 4)
+		e.handledStep(child.ID, finished, 8)
+		items := e.waitItems(parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+		if w := wakes(items)[0].WakeJSON; !strings.Contains(w, "forward one; forward two") {
+			t.Errorf("wake = %s", w)
+		}
+		if _, kept := e.subscription(res.Subscription.ID); kept {
+			t.Error("the one-shot was kept after it fired")
+		}
+	})
+}
+
 // The gate is for thread targets, one of the two at a time.
 func TestSubscribeSendGateRefused(t *testing.T) {
 	e := newEnv(t)

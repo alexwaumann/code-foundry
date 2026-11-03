@@ -345,3 +345,30 @@ func TestLeadSubscribedToWorkers(t *testing.T) {
 		t.Errorf("wake = %s", w.WakeTitle)
 	}
 }
+
+// A forward's note on the top thread's repeat subscription (its next wake only) rides on
+// the held wake, and on the one that replaces it.
+func TestLeadWakeHeldKeepsForwardNote(t *testing.T) {
+	l := newLeadEnv(t)
+	for _, o := range []SubscribeOptions{
+		{SubscriberID: l.top.ID, TargetThreadID: l.lead.ID, BeforeSend: true, Note: "forwarded"},
+		{SubscriberID: l.top.ID, TargetThreadID: l.lead.ID, AfterOrdinal: 1, Note: "forwarded"},
+	} {
+		if res, err := l.m.Subscribe(l.ctx(), o); err != nil || !res.Existed {
+			t.Fatalf("Subscribe(%+v) = %+v, %v", o, res, err)
+		}
+	}
+	l.setStep(l.lead.ID, finished)
+	l.settled(1)
+	if !l.held() {
+		t.Fatal("not held")
+	}
+	l.setStep(l.lead.ID, busy)
+	l.report(ReportDone)
+	l.setStep(l.lead.ID, finished)
+	l.settled(2)
+	items := l.waitItems(l.top.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+	if w := wakes(items)[0].WakeJSON; !strings.Contains(w, "forwarded") {
+		t.Errorf("wake = %s, want the forward's note", w)
+	}
+}

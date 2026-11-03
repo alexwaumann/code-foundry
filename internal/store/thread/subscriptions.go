@@ -219,9 +219,10 @@ type SubscribeOptions struct {
 	// arming (a permission prompt the sender may answer); at once when that already
 	// happened. With the same subscription (subscriber, target, condition) existing,
 	// BeforeSend leaves it as it is; AfterOrdinal arms an unarmed one, makes an armed one
-	// wait for the later message, and leaves any other's repeat flag, note and gate
-	// alone. The gate is not persisted: after a daemon restart the subscription fires on
-	// the next transition, as any does.
+	// wait for the later message, and leaves any other's repeat flag and gate alone. Its
+	// note then goes on the subscription's next wake only (subRec.extra), added to the
+	// stored note, which is unchanged. The gate is not persisted: after a daemon restart
+	// the subscription fires on the next transition, as any does.
 	BeforeSend   bool
 	AfterOrdinal int64
 }
@@ -307,6 +308,9 @@ type subRec struct {
 	unarmed bool
 	through int64
 	armReq  string
+	// extra are notes for the next wake only (a forward onto an existing subscription),
+	// after the stored note; in memory.
+	extra []string
 }
 
 // sendGate is a Subscribe's BeforeSend and AfterOrdinal.
@@ -325,6 +329,29 @@ func (r *subRec) meets(t Thread) bool {
 	}
 	req := requestKey(t)
 	return t.HandledThrough >= r.through || (req != "" && req != r.armReq)
+}
+
+// wakeNote is the note r's next wake carries: the stored one, then the extra ones.
+func (r *subRec) wakeNote() string {
+	return joinNotes(r.s.Note, r.extra)
+}
+
+// joinNotes joins a note and extra ones with "; ", leaving out empty ones.
+func joinNotes(note string, extra []string) string {
+	parts := make([]string, 0, 1+len(extra))
+	for _, n := range append([]string{note}, extra...) {
+		if n != "" {
+			parts = append(parts, n)
+		}
+	}
+	return strings.Join(parts, "; ")
+}
+
+// addExtraLocked puts note on r's next wake, unless r's note or an extra one says it.
+func (r *subRec) addExtraLocked(note string) {
+	if note != "" && note != r.s.Note && !slices.Contains(r.extra, note) {
+		r.extra = append(r.extra, note)
+	}
 }
 
 // requestKey names the pending request (permission prompt or question) a running
@@ -597,7 +624,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 			case g.before:
 				return SubscribeResult{Subscription: r.s, Existed: true}, nil
 			case g.after > 0:
-				return m.armLocked(r, target, g.after), nil
+				return m.armLocked(r, target, g.after, sub.Note), nil
 			}
 			if r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note) {
 				r.s.Repeat = sub.Repeat
@@ -648,18 +675,19 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	return SubscribeResult{Subscription: r.s, Fired: fired}, nil
 }
 
-// armLocked is a Subscribe with AfterOrdinal ordinal finding r, the same subscription:
-// an unarmed one is armed with it, an armed one waits for the later of the two messages,
-// any other keeps its gate. r fires at once when its target, as it is, now meets the
-// condition and did not before (a turn that handled the message already ended).
-// Callers hold m.mu and m.subs.mu.
-func (m *Manager) armLocked(r *subRec, target Thread, ordinal int64) SubscribeResult {
+// armLocked is a Subscribe with AfterOrdinal ordinal (and note) finding r, the same
+// subscription: an unarmed one is armed with it, an armed one waits for the later of the
+// two messages, any other keeps its gate; the note goes on r's next wake only. r fires
+// at once when its target, as it is, now meets the condition and did not before (a turn
+// that handled the message already ended). Callers hold m.mu and m.subs.mu.
+func (m *Manager) armLocked(r *subRec, target Thread, ordinal int64, note string) SubscribeResult {
 	switch {
 	case r.unarmed:
 		r.unarmed, r.through, r.armReq = false, ordinal, requestKey(target)
 	case r.through > 0:
 		r.through = max(r.through, ordinal)
 	}
+	r.addExtraLocked(note)
 	was := r.sat
 	r.sat, r.req = r.meets(target), requestKey(target)
 	if !r.sat || was || !m.fireThreadLocked(r, target) {
