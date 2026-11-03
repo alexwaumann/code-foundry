@@ -11,6 +11,7 @@ import { ProjectPicker } from "@/components/compose/ProjectPicker";
 import { PromptsPicker } from "./PromptsPicker";
 import { RunInPicker } from "./RunInPicker";
 import { FileFinder } from "./FileFinder";
+import { SearchDialog } from "@/components/search/SearchDialog";
 import { inPalette, invokeStarted, presentCommand, presentInPalette } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
@@ -18,6 +19,7 @@ import { rankCommands } from "@/palette/rank";
 import { refreshCommands, useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useUiStore } from "@/stores/ui";
+import { cn } from "@/lib/utils";
 
 function CommandRow({ c, onPick }: { c: CommandView; onPick: (c: CommandView) => void }) {
   return (
@@ -337,7 +339,7 @@ export function CommandPalette() {
   const runInThread = useUiStore((s) => s.palette.threadId ?? "");
   const context = useUiStore((s) => s.palette.context);
   const close = useUiStore((s) => s.closePalette);
-  const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : page === "prompts" ? "Previous prompts" : page === "files" ? "Go to file" : "Command palette";
+  const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : page === "prompts" ? "Previous prompts" : page === "files" ? "Go to file" : page === "search" ? "Search threads" : "Command palette";
   const description =
     page === "projects"
       ? "Pick the project for a new thread"
@@ -347,7 +349,9 @@ export function CommandPalette() {
           ? "Pick a prompt you sent to put it in the composer"
           : page === "files"
             ? "Pick a file of the thread to open in its side panel"
-            : "Run a command in the current context";
+            : page === "search"
+              ? "Find threads by name and messages, and open one at the match"
+              : "Run a command in the current context";
   return (
     <Dialog
       open={open}
@@ -356,7 +360,8 @@ export function CommandPalette() {
       }}
     >
       <DialogContent
-        className="max-w-xl overflow-hidden p-0"
+        // The Find dialog is wider (about 1000px, clamped to the window) and lays out its own body.
+        className={cn("overflow-hidden p-0", page === "search" ? "w-[min(1000px,calc(100vw/var(--cf-zoom)-2rem))] max-w-none" : "max-w-xl")}
         data-region="palette"
         onCloseAutoFocus={(e) => {
           e.preventDefault();
@@ -372,6 +377,8 @@ export function CommandPalette() {
           <PromptsPicker close={close} />
         ) : page === "files" ? (
           <FileFinder threadId={runInThread} />
+        ) : page === "search" ? (
+          <SearchDialog />
         ) : (
           <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} initialContext={context} close={close} />
         )}

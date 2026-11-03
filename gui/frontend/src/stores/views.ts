@@ -20,6 +20,7 @@ import { jumpToNeighbour } from "./threadNeighbours";
 import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
 import { presentFileFinder } from "./fileFinder";
+import { presentSearch } from "./threadSearch";
 import { presentThreadFind } from "./threadFind";
 import { presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";
@@ -208,6 +209,9 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
       return presentThreadFind("next");
     case "thread.find.previous":
       return presentThreadFind("previous");
+    case "search.open":
+      // search.open: the palette's Find dialog over every thread, whatever the window shows.
+      return presentSearch();
     case "project.add":
       // project.add without a folder from the CLI or a page: the Add Project dialog, which
       // leaves the window where it is once the project is added (a page asked for it).

@@ -16,6 +16,7 @@ import { allSurfaces } from "@/stores/plugins";
 import { presentPromptHistory } from "@/stores/historyComposers";
 import { presentFileFinder } from "@/stores/fileFinder";
 import { presentThreadFind } from "@/stores/threadFind";
+import { presentSearch } from "@/stores/threadSearch";
 import { presentDictationToggle } from "@/stores/dictation";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
@@ -180,10 +181,11 @@ function terminalYields(chord: string): CommandView | undefined {
  * Commands whose chords also leave a focused text field (the settings search, which the
  * settings sheet focuses on open; a filter box): back and forward, as in Safari, and the
  * settings toggle, so cmd+, closes the sheet it just opened; and dictation, so ⌘⇧M works in
- * a side panel's PR review composer (a plain textarea). Only cmd chords that do not
- * move or delete text (a user may rebind these to cmd+arrow).
+ * a side panel's PR review composer (a plain textarea); and search.open, which works from
+ * anywhere (a thread's find bar included). Only cmd chords that do not move or delete text
+ * (a user may rebind these to cmd+arrow).
  */
-const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward", "view.settings", "dictation.toggle"]);
+const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward", "view.settings", "dictation.toggle", "search.open"]);
 
 /** A chord that moves or deletes text in a field (cmd+arrows, cmd+backspace, …). */
 function editingChord(chord: string): boolean {
@@ -364,6 +366,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "thread.find": () => presentThreadFind("open") || true,
   "thread.find.next": () => presentThreadFind("next") || true,
   "thread.find.previous": () => presentThreadFind("previous") || true,
+  // Window-local: the palette's Find dialog over every thread (stores/threadSearch.ts), from
+  // any view. The CLI's reaches every window through ShowView.
+  "search.open": () => presentSearch(),
   // Window-local: dictation into the focused composer, else the one dictating (it stops),
   // else the content pane's (stores/dictation.ts). The CLI's reaches every window through ShowView.
   "dictation.toggle": () => presentDictationToggle(),
