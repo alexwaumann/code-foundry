@@ -39,16 +39,31 @@ export function searchTerms(query: string): string[] {
  * The bar finds one plain substring, so a query of several terms hands over its longest
  * term (the first of equals): the whole query would match only where the terms happen to
  * be adjacent. One term (or one phrase) is handed over as it is, without its quotes.
+ *
+ * The bar's smart case follows the term alone, the daemon's the whole query. So when the
+ * query is case-sensitive (a capital somewhere), only a term with a capital of its own is
+ * handed over (the longest of those): a lower-case term would be searched without case in
+ * the bar and land on a match the preview did not show.
  */
 export function handoffQuery(query: string): string {
   const terms = searchTerms(query);
+  const pool = caseSensitive(query) ? terms.filter(caseSensitive) : terms;
   let best = "";
   let bestLen = 0;
-  for (const t of terms) {
+  for (const t of pool) {
     const n = codePoints(t);
     if (n > bestLen) [best, bestLen] = [t, n];
   }
   return best;
+}
+
+/**
+ * Where the find bar finds the handed-over term in a text (the bar's own rule: smart case
+ * over the term). What the preview's caption counts and its current match comes from.
+ */
+export function handoffMatches(text: string, query: string): TextRange[] {
+  const term = handoffQuery(query);
+  return term === "" ? [] : matchOffsets(text, term);
 }
 
 /** How many code points a string has (an emoji is one). */
@@ -89,9 +104,7 @@ export function queryMatches(text: string, query: string): TextRange[] {
  * match in the item). -1 when the term is not among them.
  */
 export function currentMatchIndex(text: string, matches: readonly TextRange[], query: string): number {
-  const term = handoffQuery(query);
-  if (term === "") return -1;
-  const first = (caseSensitive(query) ? exactOffsets(text, term) : matchOffsets(text, term))[0];
+  const first = handoffMatches(text, query)[0];
   if (!first) return -1;
   return matches.findIndex((m) => m.start <= first.start && m.end > first.start);
 }

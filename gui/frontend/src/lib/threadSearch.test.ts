@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SearchGroupView, SearchHitView, SearchResultView } from "@/api/threadSearch";
-import { currentMatchIndex, dayLabel, fitSnippet, firstSelectable, handoffQuery, keepSelection, messagesLabel, moveSelection, queryMatches, searchRows, searchTerms, textRuns } from "./threadSearch";
+import { currentMatchIndex, dayLabel, fitSnippet, firstSelectable, handoffMatches, handoffQuery, keepSelection, messagesLabel, moveSelection, queryMatches, searchRows, searchTerms, textRuns } from "./threadSearch";
 
 describe("searchTerms", () => {
   it.each([
@@ -23,6 +23,21 @@ describe("handoffQuery", () => {
     expect(handoffQuery("go badge fix")).toBe("badge");
     expect(handoffQuery("abc 🐛🐛")).toBe("abc");
     expect(handoffQuery("   ")).toBe("");
+  });
+  it("hands over only a term with a capital of its own when the query is case-sensitive", () => {
+    // "fingerprint" is longer, but the bar would search it without case.
+    expect(handoffQuery("HeadOid fingerprint")).toBe("HeadOid");
+    expect(handoffQuery("Go badge Fix")).toBe("Fix");
+    expect(handoffQuery("headoid fingerprint")).toBe("fingerprint");
+  });
+});
+
+describe("handoffMatches (what the find bar counts in a message)", () => {
+  it("counts only the handed-over term, with the bar's smart case over it", () => {
+    const t = "Fingerprint and fingerprint, the stale badge";
+    expect(handoffMatches(t, "stale fingerprint").map((m) => t.slice(m.start, m.end))).toEqual(["Fingerprint", "fingerprint"]);
+    expect(handoffMatches(t, "Fingerprint").map((m) => t.slice(m.start, m.end))).toEqual(["Fingerprint"]);
+    expect(handoffMatches(t, "   ")).toEqual([]);
   });
 });
 
@@ -48,6 +63,15 @@ describe("queryMatches (the preview matches the whole message again)", () => {
     // "stale" is longer: the bar takes "stale", whose first match is the second range.
     expect(currentMatchIndex(t, ms, "stale badge")).toBe(1);
     expect(currentMatchIndex(t, ms, "zzz")).toBe(-1);
+  });
+  it("a case-sensitive query lands on the capitalised term's match, the one the preview paints", () => {
+    const t = "`Fingerprint` carries HeadOid now. The fingerprint now has it.";
+    const q = "HeadOid fingerprint";
+    const ms = queryMatches(t, q);
+    // Exact over the whole query: "Fingerprint" is not a match, "fingerprint" is.
+    expect(ms.map((m) => t.slice(m.start, m.end))).toEqual(["HeadOid", "fingerprint"]);
+    expect(handoffQuery(q)).toBe("HeadOid");
+    expect(currentMatchIndex(t, ms, q)).toBe(0);
   });
 });
 

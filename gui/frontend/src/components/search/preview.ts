@@ -7,7 +7,7 @@ import type { ThreadItemView } from "@/api/thread";
 import { highlightsSupported, lineRects, paintAll, rangeOf } from "@/components/thread/cite/citeDom";
 import { findText } from "@/components/thread/find/findDom";
 import { findDoc } from "@/lib/threadFind";
-import { currentMatchIndex, handoffQuery, queryMatches } from "@/lib/threadSearch";
+import { currentMatchIndex, handoffMatches, handoffQuery, queryMatches } from "@/lib/threadSearch";
 
 /** The attribute on the preview's painted texts: "hit" (the selected message: its matches count, one is current) or "context". */
 export const DOC_ATTR = "data-search-doc";
@@ -23,17 +23,21 @@ export interface PreviewSubject {
   speaker?: "user" | "assistant" | "question";
 }
 
-/** How many matches of the query a message holds, from its data (what the timeline renders; lib/threadFind findDoc). */
+/**
+ * How many matches the thread's find bar will count in a message: the handed-over term's
+ * only (lib/threadSearch handoffMatches), over the text the timeline renders (lib/threadFind
+ * findDoc). The paint shows every term; the count is what the bar's "N of M" steps through.
+ */
 export function messageMatchCount(item: ThreadItemView, query: string): number {
   const doc = findDoc(item);
-  return doc ? queryMatches(doc.text, query).length : 0;
+  return doc ? handoffMatches(doc.text, query).length : 0;
 }
 
-/** The footer caption under a hit: "3 matches in this message · Enter keeps “term” in the thread's find bar". */
+/** The footer caption under a hit: "3 matches of “term” · opening keeps it in the thread's find bar". */
 export function previewCaption(count: number, query: string): string {
-  const n = count === 1 ? "1 match in this message" : `${String(count)} matches in this message`;
   const term = handoffQuery(query);
-  return term === "" ? n : `${n} · opening it keeps “${term}” in the thread's find bar`;
+  if (term === "") return count === 1 ? "1 match" : `${String(count)} matches`;
+  return `${count === 1 ? "1 match" : `${String(count)} matches`} of “${term}” · opening keeps it in the thread's find bar`;
 }
 
 /**

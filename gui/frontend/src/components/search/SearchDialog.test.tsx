@@ -191,13 +191,13 @@ describe("the Find dialog", () => {
     expect(hitItem).toHaveBeenLastCalledWith("s-b", "u-1", 1);
     expect(promptBefore).not.toHaveBeenCalled();
     expect(screen.getByTestId("search-preview-speaker").textContent).toBe("You");
-    expect(screen.getByTestId("search-preview-caption").textContent).toBe("1 match in this message · opening it keeps “fingerprint” in the thread's find bar");
+    expect(screen.getByTestId("search-preview-caption").textContent).toBe("1 match of “fingerprint” · opening keeps it in the thread's find bar");
     await key("ArrowDown");
     expect(selectedKey()).toBe("hit:t-4");
     expect(promptBefore).toHaveBeenCalledWith("s-b", 4);
     expect(screen.getByTestId("search-preview-prompt").textContent).toContain("Keep the fingerprint");
     expect(screen.getByTestId("search-preview-text").textContent).toContain("now has the head");
-    expect(screen.getByTestId("search-preview-caption").textContent).toMatch(/^2 matches in this message/);
+    expect(screen.getByTestId("search-preview-caption").textContent).toMatch(/^2 matches of “fingerprint”/);
     expect(screen.getByTestId("search-preview-crumb").textContent).toContain("Fix stale PR badge");
     // Wraps to the first name; Up goes back.
     await key("ArrowDown");
@@ -221,6 +221,46 @@ describe("the Find dialog", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-b" });
     // Several terms: the longest goes to the bar, which takes the first match in the message.
     expect(useThreadFindStore.getState().byThread["s-b"]).toMatchObject({ query: "fingerprint", aim: { kind: "item", itemId: "t-4" } });
+  });
+
+  it("the caption counts only the word the find bar takes over, though the paint covers every word", async () => {
+    await openWithChord();
+    await type("head fingerprint");
+    await key("ArrowDown");
+    await key("ArrowDown");
+    expect(selectedKey()).toBe("hit:t-4");
+    // "head" occurs once, "fingerprint" twice: the bar counts "fingerprint" only.
+    expect(screen.getByTestId("search-preview-caption").textContent).toBe("2 matches of “fingerprint” · opening keeps it in the thread's find bar");
+  });
+
+  it("a click while a newer query is out opens the row with the query its rows answer, and the preview keeps that query", async () => {
+    await openWithChord();
+    await type("fingerprint");
+    await key("ArrowDown");
+    expect(screen.getByTestId("search-preview-caption").textContent).toMatch(/^1 match of “fingerprint”/);
+    search.mockImplementation(() => new Promise(() => undefined));
+    await type("fingerprintzzz");
+    // The answer to "fingerprint" stays on screen; the preview does not repaint with the typed text.
+    expect(selectedKey()).toBe("hit:u-1");
+    expect(screen.getByTestId("search-preview-caption").textContent).toMatch(/^1 match of “fingerprint”/);
+    fireEvent.click(document.querySelector('[data-kind="hit"][data-item="u-1"]')?.parentElement as Element);
+    await settle(10);
+    expect(useUiStore.getState().palette.open).toBe(false);
+    expect(useThreadFindStore.getState().byThread["s-b"]).toMatchObject({ query: "fingerprint", aim: { kind: "item", itemId: "u-1" } });
+  });
+
+  it("an input method's Enter (WebKit: keyCode 229 after compositionend) opens nothing", async () => {
+    await openWithChord();
+    await type("fingerprint");
+    fireEvent.keyDown(input(), { key: "Enter", keyCode: 229 });
+    await settle(10);
+    expect(useUiStore.getState().palette.open).toBe(true);
+    // An input method's arrow keys stay with it too.
+    fireEvent.keyDown(input(), { key: "ArrowDown", keyCode: 229 });
+    expect(selectedKey()).toBe("name:s-a");
+    fireEvent.keyDown(input(), { key: "Enter" });
+    await settle(10);
+    expect(useUiStore.getState().palette.open).toBe(false);
   });
 
   it("Enter on a thread name opens the thread with its prompt focused; no find bar", async () => {

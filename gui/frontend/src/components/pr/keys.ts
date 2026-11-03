@@ -1,4 +1,5 @@
 import { useCallback, useState, type KeyboardEvent } from "react";
+import { imeKeyDown } from "@/lib/ime";
 
 /** The surface's copy-link chord (SurfaceSpec.onKey in surfaces/pullrequest.ts). */
 export const COPY_LINK_CHORD = "cmd+shift+c";
@@ -31,9 +32,6 @@ export function usePanelBoundary(): { ref: (el: HTMLElement | null) => void; bou
 export const POPUP_FIT = "max-w-[calc(var(--radix-popper-available-width)/var(--cf-zoom)-8px)]";
 export const POPUP_COLLISION_PADDING = 8;
 
-/** The keyCode of a keydown an input method processes. */
-const IME_KEY_CODE = 229;
-
 /**
  * The panel composers' keys. Escape cancels. `submit: "enter"` (the ask composer): Enter
  * (or cmd+Enter) sends and Shift+Enter is a newline. `submit: "cmd-enter"` (the review
@@ -54,7 +52,7 @@ export function composerKeyAction(
   },
   submit: "enter" | "cmd-enter" = "enter",
 ): "send" | "cancel" | null {
-  if (e.isComposing || e.keyCode === IME_KEY_CODE) return null;
+  if (imeKeyDown(e)) return null;
   if (e.key === "Escape") return "cancel";
   if (e.key !== "Enter" || e.shiftKey || e.altKey || e.ctrlKey) return null;
   if (submit === "cmd-enter" && !e.metaKey) return null;

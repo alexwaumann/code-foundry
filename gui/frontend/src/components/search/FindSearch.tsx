@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { firstSelectable, keepSelection, moveSelection, searchRows, selectable, type SearchRow } from "@/lib/threadSearch";
+import { imeKeyDown } from "@/lib/ime";
 import { activateSearchRow } from "@/stores/threadSearch";
 import { SearchList } from "./SearchList";
 import type { PreviewSubject } from "./preview";
@@ -114,7 +115,8 @@ export function FindSearch({ query: raw, header, search, loaders }: SearchModePr
   }, [answered, rows, query]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.nativeEvent.isComposing) return;
+    // Keys an input method takes (WebKit's confirming Enter has isComposing false, keyCode 229).
+    if (imeKeyDown(e.nativeEvent)) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp" || (e.ctrlKey && (e.key === "n" || e.key === "p"))) {
       e.preventDefault();
       setSelected((cur) => moveSelection(rows, cur, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
@@ -159,7 +161,8 @@ export function FindSearch({ query: raw, header, search, loaders }: SearchModePr
               selected={selected}
               onSelect={setSelected}
               onActivate={(r) => {
-                activateSearchRow(r, query);
+                // The rows answer state.answered, which lags the typed query while a newer search is out.
+                activateSearchRow(r, state.answered);
               }}
             />
           ) : (
@@ -171,7 +174,7 @@ export function FindSearch({ query: raw, header, search, loaders }: SearchModePr
             </p>
           )}
         </div>
-        {preview ? <SearchPreview subject={preview.subject} data={shownData} query={query} /> : <div className="min-w-0 flex-1" data-testid="search-preview-none" />}
+        {preview ? <SearchPreview subject={preview.subject} data={shownData} query={state.answered} /> : <div className="min-w-0 flex-1" data-testid="search-preview-none" />}
       </div>
       <Hints row={row} />
     </div>
