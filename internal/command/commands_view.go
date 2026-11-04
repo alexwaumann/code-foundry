@@ -184,6 +184,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 	cmds := []Command{
 		{
 			Name:        "view.usage",
+			AgentSafe:   true,
 			Title:       "Usage",
 			Description: "Show the Usage page in every app window: token usage and its cost per day and per model over every thread.",
 			Category:    "View",
@@ -193,6 +194,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "view.pullrequests",
+			AgentSafe:   true,
 			Title:       "Show Pull Requests",
 			Description: "Show the Pull Requests page in every app window: pull requests that need your review, your open ones with what each needs, and recent merges, in every repository.",
 			Category:    "View",
@@ -204,6 +206,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		d.settingsCommand(),
 		{
 			Name:        "view.help",
+			AgentSafe:   true,
 			Title:       "Keyboard Shortcuts and Help",
 			Description: "Show keybindings and how the app works in every app window.",
 			Category:    "View",
@@ -213,6 +216,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "view.panel.toggle",
+			AgentSafe:   true,
 			Title:       "Toggle Side Panel",
 			Description: "Show or hide a side panel (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
@@ -222,6 +226,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "view.bottom.toggle",
+			AgentSafe:   true,
 			Title:       "Toggle Bottom Panel",
 			Description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.",
 			Category:    "View",
@@ -230,6 +235,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "view.panel.expand",
+			AgentSafe:   true,
 			Title:       "Expand Side Panel",
 			Description: "Toggle a side panel between its split width and the full width of the content area (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
@@ -239,6 +245,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "view.panel.new-tab",
+			AgentSafe:   true,
 			Title:       "New Side Panel Tab",
 			Description: "Show the surface list in a side panel, to open another tab there (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
@@ -249,6 +256,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "view.panel.split",
+			AgentSafe:   true,
 			Title:       "Split Side Panel",
 			Description: "Split or unsplit a side panel into two tab groups (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
@@ -258,6 +266,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "view.back",
+			AgentSafe:   true,
 			Title:       "Back",
 			Description: "Return to the previously selected thread or page.",
 			Category:    "View",
@@ -266,6 +275,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "view.forward",
+			AgentSafe:   true,
 			Title:       "Forward",
 			Description: "Go to the thread or page selected before going back.",
 			Category:    "View",
@@ -274,6 +284,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "thread.previous",
+			AgentSafe:   true,
 			Title:       "Previous Thread",
 			Description: "Select the thread above the current one in the sidebar.",
 			Category:    "View",
@@ -282,6 +293,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 		{
 			Name:        "thread.next",
+			AgentSafe:   true,
 			Title:       "Next Thread",
 			Description: "Select the thread below the current one in the sidebar.",
 			Category:    "View",

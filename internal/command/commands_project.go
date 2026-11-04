@@ -127,6 +127,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 		},
 		Command{
 			Name:        "project.worktree.new",
+			AgentSafe:   true,
 			Title:       "New Worktree",
 			Description: "Create a worktree for a branch, creating the branch from base when it does not exist.",
 			Category:    "Project",
@@ -205,6 +206,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 		},
 		Command{
 			Name:        "project.refresh",
+			AgentSafe:   true,
 			Title:       "Refresh Project Status",
 			Description: "Re-read git status now, for one project or all of them.",
 			Category:    "Project",

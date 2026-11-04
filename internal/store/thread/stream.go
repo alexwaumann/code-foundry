@@ -708,6 +708,12 @@ func (r *runner) onAsk(req *claudestream.PermissionRequest) {
 		r.answer(req, claudestream.PermissionResult{Message: "The thread is closing.", Interrupt: true})
 		return
 	}
+	if verb := r.approvedVerb(req); verb != "" {
+		// No request item, so no attention and no alert. The tool row is the record.
+		r.answer(req, claudestream.PermissionResult{Allow: true})
+		r.log().info("approved a code-foundry verb without asking", "verb", verb, "request", req.RequestID)
+		return
+	}
 	it := st.proj.w.add(requestItem(req))
 	st.pending[req.RequestID] = req
 	st.sd.ask(req.RequestID, it)

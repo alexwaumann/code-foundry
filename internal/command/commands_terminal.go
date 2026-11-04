@@ -92,8 +92,9 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 	r.SetIDLister(TerminalID, terminalIDs(d.Terminal))
 	return r.RegisterAll(
 		Command{
-			Name:  "terminal.new",
-			Title: "New Terminal",
+			Name:      "terminal.new",
+			AgentSafe: true,
+			Title:     "New Terminal",
 			Description: "Start a shell (or argv) that belongs to the active thread, else to the active worktree, " +
 				"else to the registered worktree containing --cwd (from the CLI: the working directory). " +
 				"It starts in --cwd, else in the CLI's working directory when that chose the owner, else in the thread's or worktree's directory. " +
@@ -102,8 +103,8 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Keybindings: []string{"cmd+t"},
 			Args: []ArgSpec{
 				{Name: "cwd", Type: Path, Description: "Working directory; without a thread or worktree context, its registered worktree owns the shell"},
-				{Name: "argv", Type: String, Description: `Command line, split like a shell would (e.g. "claude --model opus")`},
-				{Name: "run", Type: String, Description: "A command line typed into the new shell once it has printed its prompt, then Return; " +
+				{Name: "argv", Type: String, AgentAsk: true, Description: `Command line, split like a shell would (e.g. "claude --model opus")`},
+				{Name: "run", Type: String, AgentAsk: true, Description: "A command line typed into the new shell once it has printed its prompt, then Return; " +
 					"the shell stays open after it. A multi-line value is pasted whole where the shell supports bracketed paste, else typed line by line"},
 				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread, worktree or --cwd, " +
 					"the registered worktree containing it owns the shell, which starts there (CLI default: the working directory)"},

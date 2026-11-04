@@ -14,6 +14,7 @@ const ViewThreadInfo = "thread-info"
 func (d ViewDeps) threadInfoCommand() Command {
 	return Command{
 		Name:        "view.thread-info",
+		AgentSafe:   true,
 		Title:       "Toggle Thread Info",
 		Description: "Show or hide the thread info card beside a thread's conversation: its checkout, branch and pull requests, git state, shells, related threads and agents, MCP servers, context and usage.",
 		Category:    "View",

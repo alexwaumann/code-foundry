@@ -43,6 +43,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 	return r.RegisterAll(
 		Command{
 			Name:      "thread.mcp",
+			AgentSafe: true,
 			NoPalette: true,
 			Title:     "Show Thread MCP Servers",
 			Description: "Print a thread's MCP servers as Claude last reported them (checked at the start of every turn): " +
@@ -96,8 +97,9 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			},
 		},
 		Command{
-			Name:  "view.panel.mcp",
-			Title: "Show MCP Servers",
+			Name:      "view.panel.mcp",
+			AgentSafe: true,
+			Title:     "Show MCP Servers",
 			Description: "Open the MCP surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the thread's MCP servers with status, errors and tools, and Reconnect.",
 			Category: "View",

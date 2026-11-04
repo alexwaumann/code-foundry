@@ -16,6 +16,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/guide"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 )
@@ -114,33 +115,22 @@ func (f *argFlag) Set(s string) error {
 // IsBoolFlag lets bool args be given as bare --force.
 func (f *argFlag) IsBoolFlag() bool { return f.spec.GetType() == v1.ArgType_ARG_TYPE_BOOL }
 
-// resolveCommand finds the command named by the longest prefix of words, joined with
-// dots. It returns the command and how many words it consumed. When no prefix names a
-// command, a prefix naming a domain with a "show" command runs that: `code-foundry
-// usage` is usage.show (command names have at least two segments).
+// resolveCommand finds the command words name (command.ResolveVerb) and how many words
+// it consumed.
 func resolveCommand(cmds []*v1.Command, words []string) (*v1.Command, int) {
-	for _, suffix := range []string{"", ".show"} {
-		for n := len(words); n > 0; n-- {
-			name := strings.Join(words[:n], ".") + suffix
-			for _, c := range cmds {
-				if c.GetName() == name {
-					return c, n
-				}
-			}
+	find := func(name string) *v1.Command {
+		i := slices.IndexFunc(cmds, func(c *v1.Command) bool { return c.GetName() == name })
+		if i < 0 {
+			return nil
 		}
+		return cmds[i]
 	}
-	return nil, 0
+	name, n := command.ResolveVerb(func(s string) bool { return find(s) != nil }, words)
+	return find(name), n
 }
 
 // leadingWords returns the positional tokens before the first flag.
-func leadingWords(args []string) []string {
-	for i, a := range args {
-		if !isWord(a) {
-			return args[:i]
-		}
-	}
-	return args
-}
+func leadingWords(args []string) []string { return command.LeadingWords(args) }
 
 // lookup connects to the daemon and resolves args to a command.
 func (cl *cli) lookup(ctx context.Context, args []string) (*v1.Command, []string, error) {

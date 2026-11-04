@@ -4,28 +4,38 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 // What every thread's claude gets for orchestration besides its conversation
 // (docs/notes/orch-child-context.md): the protocol commands pre-allowed, and its own
 // TMPDIR.
 
-// ProtocolAllowedTools are the permission rules every thread's claude gets as
-// --allowedTools: the Code Foundry verbs an orchestrated child runs as part of the
+// ProtocolVerbs are the Code Foundry verbs an orchestrated child runs as part of the
 // protocol (its report, and reading threads and projects), so a supervised thread does
 // not ask its orchestrator, an Opus turn each, before them (E3/W2 of the 2026-10-19
 // battle test). Read-only verbs and report only; anything that changes another thread
-// or a project still asks. Every spawn, whatever the mode: a live switch to supervised
-// (SetPermissionMode) keeps the process, and so its rules. Plain --allowedTools: a
-// managed settings file that allows only managed rules (allowManagedPermissionRulesOnly)
-// ignores them, and the thread asks as before.
-var ProtocolAllowedTools = []string{
-	"Bash(code-foundry thread report:*)",
-	"Bash(code-foundry thread reports:*)",
-	"Bash(code-foundry thread get:*)",
-	"Bash(code-foundry thread list:*)",
-	"Bash(code-foundry thread read:*)",
-	"Bash(code-foundry project list:*)",
+// or a project still asks. A thread in any mode runs these without asking, in two ways:
+// the rules below, and the daemon's own answer when Claude asks anyway (autoapprove.go).
+var ProtocolVerbs = []string{
+	"thread.report", "thread.reports", "thread.get", "thread.list", "thread.read", "project.list",
+}
+
+// ProtocolAllowedTools are ProtocolVerbs as the permission rules every thread's claude
+// gets as --allowedTools. Every spawn, whatever the mode: a live switch to supervised
+// (SetPermissionMode) keeps the process, and so its rules, which is why nothing wider may
+// go here: a rule outlives the mode it was given for. What auto mode adds is decided per
+// request, on the thread's mode then (approvedVerb). A managed settings file that allows
+// only managed rules (allowManagedPermissionRulesOnly) ignores these, and Claude asks;
+// the daemon's answer is what covers that case.
+var ProtocolAllowedTools = protocolRules()
+
+func protocolRules() []string {
+	out := make([]string, len(ProtocolVerbs))
+	for i, v := range ProtocolVerbs {
+		out[i] = "Bash(code-foundry " + strings.ReplaceAll(v, ".", " ") + ":*)"
+	}
+	return out
 }
 
 // allowedTools is a spawn's --allowedTools: the protocol rules, then what the

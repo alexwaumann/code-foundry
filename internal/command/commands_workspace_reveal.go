@@ -20,8 +20,9 @@ func RegisterWorkspaceReveal(r *Registry, b WorkspaceBackend, reveal RevealFunc)
 		reveal = RevealInFinder
 	}
 	return r.RegisterAll(Command{
-		Name:  "workspace.reveal",
-		Title: "Open Workspace in Finder",
+		Name:      "workspace.reveal",
+		AgentSafe: true,
+		Title:     "Open Workspace in Finder",
 		Description: "Show a workspace's folder in Finder: its root when it has one, else its own folder " +
 			"(where its CLAUDE.md, AGENTS.md and .claude/skills live).",
 		Category: "Workspace",

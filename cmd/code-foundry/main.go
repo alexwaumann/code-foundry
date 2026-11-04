@@ -11,10 +11,10 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
@@ -108,7 +108,9 @@ func connectOptions(getenv func(string) string) (client.ConnectOptions, error) {
 }
 
 // dispatch runs a local verb, or else a daemon command. A local verb followed by a bare
-// word ("daemon status") is a daemon command name, not the verb with an argument.
+// word ("daemon status") is a daemon command name, not the verb with an argument, unless
+// it takes words ("guide action", a topic; command.LocalVerbs, which says the same to
+// what the daemon approves for an agent).
 func (cl *cli) dispatch(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		fmt.Fprintln(cl.stdout, "code-foundry: open the app with `code-foundry gui`.")
@@ -124,7 +126,7 @@ func (cl *cli) dispatch(ctx context.Context, args []string) error {
 	case "--version", "-version", "-v":
 		return runVersion(ctx, cl, rest)
 	}
-	if sc, ok := localVerb(name); ok && (len(rest) == 0 || !isWord(rest[0]) || verbTakesWords[name]) {
+	if sc, ok := localVerb(name); ok && (len(rest) == 0 || !isWord(rest[0]) || command.LocalVerbs[name].TakesWords) {
 		return sc.run(ctx, cl, rest)
 	}
 	if !isWord(name) {
@@ -134,11 +136,6 @@ func (cl *cli) dispatch(ctx context.Context, args []string) error {
 	}
 	return cl.runRegistry(ctx, args)
 }
-
-// verbTakesWords are the local verbs that take a positional word ("guide action", a
-// topic). Any other local verb followed by a word goes to the registry ("daemon status"
-// is daemon.status).
-var verbTakesWords = map[string]bool{"guide": true}
 
 func localVerb(name string) (subcommand, bool) {
 	for _, c := range subcommands {
@@ -150,7 +147,7 @@ func localVerb(name string) (subcommand, bool) {
 }
 
 // isWord reports whether s is a positional token rather than a flag.
-func isWord(s string) bool { return s != "" && !strings.HasPrefix(s, "-") }
+func isWord(s string) bool { return command.IsWord(s) }
 
 // help prints general usage, a local verb's summary, or a daemon command's help.
 func (cl *cli) help(ctx context.Context, args []string) error {

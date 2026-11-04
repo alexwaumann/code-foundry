@@ -213,6 +213,7 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.label",
+		AgentSafe: true,
 		NoPalette: true,
 		Title:     "Label Thread",
 		Description: "Add or remove a thread's labels (a-z, 0-9, -, _, . and /; up to 40 characters each). " +
@@ -241,6 +242,7 @@ func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.report",
+		AgentSafe: true,
 		NoPalette: true,
 		Title:     "Report on Thread",
 		Description: "Record how a thread's task went: done, blocked, failed or progress, " +

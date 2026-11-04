@@ -226,6 +226,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		},
 		Command{
 			Name:        "settings.reveal",
+			AgentSafe:   true,
 			Title:       "Open Settings File in Finder",
 			Description: "Show the settings file in Finder.",
 			Category:    "Settings",

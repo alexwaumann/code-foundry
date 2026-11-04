@@ -3,11 +3,14 @@ package main
 import (
 	"bytes"
 	"errors"
+	"maps"
+	"slices"
 	"testing"
 
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
 // failed is an Invoke error with a CommandFailed detail, as the daemon sends a command's
@@ -60,5 +63,18 @@ func TestInvokeFailed(t *testing.T) {
 				t.Errorf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
 			}
 		})
+	}
+}
+
+// command.LocalVerbs says what the CLI takes for itself to what the daemon approves for an
+// agent, so it lists every local verb, and a new one is classified there before it ships.
+func TestLocalVerbsAreTheCLIs(t *testing.T) {
+	want := []string{"help"}
+	for _, sc := range subcommands {
+		want = append(want, sc.name)
+	}
+	slices.Sort(want)
+	if got := slices.Sorted(maps.Keys(command.LocalVerbs)); !slices.Equal(got, want) {
+		t.Errorf("command.LocalVerbs %v, want %v", got, want)
 	}
 }

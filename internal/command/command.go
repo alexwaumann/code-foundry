@@ -52,6 +52,15 @@ type Command struct {
 	// page (docs/notes/bridge-1-daemon.md). Unset, a command counts as a change, so a new
 	// verb is one until it is classified (readonly_test.go keeps the list).
 	ReadOnly bool
+	// AgentSafe marks a verb that changes something and that a thread's agent in auto mode
+	// still runs without the user being asked (agent.go): it opens, shows or moves
+	// something in the app, or does work the user already set up (action.run of an
+	// existing action, thread.send). A read-only verb needs no marker. It may not have
+	// Confirm, and it is not for a verb that defines what gets run, changes configuration,
+	// fetches or runs third-party code, reaches outside this machine, or widens what any
+	// thread may do. Unset, an agent's call asks, so a new verb asks until it is classified
+	// (agent_test.go keeps the list). A flag that widens it is ArgSpec.AgentAsk.
+	AgentSafe bool
 	// When reports whether the command is available in a context; nil means always.
 	// On Invoke it sees the caller's context with explicitly passed context-bound args
 	// overlaid (see ArgSpec.Context), so it must be a pure function of Context.
@@ -249,6 +258,17 @@ func (c *Command) validate() error {
 			return invalid("arg %q declared twice", a.Name)
 		}
 		seen[a.Name] = true
+	}
+	if c.AgentSafe && (c.Confirm != "" || c.ReadOnly) {
+		return invalid("AgentSafe with Confirm or ReadOnly")
+	}
+	for _, a := range c.Args {
+		if a.AgentAsk && (a.Positional || !c.AgentApproved()) {
+			return invalid("arg %q: AgentAsk on a positional arg, or on a verb that asks anyway", a.Name)
+		}
+		if len(a.AgentOK) > 0 && !a.AgentAsk {
+			return invalid("arg %q: AgentOK without AgentAsk", a.Name)
+		}
 	}
 	if slices.Contains(c.Keybindings, "") {
 		return invalid("empty keybinding")

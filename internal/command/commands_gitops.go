@@ -150,6 +150,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:           "git.fetch",
+			AgentSafe:      true,
 			Title:          "Git: Fetch",
 			Description:    "Fetch from the remote and prune deleted branches (git fetch --prune).",
 			Category:       "Git",
@@ -213,6 +214,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		},
 		Command{
 			Name:           "pr.open",
+			AgentSafe:      true,
 			Title:          "Open Pull Request in Browser",
 			Description:    "Open the current branch's pull request on GitHub.",
 			Category:       "Pull Request",
@@ -262,6 +264,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		},
 		Command{
 			Name:        "worktree.reveal",
+			AgentSafe:   true,
 			Title:       "Open Worktree in Finder",
 			Description: "Show the worktree folder, or one file of it, in Finder.",
 			Category:    "Worktree",

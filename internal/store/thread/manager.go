@@ -47,6 +47,11 @@ type Options struct {
 	Workspaces WorkspaceSource
 	Bus        *bus.Bus     // default: a private bus
 	Log        *slog.Logger // default: slog.Default()
+	// ApprovedVerb, when set, returns the Code Foundry verb a Bash command line runs when
+	// an agent may run it without asking, else "" (command.Registry.ApprovedVerb; this
+	// package cannot import the registry). Nil: every request goes to the user. It must
+	// not block: it runs on a thread's loop.
+	ApprovedVerb func(line string) string
 	// Claude is the claude executable (resolved against PATH). Default "claude".
 	Claude string
 	// Paths locates Claude's config dir and global config. Default

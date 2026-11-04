@@ -137,7 +137,7 @@ type stores struct {
 // runs get the loopback endpoint and a scoped token of caps instead of threadEnv
 // (internal/capability).
 func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string, endpoint string, caps *capability.Registry,
-	pres *presence.Tracker) (_ *stores, err error) {
+	pres *presence.Tracker, approvedVerb func(line string) string) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
 		if err != nil {
@@ -304,6 +304,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// An open thread view counts as the user seeing the thread only while a GUI
 		// window is visible and key (docs/notes/alerts-foreground.md).
 		Attended: func() bool { return pres.Current().Attended },
+		// What a thread's agent runs without the user being asked (autoapprove.go).
+		ApprovedVerb: approvedVerb,
 	}); err != nil {
 		return nil, err
 	}

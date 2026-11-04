@@ -167,7 +167,11 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	clients := api.NewClients(pres)
 	// Scoped tokens (agent search's runs) the loopback listener accepts beside token.
 	caps := capability.NewRegistry(nil)
-	st, err := openStores(ctx, log, p, threadEnv(port, token), loopbackURL(port), caps, pres)
+	// Made before the stores: a thread asks it whether a command needs the user. It has no
+	// verbs until all.Register below, so until then every request goes to the user.
+	commands := command.NewRegistry()
+	approvedVerb := func(line string) string { return commands.ApprovedVerb(line, os.Getenv(paths.EnvBin)) }
+	st, err := openStores(ctx, log, p, threadEnv(port, token), loopbackURL(port), caps, pres, approvedVerb)
 	if err != nil {
 		return err
 	}
@@ -211,7 +215,6 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	// and its contrast reports on the user's themes (theme save, theme check).
 	liveTheme, themeReports := theme.NewLive(), theme.NewReports()
 	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithPagesOrigin(pagesOrigin(pagesPort))
-	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
 	// Plugins start once every command is registered (below), so a starting plugin's
 	// host/invoke finds them; they stop before the stores close (defers run in reverse),

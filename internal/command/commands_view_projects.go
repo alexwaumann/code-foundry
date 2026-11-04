@@ -26,8 +26,9 @@ const (
 // (the thread header's crumb opens its place this way; docs/notes/thread-crumb-links.md).
 func (d ViewDeps) projectsCommand() Command {
 	return Command{
-		Name:  "view.projects",
-		Title: "Show Projects",
+		Name:      "view.projects",
+		AgentSafe: true,
+		Title:     "Show Projects",
 		Description: "Show the Projects page in every app window: each project's worktrees and each workspace's members, with their git state and actions; " +
 			"--project or --workspace opens that one's page.",
 		Category:    "View",

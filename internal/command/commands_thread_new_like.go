@@ -17,6 +17,7 @@ import (
 func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 	return Command{
 		Name:         "thread.new-like",
+		AgentSafe:    true,
 		Title:        "New thread on this branch",
 		Description:  "Start a new thread with this thread's projects, branch, primary, workspace and mode (thread new --like).",
 		Category:     "Thread",
@@ -26,7 +27,7 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 			{Name: "project", Type: String, Description: "Where it runs: one of its projects, or workspace (default: the thread's own)"},
 			{Name: "model", Type: Enum, Enum: ThreadModels, Description: "As thread new's"},
 			{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "As thread new's"},
-			{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto", Description: "As thread new's"},
+			{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto", AgentAsk: true, AgentOK: agentThreadPermissions, Description: "As thread new's"},
 			{Name: "prompt", Type: String, FileOrStdin: true, Description: "The first message (@file, -: stdin)"},
 			{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
 			{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},

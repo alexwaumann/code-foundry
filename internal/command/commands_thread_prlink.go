@@ -19,6 +19,7 @@ type PullRequestLinkBackend interface {
 func threadPRLink(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:        "thread.pr.link",
+		AgentSafe:   true,
 		NoPalette:   true,
 		Title:       "Link Pull Request to Thread",
 		Description: "Link a GitHub pull request to a thread by hand, like Claude's links (never removed).",

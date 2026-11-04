@@ -30,6 +30,7 @@ func (d ViewDeps) threadFindCommands() []Command {
 	cmd := func(name, view, title, desc, chord string) Command {
 		return Command{
 			Name:        name,
+			AgentSafe:   true,
 			Title:       title,
 			Description: desc,
 			Category:    "View",

@@ -250,6 +250,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:      "action.run",
+			AgentSafe: true,
 			NoPalette: true,
 			Title:     "Run Action",
 			Description: "Run an action for the active thread (an action of any of its projects, in its checkout of that project; " +
@@ -328,6 +329,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:      "action.stop",
+			AgentSafe: true,
 			NoPalette: true,
 			Title:     "Stop Action Run",
 			Description: "Stop a running action run: a background run gets SIGTERM, then SIGKILL after a few seconds; a terminal run's " +

@@ -61,6 +61,7 @@ func agentViewCommands(b AgentsBackend, e Emitter) []Command {
 	return []Command{
 		{
 			Name:      "thread.agent.open",
+			AgentSafe: true,
 			NoPalette: true,
 			Title:     "Open Subagent",
 			Description: "Show one of a thread's subagent runs read-only in the GUI, under the thread (prompt, work log, report). " +
@@ -91,6 +92,7 @@ func agentViewCommands(b AgentsBackend, e Emitter) []Command {
 		},
 		{
 			Name:        "thread.agent.up",
+			AgentSafe:   true,
 			Title:       "Back to Parent Thread",
 			Description: "Leave the subagent view for the thread that ran the subagent.",
 			Category:    "Thread",

@@ -74,6 +74,13 @@ type ArgSpec struct {
 	// Positional args also take bare words on the CLI, in declaration order:
 	// `code-foundry settings set <key> <value>`.
 	Positional bool
+	// AgentAsk makes an agent's call that gives this flag ask, on a verb that otherwise
+	// runs without asking (Command.AgentSafe): the flag widens the verb (terminal.new
+	// --argv runs what it is given). The check reads the command line for the flag, so an
+	// AgentAsk arg may not be Positional.
+	AgentAsk bool
+	// AgentOK are the values of an AgentAsk flag that still run without asking.
+	AgentOK []string
 	// DefaultToCwd makes the CLI send its working directory when the flag is not
 	// given (Path args only). A Claude session runs the CLI from its worktree, so
 	// `code-foundry thread checkouts` finds the thread from its checkout.

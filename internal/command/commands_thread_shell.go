@@ -22,6 +22,7 @@ type ShellBackend interface {
 func threadShellStopCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.shell.stop",
+		AgentSafe: true,
 		NoPalette: true,
 		Title:     "Stop Background Shell",
 		Description: "Stop one of a thread's own background shells (a Bash call run in the background, a Monitor): its process " +

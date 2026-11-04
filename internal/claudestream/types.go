@@ -613,6 +613,19 @@ type PermissionRequest struct {
 	AgentID        string          `json:"agent_id,omitempty"`
 	BlockedPath    string          `json:"blocked_path,omitempty"`
 	DecisionReason string          `json:"decision_reason,omitempty"`
+	// DecisionReasonType says why Claude asks: "other" for a call nothing decided (the
+	// reason "This command requires approval"), "rule" for an ask rule,
+	// "subcommandResults", "safetyCheck", "hook", ... (Claude Code 2.1.316).
+	DecisionReasonType string `json:"decision_reason_type,omitempty"`
+	// DecisionReasonCode is a closed-set reason for a host to act on (org_ask_ceiling).
+	DecisionReasonCode string `json:"decision_reason_code,omitempty"`
+	// MatchedAskRule is the ask rule behind the request, if any. ServerPolicyAskOnly is
+	// true when a server policy allows only asking. ClassifierApprovable false: a person
+	// has to decide this, no automatic check may. Raw, as a frame that cannot be parsed
+	// would lose the request: read them with AskedOnPurpose.
+	MatchedAskRule       json.RawMessage `json:"matched_ask_rule,omitempty"`
+	ServerPolicyAskOnly  json.RawMessage `json:"server_policy_ask_only,omitempty"`
+	ClassifierApprovable json.RawMessage `json:"classifier_approvable,omitempty"`
 	// RequiresUserInteraction: the tool's card is the interaction surface (true for
 	// AskUserQuestion): offer no one-tap approve.
 	RequiresUserInteraction bool `json:"requires_user_interaction,omitempty"`
@@ -634,6 +647,23 @@ func (r *PermissionRequest) Answer(res PermissionResult) error {
 		return errors.New("claudestream: request did not come from a Conn")
 	}
 	return r.conn.answer(r, res)
+}
+
+// AskedOnPurpose reports whether something decided that a person should answer this
+// request, rather than nothing having decided it: an ask rule, a policy, a safety check,
+// a hook or the classifier. Only "other" (and no reason at all) means nothing did. A type
+// or code this version does not know counts as decided.
+func (r *PermissionRequest) AskedOnPurpose() bool {
+	if r.DecisionReasonType != "" && r.DecisionReasonType != "other" {
+		return true
+	}
+	return r.DecisionReasonCode != "" || r.RequiresUserInteraction || r.BlockedPath != "" ||
+		rawSet(r.MatchedAskRule) || rawSet(r.ServerPolicyAskOnly) || string(r.ClassifierApprovable) == "false"
+}
+
+// rawSet: an optional field holds a value other than false or null.
+func rawSet(v json.RawMessage) bool {
+	return len(v) > 0 && string(v) != "false" && string(v) != "null"
 }
 
 // IsQuestion reports whether this is an AskUserQuestion request.

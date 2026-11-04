@@ -29,6 +29,11 @@ const threadModelHelp = "Model: a claude-* id with the 1M context suffix; quote 
 // (bypassPermissions) is deliberately not offered.
 var ThreadPermissions = []string{"supervised", "accept-edits", "auto"}
 
+// agentThreadPermissions are the modes an agent starts a thread in without the user being
+// asked (ArgSpec.AgentOK): the two no broader than the auto mode it runs in. Accept edits
+// is not one: it runs edits and file commands without the classifier auto has.
+var agentThreadPermissions = []string{"supervised", "auto"}
+
 // supervisedHelp says what supervised does: Claude's manual mode, which asks before
 // edits and commands but runs reads, searches and read-only commands unasked, and the
 // protocol verbs every thread has pre-allowed (thread.ProtocolAllowedTools).
@@ -142,8 +147,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	return r.RegisterAll(
 		Command{
-			Name:  "thread.new",
-			Title: "New Thread",
+			Name:      "thread.new",
+			AgentSafe: true,
+			Title:     "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active project's main worktree, else where the thread this runs in runs), or in a new worktree. " +
 				"Inside a thread it copies that thread's projects, branch and mode. " +
 				"With no-project it belongs to no project and runs in your home directory.",
@@ -158,7 +164,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "new-branch", Type: Bool, Description: "With like, or in a thread: a new branch, new worktrees"},
 				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
-				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
+				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto", AgentAsk: true, AgentOK: agentThreadPermissions,
 					Description: supervisedHelp + ", accept-edits (edits allowed) or auto"},
 				{Name: "new-worktree", Type: Bool, Description: "New worktrees on a new branch (named from the prompt by projects.branch_naming, e.g. feat/add-filter, else cf/<thread id>); =false: each project's own checkout"},
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless the local one is ahead or base-from-origin is no); needs new-worktree; ignored when branch exists"},
@@ -168,7 +174,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "prompt", Type: String, FileOrStdin: true, Description: "The first message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 				{Name: "composer-prompt", Type: String, Description: "The GUI's text of prompt with its tag tokens, for display (the GUI sets it)"},
-				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (no placement or worktree flags with it)"},
+				{Name: "no-project", Type: Bool, AgentAsk: true, Description: "Start the thread without a project, in your home directory (no placement or worktree flags with it)"},
 				{Name: "created-by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
 					Description: "Id of the thread whose agent creates this one, noted at the top of the new thread (default: the thread this command runs in, $CODE_FOUNDRY_THREAD; pass an empty value to opt out)"},
 				{Name: "brief", Type: String, Description: "What the thread is for, in at most 500 characters (shown with the creator's note)"},
@@ -278,6 +284,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		threadNewLike(r, b, e),
 		Command{
 			Name:         "thread.focus",
+			AgentSafe:    true,
 			NoPalette:    true,
 			Title:        "Focus Thread",
 			Description:  "Show a thread in every connected window.",
@@ -294,6 +301,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "thread.rename",
+			AgentSafe:   true,
 			Title:       "Rename Thread",
 			Description: "Set the thread's name. Turns off automatic naming.",
 			Category:    "Thread",
@@ -310,6 +318,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "thread.regenerate-name",
+			AgentSafe:   true,
 			Title:       "Regenerate Thread Name",
 			Description: "Name the thread again from its most recent turns.",
 			Category:    "Thread",
@@ -325,6 +334,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "thread.fork",
+			AgentSafe:   true,
 			Title:       "Fork Thread",
 			Description: "Start a new thread that continues this thread's conversation.",
 			Category:    "Thread",

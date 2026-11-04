@@ -39,6 +39,7 @@ func (r ComposerStageResult) message() string {
 func (d ViewDeps) composerStageCommand() Command {
 	return Command{
 		Name:      "composer.stage",
+		AgentSafe: true,
 		NoPalette: true,
 		Title:     "Put Text in Composer",
 		Description: "Put text in a thread's composer without sending it, in every app window that shows the thread, and focus its prompt: " +

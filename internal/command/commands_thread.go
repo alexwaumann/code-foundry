@@ -121,6 +121,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 	return r.RegisterAll(
 		Command{
 			Name:      "thread.send",
+			AgentSafe: true,
 			NoPalette: true,
 			Title:     "Send to Thread",
 			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
@@ -251,6 +252,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		},
 		Command{
 			Name:        "thread.interrupt",
+			AgentSafe:   true,
 			Title:       "Interrupt Thread",
 			Description: "Stop a thread's running turn. Pending requests are withdrawn.",
 			Category:    "Thread",
