@@ -153,14 +153,14 @@ describe("dictation.hold", () => {
 });
 
 describe("the composer target", () => {
-  const reports = () => fakeDictation.calls.filter((c) => c.startsWith("composer"));
+  const reports = () => fakeDictation.composerReports;
 
   it("tells the daemon when a composer comes and goes", async () => {
     await hold();
     const c = composer("c1");
-    expect(reports()).toEqual(["composer true"]);
+    expect(reports()).toEqual([true]);
     c.unregister();
-    expect(reports()).toEqual(["composer true", "composer false"]);
+    expect(reports()).toEqual([true, false]);
   });
 
   it("says nothing while dictation is off", async () => {
@@ -183,7 +183,7 @@ describe("the composer target", () => {
     await vi.waitFor(() => {
       expect(useDictationStore.getState().snapshot).toBe(fresh);
     });
-    expect(reports()).toEqual(["composer true"]);
+    expect(reports()).toEqual([true]);
   });
 
   it("a composer that is not the content pane's counts while it has the keyboard", async () => {
@@ -192,11 +192,11 @@ describe("the composer target", () => {
     expect(reports()).toEqual([]);
     side.input.focus();
     await vi.waitFor(() => {
-      expect(reports()).toEqual(["composer true"]);
+      expect(reports()).toEqual([true]);
     });
     side.input.blur();
     await vi.waitFor(() => {
-      expect(reports()).toEqual(["composer true", "composer false"]);
+      expect(reports()).toEqual([true, false]);
     });
   });
 });

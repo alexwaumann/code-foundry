@@ -105,10 +105,13 @@ function end(reason: DictationEndView = "stopped", sessionId = lastSession()): v
 }
 
 const calls: string[] = [];
+const composerReports: boolean[] = [];
 
 export interface FakeDictation {
-  /** "start <client>", "stop <session> <flush>", "composer <available>", in order. */
+  /** "start <client>", "stop <session> <flush>", in order. */
   readonly calls: readonly string[];
+  /** What the store reported with reportComposerTarget, in order. */
+  readonly composerReports: readonly boolean[];
   /** Sends a snapshot to every open Watch; one opened later starts with it. */
   publish(s: DictationView): void;
   /** The phrase Stop with flush sends before the session ends. */
@@ -124,6 +127,7 @@ export interface FakeDictation {
 
 export const fakeDictation: FakeDictation = {
   calls,
+  composerReports,
   publish(s) {
     latest = s;
     for (const w of watchers) w.push(s);
@@ -156,6 +160,7 @@ export const fakeDictation: FakeDictation = {
     flushPhrase = "";
     startGate = null;
     calls.length = 0;
+    composerReports.length = 0;
   },
 };
 
@@ -179,7 +184,7 @@ export const fakeDictationApi = {
   },
 
   reportComposerTarget(available: boolean): Promise<void> {
-    calls.push(`composer ${String(available)}`);
+    composerReports.push(available);
     return Promise.resolve();
   },
 
