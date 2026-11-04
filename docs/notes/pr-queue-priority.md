@@ -3,7 +3,8 @@
 Status: PR 3 of 3 on "PRs load really slow", reported by a user. The store's worker ran a poll
 as one job, so a click waited for all of it. Now the poll stops before each of its requests and
 lets waiting jobs in. Measured on real GitHub (read only) with a scratch `daemon --dev` and curl
-over the socket. Daemon only; the GUI side is cf/pr-open-instant.
+over the socket. Daemon only; the GUI side shipped in #518, which also started the cancellation
+this PR builds on.
 
 ## What changed
 
@@ -16,9 +17,8 @@ over the socket. Daemon only; the GUI side is cf/pr-open-instant.
 * **Pauses hold for every request.** `admit` refuses while a pause is in force, with the pause's
   error and without sending. This covers the poll's later stages, jobs queued before the pause,
   and the auth check (`next` now waits it out too).
-* **A caller that leaves takes its job with it.** `submit` removes its waiter on cancel. With no
-  waiter left the job is dropped, unless it was promised to a client (`keep`, set by
-  `submitBackground`), which puts it back behind the waited jobs. A job already running finishes.
+* **A caller that leaves takes its read with it**, through #518's `abandon` and `job.read`: see
+  "Item 3" below. A job already running finishes.
 * **The queue-wait log line stays.** The debug `gh poll` line gained `yields=` and `yield_dur=`;
   its `dur` includes them, and a yielded job's requests do not count in the poll's numbers.
 
@@ -49,6 +49,31 @@ Do not add a yield anywhere else, and do not make a request between a fingerprin
 pass. Only jobs someone waits for go in: background jobs wait for the poll to end, and a queued
 poll does too, so polls never nest.
 
+## Item 3: what #518 did, what this adds, what remains
+
+#518 landed mid-way through this PR with `abandon` and `job.read`, so this PR dropped its own
+cancellation path and builds on that one. There is one path.
+
+* **From #518:** the detail and diff reads opt in through `submitRead`; a read with no waiter left
+  leaves the queue; another live waiter keeps it; writes still run; a refresh joining a queued read
+  clears `read`, so it runs whoever gives up.
+* **Added here:**
+  * Every other read opts in too: `PullRequest`, `Checks`, `PullRequestFile`, `ReviewerCandidates`,
+    `SearchRepositories`, `LookupRepository`, `PublishOwners`, and the poll `Refresh(slug)` waits
+    for. One table test walks away from each.
+  * A job `abandon` keeps has nobody waiting, so it now goes back behind the waited jobs. Without
+    this, a promoted refresh or a left write would hold its place and run in a yield, ahead of the
+    poll, for nobody.
+  * A refresh joining a read hands over its `run`, not only `read = false`. Otherwise it ran with
+    the read's closure and said nothing when nothing changed, leaving the client on `refreshing`.
+  * `submit` refuses a context that is already dead, so a write nobody asked for any more is not
+    queued. `abandon` also ignores a later job of the same key that `ch` never joined.
+* **Remains, on purpose:** a queued write whose caller left still runs. The brief said "a queued
+  job", and this PR first dropped writes too, then took #518's rule instead. The caller is told
+  `context canceled` while the write may still land, as it always was. Dropping one is safe (it was
+  never sent) and takes one line in `abandon`, but it changes what cancelling a merge means, so it
+  is a product call and not one to slip in here.
+
 ## Decisions
 
 * **Worst case for a click:** the rest of the request in flight, then the short gap, then the
@@ -72,27 +97,24 @@ poll does too, so polls never nest.
   R x 9 requests under any stream. A burst of 50 pays one poll request per 8 jobs.
 * **A background job can still wait behind a steady stream of waited jobs.** That is #513's rule,
   kept: a person stops clicking.
-* **The pause gate goes beyond the pollProjects check on PR #514, deliberately.** A job in a yield
-  can set a pause mid-poll, so the poll's later requests needed it whatever #514 does. The two fit:
-  #514's check returns first and leaves the lists as they were; the gate is what catches anything
-  else. Without #514 a refused projects request records the pause as the lists' `LastError`.
+* **The pause gate goes beyond #514's pollProjects check, deliberately.** A job in a yield can set
+  a pause mid-poll, so the poll's later requests needed it whatever #514 does. The two fit: #514's
+  check returns first and leaves the lists as they were, and the gate catches everything else,
+  including a pause set by a job that ran in the yield just before the projects request.
 * **A poll's own low-budget or rate-limit answer now stops its later stages too.** Before, details,
   failing checks and stats went out after it. They end as a failed request does: the poll publishes
   what it has with the error, and the next poll asks again.
 * **`notSent`.** A pause's error can wrap `ErrNetwork`, which `outcomeUnknown` reads as "the write
   may have run". A merge refused by the gate would have said "it may have merged" and been
   remembered, so a refused request says it never left.
-* **A background job joining a queued read passes on its `run` and `keep`.** Otherwise a refresh
-  promised to a client would die with the read's caller. It also fixes a gap from #513: a refresh
-  that joined a waited read did not announce an unchanged result, so `refreshing` had no end.
 * **`submit` after Run ended fails** (`s.stopped`) instead of hanging on a context that may never
   end. Run also checks its context at the top of the loop: a refused request sets no `lastEnd`, so
   a poll left due would spin there.
 
 ## Measured (2026-11-03, this machine, one account, alexwaumann/code-foundry #500-#510)
 
-`origin/main` at 0484add4c against this branch, three fresh scratch homes each, alternating, with
-one repository tracked. Every read is uncached. Seconds, median (max). `queue` and `fetch` are from
+`main` at 0484add4c against this branch before its rebase, three fresh scratch homes each,
+alternating, with one repository tracked. Every read is uncached. Seconds, median (max). `queue` and `fetch` are from
 the #513 log line.
 
 | Uncached open | n | Total before | Total after | queue before | queue after |
@@ -108,17 +130,20 @@ the #513 log line.
   falls inside `fetch` (`admit`) and not in `queue_wait`. Back to back it is 0.60 s, unchanged,
   with the gap in `queue_wait`.
 * The poll itself does not get slower by more than the click. Stats polls took 15.6-18.4 s before
-  and 17.0-17.7 s after, each with one yield. Request counts differ with what GitHub moved.
+  and 16.9-17.7 s after, each with one yield. Request counts differ with what GitHub moved.
 * The steady poll's click lands 0.3 s after asking for the poll.
-* These binaries predate the `notSent` commit, which changes no timing.
+* One more run on the final tree, after the rebase onto #514 and #518, agrees: 1.76 s during the
+  first poll, 2.73 s during the stats poll, 1.96-2.57 s during steady polls, 0.70-1.00 s back to
+  back, with `queue_wait` 1.05-1.84 s during polls and 0.22 s back to back.
 
 ## Verified, and not
 
 * Real daemon: the table above, reads only. Every request was a poll or `GetPullRequestDetail`.
-* Fake GitHub, under `-race`, repeated 5 times: a click at each of the 7 request kinds, a click in
-  the gap, bursts of 50 (distinct and identical), a stream before and during a poll, shutdown with
-  a job queued and during a yield, a caller leaving queued and running, publish against a click's
+* Fake GitHub, under `-race`: a click at each of the 7 request kinds, a click in the gap, bursts of
+  50 (distinct and identical), a stream before and during a poll, shutdown with a job queued and
+  during a yield, a caller leaving queued and running, every read path, publish against a click's
   fetch and a write, pauses from a job and from each poll stage, and a load test of all of these.
+  The yield tests ran 5 times over before the rebase.
 * Each rule was also broken on purpose, and a test failed for each.
 * Not run: the built Wails GUI, a real rate limit, a real network pause, or a long-lived session
   with many tracked repositories. The worst case for a click (a 10-pull-request detail batch in
@@ -135,4 +160,5 @@ the #513 log line.
 ## Tests
 
 `yield_test.go`: all of the above, plus the gap table (`TestAdmitGap`), `TestGapAllowance`,
-`TestRefusedWriteHasAKnownOutcome`, `TestRunEndsWithAPollDue`, and the poll's log line.
+`TestEveryReadLeavesWithItsCaller`, `TestRefusedWriteHasAKnownOutcome`, `TestRunEndsWithAPollDue`,
+and the poll's log line.
