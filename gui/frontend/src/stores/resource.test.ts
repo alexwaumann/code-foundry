@@ -49,6 +49,50 @@ describe("createResource", () => {
     expect(signals[2]?.aborted).toBe(false);
   });
 
+  it("readOnce holds its read past abortOnRelease until it ends, joins one in flight, and sends none beside a watch", async () => {
+    const signals: AbortSignal[] = [];
+    const reads = [deferred<string>(), deferred<string>()];
+    const r = createResource(
+      (_key, signal) => {
+        const d = reads[signals.length] ?? deferred<string>();
+        signals.push(signal);
+        return d.promise;
+      },
+      { abortOnRelease: true },
+    );
+    let ended = false;
+    void r.readOnce("a").then(() => {
+      ended = true;
+    });
+    expect(r.watched()).toEqual(["a"]);
+    await flush();
+    expect(ended).toBe(false);
+    expect(signals[0]?.aborted).toBe(false);
+    // A watcher joining and leaving while it runs leaves it running.
+    r.watch("a")();
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
+    reads[0]?.resolve("x");
+    await flush();
+    expect(ended).toBe(true);
+    expect(r.watched()).toEqual([]);
+    expect(r.store.getState().entries.a?.data).toBe("x");
+
+    // A failed read ends it too, and is the entry's error, not a rejection.
+    const once = r.readOnce("a");
+    reads[1]?.reject(new Error("down"));
+    await once;
+    expect(r.store.getState().entries.a?.error).toBe("down");
+
+    // Watched and idle: nothing to wait for, nothing sent.
+    const release = r.watch("b");
+    await flush();
+    const sent = signals.length;
+    await Promise.race([r.readOnce("b"), flush()]);
+    expect(signals).toHaveLength(sent);
+    release();
+  });
+
   it("fetches watched keys only, once per invalidation, keeping data on error", async () => {
     const calls: string[] = [];
     let fail = false;

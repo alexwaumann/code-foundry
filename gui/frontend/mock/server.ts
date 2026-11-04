@@ -163,6 +163,7 @@
  *        also pr.ask, pr.explain, pr.fix.findings, pr.task (the fork refusal), pr.merge
  *        as a moved head, and pr.review as unconfirmed)
  *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.task, pr.merge, pr.review take 800ms)
+ *   POST /__mock/gh/pr-detail-delay?ms=1500  (GetPullRequestDetail takes 1500ms, as with nothing cached; 0: at once)
  *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
  *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,
  *        #138 merged, #131 closed, #140 read-only, #142 mergeable, #146 from a fork, #147 open
@@ -480,7 +481,7 @@ function routes(router: ConnectRouter): void {
       return world.gh.getBranchPullRequests(req.repoSlug.toLowerCase(), req.headRef);
     },
     refresh: () => ({}),
-    getPullRequestDetail: (req) => prDetailCall(() => ({ detail: world.gh.prDetails.get(req.repoSlug, req.number, req.refresh) })),
+    getPullRequestDetail: (req) => world.gh.prDetails.delayed(() => prDetailCall(() => ({ detail: world.gh.prDetails.get(req.repoSlug, req.number, req.refresh) }))),
     listReviewerCandidates: (req) => prDetailCall(() => world.gh.prDetails.listCandidates(req.repoSlug, req.number, req.query)),
     setReviewRequest: (req) =>
       prDetailCall(() => ({ requested: world.gh.prDetails.setReviewRequest(req.repoSlug, req.number, req.login, req.kind, req.requested) })),
@@ -1623,6 +1624,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/gh/pr-delay":
       world.gh.prDetails.threadDelayMs = Number(q.get("ms") ?? "0");
       json(res, 200, { delayMs: world.gh.prDetails.threadDelayMs });
+      break;
+    case "POST /__mock/gh/pr-detail-delay":
+      world.gh.prDetails.readDelayMs = Number(q.get("ms") ?? "0");
+      json(res, 200, { delayMs: world.gh.prDetails.readDelayMs });
       break;
     case "POST /__mock/gh/pr-comment": {
       // A poll saw a new comment on a pull request with a detail: pull_request_detail_updated.

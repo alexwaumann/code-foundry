@@ -1,4 +1,5 @@
 import { ArrowLeft, ExternalLink, FileDiff, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from "lucide-react";
+import type { ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
@@ -7,12 +8,13 @@ import { openUrl } from "@/stores/gh";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { headerAges, stateBadge } from "./model";
-import { PrMenu } from "./PrMenu";
 import { toneBadge, toneText } from "./tones";
 
 const stateIcon: Record<string, typeof GitPullRequest> = { Open: GitPullRequest, Draft: GitPullRequestDraft, Merged: GitMerge, Closed: GitPullRequestClosed };
 
-function StatePill({ d }: { d: PullRequestDetailView }) {
+type HeaderDetail = Pick<PullRequestDetailView, "pullRequest" | "closedAtMs">;
+
+function StatePill({ d }: { d: HeaderDetail }) {
   const b = stateBadge(d.pullRequest);
   const Icon = stateIcon[b.label] ?? GitPullRequest;
   return (
@@ -25,10 +27,10 @@ function StatePill({ d }: { d: PullRequestDetailView }) {
 
 /**
  * The surface's header. Row one: the state pill, the repository and number (tinted by
- * state), then Open on GitHub and the ⋯ menu. Then the title, the author with the ages,
- * and base ← head with the diffstat at the right.
+ * state), then Open on GitHub and `menu` (the ⋯ menu). Then the title, the author with the
+ * ages, and base ← head with the diffstat at the right. All of it a dashboard row can fill.
  */
-export function PrHeader({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; onAsk: () => void }) {
+export function PrHeader({ d, prRef, menu }: { d: HeaderDetail; prRef: PrRef; menu: ReactNode }) {
   const pr = d.pullRequest;
   const now = useNow(30_000);
   const b = stateBadge(pr);
@@ -54,7 +56,7 @@ export function PrHeader({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailVi
               <ExternalLink className="size-4" aria-hidden />
             </button>
           </Tip>
-          <PrMenu prRef={prRef} detail={d} panelKey={panelKey} onAsk={onAsk} />
+          {menu}
         </span>
       </div>
       <h2 className="min-w-0 text-heading break-words select-text" data-testid="pr-title">

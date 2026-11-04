@@ -22,7 +22,8 @@ import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
 import { useWidth } from "@/lib/useWidth";
 import { cn } from "@/lib/utils";
-import { openUrl } from "@/stores/gh";
+import { openUrl, pullRequestKey } from "@/stores/gh";
+import { usePrPrefetch } from "@/stores/prPrefetch";
 import type { AuthoredRow, AuthoredStatus, AuthoredStatusKind } from "./authoredStatus";
 import { COLUMNS, gridTemplate, RIGHT, visibleColumns, type Column } from "./columns";
 import { prKey, repoName } from "./format";
@@ -134,11 +135,13 @@ type Cells = Partial<Record<Column, ReactNode>>;
 function Row({ section, pr, className, cells }: { section: Section; pr: PullRequestView; className?: string; cells: Cells }) {
   const shown = useContext(ShownColumns);
   const cols = shown?.cols ?? COLUMNS[section];
+  const warm = usePrPrefetch(pullRequestKey(pr.repoSlug, pr.number));
   return (
     <NavRow
       navKey={prKey(section, pr)}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
+      {...warm}
       className={cn("h-full rounded-md px-2 text-body", className)}
     >
       <div className="grid h-full items-center gap-3" style={{ gridTemplateColumns: shown?.template ?? gridTemplate(cols) }}>

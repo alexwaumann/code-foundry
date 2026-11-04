@@ -8,8 +8,9 @@ import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { DASHBOARD_KEY, dashboardResource, openUrl, useFreshness, useProjectsFreshness } from "@/stores/gh";
+import { DASHBOARD_KEY, dashboardResource, openUrl, pullRequestKey, useFreshness, useProjectsFreshness } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
+import { armPrefetch, disarmPrefetch } from "@/stores/prPrefetch";
 import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
 import { ActivityCharts } from "./ActivityCharts";
@@ -73,6 +74,21 @@ function Body({ d }: { d: DashboardView }) {
     [m, shown],
   );
   const nav = useNav(items);
+  // The keyboard's cursor warms its row as the pointer does (stores/prPrefetch.ts).
+  const cursorPr = useMemo(() => {
+    for (const s of shown) {
+      const row = sectionPrs(m, s).find(({ pr }) => prKey(s, pr) === nav.cursorKey);
+      if (row) return pullRequestKey(row.pr.repoSlug, row.pr.number);
+    }
+    return null;
+  }, [m, shown, nav.cursorKey]);
+  useEffect(() => {
+    if (cursorPr === null) return;
+    armPrefetch(cursorPr);
+    return () => {
+      disarmPrefetch(cursorPr);
+    };
+  }, [cursorPr]);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     rootRef.current?.focus({ preventScroll: true });

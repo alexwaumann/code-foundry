@@ -188,7 +188,9 @@ type job struct {
 	// background: nobody waits for the result (submitBackground), so every job someone
 	// waits for goes first.
 	background bool
-	waiters    []chan jobResult
+	// read: a read, which leaves the queue when the last one waiting gives up (abandon).
+	read    bool
+	waiters []chan jobResult
 }
 
 func (j *job) key() string {
@@ -435,7 +437,25 @@ func (s *Store) submit(ctx context.Context, j *job) jobResult {
 	case r := <-ch:
 		return r
 	case <-ctx.Done():
+		s.abandon(j, ch)
 		return jobResult{err: ctx.Err()}
+	}
+}
+
+// abandon takes ch off j's queued job, if it has not started. A read with nobody left
+// waiting leaves the queue, so a client that moved on does not hold up the one it moved to;
+// any other job is someone's write and still runs.
+func (s *Store) abandon(j *job, ch chan jobResult) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := slices.IndexFunc(s.queue, func(q *job) bool { return q.key() == j.key() })
+	if i < 0 {
+		return
+	}
+	q := s.queue[i]
+	q.waiters = slices.DeleteFunc(q.waiters, func(w chan jobResult) bool { return w == ch })
+	if q.read && len(q.waiters) == 0 {
+		s.queue = slices.Delete(s.queue, i, i+1)
 	}
 }
 
@@ -472,6 +492,7 @@ func (s *Store) enqueueLocked(j *job, ch chan jobResult) {
 	if i >= 0 {
 		q := s.queue[i]
 		if ch == nil {
+			q.read = false // a client was told a fetch is coming: it runs now, whoever gives up
 			return
 		}
 		q.waiters = append(q.waiters, ch)

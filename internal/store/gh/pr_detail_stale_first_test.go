@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -326,6 +327,83 @@ func TestBackgroundJobsYield(t *testing.T) {
 				t.Errorf("queue = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// A read whose last reader gave up leaves the queue; a write, a read someone else still
+// waits for, and one a client was promised stay.
+func TestAbandon(t *testing.T) {
+	mine, other := make(chan jobResult, 1), make(chan jobResult, 1)
+	read := func(id string, w ...chan jobResult) *job { return &job{kind: jobFunc, id: id, read: true, waiters: w} }
+	write := func(id string, w ...chan jobResult) *job { return &job{kind: jobFunc, id: id, waiters: w} }
+	tests := []struct {
+		name  string
+		queue []*job
+		join  *job // a background job joining before the reader gives up
+		want  []string
+	}{
+		{"a read nobody waits for leaves", []*job{read("a", mine), read("b", other)}, nil, []string{"b"}},
+		{"a read another reader waits for stays", []*job{read("a", mine, other)}, nil, []string{"a"}},
+		{"a write stays", []*job{write("a", mine)}, nil, []string{"a"}},
+		{"a read that started is out of the queue already", []*job{read("b", other)}, nil, []string{"b"}},
+		{"a read a background refresh joined stays", []*job{read("a", mine)}, &job{kind: jobFunc, id: "a", background: true}, []string{"a"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Store{queue: tt.queue}
+			if tt.join != nil {
+				s.enqueueLocked(tt.join, nil)
+			}
+			s.abandon(&job{kind: jobFunc, id: "a"}, mine)
+			var got []string
+			for _, j := range s.queue {
+				got = append(got, j.id)
+				if slices.Contains(j.waiters, mine) {
+					t.Errorf("%s still has the reader that gave up", j.id)
+				}
+			}
+			if strings.Join(got, " ") != strings.Join(tt.want, " ") {
+				t.Errorf("queue = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// A client that moved on before its read started costs GitHub nothing.
+func TestAbandonedReadSendsNothing(t *testing.T) {
+	w := newStaleWorld(t, nil)
+	before := w.f.count("PullRequestFull")
+	release := w.holdGitHub()
+	defer release()
+	running := make(chan error, 1)
+	go func() {
+		_, err := w.s.FullPullRequest(context.Background(), "o/r", 1, true)
+		running <- err
+	}()
+	w.waitForFetch(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	abandoned := make(chan error, 1)
+	go func() {
+		_, err := w.s.FullPullRequest(ctx, "o/r", 99, false)
+		abandoned <- err
+	}()
+	waitFor(t, "the read to queue", func() bool {
+		w.s.mu.Lock()
+		defer w.s.mu.Unlock()
+		return len(w.s.queue) == 1
+	})
+	cancel()
+	if err := <-abandoned; !errors.Is(err, context.Canceled) {
+		t.Fatalf("abandoned read = %v, want context.Canceled", err)
+	}
+	release()
+	if err := <-running; err != nil {
+		t.Fatal(err)
+	}
+	settleWorker(t, w.s)
+	if got := w.f.count("PullRequestFull") - before; got != 1 {
+		t.Errorf("detail requests = %d, want 1: the read that was given up on sent one", got)
 	}
 }
 

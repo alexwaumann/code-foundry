@@ -408,7 +408,7 @@ func fullJobID(k fullKey) string { return "full|" + k.String() }
 // fetchFullJob fetches k on the worker and waits; it returns GitHub's error, if any.
 func (s *Store) fetchFullJob(ctx context.Context, k fullKey) (FullPullRequest, error) {
 	submitted := s.opts.Now()
-	return submitFunc(ctx, s, fullJobID(k), func(ctx context.Context) (FullPullRequest, error) {
+	return submitRead(ctx, s, fullJobID(k), func(ctx context.Context) (FullPullRequest, error) {
 		return s.runFullFetch(ctx, k, submitted, false)
 	})
 }
@@ -534,8 +534,17 @@ func (s *Store) invalidateFull(k fullKey) {
 // submitFunc queues run as an on-demand job (coalescing with a queued job of the same
 // id) and returns its result.
 func submitFunc[T any](ctx context.Context, s *Store, id string, run func(context.Context) (T, error)) (T, error) {
+	return submitJob(ctx, s, id, false, run)
+}
+
+// submitRead is submitFunc for a read: nobody left waiting takes it off the queue.
+func submitRead[T any](ctx context.Context, s *Store, id string, run func(context.Context) (T, error)) (T, error) {
+	return submitJob(ctx, s, id, true, run)
+}
+
+func submitJob[T any](ctx context.Context, s *Store, id string, read bool, run func(context.Context) (T, error)) (T, error) {
 	var zero T
-	res := s.submit(ctx, &job{kind: jobFunc, id: id, run: func(ctx context.Context) (any, error) { return run(ctx) }})
+	res := s.submit(ctx, &job{kind: jobFunc, id: id, read: read, run: func(ctx context.Context) (any, error) { return run(ctx) }})
 	if res.err != nil {
 		return zero, res.err
 	}

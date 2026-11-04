@@ -15,6 +15,11 @@ export interface Resource<V> {
   store: UseBoundStore<StoreApi<{ entries: Readonly<Record<string, ResourceEntry<V>>> }>>;
   /** Declares interest in key: fetches now if first, re-fetches on invalidate. Returns release. */
   watch: (key: string) => () => void;
+  /**
+   * Reads key with nobody showing it: a watch held until that read ends, so abortOnRelease
+   * leaves it alone. Resolves then, whatever the outcome; at once when key is watched and idle.
+   */
+  readOnce: (key: string) => Promise<void>;
   /** Re-fetches key (or every key matching pred) if anything is watching it. */
   invalidate: (keyOrPred: string | ((key: string) => boolean)) => void;
   /**
@@ -42,6 +47,8 @@ export function createResource<V>(
   const store = create<{ entries: Readonly<Record<string, ResourceEntry<V>>> }>()(() => ({ entries: {} }));
   const interest = new Map<string, number>();
   const inflight = new Map<string, AbortController>();
+  /** How each read in flight ends: readOnce holds its watch until then. */
+  const reads = new Map<string, Promise<void>>();
   const rerun = new Set<string>();
   const timers = new Map<string, ReturnType<typeof setInterval>>();
   /** Bumped by set: a fetch that started before a set must not overwrite it. */
@@ -64,7 +71,7 @@ export function createResource<V>(
     const gen = gens.get(key) ?? 0;
     const current = () => (gens.get(key) ?? 0) === gen;
     patch(key, { loading: true });
-    fetcher(key, ctl.signal)
+    const read = fetcher(key, ctl.signal)
       .then((data) => {
         patch(key, current() ? { data, error: null, loading: false } : { loading: false });
       })
@@ -78,38 +85,46 @@ export function createResource<V>(
       })
       .finally(() => {
         inflight.delete(key);
+        reads.delete(key);
         if (rerun.delete(key) && interest.has(key)) run(key);
       });
+    reads.set(key, read);
+  };
+
+  const watch = (key: string): (() => void) => {
+    const n = (interest.get(key) ?? 0) + 1;
+    interest.set(key, n);
+    if (n === 1) {
+      run(key);
+      if (opts.keepAliveMs) timers.set(key, setInterval(() => {
+        run(key);
+      }, opts.keepAliveMs));
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const left = (interest.get(key) ?? 1) - 1;
+      if (left > 0) {
+        interest.set(key, left);
+        return;
+      }
+      interest.delete(key);
+      clearInterval(timers.get(key));
+      timers.delete(key);
+      if (opts.abortOnRelease) {
+        rerun.delete(key);
+        inflight.get(key)?.abort();
+      }
+    };
   };
 
   return {
     store,
-    watch: (key) => {
-      const n = (interest.get(key) ?? 0) + 1;
-      interest.set(key, n);
-      if (n === 1) {
-        run(key);
-        if (opts.keepAliveMs) timers.set(key, setInterval(() => {
-          run(key);
-        }, opts.keepAliveMs));
-      }
-      let released = false;
-      return () => {
-        if (released) return;
-        released = true;
-        const left = (interest.get(key) ?? 1) - 1;
-        if (left > 0) {
-          interest.set(key, left);
-          return;
-        }
-        interest.delete(key);
-        clearInterval(timers.get(key));
-        timers.delete(key);
-        if (opts.abortOnRelease) {
-          rerun.delete(key);
-          inflight.get(key)?.abort();
-        }
-      };
+    watch,
+    readOnce: (key) => {
+      const release = watch(key);
+      return (reads.get(key) ?? Promise.resolve()).finally(release);
     },
     invalidate: (keyOrPred) => {
       for (const key of interest.keys()) {

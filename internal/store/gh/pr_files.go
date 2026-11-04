@@ -85,7 +85,7 @@ func (s *Store) PullRequestDiff(ctx context.Context, slug string, number int, re
 	}
 	owner, name := splitSlug(k.slug)
 	p := "repos/" + url.PathEscape(owner) + "/" + url.PathEscape(name) + "/pulls/" + fmt.Sprint(k.number)
-	return submitFunc(ctx, s, "diff|"+k.String(), func(ctx context.Context) (PullRequestDiff, error) {
+	return submitRead(ctx, s, "diff|"+k.String(), func(ctx context.Context) (PullRequestDiff, error) {
 		res, err := s.restRaw(ctx, rr, p, nil, acceptDiff, PullRequestDiffMax)
 		if err != nil {
 			return PullRequestDiff{}, err

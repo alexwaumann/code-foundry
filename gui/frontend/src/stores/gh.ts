@@ -126,14 +126,17 @@ export const PULL_REQUEST_DETAIL_KEEPALIVE_MS = 60_000;
  * Key: pullRequestKey(slug, number). The daemon answers with any copy it has, marked
  * refreshing when it is not current, and announces (pull_request_detail_updated) when a poll
  * sees the PR move, a write lands, or that fetch ended; the re-read replaces the data in
- * place. A read waits for GitHub only with no copy, and right after a write made here.
+ * place. A read waits for GitHub only with no copy, and right after a write made here. A
+ * read the last watcher lets go of is aborted, and the daemon then drops it from its queue if
+ * it has not started: the pull request someone flew past must not hold up the one they
+ * stopped on. So a read with nobody showing it goes through readOnce, never `watch(key)()`.
  */
 export const pullRequestDetailResource = createResource(
   (key, signal) => {
     const [slug, number] = parsePullRequestKey(key);
     return getPullRequestDetail(slug, number, false, undefined, signal);
   },
-  { keepAliveMs: PULL_REQUEST_DETAIL_KEEPALIVE_MS },
+  { keepAliveMs: PULL_REQUEST_DETAIL_KEEPALIVE_MS, abortOnRelease: true },
 );
 
 /** Routes one gh notification to the views it affects. */
