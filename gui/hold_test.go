@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"reflect"
 	"slices"
@@ -175,6 +176,11 @@ type fakeHoldOS struct {
 	board   pasteHost
 	typeErr error
 	blockIn chan struct{} // frontmost waits on it when set
+	// before and beforeKnown are what charBeforeCaret says; beforeWait holds it up when set.
+	before      rune
+	beforeKnown bool
+	beforeWait  chan struct{}
+	logCaret    bool // logs each read, for the tests about them
 }
 
 func (f *fakeHoldOS) set(edit func(*fakeHoldOS)) {
@@ -230,6 +236,21 @@ func (f *fakeHoldOS) playTone(t holdTone, _ int) {
 	} else {
 		f.log.add("tone stop")
 	}
+}
+
+func (f *fakeHoldOS) charBeforeCaret(pid int) (rune, bool) {
+	f.mu.Lock()
+	wait := f.beforeWait
+	f.mu.Unlock()
+	if wait != nil {
+		<-wait
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.logCaret {
+		f.log.add(fmt.Sprintf("caret %d", pid))
+	}
+	return f.before, f.beforeKnown
 }
 
 func (f *fakeHoldOS) pasteboard() pasteHost {
@@ -742,6 +763,166 @@ func TestHoldLandFallsBackToTheClipboard(t *testing.T) {
 	}
 }
 
+func TestCountsAsInput(t *testing.T) {
+	tests := []struct {
+		name string
+		ev   altEvent
+		want bool
+	}{
+		{"the hold key going down", flagsAt(0, flagLeftAlt), false},
+		{"the hold key coming up", flagsAt(0, 0), false},
+		{"a key", keyAt(0, 14), true},
+		{"a click", altEvent{Kind: altEventMouseDown}, true},
+		{"flags after records were lost", altEvent{Kind: altEventFlags, Dropped: 2}, true},
+		{"the tap disabled by a timeout", altEvent{Kind: altEventDisabledByTimeout}, true},
+		{"the tap disabled by the user", altEvent{Kind: altEventDisabledByUserInput}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := countsAsInput(tt.ev); got != tt.want {
+				t.Errorf("got %v", got)
+			}
+		})
+	}
+}
+
+// What lands, through a run of dictations. The log has "paste <text>", so a leading space
+// shows as two, and "caret <pid>" for each read of the character before the caret.
+func TestHoldLandFitsTheCaret(t *testing.T) {
+	boom := errors.New("boom")
+	land := func(text string) func(*holdRig) {
+		return func(r *holdRig) { r.s.land(pasteJob{text: text, pressed: r.os.frontmost()}) }
+	}
+	event := func(ev altEvent) func(*holdRig) { return func(r *holdRig) { r.s.event(ev) } }
+	os := func(edit func(*fakeHoldOS)) func(*holdRig) { return func(r *holdRig) { r.os.set(edit) } }
+	first, next := land("Because if I don't do that,"), land("And if you see it.")
+	const pasted, joined = "paste  Because if I don't do that,", "paste  and if you see it."
+	caret := fmt.Sprintf("caret %d", notesApp.PID)
+	raceBundle := t.TempDir()
+	makeChromium(t, raceBundle, "155.0.1.2")
+	race := frontApp{PID: 7, Name: "Chrome", Bundle: raceBundle}
+
+	tests := []struct {
+		name  string
+		edit  func(*fakeHoldOS)
+		steps []func(*holdRig)
+		want  []string
+	}{
+		{
+			name:  "after a letter, one space",
+			edit:  func(f *fakeHoldOS) { f.before, f.beforeKnown = 'a', true },
+			steps: []func(*holdRig){first},
+			want:  []string{caret, pasted},
+		},
+		{
+			name:  "after whitespace, none",
+			edit:  func(f *fakeHoldOS) { f.before, f.beforeKnown = ' ', true },
+			steps: []func(*holdRig){land("Text.")},
+			want:  []string{caret, "paste Text."},
+		},
+		{
+			name:  "an app that does not say, or a selection: as it is",
+			steps: []func(*holdRig){land("Text.")},
+			want:  []string{caret, "paste Text."},
+		},
+		{
+			name:  "the next dictation joins the last, with no read",
+			edit:  func(f *fakeHoldOS) { f.before, f.beforeKnown = 'a', true },
+			steps: []func(*holdRig){first, next},
+			want:  []string{caret, pasted, joined},
+		},
+		{
+			name:  "with nothing known before the first, it still joins",
+			steps: []func(*holdRig){land("One."), land("well, two."), land("Three,"), land("Then four.")},
+			want:  []string{caret, "paste One.", "paste  Well, two.", "paste  Three,", "paste  then four."},
+		},
+		{
+			name:  "the hold key's own events do not end it",
+			steps: []func(*holdRig){land("One,"), event(flagsAt(0, flagLeftAlt)), event(flagsAt(500, 0)), land("And two.")},
+			want:  []string{caret, "paste One,", "paste  and two."},
+		},
+		{
+			name:  "nothing said does not end it",
+			steps: []func(*holdRig){land("One,"), land(""), land("And two.")},
+			want:  []string{caret, "paste One,", "paste  and two."},
+		},
+		{
+			name:  "a key ends it",
+			edit:  func(f *fakeHoldOS) { f.before, f.beforeKnown = 'a', true },
+			steps: []func(*holdRig){land("One,"), event(keyAt(0, 14)), land("And two.")},
+			want:  []string{caret, "paste  One,", caret, "paste  And two."},
+		},
+		{
+			name:  "a click ends it",
+			edit:  func(f *fakeHoldOS) { f.before, f.beforeKnown = 'a', true },
+			steps: []func(*holdRig){land("One,"), event(altEvent{Kind: altEventMouseDown}), land("And two.")},
+			want:  []string{caret, "paste  One,", caret, "paste  And two."},
+		},
+		{
+			name:  "a gap in the tap ends it",
+			steps: []func(*holdRig){land("One,"), func(r *holdRig) { r.s.interrupt("gone") }, land("And two.")},
+			want:  []string{caret, "paste One,", caret, "paste And two."},
+		},
+		{
+			name: "another app in front ends it",
+			steps: []func(*holdRig){land("One,"), os(func(f *fakeHoldOS) { f.front = mailApp }), land("And two."),
+				os(func(f *fakeHoldOS) { f.front = notesApp }), land("And three.")},
+			want: []string{caret, "paste One,", fmt.Sprintf("caret %d", mailApp.PID), "paste And two.", caret, "paste And three."},
+		},
+		{
+			name:  "a text left on the clipboard ends it, unspaced",
+			edit:  func(f *fakeHoldOS) { f.before, f.beforeKnown = 'a', true },
+			steps: []func(*holdRig){land("One,"), os(func(f *fakeHoldOS) { f.secure = true }), land("And two."), os(func(f *fakeHoldOS) { f.secure = false }), land("And three.")},
+			want:  []string{caret, "paste  One,", "copy And two.", caret, "paste  And three."},
+		},
+		{
+			name: "a failed paste ends it, and the clipboard gets the text unspaced",
+			edit: func(f *fakeHoldOS) {
+				f.before, f.beforeKnown = 'a', true
+				f.board = &holdPasteboard{log: f.log, postErr: boom}
+			},
+			steps: []func(*holdRig){land("One,"), land("And two.")},
+			want:  []string{caret, "paste  One,", "copy One,", caret, "paste  And two.", "copy And two."},
+		},
+		{
+			name: "typing takes the same text",
+			edit: func(f *fakeHoldOS) {
+				f.front, f.before, f.beforeKnown = race, 'a', true
+			},
+			steps: []func(*holdRig){func(r *holdRig) { r.s.land(pasteJob{text: "One,", pressed: race}) }},
+			want:  []string{"caret 7", "type  One,"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newHoldRig(t)
+			r.os.set(func(f *fakeHoldOS) { f.logCaret = true })
+			if tt.edit != nil {
+				r.os.set(tt.edit)
+			}
+			for _, step := range tt.steps {
+				step(r)
+			}
+			if got := r.log.all(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got  %q\nwant %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// A click is no sign a tap hears keys: mouse events reach a tap that keys do not.
+func TestHoldClickIsNotHearingKeys(t *testing.T) {
+	r := newHoldRig(t)
+	r.s.event(altEvent{Kind: altEventMouseDown})
+	if r.s.watch.heard {
+		t.Error("a click counted as the tap hearing keys")
+	}
+	r.s.event(keyAt(0, 14))
+	if !r.s.watch.heard {
+		t.Error("a key did not")
+	}
+}
+
 // Nothing in the service's loop waits on the daemon, the main thread or a paste: the real
 // run saw key events queue behind a 500 ms clipboard wait.
 func TestHoldNeverBlocksTheEvents(t *testing.T) {
@@ -787,6 +968,24 @@ func TestHoldNeverBlocksTheEvents(t *testing.T) {
 		})
 		close(block)
 		r.wait(t)
+	})
+
+	t.Run("an app slow to say what is before the caret", func(t *testing.T) {
+		r := newHoldRig(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		block := make(chan struct{})
+		r.os.set(func(f *fakeHoldOS) { f.beforeWait = block })
+		go r.s.pasteLoop(ctx)
+		r.conn.flushed = []string{"First."}
+		r.s.update(holdUpdate{conn: r.conn, snap: holdSnapshot(nil)})
+		inTime(t, "the hold", func() {
+			r.s.event(flagsAt(0, flagLeftAlt))
+			r.s.event(flagsAt(500, 0))
+		})
+		r.wait(t)
+		inTime(t, "the next key", func() { r.s.event(keyAt(600, 14)) })
+		close(block)
 	})
 
 	t.Run("a paste in progress", func(t *testing.T) {

@@ -76,9 +76,9 @@ text pastes into what has the keyboard there, and the overlay shows.
   does anything that fails.
 * `pressed.PID == 0` (nothing in front) also goes to the clipboard.
 * A session that ended by itself mid-hold (30 s of silence) still pastes what it heard.
-* **Chromium 155 and 156: ported, and it stayed small** (25 lines of Go, 40 of C). No
-  case or spacing changes: `joinPhrases` trims, joins with a space, and leaves the
-  engine's capitalisation, as `phraseAtCaret` does.
+* **Chromium 155 and 156: ported, and it stayed small** (25 lines of Go, 40 of C). `joinPhrases`
+  trims, joins with a space, and leaves the engine's capitalisation, as `phraseAtCaret` does.
+  What goes around a whole dictation is `dictation-smart-spacing.md`.
 * A press during another's flush waits for it, or the daemon would refuse the Start. It does
   not wait for the paste. A press during a tail cuts the tail first
   (`dictation-release-tail.md`).

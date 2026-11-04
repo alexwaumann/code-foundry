@@ -6,7 +6,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
+)
+
+// What opens and closes around text, for spacing.
+const (
+	openingPunctuation = "([{“‘«"
+	closingPunctuation = ",.;:!?…)]}”’»"
 )
 
 const (
@@ -148,7 +155,83 @@ func joinPhrases(phrases []string) string {
 func spaceBetween(before, next string) bool {
 	last, _ := utf8.DecodeLastRuneInString(before)
 	first, _ := utf8.DecodeRuneInString(next)
-	return !strings.ContainsRune("([{“‘«", last) && !strings.ContainsRune(",.;:!?…)]}”’»", first)
+	return !strings.ContainsRune(openingPunctuation, last) && !strings.ContainsRune(closingPunctuation, first)
+}
+
+// smartSpaced is text for a caret right after previous (docs/notes/dictation-smart-spacing.md);
+// known is false when the app did not say, or text is selected, which leaves it as it is.
+func smartSpaced(text string, previous rune, known bool) string {
+	if known && needsLeadingSpace(previous, text) {
+		return " " + text
+	}
+	return text
+}
+
+// needsLeadingSpace reports whether text pasted right after previous wants a space between:
+// after a letter, a digit, sentence punctuation or a closing bracket or quote, never after
+// whitespace, opening punctuation or a symbol such as @ or $, and never before text that
+// starts with whitespace or closing punctuation.
+func needsLeadingSpace(previous rune, text string) bool {
+	first, _ := utf8.DecodeRuneInString(text)
+	if text == "" || unicode.IsSpace(first) || strings.ContainsRune(closingPunctuation, first) {
+		return false
+	}
+	return unicode.IsLetter(previous) || unicode.IsNumber(previous) || strings.ContainsRune(closingPunctuation, previous)
+}
+
+// joinContinuation is next as it goes straight after previous, the text of the dictation
+// before it: the case its first word takes in a sentence, and the space between.
+func joinContinuation(previous, next string) string {
+	next = setInitialCase(next, endsSentence(previous))
+	last, _ := utf8.DecodeLastRuneInString(previous)
+	first, _ := utf8.DecodeRuneInString(next)
+	if previous == "" || next == "" || unicode.IsSpace(last) || strings.ContainsRune(openingPunctuation, last) ||
+		unicode.IsSpace(first) || strings.ContainsRune(closingPunctuation, first) {
+		return next
+	}
+	return " " + next
+}
+
+// endsSentence reports whether text ends a sentence, looking past closing quotes and brackets.
+func endsSentence(text string) bool {
+	text = strings.TrimRight(strings.TrimRightFunc(text, unicode.IsSpace), `'")]}”’»`)
+	return strings.HasSuffix(text, ".") || strings.HasSuffix(text, "?") || strings.HasSuffix(text, "!")
+}
+
+// setInitialCase gives text's first letter the case its place asks for. Whisper starts every
+// phrase with a capital, so mid-sentence it only comes down on words that are never names:
+// "Open" then "GitHub next." stays as it is.
+func setInitialCase(text string, uppercase bool) string {
+	at := strings.IndexFunc(text, unicode.IsLetter)
+	if at < 0 {
+		return text
+	}
+	r, size := utf8.DecodeRuneInString(text[at:])
+	switch {
+	case uppercase && unicode.IsLower(r):
+		r = unicode.ToUpper(r)
+	case !uppercase && unicode.IsUpper(r) && sentenceInitialWord(text[at:]):
+		r = unicode.ToLower(r)
+	default:
+		return text
+	}
+	return text[:at] + string(r) + text[at+size:]
+}
+
+// sentenceInitialWords are the words whisper capitalises only for starting a sentence.
+var sentenceInitialWords = map[string]bool{
+	"a": true, "an": true, "and": true, "as": true, "because": true, "but": true, "for": true,
+	"if": true, "nor": true, "or": true, "so": true, "the": true, "then": true, "though": true,
+	"to": true, "when": true, "while": true, "yet": true,
+}
+
+// sentenceInitialWord reports whether text starts with one of them.
+func sentenceInitialWord(text string) bool {
+	end := strings.IndexFunc(text, func(r rune) bool { return !unicode.IsLetter(r) && r != '\'' })
+	if end < 0 {
+		end = len(text)
+	}
+	return sentenceInitialWords[strings.ToLower(text[:end])]
 }
 
 // clipboardRaceChromium are the Chromium majors where a pasted text can arrive before the

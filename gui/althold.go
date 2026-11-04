@@ -39,6 +39,7 @@ const (
 	altEventKeyDown
 	altEventDisabledByTimeout
 	altEventDisabledByUserInput
+	altEventMouseDown // any button; the hold ignores it, a continuation does not
 )
 
 // altEvent is one event from the tap.

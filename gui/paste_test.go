@@ -173,6 +173,177 @@ func makeChromium(t *testing.T, bundle string, versions ...string) {
 	}
 }
 
+func TestNeedsLeadingSpace(t *testing.T) {
+	tests := []struct {
+		name     string
+		previous rune
+		text     string
+		want     bool
+	}{
+		{"a lowercase letter", 'a', "in progress", true},
+		{"a capital", 'Z', "in progress", true},
+		{"a letter beyond ASCII", 'é', "in progress", true},
+		{"a digit", '7', "in progress", true},
+		{"a full stop", '.', "in progress", true},
+		{"a comma", ',', "in progress", true},
+		{"a semicolon", ';', "in progress", true},
+		{"a colon", ':', "in progress", true},
+		{"an exclamation mark", '!', "in progress", true},
+		{"a question mark", '?', "in progress", true},
+		{"an ellipsis", '…', "in progress", true},
+		{"a closing parenthesis", ')', "in progress", true},
+		{"a closing bracket", ']', "in progress", true},
+		{"a closing brace", '}', "in progress", true},
+		{"a closing quote", '”', "in progress", true},
+		{"a closing single quote", '’', "in progress", true},
+		{"a closing guillemet", '»', "in progress", true},
+
+		{"a space", ' ', "in progress", false},
+		{"a newline", '\n', "in progress", false},
+		{"a tab", '\t', "in progress", false},
+		{"an opening parenthesis", '(', "in progress", false},
+		{"an opening bracket", '[', "in progress", false},
+		{"an opening brace", '{', "in progress", false},
+		{"an opening quote", '“', "in progress", false},
+		{"an at sign", '@', "in progress", false},
+		{"a dollar", '$', "in progress", false},
+		{"a hash", '#', "in progress", false},
+		{"a slash", '/', "in progress", false},
+		{"a hyphen", '-', "in progress", false},
+		{"a straight quote, which could be either", '"', "in progress", false},
+
+		{"no text", 'a', "", false},
+		{"text starting with a space", 'a', " spaced", false},
+		{"text starting with a line", 'a', "\nspaced", false},
+		{"text starting with a comma", 'a', ", then more", false},
+		{"text starting with a full stop", 'a', ".", false},
+		{"text starting with a closing bracket", 'a', ") done", false},
+		{"text starting with a closing quote", 'a', "” he said", false},
+		{"text starting with an opening bracket", 'a', "(aside)", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := needsLeadingSpace(tt.previous, tt.text); got != tt.want {
+				t.Errorf("got %v", got)
+			}
+		})
+	}
+}
+
+func TestSmartSpaced(t *testing.T) {
+	tests := []struct {
+		name     string
+		previous rune
+		known    bool
+		want     string
+	}{
+		{"a letter", 'a', true, " Text."},
+		{"whitespace", ' ', true, "Text."},
+		{"an app that does not say", 0, false, "Text."},
+		{"not known wins over what is there", 'a', false, "Text."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := smartSpaced("Text.", tt.previous, tt.known); got != tt.want {
+				t.Errorf("got %q", got)
+			}
+		})
+	}
+}
+
+func TestJoinContinuation(t *testing.T) {
+	tests := []struct {
+		name, previous, next, want string
+	}{
+		{"mid-sentence, a sentence word comes down", "Because if I don't do that,", "And if you see it.", " and if you see it."},
+		{"after a sentence, a capital goes up", "And if you see it.", "well, that works.", " Well, that works."},
+		{"after a question", "Is it?", "yes.", " Yes."},
+		{"after an exclamation", "Stop!", "now.", " Now."},
+		{"a sentence ended inside a quote", `He said "stop."`, "then left.", " Then left."},
+		{"a sentence ended inside brackets", "(As it was.)", "and is.", " And is."},
+		{"a sentence ended inside a curly quote", "He said “stop.”", "then left.", " Then left."},
+		{"trailing space: no second one", "Already spaced. ", "Next sentence.", "Next sentence."},
+		{"a trailing line", "One\n", "two", "two"},
+		{"closing punctuation takes no space", "Hello", ", world.", ", world."},
+		{"a next that opens with a space", "Hello", " world", " world"},
+		{"after an opening bracket", "See (", "and more", "and more"},
+		{"a name stays a name", "Open", "GitHub next.", " GitHub next."},
+		{"so does another", "Message", "Slack now.", " Slack now."},
+		{"a capital after a sentence stays", "Done.", "Next.", " Next."},
+		{"no letter", "Total", "42", " 42"},
+		{"nothing before", "", "Next.", "Next."},
+		{"nothing to add", "Done.", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := joinContinuation(tt.previous, tt.next); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEndsSentence(t *testing.T) {
+	tests := []struct {
+		text string
+		want bool
+	}{
+		{"Done.", true}, {"Done?", true}, {"Done!", true}, {"Done. ", true}, {"Done.\n", true},
+		{`"Done."`, true}, {"(Done.)", true}, {"'Done!'", true}, {"[Done?]", true}, {"{Done.}", true},
+		{"“Done.”", true}, {"‘Done.’", true}, {"«Done.»", true},
+		{"Done", false}, {"Done,", false}, {"Done:", false}, {"Done;", false}, {"", false}, {`"`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.text, func(t *testing.T) {
+			if got := endsSentence(tt.text); got != tt.want {
+				t.Errorf("got %v", got)
+			}
+		})
+	}
+}
+
+func TestSetInitialCase(t *testing.T) {
+	tests := []struct {
+		name, text string
+		uppercase  bool
+		want       string
+	}{
+		{"up", "well then", true, "Well then"},
+		{"up past punctuation", "“well then", true, "“Well then"},
+		{"up, a letter beyond ASCII", "été", true, "Été"},
+		{"up, already", "Well", true, "Well"},
+		{"down, a sentence word", "And more", false, "and more"},
+		{"down past punctuation", "(And more)", false, "(and more)"},
+		{"down, a word with no space after", "And", false, "and"},
+		{"down, a name is left", "Slack now", false, "Slack now"},
+		{"down, a word that only starts like one", "Andrew said", false, "Andrew said"},
+		{"down, an apostrophe keeps the word whole", "If's and but's", false, "If's and but's"},
+		{"down, already", "and more", false, "and more"},
+		{"no letters", "42", true, "42"},
+		{"nothing", "", false, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := setInitialCase(tt.text, tt.uppercase); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSentenceInitialWord(t *testing.T) {
+	for _, w := range []string{"A", "An", "And", "As", "Because", "But", "For", "If", "Nor", "Or", "So", "The", "Then", "Though", "To", "When", "While", "Yet"} {
+		if !sentenceInitialWord(w + " more") {
+			t.Errorf("%s", w)
+		}
+	}
+	for _, w := range []string{"", "I", "GitHub", "Slack", "Android"} {
+		if sentenceInitialWord(w) {
+			t.Errorf("%q", w)
+		}
+	}
+}
+
 func TestHasClipboardRace(t *testing.T) {
 	bundle := func(versions ...string) string {
 		dir := t.TempDir()

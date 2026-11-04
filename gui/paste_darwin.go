@@ -5,6 +5,7 @@ package main
 #cgo LDFLAGS: -framework AppKit -framework ApplicationServices -framework Foundation
 #import <AppKit/AppKit.h>
 #include <ApplicationServices/ApplicationServices.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -158,6 +159,73 @@ static int cfPasteType(const char* text) {
 	}
 }
 
+// CF_AX_TIMEOUT bounds each Accessibility call, in seconds: a hung app must not hold up the
+// paste. The first call to time out ends the read.
+#define CF_AX_TIMEOUT 0.25f
+
+// cfLastScalar is the last code point of s, 0 when s is empty or ends in half a surrogate
+// pair. Takes ownership of s.
+static uint32_t cfLastScalar(CFStringRef s) {
+	uint32_t scalar = 0;
+	CFIndex n = CFStringGetLength(s);
+	if (n > 0) {
+		UniChar last = CFStringGetCharacterAtIndex(s, n - 1);
+		if (CFStringIsSurrogateLowCharacter(last)) {
+			UniChar high = n > 1 ? CFStringGetCharacterAtIndex(s, n - 2) : 0;
+			if (CFStringIsSurrogateHighCharacter(high)) scalar = CFStringGetLongCharacterForSurrogatePair(high, last);
+		} else if (!CFStringIsSurrogateHighCharacter(last)) {
+			scalar = last;
+		}
+	}
+	CFRelease(s);
+	return scalar;
+}
+
+// cfStringForRange reads one range of a text element: a code point, or 0.
+static uint32_t cfStringForRange(AXUIElementRef focused, CFRange range) {
+	AXValueRef param = AXValueCreate(kAXValueTypeCFRange, &range);
+	if (param == NULL) return 0;
+	CFTypeRef value = NULL;
+	AXError err = AXUIElementCopyParameterizedAttributeValue(focused, kAXStringForRangeParameterizedAttribute, param, &value);
+	CFRelease(param);
+	if (err != kAXErrorSuccess || value == NULL) return 0;
+	if (CFGetTypeID(value) != CFStringGetTypeID()) {
+		CFRelease(value);
+		return 0;
+	}
+	return cfLastScalar((CFStringRef)value);
+}
+
+// cfCharBeforeCaret is the character just before the insertion point of pid's focused text
+// element: 0 with text selected, at the very start, or when the app does not say. It only
+// reads, and never prompts. Not on the tap's thread or the main thread: it waits on the app.
+static uint32_t cfCharBeforeCaret(int pid) {
+	AXUIElementRef app = AXUIElementCreateApplication(pid);
+	if (app == NULL) return 0;
+	AXUIElementSetMessagingTimeout(app, CF_AX_TIMEOUT);
+	CFTypeRef focused = NULL;
+	AXError err = AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute, &focused);
+	CFRelease(app);
+	if (err != kAXErrorSuccess || focused == NULL) return 0;
+	uint32_t scalar = 0;
+	CFTypeRef selection = NULL;
+	if (CFGetTypeID(focused) == AXUIElementGetTypeID()) {
+		AXUIElementSetMessagingTimeout((AXUIElementRef)focused, CF_AX_TIMEOUT);
+		err = AXUIElementCopyAttributeValue((AXUIElementRef)focused, kAXSelectedTextRangeAttribute, &selection);
+	}
+	CFRange range = {0, 0};
+	if (selection != NULL && err == kAXErrorSuccess && CFGetTypeID(selection) == AXValueGetTypeID() &&
+		AXValueGetValue((AXValueRef)selection, kAXValueTypeCFRange, &range) && range.length == 0 && range.location > 0) {
+		// One UTF-16 unit, or two when it is half of a surrogate pair.
+		for (CFIndex units = 1; scalar == 0 && units <= 2 && units <= range.location; units++) {
+			scalar = cfStringForRange((AXUIElementRef)focused, CFRangeMake(range.location - units, units));
+		}
+	}
+	if (selection != NULL) CFRelease(selection);
+	CFRelease(focused);
+	return scalar;
+}
+
 // cfPasteRestore puts saved back if the changeCount is still ours, and releases it.
 // 1 restored, 0 left alone, -1 failed.
 static int cfPasteRestore(void* saved, long ours) {
@@ -205,6 +273,13 @@ func typeText(text string) error {
 		return errors.New("could not create the key events")
 	}
 	return nil
+}
+
+// charBeforeCaret reads the character before pid's caret. Waits on the app, bounded; never
+// from the tap's thread or the main thread.
+func charBeforeCaret(pid int) (rune, bool) {
+	r := rune(C.cfCharBeforeCaret(C.int(pid)))
+	return r, r != 0
 }
 
 // generalPasteboard is pasteHost for the real thing.
