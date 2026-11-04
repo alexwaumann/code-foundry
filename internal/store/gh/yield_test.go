@@ -878,9 +878,32 @@ func TestAbandonedWriteKeepsItsPlace(t *testing.T) {
 	}
 }
 
+// pollAfter is the requests of the poll after the first in sent, which starts at the
+// first poll's requests: between the second Poll and the third. Whichever goroutine got
+// there first, the log says which poll a request belonged to.
+func pollAfter(sent []string) []string {
+	var at []int
+	for i, op := range sent {
+		if op == "Poll" {
+			at = append(at, i)
+		}
+	}
+	switch len(at) {
+	case 0, 1:
+		return nil
+	case 2:
+		return sent[at[1]:]
+	}
+	return sent[at[1]:at[2]]
+}
+
 // Stats asked for while a stats poll runs are not its to answer: it read its counts
-// before the request, so its end leaves them due, on success and on failure. Without a
-// request the schedule stands.
+// before the request, so its end leaves them due, on success and on failure, and the
+// next poll brings them. Asked for before the plan, the poll itself brings them, or the
+// next one if it fails. Without a request the schedule stands.
+//
+// Track also asks for a poll, so the next poll may start and end before this goroutine
+// looks: it reads the requests by poll, never from a mark taken after poll N.
 func TestStatsAskedDuringAStatsPoll(t *testing.T) {
 	ask := func(t *testing.T, w *yieldWorld) { w.s.statsDueNow("test") }
 	track := func(t *testing.T, w *yieldWorld) {
@@ -890,19 +913,26 @@ func TestStatsAskedDuringAStatsPoll(t *testing.T) {
 		}
 	}
 	tests := []struct {
-		name    string
-		stage   string
-		ask     func(*testing.T, *yieldWorld)
-		noStats bool
-		want    bool
+		name     string
+		stage    string
+		ask      func(*testing.T, *yieldWorld)
+		noStats  bool // the poll's answer loses its stats
+		failPoll bool // the poll's own request fails
+		want     bool // the poll after it carries the stats
+		tracked  bool // and o/new has them by then
 	}{
 		{name: "merge during Poll", stage: "Poll", ask: ask, want: true},
 		{name: "merge during PullRequestDetails", stage: "PullRequestDetails", ask: ask, want: true},
 		{name: "merge during DefaultBranchChecks", stage: "DefaultBranchChecks", ask: ask, want: true},
 		{name: "merge during PollStats", stage: "PollStats", ask: ask, want: true},
 		{name: "merge during search/commits", stage: "search/commits", ask: ask, want: true},
-		{name: "track during PollStats", stage: "PollStats", ask: track, want: true},
+		{name: "track during PollStats", stage: "PollStats", ask: track, want: true, tracked: true},
+		{name: "track during search/commits", stage: "search/commits", ask: track, want: true, tracked: true},
 		{name: "merge during a poll whose stats failed", stage: "Poll", ask: ask, noStats: true, want: true},
+		{name: "track during a poll whose stats failed", stage: "Poll", ask: track, noStats: true, want: true, tracked: true},
+		{name: "track before the plan: that poll brings them", stage: "PullRequest", ask: track, tracked: true},
+		{name: "merge before a plan whose poll fails", stage: "PullRequest", ask: ask, failPoll: true, want: true},
+		{name: "track before a plan whose poll fails", stage: "PullRequest", ask: track, failPoll: true, want: true, tracked: true},
 		{name: "nothing asked", stage: "PollStats"},
 		{name: "nothing asked, stats failed", stage: "Poll", noStats: true},
 	}
@@ -913,6 +943,10 @@ func TestStatsAskedDuringAStatsPoll(t *testing.T) {
 			w.mu.Lock()
 			w.noStats = tt.noStats
 			w.mu.Unlock()
+			if tt.failPoll {
+				w.g.failNext("Poll", errors.New("no answer"))
+			}
+			from := w.nsent()
 			w.holdGitHub(tt.stage, false)
 			w.kickPoll(t)
 			w.waitHeld(t)
@@ -920,17 +954,44 @@ func TestStatsAskedDuringAStatsPoll(t *testing.T) {
 				tt.ask(t, w)
 			}
 			w.free()
-			w.waitPolled(t)
-			settleWorker(t, w.s)
-			drain(w.polled)
-			from := w.nsent()
-			w.kickPoll(t)
-			w.waitPolled(t)
+			w.waitPolled(t) // poll N
+			w.kickPoll(t)   // poll N+1, unless Track's own has it running or done
+			w.waitPolled(t) // its requests are in the log before its Polled
 			sent := w.sentSince(from)
-			if got := slices.Contains(sent, "search/commits"); got != tt.want {
-				t.Errorf("sent %v: next poll carries stats = %v, want %v", sent, got, tt.want)
+			next := pollAfter(sent)
+			if len(next) == 0 {
+				t.Fatalf("sent %v: no poll after the first", sent)
+			}
+			if got := slices.Contains(next, "search/commits"); got != tt.want {
+				t.Errorf("next poll %v carries stats = %v, want %v; all of %v", next, got, tt.want, sent)
+			}
+			if tt.tracked && w.s.Snapshot().Repos["o/new"].Activity.Stats.FetchedAt.IsZero() {
+				t.Errorf("sent %v: o/new has no stats", sent)
 			}
 		})
+	}
+}
+
+// A plan can consume the request and carry no stats while it waits for the viewer's id.
+// They stay due, and the plan that has the id brings them.
+func TestPlanWaitingForTheViewerKeepsStatsDue(t *testing.T) {
+	opts := testOptions(openTestDB(t), &fakeRunner{}, nil)
+	opts.StatsInterval = time.Hour
+	s, err := New(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Track("o/r"); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	plan, _ := s.planPoll(s.config(), now)
+	if plan.stats != nil || !plan.statsDeferred {
+		t.Fatalf("without the viewer: stats %v, deferred %v", plan.stats, plan.statsDeferred)
+	}
+	s.updateSnapshot(func(n *Snapshot) { n.Viewer.Viewer = &Viewer{ID: "A1", Login: "octocat"} })
+	if plan, _ = s.planPoll(s.config(), now); plan.stats == nil {
+		t.Error("with the viewer: no stats")
 	}
 }
 
