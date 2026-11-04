@@ -184,11 +184,19 @@ the #513 log line.
 * `admit` must not re-read the clock after its timer fires: tests freeze `Now`, and it would wait
   forever. It goes straight to the send, which is why a click in the same instant waits one request.
 * `goJob` in the tests needs the worker busy, or the job is claimed before it can be seen queued.
+* `Track` asks for stats and for a poll, so poll N+1 can start and end by itself. A test that marks
+  the request log after poll N's `Polled` can then be looking at poll N+2, which rightly has no
+  stats. `TestStatsAskedDuringAStatsPoll` did that and failed on GitHub's runner, and 11 of 400 runs
+  here (`-race -count=200 -cpu 1,2`). No request was lost: with the order forced, poll N+1 carried
+  the stats and `o/new` had them, while the old window printed the same `[Poll PollProjects]`. The
+  test now reads the log by poll (`pollAfter`), and passed 400 of 400. Read such a log by poll,
+  never from a mark taken after a poll that may have a follow-up.
 
 ## Tests
 
 `yield_test.go`: all of the above, plus the gap table (`TestAdmitGap`), `TestGapAllowance`,
 `TestEveryReadLeavesWithItsCaller`, `TestRefusedWriteHasAKnownOutcome`, `TestRunEndsWithAPollDue`,
-`TestStatsAskedDuringAStatsPoll`, `TestRefusedStatsAreNotAResult`, `TestAbandonedWriteKeepsItsPlace`,
+`TestStatsAskedDuringAStatsPoll`, `TestPlanWaitingForTheViewerKeepsStatsDue`,
+`TestRefusedStatsAreNotAResult`, `TestAbandonedWriteKeepsItsPlace`,
 `TestPauseInAYieldLeavesTheProjectListsAlone`, `TestMergeCallerLeavesWhileRunning`, and the poll's
 log line.
