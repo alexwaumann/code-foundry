@@ -10,8 +10,8 @@ import "google/protobuf/timestamp.proto";
 // the microphone and streams 16 kHz mono frames here (Audio), the daemon hands them to
 // its local engine (code-foundry-dictate, whisper.cpp), and each finished phrase comes
 // back on Session. The daemon owns the engine: with dictation.enabled on and the model
-// downloaded it runs from daemon start with the model loaded, unloads it after 10
-// minutes without the user looking at the app and loads it again when they return.
+// downloaded it runs from daemon start with the model loaded and keeps it loaded. Only
+// memory pressure unloads it; the next Start loads it again.
 //
 // A session belongs to one client (the composer that pressed the mic): Start opens it,
 // the host streams Audio while Watch says LISTENING, the composer reads Session, and
@@ -67,8 +67,8 @@ enum DictationState {
   DICTATION_STATE_LOADING = 4;
   // The model is loaded: Start is instant.
   DICTATION_STATE_READY = 5;
-  // The model was unloaded (the user was away, or macOS was short of memory); it loads
-  // again when the user returns, or on the next Start.
+  // macOS was short of memory and the engine unloaded the model; it loads again on the
+  // next Start.
   DICTATION_STATE_UNLOADED = 6;
   // A session is open (session).
   DICTATION_STATE_LISTENING = 7;
@@ -95,6 +95,13 @@ message DictationSnapshot {
   bool mic_denied = 7;
   // Set on a heartbeat, which carries nothing else.
   StreamHeartbeat heartbeat = 8;
+  // dictation.anywhere: the hold key works in every app, and the GUI host stays in the
+  // menu bar with its window closed.
+  bool anywhere = 9;
+  // dictation.hold_key: "left", "right", "either" or "both" (the two pressed together).
+  string hold_key = 10;
+  // dictation.sounds: a sound as dictation starts and stops.
+  bool sounds = 11;
 }
 
 // DictationModel is the one Whisper model.

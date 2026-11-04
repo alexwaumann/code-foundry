@@ -152,7 +152,7 @@ func TestDictationStatus(t *testing.T) {
 		{"denied mic", dictationSnapshot(v1.DictationState_DICTATION_STATE_UNLOADED, func(s *v1.DictationSnapshot) {
 			s.MicDenied = true
 			s.Hardware = nil
-		}), "dictation: unloaded; it loads again when you return to the app or dictate; macOS denied the microphone"},
+		}), "dictation: unloaded; it loads again when you next dictate; macOS denied the microphone"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			reg := newDictationRegistry(t, &commandtest.Dictation{}, tc.snap, &commandtest.Emitter{})
@@ -181,7 +181,8 @@ func TestDictationToggleEmits(t *testing.T) {
 		t.Errorf("intents %v", got)
 	}
 	c, _ := reg.Get("dictation.toggle")
-	if len(c.Keybindings) != 1 || c.Keybindings[0] != "cmd+shift+m" || c.Title != "Dictate" {
+	// No default chord, but bindable: an old override keeps working.
+	if len(c.Keybindings) != 0 || c.NoKeybinding || c.Title != "Dictate" {
 		t.Errorf("toggle %+v", c)
 	}
 }
