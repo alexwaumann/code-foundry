@@ -57,7 +57,7 @@ type Command struct {
 	// something in the app, or does work the user already set up (action.run of an
 	// existing action, thread.send). A read-only verb needs no marker. It may not have
 	// Confirm, and it is not for a verb that defines what gets run, changes configuration,
-	// fetches or runs third-party code, reaches outside this machine, or widens what any
+	// fetches or runs third-party code, writes outside this machine, or widens what any
 	// thread may do. Unset, an agent's call asks, so a new verb asks until it is classified
 	// (agent_test.go keeps the list). A flag that widens it is ArgSpec.AgentAsk.
 	AgentSafe bool

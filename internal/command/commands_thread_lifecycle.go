@@ -36,7 +36,7 @@ var agentThreadPermissions = []string{"supervised", "auto"}
 
 // supervisedHelp says what supervised does: Claude's manual mode, which asks before
 // edits and commands but runs reads, searches and read-only commands unasked, and the
-// protocol verbs every thread has pre-allowed (thread.ProtocolAllowedTools).
+// protocol verbs every thread runs unasked (thread.ProtocolVerbs).
 const supervisedHelp = "supervised (asks before edits and commands, not read-only ones or thread report(s)/get/list/read, project list)"
 
 var threadPermissionModes = map[string]v1.PermissionMode{

@@ -717,7 +717,7 @@ func (r *runner) onAsk(req *claudestream.PermissionRequest) {
 	it := st.proj.w.add(requestItem(req))
 	st.pending[req.RequestID] = req
 	st.sd.ask(req.RequestID, it)
-	r.log().info("claude asks", "tool", req.ToolName, "request", req.RequestID)
+	r.log().info("claude asks", "tool", req.ToolName, "request", req.RequestID, "reason", req.DecisionReasonType, "code", req.DecisionReasonCode)
 	r.checkStatus()
 }
 

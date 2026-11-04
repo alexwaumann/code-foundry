@@ -39,8 +39,9 @@ func TestWriteTopic(t *testing.T) {
 	// and the detailed thread.pr.link to 25,888); the hard limit is guide_test's 29,000. Thread
 	// commands are detailed: thread.search (docs/notes/search-3-index.md), which agents use
 	// to find earlier work, took it to 26,700, thread.find and its next and previous to
-	// 26,759.
-	if n := guide.Len(); n > 26_800 {
+	// 26,759, what runs unasked in an auto thread (docs/notes/auto-approve-verbs.md) to
+	// 26,985.
+	if n := guide.Len(); n > 27_000 {
 		t.Errorf("the guide has %d bytes after the split", n)
 	}
 }

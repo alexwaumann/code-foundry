@@ -104,7 +104,7 @@ func (r *Registry) ApprovedVerb(line, cli string) string {
 		}
 		return ""
 	}
-	name, n := ResolveVerb(func(s string) bool { _, ok := r.Get(s); return ok }, LeadingWords(args))
+	name, n := ResolveVerb(r.has, LeadingWords(args))
 	if name == "" || slices.ContainsFunc(words[:n], func(w shellWord) bool { return !w.bare }) {
 		return ""
 	}
@@ -113,6 +113,14 @@ func (r *Registry) ApprovedVerb(line, cli string) string {
 		return ""
 	}
 	return name
+}
+
+// has reports whether name is a command, without the work Get does for what it returns.
+func (r *Registry) has(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, ok := r.cmds[name]
+	return ok
 }
 
 // AgentApproved reports whether an agent may run c without asking, in a form that does

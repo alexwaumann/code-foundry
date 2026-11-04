@@ -54,6 +54,8 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("  once by themselves; after anything else, check what it did before running it again.")
 	p("- Commands shown with `--yes` may ask for confirmation; without it they then exit 2 and do nothing, so pass")
 	p("  `--yes` when you mean it.")
+	p("- In an auto thread most of these run without the user being asked, as one plain command: no pipe, redirect or")
+	p("  `$(...)`, text in single quotes, no `--yes` and no `@file`. Anything else, and verbs that change setup, may ask.")
 	p("")
 	p("## Conventions")
 	p("")

@@ -13,7 +13,7 @@ import (
 // agentSafe is every verb that changes something and that a thread's agent in auto mode
 // runs without the user being asked (Command.AgentSafe), beside the read-only ones.
 // Adding a verb here is a decision: it must not have Confirm, define what gets run, change
-// configuration, fetch or run third-party code, reach outside this machine, or widen what
+// configuration, fetch or run third-party code, write outside this machine, or widen what
 // any thread may do. docs/notes/auto-approve-verbs.md has the reasons, and the verbs that
 // were close and still ask.
 var agentSafe = []string{
