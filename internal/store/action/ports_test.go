@@ -524,7 +524,9 @@ func TestCloseDuringProbe(t *testing.T) {
 }
 
 // The real probe on real processes: `<shell> -lc` keeps a listener where the walk finds
-// it, in a background run, and its port goes with it.
+// it, in a background run, and its port goes with it. Not `python3 -m http.server`: it
+// resolves its address between bind and listen, 35 s on the CI runner, and a socket that
+// does not listen yet is no port (docs/notes/fix-ci-go-test.md).
 func TestRunPortsLive(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("no python3")
@@ -538,7 +540,8 @@ func TestRunPortsLive(t *testing.T) {
 	ln.Close()
 	ctx := context.Background()
 	h := newHarness(t, func(o *Options) { o.PortProbe = procscanProbe{}; o.KillGrace = 200 * time.Millisecond })
-	h.create(CreateOptions{ProjectID: "web", Name: "Serve", Command: "python3 -m http.server --bind 127.0.0.1 " + strconv.Itoa(port)})
+	listener := "import socket,time;s=socket.socket();s.bind(('127.0.0.1'," + strconv.Itoa(port) + "));s.listen();time.sleep(60)"
+	h.create(CreateOptions{ProjectID: "web", Name: "Serve", Command: `python3 -c "` + listener + `"`})
 	sub := bus.Subscribe[Event](h.bus, 64)
 	defer sub.Close()
 	r, err := h.m.Run(ctx, RunOptions{Action: "serve", Worktree: h.web})
