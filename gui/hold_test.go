@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 )
 
 const holdTestPID = 100
@@ -278,9 +279,10 @@ type fakeHoldConn struct {
 	mu       sync.Mutex
 	startErr []error // one per Start, then nil
 	blockIn  chan struct{}
-	phrases  []string // arrive once the session stream opens
-	flushed  []string // arrive on Finish
-	endEarly bool     // the session ends by itself after phrases
+	phrases  []string      // arrive once the session stream opens
+	flushed  []string      // arrive on Finish and Release
+	tailing  chan struct{} // set: a Release waits for a Finish, as a tail does
+	endEarly bool          // the session ends by itself after phrases
 	reports  []*v1.DictationAccessibility
 	stream   *fakeSessionStream
 }
@@ -314,8 +316,25 @@ func (c *fakeHoldConn) Stop(_ context.Context, id string) error {
 func (c *fakeHoldConn) Finish(_ context.Context, id string) error {
 	c.log.add("finish " + id)
 	c.mu.Lock()
-	flushed := c.flushed
+	flushed, tailing := c.flushed, c.tailing
+	c.tailing = nil
 	c.mu.Unlock()
+	if tailing != nil {
+		close(tailing)
+	}
+	c.end(flushed)
+	return nil
+}
+
+func (c *fakeHoldConn) Release(_ context.Context, id string) error {
+	c.log.add("release " + id)
+	c.mu.Lock()
+	flushed, tailing := c.flushed, c.tailing
+	c.mu.Unlock()
+	if tailing != nil {
+		<-tailing
+		return nil
+	}
 	c.end(flushed)
 	return nil
 }
@@ -523,7 +542,7 @@ func TestHoldRuns(t *testing.T) {
 			name: "system: a counted hold pastes once, phrases joined", front: inNotes,
 			conn:   holdScript{phrases: []string{" One.", " Two."}, flushed: []string{" Three."}},
 			events: []altEvent{press, release},
-			want:   []string{"finish s1", "paste One. Two. Three.", "start system", "tone start", "tone stop"},
+			want:   []string{"paste One. Two. Three.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{
 			name: "system: a short hold is dropped, with no stop tone", front: inNotes,
@@ -541,39 +560,39 @@ func TestHoldRuns(t *testing.T) {
 			name: "system: a modifier 15.7 s in does not", front: inNotes,
 			conn:   holdScript{flushed: []string{"Kept."}},
 			events: []altEvent{press, flagsAt(15700, flagLeftAlt|flagRightAlt), flagsAt(16000, 0)},
-			want:   []string{"finish s1", "paste Kept.", "start system", "tone start", "tone stop"},
+			want:   []string{"paste Kept.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{
 			name: "system: nothing said", front: inNotes,
 			events: []altEvent{press, release},
-			want:   []string{"finish s1", "start system", "tone start", "tone stop"},
+			want:   []string{"release s1", "start system", "tone start", "tone stop"},
 		},
 		{
 			name: "system: another app in front by then leaves it on the clipboard", front: inNotes,
 			conn:   holdScript{flushed: []string{"Text."}},
 			events: []altEvent{press, release},
 			atLand: func(s *fakeHoldOS) { s.front = mailApp },
-			want:   []string{"copy Text.", "finish s1", "start system", "tone start", "tone stop"},
+			want:   []string{"copy Text.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{
 			name: "system: a password field leaves it on the clipboard", front: inNotes,
 			conn:   holdScript{flushed: []string{"Text."}},
 			events: []altEvent{press, release},
 			atLand: func(s *fakeHoldOS) { s.secure = true },
-			want:   []string{"copy Text.", "finish s1", "start system", "tone start", "tone stop"},
+			want:   []string{"copy Text.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{
 			name: "system: a revoked grant leaves it on the clipboard", front: inNotes,
 			conn:   holdScript{flushed: []string{"Text."}},
 			events: []altEvent{press, release},
 			atLand: func(s *fakeHoldOS) { s.trust = false },
-			want:   []string{"copy Text.", "finish s1", "start system", "tone start", "tone stop"},
+			want:   []string{"copy Text.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{
 			name: "system: the session ended itself before the release, and what it heard counts", front: inNotes,
 			conn:   holdScript{phrases: []string{"Heard."}, endEarly: true},
 			events: []altEvent{press, flagsAt(40000, 0)},
-			want:   []string{"finish s1", "paste Heard.", "start system", "tone start", "tone stop"},
+			want:   []string{"paste Heard.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{
 			name: "system: a session someone else holds gives way", front: inNotes,
@@ -583,7 +602,7 @@ func TestHoldRuns(t *testing.T) {
 			},
 			conn:   holdScript{startErr: []error{aborted}, flushed: []string{"Text."}},
 			events: []altEvent{press, release},
-			want:   []string{"finish c9", "finish s1", "paste Text.", "start system", "start system", "tone start", "tone stop"},
+			want:   []string{"finish c9", "paste Text.", "release s1", "start system", "start system", "tone start", "tone stop"},
 		},
 		{
 			name: "system: a failed Start does nothing more", front: inNotes,
@@ -615,7 +634,7 @@ func TestHoldRuns(t *testing.T) {
 			name: "own app with no composer pastes into itself", front: inOwnApp,
 			conn:   holdScript{flushed: []string{"Text."}},
 			events: []altEvent{press, release},
-			want:   []string{"finish s1", "paste Text.", "start system", "tone start", "tone stop"},
+			want:   []string{"paste Text.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{name: "anywhere off in another app does nothing at all", snap: anywhereOff, front: inNotes, events: []altEvent{press, release}, notimer: true},
 		{name: "anywhere off in another app, a composer behind it", snap: func(s *v1.DictationSnapshot) { s.Anywhere, s.ComposerTarget = false, true }, front: inNotes, events: []altEvent{press, release}, notimer: true},
@@ -625,13 +644,13 @@ func TestHoldRuns(t *testing.T) {
 			name: "sounds off", snap: func(s *v1.DictationSnapshot) { s.Sounds = false }, front: inNotes,
 			conn:   holdScript{flushed: []string{"Text."}},
 			events: []altEvent{press, release}, notimer: true,
-			want: []string{"finish s1", "paste Text.", "start system"},
+			want: []string{"paste Text.", "release s1", "start system"},
 		},
 		{
 			name: "volume zero", snap: func(s *v1.DictationSnapshot) { s.SoundVolume = 0 }, front: inNotes,
 			conn:   holdScript{flushed: []string{"Text."}},
 			events: []altEvent{press, release}, notimer: true,
-			want: []string{"finish s1", "paste Text.", "start system"},
+			want: []string{"paste Text.", "release s1", "start system"},
 		},
 		{
 			name: "composer: sounds off", snap: func(s *v1.DictationSnapshot) { s.ComposerTarget, s.Sounds = true, false }, front: inOwnApp,
@@ -838,6 +857,42 @@ func TestHoldWaitsForTheLastFlush(t *testing.T) {
 	}
 }
 
+// A press during the last hold's tail cuts it, so the new session is not kept waiting, and
+// what that hold said still pastes.
+func TestHoldPressCutsTheTail(t *testing.T) {
+	r := newHoldRig(t)
+	r.os.set(func(f *fakeHoldOS) { f.front = notesApp })
+	r.conn.mu.Lock()
+	r.conn.tailing = make(chan struct{})
+	r.conn.flushed = []string{"Whole."}
+	r.conn.mu.Unlock()
+	r.s.update(holdUpdate{conn: r.conn, snap: holdSnapshot(nil)})
+	r.s.event(flagsAt(0, flagLeftAlt))
+	r.s.event(flagsAt(500, 0))
+	first := r.s.last
+	for !slices.Contains(r.log.all(), "release s1") {
+		time.Sleep(time.Millisecond)
+	}
+	r.s.event(flagsAt(600, flagRightAlt))
+	r.s.event(flagsAt(1200, 0))
+	r.wait(t)
+	<-first.done
+	r.land()
+	got := r.log.all()
+	if !slices.Contains(got, "finish s1") || !slices.Contains(got, "paste Whole.") {
+		t.Errorf("log %q", got)
+	}
+	var starts int
+	for _, l := range got {
+		if l == "start system" {
+			starts++
+		}
+	}
+	if starts != 2 {
+		t.Errorf("log %q, want two sessions", got)
+	}
+}
+
 func TestHoldListener(t *testing.T) {
 	r := newHoldRig(t)
 	now := time.Unix(1000, 0)
@@ -916,7 +971,7 @@ func TestHoldListener(t *testing.T) {
 		t.Fatal("the tap outlived the grant")
 	}
 	<-run.done
-	if slices.Contains(r.log.all(), "finish s1") {
+	if slices.Contains(r.log.all(), "release s1") {
 		t.Errorf("a revoked hold counted: %v", r.log.all())
 	}
 
@@ -1048,3 +1103,12 @@ func (f *fakeHoldObserver) observe(c dictationConn, _ *v1.DictationSnapshot) {
 }
 
 func (f *fakeHoldObserver) lost() { f.lostCount++ }
+
+// The engine waits out the stop tone by a length it holds as a constant.
+func TestStopToneLength(t *testing.T) {
+	const header, bytesPerSecond = 44, 48000 * 2
+	got := time.Duration(len(holdToneStopWAV)-header) * time.Second / bytesPerSecond
+	if got != dictate.StopToneLength {
+		t.Errorf("dictate-stop.wav is %s, dictate.StopToneLength %s", got, dictate.StopToneLength)
+	}
+}

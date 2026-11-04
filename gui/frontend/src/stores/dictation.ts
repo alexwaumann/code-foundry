@@ -280,9 +280,10 @@ function waitEnded(ms: number): Promise<void> {
 
 /**
  * Stops this window's session. With flush the last phrase lands first; resolves once the
- * session ended (bounded by FLUSH_WAIT_MS past the Stop).
+ * session ended (bounded by FLUSH_WAIT_MS past the Stop). `tail` is a release of the hold
+ * key: the daemon hears out the word still being said first.
  */
-async function stopActive(flush: boolean): Promise<void> {
+async function stopActive(flush: boolean, tail = false): Promise<void> {
   const a = useDictationStore.getState().active;
   if (!a) return;
   if (a.phase === "starting") {
@@ -295,7 +296,7 @@ async function stopActive(flush: boolean): Promise<void> {
   setActive({ ...a, phase: "stopping" });
   const ended = waitEnded(FLUSH_WAIT_MS + 500);
   try {
-    await stopDictation(a.sessionId, flush);
+    await stopDictation(a.sessionId, flush, tail);
   } catch (err) {
     console.warn("dictation stop", errorMessage(err));
     finish();
@@ -308,7 +309,11 @@ async function stopActive(flush: boolean): Promise<void> {
 /** Starts dictating into a composer, ending this window's other session (or anyone's) first. */
 async function startFor(clientId: string): Promise<void> {
   const st = useDictationStore.getState();
-  if (st.active) await stopActive(true);
+  if (st.active) {
+    // A Stop on a session stopping cuts a hold's tail: this press should not wait it out.
+    if (st.active.phase === "stopping" && st.active.sessionId) void stopDictation(st.active.sessionId, true).catch(() => undefined);
+    await stopActive(true);
+  }
   const other = useDictationStore.getState().snapshot?.session;
   // Another window's composer (or the CLI) holds the one session: it gives way.
   if (other && !useDictationStore.getState().active) {
@@ -411,22 +416,24 @@ let holdStart: Promise<void> = Promise.resolve();
 
 /**
  * dictation.hold in this window: the host's hold key, for the composer dictation.toggle
- * would pick. A press starts it (a session already open there is kept); a release stops it
- * with the last phrase, a discard without. A stop while the press is still getting its
- * session waits for it, as Start may not have gone out yet: nothing else would close the
- * microphone it opens.
+ * would pick. A press starts it (a session already open there is kept, one on its way out
+ * is not); a release stops it with the last phrase and its tail, a discard without. A stop
+ * while the press is still getting its session waits for it, as Start may not have gone out
+ * yet: nothing else would close the microphone it opens.
  */
 export function presentDictationHold(phase: string | undefined): boolean {
   if (phase === "press") {
     const target = pickTarget();
     if (!target || micAvailability(useDictationStore.getState().snapshot) === "hidden") return false;
-    if (useDictationStore.getState().active?.clientId !== target) holdStart = startFor(target);
+    const a = useDictationStore.getState().active;
+    if (a?.clientId !== target || a.phase === "stopping") holdStart = startFor(target);
     return true;
   }
-  const flush = phase === "release";
-  void stopActive(flush)
-    .then(() => holdStart)
-    .then(() => stopActive(flush));
+  const release = phase === "release";
+  const pressed = holdStart;
+  void stopActive(release, release)
+    .then(() => pressed)
+    .then(() => (holdStart === pressed ? stopActive(release, release) : undefined)); // a later press owns what is open now
   return true;
 }
 

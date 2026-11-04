@@ -28,8 +28,8 @@ const (
 	// holdToneDelay is how long after the press the start tone waits, so a press cancelled
 	// by a shortcut stays silent.
 	holdToneDelay = 40 * time.Millisecond
-	// holdFlushWait bounds the wait for a flushed session's end (the daemon's own bound is
-	// 1.5 s): after it, what arrived is pasted.
+	// holdFlushWait bounds the wait for a released session's end (the daemon's own bound is
+	// 2.2 s, the tail and the flush): after it, what arrived is pasted.
 	holdFlushWait = 3 * time.Second
 	// holdTrustPoll is how often the host looks at the grant while it needs to know: not
 	// granted yet, or a new tap that has heard nothing so far.
@@ -191,6 +191,8 @@ type holdRun struct {
 
 	// over: the keeper decided how it ends. A tone not yet played then stays silent.
 	over atomic.Bool
+	// released is the session a system hold released, for the next press to cut its tail.
+	released atomic.Pointer[string]
 	// end says how the hold ended: true counted. Buffered, sent once.
 	end  chan bool
 	done chan struct{}
@@ -552,6 +554,7 @@ func (s *holdService) holdPhase(r *holdRun, phase string) {
 // paste. The session may end by itself first (30 s of silence): what it heard still counts.
 func (s *holdService) runSystem(r *holdRun, pressed frontApp) {
 	if r.prev != nil {
+		s.cutTail(r)
 		select {
 		case <-r.prev.done: // a flush still running would refuse this Start
 		case <-s.ctx.Done():
@@ -575,12 +578,14 @@ func (s *holdService) runSystem(r *holdRun, pressed frontApp) {
 		s.discardSession(r, id)
 		return
 	}
-	// Stop goes first: the daemon drops frames from then on, so the tone is not transcribed.
+	// The microphone stays open for the tail, so the tone sounds into it: the engine knows
+	// its length and takes nothing there for speech, and it does not end up as text.
+	r.released.Store(&id)
 	finished := make(chan struct{})
 	go func() {
 		defer close(finished)
-		if err := r.conn.Finish(s.ctx, id); err != nil {
-			s.log.Warn("dictation: finish the session", "err", err)
+		if err := r.conn.Release(s.ctx, id); err != nil {
+			s.log.Warn("dictation: release the session", "err", err)
 		}
 	}()
 	s.stopTone(r)
@@ -597,6 +602,16 @@ func (s *holdService) runSystem(r *holdRun, pressed frontApp) {
 	select {
 	case s.pastes <- pasteJob{text: joinPhrases(sess.collected()), pressed: pressed}:
 	case <-s.ctx.Done():
+	}
+}
+
+// cutTail ends the last hold's tail now: a press means the next words are for this hold, and
+// it should not wait out the last one's. What the tail heard so far still pastes.
+func (s *holdService) cutTail(r *holdRun) {
+	if id := r.prev.released.Load(); id != nil {
+		if err := r.conn.Finish(s.ctx, *id); err != nil {
+			s.log.Warn("dictation: cut the tail", "err", err)
+		}
 	}
 }
 

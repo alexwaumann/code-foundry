@@ -153,7 +153,7 @@ export async function reportComposerTarget(available: boolean, conn: DaemonConne
 }
 
 /** Ends a session; with flush its last phrase arrives on Session first (bounded by the daemon: 1.5 s). */
-export async function stopDictation(sessionId: string, flush: boolean, conn: DaemonConnection = daemon): Promise<void> {
+export async function stopDictation(sessionId: string, flush: boolean, tail = false, conn: DaemonConnection = daemon): Promise<void> {
   const c = await conn.client(DictationService);
-  await c.stop({ sessionId, flush });
+  await c.stop({ sessionId, flush, tail });
 }

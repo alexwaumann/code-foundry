@@ -59,7 +59,7 @@ describe("dictation.hold", () => {
     fakeDictation.setFlushPhrase("the end");
     presentDictationHold("release");
     await idle();
-    expect(fakeDictation.calls).toContain(`stop dict-1 true`);
+    expect(fakeDictation.calls).toContain("stop dict-1 true tail");
     await vi.waitFor(() => {
       expect(c.inserted).toEqual(["the end"]);
     });
@@ -111,6 +111,26 @@ describe("dictation.hold", () => {
     expect(fakeDictation.calls.filter((c) => c.startsWith("start"))).toEqual(["start c1"]);
     presentDictationHold("release");
     await idle();
+  });
+
+  it("press during that composer's tail cuts it and starts again", async () => {
+    await hold();
+    const c = composer("c1");
+    fakeDictation.holdTails();
+    presentDictationHold("press");
+    await listening();
+    fakeDictation.setFlushPhrase("the end");
+    presentDictationHold("release");
+    await vi.waitFor(() => {
+      expect(active()?.phase).toBe("stopping");
+    });
+    expect(c.inserted).toEqual([]);
+    presentDictationHold("press");
+    await vi.waitFor(() => {
+      expect(active()?.sessionId).toBe("dict-2");
+    });
+    expect(fakeDictation.calls).toEqual(["start c1", "stop dict-1 true tail", "stop dict-1 true", "start c1"]);
+    expect(c.inserted).toEqual(["the end"]);
   });
 
   it("a release before Start answered gives the session up", async () => {
