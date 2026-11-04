@@ -752,3 +752,33 @@ test("the MCP row: its value lines up with Usage's, its menu opens under the row
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
 });
+
+/** SHOTS=<dir>: a child thread's Lineage card with its place, and a run's without one, WebKit, 1280x800 at 2x, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test.describe(`lineage card screenshots (${scheme})`, () => {
+    test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
+    test("the Lineage rows' hover card", async ({ page }, info) => {
+      const shots = process.env.SHOTS;
+      test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      await mockPost("workspace?name=Platform&projects=repo-cf,repo-gp,repo-dot");
+      const { id } = (await mockPost("thread-info?scenario=single")) as { id: string };
+      const child = (await mockPost(`multi-thread?projects=repo-cf,repo-gp,repo-dot&project=repo-cf&branch=cf/agents-panel&name=Agents%20panel&workspace=Platform&createdBy=${id}`)) as { id: string };
+      await mockPost(`thread/status?id=${child.id}&status=busy`);
+      await openApp(page);
+      await row(page, `s:${id}`).click();
+      await toggle(page).click();
+      await expect(card(page)).toBeVisible();
+      const rows = page.getByTestId("ti-lineage-row");
+      await rows.locator(`xpath=self::*[@data-id="${child.id}"]`).hover();
+      await expect(page.getByTestId("ti-lineage-place")).toBeVisible();
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(shots)}/lineage-card-child-${scheme}.png` });
+      await page.mouse.move(640, 700);
+      await expect(page.getByTestId("ti-lineage-place")).toHaveCount(0);
+      await rows.and(page.locator('[data-kind="agent"]')).first().hover();
+      await expect(page.getByTestId("ti-lineage-model")).toBeVisible();
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(shots)}/lineage-card-run-${scheme}.png` });
+    });
+  });
+}

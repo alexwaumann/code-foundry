@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowRight, Bot, CornerLeftUp, Square } from "lucide-react";
+import { ThreadPlaceRows } from "@/components/thread/ThreadPlaceRows";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { agentName, fmtElapsed } from "@/lib/agents";
@@ -77,7 +78,7 @@ function useChildRows(threadId: string): readonly string[] {
           id,
           name: t?.name || id,
           state,
-          type: t?.branch ?? "",
+          type: "",
           model: t?.model ?? "",
           effort: t?.effort ?? "",
           startedAtMs: t?.createdAtMs ?? null,
@@ -96,7 +97,9 @@ function useChildRows(threadId: string): readonly string[] {
  * over the value column, not a button inside the row's own: Enter on it interrupts, it
  * does not open. Subagent runs have none (nothing stops one run). The hover card opens at
  * once (delay 0) like the sidebar's, and names the model as the app does (canonicalModelName):
- * a run that asked for none used its thread's model, as the subagent view says.
+ * a run that asked for none used its thread's model, as the subagent view says. A child
+ * thread's card also says where it works; a run's does not, as the daemon records no cwd per
+ * run and its thread's place could be wrong (docs/notes/lineage-card-place.md).
  */
 function LineageItem({ threadId, row, sub = false }: { threadId: string; row: LineageRow; sub?: boolean }) {
   // A finished row's time is fixed: only a live one ticks.
@@ -116,10 +119,15 @@ function LineageItem({ threadId, row, sub = false }: { threadId: string; row: Li
   const card = (
     <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>
       <div className="font-medium">{row.name}</div>
-      {row.type && <div className={cn(row.kind === "thread" && "text-code")}>{row.type}</div>}
+      {row.type && <div>{row.type}</div>}
       {(model || row.effort) && (
         <div className="text-cf-text-muted" data-testid="ti-lineage-model">
           {[model, row.effort].filter(Boolean).join(" · ")}
+        </div>
+      )}
+      {row.kind === "thread" && (
+        <div className="my-1 border-y border-cf-divider py-1" data-testid="ti-lineage-place">
+          <ThreadPlaceRows id={row.id} worktreeBranchOnly />
         </div>
       )}
       <div className="flex gap-3">
