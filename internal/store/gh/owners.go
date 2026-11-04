@@ -183,7 +183,7 @@ func (s *Store) PublishOwners(ctx context.Context) ([]PublishOwner, error) {
 // not an owner) or the request failed; transient is true for a failure worth retrying
 // (anything but not found or permission denied). Worker goroutine only.
 func (s *Store) orgPolicy(ctx context.Context, rr RESTRunner, org string) (allowed []string, known, transient bool) {
-	if err := s.pace(ctx); err != nil {
+	if err := s.admit(ctx, true); err != nil {
 		return nil, false, true
 	}
 	start := s.opts.Now()

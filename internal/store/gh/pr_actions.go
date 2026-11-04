@@ -222,7 +222,7 @@ func outcomeUnknown(err error) bool {
 // restWrite sends one paced REST write and applies its global effects (auth state,
 // rate-limit and network pauses), like callDoc does for GraphQL.
 func (s *Store) restWrite(ctx context.Context, rw RESTWriter, method, path string, body any) (json.RawMessage, error) {
-	if err := s.pace(ctx); err != nil {
+	if err := s.admit(ctx, false); err != nil {
 		return nil, err
 	}
 	start := s.opts.Now()

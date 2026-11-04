@@ -29,6 +29,11 @@ import (
 //     current month every StatsInterval, the closed ones every HistoryInterval).
 //
 // Then the snapshot is updated and events go out only for what changed, plus Polled.
+//
+// A poll is one job, but it does not hold the worker: before each of its requests, jobs
+// someone waits for run first (yield.go). That happens inside call/callDoc and nowhere
+// else, so the code between two requests runs unbroken: a fingerprint response and what
+// it marks stale are one step, and so are the last request and the publish.
 
 // isGlobal reports errors handled by a store-wide pause rather than per-job backoff.
 func isGlobal(err error) bool {
@@ -44,8 +49,10 @@ const mergeableRechecks = 3
 type cycleStats struct {
 	requests, cost, details int
 	// pollDur is the poll request's time (stats included when due; callDoc sets it);
-	// statsDur is applyStats' (the REST commit searches).
-	pollDur, statsDur time.Duration
+	// statsDur is applyStats' (the REST commit searches); yieldDur is the time spent on
+	// the yields waiting jobs ran in, which the poll's dur includes.
+	pollDur, statsDur, yieldDur time.Duration
+	yields                      int
 }
 
 // poll runs one poll. Its error is the fingerprint request's (the parts that follow log
@@ -65,6 +72,7 @@ func (s *Store) poll(ctx context.Context) error {
 		s.mu.Unlock()
 		attrs := append([]any{"requests", s.cycle.requests, "cost", s.cycle.cost, "details", s.cycle.details,
 			"dur", end.Sub(start).Round(time.Millisecond).String(), "poll_dur", s.cycle.pollDur.Round(time.Millisecond).String(),
+			"yields", s.cycle.yields, "yield_dur", s.cycle.yieldDur.Round(time.Millisecond).String(),
 			"tier", s.presence().String(),
 			"next_in", max(0, next).Round(time.Second).String()}, plan.summary()...)
 		if plan.stats != nil {
@@ -976,7 +984,7 @@ func (s *Store) fetchClosedStats(ctx context.Context, cp *pollPlan) (*pollResult
 // own rate limit (30/min), so a rate-limit error here does not pause GraphQL polling;
 // only auth and network errors have global effects.
 func (s *Store) searchCommits(ctx context.Context, rr RESTRunner, q string) (int, error) {
-	if err := s.pace(ctx); err != nil {
+	if err := s.admit(ctx, true); err != nil {
 		return 0, err
 	}
 	start := s.opts.Now()
@@ -1031,7 +1039,7 @@ func sameStats(a, b MonthlyStats) bool {
 // its token again and validates it with one REST call (GET /user); on success, polling
 // resumes and the next GraphQL success clears the auth state.
 func (s *Store) checkAuth(ctx context.Context) {
-	if err := s.pace(ctx); err != nil {
+	if err := s.admit(ctx, true); err != nil {
 		return
 	}
 	st, err := s.opts.Runner.AuthStatus(ctx)

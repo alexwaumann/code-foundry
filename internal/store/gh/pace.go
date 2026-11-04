@@ -17,8 +17,22 @@ import "time"
 //     requests/hour at a 1s gap: even a runaway schedule cannot drain the budget past
 //     MinRemaining. A 0.5s gap would allow ~5,100. The store also reads rateLimit from
 //     every response and pauses until resetAt when fewer than MinRemaining points remain.
+//   - A read someone is waiting for may follow at a quarter of the gap, from a small
+//     allowance (gapAllowance, docs/notes/pr-queue-priority.md). Over an hour that adds
+//     at most 3600/userGapRefill = 360 requests to the 3,000 above; a write never uses
+//     it, as GitHub asks for a second between writes.
 const (
 	DefaultMinGap = time.Second
+	// userGapDivisor makes Options.UserGap's default a quarter of MinGap.
+	userGapDivisor = 4
+	// userGapBurst is how many short gaps the allowance holds: a few pull requests
+	// opened in a row, each one or two reads.
+	userGapBurst = 8
+	// userGapRefill is the time that buys one short gap back.
+	userGapRefill = 10 * time.Second
+	// maxJobsAhead is how many jobs may go ahead of due scheduled work before it gets a
+	// request of its own, so a steady stream of them cannot stop the poll (yield.go).
+	maxJobsAhead = 8
 	// DefaultPollInterval is how often the fingerprint poll runs while the dashboards
 	// are on or any repository is tracked or branch watched
 	// (github.poll_interval_seconds). One request, cost 1.

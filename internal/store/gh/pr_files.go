@@ -152,7 +152,7 @@ func (s *Store) PullRequestFile(ctx context.Context, slug, ref, filePath string)
 // restRaw sends one paced raw REST GET and applies its global effects (auth state,
 // rate-limit and network pauses), like restWrite. Worker goroutine only.
 func (s *Store) restRaw(ctx context.Context, rr RawRESTRunner, p string, params map[string]string, accept string, limit int64) (RawResponse, error) {
-	if err := s.pace(ctx); err != nil {
+	if err := s.admit(ctx, true); err != nil {
 		return RawResponse{}, err
 	}
 	start := s.opts.Now()
