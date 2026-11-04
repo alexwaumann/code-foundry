@@ -152,9 +152,39 @@ test.describe("composer", () => {
   });
 });
 
-/** SHOTS=<dir>: the hold key's permission row and the Advanced rows, for the PR body, in both schemes. */
+/** SHOTS=<dir>: the hold key's permission row, the Advanced rows and the Microphone row, for the PR body, in both schemes. */
 test.describe("shots", () => {
   for (const scheme of ["dark", "light"] as const) {
+    test(`the Microphone row, ${scheme}`, async ({ page }) => {
+      const dir = process.env.SHOTS;
+      test.skip(!dir, "SHOTS=<dir> only");
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.setViewportSize({ width: 1440, height: 1200 });
+      await mockPost("dictation?state=ready&access=granted&mic=avoiding");
+      await openApp(page);
+      await page.keyboard.press("Meta+Comma");
+      const section = page.locator('[data-section="dictation"]');
+      const row = section.locator('[data-setting="dictation.microphone"]');
+      await section.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500); // the settings sheet's fade
+      await page.getByTestId("settings-advanced-toggle").click();
+      await expect(row).toContainText("AirPods Pro are Bluetooth");
+      await section.screenshot({ path: `${dir ?? ""}/mic-avoiding-${scheme}.png` });
+      await page.getByTestId("settings-advanced-toggle").click();
+      await mockPost("dictation?mic=plain");
+      await row.getByRole("combobox").click();
+      await expect(page.getByRole("option", { name: /Shure MV7/ })).toBeVisible();
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: `${dir ?? ""}/mic-menu-${scheme}.png` });
+      await page.getByRole("option", { name: /Shure MV7/ }).click();
+      await mockPost("dictation?mic=named");
+      await expect(row).toContainText("Always listens");
+      await row.screenshot({ path: `${dir ?? ""}/mic-named-${scheme}.png` });
+      await mockPost("dictation?mic=missing");
+      await expect(row).toContainText("Shure MV7 isn’t connected");
+      await expect(row.getByRole("combobox")).toHaveText("Shure MV7", { useInnerText: true });
+      await row.screenshot({ path: `${dir ?? ""}/mic-missing-${scheme}.png` });
+    });
     test(`the Advanced rows, ${scheme}`, async ({ page }) => {
       const dir = process.env.SHOTS;
       test.skip(!dir, "SHOTS=<dir> only");

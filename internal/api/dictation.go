@@ -12,6 +12,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 	"github.com/alexwaumann/code-foundry/internal/store/dictation"
 )
 
@@ -28,6 +29,7 @@ type DictationStore interface {
 	SessionEnded(sessionID string) (reason dictation.EndReason, ended, ok bool)
 	MicDenied(denied bool)
 	ReportAccessibility(a dictation.Accessibility)
+	ReportInputs(in dictation.Inputs)
 	ComposerTarget(available bool)
 }
 
@@ -212,6 +214,17 @@ func (h *Dictation) MicDenied(_ context.Context, req *connect.Request[v1.Dictati
 	return connect.NewResponse(&v1.DictationMicDeniedResponse{}), nil
 }
 
+// Inputs records what the host says about the input devices.
+func (h *Dictation) Inputs(_ context.Context, req *connect.Request[v1.DictationInputsRequest]) (*connect.Response[v1.DictationInputsResponse], error) {
+	in := req.Msg.GetInputs()
+	devices := make([]dictate.Input, 0, len(in.GetDevices()))
+	for _, d := range in.GetDevices() {
+		devices = append(devices, dictate.Input{UID: d.GetUid(), Name: d.GetName(), Transport: dictate.Transport(d.GetTransport())})
+	}
+	h.store.ReportInputs(dictation.Inputs{Devices: devices, Default: in.GetDefaultUid(), LidClosed: in.GetLidClosed(), MicrophoneName: in.GetMicrophoneName()})
+	return connect.NewResponse(&v1.DictationInputsResponse{}), nil
+}
+
 // Accessibility records what the host says macOS allows the hold key.
 func (h *Dictation) Accessibility(_ context.Context, req *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error) {
 	a := req.Msg.GetAccessibility()
@@ -268,7 +281,7 @@ func DictationSnapshotToProto(s dictation.Snapshot) *v1.DictationSnapshot {
 	out := &v1.DictationSnapshot{
 		Enabled: s.Enabled, State: dictationStates[s.State], Error: s.Error, MicDenied: s.MicDenied,
 		Anywhere: s.Prefs.Anywhere, HoldKey: s.Prefs.HoldKey, Sounds: s.Prefs.Sounds, SoundVolume: int32(s.Prefs.SoundVolume),
-		ComposerTarget: s.ComposerTarget, OtherAudio: s.Prefs.OtherAudio,
+		ComposerTarget: s.ComposerTarget, OtherAudio: s.Prefs.OtherAudio, Microphone: s.Prefs.Microphone, AvoidBluetooth: s.Prefs.AvoidBluetooth,
 		Model: &v1.DictationModel{Name: s.Model.Name, SizeBytes: s.Model.Size, Downloaded: s.Model.Downloaded},
 		Hardware: &v1.DictationHardware{
 			Chip: s.Hardware.Chip, MemoryBytes: s.Hardware.MemoryBytes, M1Family: s.Hardware.M1Family,
@@ -279,6 +292,17 @@ func DictationSnapshotToProto(s dictation.Snapshot) *v1.DictationSnapshot {
 	}
 	if a := s.Accessibility; a != nil {
 		out.Accessibility = &v1.DictationAccessibility{Granted: a.Granted, TapSilent: a.TapSilent, ListName: a.ListName, Executable: a.Executable}
+	}
+	if in := s.Inputs; in != nil {
+		out.Inputs = &v1.DictationInputs{DefaultUid: in.Default, LidClosed: in.LidClosed, MicrophoneName: in.MicrophoneName}
+		for _, d := range in.Devices {
+			out.Inputs.Devices = append(out.Inputs.Devices, &v1.DictationInput{Uid: d.UID, Name: d.Name, Transport: string(d.Transport)})
+		}
+		pick := dictate.PickMicrophone(dictate.InputFacts{
+			Inputs: in.Devices, Default: in.Default, LidClosed: in.LidClosed,
+			Microphone: s.Prefs.Microphone, AvoidBluetooth: s.Prefs.AvoidBluetooth,
+		})
+		out.MicrophonePick = &v1.DictationMicrophonePick{State: string(pick.State), Name: pick.Name, DefaultName: pick.DefaultName}
 	}
 	if x := s.Session; x != nil {
 		out.Session = &v1.DictationSession{Id: x.ID, ClientId: x.ClientID, StartedAt: timestamppb.New(x.StartedAt), Stopping: x.Stopping}

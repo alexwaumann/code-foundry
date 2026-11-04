@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 	"github.com/alexwaumann/code-foundry/internal/store/dictation"
 	"github.com/alexwaumann/code-foundry/internal/store/dictation/dictationtest"
 )
@@ -202,6 +204,17 @@ func TestDictationService(t *testing.T) {
 		a := m.GetAccessibility()
 		return a.GetGranted() && a.GetTapSilent() && a.GetListName() == "Accessibility" && a.GetExecutable() == "/x"
 	})
+	if _, err := c.Inputs(ctx, connect.NewRequest(&v1.DictationInputsRequest{Inputs: &v1.DictationInputs{
+		DefaultUid: "pods", MicrophoneName: "Shure MV7",
+		Devices: []*v1.DictationInput{{Uid: "pods", Name: "AirPods Pro", Transport: "bluetooth"}, {Uid: "mac", Name: "MacBook Pro Microphone", Transport: "built_in"}},
+	}})); err != nil {
+		t.Fatal(err)
+	}
+	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool {
+		in := m.GetInputs()
+		return len(in.GetDevices()) == 2 && in.GetDefaultUid() == "pods" && in.GetMicrophoneName() == "Shure MV7" && in.GetDevices()[1].GetTransport() == "built_in" &&
+			m.GetMicrophonePick().GetState() == "plain" // the harness's settings leave avoid off
+	})
 	if _, err := c.ComposerTarget(ctx, connect.NewRequest(&v1.DictationComposerTargetRequest{Available: true})); err != nil {
 		t.Fatal(err)
 	}
@@ -242,5 +255,35 @@ func TestDictationErrorCodes(t *testing.T) {
 		if got := connect.CodeOf(dictationError(tc.err)); got != tc.want {
 			t.Errorf("%v: %v, want %v", tc.err, got, tc.want)
 		}
+	}
+}
+
+func TestDictationSnapshotPick(t *testing.T) {
+	inputs := &dictation.Inputs{Default: "pods", Devices: []dictate.Input{
+		{UID: "pods", Name: "AirPods Pro", Transport: dictate.TransportBluetooth},
+		{UID: "mac", Name: "MacBook Pro Microphone", Transport: dictate.TransportBuiltIn},
+	}}
+	tests := []struct {
+		name   string
+		prefs  dictation.Prefs
+		inputs *dictation.Inputs
+		want   *v1.DictationMicrophonePick
+	}{
+		{"no report", dictation.Prefs{AvoidBluetooth: true}, nil, nil},
+		{"plain", dictation.Prefs{}, inputs, &v1.DictationMicrophonePick{State: "plain"}},
+		{"avoiding", dictation.Prefs{AvoidBluetooth: true}, inputs, &v1.DictationMicrophonePick{State: "avoiding", Name: "MacBook Pro Microphone", DefaultName: "AirPods Pro"}},
+		{"named", dictation.Prefs{Microphone: "mac"}, inputs, &v1.DictationMicrophonePick{State: "named"}},
+		{"missing", dictation.Prefs{Microphone: "shure"}, inputs, &v1.DictationMicrophonePick{State: "missing"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := DictationSnapshotToProto(dictation.Snapshot{Prefs: tt.prefs, Inputs: tt.inputs})
+			if !proto.Equal(got.GetMicrophonePick(), tt.want) {
+				t.Errorf("got %v, want %v", got.GetMicrophonePick(), tt.want)
+			}
+			if got.GetMicrophone() != tt.prefs.Microphone || got.GetAvoidBluetooth() != tt.prefs.AvoidBluetooth {
+				t.Errorf("settings: %v", got)
+			}
+		})
 	}
 }

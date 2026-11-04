@@ -269,6 +269,7 @@ const staticFields: FieldInit[] = [
     enumLabels: ["Left ⌥", "Right ⌥", "Both ⌥"],
     defaultValue: "both",
   },
+  { key: "dictation.microphone", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.STRING, title: "Microphone", description: "Follows the input chosen in System Settings.", defaultValue: "" },
   { key: "dictation.sounds", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.BOOL, title: "Sounds", description: "Plays a sound as dictation starts and stops, at the alert volume.", defaultValue: "true" },
   {
     key: "dictation.other_audio",
@@ -283,6 +284,7 @@ const staticFields: FieldInit[] = [
     enumLabels: ["Do nothing", "Lower"],
     defaultValue: "do_nothing",
   },
+  { key: "dictation.avoid_bluetooth", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.BOOL, title: "Avoid Bluetooth microphones", description: "When the system default is Bluetooth, use the Mac’s microphone, so headphones stay out of low-quality call audio.", defaultValue: "true" },
   { key: "dictation.spoken_symbols", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.BOOL, title: "Spoken symbols", description: "Words like “underscore”, “hashtag” and “comma” become the symbol: “my underscore variable” is my_variable.", defaultValue: "false" },
   { key: "dictation.spoken_formatting", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.BOOL, title: "Spoken formatting", description: "“New line”, “new paragraph”, “open quote” and “close quote” become line breaks and quotation marks.", defaultValue: "true" },
   // Ember (docs/notes/ember-2-store.md).

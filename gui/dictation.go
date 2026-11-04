@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -10,6 +11,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 )
 
 const (
@@ -53,6 +55,7 @@ type dictationConn interface {
 	// Hold runs dictation.hold: the hold key, for the window's composer.
 	Hold(ctx context.Context, phase string) error
 	Accessibility(ctx context.Context, a *v1.DictationAccessibility) error
+	Inputs(ctx context.Context, in *v1.DictationInputs) error
 }
 
 // sessionStream is the client side of DictationService.Session.
@@ -93,14 +96,23 @@ type dictationWatcher struct {
 	// carries none, and a lost stream says nothing, so neither calls it). Nil in tests that
 	// do not care.
 	anywhere func(on bool)
-	// overlay and hold, when set, are told of every snapshot.
+	// overlay, hold and inputs, when set, are told of every snapshot.
 	overlay overlayObserver
 	hold    holdObserver
+	inputs  holdObserver
+	// micChoice is the last snapshot's settings for choosing an input.
+	micChoice atomic.Pointer[micChoice]
+}
+
+// micChoice is dictation.microphone and dictation.avoid_bluetooth.
+type micChoice struct {
+	microphone string
+	avoid      bool
 }
 
 // watchDictation runs the dictation watcher over the host's daemon client until ctx
 // ends, reconnecting when the daemon restarts (connectDaemon may start it).
-func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*client.Client, error), mic microphone, anywhere func(on bool), overlay overlayObserver, hold holdObserver, log *slog.Logger) {
+func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*client.Client, error), mic microphone, anywhere func(on bool), overlay overlayObserver, hold, inputs holdObserver, log *slog.Logger) {
 	w := dictationWatcher{
 		dial: func(ctx context.Context) (dictationConn, error) {
 			c, err := connectDaemon(ctx)
@@ -116,6 +128,7 @@ func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*c
 		anywhere:   anywhere,
 		overlay:    overlay,
 		hold:       hold,
+		inputs:     inputs,
 	}
 	w.run(ctx)
 }
@@ -168,6 +181,9 @@ func (w *dictationWatcher) once(parent context.Context) error {
 	if w.hold != nil {
 		defer w.hold.lost()
 	}
+	if w.inputs != nil {
+		defer w.inputs.lost()
+	}
 
 	var sess *micSession
 	defer func() {
@@ -181,6 +197,7 @@ func (w *dictationWatcher) once(parent context.Context) error {
 		snap := stream.Msg()
 		if snap.GetHeartbeat() == nil {
 			enabled, denied = snap.GetEnabled(), snap.GetMicDenied()
+			w.micChoice.Store(&micChoice{microphone: snap.GetMicrophone(), avoid: snap.GetAvoidBluetooth()})
 			if w.anywhere != nil {
 				w.anywhere(snap.GetEnabled() && snap.GetAnywhere())
 			}
@@ -201,6 +218,9 @@ func (w *dictationWatcher) once(parent context.Context) error {
 			}
 			if w.hold != nil {
 				w.hold.observe(conn, snap)
+			}
+			if w.inputs != nil {
+				w.inputs.observe(conn, snap)
 			}
 		}
 		// The user may have allowed the microphone in System Settings since it was
@@ -258,7 +278,7 @@ func (w *dictationWatcher) capture(ctx, connCtx context.Context, conn dictationC
 		w.reportDenied(ctx, conn, false)
 	}
 	opened := time.Now()
-	mic, err := w.mic.Start()
+	mic, err := w.openMic()
 	if err != nil {
 		w.log.Warn("dictation: cannot open the microphone; stopping the session", "session", id, "err", err)
 		w.stopSession(ctx, conn, id)
@@ -320,11 +340,32 @@ func (w *dictationWatcher) reopen(ctx context.Context) (micCapture, error) {
 			}
 		}
 		var mic micCapture
-		if mic, err = w.mic.Start(); err == nil {
+		if mic, err = w.openMic(); err == nil {
 			return mic, nil
 		}
 	}
 	return nil, err
+}
+
+// openMic opens the input the settings choose among what is connected now, so a microphone
+// that has come back is picked up here. An input that will not open gives way to the system
+// default: a session on the wrong microphone beats none.
+func (w *dictationWatcher) openMic() (micCapture, error) {
+	var choice micChoice
+	if c := w.micChoice.Load(); c != nil {
+		choice = *c
+	}
+	list := w.mic.Inputs()
+	pick := dictate.PickMicrophone(dictate.InputFacts{
+		Inputs: list.Devices, Default: list.Default, LidClosed: list.LidClosed,
+		Microphone: choice.microphone, AvoidBluetooth: choice.avoid,
+	})
+	mic, err := w.mic.Start(pick.UID)
+	if err != nil && pick.UID != "" {
+		w.log.Warn("dictation: cannot open the chosen input; using the system default", "state", string(pick.State), "err", err)
+		return w.mic.Start("")
+	}
+	return mic, err
 }
 
 func (w *dictationWatcher) reportDenied(ctx context.Context, conn dictationConn, denied bool) {
@@ -390,6 +431,11 @@ func (d daemonDictation) Hold(ctx context.Context, phase string) error {
 		Name: "dictation.hold",
 		Args: map[string]string{"phase": phase},
 	}))
+	return err
+}
+
+func (d daemonDictation) Inputs(ctx context.Context, in *v1.DictationInputs) error {
+	_, err := d.c.Inputs(ctx, connect.NewRequest(&v1.DictationInputsRequest{Inputs: in}))
 	return err
 }
 

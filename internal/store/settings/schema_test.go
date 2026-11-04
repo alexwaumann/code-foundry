@@ -487,6 +487,8 @@ func TestDictationFields(t *testing.T) {
 		{KeyDictationAnywhere, "false", "", Bool},
 		{KeyDictationHoldKey, HoldKeyBoth, KeyDictationEnabled, Enum},
 		{KeyDictationSounds, "true", KeyDictationEnabled, Bool},
+		{KeyDictationMicrophone, "", KeyDictationEnabled, String},
+		{KeyDictationAvoidBluetooth, "true", KeyDictationEnabled, Bool},
 		{KeyDictationOtherAudio, OtherAudioDoNothing, KeyDictationEnabled, Enum},
 		{KeyDictationSpokenSymbols, "false", KeyDictationEnabled, Bool},
 		{KeyDictationSpokenFormatting, "true", KeyDictationEnabled, Bool},
@@ -519,7 +521,7 @@ func TestDictationFields(t *testing.T) {
 // A settings file from before dictate anywhere has none of the new keys: it reads with
 // the defaults and no issue. A bad value falls back to its default and is reported.
 func TestDictationSettingsFromFile(t *testing.T) {
-	want := Dictation{Enabled: true, HoldKey: HoldKeyBoth, Sounds: true, OtherAudio: OtherAudioDoNothing, SpokenFormatting: true}
+	want := Dictation{Enabled: true, HoldKey: HoldKeyBoth, Sounds: true, AvoidBluetooth: true, OtherAudio: OtherAudioDoNothing, SpokenFormatting: true}
 	tests := []struct {
 		name   string
 		file   string
@@ -527,9 +529,9 @@ func TestDictationSettingsFromFile(t *testing.T) {
 		issues []string
 	}{
 		{"older file", "[dictation]\nenabled = true\n", want, nil},
-		{"no table", "", Dictation{HoldKey: HoldKeyBoth, Sounds: true, OtherAudio: OtherAudioDoNothing, SpokenFormatting: true}, nil},
-		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"left\"\nsounds = false\nother_audio = \"lower\"\nspoken_symbols = true\nspoken_formatting = false\n",
-			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyLeft, OtherAudio: OtherAudioLower, SpokenSymbols: true}, nil},
+		{"no table", "", Dictation{HoldKey: HoldKeyBoth, Sounds: true, AvoidBluetooth: true, OtherAudio: OtherAudioDoNothing, SpokenFormatting: true}, nil},
+		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"left\"\nsounds = false\nother_audio = \"lower\"\nspoken_symbols = true\nspoken_formatting = false\nmicrophone = \"usb-1\"\navoid_bluetooth = false\n",
+			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyLeft, Microphone: "usb-1", OtherAudio: OtherAudioLower, SpokenSymbols: true}, nil},
 		// Pause is Hex's third choice, which this does not have.
 		{"unknown other audio", "[dictation]\nenabled = true\nother_audio = \"pause\"\n", want, []string{KeyDictationOtherAudio}},
 		// A value from the tip releases that had a fourth option: the default means the same.

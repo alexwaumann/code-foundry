@@ -241,6 +241,8 @@ const (
 	KeyDictationEnabled          = "dictation.enabled"
 	KeyDictationAnywhere         = "dictation.anywhere"
 	KeyDictationHoldKey          = "dictation.hold_key"
+	KeyDictationMicrophone       = "dictation.microphone"
+	KeyDictationAvoidBluetooth   = "dictation.avoid_bluetooth"
 	KeyDictationSounds           = "dictation.sounds"
 	KeyDictationOtherAudio       = "dictation.other_audio"
 	KeyDictationSpokenSymbols    = "dictation.spoken_symbols"
@@ -419,6 +421,12 @@ var staticFields = []Field{
 		bind:        func(s *Settings) any { return &s.Dictation.HoldKey },
 	},
 	{
+		Key: KeyDictationMicrophone, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: String, Title: "Microphone",
+		Description: "Follows the input chosen in System Settings.",
+		Default:     "",
+		bind:        func(s *Settings) any { return &s.Dictation.Microphone },
+	},
+	{
 		Key: KeyDictationSounds, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Sounds",
 		Description: "Plays a sound as dictation starts and stops, at the alert volume.",
 		Default:     "true",
@@ -433,6 +441,12 @@ var staticFields = []Field{
 		bind:        func(s *Settings) any { return &s.Dictation.OtherAudio },
 	},
 	// Behind the section's Advanced disclosure (the GUI's advancedFields.ts).
+	{
+		Key: KeyDictationAvoidBluetooth, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Avoid Bluetooth microphones",
+		Description: "When the system default is Bluetooth, use the Mac’s microphone, so headphones stay out of low-quality call audio.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Dictation.AvoidBluetooth },
+	},
 	{
 		Key: KeyDictationSpokenSymbols, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Spoken symbols",
 		Description: "Words like “underscore”, “hashtag” and “comma” become the symbol: “my underscore variable” is my_variable.",

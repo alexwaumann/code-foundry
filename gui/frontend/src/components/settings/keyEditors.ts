@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { BackdropEditor } from "./BackdropEditor";
-import { DictationNeedsModel, DictationStateChip, DictationToggleEditor } from "./DictationSettings";
+import { DictationMicrophoneDescription, DictationMicrophoneEditor, DictationNeedsModel, DictationStateChip, DictationToggleEditor } from "./DictationSettings";
 import type { SettingEditor } from "./editor";
 import { ThemeDarkEditor, ThemeLightEditor } from "./ThemeSlotEditor";
 import { VolumeEditor } from "./VolumeEditor";
@@ -17,6 +17,7 @@ export const keyEditors: Readonly<Partial<Record<string, SettingEditor>>> = {
   "appearance.backdrop": BackdropEditor,
   "ember.worker_models": WorkerModelsEditor,
   "dictation.enabled": DictationToggleEditor,
+  "dictation.microphone": DictationMicrophoneEditor,
 };
 
 /**
@@ -30,6 +31,11 @@ export const keyTitleChips: Readonly<Partial<Record<string, ComponentType>>> = {
 /** Words after a setting's description, by key, that depend on state ("Needs the model below."). */
 export const keyDescriptionTails: Readonly<Partial<Record<string, ComponentType>>> = {
   "dictation.enabled": DictationNeedsModel,
+};
+
+/** A description that depends on state, by key, in place of the setting's own (its `fallback`). The search still shows and marks the setting's own. */
+export const keyDescriptions: Readonly<Partial<Record<string, ComponentType<{ fallback: string }>>>> = {
+  "dictation.microphone": DictationMicrophoneDescription,
 };
 
 /**

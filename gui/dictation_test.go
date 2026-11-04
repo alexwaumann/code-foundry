@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 )
 
 // eventLog records what the fakes were asked to do, in order.
@@ -39,6 +40,9 @@ type fakeMic struct {
 	answer   bool  // RequestAccess's answer; it also sets perm
 	startErr error // Start fails with it
 	last     *fakeCapture
+	list     inputList
+	failUID  string   // Start fails for this input
+	uids     []string // every Start's input
 }
 
 func (m *fakeMic) setStartErr(err error) {
@@ -78,12 +82,22 @@ func (m *fakeMic) RequestAccess(context.Context) (bool, error) {
 	return m.answer, nil
 }
 
-func (m *fakeMic) Start() (micCapture, error) {
+func (m *fakeMic) Inputs() inputList {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.list
+}
+
+func (m *fakeMic) Start(uid string) (micCapture, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.log.add("mic.start")
+	m.uids = append(m.uids, uid)
 	if m.startErr != nil {
 		return nil, m.startErr
+	}
+	if uid != "" && uid == m.failUID {
+		return nil, errors.New("that input failed")
 	}
 	c := &fakeCapture{log: m.log, frames: make(chan micFrame, 2), changed: make(chan struct{}, 1)}
 	c.frames <- micFrame{pcm: []byte{1, 0}, rms: 0.1}
@@ -171,7 +185,9 @@ func (d *fakeDaemon) Start(context.Context, string) (string, error) { return "",
 func (d *fakeDaemon) Session(context.Context, string) (sessionStream, error) {
 	return nil, errors.New("no sessions here")
 }
-func (d *fakeDaemon) Hold(context.Context, string) error { return nil }
+func (d *fakeDaemon) Hold(context.Context, string) error                { return nil }
+func (d *fakeDaemon) Inputs(context.Context, *v1.DictationInputs) error { return nil }
+
 func (d *fakeDaemon) Accessibility(context.Context, *v1.DictationAccessibility) error {
 	return nil
 }
@@ -417,6 +433,64 @@ func TestDictationWatcher(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A session opens what the settings choose among what is connected at that moment.
+func TestDictationOpensTheChosenInput(t *testing.T) {
+	mac := dictate.Input{UID: "mac", Name: "MacBook Pro Microphone", Transport: dictate.TransportBuiltIn}
+	pods := dictate.Input{UID: "pods", Name: "AirPods Pro", Transport: dictate.TransportBluetooth}
+	shure := dictate.Input{UID: "shure", Name: "Shure MV7", Transport: dictate.TransportUSB}
+	tests := []struct {
+		name    string
+		list    inputList
+		choice  *micChoice
+		failUID string
+		want    []string
+	}{
+		{"no snapshot yet", inputList{Devices: []dictate.Input{mac}, Default: "mac"}, nil, "", []string{""}},
+		{"the system default is left alone", inputList{Devices: []dictate.Input{mac}, Default: "mac"}, &micChoice{avoid: true}, "", []string{""}},
+		{"a Bluetooth default passed over", inputList{Devices: []dictate.Input{mac, pods}, Default: "pods"}, &micChoice{avoid: true}, "", []string{"mac"}},
+		{"a Bluetooth default kept", inputList{Devices: []dictate.Input{mac, pods}, Default: "pods"}, &micChoice{}, "", []string{""}},
+		{"a named microphone", inputList{Devices: []dictate.Input{mac, shure}, Default: "mac"}, &micChoice{microphone: "shure", avoid: true}, "", []string{"shure"}},
+		{"a named microphone that is gone", inputList{Devices: []dictate.Input{mac}, Default: "mac"}, &micChoice{microphone: "shure"}, "", []string{""}},
+		{"one that will not open gives way to the default", inputList{Devices: []dictate.Input{mac, shure}, Default: "mac"}, &micChoice{microphone: "shure"}, "shure", []string{"shure", ""}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mic := &fakeMic{log: &eventLog{}, list: tt.list, failUID: tt.failUID}
+			w := dictationWatcher{mic: mic, log: slog.New(slog.DiscardHandler)}
+			w.micChoice.Store(tt.choice)
+			if _, err := w.openMic(); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(mic.uids, tt.want) {
+				t.Errorf("opened %q, want %q", mic.uids, tt.want)
+			}
+		})
+	}
+	t.Run("the default failing too is the failure", func(t *testing.T) {
+		mic := &fakeMic{log: &eventLog{}, startErr: errors.New("no microphone")}
+		w := dictationWatcher{mic: mic, log: slog.New(slog.DiscardHandler)}
+		if _, err := w.openMic(); err == nil {
+			t.Error("no error")
+		}
+	})
+	// The named microphone comes back: the next open has it, with the setting unchanged.
+	t.Run("a named microphone is picked up when it returns", func(t *testing.T) {
+		mic := &fakeMic{log: &eventLog{}, list: inputList{Devices: []dictate.Input{mac}, Default: "mac"}}
+		w := dictationWatcher{mic: mic, log: slog.New(slog.DiscardHandler)}
+		w.micChoice.Store(&micChoice{microphone: "shure"})
+		if _, err := w.reopen(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		mic.list.Devices = append(mic.list.Devices, shure)
+		if _, err := w.reopen(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(mic.uids, []string{"", "shure"}) {
+			t.Errorf("opened %q", mic.uids)
+		}
+	})
 }
 
 // The host learns dictation.anywhere from snapshots only: a heartbeat carries no settings

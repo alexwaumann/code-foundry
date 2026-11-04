@@ -2,6 +2,7 @@
  * Dictation's pure helpers (docs/notes/dictation-4-gui.md): where a phrase lands, the
  * listening pill's level bars and clock, and the settings section's sizes.
  */
+import type { DictationMicrophoneView } from "@/api/dictation";
 
 /** Whether a phrase starting `text` takes a space after `before`, as joinPhrases in gui/paste.go decides for a paste. */
 function spaceBefore(text: string, before: string): boolean {
@@ -28,6 +29,25 @@ export function phraseAtCaret(text: string, before: string, after = ""): string 
 /** A phrase for a one-line field, where a spoken line break is a space. */
 export function phraseOnOneLine(text: string): string {
   return text.replace(/\s*\n\s*/g, " ");
+}
+
+/** "is" or "are" for a device: AirPods, Buds, Headphones and the like are plural, whatever follows them. */
+export function deviceVerb(name: string): "is" | "are" {
+  return /(pods|buds|phones|beats)\b/i.test(name) ? "are" : "is";
+}
+
+/** What the Microphone row says. */
+export function microphoneDescription(m: Pick<DictationMicrophoneView, "state" | "listeningName" | "defaultName" | "chosenName">): string {
+  switch (m.state) {
+    case "plain":
+      return "Follows the input chosen in System Settings.";
+    case "avoiding":
+      return `${m.defaultName} ${deviceVerb(m.defaultName)} Bluetooth, so Code Foundry listens to ${m.listeningName}.`;
+    case "named":
+      return "Always listens to this microphone while it is connected.";
+    case "missing":
+      return `${m.chosenName || "That microphone"} isn’t connected, so Code Foundry is using the system default.`;
+  }
 }
 
 /** What the denied line's link opens: System Settings at Privacy & Security › Microphone. */

@@ -793,6 +793,7 @@ function routes(router: ConnectRouter): void {
     micDenied: (req) => (world.dictation.setMicDenied(req.denied), {}),
     // The host's report: the mock has no host; POST /__mock/dictation?access= stands in.
     accessibility: () => ({}),
+    inputs: () => ({}),
     composerTarget: (req) => (world.dictation.setComposerTarget(req.available), {}),
   });
 
