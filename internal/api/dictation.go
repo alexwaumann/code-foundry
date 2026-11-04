@@ -234,10 +234,11 @@ var dictationStates = map[dictation.State]v1.DictationState{
 }
 
 var dictationEndReasons = map[dictation.EndReason]v1.DictationEndReason{
-	dictation.EndStopped:  v1.DictationEndReason_DICTATION_END_REASON_STOPPED,
-	dictation.EndSilence:  v1.DictationEndReason_DICTATION_END_REASON_SILENCE,
-	dictation.EndDisabled: v1.DictationEndReason_DICTATION_END_REASON_DISABLED,
-	dictation.EndError:    v1.DictationEndReason_DICTATION_END_REASON_ERROR,
+	dictation.EndStopped:   v1.DictationEndReason_DICTATION_END_REASON_STOPPED,
+	dictation.EndSilence:   v1.DictationEndReason_DICTATION_END_REASON_SILENCE,
+	dictation.EndDisabled:  v1.DictationEndReason_DICTATION_END_REASON_DISABLED,
+	dictation.EndError:     v1.DictationEndReason_DICTATION_END_REASON_ERROR,
+	dictation.EndDiscarded: v1.DictationEndReason_DICTATION_END_REASON_DISCARDED,
 }
 
 // DictationSnapshotToProto converts the store's snapshot.
@@ -254,7 +255,7 @@ func DictationSnapshotToProto(s dictation.Snapshot) *v1.DictationSnapshot {
 		out.Model.Download = &v1.DictationDownload{ReceivedBytes: d.Received, TotalBytes: d.Total, BytesPerSecond: d.BytesPerSecond}
 	}
 	if x := s.Session; x != nil {
-		out.Session = &v1.DictationSession{Id: x.ID, ClientId: x.ClientID, StartedAt: timestamppb.New(x.StartedAt)}
+		out.Session = &v1.DictationSession{Id: x.ID, ClientId: x.ClientID, StartedAt: timestamppb.New(x.StartedAt), Stopping: x.Stopping}
 	}
 	return out
 }

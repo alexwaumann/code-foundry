@@ -277,7 +277,7 @@ import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles, WELCOME_PAGE } from "./files";
-import { mockPaint, publishMockTheme, themeRoute } from "./theme";
+import { mockPaint, mockThemeJson, publishMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
@@ -548,6 +548,7 @@ function routes(router: ConnectRouter): void {
       }
       return {};
     },
+    getTheme: () => mockThemeJson(),
     publishThemeReport: (req) => {
       try {
         world.themes.publishReports(req.reports);

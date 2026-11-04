@@ -16,6 +16,10 @@ service UiService {
   // every theme change. One per daemon, in memory: with several windows the last writer
   // wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
   rpc PublishTheme(PublishThemeRequest) returns (PublishThemeResponse) {}
+  // GetTheme is the theme as last published, for a window that does not run the theme
+  // engine (the dictation overlay): the same answer as /cf/theme.json, on the API listener.
+  // Before the first publish it is GitHub Dark with published false.
+  rpc GetTheme(GetThemeRequest) returns (GetThemeResponse) {}
   // PublishThemeReport records the GUI's contrast report on the user's themes
   // (docs/notes/theme-followups.md): the daemon derives no colour, so the GUI resolves each
   // user theme it is sent and reports the pairs that fall short and the stale pins, keyed
@@ -77,6 +81,17 @@ message PublishThemeRequest {
 }
 
 message PublishThemeResponse {}
+
+message GetThemeRequest {}
+
+// GetThemeResponse is the theme PublishThemeRequest last carried.
+message GetThemeResponse {
+  string id = 1;
+  string scheme = 2;
+  map<string, string> vars = 3;
+  // False until the GUI has published: the defaults.
+  bool published = 4;
+}
 
 message WatchIntentsRequest {}
 

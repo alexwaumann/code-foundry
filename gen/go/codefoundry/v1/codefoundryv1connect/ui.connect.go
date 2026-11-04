@@ -39,6 +39,8 @@ const (
 	UiServiceEmitProcedure = "/codefoundry.v1.UiService/Emit"
 	// UiServicePublishThemeProcedure is the fully-qualified name of the UiService's PublishTheme RPC.
 	UiServicePublishThemeProcedure = "/codefoundry.v1.UiService/PublishTheme"
+	// UiServiceGetThemeProcedure is the fully-qualified name of the UiService's GetTheme RPC.
+	UiServiceGetThemeProcedure = "/codefoundry.v1.UiService/GetTheme"
 	// UiServicePublishThemeReportProcedure is the fully-qualified name of the UiService's
 	// PublishThemeReport RPC.
 	UiServicePublishThemeReportProcedure = "/codefoundry.v1.UiService/PublishThemeReport"
@@ -56,6 +58,10 @@ type UiServiceClient interface {
 	// every theme change. One per daemon, in memory: with several windows the last writer
 	// wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
 	PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error)
+	// GetTheme is the theme as last published, for a window that does not run the theme
+	// engine (the dictation overlay): the same answer as /cf/theme.json, on the API listener.
+	// Before the first publish it is GitHub Dark with published false.
+	GetTheme(context.Context, *connect.Request[v1.GetThemeRequest]) (*connect.Response[v1.GetThemeResponse], error)
 	// PublishThemeReport records the GUI's contrast report on the user's themes
 	// (docs/notes/theme-followups.md): the daemon derives no colour, so the GUI resolves each
 	// user theme it is sent and reports the pairs that fall short and the stale pins, keyed
@@ -95,6 +101,12 @@ func NewUiServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(uiServiceMethods.ByName("PublishTheme")),
 			connect.WithClientOptions(opts...),
 		),
+		getTheme: connect.NewClient[v1.GetThemeRequest, v1.GetThemeResponse](
+			httpClient,
+			baseURL+UiServiceGetThemeProcedure,
+			connect.WithSchema(uiServiceMethods.ByName("GetTheme")),
+			connect.WithClientOptions(opts...),
+		),
 		publishThemeReport: connect.NewClient[v1.PublishThemeReportRequest, v1.PublishThemeReportResponse](
 			httpClient,
 			baseURL+UiServicePublishThemeReportProcedure,
@@ -109,6 +121,7 @@ type uiServiceClient struct {
 	watchIntents       *connect.Client[v1.WatchIntentsRequest, v1.UiIntent]
 	emit               *connect.Client[v1.EmitIntentRequest, v1.EmitIntentResponse]
 	publishTheme       *connect.Client[v1.PublishThemeRequest, v1.PublishThemeResponse]
+	getTheme           *connect.Client[v1.GetThemeRequest, v1.GetThemeResponse]
 	publishThemeReport *connect.Client[v1.PublishThemeReportRequest, v1.PublishThemeReportResponse]
 }
 
@@ -125,6 +138,11 @@ func (c *uiServiceClient) Emit(ctx context.Context, req *connect.Request[v1.Emit
 // PublishTheme calls codefoundry.v1.UiService.PublishTheme.
 func (c *uiServiceClient) PublishTheme(ctx context.Context, req *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error) {
 	return c.publishTheme.CallUnary(ctx, req)
+}
+
+// GetTheme calls codefoundry.v1.UiService.GetTheme.
+func (c *uiServiceClient) GetTheme(ctx context.Context, req *connect.Request[v1.GetThemeRequest]) (*connect.Response[v1.GetThemeResponse], error) {
+	return c.getTheme.CallUnary(ctx, req)
 }
 
 // PublishThemeReport calls codefoundry.v1.UiService.PublishThemeReport.
@@ -144,6 +162,10 @@ type UiServiceHandler interface {
 	// every theme change. One per daemon, in memory: with several windows the last writer
 	// wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
 	PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error)
+	// GetTheme is the theme as last published, for a window that does not run the theme
+	// engine (the dictation overlay): the same answer as /cf/theme.json, on the API listener.
+	// Before the first publish it is GitHub Dark with published false.
+	GetTheme(context.Context, *connect.Request[v1.GetThemeRequest]) (*connect.Response[v1.GetThemeResponse], error)
 	// PublishThemeReport records the GUI's contrast report on the user's themes
 	// (docs/notes/theme-followups.md): the daemon derives no colour, so the GUI resolves each
 	// user theme it is sent and reports the pairs that fall short and the stale pins, keyed
@@ -179,6 +201,12 @@ func NewUiServiceHandler(svc UiServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(uiServiceMethods.ByName("PublishTheme")),
 		connect.WithHandlerOptions(opts...),
 	)
+	uiServiceGetThemeHandler := connect.NewUnaryHandler(
+		UiServiceGetThemeProcedure,
+		svc.GetTheme,
+		connect.WithSchema(uiServiceMethods.ByName("GetTheme")),
+		connect.WithHandlerOptions(opts...),
+	)
 	uiServicePublishThemeReportHandler := connect.NewUnaryHandler(
 		UiServicePublishThemeReportProcedure,
 		svc.PublishThemeReport,
@@ -193,6 +221,8 @@ func NewUiServiceHandler(svc UiServiceHandler, opts ...connect.HandlerOption) (s
 			uiServiceEmitHandler.ServeHTTP(w, r)
 		case UiServicePublishThemeProcedure:
 			uiServicePublishThemeHandler.ServeHTTP(w, r)
+		case UiServiceGetThemeProcedure:
+			uiServiceGetThemeHandler.ServeHTTP(w, r)
 		case UiServicePublishThemeReportProcedure:
 			uiServicePublishThemeReportHandler.ServeHTTP(w, r)
 		default:
@@ -214,6 +244,10 @@ func (UnimplementedUiServiceHandler) Emit(context.Context, *connect.Request[v1.E
 
 func (UnimplementedUiServiceHandler) PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.PublishTheme is not implemented"))
+}
+
+func (UnimplementedUiServiceHandler) GetTheme(context.Context, *connect.Request[v1.GetThemeRequest]) (*connect.Response[v1.GetThemeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.GetTheme is not implemented"))
 }
 
 func (UnimplementedUiServiceHandler) PublishThemeReport(context.Context, *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error) {
