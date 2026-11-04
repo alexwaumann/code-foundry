@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentHitView, SearchEntryView, SearchWatchEventView } from "@/api/search";
 import type { ThreadItemView } from "@/api/thread";
@@ -97,13 +97,9 @@ vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/
 const { useUiStore } = await import("@/stores/ui");
 const { setSearchTarget, useSearchDialogStore } = await import("@/stores/searchDialog");
 const { useCiteStore } = await import("@/stores/cite");
-const { useThreadStore } = await import("@/stores/thread");
-const { answerConfirm, useConfirmStore } = await import("@/stores/confirm");
-const { daemon, invocationsOf, confirmFirst, resetDaemon } = await import("@/test/daemonFakes");
+const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 const { addThreads, seedWorld, thread } = await import("@/test/projectsWorld");
 const { CommandPalette } = await import("@/components/palette/CommandPalette");
-const { SEARCH_DEBOUNCE_MS, PREVIEW_DEBOUNCE_MS } = await import("./useSearch");
-const { RESTORE_MS } = await import("@/lib/agentSearch");
 
 const hit = (n: number, over: Partial<AgentHitView> = {}): AgentHitView => ({
   n,
@@ -148,13 +144,6 @@ const done = (over: Partial<SearchEntryView> = {}) =>
 
 const base = { parentToolUseId: "", createdAtMs: 0, updatedAtMs: 0, streaming: false } as const;
 const textItem = (id: string, ordinal: number, text: string): ThreadItemView => ({ ...base, id, ordinal, kind: "text", text });
-
-async function wait(ms: number): Promise<void> {
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, ms));
-  });
-  await settle(10);
-}
 
 async function open(): Promise<void> {
   act(() => {

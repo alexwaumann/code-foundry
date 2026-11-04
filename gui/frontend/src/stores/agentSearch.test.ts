@@ -70,7 +70,7 @@ describe("promotedThreadId", () => {
 describe("the remembered mode", () => {
   it("reads back only a known mode (another build's or a damaged value falls back to Agent search)", () => {
     const merge = useSearchDialogStore.persist.getOptions().merge;
-    const cur = { mode: "agent" as const, session: null, pending: null };
+    const cur = { mode: "agent" as const, session: null, pending: null, target: null, targetSeq: 0 };
     expect(merge?.({ mode: "find" }, cur)).toMatchObject({ mode: "find" });
     expect(merge?.({ mode: "ask" }, cur)).toMatchObject({ mode: "agent" });
     expect(merge?.(null, cur)).toMatchObject({ mode: "agent" });
