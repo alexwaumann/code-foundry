@@ -49,7 +49,11 @@ thread never wakes, at startup or on the tick.
 
 ## Verification
 
-See the PR body for the run. `make check` green. Go tests:
+`make check` green. End to end on a scratch home (daemon, CLI, a real Claude thread):
+`--save` on a live thread (closed, listed `[saved]`, `saved for later` in `thread get`,
+`saved_at` set and `snoozed_until` 0 in the database), both refusals, a timed snooze
+replacing it and back, `--clear`, pin, a message; a daemon restart and 35 s (past the
+wake check) left it saved. Go tests:
 `internal/store/thread/save_for_later_test.go` (the put-away table, restart, keeping the
 time, ten years on with no wake at the tick or at startup, every way to clear it, the
 woken status), `TestThreadSnoozeSave` (API), `TestThreadSnooze` (command rows),
