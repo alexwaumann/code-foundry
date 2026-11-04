@@ -368,7 +368,7 @@ export interface LineageRow {
   id: string;
   name: string;
   state: LineageRowState;
-  /** The hover card's type: the subagent's type, or the child's branch. */
+  /** The hover card's type: the subagent's type; "" for a child thread. */
   type: string;
   model: string;
   effort: string;

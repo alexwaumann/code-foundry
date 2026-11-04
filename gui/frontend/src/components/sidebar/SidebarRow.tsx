@@ -1,10 +1,8 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
-import { AlarmClock, ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
-import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
-import { Chip } from "@/components/thread/Chip";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,19 +14,15 @@ import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
 import { statusLine, statusText, tipStatusTone, type StatusLineKind, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { statusBadge, statusDetail, statusTimeAt } from "@/lib/statusRegistry";
-import { FRESH_COPY, PROJECT_FOLDER } from "@/lib/compose";
-import { projectKind, type ProjectKind } from "@/lib/projects";
-import { WORKSPACE_FOLDER } from "@/lib/projectSet";
-import { modelLabel, projectsLabel, threadRowModel, type ThreadPlace, type WorkspaceLookup } from "@/lib/threadRow";
+import { modelLabel } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useLiveCount, useMadeByThread } from "@/stores/lineage";
-import { useProjectsStore } from "@/stores/projects";
 import { archiveThread, renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
-import { useThreadPlace, useThreadPlaceInput } from "@/components/thread/useThreadPlace";
-import { useWorkspacesStore } from "@/stores/workspaces";
+import { ThreadPlaceRows, TipRow } from "@/components/thread/ThreadPlaceRows";
+import { useThreadPlace } from "@/components/thread/useThreadPlace";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { TipWaiting } from "./TipWaiting";
 import { LinkedPrsBadge } from "./LinkedPrsBadge";
@@ -90,7 +84,6 @@ function RenameField({ id, name }: { id: string; name: string }) {
   );
 }
 
-const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
 /** The hover card's status colours (lib/statusLine tones): amber waiting on the user, red failed, emerald done. */
 const toneClasses: Readonly<Record<StatusTone, string>> = {
@@ -380,35 +373,6 @@ function ThreadLabel({ id, cursor }: { id: string; cursor: boolean }) {
 }
 
 
-/**
- * One line of the thread tooltip: an icon, the text, and on the right an optional muted
- * chip or a muted meta text (a count), never both.
- */
-function TipRow({ icon, chip, meta, children, testId }: { icon: ReactNode; chip?: string | null; meta?: string | null; children: ReactNode; testId: string }) {
-  return (
-    <div className="flex items-center gap-2 leading-5" data-testid={testId}>
-      {icon}
-      <span className="min-w-0 truncate">{children}</span>
-      {meta && !chip && (
-        <span className="ml-auto shrink-0 pl-1 text-cf-text-muted tabular-nums" data-testid={`${testId}-meta`}>
-          {meta}
-        </span>
-      )}
-      {chip && (
-        <Chip className="ml-auto" data-testid={`${testId}-chip`}>
-          {chip}
-        </Chip>
-      )}
-    </div>
-  );
-}
-
-const TIP_ICON = "size-3.5 shrink-0 text-cf-icon-muted";
-
-function TipIcon({ icon: Icon }: { icon: LucideIcon }) {
-  return <Icon className={TIP_ICON} aria-hidden />;
-}
-
 type CardTone = TipStatusTone | "emerald";
 
 const tipStatusIcons: Readonly<Record<CardTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX, emerald: CircleCheck };
@@ -491,15 +455,10 @@ function TipMoving({ id }: { id: string }) {
   );
 }
 
-/** The project row's muted meta: where the thread runs, in the composer's Work in words (lib/threadRow threadPlace). */
-const placeWords: Readonly<Record<NonNullable<ThreadPlace>, string>> = { fresh: FRESH_COPY, folder: PROJECT_FOLDER };
-
 /**
  * The tooltip's body: name, status (attention or error only; a thread waiting on its child
  * threads says on which, TipWaiting), who created it (a thread an agent made), a queued move,
- * the workspace of a multi-project thread (its name with "N projects" as muted meta on the right, else "N projects"), the project it runs in ("No project" with
- * the House icon for a thread without one; "Workspace folder" for its workspace's folder) with where it runs as muted
- * meta on the right like the workspace's count (Fresh copy, Project folder; a "no git" chip instead), branch (git only), model, and the linked pull requests (TipLinkedPrs).
+ * where it works (ThreadPlaceRows), model, and the linked pull requests (TipLinkedPrs).
  * Mounted only while open (docs/notes/sidebar-thread-card.md).
  */
 function ThreadTipBody({ id }: { id: string }) {
@@ -507,17 +466,6 @@ function ThreadTipBody({ id }: { id: string }) {
   const model = useThreadsStore((s) => s.byId[id]?.model ?? "");
   const effort = useThreadsStore((s) => s.byId[id]?.effort ?? "");
   const models = useModelChoices();
-  const where = useThreadPlaceInput(id);
-  // A thread in its workspace's folder is in no project: the workspace row names it (never its w-<id>).
-  const wsName = useWorkspacesStore((s) => (where.workspaceId ? (s.byId[where.workspaceId]?.name ?? "") : ""));
-  const m = useProjectsStore(
-    useShallow((st) => {
-      const r = threadRowModel(where, st, wsName ? { byId: { [where.workspaceId]: { name: wsName } } } : NO_WORKSPACES);
-      const p = st.byId[where.projectId];
-      const kind: ProjectKind = p ? projectKind(p).kind : r.noGit ? "nogit" : "git";
-      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, place: r.place, set: r.set, inFolder: !r.noProject && where.projectId === "" && where.workspaceId !== "", kind };
-    }),
-  );
   return (
     <>
       <div className="mb-[5px] truncate text-subheading" data-testid="tip-name">
@@ -527,25 +475,7 @@ function ThreadTipBody({ id }: { id: string }) {
       <TipWaiting id={id} />
       <TipCreatedBy id={id} />
       <TipMoving id={id} />
-      {m.set !== null && (
-        // A named workspace says how many projects it spans on the right; an unnamed set's label already is "N projects".
-        <TipRow icon={<TipIcon icon={Layers} />} meta={wsName ? projectsLabel(where.projectCount ?? 0) : null} testId="tip-workspace">
-          {m.set}
-        </TipRow>
-      )}
-      <TipRow
-        icon={m.noProject ? <TipIcon icon={House} /> : m.inFolder ? <TipIcon icon={Layers} /> : <ProjectKindIcon kind={m.kind} className={TIP_ICON} />}
-        chip={m.noGit ? "no git" : null}
-        meta={m.place === null ? null : placeWords[m.place]}
-        testId="tip-project"
-      >
-        {m.inFolder ? WORKSPACE_FOLDER : m.project}
-      </TipRow>
-      {!m.noGit && !m.noProject && m.branch !== "" && (
-        <TipRow icon={<TipIcon icon={GitBranch} />} testId="tip-branch">
-          <span className="font-mono">{m.branch}</span>
-        </TipRow>
-      )}
+      <ThreadPlaceRows id={id} />
       <TipRow icon={<ClaudeMark className="size-3.5 shrink-0" style={{ color: CLAUDE_ORANGE }} />} testId="tip-model">
         {modelLabel(model, models)}
         {effort && <span className="text-cf-text-muted"> ({effort})</span>}

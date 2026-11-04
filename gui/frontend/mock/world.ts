@@ -1644,7 +1644,7 @@ export class World {
    * worktrees made in every git project now (the daemon makes them at spawn), running in
    * `project`'s (else the first's). POST /__mock/multi-thread.
    */
-  addMultiThread(refs: readonly string[], project: string, branch: string, name: string, workspace = "", id = ""): MockThread {
+  addMultiThread(refs: readonly string[], project: string, branch: string, name: string, workspace = "", id = "", createdBy = ""): MockThread {
     const ids = refs.map((r) => this.projectRef(r).id);
     if (ids.length === 0) throw new CommandError("invalid", "name the projects");
     const primary = project ? this.projectRef(project).id : (ids[0] ?? "");
@@ -1656,7 +1656,7 @@ export class World {
       if (id === primary) cwd = path;
     }
     const ws = workspace ? this.workspaceRef(workspace) : undefined;
-    const s = this.addThread({ id: id || `s-mp-${String(this.nextId++)}`, projectId: primary, worktreePath: cwd, projectIds: ids, branch, createdWorktree: true, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws?.id ?? "", createdAt: new Date() });
+    const s = this.addThread({ id: id || `s-mp-${String(this.nextId++)}`, projectId: primary, worktreePath: cwd, projectIds: ids, branch, createdWorktree: true, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws?.id ?? "", createdBy, createdAt: new Date() });
     this.publishThread(s);
     return s;
   }

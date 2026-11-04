@@ -1,11 +1,12 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentRunView } from "@/api/agents";
+import type { ThreadView } from "@/api/threads";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
-const { thread } = await import("@/test/projectsWorld");
+const { addWorkspace, CF, FEAT, HOME, seedWorld, thread, WR } = await import("@/test/projectsWorld");
 const { useThreadStore } = await import("@/stores/thread");
 const { useThreadsStore } = await import("@/stores/threads");
 const { LineageGroup } = await import("./LineageGroup");
@@ -74,5 +75,106 @@ describe("the card's agent rows", () => {
     fireEvent.click(screen.getByTestId("ti-previous"));
     fireEvent.click(row("a0") as HTMLElement);
     expect(invocationsOf("thread.agent.open").map((i) => i.args).at(-1)).toEqual({ id: "s-r1", run: "a0" });
+  });
+});
+
+describe("the hover card's place", () => {
+  const anyRow = (id: string) => document.querySelector<HTMLElement>(`[data-testid="ti-lineage-row"][data-id="${id}"]`) as HTMLElement;
+
+  /** The row's card, opened as keyboard navigation would. */
+  function open(id: string): HTMLElement {
+    const el = anyRow(id);
+    fireEvent.keyDown(document, { key: "Tab" });
+    act(() => {
+      el.focus();
+    });
+    return screen.getByRole("tooltip");
+  }
+
+  /** The place rows in order: test id (without "tip-"), then the text with its meta or chip. */
+  const place = (card: HTMLElement) =>
+    [...within(card).getByTestId("ti-lineage-place").children].map((r) => [(r as HTMLElement).dataset.testid?.replace("tip-", ""), r.textContent]);
+
+  /** A lead with one child thread "c" in the given place, and no runs. */
+  function child(o: Partial<ThreadView>): void {
+    const lead = thread("lead", { state: "connected" });
+    const c = thread("c", { name: "Child", createdBy: "lead", state: "connected", status: "busy", ...o });
+    useThreadsStore.setState({ byId: { lead, c }, order: ["lead", "c"] });
+    useThreadStore.setState({ logs: {} });
+    render(<LineageGroup threadId="lead" />);
+  }
+
+  beforeEach(seedWorld);
+
+  it.each<[string, Partial<ThreadView>, (string | undefined)[][]]>([
+    ["a fresh copy: project with its meta, then the branch", { worktreePath: FEAT, createdWorktree: true }, [["project", "code-foundryFresh copy"], ["branch", "feat/sidebar"]]],
+    ["the project's folder: no branch", { worktreePath: CF }, [["project", "code-foundryProject folder"]]],
+    ["a worktree the user picked is not a fresh copy: no meta, no branch", { worktreePath: FEAT }, [["project", "code-foundry"]]],
+    ["a project without git: the chip, no branch", { projectId: "repo-wr", worktreePath: WR }, [["project", "writingno git"]]],
+    ["no project: the name alone", { projectId: "", projectIds: [], worktreePath: HOME }, [["project", "No project"]]],
+    ["several projects with no workspace: their count, then the project", { worktreePath: FEAT, createdWorktree: true, projectIds: ["repo-cf", "repo-gp"] }, [["workspace", "2 projects"], ["project", "code-foundryFresh copy"], ["branch", "feat/sidebar"]]],
+  ])("a child thread in %s", (_name, o, want) => {
+    child(o);
+    expect(place(open("c"))).toEqual(want);
+  });
+
+  it("a workspace comes first with its project count, then the project, then the branch", () => {
+    const ws = addWorkspace("Platform", ["repo-cf", "repo-gp", "repo-dot"]);
+    child({ worktreePath: FEAT, createdWorktree: true, workspaceId: ws.id, projectIds: ["repo-cf", "repo-gp", "repo-dot"] });
+    expect(place(open("c"))).toEqual([["workspace", "Platform3 projects"], ["project", "code-foundryFresh copy"], ["branch", "feat/sidebar"]]);
+  });
+
+  it("a thread in its workspace's folder: the workspace, then the folder, no branch", () => {
+    const ws = addWorkspace("Platform", ["repo-cf", "repo-gp"]);
+    child({ projectId: "", worktreePath: ws.managedDir, workspaceId: ws.id, projectIds: ["repo-cf", "repo-gp"], branch: "feat/x" });
+    expect(place(open("c"))).toEqual([["workspace", "Platform2 projects"], ["project", "Workspace folder"]]);
+  });
+
+  it("uses the app's icons: Layers, the project's kind, GitBranch with the branch in mono; House for no project", () => {
+    const ws = addWorkspace("Platform", ["repo-cf", "repo-gp"]);
+    child({ worktreePath: FEAT, createdWorktree: true, workspaceId: ws.id, projectIds: ["repo-cf", "repo-gp"] });
+    const card = open("c");
+    expect(within(card).getByTestId("tip-workspace").querySelector("svg.lucide-layers")).not.toBeNull();
+    expect(within(card).getByTestId("tip-project").querySelector("svg")).not.toBeNull();
+    expect(within(card).getByTestId("tip-project").querySelector("svg.lucide-folder")).toBeNull();
+    expect(within(card).getByTestId("tip-branch").querySelector("svg.lucide-git-branch")).not.toBeNull();
+    expect(within(within(card).getByTestId("tip-branch")).getByText("feat/sidebar").className).toContain("font-mono");
+    cleanup();
+    child({ projectId: "", projectIds: [], worktreePath: HOME });
+    expect(within(open("c")).getByTestId("tip-project").querySelector("svg.lucide-house")).not.toBeNull();
+  });
+
+  it.each<[string, Partial<ThreadView>, number]>([
+    ["once, in the place rows, in a fresh copy", { worktreePath: FEAT, createdWorktree: true, branch: "feat/sidebar" }, 1],
+    ["not at all in the project's folder", { worktreePath: CF, branch: "feat/sidebar" }, 0],
+  ])("a child's branch shows %s", (_name, o, want) => {
+    child(o);
+    expect(open("c").textContent.split("feat/sidebar")).toHaveLength(want + 1);
+  });
+
+  it("a run shows no place: the daemon records none, and its thread's could be wrong", () => {
+    useThreadsStore.setState({ byId: { "s-r1": thread("s-r1", { state: "connected", worktreePath: FEAT, createdWorktree: true }) }, order: ["s-r1"] });
+    useThreadStore.setState({ logs: { "s-r1": { seq: 1, byId: {}, order: [], pending: [], mcp: null, commands: [], agents: RUNS } } });
+    render(<LineageGroup threadId="s-r1" />);
+    const card = open("a1");
+    expect(card.textContent).toContain("general-purpose");
+    expect(within(card).queryByTestId("ti-lineage-place")).toBeNull();
+    expect(within(card).queryByTestId("tip-project")).toBeNull();
+  });
+
+  it("a child shows its own place, not its creator's", () => {
+    const lead = thread("lead", { state: "connected", worktreePath: FEAT, createdWorktree: true });
+    const c = thread("c", { createdBy: "lead", state: "connected", status: "busy", projectId: "repo-gp", worktreePath: `${HOME}/src/ghostty-playground` });
+    useThreadsStore.setState({ byId: { lead, c }, order: ["lead", "c"] });
+    useThreadStore.setState({ logs: {} });
+    render(<LineageGroup threadId="lead" />);
+    expect(place(open("c"))).toEqual([["project", "ghostty-playgroundProject folder"]]);
+  });
+
+  it("mounts only while the card is open", () => {
+    child({ worktreePath: FEAT, createdWorktree: true });
+    expect(document.querySelector('[data-testid="tip-project"]')).toBeNull();
+    open("c");
+    expect(document.querySelector('[data-testid="tip-project"]')).not.toBeNull();
   });
 });

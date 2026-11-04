@@ -106,7 +106,7 @@
  *   thread.workspace sets a thread's workspace reference; thread.project.add and .remove change a
  *   thread's set (its workspace reference goes; a dirty member's removal asks first).
  *   POST /__mock/thread-info?scenario=single|ws9|busy|child|nogit|unnamed|home|servers|child-server   (the thread info card's fixtures; World.addThreadInfo)
- *   POST /__mock/multi-thread?projects=repo-cf,repo-gp[&project=repo-gp&branch=feat/x&name=multi&workspace=login]
+ *   POST /__mock/multi-thread?projects=repo-cf,repo-gp[&project=repo-gp&branch=feat/x&name=multi&workspace=login&createdBy=s-ti-1]
  *                                                 (a worktree-mode thread over several projects, its worktrees made)
  *   GET  /__mock/workspaces                       (id, name, members, root, default primary, files)
  *   POST /__mock/thread/project-ids?id=…&projects=repo-cf,repo-gp   (a thread's project set)
@@ -1386,7 +1386,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/multi-thread":
       try {
-        const s = world.addMultiThread((q.get("projects") ?? "").split(",").filter(Boolean), q.get("project") ?? "", q.get("branch") ?? "feat/multi", q.get("name") ?? "multi", q.get("workspace") ?? "");
+        const s = world.addMultiThread((q.get("projects") ?? "").split(",").filter(Boolean), q.get("project") ?? "", q.get("branch") ?? "feat/multi", q.get("name") ?? "multi", q.get("workspace") ?? "", "", q.get("createdBy") ?? "");
         json(res, 200, threadSummary(s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
