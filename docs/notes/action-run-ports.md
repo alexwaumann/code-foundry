@@ -135,6 +135,8 @@ Scratch `daemon --dev` on `CODE_FOUNDRY_HOME=/tmp/cf-arp/home`, scratch repo, `/
   at +1.0 s, `[19601]` at +10.1 s, empty at +20.3 s with the run still running. The event
   stream had 5 `run_updated` for it (start, three changes, end) and 2 for a quiet `sleep`.
 * A terminal run owned by a thread: `threadId`, `terminalId`, `ports` all on the run.
+* `python3 -m http.server … &` as the whole command in the background: the run was `exited 0`
+  with no ports while lsof showed the server listening.
 * A clean daemon stop closed the ports of both modes; the restarted daemon listed no runs and
   made no probe. After a SIGKILL of the daemon a background server stayed up.
 
