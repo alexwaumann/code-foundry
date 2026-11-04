@@ -39,6 +39,9 @@ var _ DictationStore = (*dictation.Store)(nil)
 // this is seconds of them.
 const dictationSessionBuffer = 256
 
+// audioLostStop bounds ending a session whose host went away.
+const audioLostStop = 2 * time.Second
+
 // Dictation implements codefoundryv1connect.DictationServiceHandler over the dictation
 // store (docs/notes/dictation-2-daemon.md).
 type Dictation struct {
@@ -197,12 +200,21 @@ func (h *Dictation) Session(ctx context.Context, req *connect.Request[v1.Dictati
 }
 
 // Audio takes the host's microphone frames until it closes the stream.
-func (h *Dictation) Audio(_ context.Context, stream *connect.ClientStream[v1.DictationAudioFrame]) (*connect.Response[v1.DictationAudioResponse], error) {
+func (h *Dictation) Audio(ctx context.Context, stream *connect.ClientStream[v1.DictationAudioFrame]) (*connect.Response[v1.DictationAudioResponse], error) {
+	var session string
 	for stream.Receive() {
 		f := stream.Msg()
-		h.store.Audio(f.GetSessionId(), f.GetPcm(), f.GetRms())
+		session = f.GetSessionId()
+		h.store.Audio(session, f.GetPcm(), f.GetRms())
 	}
 	if err := stream.Err(); err != nil && !errors.Is(err, io.EOF) {
+		// The host went away without closing its stream: nothing feeds the session now, and
+		// a crashed host must not find it open when it starts again.
+		if session != "" {
+			stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), audioLostStop)
+			defer cancel()
+			_ = h.store.Stop(stop, session, false)
+		}
 		return nil, err
 	}
 	return connect.NewResponse(&v1.DictationAudioResponse{}), nil

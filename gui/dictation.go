@@ -22,6 +22,14 @@ const (
 	// not be ready the moment it connects).
 	micReopenTries = 3
 	micReopenWait  = 300 * time.Millisecond
+	// micSettle is how quiet the hardware must go before the microphone is touched after a
+	// change, and micSettleMost the longest that wait lasts. A headset changing mode sends
+	// several, and tearing an engine down in the middle of one crashed the app.
+	micSettle     = 500 * time.Millisecond
+	micSettleMost = 2 * time.Second
+	// micMostReopens is how many changes one session rides out. Opening a microphone can
+	// itself change the hardware, so without a limit a session could flap until it ended.
+	micMostReopens = 3
 )
 
 // dictationStream is the client side of DictationService.Watch.
@@ -92,6 +100,8 @@ type dictationWatcher struct {
 	retry time.Duration
 	// reopenWait is the pause between tries to reopen the microphone after a change.
 	reopenWait time.Duration
+	// settle and settleMost are micSettle and micSettleMost; 0 in tests.
+	settle, settleMost time.Duration
 	// anywhere gets dictation.enabled && dictation.anywhere from every snapshot (a heartbeat
 	// carries none, and a lost stream says nothing, so neither calls it). Nil in tests that
 	// do not care.
@@ -125,6 +135,8 @@ func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*c
 		log:        log,
 		retry:      dictationRetry,
 		reopenWait: micReopenWait,
+		settle:     micSettle,
+		settleMost: micSettleMost,
 		anywhere:   anywhere,
 		overlay:    overlay,
 		hold:       hold,
@@ -193,6 +205,7 @@ func (w *dictationWatcher) once(parent context.Context) error {
 	}()
 	// The daemon's view, from the last snapshot (a heartbeat carries none).
 	var enabled, denied bool
+	first := true
 	for stream.Receive() {
 		snap := stream.Msg()
 		if snap.GetHeartbeat() == nil {
@@ -205,6 +218,17 @@ func (w *dictationWatcher) once(parent context.Context) error {
 			if snap.GetState() == v1.DictationState_DICTATION_STATE_LISTENING {
 				id = snap.GetSession().GetId()
 			}
+			// A hold starts its session on a connection that has seen a snapshot, so one
+			// already open here is a hold this host has lost. Opening the microphone for
+			// it would listen with no key held, and a crash in the microphone would come
+			// back at every launch until the daemon restarted.
+			stale := first && id != "" && snap.GetSession().GetClientId() == overlayClientID
+			first = false
+			if stale {
+				w.log.Warn("dictation: ending a hold left open", "session", id)
+				w.stopSession(ctx, conn, id)
+				id = ""
+			}
 			if sess != nil && sess.id != id {
 				sess.stop()
 				sess = nil
@@ -213,7 +237,7 @@ func (w *dictationWatcher) once(parent context.Context) error {
 				sess = w.startSession(ctx, conn, id, denied)
 			}
 			// After the capture started: the first show creates the window.
-			if w.overlay != nil {
+			if w.overlay != nil && !stale {
 				w.overlay.observe(snap)
 			}
 			if w.hold != nil {
@@ -293,6 +317,7 @@ func (w *dictationWatcher) capture(ctx, connCtx context.Context, conn dictationC
 		}
 		w.log.Info("dictation: microphone closed", "session", id)
 	}()
+	reopens := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -300,7 +325,15 @@ func (w *dictationWatcher) capture(ctx, connCtx context.Context, conn dictationC
 		case <-mic.Changed():
 			// AirPods connecting, say: the old capture is dead. Open the new input and keep
 			// streaming to the same session, or end it so the mic returns to idle now.
+			if reopens++; reopens > micMostReopens {
+				w.log.Warn("dictation: the audio hardware keeps changing; stopping the session", "session", id)
+				w.stopSession(ctx, conn, id)
+				return
+			}
 			w.log.Info("dictation: the audio hardware changed; reopening the microphone", "session", id)
+			if !w.settleHardware(ctx, mic) {
+				return
+			}
 			mic.Stop()
 			next, err := w.reopen(ctx)
 			if err != nil {
@@ -323,6 +356,26 @@ func (w *dictationWatcher) capture(ctx, connCtx context.Context, conn dictationC
 				w.log.Debug("dictation: audio stream", "err", err)
 				return
 			}
+		}
+	}
+}
+
+// settleHardware waits for the audio hardware to stop changing, false if ctx ends first.
+func (w *dictationWatcher) settleHardware(ctx context.Context, mic micCapture) bool {
+	quiet := time.NewTimer(w.settle)
+	defer quiet.Stop()
+	most := time.NewTimer(w.settleMost)
+	defer most.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-mic.Changed():
+			quiet.Reset(w.settle)
+		case <-quiet.C:
+			return true
+		case <-most.C:
+			return true
 		}
 	}
 }

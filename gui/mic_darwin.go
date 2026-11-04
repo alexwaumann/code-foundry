@@ -96,6 +96,17 @@ static void cfMicSinkClose(CFMicSink* s) {
 	pthread_mutex_unlock(&s->mu);
 }
 
+// cfMicReleaseLater lets go of an engine a while from now, off this thread. Releasing it
+// tears down its audio unit, and that races work still running on AVFoundation's own queue: a
+// Bluetooth headset changing mode made the engine reconfigure as we released it, and the
+// queue faulted in freed memory, which no exception handler can catch. Nothing in the engine
+// is ours to wait on, so it gets the time to finish. The block retains it until then.
+static void cfMicReleaseLater(AVAudioEngine* engine) {
+	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+		[engine release];
+	});
+}
+
 // cfMicPin points the input node's audio unit at the device with this UID. It must come before
 // the node's format is read: the format is the device's. NULL, or the failure (malloc'd).
 static char* cfMicPin(AVAudioInputNode* input, const char* text) {
@@ -128,21 +139,21 @@ static cfMic* cfMicStart(int fd, int changeFd, const char* uid, char** err) {
 		if (uid != NULL) {
 			char* failed = cfMicPin(input, uid);
 			if (failed != NULL) {
-				[engine release];
+				cfMicReleaseLater(engine);
 				*err = failed;
 				return NULL;
 			}
 		}
 		AVAudioFormat* inFmt = [input outputFormatForBus:0];
 		if (inFmt.sampleRate <= 0 || inFmt.channelCount == 0) {
-			[engine release];
+			cfMicReleaseLater(engine);
 			*err = strdup("no microphone");
 			return NULL;
 		}
 		AVAudioFormat* outFmt = [[[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatInt16 sampleRate:16000 channels:1 interleaved:YES] autorelease];
 		AVAudioConverter* conv = [[[AVAudioConverter alloc] initFromFormat:inFmt toFormat:outFmt] autorelease];
 		if (conv == nil) {
-			[engine release];
+			cfMicReleaseLater(engine);
 			*err = strdup("cannot convert the microphone's format to 16 kHz mono");
 			return NULL;
 		}
@@ -179,7 +190,7 @@ static cfMic* cfMicStart(int fd, int changeFd, const char* uid, char** err) {
 		if (![engine startAndReturnError:&serr]) {
 			[input removeTapOnBus:0];
 			*err = strdup(serr != nil ? serr.localizedDescription.UTF8String : "the audio engine did not start");
-			[engine release];
+			cfMicReleaseLater(engine);
 			[sink release];
 			return NULL;
 		}
@@ -198,17 +209,18 @@ static cfMic* cfMicStart(int fd, int changeFd, const char* uid, char** err) {
 }
 
 // cfMicStop closes the microphone and both pipes (the readers then see EOF), and frees m.
+// Stop comes first: it returns once the tap's block can no longer run.
 static void cfMicStop(cfMic* m) {
 	@autoreleasepool {
 		[[NSNotificationCenter defaultCenter] removeObserver:(id)m->observer];
 		[(id)m->observer release];
-		[[m->engine inputNode] removeTapOnBus:0];
 		[m->engine stop];
+		[[m->engine inputNode] removeTapOnBus:0];
 		cfMicSinkClose(m->sink);
 		cfMicSinkClose(m->change);
 		[m->sink release];
 		[m->change release];
-		[m->engine release];
+		cfMicReleaseLater(m->engine);
 		free(m);
 	}
 }
