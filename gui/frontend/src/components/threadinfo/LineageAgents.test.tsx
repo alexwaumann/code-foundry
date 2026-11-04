@@ -109,7 +109,7 @@ describe("the hover card's place", () => {
   it.each<[string, Partial<ThreadView>, (string | undefined)[][]]>([
     ["a fresh copy: project with its meta, then the branch", { worktreePath: FEAT, createdWorktree: true }, [["project", "code-foundryFresh copy"], ["branch", "feat/sidebar"]]],
     ["the project's folder: no branch", { worktreePath: CF }, [["project", "code-foundryProject folder"]]],
-    ["a worktree the user picked is not a fresh copy: no meta, no branch", { worktreePath: FEAT }, [["project", "code-foundry"]]],
+    ["a worktree the user picked: no meta, but the branch", { worktreePath: FEAT }, [["project", "code-foundry"], ["branch", "feat/sidebar"]]],
     ["a project without git: the chip, no branch", { projectId: "repo-wr", worktreePath: WR }, [["project", "writingno git"]]],
     ["no project: the name alone", { projectId: "", projectIds: [], worktreePath: HOME }, [["project", "No project"]]],
     ["several projects with no workspace: their count, then the project", { worktreePath: FEAT, createdWorktree: true, projectIds: ["repo-cf", "repo-gp"] }, [["workspace", "2 projects"], ["project", "code-foundryFresh copy"], ["branch", "feat/sidebar"]]],

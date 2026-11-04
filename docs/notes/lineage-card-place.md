@@ -7,7 +7,7 @@ place, in the sidebar card's words and icons.
 
 | Path | What |
 |---|---|
-| `gui/frontend/src/components/thread/ThreadPlaceRows.tsx` (new) | `ThreadPlaceRows` and `TipRow`, moved out of `SidebarRow.tsx`; `freshBranchOnly` keeps the branch to a fresh copy |
+| `gui/frontend/src/components/thread/ThreadPlaceRows.tsx` (new) | `ThreadPlaceRows` and `TipRow`, moved out of `SidebarRow.tsx`; `worktreeBranchOnly` keeps the branch to a thread on a worktree |
 | `gui/frontend/src/components/sidebar/SidebarRow.tsx` | `ThreadTipBody` renders `ThreadPlaceRows`; no behaviour change |
 | `gui/frontend/src/components/threadinfo/LineageGroup.tsx` | a child row's card shows the place between two dividers; the child's branch no longer sits on its own line (`LineageRow.type` is "" for a child) |
 | `gui/frontend/mock/` | `multi-thread` takes `createdBy`, so a child can sit in a workspace on a fresh copy |
@@ -21,8 +21,8 @@ place, in the sidebar card's words and icons.
   really be elsewhere: the Agent tool has a worktree isolation option (the orchestrate skill
   tells agents not to use it), and the daemon records no cwd per run. The owner chose to show
   nothing rather than something possibly wrong. No daemon data was added.
-* The branch shows only for place "fresh", as asked. A worktree the user picked (place null)
-  and a thread in its workspace's folder show no branch here, though the sidebar card does.
+* The branch shows for a thread on any worktree, a fresh copy or one the user picked (place
+  null): a thread in its project's folder or its workspace's folder leaves it out.
 * Several projects with no workspace keep the sidebar's Layers row reading "N projects". It
   is the same logic as the sidebar, and without it the card hides that the thread spans several.
 * `ThreadPlaceRows` lives in the card, so its selectors run only while the card is open.

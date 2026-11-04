@@ -51,9 +51,9 @@ const placeWords: Readonly<Record<NonNullable<ThreadPlace>, string>> = { fresh: 
  * right, else "N projects"), the project it runs in ("No project" with the House icon for a
  * thread without one; "Workspace folder" for its workspace's folder) with where it runs as
  * muted meta on the right (Fresh copy, Project folder; a "no git" chip instead), and the
- * branch (git only; with `freshBranchOnly`, only for a thread in a fresh copy).
+ * branch (git only; with `worktreeBranchOnly`, only for a thread on a worktree, not in its project's or workspace's folder).
  */
-export function ThreadPlaceRows({ id, freshBranchOnly = false }: { id: string; freshBranchOnly?: boolean }) {
+export function ThreadPlaceRows({ id, worktreeBranchOnly = false }: { id: string; worktreeBranchOnly?: boolean }) {
   const where = useThreadPlaceInput(id);
   // A thread in its workspace's folder is in no project: the workspace row names it (never its w-<id>).
   const wsName = useWorkspacesStore((s) => (where.workspaceId ? (s.byId[where.workspaceId]?.name ?? "") : ""));
@@ -81,7 +81,7 @@ export function ThreadPlaceRows({ id, freshBranchOnly = false }: { id: string; f
       >
         {m.inFolder ? WORKSPACE_FOLDER : m.project}
       </TipRow>
-      {!m.noGit && !m.noProject && m.branch !== "" && (!freshBranchOnly || m.place === "fresh") && (
+      {!m.noGit && !m.noProject && m.branch !== "" && (!worktreeBranchOnly || (m.place !== "folder" && !m.inFolder)) && (
         <TipRow icon={<TipIcon icon={GitBranch} />} testId="tip-branch">
           <span className="font-mono">{m.branch}</span>
         </TipRow>

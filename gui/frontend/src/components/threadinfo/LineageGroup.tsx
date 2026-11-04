@@ -127,7 +127,7 @@ function LineageItem({ threadId, row, sub = false }: { threadId: string; row: Li
       )}
       {row.kind === "thread" && (
         <div className="my-1 border-y border-cf-divider py-1" data-testid="ti-lineage-place">
-          <ThreadPlaceRows id={row.id} freshBranchOnly />
+          <ThreadPlaceRows id={row.id} worktreeBranchOnly />
         </div>
       )}
       <div className="flex gap-3">
