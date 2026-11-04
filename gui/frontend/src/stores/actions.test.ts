@@ -13,6 +13,7 @@ const run = (id: string, running = true): ActionRunView => ({
   worktreePath: "/w",
   mode: "terminal",
   terminalId: "t",
+  ports: [],
   running,
   exitCode: 0,
   startedAtMs: 1,

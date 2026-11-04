@@ -62,6 +62,8 @@ export interface ActionRunView {
   startedAtMs: number | null;
   finishedAtMs: number | null;
   trigger: ActionRunTriggerView;
+  /** The TCP ports its processes listen on, ascending, while it runs; a run_updated brings a change. */
+  ports: number[];
 }
 
 /** A run ended (once per run, after its last run_updated): what a toast needs. */
@@ -136,6 +138,7 @@ export function toActionRunView(r: ActionRun): ActionRunView {
     startedAtMs: r.startedAt ? timestampMs(r.startedAt) : null,
     finishedAtMs: r.finishedAt ? timestampMs(r.finishedAt) : null,
     trigger: triggerNames[r.trigger],
+    ports: r.ports,
   };
 }
 

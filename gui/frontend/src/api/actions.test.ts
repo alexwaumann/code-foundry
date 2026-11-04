@@ -27,6 +27,7 @@ describe("toActionEventView", () => {
               startedAt: timestampFromMs(1000),
               finishedAt: timestampFromMs(5200),
               trigger: ActionRunTrigger.WORKTREE_CREATE,
+              ports: [5173, 24678],
             },
           ],
         },
@@ -51,6 +52,7 @@ describe("toActionEventView", () => {
           startedAtMs: 1000,
           finishedAtMs: 5200,
           trigger: "worktree-create",
+          ports: [5173, 24678],
         },
       ],
     });
