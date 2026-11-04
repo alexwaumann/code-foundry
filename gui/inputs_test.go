@@ -220,7 +220,7 @@ func TestInputReporter(t *testing.T) {
 		r.observe(conn, on(reported))
 		host.changed <- struct{}{}
 		deadline := time.Now().Add(2 * time.Second)
-		for host.changed != nil && len(host.changed) > 0 && time.Now().Before(deadline) {
+		for len(host.changed) > 0 && time.Now().Before(deadline) {
 			time.Sleep(time.Millisecond)
 		}
 		cancel()
