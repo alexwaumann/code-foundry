@@ -89,7 +89,7 @@ test("Working section: the header sits on the rows' edge; cmd+4/cmd+5 skip hidde
   await expect(row(page, "s:s-5")).toHaveAttribute("aria-selected", "true");
 });
 
-test("thread rows sit 4px apart at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
+test("thread rows sit 8px apart at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
   await openApp(page);
   await page.getByTestId("snoozed-header").click();
   await expect(page.getByTestId("sidebar-snoozed-rows").locator("[data-row-key]")).toHaveCount(2);
@@ -110,9 +110,9 @@ test("thread rows sit 4px apart at both densities, each row's box (and its selec
     await mockPost(`settings/external?appearance.density=${density}`);
     await expect(page.locator("html")).toHaveAttribute("data-density", density);
     // Main list and the Working footer: three-line rows; Snoozed: one-line rows.
-    await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: three, gap: 4 });
-    expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: three, gap: 4 });
-    expect(await snoozed()).toEqual({ height: one, gap: 4 });
+    await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: three, gap: 8 });
+    expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: three, gap: 8 });
+    expect(await snoozed()).toEqual({ height: one, gap: 8 });
   }
   // The selection background is the row's own box: the gap under it stays the sidebar's.
   await row(page, "s:s-2").click();

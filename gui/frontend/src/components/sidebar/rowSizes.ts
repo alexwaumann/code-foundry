@@ -21,7 +21,7 @@ export const HEADER_HEIGHT = 26;
  * is the virtualizer's `gap`, so the list's total height and scroll-to-row count it, and a
  * row's own box (its selection, hover and cursor backgrounds) never covers it.
  */
-export const ROW_GAP = 4;
+export const ROW_GAP = 8;
 
 /**
  * A row's height: a footer header's, a one-line snoozed or archived row's (`rowHeight`, by
