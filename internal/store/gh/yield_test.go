@@ -780,6 +780,51 @@ func settleWorkerPaused(t *testing.T, w *yieldWorld) {
 	}
 }
 
+// A write queued when a network pause starts was never sent, so it is a plain failure:
+// not "it may have merged", and nothing holds back the retry.
+func TestRefusedWriteHasAKnownOutcome(t *testing.T) {
+	g, w, s, _, _ := mergeWorld(t, func(o *Options) { o.NetworkBackoff, o.MaxBackoff = time.Hour, time.Hour })
+	ctx := context.Background()
+	if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+		t.Fatal(err)
+	}
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	w.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+		if op == "Poll" {
+			once.Do(func() { close(entered) })
+			<-release
+			return nil, fmt.Errorf("%w: connection reset", ErrNetwork)
+		}
+		return g.respond(op, doc, vars)
+	})
+	if err := s.Refresh(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	<-entered
+	merge := make(chan error, 1)
+	go func() {
+		_, err := s.MergePullRequest(ctx, "o/r", 1, MergeRequest{Method: MergeSquash})
+		merge <- err
+	}()
+	waitFor(t, "the merge in the queue", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return len(s.queue) == 1
+	})
+	close(release)
+	err := recv(t, merge)
+	if !errors.Is(err, ErrNetwork) || strings.Contains(err.Error(), "may have merged") {
+		t.Errorf("merge: %v", err)
+	}
+	if len(g.merges()) != 0 {
+		t.Errorf("mutations: %v", g.merges())
+	}
+	if _, ok := s.full.merges.recent(fullKey{"o/r", 1}, time.Now()); ok {
+		t.Error("the refused merge was remembered")
+	}
+}
+
 // A refresh queued when a pause starts ends like a failed fetch: refused without a
 // request, and the client told Refreshing hears the end.
 func TestBackgroundRefreshRefusedByAPause(t *testing.T) {

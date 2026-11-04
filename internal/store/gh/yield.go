@@ -41,7 +41,7 @@ wait:
 		err := s.pausedLocked()
 		s.mu.Unlock()
 		if err != nil {
-			return err
+			return notSent{err}
 		}
 		now := s.opts.Now()
 		left := s.lastEnd.Add(s.gap(short, now)).Sub(now)
@@ -72,6 +72,12 @@ wait:
 	}
 	return nil
 }
+
+// notSent is a pause's error from admit: it reads and matches like the pause, and says
+// the request never left, which a network error otherwise cannot (outcomeUnknown).
+type notSent struct{ error }
+
+func (e notSent) Unwrap() error { return e.error }
 
 // letWaitingIn runs the jobs someone waits for, oldest first, up to maxJobsAhead since
 // scheduled work last sent a request; the rest get their turn before its next one.

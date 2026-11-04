@@ -216,6 +216,10 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 // outcomeUnknown reports whether a failed mutation may still have run: GitHub timed out
 // (502/504) or the connection failed after the request may have left.
 func outcomeUnknown(err error) bool {
+	var refused notSent
+	if errors.As(err, &refused) {
+		return false
+	}
 	return errors.Is(err, ErrServerTimeout) || errors.Is(err, ErrNetwork) || errors.Is(err, context.DeadlineExceeded)
 }
 
