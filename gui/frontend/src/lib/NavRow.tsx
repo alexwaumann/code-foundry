@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, type ReactNode } from "react";
+import { useContext, useEffect, useRef, type PointerEventHandler, type ReactNode } from "react";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { navId, NavContext, type NavCtx } from "./nav";
@@ -25,6 +25,8 @@ export function NavRow({
   activateOnClick = false,
   passive = false,
   onCmdClick,
+  onPointerEnter,
+  onPointerLeave,
 }: {
   navKey: string;
   className?: string;
@@ -34,6 +36,8 @@ export function NavRow({
   activateOnClick?: boolean;
   passive?: boolean;
   onCmdClick?: () => void;
+  onPointerEnter?: PointerEventHandler<HTMLElement>;
+  onPointerLeave?: PointerEventHandler<HTMLElement>;
 }) {
   const { cursorKey, setCursor, activate } = useContext(NavContext);
   const selected = cursorKey === navKey;
@@ -49,6 +53,8 @@ export function NavRow({
       aria-selected={selected}
       data-nav-key={navKey}
       className={cn("cursor-default rounded-sm", selected ? "bg-cf-control-hover text-cf-text ring-1 ring-cf-focus/40" : "hover:bg-cf-control-hover/50", className)}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       onClick={
         passive
           ? undefined

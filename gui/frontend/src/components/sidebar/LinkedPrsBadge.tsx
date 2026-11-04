@@ -4,6 +4,7 @@ import { prStateLook } from "@/components/prs/prState";
 import { threadKey } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
+import { usePrPrefetch } from "@/stores/prPrefetch";
 import { showThreadView } from "@/stores/threadPanelIntent";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -33,17 +34,20 @@ function selectThread(id: string): void {
  * tab (view.panel.pr's ShowView, scoped to the thread: the repo slug comes from the
  * thread's own link, `keys` being their pullRequestKeys), the shown one last so its tab is
  * the active one. The thread is selected first, so what opened shows. Each one's detail is
- * read once as well (a watch released at once; the entry stays): only the active tab reads
- * its own, and a closed one must leave the tag, as it did when the card read them all.
+ * read once as well, the shown one first because the daemon answers in order (the entry
+ * stays): only the active tab reads its own, and a closed one must leave the tag, as it did
+ * when the card read them all.
  */
-function openLinked(id: string, keys: readonly string[]): void {
+function openLinked(id: string, keys: readonly string[], shown: string | null): void {
   selectThread(id);
   const links = useThreadsStore.getState().byId[id]?.linkedPullRequests ?? [];
-  for (const key of keys) {
-    const link = links.find((l) => pullRequestKey(l.slug, l.number) === key);
-    if (!link) continue;
-    pullRequestDetailResource.watch(key)();
-    showThreadView("panel.pr", id, { slug: link.slug, number: String(link.number) });
+  const linkOf = (key: string) => links.find((l) => pullRequestKey(l.slug, l.number) === key);
+  const rest = keys.filter((k) => k !== shown && linkOf(k));
+  const lead = shown !== null && linkOf(shown) ? [shown] : [];
+  for (const key of [...lead, ...rest]) void pullRequestDetailResource.readOnce(key);
+  for (const key of [...rest, ...lead]) {
+    const link = linkOf(key);
+    if (link) showThreadView("panel.pr", id, { slug: link.slug, number: String(link.number) });
   }
 }
 
@@ -57,6 +61,10 @@ export function LinkedPrsBadge({ id }: { id: string }) {
   const keys = useLinkKeys(id);
   const facts = useLinkedPrFacts(keys);
   const tag = linkedPrTag(facts);
+  // The pull request the tag shows: the one a click lands on, so the one a hover warms.
+  const lead = tag === null ? null : tag.kind === "one" ? tag.number : tag.lead;
+  const shown = keys[facts.findIndex((f) => f.number === lead && f.state !== "closed")] ?? null;
+  const warm = usePrPrefetch(shown);
   if (tag === null) return null;
   const look = prStateLook(tag.state === "draft" ? "open" : tag.state === "unknown" ? null : tag.state, tag.state === "draft");
   return (
@@ -68,13 +76,11 @@ export function LinkedPrsBadge({ id }: { id: string }) {
       data-state={tag.state}
       data-tone={tag.tone}
       data-quiet=""
+      {...warm}
       onClick={(e) => {
         e.stopPropagation();
-        // The counted pull requests' keys (facts and keys share their order), the shown one last.
-        const counted = keys.filter((_, i) => facts[i]?.state !== "closed");
-        const lead = tag.kind === "one" ? tag.number : tag.lead;
-        const shown = keys[facts.findIndex((f) => f.number === lead && f.state !== "closed")];
-        openLinked(id, [...counted.filter((k) => k !== shown), ...(shown === undefined ? [] : [shown])]);
+        // The counted pull requests' keys: facts and keys share their order.
+        openLinked(id, keys.filter((_, i) => facts[i]?.state !== "closed"), shown);
       }}
       onDoubleClick={(e) => {
         e.stopPropagation();

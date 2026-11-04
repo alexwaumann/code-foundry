@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { copyPullRequestLink, openPullRequestInPanel } from "@/stores/prPanel";
+import { usePrPrefetch } from "@/stores/prPrefetch";
 import { useProjectsStore } from "@/stores/projects";
 import { copyBranchName, pendingKey, runOnce, sendThreadPrompt, useCardPending, useCheckoutShared, useWatchKeys } from "@/stores/threadInfo";
 import { threadContext } from "@/stores/threadActions";
@@ -180,8 +181,10 @@ const CHECK_ICON: Record<"ok" | "failed" | "running", ReactNode> = {
 /** One linked pull request: title; #n and its status (→ #base when stacked); its project when not the cwd's. A click opens its tab; the ellipsis offers GitHub and Copy URL. */
 function PrRowView({ row }: { row: PrRow }) {
   const ref = { slug: row.slug, number: row.number };
+  const warm = usePrPrefetch(pullRequestKey(row.slug, row.number));
   return (
     <Row
+      {...warm}
       icon={PR_ICON[row.state]}
       tall
       onActivate={() => void openPullRequestInPanel(ref)}

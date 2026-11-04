@@ -1,6 +1,6 @@
 /**
  * The PR Code tab's data (components/pr/PrCode.tsx): the pull request's diff, read while
- * the tab shows. Keyed like the detail (pullRequestKey). The daemon serves its cached
+ * the tab shows, and warmed ahead of it while the pull request does (warmPullRequestDiff). Keyed like the detail (pullRequestKey). The daemon serves its cached
  * diff when it was fetched for the head the cached detail has, so the tab reads it only
  * after the detail loaded; when the detail's head moves (a push the poll saw, a
  * pull_request_detail_updated re-read), the tab invalidates it (syncPullRequestDiff).
@@ -10,7 +10,8 @@ import { create } from "zustand";
 import { getPullRequestDiff, getPullRequestFile, type PullRequestDiffView } from "@/api/prDiff";
 import { errorMessage } from "@/api/stream";
 import { ExpandError } from "@/components/pr/diffModel";
-import { pullRequestKey } from "./gh";
+import { pullRequestDetailResource, pullRequestKey } from "./gh";
+import { prefetchHeld } from "./prPrefetch";
 import { createResource } from "./resource";
 
 function parseKey(key: string): [string, number] {
@@ -18,11 +19,41 @@ function parseKey(key: string): [string, number] {
   return [key.slice(0, i), Number(key.slice(i + 1))];
 }
 
-/** Key: pullRequestKey(slug, number). No keep-alive: the head SHA decides when to read again. */
-export const pullRequestDiffResource = createResource((key, signal) => {
-  const [slug, number] = parseKey(key);
-  return getPullRequestDiff(slug, number, false, undefined, signal);
-});
+/**
+ * Key: pullRequestKey(slug, number). No keep-alive: the head SHA decides when to read again.
+ * Like the detail's, a read nobody holds any more is aborted, and leaves the daemon's queue.
+ */
+export const pullRequestDiffResource = createResource(
+  (key, signal) => {
+    const [slug, number] = parseKey(key);
+    return getPullRequestDiff(slug, number, false, undefined, signal);
+  },
+  { abortOnRelease: true },
+);
+
+/** How long a landed detail waits before its diff is read, and between looks at a busy queue. */
+export const DIFF_WARM_AFTER_MS = 600;
+
+/**
+ * Reads key's diff before the Code tab asks, behind what someone is waiting for: it starts
+ * once no detail read is in flight, and not at all while reads would fail or spend a budget
+ * that is running out (prefetchHeld). Returns the release: a read not finished by then is
+ * abandoned.
+ */
+export function warmPullRequestDiff(key: string): () => void {
+  let release: (() => void) | null = null;
+  const tick = () => {
+    if (prefetchHeld()) return;
+    const busy = Object.values(pullRequestDetailResource.store.getState().entries).some((e) => e.loading);
+    if (busy) timer = setTimeout(tick, DIFF_WARM_AFTER_MS);
+    else release = pullRequestDiffResource.watch(key);
+  };
+  let timer = setTimeout(tick, DIFF_WARM_AFTER_MS);
+  return () => {
+    clearTimeout(timer);
+    release?.();
+  };
+}
 
 interface PrDiffState {
   /** pullRequestKey → a refresh in flight. */
