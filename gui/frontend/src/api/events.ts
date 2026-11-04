@@ -5,6 +5,7 @@ import { HEARTBEAT, isPageFocused, isPageVisible, type Heartbeat } from "./strea
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toMemoryEventView, type MemoryEventView } from "./memory";
+import { toSearchActivityView, type SearchActivityView } from "./search";
 import { toPluginEventView, type PluginEventView } from "./plugin";
 import { toProjectEventView, type ProjectEventView } from "./project";
 import { toSkillEventView, type SkillEventView } from "./skill";
@@ -38,6 +39,7 @@ export type EventView =
   | { source: "plugin"; event: PluginEventView }
   | { source: "skill"; event: SkillEventView }
   | { source: "memory"; event: MemoryEventView }
+  | { source: "search"; event: SearchActivityView }
   | { source: "theme"; event: ThemesSnapshotView };
 
 export function toEventView(ev: Event): EventView | null {
@@ -95,6 +97,8 @@ export function toEventView(ev: Event): EventView | null {
       return { source: "skill", event: toSkillEventView(e.value) };
     case "memory":
       return { source: "memory", event: toMemoryEventView(e.value) };
+    case "search":
+      return { source: "search", event: toSearchActivityView(e.value) };
     case "theme":
       return { source: "theme", event: toThemeEventView(e.value) };
     default:

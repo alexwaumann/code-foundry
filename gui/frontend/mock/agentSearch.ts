@@ -7,7 +7,8 @@
  * only a snapshot says (opened, seen, promoted) comes as another snapshot; a forgotten
  * entry ends the stream NOT_FOUND. WatchRecent sends the whole list now and after every
  * change. `unseen` turns true when a run ends on its own (not when stopped), false on
- * MarkSeen or Promote.
+ * MarkSeen or Promote. EventService's search source sends the activity (the sidebar's row)
+ * on connect and when it changes; a daemon restart fails what runs.
  *
  * The scripted run (stepMs apart): two searches start and end, a read, then the hits it
  * finds (each a candidate below whose thread exists and whose message has the quote), the
@@ -25,6 +26,7 @@ import {
   SearchStatus,
   type AgentSearchHitSchema,
   type AgentSearchStepSchema,
+  type SearchActivitySchema,
   type SearchEntrySchema,
   type SearchWatchEventSchema,
 } from "../src/gen/codefoundry/v1/search_pb";
@@ -35,6 +37,7 @@ import type { InvokeOut } from "./gitops";
 import { Hub } from "./hub";
 
 type EntryInit = MessageInitShape<typeof SearchEntrySchema>;
+export type ActivityInit = MessageInitShape<typeof SearchActivitySchema>;
 type HitInit = MessageInitShape<typeof AgentSearchHitSchema>;
 type StepInit = MessageInitShape<typeof AgentSearchStepSchema>;
 type WatchEventInit = MessageInitShape<typeof SearchWatchEventSchema>;
@@ -110,6 +113,8 @@ export interface SearchDeps {
   items: (id: string) => ItemInit[];
   /** Promote: a thread without a project that starts with the question; its id. */
   promote: (question: string, firstMessage: string) => string;
+  /** EventService's search source. */
+  publishActivity: (a: ActivityInit) => void;
 }
 
 function itemText(it: ItemInit): { text: string; speaker: SearchSpeaker } | null {
@@ -128,6 +133,7 @@ export class MockSearches {
   private entries = new Map<string, Entry>();
   private readonly recent = new Hub<void>();
   private seq = 0;
+  private lastActivity = "";
   private stepMs = 350;
   private fail = false;
   private hitCap = 8;
@@ -143,7 +149,7 @@ export class MockSearches {
     this.fail = false;
     this.hitCap = 8;
     this.calls.length = 0;
-    this.recent.publish();
+    this.listChanged();
   }
 
   private newEntry(mode: SearchMode, query: string, createdAt = new Date()): Entry {
@@ -244,7 +250,7 @@ export class MockSearches {
       if (o.status === SearchStatus.RUNNING) continue;
       this.drop(o);
     }
-    this.recent.publish();
+    this.listChanged();
   }
 
   private drop(e: Entry): void {
@@ -258,11 +264,35 @@ export class MockSearches {
     e.timers = [];
   }
 
+  /** The history changed: the list to WatchRecent, and the activity when it moved (the daemon's Activity). */
+  private listChanged(): void {
+    this.recent.publish();
+    const a = this.activity();
+    const key = JSON.stringify(a);
+    if (key === this.lastActivity) return;
+    this.lastActivity = key;
+    this.deps.publishActivity(a);
+  }
+
+  /** EventService's search source: the newest running search, and the unseen one that finished last. */
+  activity(): ActivityInit {
+    const agents = [...this.entries.values()].filter((e) => e.mode === SearchMode.AGENT);
+    const running = agents.filter((e) => e.status === SearchStatus.RUNNING).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const at = (e: Entry) => e.finishedAt?.getTime() ?? 0;
+    const unseen = agents.filter((e) => e.unseen && e.status !== SearchStatus.RUNNING).sort((a, b) => at(b) - at(a) || b.createdAt.getTime() - a.createdAt.getTime())[0];
+    return { running: running.length, runningId: running[0]?.id ?? "", unseenId: unseen?.id ?? "", unseenStatus: unseen?.status ?? SearchStatus.UNSPECIFIED, unseenHits: unseen?.hits.filter((h) => this.deps.thread(h.threadId)).length ?? 0 };
+  }
+
+  /** A daemon restart: a run in flight is lost, FAILED and unseen (POST /__mock/daemon/restart). */
+  restarted(): void {
+    for (const e of this.entries.values()) if (e.status === SearchStatus.RUNNING) this.finish(e, SearchStatus.FAILED, "the daemon stopped while it ran");
+  }
+
   /** A change: version + 1, the event to watchers (a snapshot when none is given), the list to WatchRecent. */
   private changed(e: Entry, ev?: WatchEventInit["event"]): void {
     e.version++;
     e.events.publish({ version: BigInt(e.version), event: ev ?? { case: "snapshot", value: this.entryMsg(e) } });
-    this.recent.publish();
+    this.listChanged();
   }
 
   startAgent(question: string): EntryInit {
@@ -441,14 +471,14 @@ export class MockSearches {
     this.calls.push(`forget ${id}`);
     if (!e) return;
     this.drop(e);
-    this.recent.publish();
+    this.listChanged();
   }
 
   clear(): number {
     const n = this.entries.size;
     this.calls.push("clear");
     for (const e of [...this.entries.values()]) this.drop(e);
-    this.recent.publish();
+    this.listChanged();
     return n;
   }
 

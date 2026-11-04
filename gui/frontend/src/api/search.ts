@@ -12,6 +12,7 @@ import {
   SearchStatus,
   type AgentSearchHit,
   type AgentSearchStep,
+  type SearchActivity,
   type SearchEntry,
   type SearchWatchEvent,
 } from "@/gen/codefoundry/v1/search_pb";
@@ -80,6 +81,17 @@ export interface SearchEntryView {
   promotedThreadId: string;
   /** A Find entry's result count when recorded; 0 when not known. */
   findHits: number;
+}
+
+/** What the sidebar's search row reads: EventService's search source, whole on connect and per change. */
+export interface SearchActivityView {
+  /** The newest running agent search; "" when none runs. */
+  runningId: string;
+  /** The unseen finished agent search that finished last; "" for none. */
+  unseenId: string;
+  unseenStatus: SearchStatusView;
+  /** Its hits. */
+  unseenHits: number;
 }
 
 /** A Watch event: the entry whole, or a change to it. Versions grow by one per change. */
@@ -156,6 +168,10 @@ export function toSearchEntryView(e: SearchEntry): SearchEntryView {
   };
 }
 
+export function toSearchActivityView(a: SearchActivity): SearchActivityView {
+  return { runningId: a.runningId, unseenId: a.unseenId, unseenStatus: statuses[a.unseenStatus], unseenHits: a.unseenHits };
+}
+
 /** A Watch event as a view; null for a heartbeat or an event this build does not know. */
 export function toSearchWatchEventView(ev: SearchWatchEvent): SearchWatchEventView | null {
   const version = Number(ev.version);
@@ -195,6 +211,14 @@ export function isSearchGone(err: unknown): boolean {
 export async function startAgentSearch(question: string, conn: DaemonConnection = daemon): Promise<SearchEntryView> {
   const c = await conn.client(SearchService);
   const res = await c.startAgent({ question });
+  if (!res.entry) throw new Error("the daemon returned no search");
+  return toSearchEntryView(res.entry);
+}
+
+/** SearchService.Get: one entry (NOT_FOUND once forgotten). */
+export async function getSearch(id: string, conn: DaemonConnection = daemon): Promise<SearchEntryView> {
+  const c = await conn.client(SearchService);
+  const res = await c.get({ id });
   if (!res.entry) throw new Error("the daemon returned no search");
   return toSearchEntryView(res.entry);
 }

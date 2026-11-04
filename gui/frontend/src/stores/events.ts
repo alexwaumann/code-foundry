@@ -13,6 +13,7 @@ import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
 import { applyMemoryEvent } from "./memory";
+import { applySearchActivity } from "./searchActivity";
 import { applyThemeEvent } from "./themes";
 import { onPluginEvent } from "./plugins";
 import { applyProjectEvent, replaceProjects, useProjectsStore } from "./projects";
@@ -95,6 +96,8 @@ const handlers: Handlers = {
   skill: (ev) => { onSkillEpoch(ev.epoch); },
   // The app memory, for Settings › Memory (stores/memory.ts).
   memory: applyMemoryEvent,
+  // Agent searches, for the sidebar's search row (stores/searchActivity.ts).
+  search: applySearchActivity,
   // The user's own themes (stores/themes.ts; src/themes resolves them).
   theme: applyThemeEvent,
 };

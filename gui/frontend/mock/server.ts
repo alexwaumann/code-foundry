@@ -808,12 +808,12 @@ function routes(router: ConnectRouter): void {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
     // Snapshots first in the order events.proto promises (project, workspace, terminal,
-    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory), then everything published, filtered by `sources`.
+    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH],
       );
       if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
@@ -831,6 +831,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.PLUGIN, event: { event: { case: "plugin", value: world.plugins.snapshot() } } },
         { source: EventSource.SKILL, event: { event: { case: "skill", value: world.skills.event() } } },
         { source: EventSource.MEMORY, event: { event: { case: "memory", value: world.memory.event() } } },
+        { source: EventSource.SEARCH, event: { event: { case: "search", value: world.searches.activity() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
