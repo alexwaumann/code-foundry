@@ -14,7 +14,7 @@ prompt and the follow-up (no migration); the GUI half works without it.
 | `internal/store/search/run.go` | the one follow-up: `loop.held`, `wantsReports`, `askForReports` |
 | `gui/frontend/src/lib/answerMarkdown.ts` | `answerPieces` (moved), `withoutRefs`, `rehypeInert`, `rehypeAnswerRefs` |
 | `gui/frontend/src/lib/markdownPlugins.ts`, `components/pr/Markdown.tsx` | `MarkdownExtras.inert` and `.citation` |
-| `gui/frontend/src/lib/agentSearch.ts` | `ANSWER_ROW`, `hasAnswerRow`, `resultRows`, `defaultSelection`, `answerPreview`; `restoreSelection` and `moveHit` work over rows |
+| `gui/frontend/src/lib/agentSearch.ts` | `ANSWER_ROW`, `hasAnswerRow`, `resultRows`, `defaultSelection`, `openingSelection`, `answerPreview`; `restoreSelection` and `moveHit` work over rows |
 | `gui/frontend/src/components/search/` | `AnswerRow`, `AnswerPane`, `AnswerText` rendered; selection in `AgentSearch` |
 | `gui/frontend/mock/agentSearch.ts` | `POST /__mock/search?long=1`: a long markdown answer with up to 8 hits |
 
@@ -29,8 +29,11 @@ prompt and the follow-up (no migration); the GUI half works without it.
   pointer, a marker, or a restored selection. Yanking the preview from under someone reading a
   hit would be the surprise; the row is at the top of the column either way.
 * **A running search reports no selection** unless picked: its first hit is not a choice, so a
-  dialog closed mid-run and reopened after the end lands on the Answer row. `show()` passes
-  null for a running entry for the same reason.
+  dialog closed mid-run and reopened after the end lands on the Answer row.
+* **One rule for opening a search** (`openingSelection`): Recent, the unseen cue and the
+  sidebar's search row (#511) all open on the first row, and a running entry has no selection
+  yet. `restoreSelection` takes bare hits too, so a call that forgets the Answer row still
+  type-checks: #511's path did exactly that when this branch rebased over it. Use the helper.
 * **Restore.** The Answer row wins when it was selected last, even with an opened hit in the
   session. After an opened hit the selection moves over hits only (wrapping does not stop at
   the Answer row); with every hit opened it falls to the first row, the Answer row.
@@ -92,7 +95,7 @@ A turn that ends cleanly on an answer citing `[n]` with zero hits gets `reportMe
 ## Verification
 
 * vitest: `lib/agentSearch.test.ts`, `components/search/AgentParts.test.tsx`,
-  `AgentSearch.test.tsx`, `mock/agentSearch.test.ts`. Go: `TestReportFollowUp`,
+  `AgentSearch.test.tsx`, `SearchTarget.test.tsx`, `mock/agentSearch.test.ts`. Go: `TestReportFollowUp`,
   `TestReportFollowUpTakesItsHits`, `TestStopDuringReportSend`, `TestCitesReports`.
 * WebKit e2e `e2e/agent-search.spec.ts`: hits in view under a long answer, the two-line clamp,
   the pane scrolling alone, the selected row kept in view, a marker keeping the field's focus.

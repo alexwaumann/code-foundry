@@ -169,6 +169,7 @@ async function type(q: string): Promise<void> {
 }
 const hitRows = () => screen.queryAllByTestId("agent-hit");
 const selectedHit = () => hitRows().find((r) => r.hasAttribute("data-selected"))?.getAttribute("data-n");
+const answerSelected = () => screen.queryByTestId("agent-answer-row")?.hasAttribute("data-selected") ?? false;
 
 /** Shows a running search for the typed question: Enter, StartAgent's entry, Watch's snapshot. */
 async function startShown(e: SearchEntryView = entry()): Promise<void> {
@@ -221,9 +222,18 @@ describe("opened on a search (the sidebar's row)", () => {
     watchOf("q-7").push({ kind: "snapshot", version: e.version, entry: e });
     await settle(20);
     expect(hitRows()).toHaveLength(2);
-    expect(selectedHit()).toBe("1");
+    expect(answerSelected()).toBe(true);
+    expect(screen.getByTestId("agent-answer-pane")).toBeTruthy();
     expect(invocationsOf("search.seen").map((i) => i.args)).toEqual([{ id: "q-7" }]);
     expect(useSearchDialogStore.getState().target).toBeNull();
+  });
+
+  it("with no answer it opens on the first hit", async () => {
+    const e = done({ id: "q-7", answer: "", hits: [hit(1), hit(2)] });
+    await openOn(e);
+    watchOf("q-7").push({ kind: "snapshot", version: e.version, entry: e });
+    await settle(20);
+    expect(selectedHit()).toBe("1");
   });
 
   it("from Find too, and whatever a restored session held", async () => {
@@ -246,6 +256,7 @@ describe("opened on a search (the sidebar's row)", () => {
     const e = done({ hits: [hit(1), hit(2), hit(3)] });
     await startShown(e);
     key("ArrowDown");
+    key("ArrowDown");
     await settle(10);
     expect(selectedHit()).toBe("2");
     await close();
@@ -257,17 +268,20 @@ describe("opened on a search (the sidebar's row)", () => {
   });
 
   it("a running one: its question, and no second run on open; it is seen when it ends in view", async () => {
-    const e = entry({ id: "q-r", query: "still going?", status: "running" });
+    const e = entry({ id: "q-r", query: "still going?", status: "running", hits: [hit(1)] });
     await openOn(e);
     expect(input().value).toBe("still going?");
     expect(startAgentSearch).not.toHaveBeenCalled();
     watchOf("q-r").push({ kind: "snapshot", version: e.version, entry: e });
     await settle(20);
     expect(invocationsOf("search.seen")).toHaveLength(0);
+    expect(selectedHit()).toBe("1");
     const end = done({ id: "q-r", query: "still going?", unseen: true, version: e.version + 1 });
     watchOf("q-r").push({ kind: "snapshot", version: end.version, entry: end });
     await settle(20);
     expect(invocationsOf("search.seen").map((i) => i.args)).toEqual([{ id: "q-r" }]);
+    // Its first hit was no choice: the end still selects the Answer row.
+    expect(answerSelected()).toBe(true);
   });
 
   it("another unseen search is cued, not jumped to", async () => {

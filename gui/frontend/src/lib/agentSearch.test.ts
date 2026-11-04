@@ -6,6 +6,7 @@ import {
   answerPreview,
   defaultSelection,
   endedNote,
+  openingSelection,
   findHitCount,
   footerModel,
   hasAnswerRow,
@@ -225,6 +226,15 @@ describe("the Answer row", () => {
     ["empty", "", ""],
   ])("answerPreview: %s", (_name, answer, want) => {
     expect(answerPreview(answer)).toBe(want);
+  });
+
+  it.each<[string, { status: "running" | "done" | "stopped"; answer: string; hits: AgentHitView[] }, number | null]>([
+    ["ended with an answer: the Answer row", { status: "done", answer: "It did [1].", hits: [hit(1)] }, ANSWER_ROW],
+    ["ended with no answer: the first unopened hit", { status: "done", answer: "", hits: [hit(1, { opened: true }), hit(2)] }, 2],
+    ["ended with nothing", { status: "stopped", answer: "", hits: [] }, null],
+    ["running: nothing yet, so its end can select the Answer row", { status: "running", answer: "", hits: [hit(1)] }, null],
+  ])("openingSelection: %s", (_name, e, want) => {
+    expect(openingSelection(e)).toBe(want);
   });
 
   it("withoutRefs leaves other brackets", () => {

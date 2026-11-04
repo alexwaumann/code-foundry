@@ -138,6 +138,16 @@ export function restoreSelection(rows: readonly ResultRow[], openedN: number | n
   return next?.n ?? null;
 }
 
+/**
+ * The selection a search opens on when no earlier selection of it is kept (Recent, the
+ * unseen cue, the sidebar's search row): its first row, the Answer row when it has one. A
+ * running search has none yet: its first hit is no choice, so its end still selects the
+ * Answer row.
+ */
+export function openingSelection(e: Pick<SearchEntryView, "status" | "answer" | "hits">): number | null {
+  return searchEnded(e) ? restoreSelection(resultRows(e), null) : null;
+}
+
 /** ↑/↓ over the rows: the next or previous n, wrapping; the first for none selected. */
 export function moveHit(rows: readonly Pick<ResultRow, "n">[], cur: number | null, dir: 1 | -1): number | null {
   if (rows.length === 0) return null;
