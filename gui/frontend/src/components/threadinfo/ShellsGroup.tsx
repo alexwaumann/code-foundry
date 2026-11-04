@@ -105,7 +105,7 @@ function ServerRow({ threadId, server }: { threadId: string; server: ServerSourc
           <span className="truncate text-code">{address}</span>
           <SubLine className="text-cf-text-muted" testId="ti-server-line">
             <span className="min-w-0 truncate">{command}</span>
-            {source && <span className="min-w-0 truncate" data-testid="ti-server-source">· {source}</span>}
+            {source && <span className="min-w-16 shrink-[100] truncate" data-testid="ti-server-source">· {source}</span>}
             {startedAtMs !== null && (
               <span className="shrink-0">
                 · <Uptime startedAtMs={startedAtMs} />
