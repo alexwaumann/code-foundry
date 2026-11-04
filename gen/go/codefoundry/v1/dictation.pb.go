@@ -223,7 +223,13 @@ type DictationSnapshot struct {
 	// dictation.hold_key: "left", "right", "either" or "both" (the two pressed together).
 	HoldKey string `protobuf:"bytes,10,opt,name=hold_key,json=holdKey,proto3" json:"hold_key,omitempty"`
 	// dictation.sounds: a sound as dictation starts and stops.
-	Sounds        bool `protobuf:"varint,11,opt,name=sounds,proto3" json:"sounds,omitempty"`
+	Sounds bool `protobuf:"varint,11,opt,name=sounds,proto3" json:"sounds,omitempty"`
+	// notifications.sound_volume: the sounds' volume, percent of the Mac's output volume.
+	SoundVolume int32 `protobuf:"varint,12,opt,name=sound_volume,json=soundVolume,proto3" json:"sound_volume,omitempty"`
+	// The window has a composer dictation can target (ComposerTarget).
+	ComposerTarget bool `protobuf:"varint,13,opt,name=composer_target,json=composerTarget,proto3" json:"composer_target,omitempty"`
+	// What the host last reported; unset until it has (no host, or dictation off so far).
+	Accessibility *DictationAccessibility `protobuf:"bytes,14,opt,name=accessibility,proto3" json:"accessibility,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -335,6 +341,101 @@ func (x *DictationSnapshot) GetSounds() bool {
 	return false
 }
 
+func (x *DictationSnapshot) GetSoundVolume() int32 {
+	if x != nil {
+		return x.SoundVolume
+	}
+	return 0
+}
+
+func (x *DictationSnapshot) GetComposerTarget() bool {
+	if x != nil {
+		return x.ComposerTarget
+	}
+	return false
+}
+
+func (x *DictationSnapshot) GetAccessibility() *DictationAccessibility {
+	if x != nil {
+		return x.Accessibility
+	}
+	return nil
+}
+
+// DictationAccessibility is what macOS allows the hold key, as the host sees it.
+type DictationAccessibility struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// AXIsProcessTrusted: the host may listen for the hold key and paste.
+	Granted bool `protobuf:"varint,1,opt,name=granted,proto3" json:"granted,omitempty"`
+	// Granted, but the event tap hears nothing while keys are being pressed: this process
+	// needs restarting (docs/notes/dictate-anywhere.md).
+	TapSilent bool `protobuf:"varint,2,opt,name=tap_silent,json=tapSilent,proto3" json:"tap_silent,omitempty"`
+	// What System Settings calls the list, for this macOS.
+	ListName string `protobuf:"bytes,3,opt,name=list_name,json=listName,proto3" json:"list_name,omitempty"`
+	// The host's executable: what to add to the list by hand.
+	Executable    string `protobuf:"bytes,4,opt,name=executable,proto3" json:"executable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DictationAccessibility) Reset() {
+	*x = DictationAccessibility{}
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DictationAccessibility) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DictationAccessibility) ProtoMessage() {}
+
+func (x *DictationAccessibility) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DictationAccessibility.ProtoReflect.Descriptor instead.
+func (*DictationAccessibility) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *DictationAccessibility) GetGranted() bool {
+	if x != nil {
+		return x.Granted
+	}
+	return false
+}
+
+func (x *DictationAccessibility) GetTapSilent() bool {
+	if x != nil {
+		return x.TapSilent
+	}
+	return false
+}
+
+func (x *DictationAccessibility) GetListName() string {
+	if x != nil {
+		return x.ListName
+	}
+	return ""
+}
+
+func (x *DictationAccessibility) GetExecutable() string {
+	if x != nil {
+		return x.Executable
+	}
+	return ""
+}
+
 // DictationModel is the one Whisper model.
 type DictationModel struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -351,7 +452,7 @@ type DictationModel struct {
 
 func (x *DictationModel) Reset() {
 	*x = DictationModel{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[2]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -363,7 +464,7 @@ func (x *DictationModel) String() string {
 func (*DictationModel) ProtoMessage() {}
 
 func (x *DictationModel) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[2]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -376,7 +477,7 @@ func (x *DictationModel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationModel.ProtoReflect.Descriptor instead.
 func (*DictationModel) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{2}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DictationModel) GetName() string {
@@ -420,7 +521,7 @@ type DictationDownload struct {
 
 func (x *DictationDownload) Reset() {
 	*x = DictationDownload{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -432,7 +533,7 @@ func (x *DictationDownload) String() string {
 func (*DictationDownload) ProtoMessage() {}
 
 func (x *DictationDownload) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -445,7 +546,7 @@ func (x *DictationDownload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationDownload.ProtoReflect.Descriptor instead.
 func (*DictationDownload) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{3}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DictationDownload) GetReceivedBytes() int64 {
@@ -484,7 +585,7 @@ type DictationHardware struct {
 
 func (x *DictationHardware) Reset() {
 	*x = DictationHardware{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -496,7 +597,7 @@ func (x *DictationHardware) String() string {
 func (*DictationHardware) ProtoMessage() {}
 
 func (x *DictationHardware) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -509,7 +610,7 @@ func (x *DictationHardware) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationHardware.ProtoReflect.Descriptor instead.
 func (*DictationHardware) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{4}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DictationHardware) GetChip() string {
@@ -549,7 +650,7 @@ type DictationSession struct {
 
 func (x *DictationSession) Reset() {
 	*x = DictationSession{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -561,7 +662,7 @@ func (x *DictationSession) String() string {
 func (*DictationSession) ProtoMessage() {}
 
 func (x *DictationSession) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -574,7 +675,7 @@ func (x *DictationSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationSession.ProtoReflect.Descriptor instead.
 func (*DictationSession) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{5}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DictationSession) GetId() string {
@@ -613,7 +714,7 @@ type DownloadDictationModelRequest struct {
 
 func (x *DownloadDictationModelRequest) Reset() {
 	*x = DownloadDictationModelRequest{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -625,7 +726,7 @@ func (x *DownloadDictationModelRequest) String() string {
 func (*DownloadDictationModelRequest) ProtoMessage() {}
 
 func (x *DownloadDictationModelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -638,7 +739,7 @@ func (x *DownloadDictationModelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadDictationModelRequest.ProtoReflect.Descriptor instead.
 func (*DownloadDictationModelRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{6}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{7}
 }
 
 type DownloadDictationModelResponse struct {
@@ -650,7 +751,7 @@ type DownloadDictationModelResponse struct {
 
 func (x *DownloadDictationModelResponse) Reset() {
 	*x = DownloadDictationModelResponse{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -662,7 +763,7 @@ func (x *DownloadDictationModelResponse) String() string {
 func (*DownloadDictationModelResponse) ProtoMessage() {}
 
 func (x *DownloadDictationModelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -675,7 +776,7 @@ func (x *DownloadDictationModelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadDictationModelResponse.ProtoReflect.Descriptor instead.
 func (*DownloadDictationModelResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{7}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DownloadDictationModelResponse) GetSnapshot() *DictationSnapshot {
@@ -693,7 +794,7 @@ type CancelDictationDownloadRequest struct {
 
 func (x *CancelDictationDownloadRequest) Reset() {
 	*x = CancelDictationDownloadRequest{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -705,7 +806,7 @@ func (x *CancelDictationDownloadRequest) String() string {
 func (*CancelDictationDownloadRequest) ProtoMessage() {}
 
 func (x *CancelDictationDownloadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -718,7 +819,7 @@ func (x *CancelDictationDownloadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelDictationDownloadRequest.ProtoReflect.Descriptor instead.
 func (*CancelDictationDownloadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{9}
 }
 
 type CancelDictationDownloadResponse struct {
@@ -730,7 +831,7 @@ type CancelDictationDownloadResponse struct {
 
 func (x *CancelDictationDownloadResponse) Reset() {
 	*x = CancelDictationDownloadResponse{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -742,7 +843,7 @@ func (x *CancelDictationDownloadResponse) String() string {
 func (*CancelDictationDownloadResponse) ProtoMessage() {}
 
 func (x *CancelDictationDownloadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -755,7 +856,7 @@ func (x *CancelDictationDownloadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelDictationDownloadResponse.ProtoReflect.Descriptor instead.
 func (*CancelDictationDownloadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CancelDictationDownloadResponse) GetSnapshot() *DictationSnapshot {
@@ -773,7 +874,7 @@ type RemoveDictationModelRequest struct {
 
 func (x *RemoveDictationModelRequest) Reset() {
 	*x = RemoveDictationModelRequest{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -785,7 +886,7 @@ func (x *RemoveDictationModelRequest) String() string {
 func (*RemoveDictationModelRequest) ProtoMessage() {}
 
 func (x *RemoveDictationModelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -798,7 +899,7 @@ func (x *RemoveDictationModelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveDictationModelRequest.ProtoReflect.Descriptor instead.
 func (*RemoveDictationModelRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{10}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{11}
 }
 
 type RemoveDictationModelResponse struct {
@@ -810,7 +911,7 @@ type RemoveDictationModelResponse struct {
 
 func (x *RemoveDictationModelResponse) Reset() {
 	*x = RemoveDictationModelResponse{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -822,7 +923,7 @@ func (x *RemoveDictationModelResponse) String() string {
 func (*RemoveDictationModelResponse) ProtoMessage() {}
 
 func (x *RemoveDictationModelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -835,7 +936,7 @@ func (x *RemoveDictationModelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveDictationModelResponse.ProtoReflect.Descriptor instead.
 func (*RemoveDictationModelResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RemoveDictationModelResponse) GetSnapshot() *DictationSnapshot {
@@ -856,7 +957,7 @@ type StartDictationRequest struct {
 
 func (x *StartDictationRequest) Reset() {
 	*x = StartDictationRequest{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -868,7 +969,7 @@ func (x *StartDictationRequest) String() string {
 func (*StartDictationRequest) ProtoMessage() {}
 
 func (x *StartDictationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -881,7 +982,7 @@ func (x *StartDictationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDictationRequest.ProtoReflect.Descriptor instead.
 func (*StartDictationRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StartDictationRequest) GetClientId() string {
@@ -900,7 +1001,7 @@ type StartDictationResponse struct {
 
 func (x *StartDictationResponse) Reset() {
 	*x = StartDictationResponse{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +1013,7 @@ func (x *StartDictationResponse) String() string {
 func (*StartDictationResponse) ProtoMessage() {}
 
 func (x *StartDictationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +1026,7 @@ func (x *StartDictationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDictationResponse.ProtoReflect.Descriptor instead.
 func (*StartDictationResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{13}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *StartDictationResponse) GetSessionId() string {
@@ -946,7 +1047,7 @@ type StopDictationRequest struct {
 
 func (x *StopDictationRequest) Reset() {
 	*x = StopDictationRequest{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -958,7 +1059,7 @@ func (x *StopDictationRequest) String() string {
 func (*StopDictationRequest) ProtoMessage() {}
 
 func (x *StopDictationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -971,7 +1072,7 @@ func (x *StopDictationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopDictationRequest.ProtoReflect.Descriptor instead.
 func (*StopDictationRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{14}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StopDictationRequest) GetSessionId() string {
@@ -996,7 +1097,7 @@ type StopDictationResponse struct {
 
 func (x *StopDictationResponse) Reset() {
 	*x = StopDictationResponse{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1008,7 +1109,7 @@ func (x *StopDictationResponse) String() string {
 func (*StopDictationResponse) ProtoMessage() {}
 
 func (x *StopDictationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1021,7 +1122,7 @@ func (x *StopDictationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopDictationResponse.ProtoReflect.Descriptor instead.
 func (*StopDictationResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{15}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{16}
 }
 
 type DictationSessionRequest struct {
@@ -1033,7 +1134,7 @@ type DictationSessionRequest struct {
 
 func (x *DictationSessionRequest) Reset() {
 	*x = DictationSessionRequest{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1045,7 +1146,7 @@ func (x *DictationSessionRequest) String() string {
 func (*DictationSessionRequest) ProtoMessage() {}
 
 func (x *DictationSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1058,7 +1159,7 @@ func (x *DictationSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationSessionRequest.ProtoReflect.Descriptor instead.
 func (*DictationSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{16}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *DictationSessionRequest) GetSessionId() string {
@@ -1084,7 +1185,7 @@ type DictationSessionEvent struct {
 
 func (x *DictationSessionEvent) Reset() {
 	*x = DictationSessionEvent{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1096,7 +1197,7 @@ func (x *DictationSessionEvent) String() string {
 func (*DictationSessionEvent) ProtoMessage() {}
 
 func (x *DictationSessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1109,7 +1210,7 @@ func (x *DictationSessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationSessionEvent.ProtoReflect.Descriptor instead.
 func (*DictationSessionEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *DictationSessionEvent) GetEvent() isDictationSessionEvent_Event {
@@ -1194,7 +1295,7 @@ type DictationLevel struct {
 
 func (x *DictationLevel) Reset() {
 	*x = DictationLevel{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1206,7 +1307,7 @@ func (x *DictationLevel) String() string {
 func (*DictationLevel) ProtoMessage() {}
 
 func (x *DictationLevel) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1219,7 +1320,7 @@ func (x *DictationLevel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationLevel.ProtoReflect.Descriptor instead.
 func (*DictationLevel) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DictationLevel) GetRms() float32 {
@@ -1239,7 +1340,7 @@ type DictationPhrase struct {
 
 func (x *DictationPhrase) Reset() {
 	*x = DictationPhrase{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1251,7 +1352,7 @@ func (x *DictationPhrase) String() string {
 func (*DictationPhrase) ProtoMessage() {}
 
 func (x *DictationPhrase) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1264,7 +1365,7 @@ func (x *DictationPhrase) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationPhrase.ProtoReflect.Descriptor instead.
 func (*DictationPhrase) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DictationPhrase) GetText() string {
@@ -1284,7 +1385,7 @@ type DictationEnded struct {
 
 func (x *DictationEnded) Reset() {
 	*x = DictationEnded{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1296,7 +1397,7 @@ func (x *DictationEnded) String() string {
 func (*DictationEnded) ProtoMessage() {}
 
 func (x *DictationEnded) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1309,7 +1410,7 @@ func (x *DictationEnded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationEnded.ProtoReflect.Descriptor instead.
 func (*DictationEnded) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DictationEnded) GetReason() DictationEndReason {
@@ -1333,7 +1434,7 @@ type DictationAudioFrame struct {
 
 func (x *DictationAudioFrame) Reset() {
 	*x = DictationAudioFrame{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1345,7 +1446,7 @@ func (x *DictationAudioFrame) String() string {
 func (*DictationAudioFrame) ProtoMessage() {}
 
 func (x *DictationAudioFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1358,7 +1459,7 @@ func (x *DictationAudioFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationAudioFrame.ProtoReflect.Descriptor instead.
 func (*DictationAudioFrame) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DictationAudioFrame) GetSessionId() string {
@@ -1390,7 +1491,7 @@ type DictationAudioResponse struct {
 
 func (x *DictationAudioResponse) Reset() {
 	*x = DictationAudioResponse{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1402,7 +1503,7 @@ func (x *DictationAudioResponse) String() string {
 func (*DictationAudioResponse) ProtoMessage() {}
 
 func (x *DictationAudioResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1415,7 +1516,7 @@ func (x *DictationAudioResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationAudioResponse.ProtoReflect.Descriptor instead.
 func (*DictationAudioResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{22}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{23}
 }
 
 type DictationMicDeniedRequest struct {
@@ -1427,7 +1528,7 @@ type DictationMicDeniedRequest struct {
 
 func (x *DictationMicDeniedRequest) Reset() {
 	*x = DictationMicDeniedRequest{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1439,7 +1540,7 @@ func (x *DictationMicDeniedRequest) String() string {
 func (*DictationMicDeniedRequest) ProtoMessage() {}
 
 func (x *DictationMicDeniedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1452,7 +1553,7 @@ func (x *DictationMicDeniedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationMicDeniedRequest.ProtoReflect.Descriptor instead.
 func (*DictationMicDeniedRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{23}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DictationMicDeniedRequest) GetDenied() bool {
@@ -1470,7 +1571,7 @@ type DictationMicDeniedResponse struct {
 
 func (x *DictationMicDeniedResponse) Reset() {
 	*x = DictationMicDeniedResponse{}
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1482,7 +1583,7 @@ func (x *DictationMicDeniedResponse) String() string {
 func (*DictationMicDeniedResponse) ProtoMessage() {}
 
 func (x *DictationMicDeniedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_dictation_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1495,7 +1596,167 @@ func (x *DictationMicDeniedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictationMicDeniedResponse.ProtoReflect.Descriptor instead.
 func (*DictationMicDeniedResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{24}
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{25}
+}
+
+type DictationAccessibilityRequest struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Accessibility *DictationAccessibility `protobuf:"bytes,1,opt,name=accessibility,proto3" json:"accessibility,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DictationAccessibilityRequest) Reset() {
+	*x = DictationAccessibilityRequest{}
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DictationAccessibilityRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DictationAccessibilityRequest) ProtoMessage() {}
+
+func (x *DictationAccessibilityRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DictationAccessibilityRequest.ProtoReflect.Descriptor instead.
+func (*DictationAccessibilityRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *DictationAccessibilityRequest) GetAccessibility() *DictationAccessibility {
+	if x != nil {
+		return x.Accessibility
+	}
+	return nil
+}
+
+type DictationAccessibilityResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DictationAccessibilityResponse) Reset() {
+	*x = DictationAccessibilityResponse{}
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DictationAccessibilityResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DictationAccessibilityResponse) ProtoMessage() {}
+
+func (x *DictationAccessibilityResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DictationAccessibilityResponse.ProtoReflect.Descriptor instead.
+func (*DictationAccessibilityResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{27}
+}
+
+type DictationComposerTargetRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Available     bool                   `protobuf:"varint,1,opt,name=available,proto3" json:"available,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DictationComposerTargetRequest) Reset() {
+	*x = DictationComposerTargetRequest{}
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DictationComposerTargetRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DictationComposerTargetRequest) ProtoMessage() {}
+
+func (x *DictationComposerTargetRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DictationComposerTargetRequest.ProtoReflect.Descriptor instead.
+func (*DictationComposerTargetRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *DictationComposerTargetRequest) GetAvailable() bool {
+	if x != nil {
+		return x.Available
+	}
+	return false
+}
+
+type DictationComposerTargetResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DictationComposerTargetResponse) Reset() {
+	*x = DictationComposerTargetResponse{}
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DictationComposerTargetResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DictationComposerTargetResponse) ProtoMessage() {}
+
+func (x *DictationComposerTargetResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_dictation_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DictationComposerTargetResponse.ProtoReflect.Descriptor instead.
+func (*DictationComposerTargetResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_dictation_proto_rawDescGZIP(), []int{29}
 }
 
 var File_codefoundry_v1_dictation_proto protoreflect.FileDescriptor
@@ -1503,7 +1764,7 @@ var File_codefoundry_v1_dictation_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\n" +
 	"\x1ecodefoundry/v1/dictation.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x17\n" +
-	"\x15WatchDictationRequest\"\xd7\x03\n" +
+	"\x15WatchDictationRequest\"\xf1\x04\n" +
 	"\x11DictationSnapshot\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x124\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1e.codefoundry.v1.DictationStateR\x05state\x124\n" +
@@ -1517,7 +1778,18 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\banywhere\x18\t \x01(\bR\banywhere\x12\x19\n" +
 	"\bhold_key\x18\n" +
 	" \x01(\tR\aholdKey\x12\x16\n" +
-	"\x06sounds\x18\v \x01(\bR\x06sounds\"\xa2\x01\n" +
+	"\x06sounds\x18\v \x01(\bR\x06sounds\x12!\n" +
+	"\fsound_volume\x18\f \x01(\x05R\vsoundVolume\x12'\n" +
+	"\x0fcomposer_target\x18\r \x01(\bR\x0ecomposerTarget\x12L\n" +
+	"\raccessibility\x18\x0e \x01(\v2&.codefoundry.v1.DictationAccessibilityR\raccessibility\"\x8e\x01\n" +
+	"\x16DictationAccessibility\x12\x18\n" +
+	"\agranted\x18\x01 \x01(\bR\agranted\x12\x1d\n" +
+	"\n" +
+	"tap_silent\x18\x02 \x01(\bR\ttapSilent\x12\x1b\n" +
+	"\tlist_name\x18\x03 \x01(\tR\blistName\x12\x1e\n" +
+	"\n" +
+	"executable\x18\x04 \x01(\tR\n" +
+	"executable\"\xa2\x01\n" +
 	"\x0eDictationModel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
@@ -1583,7 +1855,13 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\x16DictationAudioResponse\"3\n" +
 	"\x19DictationMicDeniedRequest\x12\x16\n" +
 	"\x06denied\x18\x01 \x01(\bR\x06denied\"\x1c\n" +
-	"\x1aDictationMicDeniedResponse*\x9e\x02\n" +
+	"\x1aDictationMicDeniedResponse\"m\n" +
+	"\x1dDictationAccessibilityRequest\x12L\n" +
+	"\raccessibility\x18\x01 \x01(\v2&.codefoundry.v1.DictationAccessibilityR\raccessibility\" \n" +
+	"\x1eDictationAccessibilityResponse\">\n" +
+	"\x1eDictationComposerTargetRequest\x12\x1c\n" +
+	"\tavailable\x18\x01 \x01(\bR\tavailable\"!\n" +
+	"\x1fDictationComposerTargetResponse*\x9e\x02\n" +
 	"\x0eDictationState\x12\x1f\n" +
 	"\x1bDICTATION_STATE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DICTATION_STATE_DISABLED\x10\x01\x12\x1c\n" +
@@ -1600,7 +1878,7 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\x1cDICTATION_END_REASON_SILENCE\x10\x02\x12!\n" +
 	"\x1dDICTATION_END_REASON_DISABLED\x10\x03\x12\x1e\n" +
 	"\x1aDICTATION_END_REASON_ERROR\x10\x04\x12\"\n" +
-	"\x1eDICTATION_END_REASON_DISCARDED\x10\x052\x87\a\n" +
+	"\x1eDICTATION_END_REASON_DISCARDED\x10\x052\xee\b\n" +
 	"\x10DictationService\x12U\n" +
 	"\x05Watch\x12%.codefoundry.v1.WatchDictationRequest\x1a!.codefoundry.v1.DictationSnapshot\"\x000\x01\x12k\n" +
 	"\bDownload\x12-.codefoundry.v1.DownloadDictationModelRequest\x1a..codefoundry.v1.DownloadDictationModelResponse\"\x00\x12s\n" +
@@ -1610,7 +1888,9 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\x04Stop\x12$.codefoundry.v1.StopDictationRequest\x1a%.codefoundry.v1.StopDictationResponse\"\x00\x12]\n" +
 	"\aSession\x12'.codefoundry.v1.DictationSessionRequest\x1a%.codefoundry.v1.DictationSessionEvent\"\x000\x01\x12X\n" +
 	"\x05Audio\x12#.codefoundry.v1.DictationAudioFrame\x1a&.codefoundry.v1.DictationAudioResponse\"\x00(\x01\x12d\n" +
-	"\tMicDenied\x12).codefoundry.v1.DictationMicDeniedRequest\x1a*.codefoundry.v1.DictationMicDeniedResponse\"\x00B\xc6\x01\n" +
+	"\tMicDenied\x12).codefoundry.v1.DictationMicDeniedRequest\x1a*.codefoundry.v1.DictationMicDeniedResponse\"\x00\x12p\n" +
+	"\rAccessibility\x12-.codefoundry.v1.DictationAccessibilityRequest\x1a..codefoundry.v1.DictationAccessibilityResponse\"\x00\x12s\n" +
+	"\x0eComposerTarget\x12..codefoundry.v1.DictationComposerTargetRequest\x1a/.codefoundry.v1.DictationComposerTargetResponse\"\x00B\xc6\x01\n" +
 	"\x12com.codefoundry.v1B\x0eDictationProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -1626,77 +1906,88 @@ func file_codefoundry_v1_dictation_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_dictation_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_codefoundry_v1_dictation_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_codefoundry_v1_dictation_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_codefoundry_v1_dictation_proto_goTypes = []any{
 	(DictationState)(0),                     // 0: codefoundry.v1.DictationState
 	(DictationEndReason)(0),                 // 1: codefoundry.v1.DictationEndReason
 	(*WatchDictationRequest)(nil),           // 2: codefoundry.v1.WatchDictationRequest
 	(*DictationSnapshot)(nil),               // 3: codefoundry.v1.DictationSnapshot
-	(*DictationModel)(nil),                  // 4: codefoundry.v1.DictationModel
-	(*DictationDownload)(nil),               // 5: codefoundry.v1.DictationDownload
-	(*DictationHardware)(nil),               // 6: codefoundry.v1.DictationHardware
-	(*DictationSession)(nil),                // 7: codefoundry.v1.DictationSession
-	(*DownloadDictationModelRequest)(nil),   // 8: codefoundry.v1.DownloadDictationModelRequest
-	(*DownloadDictationModelResponse)(nil),  // 9: codefoundry.v1.DownloadDictationModelResponse
-	(*CancelDictationDownloadRequest)(nil),  // 10: codefoundry.v1.CancelDictationDownloadRequest
-	(*CancelDictationDownloadResponse)(nil), // 11: codefoundry.v1.CancelDictationDownloadResponse
-	(*RemoveDictationModelRequest)(nil),     // 12: codefoundry.v1.RemoveDictationModelRequest
-	(*RemoveDictationModelResponse)(nil),    // 13: codefoundry.v1.RemoveDictationModelResponse
-	(*StartDictationRequest)(nil),           // 14: codefoundry.v1.StartDictationRequest
-	(*StartDictationResponse)(nil),          // 15: codefoundry.v1.StartDictationResponse
-	(*StopDictationRequest)(nil),            // 16: codefoundry.v1.StopDictationRequest
-	(*StopDictationResponse)(nil),           // 17: codefoundry.v1.StopDictationResponse
-	(*DictationSessionRequest)(nil),         // 18: codefoundry.v1.DictationSessionRequest
-	(*DictationSessionEvent)(nil),           // 19: codefoundry.v1.DictationSessionEvent
-	(*DictationLevel)(nil),                  // 20: codefoundry.v1.DictationLevel
-	(*DictationPhrase)(nil),                 // 21: codefoundry.v1.DictationPhrase
-	(*DictationEnded)(nil),                  // 22: codefoundry.v1.DictationEnded
-	(*DictationAudioFrame)(nil),             // 23: codefoundry.v1.DictationAudioFrame
-	(*DictationAudioResponse)(nil),          // 24: codefoundry.v1.DictationAudioResponse
-	(*DictationMicDeniedRequest)(nil),       // 25: codefoundry.v1.DictationMicDeniedRequest
-	(*DictationMicDeniedResponse)(nil),      // 26: codefoundry.v1.DictationMicDeniedResponse
-	(*StreamHeartbeat)(nil),                 // 27: codefoundry.v1.StreamHeartbeat
-	(*timestamppb.Timestamp)(nil),           // 28: google.protobuf.Timestamp
+	(*DictationAccessibility)(nil),          // 4: codefoundry.v1.DictationAccessibility
+	(*DictationModel)(nil),                  // 5: codefoundry.v1.DictationModel
+	(*DictationDownload)(nil),               // 6: codefoundry.v1.DictationDownload
+	(*DictationHardware)(nil),               // 7: codefoundry.v1.DictationHardware
+	(*DictationSession)(nil),                // 8: codefoundry.v1.DictationSession
+	(*DownloadDictationModelRequest)(nil),   // 9: codefoundry.v1.DownloadDictationModelRequest
+	(*DownloadDictationModelResponse)(nil),  // 10: codefoundry.v1.DownloadDictationModelResponse
+	(*CancelDictationDownloadRequest)(nil),  // 11: codefoundry.v1.CancelDictationDownloadRequest
+	(*CancelDictationDownloadResponse)(nil), // 12: codefoundry.v1.CancelDictationDownloadResponse
+	(*RemoveDictationModelRequest)(nil),     // 13: codefoundry.v1.RemoveDictationModelRequest
+	(*RemoveDictationModelResponse)(nil),    // 14: codefoundry.v1.RemoveDictationModelResponse
+	(*StartDictationRequest)(nil),           // 15: codefoundry.v1.StartDictationRequest
+	(*StartDictationResponse)(nil),          // 16: codefoundry.v1.StartDictationResponse
+	(*StopDictationRequest)(nil),            // 17: codefoundry.v1.StopDictationRequest
+	(*StopDictationResponse)(nil),           // 18: codefoundry.v1.StopDictationResponse
+	(*DictationSessionRequest)(nil),         // 19: codefoundry.v1.DictationSessionRequest
+	(*DictationSessionEvent)(nil),           // 20: codefoundry.v1.DictationSessionEvent
+	(*DictationLevel)(nil),                  // 21: codefoundry.v1.DictationLevel
+	(*DictationPhrase)(nil),                 // 22: codefoundry.v1.DictationPhrase
+	(*DictationEnded)(nil),                  // 23: codefoundry.v1.DictationEnded
+	(*DictationAudioFrame)(nil),             // 24: codefoundry.v1.DictationAudioFrame
+	(*DictationAudioResponse)(nil),          // 25: codefoundry.v1.DictationAudioResponse
+	(*DictationMicDeniedRequest)(nil),       // 26: codefoundry.v1.DictationMicDeniedRequest
+	(*DictationMicDeniedResponse)(nil),      // 27: codefoundry.v1.DictationMicDeniedResponse
+	(*DictationAccessibilityRequest)(nil),   // 28: codefoundry.v1.DictationAccessibilityRequest
+	(*DictationAccessibilityResponse)(nil),  // 29: codefoundry.v1.DictationAccessibilityResponse
+	(*DictationComposerTargetRequest)(nil),  // 30: codefoundry.v1.DictationComposerTargetRequest
+	(*DictationComposerTargetResponse)(nil), // 31: codefoundry.v1.DictationComposerTargetResponse
+	(*StreamHeartbeat)(nil),                 // 32: codefoundry.v1.StreamHeartbeat
+	(*timestamppb.Timestamp)(nil),           // 33: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_dictation_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.DictationSnapshot.state:type_name -> codefoundry.v1.DictationState
-	4,  // 1: codefoundry.v1.DictationSnapshot.model:type_name -> codefoundry.v1.DictationModel
-	6,  // 2: codefoundry.v1.DictationSnapshot.hardware:type_name -> codefoundry.v1.DictationHardware
-	7,  // 3: codefoundry.v1.DictationSnapshot.session:type_name -> codefoundry.v1.DictationSession
-	27, // 4: codefoundry.v1.DictationSnapshot.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
-	5,  // 5: codefoundry.v1.DictationModel.download:type_name -> codefoundry.v1.DictationDownload
-	28, // 6: codefoundry.v1.DictationSession.started_at:type_name -> google.protobuf.Timestamp
-	3,  // 7: codefoundry.v1.DownloadDictationModelResponse.snapshot:type_name -> codefoundry.v1.DictationSnapshot
-	3,  // 8: codefoundry.v1.CancelDictationDownloadResponse.snapshot:type_name -> codefoundry.v1.DictationSnapshot
-	3,  // 9: codefoundry.v1.RemoveDictationModelResponse.snapshot:type_name -> codefoundry.v1.DictationSnapshot
-	20, // 10: codefoundry.v1.DictationSessionEvent.level:type_name -> codefoundry.v1.DictationLevel
-	21, // 11: codefoundry.v1.DictationSessionEvent.phrase:type_name -> codefoundry.v1.DictationPhrase
-	22, // 12: codefoundry.v1.DictationSessionEvent.ended:type_name -> codefoundry.v1.DictationEnded
-	27, // 13: codefoundry.v1.DictationSessionEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
-	1,  // 14: codefoundry.v1.DictationEnded.reason:type_name -> codefoundry.v1.DictationEndReason
-	2,  // 15: codefoundry.v1.DictationService.Watch:input_type -> codefoundry.v1.WatchDictationRequest
-	8,  // 16: codefoundry.v1.DictationService.Download:input_type -> codefoundry.v1.DownloadDictationModelRequest
-	10, // 17: codefoundry.v1.DictationService.CancelDownload:input_type -> codefoundry.v1.CancelDictationDownloadRequest
-	12, // 18: codefoundry.v1.DictationService.RemoveModel:input_type -> codefoundry.v1.RemoveDictationModelRequest
-	14, // 19: codefoundry.v1.DictationService.Start:input_type -> codefoundry.v1.StartDictationRequest
-	16, // 20: codefoundry.v1.DictationService.Stop:input_type -> codefoundry.v1.StopDictationRequest
-	18, // 21: codefoundry.v1.DictationService.Session:input_type -> codefoundry.v1.DictationSessionRequest
-	23, // 22: codefoundry.v1.DictationService.Audio:input_type -> codefoundry.v1.DictationAudioFrame
-	25, // 23: codefoundry.v1.DictationService.MicDenied:input_type -> codefoundry.v1.DictationMicDeniedRequest
-	3,  // 24: codefoundry.v1.DictationService.Watch:output_type -> codefoundry.v1.DictationSnapshot
-	9,  // 25: codefoundry.v1.DictationService.Download:output_type -> codefoundry.v1.DownloadDictationModelResponse
-	11, // 26: codefoundry.v1.DictationService.CancelDownload:output_type -> codefoundry.v1.CancelDictationDownloadResponse
-	13, // 27: codefoundry.v1.DictationService.RemoveModel:output_type -> codefoundry.v1.RemoveDictationModelResponse
-	15, // 28: codefoundry.v1.DictationService.Start:output_type -> codefoundry.v1.StartDictationResponse
-	17, // 29: codefoundry.v1.DictationService.Stop:output_type -> codefoundry.v1.StopDictationResponse
-	19, // 30: codefoundry.v1.DictationService.Session:output_type -> codefoundry.v1.DictationSessionEvent
-	24, // 31: codefoundry.v1.DictationService.Audio:output_type -> codefoundry.v1.DictationAudioResponse
-	26, // 32: codefoundry.v1.DictationService.MicDenied:output_type -> codefoundry.v1.DictationMicDeniedResponse
-	24, // [24:33] is the sub-list for method output_type
-	15, // [15:24] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	5,  // 1: codefoundry.v1.DictationSnapshot.model:type_name -> codefoundry.v1.DictationModel
+	7,  // 2: codefoundry.v1.DictationSnapshot.hardware:type_name -> codefoundry.v1.DictationHardware
+	8,  // 3: codefoundry.v1.DictationSnapshot.session:type_name -> codefoundry.v1.DictationSession
+	32, // 4: codefoundry.v1.DictationSnapshot.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	4,  // 5: codefoundry.v1.DictationSnapshot.accessibility:type_name -> codefoundry.v1.DictationAccessibility
+	6,  // 6: codefoundry.v1.DictationModel.download:type_name -> codefoundry.v1.DictationDownload
+	33, // 7: codefoundry.v1.DictationSession.started_at:type_name -> google.protobuf.Timestamp
+	3,  // 8: codefoundry.v1.DownloadDictationModelResponse.snapshot:type_name -> codefoundry.v1.DictationSnapshot
+	3,  // 9: codefoundry.v1.CancelDictationDownloadResponse.snapshot:type_name -> codefoundry.v1.DictationSnapshot
+	3,  // 10: codefoundry.v1.RemoveDictationModelResponse.snapshot:type_name -> codefoundry.v1.DictationSnapshot
+	21, // 11: codefoundry.v1.DictationSessionEvent.level:type_name -> codefoundry.v1.DictationLevel
+	22, // 12: codefoundry.v1.DictationSessionEvent.phrase:type_name -> codefoundry.v1.DictationPhrase
+	23, // 13: codefoundry.v1.DictationSessionEvent.ended:type_name -> codefoundry.v1.DictationEnded
+	32, // 14: codefoundry.v1.DictationSessionEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	1,  // 15: codefoundry.v1.DictationEnded.reason:type_name -> codefoundry.v1.DictationEndReason
+	4,  // 16: codefoundry.v1.DictationAccessibilityRequest.accessibility:type_name -> codefoundry.v1.DictationAccessibility
+	2,  // 17: codefoundry.v1.DictationService.Watch:input_type -> codefoundry.v1.WatchDictationRequest
+	9,  // 18: codefoundry.v1.DictationService.Download:input_type -> codefoundry.v1.DownloadDictationModelRequest
+	11, // 19: codefoundry.v1.DictationService.CancelDownload:input_type -> codefoundry.v1.CancelDictationDownloadRequest
+	13, // 20: codefoundry.v1.DictationService.RemoveModel:input_type -> codefoundry.v1.RemoveDictationModelRequest
+	15, // 21: codefoundry.v1.DictationService.Start:input_type -> codefoundry.v1.StartDictationRequest
+	17, // 22: codefoundry.v1.DictationService.Stop:input_type -> codefoundry.v1.StopDictationRequest
+	19, // 23: codefoundry.v1.DictationService.Session:input_type -> codefoundry.v1.DictationSessionRequest
+	24, // 24: codefoundry.v1.DictationService.Audio:input_type -> codefoundry.v1.DictationAudioFrame
+	26, // 25: codefoundry.v1.DictationService.MicDenied:input_type -> codefoundry.v1.DictationMicDeniedRequest
+	28, // 26: codefoundry.v1.DictationService.Accessibility:input_type -> codefoundry.v1.DictationAccessibilityRequest
+	30, // 27: codefoundry.v1.DictationService.ComposerTarget:input_type -> codefoundry.v1.DictationComposerTargetRequest
+	3,  // 28: codefoundry.v1.DictationService.Watch:output_type -> codefoundry.v1.DictationSnapshot
+	10, // 29: codefoundry.v1.DictationService.Download:output_type -> codefoundry.v1.DownloadDictationModelResponse
+	12, // 30: codefoundry.v1.DictationService.CancelDownload:output_type -> codefoundry.v1.CancelDictationDownloadResponse
+	14, // 31: codefoundry.v1.DictationService.RemoveModel:output_type -> codefoundry.v1.RemoveDictationModelResponse
+	16, // 32: codefoundry.v1.DictationService.Start:output_type -> codefoundry.v1.StartDictationResponse
+	18, // 33: codefoundry.v1.DictationService.Stop:output_type -> codefoundry.v1.StopDictationResponse
+	20, // 34: codefoundry.v1.DictationService.Session:output_type -> codefoundry.v1.DictationSessionEvent
+	25, // 35: codefoundry.v1.DictationService.Audio:output_type -> codefoundry.v1.DictationAudioResponse
+	27, // 36: codefoundry.v1.DictationService.MicDenied:output_type -> codefoundry.v1.DictationMicDeniedResponse
+	29, // 37: codefoundry.v1.DictationService.Accessibility:output_type -> codefoundry.v1.DictationAccessibilityResponse
+	31, // 38: codefoundry.v1.DictationService.ComposerTarget:output_type -> codefoundry.v1.DictationComposerTargetResponse
+	28, // [28:39] is the sub-list for method output_type
+	17, // [17:28] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_dictation_proto_init() }
@@ -1705,7 +1996,7 @@ func file_codefoundry_v1_dictation_proto_init() {
 		return
 	}
 	file_codefoundry_v1_heartbeat_proto_init()
-	file_codefoundry_v1_dictation_proto_msgTypes[17].OneofWrappers = []any{
+	file_codefoundry_v1_dictation_proto_msgTypes[18].OneofWrappers = []any{
 		(*DictationSessionEvent_Level)(nil),
 		(*DictationSessionEvent_Phrase)(nil),
 		(*DictationSessionEvent_Ended)(nil),
@@ -1717,7 +2008,7 @@ func file_codefoundry_v1_dictation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_dictation_proto_rawDesc), len(file_codefoundry_v1_dictation_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   25,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

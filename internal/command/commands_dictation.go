@@ -23,6 +23,25 @@ import (
 // focused composer ignores it.
 const ViewDictationToggle = "dictation.toggle"
 
+// ViewDictationHold is the ShowView name of dictation.hold: the hold key, routed to a
+// composer (docs/notes/dictate-anywhere.md). Its "phase" param is one of the
+// DictationHold* phases. The window starts and stops its own session with them, so the
+// composer's session has one state machine, the one the mic already uses.
+const ViewDictationHold = "dictation.hold"
+
+// The phases of dictation.hold: the key went down, it came up after a counted hold, or
+// the hold was discarded (too short, or a shortcut).
+const (
+	DictationHoldPress   = "press"
+	DictationHoldRelease = "release"
+	DictationHoldDiscard = "discard"
+)
+
+// ViewDictationAllow is the ShowView name of dictation.allow. Only the GUI host acts on
+// it, on UiService.WatchIntents: AXIsProcessTrustedWithOptions has to run in the process
+// that needs the grant. Windows ignore it.
+const ViewDictationAllow = "dictation.allow"
+
 // DictationBackend is the slice of DictationService the dictation.* commands need, in
 // generated Connect signatures (see TerminalBackend for why).
 type DictationBackend interface {
@@ -94,13 +113,22 @@ func DictationSummary(s *v1.DictationSnapshot) string {
 	if s.GetMicDenied() {
 		out += "; macOS denied the microphone"
 	}
+	if a := s.GetAccessibility(); s.GetEnabled() && a != nil {
+		switch {
+		case !a.GetGranted():
+			out += "; the hold key is not allowed (dictation.allow)"
+		case a.GetTapSilent():
+			out += "; the hold key is allowed but not heard: restart the app (app.restart)"
+		}
+	}
 	return out
 }
 
 func megabytes(n int64) string { return fmt.Sprintf("%d MB", n/1_000_000) }
 
-// RegisterDictation registers dictation.toggle, dictation.start, dictation.stop,
-// dictation.download, dictation.download.cancel, dictation.remove and dictation.status.
+// RegisterDictation registers dictation.toggle, dictation.hold, dictation.allow,
+// dictation.start, dictation.stop, dictation.download, dictation.download.cancel,
+// dictation.remove and dictation.status.
 func RegisterDictation(r *Registry, d DictationDeps) error {
 	if d.Dictation == nil {
 		d.Dictation = codefoundryv1connect.UnimplementedDictationServiceHandler{}
@@ -132,6 +160,56 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 					return Result{}, fmt.Errorf("%w: no app windows to dictate in", ErrUnavailable)
 				}
 				return EmitTo(d.Emitter, showViewIntent(ViewDictationToggle, "", nil)).CLIResult(uctx), nil
+			},
+		},
+		Command{
+			Name:         "dictation.hold",
+			NoPalette:    true,
+			NoKeybinding: true,
+			Title:        "Hold to Dictate",
+			Description: "The hold key pressed or let go, for the composer dictation.toggle would pick. The GUI host runs this when the key goes down with " +
+				"Code Foundry in front; the window opens and ends the session.",
+			Category: dictationCategory,
+			Args: []ArgSpec{
+				{Name: "phase", Type: String, Default: DictationHoldPress, Description: "press, release (transcribe the rest) or discard (drop it)"},
+			},
+			Run: func(_ context.Context, uctx Context, a Args) (Result, error) {
+				phase := a.String("phase")
+				switch phase {
+				case DictationHoldPress, DictationHoldRelease, DictationHoldDiscard:
+				default:
+					return Result{}, fmt.Errorf("%w: unknown phase %q", ErrInvalidArgs, phase)
+				}
+				if d.Emitter == nil {
+					return Result{}, fmt.Errorf("%w: no app windows to dictate in", ErrUnavailable)
+				}
+				return EmitTo(d.Emitter, showViewIntent(ViewDictationHold, "", map[string]string{"phase": phase})).CLIResult(uctx), nil
+			},
+		},
+		Command{
+			Name:        "dictation.allow",
+			Title:       "Allow the Dictation Hold Key",
+			Description: "Ask macOS to let Code Foundry hear the hold key and paste, and open the list in System Settings where that is turned on.",
+			Category:    dictationCategory,
+			When: func(Context) bool {
+				s := status()
+				return s.GetEnabled() && s.GetAccessibility() != nil && !s.GetAccessibility().GetGranted()
+			},
+			WhyUnavailable: func(Context) string {
+				s := status()
+				switch {
+				case !s.GetEnabled():
+					return "dictation is off (Settings → General → Dictation)"
+				case s.GetAccessibility() == nil:
+					return "the app is not open"
+				}
+				return "macOS already allows it"
+			},
+			Run: func(_ context.Context, uctx Context, _ Args) (Result, error) {
+				if d.Emitter == nil {
+					return Result{}, fmt.Errorf("%w: no app to ask from", ErrUnavailable)
+				}
+				return EmitTo(d.Emitter, showViewIntent(ViewDictationAllow, "", nil)).CLIResult(uctx), nil
 			},
 		},
 		Command{

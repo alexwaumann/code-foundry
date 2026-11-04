@@ -56,6 +56,12 @@ const (
 	// DictationServiceMicDeniedProcedure is the fully-qualified name of the DictationService's
 	// MicDenied RPC.
 	DictationServiceMicDeniedProcedure = "/codefoundry.v1.DictationService/MicDenied"
+	// DictationServiceAccessibilityProcedure is the fully-qualified name of the DictationService's
+	// Accessibility RPC.
+	DictationServiceAccessibilityProcedure = "/codefoundry.v1.DictationService/Accessibility"
+	// DictationServiceComposerTargetProcedure is the fully-qualified name of the DictationService's
+	// ComposerTarget RPC.
+	DictationServiceComposerTargetProcedure = "/codefoundry.v1.DictationService/ComposerTarget"
 )
 
 // DictationServiceClient is a client for the codefoundry.v1.DictationService service.
@@ -96,6 +102,14 @@ type DictationServiceClient interface {
 	// MicDenied is the host reporting whether macOS denied the microphone; it shows as
 	// mic_denied on Watch.
 	MicDenied(context.Context, *connect.Request[v1.DictationMicDeniedRequest]) (*connect.Response[v1.DictationMicDeniedResponse], error)
+	// Accessibility is the host reporting what macOS allows the hold key; it shows as
+	// accessibility on Watch. Nothing is stored: a restarted daemon has none until the host
+	// reports again.
+	Accessibility(context.Context, *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error)
+	// ComposerTarget is the window saying whether a composer can take dictation now (the
+	// choice dictation.toggle makes); it shows as composer_target on Watch, so the host can
+	// route a press of the hold key without asking the window.
+	ComposerTarget(context.Context, *connect.Request[v1.DictationComposerTargetRequest]) (*connect.Response[v1.DictationComposerTargetResponse], error)
 }
 
 // NewDictationServiceClient constructs a client for the codefoundry.v1.DictationService service. By
@@ -163,6 +177,18 @@ func NewDictationServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(dictationServiceMethods.ByName("MicDenied")),
 			connect.WithClientOptions(opts...),
 		),
+		accessibility: connect.NewClient[v1.DictationAccessibilityRequest, v1.DictationAccessibilityResponse](
+			httpClient,
+			baseURL+DictationServiceAccessibilityProcedure,
+			connect.WithSchema(dictationServiceMethods.ByName("Accessibility")),
+			connect.WithClientOptions(opts...),
+		),
+		composerTarget: connect.NewClient[v1.DictationComposerTargetRequest, v1.DictationComposerTargetResponse](
+			httpClient,
+			baseURL+DictationServiceComposerTargetProcedure,
+			connect.WithSchema(dictationServiceMethods.ByName("ComposerTarget")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -177,6 +203,8 @@ type dictationServiceClient struct {
 	session        *connect.Client[v1.DictationSessionRequest, v1.DictationSessionEvent]
 	audio          *connect.Client[v1.DictationAudioFrame, v1.DictationAudioResponse]
 	micDenied      *connect.Client[v1.DictationMicDeniedRequest, v1.DictationMicDeniedResponse]
+	accessibility  *connect.Client[v1.DictationAccessibilityRequest, v1.DictationAccessibilityResponse]
+	composerTarget *connect.Client[v1.DictationComposerTargetRequest, v1.DictationComposerTargetResponse]
 }
 
 // Watch calls codefoundry.v1.DictationService.Watch.
@@ -224,6 +252,16 @@ func (c *dictationServiceClient) MicDenied(ctx context.Context, req *connect.Req
 	return c.micDenied.CallUnary(ctx, req)
 }
 
+// Accessibility calls codefoundry.v1.DictationService.Accessibility.
+func (c *dictationServiceClient) Accessibility(ctx context.Context, req *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error) {
+	return c.accessibility.CallUnary(ctx, req)
+}
+
+// ComposerTarget calls codefoundry.v1.DictationService.ComposerTarget.
+func (c *dictationServiceClient) ComposerTarget(ctx context.Context, req *connect.Request[v1.DictationComposerTargetRequest]) (*connect.Response[v1.DictationComposerTargetResponse], error) {
+	return c.composerTarget.CallUnary(ctx, req)
+}
+
 // DictationServiceHandler is an implementation of the codefoundry.v1.DictationService service.
 type DictationServiceHandler interface {
 	// Watch sends the snapshot now, then again on every change, and a heartbeat after 5 s
@@ -262,6 +300,14 @@ type DictationServiceHandler interface {
 	// MicDenied is the host reporting whether macOS denied the microphone; it shows as
 	// mic_denied on Watch.
 	MicDenied(context.Context, *connect.Request[v1.DictationMicDeniedRequest]) (*connect.Response[v1.DictationMicDeniedResponse], error)
+	// Accessibility is the host reporting what macOS allows the hold key; it shows as
+	// accessibility on Watch. Nothing is stored: a restarted daemon has none until the host
+	// reports again.
+	Accessibility(context.Context, *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error)
+	// ComposerTarget is the window saying whether a composer can take dictation now (the
+	// choice dictation.toggle makes); it shows as composer_target on Watch, so the host can
+	// route a press of the hold key without asking the window.
+	ComposerTarget(context.Context, *connect.Request[v1.DictationComposerTargetRequest]) (*connect.Response[v1.DictationComposerTargetResponse], error)
 }
 
 // NewDictationServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -325,6 +371,18 @@ func NewDictationServiceHandler(svc DictationServiceHandler, opts ...connect.Han
 		connect.WithSchema(dictationServiceMethods.ByName("MicDenied")),
 		connect.WithHandlerOptions(opts...),
 	)
+	dictationServiceAccessibilityHandler := connect.NewUnaryHandler(
+		DictationServiceAccessibilityProcedure,
+		svc.Accessibility,
+		connect.WithSchema(dictationServiceMethods.ByName("Accessibility")),
+		connect.WithHandlerOptions(opts...),
+	)
+	dictationServiceComposerTargetHandler := connect.NewUnaryHandler(
+		DictationServiceComposerTargetProcedure,
+		svc.ComposerTarget,
+		connect.WithSchema(dictationServiceMethods.ByName("ComposerTarget")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.DictationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DictationServiceWatchProcedure:
@@ -345,6 +403,10 @@ func NewDictationServiceHandler(svc DictationServiceHandler, opts ...connect.Han
 			dictationServiceAudioHandler.ServeHTTP(w, r)
 		case DictationServiceMicDeniedProcedure:
 			dictationServiceMicDeniedHandler.ServeHTTP(w, r)
+		case DictationServiceAccessibilityProcedure:
+			dictationServiceAccessibilityHandler.ServeHTTP(w, r)
+		case DictationServiceComposerTargetProcedure:
+			dictationServiceComposerTargetHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -388,4 +450,12 @@ func (UnimplementedDictationServiceHandler) Audio(context.Context, *connect.Clie
 
 func (UnimplementedDictationServiceHandler) MicDenied(context.Context, *connect.Request[v1.DictationMicDeniedRequest]) (*connect.Response[v1.DictationMicDeniedResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.DictationService.MicDenied is not implemented"))
+}
+
+func (UnimplementedDictationServiceHandler) Accessibility(context.Context, *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.DictationService.Accessibility is not implemented"))
+}
+
+func (UnimplementedDictationServiceHandler) ComposerTarget(context.Context, *connect.Request[v1.DictationComposerTargetRequest]) (*connect.Response[v1.DictationComposerTargetResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.DictationService.ComposerTarget is not implemented"))
 }

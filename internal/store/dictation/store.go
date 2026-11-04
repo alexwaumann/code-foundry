@@ -166,6 +166,17 @@ type Prefs struct {
 	HoldKey string
 	// Sounds is dictation.sounds.
 	Sounds bool
+	// SoundVolume is notifications.sound_volume, which the sounds play at.
+	SoundVolume int
+}
+
+// Accessibility is what the host reported macOS allows the hold key.
+type Accessibility struct {
+	Granted bool
+	// TapSilent: granted, but the host's event tap hears nothing.
+	TapSilent bool
+	// ListName is what System Settings calls the list; Executable is the host's path.
+	ListName, Executable string
 }
 
 // Snapshot is the store's published state.
@@ -180,6 +191,10 @@ type Snapshot struct {
 	// Error is the engine's failure while Failed, else the last download's failure.
 	Error     string
 	MicDenied bool
+	// ComposerTarget: the window has a composer dictation can target.
+	ComposerTarget bool
+	// Accessibility is the host's last report; nil before the first.
+	Accessibility *Accessibility
 }
 
 // Changed is published on the bus with every new snapshot.
@@ -298,6 +313,8 @@ type Store struct {
 	session   *session
 	ended     map[string]EndReason // sessions that ended, for a late Session stream
 	micDenied bool
+	composer  bool
+	access    *Accessibility
 	// changed is closed and replaced on every publish (Start waits on it).
 	changed chan struct{}
 }
@@ -402,6 +419,26 @@ func (s *Store) MicDenied(denied bool) {
 	defer s.mu.Unlock()
 	if s.micDenied != denied {
 		s.micDenied = denied
+		s.publishLocked()
+	}
+}
+
+// ComposerTarget records whether the window has a composer dictation can target.
+func (s *Store) ComposerTarget(available bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.composer != available {
+		s.composer = available
+		s.publishLocked()
+	}
+}
+
+// ReportAccessibility records what the host reported about Accessibility.
+func (s *Store) ReportAccessibility(a Accessibility) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.access == nil || *s.access != a {
+		s.access = &a
 		s.publishLocked()
 	}
 }
@@ -986,6 +1023,7 @@ func (s *Store) publishLocked() {
 	m := s.opts.Model
 	snap := &Snapshot{
 		Enabled: s.enabled, Prefs: s.prefs, State: s.stateLocked(), Hardware: s.hw, MicDenied: s.micDenied,
+		ComposerTarget: s.composer, Accessibility: s.access,
 		Model: ModelState{Name: m.Name, Title: m.Title, Size: m.Size, Downloaded: s.onDisk},
 		Error: s.dlErr,
 	}
@@ -1012,7 +1050,10 @@ func (s *Store) publishLocked() {
 
 func equal(a, b *Snapshot) bool {
 	if a.Enabled != b.Enabled || a.Prefs != b.Prefs || a.State != b.State || a.Hardware != b.Hardware || a.Error != b.Error ||
-		a.MicDenied != b.MicDenied || a.Model.Downloaded != b.Model.Downloaded {
+		a.MicDenied != b.MicDenied || a.ComposerTarget != b.ComposerTarget || a.Model.Downloaded != b.Model.Downloaded {
+		return false
+	}
+	if (a.Accessibility == nil) != (b.Accessibility == nil) || (a.Accessibility != nil && *a.Accessibility != *b.Accessibility) {
 		return false
 	}
 	if (a.Model.Download == nil) != (b.Model.Download == nil) || (a.Model.Download != nil && *a.Model.Download != *b.Model.Download) {

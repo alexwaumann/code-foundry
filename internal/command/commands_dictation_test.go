@@ -153,6 +153,18 @@ func TestDictationStatus(t *testing.T) {
 			s.MicDenied = true
 			s.Hardware = nil
 		}), "dictation: unloaded; it loads again when you next dictate; macOS denied the microphone"},
+		{"hold key not allowed", dictationSnapshot(v1.DictationState_DICTATION_STATE_READY, func(s *v1.DictationSnapshot) {
+			s.Accessibility = &v1.DictationAccessibility{}
+			s.Hardware = nil
+		}), "dictation: ready; the hold key is not allowed (dictation.allow)"},
+		{"hold key not heard", dictationSnapshot(v1.DictationState_DICTATION_STATE_READY, func(s *v1.DictationSnapshot) {
+			s.Accessibility = &v1.DictationAccessibility{Granted: true, TapSilent: true}
+			s.Hardware = nil
+		}), "dictation: ready; the hold key is allowed but not heard: restart the app (app.restart)"},
+		{"hold key allowed", dictationSnapshot(v1.DictationState_DICTATION_STATE_READY, func(s *v1.DictationSnapshot) {
+			s.Accessibility = &v1.DictationAccessibility{Granted: true}
+			s.Hardware = nil
+		}), "dictation: ready"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			reg := newDictationRegistry(t, &commandtest.Dictation{}, tc.snap, &commandtest.Emitter{})
@@ -184,5 +196,78 @@ func TestDictationToggleEmits(t *testing.T) {
 	// No default chord, but bindable: an old override keeps working.
 	if len(c.Keybindings) != 0 || c.NoKeybinding || c.Title != "Dictate" {
 		t.Errorf("toggle %+v", c)
+	}
+}
+
+func TestDictationHoldEmits(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		args    map[string]string
+		want    string
+		wantErr error
+	}{
+		{name: "press by default", want: command.DictationHoldPress},
+		{name: "release", args: map[string]string{"phase": "release"}, want: command.DictationHoldRelease},
+		{name: "discard", args: map[string]string{"phase": "discard"}, want: command.DictationHoldDiscard},
+		{name: "anything else", args: map[string]string{"phase": "later"}, wantErr: command.ErrInvalidArgs},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
+			reg := newDictationRegistry(t, &commandtest.Dictation{}, dictationSnapshot(v1.DictationState_DICTATION_STATE_READY, nil), e)
+			_, err := reg.Invoke(context.Background(), command.Context{}, "dictation.hold", tc.args)
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("err %v, want %v", err, tc.wantErr)
+				}
+				if len(e.Intents()) != 0 {
+					t.Errorf("intents %v", e.Intents())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := e.Intents()
+			if len(got) != 1 || got[0].GetShowView().GetName() != command.ViewDictationHold || got[0].GetShowView().GetParams()["phase"] != tc.want {
+				t.Errorf("intents %v", got)
+			}
+		})
+	}
+}
+
+func TestDictationAllow(t *testing.T) {
+	ready := func(a *v1.DictationAccessibility, enabled bool) *v1.DictationSnapshot {
+		return dictationSnapshot(v1.DictationState_DICTATION_STATE_READY, func(s *v1.DictationSnapshot) {
+			s.Accessibility, s.Enabled = a, enabled
+		})
+	}
+	for _, tc := range []struct {
+		name    string
+		snap    *v1.DictationSnapshot
+		emits   bool
+		wantWhy string
+	}{
+		{name: "not granted", snap: ready(&v1.DictationAccessibility{}, true), emits: true},
+		{name: "granted", snap: ready(&v1.DictationAccessibility{Granted: true}, true), wantWhy: "already allows"},
+		{name: "no host has reported", snap: ready(nil, true), wantWhy: "not open"},
+		{name: "dictation off", snap: ready(&v1.DictationAccessibility{}, false), wantWhy: "dictation is off"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
+			reg := newDictationRegistry(t, &commandtest.Dictation{}, tc.snap, e)
+			_, err := reg.Invoke(context.Background(), command.Context{}, "dictation.allow", nil)
+			if !tc.emits {
+				if err == nil || !strings.Contains(err.Error(), tc.wantWhy) {
+					t.Errorf("err %v, want it to say %q", err, tc.wantWhy)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := e.Intents(); len(got) != 1 || got[0].GetShowView().GetName() != command.ViewDictationAllow {
+				t.Errorf("intents %v", got)
+			}
+		})
 	}
 }

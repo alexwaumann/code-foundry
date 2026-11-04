@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/dictation.proto.
  */
 export const file_codefoundry_v1_dictation: GenFile = /*@__PURE__*/
-  fileDesc("Ch5jb2RlZm91bmRyeS92MS9kaWN0YXRpb24ucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIhcKFVdhdGNoRGljdGF0aW9uUmVxdWVzdCL1AgoRRGljdGF0aW9uU25hcHNob3QSDwoHZW5hYmxlZBgBIAEoCBItCgVzdGF0ZRgCIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvblN0YXRlEi0KBW1vZGVsGAMgASgLMh4uY29kZWZvdW5kcnkudjEuRGljdGF0aW9uTW9kZWwSMwoIaGFyZHdhcmUYBCABKAsyIS5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25IYXJkd2FyZRIxCgdzZXNzaW9uGAUgASgLMiAuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uU2Vzc2lvbhINCgVlcnJvchgGIAEoCRISCgptaWNfZGVuaWVkGAcgASgIEjIKCWhlYXJ0YmVhdBgIIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdBIQCghhbnl3aGVyZRgJIAEoCBIQCghob2xkX2tleRgKIAEoCRIOCgZzb3VuZHMYCyABKAgiewoORGljdGF0aW9uTW9kZWwSDAoEbmFtZRgBIAEoCRISCgpzaXplX2J5dGVzGAIgASgDEhIKCmRvd25sb2FkZWQYAyABKAgSMwoIZG93bmxvYWQYBCABKAsyIS5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25Eb3dubG9hZCJaChFEaWN0YXRpb25Eb3dubG9hZBIWCg5yZWNlaXZlZF9ieXRlcxgBIAEoAxITCgt0b3RhbF9ieXRlcxgCIAEoAxIYChBieXRlc19wZXJfc2Vjb25kGAMgASgDIkoKEURpY3RhdGlvbkhhcmR3YXJlEgwKBGNoaXAYASABKAkSFAoMbWVtb3J5X2J5dGVzGAIgASgDEhEKCW0xX2ZhbWlseRgDIAEoCCJzChBEaWN0YXRpb25TZXNzaW9uEgoKAmlkGAEgASgJEhEKCWNsaWVudF9pZBgCIAEoCRIuCgpzdGFydGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIQCghzdG9wcGluZxgEIAEoCCIfCh1Eb3dubG9hZERpY3RhdGlvbk1vZGVsUmVxdWVzdCJVCh5Eb3dubG9hZERpY3RhdGlvbk1vZGVsUmVzcG9uc2USMwoIc25hcHNob3QYASABKAsyIS5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25TbmFwc2hvdCIgCh5DYW5jZWxEaWN0YXRpb25Eb3dubG9hZFJlcXVlc3QiVgofQ2FuY2VsRGljdGF0aW9uRG93bmxvYWRSZXNwb25zZRIzCghzbmFwc2hvdBgBIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvblNuYXBzaG90Ih0KG1JlbW92ZURpY3RhdGlvbk1vZGVsUmVxdWVzdCJTChxSZW1vdmVEaWN0YXRpb25Nb2RlbFJlc3BvbnNlEjMKCHNuYXBzaG90GAEgASgLMiEuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uU25hcHNob3QiKgoVU3RhcnREaWN0YXRpb25SZXF1ZXN0EhEKCWNsaWVudF9pZBgBIAEoCSIsChZTdGFydERpY3RhdGlvblJlc3BvbnNlEhIKCnNlc3Npb25faWQYASABKAkiOQoUU3RvcERpY3RhdGlvblJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRINCgVmbHVzaBgCIAEoCCIXChVTdG9wRGljdGF0aW9uUmVzcG9uc2UiLQoXRGljdGF0aW9uU2Vzc2lvblJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCSLrAQoVRGljdGF0aW9uU2Vzc2lvbkV2ZW50Ei8KBWxldmVsGAEgASgLMh4uY29kZWZvdW5kcnkudjEuRGljdGF0aW9uTGV2ZWxIABIxCgZwaHJhc2UYAiABKAsyHy5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25QaHJhc2VIABIvCgVlbmRlZBgDIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvbkVuZGVkSAASNAoJaGVhcnRiZWF0GAQgASgLMh8uY29kZWZvdW5kcnkudjEuU3RyZWFtSGVhcnRiZWF0SABCBwoFZXZlbnQiHQoORGljdGF0aW9uTGV2ZWwSCwoDcm1zGAEgASgCIh8KD0RpY3RhdGlvblBocmFzZRIMCgR0ZXh0GAEgASgJIkQKDkRpY3RhdGlvbkVuZGVkEjIKBnJlYXNvbhgBIAEoDjIiLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvbkVuZFJlYXNvbiJDChNEaWN0YXRpb25BdWRpb0ZyYW1lEhIKCnNlc3Npb25faWQYASABKAkSCwoDcGNtGAIgASgMEgsKA3JtcxgDIAEoAiIYChZEaWN0YXRpb25BdWRpb1Jlc3BvbnNlIisKGURpY3RhdGlvbk1pY0RlbmllZFJlcXVlc3QSDgoGZGVuaWVkGAEgASgIIhwKGkRpY3RhdGlvbk1pY0RlbmllZFJlc3BvbnNlKp4CCg5EaWN0YXRpb25TdGF0ZRIfChtESUNUQVRJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIcChhESUNUQVRJT05fU1RBVEVfRElTQUJMRUQQARIcChhESUNUQVRJT05fU1RBVEVfTk9fTU9ERUwQAhIfChtESUNUQVRJT05fU1RBVEVfRE9XTkxPQURJTkcQAxIbChdESUNUQVRJT05fU1RBVEVfTE9BRElORxAEEhkKFURJQ1RBVElPTl9TVEFURV9SRUFEWRAFEhwKGERJQ1RBVElPTl9TVEFURV9VTkxPQURFRBAGEh0KGURJQ1RBVElPTl9TVEFURV9MSVNURU5JTkcQBxIZChVESUNUQVRJT05fU1RBVEVfRVJST1IQCCrlAQoSRGljdGF0aW9uRW5kUmVhc29uEiQKIERJQ1RBVElPTl9FTkRfUkVBU09OX1VOU1BFQ0lGSUVEEAASIAocRElDVEFUSU9OX0VORF9SRUFTT05fU1RPUFBFRBABEiAKHERJQ1RBVElPTl9FTkRfUkVBU09OX1NJTEVOQ0UQAhIhCh1ESUNUQVRJT05fRU5EX1JFQVNPTl9ESVNBQkxFRBADEh4KGkRJQ1RBVElPTl9FTkRfUkVBU09OX0VSUk9SEAQSIgoeRElDVEFUSU9OX0VORF9SRUFTT05fRElTQ0FSREVEEAUyhwcKEERpY3RhdGlvblNlcnZpY2USVQoFV2F0Y2gSJS5jb2RlZm91bmRyeS52MS5XYXRjaERpY3RhdGlvblJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25TbmFwc2hvdCIAMAESawoIRG93bmxvYWQSLS5jb2RlZm91bmRyeS52MS5Eb3dubG9hZERpY3RhdGlvbk1vZGVsUmVxdWVzdBouLmNvZGVmb3VuZHJ5LnYxLkRvd25sb2FkRGljdGF0aW9uTW9kZWxSZXNwb25zZSIAEnMKDkNhbmNlbERvd25sb2FkEi4uY29kZWZvdW5kcnkudjEuQ2FuY2VsRGljdGF0aW9uRG93bmxvYWRSZXF1ZXN0Gi8uY29kZWZvdW5kcnkudjEuQ2FuY2VsRGljdGF0aW9uRG93bmxvYWRSZXNwb25zZSIAEmoKC1JlbW92ZU1vZGVsEisuY29kZWZvdW5kcnkudjEuUmVtb3ZlRGljdGF0aW9uTW9kZWxSZXF1ZXN0GiwuY29kZWZvdW5kcnkudjEuUmVtb3ZlRGljdGF0aW9uTW9kZWxSZXNwb25zZSIAElgKBVN0YXJ0EiUuY29kZWZvdW5kcnkudjEuU3RhcnREaWN0YXRpb25SZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuU3RhcnREaWN0YXRpb25SZXNwb25zZSIAElUKBFN0b3ASJC5jb2RlZm91bmRyeS52MS5TdG9wRGljdGF0aW9uUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLlN0b3BEaWN0YXRpb25SZXNwb25zZSIAEl0KB1Nlc3Npb24SJy5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25TZXNzaW9uUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvblNlc3Npb25FdmVudCIAMAESWAoFQXVkaW8SIy5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25BdWRpb0ZyYW1lGiYuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uQXVkaW9SZXNwb25zZSIAKAESZAoJTWljRGVuaWVkEikuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uTWljRGVuaWVkUmVxdWVzdBoqLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvbk1pY0RlbmllZFJlc3BvbnNlIgBCxgEKEmNvbS5jb2RlZm91bmRyeS52MUIORGljdGF0aW9uUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_heartbeat, file_google_protobuf_timestamp]);
+  fileDesc("Ch5jb2RlZm91bmRyeS92MS9kaWN0YXRpb24ucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIhcKFVdhdGNoRGljdGF0aW9uUmVxdWVzdCLjAwoRRGljdGF0aW9uU25hcHNob3QSDwoHZW5hYmxlZBgBIAEoCBItCgVzdGF0ZRgCIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvblN0YXRlEi0KBW1vZGVsGAMgASgLMh4uY29kZWZvdW5kcnkudjEuRGljdGF0aW9uTW9kZWwSMwoIaGFyZHdhcmUYBCABKAsyIS5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25IYXJkd2FyZRIxCgdzZXNzaW9uGAUgASgLMiAuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uU2Vzc2lvbhINCgVlcnJvchgGIAEoCRISCgptaWNfZGVuaWVkGAcgASgIEjIKCWhlYXJ0YmVhdBgIIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdBIQCghhbnl3aGVyZRgJIAEoCBIQCghob2xkX2tleRgKIAEoCRIOCgZzb3VuZHMYCyABKAgSFAoMc291bmRfdm9sdW1lGAwgASgFEhcKD2NvbXBvc2VyX3RhcmdldBgNIAEoCBI9Cg1hY2Nlc3NpYmlsaXR5GA4gASgLMiYuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uQWNjZXNzaWJpbGl0eSJkChZEaWN0YXRpb25BY2Nlc3NpYmlsaXR5Eg8KB2dyYW50ZWQYASABKAgSEgoKdGFwX3NpbGVudBgCIAEoCBIRCglsaXN0X25hbWUYAyABKAkSEgoKZXhlY3V0YWJsZRgEIAEoCSJ7Cg5EaWN0YXRpb25Nb2RlbBIMCgRuYW1lGAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMSEgoKZG93bmxvYWRlZBgDIAEoCBIzCghkb3dubG9hZBgEIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvbkRvd25sb2FkIloKEURpY3RhdGlvbkRvd25sb2FkEhYKDnJlY2VpdmVkX2J5dGVzGAEgASgDEhMKC3RvdGFsX2J5dGVzGAIgASgDEhgKEGJ5dGVzX3Blcl9zZWNvbmQYAyABKAMiSgoRRGljdGF0aW9uSGFyZHdhcmUSDAoEY2hpcBgBIAEoCRIUCgxtZW1vcnlfYnl0ZXMYAiABKAMSEQoJbTFfZmFtaWx5GAMgASgIInMKEERpY3RhdGlvblNlc3Npb24SCgoCaWQYASABKAkSEQoJY2xpZW50X2lkGAIgASgJEi4KCnN0YXJ0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCHN0b3BwaW5nGAQgASgIIh8KHURvd25sb2FkRGljdGF0aW9uTW9kZWxSZXF1ZXN0IlUKHkRvd25sb2FkRGljdGF0aW9uTW9kZWxSZXNwb25zZRIzCghzbmFwc2hvdBgBIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvblNuYXBzaG90IiAKHkNhbmNlbERpY3RhdGlvbkRvd25sb2FkUmVxdWVzdCJWCh9DYW5jZWxEaWN0YXRpb25Eb3dubG9hZFJlc3BvbnNlEjMKCHNuYXBzaG90GAEgASgLMiEuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uU25hcHNob3QiHQobUmVtb3ZlRGljdGF0aW9uTW9kZWxSZXF1ZXN0IlMKHFJlbW92ZURpY3RhdGlvbk1vZGVsUmVzcG9uc2USMwoIc25hcHNob3QYASABKAsyIS5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25TbmFwc2hvdCIqChVTdGFydERpY3RhdGlvblJlcXVlc3QSEQoJY2xpZW50X2lkGAEgASgJIiwKFlN0YXJ0RGljdGF0aW9uUmVzcG9uc2USEgoKc2Vzc2lvbl9pZBgBIAEoCSI5ChRTdG9wRGljdGF0aW9uUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEg0KBWZsdXNoGAIgASgIIhcKFVN0b3BEaWN0YXRpb25SZXNwb25zZSItChdEaWN0YXRpb25TZXNzaW9uUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJIusBChVEaWN0YXRpb25TZXNzaW9uRXZlbnQSLwoFbGV2ZWwYASABKAsyHi5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25MZXZlbEgAEjEKBnBocmFzZRgCIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvblBocmFzZUgAEi8KBWVuZGVkGAMgASgLMh4uY29kZWZvdW5kcnkudjEuRGljdGF0aW9uRW5kZWRIABI0CgloZWFydGJlYXQYBCABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIAEIHCgVldmVudCIdCg5EaWN0YXRpb25MZXZlbBILCgNybXMYASABKAIiHwoPRGljdGF0aW9uUGhyYXNlEgwKBHRleHQYASABKAkiRAoORGljdGF0aW9uRW5kZWQSMgoGcmVhc29uGAEgASgOMiIuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uRW5kUmVhc29uIkMKE0RpY3RhdGlvbkF1ZGlvRnJhbWUSEgoKc2Vzc2lvbl9pZBgBIAEoCRILCgNwY20YAiABKAwSCwoDcm1zGAMgASgCIhgKFkRpY3RhdGlvbkF1ZGlvUmVzcG9uc2UiKwoZRGljdGF0aW9uTWljRGVuaWVkUmVxdWVzdBIOCgZkZW5pZWQYASABKAgiHAoaRGljdGF0aW9uTWljRGVuaWVkUmVzcG9uc2UiXgodRGljdGF0aW9uQWNjZXNzaWJpbGl0eVJlcXVlc3QSPQoNYWNjZXNzaWJpbGl0eRgBIAEoCzImLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvbkFjY2Vzc2liaWxpdHkiIAoeRGljdGF0aW9uQWNjZXNzaWJpbGl0eVJlc3BvbnNlIjMKHkRpY3RhdGlvbkNvbXBvc2VyVGFyZ2V0UmVxdWVzdBIRCglhdmFpbGFibGUYASABKAgiIQofRGljdGF0aW9uQ29tcG9zZXJUYXJnZXRSZXNwb25zZSqeAgoORGljdGF0aW9uU3RhdGUSHwobRElDVEFUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASHAoYRElDVEFUSU9OX1NUQVRFX0RJU0FCTEVEEAESHAoYRElDVEFUSU9OX1NUQVRFX05PX01PREVMEAISHwobRElDVEFUSU9OX1NUQVRFX0RPV05MT0FESU5HEAMSGwoXRElDVEFUSU9OX1NUQVRFX0xPQURJTkcQBBIZChVESUNUQVRJT05fU1RBVEVfUkVBRFkQBRIcChhESUNUQVRJT05fU1RBVEVfVU5MT0FERUQQBhIdChlESUNUQVRJT05fU1RBVEVfTElTVEVOSU5HEAcSGQoVRElDVEFUSU9OX1NUQVRFX0VSUk9SEAgq5QEKEkRpY3RhdGlvbkVuZFJlYXNvbhIkCiBESUNUQVRJT05fRU5EX1JFQVNPTl9VTlNQRUNJRklFRBAAEiAKHERJQ1RBVElPTl9FTkRfUkVBU09OX1NUT1BQRUQQARIgChxESUNUQVRJT05fRU5EX1JFQVNPTl9TSUxFTkNFEAISIQodRElDVEFUSU9OX0VORF9SRUFTT05fRElTQUJMRUQQAxIeChpESUNUQVRJT05fRU5EX1JFQVNPTl9FUlJPUhAEEiIKHkRJQ1RBVElPTl9FTkRfUkVBU09OX0RJU0NBUkRFRBAFMu4IChBEaWN0YXRpb25TZXJ2aWNlElUKBVdhdGNoEiUuY29kZWZvdW5kcnkudjEuV2F0Y2hEaWN0YXRpb25SZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uU25hcHNob3QiADABEmsKCERvd25sb2FkEi0uY29kZWZvdW5kcnkudjEuRG93bmxvYWREaWN0YXRpb25Nb2RlbFJlcXVlc3QaLi5jb2RlZm91bmRyeS52MS5Eb3dubG9hZERpY3RhdGlvbk1vZGVsUmVzcG9uc2UiABJzCg5DYW5jZWxEb3dubG9hZBIuLmNvZGVmb3VuZHJ5LnYxLkNhbmNlbERpY3RhdGlvbkRvd25sb2FkUmVxdWVzdBovLmNvZGVmb3VuZHJ5LnYxLkNhbmNlbERpY3RhdGlvbkRvd25sb2FkUmVzcG9uc2UiABJqCgtSZW1vdmVNb2RlbBIrLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZURpY3RhdGlvbk1vZGVsUmVxdWVzdBosLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZURpY3RhdGlvbk1vZGVsUmVzcG9uc2UiABJYCgVTdGFydBIlLmNvZGVmb3VuZHJ5LnYxLlN0YXJ0RGljdGF0aW9uUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlN0YXJ0RGljdGF0aW9uUmVzcG9uc2UiABJVCgRTdG9wEiQuY29kZWZvdW5kcnkudjEuU3RvcERpY3RhdGlvblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5TdG9wRGljdGF0aW9uUmVzcG9uc2UiABJdCgdTZXNzaW9uEicuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uU2Vzc2lvblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25TZXNzaW9uRXZlbnQiADABElgKBUF1ZGlvEiMuY29kZWZvdW5kcnkudjEuRGljdGF0aW9uQXVkaW9GcmFtZRomLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvbkF1ZGlvUmVzcG9uc2UiACgBEmQKCU1pY0RlbmllZBIpLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvbk1pY0RlbmllZFJlcXVlc3QaKi5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25NaWNEZW5pZWRSZXNwb25zZSIAEnAKDUFjY2Vzc2liaWxpdHkSLS5jb2RlZm91bmRyeS52MS5EaWN0YXRpb25BY2Nlc3NpYmlsaXR5UmVxdWVzdBouLmNvZGVmb3VuZHJ5LnYxLkRpY3RhdGlvbkFjY2Vzc2liaWxpdHlSZXNwb25zZSIAEnMKDkNvbXBvc2VyVGFyZ2V0Ei4uY29kZWZvdW5kcnkudjEuRGljdGF0aW9uQ29tcG9zZXJUYXJnZXRSZXF1ZXN0Gi8uY29kZWZvdW5kcnkudjEuRGljdGF0aW9uQ29tcG9zZXJUYXJnZXRSZXNwb25zZSIAQsYBChJjb20uY29kZWZvdW5kcnkudjFCDkRpY3RhdGlvblByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_heartbeat, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.WatchDictationRequest
@@ -107,6 +107,27 @@ export type DictationSnapshot = Message<"codefoundry.v1.DictationSnapshot"> & {
    * @generated from field: bool sounds = 11;
    */
   sounds: boolean;
+
+  /**
+   * notifications.sound_volume: the sounds' volume, percent of the Mac's output volume.
+   *
+   * @generated from field: int32 sound_volume = 12;
+   */
+  soundVolume: number;
+
+  /**
+   * The window has a composer dictation can target (ComposerTarget).
+   *
+   * @generated from field: bool composer_target = 13;
+   */
+  composerTarget: boolean;
+
+  /**
+   * What the host last reported; unset until it has (no host, or dictation off so far).
+   *
+   * @generated from field: codefoundry.v1.DictationAccessibility accessibility = 14;
+   */
+  accessibility?: DictationAccessibility | undefined;
 };
 
 /**
@@ -115,6 +136,49 @@ export type DictationSnapshot = Message<"codefoundry.v1.DictationSnapshot"> & {
  */
 export const DictationSnapshotSchema: GenMessage<DictationSnapshot> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_dictation, 1);
+
+/**
+ * DictationAccessibility is what macOS allows the hold key, as the host sees it.
+ *
+ * @generated from message codefoundry.v1.DictationAccessibility
+ */
+export type DictationAccessibility = Message<"codefoundry.v1.DictationAccessibility"> & {
+  /**
+   * AXIsProcessTrusted: the host may listen for the hold key and paste.
+   *
+   * @generated from field: bool granted = 1;
+   */
+  granted: boolean;
+
+  /**
+   * Granted, but the event tap hears nothing while keys are being pressed: this process
+   * needs restarting (docs/notes/dictate-anywhere.md).
+   *
+   * @generated from field: bool tap_silent = 2;
+   */
+  tapSilent: boolean;
+
+  /**
+   * What System Settings calls the list, for this macOS.
+   *
+   * @generated from field: string list_name = 3;
+   */
+  listName: string;
+
+  /**
+   * The host's executable: what to add to the list by hand.
+   *
+   * @generated from field: string executable = 4;
+   */
+  executable: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.DictationAccessibility.
+ * Use `create(DictationAccessibilitySchema)` to create a new message.
+ */
+export const DictationAccessibilitySchema: GenMessage<DictationAccessibility> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_dictation, 2);
 
 /**
  * DictationModel is the one Whisper model.
@@ -154,7 +218,7 @@ export type DictationModel = Message<"codefoundry.v1.DictationModel"> & {
  * Use `create(DictationModelSchema)` to create a new message.
  */
 export const DictationModelSchema: GenMessage<DictationModel> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 2);
+  messageDesc(file_codefoundry_v1_dictation, 3);
 
 /**
  * DictationDownload is a running model download's progress.
@@ -185,7 +249,7 @@ export type DictationDownload = Message<"codefoundry.v1.DictationDownload"> & {
  * Use `create(DictationDownloadSchema)` to create a new message.
  */
 export const DictationDownloadSchema: GenMessage<DictationDownload> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 3);
+  messageDesc(file_codefoundry_v1_dictation, 4);
 
 /**
  * DictationHardware is this Mac, for the settings page.
@@ -220,7 +284,7 @@ export type DictationHardware = Message<"codefoundry.v1.DictationHardware"> & {
  * Use `create(DictationHardwareSchema)` to create a new message.
  */
 export const DictationHardwareSchema: GenMessage<DictationHardware> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 4);
+  messageDesc(file_codefoundry_v1_dictation, 5);
 
 /**
  * DictationSession is the open session.
@@ -259,7 +323,7 @@ export type DictationSession = Message<"codefoundry.v1.DictationSession"> & {
  * Use `create(DictationSessionSchema)` to create a new message.
  */
 export const DictationSessionSchema: GenMessage<DictationSession> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 5);
+  messageDesc(file_codefoundry_v1_dictation, 6);
 
 /**
  * @generated from message codefoundry.v1.DownloadDictationModelRequest
@@ -272,7 +336,7 @@ export type DownloadDictationModelRequest = Message<"codefoundry.v1.DownloadDict
  * Use `create(DownloadDictationModelRequestSchema)` to create a new message.
  */
 export const DownloadDictationModelRequestSchema: GenMessage<DownloadDictationModelRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 6);
+  messageDesc(file_codefoundry_v1_dictation, 7);
 
 /**
  * @generated from message codefoundry.v1.DownloadDictationModelResponse
@@ -289,7 +353,7 @@ export type DownloadDictationModelResponse = Message<"codefoundry.v1.DownloadDic
  * Use `create(DownloadDictationModelResponseSchema)` to create a new message.
  */
 export const DownloadDictationModelResponseSchema: GenMessage<DownloadDictationModelResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 7);
+  messageDesc(file_codefoundry_v1_dictation, 8);
 
 /**
  * @generated from message codefoundry.v1.CancelDictationDownloadRequest
@@ -302,7 +366,7 @@ export type CancelDictationDownloadRequest = Message<"codefoundry.v1.CancelDicta
  * Use `create(CancelDictationDownloadRequestSchema)` to create a new message.
  */
 export const CancelDictationDownloadRequestSchema: GenMessage<CancelDictationDownloadRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 8);
+  messageDesc(file_codefoundry_v1_dictation, 9);
 
 /**
  * @generated from message codefoundry.v1.CancelDictationDownloadResponse
@@ -319,7 +383,7 @@ export type CancelDictationDownloadResponse = Message<"codefoundry.v1.CancelDict
  * Use `create(CancelDictationDownloadResponseSchema)` to create a new message.
  */
 export const CancelDictationDownloadResponseSchema: GenMessage<CancelDictationDownloadResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 9);
+  messageDesc(file_codefoundry_v1_dictation, 10);
 
 /**
  * @generated from message codefoundry.v1.RemoveDictationModelRequest
@@ -332,7 +396,7 @@ export type RemoveDictationModelRequest = Message<"codefoundry.v1.RemoveDictatio
  * Use `create(RemoveDictationModelRequestSchema)` to create a new message.
  */
 export const RemoveDictationModelRequestSchema: GenMessage<RemoveDictationModelRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 10);
+  messageDesc(file_codefoundry_v1_dictation, 11);
 
 /**
  * @generated from message codefoundry.v1.RemoveDictationModelResponse
@@ -349,7 +413,7 @@ export type RemoveDictationModelResponse = Message<"codefoundry.v1.RemoveDictati
  * Use `create(RemoveDictationModelResponseSchema)` to create a new message.
  */
 export const RemoveDictationModelResponseSchema: GenMessage<RemoveDictationModelResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 11);
+  messageDesc(file_codefoundry_v1_dictation, 12);
 
 /**
  * @generated from message codefoundry.v1.StartDictationRequest
@@ -369,7 +433,7 @@ export type StartDictationRequest = Message<"codefoundry.v1.StartDictationReques
  * Use `create(StartDictationRequestSchema)` to create a new message.
  */
 export const StartDictationRequestSchema: GenMessage<StartDictationRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 12);
+  messageDesc(file_codefoundry_v1_dictation, 13);
 
 /**
  * @generated from message codefoundry.v1.StartDictationResponse
@@ -386,7 +450,7 @@ export type StartDictationResponse = Message<"codefoundry.v1.StartDictationRespo
  * Use `create(StartDictationResponseSchema)` to create a new message.
  */
 export const StartDictationResponseSchema: GenMessage<StartDictationResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 13);
+  messageDesc(file_codefoundry_v1_dictation, 14);
 
 /**
  * @generated from message codefoundry.v1.StopDictationRequest
@@ -410,7 +474,7 @@ export type StopDictationRequest = Message<"codefoundry.v1.StopDictationRequest"
  * Use `create(StopDictationRequestSchema)` to create a new message.
  */
 export const StopDictationRequestSchema: GenMessage<StopDictationRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 14);
+  messageDesc(file_codefoundry_v1_dictation, 15);
 
 /**
  * @generated from message codefoundry.v1.StopDictationResponse
@@ -423,7 +487,7 @@ export type StopDictationResponse = Message<"codefoundry.v1.StopDictationRespons
  * Use `create(StopDictationResponseSchema)` to create a new message.
  */
 export const StopDictationResponseSchema: GenMessage<StopDictationResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 15);
+  messageDesc(file_codefoundry_v1_dictation, 16);
 
 /**
  * @generated from message codefoundry.v1.DictationSessionRequest
@@ -440,7 +504,7 @@ export type DictationSessionRequest = Message<"codefoundry.v1.DictationSessionRe
  * Use `create(DictationSessionRequestSchema)` to create a new message.
  */
 export const DictationSessionRequestSchema: GenMessage<DictationSessionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 16);
+  messageDesc(file_codefoundry_v1_dictation, 17);
 
 /**
  * DictationSessionEvent is one event of a session. Exactly one field is set.
@@ -483,7 +547,7 @@ export type DictationSessionEvent = Message<"codefoundry.v1.DictationSessionEven
  * Use `create(DictationSessionEventSchema)` to create a new message.
  */
 export const DictationSessionEventSchema: GenMessage<DictationSessionEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 17);
+  messageDesc(file_codefoundry_v1_dictation, 18);
 
 /**
  * DictationLevel is the microphone's level, for the live bars.
@@ -504,7 +568,7 @@ export type DictationLevel = Message<"codefoundry.v1.DictationLevel"> & {
  * Use `create(DictationLevelSchema)` to create a new message.
  */
 export const DictationLevelSchema: GenMessage<DictationLevel> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 18);
+  messageDesc(file_codefoundry_v1_dictation, 19);
 
 /**
  * DictationPhrase is one transcribed phrase, to insert at the caret.
@@ -523,7 +587,7 @@ export type DictationPhrase = Message<"codefoundry.v1.DictationPhrase"> & {
  * Use `create(DictationPhraseSchema)` to create a new message.
  */
 export const DictationPhraseSchema: GenMessage<DictationPhrase> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 19);
+  messageDesc(file_codefoundry_v1_dictation, 20);
 
 /**
  * DictationEnded is a session's last event.
@@ -542,7 +606,7 @@ export type DictationEnded = Message<"codefoundry.v1.DictationEnded"> & {
  * Use `create(DictationEndedSchema)` to create a new message.
  */
 export const DictationEndedSchema: GenMessage<DictationEnded> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 20);
+  messageDesc(file_codefoundry_v1_dictation, 21);
 
 /**
  * DictationAudioFrame is a slice of microphone audio.
@@ -575,7 +639,7 @@ export type DictationAudioFrame = Message<"codefoundry.v1.DictationAudioFrame"> 
  * Use `create(DictationAudioFrameSchema)` to create a new message.
  */
 export const DictationAudioFrameSchema: GenMessage<DictationAudioFrame> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 21);
+  messageDesc(file_codefoundry_v1_dictation, 22);
 
 /**
  * @generated from message codefoundry.v1.DictationAudioResponse
@@ -588,7 +652,7 @@ export type DictationAudioResponse = Message<"codefoundry.v1.DictationAudioRespo
  * Use `create(DictationAudioResponseSchema)` to create a new message.
  */
 export const DictationAudioResponseSchema: GenMessage<DictationAudioResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 22);
+  messageDesc(file_codefoundry_v1_dictation, 23);
 
 /**
  * @generated from message codefoundry.v1.DictationMicDeniedRequest
@@ -605,7 +669,7 @@ export type DictationMicDeniedRequest = Message<"codefoundry.v1.DictationMicDeni
  * Use `create(DictationMicDeniedRequestSchema)` to create a new message.
  */
 export const DictationMicDeniedRequestSchema: GenMessage<DictationMicDeniedRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 23);
+  messageDesc(file_codefoundry_v1_dictation, 24);
 
 /**
  * @generated from message codefoundry.v1.DictationMicDeniedResponse
@@ -618,7 +682,67 @@ export type DictationMicDeniedResponse = Message<"codefoundry.v1.DictationMicDen
  * Use `create(DictationMicDeniedResponseSchema)` to create a new message.
  */
 export const DictationMicDeniedResponseSchema: GenMessage<DictationMicDeniedResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_dictation, 24);
+  messageDesc(file_codefoundry_v1_dictation, 25);
+
+/**
+ * @generated from message codefoundry.v1.DictationAccessibilityRequest
+ */
+export type DictationAccessibilityRequest = Message<"codefoundry.v1.DictationAccessibilityRequest"> & {
+  /**
+   * @generated from field: codefoundry.v1.DictationAccessibility accessibility = 1;
+   */
+  accessibility?: DictationAccessibility | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.DictationAccessibilityRequest.
+ * Use `create(DictationAccessibilityRequestSchema)` to create a new message.
+ */
+export const DictationAccessibilityRequestSchema: GenMessage<DictationAccessibilityRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_dictation, 26);
+
+/**
+ * @generated from message codefoundry.v1.DictationAccessibilityResponse
+ */
+export type DictationAccessibilityResponse = Message<"codefoundry.v1.DictationAccessibilityResponse"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.DictationAccessibilityResponse.
+ * Use `create(DictationAccessibilityResponseSchema)` to create a new message.
+ */
+export const DictationAccessibilityResponseSchema: GenMessage<DictationAccessibilityResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_dictation, 27);
+
+/**
+ * @generated from message codefoundry.v1.DictationComposerTargetRequest
+ */
+export type DictationComposerTargetRequest = Message<"codefoundry.v1.DictationComposerTargetRequest"> & {
+  /**
+   * @generated from field: bool available = 1;
+   */
+  available: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.DictationComposerTargetRequest.
+ * Use `create(DictationComposerTargetRequestSchema)` to create a new message.
+ */
+export const DictationComposerTargetRequestSchema: GenMessage<DictationComposerTargetRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_dictation, 28);
+
+/**
+ * @generated from message codefoundry.v1.DictationComposerTargetResponse
+ */
+export type DictationComposerTargetResponse = Message<"codefoundry.v1.DictationComposerTargetResponse"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.DictationComposerTargetResponse.
+ * Use `create(DictationComposerTargetResponseSchema)` to create a new message.
+ */
+export const DictationComposerTargetResponseSchema: GenMessage<DictationComposerTargetResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_dictation, 29);
 
 /**
  * DictationState is dictation's state as the settings page and composers show it.
@@ -760,7 +884,9 @@ export const DictationEndReasonSchema: GenEnum<DictationEndReason> = /*@__PURE__
  *
  * A session belongs to one client (the composer that pressed the mic): Start opens it,
  * the host streams Audio while Watch says LISTENING, the composer reads Session, and
- * Stop (or 30 s without speech, or disabling) ends it. One session at a time.
+ * Stop (or 30 s without speech, or disabling) ends it. One session at a time. The hold key
+ * (docs/notes/dictate-anywhere.md) opens one for a composer through dictation.hold, or
+ * for the host itself with client id "system", which then reads Session and pastes.
  *
  * @generated from service codefoundry.v1.DictationService
  */
@@ -872,6 +998,30 @@ export const DictationService: GenService<{
     methodKind: "unary";
     input: typeof DictationMicDeniedRequestSchema;
     output: typeof DictationMicDeniedResponseSchema;
+  },
+  /**
+   * Accessibility is the host reporting what macOS allows the hold key; it shows as
+   * accessibility on Watch. Nothing is stored: a restarted daemon has none until the host
+   * reports again.
+   *
+   * @generated from rpc codefoundry.v1.DictationService.Accessibility
+   */
+  accessibility: {
+    methodKind: "unary";
+    input: typeof DictationAccessibilityRequestSchema;
+    output: typeof DictationAccessibilityResponseSchema;
+  },
+  /**
+   * ComposerTarget is the window saying whether a composer can take dictation now (the
+   * choice dictation.toggle makes); it shows as composer_target on Watch, so the host can
+   * route a press of the hold key without asking the window.
+   *
+   * @generated from rpc codefoundry.v1.DictationService.ComposerTarget
+   */
+  composerTarget: {
+    methodKind: "unary";
+    input: typeof DictationComposerTargetRequestSchema;
+    output: typeof DictationComposerTargetResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_dictation, 0);
