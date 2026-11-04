@@ -7,7 +7,7 @@ const colours: ScopeColours = { plate: [0, 0, 0], edge: [1, 1, 1], live: [2, 2, 
 
 type Handlers = Parameters<OverlayDeps["follow"]>[1];
 
-function world(reduced = false) {
+function world() {
   let queued: ((ms: number) => void)[] = [];
   let now = 0;
   const follows: { id: string; h: Handlers; stopped: boolean }[] = [];
@@ -17,7 +17,6 @@ function world(reduced = false) {
       queued.push(cb);
       return queued.length;
     }),
-    reducedMotion: () => reduced,
     follow: (id: string, h: Handlers) => {
       const f = { id, h, stopped: false };
       follows.push(f);
@@ -141,14 +140,6 @@ describe("OverlayController", () => {
     w.follows[0]?.h.onLost();
     w.frames(1000);
     expect(w.deps.done).toHaveBeenCalledWith("s1");
-  });
-
-  it("uses the still scope under Reduce Motion", async () => {
-    const w = world(true);
-    w.c.begin("s1");
-    await vi.advanceTimersByTimeAsync(0);
-    w.frames(100);
-    expect(w.painted.at(-1)?.still).toBe(true);
   });
 
   it("a session after a hide starts from a closed plate", async () => {

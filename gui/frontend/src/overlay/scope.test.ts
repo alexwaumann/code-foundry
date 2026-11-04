@@ -128,46 +128,4 @@ describe("Scope", () => {
     s.setPhase("working");
     expect(s.gone).toBe(false);
   });
-
-  describe("Reduce Motion", () => {
-    it("the width never moves in any phase", () => {
-      const s = new Scope(true);
-      for (const p of ["listening", "working", "done"] as const) {
-        s.setPhase(p);
-        const { max, min } = run(s, 0.4, 0.5);
-        expect([max, min]).toEqual([PLATE_WIDTH, PLATE_WIDTH]);
-      }
-      expect(s.wipe).toBe(0);
-    });
-
-    it("the level lights columns from the middle out", () => {
-      const lit = (level: number) => {
-        const s = new Scope(true);
-        run(s, 0.5, level);
-        return [...s.dots].filter((v) => v === 1).length / 9;
-      };
-      expect(lit(0)).toBe(1);
-      expect(lit(0.3)).toBeGreaterThan(lit(0));
-      expect(lit(0.9)).toBeGreaterThan(lit(0.3));
-      const s = new Scope(true);
-      run(s, 0.5, 0.3);
-      expect(s.dots[21 * 9]).toBe(1);
-      expect(s.dots[0]).toBe(0);
-    });
-
-    it("a working plate is still dots, not the meter", () => {
-      const s = new Scope(true);
-      run(s, 0.3, 0.5);
-      s.setPhase("working");
-      run(s, 1);
-      expect(Math.max(...s.dots) - Math.min(...s.dots)).toBeLessThan(0.01);
-    });
-
-    it("fades out on an end", () => {
-      const s = new Scope(true);
-      run(s, 0.3);
-      s.setPhase("done");
-      expect(fadeTime(s)).toBeLessThan(0.6);
-    });
-  });
 });

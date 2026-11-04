@@ -24,7 +24,6 @@ function fit(el: HTMLCanvasElement): number {
 
 const controller = new OverlayController({
   requestFrame: (cb) => window.requestAnimationFrame(cb),
-  reducedMotion: () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   follow: followOverlaySession,
   colours: async () => scopeColours(await overlayThemeVars()),
   paint: (scope, colours) => {
