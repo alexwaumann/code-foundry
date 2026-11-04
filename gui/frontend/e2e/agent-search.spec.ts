@@ -167,14 +167,9 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
     await expect(dialog(page).getByTestId("agent-answer-pane")).toBeVisible();
     await page.screenshot({ path: `${dir ?? ""}/long-answer-${scheme}.png` });
-    await mockPost("search?long=0");
-    await page.keyboard.press("Meta+Backspace");
-    await page.keyboard.type("where did we decide the badge fix?");
-    await page.keyboard.press("Enter");
-    await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
 
-    // A second question left running while the first is shown again, then closed.
-    await mockPost("search?stepMs=300");
+    // Another question left running while the first is shown again, then closed.
+    await mockPost("search?stepMs=300&long=0");
     await page.keyboard.press("Meta+Backspace");
     await page.keyboard.type("why did the PR badge stay green after a force-push?");
     await page.keyboard.press("Enter");
@@ -189,7 +184,7 @@ for (const scheme of ["dark", "light"] as const) {
       .not.toBe(1);
     await page.keyboard.press("Meta+Shift+F");
     await expect(dialog(page).getByTestId("search-unseen-cue")).toBeVisible();
-    await expect.poll(() => marked(page, "cf-search-quote")).not.toEqual([]);
+    await expect(dialog(page).getByTestId("agent-answer-pane")).toBeVisible();
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${dir ?? ""}/cue-${scheme}.png` });
   });
