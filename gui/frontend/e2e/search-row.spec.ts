@@ -76,6 +76,8 @@ for (const scheme of ["dark", "light"] as const) {
     await shot("results");
     await navRow(page).click();
     await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
+    // The dialog's fade.
+    await page.waitForTimeout(400);
     await shot("opened");
     await page.keyboard.press("Escape");
     await mockPost("search?stepMs=60&hits=0");
@@ -85,6 +87,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.keyboard.press("Enter");
     await page.keyboard.press("Escape");
     await expect(navRow(page)).toHaveAttribute("data-state", "none");
+    await page.mouse.move(640, 700);
     await shot("none");
     await navRow(page).click();
     await expect(dialog(page)).toBeVisible();
@@ -96,6 +99,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.keyboard.press("Enter");
     await page.keyboard.press("Escape");
     await expect(navRow(page)).toHaveAttribute("data-state", "failed");
+    await page.mouse.move(640, 700);
     await shot("failed");
   });
 }
