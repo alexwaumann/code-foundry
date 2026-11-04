@@ -210,6 +210,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css),
 	// and its contrast reports on the user's themes (theme save, theme check).
 	liveTheme, themeReports := theme.NewLive(), theme.NewReports()
+	// Terminals answer color queries from the theme; dark until the GUI publishes one.
+	st.terminal.SetColors(ctx, terminalColors(theme.DefaultFrame(theme.SchemeDark)))
 	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithPagesOrigin(pagesOrigin(pagesPort))
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
@@ -332,7 +334,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version, skills.WelcomePath(p.Pages())).Route(),
 		commandAPI.Route(),
-		api.NewUI(events, liveTheme, themeReports).Route(),
+		api.NewUI(events, liveTheme, themeReports).WithThemePublished(publishTerminalColors(st.terminal)).Route(),
 		terminalAPI.Route(),
 		threadAPI.Route(),
 		projectAPI.Route(),

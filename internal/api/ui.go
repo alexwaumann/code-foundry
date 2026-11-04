@@ -25,6 +25,8 @@ type UI struct {
 	bus     *bus.Bus
 	theme   *theme.Live
 	reports *theme.Reports
+	// published hears each theme theme.Live accepted; nil: nobody listens.
+	published func(context.Context, theme.Frame)
 }
 
 var _ codefoundryv1connect.UiServiceHandler = (*UI)(nil)
@@ -33,6 +35,12 @@ var _ codefoundryv1connect.UiServiceHandler = (*UI)(nil)
 // to reports.
 func NewUI(b *bus.Bus, live *theme.Live, reports *theme.Reports) *UI {
 	return &UI{bus: b, theme: live, reports: reports}
+}
+
+// WithThemePublished calls fn with each theme PublishTheme accepts.
+func (h *UI) WithThemePublished(fn func(context.Context, theme.Frame)) *UI {
+	h.published = fn
+	return h
 }
 
 // Route mounts the service.
@@ -76,12 +84,16 @@ func (h *UI) Emit(_ context.Context, req *connect.Request[v1.EmitIntentRequest])
 }
 
 // PublishTheme makes the GUI's active theme the one GET /cf/theme.css and /cf/theme.json
-// serve. InvalidArgument when the id, scheme, a name or a value would not be safe in a
+// serve, and tells whoever WithThemePublished named. InvalidArgument when the id, scheme, a name or a value would not be safe in a
 // stylesheet (theme.Frame.Check).
-func (h *UI) PublishTheme(_ context.Context, req *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error) {
+func (h *UI) PublishTheme(ctx context.Context, req *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error) {
 	m := req.Msg
-	if err := h.theme.Publish(theme.Frame{ID: m.GetId(), Scheme: m.GetScheme(), Vars: m.GetVars()}); err != nil {
+	f := theme.Frame{ID: m.GetId(), Scheme: m.GetScheme(), Vars: m.GetVars()}
+	if err := h.theme.Publish(f); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	if h.published != nil {
+		h.published(ctx, f)
 	}
 	return connect.NewResponse(&v1.PublishThemeResponse{}), nil
 }
