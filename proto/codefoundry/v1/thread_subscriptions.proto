@@ -193,12 +193,20 @@ message UnsubscribeThreadResponse {
   repeated ThreadSubscription removed = 1;
 }
 
+// A thread's wake subscriptions, whole (ThreadEvent.subscriptions).
+message ThreadSubscriptionsChange {
+  string thread_id = 1;
+  repeated ThreadSubscription subscriptions = 2;
+}
+
 message ListThreadSubscriptionsRequest {
   // Empty: every thread's subscriptions.
   string subscriber_thread_id = 1;
 }
 
 message ListThreadSubscriptionsResponse {
-  // By subscriber, then creation time.
+  // By subscriber, then creation time. A one-shot goes when it fires, but a wake about
+  // a lead whose team still works is held (docs/notes/ember-fixes-1-wakes.md): it stays
+  // listed until its wake goes out, and Unsubscribe by id drops it.
   repeated ThreadSubscription subscriptions = 1;
 }

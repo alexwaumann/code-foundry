@@ -43,19 +43,25 @@ func threadShellStopCmd(b ThreadBackend, idArg ArgSpec) Command {
 	}
 }
 
+// shellName is a shell as the user knows it: its command's first line, else its
+// description.
+func shellName(sh *v1.BackgroundShell) string {
+	what := sh.GetCommand()
+	if what == "" {
+		what = sh.GetDescription()
+	}
+	if i := strings.IndexByte(what, '\n'); i >= 0 {
+		what = what[:i] + " …"
+	}
+	return what
+}
+
 // shellLines are thread.get's lines for the running background shells: "background
 // shell b1x2: python3 -m http.server 9399 (localhost:9399)".
 func shellLines(s *v1.Thread) []string {
 	var out []string
 	for _, sh := range s.GetBackgroundShells() {
-		what := sh.GetCommand()
-		if what == "" {
-			what = sh.GetDescription()
-		}
-		if i := strings.IndexByte(what, '\n'); i >= 0 {
-			what = what[:i] + " …"
-		}
-		l := "background shell " + sh.GetTaskId() + ": " + what
+		l := "background shell " + sh.GetTaskId() + ": " + shellName(sh)
 		if ps := sh.GetPorts(); len(ps) > 0 {
 			addrs := make([]string, len(ps))
 			for i, p := range ps {

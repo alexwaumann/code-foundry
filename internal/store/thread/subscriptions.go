@@ -929,8 +929,22 @@ func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 	if id := strings.TrimSpace(o.ID); id != "" {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		// Its wake too, when it already fired: on its way (a one-shot then has no record
+		// left but that wake), or held.
+		way := s.dropWakesLocked("", []string{id})
 		r, ok := s.byID[id]
 		if !ok {
+			if h, held := s.heldOnlyLocked("")[id]; held {
+				s.forgetHeldLocked("", []string{id})
+				s.changedLocked(h.SubscriberID)
+				m.log.Info("held wake removed", "subscription", id)
+				return []Subscription{h}, nil
+			}
+			if len(way) > 0 {
+				s.changedLocked(way[0].SubscriberID)
+				m.log.Info("wake on its way taken back", "subscription", id)
+				return way[:1], nil
+			}
 			return nil, fmt.Errorf("%w: subscription %s", ErrNotFound, id)
 		}
 		s.removeLocked([]string{id})
@@ -962,10 +976,18 @@ func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 			ids = append(ids, id)
 		}
 	}
+	// A one-shot that fired: its wake on the way is all that is left of it.
+	for _, w := range s.onTheWayLocked(subscriber) {
+		if w.TargetKind == kind && (w.TargetID == target || (kind == TargetTimer && target == "")) && !slices.Contains(ids, w.ID) {
+			out = append(out, w)
+			ids = append(ids, w.ID)
+		}
+	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%w: thread %s has no subscription to %s", ErrNotFound, subscriber, cmp.Or(target, "a timer"))
 	}
 	sortSubscriptions(out)
+	s.dropWakesLocked(subscriber, ids)
 	s.removeLocked(ids)
 	m.log.Info("wake subscriptions removed", "subscriber", subscriber, "target", target, "count", len(ids))
 	return out, nil
@@ -986,6 +1008,7 @@ func (m *Manager) Subscriptions(ctx context.Context, subscriber string) ([]Subsc
 			out = append(out, r.s)
 		}
 	}
+	out = slices.AppendSeq(out, maps.Values(s.heldOnlyLocked(subscriber)))
 	s.mu.Unlock()
 	for i := range out {
 		sub := &out[i]
@@ -1109,10 +1132,12 @@ func (s *subscriptions) subscribersOf(target string) []string {
 	return out
 }
 
-// wakeQueued reports whether a wake to thread id is queued or being delivered.
+// wakeQueued reports whether a wake to thread id is queued or being delivered. A queue
+// whose every wake was taken back has nothing coming, though its drain still waits out
+// the batch window.
 func (s *subscriptions) wakeQueued(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, ok := s.queues[id]
-	return ok
+	q, ok := s.queues[id]
+	return ok && !q.spentLocked()
 }

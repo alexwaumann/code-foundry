@@ -27,6 +27,7 @@ type Thread struct {
 	store thread.Store
 	bus   *bus.Bus
 	beat  time.Duration      // WatchThread's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
+	wakes time.Duration      // WatchThread's look at the wake list's targets; zero is wakeRefresh (tests shorten it)
 	fetch *proxyfetch.Client // ProxyFetch's client (WithFetch)
 }
 
@@ -73,6 +74,8 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 	defer gone.Close()
 	sub := bus.Subscribe[thread.ThreadEvent](h.bus, threadWatchBuffer)
 	defer sub.Close()
+	wakes := h.newWakeFeed(ctx, id)
+	defer wakes.close()
 	snap, err := h.store.WatchItems(ctx, id)
 	if err != nil {
 		return threadError(err)
@@ -83,7 +86,7 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 		beat.Reset()
 		return stream.Send(msg)
 	}
-	if err := send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Snapshot{Snapshot: itemsSnapshotToProto(snap)}}); err != nil {
+	if err := send(wakes.snapshot(snap)); err != nil {
 		return err
 	}
 	seen := snap.Seq
@@ -111,6 +114,21 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 			if err := send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
 				return err
 			}
+		case ev, ok := <-wakes.changes.C():
+			if !ok {
+				return nil
+			}
+			if msg := wakes.changed(ev); msg != nil {
+				if err := send(msg); err != nil {
+					return err
+				}
+			}
+		case <-wakes.tick.C:
+			if msg := wakes.read(); msg != nil {
+				if err := send(msg); err != nil {
+					return err
+				}
+			}
 		case ev, ok := <-sub.C():
 			if !ok {
 				return nil
@@ -121,7 +139,7 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 					return threadError(err)
 				}
 				seen = snap.Seq
-				if err := send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Snapshot{Snapshot: itemsSnapshotToProto(snap)}}); err != nil {
+				if err := send(wakes.snapshot(snap)); err != nil {
 					return err
 				}
 				continue

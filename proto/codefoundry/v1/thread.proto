@@ -177,6 +177,10 @@ service ThreadService {
   rpc Unsubscribe(UnsubscribeThreadRequest) returns (UnsubscribeThreadResponse) {}
   // ListSubscriptions lists one subscriber's subscriptions, or every thread's.
   rpc ListSubscriptions(ListThreadSubscriptionsRequest) returns (ListThreadSubscriptionsResponse) {}
+  // Removes everything that would wake a thread: its subscriptions and the wakes on their
+  // way to it, and stops its background shells. Child threads and subagents run on
+  // (docs/notes/wait-list-daemon.md).
+  rpc StopWaiting(StopThreadWaitingRequest) returns (StopThreadWaitingResponse) {}
   // Watch streams changes to the thread list (every thread's record, not its items).
   // The first event is a snapshot. WatchThread streams one thread's conversation.
   rpc Watch(WatchThreadsRequest) returns (stream ThreadListEvent) {}
@@ -624,6 +628,9 @@ message ThreadItemsSnapshot {
   // The thread's subagent runs, in spawn order (never reordered by status); also while
   // it is not running (the runs persist). See docs/notes/agents-1-daemon.md.
   repeated ThreadAgentRun agents = 7;
+  // WatchThread only: the thread's wake subscriptions (ListSubscriptions), then
+  // ThreadEvent.subscriptions on every change.
+  repeated ThreadSubscription subscriptions = 8;
 }
 
 // Text appended to a streaming item.
@@ -685,6 +692,10 @@ message ThreadEvent {
     // report or a new run comes at once; its progress (activity, last tool, counters) at
     // most once a second.
     ThreadAgentsChange agents = 10;
+    // WatchThread only: the thread's wake subscriptions changed (the whole list, as
+    // ListSubscriptions has it), or a target's name or status did. It does not advance
+    // seq. The snapshot carries the list too.
+    ThreadSubscriptionsChange subscriptions = 11;
   }
 }
 
@@ -992,6 +1003,19 @@ message StopThreadShellRequest {
 
 message StopThreadShellResponse {
   Thread thread = 1;
+}
+
+message StopThreadWaitingRequest {
+  string thread_id = 1;
+}
+
+message StopThreadWaitingResponse {
+  // After the wakes went; the shells stop in the background.
+  Thread thread = 1;
+  // The subscriptions it removed, and any wake held for the thread.
+  repeated ThreadSubscription removed = 2;
+  // The shells it is stopping.
+  repeated BackgroundShell stopped_shells = 3;
 }
 
 message ReseedThreadRequest {

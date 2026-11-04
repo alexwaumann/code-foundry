@@ -756,6 +756,59 @@ func (x *UnsubscribeThreadResponse) GetRemoved() []*ThreadSubscription {
 	return nil
 }
 
+// A thread's wake subscriptions, whole (ThreadEvent.subscriptions).
+type ThreadSubscriptionsChange struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Subscriptions []*ThreadSubscription  `protobuf:"bytes,2,rep,name=subscriptions,proto3" json:"subscriptions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ThreadSubscriptionsChange) Reset() {
+	*x = ThreadSubscriptionsChange{}
+	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ThreadSubscriptionsChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ThreadSubscriptionsChange) ProtoMessage() {}
+
+func (x *ThreadSubscriptionsChange) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ThreadSubscriptionsChange.ProtoReflect.Descriptor instead.
+func (*ThreadSubscriptionsChange) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_subscriptions_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ThreadSubscriptionsChange) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *ThreadSubscriptionsChange) GetSubscriptions() []*ThreadSubscription {
+	if x != nil {
+		return x.Subscriptions
+	}
+	return nil
+}
+
 type ListThreadSubscriptionsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Empty: every thread's subscriptions.
@@ -766,7 +819,7 @@ type ListThreadSubscriptionsRequest struct {
 
 func (x *ListThreadSubscriptionsRequest) Reset() {
 	*x = ListThreadSubscriptionsRequest{}
-	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -778,7 +831,7 @@ func (x *ListThreadSubscriptionsRequest) String() string {
 func (*ListThreadSubscriptionsRequest) ProtoMessage() {}
 
 func (x *ListThreadSubscriptionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -791,7 +844,7 @@ func (x *ListThreadSubscriptionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListThreadSubscriptionsRequest.ProtoReflect.Descriptor instead.
 func (*ListThreadSubscriptionsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_subscriptions_proto_rawDescGZIP(), []int{5}
+	return file_codefoundry_v1_thread_subscriptions_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListThreadSubscriptionsRequest) GetSubscriberThreadId() string {
@@ -803,7 +856,9 @@ func (x *ListThreadSubscriptionsRequest) GetSubscriberThreadId() string {
 
 type ListThreadSubscriptionsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// By subscriber, then creation time.
+	// By subscriber, then creation time. A one-shot goes when it fires, but a wake about
+	// a lead whose team still works is held (docs/notes/ember-fixes-1-wakes.md): it stays
+	// listed until its wake goes out, and Unsubscribe by id drops it.
 	Subscriptions []*ThreadSubscription `protobuf:"bytes,1,rep,name=subscriptions,proto3" json:"subscriptions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -811,7 +866,7 @@ type ListThreadSubscriptionsResponse struct {
 
 func (x *ListThreadSubscriptionsResponse) Reset() {
 	*x = ListThreadSubscriptionsResponse{}
-	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -823,7 +878,7 @@ func (x *ListThreadSubscriptionsResponse) String() string {
 func (*ListThreadSubscriptionsResponse) ProtoMessage() {}
 
 func (x *ListThreadSubscriptionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_thread_subscriptions_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -836,7 +891,7 @@ func (x *ListThreadSubscriptionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListThreadSubscriptionsResponse.ProtoReflect.Descriptor instead.
 func (*ListThreadSubscriptionsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_subscriptions_proto_rawDescGZIP(), []int{6}
+	return file_codefoundry_v1_thread_subscriptions_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListThreadSubscriptionsResponse) GetSubscriptions() []*ThreadSubscription {
@@ -906,7 +961,10 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	" \x01(\tR\ftargetPlugin\x12!\n" +
 	"\ftarget_timer\x18\v \x01(\bR\vtargetTimer\"Y\n" +
 	"\x19UnsubscribeThreadResponse\x12<\n" +
-	"\aremoved\x18\x01 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\aremoved\"R\n" +
+	"\aremoved\x18\x01 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\aremoved\"\x82\x01\n" +
+	"\x19ThreadSubscriptionsChange\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12H\n" +
+	"\rsubscriptions\x18\x02 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\rsubscriptions\"R\n" +
 	"\x1eListThreadSubscriptionsRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\"k\n" +
 	"\x1fListThreadSubscriptionsResponse\x12H\n" +
@@ -953,7 +1011,7 @@ func file_codefoundry_v1_thread_subscriptions_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_thread_subscriptions_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_codefoundry_v1_thread_subscriptions_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_codefoundry_v1_thread_subscriptions_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_codefoundry_v1_thread_subscriptions_proto_goTypes = []any{
 	(ThreadSubscriptionTarget)(0),           // 0: codefoundry.v1.ThreadSubscriptionTarget
 	(ThreadSubscriptionCondition)(0),        // 1: codefoundry.v1.ThreadSubscriptionCondition
@@ -962,31 +1020,33 @@ var file_codefoundry_v1_thread_subscriptions_proto_goTypes = []any{
 	(*SubscribeThreadResponse)(nil),         // 4: codefoundry.v1.SubscribeThreadResponse
 	(*UnsubscribeThreadRequest)(nil),        // 5: codefoundry.v1.UnsubscribeThreadRequest
 	(*UnsubscribeThreadResponse)(nil),       // 6: codefoundry.v1.UnsubscribeThreadResponse
-	(*ListThreadSubscriptionsRequest)(nil),  // 7: codefoundry.v1.ListThreadSubscriptionsRequest
-	(*ListThreadSubscriptionsResponse)(nil), // 8: codefoundry.v1.ListThreadSubscriptionsResponse
-	nil,                                     // 9: codefoundry.v1.ThreadSubscription.ArgsEntry
-	nil,                                     // 10: codefoundry.v1.SubscribeThreadRequest.ArgsEntry
-	(*timestamppb.Timestamp)(nil),           // 11: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),             // 12: google.protobuf.Duration
+	(*ThreadSubscriptionsChange)(nil),       // 7: codefoundry.v1.ThreadSubscriptionsChange
+	(*ListThreadSubscriptionsRequest)(nil),  // 8: codefoundry.v1.ListThreadSubscriptionsRequest
+	(*ListThreadSubscriptionsResponse)(nil), // 9: codefoundry.v1.ListThreadSubscriptionsResponse
+	nil,                                     // 10: codefoundry.v1.ThreadSubscription.ArgsEntry
+	nil,                                     // 11: codefoundry.v1.SubscribeThreadRequest.ArgsEntry
+	(*timestamppb.Timestamp)(nil),           // 12: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),             // 13: google.protobuf.Duration
 }
 var file_codefoundry_v1_thread_subscriptions_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.ThreadSubscription.target:type_name -> codefoundry.v1.ThreadSubscriptionTarget
 	1,  // 1: codefoundry.v1.ThreadSubscription.condition:type_name -> codefoundry.v1.ThreadSubscriptionCondition
-	11, // 2: codefoundry.v1.ThreadSubscription.created_at:type_name -> google.protobuf.Timestamp
-	11, // 3: codefoundry.v1.ThreadSubscription.last_fired_at:type_name -> google.protobuf.Timestamp
-	9,  // 4: codefoundry.v1.ThreadSubscription.args:type_name -> codefoundry.v1.ThreadSubscription.ArgsEntry
-	11, // 5: codefoundry.v1.SubscribeThreadRequest.target_at:type_name -> google.protobuf.Timestamp
-	12, // 6: codefoundry.v1.SubscribeThreadRequest.target_every:type_name -> google.protobuf.Duration
+	12, // 2: codefoundry.v1.ThreadSubscription.created_at:type_name -> google.protobuf.Timestamp
+	12, // 3: codefoundry.v1.ThreadSubscription.last_fired_at:type_name -> google.protobuf.Timestamp
+	10, // 4: codefoundry.v1.ThreadSubscription.args:type_name -> codefoundry.v1.ThreadSubscription.ArgsEntry
+	12, // 5: codefoundry.v1.SubscribeThreadRequest.target_at:type_name -> google.protobuf.Timestamp
+	13, // 6: codefoundry.v1.SubscribeThreadRequest.target_every:type_name -> google.protobuf.Duration
 	1,  // 7: codefoundry.v1.SubscribeThreadRequest.condition:type_name -> codefoundry.v1.ThreadSubscriptionCondition
-	10, // 8: codefoundry.v1.SubscribeThreadRequest.args:type_name -> codefoundry.v1.SubscribeThreadRequest.ArgsEntry
+	11, // 8: codefoundry.v1.SubscribeThreadRequest.args:type_name -> codefoundry.v1.SubscribeThreadRequest.ArgsEntry
 	2,  // 9: codefoundry.v1.SubscribeThreadResponse.subscription:type_name -> codefoundry.v1.ThreadSubscription
 	2,  // 10: codefoundry.v1.UnsubscribeThreadResponse.removed:type_name -> codefoundry.v1.ThreadSubscription
-	2,  // 11: codefoundry.v1.ListThreadSubscriptionsResponse.subscriptions:type_name -> codefoundry.v1.ThreadSubscription
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	2,  // 11: codefoundry.v1.ThreadSubscriptionsChange.subscriptions:type_name -> codefoundry.v1.ThreadSubscription
+	2,  // 12: codefoundry.v1.ListThreadSubscriptionsResponse.subscriptions:type_name -> codefoundry.v1.ThreadSubscription
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_thread_subscriptions_proto_init() }
@@ -1000,7 +1060,7 @@ func file_codefoundry_v1_thread_subscriptions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_thread_subscriptions_proto_rawDesc), len(file_codefoundry_v1_thread_subscriptions_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -784,6 +784,11 @@ type Store interface {
 	// note in its conversation (servers.go). ErrNotFound when the thread runs no such
 	// shell, ErrFailedPrecondition when its process cannot be found.
 	StopShell(ctx context.Context, id, taskID string) (Thread, error)
+	// StopWaiting removes everything that would wake a thread: its subscriptions, the
+	// wakes queued or held for it, and its background shells (stop_waiting.go). Its child
+	// threads and subagents run on. ErrNotFound when the thread does not exist,
+	// ErrFailedPrecondition for a resident thread, whose wakes run its board.
+	StopWaiting(ctx context.Context, id string) (StopWaitingResult, error)
 	// McpStatus returns a thread's MCP servers as last checked (mcp.go), also while it
 	// is not running. refresh asks Claude again first, starting a stopped thread without
 	// a prompt. Without it, a running thread not checked yet is asked once.

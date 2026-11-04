@@ -61,6 +61,8 @@ type Thread struct {
 	Cascade map[string][]*v1.Thread
 	// MoveErr, when set, is Move's error for a request (after it is recorded).
 	MoveErr func(*v1.MoveThreadRequest) error
+	// StopWaitingErr is StopWaiting's error, after the call is recorded.
+	StopWaitingErr error
 	// SentOrdinal is the ordinal of the item Send answers with (the message's item
 	// "i-sent").
 	SentOrdinal int64
