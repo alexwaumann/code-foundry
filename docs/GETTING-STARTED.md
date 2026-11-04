@@ -32,7 +32,7 @@ anything, working in your home folder. For a thread in a project, click **New th
 (<kbd>⌘N</kbd>), pick the project, type what you want and press Enter. Paste or attach screenshots with the paperclip. Type <kbd>@</kbd> to mention a
 file and <kbd>/</kbd> to run one of the project's skills or commands. To speak instead
 of typing, turn on Settings › General › **Dictation** (a one-time model download; audio
-never leaves your Mac), then press the microphone beside the paperclip or <kbd>⇧⌘M</kbd>.
+never leaves your Mac), then press the microphone beside the paperclip.
 
 Under the prompt, **Model** picks the model, **Effort** how hard it thinks, and
 **Permissions** what it may do without asking: **Supervised** asks before edits and

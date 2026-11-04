@@ -51,7 +51,10 @@ Three processes, one protocol.
   It also captures the microphone for dictation: while `DictationService.Watch` says
   LISTENING it streams 16 kHz frames with `DictationService.Audio`; it starts itself as
   its own responsible process so the macOS prompt names Code Foundry, not the terminal
-  (`docs/notes/dictation-3-host.md`).
+  (`docs/notes/dictation-3-host.md`). While `dictation.anywhere` is on (it reads the
+  setting from the same stream) it keeps a menu bar item, and closing the window hides it
+  and drops the Dock icon instead of quitting (`gui/menubar.go`,
+  `docs/notes/dictate-anywhere-settings.md`).
   No business logic lives in the Wails host.
 * **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
@@ -122,7 +125,7 @@ internal/
                            every thread's system prompt at spawn
     dictation/             voice dictation: the Whisper model (<home>/dictation/models,
                            resumed download, sha256-pinned), the code-foundry-dictate engine
-                           process (stdio JSON), one session at a time, unload while away
+                           process (stdio JSON), one session at a time, the model kept loaded
                            (docs/notes/dictation-2-daemon.md)
     search/                the search dialog's history and Agent search's hidden runs
                            (claude over stream-json, not threads), quote-verified hits, Promote
@@ -418,8 +421,8 @@ Services (v1):
   memory, read only; its actions are the `memory.*` commands (`docs/notes/memory-dir.md`).
   The GUI shows it on Settings › Memory, fed by the EventService memory source
   (`docs/notes/memory-page.md`).
-* `DictationService` — Watch (the whole state: on/off, model and download, this Mac,
-  the open session, mic denied), Download, CancelDownload, RemoveModel, Start, Stop,
+* `DictationService` — Watch (the whole state: on/off, the anywhere, hold key and sounds
+  settings, model and download, this Mac, the open session, mic denied), Download, CancelDownload, RemoveModel, Start, Stop,
   Session (one session's levels, phrases and end), Audio (the Wails host's microphone
   client stream), MicDenied: voice dictation into the composers, transcribed on this Mac
   by the code-foundry-dictate engine the daemon runs (`docs/notes/dictation-2-daemon.md`).
