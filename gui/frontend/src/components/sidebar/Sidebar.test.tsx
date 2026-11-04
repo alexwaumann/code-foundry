@@ -279,6 +279,25 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
     setThread("s-7", { archivedAtMs: Date.now() });
     expect(screen.getByTestId("archived-count").textContent).toBe("1");
   });
+
+  it("their rows sit 2px apart; the main list's and Working's stay 8px apart", () => {
+    setThread("s-8", { statusReason: "finished" });
+    setThread("s-6", { archivedAtMs: Date.now() });
+    render(<Sidebar />);
+    fireEvent.click(screen.getByTestId("snoozed-header"));
+    fireEvent.click(screen.getByTestId("archived-header"));
+    /** The space between two neighbouring rows of one panel, from where the virtualizer put them. */
+    const space = (panel: string) => {
+      const boxes = [...screen.getByTestId(panel).querySelectorAll<HTMLElement>("[data-row-key]")].map((r) => r.parentElement as HTMLElement);
+      const [a, b] = boxes as [HTMLElement, HTMLElement];
+      const top = (e: HTMLElement) => Number(/translateY\((\d+)px\)/.exec(e.style.transform)?.[1]);
+      return top(b) - top(a) - parseFloat(a.style.height);
+    };
+    expect(space("sidebar-snoozed-rows")).toBe(2);
+    expect(space("sidebar-archived-rows")).toBe(2);
+    expect(space("sidebar-working-rows")).toBe(8);
+    expect(space("sidebar-main")).toBe(8);
+  });
 });
 
 describe("Sidebar: the row menu", () => {

@@ -1,4 +1,4 @@
-import type { Row } from "@/lib/tree";
+import type { Row, Section } from "@/lib/tree";
 
 /**
  * The thread list's row sizes in layout px (docs/notes/sidebar-row-emphasis.md). A snoozed
@@ -23,11 +23,24 @@ export const HEADER_HEIGHT = 26;
  */
 export const ROW_GAP = 8;
 
+/** ROW_GAP for the one-line rows of Snoozed and Archived, which read as a compact list. */
+export const QUIET_ROW_GAP = 2;
+
+/** Whether a section's thread rows are one line (ROW_HEIGHTS[density]), not three. */
+function isQuiet(section: Section | undefined): boolean {
+  return section === "archived" || section === "snoozed";
+}
+
+/** The space between two thread rows of a section's panel. */
+export function rowGap(section: Section): number {
+  return isQuiet(section) ? QUIET_ROW_GAP : ROW_GAP;
+}
+
 /**
  * A row's height: a footer header's, a one-line snoozed or archived row's (`rowHeight`, by
  * density), or a three-line thread row's (THREE_LINE_ROW; also for a row out of range).
  */
 export function rowSize(row: Row | undefined, rowHeight: number): number {
   if (row?.kind === "header") return HEADER_HEIGHT;
-  return row?.section === "archived" || row?.section === "snoozed" ? rowHeight : THREE_LINE_ROW;
+  return isQuiet(row?.section) ? rowHeight : THREE_LINE_ROW;
 }
