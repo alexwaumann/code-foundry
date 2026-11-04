@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronRight, Loader2, X } from "lucide-react";
 import type { AgentHitView, AgentStepView, SearchEntryView } from "@/api/search";
+import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
 import { useThreadPlace } from "@/components/thread/useThreadPlace";
-import { answerPieces, summaryLine, type AnswerPiece } from "@/lib/agentSearch";
+import { answerPreview, summaryLine } from "@/lib/agentSearch";
 import { dayLabel } from "@/lib/threadSearch";
 import { cn } from "@/lib/utils";
 
@@ -54,36 +55,83 @@ export function StepList({ steps }: { steps: readonly AgentStepView[] }) {
   );
 }
 
-/** Whether a marker's next piece starts with punctuation, which then sits against it. */
-function beforePunctuation(next: AnswerPiece | undefined): boolean {
-  return next?.kind === "text" && /^[.,;:!?)\]}…]/.test(next.text);
+/** A hit's [n] in the answer: a small number that selects it (with onRef), else only says which. */
+function AnswerRef({ n, tight, onRef }: { n: number; tight: boolean; onRef: ((n: number) => void) | undefined }) {
+  // No gap before punctuation ("spot 1."); one between a word or marker and the next.
+  const gap = tight ? "ml-px pl-0.5" : "mx-px px-0.5";
+  if (!onRef)
+    return (
+      <span className={cn("text-caption text-cf-warning-text", gap)} data-testid="agent-answer-ref">
+        {n}
+      </span>
+    );
+  return (
+    <button
+      type="button"
+      className={cn("rounded-sm text-caption text-cf-warning-text outline-none hover:bg-cf-control-hover", gap)}
+      aria-label={`Result ${String(n)}`}
+      data-testid="agent-answer-ref"
+      onMouseDown={(e) => {
+        e.preventDefault();
+      }}
+      onClick={() => {
+        onRef(n);
+      }}
+    >
+      {n}
+    </button>
+  );
 }
 
-/** The answer: plain text (the model's, never markdown or links), its [n] references as small numbered markers that select that hit. */
-export function AnswerText({ answer, onRef }: { answer: string; onRef?: (n: number) => void }) {
+/**
+ * The answer as markdown, inert (the model's text, from old thread content: no links,
+ * images or raw HTML; components/pr/Markdown). Its [n] are small numbered markers for the
+ * hits it has; one with no such hit stays as typed, as it points at nothing.
+ */
+export function AnswerText({ answer, hits, onRef, className }: { answer: string; hits: readonly Pick<AgentHitView, "n">[]; onRef?: (n: number) => void; className?: string }) {
+  const extras = useMemo<MarkdownExtras>(() => {
+    const known = new Set(hits.map((h) => h.n));
+    return { inert: true, citation: (n, tight) => (known.has(n) ? <AnswerRef n={n} tight={tight} onRef={onRef} /> : `[${String(n)}]`) };
+  }, [hits, onRef]);
   return (
-    <p className="px-3 pt-3 pb-1 text-body whitespace-pre-wrap text-cf-text" data-testid="agent-answer">
-      {answerPieces(answer).map((p, i, all) =>
-        p.kind === "text" ? (
-          <span key={i}>{p.text}</span>
-        ) : (
-          <button
-            key={i}
-            type="button"
-            // No gap before punctuation ("spot 1."); one between a word or marker and the next.
-            className={cn("rounded-sm text-caption text-cf-warning-text outline-none hover:bg-cf-control-hover", beforePunctuation(all[i + 1]) ? "ml-px pl-0.5" : "mx-px px-0.5")}
-            aria-label={`Result ${String(p.n)}`}
-            data-testid="agent-answer-ref"
-            onMouseDown={(e) => {
-              e.preventDefault();
-            }}
-            onClick={() => onRef?.(p.n)}
-          >
-            {p.n}
-          </button>
-        ),
-      )}
-    </p>
+    <div className={cn("text-body text-cf-text", className)} data-testid="agent-answer">
+      <Markdown extras={extras}>{answer}</Markdown>
+    </div>
+  );
+}
+
+/** The right side with the Answer row selected: the whole answer, scrolling on its own. */
+export function AnswerPane({ answer, hits, onRef }: { answer: string; hits: readonly Pick<AgentHitView, "n">[]; onRef: (n: number) => void }) {
+  return (
+    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pt-4 pb-4" data-testid="agent-answer-pane">
+      <p className="pb-2 text-overline text-cf-text-muted">Answer</p>
+      <AnswerText answer={answer} hits={hits} onRef={onRef} />
+    </div>
+  );
+}
+
+/** The left column's first row when a search has an answer: its opening lines as plain text; the pane shows the whole of it. */
+export function AnswerRow({ answer, selected, onSelect }: { answer: string; selected: boolean; onSelect: () => void }) {
+  const preview = useMemo(() => answerPreview(answer), [answer]);
+  return (
+    <div
+      role="option"
+      aria-selected={selected}
+      className={cn("cursor-default rounded-md px-2.5 py-2", selected && "bg-cf-control-hover")}
+      data-testid="agent-answer-row"
+      data-selected={selected || undefined}
+      onPointerMove={selected ? undefined : onSelect}
+      onMouseDown={(e) => {
+        // Keep the keyboard in the query field.
+        e.preventDefault();
+      }}
+      onClick={onSelect}
+    >
+      <div className="text-label font-medium text-cf-text">Answer</div>
+      <p className="mt-1 line-clamp-2 text-body-sm wrap-anywhere text-cf-text-muted" data-testid="agent-answer-preview">
+        {preview}
+      </p>
+    </div>
   );
 }
 

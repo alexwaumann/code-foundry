@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { AgentHitView, AgentStepView, SearchEntryView, SearchWatchEventView } from "@/api/search";
+import { answerPieces, withoutRefs } from "./answerMarkdown";
 import {
-  answerPieces,
+  ANSWER_ROW,
+  answerPreview,
+  defaultSelection,
   endedNote,
+  openingSelection,
   findHitCount,
   footerModel,
+  hasAnswerRow,
   moveHit,
   recentMeta,
   reduceSearch,
   resultsWord,
   RESTORE_MS,
   restoreSelection,
+  resultRows,
   sessionToRestore,
   summaryLine,
   unseenCue,
@@ -138,6 +144,7 @@ describe("the restore rules", () => {
 
 describe("restoreSelection", () => {
   const hits = (opened: number[]) => [1, 2, 3, 4].map((n) => ({ n, opened: opened.includes(n) }));
+  const withAnswer = (opened: number[]) => [{ n: ANSWER_ROW, opened: false }, ...hits(opened)];
   it.each<[string, { n: number; opened: boolean }[], number | null, number | null, number | null]>([
     ["the next unopened after the one opened", hits([1]), 1, null, 2],
     ["skips opened ones after it", hits([2, 3]), 2, null, 4],
@@ -148,6 +155,16 @@ describe("restoreSelection", () => {
     ["nothing opened: the one selected before", hits([]), null, 3, 3],
     ["nothing opened, the selected one gone: the first unopened", hits([1]), null, 9, 2],
     ["no hits", [], 1, 1, null],
+    ["the Answer row first: nothing selected, it", withAnswer([]), null, null, ANSWER_ROW],
+    ["the Answer row selected before: it", withAnswer([]), null, ANSWER_ROW, ANSWER_ROW],
+    ["the Answer row selected after a hit was opened: it", withAnswer([1]), 1, ANSWER_ROW, ANSWER_ROW],
+    ["the Answer row selected, the answer gone: the first unopened", hits([1]), null, ANSWER_ROW, 2],
+    ["a hit selected, the Answer row there: the hit", withAnswer([]), null, 3, 3],
+    ["the selected hit gone: the Answer row", withAnswer([]), null, 9, ANSWER_ROW],
+    ["after an opened hit: the next unopened hit, not the Answer row", withAnswer([1]), 1, 1, 2],
+    ["wrapping past the end: the first unopened hit, not the Answer row", withAnswer([2, 4]), 4, 4, 1],
+    ["every hit opened, the last opened: the Answer row", withAnswer([1, 2, 3, 4]), 4, 4, ANSWER_ROW],
+    ["the Answer row alone", [{ n: ANSWER_ROW, opened: false }], null, null, ANSWER_ROW],
   ])("%s", (_name, h, openedN, selectedN, want) => {
     expect(restoreSelection(h, openedN, selectedN)).toBe(want);
   });
@@ -159,6 +176,69 @@ describe("restoreSelection", () => {
     expect(moveHit(h, null, 1)).toBe(1);
     expect(moveHit(h, null, -1)).toBe(3);
     expect(moveHit([], 1, 1)).toBeNull();
+  });
+
+  it("moveHit goes through the Answer row", () => {
+    const rows = [{ n: ANSWER_ROW }, { n: 1 }, { n: 2 }];
+    expect(moveHit(rows, ANSWER_ROW, 1)).toBe(1);
+    expect(moveHit(rows, 1, -1)).toBe(ANSWER_ROW);
+    expect(moveHit(rows, ANSWER_ROW, -1)).toBe(2);
+    expect(moveHit(rows, 2, 1)).toBe(ANSWER_ROW);
+    expect(moveHit([{ n: ANSWER_ROW }], ANSWER_ROW, 1)).toBe(ANSWER_ROW);
+  });
+});
+
+describe("the Answer row", () => {
+  it.each<[string, { status: "running" | "done" | "failed" | "stopped"; answer: string }, boolean]>([
+    ["done with an answer", { status: "done", answer: "It did [1]." }, true],
+    ["done without one", { status: "done", answer: "" }, false],
+    ["only whitespace", { status: "done", answer: " \n " }, false],
+    ["an answer while it still runs: hits behave as before", { status: "running", answer: "It did [1]." }, false],
+    ["stopped with an answer", { status: "stopped", answer: "It did [1]." }, true],
+    ["failed without one", { status: "failed", answer: "" }, false],
+  ])("hasAnswerRow: %s", (_name, e, want) => {
+    expect(hasAnswerRow(e)).toBe(want);
+    expect(resultRows({ ...e, hits: [hit(1)] }).map((r) => r.n)).toEqual(want ? [ANSWER_ROW, 1] : [1]);
+  });
+
+  it.each<[string, number[], number | null, boolean, number | null]>([
+    ["a run's end moves to the Answer row", [ANSWER_ROW, 1, 2], 1, false, ANSWER_ROW],
+    ["unless the user picked a hit", [ANSWER_ROW, 1, 2], 2, true, 2],
+    ["a picked hit that went: the first row", [ANSWER_ROW, 1], 7, true, ANSWER_ROW],
+    ["while it runs: the same hit", [1, 2], 2, false, 2],
+    ["while it runs: the first as it arrives", [1], null, false, 1],
+    ["no rows", [], 1, false, null],
+  ])("defaultSelection: %s", (_name, ns, cur, picked, want) => {
+    expect(
+      defaultSelection(
+        ns.map((n) => ({ n })),
+        cur,
+        picked,
+      ),
+    ).toBe(want);
+  });
+
+  it.each([
+    ["markdown stripped", "**Bold** and `code` and a [link](https://example.com).", "Bold and code and a link."],
+    ["blocks on one line", "## Heading\n\n- one\n- two\n\nThen text.", "Heading one two Then text."],
+    ["references out, with the space before them", "The spot [1]. Both [2][3] and [1, 4], done.", "The spot. Both and, done."],
+    ["an image is nothing, raw HTML its text", "See ![x](https://example.com/a.png) and <b>this", "See and <b>this"],
+    ["empty", "", ""],
+  ])("answerPreview: %s", (_name, answer, want) => {
+    expect(answerPreview(answer)).toBe(want);
+  });
+
+  it.each<[string, { status: "running" | "done" | "stopped"; answer: string; hits: AgentHitView[] }, number | null]>([
+    ["ended with an answer: the Answer row", { status: "done", answer: "It did [1].", hits: [hit(1)] }, ANSWER_ROW],
+    ["ended with no answer: the first unopened hit", { status: "done", answer: "", hits: [hit(1, { opened: true }), hit(2)] }, 2],
+    ["ended with nothing", { status: "stopped", answer: "", hits: [] }, null],
+    ["running: nothing yet, so its end can select the Answer row", { status: "running", answer: "", hits: [hit(1)] }, null],
+  ])("openingSelection: %s", (_name, e, want) => {
+    expect(openingSelection(e)).toBe(want);
+  });
+
+  it("withoutRefs leaves other brackets", () => {
+    expect(withoutRefs("See [a] and [100] there [2].")).toBe("See [a] and [100] there.");
   });
 });
 
@@ -214,11 +294,14 @@ describe("texts", () => {
   });
 
   it("endedNote says how a search that did not answer ended", () => {
-    expect(endedNote({ status: "failed", error: "Claude refused --safe-mode", hits: [] })).toBe("Agent search failed: Claude refused --safe-mode.");
-    expect(endedNote({ status: "stopped", error: "", hits: [hit(1)] })).toBe("Stopped. 1 result found before it stopped.");
-    expect(endedNote({ status: "stopped", error: "", hits: [] })).toBe("Stopped before it found anything.");
-    expect(endedNote({ status: "done", error: "", hits: [] })).toBe("No messages answer it.");
-    expect(endedNote({ status: "done", error: "", hits: [hit(1)] })).toBe("");
+    expect(endedNote({ status: "failed", error: "Claude refused --safe-mode", hits: [], answer: "" })).toBe("Agent search failed: Claude refused --safe-mode.");
+    expect(endedNote({ status: "stopped", error: "", hits: [hit(1)], answer: "" })).toBe("Stopped. 1 result found before it stopped.");
+    expect(endedNote({ status: "stopped", error: "", hits: [], answer: "" })).toBe("Stopped before it found anything.");
+    expect(endedNote({ status: "done", error: "", hits: [], answer: "" })).toBe("No messages answer it.");
+    expect(endedNote({ status: "done", error: "", hits: [hit(1)], answer: "" })).toBe("");
+    // The answer says it itself; one that cites what it never reported is told apart.
+    expect(endedNote({ status: "done", error: "", hits: [], answer: "None of your threads talk about it." })).toBe("");
+    expect(endedNote({ status: "done", error: "", hits: [], answer: "It was decided [1]." })).toBe("It reported no messages to open.");
   });
 
   it("footerModel names the utility model at low effort", () => {

@@ -7,6 +7,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import type { PluggableList } from "unified";
+import { rehypeAnswerRefs, rehypeInert } from "./answerMarkdown";
 import { INLINE_HTML_TAGS, rehypeInlineHtml } from "./inlineHtml";
 import { rehypePathChips } from "./pathChips";
 
@@ -40,6 +41,15 @@ const rehypePlugins: PluggableList = [rehypeRaw, [rehypeSanitize, markdownSchema
  * (lib/inlineHtml). Never stripped silently. Still sanitized.
  */
 const rehypePluginsNoHtml: PluggableList = [rehypeInlineHtml, [rehypeSanitize, inlineSchema]];
+
+/** Inert text (lib/answerMarkdown): markdown's own elements but links and images, which rehypeInert has turned to text; the sanitizer stands behind it. */
+const inertSchema: SanitizeSchema = { ...markdownSchema, tagNames: markdownTags.filter((t) => t !== "a" && t !== "img") };
+const rehypePluginsInert: PluggableList = [rehypeInert, [rehypeSanitize, inertSchema]];
+
+/** The rehype plugins for inert text, then the [n] marker pass when it draws citations. */
+export function rehypePluginsInertFor(opts: { citations: boolean }): PluggableList {
+  return opts.citations ? [...rehypePluginsInert, rehypeAnswerRefs] : rehypePluginsInert;
+}
 
 /** The rehype plugins for a surface: raw HTML or not, then the prose path pass when it draws path chips. */
 export function rehypePluginsFor(opts: { html: boolean; pathChips: boolean }): PluggableList {

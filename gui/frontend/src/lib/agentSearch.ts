@@ -4,7 +4,9 @@
  * rules, the selection after an opened hit, and the texts of rows and summary lines.
  */
 import type { AgentHitView, AgentStepView, SearchEntryView, SearchWatchEventView } from "@/api/search";
+import { answerPieces, withoutRefs } from "./answerMarkdown";
 import { formatUptime } from "./format";
+import { markdownText } from "./markdownText";
 import { relativeAge } from "./promptHistory";
 
 /** How long after the dialog closes it reopens as it was; after that it opens on Recent searches. Fixed, not a setting. */
@@ -57,7 +59,7 @@ export interface SearchSession {
   query: string;
   /** The agent search shown; null for none (Find, or the empty state). */
   entryId: string | null;
-  /** The selected hit's n (agent results). */
+  /** The selected row (agent results): a hit's n or ANSWER_ROW; null while a run's selection is only the first hit so far. */
   selectedN: number | null;
   /** The hit Enter opened last; the selection moves on from it on restore. */
   openedN: number | null;
@@ -94,48 +96,69 @@ export function unseenCue(recent: readonly SearchEntryView[] | null, shownId: st
   return entry ? { entry, more: all.length - 1 } : null;
 }
 
+/** The Answer row's place in the selection: a hit's n starts at 1, so selectedN says which row with one number. */
+export const ANSWER_ROW = 0;
+
+/** A selectable row of the results: the Answer row or a hit. */
+export type ResultRow = Pick<AgentHitView, "n" | "opened">;
+
+/** Whether the results start with the Answer row: an ended search with an answer. While it runs, only hits. */
+export function hasAnswerRow(e: Pick<SearchEntryView, "status" | "answer">): boolean {
+  return searchEnded(e) && e.answer.trim() !== "";
+}
+
+/** The rows ↑/↓ move over, top to bottom. */
+export function resultRows(e: Pick<SearchEntryView, "status" | "answer" | "hits">): readonly ResultRow[] {
+  return hasAnswerRow(e) ? [{ n: ANSWER_ROW, opened: false }, ...e.hits] : e.hits;
+}
+
+/** The row selected as the rows change: the Answer row once there is one, unless the user picked a row; else the same row, else the first. */
+export function defaultSelection(rows: readonly Pick<ResultRow, "n">[], cur: number | null, picked: boolean): number | null {
+  if (!picked && rows[0]?.n === ANSWER_ROW) return ANSWER_ROW;
+  return cur !== null && rows.some((r) => r.n === cur) ? cur : (rows[0]?.n ?? null);
+}
+
 /**
- * The hit selected on restore: the next unopened hit after the one opened (wrapping to the
- * first unopened one), else the opened one's next, else the first. Without an opened hit,
- * the one selected before (when it is still there), else the first unopened one.
+ * The row selected on restore, over resultRows: the Answer row when it was selected last;
+ * after an opened hit, the next unopened hit (wrapping to the first unopened one), else
+ * the opened one's next, else the first row. With nothing opened, the row selected before
+ * (when it is still there), else the first unopened row, which is the Answer row when
+ * there is one.
  */
-export function restoreSelection(hits: readonly Pick<AgentHitView, "n" | "opened">[], openedN: number | null, selectedN: number | null = null): number | null {
-  if (hits.length === 0) return null;
+export function restoreSelection(rows: readonly ResultRow[], openedN: number | null, selectedN: number | null = null): number | null {
+  if (rows.length === 0) return null;
+  if (selectedN === ANSWER_ROW && rows[0]?.n === ANSWER_ROW) return ANSWER_ROW;
   if (openedN === null) {
-    if (selectedN !== null && hits.some((h) => h.n === selectedN)) return selectedN;
-    return (hits.find((h) => !h.opened) ?? hits[0])?.n ?? null;
+    if (selectedN !== null && rows.some((r) => r.n === selectedN)) return selectedN;
+    return (rows.find((r) => !r.opened) ?? rows[0])?.n ?? null;
   }
+  const hits = rows.filter((r) => r.n !== ANSWER_ROW);
   const after = hits.filter((h) => h.n > openedN);
-  const next = after.find((h) => !h.opened) ?? hits.find((h) => !h.opened && h.n !== openedN) ?? after[0] ?? hits[0];
+  const next = after.find((h) => !h.opened) ?? hits.find((h) => !h.opened && h.n !== openedN) ?? after[0] ?? rows[0];
   return next?.n ?? null;
 }
 
-/** ↑/↓ over hits: the next or previous n, wrapping; the first for none selected. */
-export function moveHit(hits: readonly Pick<AgentHitView, "n">[], cur: number | null, dir: 1 | -1): number | null {
-  if (hits.length === 0) return null;
-  const i = hits.findIndex((h) => h.n === cur);
-  if (i < 0) return hits[dir === 1 ? 0 : hits.length - 1]?.n ?? null;
-  return hits[(i + dir + hits.length) % hits.length]?.n ?? null;
+/**
+ * The selection a search opens on when no earlier selection of it is kept (Recent, the
+ * unseen cue, the sidebar's search row): its first row, the Answer row when it has one. A
+ * running search has none yet: its first hit is no choice, so its end still selects the
+ * Answer row.
+ */
+export function openingSelection(e: Pick<SearchEntryView, "status" | "answer" | "hits">): number | null {
+  return searchEnded(e) ? restoreSelection(resultRows(e), null) : null;
 }
 
-/** A piece of the answer: plain text, or a reference to hit n ("[n]"). */
-export type AnswerPiece = { kind: "text"; text: string } | { kind: "ref"; n: number };
+/** ↑/↓ over the rows: the next or previous n, wrapping; the first for none selected. */
+export function moveHit(rows: readonly Pick<ResultRow, "n">[], cur: number | null, dir: 1 | -1): number | null {
+  if (rows.length === 0) return null;
+  const i = rows.findIndex((r) => r.n === cur);
+  if (i < 0) return rows[dir === 1 ? 0 : rows.length - 1]?.n ?? null;
+  return rows[(i + dir + rows.length) % rows.length]?.n ?? null;
+}
 
-/**
- * The answer as text and its [n] references ("[1]", "[1][2]", "[1, 2]"), for small
- * numbered markers. Everything else stays text: the answer is the model's, never markdown.
- */
-export function answerPieces(answer: string): AnswerPiece[] {
-  const out: AnswerPiece[] = [];
-  const re = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
-  let at = 0;
-  for (let m = re.exec(answer); m; m = re.exec(answer)) {
-    if (m.index > at) out.push({ kind: "text", text: answer.slice(at, m.index) });
-    for (const n of (m[1] ?? "").split(",")) out.push({ kind: "ref", n: Number(n.trim()) });
-    at = m.index + m[0].length;
-  }
-  if (at < answer.length) out.push({ kind: "text", text: answer.slice(at) });
-  return out;
+/** The Answer row's text: the answer as it reads rendered, on one line, without its [n] references (the row clamps it). */
+export function answerPreview(answer: string): string {
+  return withoutRefs(markdownText(answer)).replace(/\s+/g, " ").trim();
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -174,10 +197,14 @@ export function findHitCount(r: { threads: readonly unknown[]; totalHits: number
 }
 
 /** How a search that did not finish says so above its results. */
-export function endedNote(e: Pick<SearchEntryView, "status" | "error" | "hits">): string {
+export function endedNote(e: Pick<SearchEntryView, "status" | "error" | "hits" | "answer">): string {
   if (e.status === "failed") return `Agent search failed: ${(e.error || "it ended without an answer").replace(/[.\s]+$/, "")}.`;
   if (e.status === "stopped") return e.hits.length > 0 ? `Stopped. ${plural(e.hits.length, "result")} found before it stopped.` : "Stopped before it found anything.";
-  if (e.status === "done" && e.hits.length === 0) return "No messages answer it.";
+  if (e.status === "done" && e.hits.length === 0) {
+    if (e.answer.trim() === "") return "No messages answer it.";
+    // Its citations point at nothing (it reported none, or none was accepted).
+    if (answerPieces(e.answer).some((p) => p.kind === "ref")) return "It reported no messages to open.";
+  }
   return "";
 }
 

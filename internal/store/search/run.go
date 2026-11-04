@@ -298,7 +298,11 @@ type loop struct {
 	// wrapping: asked for the answer (interrupted); wrapSent: the wrap-up message went.
 	wrapping, wrapSent bool
 	lastText           string
-	cost               float64
+	// held: the answer of a turn that cited reports with none accepted, while the one
+	// follow-up (reportMessage) runs. It is a finished answer: whatever cuts the follow-up
+	// short, the run ends DONE with it. Set at most once, so one follow-up at most.
+	held string
+	cost float64
 }
 
 func newLoop(s *Store, r *run, e Entry) *loop {
@@ -342,8 +346,9 @@ func (l *loop) send(conn *claudestream.Conn, text string) error {
 	return conn.Send(ctx, claudestream.UserMessage{Blocks: []claudestream.ContentBlock{claudestream.TextBlock(text)}})
 }
 
-// beforeWrapUpSend, when set (tests), runs just before the wrap-up message is sent.
-var beforeWrapUpSend func(conn *claudestream.Conn, r *run)
+// beforeWrapUpSend and beforeReportSend, when set (tests), run just before the wrap-up
+// message and the follow-up are sent.
+var beforeWrapUpSend, beforeReportSend func(conn *claudestream.Conn, r *run)
 
 // refusedFlag names the hardened flag claude's start error refuses.
 func refusedFlag(detail string) string {
@@ -436,8 +441,11 @@ func (l *loop) run(env []string) runEnd {
 }
 
 // cut is the end of a run broken off: status, with the hits it has; a time limit with no
-// hit is a failure.
+// hit is a failure. A run broken off in its follow-up had finished: DONE with its answer.
 func (l *loop) cut(status Status, note string) runEnd {
+	if l.held != "" {
+		return runEnd{status: StatusDone, answer: l.held, cost: l.cost}
+	}
 	if status == StatusDone && l.hits() == 0 {
 		status = StatusFailed
 	}
@@ -447,6 +455,9 @@ func (l *loop) cut(status Status, note string) runEnd {
 // exited is the end of a run whose claude exited before it answered.
 func (l *loop) exited(proc *claudestream.Process) runEnd {
 	waitExit(proc, l.s.opts.KillGrace)
+	if l.held != "" {
+		return l.cut(StatusDone, "")
+	}
 	why := cmpOr(lastLine(proc.Stderr()), fmt.Sprintf("exit status %d", proc.ExitCode()))
 	return runEnd{status: StatusFailed, note: "Claude exited before it answered: " + why, cost: l.cost, err: errors.New(why)}
 }
@@ -505,6 +516,13 @@ func (l *loop) event(conn *claudestream.Conn, ev claudestream.Event) (runEnd, bo
 		// The model may have finished just before the interrupt landed: a turn that
 		// ended on its own with text is the answer, and no wrap-up goes.
 		finished := !ev.IsError && !ev.Interrupted() && answer != ""
+		if l.held != "" {
+			// The follow-up's turn ended: its answer, else the one it was asked to repeat.
+			if !finished {
+				answer = l.held
+			}
+			return runEnd{status: StatusDone, answer: answer, cost: l.cost}, true
+		}
 		if l.wrapping && !l.wrapSent && !finished {
 			// The interrupted turn ended: ask for the answer.
 			l.wrapSent = true
@@ -530,7 +548,33 @@ func (l *loop) event(conn *claudestream.Conn, ev claudestream.Event) (runEnd, bo
 			}
 			return runEnd{status: StatusFailed, note: why, cost: l.cost, err: errors.New(why)}, true
 		}
+		if l.wantsReports(answer) {
+			return l.askForReports(conn, answer)
+		}
 		return runEnd{status: StatusDone, answer: answer, cost: l.cost}, true
+	}
+	return runEnd{}, false
+}
+
+// wantsReports reports whether a finished answer cites reports the run never made. A run
+// asked to wrap up was told to report nothing more, and a stopped one is over.
+func (l *loop) wantsReports(answer string) bool {
+	return !l.wrapping && l.r.stopWhy() == 0 && citesReports(answer) && l.hits() == 0
+}
+
+// askForReports sends the one follow-up and keeps answer until its turn ends. The run's
+// limits go on: the tool call cap and the wrap-up interrupt it, the wall time cuts it.
+func (l *loop) askForReports(conn *claudestream.Conn, answer string) (runEnd, bool) {
+	l.held = answer
+	if beforeReportSend != nil {
+		beforeReportSend(conn, l.r)
+	}
+	if err := l.send(conn, reportMessage); err != nil {
+		if l.r.stopWhy() != 0 {
+			return l.stoppedEnd(), true
+		}
+		l.s.log.Warn("search: ask for the reports", "search", l.e.ID, "err", err)
+		return l.cut(StatusDone, ""), true
 	}
 	return runEnd{}, false
 }

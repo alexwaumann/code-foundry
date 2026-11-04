@@ -1,7 +1,8 @@
 import { memo, useMemo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { Tip } from "@/components/ui/tooltip";
-import { rehypePluginsFor, remarkPlugins } from "@/lib/markdownPlugins";
+import { REF_PROP, REF_TIGHT_PROP } from "@/lib/answerMarkdown";
+import { rehypePluginsFor, rehypePluginsInertFor, remarkPlugins } from "@/lib/markdownPlugins";
 import { CHIP_PROP, isRelativeHref, matchPath, type PathMatch } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
@@ -92,10 +93,21 @@ export interface MarkdownExtras {
    * it, every link opens the browser.
    */
   openLink?: (url: string) => boolean;
+  /**
+   * Text that must do nothing (an agent search's answer, which derives from old thread
+   * content): a link is its text, an image its alt text, raw HTML shows as typed. Nothing
+   * loads or navigates, whatever else `extras` says.
+   */
+  inert?: boolean;
+  /**
+   * With `inert`, an [n] reference in the text outside code (lib/answerMarkdown): what
+   * renders in its place. `tight`: punctuation follows it, so it sits against that.
+   */
+  citation?: (n: number, tight: boolean) => ReactNode;
 }
 
 function withExtras(extras: MarkdownExtras): Components {
-  const { code, image, table, pathChip, link, openLink } = extras;
+  const { code, image, table, pathChip, link, openLink, citation } = extras;
   return {
     ...baseComponents,
     ...((link || openLink) && {
@@ -136,11 +148,18 @@ function withExtras(extras: MarkdownExtras): Components {
         return m ? <>{pathChip(m)}</> : <span {...props}>{children}</span>;
       },
     }),
+    ...(citation && {
+      span: ({ node, children, ...props }) => {
+        const n = node?.properties[REF_PROP];
+        return typeof n === "number" ? <>{citation(n, node?.properties[REF_TIGHT_PROP] === true)}</> : <span {...props}>{children}</span>;
+      },
+    }),
   };
 }
 
-/** The rehype plugins for a set of extras (lib/markdownPlugins): raw HTML or not, then the prose path pass. */
+/** The rehype plugins for a set of extras (lib/markdownPlugins): inert, else raw HTML or not, then the prose path pass. */
 function rehypeFor(extras: MarkdownExtras | undefined) {
+  if (extras?.inert) return rehypePluginsInertFor({ citations: extras.citation !== undefined });
   return rehypePluginsFor({ html: extras?.html !== false, pathChips: extras?.pathChip !== undefined });
 }
 

@@ -2,12 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Square } from "lucide-react";
 import type { AgentHitView, SearchEntryView } from "@/api/search";
 import { Kbd } from "@/components/ui/kbd";
-import { endedNote, footerModel, moveHit, restoreSelection, searchEnded, tookLabel } from "@/lib/agentSearch";
+import { ANSWER_ROW, defaultSelection, endedNote, footerModel, hasAnswerRow, moveHit, restoreSelection, resultRows, searchEnded, tookLabel } from "@/lib/agentSearch";
 import { canonicalModelName } from "@/lib/models";
 import { imeKeyDown } from "@/lib/ime";
 import { markSearchSeen, openAgentHit, promoteAgent, stopAgent } from "@/stores/agentSearch";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
-import { AnswerText, HitRow, SectionHeading, StepList, SummaryLine } from "./AgentParts";
+import { AnswerPane, AnswerRow, HitRow, SectionHeading, StepList, SummaryLine } from "./AgentParts";
 import { paintQuote, type PreviewSubject } from "./preview";
 import { RecentList, RecentPreview, UnseenCueRow } from "./RecentSearches";
 import { SearchPreview } from "./SearchPreview";
@@ -59,7 +59,7 @@ function HitPreview({ hit, loaders }: { hit: AgentHitView; loaders: PreviewLoade
   return <SearchPreview subject={subject} data={shown} query="" paint={paint} caption={null} />;
 }
 
-/** The results column: the steps while running (or folded under the answer when done), the answer, the ranked hits. */
+/** The results column: the steps while running (or folded under the Answer row when done), the Answer row, the ranked hits. */
 function Results({
   entry,
   selectedN,
@@ -87,12 +87,22 @@ function Results({
         </>
       ) : (
         <>
+          {hasAnswerRow(entry) && (
+            <div className="pt-2" role="listbox" aria-label="Answer">
+              <AnswerRow
+                answer={entry.answer}
+                selected={selectedN === ANSWER_ROW}
+                onSelect={() => {
+                  onSelect(ANSWER_ROW);
+                }}
+              />
+            </div>
+          )}
           {note && (
             <p className={entry.status === "failed" ? "px-3 pt-3 text-body-sm text-cf-error-text" : "px-3 pt-3 text-body-sm text-cf-text-muted"} role={entry.status === "failed" ? "alert" : undefined} data-testid="agent-ended">
               {note}
             </p>
           )}
-          {entry.answer && <AnswerText answer={entry.answer} onRef={onSelect} />}
           {entry.steps.length > 0 && <SummaryLine entry={entry} />}
           {entry.hits.length > 0 && <div className="mx-1 mt-1 mb-1 border-t" />}
         </>
@@ -116,6 +126,11 @@ function Results({
   );
 }
 
+/** Whether a restored selection is the user's: one that was reported, or a hit opened. */
+function restoredPick(r: RestoreInit): boolean {
+  return r.selectedN !== null || r.openedN !== null;
+}
+
 /** Before a question, the left column's hint; Recent searches under it. */
 function AskHint() {
   return (
@@ -128,10 +143,12 @@ function AskHint() {
 /**
  * The Agent search mode (docs/notes/search-6-agent-gui.md): Enter asks the question
  * (SearchService.StartAgent; typing does not search). While it runs, its steps and the
- * verified hits as they arrive; when done, the answer (plain text, [n] as markers), the
- * summary line that opens the steps, and the ranked hits. The preview shows the selected
- * hit's message with the quote marked. Enter opens it in its thread with the quote
- * revealed, ⌘⏎ continues the search as a thread, Esc closes and the search keeps running.
+ * verified hits as they arrive; when done, the Answer row, the summary line that opens
+ * the steps, and the ranked hits. The preview shows the whole answer (rendered, [n] as
+ * markers) for the Answer row and the selected hit's message with the quote marked for a
+ * hit. Enter opens a hit in its thread with the quote revealed, and from the Answer row
+ * moves to the first hit; ⌘⏎ continues the search as a thread, Esc closes and the search
+ * keeps running.
  */
 export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeProps) {
   const query = raw.trim();
@@ -139,31 +156,46 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
   const running = entry?.status === "running";
   const now = useNow(running || query === "");
   const hits = useMemo(() => entry?.hits ?? [], [entry?.hits]);
+  const status = entry?.status ?? "running";
+  const answer = entry?.answer ?? "";
+  const rows = useMemo(() => resultRows({ status, answer, hits }), [status, answer, hits]);
 
-  // The selection: restored (the next unopened hit after the one opened), else the first hit as it arrives.
+  // The selection: restored (the next unopened hit after the one opened), else the first
+  // hit as it arrives, then the Answer row when the run ends. `picked`: the row is one the
+  // user chose (a key, the pointer, a marker, or restored), which a run's end leaves alone.
   const [selectedN, setSelectedN] = useState<number | null>(dialog.restore?.selectedN ?? null);
+  const [picked, setPicked] = useState(dialog.restore ? restoredPick(dialog.restore) : false);
+  const pick = useCallback((n: number) => {
+    setPicked(true);
+    setSelectedN(n);
+  }, []);
   // Another search shown: its own selection.
   const [selectionFor, setSelectionFor] = useState(dialog.entryId);
   if (selectionFor !== dialog.entryId) {
     setSelectionFor(dialog.entryId);
+    setPicked(false);
     if (!dialog.restore) setSelectedN(null);
   }
   const restored = useRef<RestoreInit | null>(null);
   useEffect(() => {
-    if (hits.length === 0) return;
+    if (rows.length === 0) return;
     const r = dialog.restore;
     if (r && restored.current !== r) {
       restored.current = r;
-      setSelectedN(restoreSelection(hits, r.openedN, r.selectedN));
+      setPicked(restoredPick(r));
+      setSelectedN(restoreSelection(rows, r.openedN, r.selectedN));
       return;
     }
-    setSelectedN((cur) => (cur !== null && hits.some((h) => h.n === cur) ? cur : (hits[0]?.n ?? null)));
-  }, [hits, dialog.restore]);
+    setSelectedN((cur) => defaultSelection(rows, cur, picked));
+  }, [rows, dialog.restore, picked]);
   const selected = hits.find((h) => h.n === selectedN) ?? null;
+  const answerSelected = selectedN === ANSWER_ROW && rows[0]?.n === ANSWER_ROW;
   const { report } = dialog;
+  // While a run goes, the first hit is no choice: a restore after it ended starts on the Answer row.
+  const reportedN = status === "running" && !picked ? null : selectedN;
   useEffect(() => {
-    report({ selectedN });
-  }, [selectedN, report]);
+    report({ selectedN: reportedN });
+  }, [reportedN, report]);
 
   // The results' scroll: restored once, reported as it moves.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -180,7 +212,8 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
   // A moved selection comes into view.
   useEffect(() => {
     if (selectedN === null) return;
-    scrollRef.current?.querySelector(`[data-testid="agent-hit"][data-n="${String(selectedN)}"]`)?.scrollIntoView({ block: "nearest" });
+    const row = selectedN === ANSWER_ROW ? '[data-testid="agent-answer-row"]' : `[data-testid="agent-hit"][data-n="${String(selectedN)}"]`;
+    scrollRef.current?.querySelector(row)?.scrollIntoView({ block: "nearest" });
   }, [selectedN]);
 
   // A finished result on screen is seen.
@@ -205,7 +238,8 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
     if (imeKeyDown(e.nativeEvent)) return;
     if (resultsShown && (e.key === "ArrowDown" || e.key === "ArrowUp" || (e.ctrlKey && (e.key === "n" || e.key === "p")))) {
       e.preventDefault();
-      setSelectedN((cur) => moveHit(hits, cur, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
+      setPicked(true);
+      setSelectedN((cur) => moveHit(rows, cur, e.key === "ArrowDown" || e.key === "n" ? 1 : -1));
       return;
     }
     if (e.key === "Backspace" && e.metaKey && resultsShown) {
@@ -233,6 +267,12 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
       open(selected);
       return;
     }
+    // The Answer row has nothing to open and the dialog already shows it: on to the first hit.
+    const first = hits[0];
+    if (answerSelected && first) {
+      pick(first.n);
+      return;
+    }
     // Ended with nothing to open: ask again.
     if (searchEnded(entry)) dialog.start(query);
   };
@@ -257,7 +297,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
       </p>
     );
   } else if (resultsShown) {
-    left = <Results entry={entry} selectedN={selectedN} onSelect={setSelectedN} onOpen={open} scrollRef={scrollRef} onScroll={onScroll} />;
+    left = <Results entry={entry} selectedN={selectedN} onSelect={pick} onOpen={open} scrollRef={scrollRef} onScroll={onScroll} />;
   } else {
     left = (
       <>
@@ -276,6 +316,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
   let right: React.ReactNode;
   if (recentRow) right = <RecentPreview entry={recentRow} />;
   else if (resultsShown && selected) right = <HitPreview hit={selected} loaders={loaders} />;
+  else if (resultsShown && answerSelected) right = <AnswerPane key={entry.id} answer={entry.answer} hits={hits} onRef={pick} />;
   else
     right = (
       <div className="flex min-w-0 flex-1 items-center justify-center px-8 text-center text-body-sm text-cf-text-muted" data-testid="search-preview-none">
@@ -320,9 +361,9 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
       <div className="flex shrink-0 items-center gap-4 border-t px-4 py-2 text-caption text-cf-text-muted" data-testid="search-hints">
         {recentRow ? (
           <Hint k="⏎">{recentRow.mode === "agent" ? "open saved results" : "search again"}</Hint>
-        ) : sameQuestion && selected ? (
+        ) : sameQuestion && (selected || answerSelected) ? (
           <>
-            <Hint k="⏎">open and highlight</Hint>
+            <Hint k="⏎">{selected ? "open and highlight" : hits.length > 0 ? "first result" : "search again"}</Hint>
             {searchEnded(entry) && <Hint k="⌘⏎">{promoted ? "open its thread" : "continue in a thread"}</Hint>}
             <Hint k="⌘⌫">new search</Hint>
           </>

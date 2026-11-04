@@ -134,7 +134,7 @@ export function RecentPreview({ entry }: { entry: SearchEntryView }) {
   return (
     <div className="min-w-0 flex-1 overflow-y-auto px-4 pt-4 pb-4" data-testid="search-recent-preview" data-mode="agent">
       <p className="px-3 text-caption text-cf-text-muted">{entry.status === "running" ? "Still running · ⏎ shows it" : "Saved results · not re-run"}</p>
-      {entry.answer && <AnswerText answer={entry.answer} />}
+      {entry.answer && <AnswerText answer={entry.answer} hits={entry.hits} className="px-3 pt-3 pb-1" />}
       {entry.status !== "running" && entry.steps.length > 0 && <SummaryLine entry={entry} />}
       <div className="mt-2 flex flex-col gap-0.5">
         {entry.hits.map((h) => (

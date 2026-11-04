@@ -6,7 +6,7 @@ import { DictationMic } from "@/components/compose/DictationMic";
 import { useComposerDictation } from "@/components/compose/useComposerDictation";
 import { Segmented } from "@/components/usage/Segmented";
 import { chordFromEvent } from "@/keys/chord";
-import { restoreSelection, unseenCue, unseenToRestore, type SearchModeId, type SearchSession } from "@/lib/agentSearch";
+import { openingSelection, unseenCue, unseenToRestore, type SearchModeId, type SearchSession } from "@/lib/agentSearch";
 import { phraseAtCaret } from "@/lib/dictation";
 import { imeKeyDown } from "@/lib/ime";
 import { clearSearches, forgetSearch, startAgent } from "@/stores/agentSearch";
@@ -90,7 +90,7 @@ function openingState(now: number) {
   const s = searchSessionAt(now);
   const target = searchTarget();
   if (target) {
-    const restore = s?.entryId === target.id ? { selectedN: s.selectedN, openedN: s.openedN, scrollTop: s.scrollTop } : { selectedN: restoreSelection(target.hits, null), openedN: null, scrollTop: 0 };
+    const restore = s?.entryId === target.id ? { selectedN: s.selectedN, openedN: s.openedN, scrollTop: s.scrollTop } : { selectedN: openingSelection(target), openedN: null, scrollTop: 0 };
     return { restored: true, mode: "agent" as const, query: target.query, entryId: target.id, seed: target, restore, pending: null };
   }
   if (s) {
@@ -168,7 +168,7 @@ export function SearchDialog({
     setSearchMode("agent");
     setQuery(e.query);
     setShown({ id: e.id, seed: e });
-    setRestore({ selectedN: restoreSelection(e.hits, null), openedN: null, scrollTop: 0 });
+    setRestore({ selectedN: openingSelection(e), openedN: null, scrollTop: 0 });
     setStartError("");
     requestAnimationFrame(() => inputRef.current?.select());
   }, []);
