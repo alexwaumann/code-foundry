@@ -5,6 +5,7 @@ import { frameNonce, nonceMatches, withNonce } from "@/lib/bridge";
 import { addPageError, type PageError } from "@/lib/pageErrors";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { zoomFactor } from "@/lib/zoom";
 import { isThemeAck, pageKey, resizeHeight, themedUrl } from "./previewGrant";
 
 /**
@@ -63,7 +64,7 @@ export const FRAME_REVEAL_MS = 1000;
  *   stylesheet (fetched once, no-store) repaints, its state going with the reload.
  *
  * `onResize` hears this frame's own `{ type: "cf:resize", height }` messages (a page asking
- * for its height).
+ * for its height), in layout px. A page stays at 100% under the app's zoom.
  *
  * No white flash (docs/notes/inline-page-frame.md): the iframe is transparent over a
  * `bg-cf-surface` box (className and style size the box) and hidden until its `load`, or
@@ -228,7 +229,8 @@ export function HtmlFrame({
       }
       const h = resizeHeight(e.data);
       if (h !== null) {
-        if (nonceMatches(e.data, nonce, true)) resizeRef.current?.(h);
+        // The page measures at scale 1 (the frame undoes the zoom); the box's height is in layout px.
+        if (nonceMatches(e.data, nonce, true)) resizeRef.current?.(h / zoomFactor());
         return;
       }
       const key = pageKey(e.data);
@@ -275,7 +277,10 @@ export function HtmlFrame({
         referrerPolicy="no-referrer"
         // Transparent: the box's surface shows until the page paints, and behind a thread's
         // page with no background. An opaque frame's page turns white once shown, as in a browser.
-        className={cn("absolute inset-0 size-full border-0 transition-opacity duration-120 ease-out motion-reduce:transition-none", visible ? "opacity-100" : "opacity-0", visible && opaque && "bg-white")}
+        // The page zoom undone on the frame: the system WKWebView scales a frame's document again
+        // under zoom on <html>, leaving a white strip below 100% and a clipped page above it. It
+        // must be there before the frame loads. docs/notes/frame-page-zoom.md.
+        className={cn("absolute inset-0 size-full border-0 [zoom:calc(1/var(--cf-zoom))] transition-opacity duration-120 ease-out motion-reduce:transition-none", visible ? "opacity-100" : "opacity-0", visible && opaque && "bg-white")}
         style={{ colorScheme: scheme }}
         data-testid={testId}
         data-load={load}
