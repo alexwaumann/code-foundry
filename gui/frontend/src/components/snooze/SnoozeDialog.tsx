@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useNow } from "@/lib/clock";
 import { addDays, compareDays, dayOf, formatDay, monthGrid, monthTitle, parseTimeValue, sameDay, shiftMonth, SNOOZE_HOUR, wallTime, type Day } from "@/lib/snooze";
 import { cn } from "@/lib/utils";
-import { snoozeThread } from "@/stores/threadActions";
+import { saveThreadForLater, snoozeThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { closeSnoozeDialog, useSnoozeDialogStore } from "@/stores/snoozeDialog";
 
@@ -104,7 +104,8 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
 
 /**
  * The dialog's body for one thread: the calendar (tomorrow selected), a time (9:00 AM),
- * the chosen day spelled out, Cancel and Snooze. Snooze is disabled while the chosen time
+ * the chosen day spelled out, Save for later (how the palette reaches it; a thread already
+ * saved says so instead), Cancel and Snooze. Snooze is disabled while the chosen time
  * is not in the future; it invokes thread.snooze with the absolute time (the daemon
  * confirms only mid-turn).
  */
@@ -112,6 +113,7 @@ function SnoozeBody({ threadId }: { threadId: string }) {
   const now = useNow(30_000);
   const [day, setDay] = useState<Day>(() => addDays(dayOf(Date.now()), 1));
   const [time, setTime] = useState(DEFAULT_TIME);
+  const saved = useThreadsStore((s) => (s.byId[threadId]?.savedAtMs ?? null) !== null);
   const parsed = parseTimeValue(time);
   const untilMs = parsed ? wallTime(day, parsed.hour, parsed.minute) : null;
   const ready = untilMs !== null && untilMs > now;
@@ -147,7 +149,26 @@ function SnoozeBody({ threadId }: { threadId: string }) {
           {untilMs !== null && !ready ? "In the past" : formatDay(day, now)}
         </span>
       </div>
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center gap-2">
+        {saved ? (
+          <span className="mr-auto text-caption text-cf-text-muted" data-testid="snooze-dialog-saved">
+            Saved for later
+          </span>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="mr-auto"
+            data-testid="snooze-dialog-save"
+            onClick={() => {
+              closeSnoozeDialog();
+              void saveThreadForLater(threadId);
+            }}
+          >
+            Save for later
+          </Button>
+        )}
         <Button type="button" size="sm" variant="ghost" onClick={closeSnoozeDialog}>
           Cancel
         </Button>

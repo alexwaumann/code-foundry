@@ -141,6 +141,8 @@ export interface ThreadView {
    * unsnoozes it. docs/notes/snooze-threads-1-daemon.md.
    */
   snoozedUntilMs: number | null;
+  /** When it was saved for later (epoch ms), null when not: a snooze with no wake time, so snoozedUntilMs stays null. lib/snooze isSnoozed covers both. */
+  savedAtMs: number | null;
   /**
    * An effort change (thread.set-effort) not applied yet: `effort` is the
    * new level; Claude restarts with it once the running turn ends.
@@ -445,6 +447,7 @@ export function toThreadView(s: Thread): ThreadView {
     pinned: s.pinned,
     archivedAtMs: s.archivedAt ? timestampMs(s.archivedAt) : null,
     snoozedUntilMs: s.snoozedUntil ? timestampMs(s.snoozedUntil) : null,
+    savedAtMs: s.savedAt ? timestampMs(s.savedAt) : null,
     effortPending: s.effortPending,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,

@@ -17,7 +17,7 @@ export interface ThreadTagInfo {
   known: boolean;
   /** The project's name, "No project", or "" when the thread is not known. */
   project: string;
-  /** "Working", "Finished 5 min ago", "Needs input · Bash", "Idle", "Archived", "Snoozed"; "" when not known. */
+  /** "Working", "Finished 5 min ago", "Needs input · Bash", "Idle", "Archived", "Snoozed", "Saved"; "" when not known. */
   status: string;
 }
 
@@ -26,14 +26,14 @@ export function useThreadTagInfo(id: string, label: string): ThreadTagInfo {
     useShallow((s) => {
       const x = s.byId[id];
       return x
-        ? { name: x.name, projectId: x.projectId, archived: x.archivedAtMs !== null, snoozed: x.snoozedUntilMs !== null, ...statusLine(x) }
+        ? { name: x.name, projectId: x.projectId, archived: x.archivedAtMs !== null, snoozed: x.snoozedUntilMs !== null, saved: (x.savedAtMs ?? null) !== null, ...statusLine(x) }
         : null;
     }),
   );
   const project = useProjectsStore((s) => (t === null ? "" : t.projectId ? (s.byId[t.projectId]?.name ?? t.projectId) : NO_PROJECT));
   const now = useNow(30_000);
   if (t === null) return { name: threadLabel(label, id), known: false, project: "", status: "" };
-  const status = t.archived ? "Archived" : t.snoozed ? "Snoozed" : t.kind === "place" ? "Idle" : statusText(t, now);
+  const status = t.archived ? "Archived" : t.saved ? "Saved" : t.snoozed ? "Snoozed" : t.kind === "place" ? "Idle" : statusText(t, now);
   return { name: threadLabel(t.name, id), known: true, project, status };
 }
 

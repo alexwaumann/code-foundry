@@ -9,6 +9,7 @@ import type { PullRequestView } from "@/api/gh";
 import type { ThreadView } from "@/api/threads";
 import type { CompletionItem } from "./completion";
 import { threadLabel } from "./prompt";
+import { isSnoozed } from "./snooze";
 
 /** At most this many threads above the files. */
 export const THREAD_ROWS = 3;
@@ -35,7 +36,7 @@ export function threadScore(name: string, query: string): number {
   return n.includes(q) ? 2 : 0;
 }
 
-export type ThreadCandidate = Pick<ThreadView, "id" | "name" | "archivedAtMs" | "snoozedUntilMs" | "lastActivityAtMs" | "createdAtMs">;
+export type ThreadCandidate = Pick<ThreadView, "id" | "name" | "archivedAtMs" | "snoozedUntilMs" | "lastActivityAtMs" | "createdAtMs"> & Partial<Pick<ThreadView, "savedAtMs">>;
 
 /**
  * The threads a `@` query offers: active ones only (not archived, not snoozed), never the
@@ -45,7 +46,7 @@ export type ThreadCandidate = Pick<ThreadView, "id" | "name" | "archivedAtMs" | 
 export function threadCandidates<T extends ThreadCandidate>(threads: Iterable<T>, query: string, currentId: string, cap = THREAD_ROWS): T[] {
   const hits: { t: T; score: number; at: number }[] = [];
   for (const t of threads) {
-    if (t.id === currentId || t.archivedAtMs !== null || t.snoozedUntilMs !== null) continue;
+    if (t.id === currentId || t.archivedAtMs !== null || isSnoozed(t)) continue;
     const score = threadScore(t.name || t.id, query);
     if (score > 0) hits.push({ t, score, at: t.lastActivityAtMs ?? t.createdAtMs ?? 0 });
   }

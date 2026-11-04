@@ -42,6 +42,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     pinned: false,
     archivedAtMs: null,
     snoozedUntilMs: null,
+    savedAtMs: null,
     effortPending: false,
     linkedPullRequests: [],
     usage: [],
@@ -183,8 +184,9 @@ describe("thread reducers", () => {
       thread("e", { status: "attention", statusReason: "finished", state: "disconnected", archivedAtMs: 7 }),
       thread("f", { status: "attention", statusReason: "finished", state: "disconnected", snoozedUntilMs: 9 }),
       thread("g", { status: "attention", statusReason: "snooze ended", state: "disconnected" }),
+      thread("h", { status: "attention", statusReason: "finished", state: "disconnected", savedAtMs: 9 }),
     ]);
-    // e waits (a finished turn) but is archived, f is snoozed: not counted. g woke: counted.
+    // e waits (a finished turn) but is archived, f is snoozed, h saved: not counted. g woke: counted.
     expect(attentionIds(d)).toEqual(["a", "b", "g"]);
   });
 

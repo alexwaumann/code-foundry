@@ -7,7 +7,7 @@ vi.mock("./context", () => ({ getUiContext: (target: { id: string }) => ({ activ
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-const { archiveThread, respondThread, snoozeThread, THREAD_COMMANDS } = await import("./threadActions");
+const { archiveThread, respondThread, saveThreadForLater, snoozeThread, THREAD_COMMANDS } = await import("./threadActions");
 const { useThreadStore } = await import("./thread");
 
 type Opts = { expected?: (err: unknown) => boolean };
@@ -38,6 +38,11 @@ describe("snoozeThread", () => {
   it("null unsnoozes with clear", async () => {
     await snoozeThread("s2", null);
     expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { clear: "true" }, { activeThreadId: "s2" });
+  });
+
+  it("saving for later sends save, with no time", async () => {
+    await saveThreadForLater("s3");
+    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" });
   });
 });
 

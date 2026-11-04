@@ -7,6 +7,7 @@
  * current name (docs/notes/lineage-by-id.md).
  */
 import type { ThreadView } from "@/api/threads";
+import { isSnoozed } from "./snooze";
 import { statusLine } from "./statusLine";
 
 /** The thread list as lineage reads it (stores/threads ThreadsData). */
@@ -114,7 +115,7 @@ export type LineageStatus = "working" | "input" | "finished" | "error" | "idle" 
 export function lineageStatus(t: ThreadView | undefined): LineageStatus {
   if (!t) return "idle";
   if (t.archivedAtMs !== null) return "archived";
-  if (t.snoozedUntilMs !== null) return "snoozed";
+  if (isSnoozed(t)) return "snoozed";
   switch (statusLine(t).kind) {
     case "working":
     case "waiting": // on its own child threads or background work: its team works (lib/waiting)

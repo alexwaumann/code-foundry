@@ -843,7 +843,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   errors) and finished turns (most recent status change first), and idle ones (most
   recent activity first), with no headers, scrolling on its own;
   pinned under it the collapsible footers Working, Snoozed (single-line rows with the
-  time left, soonest wake first) and Archived (single-line rows with their age), each
+  time left, soonest wake first, then "Saved" for those saved for later) and Archived (single-line rows with their age), each
   counting its threads; each thread row says its status in words on its second line (or
   project and branch; a thread of several projects names its workspace, else "N
   projects", and its branch: `docs/notes/workspaces-v2-3-composer.md`) with a hover

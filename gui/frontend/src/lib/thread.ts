@@ -27,12 +27,12 @@ export const BADGE_WORD: Record<ThreadBadge, string> = { busy: "working", idle: 
 
 /**
  * Whether a thread counts as running for the composer's collision banner
- * (lib/collisionHints): not archived, not snoozed (a wake time still ahead of `now`), and
+ * (lib/collisionHints): not archived, not saved for later, not snoozed (a wake time still ahead of `now`), and
  * its Claude process starting or connected. A stopped thread edits nothing until it is
  * sent to again (the daemon's own hints after the Create still name it).
  */
-export function isRunningThread(t: Pick<ThreadView, "archivedAtMs" | "snoozedUntilMs" | "state">, now: number): boolean {
-  if (t.archivedAtMs !== null) return false;
+export function isRunningThread(t: Pick<ThreadView, "archivedAtMs" | "snoozedUntilMs" | "state"> & Partial<Pick<ThreadView, "savedAtMs">>, now: number): boolean {
+  if (t.archivedAtMs !== null || (t.savedAtMs ?? null) !== null) return false;
   if (t.snoozedUntilMs !== null && t.snoozedUntilMs > now) return false;
   return t.state === "connected" || t.state === "starting";
 }

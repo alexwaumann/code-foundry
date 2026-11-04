@@ -193,6 +193,7 @@ export class EmberWorld {
       createdAtMs: w.createdAtMs,
       lastActivityAtMs: w.lastActivityAtMs,
       archived: false,
+      saved: false,
       removed: false,
       descendantsWorking: team.filter((x) => !teamAsks(x) && teamWorking(x)).length,
       descendantsWaiting: team.filter(teamAsks).length,

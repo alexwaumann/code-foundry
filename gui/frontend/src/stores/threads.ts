@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { AgentRunView, BackgroundShellView, ThreadFlagView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
 import { inSidebar } from "@/lib/inSidebar";
+import { isSnoozed } from "@/lib/snooze";
 import { threadBadge } from "@/lib/thread";
 
 export interface ThreadsData {
@@ -239,7 +240,7 @@ export function isAttention(s: Pick<ThreadView, "status" | "state"> & Partial<Pi
 export function attentionIds(data: ThreadsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
-    return s !== undefined && s.archivedAtMs === null && s.snoozedUntilMs === null && inSidebar(s, data.byId) && isAttention(s);
+    return s !== undefined && s.archivedAtMs === null && !isSnoozed(s) && inSidebar(s, data.byId) && isAttention(s);
   });
 }
 

@@ -58,6 +58,7 @@ function thread(over: Partial<EmberTaskThreadView> = {}): EmberTaskThreadView {
     createdAtMs: NOW - 30 * MIN,
     lastActivityAtMs: NOW - 2 * MIN,
     archived: false,
+    saved: false,
     removed: false,
     descendantsWorking: 0,
     descendantsWaiting: 0,
@@ -710,6 +711,7 @@ describe("idle workers and tasks waiting on Ember", () => {
 
   it("reads a bare waiting reason as idle, a lead's as working", () => {
     expect(workerWords(thread({ status: "idle", statusReason: "waiting" }))).toEqual({ text: "Idle", tone: "muted" });
+    expect(workerWords(thread({ state: "disconnected", status: "attention", statusReason: "finished", saved: true }))).toEqual({ text: "Saved", tone: "muted" });
     expect(workerWords(thread({ status: "idle", statusReason: "waiting on 1 child thread" }))).toEqual({ text: "Working", tone: "sky" });
   });
 });

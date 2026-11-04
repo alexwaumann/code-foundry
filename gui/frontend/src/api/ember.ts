@@ -24,6 +24,8 @@ export interface EmberTaskThreadView {
   createdAtMs: number | null;
   lastActivityAtMs: number | null;
   archived: boolean;
+  /** Saved for later (a snooze with no wake time). */
+  saved: boolean;
   /** The thread was removed: only the task remembers it. */
   removed: boolean;
   /** Its team (the threads below it, not archived; open tasks only): how many work, wait on the user, and are. */
@@ -133,6 +135,7 @@ function toTaskThreadView(t: EmberTaskThread): EmberTaskThreadView {
     createdAtMs: ms(t.createdAt),
     lastActivityAtMs: ms(t.lastActivityAt),
     archived: t.archived,
+    saved: t.saved,
     removed: t.removed,
     descendantsWorking: t.descendantsWorking,
     descendantsWaiting: t.descendantsWaiting,
