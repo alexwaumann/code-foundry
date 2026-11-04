@@ -29,12 +29,6 @@ static int cfNeedsDisclaim(void) {
 	}
 }
 
-// cfResponsiblePid is the pid macOS holds responsible for this process (0 if it cannot say).
-static int cfResponsiblePid(void) {
-	if (responsibility_get_pid_responsible_for_pid == NULL) return 0;
-	return responsibility_get_pid_responsible_for_pid(getpid());
-}
-
 // cfSpawnDisclaimed starts path with argv and envp as its own responsible process,
 // inheriting stdio, and sets *pid. Returns posix_spawn's error (0 on success).
 static int cfSpawnDisclaimed(const char* path, char** argv, char** envp, pid_t* pid) {
@@ -66,23 +60,17 @@ const envDisclaimed = "CODE_FOUNDRY_GUI_DISCLAIMED"
 // was started from (docs/notes/dictation-3-host.md). It reports whether it did: the
 // caller then exits. Called first thing in main, before any window or goroutine.
 func respawnDisclaimed(log *slog.Logger) bool {
-	_, ok := spawnDisclaimed(log)
-	return ok
-}
-
-// spawnDisclaimed is respawnDisclaimed's work, and returns the new process's pid.
-func spawnDisclaimed(log *slog.Logger) (int, bool) {
 	if os.Getenv(envDisclaimed) != "" {
 		_ = os.Unsetenv(envDisclaimed) // the daemon and its threads inherit the environment
-		return 0, false
+		return false
 	}
 	if C.cfNeedsDisclaim() == 0 {
-		return 0, false
+		return false
 	}
 	exe, err := os.Executable()
 	if err != nil {
 		log.Warn("respawn as responsible process", "err", err)
-		return 0, false
+		return false
 	}
 	argv := cStrings(os.Args)
 	defer freeCStrings(argv)
@@ -93,15 +81,10 @@ func spawnDisclaimed(log *slog.Logger) (int, bool) {
 	var pid C.pid_t
 	if rc := C.cfSpawnDisclaimed(path, &argv[0], &envp[0], &pid); rc != 0 {
 		log.Warn("respawn as responsible process", "err", syscall.Errno(rc))
-		return 0, false
+		return false
 	}
 	log.Debug("respawned as its own responsible process")
-	return int(pid), true
-}
-
-// responsiblePid is the pid macOS holds responsible for this process (0 if it cannot say).
-func responsiblePid() int {
-	return int(C.cfResponsiblePid())
+	return true
 }
 
 // cStrings is a NULL-terminated array of C copies of ss.

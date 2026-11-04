@@ -46,6 +46,30 @@ static void cfPlayAlertSound(float volume) {
 	});
 }
 
+// holdTones are the hold key's two sounds, kept like alertSound.
+static NSSound* holdTones[2];
+
+// cfLoadHoldTone creates sound which (0 start, 1 stop) from WAV bytes. Takes ownership of
+// data, as cfLoadAlertSound does.
+static void cfLoadHoldTone(int which, void* data, int len) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		NSData* d = [NSData dataWithBytes:data length:len];
+		free(data);
+		if (holdTones[which] == nil) holdTones[which] = [[NSSound alloc] initWithData:d];
+	});
+}
+
+// cfPlayHoldTone plays one of them at volume (0 to 1), as cfPlayAlertSound does.
+static void cfPlayHoldTone(int which, float volume) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		NSSound* s = holdTones[which];
+		if (s == nil) return;
+		[s setVolume:volume];
+		if ([s isPlaying]) [s stop];
+		[s play];
+	});
+}
+
 // cfBounceDock bounces the Dock icon once (NSInformationalRequest). AppKit ignores it
 // while the app is active and stops it when the app is activated.
 static void cfBounceDock(void) {
@@ -72,6 +96,18 @@ func bounceDock() {
 var loadAlertSound = sync.OnceFunc(func() {
 	C.cfLoadAlertSound(C.CBytes(alertWAV), C.int(len(alertWAV)))
 })
+
+var loadHoldTones = sync.OnceFunc(func() {
+	C.cfLoadHoldTone(C.int(toneStart), C.CBytes(holdToneStartWAV), C.int(len(holdToneStartWAV)))
+	C.cfLoadHoldTone(C.int(toneStop), C.CBytes(holdToneStopWAV), C.int(len(holdToneStopWAV)))
+})
+
+// playHoldTone plays a hold key sound at volume (0 to 1), creating them on first use. Safe
+// from any goroutine; returns at once.
+func playHoldTone(t holdTone, volume float64) {
+	loadHoldTones()
+	C.cfPlayHoldTone(C.int(t), C.float(volume))
+}
 
 // playAlertSound plays the alert sound at volume (0 to 1), creating the NSSound on first
 // use. Safe from any goroutine; returns at once.

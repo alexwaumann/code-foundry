@@ -5,11 +5,11 @@ import (
 	"sync/atomic"
 )
 
-// While dictation.anywhere is on the host lives in the menu bar: the hold key has to work
-// with no window open, so closing the window hides it, and the Dock icon goes with it,
-// instead of quitting. Quit (the menu bar item's, ⌘Q, a relaunch) still ends the process.
-// With the setting off nothing here acts: the window closes and the app quits, as ever
-// (docs/notes/dictate-anywhere-settings.md).
+// While dictation.enabled and dictation.anywhere are both on the host lives in the menu
+// bar: the hold key has to work with no window open, so closing the window hides it, and the
+// Dock icon goes with it, instead of quitting. Quit (the menu bar item's, ⌘Q, a relaunch)
+// still ends the process. With either off nothing here acts: the window closes and the app
+// quits, as ever (docs/notes/dictate-anywhere-settings.md).
 
 // menuBarHost is what menuBar asks of AppKit (appMenuBarHost; a fake in tests). A menuBar
 // calls it with its lock held and from any goroutine, never from the main thread.
@@ -22,7 +22,7 @@ type menuBarHost interface {
 	reveal()
 }
 
-// menuBar decides what closing the window does, from dictation.anywhere. The daemon's
+// menuBar decides what closing the window does, from those settings. The daemon's
 // last word stands while it is away: a restart must not take the item from under a
 // hidden window.
 type menuBar struct {
@@ -36,7 +36,7 @@ type menuBar struct {
 	hidden   bool
 }
 
-// setAnywhere follows dictation.anywhere. Turned off with the window hidden (the CLI, or
+// setAnywhere follows dictation.enabled && dictation.anywhere. Turned off with the window hidden (the CLI, or
 // the settings file) the window comes back: nothing else could reach it.
 func (m *menuBar) setAnywhere(on bool) {
 	m.mu.Lock()

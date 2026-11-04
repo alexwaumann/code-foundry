@@ -26,10 +26,12 @@ const (
 )
 
 const (
-	// altHoldMin is how long Alt must stay down to count. Under it, Alt was a tap.
+	// altHoldMin is how long the key must stay down to count. Under it, it was a tap. It is
+	// also how long a modifier can still cancel the hold.
 	altHoldMin = 300 * time.Millisecond
-	// altBothWindow is how close the two Alts must go down to be one press of both.
-	altBothWindow = 80 * time.Millisecond
+	// altBothWindow is how close the two Alts must go down to be one press of both. A real
+	// press measured 83 ms.
+	altBothWindow = 150 * time.Millisecond
 )
 
 // altEventKind matches cfAltRecord's kind in althold_darwin.go.
@@ -77,71 +79,105 @@ func pumpAltEvents(r io.Reader, out chan<- altEvent) {
 	}
 }
 
-// altSide is which Alt a report is about.
-type altSide int
+// holdKeyMode is dictation.hold_key: which Option key, or keys, make a hold.
+type holdKeyMode int
 
 const (
-	altLeft altSide = iota
-	altRight
-	altBothSides
+	holdEither holdKeyMode = iota // the zero value, as the setting's default
+	holdLeft
+	holdRight
+	holdBoth
 )
 
-func (s altSide) String() string {
+// parseHoldKey reads dictation.hold_key. The daemon validates it; anything else (an older
+// daemon sends "") reads as the default.
+func parseHoldKey(s string) holdKeyMode {
 	switch s {
-	case altLeft:
-		return "left"
-	case altRight:
-		return "right"
+	case "left":
+		return holdLeft
+	case "right":
+		return holdRight
+	case "both":
+		return holdBoth
 	}
-	return "both"
+	return holdEither
 }
 
-// altReportKind is what happened.
+// altReportKind is what happened to a hold.
 type altReportKind int
 
 const (
-	altReportDown      altReportKind = iota // an Alt went down
-	altReportUp                             // an Alt came up
-	altReportBoth                           // the second Alt joined the first within altBothWindow
-	altReportStarted                        // a clean press began a hold
-	altReportDiscarded                      // this hold will not count, because of Why
-	altReportCounted                        // a hold ended and counts as a dictation
+	altReportStarted   altReportKind = iota // the key went down: open the session
+	altReportDiscarded                      // the hold is over and does not count, because of Why
+	altReportCounted                        // the key came up on a hold that counts
 )
 
-// altReport is one thing the machine has to say. Held is set on Counted and on a
-// Discarded that came at the release.
+// altReport is one thing the machine has to say. Every Started is followed by exactly one
+// Discarded or Counted. Why never names a key: logs must not read as a keylogger's.
 type altReport struct {
 	Kind altReportKind
-	Side altSide
-	Held time.Duration
+	Held time.Duration // on Counted, and on a Discarded that came at the release
 	Why  string
 }
 
-// altHold decides whether Alt was held alone, as a dictation. The rule is Hex's: Alt
-// pressed alone and held at least altHoldMin, then released, counts; a shorter hold, or
-// any other key or modifier pressed during it, is discarded, so Alt+arrow and Alt+letter
-// stay what they were. A hold runs from the first Alt down to the last Alt up. It only
-// observes: the zero value is ready, and nothing here touches the event stream.
+// holdPhase is where a press has got to.
+type holdPhase int
+
+const (
+	phaseIdle    holdPhase = iota // nothing down that matters
+	phaseArming                   // holdBoth: one key down, waiting for the other
+	phaseHolding                  // a hold runs
+	phaseWaiting                  // this press will not start or count: wait for the keys to come up
+)
+
+// altHold decides whether the hold key was held, as a dictation. The rules start from
+// Hex's and differ on one point: Hex's hold ends with any other key or modifier, and here
+// a modifier only cancels in the first altHoldMin, because a real hold was lost to a second
+// Option key 15.7 s in. A key that is not a modifier cancels at any time: Option plus a key
+// is a shortcut the user meant, so Option+arrow and Option+letter stay what they were.
 //
-// Alt's state comes from each event's flags, not from counting edges, so an event lost
+//   - A clean press starts the hold at once, so the session opens on the press. With other
+//     modifiers already down it was a chord, and nothing starts.
+//   - holdBoth starts on the second key, which must go down within altBothWindow of the
+//     first, and ends when either comes up.
+//   - holdEither runs from the first key down to the last key up, and the other side going
+//     down at any time changes nothing. For holdLeft and holdRight the other side is a
+//     modifier like any other.
+//   - A hold shorter than altHoldMin is discarded at the release.
+//
+// It only observes: the zero value is ready, and nothing here touches the event stream.
+// The Alts' state comes from each event's flags, not from counting edges, so an event lost
 // to a full pipe or a disabled tap is corrected by the next one.
 type altHold struct {
+	mode        holdKeyMode
 	left, right bool
 	flags       uint64 // as of the last flags event
 
-	active  bool // from the first Alt down to the last Alt up
-	spoiled bool // discarded already; it only waits for the release
-	both    bool
-	first   altSide
+	phase   holdPhase
+	armedAt time.Duration // holdBoth: when the first key went down
 	start   time.Duration
+}
+
+// SetMode changes which keys make a hold. A hold in progress is discarded.
+func (h *altHold) SetMode(m holdKeyMode) []altReport {
+	if m == h.mode {
+		return nil
+	}
+	out := h.interrupt("the hold key setting changed")
+	h.mode = m
+	h.settle()
+	return out
 }
 
 // Step feeds one event in and says what it meant, in order.
 func (h *altHold) Step(ev altEvent) []altReport {
 	switch ev.Kind {
 	case altEventKeyDown:
-		if h.active {
-			return h.spoil(fmt.Sprintf("key %d pressed during the hold", ev.KeyCode))
+		switch h.phase {
+		case phaseHolding:
+			return h.cancel("a key was pressed during the hold")
+		case phaseArming:
+			h.phase = phaseWaiting
 		}
 	case altEventFlags:
 		return h.flagsChanged(ev)
@@ -154,95 +190,144 @@ func (h *altHold) Step(ev altEvent) []altReport {
 }
 
 func (h *altHold) flagsChanged(ev altEvent) []altReport {
-	var out []altReport
+	wasLeft, wasRight := h.left, h.right
 	pressed := ev.Flags &^ h.flags & heldModifiers
 	pressed |= (ev.Flags ^ h.flags) & flagCapsLock
-	if h.active && pressed != 0 {
-		out = append(out, h.spoil(modifierNames(pressed)+" pressed during the hold")...)
-	}
 	h.flags = ev.Flags
-	left, right := ev.Flags&flagLeftAlt != 0, ev.Flags&flagRightAlt != 0
-	if left != h.left {
-		h.left = left
-		out = append(out, h.sideChanged(altLeft, left, ev)...)
-	}
-	if right != h.right {
-		h.right = right
-		out = append(out, h.sideChanged(altRight, right, ev)...)
-	}
-	return out
-}
+	h.left, h.right = ev.Flags&flagLeftAlt != 0, ev.Flags&flagRightAlt != 0
+	leftDown, rightDown := h.left && !wasLeft, h.right && !wasRight
 
-func (h *altHold) sideChanged(side altSide, down bool, ev altEvent) []altReport {
-	if down {
-		return h.press(side, ev)
-	}
-	return h.release(side, ev.At)
-}
-
-func (h *altHold) press(side altSide, ev altEvent) []altReport {
-	out := []altReport{{Kind: altReportDown, Side: side}}
-	if !h.active {
-		h.active, h.spoiled, h.both = true, false, false
-		h.first, h.start = side, ev.At
-		if held := ev.Flags & heldModifiers; held != 0 {
-			return append(out, h.spoil("pressed with "+modifierNames(held))...)
+	switch h.phase {
+	case phaseIdle:
+		return h.idle(ev, leftDown, rightDown)
+	case phaseArming:
+		switch {
+		case pressed != 0:
+			h.phase = phaseWaiting
+		case !h.left && !h.right:
+			h.phase = phaseIdle
+		case h.left && h.right:
+			if ev.At-h.armedAt <= altBothWindow {
+				return h.begin(ev.At)
+			}
+			h.phase = phaseWaiting
 		}
-		return append(out, altReport{Kind: altReportStarted, Side: side})
+	case phaseHolding:
+		if !h.triggerDown() {
+			return h.release(ev.At)
+		}
+		if h.mode == holdLeft && rightDown {
+			pressed |= flagLeftAlt
+		}
+		if h.mode == holdRight && leftDown {
+			pressed |= flagRightAlt
+		}
+		if pressed != 0 && ev.At-h.start < altHoldMin {
+			return h.cancel(modifierNames(pressed) + " pressed early in the hold")
+		}
 	}
-	since := ev.At - h.start
-	if !h.both && side != h.first && since <= altBothWindow {
-		h.both = true
-		return append(out, altReport{Kind: altReportBoth, Side: altBothSides})
+	if h.phase == phaseWaiting && h.keysUp() {
+		h.phase = phaseIdle
 	}
-	return append(out, h.spoil(fmt.Sprintf("%s Alt went down %d ms into the hold", side, since.Milliseconds()))...)
+	return nil
 }
 
-func (h *altHold) release(side altSide, at time.Duration) []altReport {
-	out := []altReport{{Kind: altReportUp, Side: side}}
-	if !h.active || h.left || h.right {
-		return out
+// idle looks for a press. A key that went down with others already held was a chord.
+func (h *altHold) idle(ev altEvent, leftDown, rightDown bool) []altReport {
+	var candidate, other bool
+	switch h.mode {
+	case holdLeft:
+		candidate, other = leftDown, h.right
+	case holdRight:
+		candidate, other = rightDown, h.left
+	default:
+		candidate = leftDown || rightDown
 	}
-	h.active = false
-	if h.spoiled {
-		return out
+	switch {
+	case !candidate:
+		if !h.keysUp() {
+			h.phase = phaseWaiting
+		}
+		return nil
+	case other || ev.Flags&heldModifiers != 0:
+		h.phase = phaseWaiting
+		return nil
+	case h.mode == holdBoth && !(h.left && h.right):
+		h.phase, h.armedAt = phaseArming, ev.At
+		return nil
 	}
+	return h.begin(ev.At)
+}
+
+func (h *altHold) begin(at time.Duration) []altReport {
+	h.phase, h.start = phaseHolding, at
+	return []altReport{{Kind: altReportStarted}}
+}
+
+// triggerDown reports whether the keys that make the hold are down.
+func (h *altHold) triggerDown() bool {
+	switch h.mode {
+	case holdLeft:
+		return h.left
+	case holdRight:
+		return h.right
+	case holdBoth:
+		return h.left && h.right
+	}
+	return h.left || h.right
+}
+
+// keysUp reports whether nothing of a press this mode cares about is still down.
+func (h *altHold) keysUp() bool {
+	switch h.mode {
+	case holdLeft:
+		return !h.left
+	case holdRight:
+		return !h.right
+	}
+	return !h.left && !h.right
+}
+
+func (h *altHold) release(at time.Duration) []altReport {
+	h.settle() // holdBoth: the other key may still be on its way up
 	held := at - h.start
 	if held < altHoldMin {
-		return append(out, altReport{
+		return []altReport{{
 			Kind: altReportDiscarded,
 			Held: held,
 			Why:  fmt.Sprintf("held %d ms, under %d ms", held.Milliseconds(), altHoldMin.Milliseconds()),
-		})
+		}}
 	}
-	counted := h.first
-	if h.both {
-		counted = altBothSides
-	}
-	return append(out, altReport{Kind: altReportCounted, Side: counted, Held: held})
+	return []altReport{{Kind: altReportCounted, Held: held}}
 }
 
-// spoil discards the hold in progress, once. It still runs until the last Alt comes up,
-// so the rest of it cannot start a new one.
-func (h *altHold) spoil(why string) []altReport {
-	if h.spoiled {
-		return nil
-	}
-	h.spoiled = true
+// cancel discards the hold now. The press still has to end before another can start.
+func (h *altHold) cancel(why string) []altReport {
+	h.phase = phaseWaiting
 	return []altReport{{Kind: altReportDiscarded, Why: why}}
 }
 
-// interrupt forgets everything: while the tap was off, events went by unseen.
+// interrupt ends whatever was going on: while the tap was off, events went by unseen.
+// What is known of the keys stays, so a key still down cannot read as a new press.
 func (h *altHold) interrupt(why string) []altReport {
 	var out []altReport
-	if h.active {
-		out = h.spoil(why)
+	if h.phase == phaseHolding {
+		out = []altReport{{Kind: altReportDiscarded, Why: why}}
 	}
-	*h = altHold{}
+	h.settle()
 	return out
 }
 
-// modifierNames names the modifier bits in bits.
+// settle leaves a press behind: idle, or waiting for what is still down.
+func (h *altHold) settle() {
+	h.phase = phaseIdle
+	if !h.keysUp() {
+		h.phase = phaseWaiting
+	}
+}
+
+// modifierNames names the modifier bits in bits. flagLeftAlt and flagRightAlt stand for the
+// Option key that is not the hold key.
 func modifierNames(bits uint64) string {
 	var names []string
 	for _, m := range []struct {
@@ -254,6 +339,7 @@ func modifierNames(bits uint64) string {
 		{flagCommand, "Command"},
 		{flagFn, "Fn"},
 		{flagCapsLock, "Caps Lock"},
+		{flagLeftAlt | flagRightAlt, "the other Option"},
 	} {
 		if bits&m.bit != 0 {
 			names = append(names, m.name)

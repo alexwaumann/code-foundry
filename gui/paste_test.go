@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -106,4 +108,98 @@ func errText(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func TestDecidePaste(t *testing.T) {
+	app := frontApp{PID: 7, Name: "Notes"}
+	other := frontApp{PID: 9, Name: "Mail"}
+	tests := []struct {
+		name  string
+		facts pasteFacts
+		want  pasteAction
+	}{
+		{"same app", pasteFacts{Text: "hi", Pressed: app, Front: app, Trusted: true}, pasteKeys},
+		{"nothing said", pasteFacts{Pressed: app, Front: app, Trusted: true}, pasteNothing},
+		{"nothing said in a password field", pasteFacts{Pressed: app, Front: app, Secure: true}, pasteNothing},
+		{"another app in front", pasteFacts{Text: "hi", Pressed: app, Front: other, Trusted: true}, pasteClipboard},
+		{"secure input", pasteFacts{Text: "hi", Pressed: app, Front: app, Secure: true, Trusted: true}, pasteClipboard},
+		{"the grant went", pasteFacts{Text: "hi", Pressed: app, Front: app}, pasteClipboard},
+		{"no app at the press", pasteFacts{Text: "hi", Trusted: true}, pasteClipboard},
+		{"the clipboard race", pasteFacts{Text: "hi", Pressed: app, Front: app, Trusted: true, Race: true}, pasteTyped},
+		{"the race, but another app in front", pasteFacts{Text: "hi", Pressed: app, Front: other, Trusted: true, Race: true}, pasteClipboard},
+		{"the race, but secure input", pasteFacts{Text: "hi", Pressed: app, Front: app, Secure: true, Trusted: true, Race: true}, pasteClipboard},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := decidePaste(tt.facts); got != tt.want {
+				t.Errorf("got %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestJoinPhrases(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want string
+	}{
+		{"none", nil, ""},
+		{"blank", []string{"", "  "}, ""},
+		{"one", []string{" Hello there. "}, "Hello there."},
+		{"two", []string{"First one.", "Second one."}, "First one. Second one."},
+		{"leading spaces", []string{" First,", " and then."}, "First, and then."},
+		{"blank in the middle", []string{"One.", " ", "Two."}, "One. Two."},
+		{"closing punctuation", []string{"Well", ", then"}, "Well, then"},
+		{"after an opening bracket", []string{"Call (", "me"}, "Call (me"},
+		{"not ASCII", []string{"café", "“quoted”", "…"}, "café “quoted”…"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := joinPhrases(tt.in); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// makeChromium lays out a Chromium framework inside bundle.
+func makeChromium(t *testing.T, bundle string, versions ...string) {
+	t.Helper()
+	for _, v := range versions {
+		if err := os.MkdirAll(filepath.Join(bundle, "Contents", "Frameworks", "Chrome Framework.framework", "Versions", v), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestHasClipboardRace(t *testing.T) {
+	bundle := func(versions ...string) string {
+		dir := t.TempDir()
+		makeChromium(t, dir, versions...)
+		return dir
+	}
+	tests := []struct {
+		name   string
+		bundle string
+		want   bool
+	}{
+		{"no bundle", "", false},
+		{"no frameworks", bundle(), false},
+		{"155", bundle("155.0.7000.12"), true},
+		{"156", bundle("156.1.2.3", "Current"), true},
+		{"154", bundle("154.0.1.2"), false},
+		{"157", bundle("157.0.1.2"), false},
+		{"a staged update counts", bundle("157.0.1.2", "156.0.1.2"), true},
+		{"Electron", bundle("A"), false},
+		{"three parts", bundle("155.0.1"), false},
+		{"not a number", bundle("155.x.1.2"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hasClipboardRace(tt.bundle); got != tt.want {
+				t.Errorf("got %t, want %t", got, tt.want)
+			}
+		})
+	}
 }

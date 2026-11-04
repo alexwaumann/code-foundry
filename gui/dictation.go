@@ -43,12 +43,34 @@ type dictationConn interface {
 	Watch(ctx context.Context) (dictationStream, error)
 	Audio(ctx context.Context) audioSink
 	MicDenied(ctx context.Context, denied bool) error
+	// Stop ends a session and drops what it holds; Finish transcribes that first.
 	Stop(ctx context.Context, sessionID string) error
+	Finish(ctx context.Context, sessionID string) error
+	Start(ctx context.Context, clientID string) (string, error)
+	Session(ctx context.Context, sessionID string) (sessionStream, error)
+	// Hold runs dictation.hold: the hold key, for the window's composer.
+	Hold(ctx context.Context, phase string) error
+	Accessibility(ctx context.Context, a *v1.DictationAccessibility) error
+}
+
+// sessionStream is the client side of DictationService.Session.
+type sessionStream interface {
+	Receive() bool
+	Msg() *v1.DictationSessionEvent
+	Err() error
+	Close() error
 }
 
 // overlayObserver hears what Watch says, for the dictation overlay (OverlayService).
 type overlayObserver interface {
 	observe(*v1.DictationSnapshot)
+	lost()
+}
+
+// holdObserver hears what Watch says, for the hold key (holdService). A snapshot comes with
+// the connection it arrived on, for the hold's own calls.
+type holdObserver interface {
+	observe(dictationConn, *v1.DictationSnapshot)
 	lost()
 }
 
@@ -65,23 +87,25 @@ type dictationWatcher struct {
 	retry time.Duration
 	// reopenWait is the pause between tries to reopen the microphone after a change.
 	reopenWait time.Duration
-	// anywhere gets dictation.anywhere from every snapshot (a heartbeat carries none, and
-	// a lost stream says nothing, so neither calls it). Nil in tests that do not care.
+	// anywhere gets dictation.enabled && dictation.anywhere from every snapshot (a heartbeat
+	// carries none, and a lost stream says nothing, so neither calls it). Nil in tests that
+	// do not care.
 	anywhere func(on bool)
-	// overlay, when set, is told of every snapshot.
+	// overlay and hold, when set, are told of every snapshot.
 	overlay overlayObserver
+	hold    holdObserver
 }
 
 // watchDictation runs the dictation watcher over the host's daemon client until ctx
 // ends, reconnecting when the daemon restarts (connectDaemon may start it).
-func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*client.Client, error), mic microphone, anywhere func(on bool), overlay overlayObserver, log *slog.Logger) {
+func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*client.Client, error), mic microphone, anywhere func(on bool), overlay overlayObserver, hold holdObserver, log *slog.Logger) {
 	w := dictationWatcher{
 		dial: func(ctx context.Context) (dictationConn, error) {
 			c, err := connectDaemon(ctx)
 			if err != nil {
 				return nil, err
 			}
-			return daemonDictation{c.Dictation}, nil
+			return daemonDictation{c: c.Dictation, commands: c.Command}, nil
 		},
 		mic:        mic,
 		log:        log,
@@ -89,6 +113,7 @@ func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*c
 		reopenWait: micReopenWait,
 		anywhere:   anywhere,
 		overlay:    overlay,
+		hold:       hold,
 	}
 	w.run(ctx)
 }
@@ -138,6 +163,9 @@ func (w *dictationWatcher) once(parent context.Context) error {
 	if w.overlay != nil {
 		defer w.overlay.lost()
 	}
+	if w.hold != nil {
+		defer w.hold.lost()
+	}
 
 	var sess *micSession
 	defer func() {
@@ -152,7 +180,7 @@ func (w *dictationWatcher) once(parent context.Context) error {
 		if snap.GetHeartbeat() == nil {
 			enabled, denied = snap.GetEnabled(), snap.GetMicDenied()
 			if w.anywhere != nil {
-				w.anywhere(snap.GetAnywhere())
+				w.anywhere(snap.GetEnabled() && snap.GetAnywhere())
 			}
 			id := ""
 			if snap.GetState() == v1.DictationState_DICTATION_STATE_LISTENING {
@@ -168,6 +196,9 @@ func (w *dictationWatcher) once(parent context.Context) error {
 			// After the capture started: the first show creates the window.
 			if w.overlay != nil {
 				w.overlay.observe(snap)
+			}
+			if w.hold != nil {
+				w.hold.observe(conn, snap)
 			}
 		}
 		// The user may have allowed the microphone in System Settings since it was
@@ -308,7 +339,8 @@ func (w *dictationWatcher) stopSession(ctx context.Context, conn dictationConn, 
 
 // daemonDictation is dictationConn over the daemon's DictationService client.
 type daemonDictation struct {
-	c codefoundryv1connect.DictationServiceClient
+	c        codefoundryv1connect.DictationServiceClient
+	commands codefoundryv1connect.CommandServiceClient
 }
 
 func (d daemonDictation) Watch(ctx context.Context) (dictationStream, error) {
@@ -326,6 +358,36 @@ func (d daemonDictation) MicDenied(ctx context.Context, denied bool) error {
 
 func (d daemonDictation) Stop(ctx context.Context, sessionID string) error {
 	_, err := d.c.Stop(ctx, connect.NewRequest(&v1.StopDictationRequest{SessionId: sessionID}))
+	return err
+}
+
+func (d daemonDictation) Finish(ctx context.Context, sessionID string) error {
+	_, err := d.c.Stop(ctx, connect.NewRequest(&v1.StopDictationRequest{SessionId: sessionID, Flush: true}))
+	return err
+}
+
+func (d daemonDictation) Start(ctx context.Context, clientID string) (string, error) {
+	res, err := d.c.Start(ctx, connect.NewRequest(&v1.StartDictationRequest{ClientId: clientID}))
+	if err != nil {
+		return "", err
+	}
+	return res.Msg.GetSessionId(), nil
+}
+
+func (d daemonDictation) Session(ctx context.Context, sessionID string) (sessionStream, error) {
+	return d.c.Session(ctx, connect.NewRequest(&v1.DictationSessionRequest{SessionId: sessionID}))
+}
+
+func (d daemonDictation) Hold(ctx context.Context, phase string) error {
+	_, err := d.commands.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{
+		Name: "dictation.hold",
+		Args: map[string]string{"phase": phase},
+	}))
+	return err
+}
+
+func (d daemonDictation) Accessibility(ctx context.Context, a *v1.DictationAccessibility) error {
+	_, err := d.c.Accessibility(ctx, connect.NewRequest(&v1.DictationAccessibilityRequest{Accessibility: a}))
 	return err
 }
 
