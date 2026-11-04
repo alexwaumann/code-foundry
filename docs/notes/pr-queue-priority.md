@@ -1,0 +1,138 @@
+# Pull request opens no longer wait for the poll
+
+Status: PR 3 of 3 on "PRs load really slow", reported by a user. The store's worker ran a poll
+as one job, so a click waited for all of it. Now the poll stops before each of its requests and
+lets waiting jobs in. Measured on real GitHub (read only) with a scratch `daemon --dev` and curl
+over the socket. Daemon only; the GUI side is cf/pr-open-instant.
+
+## What changed
+
+* **The poll yields** (`yield.go`). Every request goes through `admit`. While the worker runs
+  scheduled work (the poll, the auth check), `admit` first runs the jobs someone waits for, as
+  plain calls on the same goroutine, then the poll carries on. It also watches `s.wake` during
+  the poll's gap, so a click that lands there goes before the poll's next request.
+* **A short gap for waited reads.** A read someone waits for may start 250 ms (a quarter of
+  MinGap) after the previous request, from a token bucket of 8 that refills one per 10 s.
+* **Pauses hold for every request.** `admit` refuses while a pause is in force, with the pause's
+  error and without sending. This covers the poll's later stages, jobs queued before the pause,
+  and the auth check (`next` now waits it out too).
+* **A caller that leaves takes its job with it.** `submit` removes its waiter on cancel. With no
+  waiter left the job is dropped, unless it was promised to a client (`keep`, set by
+  `submitBackground`), which puts it back behind the waited jobs. A job already running finishes.
+* **The queue-wait log line stays.** The debug `gh poll` line gained `yields=` and `yield_dur=`;
+  its `dur` includes them, and a yielded job's requests do not count in the poll's numbers.
+
+## Why the yield is on the worker
+
+The alternative was a second goroutine, or splitting the poll into resumable stages. A nested
+call keeps every property that the worker gives for free:
+
+* One request in flight, by construction: there is still one goroutine.
+* Worker-only fields stay worker-only (`lastEnd`, `recheck`, `detailBatch`, `searchFirst`,
+  `failingKey`, `appearing`). No job touches the ones the poll keeps across a yield, checked by
+  grep, and `cycle` is saved and restored around a job.
+* The poll's state stays on its stack, so there is nothing to resume or to get wrong on resume.
+
+**The rule that makes it safe:** a poll stops only in `admit`, right before a request. Everything
+between two requests runs unbroken:
+
+* A fingerprint response and its `staleFullDetails` / `markMovedDetails` are one step, because
+  the next chance to yield is the next request. So a job's fetch is never judged by a fingerprint
+  older than itself, which would send a newer copy back for a needless fetch.
+* The last request and the publish are one step, so a publish cannot be split.
+* What the poll holds across a yield is what it asked GitHub before the job ran. The publish does
+  not touch the detail cache, so it cannot overwrite a click's result. A write in a yield asks for
+  another poll (`pollSoon`, kept by `pollAgain`, which `planPoll` cleared before any yield), and a
+  merge shown meanwhile survives through `mergedOverlay.apply`, which already allowed for it.
+
+Do not add a yield anywhere else, and do not make a request between a fingerprint and its stale
+pass. Only jobs someone waits for go in: background jobs wait for the poll to end, and a queued
+poll does too, so polls never nest.
+
+## Decisions
+
+* **Worst case for a click:** the rest of the request in flight, then the short gap, then the
+  fetch. In-flight requests are not cancelled: that throws away a request already paid for, and
+  a detail batch can be 4-6 s but is rare. A background job does not yield either: it is one
+  request unless the pull request has over 100 checks.
+* **MinGap: an allowance, not a removal.** GitHub's published secondary limits are 100 concurrent
+  requests, 2,000 points a minute for GraphQL (900 for REST), and a query or GET costs 1 point. It
+  asks for requests in series, and for at least a second between POST, PATCH, PUT and DELETE
+  requests. So for reads the risk is rate rather than spacing, and writes must keep the gap:
+  * Only reads with a caller waiting get it. Writes (a `mutation` document, `restWrite`), the poll
+    and background jobs pay the full MinGap, and the poll pays it after a job too.
+  * The bucket keeps the runaway sum in `pace.go` true: at most 360 more requests an hour on top
+    of 3,000, under the 5,000 budget, and the store still pauses at MinRemaining. A worst-case
+    minute is about 70 requests against 2,000 points.
+  * A token is spent only when the short gap actually saved time.
+  * A rate-limit error empties the bucket, so nothing leans on GitHub right after it pushed back.
+* **Starvation: `maxJobsAhead` = 8.** At most 8 jobs go ahead of due scheduled work before it gets
+  a request, counted in `next` and in yields alike and reset when that work sends one. `next` had
+  this bug already: any queued job beat a due poll, forever. A poll of R requests ends within
+  R x 9 requests under any stream. A burst of 50 pays one poll request per 8 jobs.
+* **A background job can still wait behind a steady stream of waited jobs.** That is #513's rule,
+  kept: a person stops clicking.
+* **The pause gate goes beyond the pollProjects check on PR #514, deliberately.** A job in a yield
+  can set a pause mid-poll, so the poll's later requests needed it whatever #514 does. The two fit:
+  #514's check returns first and leaves the lists as they were; the gate is what catches anything
+  else. Without #514 a refused projects request records the pause as the lists' `LastError`.
+* **A poll's own low-budget or rate-limit answer now stops its later stages too.** Before, details,
+  failing checks and stats went out after it. They end as a failed request does: the poll publishes
+  what it has with the error, and the next poll asks again.
+* **`notSent`.** A pause's error can wrap `ErrNetwork`, which `outcomeUnknown` reads as "the write
+  may have run". A merge refused by the gate would have said "it may have merged" and been
+  remembered, so a refused request says it never left.
+* **A background job joining a queued read passes on its `run` and `keep`.** Otherwise a refresh
+  promised to a client would die with the read's caller. It also fixes a gap from #513: a refresh
+  that joined a waited read did not announce an unchanged result, so `refreshing` had no end.
+* **`submit` after Run ended fails** (`s.stopped`) instead of hanging on a context that may never
+  end. Run also checks its context at the top of the loop: a refused request sets no `lastEnd`, so
+  a poll left due would spin there.
+
+## Measured (2026-11-03, this machine, one account, alexwaumann/code-foundry #500-#510)
+
+`origin/main` at 0484add4c against this branch, three fresh scratch homes each, alternating, with
+one repository tracked. Every read is uncached. Seconds, median (max). `queue` and `fetch` are from
+the #513 log line.
+
+| Uncached open | n | Total before | Total after | queue before | queue after |
+|---|---|---|---|---|---|
+| During the first poll (5 requests) | 3 | 12.61 (13.69) | 2.74 (2.75) | 11.91 (12.51) | 1.84 (1.85) |
+| During the stats poll (9-11 requests) | 3 | 17.86 (19.82) | 2.86 (3.42) | 17.27 (19.32) | 2.06 (2.58) |
+| During a steady poll (2-3 requests) | 12 | 5.80 (8.98) | 2.17 (2.77) | 5.20 (7.03) | 1.29 (1.91) |
+| Back to back, no poll | 15 | 1.61 (1.83) | 0.81 (0.98) | 0.98 (0.99) | 0.23 (0.24) |
+
+* `queue` after is the rest of the poll request in flight. GitHub was slower than in #513's
+  numbers: a poll request took about 2-3 s here, which is what is left of the wait.
+* `fetch` went from 0.49-0.70 s to 0.84-0.89 s during polls, because in a yield the short gap
+  falls inside `fetch` (`admit`) and not in `queue_wait`. Back to back it is 0.60 s, unchanged,
+  with the gap in `queue_wait`.
+* The poll itself does not get slower by more than the click. Stats polls took 15.6-18.4 s before
+  and 17.0-17.7 s after, each with one yield. Request counts differ with what GitHub moved.
+* The steady poll's click lands 0.3 s after asking for the poll.
+* These binaries predate the `notSent` commit, which changes no timing.
+
+## Verified, and not
+
+* Real daemon: the table above, reads only. Every request was a poll or `GetPullRequestDetail`.
+* Fake GitHub, under `-race`, repeated 5 times: a click at each of the 7 request kinds, a click in
+  the gap, bursts of 50 (distinct and identical), a stream before and during a poll, shutdown with
+  a job queued and during a yield, a caller leaving queued and running, publish against a click's
+  fetch and a write, pauses from a job and from each poll stage, and a load test of all of these.
+* Each rule was also broken on purpose, and a test failed for each.
+* Not run: the built Wails GUI, a real rate limit, a real network pause, or a long-lived session
+  with many tracked repositories. The worst case for a click (a 10-pull-request detail batch in
+  flight) did not come up in these runs.
+
+## Gotchas
+
+* A job can be claimed at the short gap and still wait in `admit` when it turns out to be a write.
+  Its caller can no longer drop it for that moment, at most MinGap.
+* `admit` must not re-read the clock after its timer fires: tests freeze `Now`, and it would wait
+  forever. It goes straight to the send, which is why a click in the same instant waits one request.
+* `goJob` in the tests needs the worker busy, or the job is claimed before it can be seen queued.
+
+## Tests
+
+`yield_test.go`: all of the above, plus the gap table (`TestAdmitGap`), `TestGapAllowance`,
+`TestRefusedWriteHasAKnownOutcome`, `TestRunEndsWithAPollDue`, and the poll's log line.
