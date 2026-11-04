@@ -198,7 +198,8 @@ export function headerAges(d: Pick<PullRequestDetailView, "pullRequest" | "close
   const pr = d.pullRequest;
   const parts = [`opened ${ago(pr.createdAtMs, now) || "—"}`];
   if (pr.state === "merged") parts.push(`merged ${ago(pr.mergedAtMs ?? d.closedAtMs, now) || "—"}`);
-  else if (pr.state === "closed") parts.push(`closed ${ago(d.closedAtMs, now) || "—"}`);
+  // A dashboard row has no closing time; the detail always does.
+  else if (pr.state === "closed") parts.push(...(d.closedAtMs === null ? [] : [`closed ${ago(d.closedAtMs, now) || "—"}`]));
   else parts.push(`updated ${ago(pr.updatedAtMs, now) || "—"}`);
   return parts.join(" · ");
 }

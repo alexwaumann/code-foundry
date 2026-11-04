@@ -23,6 +23,7 @@ import {
 import { useMemo } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ import { checkIcon, useChecksClock } from "./checkIcons";
 import { CheckList } from "./PrChecks";
 import { detailFresh, readiness, type ReadinessRow, type ReadyIcon, type ReadyTone, type RowAction, type SubLine } from "./readiness";
 import { ReviewButton } from "./ReviewButton";
+import { seedReadiness } from "./seed";
 import { TaskButton } from "./TaskButton";
 import { taskVerb, type TaskRouting } from "./taskRouting";
 import { useTaskRouting } from "./useTaskRouting";
@@ -298,6 +300,36 @@ export function ReadinessBox({ d, prRef, panelKey, tabKey, onReview, compact = f
             </div>
           )}
         </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The box while the detail is on its way, from a dashboard row (seedDetail): the rows the row
+ * can fill, with bars where the headline's verdict and the footer's controls will be, so
+ * nothing here can be pressed. `failed`: the detail did not come; nothing is on its way.
+ */
+export function SeededReadinessBox({ d, prRef, panelKey, tabKey, compact, failed }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; tabKey: string; compact: boolean; failed: boolean }) {
+  const viewer = useViewerLogin();
+  const clock = useNow(30_000);
+  const r = useMemo(() => seedReadiness(d, viewer, clock), [d, viewer, clock]);
+  const HeadIcon = r.headline ? icons[r.headline.icon] : null;
+  const pending = r.footerPending && !failed;
+  const verdict = r.headline ? r.headline.title : failed ? "Readiness unknown" : null;
+  return (
+    <section className="mx-4 mt-3 shrink-0 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised @max-[340px]:mx-3" data-testid="pr-readiness" data-seeded="" data-compact={compact || undefined} aria-label="Merge readiness">
+      <div className={cn("flex min-h-9 min-w-0 items-center gap-2 px-3", compact ? "py-1.5" : "border-b border-cf-divider py-2")} data-testid="pr-ready-headline" data-tone={r.headline?.tone}>
+        {HeadIcon && r.headline && <HeadIcon className={cn("size-3.5 shrink-0", tone(r.headline.tone))} aria-hidden />}
+        {verdict === null ? <Skeleton className="h-3.5 w-40" data-testid="pr-ready-pending" /> : <span className="min-w-0 truncate text-body-sm font-medium text-cf-text">{verdict}</span>}
+        {compact && pending && <Skeleton className="ml-auto h-6 w-32 shrink-0" />}
+      </div>
+      {!compact && <Rows rows={r.rows} d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} clock={clock} checksNow={clock} viewer={viewer} />}
+      {!compact && pending && (
+        <div className="flex min-w-0 items-center justify-between gap-2 bg-cf-surface-sunken/60 px-3 py-2" data-testid="pr-ready-footer-pending">
+          <Skeleton className="h-6 w-20" />
+          <Skeleton className="h-6 w-32" />
+        </div>
       )}
     </section>
   );
