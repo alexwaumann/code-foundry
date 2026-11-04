@@ -57,6 +57,7 @@ func main() {
 
 	daemonService := NewDaemonService(p, log)
 	appService := NewAppService(log, p.WindowBackground())
+	overlayService := NewOverlayService(log)
 	app := application.New(application.Options{
 		Name:        "Code Foundry",
 		Description: "Supervise fleets of Claude Code threads",
@@ -64,6 +65,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(daemonService),
 			application.NewService(appService),
+			application.NewService(overlayService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -135,8 +137,18 @@ func main() {
 			log.Error("relaunch", "err", err)
 		}
 	})
-	// The host is the daemon's microphone for dictation (dictation.go).
-	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), bar.setAnywhere, log)
+	// The host is the daemon's microphone for dictation (dictation.go), and shows the
+	// overlay for a session started outside the app (overlay.go). The setting makes the
+	// panel ahead of the first session, so its page has loaded by then.
+	overlayPanel := newOverlayWindow(app, log)
+	overlayService.panel = overlayPanel
+	anywhere := func(on bool) {
+		bar.setAnywhere(on)
+		if on {
+			overlayPanel.prepare()
+		}
+	}
+	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), anywhere, overlayService, log)
 
 	if err := app.Run(); err != nil {
 		log.Error("wails app", "err", err)
