@@ -39,11 +39,19 @@ between two requests runs unbroken:
 * A fingerprint response and its `staleFullDetails` / `markMovedDetails` are one step, because
   the next chance to yield is the next request. So a job's fetch is never judged by a fingerprint
   older than itself, which would send a newer copy back for a needless fetch.
-* The last request and the publish are one step, so a publish cannot be split.
+* The snapshot update and its events are one step, so a publish cannot be split. It is not the end
+  of the poll: `pollProjects` runs after it, with requests and yields of its own, and only then
+  come `Polled` and the schedule. A job can therefore run after the dashboards are published and
+  before `Polled`.
 * What the poll holds across a yield is what it asked GitHub before the job ran. The publish does
   not touch the detail cache, so it cannot overwrite a click's result. A write in a yield asks for
-  another poll (`pollSoon`, kept by `pollAgain`, which `planPoll` cleared before any yield), and a
-  merge shown meanwhile survives through `mergedOverlay.apply`, which already allowed for it.
+  another poll (`pollSoon`, kept by `pollAgain`), and a merge shown meanwhile survives through
+  `mergedOverlay.apply`, which already allowed for it.
+* `planPoll` clears `pollAgain`, and `resolveWatchedHeads` can yield before it. A write in that
+  yield has its `pollAgain` cleared, which is safe because the plan and its requests come after
+  the write. Any yield after `planPoll` keeps it.
+* Anything a poll schedules at its end must honour a request that came after it planned. `pollAgain`
+  always did; `statsAsked` does the same for the stats.
 
 Do not add a yield anywhere else, and do not make a request between a fingerprint and its stale
 pass. Only jobs someone waits for go in: background jobs wait for the poll to end, and a queued
@@ -61,18 +69,18 @@ cancellation path and builds on that one. There is one path.
   * Every other read opts in too: `PullRequest`, `Checks`, `PullRequestFile`, `ReviewerCandidates`,
     `SearchRepositories`, `LookupRepository`, `PublishOwners`, and the poll `Refresh(slug)` waits
     for. One table test walks away from each.
-  * A job `abandon` keeps has nobody waiting, so it now goes back behind the waited jobs. Without
-    this, a promoted refresh or a left write would hold its place and run in a yield, ahead of the
-    poll, for nobody.
+  * A promised refresh with nobody left waiting goes back behind the waited jobs (`job.promised`,
+    which replaces #518's `read = false` on joining). Without this, a promoted refresh would hold
+    its place and run in a yield, ahead of the poll, for nobody.
   * A refresh joining a read hands over its `run`, not only `read = false`. Otherwise it ran with
     the read's closure and said nothing when nothing changed, leaving the client on `refreshing`.
   * `submit` refuses a context that is already dead, so a write nobody asked for any more is not
     queued. `abandon` also ignores a later job of the same key that `ch` never joined.
-* **Remains, on purpose:** a queued write whose caller left still runs. The brief said "a queued
-  job", and this PR first dropped writes too, then took #518's rule instead. The caller is told
-  `context canceled` while the write may still land, as it always was. Dropping one is safe (it was
-  never sent) and takes one line in `abandon`, but it changes what cancelling a merge means, so it
-  is a product call and not one to slip in here.
+* **Closed: a queued write whose caller left still runs, and keeps its place.** Decided in review.
+  The caller is told `context canceled` while the write still lands, as it always was. An earlier
+  revision of this PR moved such a write behind the waited jobs, which reversed two writes: convert
+  to draft abandoned, then mark ready, went out as mark ready, then draft, so GitHub ended on the
+  action given up. Nothing remains of item 3.
 
 ## Decisions
 
@@ -107,6 +115,24 @@ cancellation path and builds on that one. There is one path.
 * **`notSent`.** A pause's error can wrap `ErrNetwork`, which `outcomeUnknown` reads as "the write
   may have run". A merge refused by the gate would have said "it may have merged" and been
   remembered, so a refused request says it never left.
+* **A refused stats request is no result; search does not go through a pause.** `searchCommits`
+  used to skip the pause, and its comment says REST search has its own limit. Letting it through
+  would keep the counts fresher, but a pause may be the network's, GitHub's secondary limits span
+  both APIs, and the store cannot tell which it has, so "nothing goes out" stays without an
+  exception. So a refusal in the closed months or the searches makes `applyStats` return nil: the
+  held counts and `ClosedAt` stay, nothing is saved, and `statsNext` does not move, so the poll
+  after the pause brings them. The whole pass is dropped, not only the month refused, because a
+  half-applied pass is what stamped contributions counts as done until HistoryInterval. A real
+  search failure (an answer, not a refusal) keeps its old fallback to contributions.
+* **Stats asked for during a poll stay due.** `statsDueNow` and `Track` zero `statsNext`, and the
+  poll's end used to overwrite that, so a merge in a yield left the merged count stale for up to
+  StatsInterval. `askStatsLocked` sets `statsAsked` too, `planPoll` consumes it, and both ends of
+  `applyStats` go through `scheduleStatsLocked`, which leaves a later request alone.
+* **A pause set in a yield is the same to the project lists as #514's own-pause case.** A refusal
+  of their request, or of their details, returns with the lists and their `LastError` as they were.
+* **A merge whose outcome is unknown invalidates on the worker**, as the review path already does.
+  This removes the `unknown` variable that a caller leaving mid-merge read while the worker wrote
+  it, and also fixes what that race hid: a caller that had left never told clients to re-read.
 * **`submit` after Run ended fails** (`s.stopped`) instead of hanging on a context that may never
   end. Run also checks its context at the top of the loop: a refused request sets no `lastEnd`, so
   a poll left due would spin there.
@@ -144,7 +170,9 @@ the #513 log line.
   during a yield, a caller leaving queued and running, every read path, publish against a click's
   fetch and a write, pauses from a job and from each poll stage, and a load test of all of these.
   The yield tests ran 5 times over before the rebase.
-* Each rule was also broken on purpose, and a test failed for each.
+* Each rule was also broken on purpose, and a test failed for each. After review the same was done
+  for each fix: stats asked at each of 5 stages and on the failure path, refused searches and closed
+  months, the two writes' order, the project lists' request and details, the merge's invalidation.
 * Not run: the built Wails GUI, a real rate limit, a real network pause, or a long-lived session
   with many tracked repositories. The worst case for a click (a 10-pull-request detail batch in
   flight) did not come up in these runs.
@@ -161,4 +189,6 @@ the #513 log line.
 
 `yield_test.go`: all of the above, plus the gap table (`TestAdmitGap`), `TestGapAllowance`,
 `TestEveryReadLeavesWithItsCaller`, `TestRefusedWriteHasAKnownOutcome`, `TestRunEndsWithAPollDue`,
-and the poll's log line.
+`TestStatsAskedDuringAStatsPoll`, `TestRefusedStatsAreNotAResult`, `TestAbandonedWriteKeepsItsPlace`,
+`TestPauseInAYieldLeavesTheProjectListsAlone`, `TestMergeCallerLeavesWhileRunning`, and the poll's
+log line.

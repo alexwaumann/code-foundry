@@ -937,16 +937,30 @@ func TestStatsAskedDuringAStatsPoll(t *testing.T) {
 // A search or closed-month request a pause refused is no answer: the counts stay what
 // they were and the stats stay due, so the poll after the pause brings them.
 func TestRefusedStatsAreNotAResult(t *testing.T) {
-	for _, stage := range []string{"DefaultBranchChecks", "PollStats"} {
-		t.Run("pause after "+stage, func(t *testing.T) {
-			w := newYieldWorld(t, func(o *Options) { o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour })
+	tests := []struct {
+		name  string
+		stage string // the job that brings the pause on goes in right after this request
+		rest  bool
+	}{
+		{"closed months refused", "DefaultBranchChecks", true},
+		{"searches refused", "PollStats", true},
+		{"closed months refused, no searches to refuse", "DefaultBranchChecks", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := newYieldWorld(t, func(o *Options) {
+				o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour
+				if !tt.rest {
+					o.Runner = o.Runner.(rawYieldRunner).fakeRunner
+				}
+			})
 			before := w.s.Snapshot()
-			if m := before.Dashboard.Stats.Months[1]; m.Commits != 7 || m.Source != CommitsFromSearch {
+			if m := before.Dashboard.Stats.Months[1]; tt.rest && (m.Commits != 7 || m.Source != CommitsFromSearch) {
 				t.Fatalf("setup: %+v", m)
 			}
 			w.moveEverything(t, 1)
 			w.g.failNext(opLookup, &RateLimitError{Secondary: true, Msg: "slow down"})
-			w.holdGitHub(stage, false)
+			w.holdGitHub(tt.stage, false)
 			w.kickPoll(t)
 			w.waitHeld(t)
 			job := w.goJob(t, context.Background(), "limited")
@@ -976,11 +990,11 @@ func TestRefusedStatsAreNotAResult(t *testing.T) {
 			from = w.nsent()
 			w.kickPoll(t)
 			w.waitPolled(t)
-			if sent := w.sentSince(from); !slices.Contains(sent, "search/commits") {
+			if sent := w.sentSince(from); !slices.Contains(sent, "PollStats") {
 				t.Errorf("sent %v after the pause, want the stats", sent)
 			}
 			stats := w.s.Snapshot().Dashboard.Stats
-			if !stats.FetchedAt.After(before.Dashboard.Stats.FetchedAt) || stats.Months[1].Source != CommitsFromSearch {
+			if !stats.FetchedAt.After(before.Dashboard.Stats.FetchedAt) || tt.rest && stats.Months[1].Source != CommitsFromSearch {
 				t.Errorf("after the pause: %+v", stats)
 			}
 		})
