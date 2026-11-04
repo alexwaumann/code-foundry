@@ -96,10 +96,11 @@ func newOverlayWindow(app *application.App, log *slog.Logger) *overlayWindow {
 	return &overlayWindow{app: app, log: log}
 }
 
-// prepare creates the panel, hidden, once. Showing it needs nothing else; the setting
-// that turns dictating anywhere on can call this ahead of the first session, so its page
-// has loaded by then.
+// prepare creates the panel, hidden, once: on dictation.anywhere (main.go), or on a first
+// session with the setting off (the CLI). It stays for the app's life.
 func (o *overlayWindow) prepare() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	if o.window != nil {
 		return
 	}
@@ -127,12 +128,13 @@ func (o *overlayWindow) prepare() {
 			CollectionBehavior: overlayBehavior,
 		},
 	})
-	// The window is created on the main thread, queued ahead of this.
-	application.InvokeSync(func() { C.cfOverlayConfigure(o.window.NativeWindow()) })
-	// As for the main window: the webview paints its own empty-page colour until told not
-	// to, Wails' transparent backdrop or not.
+	// Before the first show, which waits for this. As for the main window: the webview
+	// paints its own empty-page colour until told not to, Wails' transparent backdrop or not.
 	o.window.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
-		application.InvokeSync(func() { clearWebViewBackground(o.window.NativeWindow()) })
+		application.InvokeSync(func() {
+			C.cfOverlayConfigure(o.window.NativeWindow())
+			clearWebViewBackground(o.window.NativeWindow())
+		})
 		o.mu.Lock()
 		defer o.mu.Unlock()
 		o.loaded = true
