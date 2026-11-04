@@ -27,6 +27,7 @@ describe("isRunningThread (counts for the composer's collision banner)", () => {
     ["connected", {}, true],
     ["starting", { state: "starting" }, true],
     ["disconnected: stopped, edits nothing", { state: "disconnected" }, false],
+    ["saved for later: never awake, though no wake time", { savedAtMs: 5 }, false],
     ["closing", { state: "closing" }, false],
     ["unknown", { state: "unknown" }, false],
     ["archived, even connected", { archivedAtMs: now - 1 }, false],

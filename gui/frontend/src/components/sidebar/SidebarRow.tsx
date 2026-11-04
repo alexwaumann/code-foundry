@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
-import { AlarmClock, ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bookmark, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -590,13 +590,26 @@ function ArchivedAge({ id }: { id: string }) {
   );
 }
 
+/** A thread saved for later: a bookmark and "Saved", where a snoozed row counts down (it never wakes). */
+function SavedMark() {
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm text-cf-sidebar-muted-foreground" data-testid="row-saved">
+      <Bookmark className="size-3 shrink-0" aria-hidden data-testid="row-saved-icon" />
+      Saved
+    </span>
+  );
+}
+
 /**
  * How long until the snoozed thread wakes ("45m", "2h", "4d"; "<1m"), on the shared 30 s
- * clock, after an alarm clock that says it is a countdown (the tooltip no longer repeats it).
+ * clock, after an alarm clock that says it is a countdown (the tooltip no longer repeats it);
+ * SavedMark for one saved for later.
  */
 function SnoozeLeft({ id }: { id: string }) {
   const until = useThreadsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
+  const saved = useThreadsStore((s) => (s.byId[id]?.savedAtMs ?? null) !== null);
   const now = useNow(30_000);
+  if (saved) return <SavedMark />;
   if (until === null) return null;
   return (
     <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-snooze-left">

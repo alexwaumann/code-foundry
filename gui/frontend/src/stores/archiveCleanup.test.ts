@@ -9,6 +9,7 @@ import { HOME, useUiStore, type Selection } from "./ui";
 const thread = (id: string, archivedAtMs: number | null = null, snoozedUntilMs: number | null = null) =>
   ({ id, createdAtMs: 1, archivedAtMs, snoozedUntilMs, linkedPullRequests: [], usage: [], agentRuns: [] }) as unknown as ThreadView;
 const snoozed = (id: string, until: number) => thread(id, null, until);
+const saved = (id: string) => ({ ...thread(id), savedAtMs: 7 }) as ThreadView;
 
 describe("newlyArchived", () => {
   const before = replaceThreads(emptyThreads, [thread("a"), thread("b"), thread("c", 5)]);
@@ -38,6 +39,8 @@ describe("newlySnoozed", () => {
     ["c woke or unsnoozed", [thread("a"), thread("b"), thread("c")], []],
     ["c snoozed to another time", [thread("a"), thread("b"), snoozed("c", 6)], []],
     ["a archived (not a snooze)", [thread("a", 9), thread("b"), snoozed("c", 5)], []],
+    ["a saved for later", [saved("a"), thread("b"), snoozed("c", 5)], ["a"]],
+    ["c saved instead of timed (still put away)", [thread("a"), thread("b"), saved("c")], []],
     ["a new thread that is snoozed (not a transition)", [thread("a"), thread("b"), snoozed("c", 5), snoozed("d", 9)], []],
   ])("%s", (_name, list, want) => {
     expect(newlySnoozed(before, replaceThreads(before, list))).toEqual(want);

@@ -4,9 +4,10 @@
  * closed, and the bottom panel is closed (the daemon removed the thread's shells, so its
  * tabs went on their own). Reacting to the threads store rather than wrapping
  * archiveThread / snoozeThread makes every archive and snooze behave the same. Only a
- * transition counts (archivedAtMs or snoozedUntilMs null to set, on a thread this window
- * already knew), so panels opened later on an archived or snoozed thread are left alone,
- * a re-snooze to another time resets nothing, and neither does the first snapshot.
+ * transition counts (not archived or snoozed to so, on a thread this window already
+ * knew), so panels opened later on an archived or snoozed thread are left alone, a
+ * re-snooze to another time or between a time and saved for later resets nothing, and
+ * neither does the first snapshot.
  * The selection follows the same rule: when the selected thread is archived, snoozed or
  * removed (a `removed` event, or a snapshot without it) the window selects HOME (the No
  * project composer) instead of showing a put-away or missing thread. HOME is selected,
@@ -15,31 +16,31 @@
  * See docs/notes/archive-threads-2-sidebar.md, snooze-threads-2-sidebar.md,
  * put-away-focuses-dashboard.md and remove-dashboard.md.
  */
+import type { ThreadView } from "@/api/threads";
+import { isSnoozed } from "@/lib/snooze";
 import { emptyBottom, useBottomStore } from "./bottomPanel";
 import { emptyEntry, keyOf, usePanelStore } from "./panel";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { HOME, useUiStore, type Selection } from "./ui";
 
-/** The fields whose null → set transition puts a thread away. */
-type PutAwayField = "archivedAtMs" | "snoozedUntilMs";
-
-/** Ids whose `field` was set between two thread sets: known and unset before, set now. */
-function newlySet(prev: ThreadsData, next: ThreadsData, field: PutAwayField): string[] {
+/** Ids that became `is` between two thread sets: known and not so before, so now. */
+function newly(prev: ThreadsData, next: ThreadsData, is: (t: ThreadView) => boolean): string[] {
   if (prev.byId === next.byId) return [];
   return next.order.filter((id) => {
     const was = prev.byId[id];
-    return was !== undefined && was[field] === null && (next.byId[id]?.[field] ?? null) !== null;
+    const now = next.byId[id];
+    return was !== undefined && now !== undefined && !is(was) && is(now);
   });
 }
 
 /** Ids archived between two thread sets: known and not archived before, archived now. */
 export function newlyArchived(prev: ThreadsData, next: ThreadsData): string[] {
-  return newlySet(prev, next, "archivedAtMs");
+  return newly(prev, next, (t) => t.archivedAtMs !== null);
 }
 
-/** Ids snoozed between two thread sets: known and not snoozed before, snoozed now. */
+/** Ids snoozed, in either form, between two thread sets: known and not snoozed before, snoozed now. */
 export function newlySnoozed(prev: ThreadsData, next: ThreadsData): string[] {
-  return newlySet(prev, next, "snoozedUntilMs");
+  return newly(prev, next, isSnoozed);
 }
 
 /** Resets a thread's side panel (no tabs, closed) and bottom panel (closed) entries. */

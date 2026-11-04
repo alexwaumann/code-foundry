@@ -11,6 +11,7 @@ import {
   snoozePresets,
   snoozeTimeShort,
   wallTime,
+  isSnoozed,
 } from "./snooze";
 
 // Local wall times in a zone with DST (2026: spring forward Sun Mar 8, fall back Sun Nov 1),
@@ -24,6 +25,17 @@ afterAll(() => {
 /** A local time (month 1-based) as epoch ms. */
 const at = (y: number, mo: number, d: number, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
 const H = 3_600_000;
+
+describe("isSnoozed", () => {
+  it.each([
+    ["neither", { snoozedUntilMs: null, savedAtMs: null }, false],
+    ["neither, saved absent", { snoozedUntilMs: null }, false],
+    ["until a time", { snoozedUntilMs: 5, savedAtMs: null }, true],
+    ["saved for later", { snoozedUntilMs: null, savedAtMs: 5 }, true],
+  ])("%s", (_name, t, want) => {
+    expect(isSnoozed(t)).toBe(want);
+  });
+});
 
 describe("snoozePresets", () => {
   const presets = (now: number) => Object.fromEntries(snoozePresets(now).map((p) => [p.id, p]));

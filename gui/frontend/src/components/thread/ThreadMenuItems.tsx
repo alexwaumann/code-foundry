@@ -3,6 +3,7 @@ import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
+import { isSnoozed } from "@/lib/snooze";
 import { canNewLike, canRunElsewhere, worktreeBranch } from "@/lib/threadRow";
 import { runCommand, useCommandsStore } from "@/stores/commands";
 import { composeLike } from "@/stores/compose";
@@ -101,7 +102,10 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const resident = useThreadsStore((s) => (s.byId[id]?.resident ?? "") !== "");
   const naming = useThreadsStore((s) => s.byId[id]?.naming ?? false);
   const archived = useThreadsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
-  const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
+  const snoozed = useThreadsStore((s) => {
+    const t = s.byId[id];
+    return t !== undefined && isSnoozed(t);
+  });
   const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
   // Plugin flags hold the thread in the attention group until a plugin or the user clears them.
   const flags = useThreadsStore((s) => s.byId[id]?.flags.length ?? 0);

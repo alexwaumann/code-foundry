@@ -203,6 +203,29 @@ describe("buildSections (main list, Working and Archived footers)", () => {
   });
 });
 
+describe("buildSections: threads saved for later", () => {
+  const list = [
+    thread("s1"),
+    thread("old", { savedAtMs: 100 }),
+    thread("late", { snoozedUntilMs: 9000 }),
+    thread("new", { group: "prompt", savedAtMs: 300 }), // waiting on the user, saved: under Snoozed only
+    thread("soon", { snoozedUntilMs: 5000 }),
+    thread("gone", { archivedAtMs: 200, savedAtMs: 50 }), // defensively both: archived wins
+  ];
+
+  it("follow the timed ones under Snoozed, most recently saved first, and count in the header", () => {
+    const sec = buildSections(list);
+    const rows = sec.snoozed.filter((r) => r.kind === "thread").map((r) => r.threadId);
+    expect(rows).toEqual(["soon", "late", "new", "old"]);
+    expect(sec.snoozed[0]).toMatchObject({ kind: "header", count: 4 });
+    expect(sec.main.map((r) => (r.kind === "thread" ? r.threadId : ""))).toEqual(["s1"]);
+  });
+
+  it("are not a live thread's band", () => {
+    expect(bandSortTimes({ pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, savedAtMs: 5, statusChangedAtMs: 9 })).toEqual({ statusChangedAtMs: null, lastActivityAtMs: null });
+  });
+});
+
 describe("buildSections: the Snoozed footer", () => {
   const threads = [
     thread("s1", { group: "prompt" }),

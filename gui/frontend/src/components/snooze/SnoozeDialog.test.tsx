@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 
 const snoozeThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), snoozeThread }));
+const saveThreadForLater = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), snoozeThread, saveThreadForLater }));
 
 const { SnoozeDialog } = await import("./SnoozeDialog");
 const { useThreadsStore } = await import("@/stores/threads");
@@ -82,6 +83,21 @@ describe("SnoozeDialog", () => {
     fireEvent.click(screen.getByTestId("snooze-prev-month"));
     fireEvent.click(screen.getByTestId("snooze-prev-month"));
     expect(screen.getByTestId("snooze-month").textContent).toBe("October 2026");
+  });
+
+  it("Save for later saves the thread with no time, and closes", () => {
+    open();
+    fireEvent.click(screen.getByTestId("snooze-dialog-save"));
+    expect(saveThreadForLater).toHaveBeenCalledWith("s-1");
+    expect(snoozeThread).not.toHaveBeenCalled();
+    expect(useSnoozeDialogStore.getState().open).toBe(false);
+  });
+
+  it("a thread already saved says so instead of offering it", () => {
+    useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Bump wails to v3.1", savedAtMs: NOW } as ThreadView }, order: ["s-1"] });
+    open();
+    expect(screen.getByTestId("snooze-dialog-saved").textContent).toBe("Saved for later");
+    expect(screen.queryByTestId("snooze-dialog-save")).toBeNull();
   });
 
   it("Cancel closes without snoozing", () => {

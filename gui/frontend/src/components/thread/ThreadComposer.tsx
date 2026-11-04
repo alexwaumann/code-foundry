@@ -95,21 +95,22 @@ function SnoozeEnded({ at }: { at: number | null }) {
 }
 
 /**
- * The composer's snooze line above the prompt: a snoozed thread says until when, with
- * Unsnooze (a message unsnoozes too); a thread the daemon woke says "Snooze ended · <ago>"
+ * The composer's snooze line above the prompt: a snoozed thread says until when and a
+ * saved one "Saved for later", with Unsnooze (a message unsnoozes too); a thread the daemon woke says "Snooze ended · <ago>"
  * (the header's Snooze button snoozes again). Nothing otherwise.
  */
 export function SnoozeNote({ threadId }: { threadId: string }) {
   const snoozedUntil = useThreadsStore((s) => s.byId[threadId]?.snoozedUntilMs ?? null);
+  const saved = useThreadsStore((s) => (s.byId[threadId]?.savedAtMs ?? null) !== null);
   const wokeAt = useThreadsStore((s) => {
     const l = statusLine(s.byId[threadId]);
     return l.kind === "snoozeEnded" ? (l.at ?? 0) : null;
   });
-  if (snoozedUntil === null && wokeAt === null) return null;
+  if (snoozedUntil === null && !saved && wokeAt === null) return null;
   return (
     <div className="col-span-2 flex min-w-0 items-center gap-2 px-4 pt-2 text-caption" data-testid="thread-snooze-note">
-      {snoozedUntil !== null ? <SnoozedUntil until={snoozedUntil} /> : <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />}
-      {snoozedUntil !== null && (
+      {saved ? <span data-testid="thread-saved">Saved for later</span> : snoozedUntil !== null ? <SnoozedUntil until={snoozedUntil} /> : <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />}
+      {(saved || snoozedUntil !== null) && (
         <button
           type="button"
           className="btn outline ml-auto"

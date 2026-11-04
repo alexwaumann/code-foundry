@@ -122,6 +122,8 @@ message EmberTaskThread {
   // The first of them in tree order (each thread before the threads it created, siblings
   // oldest first), at most 10.
   repeated EmberTaskDescendant descendants = 16;
+  // Saved for later (Thread.saved_at): put away with no wake time, so the board says so.
+  bool saved = 17;
 }
 
 // EmberTaskDescendant is a thread below a task's worker thread, as the board shows it.

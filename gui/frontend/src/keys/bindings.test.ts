@@ -56,6 +56,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     pinned: false,
     archivedAtMs: null,
     snoozedUntilMs: null,
+    savedAtMs: null,
     effortPending: false,
     linkedPullRequests: [],
     usage: [],

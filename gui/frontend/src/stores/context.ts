@@ -149,12 +149,12 @@ export function encodeThreadListKey(id: string, x: ThreadView | undefined, byId:
   const hidden = x !== undefined && !inSidebar(x, byId);
   const group = x ? threadGroup(x) : "idle";
   const times = x ? bandSortTimes({ ...x, group }) : { statusChangedAtMs: null, lastActivityAtMs: null };
-  return [id, x?.pinned ? "1" : "", group, ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), hidden ? "1" : "", ms(times.statusChangedAtMs), ms(times.lastActivityAtMs)].join(SEP);
+  return [id, x?.pinned ? "1" : "", group, ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), ms(x?.savedAtMs), hidden ? "1" : "", ms(times.statusChangedAtMs), ms(times.lastActivityAtMs)].join(SEP);
 }
 
 export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
   return keys.map((k) => {
-    const [id = "", pinned = "", group = "", archived = "", snoozed = "", hidden = "", statusChanged = "", lastActivity = ""] = k.split(SEP);
+    const [id = "", pinned = "", group = "", archived = "", snoozed = "", saved = "", hidden = "", statusChanged = "", lastActivity = ""] = k.split(SEP);
     return {
       id,
       pinned: pinned === "1",
@@ -163,6 +163,7 @@ export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
       snoozedUntilMs: snoozed === "" ? null : Number(snoozed),
       statusChangedAtMs: statusChanged === "" ? null : Number(statusChanged),
       lastActivityAtMs: lastActivity === "" ? null : Number(lastActivity),
+      ...(saved === "" ? {} : { savedAtMs: Number(saved) }),
       ...(hidden === "1" ? { hidden: true } : {}),
     };
   });
@@ -180,6 +181,7 @@ export function getListThreads(): ListThread[] {
       group: threadGroup(x),
       archivedAtMs: x.archivedAtMs,
       snoozedUntilMs: x.snoozedUntilMs,
+      savedAtMs: x.savedAtMs,
       statusChangedAtMs: x.statusChangedAtMs,
       lastActivityAtMs: x.lastActivityAtMs,
     };

@@ -108,6 +108,14 @@ export function snoozeThread(id: string, untilMs: number | null): Promise<boolea
   return runCommand(THREAD_COMMANDS.snooze, args, threadContext(id));
 }
 
+/**
+ * thread.snooze with save: a snooze with no wake time. Everything else is as snoozeThread
+ * (the daemon's confirmation mid-turn; snoozeThread(id, null) ends it).
+ */
+export function saveThreadForLater(id: string): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.snooze, { save: "true" }, threadContext(id));
+}
+
 /** thread.run-in ("Run in…"): moves a workspace thread to the member in projectId. */
 export function runThreadIn(id: string, projectId: string): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.runIn, { project: projectId }, threadContext(id));

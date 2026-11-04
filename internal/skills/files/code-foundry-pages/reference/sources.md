@@ -34,7 +34,7 @@ pointer makes a click act on the wrong one. So:
 - each button's handler acts on the id its row was drawn with (`const id = t.id` in the
   closure), never on an index into the latest array;
 - an archived or snoozed thread leaves the list at once (filter on `archivedAtMs`,
-  `snoozedUntilMs`); after your own Archive click remove the row from the result, not
+  `snoozedUntilMs`, `savedAtMs`); after your own Archive click remove the row from the result, not
   from the next update.
 
 ## Page storage, in detail
@@ -85,8 +85,9 @@ An array of the user's threads in sidebar order (threads a plugin owns left out)
 - `status`: busy, idle, attention, error or unknown. `statusReason` says why in one line
   (finished, at prompt, "permission: Bash git push", interrupted, crashed);
   `statusChangedAtMs`.
-- `pinned`; `archivedAtMs` and `snoozedUntilMs`: null unless the thread is archived or
-  snoozed (filter those out of a board).
+- `pinned`; `archivedAtMs`, `snoozedUntilMs` and `savedAtMs`: null unless the thread is
+  archived, snoozed or saved for later, a snooze with no wake time (filter those out of a
+  board).
 - `createdAtMs`, `lastActivityAtMs`.
 - `parentId`, `createdBy`, `createdByName`: the thread that started it ("" for the user's
   own; a child is out of the sidebar while its creator exists); `labels`: strings.

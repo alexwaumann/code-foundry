@@ -35,6 +35,14 @@ describe("presentSnooze (thread.snooze's presenter)", () => {
     expect(useSnoozeDialogStore.getState().open).toBe(false);
   });
 
+  it("unsnoozes a saved thread, which has no wake time", async () => {
+    useThreadsStore.setState({ byId: { c: { ...thread("c", null), savedAtMs: 5_000 } }, order: ["c"] });
+    expect(presentSnooze("c")).toBe(true);
+    await Promise.resolve();
+    expect(snoozeThread).toHaveBeenCalledWith("c", null);
+    expect(useSnoozeDialogStore.getState().open).toBe(false);
+  });
+
   it("falls back without a thread", () => {
     expect(presentSnooze("")).toBe(false);
     expect(presentSnooze("nope")).toBe(false);

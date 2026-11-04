@@ -46,7 +46,7 @@
  *                                                 child threads go along: World.archiveCascade)
  *   POST /__mock/thread/forget?id=s-l-parent      (forgets that one thread, no cascade: its children's
  *                                                 creator no longer exists, so they join the sidebar)
- *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true]   (thread.snooze as the CLI's
+ *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true][&save=true]   (thread.snooze as the CLI's
  *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
  *   POST /__mock/thread/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; mock/context.ts)
@@ -1060,6 +1060,7 @@ function threadSummary(id: string): Record<string, unknown> {
     pinned: s.pinned,
     archivedAt: s.archivedAt?.toISOString() ?? null,
     snoozedUntil: s.snoozedUntil?.toISOString() ?? null,
+    savedAt: s.savedAt?.toISOString() ?? null,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url })),
     flags: s.flags.map((f) => ({ plugin: f.plugin, level: ThreadFlagLevel[f.level], reason: f.reason, untilSeen: f.untilSeen })),
   };
@@ -1118,7 +1119,8 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         json(res, 200, { forgotten: id });
         return;
       case "snooze":
-        world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
+        if (q.get("save") === "true") world.saveThread(id);
+        else world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
         break;
       case "wake":
         world.wakeThread(id);

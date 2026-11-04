@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 // Snoozed threads in the GUI (docs/notes/snooze-threads-2-sidebar.md). The default world
 // has two snoozed threads: s-8 ("Refactor the gh poller", a finished turn, wakes in 2.5 h)
@@ -130,3 +130,45 @@ test("the hover snooze menu keeps the row's card shut, and clicking away leaves 
   await r.hover();
   await expect(tip).toBeVisible();
 });
+
+// The row text, sort, menu contents and which command runs: unit tests (SidebarRow, tree,
+// ThreadMenuItems). This is the flow across the daemon's stream: the row leaves the main list
+// for the Snoozed section, after the timed ones.
+test("Save for later: the row menu moves the thread under Snoozed, after the timed ones", async ({ page }) => {
+  await openApp(page);
+  await page.getByTestId("snoozed-header").click();
+  await row(page, "s:s-2").click({ button: "right" });
+  await page.getByTestId("menu-snooze").hover();
+  await page.getByTestId("snooze-save").click();
+  const saved = row(page, "s:s-2");
+  await expect(saved).toHaveAttribute("data-section", "snoozed");
+  await expect(saved.getByTestId("row-saved")).toHaveText("Saved");
+  await expect(page.getByTestId("snoozed-count")).toHaveText("3");
+  await expect(list(page).locator('[data-section="snoozed"][data-row-kind="thread"]').last()).toHaveAttribute("data-row-key", "s:s-2");
+});
+
+/** SHOTS=<dir>: the PR's screenshots, WebKit, 1280x800 at 2x, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test.describe(`save for later screenshots (${scheme})`, () => {
+    test.use({ colorScheme: scheme, deviceScaleFactor: 2, viewport: { width: 1280, height: 800 } });
+    test("the menu, the saved row and the saved thread's page", async ({ page }, info) => {
+      const dir = process.env.SHOTS;
+      test.skip(!dir || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      await mockPost("/__mock/thread/snooze?id=s-9&save=true");
+      await openApp(page);
+      await page.getByTestId("snoozed-header").click();
+      await row(page, "s:s-2").click({ button: "right" });
+      await page.getByTestId("menu-snooze").hover();
+      await expect(page.getByTestId("snooze-save")).toBeVisible();
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(dir)}/menu-${scheme}.png` });
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      await row(page, "s:s-9").click();
+      await expect(page.getByTestId("thread-saved")).toBeVisible();
+      await page.mouse.move(640, 300);
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(dir)}/saved-${scheme}.png` });
+    });
+  });
+}

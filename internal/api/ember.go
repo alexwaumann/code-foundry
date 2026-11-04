@@ -137,7 +137,7 @@ func EmberTaskToProto(t ember.Task) *v1.EmberTask {
 		out.Thread = &v1.EmberTaskThread{
 			Id: w.ID, Name: w.Name, State: v1.ThreadState(w.State), Status: v1.ThreadStatus(w.Status), StatusReason: w.StatusReason,
 			ReportStatus: v1.ThreadReportStatus(w.Report.Status), ReportSummary: w.Report.Summary, ReportAt: optionalTime(w.Report.At),
-			CreatedAt: optionalTime(w.CreatedAt), LastActivityAt: optionalTime(w.LastActivityAt), Archived: w.Archived, Removed: w.Removed,
+			CreatedAt: optionalTime(w.CreatedAt), LastActivityAt: optionalTime(w.LastActivityAt), Archived: w.Archived, Saved: w.Saved, Removed: w.Removed,
 			DescendantsWorking: int32(w.Team.Working), DescendantsWaiting: int32(w.Team.Waiting), DescendantsTotal: int32(w.Team.Total),
 		}
 		for _, m := range w.Team.Members {

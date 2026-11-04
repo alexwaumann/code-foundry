@@ -107,6 +107,7 @@ func TestThreadState(t *testing.T) {
 		{TaskThread{Status: thread.StatusUnknown, State: thread.StateDisconnected}, "stopped"},
 		{TaskThread{Status: thread.StatusUnknown, State: thread.StateStarting}, "starting"},
 		{TaskThread{Status: thread.StatusBusy, Archived: true}, "archived"},
+		{TaskThread{Status: thread.StatusIdle, Saved: true}, "saved for later"},
 		{TaskThread{Removed: true}, "removed"},
 	}
 	for _, tt := range tests {

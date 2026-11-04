@@ -7,6 +7,11 @@
  * `next-week` (internal/command/snooze_time.go).
  */
 
+/** Put away in either form: until a time, or saved for later (no wake time, so never read snoozedUntilMs as "is it snoozed"). */
+export function isSnoozed(t: { snoozedUntilMs: number | null; savedAtMs?: number | null }): boolean {
+  return t.snoozedUntilMs !== null || (t.savedAtMs ?? null) !== null;
+}
+
 /** The hour day presets (Tomorrow, Next week) and the custom dialog default to. */
 export const SNOOZE_HOUR = 9;
 

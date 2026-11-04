@@ -49,6 +49,18 @@ describe("SnoozeNote", () => {
     expect(screen.getByTestId("thread-snoozed").textContent).toMatch(/^Snoozed until (\w{3} )?\d{1,2}:\d\d [AP]M$/);
   });
 
+  it("saved for later: says so with no time, with Unsnooze, which runs thread.snooze --clear", async () => {
+    set("s-1", { savedAtMs: Date.now() });
+    render(<SnoozeNote threadId="s-1" />);
+    expect(screen.getByTestId("thread-snooze-note").textContent).toBe("Saved for laterUnsnooze");
+    fireEvent.click(screen.getByTestId("thread-unsnooze"));
+    await vi.waitFor(() => {
+      expect(lastInvocation("thread.snooze")).toMatchObject({ args: { clear: "true" }, context: { activeThreadId: "s-1" } });
+    });
+    set("s-1", { savedAtMs: null });
+    expect(screen.queryByTestId("thread-snooze-note")).toBeNull();
+  });
+
   it("woken by the daemon: Snooze ended · just now, in amber, no Unsnooze", () => {
     set("s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() });
     render(<SnoozeNote threadId="s-8" />);

@@ -79,6 +79,7 @@ export function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
     pinned: false,
     archivedAtMs: null,
     snoozedUntilMs: null,
+    savedAtMs: null,
     linkedPullRequests: [],
     ...o,
   } as ThreadView;

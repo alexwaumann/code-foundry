@@ -287,13 +287,15 @@ func ThreadProgress(tt *TaskThread, now time.Time) string {
 }
 
 // ThreadState is a worker thread's state in a word or two: "busy", "idle", "needs
-// attention (permission: Bash)", "archived", "stopped".
+// attention (permission: Bash)", "archived", "saved for later", "stopped".
 func ThreadState(tt *TaskThread) string {
 	switch {
 	case tt.Removed:
 		return "removed"
 	case tt.Archived:
 		return "archived"
+	case tt.Saved:
+		return "saved for later"
 	}
 	s := tt.Status.String()
 	if tt.Status == thread.StatusUnknown {

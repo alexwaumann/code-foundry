@@ -598,6 +598,16 @@ describe("SidebarRow snoozed", () => {
     expect(left.textContent).toBe("2h");
   });
 
+  it("saved for later: a bookmark and Saved where the countdown goes, no time", () => {
+    const row = renderSnoozed({ name: "Later work", savedAtMs: Date.now() });
+    expect(row.textContent).toBe("Later workSaved");
+    const mark = screen.getByTestId("row-saved");
+    expect(mark.className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "text-cf-sidebar-muted-foreground", "gap-1"]));
+    expect(mark.firstElementChild).toBe(screen.getByTestId("row-saved-icon"));
+    expect(screen.getByTestId("row-saved-icon").getAttribute("class")).toContain("lucide-bookmark");
+    expect(screen.queryByTestId("row-snooze-left")).toBeNull();
+  });
+
   it("an unnamed thread shows its id, muted", () => {
     renderSnoozed({ name: "", snoozedUntilMs: Date.now() + 3_600_000 + 1000 });
     expect(screen.getByTestId("thread-name").textContent).toBe("s-1");

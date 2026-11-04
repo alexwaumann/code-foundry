@@ -174,6 +174,8 @@ interface MockThread {
    * clear it, like the daemon; the tick (or POST /__mock/thread/wake) wakes it.
    */
   snoozedUntil: Date | null;
+  /** Saved for later: a snooze with no wake time (snoozedUntil stays null). */
+  savedAt: Date | null;
   /** An effort change waiting for the turn to end (thread.set-effort). */
   effortPending: boolean;
   /** Mock-only: a new thread's first message, sent once it connects (the daemon sends it after the handshake). */
@@ -2160,6 +2162,7 @@ export class World {
       pinned: false,
       archivedAt: null,
       snoozedUntil: null,
+      savedAt: null,
       effortPending: false,
       firstMessage: null,
       onReady: [],
@@ -2296,6 +2299,7 @@ export class World {
       ...(s.transcriptMissing ? { transcriptMissing: true } : {}),
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
+      ...(s.savedAt ? { savedAt: timestampFromDate(s.savedAt) } : {}),
       effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
@@ -2729,6 +2733,7 @@ export class World {
     s.pinned = false;
     s.archivedAt ??= new Date();
     s.snoozedUntil = null;
+    s.savedAt = null;
     s.flags = [];
     this.publishThread(s);
   }
@@ -2744,6 +2749,7 @@ export class World {
     const label = s.name ? `${s.name} (${s.id})` : s.id;
     if (until === null) {
       s.snoozedUntil = null;
+      s.savedAt = null;
       this.publishThread(s);
       return `unsnoozed thread ${label}`;
     }
@@ -2752,8 +2758,22 @@ export class World {
     s.pinned = false;
     s.archivedAt = null;
     s.snoozedUntil = until;
+    s.savedAt = null;
     this.publishThread(s);
     return `snoozed thread ${label} until ${until.toISOString()}`;
+  }
+
+  /** thread.snooze with save, without its confirmation: a snooze with no wake time, so the tick never wakes it. Returns the message. */
+  saveThread(id: string): string {
+    const s = this.thread(id);
+    if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
+    this.closeShells((l) => l[LABEL_THREAD] === s.id);
+    s.pinned = false;
+    s.archivedAt = null;
+    s.snoozedUntil = null;
+    s.savedAt ??= new Date();
+    this.publishThread(s);
+    return `saved thread ${s.name ? `${s.name} (${s.id})` : s.id} for later`;
   }
 
   /**
@@ -2785,6 +2805,7 @@ export class World {
     s.state = ThreadState.STARTING;
     s.archivedAt = null;
     s.snoozedUntil = null;
+    s.savedAt = null;
     // A message starts a turn: the saved status is replaced at once, like the daemon.
     this.setStatus(s, ThreadStatus.BUSY, "working");
     s.settleIn = 2;
@@ -4160,6 +4181,7 @@ export class World {
           if (s.pinned) {
             s.archivedAt = null;
             s.snoozedUntil = null;
+            s.savedAt = null;
           }
           this.publishThread(s);
           return `${s.pinned ? "pinned" : "unpinned"} thread ${s.name ? `${s.name} (${s.id})` : s.id}`;
@@ -4464,28 +4486,36 @@ export class World {
           keybindings: [],
           args: [
             { name: "until", type: ArgType.STRING, required: false, description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339" },
-            { name: "clear", type: ArgType.BOOL, required: false, description: "Unsnooze the thread instead" },
+            { name: "save", type: ArgType.BOOL, required: false, description: "Save it for later: it never wakes" },
+            { name: "clear", type: ArgType.BOOL, required: false, description: "Unsnooze instead" },
           ],
-          // Like the daemon: only snoozing (a valid time) a thread that is mid-turn asks.
+          // Like the daemon: only snoozing (a valid time, or save) a thread that is mid-turn asks.
           confirmIf: (ctx, args) => {
             const s = activeThread(ctx);
             if (s === undefined || args.clear === "true" || this.interrupts(s).why === "") return false;
+            if (args.save === "true") return args.until === undefined;
             try {
               return snoozeUntil(args) !== null;
             } catch {
               return false;
             }
           },
-          confirm: (ctx) => {
+          confirm: (ctx, args) => {
             const s = activeThread(ctx);
             const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
-            return `Snooze thread ${s?.name || (s?.id ?? "")}? ${why}; snoozing ${ends}.`;
+            const name = s?.name || (s?.id ?? "");
+            if (args.save === "true") return `Save thread ${name} for later? ${why}; saving ${ends}.`;
+            return `Snooze thread ${name}? ${why}; snoozing ${ends}.`;
           },
         },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
+          if (args.save === "true") {
+            if (args.until !== undefined || args.clear === "true") throw new CommandError("invalid", "invalid save: give until, save or clear, not two");
+            return this.saveThread(s.id);
+          }
           return this.snoozeThread(s.id, snoozeUntil(args));
         },
       },

@@ -465,7 +465,9 @@ type EmberTaskThread struct {
 	DescendantsTotal   int32 `protobuf:"varint,15,opt,name=descendants_total,json=descendantsTotal,proto3" json:"descendants_total,omitempty"`
 	// The first of them in tree order (each thread before the threads it created, siblings
 	// oldest first), at most 10.
-	Descendants   []*EmberTaskDescendant `protobuf:"bytes,16,rep,name=descendants,proto3" json:"descendants,omitempty"`
+	Descendants []*EmberTaskDescendant `protobuf:"bytes,16,rep,name=descendants,proto3" json:"descendants,omitempty"`
+	// Saved for later (Thread.saved_at): put away with no wake time, so the board says so.
+	Saved         bool `protobuf:"varint,17,opt,name=saved,proto3" json:"saved,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -610,6 +612,13 @@ func (x *EmberTaskThread) GetDescendants() []*EmberTaskDescendant {
 		return x.Descendants
 	}
 	return nil
+}
+
+func (x *EmberTaskThread) GetSaved() bool {
+	if x != nil {
+		return x.Saved
+	}
+	return false
 }
 
 // EmberTaskDescendant is a thread below a task's worker thread, as the board shows it.
@@ -1123,7 +1132,7 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x123\n" +
 	"\adone_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x06doneAt\x127\n" +
 	"\x06thread\x18\f \x01(\v2\x1f.codefoundry.v1.EmberTaskThreadR\x06thread\x12\x16\n" +
-	"\x06branch\x18\r \x01(\tR\x06branch\"\xf9\x05\n" +
+	"\x06branch\x18\r \x01(\tR\x06branch\"\x8f\x06\n" +
 	"\x0fEmberTaskThread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
@@ -1142,7 +1151,8 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	"\x13descendants_working\x18\r \x01(\x05R\x12descendantsWorking\x12/\n" +
 	"\x13descendants_waiting\x18\x0e \x01(\x05R\x12descendantsWaiting\x12+\n" +
 	"\x11descendants_total\x18\x0f \x01(\x05R\x10descendantsTotal\x12E\n" +
-	"\vdescendants\x18\x10 \x03(\v2#.codefoundry.v1.EmberTaskDescendantR\vdescendants\"\x93\x03\n" +
+	"\vdescendants\x18\x10 \x03(\v2#.codefoundry.v1.EmberTaskDescendantR\vdescendants\x12\x14\n" +
+	"\x05saved\x18\x11 \x01(\bR\x05saved\"\x93\x03\n" +
 	"\x13EmberTaskDescendant\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +

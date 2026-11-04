@@ -6,8 +6,9 @@ import type { ThreadView } from "@/api/threads";
 const pinThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const archiveThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const snoozeThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+const saveThreadForLater = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const regenerateThreadName = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), pinThread, archiveThread, snoozeThread, regenerateThreadName }));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), pinThread, archiveThread, snoozeThread, saveThreadForLater, regenerateThreadName }));
 const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
 const openSnoozeDialog = vi.hoisted(() => vi.fn());
@@ -214,6 +215,9 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     ["Unsnooze", { snoozedUntilMs: Date.now() + 3_600_000 }, "menu-unsnooze", () => {
         expect(snoozeThread).toHaveBeenCalledWith("s-1", null);
       }],
+    ["Unsnooze", { savedAtMs: Date.now() }, "menu-unsnooze", () => {
+        expect(snoozeThread).toHaveBeenCalledWith("s-1", null);
+      }],
     ["Save as workspace", { projectIds: ["web", "api"] }, "menu-save-workspace", () => {
         expect(openSaveWorkspace).toHaveBeenCalledWith("s-1");
       }],
@@ -244,6 +248,24 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     fireEvent.keyDown(within(openTitleMenu()).getByTestId("menu-snooze"), { key: "ArrowRight" });
     fireEvent.click(screen.getByTestId("snooze-pick"));
     expect(openSnoozeDialog).toHaveBeenCalledWith("s-1");
+  });
+
+  it("Snooze ▸ Save for later comes after Pick a date and time, says No alarm, and saves the thread", () => {
+    setThread({});
+    fireEvent.keyDown(within(openTitleMenu()).getByTestId("menu-snooze"), { key: "ArrowRight" });
+    const item = screen.getByTestId("snooze-save");
+    expect(item.textContent).toBe("Save for laterNo alarm");
+    expect(screen.getByTestId("snooze-pick").compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(item);
+    expect(saveThreadForLater).toHaveBeenCalledWith("s-1");
+    expect(snoozeThread).not.toHaveBeenCalled();
+  });
+
+  it("Snooze ▸ leaves Save for later out for a thread already saved", () => {
+    setThread({ savedAtMs: Date.now() });
+    fireEvent.keyDown(within(openTitleMenu()).getByTestId("menu-snooze"), { key: "ArrowRight" });
+    expect(screen.getByTestId("snooze-pick")).toBeTruthy();
+    expect(screen.queryByTestId("snooze-save")).toBeNull();
   });
 
   it.each([

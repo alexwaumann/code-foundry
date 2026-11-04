@@ -11,6 +11,7 @@
  * (not on name or status-text updates). The placement helper (which worktree a thread sits in) is here too;
  * the command context uses it.
  */
+import { isSnoozed } from "./snooze";
 import type { ThreadGroup } from "./thread";
 
 export interface WorktreeRef {
@@ -33,6 +34,8 @@ export interface ListThread {
   archivedAtMs: number | null;
   /** When the snooze ends (epoch ms), null when not snoozed: it then sorts under Snoozed, whatever its pin and group. */
   snoozedUntilMs: number | null;
+  /** When it was saved for later (epoch ms): it sorts under Snoozed too, after the timed ones. Null or absent: not saved. */
+  savedAtMs?: number | null;
   /**
    * Hidden from the sidebar (lib/inSidebar.ts: a thread another thread created, while its
    * creator exists): in no panel, no count, no keyboard order. Absent: shown.
@@ -55,9 +58,9 @@ export interface ListThread {
  * thread's activity ticks do not rebuild the list.
  */
 export function bandSortTimes(
-  t: Pick<ListThread, "pinned" | "group" | "archivedAtMs" | "snoozedUntilMs" | "statusChangedAtMs" | "lastActivityAtMs">,
+  t: Pick<ListThread, "pinned" | "group" | "archivedAtMs" | "snoozedUntilMs" | "savedAtMs" | "statusChangedAtMs" | "lastActivityAtMs">,
 ): { statusChangedAtMs: number | null; lastActivityAtMs: number | null } {
-  const live = !t.pinned && t.archivedAtMs === null && t.snoozedUntilMs === null;
+  const live = !t.pinned && t.archivedAtMs === null && !isSnoozed(t);
   const byStatus = live && (t.group === "prompt" || t.group === "error" || t.group === "done");
   return {
     statusChangedAtMs: byStatus ? (t.statusChangedAtMs ?? null) : null,
@@ -182,7 +185,7 @@ export interface Sections {
  * a band, threads without the time sort after those with one, newest created first, as do
  * equal times. Working: the working ones (busy, starting, or waiting on child threads)
  * under a Working header that counts them, newest created first. Snoozed: every snoozed thread (pinned or not,
- * whatever its group; it appears nowhere else) under a Snoozed header, soonest wake first.
+ * whatever its group; it appears nowhere else) under a Snoozed header, soonest wake first, then those saved for later, most recently saved first.
  * Archived: every archived thread (pinned or not, whatever its group; it appears nowhere
  * else; a thread is never both, but archived wins) under an Archived header, most recently
  * archived first. A footer has its header only when it has threads; collapsed, the header
@@ -190,7 +193,7 @@ export interface Sections {
  */
 export function buildSections(threads: readonly ListThread[], opts: ListOptions = {}): Sections {
   const newest = threads.filter((s) => s.hidden !== true).reverse();
-  const live = newest.filter((s) => s.archivedAtMs === null && s.snoozedUntilMs === null);
+  const live = newest.filter((s) => s.archivedAtMs === null && !isSnoozed(s));
   const unpinned = (...groups: ThreadGroup[]) => groups.flatMap((g) => live.filter((s) => !s.pinned && s.group === g));
   const byStatus = (...groups: ThreadGroup[]) => groups.flatMap((g) => byRecent(unpinned(g), (s) => s.statusChangedAtMs));
   const rowsOf = (section: Section, list: readonly ListThread[]): Row[] => list.map((s) => ({ key: threadKey(s.id), kind: "thread", section, threadId: s.id }));
@@ -198,8 +201,10 @@ export function buildSections(threads: readonly ListThread[], opts: ListOptions 
     list.length === 0 ? [] : [{ key: headerKey(section), kind: "header", section, label, count: list.length, collapsed }, ...(collapsed ? [] : rowsOf(section, list))];
   // Stable sort: equal archive times keep newest-created first.
   const archived = newest.filter((s) => s.archivedAtMs !== null).sort((a, b) => (b.archivedAtMs ?? 0) - (a.archivedAtMs ?? 0));
-  // Stable sort: equal wake times keep newest-created first.
-  const snoozed = newest.filter((s) => s.archivedAtMs === null && s.snoozedUntilMs !== null).sort((a, b) => (a.snoozedUntilMs ?? 0) - (b.snoozedUntilMs ?? 0));
+  // Stable sorts: equal times keep newest-created first. Saved threads have no wake, so they follow the timed ones.
+  const putAway = newest.filter((s) => s.archivedAtMs === null);
+  const timed = putAway.filter((s) => s.snoozedUntilMs !== null).sort((a, b) => (a.snoozedUntilMs ?? 0) - (b.snoozedUntilMs ?? 0));
+  const saved = putAway.filter((s) => s.snoozedUntilMs === null && isSnoozed(s)).sort((a, b) => (b.savedAtMs ?? 0) - (a.savedAtMs ?? 0));
   return {
     main: [
       ...rowsOf("pinned", live.filter((s) => s.pinned)),
@@ -208,7 +213,7 @@ export function buildSections(threads: readonly ListThread[], opts: ListOptions 
       ...rowsOf("idle", byRecent(unpinned("idle"), (s) => s.lastActivityAtMs)),
     ],
     working: footer("working", "Working", unpinned("working"), opts.workingCollapsed === true),
-    snoozed: footer("snoozed", "Snoozed", snoozed, opts.snoozedCollapsed === true),
+    snoozed: footer("snoozed", "Snoozed", [...timed, ...saved], opts.snoozedCollapsed === true),
     archived: footer("archived", "Archived", archived, opts.archivedCollapsed === true),
   };
 }

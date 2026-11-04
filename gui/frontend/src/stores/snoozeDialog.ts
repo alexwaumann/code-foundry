@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { isSnoozed } from "@/lib/snooze";
 import { snoozeThread } from "./threadActions";
 import { useThreadsStore } from "./threads";
 
@@ -31,15 +32,15 @@ export function closeSnoozeDialog(): void {
 }
 
 /**
- * thread.snooze's presenter (the palette, a chord): a snoozed thread is unsnoozed, any
- * other opens the custom dialog, since the command needs a time the palette would not ask
+ * thread.snooze's presenter (the palette, a chord): a snoozed or saved thread is
+ * unsnoozed, any other opens the custom dialog (which offers Save for later too), since the command needs a time the palette would not ask
  * for (until is optional, so it is not prompted). False without such a thread, so the
  * command falls back to its default presentation.
  */
 export function presentSnooze(threadId: string): boolean {
   const s = useThreadsStore.getState().byId[threadId];
   if (!s) return false;
-  if (s.snoozedUntilMs !== null) void snoozeThread(threadId, null);
+  if (isSnoozed(s)) void snoozeThread(threadId, null);
   else openSnoozeDialog(threadId);
   return true;
 }
