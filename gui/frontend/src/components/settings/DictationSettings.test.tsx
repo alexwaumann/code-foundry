@@ -26,6 +26,7 @@ const { fakeDictation, dictationSnap } = await import("@/test/dictation");
 const { useSettingsStore } = await import("@/stores/settings");
 const { resetDictationForTests, useDictationStore } = await import("@/stores/dictation");
 const { SettingsSection } = await import("./SectionCard");
+const { ALLOW_ADVICE_MS } = await import("./DictationSettings");
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 
 // The daemon's schema for General › Dictation (internal/store/settings/schema.go).
@@ -202,5 +203,94 @@ describe("Settings › Dictation", () => {
     expect(invokeCommand).toHaveBeenLastCalledWith("dictation.remove", expect.anything(), {}, undefined, { confirmed: true });
     await publish(dictationSnap({ model: { downloaded: false } }));
     expect(within(sec).getByTestId("dictation-download-button")).not.toBeNull();
+  });
+});
+
+describe("the hold key's permission row", () => {
+  const access = (o: Partial<{ granted: boolean; tapSilent: boolean; listName: string }> = {}) => ({
+    granted: false,
+    tapSilent: false,
+    listName: "Device Control and Data Access",
+    executable: "/Users/me/.code-foundry/app/Code Foundry",
+    ...o,
+  });
+  const row = (sec: HTMLElement) => sec.querySelector<HTMLElement>('[data-testid="dictation-access-row"]');
+
+  it.each([
+    ["dictation off", dictationSnap({ enabled: false, state: "disabled", accessibility: access() })],
+    ["no host has reported", dictationSnap()],
+  ])("is not there with %s", async (_name, snap) => {
+    const { sec } = await mount(snap);
+    expect(row(sec)).toBeNull();
+  });
+
+  it("not granted: names the list by what the host said, and Allow runs dictation.allow", async () => {
+    const { sec } = await mount(dictationSnap({ accessibility: access() }));
+    const r = row(sec);
+    expect(r?.getAttribute("data-state")).toBe("ask");
+    expect(r?.textContent).toContain("Privacy & Security › Device Control and Data Access");
+    fireEvent.click(screen.getByTestId("dictation-allow"));
+    await vi.waitFor(() => {
+      expect(invoked()).toEqual(["dictation.allow"]);
+    });
+  });
+
+  it("before macOS 27 says Accessibility", async () => {
+    const { sec } = await mount(dictationSnap({ accessibility: access({ listName: "Accessibility" }) }));
+    expect(row(sec)?.textContent).toContain("Privacy & Security › Accessibility.");
+  });
+
+  it("sits above the Model row", async () => {
+    const { sec } = await mount(dictationSnap({ accessibility: access() }));
+    expect(sec.querySelector('[data-testid="dictation-access-row"] ~ [data-testid="dictation-model-row"]')).not.toBeNull();
+  });
+
+  it("the grant arriving moves it on by itself", async () => {
+    const { sec } = await mount(dictationSnap({ accessibility: access() }));
+    await publish(dictationSnap({ accessibility: access({ granted: true }) }));
+    expect(row(sec)?.getAttribute("data-state")).toBe("allowed");
+    expect(within(sec).getByTestId("dictation-access-chip").textContent).toBe("Allowed");
+    expect(screen.queryByTestId("dictation-allow")).toBeNull();
+  });
+
+  it("still ungranted a while after Allow: remove the entry and add it again, with the path", async () => {
+    const { sec } = await mount(dictationSnap({ accessibility: access() }));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      fireEvent.click(screen.getByTestId("dictation-allow"));
+      expect(row(sec)?.getAttribute("data-state")).toBe("ask");
+      act(() => {
+        vi.advanceTimersByTime(ALLOW_ADVICE_MS - 1);
+      });
+      expect(row(sec)?.getAttribute("data-state")).toBe("ask");
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(row(sec)?.getAttribute("data-state")).toBe("stuck");
+      const text = row(sec)?.textContent ?? "";
+      expect(text).toContain("remove it with −");
+      expect(text).toContain("add it back with +");
+      expect(text).toContain("app/Code Foundry");
+      // Allow is still there: the prompt adds the fresh entry again.
+      expect(screen.getByTestId("dictation-allow")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("the advice does not come without a press of Allow", async () => {
+    const { sec } = await mount(dictationSnap({ accessibility: access() }));
+    await publish(dictationSnap({ accessibility: access() }));
+    expect(row(sec)?.getAttribute("data-state")).toBe("ask");
+  });
+
+  it("granted but deaf: offers a restart through app.restart", async () => {
+    const { sec } = await mount(dictationSnap({ accessibility: access({ granted: true, tapSilent: true }) }));
+    expect(row(sec)?.getAttribute("data-state")).toBe("restart");
+    expect(screen.queryByTestId("dictation-allow")).toBeNull();
+    fireEvent.click(screen.getByTestId("dictation-access-restart"));
+    await vi.waitFor(() => {
+      expect(invoked()).toEqual(["app.restart"]);
+    });
   });
 });

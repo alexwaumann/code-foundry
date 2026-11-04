@@ -789,6 +789,9 @@ function routes(router: ConnectRouter): void {
       return {};
     },
     micDenied: (req) => (world.dictation.setMicDenied(req.denied), {}),
+    // The host's report: the mock has no host; POST /__mock/dictation?access= stands in.
+    accessibility: () => ({}),
+    composerTarget: (req) => (world.dictation.setComposerTarget(req.available), {}),
   });
 
   // Agent search and the history (mock/agentSearch.ts).

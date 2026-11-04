@@ -67,6 +67,8 @@ export function dictationSnap(o: Partial<Omit<DictationView, "model" | "hardware
     session: null,
     error: "",
     micDenied: false,
+    accessibility: null,
+    composerTarget: false,
     ...rest,
     model: { name: "ggml-large-v3-turbo-q8_0.bin", sizeBytes: 874_188_075, downloaded: true, download: null, ...model },
     hardware: { chip: "Apple M4 Pro", memoryBytes: 48 * 2 ** 30, m1Family: false, ...hardware },
@@ -105,7 +107,7 @@ function end(reason: DictationEndView = "stopped", sessionId = lastSession()): v
 const calls: string[] = [];
 
 export interface FakeDictation {
-  /** "start <client>", "stop <session> <flush>", in order. */
+  /** "start <client>", "stop <session> <flush>", "composer <available>", in order. */
   readonly calls: readonly string[];
   /** Sends a snapshot to every open Watch; one opened later starts with it. */
   publish(s: DictationView): void;
@@ -174,6 +176,11 @@ export const fakeDictationApi = {
       return none.iterate(signal);
     }
     return s.events.iterate(signal);
+  },
+
+  reportComposerTarget(available: boolean): Promise<void> {
+    calls.push(`composer ${String(available)}`);
+    return Promise.resolve();
   },
 
   async startDictation(clientId: string): Promise<string> {

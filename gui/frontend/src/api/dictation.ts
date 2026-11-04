@@ -41,6 +41,21 @@ export interface DictationView {
   error: string;
   /** macOS denied the microphone (the host says so). */
   micDenied: boolean;
+  /** What macOS allows the hold key, as the host last said; null before it has. */
+  accessibility: DictationAccessibilityView | null;
+  /** The daemon's word on whether a composer can take dictation (what this window told it). */
+  composerTarget: boolean;
+}
+
+/** What macOS allows the hold key. */
+export interface DictationAccessibilityView {
+  granted: boolean;
+  /** Granted, but the host's event tap hears nothing: it needs a restart. */
+  tapSilent: boolean;
+  /** What System Settings calls the list on this macOS. */
+  listName: string;
+  /** The host's executable, for adding it to the list by hand. */
+  executable: string;
 }
 
 export type DictationEndView = "stopped" | "silence" | "disabled" | "error" | "discarded";
@@ -85,6 +100,10 @@ export function toDictationView(s: DictationSnapshot): DictationView {
     session: s.session ? { id: s.session.id, clientId: s.session.clientId, startedAtMs: s.session.startedAt ? timestampDate(s.session.startedAt).getTime() : 0, stopping: s.session.stopping } : null,
     error: s.error,
     micDenied: s.micDenied,
+    accessibility: s.accessibility
+      ? { granted: s.accessibility.granted, tapSilent: s.accessibility.tapSilent, listName: s.accessibility.listName, executable: s.accessibility.executable }
+      : null,
+    composerTarget: s.composerTarget,
   };
 }
 
@@ -125,6 +144,12 @@ export async function* dictationSession(sessionId: string, signal: AbortSignal, 
 export async function startDictation(clientId: string, conn: DaemonConnection = daemon): Promise<string> {
   const c = await conn.client(DictationService);
   return (await c.start({ clientId })).sessionId;
+}
+
+/** Tells the daemon whether this window has a composer dictation can target, for the host's hold key. */
+export async function reportComposerTarget(available: boolean, conn: DaemonConnection = daemon): Promise<void> {
+  const c = await conn.client(DictationService);
+  await c.composerTarget({ available });
 }
 
 /** Ends a session; with flush its last phrase arrives on Session first (bounded by the daemon: 1.5 s). */
