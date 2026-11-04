@@ -21,6 +21,7 @@ import { actionPicksResource, editorAppsResource } from "@/stores/threadInfo";
 import { useThreadStore } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
+import { actionRun, actionTerminal, terminalUpdated } from "./actionsWorld";
 import { card } from "./cardFakes";
 import { daemon } from "./daemonFakes";
 import { addThreads, addWorkspace, addWorktrees, CF, HOME, pullRequest, seedWorld, status, thread, WR, worktree } from "./projectsWorld";
@@ -231,6 +232,47 @@ export function seedServers(): string {
   );
   selectThread("s-ti-srv");
   return "s-ti-srv";
+}
+
+/** The action of a server run: what the mock's Dev and Debug daemon are to the card. */
+const serverAction = (id: string, name: string, command: string): ActionView => ({ ...action(id, "repo-cf", name, 0), command });
+
+/**
+ * child-server (mock/world.ts): s-ti-1 runs Debug daemon in the background on 7788; its child
+ * s-ti-kid-srv "Serve the web preview" runs Dev in a terminal on 5173 and 24678, and has the
+ * servers state's shells (pnpm reports the same two ports, python3 9399).
+ */
+export function seedChildServer(): { parent: string; child: string; devRun: string; devTerminal: string; debugRun: string } {
+  seedSingle();
+  const child = "s-ti-kid-srv";
+  addThreads(
+    thread(child, {
+      ...base,
+      name: "Serve the web preview",
+      createdBy: "s-ti-1",
+      createdByName: "Fix the stale PR badge",
+      flags: [],
+      backgroundShells: [
+        shell("bk4v8n2p7", "pnpm --dir web dev", { description: "web dev server", ports: [5173, 24678] }),
+        shell("bd9r3t6w1", "python3 -m http.server 9399", { description: "docs preview", ports: [9399] }),
+        shell("bw1", "pnpm tsc --watch"),
+      ],
+    }),
+  );
+  const owner = { threadId: child, projectId: "repo-cf", worktree: CF };
+  const dev = serverAction("a-dev000000000", "Dev", "pnpm dev");
+  const debug = serverAction("a-debug0000000", "Debug daemon", "make dev");
+  terminalUpdated(actionTerminal("t-dev", dev, "r-dev", owner));
+  act(() => {
+    useActionsStore.setState((s) => ({
+      runs: {
+        ...s.runs,
+        "r-dev": actionRun("r-dev", dev, owner, "t-dev", { ports: [5173, 24678], startedAtMs: Date.now() - 107_000 }),
+        "r-debug": actionRun("r-debug", debug, { threadId: "s-ti-1", projectId: "repo-cf", worktree: TREE }, "", { mode: "background", ports: [7788], startedAtMs: Date.now() - 60_000 }),
+      },
+    }));
+  });
+  return { parent: "s-ti-1", child, devRun: "r-dev", devTerminal: "t-dev", debugRun: "r-debug" };
 }
 
 export const WS9 = ["api", "web", "auth-lib", "docs", "mobile", "infra", "billing", "notify", "cli"] as const;

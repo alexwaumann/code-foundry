@@ -13,9 +13,9 @@ vi.mock("sonner", () => ({ toast: { error: toastError } }));
 const writeTerminal = vi.hoisted(() => vi.fn());
 vi.mock("@/api/terminal", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/api/terminal")>()), writeTerminal }));
 
-const { closeBottomTerminal, closeEmptyPanels, newBottomTerminal, newThreadTerminal, onNewTerminal, onRemovedTerminal, openBottomShell, paneContext, revealShell, runInThreadTerminal, toggleBottomFromHere } =
+const { carryShownTerminal, closeBottomTerminal, closeEmptyPanels, newBottomTerminal, newThreadTerminal, onNewTerminal, onRemovedTerminal, openBottomShell, paneContext, revealShell, runInThreadTerminal, showTerminalIn, toggleBottomFromHere } =
   await import("./bottomActions");
-const { getBottom, markPendingFocus, markStarting, useBottomStore } = await import("./bottomPanel");
+const { bottomTabIds, getBottom, markPendingFocus, markStarting, useBottomStore } = await import("./bottomPanel");
 const { usePanelStore } = await import("./panel");
 const { useTerminalsStore } = await import("./terminals");
 const { HOME, useUiStore } = await import("./ui");
@@ -27,7 +27,7 @@ function term(id: string, labels: Record<string, string>, extra: Partial<Termina
 const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", project: "r1", worktree, ...(thread ? { thread } : {}) });
 
 function setTerminals(list: TerminalView[]): void {
-  useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });
+  useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true, shownIn: {} });
 }
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as const };
@@ -517,5 +517,144 @@ describe("closeBottomTerminal", () => {
     if (!stillThere) setTerminals([]);
     await closeBottomTerminal("a");
     expect(toastError).toHaveBeenCalledTimes(toasted ? 1 : 0);
+  });
+});
+
+// docs/notes/server-rollup.md: a child thread's terminal opened from its parent's card.
+describe("a rolled-up terminal", () => {
+  const run = (id: string, thread = "kid") => term(id, { kind: "action", project: "r1", worktree: "/src/app", thread, action: "a-dev", "action.name": "Dev" });
+  const P = "thread:s1";
+  const KID = "thread:kid";
+  const tabs = (key: string) => bottomTabIds(useTerminalsStore.getState(), key);
+  /** The store as a removed terminal's event leaves it, and the event's call. */
+  function remove(id: string): void {
+    const before = useTerminalsStore.getState();
+    const t = before.byId[id];
+    if (!t) throw new Error(id);
+    const { [id]: _gone, ...byId } = before.byId;
+    useTerminalsStore.setState({ byId, order: before.order.filter((x) => x !== id) });
+    onRemovedTerminal(t, before);
+  }
+
+  beforeEach(() => {
+    setTerminals([term("a", shell("s1")), run("dev"), run("dev2")]);
+  });
+
+  it("opens a closed panel on it, focused, and the selection stays", () => {
+    expect(showTerminalIn("dev", P)).toBe(true);
+    expect(getBottom(P)).toEqual({ open: true, activeTerminalId: "dev" });
+    expect(tabs(P)).toEqual(["a", "dev"]);
+    expect(tabs(KID)).toEqual(["dev", "dev2"]);
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
+    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
+  });
+
+  it("uncovers the panel: a sheet closes and the side panel leaves full width", () => {
+    useViewsStore.setState({ settingsOpen: true });
+    usePanelStore.setState({ byKey: { [P]: { open: true, expanded: true } as never } });
+    showTerminalIn("dev", P);
+    expect(useViewsStore.getState().settingsOpen).toBe(false);
+    expect(usePanelStore.getState().byKey[P]?.expanded).toBeFalsy();
+  });
+
+  it("already open: activates it without a second tab", () => {
+    showTerminalIn("dev", P);
+    showTerminalIn("dev2", P);
+    showTerminalIn("dev", P);
+    expect(tabs(P)).toEqual(["a", "dev", "dev2"]);
+    expect(getBottom(P).activeTerminalId).toBe("dev");
+  });
+
+  it("a thread's own terminal is just shown: its tab stays a real one, whose × closes", async () => {
+    setTerminals([run("own", "s1")]);
+    showTerminalIn("own", P);
+    expect(useTerminalsStore.getState().shownIn).toEqual({});
+    await closeBottomTerminal("own", P);
+    expect(commands.invokeConfirmed).toHaveBeenCalledWith("terminal.close", { id: "own" }, expect.anything());
+  });
+
+  it("an unknown terminal is refused, so the row falls back to the browser", () => {
+    expect(showTerminalIn("nope", P)).toBe(false);
+    expect(getBottom(P).open).toBe(false);
+  });
+
+  it("shows in every ancestor it was opened from; hiding it in one leaves the others", async () => {
+    showTerminalIn("dev", P);
+    showTerminalIn("dev", "thread:gp");
+    await closeBottomTerminal("dev", P);
+    expect(tabs(P)).toEqual(["a"]);
+    expect(tabs("thread:gp")).toEqual(["dev"]);
+  });
+
+  it("× hides it and never reaches the daemon; the tab after it becomes active", async () => {
+    setTerminals([term("a", shell("s1")), run("dev"), term("b", shell("s1"))]);
+    showTerminalIn("dev", P);
+    await closeBottomTerminal("dev", P);
+    expect(commands.invokeConfirmed).not.toHaveBeenCalled();
+    expect(useTerminalsStore.getState().byId.dev).toBeDefined();
+    expect(tabs(P)).toEqual(["a", "b"]);
+    expect(getBottom(P).activeTerminalId).toBe("b");
+    expect(tabs(KID)).toEqual(["dev"]);
+  });
+
+  it("hiding the last tab hides the panel, and the keyboard goes to the content pane", async () => {
+    setTerminals([run("dev")]);
+    showTerminalIn("dev", P);
+    useUiStore.setState({ focus: "bottom" });
+    await closeBottomTerminal("dev", P);
+    expect(getBottom(P).open).toBe(false);
+    expect(useUiStore.getState().contentFocusSeq).toBe(1);
+  });
+
+  it("reopening after a hide shows it again", async () => {
+    showTerminalIn("dev", P);
+    await closeBottomTerminal("dev", P);
+    expect(showTerminalIn("dev", P)).toBe(true);
+    expect(tabs(P)).toEqual(["a", "dev"]);
+    expect(getBottom(P)).toMatchObject({ open: true, activeTerminalId: "dev" });
+  });
+
+  it("from the owner's panel × is still a real close, and without a key too (a Rerun)", async () => {
+    showTerminalIn("dev", P);
+    await closeBottomTerminal("dev", KID);
+    await closeBottomTerminal("dev");
+    expect(commands.invokeConfirmed.mock.calls.map((c) => c[0])).toEqual(["terminal.close", "terminal.close"]);
+  });
+
+  it("when the terminal goes, every panel showing it moves on: a neighbour takes over, a last tab hides", () => {
+    setTerminals([term("a", shell("s1")), run("dev"), term("g", shell("gp"))]);
+    showTerminalIn("dev", P);
+    useUiStore.setState({ selection: { kind: "thread", id: "gp2" } });
+    showTerminalIn("dev", "thread:gp2");
+    remove("dev");
+    expect(getBottom(P).activeTerminalId).toBe("a");
+    expect(getBottom("thread:gp2").open).toBe(false);
+    expect(useTerminalsStore.getState().shownIn).toEqual({});
+  });
+
+  it("a Rerun's terminal takes the old one's place, active where it was pressed; it may not have arrived", () => {
+    showTerminalIn("dev", P);
+    showTerminalIn("dev", "thread:gp");
+    const seq = useUiStore.getState().bottomFocusSeq;
+    carryShownTerminal("t-next", [P, "thread:gp"]);
+    expect(getBottom(P).activeTerminalId).toBe("t-next");
+    expect(useUiStore.getState().bottomFocusSeq).toBe(seq + 1);
+    useTerminalsStore.setState((s) => ({ byId: { ...s.byId, "t-next": run("t-next") }, order: [...s.order, "t-next"] }));
+    remove("dev");
+    expect(tabs(P)).toEqual(["a", "t-next"]);
+    expect(tabs("thread:gp")).toEqual(["t-next"]);
+  });
+});
+
+describe("a plugin's terminal going", () => {
+  it("leaves the panel it was opened in like any tab", () => {
+    const clock = term("clock", { kind: "plugin", plugin: "hello" });
+    setTerminals([term("a", shell("s1")), clock]);
+    useTerminalsStore.setState({ shownIn: { clock: ["thread:s1"] } });
+    useBottomStore.setState({ byKey: { "thread:s1": { open: true, activeTerminalId: "clock" } } });
+    const before = useTerminalsStore.getState();
+    useTerminalsStore.setState({ byId: { a: before.byId.a as TerminalView }, order: ["a"] });
+    onRemovedTerminal(clock, before);
+    expect(getBottom("thread:s1").activeTerminalId).toBe("a");
   });
 });

@@ -20,10 +20,11 @@ const { attach } = await import("@/test/terminalHost");
 const { ACTION_IDS, action, actionTerminal, fakeActionCommands, seedActions, terminalExited, terminalRemoved, terminalUpdated } = await import("@/test/actionsWorld");
 const { CF, DOT, FEAT, GP, seedWorld } = await import("@/test/projectsWorld");
 const { runAction } = await import("@/stores/actionActions");
-const { closeEmptyPanels, newWorktreeTerminal, toggleBottomFromHere } = await import("@/stores/bottomActions");
+const { closeEmptyPanels, newWorktreeTerminal, showTerminalIn, toggleBottomFromHere } = await import("@/stores/bottomActions");
 const { getBottom, useBottomStore } = await import("@/stores/bottomPanel");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useActionStopsStore } = await import("@/stores/actionStops");
+const { useActionsStore } = await import("@/stores/actions");
 const { useTerminalsStore } = await import("@/stores/terminals");
 const { useThreadsStore } = await import("@/stores/threads");
 const { PROJECTS_INDEX, projectPage, useUiStore } = await import("@/stores/ui");
@@ -561,5 +562,104 @@ describe("cmd+j and the empty state", () => {
     await settle();
     expect(tabs()).toHaveLength(1);
     expect(invocationsOf("terminal.new")).toHaveLength(3);
+  });
+});
+
+// docs/notes/server-rollup.md: s-2's run, opened in s-1's panel from its card.
+describe("a rolled-up tab", () => {
+  const owner = { threadId: "s-2", projectId: "repo-gp", worktree: GP };
+  const dev = action(ACTION_IDS.dev, "repo-gp", "Dev", "pnpm dev");
+
+  /** s-1 on screen, with s-2's Dev run shown in its panel. */
+  async function shown(): Promise<string> {
+    const started = fakeActionCommands(worktreeOf);
+    seedActions();
+    useActionsStore.setState((s) => ({ byId: { ...s.byId, [dev.id]: dev } }));
+    select({ kind: "thread", id: "s-1" });
+    renderPanel();
+    terminalUpdated(actionTerminal("t-dev", dev, "r-dev", owner));
+    act(() => {
+      showTerminalIn("t-dev", "thread:s-1");
+    });
+    await settle();
+    expect(started).toEqual([]);
+    return "t-dev";
+  }
+
+  it("is an action tab like any: the action's name, echo, status line, one host on the terminal", async () => {
+    const id = await shown();
+    expect(tabTexts()).toEqual(["code-foundry", "Dev"]);
+    expect(host().dataset.terminalId).toBe(id);
+    expect(screen.getByTestId("action-echo").textContent).toBe("$ pnpm dev");
+    expect(status().dataset.status).toBe("running");
+  });
+
+  it("× says Hide and never closes or kills; the owner's tab is left", async () => {
+    const id = await shown();
+    const tab = tabOf(id) as HTMLElement;
+    const hide = within(tab).getByRole("button", { name: "Hide Dev" });
+    expect(tooltipText(hide)).toBe("Hide tab");
+    fireEvent.click(hide);
+    await settle();
+    expect(tabOf(id)).toBeNull();
+    expect(invocationsOf("terminal.close")).toEqual([]);
+    expect(invocationsOf("terminal.kill")).toEqual([]);
+    expect(useTerminalsStore.getState().byId[id]).toBeDefined();
+  });
+
+  it("a middle click and cmd+w hide it too", async () => {
+    const id = await shown();
+    fireEvent(tabOf(id) as HTMLElement, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    await settle();
+    expect(tabOf(id)).toBeNull();
+    act(() => {
+      showTerminalIn(id, "thread:s-1");
+    });
+    await settle();
+    fireEvent.keyDown(screen.getByTestId("bottom-panel"), { key: "w", code: "KeyW", metaKey: true });
+    await settle();
+    expect(tabOf(id)).toBeNull();
+    expect(invocationsOf("terminal.close")).toEqual([]);
+  });
+
+  it("the footer's Stop kills it; the tab stays Stopped, like any action tab", async () => {
+    const id = await shown();
+    fireEvent.click(screen.getByTestId("action-stop"));
+    await settle();
+    expect(invocationsOf("terminal.kill").map((i) => i.args.id)).toEqual([id]);
+    expect(status().dataset.status).toBe("stopped");
+    expect(tabOf(id)).not.toBeNull();
+  });
+
+  it("a finished run's × still only hides; the terminal stays for its owner", async () => {
+    const id = await shown();
+    terminalExited(id, 0);
+    await settle();
+    fireEvent.click(within(tabOf(id) as HTMLElement).getByRole("button", { name: "Hide Dev" }));
+    await settle();
+    expect(tabOf(id)).toBeNull();
+    expect(invocationsOf("terminal.close")).toEqual([]);
+  });
+
+  it("Rerun runs for the owner and the new tab stays here, active", async () => {
+    const id = await shown();
+    terminalExited(id, 0);
+    await settle();
+    fireEvent.click(screen.getByTestId("action-rerun"));
+    await settle();
+    expect(invocationsOf("action.run").map((i) => i.context.activeThreadId)).toEqual(["s-2"]);
+    expect(invocationsOf("terminal.close").map((i) => i.args.id)).toEqual([id]);
+    expect(tabOf(id)).toBeNull();
+    expect(tabTexts()).toEqual(["code-foundry", "Dev"]);
+    expect(host().dataset.terminalId).toMatch(/^t-run-/);
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
+  });
+
+  it("the terminal going takes the tab with it, and the neighbour takes over", async () => {
+    const id = await shown();
+    terminalRemoved(id);
+    await settle();
+    expect(tabTexts()).toEqual(["code-foundry"]);
+    expect(host().dataset.terminalId).toBe(S1_SHELL);
   });
 });

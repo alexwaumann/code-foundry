@@ -8,6 +8,7 @@ import {
   isStarting,
   markStarting,
   focusedBottomShell,
+  isRolledUpTab,
   markPendingFocusId,
   neighbourOf,
   takePendingFocusId,
@@ -217,6 +218,34 @@ describe("focusedBottomShell", () => {
   ];
   it.each(cases)("%s", (_name, selection, focus, palette, byKey, want) => {
     expect(focusedBottomShell({ selection, focus, palette }, terminals, byKey)).toBe(want);
+  });
+});
+
+describe("rolled-up tabs", () => {
+  const dev = term("dev", { kind: "action", thread: "kid", "action.name": "Dev" });
+  const clock = term("clock", { kind: "plugin", plugin: "hello" });
+  const terminals = { ...data([term("a", shell("p")), dev, clock]), shownIn: { dev: ["thread:p", "thread:gp"], clock: ["thread:p"] } };
+
+  it("a shown terminal is a tab of each panel it was opened in and of its owner's", () => {
+    expect(bottomTabIds(terminals, "thread:p")).toEqual(["a", "dev", "clock"]);
+    expect(bottomTabIds(terminals, "thread:gp")).toEqual(["dev"]);
+    expect(bottomTabIds(terminals, "thread:kid")).toEqual(["dev"]);
+    expect(bottomTabIds(terminals, "thread:other")).toEqual([]);
+  });
+
+  it("only another thread's terminal opened here is rolled up: not the owner's tab, not a plugin's", () => {
+    expect(isRolledUpTab(terminals, "thread:p", "dev")).toBe(true);
+    expect(isRolledUpTab(terminals, "thread:kid", "dev")).toBe(false);
+    expect(isRolledUpTab(terminals, "thread:other", "dev")).toBe(false);
+    expect(isRolledUpTab(terminals, "thread:p", "clock")).toBe(false);
+    expect(isRolledUpTab(terminals, "thread:p", "a")).toBe(false);
+  });
+
+  it("the palette's terminal commands do not reach a rolled-up tab; the owner's panel still does", () => {
+    const palette = { open: false, returnTo: "content" };
+    const key = (id: string) => ({ [`thread:${id}`]: { open: true, activeTerminalId: "dev" } });
+    expect(focusedBottomShell({ selection: { kind: "thread", id: "p" }, focus: "bottom", palette }, terminals, key("p"))).toBe("");
+    expect(focusedBottomShell({ selection: { kind: "thread", id: "kid" }, focus: "bottom", palette }, terminals, key("kid"))).toBe("dev");
   });
 });
 
