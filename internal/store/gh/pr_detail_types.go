@@ -69,6 +69,9 @@ type FullPullRequest struct {
 	// FetchFailed: this is the cached copy, served because the fetch failed. Never
 	// stored; it tells a stale copy from a fresh fetch whose LastError is about checks.
 	FetchFailed bool `json:"-"`
+	// Refreshing: this is the cached copy, not current, and a fetch is on its way;
+	// PullRequestDetailUpdated says when it ended. Never stored.
+	Refreshing bool `json:"-"`
 }
 
 // ViewerCanUpdate reports write access: the viewer may request reviewers and revert.
@@ -237,8 +240,12 @@ type MergeResult struct {
 
 // PullRequestDetailUpdated is published when a cached FullPullRequest changed or went
 // stale (a poll saw the pull request change, a review request was set, it was
-// reverted or merged). Clients re-read with GetPullRequestDetail.
+// reverted or merged), or when a fetch a read was promised ended. Clients re-read with
+// GetPullRequestDetail.
 type PullRequestDetailUpdated struct {
 	Slug   string
 	Number int
+	// Unchanged: the pull request's data is as it was; only what a client reads about
+	// the copy moved (fetched_at, refreshing, fetch_failed).
+	Unchanged bool
 }

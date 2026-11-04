@@ -3394,7 +3394,10 @@ type PullRequestDetail struct {
 	AutoMergeMethod PullRequestMergeMethod `protobuf:"varint,27,opt,name=auto_merge_method,json=autoMergeMethod,proto3,enum=codefoundry.v1.PullRequestMergeMethod" json:"auto_merge_method,omitempty"`
 	// This is the cached copy, served because fetching it from GitHub failed (last_error
 	// says why). False for a fresh fetch, also when last_error explains checks_truncated.
-	FetchFailed   bool `protobuf:"varint,28,opt,name=fetch_failed,json=fetchFailed,proto3" json:"fetch_failed,omitempty"`
+	FetchFailed bool `protobuf:"varint,28,opt,name=fetch_failed,json=fetchFailed,proto3" json:"fetch_failed,omitempty"`
+	// This is the cached copy, not current, and a fetch from GitHub is on its way;
+	// pull_request_detail_updated says when it ended.
+	Refreshing    bool `protobuf:"varint,29,opt,name=refreshing,proto3" json:"refreshing,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3621,6 +3624,13 @@ func (x *PullRequestDetail) GetAutoMergeMethod() PullRequestMergeMethod {
 func (x *PullRequestDetail) GetFetchFailed() bool {
 	if x != nil {
 		return x.FetchFailed
+	}
+	return false
+}
+
+func (x *PullRequestDetail) GetRefreshing() bool {
+	if x != nil {
+		return x.Refreshing
 	}
 	return false
 }
@@ -5572,7 +5582,8 @@ func (x *GhEvent_PullRequestChanged) GetChanges() []*PullRequestChange {
 }
 
 // A pull request's cached detail changed or went stale (a poll saw the pull request
-// change, or a review request was set). Re-read with GetPullRequestDetail.
+// change, or a review request was set), or a fetch promised by refreshing ended.
+// Re-read with GetPullRequestDetail.
 type GhEvent_PullRequestDetailUpdated struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RepoSlug      string                 `protobuf:"bytes,1,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
@@ -6152,7 +6163,7 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x18\n" +
 	"\arefresh\x18\x03 \x01(\bR\arefresh\"Y\n" +
 	"\x1cGetPullRequestDetailResponse\x129\n" +
-	"\x06detail\x18\x01 \x01(\v2!.codefoundry.v1.PullRequestDetailR\x06detail\"\x98\v\n" +
+	"\x06detail\x18\x01 \x01(\v2!.codefoundry.v1.PullRequestDetailR\x06detail\"\xb8\v\n" +
 	"\x11PullRequestDetail\x12>\n" +
 	"\fpull_request\x18\x01 \x01(\v2\x1b.codefoundry.v1.PullRequestR\vpullRequest\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x128\n" +
@@ -6184,7 +6195,10 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x0edefault_branch\x18\x19 \x01(\tR\rdefaultBranch\x12,\n" +
 	"\x12auto_merge_allowed\x18\x1a \x01(\bR\x10autoMergeAllowed\x12R\n" +
 	"\x11auto_merge_method\x18\x1b \x01(\x0e2&.codefoundry.v1.PullRequestMergeMethodR\x0fautoMergeMethod\x12!\n" +
-	"\ffetch_failed\x18\x1c \x01(\bR\vfetchFailed\"<\n" +
+	"\ffetch_failed\x18\x1c \x01(\bR\vfetchFailed\x12\x1e\n" +
+	"\n" +
+	"refreshing\x18\x1d \x01(\bR\n" +
+	"refreshing\"<\n" +
 	"\x10PullRequestLabel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05color\x18\x02 \x01(\tR\x05color\"\xab\x02\n" +

@@ -73,8 +73,9 @@ func mergeCommand(b GhBackend, slug, number ArgSpec) Command {
 // the branch it deletes: the title and repository say which pull request when a page
 // asks (docs/notes/bridge-fix-c-daemon.md). Without head-sha it also names what merges
 // ("#N “…” (3 commits, head e2e0142)"): the daemon merges its head at the time, and this
-// is the user's look at it. Empty (the static Confirm instead) when the args are bad or
-// the detail cannot be read.
+// is the user's look at it, so the read asks GitHub rather than take a copy that may be
+// behind; with head-sha the daemon refuses any other head, and the cached copy will do.
+// Empty (the static Confirm instead) when the args are bad or the detail cannot be read.
 func mergeConfirm(ctx context.Context, b GhBackend, a Args) string {
 	words, ok := mergeMethodWords[a.String("method")]
 	if !ok || checkPullRequestArgs(a) != nil {
@@ -82,7 +83,7 @@ func mergeConfirm(ctx context.Context, b GhBackend, a Args) string {
 	}
 	n := a.Int("number")
 	res, err := b.GetPullRequestDetail(ctx, connect.NewRequest(&v1.GetPullRequestDetailRequest{
-		RepoSlug: a.String("repo-slug"), Number: int32(n),
+		RepoSlug: a.String("repo-slug"), Number: int32(n), Refresh: a.String("head-sha") == "",
 	}))
 	if err != nil {
 		return ""

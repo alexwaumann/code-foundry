@@ -46,6 +46,7 @@ func detailFixture(at time.Time) gh.FullPullRequest {
 		FetchedAt:          at,
 		LastError:          "stale",
 		FetchFailed:        true,
+		Refreshing:         true,
 	}
 }
 
@@ -77,7 +78,7 @@ func TestGhGetPullRequestDetail(t *testing.T) {
 					t.Errorf("summary = %v", pr)
 				}
 				if d.GetBody() != "## Summary\nIt fixes the thing." || d.GetNodeId() != "PR_7" || !d.GetViewerCanUpdate() ||
-					d.GetViewerPermission() != "write" || !d.GetFetchedAt().AsTime().Equal(at) || d.GetLastError() != "stale" || !d.GetFetchFailed() ||
+					d.GetViewerPermission() != "write" || !d.GetFetchedAt().AsTime().Equal(at) || d.GetLastError() != "stale" || !d.GetFetchFailed() || !d.GetRefreshing() ||
 					d.GetCommitCount() != 120 || !d.GetCommentsTruncated() || !d.GetReviewThreadsTruncated() ||
 					!d.GetLabelsTruncated() || !d.GetReviewersTruncated() || !d.GetChecksTruncated() {
 					t.Errorf("detail = %v", d)
@@ -118,7 +119,7 @@ func TestGhGetPullRequestDetail(t *testing.T) {
 			req:  &v1.GetPullRequestDetailRequest{RepoSlug: "o/r", Number: 8, Refresh: true},
 			check: func(t *testing.T, d *v1.PullRequestDetail) {
 				if d.GetMergeCommitSha() != "def" || d.GetMergedBy() != "kim" || !d.GetClosedAt().AsTime().Equal(at) ||
-					d.GetViewerCanUpdate() || d.GetViewerPermission() != "read" || d.GetLastError() != "" || d.GetFetchFailed() ||
+					d.GetViewerCanUpdate() || d.GetViewerPermission() != "read" || d.GetLastError() != "" || d.GetFetchFailed() || d.GetRefreshing() ||
 					d.GetLabelsTruncated() || d.GetReviewersTruncated() || d.GetChecksTruncated() ||
 					d.GetPullRequest().GetState() != v1.PullRequestState_PULL_REQUEST_STATE_MERGED {
 					t.Errorf("merged = %v", d)

@@ -43,6 +43,16 @@ func nextInterval(cfg Config, p Presence, idle bool, idleInterval time.Duration)
 	return d
 }
 
+// pollCadence is the interval the poll runs at right now: nextInterval for the current
+// presence, what a poll finishing now would schedule.
+func (s *Store) pollCadence(cfg Config) time.Duration {
+	p := s.presence()
+	s.mu.Lock()
+	idle := isIdle(cfg, len(s.tracked), len(s.watches)+len(s.prWatches))
+	s.mu.Unlock()
+	return nextInterval(cfg, p, idle, s.opts.IdleInterval)
+}
+
 // presence returns the current presence; foreground without Options.Presence. The
 // daemon's Options.Presence reads presence.Tracker.Current, which never waits on a
 // subscriber, so this is safe with or without s.mu held.

@@ -156,7 +156,7 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 	if m, ok := s.full.reverts.recent(k, s.opts.Now()); ok {
 		return m.res, m.err
 	}
-	d, err := s.FullPullRequest(ctx, k.slug, k.number, false)
+	d, err := s.currentFull(ctx, k)
 	if err != nil {
 		return RevertResult{}, err
 	}

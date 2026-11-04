@@ -132,10 +132,12 @@ type GhServiceClient interface {
 	// GetPullRequestDetail returns everything the pull request detail panel shows: the
 	// summary, body, labels, reviewers, commits, comments and reviews, review threads, and
 	// checks. On demand (one GraphQL request, more only for checks beyond 100), cached per
-	// pull request. The cache serves until refresh is set, the entry is older than the
-	// poll interval, or a poll saw the pull request change (updated, pushed, state, or
-	// check counts); pull_request_detail_updated says so. On fetch failure the cached
-	// copy is returned with last_error set.
+	// pull request. A copy is current until the entry is older than the poll interval or
+	// a poll saw the pull request change (updated, pushed, state, or check counts). Any
+	// cached copy answers at once: one that is not current comes with refreshing set and
+	// a fetch queued, and pull_request_detail_updated follows when it ends. Only nothing
+	// cached, refresh, and the read right after a write made here wait for GitHub. On
+	// fetch failure the cached copy is returned with last_error and fetch_failed set.
 	GetPullRequestDetail(context.Context, *connect.Request[v1.GetPullRequestDetailRequest]) (*connect.Response[v1.GetPullRequestDetailResponse], error)
 	// ListReviewerCandidates returns who can be asked to review a pull request: the
 	// current requests (users and teams) and, for a non-empty query, up to 20 of the
@@ -512,10 +514,12 @@ type GhServiceHandler interface {
 	// GetPullRequestDetail returns everything the pull request detail panel shows: the
 	// summary, body, labels, reviewers, commits, comments and reviews, review threads, and
 	// checks. On demand (one GraphQL request, more only for checks beyond 100), cached per
-	// pull request. The cache serves until refresh is set, the entry is older than the
-	// poll interval, or a poll saw the pull request change (updated, pushed, state, or
-	// check counts); pull_request_detail_updated says so. On fetch failure the cached
-	// copy is returned with last_error set.
+	// pull request. A copy is current until the entry is older than the poll interval or
+	// a poll saw the pull request change (updated, pushed, state, or check counts). Any
+	// cached copy answers at once: one that is not current comes with refreshing set and
+	// a fetch queued, and pull_request_detail_updated follows when it ends. Only nothing
+	// cached, refresh, and the read right after a write made here wait for GitHub. On
+	// fetch failure the cached copy is returned with last_error and fetch_failed set.
 	GetPullRequestDetail(context.Context, *connect.Request[v1.GetPullRequestDetailRequest]) (*connect.Response[v1.GetPullRequestDetailResponse], error)
 	// ListReviewerCandidates returns who can be asked to review a pull request: the
 	// current requests (users and teams) and, for a non-empty query, up to 20 of the

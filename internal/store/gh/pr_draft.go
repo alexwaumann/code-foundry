@@ -171,7 +171,7 @@ func (s *Store) SetPullRequestAutoMerge(ctx context.Context, slug string, number
 // one, which must be fetched: the cached copy may be behind. It refuses with
 // ErrFailedPrecondition when refusal still finds something ("is a draft").
 func (s *Store) freshFor(ctx context.Context, k fullKey, look func(*FullPullRequest) bool, refusal func(*FullPullRequest) string) (FullPullRequest, error) {
-	d, err := s.FullPullRequest(ctx, k.slug, k.number, false)
+	d, err := s.currentFull(ctx, k)
 	if err != nil {
 		return FullPullRequest{}, err
 	}

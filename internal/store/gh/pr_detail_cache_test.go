@@ -3,6 +3,7 @@ package gh
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -63,7 +64,7 @@ func TestFullCacheAdopt(t *testing.T) {
 }
 
 // A row read back from SQLite may predate polls that would have marked it stale (it was
-// evicted from memory, or the daemon was down), so the first read fetches.
+// evicted from memory, or the daemon was down), so the first read shows it and fetches.
 func TestFullPullRequestSQLiteRowStartsStale(t *testing.T) {
 	g, _ := changeDrivenWorld()
 	g.setBody("PR_a", "v1")
@@ -78,11 +79,13 @@ func TestFullPullRequestSQLiteRowStartsStale(t *testing.T) {
 	f2 := (&fakeRunner{}).serve(g)
 	s2 := startStore(t, testOptions(db, f2, nil))
 	d, err := s2.FullPullRequest(ctx, "o/r", 1, false)
-	if err != nil || d.Body != "v2" || f2.count("PullRequestFull") != 1 {
-		t.Errorf("after reload: body %q, err %v, fetches %d; want v2 fetched once", d.Body, err, f2.count("PullRequestFull"))
+	if err != nil || d.Body != "v1" || !d.Refreshing {
+		t.Errorf("after reload: body %q, refreshing %v, err %v; want v1 at once", d.Body, d.Refreshing, err)
 	}
-	if _, err := s2.FullPullRequest(ctx, "o/r", 1, false); err != nil || f2.count("PullRequestFull") != 1 {
-		t.Errorf("second read fetched again (%d) or failed: %v", f2.count("PullRequestFull"), err)
+	settleWorker(t, s2)
+	d, err = s2.FullPullRequest(ctx, "o/r", 1, false)
+	if err != nil || d.Body != "v2" || d.Refreshing || f2.count("PullRequestFull") != 1 {
+		t.Errorf("second read: body %q, refreshing %v, err %v, fetches %d; want v2 fetched once", d.Body, d.Refreshing, err, f2.count("PullRequestFull"))
 	}
 }
 
@@ -167,10 +170,18 @@ func TestFullEntryServes(t *testing.T) {
 		{"closed, past closedDetailTTL", entry(PullRequestClosed, 11*time.Minute, never, false), false},
 		{"merged, stale inside closedDetailTTL", entry(PullRequestMerged, time.Minute, never, true), false},
 		{"merged, confirmed but past confirmedMaxAge", entry(PullRequestMerged, 11*time.Minute, 0, false), false},
+		{"open, hidden windows: confirmed inside the tier's window", entry(PullRequestOpen, 8*time.Minute, 6*time.Minute, false), true},
+		{"open, hidden windows: past the tier's window", entry(PullRequestOpen, 8*time.Minute, 7*time.Minute+30*time.Second, false), false},
+		{"open, hidden windows: the age limit stays the configured interval", entry(PullRequestOpen, 2*time.Minute, never, false), false},
+		{"open, hidden windows: confirmedMaxAge still caps it", entry(PullRequestOpen, confirmedMaxAge, time.Minute, false), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.e.serves(now, interval); got != tt.want {
+			cadence := interval
+			if strings.HasPrefix(tt.name, "open, hidden windows") {
+				cadence = DefaultBackgroundInterval
+			}
+			if got := tt.e.serves(now, interval, cadence); got != tt.want {
 				t.Errorf("serves = %v, want %v", got, tt.want)
 			}
 		})
@@ -178,7 +189,7 @@ func TestFullEntryServes(t *testing.T) {
 
 	// A poll interval longer than closedDetailTTL stays the closed limit too.
 	long := entry(PullRequestMerged, 15*time.Minute, never, false)
-	if !long.serves(now, 20*time.Minute) {
+	if !long.serves(now, 20*time.Minute, 20*time.Minute) {
 		t.Error("merged under a 20 minute interval: refetched before the interval")
 	}
 }

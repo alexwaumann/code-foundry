@@ -54,7 +54,7 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 	if m, ok := s.full.merges.recent(k, s.opts.Now()); ok {
 		return repeatMerge(m, r)
 	}
-	d, err := s.FullPullRequest(ctx, k.slug, k.number, false)
+	d, err := s.currentFull(ctx, k)
 	if err != nil {
 		return MergeResult{}, err
 	}
