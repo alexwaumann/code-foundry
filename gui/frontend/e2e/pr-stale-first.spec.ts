@@ -29,7 +29,7 @@ test("the fetch landing behind a stale copy leaves the panel where it was scroll
   await page.getByTestId("pr-tab-activity").click();
   const scrollTop = (to?: number) =>
     page.getByTestId("pr-surface").evaluate((surface, y) => {
-      let el: HTMLElement | null = surface;
+      let el: Element | null = surface;
       while (el && !(el.scrollHeight > el.clientHeight && /auto|scroll/.test(getComputedStyle(el).overflowY))) el = el.parentElement;
       if (!el) throw new Error("the surface does not scroll");
       if (y !== undefined) el.scrollTop = y;
