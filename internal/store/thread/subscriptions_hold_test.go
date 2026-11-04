@@ -93,11 +93,12 @@ type leadEnv struct {
 	sub     string
 }
 
-func newLeadEnv(t *testing.T) *leadEnv {
+func newLeadEnv(t *testing.T, mutate ...func(*Options)) *leadEnv {
 	t.Helper()
 	clock := &atomic.Int64{}
 	clock.Store(time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC).UnixNano())
-	l := &leadEnv{clock: clock, env: newEnv(t, func(o *Options) { o.Now = func() time.Time { return time.Unix(0, clock.Load()).UTC() } })}
+	mutate = append([]func(*Options){func(o *Options) { o.Now = func() time.Time { return time.Unix(0, clock.Load()).UTC() } }}, mutate...)
+	l := &leadEnv{clock: clock, env: newEnv(t, mutate...)}
 	l.top, l.lead = l.stopped("top"), l.stopped("lead")
 	for _, name := range []string{"w1", "w2", "w3"} {
 		w := l.stopped(name)

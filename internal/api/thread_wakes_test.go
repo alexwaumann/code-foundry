@@ -157,4 +157,8 @@ func TestStopWaitingRPC(t *testing.T) {
 	if _, err := c.StopWaiting(ctx, connect.NewRequest(&v1.StopThreadWaitingRequest{ThreadId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("unknown thread: %v", err)
 	}
+	fake.Put(thread.Thread{ID: "ember", Kind: thread.KindResident, ResidentName: "ember"})
+	if _, err := c.StopWaiting(ctx, connect.NewRequest(&v1.StopThreadWaitingRequest{ThreadId: "ember"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("a resident thread: %v", err)
+	}
 }

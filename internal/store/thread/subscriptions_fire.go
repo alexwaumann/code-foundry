@@ -72,6 +72,46 @@ type wakeQueue struct {
 	items   []delivery
 	running bool
 	holding bool
+	// taken are the wakes the drain took off items and has not sent yet, by subscription:
+	// through the batch window (seconds) and while their message is built. Only a Send
+	// that started is past stopping. A restart's wakes are under "" and their
+	// subscriptions (next). Nil when none.
+	taken map[string]Subscription
+	// dropped are those of taken a stop or an unsubscribe took back (dropWakesLocked):
+	// never sent, never held. By subscription, not for the whole batch: a new subscription
+	// that fires after the stop joins the same open batch and goes.
+	dropped map[string]bool
+}
+
+// take notes d as taken off items. Callers hold s.mu.
+func (q *wakeQueue) take(d delivery) {
+	if q.taken == nil {
+		q.taken = map[string]Subscription{}
+	}
+	q.taken[d.sub] = d.of
+	if d.restart != nil {
+		for _, sub := range d.restart.subs {
+			q.taken[sub] = Subscription{}
+		}
+	}
+}
+
+// droppedLocked reports whether the taken wake of subscription sub was taken back.
+// Callers hold s.mu.
+func (q *wakeQueue) droppedLocked(sub string) bool { return q != nil && q.dropped[sub] }
+
+// spentLocked reports whether nothing is left to send: nothing queued, and every wake
+// taken was taken back, while the drain waits out a window that no longer matters.
+func (q *wakeQueue) spentLocked() bool {
+	if len(q.items) > 0 || len(q.taken) == 0 {
+		return false
+	}
+	for sub := range q.taken {
+		if !q.dropped[sub] {
+			return false
+		}
+	}
+	return true
 }
 
 // delivery is a wake to send, or (limit) the wake limit to tell. msg makes the message
@@ -79,7 +119,9 @@ type wakeQueue struct {
 // target's items then, and may join others in one message: subscriptions_batch.go); the
 // wakes of a restart have restart (subscriptions_restart.go), which batches like one.
 type delivery struct {
-	sub     string // the subscription, for the log
+	sub string // the subscription: the log, and taking a wake back (dropWakesLocked)
+	// of is that subscription as it fired: all that is left of a one-shot once it fired.
+	of      Subscription
 	msg     func(context.Context) Message
 	thread  func(context.Context) threadWakePart
 	restart *restartWakes
@@ -195,7 +237,7 @@ func (m *Manager) fireLaterLocked(r *subRec, handled int64, build func(Subscript
 	}
 	r.s.FiredCount++
 	r.s.LastFiredAt = now
-	d.sub, d.queued = r.s.ID, time.Now()
+	d.sub, d.of, d.queued = r.s.ID, sub, time.Now()
 	if !joins {
 		d.slot = now
 	}
@@ -260,7 +302,19 @@ func (s *subscriptions) next(subscriber string, batching bool) (delivery, bool) 
 	d := q.items[0]
 	q.items = q.items[1:]
 	q.holding = batching && d.batched()
+	if d.batched() {
+		q.take(d)
+	}
 	return d, true
+}
+
+// delivered ends what next and collectBatch took: the drain is done with it.
+func (s *subscriptions) delivered(subscriber string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if q := s.queues[subscriber]; q != nil {
+		q.taken, q.dropped = nil, nil
+	}
 }
 
 // drain delivers subscriber's wakes in order through Send (a busy thread's Claude picks
@@ -289,6 +343,7 @@ func (m *Manager) drain(subscriber string) {
 		}
 		if d.batched() {
 			m.deliverThreadWakes(subscriber, m.collectBatch(subscriber, d))
+			m.subs.delivered(subscriber)
 			continue
 		}
 		msg := m.withWakeNote(subscriber, d.msg(m.ctx), nil)

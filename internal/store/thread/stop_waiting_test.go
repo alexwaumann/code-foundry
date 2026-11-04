@@ -2,6 +2,7 @@ package thread
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"slices"
 	"strings"
@@ -63,11 +64,256 @@ func TestStopWaitingRemovesTheWakes(t *testing.T) {
 	}
 }
 
-func TestStopWaitingUnknownThread(t *testing.T) {
+// A resident thread refuses, leaving its wakes alone: they run its board.
+func TestStopWaitingRefuses(t *testing.T) {
 	e := newEnv(t)
-	if _, err := e.m.StopWaiting(e.ctx(), "nope"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("err = %v, want ErrNotFound", err)
+	resident, _, err := e.m.EnsureResident(e.ctx(), "ember", ResidentOptions{Cwd: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
 	}
+	plain := e.stopped("plain")
+	tests := []struct {
+		name    string
+		id      string
+		want    error
+		wantMsg string
+		left    int
+	}{
+		{name: "an ordinary thread", id: plain.ID},
+		{name: "a resident thread", id: resident.ID, want: ErrFailedPrecondition, wantMsg: "resident ember thread", left: 1},
+		{name: "an unknown thread", id: "nope", want: ErrNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.id != "nope" {
+				if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: tt.id, TargetEvery: time.Hour}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err := e.m.StopWaiting(e.ctx(), tt.id)
+			if !errors.Is(err, tt.want) || (tt.wantMsg != "" && !strings.Contains(err.Error(), tt.wantMsg)) {
+				t.Fatalf("err = %v, want %v naming %q", err, tt.want, tt.wantMsg)
+			}
+			if tt.id == "nope" {
+				return
+			}
+			if subs, err := e.m.Subscriptions(e.ctx(), tt.id); err != nil || len(subs) != tt.left {
+				t.Errorf("left %d subscriptions (%v), want %d", len(subs), err, tt.left)
+			}
+		})
+	}
+}
+
+// batchWindow is a real batch window: long enough to act inside it under -race.
+const batchWindow = time.Second
+
+func withBatchWindow(o *Options) { o.WakeBatch = batchWindow }
+
+// inWindow waits until the drain took a wake to id off the queue and holds it in the
+// batch window.
+func inWindow(t *testing.T, e *env, id string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		s := e.m.subs
+		s.mu.Lock()
+		q := s.queues[id]
+		open := q != nil && len(q.taken) > 0
+		s.mu.Unlock()
+		if open {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("no wake in its batch window")
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+}
+
+// drained waits until no wake to id is left in its queue, the batch window included.
+func drained(t *testing.T, e *env, id string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		s := e.m.subs
+		s.mu.Lock()
+		_, busy := s.queues[id]
+		s.mu.Unlock()
+		if !busy {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the queue did not drain")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// The ways of taking back a wake that already fired and waits out its batch window.
+var takeBacks = []struct {
+	name string
+	take func(t *testing.T, e *env, top, target, sub string) []string
+}{
+	{"stop waiting", func(t *testing.T, e *env, top, _, _ string) []string {
+		res, err := e.m.StopWaiting(e.ctx(), top)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return stopSubIDs(res.Removed)
+	}},
+	{"the row's x, by id", func(t *testing.T, e *env, _, _, sub string) []string {
+		gone, err := e.m.Unsubscribe(e.ctx(), UnsubscribeOptions{ID: sub})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return stopSubIDs(gone)
+	}},
+	{"unsubscribe by target", func(t *testing.T, e *env, top, target, _ string) []string {
+		gone, err := e.m.Unsubscribe(e.ctx(), UnsubscribeOptions{SubscriberID: top, TargetThreadID: target})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return stopSubIDs(gone)
+	}},
+}
+
+// Scenario A: a child settles and, inside the window, the user takes the wake back. It
+// never goes, for a one-shot (nothing but the wake is left of it) or a repeat one, the
+// wake limit slot comes back, and the thread stops reading waiting at once.
+func TestWakeTakenBackInTheBatchWindow(t *testing.T) {
+	for _, tt := range takeBacks {
+		for _, repeat := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s repeat=%t", tt.name, repeat), func(t *testing.T) {
+				e := newEnv(t, withBatchWindow)
+				top, child := e.stopped("top"), e.stopped("child")
+				e.setStep(child.ID, busy)
+				res, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: top.ID, TargetThreadID: child.ID, Repeat: repeat})
+				if err != nil {
+					t.Fatal(err)
+				}
+				e.setStep(child.ID, finished)
+				inWindow(t, e, top.ID)
+				if gone := tt.take(t, e, top.ID, child.ID, res.Subscription.ID); !slices.Equal(gone, []string{res.Subscription.ID}) {
+					t.Errorf("reported %v, want the subscription", gone)
+				}
+				if th, _ := e.m.Snapshot().Thread(top.ID); shownWaiting(th.Status, th.StatusReason) {
+					t.Errorf("reads %q though nothing is coming", th.StatusReason)
+				}
+				drained(t, e, top.ID)
+				time.Sleep(50 * time.Millisecond)
+				if n := len(wakes(e.items(top.ID).Items)); n != 0 {
+					t.Errorf("%d wakes after taking it back", n)
+				}
+				s := e.m.subs
+				s.mu.Lock()
+				defer s.mu.Unlock()
+				if n := len(s.sent[top.ID]); n != 0 {
+					t.Errorf("%d wake limit slots kept", n)
+				}
+			})
+		}
+	}
+}
+
+// Scenario B: the target is a lead with working children, so without the take-back the
+// drain would hold the wake after the stop: the list would go from 0 rows to 1 and the
+// thread be woken once the team settled, maybe hours later.
+func TestLeadWakeTakenBackInTheBatchWindow(t *testing.T) {
+	for _, tt := range takeBacks {
+		t.Run(tt.name, func(t *testing.T) {
+			l := newLeadEnv(t, withBatchWindow)
+			l.setStep(l.lead.ID, finished)
+			inWindow(t, l.env, l.top.ID)
+			tt.take(t, l.env, l.top.ID, l.lead.ID, l.sub)
+			drained(t, l.env, l.top.ID)
+			if l.held() {
+				t.Error("held after it was taken back")
+			}
+			if subs, _ := l.m.Subscriptions(l.ctx(), l.top.ID); len(subs) != 0 {
+				t.Errorf("listed again: %v", stopSubIDs(subs))
+			}
+			for _, w := range l.workers {
+				l.setStep(w.ID, finished)
+			}
+			time.Sleep(100 * time.Millisecond)
+			drained(t, l.env, l.top.ID)
+			if n := len(wakes(l.items(l.top.ID).Items)); n != 0 {
+				t.Errorf("%d wakes once the team settled", n)
+			}
+		})
+	}
+}
+
+// Taking one wake back leaves what the user did not take back: another subscription's in
+// the same batch, and one that fires after a stop and joins the batch still open.
+func TestTakeBackIsPerWake(t *testing.T) {
+	titled := func(e *env, id string) []string {
+		var out []string
+		for _, w := range wakes(e.items(id).Items) {
+			out = append(out, w.WakeTitle)
+		}
+		return out
+	}
+	tests := []struct {
+		name string
+		run  func(t *testing.T, e *env, top string, a, b Thread, sub func(Thread) string)
+	}{
+		{"unsubscribing one leaves the other in the batch", func(t *testing.T, e *env, top string, a, b Thread, sub func(Thread) string) {
+			first := sub(a)
+			sub(b)
+			e.setStep(a.ID, finished)
+			inWindow(t, e, top)
+			e.setStep(b.ID, finished)
+			if _, err := e.m.Unsubscribe(e.ctx(), UnsubscribeOptions{ID: first}); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"a subscription made after the stop joins the open batch and goes", func(t *testing.T, e *env, top string, a, b Thread, sub func(Thread) string) {
+			sub(a)
+			e.setStep(a.ID, finished)
+			inWindow(t, e, top)
+			if _, err := e.m.StopWaiting(e.ctx(), top); err != nil {
+				t.Fatal(err)
+			}
+			sub(b)
+			e.setStep(b.ID, finished)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newEnv(t, withBatchWindow)
+			top, a, b := e.stopped("top"), e.stopped("about-a"), e.stopped("about-b")
+			e.setStep(a.ID, busy)
+			e.setStep(b.ID, busy)
+			sub := func(target Thread) string {
+				res, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: top.ID, TargetThreadID: target.ID})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return res.Subscription.ID
+			}
+			tt.run(t, e, top.ID, a, b, sub)
+			e.waitItems(top.ID, "the wake", func(items []Item) bool { return len(wakes(items)) > 0 })
+			drained(t, e, top.ID)
+			got := titled(e, top.ID)
+			if len(got) != 1 || !strings.Contains(got[0], "about-b") || strings.Contains(got[0], "about-a") {
+				t.Errorf("wakes %q, want the one about b alone", got)
+			}
+		})
+	}
+}
+
+// Without a take-back the same wake goes: the window above is a real one.
+func TestBatchWindowDeliversUntouched(t *testing.T) {
+	e := newEnv(t, withBatchWindow)
+	top, child := e.stopped("top"), e.stopped("child")
+	e.setStep(child.ID, busy)
+	if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: top.ID, TargetThreadID: child.ID}); err != nil {
+		t.Fatal(err)
+	}
+	e.setStep(child.ID, finished)
+	inWindow(t, e, top.ID)
+	e.waitItems(top.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 }
 
 // A one-shot goes when it fires, but its wake can be held while the lead's team works.
@@ -160,25 +406,6 @@ func TestHeldOneShot(t *testing.T) {
 			}
 		})
 	}
-}
-
-// A queued wake goes too: it must not start a turn after the user stopped waiting.
-func TestStopWaitingDropsQueuedWakes(t *testing.T) {
-	e := newEnv(t, func(o *Options) { o.WakeBatch = time.Hour })
-	top := e.stopped("top")
-	s := e.m.subs
-	s.mu.Lock()
-	s.queues[top.ID] = &wakeQueue{items: []delivery{{sub: "sub-x"}}, running: true}
-	s.mu.Unlock()
-	if _, err := e.m.StopWaiting(e.ctx(), top.ID); err != nil {
-		t.Fatal(err)
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if n := len(s.queues[top.ID].items); n != 0 {
-		t.Errorf("%d wakes still queued", n)
-	}
-	delete(s.queues, top.ID)
 }
 
 // The thread's shells stop with its wakes, through the same path as thread.shell.stop:

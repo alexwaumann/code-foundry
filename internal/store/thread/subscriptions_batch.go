@@ -130,6 +130,7 @@ func (m *Manager) collectBatch(subscriber string, first delivery) []delivery {
 				var rest []delivery
 				for _, d := range q.items {
 					if d.batched() {
+						q.take(d)
 						batch = append(batch, d)
 					} else {
 						rest = append(rest, d)
@@ -169,6 +170,9 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		if !d.slot.IsZero() {
 			slots = append(slots, d.slot)
 		}
+		if m.subs.takenBack(subscriber, d.sub) {
+			continue
+		}
 		rw = cmp.Or(rw, d.restart)
 		for _, build := range d.restart.parts {
 			parts = append(parts, build(ctx))
@@ -181,6 +185,9 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		}
 		if !d.slot.IsZero() {
 			slots = append(slots, d.slot)
+		}
+		if m.subs.takenBack(subscriber, d.sub) {
+			continue
 		}
 		p := d.thread(ctx)
 		if heldLeadWake(p) {
@@ -205,6 +212,11 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 	}
 	snap := m.Snapshot()
 	parts = archivedTargets(snap, parts) // archive_wakes.go
+	// The last look before the Send: building read the items, off the locks.
+	parts = slices.DeleteFunc(parts, func(p threadWakePart) bool { return m.subs.takenBack(subscriber, p.sub.ID) })
+	if rw != nil && m.subs.takenBack(subscriber, "") {
+		rw = nil
+	}
 	if rw != nil {
 		var left bool
 		if parts, left = rw.keepLive(snap, parts); !left {
@@ -249,6 +261,14 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		return
 	}
 	m.log.Info("woke thread", "thread", subscriber, "subscriptions", subs, "wakes", len(parts), "wake", msg.WakeTitle)
+}
+
+// takenBack reports whether the wake of subscription sub, taken off subscriber's queue,
+// was taken back since.
+func (s *subscriptions) takenBack(subscriber, sub string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.queues[subscriber].droppedLocked(sub)
 }
 
 // refundLocked gives back the wake limit slots of wakes that were not sent. Callers

@@ -3,9 +3,11 @@ package command_test
 import (
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"testing"
 
+	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -69,6 +71,72 @@ func TestThreadStopWaiting(t *testing.T) {
 				t.Errorf("requests = %v, want %v", got, tt.wantReqs)
 			}
 		})
+	}
+}
+
+// A yes is tied to the shells it named: one that started since refuses and stops nothing.
+// One that ended is fine, and --yes (no digest) stops what runs.
+func TestThreadStopWaitingBindsTheYes(t *testing.T) {
+	dev := &v1.BackgroundShell{TaskId: "b1", Command: "npm run dev"}
+	late := &v1.BackgroundShell{TaskId: "b2", Command: "rm -rf build"}
+	stop := &v1.StopThreadWaitingRequest{ThreadId: "s5"}
+	shown := []*v1.BackgroundShell{dev}
+	tests := []struct {
+		name     string
+		now      []*v1.BackgroundShell
+		bound    bool
+		wantCode connect.Code
+		wantStop bool
+	}{
+		{name: "the same shells", now: shown, bound: true, wantStop: true},
+		{name: "another shell started while the question was open", now: []*v1.BackgroundShell{dev, late}, bound: true, wantCode: connect.CodeFailedPrecondition},
+		{name: "a different one in its place", now: []*v1.BackgroundShell{late}, bound: true, wantCode: connect.CodeFailedPrecondition},
+		{name: "the shell ended meanwhile", bound: true, wantStop: true},
+		{name: "--yes names no list", now: []*v1.BackgroundShell{dev, late}, wantStop: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, b, _ := newLifecycleRegistry(t)
+			ctx := command.Context{ActiveThreadID: "s5"}
+			b.Current = &v1.Thread{Id: "s5", Name: "drv", BackgroundShells: shown}
+			var ce *command.ConfirmError
+			if _, err := reg.Invoke(context.Background(), ctx, "thread.stop-waiting", nil); !errors.As(err, &ce) {
+				t.Fatalf("err = %v, want the question", err)
+			}
+			args := map[string]string{}
+			if tt.bound {
+				maps.Copy(args, ce.Bind)
+				if args["shown-digest"] != command.ConfirmDigest(ce.Message) {
+					t.Fatalf("bind %v", ce.Bind)
+				}
+			}
+			b.Current = &v1.Thread{Id: "s5", Name: "drv", BackgroundShells: tt.now}
+			_, err := reg.Invoke(context.Background(), ctx, "thread.stop-waiting", args, command.Confirmed(true))
+			if connect.CodeOf(err) != tt.wantCode && (tt.wantCode != 0 || err != nil) {
+				t.Fatalf("err = %v, want code %v", err, tt.wantCode)
+			}
+			stopped := slices.ContainsFunc(b.Requests(), func(m proto.Message) bool { return proto.Equal(m, stop) })
+			if stopped != tt.wantStop {
+				t.Errorf("stopped = %v, want %v", stopped, tt.wantStop)
+			}
+		})
+	}
+}
+
+// A resident thread is not asked about its shells: the store refuses it, and the refusal
+// must reach the palette and the CLI as itself.
+func TestThreadStopWaitingResident(t *testing.T) {
+	refused := connect.NewError(connect.CodeFailedPrecondition, errors.New("thread s5 is the resident ember thread"))
+	reg, b, _ := newLifecycleRegistry(t)
+	b.Current = &v1.Thread{Id: "s5", Kind: v1.ThreadKind_THREAD_KIND_RESIDENT, BackgroundShells: []*v1.BackgroundShell{{TaskId: "b1", Command: "x"}}}
+	b.StopWaitingErr = refused
+	_, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s5"}, "thread.stop-waiting", nil)
+	var ce *command.ConfirmError
+	if errors.As(err, &ce) {
+		t.Fatalf("it asked: %q", ce.Message)
+	}
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("err = %v, want the store's refusal", err)
 	}
 }
 

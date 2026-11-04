@@ -9,11 +9,14 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
-// StopWaiting records "StopWaiting <id>", drops the thread's subscriptions and shells and
+// StopWaiting records "StopWaiting <id>", refuses a resident thread, drops the thread's subscriptions and shells and
 // publishes thread.SubscriptionsChanged, as the store does.
 func (f *Fake) StopWaiting(_ context.Context, id string) (thread.StopWaitingResult, error) {
 	var out thread.StopWaitingResult
 	t, err := f.mutate(fmt.Sprintf("StopWaiting %s", id), id, func(s *thread.Thread) error {
+		if s.Kind == thread.KindResident {
+			return fmt.Errorf("%w: thread %s is the resident %s thread", thread.ErrFailedPrecondition, id, s.ResidentName)
+		}
 		out.Shells = s.BackgroundShells
 		s.BackgroundShells, s.BackgroundShellsRunning = nil, 0
 		return nil

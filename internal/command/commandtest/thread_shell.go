@@ -21,5 +21,8 @@ func (s *Thread) StopWaiting(_ context.Context, r *connect.Request[v1.StopThread
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
+	if s.StopWaitingErr != nil {
+		return nil, s.StopWaitingErr
+	}
 	return connect.NewResponse(&v1.StopThreadWaitingResponse{Thread: s.current(r.Msg.GetThreadId())}), nil
 }

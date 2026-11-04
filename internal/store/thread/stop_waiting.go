@@ -25,7 +25,8 @@ type StopWaitingResult struct {
 	Shells []BackgroundShell
 }
 
-// StopWaiting implements Store. The wakes go first: a shell that cannot be stopped (an
+// StopWaiting implements Store. A resident thread refuses: what wakes it is its board.
+// The wakes go first: a shell that cannot be stopped (an
 // error naming it, for every such shell) leaves them gone. A shell that ended meanwhile
 // is not an error. Stopping a shell at the prompt can still wake Claude to report it
 // (bgshells_runner.go), as thread.shell.stop does.
@@ -33,6 +34,10 @@ func (m *Manager) StopWaiting(ctx context.Context, id string) (StopWaitingResult
 	t, ok := m.Snapshot().Thread(id)
 	if !ok {
 		return StopWaitingResult{}, m.notFound(id)
+	}
+	if t.Kind == KindResident {
+		return StopWaitingResult{}, fmt.Errorf("%w: thread %s is the resident %s thread: its wakes and timers run its board and nothing would bring them back; remove one with thread unsubscribe <id>",
+			ErrFailedPrecondition, id, t.ResidentName)
 	}
 	out := StopWaitingResult{Removed: m.subs.dropWakes(id)}
 	m.rewait(id)
@@ -50,31 +55,93 @@ func (m *Manager) StopWaiting(ctx context.Context, id string) (StopWaitingResult
 	return out, errors.Join(errs...)
 }
 
-// dropWakes removes every subscription of subscriber and the wakes queued or held for
-// it, and returns the subscriptions in listing order. A wake being delivered right now
-// is past this point. Wakes held about subscriber, to its own subscribers, stay.
+// dropWakes removes every subscription of subscriber and takes back the wakes on their
+// way to it and held for it, and returns them in listing order. That reaches a wake
+// waiting out its batch window: only one whose Send started is past stopping. Wakes held
+// about subscriber, to its own subscribers, stay.
 func (s *subscriptions) dropWakes(subscriber string) []Subscription {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []Subscription
+	out := s.dropWakesLocked(subscriber, nil)
+	seen := map[string]bool{}
+	for _, sub := range out {
+		seen[sub.ID] = true
+	}
 	for _, r := range s.byID {
-		if r.s.SubscriberID == subscriber {
+		if r.s.SubscriberID == subscriber && !seen[r.s.ID] {
+			seen[r.s.ID] = true
 			out = append(out, r.s)
 		}
 	}
-	out = slices.AppendSeq(out, maps.Values(s.heldOnlyLocked(subscriber)))
-	sortSubscriptions(out)
-	if q, ok := s.queues[subscriber]; ok {
-		q.items = nil
+	for id, h := range s.heldOnlyLocked(subscriber) {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, h)
+		}
 	}
+	sortSubscriptions(out)
 	if len(out) == 0 {
 		return nil
 	}
-	ids := make([]string, len(out))
-	for i, sub := range out {
-		ids[i] = sub.ID
-	}
-	s.removeLocked(ids)
+	s.removeLocked(slices.Collect(maps.Keys(seen)))
 	s.changedLocked(subscriber) // removeLocked tells only of the ones it kept
 	return out
+}
+
+// onTheWayLocked are the subscriptions of the wakes on their way to subscriber, queued or
+// taken by the drain. Callers hold s.mu.
+func (s *subscriptions) onTheWayLocked(subscriber string) []Subscription {
+	q := s.queues[subscriber]
+	if q == nil {
+		return nil
+	}
+	var out []Subscription
+	for _, d := range q.items {
+		if d.of.ID != "" {
+			out = append(out, d.of)
+		}
+	}
+	for _, of := range q.taken {
+		if of.ID != "" {
+			out = append(out, of)
+		}
+	}
+	return out
+}
+
+// dropWakesLocked takes back wakes on their way, queued or taken by the drain: subscriber's
+// ("": every thread's), of subscriptions ids (nil: all of them). It returns their
+// subscriptions as they fired, each once; a one-shot that fired has no other record. A
+// restart's notice is taken back only by a stop (ids nil). Callers hold s.mu.
+func (s *subscriptions) dropWakesLocked(subscriber string, ids []string) []Subscription {
+	hit := func(sub string) bool { return ids == nil || slices.Contains(ids, sub) }
+	found := map[string]Subscription{}
+	note := func(sub Subscription) {
+		if sub.ID != "" {
+			found[sub.ID] = sub
+		}
+	}
+	for owner, q := range s.queues {
+		if subscriber != "" && owner != subscriber {
+			continue
+		}
+		q.items = slices.DeleteFunc(q.items, func(d delivery) bool {
+			if !hit(d.sub) {
+				return false
+			}
+			note(d.of)
+			return true
+		})
+		for sub, of := range q.taken {
+			if !hit(sub) {
+				continue
+			}
+			note(of)
+			if q.dropped == nil {
+				q.dropped = map[string]bool{}
+			}
+			q.dropped[sub] = true
+		}
+	}
+	return slices.Collect(maps.Values(found))
 }

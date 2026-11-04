@@ -111,6 +111,9 @@ func (m *Manager) holdLocked(p threadWakePart) (int, bool) {
 	if n == 0 && m.quietLocked(rec) {
 		return 0, false
 	}
+	if s.queues[p.sub.SubscriberID].droppedLocked(p.sub.ID) {
+		return 0, false // taken back: not held, and deliverThreadWakes drops it
+	}
 	if s.held == nil {
 		s.held = map[string]map[string]Subscription{}
 	}
@@ -217,7 +220,7 @@ func (m *Manager) releaseLocked(t Thread, h map[string]Subscription) {
 			m.log.Warn("held wake dropped: the subscriber reached the wake limit", "thread", sub.SubscriberID, "subscription", id, "target", t.ID)
 			continue
 		}
-		d := delivery{sub: id, queued: time.Now(), thread: func(ctx context.Context) threadWakePart { return m.threadPart(ctx, sub, t, now, kids) }}
+		d := delivery{sub: id, of: sub, queued: time.Now(), thread: func(ctx context.Context) threadWakePart { return m.threadPart(ctx, sub, t, now, kids) }}
 		if !joins {
 			d.slot = now
 		}
