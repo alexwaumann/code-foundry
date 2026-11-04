@@ -58,7 +58,8 @@ test("Enter on a hit opens its thread with the quote revealed and marked as a ci
   await page.keyboard.type("where did we decide the badge fix?");
   await page.keyboard.press("Enter");
   await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
-  // The first hit is Claude's reply in s-r1; its quote is marked in the preview too.
+  // Past the Answer row, the first hit is Claude's reply in s-r1; its quote is marked in the preview too.
+  await page.keyboard.press("ArrowDown");
   const first = dialog(page).locator('[data-testid="agent-hit"][data-n="1"]');
   await expect(first).toHaveAttribute("data-selected", "true");
   const quote = "The fingerprint now includes the head SHA, which the batched GraphQL query already returns";
@@ -86,6 +87,53 @@ test("Enter on a hit opens its thread with the quote revealed and marked as a ci
   await expect.poll(() => marked(page, "cf-cite-mark")).toEqual([]);
 });
 
+test("a long answer leaves the hits in view: the pane scrolls on its own and the keys keep the selected row visible", async ({ page }) => {
+  await mockPost("search?stepMs=20&long=1");
+  await openApp(page);
+  await page.keyboard.press("Meta+Shift+F");
+  await page.keyboard.type("which threads talked about the PR badge fix");
+  await page.keyboard.press("Enter");
+  const results = dialog(page).getByTestId("agent-results");
+  await expect(results).toHaveAttribute("data-status", "done");
+  const pane = dialog(page).getByTestId("agent-answer-pane");
+  await expect(pane).toBeVisible();
+
+  // The hits start right under the Answer row, inside the column.
+  const inView = (el: HTMLElement) => {
+    const box = el.getBoundingClientRect();
+    const col = (el.closest('[data-testid="agent-results"]') as HTMLElement).getBoundingClientRect();
+    return box.top >= col.top && box.bottom <= col.bottom;
+  };
+  const first = results.locator('[data-testid="agent-hit"][data-n="1"]');
+  expect(await first.evaluate(inView)).toBe(true);
+  // Two lines at most.
+  const preview = results.getByTestId("agent-answer-preview");
+  expect(await preview.evaluate((el) => el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight))).toBeLessThanOrEqual(2.1);
+
+  // The answer is taller than the pane and scrolls without moving the column.
+  expect(await pane.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await pane.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  expect(await pane.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  expect(await results.evaluate((el) => el.scrollTop)).toBe(0);
+
+  // Up wraps to the last hit, down wraps back to the Answer row: each comes into view.
+  await page.keyboard.press("ArrowUp");
+  const last = results.locator('[data-testid="agent-hit"]').last();
+  await expect(last).toHaveAttribute("data-selected", "true");
+  await expect.poll(() => last.evaluate(inView)).toBe(true);
+  await page.keyboard.press("ArrowDown");
+  const row = results.getByTestId("agent-answer-row");
+  await expect(row).toHaveAttribute("data-selected", "true");
+  await expect.poll(() => row.evaluate(inView)).toBe(true);
+
+  // A marker in the rendered answer shows its hit, and the field keeps the keyboard.
+  await pane.getByRole("button", { name: "Result 2" }).first().click();
+  await expect(results.locator('[data-testid="agent-hit"][data-n="2"]')).toHaveAttribute("data-selected", "true");
+  await expect(input(page)).toBeFocused();
+});
+
 async function marked(page: Page, name: string): Promise<string[]> {
   return page.evaluate((name) => {
     const h = (CSS as unknown as { highlights: Map<string, Set<Range>> }).highlights.get(name);
@@ -93,7 +141,7 @@ async function marked(page: Page, name: string): Promise<string[]> {
   }, name);
 }
 
-/** SHOTS=<dir>: the done layout (markers against their punctuation) and a restored dialog's cue, in both schemes. */
+/** SHOTS=<dir>: the done layout (markers against their punctuation), a hit, a long answer and a restored dialog's cue, in both schemes. */
 for (const scheme of ["dark", "light"] as const) {
   test(`agent search screenshots (${scheme})`, async ({ page }) => {
     const dir = process.env.SHOTS;
@@ -105,8 +153,25 @@ for (const scheme of ["dark", "light"] as const) {
     await page.keyboard.type("where did we decide the badge fix?");
     await page.keyboard.press("Enter");
     await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
-    await expect.poll(() => marked(page, "cf-search-quote")).not.toEqual([]);
+    await expect(dialog(page).getByTestId("agent-answer-pane")).toBeVisible();
     await page.screenshot({ path: `${dir ?? ""}/done-${scheme}.png` });
+    await page.keyboard.press("ArrowDown");
+    await expect.poll(() => marked(page, "cf-search-quote")).not.toEqual([]);
+    await page.screenshot({ path: `${dir ?? ""}/hit-${scheme}.png` });
+
+    // A long markdown answer: the hits stay in view, the pane holds the whole of it.
+    await mockPost("search?stepMs=60&long=1");
+    await page.keyboard.press("Meta+Backspace");
+    await page.keyboard.type("which threads talked about the PR badge fix");
+    await page.keyboard.press("Enter");
+    await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
+    await expect(dialog(page).getByTestId("agent-answer-pane")).toBeVisible();
+    await page.screenshot({ path: `${dir ?? ""}/long-answer-${scheme}.png` });
+    await mockPost("search?long=0");
+    await page.keyboard.press("Meta+Backspace");
+    await page.keyboard.type("where did we decide the badge fix?");
+    await page.keyboard.press("Enter");
+    await expect(dialog(page).getByTestId("agent-results")).toHaveAttribute("data-status", "done");
 
     // A second question left running while the first is shown again, then closed.
     await mockPost("search?stepMs=300");

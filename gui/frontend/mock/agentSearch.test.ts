@@ -70,6 +70,21 @@ describe("MockSearches", () => {
     expect(s.list().map((x) => [x.query, x.findHits])).toEqual([["fingerprint", 14]]);
   });
 
+  it("long=1: a markdown answer citing only the hits it found, and more candidates; reset turns it off", async () => {
+    const s = world();
+    s.control(new URLSearchParams("stepMs=10&long=1"));
+    const e = s.startAgent("why the race?");
+    await collect(s.watch(e.id ?? "", new AbortController().signal));
+    const got = s.list()[0];
+    // Two of the candidates are s-3's; the test world's one message has the first alone, the second is the prompt it lacks.
+    expect(got?.hits?.map((h) => h.n)).toEqual([1]);
+    expect(got?.answer).toContain("## Still open");
+    expect(got?.answer).toContain("[1]");
+    expect(got?.answer).not.toContain("[2]");
+    s.reset();
+    expect(s.control(new URLSearchParams())).toMatchObject({ long: false });
+  });
+
   it("seed: an agent entry with hits reads its first hit's thread, so its summary counts the read", () => {
     const s = world();
     s.seed();

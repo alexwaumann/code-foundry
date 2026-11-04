@@ -226,7 +226,7 @@
  *   GET  /__mock/dictation                        ({ state, enabled, downloaded, session, micDenied, calls })
  *   SearchService and search.* (mock/agentSearch.ts): the history and a scripted agent run over the world's
  *        threads (steps, hits, answer, status, stepMs apart).
- *   POST /__mock/search?stepMs=350&fail=1&hits=2  (the next runs' pace, a FAILED end, a hit cap)
+ *   POST /__mock/search?stepMs=350&fail=1&hits=2&long=1  (the next runs' pace, a FAILED end, a hit cap, a long markdown answer with more hits)
  *   POST /__mock/search/seed                      (a history for Recent searches)
  *   GET  /__mock/search                           ({ entries, calls })
  *   GET  /__mock/ember                            (the board: status and tasks, as JSON)

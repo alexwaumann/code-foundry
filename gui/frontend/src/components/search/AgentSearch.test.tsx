@@ -103,7 +103,7 @@ const { daemon, invocationsOf, confirmFirst, resetDaemon } = await import("@/tes
 const { addThreads, seedWorld, thread } = await import("@/test/projectsWorld");
 const { CommandPalette } = await import("@/components/palette/CommandPalette");
 const { SEARCH_DEBOUNCE_MS, PREVIEW_DEBOUNCE_MS } = await import("./useSearch");
-const { RESTORE_MS } = await import("@/lib/agentSearch");
+const { ANSWER_ROW, RESTORE_MS } = await import("@/lib/agentSearch");
 
 const hit = (n: number, over: Partial<AgentHitView> = {}): AgentHitView => ({
   n,
@@ -180,6 +180,8 @@ async function type(q: string): Promise<void> {
 }
 const hitRows = () => screen.queryAllByTestId("agent-hit");
 const selectedHit = () => hitRows().find((r) => r.hasAttribute("data-selected"))?.getAttribute("data-n");
+const answerRow = () => screen.queryByTestId("agent-answer-row");
+const answerSelected = () => answerRow()?.hasAttribute("data-selected") ?? false;
 
 /** Shows a running search for the typed question: Enter, StartAgent's entry, Watch's snapshot. */
 async function startShown(e: SearchEntryView = entry()): Promise<void> {
@@ -302,14 +304,20 @@ describe("Agent search", () => {
     expect(invocationsOf("search.stop")).toHaveLength(0);
   });
 
-  it("done: the answer as plain text with [n] markers, a summary line that opens the steps, the ranked hits; opened ones dimmed", async () => {
+  it("done: the Answer row selected with the whole answer in the pane, a summary line that opens the steps, the ranked hits; opened ones dimmed", async () => {
     await open();
     await startShown(done({ answer: "Kept **check-count** [1]; see [link](http://x) and [2].", hits: [hit(1, { opened: true }), hit(2)], steps: [{ index: 0, kind: "search", done: true, failed: false, text: "Searched a · 1 hit", query: "a", threadName: "" }] }));
-    const answer = screen.getByTestId("agent-answer");
-    // Model text: no markdown, no links.
-    expect(answer.textContent).toBe("Kept **check-count** 1; see [link](http://x) and 2.");
-    expect(answer.querySelector("a, strong")).toBeNull();
-    expect(screen.getAllByTestId("agent-answer-ref").map((r) => r.textContent)).toEqual(["1", "2"]);
+    // Left, in order: the Answer row, the summary line, the hits.
+    const results = screen.getByTestId("agent-results");
+    expect([...results.querySelectorAll('[data-testid="agent-answer-row"], [data-testid="agent-summary"], [data-testid="agent-hit"]')].map((el) => el.getAttribute("data-testid"))).toEqual(["agent-answer-row", "agent-summary", "agent-hit", "agent-hit"]);
+    expect(answerSelected()).toBe(true);
+    expect(screen.getByTestId("agent-answer-preview").textContent).toBe("Kept check-count; see link and.");
+    // Right: rendered, inert, its markers on.
+    const answer = within(screen.getByTestId("agent-answer-pane")).getByTestId("agent-answer");
+    expect(answer.textContent).toBe("Kept check-count 1; see link and 2.");
+    expect(answer.querySelector("strong")?.textContent).toBe("check-count");
+    expect(answer.querySelector("a")).toBeNull();
+    expect(screen.queryByTestId("search-preview")).toBeNull();
     expect(screen.getByTestId("agent-summary-toggle").textContent).toBe("2 searches · read 3 threads · 21s");
     expect(screen.queryByTestId("agent-steps")).toBeNull();
     fireEvent.click(screen.getByTestId("agent-summary-toggle"));
@@ -319,11 +327,71 @@ describe("Agent search", () => {
     expect(within(first as HTMLElement).getByTestId("agent-hit-opened").textContent).toBe("opened");
     expect(within(second as HTMLElement).getByTestId("agent-hit-quote").textContent).toBe("“the quote of hit 2”");
     expect(within(second as HTMLElement).getByTestId("agent-hit-why").textContent).toBe("why 2");
-    // A marker selects its hit.
+    expect(screen.getByTestId("search-hints").textContent).toContain("continue in a thread");
+    // A marker selects its hit, and the preview takes the pane.
     fireEvent.click(screen.getAllByTestId("agent-answer-ref")[1] as HTMLElement);
     expect(selectedHit()).toBe("2");
-    // The finished result was shown: not unseen any more.
-    expect(screen.getByTestId("search-hints").textContent).toContain("continue in a thread");
+    expect(screen.queryByTestId("agent-answer-pane")).toBeNull();
+    await wait(PREVIEW_DEBOUNCE_MS + 20);
+    expect(screen.getByTestId("search-preview")).toBeTruthy();
+    // The row brings the answer back.
+    fireEvent.click(answerRow() as HTMLElement);
+    expect(answerSelected()).toBe(true);
+    expect(screen.getByTestId("agent-answer-pane")).toBeTruthy();
+  });
+
+  it("a run's end selects the Answer row; hits arriving before it behave as they did", async () => {
+    await open();
+    await startShown();
+    watchOf("q-1").push({ kind: "hit", version: 2, hit: hit(1) }, { kind: "hit", version: 3, hit: hit(2) }, { kind: "answer", version: 4, text: "It did [1]." });
+    await settle(20);
+    // The answer has come but the run goes on: no row yet.
+    expect(answerRow()).toBeNull();
+    expect(selectedHit()).toBe("1");
+    watchOf("q-1").push({ kind: "status", version: 5, status: "done", error: "", finishedAtMs: 1, costUsd: 0, durationMs: 1000, unseen: false });
+    await settle(20);
+    expect(answerSelected()).toBe(true);
+    expect(selectedHit()).toBeUndefined();
+  });
+
+  it("a hit the user picked while it ran stays selected when it ends", async () => {
+    await open();
+    await startShown();
+    watchOf("q-1").push({ kind: "hit", version: 2, hit: hit(1) }, { kind: "hit", version: 3, hit: hit(2) });
+    await settle(20);
+    key("ArrowDown");
+    expect(selectedHit()).toBe("2");
+    watchOf("q-1").push({ kind: "answer", version: 4, text: "It did [1]." }, { kind: "status", version: 5, status: "done", error: "", finishedAtMs: 1, costUsd: 0, durationMs: 1000, unseen: false });
+    await settle(20);
+    expect(answerRow()).toBeTruthy();
+    expect(selectedHit()).toBe("2");
+    expect(screen.queryByTestId("agent-answer-pane")).toBeNull();
+  });
+
+  it("no answer: no row, the first hit selected, as before", async () => {
+    await open();
+    await startShown(done({ answer: "" }));
+    expect(answerRow()).toBeNull();
+    expect(selectedHit()).toBe("1");
+    expect(screen.getByTestId("search-hints").textContent).toContain("open and highlight");
+  });
+
+  it("an answer with no hits: the row alone, its marker as typed, and a note that nothing was reported", async () => {
+    await open();
+    await startShown(done({ answer: "It was decided [1].", hits: [] }));
+    expect(answerSelected()).toBe(true);
+    expect(screen.queryByTestId("agent-answer-ref")).toBeNull();
+    expect(screen.getByTestId("agent-answer").textContent).toBe("It was decided [1].");
+    expect(screen.getByTestId("agent-ended").textContent).toBe("It reported no messages to open.");
+    expect(screen.getByTestId("search-hints").textContent).toContain("search again");
+  });
+
+  it("a marker past the hits selects nothing and leaves the pane", async () => {
+    await open();
+    await startShown(done({ answer: "One [1], past the end [9].", hits: [hit(1)] }));
+    expect(screen.getAllByTestId("agent-answer-ref").map((r) => r.textContent)).toEqual(["1"]);
+    expect(screen.getByTestId("agent-answer").textContent).toBe("One 1, past the end [9].");
+    expect(answerSelected()).toBe(true);
   });
 
   it("FAILED and STOPPED say so", async () => {
@@ -352,9 +420,42 @@ describe("Agent search", () => {
 });
 
 describe("keys on results", () => {
+  it("↑/↓ go through the Answer row, wrapping", async () => {
+    await open();
+    await startShown(done());
+    expect(answerSelected()).toBe(true);
+    key("ArrowDown");
+    expect(selectedHit()).toBe("1");
+    key("ArrowUp");
+    expect(answerSelected()).toBe(true);
+    key("ArrowUp");
+    expect(selectedHit()).toBe("3");
+    key("ArrowDown");
+    expect(answerSelected()).toBe(true);
+  });
+
+  it("Enter on the Answer row moves to the first hit: nothing opens, nothing runs again; ⌘⏎ still continues", async () => {
+    await open();
+    await startShown(done());
+    expect(screen.getByTestId("search-hints").textContent).toContain("first result");
+    key("Enter");
+    await settle(10);
+    expect(selectedHit()).toBe("1");
+    expect(useUiStore.getState().palette.open).toBe(true);
+    expect(invocationsOf("search.open-hit")).toHaveLength(0);
+    expect(startAgentSearch).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("search-hints").textContent).toContain("open and highlight");
+    key("ArrowUp");
+    expect(answerSelected()).toBe(true);
+    key("Enter", { metaKey: true });
+    await settle(10);
+    expect(invocationsOf("search.promote").map((i) => i.args)).toEqual([{ id: "q-1" }]);
+  });
+
   it("Enter on a hit marks it opened, closes, selects its thread and reveals the quote once its log has the item", async () => {
     await open();
     await startShown(done());
+    key("ArrowDown");
     key("ArrowDown");
     expect(selectedHit()).toBe("2");
     key("Enter");
@@ -479,9 +580,13 @@ describe("restore and Recent searches", () => {
     watchOf("q-1").push({ kind: "snapshot", version: 9, entry: done() });
     await settle(20);
     expect(hitRows()).toHaveLength(3);
-    key("Enter"); // the selected hit, not a second run
+    expect(answerSelected()).toBe(true);
+    key("Enter"); // on to the first hit, not a second run
     await settle(10);
     expect(startAgentSearch).toHaveBeenCalledTimes(1);
+    expect(selectedHit()).toBe("1");
+    key("Enter");
+    await settle(10);
     expect(useUiStore.getState().palette.open).toBe(false);
   });
 
@@ -545,6 +650,7 @@ describe("restore and Recent searches", () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(t0);
     await open();
     await startShown(done());
+    key("ArrowDown");
     key("Enter"); // opens hit 1
     await settle(10);
     now.mockReturnValue(t0 + RESTORE_MS - 1000);
@@ -566,6 +672,49 @@ describe("restore and Recent searches", () => {
     expect(screen.getAllByTestId("search-recent-row").map((r) => r.dataset.id)).toEqual(["q-1", "q-f"]);
   });
 
+  it("restored on the Answer row: the session says so and the reopen shows it", async () => {
+    await open();
+    await startShown(done());
+    expect(answerSelected()).toBe(true);
+    await close();
+    expect(useSearchDialogStore.getState().session?.selectedN).toBe(ANSWER_ROW);
+    await open();
+    watchOf("q-1").push({ kind: "snapshot", version: 9, entry: done() });
+    await settle(20);
+    expect(answerSelected()).toBe(true);
+    expect(screen.getByTestId("agent-answer-pane")).toBeTruthy();
+  });
+
+  it("a hit selected at close stays selected on the reopen, past later snapshots", async () => {
+    await open();
+    await startShown(done());
+    key("ArrowDown");
+    key("ArrowDown");
+    await close();
+    expect(useSearchDialogStore.getState().session?.selectedN).toBe(2);
+    await open();
+    watchOf("q-1").push({ kind: "snapshot", version: 9, entry: done() });
+    await settle(20);
+    expect(selectedHit()).toBe("2");
+    watchOf("q-1").push({ kind: "snapshot", version: 10, entry: done({ version: 10, unseen: false }) });
+    await settle(20);
+    expect(selectedHit()).toBe("2");
+  });
+
+  it("closed while it ran on the first hit, reopened after it ended: the Answer row", async () => {
+    await open();
+    await startShown();
+    watchOf("q-1").push({ kind: "hit", version: 2, hit: hit(1) });
+    await settle(20);
+    expect(selectedHit()).toBe("1");
+    await close();
+    expect(useSearchDialogStore.getState().session?.selectedN).toBeNull();
+    await open();
+    watchOf("q-1").push({ kind: "snapshot", version: 9, entry: done() });
+    await settle(20);
+    expect(answerSelected()).toBe(true);
+  });
+
   it("an unseen finished search restores whatever the timer, then is marked seen", async () => {
     vi.spyOn(Date, "now").mockReturnValue(Date.now() + 10 * RESTORE_MS);
     await open();
@@ -576,6 +725,7 @@ describe("restore and Recent searches", () => {
     watchOf("q-9").push({ kind: "snapshot", version: 9, entry: done({ id: "q-9", query: "what did we pin?", unseen: true }) });
     await settle(20);
     expect(hitRows()).toHaveLength(3);
+    expect(answerSelected()).toBe(true);
     expect(invocationsOf("search.seen").map((i) => i.args)).toEqual([{ id: "q-9" }]);
   });
 

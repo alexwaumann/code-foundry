@@ -13,7 +13,7 @@
  * The scripted run (stepMs apart): two searches start and end, a read, then the hits it
  * finds (each a candidate below whose thread exists and whose message has the quote), the
  * answer citing them, DONE. Controls (mock/server.ts):
- *   POST /__mock/search?stepMs=350&fail=1&hits=2   (the next runs' pace, a FAILED end, a hit cap)
+ *   POST /__mock/search?stepMs=350&fail=1&hits=2&long=1   (the next runs' pace, a FAILED end, a hit cap, a long markdown answer with more hits)
  *   POST /__mock/search/seed                       (a history: an agent search 1h old, a Find 1 day old, one 3h old)
  *   GET  /__mock/search                            ({ entries, calls })
  */
@@ -107,6 +107,53 @@ const CANDIDATES: readonly Candidate[] = [
   { threadId: "s-1", quote: "The tree now flattens into rows; only the visible rows render.", why: "The sidebar tree became a virtualized list." },
 ];
 
+/** What a long answer's run also finds: the seeded threads' own words. */
+const MORE_CANDIDATES: readonly Candidate[] = [
+  { threadId: "s-3", quote: "Fix the resize race in the terminal actor.", why: "The report that started the resize work." },
+  { threadId: "s-1", quote: "Refactor the sidebar tree into a virtualized list.", why: "What the sidebar work set out to do." },
+  { threadId: "s-2", quote: "Port the grid renderer to libghostty-vt.", why: "The renderer port the resize fix unblocked." },
+  { threadId: "s-4", quote: "Investigate the flaky e2e run on CI.", why: "The flake that made the badge look worse than it was." },
+  { threadId: "s-6", quote: "Removed docker and kubectl from the plugin list; nothing else references them.", why: "Mentioned only in passing." },
+];
+
+/** A long markdown answer citing hits 1 to n (a marker past n is left out): every block the answer pane draws, taller than the dialog. */
+function longAnswer(n: number): string {
+  const ref = (i: number) => (i <= n ? ` [${String(i)}]` : "");
+  return [
+    `The stale badge came from a fingerprint that left out the head SHA, so a force-push changed nothing the poll could see${ref(1)}. **Three threads** worked on it:`,
+    "",
+    `- **Report and fix:** the head SHA joined the fingerprint, which the batched GraphQL query already returned${ref(1)}${ref(2)}`,
+    `- **Polling:** check counts were added next, so a rerun also moves the badge${ref(3)}`,
+    `- **Sidebar:** the row now reads the dashboard entry instead of its own copy${ref(4)}${ref(5)}`,
+    "",
+    `## Still open${ref(3)}`,
+    "",
+    `A rerun that ends in the same state does not change the count, so \`gh-granular-events\` left that as a known blind spot${ref(5)}.`,
+    "",
+    "### What changed, in order",
+    "",
+    `1. The poller compared only \`CheckCount\` and \`ReviewState\`${ref(1)}.`,
+    `2. \`Fingerprint\` gained \`HeadOid\`, filled from \`pr.HeadRefOid\`${ref(2)}.`,
+    `3. A new test pins it: a force-push with the same checks refreshes the badge${ref(6)}.`,
+    "",
+    "```go",
+    "func fingerprintOf(pr PullRequest) Fingerprint {",
+    "\treturn Fingerprint{CheckCount: len(pr.Checks), HeadOid: pr.HeadRefOid}",
+    "}",
+    "```",
+    "",
+    ...["Why it stayed hidden", "Why no extra calls", "Why the sidebar lagged", "What the threads left behind"].flatMap((h, i) => [
+      `### ${h}`,
+      "",
+      `Nothing in these threads suggests the badge regressed after that, and each of them says so in its own words${ref(i + 1)}. The poll runs on the same cadence as before, and the *dashboard* row stays the one source the sidebar reads${ref(i + 2)}.`,
+      "",
+      `- The fix needed no new query${ref(i + 3)}`,
+      "- Nothing else reads the old fields",
+      "",
+    ]),
+  ].join("\n");
+}
+
 export interface SearchDeps {
   /** A thread's name and whether it is archived; undefined when it is not in the world. */
   thread: (id: string) => { name: string; archived: boolean } | undefined;
@@ -137,6 +184,7 @@ export class MockSearches {
   private stepMs = 350;
   private fail = false;
   private hitCap = 8;
+  private long = false;
   readonly calls: string[] = [];
 
   constructor(private readonly deps: SearchDeps) {}
@@ -148,6 +196,7 @@ export class MockSearches {
     this.stepMs = 350;
     this.fail = false;
     this.hitCap = 8;
+    this.long = false;
     this.calls.length = 0;
     this.listChanged();
   }
@@ -308,7 +357,8 @@ export class MockSearches {
   /** The scripted run: steps, hits, answer, status, stepMs apart. */
   private script(e: Entry): void {
     const found: Hit[] = [];
-    for (const c of CANDIDATES) {
+    const long = this.long;
+    for (const c of long ? [...CANDIDATES, ...MORE_CANDIDATES] : CANDIDATES) {
       if (found.length >= this.hitCap) break;
       const t = this.deps.thread(c.threadId);
       if (!t) continue;
@@ -373,7 +423,9 @@ export class MockSearches {
       e.answer =
         found.length === 0
           ? "None of your threads talk about it."
-          : `The fingerprint now includes the head SHA, so a force-push refreshes the badge ${refs[0] ?? ""}.${refs[1] ? ` You reported the stale badge first ${refs[1]}.` : ""}${refs.length > 2 ? ` Related: ${refs.slice(2).join("")}.` : ""}`;
+          : long
+            ? longAnswer(found.length)
+            : `The fingerprint now includes the head SHA, so a force-push refreshes the badge ${refs[0] ?? ""}.${refs[1] ? ` You reported the stale badge first ${refs[1]}.` : ""}${refs.length > 2 ? ` Related: ${refs.slice(2).join("")}.` : ""}`;
       this.changed(e, { case: "answer", value: { text: e.answer } });
     });
     plan.push(() => {
@@ -489,18 +541,19 @@ export class MockSearches {
     this.calls.push(`promote ${id}`);
     if (e.promotedThreadId && this.deps.thread(e.promotedThreadId)) return e.promotedThreadId;
     const cites = e.hits.map((h) => `${String(h.n)}. “${h.quote}” in ${this.deps.thread(h.threadId)?.name ?? h.threadId} (#${String(h.ordinal)})`).join("\n");
-    e.promotedThreadId = this.deps.promote(e.query, `${e.query}\n\n${cites}\n\nYour answer: ${e.answer}`);
+    e.promotedThreadId = this.deps.promote(e.query, `${e.query}\n\n${cites}\n\nYour answer:\n\n${e.answer}`);
     e.unseen = false;
     this.changed(e);
     return e.promotedThreadId;
   }
 
-  /** POST /__mock/search: the next runs' pace, failure and hit cap. */
+  /** POST /__mock/search: the next runs' pace, failure, hit cap and long answer. */
   control(q: URLSearchParams): Record<string, unknown> {
     if (q.has("stepMs")) this.stepMs = Math.max(10, Number(q.get("stepMs")) || 350);
     if (q.has("fail")) this.fail = q.get("fail") === "1" || q.get("fail") === "true";
     if (q.has("hits")) this.hitCap = Math.max(0, Number(q.get("hits")) || 0);
-    return { stepMs: this.stepMs, fail: this.fail, hits: this.hitCap };
+    if (q.has("long")) this.long = q.get("long") === "1" || q.get("long") === "true";
+    return { stepMs: this.stepMs, fail: this.fail, hits: this.hitCap, long: this.long };
   }
 
   /** POST /__mock/search/seed: a history for Recent searches (an agent search with its hits, Find entries). */

@@ -6,7 +6,7 @@ import { DictationMic } from "@/components/compose/DictationMic";
 import { useComposerDictation } from "@/components/compose/useComposerDictation";
 import { Segmented } from "@/components/usage/Segmented";
 import { chordFromEvent } from "@/keys/chord";
-import { restoreSelection, unseenCue, unseenToRestore, type SearchModeId, type SearchSession } from "@/lib/agentSearch";
+import { restoreSelection, resultRows, searchEnded, unseenCue, unseenToRestore, type SearchModeId, type SearchSession } from "@/lib/agentSearch";
 import { phraseAtCaret } from "@/lib/dictation";
 import { imeKeyDown } from "@/lib/ime";
 import { clearSearches, forgetSearch, startAgent } from "@/stores/agentSearch";
@@ -168,7 +168,8 @@ export function SearchDialog({
     setSearchMode("agent");
     setQuery(e.query);
     setShown({ id: e.id, seed: e });
-    setRestore({ selectedN: restoreSelection(e.hits, null), openedN: null, scrollTop: 0 });
+    // A running search has only its first hit so far: no selection to keep.
+    setRestore({ selectedN: searchEnded(e) ? restoreSelection(resultRows(e), null) : null, openedN: null, scrollTop: 0 });
     setStartError("");
     requestAnimationFrame(() => inputRef.current?.select());
   }, []);
