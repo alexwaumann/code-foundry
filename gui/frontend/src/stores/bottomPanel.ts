@@ -4,7 +4,7 @@
  * Projects page (`view:projects`); every other selection has none.
  *
  * Tabs are derived, not stored: a key's tabs are the shells in the terminals store that
- * it owns (bottomTabIds), in the store's order. Per key this store keeps only whether the
+ * it owns or that were opened in it (bottomTabIds), in the store's order. Per key this store keeps only whether the
  * panel is open, its height, and which terminal was last active. A terminal that goes
  * away (closed, reaped, the daemon restarted) leaves its tab with it. Persisted
  * (localStorage "code-foundry.bottom"); entries are never pruned.

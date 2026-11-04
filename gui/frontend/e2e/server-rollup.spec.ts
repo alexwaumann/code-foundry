@@ -87,6 +87,14 @@ test("the row's buttons show on hover, over the row's end, and line 2 stops shor
   expect(line.x + line.width).toBeLessThanOrEqual(o.x);
   expect(o.x + o.width).toBeLessThanOrEqual(s.x);
   expect(s.x + s.width).toBeLessThanOrEqual(r.x + r.width);
+
+  // The keyboard shows them too, with the pointer elsewhere, and Tab reaches both (WebKit leaves plain buttons out by default).
+  await page.mouse.move(600, 300);
+  await expect.poll(shown).toBe("0");
+  await open.focus();
+  await page.keyboard.press("Tab");
+  await expect(stop).toBeFocused();
+  await expect.poll(shown).toBe("1");
 });
 
 /** SHOTS=<dir>: the PR's screenshots, WebKit at 2x, dark and light. */
