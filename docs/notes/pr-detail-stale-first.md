@@ -72,7 +72,7 @@ from the dashboard row and hover prefetch; user jobs ahead of the poll.
 ## Measured (2026-11-03, this machine, one account, alexwaumann/code-foundry #504-#509)
 
 Old and new binaries, scratch homes, `curl` over the unix socket, reads one after another. All
-six are merged pull requests of 5-10 KB, so a busy open pull request costs more on the old path.
+six are merged pull requests of 7-15 KB, so a busy open pull request costs more on the old path.
 
 | GetPullRequestDetail | Before | After |
 |---|---|---|
