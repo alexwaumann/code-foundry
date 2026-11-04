@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { agentsLabel } from "@/lib/agents";
 import { useNow, useNowSelect } from "@/lib/clock";
 import { formatElapsed } from "@/lib/elapsed";
+import { QUIET } from "@/lib/quiet";
 import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
@@ -622,7 +623,8 @@ function SnoozeLeft({ id }: { id: string }) {
 /**
  * An archived or snoozed thread's single line: the name, quiet (regular and muted; the id
  * while unnamed) and, on the right, how long ago it was archived or how long until it wakes. No status line,
- * badges or pin (such a thread is unpinned): the whole section is such threads.
+ * badges or pin (such a thread is unpinned): the whole section is such threads. All of it is
+ * dimmed (QUIET) but the rename field, which is being typed in.
  */
 function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
@@ -630,7 +632,7 @@ function SingleLineLabel({ id, section }: { id: string; section: "archived" | "s
   const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
-    <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="thread-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
+    <span className={cn("flex min-w-0 flex-1 items-center gap-1.5", !renaming && QUIET)} data-testid="thread-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
       {renaming ? (
         <RenameField id={id} name={name} />
       ) : (

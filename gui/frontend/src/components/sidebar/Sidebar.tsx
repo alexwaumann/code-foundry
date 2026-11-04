@@ -15,7 +15,6 @@ import { useEventsStore } from "@/stores/events";
 import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
 import { ResizeHandle } from "./ResizeHandle";
 import { HEADER_HEIGHT, ROW_GAP, rowGap, rowSize } from "./rowSizes";
@@ -120,7 +119,6 @@ type ScrollTo = (index: number) => void;
 interface PanelRowsProps {
   rows: readonly Row[];
   /** Size of one row (header, snoozed or archived, or two-line thread row). */
-  sizeOf: (row: Row | undefined) => number;
   selectedKey: string | null;
   cursorKey: string | null;
   onActivate: (row: Row) => void;
@@ -140,13 +138,13 @@ interface PanelRowsProps {
  * list takes the remaining height; a footer's rows are as tall as they need, up to
  * `maxHeight`, then scroll inside the footer.
  */
-function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo, maxHeight, gap, paddingStart, paddingEnd, testId, children }: PanelRowsProps) {
+function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, maxHeight, gap, paddingStart, paddingEnd, testId, children }: PanelRowsProps) {
   const ref = useRef<HTMLDivElement>(null);
   // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => ref.current,
-    estimateSize: (i) => sizeOf(rows[i]),
+    estimateSize: (i) => rowSize(rows[i]),
     getItemKey: (i) => rows[i]?.key ?? i,
     overscan: 10,
     // Space between rows, outside each row's box (rowSizes.ts). A panel holds thread rows
@@ -155,10 +153,10 @@ function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo,
     paddingStart,
     paddingEnd,
   });
-  // appearance.density changes the row height, and rows move between panels; drop the cached sizes.
+  // Rows move between panels; drop the cached sizes.
   useEffect(() => {
     virtualizer.measure();
-  }, [virtualizer, sizeOf, rows]);
+  }, [virtualizer, rows]);
   useImperativeHandle(scrollTo, () => (i) => {
     virtualizer.scrollToIndex(i, { align: "auto" });
   }, [virtualizer]);
@@ -212,15 +210,12 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const loaded = useThreadsStore((s) => s.loaded);
   const unavailable = useThreadsStore((s) => s.availability === "unavailable");
   const streamError = useEventsStore((s) => s.streamError);
-  const rowHeight = useRowHeight();
   // Ember's pinned row (under the menu pane, components/ember/EmberRow.tsx) is the first stop
   // of the arrows: above the first thread, and where they start while its chat is selected.
   const emberId = useShownEmberThreadId();
   const emberSelected = useUiStore((s) => emberId !== "" && s.selection.kind === "thread" && s.selection.id === emberId);
   // The row the context menu is open for (right-clicked), or null.
   const [menuRow, setMenuRow] = useState<ThreadRow | null>(null);
-
-  const sizeOf = useCallback((row: Row | undefined) => rowSize(row, rowHeight), [rowHeight]);
 
   // The keyboard cursor's row, else (no cursor, or its row is gone: collapsed, hidden) the
   // highlighted one: arrows move from there.
@@ -346,7 +341,6 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
         </div>
         <PanelRows
           rows={footers[section]}
-          sizeOf={sizeOf}
           selectedKey={selectedKey}
           cursorKey={shownCursor}
           onActivate={activate}
@@ -386,8 +380,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
           >
             <PanelRows
               rows={main}
-              sizeOf={sizeOf}
-              selectedKey={selectedKey}
+                  selectedKey={selectedKey}
               cursorKey={shownCursor}
               onActivate={activate}
               scrollTo={scrollMain}
