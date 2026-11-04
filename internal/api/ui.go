@@ -98,6 +98,12 @@ func (h *UI) PublishTheme(ctx context.Context, req *connect.Request[v1.PublishTh
 	return connect.NewResponse(&v1.PublishThemeResponse{}), nil
 }
 
+// GetTheme answers with the theme /cf/theme.json serves.
+func (h *UI) GetTheme(context.Context, *connect.Request[v1.GetThemeRequest]) (*connect.Response[v1.GetThemeResponse], error) {
+	f := h.theme.JSON()
+	return connect.NewResponse(&v1.GetThemeResponse{Id: f.ID, Scheme: f.Scheme, Vars: f.Vars, Published: f.Published}), nil
+}
+
 // PublishThemeReport keeps the GUI's contrast report on each user theme it names, for
 // theme save and theme check. InvalidArgument (and nothing kept) when any is refused
 // (theme.Report.Check).

@@ -105,7 +105,7 @@ type DictationEndReason int32
 
 const (
 	DictationEndReason_DICTATION_END_REASON_UNSPECIFIED DictationEndReason = 0
-	// Stop.
+	// Stop with flush.
 	DictationEndReason_DICTATION_END_REASON_STOPPED DictationEndReason = 1
 	// 30 s without speech.
 	DictationEndReason_DICTATION_END_REASON_SILENCE DictationEndReason = 2
@@ -113,6 +113,8 @@ const (
 	DictationEndReason_DICTATION_END_REASON_DISABLED DictationEndReason = 3
 	// The engine failed or unloaded the model.
 	DictationEndReason_DICTATION_END_REASON_ERROR DictationEndReason = 4
+	// Stop without flush: whatever it held is dropped (a short press, a cancel).
+	DictationEndReason_DICTATION_END_REASON_DISCARDED DictationEndReason = 5
 )
 
 // Enum value maps for DictationEndReason.
@@ -123,6 +125,7 @@ var (
 		2: "DICTATION_END_REASON_SILENCE",
 		3: "DICTATION_END_REASON_DISABLED",
 		4: "DICTATION_END_REASON_ERROR",
+		5: "DICTATION_END_REASON_DISCARDED",
 	}
 	DictationEndReason_value = map[string]int32{
 		"DICTATION_END_REASON_UNSPECIFIED": 0,
@@ -130,6 +133,7 @@ var (
 		"DICTATION_END_REASON_SILENCE":     2,
 		"DICTATION_END_REASON_DISABLED":    3,
 		"DICTATION_END_REASON_ERROR":       4,
+		"DICTATION_END_REASON_DISCARDED":   5,
 	}
 )
 
@@ -534,8 +538,11 @@ type DictationSession struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// The client that started it (StartDictationRequest.client_id).
-	ClientId      string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	ClientId  string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	StartedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	// Stop(flush) was called and the session has not ended yet: the engine is transcribing
+	// what it holds. Never set by a Stop without flush.
+	Stopping      bool `protobuf:"varint,4,opt,name=stopping,proto3" json:"stopping,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -589,6 +596,13 @@ func (x *DictationSession) GetStartedAt() *timestamppb.Timestamp {
 		return x.StartedAt
 	}
 	return nil
+}
+
+func (x *DictationSession) GetStopping() bool {
+	if x != nil {
+		return x.Stopping
+	}
+	return false
 }
 
 type DownloadDictationModelRequest struct {
@@ -833,7 +847,8 @@ func (x *RemoveDictationModelResponse) GetSnapshot() *DictationSnapshot {
 
 type StartDictationRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Who is dictating: an id the GUI makes per composer (or "cli").
+	// Who is dictating: an id the GUI makes per composer, "cli", or "system" for dictation
+	// outside the app (the host shows its on-screen overlay for that one only).
 	ClientId      string `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1519,12 +1534,13 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\x11DictationHardware\x12\x12\n" +
 	"\x04chip\x18\x01 \x01(\tR\x04chip\x12!\n" +
 	"\fmemory_bytes\x18\x02 \x01(\x03R\vmemoryBytes\x12\x1b\n" +
-	"\tm1_family\x18\x03 \x01(\bR\bm1Family\"z\n" +
+	"\tm1_family\x18\x03 \x01(\bR\bm1Family\"\x96\x01\n" +
 	"\x10DictationSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tclient_id\x18\x02 \x01(\tR\bclientId\x129\n" +
 	"\n" +
-	"started_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\"\x1f\n" +
+	"started_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12\x1a\n" +
+	"\bstopping\x18\x04 \x01(\bR\bstopping\"\x1f\n" +
 	"\x1dDownloadDictationModelRequest\"_\n" +
 	"\x1eDownloadDictationModelResponse\x12=\n" +
 	"\bsnapshot\x18\x01 \x01(\v2!.codefoundry.v1.DictationSnapshotR\bsnapshot\" \n" +
@@ -1577,13 +1593,14 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\x15DICTATION_STATE_READY\x10\x05\x12\x1c\n" +
 	"\x18DICTATION_STATE_UNLOADED\x10\x06\x12\x1d\n" +
 	"\x19DICTATION_STATE_LISTENING\x10\a\x12\x19\n" +
-	"\x15DICTATION_STATE_ERROR\x10\b*\xc1\x01\n" +
+	"\x15DICTATION_STATE_ERROR\x10\b*\xe5\x01\n" +
 	"\x12DictationEndReason\x12$\n" +
 	" DICTATION_END_REASON_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cDICTATION_END_REASON_STOPPED\x10\x01\x12 \n" +
 	"\x1cDICTATION_END_REASON_SILENCE\x10\x02\x12!\n" +
 	"\x1dDICTATION_END_REASON_DISABLED\x10\x03\x12\x1e\n" +
-	"\x1aDICTATION_END_REASON_ERROR\x10\x042\x87\a\n" +
+	"\x1aDICTATION_END_REASON_ERROR\x10\x04\x12\"\n" +
+	"\x1eDICTATION_END_REASON_DISCARDED\x10\x052\x87\a\n" +
 	"\x10DictationService\x12U\n" +
 	"\x05Watch\x12%.codefoundry.v1.WatchDictationRequest\x1a!.codefoundry.v1.DictationSnapshot\"\x000\x01\x12k\n" +
 	"\bDownload\x12-.codefoundry.v1.DownloadDictationModelRequest\x1a..codefoundry.v1.DownloadDictationModelResponse\"\x00\x12s\n" +

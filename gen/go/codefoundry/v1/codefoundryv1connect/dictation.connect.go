@@ -80,8 +80,9 @@ type DictationServiceClient interface {
 	// starting again gets its open session back.
 	Start(context.Context, *connect.Request[v1.StartDictationRequest]) (*connect.Response[v1.StartDictationResponse], error)
 	// Stop ends the session. With flush the engine transcribes the speech it holds first
-	// and its phrases arrive on Session before ended (bounded: 1.5 s). An unknown or ended
-	// session is not an error.
+	// and its phrases arrive on Session before ended (bounded: 1.5 s), session.stopping
+	// showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. An
+	// unknown or ended session is not an error.
 	Stop(context.Context, *connect.Request[v1.StopDictationRequest]) (*connect.Response[v1.StopDictationResponse], error)
 	// Session streams one session's events: a heartbeat at once (opening the stream),
 	// level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat
@@ -245,8 +246,9 @@ type DictationServiceHandler interface {
 	// starting again gets its open session back.
 	Start(context.Context, *connect.Request[v1.StartDictationRequest]) (*connect.Response[v1.StartDictationResponse], error)
 	// Stop ends the session. With flush the engine transcribes the speech it holds first
-	// and its phrases arrive on Session before ended (bounded: 1.5 s). An unknown or ended
-	// session is not an error.
+	// and its phrases arrive on Session before ended (bounded: 1.5 s), session.stopping
+	// showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. An
+	// unknown or ended session is not an error.
 	Stop(context.Context, *connect.Request[v1.StopDictationRequest]) (*connect.Response[v1.StopDictationResponse], error)
 	// Session streams one session's events: a heartbeat at once (opening the stream),
 	// level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat

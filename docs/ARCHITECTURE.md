@@ -54,7 +54,10 @@ Three processes, one protocol.
   (`docs/notes/dictation-3-host.md`). While `dictation.anywhere` is on (it reads the
   setting from the same stream) it keeps a menu bar item, and closing the window hides it
   and drops the Dock icon instead of quitting (`gui/menubar.go`,
-  `docs/notes/dictate-anywhere-settings.md`).
+  `docs/notes/dictate-anywhere-settings.md`). For a session whose client is `system` it
+  shows the dictation overlay, a non-activating panel with its own small page
+  (`dictation-overlay.html`) that reads the daemon and asks to be hidden when it has played
+  the session (`gui/overlay.go`, `docs/notes/dictate-anywhere-overlay.md`).
   No business logic lives in the Wails host.
 * **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
@@ -322,8 +325,8 @@ Services (v1):
   optionally the result that stands if the user declines; the GUI asks again, the CLI
   prompts again on a terminal, and `--yes` never answers it
   (`docs/notes/dirty-worktree-confirm.md`).
-* `UiService` — WatchIntents (server stream: focus thread, open palette, …); Emit (from
-  CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
+* `UiService` — WatchIntents (server stream: focus thread, open palette, …); GetTheme (the
+  theme last published, for the dictation overlay's page); Emit (from CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
   changes only that thread's side panel and never a window's selection; `ui.presence`
   tells a thread's model whether the user is looking and whether a window shows its
   thread (`docs/notes/control-1-thread-scoped-views.md`). A Notify may carry a `link`

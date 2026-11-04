@@ -256,7 +256,7 @@ export class MockDictation {
     const s = this.session;
     if (s?.id !== sessionId) return;
     if (flush && this.script.flush) s.hub.publish({ event: { case: "phrase", value: { text: this.script.flush } } });
-    this.endSession(DictationEndReason.STOPPED);
+    this.endSession(flush ? DictationEndReason.STOPPED : DictationEndReason.DISCARDED);
   }
 
   /** The open session ends with `reason` (controls, disabling, removing). */

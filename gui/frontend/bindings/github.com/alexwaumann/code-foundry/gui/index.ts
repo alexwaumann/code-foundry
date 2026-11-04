@@ -3,9 +3,11 @@
 
 import * as AppService from "./appservice.js";
 import * as DaemonService from "./daemonservice.js";
+import * as OverlayService from "./overlayservice.js";
 export {
     AppService,
-    DaemonService
+    DaemonService,
+    OverlayService
 };
 
 export type {

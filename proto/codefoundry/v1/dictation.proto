@@ -37,8 +37,9 @@ service DictationService {
   // starting again gets its open session back.
   rpc Start(StartDictationRequest) returns (StartDictationResponse) {}
   // Stop ends the session. With flush the engine transcribes the speech it holds first
-  // and its phrases arrive on Session before ended (bounded: 1.5 s). An unknown or ended
-  // session is not an error.
+  // and its phrases arrive on Session before ended (bounded: 1.5 s), session.stopping
+  // showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. An
+  // unknown or ended session is not an error.
   rpc Stop(StopDictationRequest) returns (StopDictationResponse) {}
   // Session streams one session's events: a heartbeat at once (opening the stream),
   // level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat
@@ -139,6 +140,9 @@ message DictationSession {
   // The client that started it (StartDictationRequest.client_id).
   string client_id = 2;
   google.protobuf.Timestamp started_at = 3;
+  // Stop(flush) was called and the session has not ended yet: the engine is transcribing
+  // what it holds. Never set by a Stop without flush.
+  bool stopping = 4;
 }
 
 message DownloadDictationModelRequest {}
@@ -160,7 +164,8 @@ message RemoveDictationModelResponse {
 }
 
 message StartDictationRequest {
-  // Who is dictating: an id the GUI makes per composer (or "cli").
+  // Who is dictating: an id the GUI makes per composer, "cli", or "system" for dictation
+  // outside the app (the host shows its on-screen overlay for that one only).
   string client_id = 1;
 }
 
@@ -183,7 +188,7 @@ message DictationSessionRequest {
 // Why a session ended.
 enum DictationEndReason {
   DICTATION_END_REASON_UNSPECIFIED = 0;
-  // Stop.
+  // Stop with flush.
   DICTATION_END_REASON_STOPPED = 1;
   // 30 s without speech.
   DICTATION_END_REASON_SILENCE = 2;
@@ -191,6 +196,8 @@ enum DictationEndReason {
   DICTATION_END_REASON_DISABLED = 3;
   // The engine failed or unloaded the model.
   DICTATION_END_REASON_ERROR = 4;
+  // Stop without flush: whatever it held is dropped (a short press, a cancel).
+  DICTATION_END_REASON_DISCARDED = 5;
 }
 
 // DictationSessionEvent is one event of a session. Exactly one field is set.

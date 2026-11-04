@@ -132,7 +132,7 @@ describe("the thread composer's dictation", () => {
     fireEvent.click(mic());
     await pill();
     // The host reports macOS refused: the session ends and the composer says why.
-    await publish(dictationSnap({ state: "listening", micDenied: true, session: { id: fakeDictation.sessionId, clientId: "x", startedAtMs: 1 } }));
+    await publish(dictationSnap({ state: "listening", micDenied: true, session: { id: fakeDictation.sessionId, clientId: "x", startedAtMs: 1, stopping: false } }));
     await vi.waitFor(() => {
       expect(screen.getByTestId("dictation-mic")).not.toBeNull();
     });
@@ -143,7 +143,7 @@ describe("the thread composer's dictation", () => {
   });
 
   it("a session held elsewhere (the CLI) gives way to this composer", async () => {
-    await mount(dictationSnap({ state: "listening", session: { id: "dict-cli", clientId: "cli", startedAtMs: 1 } }));
+    await mount(dictationSnap({ state: "listening", session: { id: "dict-cli", clientId: "cli", startedAtMs: 1, stopping: false } }));
     fireEvent.click(mic());
     await pill();
     expect(fakeDictation.calls[0]).toBe("stop dict-cli true");

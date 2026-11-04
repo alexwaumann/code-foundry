@@ -413,12 +413,13 @@ func TestMissingEngineFailsAtOnce(t *testing.T) {
 
 func TestSessionPhrasesAndFlush(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		flush bool
-		want  []string
+		name   string
+		flush  bool
+		want   []string
+		reason dictation.EndReason
 	}{
-		{"flush keeps the tail", true, []string{"hello there", "and the tail", "ended:stopped"}},
-		{"no flush drops it", false, []string{"hello there", "ended:stopped"}},
+		{"flush keeps the tail", true, []string{"hello there", "and the tail", "ended:stopped"}, dictation.EndStopped},
+		{"no flush drops it", false, []string{"hello there", "ended:discarded"}, dictation.EndDiscarded},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t, setup{enabled: true, model: true})
@@ -451,12 +452,50 @@ func TestSessionPhrasesAndFlush(t *testing.T) {
 				t.Errorf("events %v, want %v", got, tc.want)
 			}
 			h.waitState(dictation.Ready)
-			if r, ended, ok := h.store.SessionEnded(id); !ok || !ended || r != dictation.EndStopped {
+			if r, ended, ok := h.store.SessionEnded(id); !ok || !ended || r != tc.reason {
 				t.Errorf("SessionEnded = %v %v %v", r, ended, ok)
 			}
 			// Stopping again is fine.
 			if err := h.store.Stop(context.Background(), id, true); err != nil {
 				t.Error(err)
+			}
+		})
+	}
+}
+
+// Stopping shows on the snapshot only for a flush, between Stop and the end.
+func TestStoppingSnapshot(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		flush bool
+		want  []bool // Session.Stopping of each snapshot with the session, from the Stop on
+	}{
+		{"flush", true, []bool{true}},
+		{"no flush", false, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, setup{enabled: true, model: true})
+			h.waitState(dictation.Ready)
+			id, err := h.store.Start(context.Background(), "c1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			changes := bus.Subscribe[dictation.Changed](h.bus, 64)
+			defer changes.Close()
+			if err := h.store.Stop(context.Background(), id, tc.flush); err != nil {
+				t.Fatal(err)
+			}
+			var got []bool
+			for len(changes.C()) > 0 {
+				if s := (<-changes.C()).Snapshot.Session; s != nil {
+					got = append(got, s.Stopping)
+				}
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("stopping snapshots %v, want %v", got, tc.want)
+			}
+			if s := h.store.Snapshot(); s.Session != nil {
+				t.Errorf("session after the end: %+v", s.Session)
 			}
 		})
 	}

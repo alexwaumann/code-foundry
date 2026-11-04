@@ -36,14 +36,14 @@ export interface DictationView {
   };
   hardware: { chip: string; memoryBytes: number; m1Family: boolean };
   /** The open session; null unless listening. */
-  session: { id: string; clientId: string; startedAtMs: number } | null;
+  session: { id: string; clientId: string; startedAtMs: number; stopping: boolean } | null;
   /** The engine's failure in ERROR, else the last download's failure ("" when none). */
   error: string;
   /** macOS denied the microphone (the host says so). */
   micDenied: boolean;
 }
 
-export type DictationEndView = "stopped" | "silence" | "disabled" | "error";
+export type DictationEndView = "stopped" | "silence" | "disabled" | "error" | "discarded";
 
 export type DictationSessionEventView = { kind: "level"; rms: number } | { kind: "phrase"; text: string } | { kind: "ended"; reason: DictationEndView };
 
@@ -65,6 +65,7 @@ const endMap: Record<DictationEndReason, DictationEndView> = {
   [DictationEndReason.SILENCE]: "silence",
   [DictationEndReason.DISABLED]: "disabled",
   [DictationEndReason.ERROR]: "error",
+  [DictationEndReason.DISCARDED]: "discarded",
 };
 
 export function toDictationView(s: DictationSnapshot): DictationView {
@@ -81,7 +82,7 @@ export function toDictationView(s: DictationSnapshot): DictationView {
       download: d ? { receivedBytes: Number(d.receivedBytes), totalBytes: Number(d.totalBytes), bytesPerSecond: Number(d.bytesPerSecond) } : null,
     },
     hardware: { chip: hw?.chip ?? "", memoryBytes: Number(hw?.memoryBytes ?? 0n), m1Family: hw?.m1Family ?? false },
-    session: s.session ? { id: s.session.id, clientId: s.session.clientId, startedAtMs: s.session.startedAt ? timestampDate(s.session.startedAt).getTime() : 0 } : null,
+    session: s.session ? { id: s.session.id, clientId: s.session.clientId, startedAtMs: s.session.startedAt ? timestampDate(s.session.startedAt).getTime() : 0, stopping: s.session.stopping } : null,
     error: s.error,
     micDenied: s.micDenied,
   };

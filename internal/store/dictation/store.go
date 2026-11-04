@@ -108,6 +108,8 @@ const (
 	EndSilence
 	EndDisabled
 	EndError
+	// EndDiscarded: Stop without flush.
+	EndDiscarded
 )
 
 func (r EndReason) String() string {
@@ -120,6 +122,8 @@ func (r EndReason) String() string {
 		return "disabled"
 	case EndError:
 		return "error"
+	case EndDiscarded:
+		return "discarded"
 	}
 	return fmt.Sprintf("EndReason(%d)", int(r))
 }
@@ -148,6 +152,8 @@ type ModelState struct {
 type Session struct {
 	ID, ClientID string
 	StartedAt    time.Time
+	// Stopping is set between Stop with flush and the session's end.
+	Stopping bool
 }
 
 // Prefs are the dictation settings the store does not act on itself: the snapshot carries
@@ -249,6 +255,8 @@ type session struct {
 	// heard: a frame of audio arrived, so the silence clock runs.
 	heard    bool
 	stopping bool
+	// flushing: stopping, with the engine transcribing what it holds.
+	flushing bool
 	// silence ends the session after SilenceStop without speech; silenceGen tells a
 	// stale timer from the current one.
 	silence    Timer
@@ -794,10 +802,15 @@ func (s *Store) Start(ctx context.Context, clientID string) (string, error) {
 }
 
 // Stop ends the session. With flush the engine transcribes what it holds first, its
-// phrases published before the end (bounded by FlushWait). An unknown or ended session
-// is not an error.
+// phrases published before the end (bounded by FlushWait), and the session ends
+// EndStopped; without flush it ends EndDiscarded. An unknown or ended session is not an
+// error.
 func (s *Store) Stop(ctx context.Context, sessionID string, flush bool) error {
-	s.stopSession(ctx, sessionID, flush, EndStopped)
+	why := EndDiscarded
+	if flush {
+		why = EndStopped
+	}
+	s.stopSession(ctx, sessionID, flush, why)
 	return nil
 }
 
@@ -809,7 +822,11 @@ func (s *Store) stopSession(ctx context.Context, sessionID string, flush bool, w
 		return
 	}
 	sess.stopping = true
+	sess.flushing = flush
 	s.stopSilenceLocked(sess)
+	if flush {
+		s.publishLocked()
+	}
 	eng := s.eng
 	if eng != nil && sess.begun {
 		s.mu.Unlock()
@@ -980,7 +997,7 @@ func (s *Store) publishLocked() {
 		snap.Model.Download = &p
 	}
 	if sess := s.session; sess != nil && sess.begun {
-		snap.Session = &Session{ID: sess.id, ClientID: sess.clientID, StartedAt: sess.started}
+		snap.Session = &Session{ID: sess.id, ClientID: sess.clientID, StartedAt: sess.started, Stopping: sess.flushing}
 	}
 	if old := s.snap.Load(); old != nil && equal(old, snap) {
 		return

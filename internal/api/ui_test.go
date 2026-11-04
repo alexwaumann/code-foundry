@@ -124,6 +124,36 @@ func TestUIPublishTheme(t *testing.T) {
 	}
 }
 
+func TestUIGetTheme(t *testing.T) {
+	live := theme.NewLive()
+	mux := http.NewServeMux()
+	r := NewUI(bus.New(), live, theme.NewReports()).Route()
+	mux.Handle(r.Path, r.Handler)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := codefoundryv1connect.NewUiServiceClient(srv.Client(), srv.URL)
+	ctx := context.Background()
+
+	res, err := c.GetTheme(ctx, connect.NewRequest(&v1.GetThemeRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := res.Msg; m.GetPublished() || m.GetScheme() != theme.SchemeDark || m.GetVars()["--cf-accent"] == "" {
+		t.Fatalf("before a publish: %+v", m)
+	}
+	vars := themeVars(map[string]string{"--cf-accent": "#88c0d0"})
+	if _, err := c.PublishTheme(ctx, connect.NewRequest(&v1.PublishThemeRequest{Id: "nord", Scheme: "light", Vars: vars})); err != nil {
+		t.Fatal(err)
+	}
+	res, err = c.GetTheme(ctx, connect.NewRequest(&v1.GetThemeRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := res.Msg; !m.GetPublished() || m.GetId() != "nord" || m.GetScheme() != "light" || m.GetVars()["--cf-accent"] != "#88c0d0" {
+		t.Fatalf("after a publish: %+v", m)
+	}
+}
+
 func TestUIPublishThemeReport(t *testing.T) {
 	reports := theme.NewReports()
 	mux := http.NewServeMux()

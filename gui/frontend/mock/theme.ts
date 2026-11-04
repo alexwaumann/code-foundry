@@ -72,6 +72,12 @@ export function mockPaint(html: string): string {
   return tag + html;
 }
 
+/** UiService.GetTheme and /cf/theme.json's body: the published theme, else GitHub Dark with published false. */
+export function mockThemeJson(): MockFrame & { published: boolean } {
+  const f = published ?? defaults.dark;
+  return { id: f.id, scheme: f.scheme, vars: f.vars, published: published !== null };
+}
+
 /** GET /cf/theme.css (?scheme=dark or light pins it, Live.PinnedCSS) or /cf/theme.json; undefined for any other path (a 404). */
 export function themeRoute(pathname: string, scheme: string | null = null): { type: string; body: string } | undefined {
   if (pathname === "/cf/theme.css" && (scheme === "dark" || scheme === "light")) {
@@ -82,8 +88,7 @@ export function themeRoute(pathname: string, scheme: string | null = null): { ty
     return { type: "text/css; charset=utf-8", body: head + frameCss };
   }
   if (pathname === "/cf/theme.json") {
-    const f = published ?? defaults.dark;
-    return { type: "application/json; charset=utf-8", body: JSON.stringify({ id: f.id, scheme: f.scheme, vars: f.vars, published: published !== null }) + "\n" };
+    return { type: "application/json; charset=utf-8", body: JSON.stringify(mockThemeJson()) + "\n" };
   }
   return undefined;
 }

@@ -33,6 +33,10 @@ export default defineConfig({
     alias: { "@": path.resolve(import.meta.dirname, "./src") },
   },
   plugins: [react(), tailwindcss(), wails("./bindings")],
+  build: {
+    // The dictation overlay's panel loads its own small page, not the app (gui/overlay.go).
+    rolldownOptions: { input: { main: "index.html", "dictation-overlay": "dictation-overlay.html" } },
+  },
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}", "themes/**/*.test.ts", "mock/**/*.test.ts"],

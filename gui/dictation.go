@@ -46,6 +46,12 @@ type dictationConn interface {
 	Stop(ctx context.Context, sessionID string) error
 }
 
+// overlayObserver hears what Watch says, for the dictation overlay (OverlayService).
+type overlayObserver interface {
+	observe(*v1.DictationSnapshot)
+	lost()
+}
+
 // dictationWatcher makes the host the daemon's microphone (docs/notes/dictation-3-host.md):
 // it follows DictationService.Watch and, while the snapshot is LISTENING, captures the
 // microphone and streams it to the session with DictationService.Audio. It asks for the
@@ -62,11 +68,13 @@ type dictationWatcher struct {
 	// anywhere gets dictation.anywhere from every snapshot (a heartbeat carries none, and
 	// a lost stream says nothing, so neither calls it). Nil in tests that do not care.
 	anywhere func(on bool)
+	// overlay, when set, is told of every snapshot.
+	overlay overlayObserver
 }
 
 // watchDictation runs the dictation watcher over the host's daemon client until ctx
 // ends, reconnecting when the daemon restarts (connectDaemon may start it).
-func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*client.Client, error), mic microphone, anywhere func(on bool), log *slog.Logger) {
+func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*client.Client, error), mic microphone, anywhere func(on bool), overlay overlayObserver, log *slog.Logger) {
 	w := dictationWatcher{
 		dial: func(ctx context.Context) (dictationConn, error) {
 			c, err := connectDaemon(ctx)
@@ -80,6 +88,7 @@ func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*c
 		retry:      dictationRetry,
 		reopenWait: micReopenWait,
 		anywhere:   anywhere,
+		overlay:    overlay,
 	}
 	w.run(ctx)
 }
@@ -126,6 +135,9 @@ func (w *dictationWatcher) once(parent context.Context) error {
 		return err
 	}
 	defer func() { _ = stream.Close() }()
+	if w.overlay != nil {
+		defer w.overlay.lost()
+	}
 
 	var sess *micSession
 	defer func() {
@@ -152,6 +164,10 @@ func (w *dictationWatcher) once(parent context.Context) error {
 			}
 			if sess == nil && id != "" {
 				sess = w.startSession(ctx, conn, id, denied)
+			}
+			// After the capture started: the first show creates the window.
+			if w.overlay != nil {
+				w.overlay.observe(snap)
 			}
 		}
 		// The user may have allowed the microphone in System Settings since it was
