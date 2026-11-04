@@ -16,6 +16,8 @@ const { runCommandForResult } = await import("@/stores/commands");
 const { closePanelTab, usePanelStore } = await import("@/stores/panel");
 const { mergePullRequest } = await import("@/stores/prPanel");
 const { useUiStore } = await import("@/stores/ui");
+const { applyGhEvent } = await import("@/stores/gh");
+const { UPDATING_AFTER_MS } = await import("./PullRequestSurface");
 const { useThreadsStore } = await import("@/stores/threads");
 const { PREPARING_TOAST_DELAY_MS } = await import("@/stores/prThreads");
 
@@ -1012,6 +1014,88 @@ describe("auto-merge", () => {
     expect(queryTestId("pr-auto-merge-button")).toBeNull();
     press(byTestId("pr-merge-button-menu-button"));
     expect(texts("pr-merge-note")).toEqual(["Behind main: this repository merges only up-to-date branches"]);
+  });
+});
+
+describe("a stale copy refreshing behind the panel", () => {
+  const landed = async (number: number) => {
+    await act(async () => {
+      applyGhEvent({ kind: "pullRequestDetail", repoSlug: SLUG, number });
+      await Promise.resolve();
+    });
+    await settle(3);
+  };
+
+  it("says nothing on a normal open, says Updating… only once it runs long, and goes when the fetch lands", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      world.update(145, (d) => ({ ...d, refreshing: true }));
+      renderPrPanel();
+      await openPr(145);
+      expect(queryTestId("pr-loading")).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(UPDATING_AFTER_MS - 200);
+      });
+      expect(queryTestId("pr-updating")).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(400);
+      });
+      expect(byTestId("pr-updating").textContent).toBe("Updating…");
+      world.update(145, (d) => ({ ...d, refreshing: false }));
+      await landed(145);
+      expect(queryTestId("pr-updating")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the open tab and takes the new readiness and checks in place when the fetch lands", async () => {
+    world.update(142, (d) => ({ ...d, refreshing: true }));
+    renderPrPanel();
+    await openPr(142);
+    const surface = byTestId("pr-surface");
+    fireEvent.click(byTestId("pr-tab-activity"));
+    expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
+    const rows = () => screen.getAllByTestId("pr-ready-row").map((r) => r.dataset.row);
+    expect(rows()).not.toContain("draft");
+
+    const [sample] = [...world.details.values()].flatMap((d) => d.checks);
+    if (!sample) throw new Error("no check in the world");
+    const failing = { ...sample, name: "go-test", status: "completed", conclusion: "failure" };
+    world.update(142, (d) => ({ ...d, refreshing: false, checks: [failing], pullRequest: { ...d.pullRequest, draft: true } }));
+    await landed(142);
+    expect(byTestId("pr-surface")).toBe(surface); // updated, not remounted
+    expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
+    expect(rows()).toContain("draft");
+    expect(texts("pr-ready-title").join(" ")).toContain("failing");
+    expect(queryTestId("pr-loading")).toBeNull();
+  });
+
+  it("a failed refresh keeps the copy and adds the banner; never the error page", async () => {
+    world.update(145, (d) => ({ ...d, refreshing: true }));
+    renderPrPanel();
+    await openPr(145);
+    const title = byTestId("pr-title").textContent;
+    world.update(145, (d) => ({ ...d, refreshing: false, fetchFailed: true, lastError: "github graphql: 502 Bad Gateway" }));
+    await landed(145);
+    expect(byTestId("pr-title").textContent).toBe(title);
+    expect(byTestId("pr-stale").textContent).toContain("502 Bad Gateway");
+    expect(queryTestId("pr-error")).toBeNull();
+    expect(queryTestId("pr-updating")).toBeNull();
+  });
+
+  it("a copy that may predate autoMergeAllowed claims nothing about auto-merge until its fetch lands", async () => {
+    world.update(162, (d) => ({ ...d, autoMergeAllowed: false, refreshing: true }));
+    renderPrPanel();
+    await openPr(162);
+    expect(queryTestId("pr-auto-merge-button")).toBeNull();
+    press(byTestId("pr-merge-button-menu-button"));
+    expect(texts("pr-merge-note")).not.toContain("Auto-merge is off for this repository");
+    fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
+
+    world.update(162, (d) => ({ ...d, autoMergeAllowed: true, refreshing: false }));
+    await landed(162);
+    expect(queryTestId("pr-auto-merge-button")).not.toBeNull();
   });
 });
 

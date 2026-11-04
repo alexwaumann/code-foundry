@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -182,9 +183,12 @@ type job struct {
 	number int
 	ref    string
 	// id and run: jobFunc only.
-	id      string
-	run     func(context.Context) (any, error)
-	waiters []chan jobResult
+	id  string
+	run func(context.Context) (any, error)
+	// background: nobody waits for the result (submitBackground), so every job someone
+	// waits for goes first.
+	background bool
+	waiters    []chan jobResult
 }
 
 func (j *job) key() string {
@@ -420,23 +424,11 @@ func (s *Store) Checks(ctx context.Context, slug, ref string) (RefChecks, error)
 func (s *Store) submit(ctx context.Context, j *job) jobResult {
 	ch := make(chan jobResult, 1)
 	s.mu.Lock()
-	if now := s.opts.Now(); now.Before(s.pauseUntil) {
-		err := fmt.Errorf("paused until %s: %w", s.pauseUntil.Format(time.TimeOnly), s.pauseErr)
+	if err := s.pausedLocked(); err != nil {
 		s.mu.Unlock()
 		return jobResult{err: err}
 	}
-	queued := false
-	for _, q := range s.queue {
-		if q.key() == j.key() {
-			q.waiters = append(q.waiters, ch)
-			queued = true
-			break
-		}
-	}
-	if !queued {
-		j.waiters = []chan jobResult{ch}
-		s.queue = append(s.queue, j)
-	}
+	s.enqueueLocked(j, ch)
 	s.mu.Unlock()
 	s.nudge()
 	select {
@@ -445,6 +437,67 @@ func (s *Store) submit(ctx context.Context, j *job) jobResult {
 	case <-ctx.Done():
 		return jobResult{err: ctx.Err()}
 	}
+}
+
+// submitBackground queues j with nobody waiting for it, behind every job someone waits
+// for, coalescing with an identical queued job. While the store is paused it queues
+// nothing and returns the pause's error.
+func (s *Store) submitBackground(j *job) error {
+	j.background = true
+	s.mu.Lock()
+	err := s.pausedLocked()
+	if err == nil {
+		s.enqueueLocked(j, nil)
+	}
+	s.mu.Unlock()
+	if err == nil {
+		s.nudge()
+	}
+	return err
+}
+
+// pausedLocked is the error of a rate-limit or network pause in force; nil without one.
+// Called with s.mu held.
+func (s *Store) pausedLocked() error {
+	if s.opts.Now().Before(s.pauseUntil) {
+		return fmt.Errorf("paused until %s: %w", s.pauseUntil.Format(time.TimeOnly), s.pauseErr)
+	}
+	return nil
+}
+
+// enqueueLocked queues j for ch (nil: nobody waits), or joins an identical queued job,
+// which then counts as waited for. Called with s.mu held.
+func (s *Store) enqueueLocked(j *job, ch chan jobResult) {
+	i := slices.IndexFunc(s.queue, func(q *job) bool { return q.key() == j.key() })
+	if i >= 0 {
+		q := s.queue[i]
+		if ch == nil {
+			return
+		}
+		q.waiters = append(q.waiters, ch)
+		if q.background {
+			q.background = false
+			s.queue = slices.Delete(s.queue, i, i+1)
+			s.insertLocked(q)
+		}
+		return
+	}
+	if ch != nil {
+		j.waiters = append(j.waiters, ch)
+	}
+	s.insertLocked(j)
+}
+
+// insertLocked puts j at the end of its class: jobs someone waits for, then background
+// ones. Called with s.mu held.
+func (s *Store) insertLocked(j *job) {
+	at := len(s.queue)
+	if !j.background {
+		if i := slices.IndexFunc(s.queue, func(q *job) bool { return q.background }); i >= 0 {
+			at = i
+		}
+	}
+	s.queue = slices.Insert(s.queue, at, j)
 }
 
 func (s *Store) nudge() {

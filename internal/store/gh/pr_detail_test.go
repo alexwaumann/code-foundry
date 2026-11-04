@@ -94,30 +94,48 @@ func TestFullPullRequestCache(t *testing.T) {
 	g.edit("PR_a", func(p *PullRequest) { p.UpdatedAt = p.UpdatedAt.Add(time.Minute) })
 	pollOnce(t, s, f)
 	step("the poll saw updatedAt move: stale + event", 3, 1)
-	read(false)
-	step("stale: fetched", 4, 0)
+	if d := read(false); !d.Refreshing {
+		t.Error("a stale copy was not marked refreshing")
+	}
+	settleWorker(t, s)
+	step("stale: served, fetched behind it, announced", 4, 1)
 
 	g.edit("PR_a", func(p *PullRequest) { p.Checks = CheckRollup{State: RollupSuccess, Total: 4, Passed: 4} })
 	pollOnce(t, s, f)
 	step("check counts moved: stale + event", 4, 1)
-	if d := read(false); d.PullRequest.Checks.Total != 4 {
-		t.Errorf("checks after refetch = %+v", d.PullRequest.Checks)
+	if d := read(false); d.PullRequest.Checks.Total == 4 || !d.Refreshing {
+		t.Errorf("read of the stale entry: checks %+v refreshing %v, want the old copy", d.PullRequest.Checks, d.Refreshing)
 	}
-	step("refetched quietly (the stale event was the announcement)", 5, 0)
+	settleWorker(t, s)
+	step("refetched, announced", 5, 1)
+	if d := read(false); d.PullRequest.Checks.Total != 4 || d.Refreshing {
+		t.Errorf("after the refetch: checks %+v refreshing %v", d.PullRequest.Checks, d.Refreshing)
+	}
 
 	clk.advance(2 * time.Hour) // past the poll interval (1h in testOptions)
 	read(false)
-	step("older than the poll interval: fetched", 6, 0)
+	settleWorker(t, s)
+	step("older than the poll interval: fetched, announced though unchanged", 6, 1)
 
 	clk.advance(2 * time.Hour)
 	g.failNext("PullRequestFull", errors.New("github graphql: boom"))
-	if d := read(false); d.LastError == "" || !d.FetchFailed || d.Body != "second body" {
-		t.Errorf("failed refresh: lastError %q fetchFailed %v body %q", d.LastError, d.FetchFailed, d.Body)
+	read(false)
+	settleWorker(t, s)
+	step("the fetch failed: said once", 7, 1)
+	if d := read(false); d.LastError == "" || !d.FetchFailed || d.Refreshing || d.Body != "second body" {
+		t.Errorf("failed refresh: lastError %q fetchFailed %v refreshing %v body %q", d.LastError, d.FetchFailed, d.Refreshing, d.Body)
 	}
+	settleWorker(t, s)
+	step("the read that event brings does not fetch again", 7, 0)
 	// The flag is never cached: the next good fetch is fresh again.
 	clk.advance(2 * time.Hour)
-	if d := read(false); d.LastError != "" || d.FetchFailed {
-		t.Errorf("after recovery: lastError %q fetchFailed %v", d.LastError, d.FetchFailed)
+	if d := read(false); !d.FetchFailed || !d.Refreshing {
+		t.Errorf("retry: fetchFailed %v refreshing %v, want both", d.FetchFailed, d.Refreshing)
+	}
+	settleWorker(t, s)
+	step("the retry worked: announced", 8, 1)
+	if d := read(false); d.LastError != "" || d.FetchFailed || d.Refreshing {
+		t.Errorf("after recovery: lastError %q fetchFailed %v refreshing %v", d.LastError, d.FetchFailed, d.Refreshing)
 	}
 
 	if _, err := s.FullPullRequest(ctx, "o/r", 99, false); !errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), "Could not resolve") {
@@ -137,6 +155,10 @@ func TestFullPullRequestCache(t *testing.T) {
 	opts2 := testOptions(db, f2, nil)
 	opts2.Now = clk.now
 	s2 := startStore(t, opts2)
+	if _, err := s2.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+		t.Fatal(err)
+	}
+	settleWorker(t, s2)
 	d2, err := s2.FullPullRequest(ctx, "o/r", 1, false)
 	if err != nil || d2.Body != "second body" || d2.LastError == "" || !d2.FetchFailed || d2.PullRequest.ID != "PR_a" {
 		t.Errorf("restart: err %v body %q lastError %q fetchFailed %v", err, d2.Body, d2.LastError, d2.FetchFailed)
@@ -465,6 +487,7 @@ func TestFullPullRequestConfirmedByPoll(t *testing.T) {
 		if _, err := s.FullPullRequest(ctx, "o/r", number, false); err != nil {
 			t.Fatal(err)
 		}
+		settleWorker(t, s)
 		fetchesOf[number] += f.count("PullRequestFull") - before
 	}
 	expect := func(step string, want map[int]int) {

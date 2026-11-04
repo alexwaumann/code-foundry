@@ -55,6 +55,7 @@ func TestPluginChecksFollowGhEvents(t *testing.T) {
 		{"title", changed(gh.ChangeTitle), false},
 		{"appeared", changed(gh.ChangeAppeared), false},
 		{"detail updated", func() { bus.Publish(b, gh.PullRequestDetailUpdated{Slug: "o/r", Number: 1}) }, true},
+		{"detail fetched, unchanged", func() { bus.Publish(b, gh.PullRequestDetailUpdated{Slug: "o/r", Number: 1, Unchanged: true}) }, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -38,7 +38,10 @@ func TestPullRequestMerge(t *testing.T) {
 		wantErr   error
 		wantCode  connect.Code
 	}{
+		// Without a head the confirmation is the user's look at what merges: it asks GitHub.
 		{name: "needs confirmation", args: args("method", "squash"),
+			wantReq: &v1.GetPullRequestDetailRequest{RepoSlug: "o/r", Number: 142, Refresh: true}, wantErr: command.ErrNeedsConfirmation},
+		{name: "needs confirmation, the head shown: the cached copy will do", args: args("method", "squash", "head-sha", "e2e0142e2e0142e2e0142e2e0142e2e0142e2e01"),
 			wantReq: &v1.GetPullRequestDetailRequest{RepoSlug: "o/r", Number: 142}, wantErr: command.ErrNeedsConfirmation},
 		{name: "squash, delete the branch", args: args("method", "squash", "delete-branch", "true"), confirmed: true,
 			wantReq: &v1.MergePullRequestRequest{RepoSlug: "o/r", Number: 142, Method: methodSquash, DeleteBranch: true},

@@ -35,7 +35,9 @@ func startPluginChecks(ctx context.Context, b *bus.Bus, plugins pluginChecks) (s
 					plugins.InvalidatePullRequestChecks(e.Slug, e.Number)
 				}
 			case e := <-detail.C():
-				plugins.InvalidatePullRequestChecks(e.Slug, e.Number)
+				if !e.Unchanged {
+					plugins.InvalidatePullRequestChecks(e.Slug, e.Number)
+				}
 			}
 		}
 	})

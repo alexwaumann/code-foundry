@@ -11,19 +11,25 @@ import (
 // The pull request detail panel's data (GetPullRequestDetail). One GraphQL request
 // (pull_request_full.graphql) per fetch, plus Checks pages only beyond 100 checks.
 //
-// Cache rules (docs/notes/gh-pr-detail.md, docs/notes/gh-detail-cache-confirm.md): an
-// entry is served until the caller asks for a refresh, the poll saw the pull request's
-// fingerprint move (updatedAt, state, head, check rollup), or it is too old. The poll
-// marks a moved entry stale and publishes PullRequestDetailUpdated, so an open panel
-// re-reads (and that read fetches). Too old is past the poll interval (closedDetailTTL
-// for merged and closed pull requests), unless a recent poll confirmed the entry: it
-// saw the fingerprint unchanged (fullEntry.serves). Only pull requests the poll covers
-// (dashboards, watched branches) are ever confirmed. A fetch whose result differs from a fresh previous entry (a refresh,
-// or one past its age) publishes it too, for the other clients showing it.
+// Cache rules (docs/notes/gh-pr-detail.md, docs/notes/gh-detail-cache-confirm.md,
+// docs/notes/pr-detail-stale-first.md): an entry is current until the poll saw the pull
+// request's fingerprint move (updatedAt, state, head, check rollup) or it is too old.
+// The poll marks a moved entry stale and publishes PullRequestDetailUpdated, so an open
+// panel re-reads. Too old is past the poll interval (closedDetailTTL for merged and
+// closed pull requests), unless a recent poll confirmed the entry: it saw the
+// fingerprint unchanged (fullEntry.serves). Only pull requests the poll covers
+// (dashboards, watched branches) are ever confirmed.
+//
+// A read never waits for GitHub while any copy exists (FullPullRequest): a copy that is
+// not current comes back at once marked Refreshing, one fetch is queued behind the jobs
+// someone waits for, and PullRequestDetailUpdated tells clients when it lands, changed
+// or not, so they re-read. What waits: a read with nothing cached, a refresh, the read
+// right after this store's own write, and a decision (currentFull).
+//
 // Entries live in memory (fullCacheMax) and in gh_activity ("pr_detail:<slug>#<n>"),
-// which serves as the fallback when a fetch fails, also after a restart. A row read
-// back from SQLite starts stale: polls that ran while it was not in memory (evicted, or
-// the daemon was down) could not mark it.
+// which serves as the copy to show until a fetch lands, also after a restart. A row
+// read back from SQLite starts stale: polls that ran while it was not in memory
+// (evicted, or the daemon was down) could not mark it.
 
 // fullCacheMax bounds the in-memory entries; the least recently fetched go first.
 const fullCacheMax = 64
@@ -32,6 +38,10 @@ const fullCacheMax = 64
 // pull request's detail (or the poll interval, when that is longer): little changes on
 // it after it closes, and a panel left open on one re-read it every interval.
 const closedDetailTTL = 10 * time.Minute
+
+// fullRetryAfter is how long after a failed fetch reads serve the copy without trying
+// again: the failure's own event brings a re-read at once, and that must not fetch.
+const fullRetryAfter = 30 * time.Second
 
 // confirmedMaxAge bounds how long confirmations keep an entry: some changes do not move
 // the fingerprint (the base branch moving changes mergeStateStatus, a thread resolved),
@@ -67,12 +77,19 @@ type fullEntry struct {
 	// confirmed is when a poll last saw the pull request's fingerprint unchanged since d
 	// was fetched; zero until one does.
 	confirmed time.Time
+	// written: this store's own write changed the pull request, so d is known wrong, not
+	// just old. Reads wait for the fetch (read your writes); a failed fetch clears it.
+	written bool
+	// failure is why the last fetch since d failed, at failedAt; nil if none did.
+	failure  error
+	failedAt time.Time
 }
 
-// serves reports whether e may be served at now without a fetch: it is not stale, and
-// it is younger than its age limit (the poll interval; closedDetailTTL once merged or
-// closed) or a poll confirmed it within confirmWindow, up to confirmedMaxAge.
-func (e fullEntry) serves(now time.Time, pollInterval time.Duration) bool {
+// serves reports whether e may be served at now as current: it is not stale, and it is
+// younger than its age limit (the configured poll interval; closedDetailTTL once merged
+// or closed) or a poll confirmed it within confirmWindow of the poll's real cadence
+// (pollCadence), up to confirmedMaxAge.
+func (e fullEntry) serves(now time.Time, pollInterval, cadence time.Duration) bool {
 	if e.stale {
 		return false
 	}
@@ -84,14 +101,14 @@ func (e fullEntry) serves(now time.Time, pollInterval time.Duration) bool {
 	if age < limit {
 		return true
 	}
-	return !e.confirmed.IsZero() && now.Sub(e.confirmed) < confirmWindow(pollInterval) && age < confirmedMaxAge
+	return !e.confirmed.IsZero() && now.Sub(e.confirmed) < confirmWindow(cadence) && age < confirmedMaxAge
 }
 
-// confirmWindow is how long a poll's confirmation holds: one interval plus half of one,
-// because the next poll is scheduled an interval after the previous one ended and
-// confirms only once its fingerprint request returns (seconds later).
-func confirmWindow(pollInterval time.Duration) time.Duration {
-	return pollInterval + pollInterval/2
+// confirmWindow is how long a poll's confirmation holds at a poll cadence: one interval
+// plus half of one, because the next poll is scheduled an interval after the previous
+// one ended and confirms only once its fingerprint request returns (seconds later).
+func confirmWindow(cadence time.Duration) time.Duration {
+	return cadence + cadence/2
 }
 
 // confirmable reports whether a poll that saw d's fingerprint unchanged vouches for
@@ -228,6 +245,29 @@ func (c *fullCache) markStale(k fullKey) bool {
 	return true
 }
 
+// markWritten marks k stale and known wrong: reads wait for the next fetch.
+func (c *fullCache) markWritten(k fullKey) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if e, ok := c.m[k]; ok {
+		e.stale, e.written = true, true
+	}
+}
+
+// fail records that a fetch of k failed at now; it reports whether that is news: the
+// entry exists and its last fetch had not failed.
+func (c *fullCache) fail(k fullKey, err error, now time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.m[k]
+	if !ok {
+		return false
+	}
+	news := e.failure == nil
+	e.failure, e.failedAt, e.written = err, now, false
+	return news
+}
+
 // applyPoll records what a poll saw: every fresh entry whose pull request's fingerprint
 // in fps moved goes stale (their keys are returned), and every other fresh one in fps
 // is confirmed at now when its detail allows (confirmable).
@@ -274,27 +314,77 @@ func sameFull(a, b FullPullRequest) bool {
 	return sameJSON(a, b)
 }
 
-// FullPullRequest implements Service.
+// FullPullRequest implements Service. It waits for GitHub only with nothing cached, for
+// a refresh, and right after this store's own write; any other copy comes back at once
+// (staleFirst). A decision reads currentFull instead.
 func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, refresh bool) (FullPullRequest, error) {
 	k, err := fullKeyOf(slug, number)
 	if err != nil {
 		return FullPullRequest{}, err
 	}
 	e, ok := s.cachedFull(ctx, k)
-	if ok && !refresh && e.serves(s.opts.Now(), s.config().PollInterval) {
+	switch {
+	case !ok, refresh, e.written:
+		return s.fetchOrCached(ctx, k, e, ok)
+	case s.current(e):
 		return e.d, nil
 	}
+	return s.staleFirst(k, e), nil
+}
+
+// currentFull returns k's detail for a decision (merge, revert, a state change): the
+// cached copy only while it is current, else a fetch it waits for. A failed fetch still
+// answers with the cached copy (FetchFailed): GitHub's own checks stand behind the
+// mutation, and a caller that must be sure fetches with fetchFullJob.
+func (s *Store) currentFull(ctx context.Context, k fullKey) (FullPullRequest, error) {
+	e, ok := s.cachedFull(ctx, k)
+	if ok && s.current(e) {
+		return e.d, nil
+	}
+	return s.fetchOrCached(ctx, k, e, ok)
+}
+
+// current reports whether e needs no fetch now.
+func (s *Store) current(e fullEntry) bool {
+	cfg := s.config()
+	return e.serves(s.opts.Now(), cfg.PollInterval, s.pollCadence(cfg))
+}
+
+// fetchOrCached fetches k and waits; if that fails, e (ok: there is one) answers with
+// the error in LastError.
+func (s *Store) fetchOrCached(ctx context.Context, k fullKey, e fullEntry, ok bool) (FullPullRequest, error) {
 	d, err := s.fetchFullJob(ctx, k)
 	if err != nil {
 		if ok && ctx.Err() == nil {
-			cached := e.d
-			cached.LastError = err.Error()
-			cached.FetchFailed = true
-			return cached, nil
+			return failedCopy(e.d, err), nil
 		}
 		return FullPullRequest{}, err
 	}
 	return d, nil
+}
+
+// failedCopy is d served because fetching it failed with err.
+func failedCopy(d FullPullRequest, err error) FullPullRequest {
+	d.LastError, d.FetchFailed = err.Error(), true
+	return d
+}
+
+// staleFirst answers a read of e, which is not current, without waiting: e's copy, with
+// a fetch queued (Refreshing) unless the last one failed moments ago or the store is
+// paused. A copy whose fetch failed says so (FetchFailed) until a fetch lands.
+func (s *Store) staleFirst(k fullKey, e fullEntry) FullPullRequest {
+	d := e.d
+	if e.failure != nil {
+		d = failedCopy(d, e.failure)
+		if s.opts.Now().Sub(e.failedAt) < fullRetryAfter {
+			return d
+		}
+	}
+	if err := s.refreshFull(k); err != nil {
+		return failedCopy(e.d, err)
+	}
+	d.Refreshing = true
+	return d
 }
 
 // cachedFull returns the cached entry of k from memory or, failing that, SQLite.
@@ -312,25 +402,67 @@ func (s *Store) cachedFull(ctx context.Context, k fullKey) (fullEntry, bool) {
 	return s.full.adopt(k, row), true
 }
 
-// fetchFullJob fetches k on the worker and returns GitHub's error, if any. Jobs with
-// the same id coalesce only while queued, so a job that finds an entry fetched after
-// it was submitted (by one that was already running) returns that instead of fetching
-// again.
+// fullJobID identifies k's fetch: a read that waits and a background refresh coalesce.
+func fullJobID(k fullKey) string { return "full|" + k.String() }
+
+// fetchFullJob fetches k on the worker and waits; it returns GitHub's error, if any.
 func (s *Store) fetchFullJob(ctx context.Context, k fullKey) (FullPullRequest, error) {
 	submitted := s.opts.Now()
-	return submitFunc(ctx, s, "full|"+k.String(), func(ctx context.Context) (FullPullRequest, error) {
-		if d, stale, ok := s.full.get(k); ok && !stale && d.FetchedAt.After(submitted) {
-			return d, nil
-		}
-		return s.fetchFull(ctx, k)
+	return submitFunc(ctx, s, fullJobID(k), func(ctx context.Context) (FullPullRequest, error) {
+		return s.runFullFetch(ctx, k, submitted, false)
 	})
 }
 
+// refreshFull queues k's fetch with nobody waiting for it; while the store is paused it
+// queues nothing and returns why. PullRequestDetailUpdated reports the end.
+func (s *Store) refreshFull(k fullKey) error {
+	submitted := s.opts.Now()
+	return s.submitBackground(&job{kind: jobFunc, id: fullJobID(k), run: func(ctx context.Context) (any, error) {
+		return s.runFullFetch(ctx, k, submitted, true)
+	}})
+}
+
+// runFullFetch is a detail fetch on the worker, asked for at submitted. Jobs with the
+// same id coalesce only while queued, so a job that finds a fetch ended since it was
+// submitted (one that was already running) takes that fetch's outcome instead of
+// sending another request. background: a read was answered Refreshing and waits for the
+// event, which goes out however this ends.
+func (s *Store) runFullFetch(ctx context.Context, k fullKey, submitted time.Time, background bool) (FullPullRequest, error) {
+	if e, ok := s.full.entry(k); ok {
+		fetched := !e.stale && e.d.FetchedAt.After(submitted)
+		failed := e.failure != nil && e.failedAt.After(submitted)
+		if fetched || failed {
+			if background {
+				publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number, Unchanged: true})
+			}
+			if failed {
+				return FullPullRequest{}, e.failure
+			}
+			return e.d, nil
+		}
+	}
+	start := s.opts.Now()
+	d, err := s.fetchFull(ctx, k, background)
+	end := s.opts.Now()
+	attrs := []any{"pr", k.String(), "query", queryPullRequestFull, "queue_wait", start.Sub(submitted).Round(time.Millisecond).String(),
+		"fetch", end.Sub(start).Round(time.Millisecond).String(), "background", background}
+	if err != nil {
+		attrs = append(attrs, "err", err)
+	}
+	s.log.Info("gh pull request detail fetch", attrs...)
+	if err != nil && ctx.Err() == nil {
+		if s.full.fail(k, err, end) || background {
+			publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number, Unchanged: true})
+		}
+	}
+	return d, err
+}
+
 // fetchFull runs on the worker: the detail request, more check pages when there are
-// over 100 checks, then the cache and, when it changed, PullRequestDetailUpdated. A
-// failed checks page keeps the checks fetched so far: ChecksTruncated and LastError say
-// so.
-func (s *Store) fetchFull(ctx context.Context, k fullKey) (FullPullRequest, error) {
+// over 100 checks, then the cache and PullRequestDetailUpdated: when it changed, when it
+// ends a failure clients were told about, or always with announce. A failed checks page
+// keeps the checks fetched so far: ChecksTruncated and LastError say so.
+func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPullRequest, error) {
 	owner, name := splitSlug(k.slug)
 	data, err := s.call(ctx, queryPullRequestFull, map[string]any{"owner": owner, "name": name, "number": k.number})
 	if err != nil && !isPartial(err) {
@@ -374,10 +506,11 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey) (FullPullRequest, erro
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
 	}
-	// A stale entry was announced when it went stale; every read since fetches, so this
-	// result needs no second announcement.
-	if had && !prev.stale && !sameFull(prev.d, d) {
+	switch {
+	case had && !sameFull(prev.d, d):
 		publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
+	case announce || prev.failure != nil:
+		publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number, Unchanged: true})
 	}
 	return d, nil
 }
@@ -390,10 +523,10 @@ func (s *Store) staleFullDetails(fps []prFingerprint) {
 	}
 }
 
-// invalidateFull marks a cached detail stale after a change the store made and tells
-// clients to re-read.
+// invalidateFull marks a cached detail wrong after a change the store made and tells
+// clients to re-read; that read waits for the fetch, so it shows the change.
 func (s *Store) invalidateFull(k fullKey) {
-	s.full.markStale(k)
+	s.full.markWritten(k)
 	s.moved.mark(k, s.opts.Now(), s.opts.DetailTTL)
 	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
 }
