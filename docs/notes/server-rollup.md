@@ -22,7 +22,7 @@ are on.
   comes back.
 * Line 2 is `command · source · uptime`. The source is "Dev action" and/or the owner's name when
   it is not this thread. The runtime word (node, python) is gone from the line, so
-  `shellRuntime` went with it. The source gives way before the command (`shrink-[100]`) but
+  `shellRuntime` went with it. The source gives way before the command (`shrink-[10000]`: at 100:1 a short command still lost its last letters) but
   keeps `min-w-16`: without the floor a long command squeezed the thread's name out entirely.
 * The hover card keeps the ports and adds the whole command and, for a child's server, its
   thread. Your own thread is not named there: it is on screen.
