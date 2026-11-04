@@ -2,6 +2,7 @@ import { memo, useMemo, type ReactNode } from "react";
 import { Check, Circle, CircleDot } from "lucide-react";
 import type { ToolCallView } from "@/api/thread";
 import { grammarForPath, highlightLines, shellTokens } from "@/lib/highlight";
+import { fitScrollbar } from "@/lib/scrollbarFit";
 import { obj, objects, parseObject, relPath, str, toolDiff } from "@/lib/toolSummary";
 import { ThreadMarkdown, TokenSpans } from "./Code";
 import { CopyButton } from "./CodeActions";
@@ -40,7 +41,7 @@ function BashDetail({ t }: { t: ToolCallView }) {
         )}
       </div>
       {output && (
-        <div className="out">
+        <div ref={fitScrollbar} className="out">
           {lines.map((l, i) => (
             <div key={i} className={FAIL_LINE.test(l) ? "t-red" : undefined}>
               {l || "​"}
@@ -152,7 +153,7 @@ function Output({ text, label }: { text: string; label?: string }) {
   return (
     <div className="term selectable">
       {label && <div className="cmd text-cf-text-muted">{label}</div>}
-      <div className="out" style={label ? undefined : { borderTop: 0 }}>
+      <div ref={fitScrollbar} className="out" style={label ? undefined : { borderTop: 0 }}>
         {clip(text.replace(/\n+$/, ""))}
       </div>
     </div>

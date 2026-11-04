@@ -4,6 +4,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { REF_PROP, REF_TIGHT_PROP } from "@/lib/answerMarkdown";
 import { rehypePluginsFor, rehypePluginsInertFor, remarkPlugins } from "@/lib/markdownPlugins";
 import { CHIP_PROP, isRelativeHref, matchPath, type PathMatch } from "@/lib/pathChips";
+import { fitScrollbar } from "@/lib/scrollbarFit";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
@@ -59,6 +60,8 @@ function isPlainClick(e: Pick<MouseEvent, "button" | "metaKey" | "ctrlKey">): bo
 const baseComponents: Components = {
   a: ({ href, children, title }) => <Link href={href} tip={title}>{children}</Link>,
   img: ({ src, alt }) => (typeof src === "string" && /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : null),
+  pre: ({ node: _node, ...props }) => <pre {...props} ref={fitScrollbar} />,
+  table: ({ node: _node, ...props }) => <table {...props} ref={fitScrollbar} />,
 };
 
 /** Optional renderers a surface adds (a thread: highlighted code, attachment images). */
@@ -124,7 +127,7 @@ function withExtras(extras: MarkdownExtras): Components {
       pre: ({ node, children }) => {
         // The hast <pre>'s <code>: its language class and its text.
         const el = node?.children.find((c) => c.type === "element" && c.tagName === "code");
-        if (el?.type !== "element") return <pre>{children}</pre>;
+        if (el?.type !== "element") return <pre ref={fitScrollbar}>{children}</pre>;
         const classes = Array.isArray(el.properties.className) ? el.properties.className.map(String) : [];
         const lang = classes.find((c) => c.startsWith("language-"))?.slice("language-".length) ?? "";
         const text = el.children.map((c) => (c.type === "text" ? c.value : "")).join("");
