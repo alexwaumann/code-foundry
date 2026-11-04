@@ -44,8 +44,6 @@ const WIPE = 0.3;
 const FLOW_PERIOD = 0.55;
 /** How far past the plate's half width the clear reaches, points. */
 const WIPE_MARGIN = 6;
-/** Reduce Motion: how bright a working or failed plate's still dots are. */
-const STILL_DOTS = 0.35;
 
 /**
  * What the plate is doing. "collapsing" is an end with nothing to report (a discarded press,
@@ -74,7 +72,7 @@ export class Scope {
   readonly dots = new Float32Array(COLS * ROWS);
   readonly heat = new Float32Array(COLS * ROWS);
   /** The plate's width, points. */
-  width: number;
+  width = START_WIDTH;
   /** 0 gone, 1 fully shown. */
   alpha = 0;
   /** How far the working look and the failed colour have come in, 0..1. */
@@ -85,8 +83,6 @@ export class Scope {
   /** The smoothed input level, 0..1. */
   level = 0;
   phase: ScopePhase = "listening";
-  /** Reduce Motion: a fade and a level meter, no spring and no travel. */
-  readonly still: boolean;
 
   private readonly history = new Float32Array(HISTORY);
   private head = 0;
@@ -94,11 +90,6 @@ export class Scope {
   /** Seconds in this phase. */
   private phaseTime = 0;
   private velocity = 0;
-
-  constructor(still = false) {
-    this.still = still;
-    this.width = still ? PLATE_WIDTH : START_WIDTH;
-  }
 
   setPhase(phase: ScopePhase): void {
     if (phase === this.phase) return;
@@ -156,10 +147,6 @@ export class Scope {
     this.alpha += (this.alphaTarget() - this.alpha) * (1 - Math.exp(-dt / 0.07));
     this.work += ((p === "working" || p === "done" ? 1 : 0) - this.work) * (1 - Math.exp(-dt / 0.09));
     this.err += ((p === "failed" ? 1 : 0) - this.err) * (1 - Math.exp(-dt / 0.06));
-    if (this.still) {
-      this.stepMeter();
-      return;
-    }
     const k = (TAU / SPRING_PERIOD) ** 2;
     const c = 2 * SPRING_DAMPING * Math.sqrt(k);
     this.velocity += (k * (this.widthTarget() - this.width) - c * this.velocity) * dt;
@@ -207,16 +194,6 @@ export class Scope {
       }
     }
   }
-
-  /** Reduce Motion: the level lights columns from the middle out; an end holds still dots. */
-  private stepMeter(): void {
-    const reach = this.level * (PLATE_WIDTH / 2 - 6);
-    const hold = Math.max(this.work, this.err);
-    for (let col = 0; col < COLS; col++) {
-      const lit = Math.abs(columnX(col)) <= reach ? 1 : 0;
-      this.dots.fill(lit * (1 - hold) + STILL_DOTS * hold, col * ROWS, (col + 1) * ROWS);
-    }
-  }
 }
 
 const mix = (a: Rgb, b: Rgb, t: number): Rgb => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -231,7 +208,7 @@ export function drawScope(ctx: CanvasRenderingContext2D, scope: Scope, col: Scop
     ctx.restore();
     return;
   }
-  const pop = scope.still ? 1 : 0.9 + 0.1 * scope.alpha;
+  const pop = 0.9 + 0.1 * scope.alpha;
   ctx.translate(width / 2, height / 2);
   ctx.scale(pop, pop);
   ctx.globalAlpha = scope.alpha;

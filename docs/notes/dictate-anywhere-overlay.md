@@ -48,9 +48,8 @@ key and paste come later. Until then a session with client id `system` drives it
   screen, and does not follow the pointer during a session.
 * **Window size 144 x 52**, plate centred in it, so the page needs no position from the host
   and centres itself. Its transparent margin reaches 7 pt into the menu bar area.
-* **Reduce Motion:** the width stays 112 throughout (a jump to 76 would be travel too), the
-  level lights columns from the middle out, working and failed are still dots in their colour,
-  no pop, no clear. Working still reads where accent and info match: still dots, not the meter.
+* **Reduce Motion does not apply:** the plate is a small status light, not page motion, so it
+  always animates, as Ember does. A meter mode shipped in #526 and was removed.
 * **A denied microphone collapses** (the host stops the session without flush), for now with
   no explanation. The paste PR decides what that says.
 
@@ -107,9 +106,6 @@ every change of key or active status at 120 Hz and from notifications.
 * Memory, hidden, after a session: the panel's WebContent process 28 MB, the host 48 to 49 MB
   (the main window's WebContent, for scale, 162 MB). CPU: 5 to 6.5% of a core for WebContent
   while showing, 0.0% hidden.
-
-This Mac has Reduce Motion on, so the production build shows the meter, checked live. The full
-animation was checked with a temporary local build that ignored the setting.
 
 Not checked: two displays (one attached). The real microphone: this build's permission prompt
 went unanswered, so levels came through `Audio`, not AVAudioEngine. Mission Control, whose

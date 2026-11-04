@@ -11,7 +11,6 @@ const MAX_FRAME_MS = 100;
 /** What the controller needs from the page: the DOM, the host and the daemon. */
 export interface OverlayDeps {
   requestFrame: (cb: (nowMs: number) => void) => number;
-  reducedMotion: () => boolean;
   /** Follows a session until the returned stop is called. */
   follow: (
     sessionId: string,
@@ -51,7 +50,7 @@ export class OverlayController {
     if (this.state.sessionId === sessionId) return;
     this.stopFollowing?.();
     if (this.state.phase === "hidden") {
-      this.scope = new Scope(this.deps.reducedMotion());
+      this.scope = new Scope();
       this.levels = new LevelFollower();
       this.owedSeconds = 0;
       this.lastMs = null;
