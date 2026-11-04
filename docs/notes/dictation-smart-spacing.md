@@ -39,9 +39,10 @@ reason.
 
 ### A click is not "the tap hears"
 
-`tapWatch` reads any event as proof the tap works, and the Restart row depends on that. Mouse
-events can reach a tap that keys do not, so a click would have cleared a deaf tap's row for good.
-`event` leaves them out (`TestHoldClickIsNotHearingKeys`).
+`tapWatch` reads any event as proof the tap works, and the Restart row depends on that. macOS
+guards keys more closely than the mouse, so a tap deaf to keys may still hear clicks, and one
+click would then clear its row for good. That was not measured; leaving clicks out costs nothing
+(`TestHoldClickIsNotHearingKeys`).
 
 ### Differences from Hex
 
