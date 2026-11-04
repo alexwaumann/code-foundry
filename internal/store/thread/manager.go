@@ -1388,7 +1388,9 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	}
 }
 
-// detach clears a finished runner from its record, applying fn to the thread.
+// detach clears a finished runner from its record, applying fn to the thread. A viewer
+// that is there while attended sees what the runner leaves: viewersChanged may have come
+// too late for it, and a close puts back the status from when it began (attended.go).
 func (m *Manager) detach(r *runner, fn func(*Thread)) {
 	m.update(r.id, true, func(rec *record) {
 		if rec.run == r {
@@ -1404,6 +1406,7 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 		if rec.archiving {
 			archivedStatus(&rec.s, m.opts.Now())
 		}
+		m.seenStoppedLocked(rec)
 	})
 	m.servers.changed() // its shells are gone (servers.go)
 }

@@ -730,10 +730,10 @@ func (m *Manager) addViewer(id string, d int) {
 		delete(m.viewers, id)
 	}
 	rec, ok := m.recs[id]
-	if ok && d > 0 && m.attended() && m.seenFlagsLocked(rec) {
-		// The user opened the thread while looking at the app: its until-seen flags are
-		// seen (flags.go). Otherwise they are once presence is attended (attended.go).
-		m.commitLocked(rec, false)
+	if ok && d > 0 && m.attended() {
+		// The user opened the thread while looking at the app. Otherwise it is seen once
+		// presence is attended (attended.go).
+		m.seenLocked(rec)
 	}
 	if ok && rec.run != nil {
 		rec.run.viewersChanged()
