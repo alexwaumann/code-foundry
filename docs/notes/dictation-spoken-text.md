@@ -55,7 +55,19 @@ its Spanish ones turned into "stays as it is"), `TestSpokenChoice`, `TestSession
 `dictation.test.ts`, `dictatedSlice.test.ts`, `DictationSettings.test.tsx`, `model.test.ts`,
 `hiddenFields.test.ts`. e2e: a line break in the real editor.
 
-**Not run live:** real speech. No microphone was used, so whether Whisper writes "new line" and
-"comma" the way these rules expect, and where it splits phrases, is for Alex to try on a tip:
-"my underscore variable", "one comma two", "first new line second" with and without a pause,
-"quote hello unquote", into a composer and with the hold key into another app.
+Run live on an Apple M3 Pro, in a scratch home, with the real daemon, engine and model. A
+throwaway client streamed `say -o` audio (no microphone, no speakers) to `DictationService.Audio`
+and read `Session`, both settings on:
+
+* "my underscore variable" gave `my_variable`; "hashtag release" gave `#release.`, and
+  "one comma two" gave `1,2` (Whisper writes the digits).
+* "First line. New line. Second line." gave `First line\nsecond line`.
+* "He said quote hello unquote and left." gave `He said "hello" and left.`
+* "Hello there." "New line." "Next thing." with pauses gave three phrases, the second just
+  `\n`, which is the case that the old trimming would have lost.
+* "He said open quote" "hello there" "close quote and left." gave `He said "`, `Hello there.`
+  and `" and left.`: Whisper capitalises after a pause.
+
+**Not run live:** a human voice, a real microphone, the hold key, and a paste into another app
+(`joinPhrases` is table-tested, the real paste is not). For Alex to try on a tip: the phrases
+above with and without a pause, into a composer and with the hold key into another app.
