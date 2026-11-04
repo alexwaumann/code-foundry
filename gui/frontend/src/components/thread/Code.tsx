@@ -6,6 +6,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { grammarFor, highlightLines, type Token } from "@/lib/highlight";
 import { markdownBlocks } from "@/lib/markdownBlocks";
 import { linkPath } from "@/lib/pathChips";
+import { fitScrollbar } from "@/lib/scrollbarFit";
 import { cn } from "@/lib/utils";
 import { useAttachmentUrl } from "@/stores/attachments";
 import { CodeActions } from "./CodeActions";
@@ -29,7 +30,7 @@ export const CodeBlock = memo(function CodeBlock({ lang, code }: { lang: string;
   const lines = useMemo(() => highlightLines(code, grammarFor(lang)), [code, lang]);
   return (
     <div className="cf-code">
-      <pre data-lang={lang || undefined}>
+      <pre ref={fitScrollbar} data-lang={lang || undefined}>
         <code>
           {lines.map((l, i) => (
             <span key={i}>
@@ -80,7 +81,7 @@ const threadExtras: MarkdownExtras = {
   image: (src, alt) => <LocalImage src={src} alt={alt} />,
   // The frame (rounded, scrolling sideways when too wide) is the wrapper's: thread.css.
   table: (rows) => (
-    <div className="cf-table">
+    <div ref={fitScrollbar} className="cf-table">
       <table>{rows}</table>
     </div>
   ),
