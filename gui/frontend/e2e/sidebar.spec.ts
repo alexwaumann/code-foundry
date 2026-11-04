@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { expectAttention, mockPost, openApp, resetMock, row } from "./fixtures";
 
 function list(page: Page) {
@@ -89,7 +89,7 @@ test("Working section: the header sits on the rows' edge; cmd+4/cmd+5 skip hidde
   await expect(row(page, "s:s-5")).toHaveAttribute("aria-selected", "true");
 });
 
-test("thread rows sit 8px apart, snoozed rows 2px, at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
+test("thread rows sit 8px apart, snoozed rows 2px and 24px tall, at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
   await openApp(page);
   await page.getByTestId("snoozed-header").click();
   await expect(page.getByTestId("sidebar-snoozed-rows").locator("[data-row-key]")).toHaveCount(2);
@@ -102,10 +102,10 @@ test("thread rows sit 8px apart, snoozed rows 2px, at both densities, each row's
     expect(keys).toHaveLength(2);
     return gaps(keys[0] ?? "", keys[1] ?? "");
   };
-  // Thread rows are three lines (THREE_LINE_ROW, 60px) at both densities; snoozed rows one line by density.
+  // Thread rows are three lines (THREE_LINE_ROW, 60px), snoozed rows one (ONE_LINE_ROW, 24px), at both densities.
   for (const [density, three, one] of [
-    ["comfortable", 60, 32],
-    ["compact", 60, 28],
+    ["comfortable", 60, 24],
+    ["compact", 60, 24],
   ] as const) {
     await mockPost(`settings/external?appearance.density=${density}`);
     await expect(page.locator("html")).toHaveAttribute("data-density", density);
@@ -120,6 +120,28 @@ test("thread rows sit 8px apart, snoozed rows 2px, at both densities, each row's
   const parent = await row(page, "s:s-2").evaluate((e) => (e.parentElement ? e.parentElement.getBoundingClientRect().height : 0));
   expect(parent).toBe(60);
   await mockPost("settings/external?appearance.density=");
+});
+
+test("a snoozed row's text is at 60% until hovered, selected or under the cursor; its background never dims", async ({ page }) => {
+  await openApp(page);
+  await page.getByTestId("snoozed-header").click();
+  const rows = page.getByTestId("sidebar-snoozed-rows").locator("[data-row-key]");
+  await expect(rows).toHaveCount(2);
+  const [first, second] = [rows.nth(0), rows.nth(1)];
+  const opacity = (r: Locator) => r.getByTestId("thread-body").evaluate((e) => getComputedStyle(e).opacity);
+  await page.mouse.move(640, 400);
+  await expect.poll(() => opacity(first)).toBe("0.6");
+  await first.hover();
+  await expect.poll(() => opacity(first)).toBe("1");
+  expect(await first.evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
+  await first.click();
+  await page.mouse.move(640, 400);
+  await expect(first).toHaveAttribute("aria-selected", "true");
+  await expect.poll(() => opacity(first)).toBe("1");
+  await page.getByTestId("thread-list").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(second).toHaveAttribute("data-cursor", "true");
+  await expect.poll(() => opacity(second)).toBe("1");
 });
 
 test("the menu pane: under the band, gutter to edge, surface fill, divider border, pane radius, 4px inside; the threads 8px below", async ({ page }) => {
@@ -257,11 +279,11 @@ test("a long permission prompt: line 3 cuts it off; the card wraps all of it bet
   expect(name && st && project && name.y < st.y && st.y + st.height <= project.y).toBe(true);
 });
 
-/** SHOTS=<dir>: Snoozed and Archived open, their rows 2px apart under Working's 8px, WebKit, 1280x800 at 2x, dark and light. */
+/** SHOTS=<dir>: Snoozed and Archived open, 24px rows 2px apart under Working's 8px, WebKit, 1280x800 at 2x, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test.describe(`screenshots (${scheme})`, () => {
     test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
-    test("the quiet sections' gap", async ({ page }, info) => {
+    test("the quiet sections' rows", async ({ page }, info) => {
       const shots = process.env.SHOTS;
       test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
       await mockPost("thread/archive?id=s-3");
@@ -273,7 +295,7 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(page.getByTestId("sidebar-archived-rows").locator("[data-row-key]")).toHaveCount(3);
       await page.mouse.move(640, 400);
       await page.waitForTimeout(350);
-      await page.screenshot({ path: `${String(shots)}/quiet-row-gap-${scheme}.png` });
+      await page.screenshot({ path: `${String(shots)}/quiet-rows-tighter-${scheme}.png` });
     });
   });
 }

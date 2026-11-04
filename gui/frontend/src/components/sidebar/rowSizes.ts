@@ -1,17 +1,20 @@
 import type { Row, Section } from "@/lib/tree";
 
 /**
- * The thread list's row sizes in layout px (docs/notes/sidebar-row-emphasis.md). A snoozed
- * or archived row is one line, ROW_HEIGHTS[density] (stores/settings.ts): the name, a
- * text-body line (22px), with 3px (compact) or 5px (comfortable) above and below it.
+ * The thread list's row sizes in layout px (docs/notes/sidebar-row-emphasis.md).
  *
- * A thread row in the inbox layout (docs/notes/sidebar-inbox-2-libs.md), whatever the
- * density: three lines with no gap between them, a text-caption-sm project and status line
- * (16px), the text-body name (22px) and a text-caption-sm detail or branch line (16px), with
- * 3px above and below. Every thread row but a snoozed or archived one (still one line,
- * ROW_HEIGHTS[density]) has it.
+ * A thread row in the inbox layout (docs/notes/sidebar-inbox-2-libs.md): three lines with no
+ * gap between them, a text-caption-sm project and status line (16px), the text-body name
+ * (22px) and a text-caption-sm detail or branch line (16px), with 3px above and below. Every
+ * thread row but a snoozed or archived one (ONE_LINE_ROW) has it.
  */
 export const THREE_LINE_ROW = 60;
+
+/**
+ * A snoozed or archived row: one text-body line (22px) with 1px above and below, so with
+ * QUIET_ROW_GAP two names sit 4px apart (docs/notes/quiet-rows-tighter.md).
+ */
+export const ONE_LINE_ROW = 24;
 
 /** A footer header's height (Working, Snoozed, Archived): its 22px button sits on the bottom. */
 export const HEADER_HEIGHT = 26;
@@ -26,7 +29,7 @@ export const ROW_GAP = 8;
 /** ROW_GAP for the one-line rows of Snoozed and Archived, which read as a compact list. */
 export const QUIET_ROW_GAP = 2;
 
-/** Whether a section's thread rows are one line (ROW_HEIGHTS[density]), not three. */
+/** Whether a section's thread rows are one line (ONE_LINE_ROW), not three. */
 function isQuiet(section: Section | undefined): boolean {
   return section === "archived" || section === "snoozed";
 }
@@ -37,10 +40,10 @@ export function rowGap(section: Section): number {
 }
 
 /**
- * A row's height: a footer header's, a one-line snoozed or archived row's (`rowHeight`, by
- * density), or a three-line thread row's (THREE_LINE_ROW; also for a row out of range).
+ * A row's height: a footer header's, a one-line snoozed or archived row's (ONE_LINE_ROW), or
+ * a three-line thread row's (THREE_LINE_ROW; also for a row out of range).
  */
-export function rowSize(row: Row | undefined, rowHeight: number): number {
+export function rowSize(row: Row | undefined): number {
   if (row?.kind === "header") return HEADER_HEIGHT;
-  return isQuiet(row?.section) ? rowHeight : THREE_LINE_ROW;
+  return isQuiet(row?.section) ? ONE_LINE_ROW : THREE_LINE_ROW;
 }

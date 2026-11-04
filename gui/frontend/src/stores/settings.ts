@@ -32,11 +32,8 @@ export const KEYS = {
 
 const KEYBINDING_PREFIX = "keybindings.";
 
-/** A sidebar thread row's first line by density: a text-body name with 3px or 5px above and below (components/sidebar/rowSizes.ts). */
-export const ROW_HEIGHTS = { compact: 28, comfortable: 32 } as const;
-
 /** appearance.density as a known value; anything else is the default (comfortable). */
-export function densityOf(v: string | undefined): keyof typeof ROW_HEIGHTS {
+export function densityOf(v: string | undefined): "compact" | "comfortable" {
   return v === "compact" ? "compact" : "comfortable";
 }
 
@@ -124,10 +121,6 @@ export function useTerminalFontFamily(): string {
 export function useScrollbackLines(): number {
   const v = Number(useSettingValue(KEYS.scrollback));
   return Number.isFinite(v) && v > 0 ? v : 10_000;
-}
-
-export function useRowHeight(): number {
-  return ROW_HEIGHTS[densityOf(useSettingValue(KEYS.density))];
 }
 
 /** The models the composer offers and threads are named by: the daemon's registry, else the family aliases. */

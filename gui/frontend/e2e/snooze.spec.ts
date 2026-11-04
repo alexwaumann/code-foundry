@@ -29,7 +29,7 @@ test("Snoozed section: stacked between Working and Archived; quiet rows at the l
   expect((await box(page, "sidebar-archived")).top).toBeGreaterThanOrEqual((await box(page, "sidebar-snoozed")).bottom - 0.5);
   await page.getByTestId("snoozed-header").click();
   const s8 = row(page, "s:s-8");
-  await expect(s8.getByTestId("thread-body")).toHaveCSS("opacity", "1");
+  await expect(s8.getByTestId("thread-body")).toHaveCSS("opacity", "0.6");
   await expect(s8.getByTestId("thread-name")).toHaveCSS("font-weight", "400");
   await expect(s8.getByTestId("thread-name")).toHaveCSS("font-size", await row(page, "s:s-2").getByTestId("thread-name").evaluate((el) => getComputedStyle(el).fontSize));
   await page.reload();

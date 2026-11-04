@@ -510,6 +510,34 @@ describe("SidebarRow rename field", () => {
   });
 });
 
+describe("SidebarRow quiet content", () => {
+  function renderIn(section: "archived" | "snoozed" | "idle", renaming = false): HTMLElement {
+    useThreadsStore.setState({ byId: { "s-1": thread({ name: "Later work", archivedAtMs: Date.now(), snoozedUntilMs: Date.now() + MIN }) }, order: ["s-1"] });
+    useUiStore.setState({ renamingThreadId: renaming ? "s-1" : null });
+    onTestFinished(() => {
+      useUiStore.setState({ renamingThreadId: null });
+    });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section, threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+      </TooltipProvider>,
+    );
+    return screen.getByTestId("thread-body");
+  }
+
+  it.each<["archived" | "snoozed" | "idle", boolean, boolean]>([
+    ["archived", false, true],
+    ["snoozed", false, true],
+    ["archived", true, false],
+    ["snoozed", true, false],
+    ["idle", false, false],
+  ])("a %s row, renaming %s: dimmed %s, and never the row's own box", (section, renaming, dimmed) => {
+    const body = renderIn(section, renaming);
+    expect(body.className.split(" ").includes("opacity-60")).toBe(dimmed);
+    expect(screen.getByRole("option").className).not.toContain("opacity-60");
+  });
+});
+
 describe("SidebarRow archived", () => {
   function renderArchived(o: Partial<ThreadView>): HTMLElement {
     useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });

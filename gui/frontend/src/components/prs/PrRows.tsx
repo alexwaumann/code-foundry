@@ -20,6 +20,7 @@ import type { PullRequestView } from "@/api/gh";
 import { statusPill, toneText } from "@/components/pr/tones";
 import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
+import { QUIET } from "@/lib/quiet";
 import { useWidth } from "@/lib/useWidth";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey } from "@/stores/gh";
@@ -40,9 +41,6 @@ interface Shown {
   template: string;
 }
 const ShownColumns = createContext<Shown | null>(null);
-
-/** Rows that do not involve the viewer now: dimmed until hovered or under the cursor. */
-const QUIET = "opacity-60 hover:opacity-100 aria-selected:opacity-100";
 
 const WHY_LOOK: Record<NeedsWhy, { icon: LucideIcon; cls: string }> = {
   requested: { icon: Eye, cls: "text-cf-text" },
