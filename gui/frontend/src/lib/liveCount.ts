@@ -12,35 +12,13 @@
  * (lib/thread restartCutsOff), since children survive a restart and subagents do not.
  */
 import type { ThreadView } from "@/api/threads";
-import { lineageStatus, type LineageData } from "./lineage";
+import { childIndex, lineageStatus, type LineageData } from "./lineage";
 import { childRowState } from "./threadInfo";
 
 /** Whether a child thread counts as live: a lineage row that is working or needs the user. */
 export function isLiveChild(t: ThreadView | undefined): boolean {
   const state = childRowState(lineageStatus(t));
   return state === "working" || state === "attention";
-}
-
-/**
- * Each creator's children in spawn order (lib/lineage childIds for every thread at once),
- * built once per thread list: every sidebar row's selector runs on every list change, and
- * a scan of the list per row would be quadratic. Keyed on the list's own objects (the
- * store replaces them on change).
- */
-let memo: { byId: LineageData["byId"]; order: LineageData["order"]; index: ReadonlyMap<string, readonly string[]> } | null = null;
-
-function childIndex(data: LineageData): ReadonlyMap<string, readonly string[]> {
-  if (memo?.byId === data.byId && memo.order === data.order) return memo.index;
-  const index = new Map<string, string[]>();
-  for (const id of data.order) {
-    const by = data.byId[id]?.createdBy;
-    if (!by || by === id) continue;
-    const kids = index.get(by);
-    if (kids) kids.push(id);
-    else index.set(by, [id]);
-  }
-  memo = { byId: data.byId, order: data.order, index };
-  return index;
 }
 
 /** How many of the thread's child threads are live (isLiveChild). */

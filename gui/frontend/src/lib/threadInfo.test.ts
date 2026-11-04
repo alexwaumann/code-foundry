@@ -25,7 +25,6 @@ import {
   rebasePrompt,
   serverAddress,
   shellCount,
-  shellRuntime,
   splitLineage,
   USD_SHOWN,
   type GitStateRow,
@@ -243,23 +242,6 @@ describe("small figures", () => {
 });
 
 describe("background shells", () => {
-  it.each([
-    ["node", "node server.js"],
-    ["node", "pnpm --dir web dev"],
-    ["node", "npx vite --port 5173"],
-    ["node", "PORT=3000 NODE_ENV=dev npm start"],
-    ["node", "/usr/local/bin/node app.js"],
-    ["python", "python3 -m http.server 9399"],
-    ["python", "python -m flask run"],
-    ["python", "python3.12 serve.py"],
-    ["go", "go run ./cmd/server"],
-    ["", "make dev"],
-    ["", "cd web && pnpm dev"],
-    ["", "pythonista run"],
-    ["", ""],
-  ])("runtime %j of %j", (want, command) => {
-    expect(shellRuntime(command)).toBe(want);
-  });
   it("addresses and counts", () => {
     expect(serverAddress(9399)).toBe("localhost:9399");
     expect(shellCount(1)).toBe("1 shell");

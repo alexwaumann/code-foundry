@@ -50,6 +50,58 @@ export function childIds(data: LineageData, id: string): string[] {
   return data.order.filter((x) => x !== id && data.byId[x]?.createdBy === id);
 }
 
+/**
+ * Each creator's children in spawn order (childIds for every thread at once), built once
+ * per thread list: every sidebar row's selector runs on every list change, and a scan of
+ * the list per row would be quadratic. Keyed on the list's own objects (the store replaces
+ * them on change).
+ */
+let memo: { byId: LineageData["byId"]; order: LineageData["order"]; index: ReadonlyMap<string, readonly string[]> } | null = null;
+
+export function childIndex(data: LineageData): ReadonlyMap<string, readonly string[]> {
+  if (memo?.byId === data.byId && memo.order === data.order) return memo.index;
+  const index = new Map<string, string[]>();
+  for (const id of data.order) {
+    const by = data.byId[id]?.createdBy;
+    if (!by || by === id) continue;
+    const kids = index.get(by);
+    if (kids) kids.push(id);
+    else index.set(by, [id]);
+  }
+  memo = { byId: data.byId, order: data.order, index };
+  return index;
+}
+
+/** How far below its root a subtree goes (the daemon's thread.MaxLineageDepth). */
+export const MAX_LINEAGE_DEPTH = 8;
+
+/**
+ * `root` and every thread below it, depth first, the daemon's thread.Subtree over the
+ * thread list: each thread before the threads it created, siblings in spawn order, at most
+ * MAX_LINEAGE_DEPTH levels down. A creator cycle is cut where it closes: each thread is
+ * listed once. It follows `createdBy`, so a fork (`parentId`) is not part of it, and a
+ * removed thread ends the line under it (the GUI has no record of it; its children are in
+ * the sidebar by then, lib/inSidebar). The walk reads childIndex, so it costs the subtree,
+ * not the list.
+ */
+export function subtreeIds(data: LineageData, root: string): string[] {
+  if (!root) return [];
+  const index = childIndex(data);
+  const seen = new Set([root]);
+  const out = [root];
+  const walk = (id: string, depth: number) => {
+    if (depth > MAX_LINEAGE_DEPTH) return;
+    for (const kid of index.get(id) ?? []) {
+      if (seen.has(kid)) continue;
+      seen.add(kid);
+      out.push(kid);
+      walk(kid, depth + 1);
+    }
+  };
+  walk(root, 1);
+  return out;
+}
+
 /** A related thread's status (the card's lineage rows), in the sidebar's terms. */
 export type LineageStatus = "working" | "input" | "finished" | "error" | "idle" | "archived" | "snoozed";
 
