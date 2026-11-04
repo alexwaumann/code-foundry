@@ -62,7 +62,7 @@ func (s *Store) SearchRepositories(ctx context.Context, query string) ([]Reposit
 	case utf8.RuneCountInString(q) > maxSearchQuery:
 		return nil, fmt.Errorf("%w: search is longer than %d characters", ErrInvalidArgument, maxSearchQuery)
 	}
-	return submitFunc(ctx, s, "search|"+q, func(ctx context.Context) ([]Repository, error) {
+	return submitRead(ctx, s, "search|"+q, func(ctx context.Context) ([]Repository, error) {
 		data, err := s.call(ctx, querySearchRepositories, map[string]any{"q": q})
 		if err != nil && !isPartial(err) {
 			return nil, err
@@ -79,7 +79,7 @@ func (s *Store) LookupRepository(ctx context.Context, owner, name string) (Repos
 	if err != nil {
 		return Repository{}, err
 	}
-	return submitFunc(ctx, s, "lookup|"+slug, func(ctx context.Context) (Repository, error) {
+	return submitRead(ctx, s, "lookup|"+slug, func(ctx context.Context) (Repository, error) {
 		data, err := s.call(ctx, queryLookupRepository, map[string]any{"owner": owner, "name": name})
 		var pe *PartialError
 		if errors.As(err, &pe) {

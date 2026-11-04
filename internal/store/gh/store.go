@@ -27,6 +27,9 @@ type Options struct {
 	Log *slog.Logger
 
 	MinGap time.Duration
+	// UserGap replaces MinGap for a read someone is waiting for, while the allowance
+	// lasts (gapAllowance). Zero takes a quarter of MinGap; it is never above MinGap.
+	UserGap time.Duration
 	// PollInterval is the default for Config().PollInterval.
 	PollInterval time.Duration
 	// IdleInterval is the poll cadence while dashboards are off and nothing is tracked
@@ -86,6 +89,8 @@ func (o *Options) setDefaults() {
 		}
 	}
 	def(&o.MinGap, DefaultMinGap)
+	def(&o.UserGap, o.MinGap/userGapDivisor)
+	o.UserGap = min(o.UserGap, o.MinGap)
 	def(&o.PollInterval, DefaultPollInterval)
 	def(&o.IdleInterval, DefaultIdleInterval)
 	def(&o.AuthRetry, DefaultAuthRetry)
@@ -133,6 +138,7 @@ type Store struct {
 	pollFailures   int
 	lastPoll       time.Time // when the last poll ended (or the cached poll's time after New)
 	statsNext      time.Time
+	statsAsked     bool // stats were asked for since the last plan (askStatsLocked)
 	statsFailures  int
 	authBad        bool
 	authNext       time.Time
@@ -142,6 +148,7 @@ type Store struct {
 	globalFailures int
 	lastResetAt    time.Time // rateLimit.resetAt of the last successful response
 	queue          []*job
+	stopped        error // why Run ended; nothing queues after it
 
 	branches branchStates // per-branch results (activity.go)
 	full     fullCache    // pull request detail panel cache (pr_detail.go)
@@ -153,6 +160,10 @@ type Store struct {
 
 	// Worker goroutine only.
 	lastEnd     time.Time       // when the previous request finished
+	scheduled   bool            // running the poll or the auth check: waiting jobs go first (yield.go)
+	forUser     bool            // running a job someone waits for: its reads may use the allowance
+	ahead       int             // jobs run ahead of due scheduled work since its last request (yield.go)
+	allowance   gapAllowance    // short gaps left (yield.go)
 	searchFirst map[string]int  // per-section search size after 502/504 shrinking
 	detailBatch int             // open PRs per detail request after 502/504 shrinking
 	recheck     map[string]int  // PR id -> detail refetches left while mergeable is UNKNOWN
@@ -185,12 +196,14 @@ type job struct {
 	// id and run: jobFunc only.
 	id  string
 	run func(context.Context) (any, error)
-	// background: nobody waits for the result (submitBackground), so every job someone
-	// waits for goes first.
+	// background: nobody waits for the result, so every job someone waits for goes first.
 	background bool
 	// read: a read, which leaves the queue when the last one waiting gives up (abandon).
-	read    bool
-	waiters []chan jobResult
+	read bool
+	// promised: a client was told this fetch is coming (submitBackground), so it runs
+	// whoever gives up.
+	promised bool
+	waiters  []chan jobResult
 }
 
 func (j *job) key() string {
@@ -312,9 +325,8 @@ func (s *Store) Track(slug string) error {
 		s.pollSoonLocked(now)
 	}
 	if a.Stats.FetchedAt.IsZero() {
-		// The next poll brings its stats (and refreshes the others). Zero, not now: a
-		// poll that started a moment ago and plans after this sees them due.
-		s.statsNext = time.Time{}
+		// The next poll brings its stats (and refreshes the others).
+		s.askStatsLocked()
 	}
 	s.mu.Unlock()
 	s.setTracked(key, true)
@@ -363,7 +375,7 @@ func (s *Store) Refresh(ctx context.Context, slug string) error {
 	if _, err := NormalizeSlug(slug); err != nil {
 		return err
 	}
-	return s.submit(ctx, &job{kind: jobPoll}).err
+	return s.submit(ctx, &job{kind: jobPoll, read: true}).err
 }
 
 // PullRequest implements Service.
@@ -382,7 +394,7 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 	if ok && s.opts.Now().Sub(cached.FetchedAt) < s.opts.DetailTTL && !s.moved.movedSince(fullKey{key, number}, cached.FetchedAt) {
 		return cached, nil
 	}
-	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number})
+	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number, read: true})
 	if res.err != nil {
 		if ok && ctx.Err() == nil {
 			cached.LastError = res.err.Error()
@@ -409,7 +421,7 @@ func (s *Store) Checks(ctx context.Context, slug, ref string) (RefChecks, error)
 	if ok && s.opts.Now().Sub(cached.FetchedAt) < s.opts.DetailTTL {
 		return cached, nil
 	}
-	res := s.submit(ctx, &job{kind: jobChecks, slug: key, ref: ref})
+	res := s.submit(ctx, &job{kind: jobChecks, slug: key, ref: ref, read: true})
 	if res.err != nil {
 		if ok && ctx.Err() == nil {
 			cached.LastError = res.err.Error()
@@ -422,11 +434,12 @@ func (s *Store) Checks(ctx context.Context, slug, ref string) (RefChecks, error)
 
 // submit queues an on-demand job (coalescing with an identical queued one) and waits
 // for its result. While the store is paused for rate limiting or network failure it
-// fails fast instead of queueing behind the pause.
+// fails fast instead of queueing behind the pause. A caller that goes away gives up its
+// place (abandon); a job already running finishes.
 func (s *Store) submit(ctx context.Context, j *job) jobResult {
 	ch := make(chan jobResult, 1)
 	s.mu.Lock()
-	if err := s.pausedLocked(); err != nil {
+	if err := cmpErr(ctx.Err(), s.stopped, s.pausedLocked()); err != nil {
 		s.mu.Unlock()
 		return jobResult{err: err}
 	}
@@ -443,8 +456,11 @@ func (s *Store) submit(ctx context.Context, j *job) jobResult {
 }
 
 // abandon takes ch off j's queued job, if it has not started. A read with nobody left
-// waiting leaves the queue, so a client that moved on does not hold up the one it moved to;
-// any other job is someone's write and still runs.
+// waiting leaves the queue, so a client that moved on does not hold up the one it moved to.
+// A refresh a client was promised still runs, behind the jobs someone waits for. A write
+// still runs and keeps its place: writes go out in the order they were asked for, or a
+// later one could be undone by an earlier one. A job the worker claimed is out of the
+// queue, and its waiters are the worker's to read.
 func (s *Store) abandon(j *job, ch chan jobResult) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -453,8 +469,17 @@ func (s *Store) abandon(j *job, ch chan jobResult) {
 		return
 	}
 	q := s.queue[i]
+	n := len(q.waiters)
 	q.waiters = slices.DeleteFunc(q.waiters, func(w chan jobResult) bool { return w == ch })
-	if q.read && len(q.waiters) == 0 {
+	if len(q.waiters) == n || len(q.waiters) > 0 {
+		return // a later job of the same key, or someone else still waits
+	}
+	switch {
+	case q.promised:
+		q.background = true
+		s.queue = slices.Delete(s.queue, i, i+1)
+		s.insertLocked(q)
+	case q.read:
 		s.queue = slices.Delete(s.queue, i, i+1)
 	}
 }
@@ -463,9 +488,9 @@ func (s *Store) abandon(j *job, ch chan jobResult) {
 // for, coalescing with an identical queued job. While the store is paused it queues
 // nothing and returns the pause's error.
 func (s *Store) submitBackground(j *job) error {
-	j.background = true
+	j.background, j.promised = true, true
 	s.mu.Lock()
-	err := s.pausedLocked()
+	err := cmpErr(s.stopped, s.pausedLocked())
 	if err == nil {
 		s.enqueueLocked(j, nil)
 	}
@@ -486,13 +511,18 @@ func (s *Store) pausedLocked() error {
 }
 
 // enqueueLocked queues j for ch (nil: nobody waits), or joins an identical queued job,
-// which then counts as waited for. Called with s.mu held.
+// which then counts as waited for. A background job joining a queued one passes on what
+// it promised: that job now runs whoever gives up, and as j would have (a refresh
+// announces its end). Called with s.mu held.
 func (s *Store) enqueueLocked(j *job, ch chan jobResult) {
 	i := slices.IndexFunc(s.queue, func(q *job) bool { return q.key() == j.key() })
 	if i >= 0 {
 		q := s.queue[i]
 		if ch == nil {
-			q.read = false // a client was told a fetch is coming: it runs now, whoever gives up
+			q.promised = true // a client was told a fetch is coming: it runs now, whoever gives up
+			if j.run != nil {
+				q.run = j.run // and it says how it ended, as j would have
+			}
 			return
 		}
 		q.waiters = append(q.waiters, ch)
@@ -536,6 +566,10 @@ func (s *Store) Run(ctx context.Context) error {
 	timer := time.NewTimer(time.Hour)
 	defer timer.Stop()
 	for {
+		if ctx.Err() != nil { // a refused request sets no lastEnd, so nothing below would wait
+			s.failQueued(ctx.Err())
+			return nil
+		}
 		j, wait := s.next()
 		if j != nil && wait <= 0 {
 			s.execute(ctx, j)
@@ -558,38 +592,44 @@ func (s *Store) Run(ctx context.Context) error {
 }
 
 // next picks the next job and how long until it may start. When the wait is <= 0 the
-// job has been claimed (removed from the queue). On-demand jobs come first; then the
-// poll (or only the auth check while gh is not authenticated). Nothing starts within
-// MinGap of the previous request's end, and the poll waits out a rate-limit or network
-// pause.
+// job has been claimed (removed from the queue). On-demand jobs come first, up to
+// maxJobsAhead of them while scheduled work is due; then the poll (or only the auth
+// check while gh is not authenticated). Nothing starts within its gap of the previous
+// request's end, and scheduled work waits out a rate-limit or network pause.
 func (s *Store) next() (*job, time.Duration) {
 	now := s.opts.Now()
-	earliest := s.lastEnd.Add(s.opts.MinGap)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.queue) > 0 {
-		if wait := earliest.Sub(now); wait > 0 {
-			return s.queue[0], wait
-		}
-		j := s.queue[0]
-		s.queue = s.queue[1:]
-		return j, 0
-	}
-	var j *job
+	var sched *job
 	var at time.Time
 	if s.authBad {
-		j, at = &job{kind: jobAuth}, s.authNext
+		sched, at = &job{kind: jobAuth}, laterOf(s.authNext, s.pauseUntil)
 	} else {
-		j, at = &job{kind: jobPoll}, laterOf(s.pollNext, s.pauseUntil)
+		sched, at = &job{kind: jobPoll}, laterOf(s.pollNext, s.pauseUntil)
 	}
-	at = laterOf(at, earliest)
-	return j, at.Sub(now)
+	due := !at.After(now)
+	if len(s.queue) > 0 && !(due && s.ahead >= maxJobsAhead) {
+		j := s.queue[0]
+		user := !j.background && j.kind != jobPoll
+		if wait := s.lastEnd.Add(s.gap(user, now)).Sub(now); wait > 0 {
+			return j, wait
+		}
+		s.queue = s.queue[1:]
+		if due {
+			s.ahead++
+		}
+		return j, 0
+	}
+	return sched, laterOf(at, s.lastEnd.Add(s.opts.MinGap)).Sub(now)
 }
 
+// failQueued ends Run: what is queued fails with err, and so does anything submitted
+// after it, which no worker would ever pick up.
 func (s *Store) failQueued(err error) {
 	s.mu.Lock()
 	q := s.queue
 	s.queue = nil
+	s.stopped = err
 	s.mu.Unlock()
 	for _, j := range q {
 		j.reply(jobResult{err: err})
@@ -602,7 +642,13 @@ func (j *job) reply(r jobResult) {
 	}
 }
 
+// execute runs j on the worker: from Run, or from a poll that is letting j in
+// (letWaitingIn), so it puts back what it found.
 func (s *Store) execute(ctx context.Context, j *job) {
+	scheduled, forUser := s.scheduled, s.forUser
+	defer func() { s.scheduled, s.forUser = scheduled, forUser }()
+	s.scheduled = j.kind == jobPoll || j.kind == jobAuth
+	s.forUser = !s.scheduled && !j.background
 	var res jobResult
 	switch j.kind {
 	case jobPoll:
@@ -629,10 +675,11 @@ func (s *Store) call(ctx context.Context, name string, vars map[string]any) (jso
 }
 
 // callDoc runs one paced GraphQL document and applies its global effects (auth state,
-// rate-limit budget, pauses). It sleeps out MinGap since the previous request first. A
-// *PartialError comes back with its data and counts as a success globally.
+// rate-limit budget, pauses). It goes through admit first, which may refuse it without
+// sending anything. A *PartialError comes back with its data and counts as a success
+// globally.
 func (s *Store) callDoc(ctx context.Context, name, doc string, vars map[string]any) (json.RawMessage, error) {
-	if err := s.pace(ctx); err != nil {
+	if err := s.admit(ctx, !isMutation(doc)); err != nil {
 		return nil, err
 	}
 	start := s.opts.Now()
@@ -671,22 +718,6 @@ func (s *Store) callDoc(ctx context.Context, name, doc string, vars map[string]a
 	}
 	s.noteResult(ctx, global, rl)
 	return data, err
-}
-
-// pace waits until MinGap has passed since the previous request ended.
-func (s *Store) pace(ctx context.Context) error {
-	wait := s.lastEnd.Add(s.opts.MinGap).Sub(s.opts.Now())
-	if wait <= 0 {
-		return nil
-	}
-	t := time.NewTimer(wait)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
-	}
 }
 
 // authBackoffLocked is the wait before the next auth check (s.mu held): AuthRetry
@@ -740,6 +771,7 @@ func (s *Store) noteResult(ctx context.Context, err error, rl *rateLimitJSON) {
 			backoff(s.opts.SecondaryBackoff, s.opts.MaxBackoff, s.globalFailures, s.opts.Rand()))
 		s.pauseUntil, s.pauseErr = until, err
 		s.mu.Unlock()
+		s.allowance.exhaust(now)
 		s.log.Warn("gh rate limited, pausing", "err", err, "until", until)
 	case errors.Is(err, ErrNetwork):
 		s.mu.Lock()

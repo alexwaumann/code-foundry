@@ -43,7 +43,7 @@ func (s *Store) ReviewerCandidates(ctx context.Context, slug string, number int,
 	}
 	owner, name := splitSlug(k.slug)
 	query = strings.TrimSpace(query)
-	return submitFunc(ctx, s, "candidates|"+k.String()+"|"+query, func(ctx context.Context) (ReviewerCandidates, error) {
+	return submitRead(ctx, s, "candidates|"+k.String()+"|"+query, func(ctx context.Context) (ReviewerCandidates, error) {
 		data, err := s.call(ctx, queryReviewerCandidates, reviewerCandidatesVars(owner, name, k.number, query))
 		if err != nil && !isPartial(err) {
 			return ReviewerCandidates{}, err
@@ -216,13 +216,16 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 // outcomeUnknown reports whether a failed mutation may still have run: GitHub timed out
 // (502/504) or the connection failed after the request may have left.
 func outcomeUnknown(err error) bool {
+	if isRefused(err) {
+		return false
+	}
 	return errors.Is(err, ErrServerTimeout) || errors.Is(err, ErrNetwork) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // restWrite sends one paced REST write and applies its global effects (auth state,
 // rate-limit and network pauses), like callDoc does for GraphQL.
 func (s *Store) restWrite(ctx context.Context, rw RESTWriter, method, path string, body any) (json.RawMessage, error) {
-	if err := s.pace(ctx); err != nil {
+	if err := s.admit(ctx, false); err != nil {
 		return nil, err
 	}
 	start := s.opts.Now()
