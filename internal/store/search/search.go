@@ -287,6 +287,9 @@ type Store struct {
 	wg      sync.WaitGroup
 	// promoteMu makes Promote one at a time, so two at once make one thread.
 	promoteMu sync.Mutex
+	// activityMu guards activity, the last Activity published (activity.go).
+	activityMu sync.Mutex
+	activity   Activity
 }
 
 // New opens the store: it reads the history and ends any run a previous daemon left
@@ -594,7 +597,15 @@ func (s *Store) update(ctx context.Context, id string, fn func(e *Entry) bool) (
 	return next.clone(), true, nil
 }
 
-func (s *Store) publish(c Changed) { bus.Publish(s.opts.Bus, c) }
+// publish sends c, and the Activity when c may have changed it: a step, a hit or an
+// answer never does (a run's hits count only once it has ended), so a run's progress
+// costs nothing here.
+func (s *Store) publish(c Changed) {
+	bus.Publish(s.opts.Bus, c)
+	if c.Kind == EventEntry || c.Kind == EventStatus || c.Kind == EventRemoved {
+		s.publishActivity()
+	}
+}
 
 // OpenHit marks hit n of entry id opened.
 func (s *Store) OpenHit(ctx context.Context, id string, n int) (Entry, error) {

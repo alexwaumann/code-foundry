@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/search.proto.
  */
 export const file_codefoundry_v1_search: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9zZWFyY2gucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIrkCCg5BZ2VudFNlYXJjaEhpdBIJCgFuGAEgASgFEhEKCXRocmVhZF9pZBgCIAEoCRITCgt0aHJlYWRfbmFtZRgDIAEoCRIQCghhcmNoaXZlZBgEIAEoCBIPCgdpdGVtX2lkGAUgASgJEg8KB29yZGluYWwYBiABKAMSLgoHc3BlYWtlchgHIAEoDjIdLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaFNwZWFrZXISMwoPaXRlbV9jcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBINCgVxdW90ZRgJIAEoCRILCgN3aHkYCiABKAkSDgoGb3BlbmVkGAsgASgIEi8KC3JlcG9ydGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLuAQoPQWdlbnRTZWFyY2hTdGVwEg0KBWluZGV4GAEgASgFEjEKBGtpbmQYAiABKA4yIy5jb2RlZm91bmRyeS52MS5BZ2VudFNlYXJjaFN0ZXBLaW5kEgwKBGRvbmUYAyABKAgSDAoEdGV4dBgEIAEoCRINCgVxdWVyeRgFIAEoCRIMCgRoaXRzGAYgASgFEhEKCXRocmVhZF9pZBgHIAEoCRITCgt0aHJlYWRfbmFtZRgIIAEoCRIUCgxmcm9tX29yZGluYWwYCSABKAMSEgoKdG9fb3JkaW5hbBgKIAEoAxIOCgZmYWlsZWQYCyABKAgipwQKC1NlYXJjaEVudHJ5EgoKAmlkGAEgASgJEigKBG1vZGUYAiABKA4yGi5jb2RlZm91bmRyeS52MS5TZWFyY2hNb2RlEg0KBXF1ZXJ5GAMgASgJEi4KCmNyZWF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC2ZpbmlzaGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCgZzdGF0dXMYBiABKA4yHC5jb2RlZm91bmRyeS52MS5TZWFyY2hTdGF0dXMSDQoFZXJyb3IYByABKAkSDgoGYW5zd2VyGAggASgJEiwKBGhpdHMYCSADKAsyHi5jb2RlZm91bmRyeS52MS5BZ2VudFNlYXJjaEhpdBIuCgVzdGVwcxgKIAMoCzIfLmNvZGVmb3VuZHJ5LnYxLkFnZW50U2VhcmNoU3RlcBIQCghzZWFyY2hlcxgLIAEoBRIUCgx0aHJlYWRzX3JlYWQYDCABKAUSGQoRY2xhdWRlX3Nlc3Npb25faWQYDSABKAkSDQoFbW9kZWwYDiABKAkSEAoIY29zdF91c2QYDyABKAESEwoLZHVyYXRpb25fbXMYECABKAMSDgoGdW5zZWVuGBEgASgIEg8KB3ZlcnNpb24YEiABKAQSGgoScHJvbW90ZWRfdGhyZWFkX2lkGBMgASgJEhEKCWZpbmRfaGl0cxgUIAEoBSIrChdTdGFydEFnZW50U2VhcmNoUmVxdWVzdBIQCghxdWVzdGlvbhgBIAEoCSJGChhTdGFydEFnZW50U2VhcmNoUmVzcG9uc2USKgoFZW50cnkYASABKAsyGy5jb2RlZm91bmRyeS52MS5TZWFyY2hFbnRyeSIgChJXYXRjaFNlYXJjaFJlcXVlc3QSCgoCaWQYASABKAkiHAoMU2VhcmNoQW5zd2VyEgwKBHRleHQYASABKAkiuQEKElNlYXJjaFN0YXR1c0NoYW5nZRIsCgZzdGF0dXMYASABKA4yHC5jb2RlZm91bmRyeS52MS5TZWFyY2hTdGF0dXMSDQoFZXJyb3IYAiABKAkSLwoLZmluaXNoZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCGNvc3RfdXNkGAQgASgBEhMKC2R1cmF0aW9uX21zGAUgASgDEg4KBnVuc2VlbhgGIAEoCCLZAgoQU2VhcmNoV2F0Y2hFdmVudBIPCgd2ZXJzaW9uGAEgASgEEi8KCHNuYXBzaG90GAIgASgLMhsuY29kZWZvdW5kcnkudjEuU2VhcmNoRW50cnlIABIvCgRzdGVwGAMgASgLMh8uY29kZWZvdW5kcnkudjEuQWdlbnRTZWFyY2hTdGVwSAASLQoDaGl0GAQgASgLMh4uY29kZWZvdW5kcnkudjEuQWdlbnRTZWFyY2hIaXRIABIuCgZhbnN3ZXIYBSABKAsyHC5jb2RlZm91bmRyeS52MS5TZWFyY2hBbnN3ZXJIABI0CgZzdGF0dXMYBiABKAsyIi5jb2RlZm91bmRyeS52MS5TZWFyY2hTdGF0dXNDaGFuZ2VIABI0CgloZWFydGJlYXQYByABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIAEIHCgVldmVudCIcChpXYXRjaFJlY2VudFNlYXJjaGVzUmVxdWVzdCJ8ChhXYXRjaFJlY2VudFNlYXJjaGVzRXZlbnQSLAoHZW50cmllcxgBIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEVudHJ5EjIKCWhlYXJ0YmVhdBgCIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdCIfChFTdG9wU2VhcmNoUmVxdWVzdBIKCgJpZBgBIAEoCSJAChJTdG9wU2VhcmNoUmVzcG9uc2USKgoFZW50cnkYASABKAsyGy5jb2RlZm91bmRyeS52MS5TZWFyY2hFbnRyeSIbChlMaXN0UmVjZW50U2VhcmNoZXNSZXF1ZXN0IkoKGkxpc3RSZWNlbnRTZWFyY2hlc1Jlc3BvbnNlEiwKB2VudHJpZXMYASADKAsyGy5jb2RlZm91bmRyeS52MS5TZWFyY2hFbnRyeSIeChBHZXRTZWFyY2hSZXF1ZXN0EgoKAmlkGAEgASgJIj8KEUdldFNlYXJjaFJlc3BvbnNlEioKBWVudHJ5GAEgASgLMhsuY29kZWZvdW5kcnkudjEuU2VhcmNoRW50cnkiLQoUT3BlblNlYXJjaEhpdFJlcXVlc3QSCgoCaWQYASABKAkSCQoBbhgCIAEoBSJDChVPcGVuU2VhcmNoSGl0UmVzcG9uc2USKgoFZW50cnkYASABKAsyGy5jb2RlZm91bmRyeS52MS5TZWFyY2hFbnRyeSIjChVNYXJrU2VhcmNoU2VlblJlcXVlc3QSCgoCaWQYASABKAkiRAoWTWFya1NlYXJjaFNlZW5SZXNwb25zZRIqCgVlbnRyeRgBIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEVudHJ5IjYKF1JlY29yZEZpbmRTZWFyY2hSZXF1ZXN0Eg0KBXF1ZXJ5GAEgASgJEgwKBGhpdHMYAiABKAUiRgoYUmVjb3JkRmluZFNlYXJjaFJlc3BvbnNlEioKBWVudHJ5GAEgASgLMhsuY29kZWZvdW5kcnkudjEuU2VhcmNoRW50cnkiIQoTRm9yZ2V0U2VhcmNoUmVxdWVzdBIKCgJpZBgBIAEoCSIWChRGb3JnZXRTZWFyY2hSZXNwb25zZSIWChRDbGVhclNlYXJjaGVzUmVxdWVzdCIoChVDbGVhclNlYXJjaGVzUmVzcG9uc2USDwoHcmVtb3ZlZBgBIAEoBSIiChRQcm9tb3RlU2VhcmNoUmVxdWVzdBIKCgJpZBgBIAEoCSIqChVQcm9tb3RlU2VhcmNoUmVzcG9uc2USEQoJdGhyZWFkX2lkGAEgASgJImgKFlJlcG9ydFNlYXJjaEhpdFJlcXVlc3QSEQoJc2VhcmNoX2lkGAEgASgJEhEKCXRocmVhZF9pZBgCIAEoCRIMCgRpdGVtGAMgASgJEg0KBXF1b3RlGAQgASgJEgsKA3doeRgFIAEoCSJUChdSZXBvcnRTZWFyY2hIaXRSZXNwb25zZRIrCgNoaXQYASABKAsyHi5jb2RlZm91bmRyeS52MS5BZ2VudFNlYXJjaEhpdBIMCgRsZWZ0GAIgASgFKlYKClNlYXJjaE1vZGUSGwoXU0VBUkNIX01PREVfVU5TUEVDSUZJRUQQABIVChFTRUFSQ0hfTU9ERV9BR0VOVBABEhQKEFNFQVJDSF9NT0RFX0ZJTkQQAiqVAQoMU2VhcmNoU3RhdHVzEh0KGVNFQVJDSF9TVEFUVVNfVU5TUEVDSUZJRUQQABIZChVTRUFSQ0hfU1RBVFVTX1JVTk5JTkcQARIWChJTRUFSQ0hfU1RBVFVTX0RPTkUQAhIYChRTRUFSQ0hfU1RBVFVTX0ZBSUxFRBADEhkKFVNFQVJDSF9TVEFUVVNfU1RPUFBFRBAEKqMBChNBZ2VudFNlYXJjaFN0ZXBLaW5kEiYKIkFHRU5UX1NFQVJDSF9TVEVQX0tJTkRfVU5TUEVDSUZJRUQQABIhCh1BR0VOVF9TRUFSQ0hfU1RFUF9LSU5EX1NFQVJDSBABEh8KG0FHRU5UX1NFQVJDSF9TVEVQX0tJTkRfUkVBRBACEiAKHEFHRU5UX1NFQVJDSF9TVEVQX0tJTkRfT1RIRVIQAzK0CQoNU2VhcmNoU2VydmljZRJhCgpTdGFydEFnZW50EicuY29kZWZvdW5kcnkudjEuU3RhcnRBZ2VudFNlYXJjaFJlcXVlc3QaKC5jb2RlZm91bmRyeS52MS5TdGFydEFnZW50U2VhcmNoUmVzcG9uc2UiABJRCgVXYXRjaBIiLmNvZGVmb3VuZHJ5LnYxLldhdGNoU2VhcmNoUmVxdWVzdBogLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaFdhdGNoRXZlbnQiADABEmcKC1dhdGNoUmVjZW50EiouY29kZWZvdW5kcnkudjEuV2F0Y2hSZWNlbnRTZWFyY2hlc1JlcXVlc3QaKC5jb2RlZm91bmRyeS52MS5XYXRjaFJlY2VudFNlYXJjaGVzRXZlbnQiADABEk8KBFN0b3ASIS5jb2RlZm91bmRyeS52MS5TdG9wU2VhcmNoUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLlN0b3BTZWFyY2hSZXNwb25zZSIAEmUKCkxpc3RSZWNlbnQSKS5jb2RlZm91bmRyeS52MS5MaXN0UmVjZW50U2VhcmNoZXNSZXF1ZXN0GiouY29kZWZvdW5kcnkudjEuTGlzdFJlY2VudFNlYXJjaGVzUmVzcG9uc2UiABJMCgNHZXQSIC5jb2RlZm91bmRyeS52MS5HZXRTZWFyY2hSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuR2V0U2VhcmNoUmVzcG9uc2UiABJYCgdPcGVuSGl0EiQuY29kZWZvdW5kcnkudjEuT3BlblNlYXJjaEhpdFJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5PcGVuU2VhcmNoSGl0UmVzcG9uc2UiABJbCghNYXJrU2VlbhIlLmNvZGVmb3VuZHJ5LnYxLk1hcmtTZWFyY2hTZWVuUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLk1hcmtTZWFyY2hTZWVuUmVzcG9uc2UiABJhCgpSZWNvcmRGaW5kEicuY29kZWZvdW5kcnkudjEuUmVjb3JkRmluZFNlYXJjaFJlcXVlc3QaKC5jb2RlZm91bmRyeS52MS5SZWNvcmRGaW5kU2VhcmNoUmVzcG9uc2UiABJVCgZGb3JnZXQSIy5jb2RlZm91bmRyeS52MS5Gb3JnZXRTZWFyY2hSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuRm9yZ2V0U2VhcmNoUmVzcG9uc2UiABJWCgVDbGVhchIkLmNvZGVmb3VuZHJ5LnYxLkNsZWFyU2VhcmNoZXNSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuQ2xlYXJTZWFyY2hlc1Jlc3BvbnNlIgASWAoHUHJvbW90ZRIkLmNvZGVmb3VuZHJ5LnYxLlByb21vdGVTZWFyY2hSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUHJvbW90ZVNlYXJjaFJlc3BvbnNlIgASWwoGUmVwb3J0EiYuY29kZWZvdW5kcnkudjEuUmVwb3J0U2VhcmNoSGl0UmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlJlcG9ydFNlYXJjaEhpdFJlc3BvbnNlIgBCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILU2VhcmNoUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_heartbeat, file_codefoundry_v1_thread_search, file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9zZWFyY2gucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIrkCCg5BZ2VudFNlYXJjaEhpdBIJCgFuGAEgASgFEhEKCXRocmVhZF9pZBgCIAEoCRITCgt0aHJlYWRfbmFtZRgDIAEoCRIQCghhcmNoaXZlZBgEIAEoCBIPCgdpdGVtX2lkGAUgASgJEg8KB29yZGluYWwYBiABKAMSLgoHc3BlYWtlchgHIAEoDjIdLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaFNwZWFrZXISMwoPaXRlbV9jcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBINCgVxdW90ZRgJIAEoCRILCgN3aHkYCiABKAkSDgoGb3BlbmVkGAsgASgIEi8KC3JlcG9ydGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLuAQoPQWdlbnRTZWFyY2hTdGVwEg0KBWluZGV4GAEgASgFEjEKBGtpbmQYAiABKA4yIy5jb2RlZm91bmRyeS52MS5BZ2VudFNlYXJjaFN0ZXBLaW5kEgwKBGRvbmUYAyABKAgSDAoEdGV4dBgEIAEoCRINCgVxdWVyeRgFIAEoCRIMCgRoaXRzGAYgASgFEhEKCXRocmVhZF9pZBgHIAEoCRITCgt0aHJlYWRfbmFtZRgIIAEoCRIUCgxmcm9tX29yZGluYWwYCSABKAMSEgoKdG9fb3JkaW5hbBgKIAEoAxIOCgZmYWlsZWQYCyABKAgipwQKC1NlYXJjaEVudHJ5EgoKAmlkGAEgASgJEigKBG1vZGUYAiABKA4yGi5jb2RlZm91bmRyeS52MS5TZWFyY2hNb2RlEg0KBXF1ZXJ5GAMgASgJEi4KCmNyZWF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC2ZpbmlzaGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCgZzdGF0dXMYBiABKA4yHC5jb2RlZm91bmRyeS52MS5TZWFyY2hTdGF0dXMSDQoFZXJyb3IYByABKAkSDgoGYW5zd2VyGAggASgJEiwKBGhpdHMYCSADKAsyHi5jb2RlZm91bmRyeS52MS5BZ2VudFNlYXJjaEhpdBIuCgVzdGVwcxgKIAMoCzIfLmNvZGVmb3VuZHJ5LnYxLkFnZW50U2VhcmNoU3RlcBIQCghzZWFyY2hlcxgLIAEoBRIUCgx0aHJlYWRzX3JlYWQYDCABKAUSGQoRY2xhdWRlX3Nlc3Npb25faWQYDSABKAkSDQoFbW9kZWwYDiABKAkSEAoIY29zdF91c2QYDyABKAESEwoLZHVyYXRpb25fbXMYECABKAMSDgoGdW5zZWVuGBEgASgIEg8KB3ZlcnNpb24YEiABKAQSGgoScHJvbW90ZWRfdGhyZWFkX2lkGBMgASgJEhEKCWZpbmRfaGl0cxgUIAEoBSKSAQoOU2VhcmNoQWN0aXZpdHkSDwoHcnVubmluZxgBIAEoBRISCgpydW5uaW5nX2lkGAIgASgJEhEKCXVuc2Vlbl9pZBgDIAEoCRIzCg11bnNlZW5fc3RhdHVzGAQgASgOMhwuY29kZWZvdW5kcnkudjEuU2VhcmNoU3RhdHVzEhMKC3Vuc2Vlbl9oaXRzGAUgASgFIisKF1N0YXJ0QWdlbnRTZWFyY2hSZXF1ZXN0EhAKCHF1ZXN0aW9uGAEgASgJIkYKGFN0YXJ0QWdlbnRTZWFyY2hSZXNwb25zZRIqCgVlbnRyeRgBIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEVudHJ5IiAKEldhdGNoU2VhcmNoUmVxdWVzdBIKCgJpZBgBIAEoCSIcCgxTZWFyY2hBbnN3ZXISDAoEdGV4dBgBIAEoCSK5AQoSU2VhcmNoU3RhdHVzQ2hhbmdlEiwKBnN0YXR1cxgBIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaFN0YXR1cxINCgVlcnJvchgCIAEoCRIvCgtmaW5pc2hlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIY29zdF91c2QYBCABKAESEwoLZHVyYXRpb25fbXMYBSABKAMSDgoGdW5zZWVuGAYgASgIItkCChBTZWFyY2hXYXRjaEV2ZW50Eg8KB3ZlcnNpb24YASABKAQSLwoIc25hcHNob3QYAiABKAsyGy5jb2RlZm91bmRyeS52MS5TZWFyY2hFbnRyeUgAEi8KBHN0ZXAYAyABKAsyHy5jb2RlZm91bmRyeS52MS5BZ2VudFNlYXJjaFN0ZXBIABItCgNoaXQYBCABKAsyHi5jb2RlZm91bmRyeS52MS5BZ2VudFNlYXJjaEhpdEgAEi4KBmFuc3dlchgFIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEFuc3dlckgAEjQKBnN0YXR1cxgGIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaFN0YXR1c0NoYW5nZUgAEjQKCWhlYXJ0YmVhdBgHIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdEgAQgcKBWV2ZW50IhwKGldhdGNoUmVjZW50U2VhcmNoZXNSZXF1ZXN0InwKGFdhdGNoUmVjZW50U2VhcmNoZXNFdmVudBIsCgdlbnRyaWVzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2VhcmNoRW50cnkSMgoJaGVhcnRiZWF0GAIgASgLMh8uY29kZWZvdW5kcnkudjEuU3RyZWFtSGVhcnRiZWF0Ih8KEVN0b3BTZWFyY2hSZXF1ZXN0EgoKAmlkGAEgASgJIkAKElN0b3BTZWFyY2hSZXNwb25zZRIqCgVlbnRyeRgBIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEVudHJ5IhsKGUxpc3RSZWNlbnRTZWFyY2hlc1JlcXVlc3QiSgoaTGlzdFJlY2VudFNlYXJjaGVzUmVzcG9uc2USLAoHZW50cmllcxgBIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEVudHJ5Ih4KEEdldFNlYXJjaFJlcXVlc3QSCgoCaWQYASABKAkiPwoRR2V0U2VhcmNoUmVzcG9uc2USKgoFZW50cnkYASABKAsyGy5jb2RlZm91bmRyeS52MS5TZWFyY2hFbnRyeSItChRPcGVuU2VhcmNoSGl0UmVxdWVzdBIKCgJpZBgBIAEoCRIJCgFuGAIgASgFIkMKFU9wZW5TZWFyY2hIaXRSZXNwb25zZRIqCgVlbnRyeRgBIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEVudHJ5IiMKFU1hcmtTZWFyY2hTZWVuUmVxdWVzdBIKCgJpZBgBIAEoCSJEChZNYXJrU2VhcmNoU2VlblJlc3BvbnNlEioKBWVudHJ5GAEgASgLMhsuY29kZWZvdW5kcnkudjEuU2VhcmNoRW50cnkiNgoXUmVjb3JkRmluZFNlYXJjaFJlcXVlc3QSDQoFcXVlcnkYASABKAkSDAoEaGl0cxgCIAEoBSJGChhSZWNvcmRGaW5kU2VhcmNoUmVzcG9uc2USKgoFZW50cnkYASABKAsyGy5jb2RlZm91bmRyeS52MS5TZWFyY2hFbnRyeSIhChNGb3JnZXRTZWFyY2hSZXF1ZXN0EgoKAmlkGAEgASgJIhYKFEZvcmdldFNlYXJjaFJlc3BvbnNlIhYKFENsZWFyU2VhcmNoZXNSZXF1ZXN0IigKFUNsZWFyU2VhcmNoZXNSZXNwb25zZRIPCgdyZW1vdmVkGAEgASgFIiIKFFByb21vdGVTZWFyY2hSZXF1ZXN0EgoKAmlkGAEgASgJIioKFVByb21vdGVTZWFyY2hSZXNwb25zZRIRCgl0aHJlYWRfaWQYASABKAkiaAoWUmVwb3J0U2VhcmNoSGl0UmVxdWVzdBIRCglzZWFyY2hfaWQYASABKAkSEQoJdGhyZWFkX2lkGAIgASgJEgwKBGl0ZW0YAyABKAkSDQoFcXVvdGUYBCABKAkSCwoDd2h5GAUgASgJIlQKF1JlcG9ydFNlYXJjaEhpdFJlc3BvbnNlEisKA2hpdBgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLkFnZW50U2VhcmNoSGl0EgwKBGxlZnQYAiABKAUqVgoKU2VhcmNoTW9kZRIbChdTRUFSQ0hfTU9ERV9VTlNQRUNJRklFRBAAEhUKEVNFQVJDSF9NT0RFX0FHRU5UEAESFAoQU0VBUkNIX01PREVfRklORBACKpUBCgxTZWFyY2hTdGF0dXMSHQoZU0VBUkNIX1NUQVRVU19VTlNQRUNJRklFRBAAEhkKFVNFQVJDSF9TVEFUVVNfUlVOTklORxABEhYKElNFQVJDSF9TVEFUVVNfRE9ORRACEhgKFFNFQVJDSF9TVEFUVVNfRkFJTEVEEAMSGQoVU0VBUkNIX1NUQVRVU19TVE9QUEVEEAQqowEKE0FnZW50U2VhcmNoU3RlcEtpbmQSJgoiQUdFTlRfU0VBUkNIX1NURVBfS0lORF9VTlNQRUNJRklFRBAAEiEKHUFHRU5UX1NFQVJDSF9TVEVQX0tJTkRfU0VBUkNIEAESHwobQUdFTlRfU0VBUkNIX1NURVBfS0lORF9SRUFEEAISIAocQUdFTlRfU0VBUkNIX1NURVBfS0lORF9PVEhFUhADMrQJCg1TZWFyY2hTZXJ2aWNlEmEKClN0YXJ0QWdlbnQSJy5jb2RlZm91bmRyeS52MS5TdGFydEFnZW50U2VhcmNoUmVxdWVzdBooLmNvZGVmb3VuZHJ5LnYxLlN0YXJ0QWdlbnRTZWFyY2hSZXNwb25zZSIAElEKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hTZWFyY2hSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuU2VhcmNoV2F0Y2hFdmVudCIAMAESZwoLV2F0Y2hSZWNlbnQSKi5jb2RlZm91bmRyeS52MS5XYXRjaFJlY2VudFNlYXJjaGVzUmVxdWVzdBooLmNvZGVmb3VuZHJ5LnYxLldhdGNoUmVjZW50U2VhcmNoZXNFdmVudCIAMAESTwoEU3RvcBIhLmNvZGVmb3VuZHJ5LnYxLlN0b3BTZWFyY2hSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuU3RvcFNlYXJjaFJlc3BvbnNlIgASZQoKTGlzdFJlY2VudBIpLmNvZGVmb3VuZHJ5LnYxLkxpc3RSZWNlbnRTZWFyY2hlc1JlcXVlc3QaKi5jb2RlZm91bmRyeS52MS5MaXN0UmVjZW50U2VhcmNoZXNSZXNwb25zZSIAEkwKA0dldBIgLmNvZGVmb3VuZHJ5LnYxLkdldFNlYXJjaFJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5HZXRTZWFyY2hSZXNwb25zZSIAElgKB09wZW5IaXQSJC5jb2RlZm91bmRyeS52MS5PcGVuU2VhcmNoSGl0UmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLk9wZW5TZWFyY2hIaXRSZXNwb25zZSIAElsKCE1hcmtTZWVuEiUuY29kZWZvdW5kcnkudjEuTWFya1NlYXJjaFNlZW5SZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuTWFya1NlYXJjaFNlZW5SZXNwb25zZSIAEmEKClJlY29yZEZpbmQSJy5jb2RlZm91bmRyeS52MS5SZWNvcmRGaW5kU2VhcmNoUmVxdWVzdBooLmNvZGVmb3VuZHJ5LnYxLlJlY29yZEZpbmRTZWFyY2hSZXNwb25zZSIAElUKBkZvcmdldBIjLmNvZGVmb3VuZHJ5LnYxLkZvcmdldFNlYXJjaFJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5Gb3JnZXRTZWFyY2hSZXNwb25zZSIAElYKBUNsZWFyEiQuY29kZWZvdW5kcnkudjEuQ2xlYXJTZWFyY2hlc1JlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5DbGVhclNlYXJjaGVzUmVzcG9uc2UiABJYCgdQcm9tb3RlEiQuY29kZWZvdW5kcnkudjEuUHJvbW90ZVNlYXJjaFJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5Qcm9tb3RlU2VhcmNoUmVzcG9uc2UiABJbCgZSZXBvcnQSJi5jb2RlZm91bmRyeS52MS5SZXBvcnRTZWFyY2hIaXRSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuUmVwb3J0U2VhcmNoSGl0UmVzcG9uc2UiAELDAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgtTZWFyY2hQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_codefoundry_v1_heartbeat, file_codefoundry_v1_thread_search, file_google_protobuf_timestamp]);
 
 /**
  * AgentSearchHit is one message the run reported, accepted by the daemon.
@@ -329,6 +329,60 @@ export const SearchEntrySchema: GenMessage<SearchEntry> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_search, 2);
 
 /**
+ * SearchActivity is what the app shows of agent searches outside the dialog: the sidebar's
+ * search row. The EventService search source sends it on connect and again when it
+ * changes, never for a step or a hit of a run, so holding it open all session costs
+ * nothing. Always the whole state: a run a daemon restart lost is FAILED and unseen in
+ * the next daemon's snapshot, so a client that replaces what it had cannot stay "running".
+ *
+ * @generated from message codefoundry.v1.SearchActivity
+ */
+export type SearchActivity = Message<"codefoundry.v1.SearchActivity"> & {
+  /**
+   * How many agent searches run now.
+   *
+   * @generated from field: int32 running = 1;
+   */
+  running: number;
+
+  /**
+   * The newest running one's id; "" when none runs.
+   *
+   * @generated from field: string running_id = 2;
+   */
+  runningId: string;
+
+  /**
+   * The finished agent search not shown yet that finished last; "" when none. A search
+   * the user stopped is never unseen.
+   *
+   * @generated from field: string unseen_id = 3;
+   */
+  unseenId: string;
+
+  /**
+   * How unseen_id ended (DONE, FAILED, STOPPED).
+   *
+   * @generated from field: codefoundry.v1.SearchStatus unseen_status = 4;
+   */
+  unseenStatus: SearchStatus;
+
+  /**
+   * unseen_id's hits, those whose thread still exists.
+   *
+   * @generated from field: int32 unseen_hits = 5;
+   */
+  unseenHits: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.SearchActivity.
+ * Use `create(SearchActivitySchema)` to create a new message.
+ */
+export const SearchActivitySchema: GenMessage<SearchActivity> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_search, 3);
+
+/**
  * @generated from message codefoundry.v1.StartAgentSearchRequest
  */
 export type StartAgentSearchRequest = Message<"codefoundry.v1.StartAgentSearchRequest"> & {
@@ -343,7 +397,7 @@ export type StartAgentSearchRequest = Message<"codefoundry.v1.StartAgentSearchRe
  * Use `create(StartAgentSearchRequestSchema)` to create a new message.
  */
 export const StartAgentSearchRequestSchema: GenMessage<StartAgentSearchRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 3);
+  messageDesc(file_codefoundry_v1_search, 4);
 
 /**
  * @generated from message codefoundry.v1.StartAgentSearchResponse
@@ -360,7 +414,7 @@ export type StartAgentSearchResponse = Message<"codefoundry.v1.StartAgentSearchR
  * Use `create(StartAgentSearchResponseSchema)` to create a new message.
  */
 export const StartAgentSearchResponseSchema: GenMessage<StartAgentSearchResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 4);
+  messageDesc(file_codefoundry_v1_search, 5);
 
 /**
  * @generated from message codefoundry.v1.WatchSearchRequest
@@ -377,7 +431,7 @@ export type WatchSearchRequest = Message<"codefoundry.v1.WatchSearchRequest"> & 
  * Use `create(WatchSearchRequestSchema)` to create a new message.
  */
 export const WatchSearchRequestSchema: GenMessage<WatchSearchRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 5);
+  messageDesc(file_codefoundry_v1_search, 6);
 
 /**
  * SearchAnswer is the run's answer.
@@ -396,7 +450,7 @@ export type SearchAnswer = Message<"codefoundry.v1.SearchAnswer"> & {
  * Use `create(SearchAnswerSchema)` to create a new message.
  */
 export const SearchAnswerSchema: GenMessage<SearchAnswer> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 6);
+  messageDesc(file_codefoundry_v1_search, 7);
 
 /**
  * SearchStatusChange is the run's end: the status with the entry's final fields.
@@ -440,7 +494,7 @@ export type SearchStatusChange = Message<"codefoundry.v1.SearchStatusChange"> & 
  * Use `create(SearchStatusChangeSchema)` to create a new message.
  */
 export const SearchStatusChangeSchema: GenMessage<SearchStatusChange> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 7);
+  messageDesc(file_codefoundry_v1_search, 8);
 
 /**
  * @generated from message codefoundry.v1.SearchWatchEvent
@@ -500,7 +554,7 @@ export type SearchWatchEvent = Message<"codefoundry.v1.SearchWatchEvent"> & {
  * Use `create(SearchWatchEventSchema)` to create a new message.
  */
 export const SearchWatchEventSchema: GenMessage<SearchWatchEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 8);
+  messageDesc(file_codefoundry_v1_search, 9);
 
 /**
  * @generated from message codefoundry.v1.WatchRecentSearchesRequest
@@ -513,7 +567,7 @@ export type WatchRecentSearchesRequest = Message<"codefoundry.v1.WatchRecentSear
  * Use `create(WatchRecentSearchesRequestSchema)` to create a new message.
  */
 export const WatchRecentSearchesRequestSchema: GenMessage<WatchRecentSearchesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 9);
+  messageDesc(file_codefoundry_v1_search, 10);
 
 /**
  * @generated from message codefoundry.v1.WatchRecentSearchesEvent
@@ -537,7 +591,7 @@ export type WatchRecentSearchesEvent = Message<"codefoundry.v1.WatchRecentSearch
  * Use `create(WatchRecentSearchesEventSchema)` to create a new message.
  */
 export const WatchRecentSearchesEventSchema: GenMessage<WatchRecentSearchesEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 10);
+  messageDesc(file_codefoundry_v1_search, 11);
 
 /**
  * @generated from message codefoundry.v1.StopSearchRequest
@@ -554,7 +608,7 @@ export type StopSearchRequest = Message<"codefoundry.v1.StopSearchRequest"> & {
  * Use `create(StopSearchRequestSchema)` to create a new message.
  */
 export const StopSearchRequestSchema: GenMessage<StopSearchRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 11);
+  messageDesc(file_codefoundry_v1_search, 12);
 
 /**
  * @generated from message codefoundry.v1.StopSearchResponse
@@ -571,7 +625,7 @@ export type StopSearchResponse = Message<"codefoundry.v1.StopSearchResponse"> & 
  * Use `create(StopSearchResponseSchema)` to create a new message.
  */
 export const StopSearchResponseSchema: GenMessage<StopSearchResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 12);
+  messageDesc(file_codefoundry_v1_search, 13);
 
 /**
  * @generated from message codefoundry.v1.ListRecentSearchesRequest
@@ -584,7 +638,7 @@ export type ListRecentSearchesRequest = Message<"codefoundry.v1.ListRecentSearch
  * Use `create(ListRecentSearchesRequestSchema)` to create a new message.
  */
 export const ListRecentSearchesRequestSchema: GenMessage<ListRecentSearchesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 13);
+  messageDesc(file_codefoundry_v1_search, 14);
 
 /**
  * @generated from message codefoundry.v1.ListRecentSearchesResponse
@@ -601,7 +655,7 @@ export type ListRecentSearchesResponse = Message<"codefoundry.v1.ListRecentSearc
  * Use `create(ListRecentSearchesResponseSchema)` to create a new message.
  */
 export const ListRecentSearchesResponseSchema: GenMessage<ListRecentSearchesResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 14);
+  messageDesc(file_codefoundry_v1_search, 15);
 
 /**
  * @generated from message codefoundry.v1.GetSearchRequest
@@ -618,7 +672,7 @@ export type GetSearchRequest = Message<"codefoundry.v1.GetSearchRequest"> & {
  * Use `create(GetSearchRequestSchema)` to create a new message.
  */
 export const GetSearchRequestSchema: GenMessage<GetSearchRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 15);
+  messageDesc(file_codefoundry_v1_search, 16);
 
 /**
  * @generated from message codefoundry.v1.GetSearchResponse
@@ -635,7 +689,7 @@ export type GetSearchResponse = Message<"codefoundry.v1.GetSearchResponse"> & {
  * Use `create(GetSearchResponseSchema)` to create a new message.
  */
 export const GetSearchResponseSchema: GenMessage<GetSearchResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 16);
+  messageDesc(file_codefoundry_v1_search, 17);
 
 /**
  * @generated from message codefoundry.v1.OpenSearchHitRequest
@@ -657,7 +711,7 @@ export type OpenSearchHitRequest = Message<"codefoundry.v1.OpenSearchHitRequest"
  * Use `create(OpenSearchHitRequestSchema)` to create a new message.
  */
 export const OpenSearchHitRequestSchema: GenMessage<OpenSearchHitRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 17);
+  messageDesc(file_codefoundry_v1_search, 18);
 
 /**
  * @generated from message codefoundry.v1.OpenSearchHitResponse
@@ -674,7 +728,7 @@ export type OpenSearchHitResponse = Message<"codefoundry.v1.OpenSearchHitRespons
  * Use `create(OpenSearchHitResponseSchema)` to create a new message.
  */
 export const OpenSearchHitResponseSchema: GenMessage<OpenSearchHitResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 18);
+  messageDesc(file_codefoundry_v1_search, 19);
 
 /**
  * @generated from message codefoundry.v1.MarkSearchSeenRequest
@@ -691,7 +745,7 @@ export type MarkSearchSeenRequest = Message<"codefoundry.v1.MarkSearchSeenReques
  * Use `create(MarkSearchSeenRequestSchema)` to create a new message.
  */
 export const MarkSearchSeenRequestSchema: GenMessage<MarkSearchSeenRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 19);
+  messageDesc(file_codefoundry_v1_search, 20);
 
 /**
  * @generated from message codefoundry.v1.MarkSearchSeenResponse
@@ -708,7 +762,7 @@ export type MarkSearchSeenResponse = Message<"codefoundry.v1.MarkSearchSeenRespo
  * Use `create(MarkSearchSeenResponseSchema)` to create a new message.
  */
 export const MarkSearchSeenResponseSchema: GenMessage<MarkSearchSeenResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 20);
+  messageDesc(file_codefoundry_v1_search, 21);
 
 /**
  * @generated from message codefoundry.v1.RecordFindSearchRequest
@@ -733,7 +787,7 @@ export type RecordFindSearchRequest = Message<"codefoundry.v1.RecordFindSearchRe
  * Use `create(RecordFindSearchRequestSchema)` to create a new message.
  */
 export const RecordFindSearchRequestSchema: GenMessage<RecordFindSearchRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 21);
+  messageDesc(file_codefoundry_v1_search, 22);
 
 /**
  * @generated from message codefoundry.v1.RecordFindSearchResponse
@@ -750,7 +804,7 @@ export type RecordFindSearchResponse = Message<"codefoundry.v1.RecordFindSearchR
  * Use `create(RecordFindSearchResponseSchema)` to create a new message.
  */
 export const RecordFindSearchResponseSchema: GenMessage<RecordFindSearchResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 22);
+  messageDesc(file_codefoundry_v1_search, 23);
 
 /**
  * @generated from message codefoundry.v1.ForgetSearchRequest
@@ -767,7 +821,7 @@ export type ForgetSearchRequest = Message<"codefoundry.v1.ForgetSearchRequest"> 
  * Use `create(ForgetSearchRequestSchema)` to create a new message.
  */
 export const ForgetSearchRequestSchema: GenMessage<ForgetSearchRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 23);
+  messageDesc(file_codefoundry_v1_search, 24);
 
 /**
  * @generated from message codefoundry.v1.ForgetSearchResponse
@@ -780,7 +834,7 @@ export type ForgetSearchResponse = Message<"codefoundry.v1.ForgetSearchResponse"
  * Use `create(ForgetSearchResponseSchema)` to create a new message.
  */
 export const ForgetSearchResponseSchema: GenMessage<ForgetSearchResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 24);
+  messageDesc(file_codefoundry_v1_search, 25);
 
 /**
  * @generated from message codefoundry.v1.ClearSearchesRequest
@@ -793,7 +847,7 @@ export type ClearSearchesRequest = Message<"codefoundry.v1.ClearSearchesRequest"
  * Use `create(ClearSearchesRequestSchema)` to create a new message.
  */
 export const ClearSearchesRequestSchema: GenMessage<ClearSearchesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 25);
+  messageDesc(file_codefoundry_v1_search, 26);
 
 /**
  * @generated from message codefoundry.v1.ClearSearchesResponse
@@ -812,7 +866,7 @@ export type ClearSearchesResponse = Message<"codefoundry.v1.ClearSearchesRespons
  * Use `create(ClearSearchesResponseSchema)` to create a new message.
  */
 export const ClearSearchesResponseSchema: GenMessage<ClearSearchesResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 26);
+  messageDesc(file_codefoundry_v1_search, 27);
 
 /**
  * @generated from message codefoundry.v1.PromoteSearchRequest
@@ -829,7 +883,7 @@ export type PromoteSearchRequest = Message<"codefoundry.v1.PromoteSearchRequest"
  * Use `create(PromoteSearchRequestSchema)` to create a new message.
  */
 export const PromoteSearchRequestSchema: GenMessage<PromoteSearchRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 27);
+  messageDesc(file_codefoundry_v1_search, 28);
 
 /**
  * @generated from message codefoundry.v1.PromoteSearchResponse
@@ -846,7 +900,7 @@ export type PromoteSearchResponse = Message<"codefoundry.v1.PromoteSearchRespons
  * Use `create(PromoteSearchResponseSchema)` to create a new message.
  */
 export const PromoteSearchResponseSchema: GenMessage<PromoteSearchResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 28);
+  messageDesc(file_codefoundry_v1_search, 29);
 
 /**
  * @generated from message codefoundry.v1.ReportSearchHitRequest
@@ -886,7 +940,7 @@ export type ReportSearchHitRequest = Message<"codefoundry.v1.ReportSearchHitRequ
  * Use `create(ReportSearchHitRequestSchema)` to create a new message.
  */
 export const ReportSearchHitRequestSchema: GenMessage<ReportSearchHitRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 29);
+  messageDesc(file_codefoundry_v1_search, 30);
 
 /**
  * @generated from message codefoundry.v1.ReportSearchHitResponse
@@ -910,7 +964,7 @@ export type ReportSearchHitResponse = Message<"codefoundry.v1.ReportSearchHitRes
  * Use `create(ReportSearchHitResponseSchema)` to create a new message.
  */
 export const ReportSearchHitResponseSchema: GenMessage<ReportSearchHitResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_search, 30);
+  messageDesc(file_codefoundry_v1_search, 31);
 
 /**
  * @generated from enum codefoundry.v1.SearchMode

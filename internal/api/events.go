@@ -53,6 +53,8 @@ type EventsDeps struct {
 	Memory MemoryStore
 	// Themes is the user's colour themes (and, through the catalog, the curated ones).
 	Themes ThemeStore
+	// Search is agent search's activity, for the sidebar's search row.
+	Search SearchActivitySource
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
@@ -139,7 +141,7 @@ type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
 // events.proto: project, workspace, terminal, thread, thread, gh, gitops, theme, settings,
-// update, action, plugin, skill, memory),
+// update, action, plugin, skill, memory, search),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -183,6 +185,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Memory != nil {
 		out = append(out, memorySource{store: d.Memory, bus: d.Bus}) // api/memory.go
+	}
+	if d.Search != nil {
+		out = append(out, searchSource{store: d.Search, bus: d.Bus}) // api/search_events.go
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out
