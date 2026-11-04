@@ -82,7 +82,9 @@ re-read. The GUI's `pullRequestDetailResource` (key `slug#number`) is invalidate
   (`reviewers: latestReviews(first: 50)`, `requestedReviewers: reviewRequests(first:
   50)`, `reviewList: reviews(last: 100)`). GraphQL rejects one response name with two
   argument sets.
-* **Cache rules.** An entry is served until one of these happens:
+* **Cache rules.** (Since `docs/notes/pr-detail-stale-first.md` these decide when an entry
+  is current, not when a read waits: any copy answers at once and the fetch runs behind it.)
+  An entry is served until one of these happens:
   * `refresh` is set
   * it is older than `github.poll_interval_seconds` (the poll interval), or 10 minutes
     for a merged or closed PR, and no recent poll confirmed it (saw its fingerprint

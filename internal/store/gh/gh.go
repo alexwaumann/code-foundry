@@ -53,9 +53,11 @@ type Service interface {
 	// branch head of the repository, and keeps that branch in the poll for a while
 	// (activity.go). It never waits on GitHub.
 	BranchPullRequests(ctx context.Context, slug, head string) (BranchPullRequests, error)
-	// FullPullRequest returns everything the detail panel shows about one pull request,
-	// from cache unless refresh is set or the entry is stale (pr_detail.go). On fetch
-	// failure the cached copy comes back with LastError set.
+	// FullPullRequest returns everything the detail panel shows about one pull request.
+	// Any cached copy answers at once, Refreshing with a fetch behind it when it is not
+	// current; only nothing cached, refresh, and the read after this store's own write
+	// wait for GitHub (pr_detail.go). On fetch failure the cached copy comes back with
+	// LastError set.
 	FullPullRequest(ctx context.Context, slug string, number int, refresh bool) (FullPullRequest, error)
 	// ReviewerCandidates returns who can be asked to review a pull request: the pending
 	// requests and, for a non-empty query, the assignable users GitHub matches (up to 20;
