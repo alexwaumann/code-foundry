@@ -34,6 +34,9 @@ func TestLiveWorktrees(t *testing.T) {
 		{name: "snoozed", threads: []thread.Thread{
 			{ID: "a", ProjectID: "p", WorktreePath: "/w/a", SnoozedUntil: now.Add(time.Hour)},
 		}, want: []string{}},
+		{name: "saved for later", threads: []thread.Thread{
+			{ID: "a", ProjectID: "p", WorktreePath: "/w/a", SavedAt: now.Add(-time.Hour)},
+		}, want: []string{}},
 		{name: "snooze past", threads: []thread.Thread{
 			{ID: "a", ProjectID: "p", WorktreePath: "/w/a", SnoozedUntil: now.Add(-time.Second)},
 		}, want: []string{"/w/a"}},

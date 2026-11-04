@@ -390,6 +390,13 @@ message Thread {
   // shows "Moving to <place>…" (project_id, else workspace_id). Unset otherwise. Not
   // persisted. See docs/notes/move-no-project-1-daemon.md.
   ThreadMove pending_move = 75;
+  // When the thread was saved for later (ThreadService.Snooze with save): a snooze with
+  // no wake time, so snoozed_until stays unset and the daemon never wakes it. Unset when
+  // it is not saved. Otherwise like a snoozed thread: disconnected, unpinned, not
+  // archived, no shells, listed apart with the snoozed ones. A timed snooze replaces it;
+  // Snooze with neither until nor save, Reconnect, Pin (pinned), Send and Archive
+  // (archived) clear it. Persisted. See docs/notes/save-for-later-1-daemon.md.
+  google.protobuf.Timestamp saved_at = 76;
 }
 
 // ThreadMove is a Move under way (Thread.pending_move).
@@ -1216,8 +1223,11 @@ message SetThreadWorkspaceResponse {
 
 message SnoozeThreadRequest {
   string id = 1;
-  // When the thread wakes; must be in the future. Unset unsnoozes.
+  // When the thread wakes; must be in the future. Unset (without save) unsnoozes.
   google.protobuf.Timestamp until = 2;
+  // Save the thread for later: a snooze with no wake time (Thread.saved_at). Not with
+  // until (INVALID_ARGUMENT).
+  bool save = 3;
 }
 
 message SnoozeThreadResponse {

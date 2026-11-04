@@ -3334,6 +3334,9 @@ export const ThreadService: GenService<{
    * wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
    * before then only clears snoozed_until. Reconnect, Pin
    * (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+   * With save instead of until it is the same with no wake time: saved_at is set,
+   * snoozed_until stays unset and the daemon never wakes it; a request with neither, and
+   * those implicit clears, end it too.
    *
    * @generated from rpc codefoundry.v1.ThreadService.Snooze
    */

@@ -376,7 +376,7 @@ func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Thread, er
 	return f.mutate(fmt.Sprintf("Pin %s %t", id, pinned), id, func(s *thread.Thread) error {
 		s.Pinned = pinned
 		if pinned {
-			s.ArchivedAt, s.SnoozedUntil = time.Time{}, time.Time{}
+			s.ArchivedAt, s.SnoozedUntil, s.SavedAt = time.Time{}, time.Time{}, time.Time{}
 		}
 		return nil
 	})
@@ -397,7 +397,7 @@ func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thre
 		if s.State != thread.StateDisconnected {
 			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
 		}
-		s.Pinned, s.SnoozedUntil = false, time.Time{}
+		s.Pinned, s.SnoozedUntil, s.SavedAt = false, time.Time{}, time.Time{}
 		if s.ArchivedAt.IsZero() {
 			s.ArchivedAt = f.Now()
 		}
@@ -407,8 +407,8 @@ func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thre
 
 // Snooze records "Snooze <id> <until RFC3339 ms>" ("Snooze <id> -" to unsnooze).
 // Snoozing requires until after Now (ErrInvalidArgument), disconnects a live thread
-// (reason "closed"), unpins and unarchives it and sets SnoozedUntil; unsnoozing clears
-// SnoozedUntil only. No shells are involved and nothing wakes: tests Put the woken
+// (reason "closed"), unpins and unarchives it and sets SnoozedUntil, clearing SavedAt;
+// unsnoozing clears SnoozedUntil and SavedAt only. No shells are involved and nothing wakes: tests Put the woken
 // state.
 func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thread, error) {
 	call := "Snooze " + id + " -"
@@ -417,7 +417,7 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thr
 	}
 	return f.mutate(call, id, func(s *thread.Thread) error {
 		if until.IsZero() {
-			s.SnoozedUntil = time.Time{}
+			s.SnoozedUntil, s.SavedAt = time.Time{}, time.Time{}
 			return nil
 		}
 		if !until.After(f.Now()) {
@@ -429,7 +429,26 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thr
 		if s.State != thread.StateDisconnected {
 			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
 		}
-		s.Pinned, s.ArchivedAt, s.SnoozedUntil = false, time.Time{}, until
+		s.Pinned, s.ArchivedAt, s.SnoozedUntil, s.SavedAt = false, time.Time{}, until, time.Time{}
+		return nil
+	})
+}
+
+// SaveForLater records "SaveForLater <id>". Like a snooze it disconnects a live thread
+// (reason "closed"), unpins and unarchives it; it clears SnoozedUntil and sets SavedAt to
+// Now unless already set.
+func (f *Fake) SaveForLater(_ context.Context, id string) (thread.Thread, error) {
+	return f.mutate("SaveForLater "+id, id, func(s *thread.Thread) error {
+		if err := f.refuseResident(id, "snoozed"); err != nil {
+			return err
+		}
+		if s.State != thread.StateDisconnected {
+			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
+		}
+		s.Pinned, s.ArchivedAt, s.SnoozedUntil = false, time.Time{}, time.Time{}
+		if s.SavedAt.IsZero() {
+			s.SavedAt = f.Now()
+		}
 		return nil
 	})
 }
@@ -455,7 +474,7 @@ func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
 		if err := refuseTranscriptMissing(*s); err != nil {
 			return err
 		}
-		s.State, s.DisconnectReason, s.ArchivedAt, s.SnoozedUntil = thread.StateStarting, "", time.Time{}, time.Time{}
+		s.State, s.DisconnectReason, s.ArchivedAt, s.SnoozedUntil, s.SavedAt = thread.StateStarting, "", time.Time{}, time.Time{}, time.Time{}
 		return nil
 	})
 }
@@ -739,9 +758,9 @@ func (f *Fake) Send(_ context.Context, id string, msg thread.Message) (thread.It
 	if started {
 		s.State, s.DisconnectReason = thread.StateConnected, ""
 	}
-	changed := started || !s.ArchivedAt.IsZero() || !s.SnoozedUntil.IsZero()
+	changed := started || !s.ArchivedAt.IsZero() || s.Snoozed()
 	if changed {
-		s.ArchivedAt, s.SnoozedUntil = time.Time{}, time.Time{}
+		s.ArchivedAt, s.SnoozedUntil, s.SavedAt = time.Time{}, time.Time{}, time.Time{}
 		f.byID[id] = s
 		f.rebuild()
 	}

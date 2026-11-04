@@ -27,7 +27,7 @@ type actionRuns interface {
 //   - a project is unregistered (project.ProjectRemoved): its actions are forgotten (the
 //     database cascades) and its runs killed and forgotten;
 //   - a thread is removed (thread.Removed), archived or snoozed (thread.Updated with
-//     ArchivedAt or SnoozedUntil set): its background runs are killed, as its action
+//     archived or snoozed in either form): its background runs are killed, as its action
 //     terminals are by the thread store;
 //   - a worktree's directory is removed (project.WorktreeRemoved, directory gone): the
 //     background runs in it are killed.
@@ -75,7 +75,7 @@ func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRu
 					switch {
 					case !e.Thread.ArchivedAt.IsZero():
 						kill("thread archived", func(r action.Run) bool { return r.ThreadID == id })
-					case !e.Thread.SnoozedUntil.IsZero():
+					case e.Thread.Snoozed():
 						kill("thread snoozed", func(r action.Run) bool { return r.ThreadID == id })
 					}
 				}

@@ -227,6 +227,11 @@ type Thread struct {
 	// snoozed. Waking clears it and sets StatusNeedsAttention ReasonSnoozeEnded.
 	// Reconnect, Pin(true), Send and Archive(true) clear it. Persisted.
 	SnoozedUntil time.Time
+	// SavedAt is when the thread was saved for later (Store.SaveForLater): a snooze with
+	// no wake time, so SnoozedUntil stays zero. Zero when it is not saved. The same calls
+	// that clear SnoozedUntil clear it, and a timed Snooze replaces it. Snoozed reports
+	// either. Persisted.
+	SavedAt time.Time
 	// LinkedPullRequests are the pull requests Claude linked to the conversation
 	// (pr-link transcript records; prlink.go) and those of the threads it created,
 	// transitively (prlink_children.go), and the pull requests whose head is a branch
@@ -696,8 +701,11 @@ type Store interface {
 	// it closes it like Close, kills and removes its shells, unpins and unarchives it
 	// and sets SnoozedUntil (replacing an earlier one). When the time comes the store
 	// clears it and the disconnected thread needs attention (ReasonSnoozeEnded). A zero
-	// until only clears SnoozedUntil.
+	// until only clears SnoozedUntil and SavedAt.
 	Snooze(ctx context.Context, id string, until time.Time) (Thread, error)
+	// SaveForLater snoozes a thread with no wake time: everything Snooze does, but it
+	// sets SavedAt (kept when already set) and clears SnoozedUntil, and nothing wakes it.
+	SaveForLater(ctx context.Context, id string) (Thread, error)
 	// StageAttachment stores an image or PDF for a message and returns its absolute
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes
 	// (an image) or MaxPDFAttachmentBytes (a PDF). pages is the client's page count

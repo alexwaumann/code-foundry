@@ -241,6 +241,9 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 		if s.GetSnoozedUntil() != nil {
 			marks = append(marks, "snoozed")
 		}
+		if s.GetSavedAt() != nil {
+			marks = append(marks, "saved")
+		}
 		if m := residentMark(s); m != "" { // commands_thread_reseed.go
 			marks = append(marks, m)
 		}

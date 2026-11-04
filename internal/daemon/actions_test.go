@@ -68,6 +68,8 @@ func TestActionCleanup(t *testing.T) {
 		{name: "a worktree still on disk (a failed refresh) keeps its runs", event: project.WorktreeRemoved{ProjectID: "web", Path: "/wt/main"}},
 		{name: "an archived thread's background runs are killed",
 			event: thread.Updated{Thread: thread.Thread{ID: "s2", ArchivedAt: time.Unix(1, 0)}}, wantKilled: []string{"r3"}},
+		{name: "a saved thread's background runs are killed",
+			event: thread.Updated{Thread: thread.Thread{ID: "s1", SavedAt: time.Unix(1, 0)}}, wantKilled: []string{"r1"}},
 		{name: "a snoozed thread's background runs are killed",
 			event: thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: time.Unix(1, 0)}}, wantKilled: []string{"r1"}},
 		{name: "other thread updates are ignored", event: thread.Updated{Thread: thread.Thread{ID: "s1"}}},

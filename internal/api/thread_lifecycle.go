@@ -155,8 +155,19 @@ func (h *Thread) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThr
 }
 
 // Snooze snoozes a thread until req.until (closing it and its shells, unpinning,
-// unarchiving) or unsnoozes it (until unset).
+// unarchiving), saves it for later (req.save: the same with no wake time), or unsnoozes
+// it (neither).
 func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
+	if req.Msg.GetSave() {
+		if req.Msg.GetUntil() != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("give until or save, not both"))
+		}
+		s, err := h.store.SaveForLater(ctx, req.Msg.GetId())
+		if err != nil {
+			return nil, threadError(err)
+		}
+		return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: threadToProto(s)}), nil
+	}
 	var until time.Time
 	if t := req.Msg.GetUntil(); t != nil {
 		if err := t.CheckValid(); err != nil {
@@ -315,6 +326,9 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	}
 	if !s.SnoozedUntil.IsZero() {
 		p.SnoozedUntil = timestamppb.New(s.SnoozedUntil)
+	}
+	if !s.SavedAt.IsZero() {
+		p.SavedAt = timestamppb.New(s.SavedAt)
 	}
 	for _, l := range s.LinkedPullRequests {
 		p.LinkedPullRequests = append(p.LinkedPullRequests, linkedPullRequestToProto(l))
