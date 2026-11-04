@@ -474,7 +474,7 @@ func TestStoppingSnapshot(t *testing.T) {
 		{"no flush", false, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newHarness(t, setup{enabled: true, model: true, attended: true})
+			h := newHarness(t, setup{enabled: true, model: true})
 			h.waitState(dictation.Ready)
 			id, err := h.store.Start(context.Background(), "c1")
 			if err != nil {
