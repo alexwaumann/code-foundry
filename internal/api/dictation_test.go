@@ -190,6 +190,20 @@ func TestDictationService(t *testing.T) {
 	}
 	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool { return m.GetMicDenied() })
 
+	if _, err := c.Accessibility(ctx, connect.NewRequest(&v1.DictationAccessibilityRequest{Accessibility: &v1.DictationAccessibility{
+		Granted: true, TapSilent: true, ListName: "Accessibility", Executable: "/x",
+	}})); err != nil {
+		t.Fatal(err)
+	}
+	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool {
+		a := m.GetAccessibility()
+		return a.GetGranted() && a.GetTapSilent() && a.GetListName() == "Accessibility" && a.GetExecutable() == "/x"
+	})
+	if _, err := c.ComposerTarget(ctx, connect.NewRequest(&v1.DictationComposerTargetRequest{Available: true})); err != nil {
+		t.Fatal(err)
+	}
+	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool { return m.GetComposerTarget() })
+
 	if _, err := c.Download(ctx, connect.NewRequest(&v1.DownloadDictationModelRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("Download with the model there: %v", err)
 	}

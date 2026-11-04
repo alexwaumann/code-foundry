@@ -15,7 +15,9 @@ import "google/protobuf/timestamp.proto";
 //
 // A session belongs to one client (the composer that pressed the mic): Start opens it,
 // the host streams Audio while Watch says LISTENING, the composer reads Session, and
-// Stop (or 30 s without speech, or disabling) ends it. One session at a time.
+// Stop (or 30 s without speech, or disabling) ends it. One session at a time. The hold key
+// (docs/notes/dictate-anywhere.md) opens one for a composer through dictation.hold, or
+// for the host itself with client id "system", which then reads Session and pastes.
 service DictationService {
   // Watch sends the snapshot now, then again on every change, and a heartbeat after 5 s
   // of silence (see heartbeat.proto).
@@ -53,6 +55,14 @@ service DictationService {
   // MicDenied is the host reporting whether macOS denied the microphone; it shows as
   // mic_denied on Watch.
   rpc MicDenied(DictationMicDeniedRequest) returns (DictationMicDeniedResponse) {}
+  // Accessibility is the host reporting what macOS allows the hold key; it shows as
+  // accessibility on Watch. Nothing is stored: a restarted daemon has none until the host
+  // reports again.
+  rpc Accessibility(DictationAccessibilityRequest) returns (DictationAccessibilityResponse) {}
+  // ComposerTarget is the window saying whether a composer can take dictation now (the
+  // choice dictation.toggle makes); it shows as composer_target on Watch, so the host can
+  // route a press of the hold key without asking the window.
+  rpc ComposerTarget(DictationComposerTargetRequest) returns (DictationComposerTargetResponse) {}
 }
 
 // DictationState is dictation's state as the settings page and composers show it.
@@ -103,6 +113,25 @@ message DictationSnapshot {
   string hold_key = 10;
   // dictation.sounds: a sound as dictation starts and stops.
   bool sounds = 11;
+  // notifications.sound_volume: the sounds' volume, percent of the Mac's output volume.
+  int32 sound_volume = 12;
+  // The window has a composer dictation can target (ComposerTarget).
+  bool composer_target = 13;
+  // What the host last reported; unset until it has (no host, or dictation off so far).
+  DictationAccessibility accessibility = 14;
+}
+
+// DictationAccessibility is what macOS allows the hold key, as the host sees it.
+message DictationAccessibility {
+  // AXIsProcessTrusted: the host may listen for the hold key and paste.
+  bool granted = 1;
+  // Granted, but the event tap hears nothing while keys are being pressed: this process
+  // needs restarting (docs/notes/dictate-anywhere.md).
+  bool tap_silent = 2;
+  // What System Settings calls the list, for this macOS.
+  string list_name = 3;
+  // The host's executable: what to add to the list by hand.
+  string executable = 4;
 }
 
 // DictationModel is the one Whisper model.
@@ -242,3 +271,15 @@ message DictationMicDeniedRequest {
 }
 
 message DictationMicDeniedResponse {}
+
+message DictationAccessibilityRequest {
+  DictationAccessibility accessibility = 1;
+}
+
+message DictationAccessibilityResponse {}
+
+message DictationComposerTargetRequest {
+  bool available = 1;
+}
+
+message DictationComposerTargetResponse {}

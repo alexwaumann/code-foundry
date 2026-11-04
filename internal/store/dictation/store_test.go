@@ -666,6 +666,32 @@ func TestMicDenied(t *testing.T) {
 	}
 }
 
+func TestHostReports(t *testing.T) {
+	h := newHarness(t, setup{})
+	if s := h.store.Snapshot(); s.Accessibility != nil || s.ComposerTarget {
+		t.Fatalf("before any report: %+v", s)
+	}
+	want := dictation.Accessibility{ListName: "Accessibility", Executable: "/x"}
+	h.store.ReportAccessibility(want)
+	if got := h.store.Snapshot().Accessibility; got == nil || *got != want {
+		t.Errorf("accessibility %+v", got)
+	}
+	// A new value must publish, not only a first one.
+	want.Granted = true
+	h.store.ReportAccessibility(want)
+	if got := h.store.Snapshot().Accessibility; got == nil || !got.Granted {
+		t.Errorf("accessibility %+v", got)
+	}
+	h.store.ComposerTarget(true)
+	if !h.store.Snapshot().ComposerTarget {
+		t.Error("composer target not recorded")
+	}
+	h.store.ComposerTarget(false)
+	if h.store.Snapshot().ComposerTarget {
+		t.Error("composer target not cleared")
+	}
+}
+
 func TestRemoveModel(t *testing.T) {
 	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)

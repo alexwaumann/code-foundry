@@ -29,10 +29,6 @@ func main() {
 		fmt.Println("Code Foundry " + version.Version)
 		return
 	}
-	// `"Code Foundry" --accessibility-probe [--prompt]`: no window, no daemon (accessibility_probe_darwin.go).
-	if probe, prompt := accessibilityProbeArgs(os.Args[1:]); probe {
-		os.Exit(runAccessibilityProbe(prompt))
-	}
 	// The GUI takes no other arguments. Refusing them is what stops a misconfigured
 	// CODE_FOUNDRY_BIN (pointed at this app) from opening a window per `daemon` spawn.
 	if len(os.Args) > 1 {
@@ -58,6 +54,8 @@ func main() {
 	daemonService := NewDaemonService(p, log)
 	appService := NewAppService(log, p.WindowBackground())
 	overlayService := NewOverlayService(log)
+	// Set below, before the app runs, which is when a second launch can first be heard.
+	var bar *menuBar
 	app := application.New(application.Options{
 		Name:        "Code Foundry",
 		Description: "Supervise fleets of Claude Code threads",
@@ -72,6 +70,15 @@ func main() {
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
+		// One GUI per home: two would mean two listeners and a double paste. A second launch
+		// shows this one's window and exits, inside New, before anything else has started.
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID: singleInstanceID(p.Home()),
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+				log.Info("a second launch: showing the window")
+				bar.open()
+			},
 		},
 	})
 
@@ -111,7 +118,7 @@ func main() {
 	})
 	appService.window = window
 	// With dictation.anywhere on, closing the window leaves the app in the menu bar (menubar.go).
-	bar := installMenuBar(app, window, appService, log)
+	bar = installMenuBar(app, window, appService, log)
 	forwardFileDrops(window)
 	// The mouse's side buttons step back and forward like a browser's (mousebuttons.go).
 	forwardMouseButtons(window)
@@ -148,7 +155,11 @@ func main() {
 			overlayPanel.prepare()
 		}
 	}
-	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), anywhere, overlayService, log)
+	// The hold key (hold.go): held in any app, it starts and ends a session.
+	hold := newMacHoldService(log)
+	go hold.run(watchCtx)
+	go watchHostIntents(watchCtx, daemonService.connect, askAccessibility, log)
+	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), anywhere, overlayService, hold, log)
 
 	if err := app.Run(); err != nil {
 		log.Error("wails app", "err", err)

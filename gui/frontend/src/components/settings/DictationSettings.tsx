@@ -3,9 +3,11 @@
  * row's switch, state chip and "Needs the model below.", and the Model row at the end of
  * the section (state from DictationService.Watch, actions through the dictation.*
  * commands). The rows between them are plain settings (hiddenFields.ts hides two of them
- * while dictation is off).
+ * while dictation is off). Before the Model row, the hold key's permission (DictationAccessRow;
+ * docs/notes/dictate-anywhere.md).
  */
-import type { DictationView } from "@/api/dictation";
+import { useEffect, useState } from "react";
+import type { DictationAccessibilityView, DictationView } from "@/api/dictation";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
@@ -13,7 +15,7 @@ import { downloadProgress, gigabytes, megabytes, memorySize } from "@/lib/dictat
 import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
 import { runCommandForResult } from "@/stores/commands";
-import { useDictationStore, useHoldDictation } from "@/stores/dictation";
+import { noteDictationAllow, useDictationStore, useHoldDictation } from "@/stores/dictation";
 import { useSettingsStore } from "@/stores/settings";
 import type { EditorProps } from "./editor";
 
@@ -169,6 +171,108 @@ function ModelActions({ snap }: { snap: DictationView | null }) {
         Download · {gigabytes(snap.model.sizeBytes || 874_188_075)}
       </Button>
     </div>
+  );
+}
+
+/** How long Allow gets before the row says what to do when the list's switch did nothing. */
+export const ALLOW_ADVICE_MS = 30_000;
+
+type AccessState = "ask" | "stuck" | "restart" | "allowed";
+
+function accessState(a: DictationAccessibilityView, stuck: boolean): AccessState {
+  if (a.granted) return a.tapSilent ? "restart" : "allowed";
+  return stuck ? "stuck" : "ask";
+}
+
+/** Whether the time since the last Allow has run out; it turns true by itself, on screen. */
+function useAllowRanOut(): boolean {
+  const allowedAtMs = useDictationStore((s) => s.allowedAtMs);
+  const [ranOutFor, setRanOutFor] = useState(0);
+  useEffect(() => {
+    if (allowedAtMs === 0) return undefined;
+    const t = setTimeout(
+      () => {
+        setRanOutFor(allowedAtMs);
+      },
+      Math.max(0, allowedAtMs + ALLOW_ADVICE_MS - Date.now()),
+    );
+    return () => {
+      clearTimeout(t);
+    };
+  }, [allowedAtMs]);
+  return allowedAtMs !== 0 && ranOutFor === allowedAtMs;
+}
+
+function accessDescription(state: AccessState, a: DictationAccessibilityView): string {
+  const list = `Privacy & Security › ${a.listName}`;
+  switch (state) {
+    case "ask":
+      return `Lets Code Foundry hear the hold key and paste into other apps. Turn it on in ${list}.`;
+    case "stuck":
+      return `Still off? In ${list}, select Code Foundry and remove it with −, then add it back with + (⇧⌘G, then ${tildify(a.executable)}). The switch alone can leave an older build's entry in place.`;
+    case "restart":
+      return "macOS allows it, but this run of the app hears no keys. A restart picks up the permission.";
+    case "allowed":
+      return `Allowed in ${list}.`;
+  }
+}
+
+/**
+ * The hold key's permission, as one row while dictation is on and the host has said how it
+ * stands (a browser has no host, so no row). The host watches the grant, so the row moves
+ * on by itself.
+ */
+export function DictationAccessRow({ className }: { className?: string | undefined }) {
+  const snap = useSnapshot();
+  const ranOut = useAllowRanOut();
+  const a = snap?.accessibility;
+  if (!snap?.enabled || !a) return null;
+  const state = accessState(a, ranOut);
+  return (
+    <div className={cn("grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 px-4 py-3", className)} data-testid="dictation-access-row" data-state={state}>
+      <div className="min-w-0">
+        <span className="text-label">Hold key permission</span>
+        <p className={cn("mt-0.5 text-caption break-words", state === "stuck" && "text-cf-warning-text")}>{accessDescription(state, a)}</p>
+      </div>
+      {state === "allowed" && (
+        <span className={cn(CHIP, "text-cf-success-text")} data-testid="dictation-access-chip">
+          Allowed
+        </span>
+      )}
+      {(state === "ask" || state === "stuck") && (
+        <Button
+          size="sm"
+          data-testid="dictation-allow"
+          onClick={() => {
+            noteDictationAllow(Date.now());
+            run("dictation.allow");
+          }}
+        >
+          Allow
+        </Button>
+      )}
+      {state === "restart" && (
+        <Button
+          size="sm"
+          data-testid="dictation-access-restart"
+          onClick={() => {
+            run("app.restart");
+          }}
+        >
+          Restart
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** What General › Dictation shows after its fields. */
+export function DictationSectionEnd({ className }: { className?: string | undefined }) {
+  return (
+    <>
+      <DictationAccessRow className={className} />
+      <DictationModelRow className={className} />
+    </>
   );
 }
 

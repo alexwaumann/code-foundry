@@ -6,10 +6,10 @@
  * first when the script has one. Download fills in over about 1.5 s and turns dictation on.
  *
  * Controls (mock/server.ts):
- *   POST /__mock/dictation?state=off|no-model|downloading|download-failed|ready|unloaded|listening|error[&m1=true][&denied=true]
+ *   POST /__mock/dictation?state=off|no-model|downloading|download-failed|ready|unloaded|listening|error[&m1=true][&denied=true][&access=none|missing|granted|silent]
  *        (off: dictation off, no model; downloading: a static 557 MB of 874 MB; download-failed:
  *        off, no model, every source failed; listening: the CLI holds a session; unloaded: Start
- *        loads for loadMs first)
+ *        loads for loadMs first; access: what the host would report about the hold key, none by default)
  *   POST /__mock/dictation/script?phrases=One.|Two.[&gap=1000][&flush=Tail.][&loadMs=800][&silence=1]
  *        (silence=1: the session ends "silence" after its phrases)
  *   POST /__mock/dictation/end?reason=silence|stopped|disabled|error   (the open session ends)
@@ -66,13 +66,15 @@ export class MockDictation {
   private loading = false;
   private error = "";
   private micDenied = false;
+  private access: Pick<NonNullable<SnapshotInit["accessibility"]>, "granted" | "tapSilent"> | null = null;
+  private composerTarget = false;
   private hardware = M4;
   private session: MockSession | null = null;
   private readonly ended = new Map<string, MockSession>();
   private nextId = 1;
   private script = { phrases: DEFAULT_PHRASES, gapMs: 1000, flush: "", loadMs: 800, silence: false };
   private readonly hub = new Hub<SnapshotInit>();
-  /** "start <client>", "stop <session> <flush>", "download", "cancel", "remove", "denied <bool>". */
+  /** "start <client>", "stop <session> <flush>", "download", "cancel", "remove", "denied <bool>", "composer <bool>", "allow". */
   calls: string[] = [];
 
   constructor(
@@ -92,6 +94,8 @@ export class MockDictation {
     this.loading = false;
     this.error = "";
     this.micDenied = false;
+    this.access = null;
+    this.composerTarget = false;
     this.hardware = M4;
     this.script = { phrases: DEFAULT_PHRASES, gapMs: 1000, flush: "", loadMs: 800, silence: false };
     this.calls = [];
@@ -131,6 +135,8 @@ export class MockDictation {
       session: this.session && !this.loading ? { id: this.session.id, clientId: this.session.clientId, startedAt: timestampFromDate(this.session.startedAt) } : undefined,
       error: this.error,
       micDenied: this.micDenied,
+      accessibility: this.access ? { ...this.access, listName: "Device Control and Data Access", executable: "/Users/you/.code-foundry/app/Code Foundry" } : undefined,
+      composerTarget: this.composerTarget,
     };
   }
 
@@ -293,12 +299,20 @@ export class MockDictation {
     this.publish();
   }
 
+  setComposerTarget(available: boolean): void {
+    this.calls.push(`composer ${String(available)}`);
+    this.composerTarget = available;
+    this.publish();
+  }
+
   // ---- controls ----
 
   control(q: URLSearchParams): Record<string, unknown> {
     const state = q.get("state");
     if (q.has("m1")) this.hardware = q.get("m1") === "true" ? M1 : M4;
     if (q.has("denied")) this.micDenied = q.get("denied") === "true";
+    const access = q.get("access");
+    if (access !== null) this.access = access === "none" ? null : { granted: access !== "missing", tapSilent: access === "silent" };
     if (state !== null) {
       this.endSession(DictationEndReason.DISABLED);
       this.stopDownload();
@@ -369,6 +383,21 @@ export class MockDictation {
         },
         when: usable,
         run: () => `delivered=${String(this.deps.emit("dictation.toggle"))}`,
+      },
+      {
+        cmd: {
+          name: "dictation.allow",
+          title: "Allow the Dictation Hold Key",
+          category: "Dictation",
+          description: "Ask macOS to let Code Foundry hear the hold key and paste, and open the list in System Settings where that is turned on.",
+          keybindings: [],
+          args: [],
+        },
+        when: () => this.deps.enabled() && this.access !== null && !this.access.granted,
+        run: () => {
+          this.calls.push("allow");
+          return "";
+        },
       },
       {
         cmd: {

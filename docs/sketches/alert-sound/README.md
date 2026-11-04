@@ -8,6 +8,9 @@ tap a touch higher (520 Hz then 640 Hz, 120 ms apart), struck with a felt mallet
 no click, rounded attack). 48 kHz mono 16-bit, 0.6 s. The shipped copy is
 `gui/build/alert.wav`, embedded in the GUI binary.
 
+**Dictation's start and stop taps** (`taps.py`): one Soft mallet knock each, 640 Hz and
+520 Hz, 0.14 s, shipped as `gui/build/dictate-start.wav` and `dictate-stop.wav`.
+
 ## How it was made
 
 Synthesised with the Python standard library only, no samples:
@@ -26,6 +29,7 @@ Synthesised with the Python standard library only, no samples:
 ```
 python3 -I wood.py <outdir>     # writes every wood variant; soft.wav is the shipped one
 python3 -I gen.py <outdir>      # the first round
+python3 -I taps.py <outdir>     # dictation's start.wav and stop.wav
 ```
 
 The output is deterministic (`random.seed(7)`): `wood.py`'s `soft.wav` is byte-identical

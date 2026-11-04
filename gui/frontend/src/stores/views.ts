@@ -22,7 +22,7 @@ import { presentPromptHistory } from "./historyComposers";
 import { presentFileFinder } from "./fileFinder";
 import { presentSearch } from "./threadSearch";
 import { presentThreadFind } from "./threadFind";
-import { presentDictationToggle } from "./dictation";
+import { presentDictationHold, presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";
 import { openMovePicker } from "./movePicker";
 import { isActingWindow } from "./windowFocus";
@@ -233,6 +233,12 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
     case "dictation.toggle":
       // dictation.toggle from the CLI: the focused composer's dictation, else the content pane's.
       return presentDictationToggle();
+    case "dictation.hold":
+      // The host's hold key, with Code Foundry in front and a composer to take it.
+      return presentDictationHold(params?.phase);
+    case "dictation.allow":
+      // For the host, which follows the intents too: a grant is asked for by the process that needs it.
+      return true;
     default:
       // A plugin surface's show command (stores/pluginPanel.ts): a sheet would cover the panel.
       if (parsePluginView(name)) {

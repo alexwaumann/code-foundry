@@ -5,10 +5,13 @@
  * dictation.toggle's presentation. One composer dictates at a time: starting
  * another stops the first, and a session someone else holds (another window, the CLI) is
  * stopped before this one starts (the daemon refuses a second session).
+ *
+ * The host's hold key (docs/notes/dictate-anywhere.md) drives the same session through
+ * dictation.hold, and reads composer_target to know a composer can take it.
  */
 import { useEffect } from "react";
 import { create } from "zustand";
-import { dictationSession, startDictation, stopDictation, watchDictation, type DictationSessionEventView, type DictationView } from "@/api/dictation";
+import { dictationSession, reportComposerTarget, startDictation, stopDictation, watchDictation, type DictationSessionEventView, type DictationView } from "@/api/dictation";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { errorMessage, runStream } from "@/api/stream";
 import { resettleStreamSlots, type StreamPriority } from "@/api/streamSlots";
@@ -39,9 +42,11 @@ interface DictationSlice {
   lastClientId: string;
   /** Why the last Start in a composer failed, shown under it until its next press. */
   failure: { clientId: string; message: string } | null;
+  /** When Allow was last pressed (the settings row's advice waits on it); 0 before. */
+  allowedAtMs: number;
 }
 
-export const useDictationStore = create<DictationSlice>()(() => ({ snapshot: null, active: null, lastClientId: "", failure: null }));
+export const useDictationStore = create<DictationSlice>()(() => ({ snapshot: null, active: null, lastClientId: "", failure: null, allowedAtMs: 0 }));
 
 // ---------- the Watch stream ----------
 
@@ -87,6 +92,9 @@ export function useHoldDictation(on: boolean, priority: StreamPriority): void {
 
 function applySnapshot(s: DictationView): void {
   useDictationStore.setState({ snapshot: s });
+  // The snapshot is the daemon's word, so a restarted daemon is told again.
+  sentTarget = null;
+  syncComposerTarget();
   // macOS refused the microphone: nothing will be heard, so the session ends here and
   // the composer says why (the denied line).
   const a = useDictationStore.getState().active;
@@ -136,10 +144,60 @@ const targets = new Map<string, DictationTarget>();
 /** A composer registers while mounted; unmounting the dictating one ends its session. Returns the unregister. */
 export function registerDictationTarget(t: DictationTarget): () => void {
   targets.set(t.clientId, t);
+  followFocus();
+  syncComposerTarget();
   return () => {
     if (targets.get(t.clientId) === t) targets.delete(t.clientId);
     if (useDictationStore.getState().active?.clientId === t.clientId) void stopActive(false);
+    syncComposerTarget();
   };
+}
+
+/** The composer dictation goes to: the one with the keyboard; else the one dictating; else the content pane's. */
+function pickTarget(): string | null {
+  const active = document.activeElement;
+  const mounted = [...targets.values()].filter((t) => t.root()?.isConnected);
+  const focused = active ? mounted.find((t) => t.root()?.contains(active)) : undefined;
+  const dictating = useDictationStore.getState().active?.clientId;
+  return focused?.clientId ?? dictating ?? mounted.find((t) => t.primary)?.clientId ?? null;
+}
+
+// ---------- what the host's hold key needs to know ----------
+
+/** How long focus settles before the answer is read: moving between two composers passes through none. */
+const FOCUS_SETTLE_MS = 50;
+
+/** What this window last sent and the daemon has not yet echoed. */
+let sentTarget: boolean | null = null;
+let focusFollowed = false;
+let focusTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Tells the daemon when the answer to "is there a composer to dictate into?" changed. Nothing while dictation is off. */
+function syncComposerTarget(): void {
+  const snap = useDictationStore.getState().snapshot;
+  if (!snap?.enabled) return;
+  const available = pickTarget() !== null;
+  if (available === (sentTarget ?? snap.composerTarget)) return;
+  sentTarget = available;
+  reportComposerTarget(available).catch((err: unknown) => {
+    sentTarget = null;
+    console.warn("dictation composer target", errorMessage(err));
+  });
+}
+
+/** A composer that is not the content pane's only counts while it has the keyboard. */
+function followFocus(): void {
+  if (focusFollowed) return;
+  focusFollowed = true;
+  const settle = () => {
+    if (focusTimer !== null) clearTimeout(focusTimer);
+    focusTimer = setTimeout(() => {
+      focusTimer = null;
+      syncComposerTarget();
+    }, FOCUS_SETTLE_MS);
+  };
+  document.addEventListener("focusin", settle);
+  document.addEventListener("focusout", settle);
 }
 
 // ---------- levels ----------
@@ -341,15 +399,40 @@ export async function flushDictationIn(clientId: string): Promise<void> {
  * dictating (it stops); else the content pane's composer. False when there is none.
  */
 export function presentDictationToggle(): boolean {
-  const active = document.activeElement;
-  const mounted = [...targets.values()].filter((t) => t.root()?.isConnected);
-  const focused = active ? mounted.find((t) => t.root()?.contains(active)) : undefined;
-  const dictating = useDictationStore.getState().active?.clientId;
-  const target = focused?.clientId ?? dictating ?? mounted.find((t) => t.primary)?.clientId;
+  const target = pickTarget();
   if (!target) return false;
   if (micAvailability(useDictationStore.getState().snapshot) === "hidden") return false;
   toggleDictation(target);
   return true;
+}
+
+/** The Start a press of the hold key is waiting on. */
+let holdStart: Promise<void> = Promise.resolve();
+
+/**
+ * dictation.hold in this window: the host's hold key, for the composer dictation.toggle
+ * would pick. A press starts it (a session already open there is kept); a release stops it
+ * with the last phrase, a discard without. A stop while the press is still getting its
+ * session waits for it, as Start may not have gone out yet: nothing else would close the
+ * microphone it opens.
+ */
+export function presentDictationHold(phase: string | undefined): boolean {
+  if (phase === "press") {
+    const target = pickTarget();
+    if (!target || micAvailability(useDictationStore.getState().snapshot) === "hidden") return false;
+    if (useDictationStore.getState().active?.clientId !== target) holdStart = startFor(target);
+    return true;
+  }
+  const flush = phase === "release";
+  void stopActive(flush)
+    .then(() => holdStart)
+    .then(() => stopActive(flush));
+  return true;
+}
+
+/** dictation.allow's row: remembers the press, so the advice can follow if nothing changes. */
+export function noteDictationAllow(atMs: number): void {
+  useDictationStore.setState({ allowedAtMs: atMs });
 }
 
 /** Tests: the module's session state back to idle. */
@@ -360,5 +443,9 @@ export function resetDictationForTests(): void {
   endedWaiters = [];
   targets.clear();
   levelListeners.clear();
-  useDictationStore.setState({ snapshot: null, active: null, lastClientId: "", failure: null });
+  sentTarget = null;
+  holdStart = Promise.resolve();
+  if (focusTimer !== null) clearTimeout(focusTimer);
+  focusTimer = null;
+  useDictationStore.setState({ snapshot: null, active: null, lastClientId: "", failure: null, allowedAtMs: 0 });
 }

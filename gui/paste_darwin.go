@@ -8,9 +8,11 @@ package main
 #include <stdlib.h>
 #include <string.h>
 
-// The paste and what it needs (docs/notes/accessibility-probe.md). Go calls these from
-// one thread, and it must be the main thread with its run loop turning: NSWorkspace only
-// updates frontmostApplication there. Contents never leave these functions.
+// The paste and what it needs (docs/notes/dictate-anywhere.md). Go calls the pasteboard
+// functions from one thread, never the main thread, as reading the pasteboard can wait on
+// its owner rendering promised data. cfFrontmost is the opposite: NSWorkspace only updates
+// frontmostApplication on the main run loop, so it runs there. Contents never leave these
+// functions.
 
 // cfPasteMark: see althold_darwin.go.
 #define CF_PASTE_MARK 0x43465056
@@ -19,12 +21,15 @@ package main
 // NX_DEVICELCMDKEYMASK, alongside the generic flag, as a real left Command sets both.
 #define CF_DEVICE_LEFT_COMMAND 0x8
 
-// cfFrontmost is the pid of the app in front (0 if none), its name in *name (malloc'd).
-static int cfFrontmost(char** name) {
+// cfFrontmost is the pid of the app in front (0 if none), its name and bundle path in
+// *name and *bundle (malloc'd; "" for none).
+static int cfFrontmost(char** name, char** bundle) {
 	@autoreleasepool {
 		NSRunningApplication* app = [[NSWorkspace sharedWorkspace] frontmostApplication];
 		const char* n = app.localizedName != nil ? app.localizedName.UTF8String : "";
+		const char* b = app.bundleURL != nil ? app.bundleURL.path.UTF8String : "";
 		*name = strdup(n != NULL ? n : "");
+		*bundle = strdup(b != NULL ? b : "");
 		return app != nil ? (int)app.processIdentifier : 0;
 	}
 }
@@ -92,6 +97,67 @@ static int cfPastePost(void) {
 	return rc;
 }
 
+// cfPasteCopy leaves text on the general pasteboard as a normal entry: no transient
+// marker, so a clipboard manager keeps it. 1 on success.
+static int cfPasteCopy(const char* text) {
+	@autoreleasepool {
+		NSPasteboard* pb = [NSPasteboard generalPasteboard];
+		[pb clearContents];
+		return [pb setString:[NSString stringWithUTF8String:text] forType:NSPasteboardTypeString] ? 1 : 0;
+	}
+}
+
+// CF_TYPE_UNITS: the most UTF-16 units one key event carries.
+#define CF_TYPE_UNITS 20
+
+// cfTypeUnits posts one key event pair carrying n UTF-16 units. They replace whatever the
+// key would have typed, so the key code does not matter. Line breaks go as characters,
+// which is what a web page's field takes.
+static int cfTypeUnits(CGEventSourceRef source, const UniChar* units, int n) {
+	int rc = -1;
+	CGEventRef down = CGEventCreateKeyboardEvent(source, 0, true);
+	CGEventRef up = CGEventCreateKeyboardEvent(source, 0, false);
+	if (down != NULL && up != NULL) {
+		CGEventKeyboardSetUnicodeString(down, n, units);
+		CGEventKeyboardSetUnicodeString(up, n, units);
+		CGEventSetFlags(down, 0);
+		CGEventSetFlags(up, 0);
+		CGEventSetIntegerValueField(down, kCGEventSourceUserData, CF_PASTE_MARK);
+		CGEventSetIntegerValueField(up, kCGEventSourceUserData, CF_PASTE_MARK);
+		CGEventPost(kCGSessionEventTap, down);
+		CGEventPost(kCGSessionEventTap, up);
+		rc = 0;
+	}
+	if (down != NULL) CFRelease(down);
+	if (up != NULL) CFRelease(up);
+	return rc;
+}
+
+// cfPasteType types text with key events, CF_TYPE_UNITS at a time and never splitting a
+// surrogate pair. 0 on success.
+static int cfPasteType(const char* text) {
+	@autoreleasepool {
+		NSString* s = [NSString stringWithUTF8String:text];
+		CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStatePrivate);
+		if (s == nil || source == NULL) {
+			if (source != NULL) CFRelease(source);
+			return -1;
+		}
+		NSUInteger length = s.length;
+		int rc = 0;
+		for (NSUInteger at = 0; rc == 0 && at < length;) {
+			NSUInteger n = MIN((NSUInteger)CF_TYPE_UNITS, length - at);
+			if (at + n < length && CFStringIsSurrogateHighCharacter([s characterAtIndex:at + n - 1])) n--;
+			UniChar units[CF_TYPE_UNITS];
+			[s getCharacters:units range:NSMakeRange(at, n)];
+			rc = cfTypeUnits(source, units, (int)n);
+			at += n;
+		}
+		CFRelease(source);
+		return rc;
+	}
+}
+
 // cfPasteRestore puts saved back if the changeCount is still ours, and releases it.
 // 1 restored, 0 left alone, -1 failed.
 static int cfPasteRestore(void* saved, long ours) {
@@ -112,18 +178,33 @@ import (
 	"unsafe"
 )
 
-// frontApp is the app in front.
-type frontApp struct {
-	PID  int
-	Name string
-}
-
 // frontmostApp reads the app in front. Main thread only (see the C comment).
 func frontmostApp() frontApp {
-	var name *C.char
-	pid := C.cfFrontmost(&name)
+	var name, bundle *C.char
+	pid := C.cfFrontmost(&name, &bundle)
 	defer C.free(unsafe.Pointer(name))
-	return frontApp{PID: int(pid), Name: C.GoString(name)}
+	defer C.free(unsafe.Pointer(bundle))
+	return frontApp{PID: int(pid), Name: C.GoString(name), Bundle: C.GoString(bundle)}
+}
+
+// copyToClipboard leaves text on the clipboard as a normal entry.
+func copyToClipboard(text string) error {
+	ctext := C.CString(text)
+	defer C.free(unsafe.Pointer(ctext))
+	if C.cfPasteCopy(ctext) == 0 {
+		return errors.New("the pasteboard refused the text")
+	}
+	return nil
+}
+
+// typeText types text into the app in front.
+func typeText(text string) error {
+	ctext := C.CString(text)
+	defer C.free(unsafe.Pointer(ctext))
+	if C.cfPasteType(ctext) != 0 {
+		return errors.New("could not create the key events")
+	}
+	return nil
 }
 
 // generalPasteboard is pasteHost for the real thing.

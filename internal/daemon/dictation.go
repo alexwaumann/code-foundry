@@ -43,8 +43,9 @@ func openDictation(log *slog.Logger, p paths.Paths, b *bus.Bus, st *settings.Sto
 		Dir: p.DictationModels(), Bus: b, Log: log,
 		Enabled: func() bool { return st.Settings().Dictation.Enabled },
 		Prefs: func() dictation.Prefs {
-			s := st.Settings().Dictation
-			return dictation.Prefs{Anywhere: s.Anywhere, HoldKey: s.HoldKey, Sounds: s.Sounds}
+			all := st.Settings()
+			s := all.Dictation
+			return dictation.Prefs{Anywhere: s.Anywhere, HoldKey: s.HoldKey, Sounds: s.Sounds, SoundVolume: all.Notifications.SoundVolume}
 		},
 		Enable: func() error {
 			_, err := st.Update(context.Background(), map[string]string{settings.KeyDictationEnabled: "true"})

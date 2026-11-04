@@ -26,6 +26,8 @@ type DictationStore interface {
 	Audio(sessionID string, pcm []byte, rms float32) bool
 	SessionEnded(sessionID string) (reason dictation.EndReason, ended, ok bool)
 	MicDenied(denied bool)
+	ReportAccessibility(a dictation.Accessibility)
+	ComposerTarget(available bool)
 }
 
 var _ DictationStore = (*dictation.Store)(nil)
@@ -205,6 +207,21 @@ func (h *Dictation) MicDenied(_ context.Context, req *connect.Request[v1.Dictati
 	return connect.NewResponse(&v1.DictationMicDeniedResponse{}), nil
 }
 
+// Accessibility records what the host says macOS allows the hold key.
+func (h *Dictation) Accessibility(_ context.Context, req *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error) {
+	a := req.Msg.GetAccessibility()
+	h.store.ReportAccessibility(dictation.Accessibility{
+		Granted: a.GetGranted(), TapSilent: a.GetTapSilent(), ListName: a.GetListName(), Executable: a.GetExecutable(),
+	})
+	return connect.NewResponse(&v1.DictationAccessibilityResponse{}), nil
+}
+
+// ComposerTarget records whether the window has a composer dictation can target.
+func (h *Dictation) ComposerTarget(_ context.Context, req *connect.Request[v1.DictationComposerTargetRequest]) (*connect.Response[v1.DictationComposerTargetResponse], error) {
+	h.store.ComposerTarget(req.Msg.GetAvailable())
+	return connect.NewResponse(&v1.DictationComposerTargetResponse{}), nil
+}
+
 func dictationError(err error) error {
 	switch {
 	case errors.Is(err, dictation.ErrBusy):
@@ -245,14 +262,18 @@ var dictationEndReasons = map[dictation.EndReason]v1.DictationEndReason{
 func DictationSnapshotToProto(s dictation.Snapshot) *v1.DictationSnapshot {
 	out := &v1.DictationSnapshot{
 		Enabled: s.Enabled, State: dictationStates[s.State], Error: s.Error, MicDenied: s.MicDenied,
-		Anywhere: s.Prefs.Anywhere, HoldKey: s.Prefs.HoldKey, Sounds: s.Prefs.Sounds,
-		Model: &v1.DictationModel{Name: s.Model.Name, SizeBytes: s.Model.Size, Downloaded: s.Model.Downloaded},
+		Anywhere: s.Prefs.Anywhere, HoldKey: s.Prefs.HoldKey, Sounds: s.Prefs.Sounds, SoundVolume: int32(s.Prefs.SoundVolume),
+		ComposerTarget: s.ComposerTarget,
+		Model:          &v1.DictationModel{Name: s.Model.Name, SizeBytes: s.Model.Size, Downloaded: s.Model.Downloaded},
 		Hardware: &v1.DictationHardware{
 			Chip: s.Hardware.Chip, MemoryBytes: s.Hardware.MemoryBytes, M1Family: s.Hardware.M1Family,
 		},
 	}
 	if d := s.Model.Download; d != nil {
 		out.Model.Download = &v1.DictationDownload{ReceivedBytes: d.Received, TotalBytes: d.Total, BytesPerSecond: d.BytesPerSecond}
+	}
+	if a := s.Accessibility; a != nil {
+		out.Accessibility = &v1.DictationAccessibility{Granted: a.Granted, TapSilent: a.TapSilent, ListName: a.ListName, Executable: a.Executable}
 	}
 	if x := s.Session; x != nil {
 		out.Session = &v1.DictationSession{Id: x.ID, ClientId: x.ClientID, StartedAt: timestamppb.New(x.StartedAt), Stopping: x.Stopping}

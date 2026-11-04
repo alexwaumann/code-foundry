@@ -160,6 +160,21 @@ func (d *fakeDaemon) Stop(_ context.Context, id string) error {
 	return nil
 }
 
+func (d *fakeDaemon) Finish(_ context.Context, id string) error {
+	d.log.add("finish:" + id)
+	return nil
+}
+
+// The hold key's calls: its own tests use fakeHoldConn.
+func (d *fakeDaemon) Start(context.Context, string) (string, error) { return "", nil }
+func (d *fakeDaemon) Session(context.Context, string) (sessionStream, error) {
+	return nil, errors.New("no sessions here")
+}
+func (d *fakeDaemon) Hold(context.Context, string) error { return nil }
+func (d *fakeDaemon) Accessibility(context.Context, *v1.DictationAccessibility) error {
+	return nil
+}
+
 type fakeWatch struct {
 	ctx context.Context
 	c   chan *v1.DictationSnapshot
@@ -434,17 +449,21 @@ func TestDictationWatcherAnywhere(t *testing.T) {
 		<-done
 	}()
 	on := snapState(v1.DictationState_DICTATION_STATE_READY, false)
-	on.Anywhere = true
+	on.Enabled, on.Anywhere = true, true
+	// The setting means nothing with dictation off.
+	off := snapState(v1.DictationState_DICTATION_STATE_DISABLED, false)
+	off.Enabled, off.Anywhere = false, true
 	daemon.stream(0) <- on
 	daemon.stream(0) <- snapHeartbeat
 	close(daemon.stream(0))
 	daemon.stream(1) <- snapHeartbeat
 	daemon.stream(1) <- snapReady
+	daemon.stream(1) <- off
 	// One more through the channel: the step before it has been handled.
 	daemon.stream(1) <- snapHeartbeat
 	mu.Lock()
 	defer mu.Unlock()
-	if want := []bool{true, false}; !slices.Equal(got, want) {
+	if want := []bool{true, false, false}; !slices.Equal(got, want) {
 		t.Errorf("anywhere calls %v, want %v", got, want)
 	}
 }

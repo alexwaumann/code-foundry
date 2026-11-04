@@ -14,6 +14,15 @@ import (
 //go:embed build/alert.wav
 var alertWAV []byte
 
+// holdToneStartWAV and holdToneStopWAV are the hold key's sounds: one Soft mallet knock
+// each, 640 Hz and 520 Hz, 48 kHz mono 16-bit, 0.14 s (docs/sketches/alert-sound/taps.py).
+//
+//go:embed build/dictate-start.wav
+var holdToneStartWAV []byte
+
+//go:embed build/dictate-stop.wav
+var holdToneStopWAV []byte
+
 // clampVolume clamps an alert volume in percent to 0–100 (0 is silent).
 func clampVolume(percent int) int {
 	return min(max(percent, 0), 100)

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -18,138 +19,209 @@ func keyAt(at int, code uint32) altEvent {
 	return altEvent{Kind: altEventKeyDown, At: ms(at), KeyCode: code}
 }
 
+func TestParseHoldKey(t *testing.T) {
+	for in, want := range map[string]holdKeyMode{"left": holdLeft, "right": holdRight, "both": holdBoth, "either": holdEither, "": holdEither, "alt": holdEither} {
+		if got := parseHoldKey(in); got != want {
+			t.Errorf("parseHoldKey(%q) = %d, want %d", in, got, want)
+		}
+	}
+}
+
 func TestAltHold(t *testing.T) {
-	down := func(s altSide) altReport { return altReport{Kind: altReportDown, Side: s} }
-	up := func(s altSide) altReport { return altReport{Kind: altReportUp, Side: s} }
-	started := func(s altSide) altReport { return altReport{Kind: altReportStarted, Side: s} }
-	counted := func(s altSide, held int) altReport {
-		return altReport{Kind: altReportCounted, Side: s, Held: ms(held)}
-	}
+	started := altReport{Kind: altReportStarted}
+	counted := func(held int) altReport { return altReport{Kind: altReportCounted, Held: ms(held)} }
 	discarded := func(why string) altReport { return altReport{Kind: altReportDiscarded, Why: why} }
-	short := func(held int, why string) altReport {
-		return altReport{Kind: altReportDiscarded, Held: ms(held), Why: why}
+	short := func(held int) altReport {
+		return altReport{Kind: altReportDiscarded, Held: ms(held), Why: fmt.Sprintf("held %d ms, under 300 ms", held)}
 	}
-	both := altReport{Kind: altReportBoth, Side: altBothSides}
 	const l, r = flagLeftAlt, flagRightAlt
+	const keyWhy = "a key was pressed during the hold"
 
 	tests := []struct {
 		name   string
+		mode   holdKeyMode
 		events []altEvent
 		want   []altReport
 	}{
+		// A plain hold, for each mode.
+		{name: "either: left held counts", events: []altEvent{flagsAt(0, l), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
+		{name: "either: right held counts", events: []altEvent{flagsAt(0, r), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
+		{name: "left: left held counts", mode: holdLeft, events: []altEvent{flagsAt(0, l), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
+		{name: "left: right does nothing", mode: holdLeft, events: []altEvent{flagsAt(0, r), flagsAt(500, 0)}},
+		{name: "right: right held counts", mode: holdRight, events: []altEvent{flagsAt(0, r), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
+		{name: "right: left does nothing", mode: holdRight, events: []altEvent{flagsAt(0, l), flagsAt(500, 0)}},
+
+		// The 300 ms line.
+		{name: "exactly the minimum counts", events: []altEvent{flagsAt(0, l), flagsAt(300, 0)}, want: []altReport{started, counted(300)}},
+		{name: "just under the minimum is discarded", events: []altEvent{flagsAt(0, l), flagsAt(299, 0)}, want: []altReport{started, short(299)}},
+
+		// Both keys.
 		{
-			name:   "left held counts",
-			events: []altEvent{flagsAt(0, l), flagsAt(500, 0)},
-			want:   []altReport{down(altLeft), started(altLeft), up(altLeft), counted(altLeft, 500)},
+			name: "both: starts on the second key, counted from it", mode: holdBoth,
+			events: []altEvent{flagsAt(0, l), flagsAt(83, l|r), flagsAt(583, r), flagsAt(600, 0)},
+			want:   []altReport{started, counted(500)},
+		},
+		{name: "both: right first", mode: holdBoth, events: []altEvent{flagsAt(0, r), flagsAt(100, l|r), flagsAt(600, l), flagsAt(610, 0)}, want: []altReport{started, counted(500)}},
+		{name: "both: exactly the window", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(150, l|r), flagsAt(650, 0)}, want: []altReport{started, counted(500)}},
+		{name: "both: one ms past the window starts nothing", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(151, l|r), flagsAt(650, r), flagsAt(660, 0)}},
+		{name: "both: one key alone starts nothing", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(900, 0)}},
+		{name: "both: the first key up in time starts nothing", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(50, 0), flagsAt(100, r), flagsAt(900, 0)}},
+		{
+			name: "both: ends at the first key up, and the other cannot start one", mode: holdBoth,
+			events: []altEvent{flagsAt(0, l), flagsAt(10, l|r), flagsAt(500, l), flagsAt(520, l|r), flagsAt(900, l), flagsAt(910, 0)},
+			want:   []altReport{started, counted(490)},
+		},
+		{name: "both: a short press is discarded", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(10, l|r), flagsAt(200, r), flagsAt(210, 0)}, want: []altReport{started, short(190)}},
+		{name: "both: a modifier while arming ends it", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(50, l|flagShift), flagsAt(60, l|r|flagShift), flagsAt(500, 0)}},
+		{name: "both: a key while arming ends it", mode: holdBoth, events: []altEvent{flagsAt(0, l), keyAt(50, 40), flagsAt(60, l|r), flagsAt(500, 0)}},
+		{name: "both: a modifier cancels early", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(50, l|r), flagsAt(100, l|r|flagCommand)}, want: []altReport{started, discarded("Command pressed early in the hold")}},
+
+		// A modifier: only the first 300 ms.
+		{
+			name:   "a modifier in the first 300 ms cancels",
+			events: []altEvent{flagsAt(0, l), flagsAt(299, l|flagShift), flagsAt(500, flagShift), flagsAt(600, 0)},
+			want:   []altReport{started, discarded("Shift pressed early in the hold")},
 		},
 		{
-			name:   "right held counts",
-			events: []altEvent{flagsAt(0, r), flagsAt(500, 0)},
-			want:   []altReport{down(altRight), started(altRight), up(altRight), counted(altRight, 500)},
+			name:   "a modifier at 300 ms does not",
+			events: []altEvent{flagsAt(0, l), flagsAt(300, l|flagShift), flagsAt(900, flagShift), flagsAt(950, 0)},
+			want:   []altReport{started, counted(900)},
 		},
 		{
-			name:   "exactly the minimum counts",
-			events: []altEvent{flagsAt(0, l), flagsAt(300, 0)},
-			want:   []altReport{down(altLeft), started(altLeft), up(altLeft), counted(altLeft, 300)},
+			name:   "a modifier long after does not",
+			events: []altEvent{flagsAt(0, l), flagsAt(15700, l|flagCommand), flagsAt(15800, l), flagsAt(16000, 0)},
+			want:   []altReport{started, counted(16000)},
 		},
 		{
-			name:   "just under the minimum is discarded",
-			events: []altEvent{flagsAt(0, l), flagsAt(299, 0)},
-			want:   []altReport{down(altLeft), started(altLeft), up(altLeft), short(299, "held 299 ms, under 300 ms")},
+			name:   "Caps Lock turned off early",
+			events: []altEvent{flagsAt(0, flagCapsLock), flagsAt(10, flagCapsLock|l), flagsAt(100, l), flagsAt(500, 0)},
+			want:   []altReport{started, discarded("Caps Lock pressed early in the hold")},
 		},
 		{
-			name:   "both within the window count as both, until the last is up",
-			events: []altEvent{flagsAt(0, l), flagsAt(80, l|r), flagsAt(400, r), flagsAt(600, 0)},
-			want:   []altReport{down(altLeft), started(altLeft), down(altRight), both, up(altLeft), up(altRight), counted(altBothSides, 600)},
-		},
-		{
-			name:   "the other Alt after the window is another key",
-			events: []altEvent{flagsAt(0, l), flagsAt(81, l|r), flagsAt(400, r), flagsAt(600, 0)},
-			want: []altReport{
-				down(altLeft), started(altLeft), down(altRight),
-				discarded("right Alt went down 81 ms into the hold"),
-				up(altLeft), up(altRight),
-			},
-		},
-		{
-			name:   "a side pressed again during both is another key",
-			events: []altEvent{flagsAt(0, l), flagsAt(50, l|r), flagsAt(100, r), flagsAt(120, l|r), flagsAt(500, 0)},
-			want: []altReport{
-				down(altLeft), started(altLeft), down(altRight), both, up(altLeft), down(altLeft),
-				discarded("left Alt went down 120 ms into the hold"),
-				up(altLeft), up(altRight),
-			},
-		},
-		{
-			name:   "a key during the hold discards it once, however long it goes on",
-			events: []altEvent{flagsAt(0, l), keyAt(100, 123), keyAt(200, 123), flagsAt(900, 0)},
-			want:   []altReport{down(altLeft), started(altLeft), discarded("key 123 pressed during the hold"), up(altLeft)},
-		},
-		{
-			name:   "a modifier during the hold discards it",
-			events: []altEvent{flagsAt(0, l), flagsAt(100, l|flagCommand), flagsAt(200, l), flagsAt(900, 0)},
-			want:   []altReport{down(altLeft), started(altLeft), discarded("Command pressed during the hold"), up(altLeft)},
-		},
-		{
-			name:   "Caps Lock turned off during the hold discards it",
-			events: []altEvent{flagsAt(0, flagCapsLock), flagsAt(10, flagCapsLock|l), flagsAt(100, l), flagsAt(900, 0)},
-			want:   []altReport{down(altLeft), started(altLeft), discarded("Caps Lock pressed during the hold"), up(altLeft)},
-		},
-		{
-			name:   "Caps Lock left on does not matter",
+			name:   "Caps Lock left on is no modifier",
 			events: []altEvent{flagsAt(0, flagCapsLock), flagsAt(10, flagCapsLock|l), flagsAt(510, flagCapsLock)},
-			want:   []altReport{down(altLeft), started(altLeft), up(altLeft), counted(altLeft, 500)},
+			want:   []altReport{started, counted(500)},
+		},
+
+		// The other Option key.
+		{
+			name:   "either: the other side early is no cancel, and the hold lasts to the last key up",
+			events: []altEvent{flagsAt(0, l), flagsAt(100, l|r), flagsAt(400, r), flagsAt(700, 0)},
+			want:   []altReport{started, counted(700)},
 		},
 		{
-			name:   "Alt pressed on top of another modifier is not alone",
-			events: []altEvent{flagsAt(0, flagShift), flagsAt(10, flagShift|l), flagsAt(20, l), flagsAt(900, 0)},
-			want:   []altReport{down(altLeft), discarded("pressed with Shift"), up(altLeft)},
+			name:   "either: the other side 15.7 s in is no cancel",
+			events: []altEvent{flagsAt(0, l), flagsAt(15700, l|r), flagsAt(15900, l), flagsAt(16000, 0)},
+			want:   []altReport{started, counted(16000)},
 		},
 		{
-			name:   "keys and modifiers outside a hold say nothing",
-			events: []altEvent{keyAt(0, 0), flagsAt(10, flagCommand), keyAt(20, 9), flagsAt(30, 0)},
+			name: "left: the other side early cancels", mode: holdLeft,
+			events: []altEvent{flagsAt(0, l), flagsAt(100, l|r), flagsAt(500, r), flagsAt(600, 0)},
+			want:   []altReport{started, discarded("the other Option pressed early in the hold")},
 		},
 		{
-			name:   "a spoiled hold does not spoil the next",
-			events: []altEvent{flagsAt(0, l), keyAt(10, 1), flagsAt(20, 0), flagsAt(100, r), flagsAt(500, 0)},
-			want: []altReport{
-				down(altLeft), started(altLeft), discarded("key 1 pressed during the hold"), up(altLeft),
-				down(altRight), started(altRight), up(altRight), counted(altRight, 400),
-			},
+			name: "left: the other side 15.7 s in does not, and only left ends it", mode: holdLeft,
+			events: []altEvent{flagsAt(0, l), flagsAt(15700, l|r), flagsAt(15800, r), flagsAt(15900, 0)},
+			want:   []altReport{started, counted(15800)},
 		},
 		{
-			name: "a tap disabled during a hold ends it, and a late release says only that",
-			events: []altEvent{
-				flagsAt(0, l),
-				{Kind: altEventDisabledByTimeout, At: ms(100)},
-				flagsAt(900, 0),
-			},
-			want: []altReport{down(altLeft), started(altLeft), discarded("macOS disabled the tap (timeout)")},
+			name: "right: the other side early cancels", mode: holdRight,
+			events: []altEvent{flagsAt(0, r), flagsAt(100, l|r), flagsAt(500, l), flagsAt(600, 0)},
+			want:   []altReport{started, discarded("the other Option pressed early in the hold")},
 		},
 		{
-			name:   "a tap disabled with no hold says nothing",
-			events: []altEvent{{Kind: altEventDisabledByUserInput, At: ms(100)}},
+			name: "left: pressed with right already down is a chord", mode: holdLeft,
+			events: []altEvent{flagsAt(0, r), flagsAt(100, l|r), flagsAt(900, r), flagsAt(950, 0)},
+		},
+
+		// A key that is not a modifier: any time.
+		{name: "a key early cancels", events: []altEvent{flagsAt(0, l), keyAt(100, 123), flagsAt(500, 0)}, want: []altReport{started, discarded(keyWhy)}},
+		{name: "a key late cancels", events: []altEvent{flagsAt(0, l), keyAt(9000, 14), flagsAt(9500, 0)}, want: []altReport{started, discarded(keyWhy)}},
+		{name: "a key before the press is nothing", events: []altEvent{keyAt(0, 14), flagsAt(10, l), flagsAt(510, 0)}, want: []altReport{started, counted(500)}},
+		{name: "a key after the release is nothing", events: []altEvent{flagsAt(0, l), flagsAt(500, 0), keyAt(510, 14)}, want: []altReport{started, counted(500)}},
+		{name: "two keys cancel once", events: []altEvent{flagsAt(0, l), keyAt(100, 14), keyAt(200, 15), flagsAt(500, 0)}, want: []altReport{started, discarded(keyWhy)}},
+
+		// Chords, and what a cancelled press leaves behind.
+		{name: "pressed with a modifier already held starts nothing", events: []altEvent{flagsAt(0, flagControl), flagsAt(100, flagControl|l), flagsAt(600, flagControl), flagsAt(700, 0)}},
+		{
+			name:   "Option still down after the modifier comes up starts nothing",
+			events: []altEvent{flagsAt(0, flagControl), flagsAt(100, flagControl|l), flagsAt(150, l), flagsAt(900, 0)},
 		},
 		{
-			name:   "a lost release is corrected by the next flags",
-			events: []altEvent{flagsAt(0, l), flagsAt(600, r), flagsAt(1200, 0)},
-			want: []altReport{
-				down(altLeft), started(altLeft), up(altLeft), counted(altLeft, 600),
-				down(altRight), started(altRight), up(altRight), counted(altRight, 600),
-			},
+			name:   "either: the other side going down in a cancelled press starts nothing",
+			events: []altEvent{flagsAt(0, l), keyAt(50, 14), flagsAt(100, l|r), flagsAt(600, r), flagsAt(900, 0)},
+			want:   []altReport{started, discarded(keyWhy)},
+		},
+		{
+			name:   "the next press after a cancel is a new hold",
+			events: []altEvent{flagsAt(0, l), keyAt(50, 14), flagsAt(100, 0), flagsAt(1000, r), flagsAt(1400, 0)},
+			want:   []altReport{started, discarded(keyWhy), started, counted(400)},
+		},
+		{
+			name:   "two holds in a row",
+			events: []altEvent{flagsAt(0, l), flagsAt(400, 0), flagsAt(1000, r), flagsAt(1100, 0)},
+			want:   []altReport{started, counted(400), started, short(100)},
+		},
+
+		// A tap off for a while.
+		{
+			name:   "disabled by timeout discards the hold",
+			events: []altEvent{flagsAt(0, l), {Kind: altEventDisabledByTimeout, At: ms(100)}, flagsAt(900, 0)},
+			want:   []altReport{started, discarded("macOS disabled the tap (timeout)")},
+		},
+		{
+			name:   "disabled by user input discards the hold",
+			events: []altEvent{flagsAt(0, l), {Kind: altEventDisabledByUserInput, At: ms(100)}},
+			want:   []altReport{started, discarded("macOS disabled the tap (user input)")},
+		},
+		{name: "disabled while idle says nothing", events: []altEvent{{Kind: altEventDisabledByTimeout}}},
+		{
+			name:   "a key still down after a disabled tap cannot start a hold",
+			events: []altEvent{flagsAt(0, l), {Kind: altEventDisabledByTimeout, At: ms(100)}, flagsAt(200, l|r), flagsAt(800, r), flagsAt(900, 0), flagsAt(1000, l), flagsAt(1500, 0)},
+			want:   []altReport{started, discarded("macOS disabled the tap (timeout)"), started, counted(500)},
+		},
+		{
+			// A lost release is corrected by the next event's flags.
+			name:   "a lost release: the next event ends the hold",
+			events: []altEvent{flagsAt(0, l), flagsAt(800, flagShift)},
+			want:   []altReport{started, counted(800)},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var h altHold
+			h := altHold{mode: tt.mode}
 			var got []altReport
 			for _, ev := range tt.events {
 				got = append(got, h.Step(ev)...)
 			}
+			if len(got) == 0 && len(tt.want) == 0 {
+				return
+			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("reports\n got %+v\nwant %+v", got, tt.want)
+				t.Errorf("got  %+v\nwant %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestAltHoldSetMode(t *testing.T) {
+	var h altHold
+	h.Step(flagsAt(0, flagLeftAlt))
+	if got := h.SetMode(holdEither); got != nil {
+		t.Errorf("same mode: %+v", got)
+	}
+	got := h.SetMode(holdRight)
+	if len(got) != 1 || got[0].Kind != altReportDiscarded {
+		t.Fatalf("a hold in progress: %+v", got)
+	}
+	// Left is no key of the new mode, so right can start at once.
+	if r := h.Step(flagsAt(100, flagLeftAlt|flagRightAlt)); len(r) != 0 {
+		t.Errorf("with the old key still down it is a chord: %+v", r)
+	}
+	h.Step(flagsAt(200, flagLeftAlt))
+	h.Step(flagsAt(300, 0))
+	if r := h.Step(flagsAt(400, flagRightAlt)); len(r) != 1 || r[0].Kind != altReportStarted {
+		t.Errorf("the new key: %+v", r)
 	}
 }
 

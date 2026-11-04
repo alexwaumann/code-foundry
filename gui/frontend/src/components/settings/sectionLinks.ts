@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { DictationModelRow } from "./DictationSettings";
+import { DictationSectionEnd } from "./DictationSettings";
 import { BrowseThemesRow } from "./LinkRow";
 
 /**
@@ -8,7 +8,7 @@ import { BrowseThemesRow } from "./LinkRow";
  */
 export const sectionLinks: Readonly<Partial<Record<string, ComponentType<{ className?: string | undefined }>>>> = {
   "appearance/theme": BrowseThemesRow,
-  "general/dictation": DictationModelRow,
+  "general/dictation": DictationSectionEnd,
 };
 
 /**
@@ -17,7 +17,7 @@ export const sectionLinks: Readonly<Partial<Record<string, ComponentType<{ class
  */
 export const sectionRowSearch: Readonly<Partial<Record<string, { description: string; keywords: readonly string[] }>>> = {
   "general/dictation": {
-    description: "Model: Whisper Large v3 Turbo, English, transcribed on this Mac. Download or remove it.",
-    keywords: ["voice", "speech", "microphone", "whisper", "model", "transcribe", "download"],
+    description: "Model: Whisper Large v3 Turbo, English, transcribed on this Mac. Download or remove it. Hold key permission.",
+    keywords: ["voice", "speech", "microphone", "whisper", "model", "transcribe", "download", "accessibility", "permission"],
   },
 };
