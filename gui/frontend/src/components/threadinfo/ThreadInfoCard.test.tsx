@@ -346,12 +346,12 @@ describe("ThreadInfoCard: other scenarios", () => {
     const [web, docs] = servers() as [HTMLElement, HTMLElement];
     expect(web.dataset.port).toBe("5173");
     expect(web.textContent).toContain("localhost:5173");
-    expect(parts(within(web).getByTestId("ti-server-line"))).toMatch(/^pnpm --dir web dev · node · 1m 1\ds$/);
+    expect(parts(within(web).getByTestId("ti-server-line"))).toMatch(/^pnpm --dir web dev · 1m 1\ds$/);
     // Several ports: the first on the row, the rest in the hover card.
     expect(within(web).getByTestId("ti-server-meta").textContent).toBe("+1");
     expect(tooltipText(web)).toContain("localhost:5173localhost:24678");
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(within(docs).getByTestId("ti-server-line").textContent).toContain("· python");
+    expect(within(docs).getByTestId("ti-server-line").textContent).toContain("python3 -m http.server");
     expect(within(docs).queryByTestId("ti-server-meta")).toBeNull();
     // The shells that listen on nothing stay folded below.
     expect(screen.getByTestId("ti-shells").textContent).toContain("2 more shells");

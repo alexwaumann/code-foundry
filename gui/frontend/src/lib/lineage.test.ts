@@ -6,6 +6,8 @@ import {
   lineageStatus,
   noteCreator,
   parseCreatedByNote,
+  subtreeIds,
+  MAX_LINEAGE_DEPTH,
   type LineageData,
 } from "./lineage";
 
@@ -133,5 +135,38 @@ describe("noteCreator", () => {
     ["a removed creator without a recorded name: its id", "gone", "", { id: "gone", name: "gone", exists: false }],
   ])("%s", (_n, createdBy, recorded, want) => {
     expect(noteCreator(N, createdBy, recorded)).toEqual(want);
+  });
+});
+
+describe("subtreeIds", () => {
+  const list = (...threads: ThreadView[]): LineageData => ({ byId: Object.fromEntries(threads.map((x) => [x.id, x])), order: threads.map((x) => x.id) });
+
+  it("depth first: each thread before its children, siblings in spawn order", () => {
+    const data = list(t("root"), t("a", { createdBy: "root" }), t("b", { createdBy: "root" }), t("a1", { createdBy: "a" }), t("b1", { createdBy: "b" }), t("other"));
+    expect(subtreeIds(data, "root")).toEqual(["root", "a", "a1", "b", "b1"]);
+    expect(subtreeIds(data, "a")).toEqual(["a", "a1"]);
+    expect(subtreeIds(data, "other")).toEqual(["other"]);
+    expect(subtreeIds(data, "")).toEqual([]);
+  });
+
+  it("a fork is no descendant: it has a parent, not a creator", () => {
+    const data = list(t("root"), t("fork", { parentId: "root" }), t("kid", { createdBy: "root" }));
+    expect(subtreeIds(data, "root")).toEqual(["root", "kid"]);
+  });
+
+  it("a creator cycle is cut where it closes, each thread once", () => {
+    const data = list(t("a", { createdBy: "c" }), t("b", { createdBy: "a" }), t("c", { createdBy: "b" }), t("self", { createdBy: "self" }));
+    expect(subtreeIds(data, "a")).toEqual(["a", "b", "c"]);
+    expect(subtreeIds(data, "self")).toEqual(["self"]);
+  });
+
+  it("a removed thread ends the line under it", () => {
+    const data = list(t("root"), t("lost", { createdBy: "gone" }));
+    expect(subtreeIds(data, "root")).toEqual(["root"]);
+  });
+
+  it("stops MAX_LINEAGE_DEPTH levels down, as the daemon does", () => {
+    const chain = Array.from({ length: MAX_LINEAGE_DEPTH + 3 }, (_, i) => t(`t${String(i)}`, i === 0 ? {} : { createdBy: `t${String(i - 1)}` }));
+    expect(subtreeIds(list(...chain), "t0")).toHaveLength(MAX_LINEAGE_DEPTH + 1);
   });
 });

@@ -18,6 +18,7 @@ import {
   bottomVisible,
   bottomTabTitleOf,
   getBottomActiveId,
+  isRolledUpTab,
   requestBottomFocus,
   threadOfKey,
   toggleBottom,
@@ -64,7 +65,8 @@ function useIsAction(id: string | null): boolean {
  * One terminal's tab: icon, title (bottomTabTitleOf: duplicates numbered), × (on hover, keyboard focus, or when
  * active). Middle click closes. The tab's tooltip is the full cwd, which the title hides.
  * An action run's tab: the action's icon and name, then its status mark (running, exit 0,
- * failed); it stays after the command exits until it is closed.
+ * failed); it stays after the command exits until it is closed. A rolled-up tab's × hides it
+ * (stores/bottomActions.ts closeBottomTerminal): the run goes on.
  * `focusable` is the roving tabindex: only the active tab (and its ×) is in the Tab order.
  */
 function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id: string; active: boolean; focusable: boolean }) {
@@ -73,6 +75,7 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
   const cwd = useTerminalsStore((s) => s.byId[id]?.cwd ?? "");
   const action = useIsAction(id);
   const exited = useTerminalsStore((s) => s.byId[id]?.state === "exited") && !action;
+  const rolledUp = useTerminalsStore((s) => isRolledUpTab(s, panelKey, id));
   return (
     <div
       role="presentation"
@@ -87,7 +90,7 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
         if (e.button === 1) e.preventDefault(); // middle click closes, below
       }}
       onAuxClick={(e) => {
-        if (e.button === 1) void closeBottomTerminal(id);
+        if (e.button === 1) void closeBottomTerminal(id, panelKey);
       }}
     >
       {/* The tab's tooltip is the shell's working directory. */}
@@ -109,16 +112,16 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
           {action && <ActionTabStatusMark id={id} />}
         </button>
       </Tip>
-      <Tip label="Close terminal">
+      <Tip label={rolledUp ? "Hide tab" : "Close terminal"}>
         <button
           type="button"
           tabIndex={focusable ? 0 : -1}
-          aria-label={`Close ${title}`}
+          aria-label={`${rolledUp ? "Hide" : "Close"} ${title}`}
           className={cn(
             "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-cf-text/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-cf-focus",
             active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
           )}
-          onClick={() => void closeBottomTerminal(id)}
+          onClick={() => void closeBottomTerminal(id, panelKey)}
         >
           <X className="size-3" aria-hidden />
         </button>
@@ -304,7 +307,7 @@ function Panel({
     if (!action) return;
     e.preventDefault();
     e.stopPropagation();
-    if (action.kind === "close") void closeBottomTerminal(action.terminalId);
+    if (action.kind === "close") void closeBottomTerminal(action.terminalId, panelKey);
     else hidePanel(panelKey);
   };
 

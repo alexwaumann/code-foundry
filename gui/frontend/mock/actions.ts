@@ -789,6 +789,14 @@ export class MockActions {
     return this.runMsg(r, true);
   }
 
+  /** action.stop: a background run takes SIGTERM (143); a terminal run its SIGHUP (129). A finished run stays as it is. */
+  stopRun(id: string): RunInit {
+    const r = this.runs.find((x) => x.id === id);
+    if (!r) throw new CommandError("notfound", `no run ${id}`);
+    if (r.state === ActionRunState.RUNNING) this.exitProcess(r, r.mode === ActionRunMode.BACKGROUND ? 143 : 129);
+    return this.runMsg(r, true);
+  }
+
   /** POST /__mock/action/ports: a running run (by run id or terminal id) listens on ports now; [] closes them. */
   setPorts(ref: { run?: string; terminal?: string }, ports: number[]): RunInit {
     const r = this.runs.find((x) => (ref.run ? x.id === ref.run : x.terminalId === ref.terminal));
@@ -1026,6 +1034,19 @@ export class MockActions {
         ]),
         when: () => true,
         run: (_ctx, args) => this.waitMessage(args.run ?? ""),
+      },
+      {
+        cmd: {
+          ...cmd("action.stop", "Stop Action Run", "Stop a running action run: a background run gets SIGTERM, then SIGKILL after a few seconds; a terminal run's terminal is killed. A finished run is left as it is.", [
+            { name: "run", type: ArgType.STRING, required: true, description: "Run id (r-...)" },
+          ]),
+          noPalette: true,
+        },
+        when: () => true,
+        run: (_ctx, args) => {
+          const run = this.stopRun(args.run ?? "");
+          return Promise.resolve({ message: `stopping ${run.actionName ?? ""} (run ${run.id ?? ""})`, resultJson: JSON.stringify(run) });
+        },
       },
       {
         cmd: cmd("action.runs", "List Action Runs", "List a project's recent action runs (the daemon remembers the last 50 per project until it restarts), newest first.", [projectArg, hereArg]),

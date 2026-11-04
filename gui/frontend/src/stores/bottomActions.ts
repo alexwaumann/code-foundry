@@ -14,13 +14,16 @@ import { terminalIdFromResult, type TerminalView } from "@/api/terminal";
 import {
   activate,
   activeTabOf,
+  addShownIn,
   bottomKeyOf,
   bottomTabIds,
   clearStarting,
   emptyOpenKeys,
+  forgetShown,
   getBottom,
   getBottomActiveId,
   getBottomTabIds,
+  isRolledUpTab,
   isStarting,
   markPendingFocus,
   markPendingFocusId,
@@ -30,7 +33,9 @@ import {
   ownerKeyOf,
   PENDING_FOCUS_MS,
   PROJECTS_KEY,
+  removeShownIn,
   requestBottomFocus,
+  shownKeysOf,
   threadOfKey,
   setOpen,
   takePendingFocus,
@@ -128,6 +133,46 @@ function showBottom(key: string, id?: string): void {
   if (bottomKeyOf(useUiStore.getState().selection) !== key) return;
   uncoverBottom(key);
   focusBottom();
+}
+
+/**
+ * Shows a terminal as a tab of `key`'s panel, active, and opens the panel on it, uncovered
+ * and focused when `key` is the selection's: a server row of the thread info card, for a
+ * terminal a thread below it owns. The selection stays. The terminal keeps its labels (the
+ * `thread` label drives kill and reap), so the owner's panel still has its tab too, and the
+ * one TerminalHost on screen is the one Attach. A terminal of `key`'s own is just shown. False
+ * for an unknown terminal.
+ */
+export function showTerminalIn(id: string, key: string): boolean {
+  const t = useTerminalsStore.getState().byId[id];
+  if (!t) return false;
+  if (ownerKeyOf(t) !== key) addShownIn(id, key);
+  showBottom(key, id);
+  return true;
+}
+
+/**
+ * A Rerun's new terminal `id` (which may not have arrived) takes the place of the old one in
+ * the panels it was rolled up in; the selection's opens on it, as for the owner's own tab.
+ */
+export function carryShownTerminal(id: string, keys: readonly string[]): void {
+  const selected = bottomKeyOf(useUiStore.getState().selection);
+  for (const key of keys) {
+    addShownIn(id, key);
+    if (key === selected) showBottom(key, id);
+  }
+}
+
+/**
+ * The × (cmd+w, a middle click) of a rolled-up tab: it leaves `key`'s strip and the terminal
+ * runs on, in its owner's panel and any other it shows in. False when it is no such tab.
+ */
+function hideRolledUpTab(id: string, key: string): boolean {
+  const before = useTerminalsStore.getState();
+  if (!isRolledUpTab(before, key, id)) return false;
+  removeShownIn(id, key);
+  afterTabLeft(key, id, before);
+  return true;
 }
 
 /** What openBottomShell does beyond making sure the panel shows a shell. */
@@ -263,13 +308,16 @@ export function newWorktreeTerminal(projectId: string, path: string, cwd?: strin
 
 /**
  * Closes a tab: terminal.close with --id for that terminal, no confirmation (it only
- * closes shells); a plugin's terminal's tab leaves the strip and the terminal runs on. Its tab goes when the daemon removes the terminal. A shell that is
- * already gone (reaped meanwhile: NotFound, or unavailable because the daemon no longer
- * knows it) is not an error.
+ * closes shells); a plugin's terminal's tab leaves the strip and the terminal runs on, and
+ * so does a rolled-up tab of `key`, the panel it is closed from (hideRolledUpTab). Without
+ * a key it is the terminal that closes, wherever it shows (a Rerun). Its tab goes when the
+ * daemon removes the terminal. A shell that is already gone (reaped meanwhile: NotFound, or
+ * unavailable because the daemon no longer knows it) is not an error.
  */
-export async function closeBottomTerminal(id: string): Promise<void> {
+export async function closeBottomTerminal(id: string, key?: string): Promise<void> {
   // A plugin's terminal is the plugin's to close: its tab only leaves the strip.
   if (hidePluginTerminalTab(id)) return;
+  if (key !== undefined && hideRolledUpTab(id, key)) return;
   const ctx: UiContextView = { ...getUiContext(), activeTerminalId: id };
   try {
     await invokeConfirmed("terminal.close", { id }, ctx);
@@ -380,21 +428,30 @@ export function onNewTerminal(t: TerminalView): void {
 }
 
 /**
- * A terminal left the store (`before` is the store with it). When it was its panel's last
- * tab, the panel hides (hideEmptyBottom), shown or not, so the next cmd+j starts a fresh
- * shell. When it was its panel's active tab, the tab after it becomes active, else the
- * one before (not the last tab, which is what activeTabOf would fall back to).
+ * A terminal left the store (`before` is the store with it): its tab left its owner's
+ * panel, and every panel it was opened in (TerminalsData.shownIn).
  */
 export function onRemovedTerminal(t: TerminalView, before: TerminalsData): void {
-  const key = ownerKeyOf(t);
-  if (key === null) return;
+  const owner = ownerKeyOf(t);
+  const shown = shownKeysOf(before, t.id);
+  for (const key of owner === null ? shown : [owner, ...shown]) afterTabLeft(key, t.id, before);
+  forgetShown(t.id);
+}
+
+/**
+ * Tab `id` left `key`'s strip (`before` is the terminals store with it). When it was the
+ * panel's last tab, the panel hides (hideEmptyBottom), shown or not, so the next cmd+j starts
+ * a fresh shell. When it was the panel's active tab, the tab after it becomes active, else
+ * the one before (not the last tab, which is what activeTabOf would fall back to).
+ */
+function afterTabLeft(key: string, id: string, before: TerminalsData): void {
   if (getBottomTabIds(key).length === 0) {
     hideEmptyBottom(key);
     return;
   }
   const ids = bottomTabIds(before, key);
-  if (activeTabOf(getBottom(key), ids) !== t.id) return;
-  const next = neighbourOf(ids, t.id);
+  if (activeTabOf(getBottom(key), ids) !== id) return;
+  const next = neighbourOf(ids, id);
   if (next !== null) updateBottom(key, (e) => activate(e, next));
 }
 

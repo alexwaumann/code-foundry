@@ -352,17 +352,6 @@ export const lineageStateWords: Readonly<Record<LineageRowState, string>> = {
   failed: "Failed",
 };
 
-/** A shell's runtime from its command's first word (after any VAR=value): node, python or go; "" for any other. */
-export function shellRuntime(command: string): string {
-  const words = command.trim().split(/\s+/);
-  const first = words.find((w) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(w)) ?? "";
-  const name = first.slice(first.lastIndexOf("/") + 1);
-  if (["node", "npm", "npx", "pnpm", "yarn"].includes(name)) return "node";
-  if (/^python(\d+(\.\d+)?)?$/.test(name)) return "python";
-  if (name === "go") return "go";
-  return "";
-}
-
 /** A port as the card shows it and the browser opens it: every listening address is localhost to the user. */
 export function serverAddress(port: number): string {
   return `localhost:${String(port)}`;

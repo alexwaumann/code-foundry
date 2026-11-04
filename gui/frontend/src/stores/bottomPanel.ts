@@ -4,7 +4,7 @@
  * Projects page (`view:projects`); every other selection has none.
  *
  * Tabs are derived, not stored: a key's tabs are the shells in the terminals store that
- * it owns (bottomTabIds), in the store's order. Per key this store keeps only whether the
+ * it owns or that were opened in it (bottomTabIds), in the store's order. Per key this store keeps only whether the
  * panel is open, its height, and which terminal was last active. A terminal that goes
  * away (closed, reaped, the daemon restarted) leaves its tab with it. Persisted
  * (localStorage "code-foundry.bottom"); entries are never pruned.
@@ -66,14 +66,53 @@ export function ownerKeyOf(t: LabelledTerminal): string | null {
   return thread ? `${THREAD_PREFIX}${thread}` : PROJECTS_KEY;
 }
 
+/** The panels a terminal was opened in beyond its owner's (TerminalsData.shownIn). */
+export function shownKeysOf(terminals: Pick<TerminalsData, "shownIn">, id: string): readonly string[] {
+  return terminals.shownIn?.[id] ?? [];
+}
+
 /**
- * A key's tabs: the ids of the shells and action runs it owns, and of the plugins'
- * terminals the user opened in it (TerminalsData.shownIn), in the terminals store's order.
+ * A key's tabs: the ids of the shells and action runs it owns, and of the terminals the
+ * user opened in it (TerminalsData.shownIn), in the terminals store's order.
  */
 export function bottomTabIds(terminals: TerminalsData, key: string): string[] {
   return terminals.order.filter((id) => {
     const t = terminals.byId[id];
-    return t !== undefined && (ownerKeyOf(t) === key || (isPluginLabels(t.labels) && terminals.shownIn?.[id] === key));
+    return t !== undefined && (ownerKeyOf(t) === key || shownKeysOf(terminals, id).includes(key));
+  });
+}
+
+/**
+ * Whether a tab of `key` is rolled up: another thread's terminal the user opened here
+ * (showTerminalIn, stores/bottomActions.ts). Such a tab is a view of the terminal, so closing
+ * it hides it and only its Stop ends the run. A plugin's has its own rule (pluginTerminals).
+ */
+export function isRolledUpTab(terminals: TerminalsData, key: string, id: string): boolean {
+  const t = terminals.byId[id];
+  return t !== undefined && !isPluginLabels(t.labels) && ownerKeyOf(t) !== key && shownKeysOf(terminals, id).includes(key);
+}
+
+/** Adds `key` to the panels showing terminal `id`. */
+export function addShownIn(id: string, key: string): void {
+  useTerminalsStore.setState((s) => {
+    const keys = shownKeysOf(s, id);
+    return keys.includes(key) ? s : { shownIn: { ...s.shownIn, [id]: [...keys, key] } };
+  });
+}
+
+/** Takes `key` off the panels showing terminal `id`. */
+export function removeShownIn(id: string, key: string): void {
+  const rest = shownKeysOf(useTerminalsStore.getState(), id).filter((k) => k !== key);
+  if (rest.length === 0) forgetShown(id);
+  else useTerminalsStore.setState((s) => ({ shownIn: { ...s.shownIn, [id]: rest } }));
+}
+
+/** Terminal `id` shows in no panel but its owner's. */
+export function forgetShown(id: string): void {
+  useTerminalsStore.setState((s) => {
+    if (!s.shownIn || !(id in s.shownIn)) return s;
+    const { [id]: _gone, ...shownIn } = s.shownIn;
+    return { shownIn };
   });
 }
 
@@ -350,7 +389,8 @@ export function emptyOpenKeys(byKey: Readonly<Record<string, BottomEntry>>, term
 /**
  * The shell the keyboard is in (or the palette returns to): the current key's active tab
  * while focus is in its open bottom panel, else "". The command context's terminal then
- * (stores/context.ts), so Close Terminal and friends act on it.
+ * (stores/context.ts), so Close Terminal and friends act on it. Not a rolled-up tab: the
+ * palette's Close and Kill would end another thread's run, which only the tab's Stop does.
  */
 export function focusedBottomShell(
   ui: { selection: Selection; focus: string; palette: { open: boolean; returnTo: string } },
@@ -362,7 +402,8 @@ export function focusedBottomShell(
   const key = bottomKeyOf(ui.selection);
   const entry = key === null ? undefined : byKey[key];
   if (key === null || !entry?.open) return "";
-  return activeTabOf(entry, bottomTabIds(terminals, key)) ?? "";
+  const active = activeTabOf(entry, bottomTabIds(terminals, key)) ?? "";
+  return isRolledUpTab(terminals, key, active) ? "" : active;
 }
 
 /** The current selection's bottom key (a string, so the selector is cheap and stable). */

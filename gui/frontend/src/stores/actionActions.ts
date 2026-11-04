@@ -14,7 +14,8 @@ import { ACTION_LABEL, PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib
 import { useActionsStore } from "./actions";
 import { openActionRunOutput } from "./actionDialog";
 import { clearStopRequested, markStopRequested } from "./actionStops";
-import { closeBottomTerminal, revealShell, showOwnTerminal } from "./bottomActions";
+import { carryShownTerminal, closeBottomTerminal, revealShell, showOwnTerminal } from "./bottomActions";
+import { shownKeysOf } from "./bottomPanel";
 import { refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
 import { getUiContext, projectContext, worktreeContext } from "./context";
 import { useThreadsStore } from "./threads";
@@ -57,20 +58,28 @@ export function ownerOfTerminal(labels: Readonly<Record<string, string>>): Actio
  * run exits (SIGHUP, then SIGKILL after the daemon's grace period when the command ignores
  * it), then "Stopped" with Rerun; the tab stays. The button is the confirmation, so the
  * command runs confirmed. A kill that fails on a running terminal goes back to Running.
+ * True when the kill went through.
  */
-export async function stopActionRun(terminalId: string): Promise<void> {
+export async function stopActionRun(terminalId: string): Promise<boolean> {
   const ctx: UiContextView = { ...getUiContext(), activeTerminalId: terminalId };
   markStopRequested(terminalId);
   try {
     await invokeCommand("terminal.kill", ctx, { id: terminalId }, undefined, { confirmed: true });
+    return true;
   } catch (err) {
-    if (useTerminalsStore.getState().byId[terminalId]?.state === "exited") return;
+    if (useTerminalsStore.getState().byId[terminalId]?.state === "exited") return false;
     clearStopRequested(terminalId);
     const title = useCommandsStore.getState().commands.find((c) => c.name === "terminal.kill")?.title ?? "Kill Terminal";
     toast.error(`${title} failed`, { description: errorMessage(err) });
+    return false;
   } finally {
     void refreshCommands();
   }
+}
+
+/** action.stop for a run without a terminal: SIGTERM, then SIGKILL after the daemon's grace. True when it went through. */
+export async function stopBackgroundRun(runId: string): Promise<boolean> {
+  return (await runCommandForResult("action.stop", { run: runId }, { quiet: true })) !== null;
 }
 
 /** Tabs whose Rerun is in flight: the button stays until the old tab closes, so a double click must not run twice. */
@@ -79,7 +88,8 @@ const rerunning = new Set<string>();
 /**
  * Rerun: the same action again for the same owner (a terminal runs one process, so there
  * is no restart in place), then the old tab closes. Run first: if the run fails (the action
- * was deleted meanwhile), the old tab and its output stay. The new tab is active. A second
+ * was deleted meanwhile), the old tab and its output stay. The new tab is active, and it
+ * takes the old one's place in any panel the run was rolled up in (showTerminalIn). A second
  * Rerun of the same tab while one is in flight does nothing.
  */
 export async function rerunAction(terminalId: string): Promise<string | null> {
@@ -88,9 +98,13 @@ export async function rerunAction(terminalId: string): Promise<string | null> {
   const owner = t ? ownerOfTerminal(t.labels) : null;
   if (!actionId || owner === null || rerunning.has(terminalId)) return null;
   rerunning.add(terminalId);
+  const shownIn = shownKeysOf(useTerminalsStore.getState(), terminalId);
   try {
     const id = await runAction(actionId, owner);
-    if (id !== null) await closeBottomTerminal(terminalId);
+    if (id !== null) {
+      carryShownTerminal(id, shownIn);
+      await closeBottomTerminal(terminalId);
+    }
     return id;
   } finally {
     rerunning.delete(terminalId);

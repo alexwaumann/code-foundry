@@ -9,7 +9,7 @@
  */
 import { toast } from "sonner";
 import { isPluginLabels } from "@/lib/termlabel";
-import { activeTabOf, bottomKeyOf, bottomTabIds, bottomVisible, openOn, requestBottomFocus, updateBottom, useBottomStore } from "./bottomPanel";
+import { activeTabOf, bottomKeyOf, bottomTabIds, bottomVisible, forgetShown, openOn, requestBottomFocus, updateBottom, useBottomStore } from "./bottomPanel";
 import { keyOf, usePanelStore } from "./panel";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
@@ -24,7 +24,7 @@ export function showPluginTerminal(id: string): boolean {
     toast.error("Select a thread to open the terminal in its bottom panel");
     return false;
   }
-  useTerminalsStore.setState((s) => (s.shownIn?.[id] === key ? s : { shownIn: { ...s.shownIn, [id]: key } }));
+  useTerminalsStore.setState((s) => ({ shownIn: { ...s.shownIn, [id]: [key] } }));
   updateBottom(key, (e) => openOn(e, id));
   requestBottomFocus();
   return true;
@@ -34,11 +34,7 @@ export function showPluginTerminal(id: string): boolean {
 export function hidePluginTerminalTab(id: string): boolean {
   const t = useTerminalsStore.getState().byId[id];
   if (!t || !isPluginLabels(t.labels)) return false;
-  useTerminalsStore.setState((s) => {
-    if (!s.shownIn || !(id in s.shownIn)) return s;
-    const { [id]: _gone, ...shownIn } = s.shownIn;
-    return { shownIn };
-  });
+  forgetShown(id);
   return true;
 }
 
