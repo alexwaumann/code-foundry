@@ -50,7 +50,7 @@ const flag = (level: "attention" | "error", reason: string, pluginName = "Lint")
 const line1 = () => screen.getByTestId("row-line-1");
 const line3 = () => screen.getByTestId("row-line-3");
 /** Line 1 as it reads at rest: the hover actions' "Archive" is in the DOM but hidden. */
-const line1Text = () => (line1().textContent ?? "").replace(screen.getByTestId("row-actions").textContent ?? "", "");
+const line1Text = () => line1().textContent.replace(screen.getByTestId("row-actions").textContent, "");
 /** How many row cards are open, under fake timers: Radix opens one on a timer even at delay 0. */
 const cardOpen = () => {
   act(() => {

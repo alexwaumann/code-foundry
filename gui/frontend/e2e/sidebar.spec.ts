@@ -229,6 +229,9 @@ test("at the narrowest sidebar the actions never cover the project, on a selecte
     expect((project?.x ?? 0) + (project?.width ?? 0)).toBeLessThanOrEqual(actions?.x ?? 0);
     await expect(r.getByTestId("row-time")).toHaveCSS("visibility", "hidden");
   }
+  // A status word and its icon, not only a time.
+  await row(page, "s:s-2").getByTestId("thread-name").hover();
+  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveCSS("visibility", "hidden");
 });
 
 // A multi-project thread's card (workspace or N projects, the run-in project and where it runs, branch, model) and line 1: src/components/sidebar/SidebarRow.test.tsx ("a workspace thread…", "an unnamed set…", "a thread in its workspace's folder…", "line 1 of a multi-project thread").
