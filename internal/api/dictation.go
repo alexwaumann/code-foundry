@@ -23,6 +23,7 @@ type DictationStore interface {
 	RemoveModel() (dictation.Snapshot, error)
 	Start(ctx context.Context, clientID string) (string, error)
 	Stop(ctx context.Context, sessionID string, flush bool) error
+	Release(ctx context.Context, sessionID string) error
 	Audio(sessionID string, pcm []byte, rms float32) bool
 	SessionEnded(sessionID string) (reason dictation.EndReason, ended, ok bool)
 	MicDenied(denied bool)
@@ -135,7 +136,11 @@ func (h *Dictation) Start(ctx context.Context, req *connect.Request[v1.StartDict
 
 // Stop ends a session.
 func (h *Dictation) Stop(ctx context.Context, req *connect.Request[v1.StopDictationRequest]) (*connect.Response[v1.StopDictationResponse], error) {
-	if err := h.store.Stop(ctx, req.Msg.GetSessionId(), req.Msg.GetFlush()); err != nil {
+	stop := func(ctx context.Context, id string) error { return h.store.Stop(ctx, id, req.Msg.GetFlush()) }
+	if req.Msg.GetFlush() && req.Msg.GetTail() {
+		stop = h.store.Release
+	}
+	if err := stop(ctx, req.Msg.GetSessionId()); err != nil {
 		return nil, dictationError(err)
 	}
 	return connect.NewResponse(&v1.StopDictationResponse{}), nil

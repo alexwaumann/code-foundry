@@ -501,6 +501,147 @@ func TestStoppingSnapshot(t *testing.T) {
 	}
 }
 
+func TestRelease(t *testing.T) {
+	sounds := func(on bool, volume int) func(*dictation.Options) {
+		return func(o *dictation.Options) {
+			o.Prefs = func() dictation.Prefs { return dictation.Prefs{Sounds: on, SoundVolume: volume} }
+		}
+	}
+	tests := []struct {
+		name    string
+		opts    func(*dictation.Options)
+		noAudio bool
+		want    dictate.EndParams
+	}{
+		{"a tail, with no tone to wait for", nil, false, dictate.EndParams{Flush: true, Tail: true}},
+		{"the tone's length with sounds on", sounds(true, 50), false, dictate.EndParams{Flush: true, Tail: true, ToneMS: 140}},
+		{"no tone at volume 0", sounds(true, 0), false, dictate.EndParams{Flush: true, Tail: true}},
+		{"no tone with sounds off", sounds(false, 50), false, dictate.EndParams{Flush: true, Tail: true}},
+		{"no tail with no frame heard", nil, true, dictate.EndParams{Flush: true}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, setup{enabled: true, model: true, opts: tc.opts})
+			h.waitState(dictation.Ready)
+			id, err := h.store.Start(context.Background(), "c1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !tc.noAudio {
+				h.store.Audio(id, make([]byte, 640), 0.5)
+			}
+			if err := h.store.Release(context.Background(), id); err != nil {
+				t.Fatal(err)
+			}
+			tc.want.Session = id
+			if got := h.launcher.Last().Ends(); !slices.Equal(got, []dictate.EndParams{tc.want}) {
+				t.Errorf("ends %+v, want %+v", got, tc.want)
+			}
+			if got := phrasesAndEnd(h.sessionEvents(id)); !slices.Equal(got, []string{"ended:stopped"}) {
+				t.Errorf("events %v", got)
+			}
+		})
+	}
+}
+
+// startTail starts a session, hears a frame and releases it, returning with the tail
+// running and what Release returned on done.
+func startTail(t *testing.T, h *harness) (id string, done chan struct{}) {
+	t.Helper()
+	h.waitState(dictation.Ready)
+	h.launcher.Last().HoldTails()
+	id, err := h.store.Start(context.Background(), "c1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.store.Audio(id, make([]byte, 640), 0.5)
+	done = make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = h.store.Release(context.Background(), id)
+	}()
+	h.wait("stopping", func(s dictation.Snapshot) bool { return s.Session != nil && s.Session.Stopping })
+	for len(h.launcher.Last().Ends()) == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	return id, done
+}
+
+// A release shows as stopping at once, and the frames of its tail still reach the engine,
+// raising no level: the plate is working by then.
+func TestTailFrames(t *testing.T) {
+	h := newHarness(t, setup{enabled: true, model: true})
+	id, done := startTail(t, h)
+	h.clock.Advance(time.Second) // past any level throttle
+	if !h.store.Audio(id, make([]byte, 640), 0.5) {
+		t.Error("a frame of the tail was dropped")
+	}
+	if f, _ := h.launcher.Last().Frames(); f != 2 {
+		t.Errorf("engine got %d frames, want 2", f)
+	}
+	if s := h.store.Snapshot(); s.State != dictation.Listening {
+		t.Errorf("state %v, want the microphone kept open by Listening", s.State)
+	}
+	h.launcher.Last().FinishTail()
+	<-done
+	if h.store.Audio(id, make([]byte, 640), 0.5) {
+		t.Error("a frame after the end was taken")
+	}
+	levels := 0
+	for _, ev := range h.sessionEvents(id) {
+		if ev.Kind == dictation.SessionLevel {
+			levels++
+		}
+	}
+	if levels != 1 {
+		t.Errorf("levels = %d, want 1, from before the release", levels)
+	}
+}
+
+func TestStopDuringATail(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		flush bool
+	}{{"with flush", true}, {"without flush, as what was released counts", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, setup{enabled: true, model: true})
+			id, done := startTail(t, h)
+			h.launcher.Last().SetPhrases("Whole.")
+			if err := h.store.Stop(context.Background(), id, tc.flush); err != nil {
+				t.Fatal(err)
+			}
+			// It returned with the session over, so a Start right after finds room.
+			if s := h.store.Snapshot(); s.Session != nil {
+				t.Errorf("session after the Stop: %+v", s.Session)
+			}
+			<-done
+			want := []dictate.EndParams{{Session: id, Flush: true, Tail: true}, {Session: id, Flush: true}}
+			if got := h.launcher.Last().Ends(); !slices.Equal(got, want) {
+				t.Errorf("ends %+v, want %+v", got, want)
+			}
+			if got := phrasesAndEnd(h.sessionEvents(id)); !slices.Equal(got, []string{"Whole.", "ended:stopped"}) {
+				t.Errorf("events %v", got)
+			}
+			if _, err := h.store.Start(context.Background(), "c2"); err != nil {
+				t.Errorf("start after the Stop: %v", err)
+			}
+		})
+	}
+}
+
+// A Start during a tail is refused, as during any stop; a Stop first makes the room.
+func TestStartDuringATail(t *testing.T) {
+	h := newHarness(t, setup{enabled: true, model: true})
+	_, done := startTail(t, h)
+	for _, client := range []string{"c1", "c2"} {
+		if _, err := h.store.Start(context.Background(), client); !errors.Is(err, dictation.ErrBusy) {
+			t.Errorf("%s: %v", client, err)
+		}
+	}
+	h.launcher.Last().FinishTail()
+	<-done
+}
+
 func TestLevelsAreThrottled(t *testing.T) {
 	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)

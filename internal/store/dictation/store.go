@@ -272,6 +272,8 @@ type session struct {
 	stopping bool
 	// flushing: stopping, with the engine transcribing what it holds.
 	flushing bool
+	// tailing: stopping by a release, with the engine still listening: frames still count.
+	tailing bool
 	// silence ends the session after SilenceStop without speech; silenceGen tells a
 	// stale timer from the current one.
 	silence    Timer
@@ -842,38 +844,62 @@ func (s *Store) Start(ctx context.Context, clientID string) (string, error) {
 // phrases published before the end (bounded by FlushWait), and the session ends
 // EndStopped; without flush it ends EndDiscarded. An unknown or ended session is not an
 // error.
+//
+// A session already stopping gives way: a Stop during a release's tail cuts the tail short,
+// with or without flush, as what was released still counts. Either way it returns once the
+// session has ended, so the next Start finds room.
 func (s *Store) Stop(ctx context.Context, sessionID string, flush bool) error {
 	why := EndDiscarded
 	if flush {
 		why = EndStopped
 	}
-	s.stopSession(ctx, sessionID, flush, why)
+	s.stopSession(ctx, sessionID, flush, false, why)
 	return nil
 }
 
-func (s *Store) stopSession(ctx context.Context, sessionID string, flush bool, why EndReason) {
+// Release is Stop with flush for the hold key's release: the session shows as stopping at
+// once, and the microphone's frames keep counting for the tail the engine decides on
+// (internal/dictate/tail.go), so the last word is whole. A session that has not heard a
+// frame has no tail.
+func (s *Store) Release(ctx context.Context, sessionID string) error {
+	s.stopSession(ctx, sessionID, true, true, EndStopped)
+	return nil
+}
+
+func (s *Store) stopSession(ctx context.Context, sessionID string, flush, tail bool, why EndReason) {
 	s.mu.Lock()
 	sess := s.session
-	if sess == nil || sess.id != sessionID || sess.stopping {
+	if sess == nil || sess.id != sessionID {
 		s.mu.Unlock()
+		return
+	}
+	if sess.stopping {
+		s.giveWayLocked(ctx, sess)
 		return
 	}
 	sess.stopping = true
 	sess.flushing = flush
+	sess.tailing = tail && sess.begun && sess.heard
 	s.stopSilenceLocked(sess)
 	if flush {
 		s.publishLocked()
 	}
 	eng := s.eng
 	if eng != nil && sess.begun {
+		params, wait := dictate.EndParams{Session: sessionID, Flush: flush}, FlushWait
+		if sess.tailing {
+			params.Tail, params.ToneMS = true, s.toneMSLocked()
+			wait += dictate.TailWait
+		}
 		s.mu.Unlock()
-		ectx, cancel := context.WithTimeout(ctx, FlushWait)
-		if err := eng.Call(ectx, dictate.MethodEnd, dictate.EndParams{Session: sessionID, Flush: flush}, nil); err != nil {
+		ectx, cancel := context.WithTimeout(ctx, wait)
+		if err := eng.Call(ectx, dictate.MethodEnd, params, nil); err != nil {
 			s.log.Warn("dictation session did not end cleanly", "session", sessionID, "err", err)
 		}
 		s.awaitEventsLocked(ectx, eng, eng.Enqueued())
 		cancel()
 	}
+	sess.tailing = false
 	if s.session == sess {
 		s.endSessionLocked(why)
 		s.publishLocked()
@@ -881,13 +907,49 @@ func (s *Store) stopSession(ctx context.Context, sessionID string, flush bool, w
 	s.mu.Unlock()
 }
 
+// toneMSLocked is how long the hold key's stop tone sounds: the host plays it as the session
+// stops, with dictation.sounds on and a volume to play it at.
+func (s *Store) toneMSLocked() int {
+	if !s.prefs.Sounds || s.prefs.SoundVolume <= 0 {
+		return 0
+	}
+	return int(dictate.StopToneLength / time.Millisecond)
+}
+
+// giveWayLocked is a second Stop: it cuts a tail short, then waits for the first Stop to end
+// sess, bounded by what that one may take. It unlocks mu.
+func (s *Store) giveWayLocked(ctx context.Context, sess *session) {
+	ctx, cancel := context.WithTimeout(ctx, FlushWait+dictate.TailWait)
+	defer cancel()
+	if eng := s.eng; eng != nil && sess.tailing {
+		sess.tailing = false
+		s.mu.Unlock()
+		if err := eng.Call(ctx, dictate.MethodEnd, dictate.EndParams{Session: sess.id, Flush: true}, nil); err != nil {
+			s.log.Warn("dictation tail not cut", "session", sess.id, "err", err)
+		}
+		s.mu.Lock()
+	}
+	for s.session == sess {
+		changed := s.changed
+		s.mu.Unlock()
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return
+		}
+		s.mu.Lock()
+	}
+	s.mu.Unlock()
+}
+
 // Audio forwards one frame of the listening session to the engine and republishes its
 // level (at most every levelEvery). It reports whether the frame was taken: frames of
-// another session, or of one stopping, are dropped.
+// another session, or of one stopping outside a tail, are dropped. A tail's frames raise no
+// level: the session shows as working by then.
 func (s *Store) Audio(sessionID string, pcm []byte, rms float32) bool {
 	s.mu.Lock()
 	sess := s.session
-	if sess == nil || sess.id != sessionID || !sess.begun || sess.stopping || s.eng == nil {
+	if sess == nil || sess.id != sessionID || !sess.begun || (sess.stopping && !sess.tailing) || s.eng == nil {
 		s.mu.Unlock()
 		return false
 	}
@@ -896,7 +958,7 @@ func (s *Store) Audio(sessionID string, pcm []byte, rms float32) bool {
 		sess.heard = true
 		s.armSilenceLocked(sess, SilenceStop)
 	}
-	if now := s.clock.Now(); now.Sub(sess.lastLevel) >= levelEvery {
+	if now := s.clock.Now(); !sess.stopping && now.Sub(sess.lastLevel) >= levelEvery {
 		sess.lastLevel = now
 		s.emit(SessionEvent{SessionID: sessionID, Kind: SessionLevel, RMS: rms})
 	}
@@ -949,7 +1011,7 @@ func (s *Store) armSilenceLocked(sess *session, d time.Duration) {
 		s.mu.Unlock()
 		if current {
 			s.log.Info("dictation stopped after silence", "session", sess.id)
-			s.stopSession(s.ctx, sess.id, false, EndSilence)
+			s.stopSession(s.ctx, sess.id, false, false, EndSilence)
 		}
 	})
 }

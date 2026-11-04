@@ -154,8 +154,11 @@ func TestDictationService(t *testing.T) {
 		t.Errorf("event %v, want the phrase", ev)
 	}
 	eng.SetPhrases("The tail.")
-	if _, err := c.Stop(ctx, connect.NewRequest(&v1.StopDictationRequest{SessionId: id, Flush: true})); err != nil {
+	if _, err := c.Stop(ctx, connect.NewRequest(&v1.StopDictationRequest{SessionId: id, Flush: true, Tail: true})); err != nil {
 		t.Fatal(err)
+	}
+	if ends := eng.Ends(); len(ends) != 1 || !ends[0].Tail {
+		t.Errorf("ends %+v, want a release", ends)
 	}
 	if ev := next(); ev.GetPhrase().GetText() != "The tail." {
 		t.Errorf("event %v, want the flushed phrase", ev)
