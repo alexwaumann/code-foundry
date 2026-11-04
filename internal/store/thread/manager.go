@@ -471,7 +471,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		}
 		// Archived or snoozed again after a wake, before Archive and Snooze cleared
 		// the "snooze ended" status (snooze.go).
-		if (!s.ArchivedAt.IsZero() || !s.SnoozedUntil.IsZero()) && clearSnoozeEnded(&s, opts.Now()) {
+		if (!s.ArchivedAt.IsZero() || s.Snoozed()) && clearSnoozeEnded(&s, opts.Now()) {
 			if err := saveThread(ctx, opts.DB, s); err != nil {
 				return nil, err
 			}

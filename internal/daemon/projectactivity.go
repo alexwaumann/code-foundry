@@ -98,14 +98,15 @@ func startProjectActivity(ctx context.Context, log *slog.Logger, threads func() 
 }
 
 // liveWorktrees is the sorted, distinct worktrees of the project threads in snap that
-// are live at now: not archived, and not snoozed (or past their snooze). Never nil.
+// are live at now: not archived, not saved for later, and not snoozed (or past their
+// snooze). Never nil.
 func liveWorktrees(snap *thread.Snapshot, now time.Time) []string {
 	out := []string{}
 	if snap == nil {
 		return out
 	}
 	for _, th := range snap.Threads {
-		if th.ProjectID == "" || th.WorktreePath == "" || !th.ArchivedAt.IsZero() ||
+		if th.ProjectID == "" || th.WorktreePath == "" || !th.ArchivedAt.IsZero() || !th.SavedAt.IsZero() ||
 			(!th.SnoozedUntil.IsZero() && th.SnoozedUntil.After(now)) {
 			continue
 		}

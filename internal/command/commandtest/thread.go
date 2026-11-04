@@ -287,7 +287,7 @@ func (s *Thread) Archive(_ context.Context, r *connect.Request[v1.ArchiveThreadR
 
 // Snooze returns Current (default: a CONNECTED thread) with the requested id:
 // snoozing disconnects, unpins and unarchives it and sets snoozed_until to the request's
-// until; an unset until clears snoozed_until.
+// until, or saved_at with save; neither clears both.
 func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -297,8 +297,11 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 		cur = proto.CloneOf(s.Current)
 	}
 	cur.Id = r.Msg.GetId()
-	cur.SnoozedUntil = r.Msg.GetUntil()
-	if cur.SnoozedUntil != nil {
+	cur.SnoozedUntil, cur.SavedAt = r.Msg.GetUntil(), nil
+	if r.Msg.GetSave() {
+		cur.SavedAt = timestamppb.New(time.UnixMilli(1))
+	}
+	if cur.SnoozedUntil != nil || cur.SavedAt != nil {
 		cur.State, cur.Pinned, cur.ArchivedAt = v1.ThreadState_THREAD_STATE_DISCONNECTED, false, nil
 	}
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: cur}), nil

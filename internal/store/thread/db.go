@@ -36,11 +36,11 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,
-			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
+			context_tokens, context_model, last_result_at, archived_at, snoozed_until, saved_at,
 			created_by, created_by_name, brief, labels,
 			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs, resume_note,
 			kind, resident_name, epoch, system_prompt_append, fresh_start, seed_prefix, pending_first, memory_hash, project_ids, checkouts, last_heads)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
@@ -69,6 +69,7 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			last_result_at = excluded.last_result_at,
 			archived_at = excluded.archived_at,
 			snoozed_until = excluded.snoozed_until,
+			saved_at = excluded.saved_at,
 			created_by = excluded.created_by,
 			created_by_name = excluded.created_by_name,
 			brief = excluded.brief,
@@ -98,7 +99,7 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
 		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned,
 		int(s.Status), s.StatusReason, millis(s.StatusChangedAt),
-		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil),
+		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil), millis(s.SavedAt),
 		s.CreatedBy, s.CreatedByName, s.Brief, labelsJSON(s.Labels),
 		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD, s.Branch, s.NameProvisional, s.Owner, labelsJSON(s.SpawnEnv), labelsJSON(s.SpawnAddDirs), resumeNoteJSON(s.ResumeNote),
 		int(s.Kind), s.ResidentName, max(s.Epoch, 1), s.SystemPromptAppend, s.FreshStart, s.SeedPrefix,
@@ -114,7 +115,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,
-			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
+			context_tokens, context_model, last_result_at, archived_at, snoozed_until, saved_at,
 			created_by, created_by_name, brief, labels,
 			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs, resume_note,
 			kind, resident_name, epoch, system_prompt_append, fresh_start, seed_prefix, pending_first, memory_hash, project_ids, checkouts, last_heads
@@ -126,14 +127,14 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 	var out []Thread
 	for rows.Next() {
 		var s Thread
-		var created, active, statusAt, lastResult, archived, snoozed, reportAt int64
+		var created, active, statusAt, lastResult, archived, snoozed, saved, reportAt int64
 		var state, perm, status, reportStatus, kind int
 		var labels, spawnEnv, spawnAddDirs, resumeNote, pendingFirst, projectIDs, checkouts, lastHeads string
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.ProjectID, &s.WorktreePath, &s.Name, &s.AutoNamed,
 			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
 			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned,
 			&status, &s.StatusReason, &statusAt,
-			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed,
+			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed, &saved,
 			&s.CreatedBy, &s.CreatedByName, &s.Brief, &labels,
 			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD, &s.Branch, &s.NameProvisional, &s.Owner, &spawnEnv, &spawnAddDirs, &resumeNote,
 			&kind, &s.ResidentName, &s.Epoch, &s.SystemPromptAppend, &s.FreshStart, &s.SeedPrefix,
@@ -151,6 +152,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 		s.LastResultAt = fromMillis(lastResult)
 		s.ArchivedAt = fromMillis(archived)
 		s.SnoozedUntil = fromMillis(snoozed)
+		s.SavedAt = fromMillis(saved)
 		s.Labels = parseLabels(labels)
 		s.ProjectIDs = CleanProjectIDs(s.ProjectID, parseLabels(projectIDs))
 		s.CheckoutPaths = parseCheckoutPaths(checkouts)

@@ -15,15 +15,19 @@ const ReasonSnoozeEnded = "snooze ended"
 // snoozed threads' SnoozedUntil (Options.SnoozeCheckInterval's default).
 const SnoozeCheckInterval = 30 * time.Second
 
+// Snoozed reports whether the thread is put away until a time or saved for later, the
+// two forms of a snooze. Use SnoozedUntil only for the wake time itself.
+func (s Thread) Snoozed() bool { return !s.SnoozedUntil.IsZero() || !s.SavedAt.IsZero() }
+
 // Snooze snoozes a thread until a time, or unsnoozes it (until zero)
 // (docs/notes/snooze-threads-1-daemon.md).
 //
 // Snoozing closes the thread like Close (a no-op when it is disconnected), kills and
 // removes its shells like Remove, then, under m.mu, unpins and unarchives it and sets
-// SnoozedUntil (replacing an earlier snooze). until must be after Options.Now. As with
-// Archive, a Reconnect that wins the race between the close and that last step makes
-// Snooze fail rather than snooze a live thread. Unsnoozing only clears SnoozedUntil:
-// the thread stays disconnected and gets no attention.
+// SnoozedUntil (replacing an earlier snooze, or a save for later). until must be after
+// Options.Now. As with Archive, a Reconnect that wins the race between the close and
+// that last step makes Snooze fail rather than snooze a live thread. Unsnoozing only
+// clears SnoozedUntil and SavedAt: the thread stays disconnected and gets no attention.
 func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Thread, error) {
 	if until.IsZero() {
 		m.mu.Lock()
@@ -38,13 +42,46 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 		}
 		return rec.s, nil
 	}
-	if err := m.refuseResident(id, "snoozed"); err != nil {
-		return Thread{}, err
-	}
 	// Wall clock only (see wakeSnoozed); persisted at millisecond precision.
 	until = until.Round(0).Truncate(time.Millisecond)
 	if !until.After(m.opts.Now()) {
 		return Thread{}, fmt.Errorf("%w: snooze time %s is not in the future", ErrInvalidArgument, until.Format(time.RFC3339))
+	}
+	s, err := m.putAway(ctx, id, func(s *Thread) {
+		s.SnoozedUntil, s.SavedAt = until, time.Time{}
+	})
+	if err != nil {
+		return Thread{}, err
+	}
+	m.log.Info("snoozed thread", "thread", id, "until", until)
+	return s, nil
+}
+
+// SaveForLater snoozes a thread with no wake time
+// (docs/notes/save-for-later-1-daemon.md): what Snooze does, except that it stamps
+// SavedAt (kept on a thread already saved, so saving twice does not reorder the list)
+// and clears SnoozedUntil, so wakeSnoozed never sees it. It lasts until a call that
+// unsnoozes.
+func (m *Manager) SaveForLater(ctx context.Context, id string) (Thread, error) {
+	s, err := m.putAway(ctx, id, func(s *Thread) {
+		s.SnoozedUntil = time.Time{}
+		if s.SavedAt.IsZero() {
+			s.SavedAt = m.opts.Now().Round(0).Truncate(time.Millisecond)
+		}
+	})
+	if err != nil {
+		return Thread{}, err
+	}
+	m.log.Info("saved thread for later", "thread", id)
+	return s, nil
+}
+
+// putAway is the part of a snooze both forms share: it closes the thread, removes its
+// shells, then under m.mu applies set, unpins and unarchives it and clears a "snooze
+// ended" status.
+func (m *Manager) putAway(ctx context.Context, id string, set func(*Thread)) (Thread, error) {
+	if err := m.refuseResident(id, "snoozed"); err != nil {
+		return Thread{}, err
 	}
 	if err := m.Close(ctx, id); err != nil {
 		return Thread{}, err
@@ -61,23 +98,22 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 	if rec.run != nil || rec.s.State != StateDisconnected {
 		return Thread{}, fmt.Errorf("%w: thread %s was started while being snoozed", ErrFailedPrecondition, id)
 	}
-	rec.s.SnoozedUntil = until
+	set(&rec.s)
 	rec.s.Pinned = false
 	clearSnoozeEnded(&rec.s, m.opts.Now()) // a re-snooze: the last wake is old news
 	m.unarchiveLocked(rec)
 	m.commitLocked(rec, true)
-	m.log.Info("snoozed thread", "thread", id, "until", until)
 	return rec.s, nil
 }
 
-// unsnoozeLocked clears rec's SnoozedUntil and reports whether it was set, so the
-// caller commits. Reconnect, Pin(true), Send and Archive(true) unsnooze implicitly, at
-// the same spots that unarchive. Callers hold m.mu.
+// unsnoozeLocked clears rec's SnoozedUntil and SavedAt and reports whether either was
+// set, so the caller commits. Reconnect, Pin(true), Send and Archive(true) unsnooze
+// implicitly, at the same spots that unarchive. Callers hold m.mu.
 func (m *Manager) unsnoozeLocked(rec *record) bool {
-	if rec.s.SnoozedUntil.IsZero() {
+	if !rec.s.Snoozed() {
 		return false
 	}
-	rec.s.SnoozedUntil = time.Time{}
+	rec.s.SnoozedUntil, rec.s.SavedAt = time.Time{}, time.Time{}
 	return true
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -310,6 +311,47 @@ func TestThreadWatchSendsSnapshotThenEvents(t *testing.T) {
 	}
 	if !stream.Receive() || stream.Msg().GetRemovedId() != "s-a" {
 		t.Fatalf("third event = %v (%v)", stream.Msg(), stream.Err())
+	}
+}
+
+func TestThreadSnoozeSave(t *testing.T) {
+	now := time.Date(2026, 10, 14, 15, 4, 5, 0, time.UTC)
+	tests := []struct {
+		name     string
+		id       string
+		until    *timestamppb.Timestamp
+		wantCode connect.Code
+		wantCall string // "" when the store is not called
+	}{
+		{name: "save has no wake time", id: "s-1", wantCall: "SaveForLater s-1"},
+		{name: "save with until is invalid", id: "s-1", until: timestamppb.New(now.Add(time.Hour)), wantCode: connect.CodeInvalidArgument},
+		{name: "unknown thread", id: "nope", wantCode: connect.CodeNotFound, wantCall: "SaveForLater nope"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c := newThreadServer(t)
+			fake.Now = func() time.Time { return now }
+			fake.Put(thread.Thread{ID: "s-1", State: thread.StateConnected, Pinned: true, ArchivedAt: now.Add(-time.Hour),
+				SnoozedUntil: now.Add(time.Hour), CreatedAt: now})
+			res, err := c.Snooze(context.Background(), connect.NewRequest(&v1.SnoozeThreadRequest{Id: tt.id, Until: tt.until, Save: true}))
+			if connect.CodeOf(err) != tt.wantCode && (tt.wantCode != 0 || err != nil) {
+				t.Fatalf("Snooze = %v, want code %v", err, tt.wantCode)
+			}
+			if tt.wantCall == "" && slices.ContainsFunc(fake.Calls(), func(c string) bool { return strings.HasPrefix(c, "SaveForLater") }) {
+				t.Errorf("calls = %v, want no save", fake.Calls())
+			}
+			if tt.wantCall != "" && !slices.Contains(fake.Calls(), tt.wantCall) {
+				t.Errorf("calls = %v, want %q", fake.Calls(), tt.wantCall)
+			}
+			if tt.wantCode != 0 || err != nil {
+				return
+			}
+			s := res.Msg.GetThread()
+			if !s.GetSavedAt().AsTime().Equal(now) || s.GetSnoozedUntil() != nil || s.GetArchivedAt() != nil || s.GetPinned() ||
+				s.GetState() != v1.ThreadState_THREAD_STATE_DISCONNECTED {
+				t.Errorf("saved = %v; want saved_at %v, no snoozed_until, not archived, unpinned, disconnected", s, now)
+			}
+		})
 	}
 }
 

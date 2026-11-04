@@ -296,6 +296,9 @@ type ThreadServiceClient interface {
 	// wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
 	// before then only clears snoozed_until. Reconnect, Pin
 	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+	// With save instead of until it is the same with no wake time: saved_at is set,
+	// snoozed_until stays unset and the daemon never wakes it; a request with neither, and
+	// those implicit clears, end it too.
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
 	// Label adds and removes a thread's labels (clear first, then remove, then add) and
 	// returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
@@ -1274,6 +1277,9 @@ type ThreadServiceHandler interface {
 	// wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
 	// before then only clears snoozed_until. Reconnect, Pin
 	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+	// With save instead of until it is the same with no wake time: saved_at is set,
+	// snoozed_until stays unset and the daemon never wakes it; a request with neither, and
+	// those implicit clears, end it too.
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
 	// Label adds and removes a thread's labels (clear first, then remove, then add) and
 	// returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
