@@ -1,7 +1,7 @@
 /*!
  * The dictation overlay's dot scope: dimensions and constants from Hex
  * (https://github.com/anomalyco/hex), MIT, Copyright (c) 2026 Christopher Langton. The
- * full notice is in src/overlay/LICENSE.
+ * full notice is in public/HEX-LICENSE.md, which ships in the app.
  */
 import type { Rgb } from "@/themes/color";
 

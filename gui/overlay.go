@@ -13,7 +13,7 @@ import (
 // bar that shows a session started outside the app listening, working and done. The host
 // only places, shows and hides the window; the page (frontend/dictation-overlay.html) reads
 // the daemon and plays the phases. The plate's dimensions come from Hex
-// (anomalyco/hex, MIT; the notice is in frontend/src/overlay/LICENSE).
+// (anomalyco/hex, MIT; the notice is in frontend/public/HEX-LICENSE.md).
 
 const (
 	// overlayClientID is the DictationSession.client_id the overlay shows for. Composers
