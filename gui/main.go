@@ -29,6 +29,10 @@ func main() {
 		fmt.Println("Code Foundry " + version.Version)
 		return
 	}
+	// `"Code Foundry" --accessibility-probe [--prompt]`: no window, no daemon (accessibility_probe_darwin.go).
+	if probe, prompt := accessibilityProbeArgs(os.Args[1:]); probe {
+		os.Exit(runAccessibilityProbe(prompt))
+	}
 	// The GUI takes no other arguments. Refusing them is what stops a misconfigured
 	// CODE_FOUNDRY_BIN (pointed at this app) from opening a window per `daemon` spawn.
 	if len(os.Args) > 1 {
