@@ -73,9 +73,12 @@ export function selectSheetOpen(s: ViewsState): boolean {
 }
 
 /** Settings, Themes or Usage is up: none of them is a selection. */
-function anyViewOpen(): boolean {
-  const s = useViewsStore.getState();
+export function selectAnyViewOpen(s: ViewsState): boolean {
   return selectSheetOpen(s) || s.usageOpen;
+}
+
+function anyViewOpen(): boolean {
+  return selectAnyViewOpen(useViewsStore.getState());
 }
 
 /** Whether the current selection's side panel is open and expanded over the content column. */

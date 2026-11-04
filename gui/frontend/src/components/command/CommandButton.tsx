@@ -16,6 +16,10 @@ interface CommandButtonProps {
   label?: string;
   /** Tooltip of an icon-only button; defaults to the command's title. A button with a label has none. Never a chord: those live in the palette and help. */
   tooltip?: string;
+  /** Which side an icon-only button's tooltip floats to; defaults to Tip's. */
+  tooltipSide?: ComponentProps<typeof Tip>["side"];
+  /** Dim the button although the command is listed: running it here would do nothing. */
+  disabled?: boolean;
   /**
    * Content drawn instead of the icon and label (a thread's name, its project and branch).
    * Visible, so the button has no tooltip; its text is its accessible name.
@@ -55,6 +59,8 @@ export function CommandButton({
   label,
   children,
   tooltip,
+  tooltipSide,
+  disabled = false,
   whenUnavailable = "hide",
   keepFocus = true,
   variant = "ghost",
@@ -74,6 +80,7 @@ export function CommandButton({
       </span>
     );
   const name = tooltip ?? commandTitle ?? label ?? command;
+  const dimmed = disabled || commandTitle === null;
   // Visible text (a label or custom content) names the button itself: no tooltip.
   const visible = Boolean(label) || children !== undefined;
   const button = (
@@ -82,7 +89,7 @@ export function CommandButton({
       variant={variant}
       size={size ?? (visible ? "sm" : count !== undefined ? "xs" : "icon-xs")}
       className={className}
-      disabled={commandTitle === null}
+      disabled={dimmed}
       aria-label={visible ? undefined : count !== undefined ? `${name} (${String(count)})` : name}
       aria-pressed={pressed}
       aria-current={current ? "page" : undefined}
@@ -113,5 +120,9 @@ export function CommandButton({
   if (visible) return button;
   // An icon-only button names itself in a tooltip (and aria-label). A disabled button gets
   // no pointer events, so a disabled one is hovered through a span around it.
-  return <Tip label={name}>{commandTitle === null ? <span className="inline-flex">{button}</span> : button}</Tip>;
+  return (
+    <Tip label={name} side={tooltipSide}>
+      {dimmed ? <span className="inline-flex">{button}</span> : button}
+    </Tip>
+  );
 }

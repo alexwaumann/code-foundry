@@ -22,10 +22,10 @@ import (
 // screen minus the menu bar and the Dock), centred (docs/notes/window-frame.md).
 
 const (
-	// windowMinWidth leaves room for the content pane (360px minimum) beside a full-width
-	// sidebar; the side panel shrinks, then hides, when it does not fit (stores/ui.ts
-	// panelMax).
-	windowMinWidth  = 900
+	// windowMinWidth fits the default sidebar (260), the content pane's 360 minimum, the
+	// side panel's 280 minimum and their three 12px gaps: 936, rounded up. The panel
+	// shrinks, then hides, beside a wider sidebar (stores/ui.ts panelMax).
+	windowMinWidth  = 940
 	windowMinHeight = 500
 	// firstLaunchShare is the share of the primary work area a first launch takes: nearly
 	// the whole screen on a 14" MacBook Pro, with room to spare on larger displays.
