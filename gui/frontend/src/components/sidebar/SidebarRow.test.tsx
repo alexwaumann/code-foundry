@@ -771,6 +771,29 @@ describe("SidebarRow linked PR tag click", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
   });
 
+  it("several: the shown one's detail is read first, though its tab opens last", () => {
+    const readOnce = vi.spyOn(pullRequestDetailResource, "readOnce").mockResolvedValue();
+    renderWith({ linkedPullRequests: [link("o/r", 1), link("o/r", 2)] });
+    fireEvent.click(screen.getByTestId("row-linked-prs"));
+    const shown = showThreadView.mock.calls.at(-1)?.[2] as { number: string };
+    expect(readOnce.mock.calls[0]).toEqual([pullRequestKey("o/r", Number(shown.number))]);
+    expect(readOnce).toHaveBeenCalledTimes(2);
+    readOnce.mockRestore();
+  });
+
+  it("a hover on the tag warms the one a click would land on, not the others", async () => {
+    const readOnce = vi.spyOn(pullRequestDetailResource, "readOnce").mockResolvedValue();
+    renderWith({ linkedPullRequests: [link("o/r", 1), link("o/r", 2)] });
+    fireEvent.pointerEnter(screen.getByTestId("row-linked-prs"));
+    await vi.waitFor(() => {
+      expect(readOnce).toHaveBeenCalledTimes(1);
+    });
+    fireEvent.click(screen.getByTestId("row-linked-prs"));
+    const shown = showThreadView.mock.calls.at(-1)?.[2] as { number: string };
+    expect(readOnce.mock.calls[0]).toEqual([pullRequestKey("o/r", Number(shown.number))]);
+    readOnce.mockRestore();
+  });
+
   it("one PR of an already selected thread: the selection stays as it is", () => {
     const select = vi.spyOn(useUiStore.getState(), "select");
     renderWith({ linkedPullRequests: [link("o/r", 7)] }, { kind: "thread", id: "s-1" });

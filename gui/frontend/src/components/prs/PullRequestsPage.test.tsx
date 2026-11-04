@@ -11,6 +11,7 @@ const { SidePanel } = await import("@/components/panel/SidePanel");
 const { useSidebarDashboard } = await import("@/components/sidebar/useLinkedPrs");
 const { applyGhEvent, usePollStore } = await import("@/stores/gh");
 const { useUiStore } = await import("@/stores/ui");
+const { PREFETCH_DWELL_MS, resetPrefetch } = await import("@/stores/prPrefetch");
 const { PullRequestsNav, PullRequestsPage } = await import("./PullRequestsPage");
 
 /**
@@ -66,6 +67,55 @@ function gh(ev: Parameters<typeof applyGhEvent>[0]) {
     applyGhEvent(ev);
   });
 }
+
+describe("warming a row's detail", () => {
+  const detailReads = () => [...world.reads.detail.entries()];
+  const reads = (n: number) => [[`${SLUG}#${String(n)}`, 1]];
+  const row = (n: number) => rows("authored").find((r) => r.dataset.navKey === `authored:${SLUG}#${String(n)}`) as HTMLElement;
+  const dwell = async () => {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, PREFETCH_DWELL_MS + 30));
+    });
+    await settle();
+  };
+
+  beforeEach(() => {
+    resetPrefetch();
+  });
+
+  it("a pointer resting on a row reads its detail; one passing over it does not; the click finds it read", async () => {
+    await openPage();
+    fireEvent.pointerEnter(row(145));
+    fireEvent.pointerLeave(row(145));
+    await dwell();
+    expect(detailReads()).toEqual([]);
+    fireEvent.pointerEnter(row(142));
+    await dwell();
+    expect(detailReads()).toEqual(reads(142));
+    fireEvent.click(row(142));
+    await settle();
+    expect(screen.getByTestId("pr-surface").dataset.seeded).toBeUndefined();
+  });
+
+  it("the keyboard's cursor warms the row it rests on, not the ones it passes", async () => {
+    await openPage();
+    const list = screen.getByTestId("prs-list");
+    for (let i = 0; i < 3; i++) fireEvent.keyDown(list, { key: "j" });
+    await dwell();
+    const at = list.querySelector<HTMLElement>('[aria-selected="true"]')?.dataset.navKey ?? "";
+    expect(detailReads()).toEqual([[at.slice(at.indexOf(":") + 1), 1]]);
+  });
+
+  it("a row that unmounts under the pointer reads nothing", async () => {
+    await openPage();
+    fireEvent.pointerEnter(row(142));
+    act(() => {
+      useUiStore.setState({ selection: { kind: "none" } });
+    });
+    await dwell();
+    expect(detailReads()).toEqual([]);
+  });
+});
 
 describe("before the first poll", () => {
   const empty = () => ({ ...world.dashboard, reviewRequested: [], reviewed: [], authored: [], recentlyMerged: [], projectOpen: { ...world.dashboard.projectOpen, pullRequests: [] }, projectMerged: { ...world.dashboard.projectMerged, pullRequests: [] }, viewer: null, fetchedAtMs: null, projectsFetchedAtMs: null });

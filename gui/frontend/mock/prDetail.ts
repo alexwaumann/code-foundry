@@ -276,6 +276,8 @@ export class PrDetailWorld {
   private nextNumber = 151;
   /** Commands whose next run fails (POST /__mock/gh/pr-fail?command=…). */
   readonly failNext = new Set<string>();
+  /** How long GetPullRequestDetail waits, as a daemon with nothing cached does at GitHub (POST /__mock/gh/pr-detail-delay?ms=…). */
+  readDelayMs = 0;
   /** How long pr.ask, pr.explain, pr.fix.findings, pr.merge and pr.review take (POST /__mock/gh/pr-delay?ms=…). */
   threadDelayMs = 0;
 
@@ -743,6 +745,12 @@ export class PrDetailWorld {
     } catch {
       return null;
     }
+  }
+
+  /** GetPullRequestDetail's wait (readDelayMs). */
+  async delayed<T>(read: () => T): Promise<T> {
+    if (this.readDelayMs > 0) await new Promise((r) => setTimeout(r, this.readDelayMs));
+    return read();
   }
 
   get(slug: string, number: number, refresh: boolean): DetailInit {
