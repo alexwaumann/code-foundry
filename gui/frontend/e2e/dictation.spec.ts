@@ -138,3 +138,33 @@ test.describe("composer", () => {
     await expect(card.getByTestId("dictation-pill")).toBeVisible();
   });
 });
+
+/** SHOTS=<dir>: the hold key's permission row, for the PR body, in both schemes. */
+test.describe("shots", () => {
+  for (const scheme of ["dark", "light"] as const) {
+    test(`the permission row, ${scheme}`, async ({ page }) => {
+      const dir = process.env.SHOTS;
+      test.skip(!dir, "SHOTS=<dir> only");
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.clock.install();
+      await mockPost("dictation?state=ready&access=missing");
+      await openApp(page);
+      await page.keyboard.press("Meta+Comma");
+      const section = page.locator('[data-section="dictation"]');
+      const row = page.getByTestId("dictation-access-row");
+      await expect(row).toHaveAttribute("data-state", "ask");
+      await page.waitForTimeout(500); // the settings sheet's fade
+      await section.screenshot({ path: `${dir ?? ""}/ask-${scheme}.png` });
+      await page.getByTestId("dictation-allow").click();
+      await page.clock.fastForward(31_000);
+      await expect(row).toHaveAttribute("data-state", "stuck");
+      await section.screenshot({ path: `${dir ?? ""}/stuck-${scheme}.png` });
+      await mockPost("dictation?access=silent");
+      await expect(row).toHaveAttribute("data-state", "restart");
+      await section.screenshot({ path: `${dir ?? ""}/restart-${scheme}.png` });
+      await mockPost("dictation?access=granted");
+      await expect(row).toHaveAttribute("data-state", "allowed");
+      await section.screenshot({ path: `${dir ?? ""}/allowed-${scheme}.png` });
+    });
+  }
+});

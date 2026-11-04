@@ -201,8 +201,8 @@ type pasteJob struct {
 	pressed frontApp
 }
 
-// holdService runs the hold key. Everything after the mutex-free line below belongs to the
-// goroutine in run; tests call update, event and check from theirs.
+// holdService runs the hold key. The fields from conn down belong to the goroutine in run;
+// tests call update, event and check from theirs.
 type holdService struct {
 	os  holdOS
 	log *slog.Logger

@@ -225,7 +225,7 @@
  *        Every change below reaches WatchBoard streams.
  *   DictationService and dictation.* (mock/dictation.ts): enabled is dictation.enabled; the model, hardware,
  *        sessions and the microphone are scripted. A session plays levels and two phrases 1 s apart.
- *   POST /__mock/dictation?state=off|no-model|downloading|ready|unloaded|listening|error[&m1=true][&denied=true]
+ *   POST /__mock/dictation?state=off|no-model|downloading|ready|unloaded|listening|error[&m1=true][&denied=true][&access=none|missing|granted|silent]
  *   POST /__mock/dictation/script?phrases=One.|Two.[&gap=1000][&flush=Tail.][&loadMs=800][&silence=1]
  *   POST /__mock/dictation/end?reason=silence|stopped|disabled|error   (the open session ends)
  *   GET  /__mock/dictation                        ({ state, enabled, downloaded, session, micDenied, calls })

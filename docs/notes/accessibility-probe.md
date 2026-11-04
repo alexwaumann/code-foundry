@@ -1,5 +1,8 @@
 # Accessibility probe (2026-11-03)
 
+The probe is gone: the feature replaced it (`dictate-anywhere.md`). This note stays as the
+record of what it was for and found.
+
 A temporary check of what a system-wide "hold Alt, speak, paste into any app" dictation
 depends on. It is not the feature: no settings, commands, UI or daemon changes.
 `"Code Foundry" --accessibility-probe [--prompt]` opens no window and starts no daemon.

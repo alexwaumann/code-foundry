@@ -51,13 +51,18 @@ Three processes, one protocol.
   It also captures the microphone for dictation: while `DictationService.Watch` says
   LISTENING it streams 16 kHz frames with `DictationService.Audio`; it starts itself as
   its own responsible process so the macOS prompt names Code Foundry, not the terminal
-  (`docs/notes/dictation-3-host.md`). While `dictation.anywhere` is on (it reads the
-  setting from the same stream) it keeps a menu bar item, and closing the window hides it
+  (`docs/notes/dictation-3-host.md`). While `dictation.enabled` and `dictation.anywhere` are
+  on (it reads the settings from the same stream) it keeps a menu bar item, and closing the window hides it
   and drops the Dock icon instead of quitting (`gui/menubar.go`,
   `docs/notes/dictate-anywhere-settings.md`). For a session whose client is `system` it
   shows the dictation overlay, a non-activating panel with its own small page
   (`dictation-overlay.html`) that reads the daemon and asks to be hidden when it has played
   the session (`gui/overlay.go`, `docs/notes/dictate-anywhere-overlay.md`).
+  With dictation on and Accessibility granted it listens for the hold key on a listen-only
+  event tap: it runs `dictation.hold` for the window's composer, or opens a `system` session
+  and pastes the phrases into the app in front (`gui/hold.go`,
+  `docs/notes/dictate-anywhere.md`). One GUI runs per home: a second launch shows the first's
+  window and exits (`gui/singleinstance.go`).
   No business logic lives in the Wails host.
 * **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
@@ -425,10 +430,13 @@ Services (v1):
   The GUI shows it on Settings › Memory, fed by the EventService memory source
   (`docs/notes/memory-page.md`).
 * `DictationService` — Watch (the whole state: on/off, the anywhere, hold key and sounds
-  settings, model and download, this Mac, the open session, mic denied), Download, CancelDownload, RemoveModel, Start, Stop,
+  settings, model and download, this Mac, the open session, mic denied, the host's
+  Accessibility report, the window's composer target), Download, CancelDownload, RemoveModel, Start, Stop,
   Session (one session's levels, phrases and end), Audio (the Wails host's microphone
-  client stream), MicDenied: voice dictation into the composers, transcribed on this Mac
-  by the code-foundry-dictate engine the daemon runs (`docs/notes/dictation-2-daemon.md`).
+  client stream), MicDenied, Accessibility, ComposerTarget: voice dictation into the composers
+  and, through the host's hold key, any app, transcribed on this Mac by the
+  code-foundry-dictate engine the daemon runs (`docs/notes/dictation-2-daemon.md`,
+  `docs/notes/dictate-anywhere.md`).
 * `SearchService` — StartAgent, Watch (server stream: the entry, then its steps, hits,
   answer and end), WatchRecent, Stop, ListRecent, Get, OpenHit, MarkSeen, RecordFind, Forget,
   Clear, Promote, Report: the search dialog's history (the last 50 searches) and Agent
@@ -782,7 +790,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   "inline" priority) or the settings section is on screen ("core"), and one
   `DictationService.Session` while a composer dictates. A phrase lands at the caret of the
   composer that pressed the mic (every composer: thread, new thread, Ember, the PR panel's
-  ask and review), tinted by a ProseMirror decoration, never a mark.
+  ask and review), tinted by a ProseMirror decoration, never a mark. The host's hold key
+  drives the same session through `dictation.hold`, and the window tells the daemon whether
+  a composer can take it (`ComposerTarget`).
 * Stream liveness: the daemon sends a `StreamHeartbeat` on each of those three streams
   after 5 s without other messages (`api.HeartbeatInterval`, mirrored by
   `api/stream.ts` `HEARTBEAT_MS`). WKWebView can hold a stream's last bytes after the
