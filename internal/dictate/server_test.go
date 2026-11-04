@@ -157,6 +157,8 @@ var (
 	endF    = req(3, MethodEnd, EndParams{Session: "s", Flush: true})
 	endNoF  = req(3, MethodEnd, EndParams{Session: "s"})
 	ended   = []string{evReady, ok(3)}
+	endTail = req(3, MethodEnd, EndParams{Session: "s", Flush: true, Tail: true})
+	endTone = req(3, MethodEnd, EndParams{Session: "s", Flush: true, Tail: true, ToneMS: 140})
 	speech  = audio("s", 1000, true)
 	silence = audio("s", 700, false)
 )
@@ -215,6 +217,113 @@ func TestServer(t *testing.T) {
 				evSpeechOn, evSpeechOff, evTranscribing, evListening,
 				`{"event":"phrase","params":{"session":"s","text":"Unfinished","start_ms":0,"end_ms":1024,"infer_ms":0}}`,
 			}, ended),
+			wantPrompts: []string{""},
+		},
+		{
+			name:  "a release keeps the base tail and nothing past it",
+			texts: []string{"Whole."},
+			steps: steps(load, begin, speech, endTail, audio("s", 2000, false)),
+			want: cat(loaded, begun, []string{
+				evSpeechOn, evSpeechOff, evTranscribing, evListening,
+				`{"event":"phrase","params":{"session":"s","text":"Whole.","start_ms":0,"end_ms":1216,"infer_ms":0}}`,
+			}, ended),
+			wantPrompts: []string{""},
+		},
+		{
+			name:  "no reply until the tail is over",
+			steps: steps(load, begin, speech, endTail, audio("s", 200, false)),
+			want:  cat(loaded, begun, []string{evSpeechOn}),
+		},
+		{
+			name:  "speech past the base grows the tail until it goes quiet",
+			texts: []string{"Grown."},
+			steps: steps(load, begin, speech, endTail, audio("s", 400, true), audio("s", 300, false)),
+			want: cat(loaded, begun, []string{
+				evSpeechOn, evSpeechOff, evTranscribing, evListening,
+				`{"event":"phrase","params":{"session":"s","text":"Grown.","start_ms":0,"end_ms":1568,"infer_ms":0}}`,
+			}, ended),
+			wantPrompts: []string{""},
+		},
+		{
+			name:  "speech that does not stop is cut at the most",
+			texts: []string{"Capped."},
+			steps: steps(load, begin, speech, endTail, audio("s", 2000, true)),
+			want: cat(loaded, begun, []string{
+				evSpeechOn, evSpeechOff, evTranscribing, evListening,
+				`{"event":"phrase","params":{"session":"s","text":"Capped.","start_ms":0,"end_ms":1568,"infer_ms":0}}`,
+			}, ended),
+			wantPrompts: []string{""},
+		},
+		{
+			name:  "what could be the stop tone does not grow the tail",
+			texts: []string{"Toned."},
+			steps: steps(load, begin, speech, endTone, audio("s", 300, true), audio("s", 300, false)),
+			want: cat(loaded, begun, []string{
+				evSpeechOn, evSpeechOff, evTranscribing, evListening,
+				`{"event":"phrase","params":{"session":"s","text":"Toned.","start_ms":0,"end_ms":1280,"infer_ms":0}}`,
+			}, ended),
+			wantPrompts: []string{""},
+		},
+		{
+			name:  "speech heard after the stop tone grows the tail",
+			texts: []string{"Past it."},
+			steps: steps(load, begin, speech, endTone, audio("s", 1000, true)),
+			want: cat(loaded, begun, []string{
+				evSpeechOn, evSpeechOff, evTranscribing, evListening,
+				`{"event":"phrase","params":{"session":"s","text":"Past it.","start_ms":0,"end_ms":1568,"infer_ms":0}}`,
+			}, ended),
+			wantPrompts: []string{""},
+		},
+		{
+			name:        "a tail with no speech before or in it transcribes nothing",
+			steps:       steps(load, begin, audio("s", 1000, false), endTone, audio("s", 700, false)),
+			want:        cat(loaded, begun, ended),
+			wantPrompts: nil,
+		},
+		{
+			name:  "a second end cuts the tail, keeping what arrived",
+			texts: []string{"Cut."},
+			steps: steps(load, begin, speech, endTail, audio("s", 100, true), req(4, MethodEnd, EndParams{Session: "s", Flush: true})),
+			want: cat(loaded, begun, []string{
+				evSpeechOn, evSpeechOff, evTranscribing, evListening,
+				`{"event":"phrase","params":{"session":"s","text":"Cut.","start_ms":0,"end_ms":1088,"infer_ms":0}}`,
+			}, ended, []string{ok(4)}),
+			wantPrompts: []string{""},
+		},
+		{
+			name:  "a stop without flush in a tail still keeps what was released",
+			texts: []string{"Kept."},
+			steps: steps(load, begin, speech, endTail, req(4, MethodEnd, EndParams{Session: "s"})),
+			want: cat(loaded, begun, []string{
+				evSpeechOn, evSpeechOff, evTranscribing, evListening,
+				`{"event":"phrase","params":{"session":"s","text":"Kept.","start_ms":0,"end_ms":992,"infer_ms":0}}`,
+			}, ended, []string{ok(4)}),
+			wantPrompts: []string{""},
+		},
+		{
+			name:  "a tail is not for an end without flush",
+			steps: steps(load, begin, speech, req(3, MethodEnd, EndParams{Session: "s", Tail: true})),
+			want:  cat(loaded, begun, []string{evSpeechOn, evSpeechOff}, ended),
+		},
+		{
+			name:  "a tail is not for a session that is not open",
+			steps: steps(load, req(3, MethodEnd, EndParams{Session: "s", Flush: true, Tail: true})),
+			want:  cat(loaded, []string{ok(3)}),
+		},
+		{
+			name:  "critical pressure answers the tail's end",
+			steps: steps(load, begin, speech, endTail, step{pressure: PressureCritical}),
+			want:  cat(loaded, begun, []string{evSpeechOn, evSpeechOff, evReady, ok(3), evIdle, evUnloaded}),
+		},
+		{
+			name:  "a warning waits for the tail",
+			texts: []string{"Kept."},
+			steps: steps(load, begin, speech, step{pressure: PressureWarn}, endTail, audio("s", 400, false)),
+			want: cat(loaded, begun, []string{
+				evSpeechOn, evSpeechOff, evTranscribing, evListening,
+				`{"event":"phrase","params":{"session":"s","text":"Kept.","start_ms":0,"end_ms":1216,"infer_ms":0}}`,
+				evReady, ok(3), evIdle, evUnloaded,
+			}),
 			wantPrompts: []string{""},
 		},
 		{
@@ -453,5 +562,38 @@ func waitFor(t *testing.T, b *syncBuffer, s string) {
 			t.Fatalf("no %q in:\n%s", s, b.String())
 		}
 		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// A tail whose audio stops coming ends after TailWait with what it heard.
+func TestTailWaitEndsATailWithNoAudio(t *testing.T) {
+	in, feed := io.Pipe()
+	defer func() { _ = feed.Close() }()
+	var out syncBuffer
+	f := &fakeBackend{texts: []string{"Heard."}}
+	s := NewServer(f, &out, slog.New(slog.DiscardHandler))
+	done := make(chan error, 1)
+	go func() { done <- s.Serve(context.Background(), in, nil) }()
+	for _, st := range steps(load, begin, speech, endTail) {
+		if _, err := io.WriteString(feed, st.line+"\n"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	start := time.Now()
+	for !strings.Contains(out.String(), ok(3)) {
+		if time.Since(start) > 5*time.Second {
+			t.Fatalf("no reply: %s", out.String())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if d := time.Since(start); d < TailWait*9/10 {
+		t.Errorf("reply after %s, want about %s", d, TailWait)
+	}
+	if !strings.Contains(out.String(), "Heard.") {
+		t.Errorf("no phrase: %s", out.String())
+	}
+	_ = feed.Close()
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

@@ -86,6 +86,7 @@ const sessions = new Map<string, Session>();
 let latest: DictationView | null = null;
 let nextId = 1;
 let flushPhrase = "";
+let tailsHeld = false;
 let startGate: Promise<void> | null = null;
 
 function lastSession(): string {
@@ -108,7 +109,7 @@ const calls: string[] = [];
 const composerReports: boolean[] = [];
 
 export interface FakeDictation {
-  /** "start <client>", "stop <session> <flush>", in order. */
+  /** "start <client>", "stop <session> <flush>" (and " tail" for a release), in order. */
   readonly calls: readonly string[];
   /** What the store reported with reportComposerTarget, in order. */
   readonly composerReports: readonly boolean[];
@@ -118,6 +119,8 @@ export interface FakeDictation {
   setFlushPhrase(text: string): void;
   /** Start waits until the returned release is called (the model loading). */
   holdStart(): () => void;
+  /** A Stop with tail leaves the session open until another Stop, as a tail does. */
+  holdTails(): void;
   /** The open session's id (the last one started). */
   readonly sessionId: string;
   phrase(text: string, sessionId?: string): void;
@@ -134,6 +137,9 @@ export const fakeDictation: FakeDictation = {
   },
   setFlushPhrase(text) {
     flushPhrase = text;
+  },
+  holdTails() {
+    tailsHeld = true;
   },
   holdStart() {
     let release: () => void = () => undefined;
@@ -158,6 +164,7 @@ export const fakeDictation: FakeDictation = {
     latest = null;
     nextId = 1;
     flushPhrase = "";
+    tailsHeld = false;
     startGate = null;
     calls.length = 0;
     composerReports.length = 0;
@@ -196,8 +203,9 @@ export const fakeDictationApi = {
     return id;
   },
 
-  stopDictation(sessionId: string, flush: boolean): Promise<void> {
-    calls.push(`stop ${sessionId} ${String(flush)}`);
+  stopDictation(sessionId: string, flush: boolean, tail = false): Promise<void> {
+    calls.push(`stop ${sessionId} ${String(flush)}${tail ? " tail" : ""}`);
+    if (tail && tailsHeld) return Promise.resolve();
     if (flush && flushPhrase) phrase(flushPhrase, sessionId);
     end("stopped", sessionId);
     return Promise.resolve();

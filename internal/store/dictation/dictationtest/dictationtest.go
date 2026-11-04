@@ -28,6 +28,10 @@ type Engine struct {
 	phrases  []string
 	failLoad error
 	loadGate chan struct{}
+	// holdTails keeps a release's end from answering until FinishTail or another end.
+	holdTails bool
+	tail      chan struct{}
+	ends      []dictate.EndParams
 
 	enqueued uint64
 	calls    []string
@@ -87,6 +91,27 @@ func (e *Engine) Call(ctx context.Context, method string, params, result any) er
 		var p dictate.EndParams
 		_ = json.Unmarshal(raw, &p)
 		e.mu.Lock()
+		e.ends = append(e.ends, p)
+		tail := e.tail
+		if tail != nil {
+			close(tail) // the session closes for the end in its tail; this one has nothing to do
+			e.tail = nil
+			e.mu.Unlock()
+			return nil
+		}
+		if p.Tail && e.holdTails {
+			tail = make(chan struct{})
+			e.tail = tail
+			e.mu.Unlock()
+			select {
+			case <-tail:
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-e.done:
+				return errors.New("the engine stopped")
+			}
+			e.mu.Lock()
+		}
 		phrases := e.phrases
 		if !p.Flush {
 			phrases = nil
@@ -164,6 +189,31 @@ func (e *Engine) SetPhrases(texts ...string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.phrases = texts
+}
+
+// HoldTails keeps every release's end from answering until FinishTail or another end, as the
+// real engine does while it hears out the tail.
+func (e *Engine) HoldTails() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.holdTails = true
+}
+
+// FinishTail ends the tail held by HoldTails.
+func (e *Engine) FinishTail() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.tail != nil {
+		close(e.tail)
+		e.tail = nil
+	}
+}
+
+// Ends are the end requests so far, in order.
+func (e *Engine) Ends() []dictate.EndParams {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.ends)
 }
 
 // SetFailLoad makes load fail with err (nil: succeed).

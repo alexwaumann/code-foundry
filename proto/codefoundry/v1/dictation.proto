@@ -40,8 +40,10 @@ service DictationService {
   rpc Start(StartDictationRequest) returns (StartDictationResponse) {}
   // Stop ends the session. With flush the engine transcribes the speech it holds first
   // and its phrases arrive on Session before ended (bounded: 1.5 s), session.stopping
-  // showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. An
-  // unknown or ended session is not an error.
+  // showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. With
+  // tail it listens on first (see StopDictationRequest.tail). A Stop on a session already
+  // stopping cuts any tail short and returns once the session has ended. An unknown or
+  // ended session is not an error.
   rpc Stop(StopDictationRequest) returns (StopDictationResponse) {}
   // Session streams one session's events: a heartbeat at once (opening the stream),
   // level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat
@@ -169,8 +171,8 @@ message DictationSession {
   // The client that started it (StartDictationRequest.client_id).
   string client_id = 2;
   google.protobuf.Timestamp started_at = 3;
-  // Stop(flush) was called and the session has not ended yet: the engine is transcribing
-  // what it holds. Never set by a Stop without flush.
+  // Stop(flush) was called and the session has not ended yet: the engine is hearing out
+  // a release's tail or transcribing what it holds. Never set by a Stop without flush.
   bool stopping = 4;
 }
 
@@ -206,6 +208,11 @@ message StopDictationRequest {
   string session_id = 1;
   // Transcribe the speech the engine holds first (Send stops with it).
   bool flush = 2;
+  // With flush: this is a release of the hold key, which often lands while the last word
+  // is still sounding. session.stopping shows at once, and the host's frames keep counting
+  // for 200 ms, up to 600 ms while speech carries on past that
+  // (docs/notes/dictation-release-tail.md).
+  bool tail = 3;
 }
 
 message StopDictationResponse {}

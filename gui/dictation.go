@@ -46,6 +46,8 @@ type dictationConn interface {
 	// Stop ends a session and drops what it holds; Finish transcribes that first.
 	Stop(ctx context.Context, sessionID string) error
 	Finish(ctx context.Context, sessionID string) error
+	// Release is Finish for the hold key's release: frames keep counting for the tail.
+	Release(ctx context.Context, sessionID string) error
 	Start(ctx context.Context, clientID string) (string, error)
 	Session(ctx context.Context, sessionID string) (sessionStream, error)
 	// Hold runs dictation.hold: the hold key, for the window's composer.
@@ -363,6 +365,11 @@ func (d daemonDictation) Stop(ctx context.Context, sessionID string) error {
 
 func (d daemonDictation) Finish(ctx context.Context, sessionID string) error {
 	_, err := d.c.Stop(ctx, connect.NewRequest(&v1.StopDictationRequest{SessionId: sessionID, Flush: true}))
+	return err
+}
+
+func (d daemonDictation) Release(ctx context.Context, sessionID string) error {
+	_, err := d.c.Stop(ctx, connect.NewRequest(&v1.StopDictationRequest{SessionId: sessionID, Flush: true, Tail: true}))
 	return err
 }
 

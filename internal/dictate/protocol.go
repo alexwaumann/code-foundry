@@ -93,6 +93,12 @@ type BeginParams struct {
 type EndParams struct {
 	Session string `json:"session"`
 	Flush   bool   `json:"flush"`
+	// Tail, with Flush, is a release: the audio that follows still counts, for as long as
+	// the release tail says, and the reply comes once the session has closed. An end for a
+	// session in its tail cuts the tail short.
+	Tail bool `json:"tail,omitempty"`
+	// ToneMS is how long the stop tone sounds from the release, 0 when it does not.
+	ToneMS int `json:"tone_ms,omitempty"`
 }
 
 // StatusResult is status's result.

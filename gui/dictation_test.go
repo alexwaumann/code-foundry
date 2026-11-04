@@ -166,6 +166,7 @@ func (d *fakeDaemon) Finish(_ context.Context, id string) error {
 }
 
 // The hold key's calls: its own tests use fakeHoldConn.
+func (d *fakeDaemon) Release(context.Context, string) error         { return nil }
 func (d *fakeDaemon) Start(context.Context, string) (string, error) { return "", nil }
 func (d *fakeDaemon) Session(context.Context, string) (sessionStream, error) {
 	return nil, errors.New("no sessions here")

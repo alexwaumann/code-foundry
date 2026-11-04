@@ -641,8 +641,8 @@ type DictationSession struct {
 	// The client that started it (StartDictationRequest.client_id).
 	ClientId  string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	StartedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	// Stop(flush) was called and the session has not ended yet: the engine is transcribing
-	// what it holds. Never set by a Stop without flush.
+	// Stop(flush) was called and the session has not ended yet: the engine is hearing out
+	// a release's tail or transcribing what it holds. Never set by a Stop without flush.
 	Stopping      bool `protobuf:"varint,4,opt,name=stopping,proto3" json:"stopping,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1040,7 +1040,12 @@ type StopDictationRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Transcribe the speech the engine holds first (Send stops with it).
-	Flush         bool `protobuf:"varint,2,opt,name=flush,proto3" json:"flush,omitempty"`
+	Flush bool `protobuf:"varint,2,opt,name=flush,proto3" json:"flush,omitempty"`
+	// With flush: this is a release of the hold key, which often lands while the last word
+	// is still sounding. session.stopping shows at once, and the host's frames keep counting
+	// for 200 ms, up to 600 ms while speech carries on past that
+	// (docs/notes/dictation-release-tail.md).
+	Tail          bool `protobuf:"varint,3,opt,name=tail,proto3" json:"tail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1085,6 +1090,13 @@ func (x *StopDictationRequest) GetSessionId() string {
 func (x *StopDictationRequest) GetFlush() bool {
 	if x != nil {
 		return x.Flush
+	}
+	return false
+}
+
+func (x *StopDictationRequest) GetTail() bool {
+	if x != nil {
+		return x.Tail
 	}
 	return false
 }
@@ -1826,11 +1838,12 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\"7\n" +
 	"\x16StartDictationResponse\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x01 \x01(\tR\tsessionId\"K\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\"_\n" +
 	"\x14StopDictationRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x14\n" +
-	"\x05flush\x18\x02 \x01(\bR\x05flush\"\x17\n" +
+	"\x05flush\x18\x02 \x01(\bR\x05flush\x12\x12\n" +
+	"\x04tail\x18\x03 \x01(\bR\x04tail\"\x17\n" +
 	"\x15StopDictationResponse\"8\n" +
 	"\x17DictationSessionRequest\x12\x1d\n" +
 	"\n" +

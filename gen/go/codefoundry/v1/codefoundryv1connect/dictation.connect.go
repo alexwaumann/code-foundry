@@ -87,8 +87,10 @@ type DictationServiceClient interface {
 	Start(context.Context, *connect.Request[v1.StartDictationRequest]) (*connect.Response[v1.StartDictationResponse], error)
 	// Stop ends the session. With flush the engine transcribes the speech it holds first
 	// and its phrases arrive on Session before ended (bounded: 1.5 s), session.stopping
-	// showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. An
-	// unknown or ended session is not an error.
+	// showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. With
+	// tail it listens on first (see StopDictationRequest.tail). A Stop on a session already
+	// stopping cuts any tail short and returns once the session has ended. An unknown or
+	// ended session is not an error.
 	Stop(context.Context, *connect.Request[v1.StopDictationRequest]) (*connect.Response[v1.StopDictationResponse], error)
 	// Session streams one session's events: a heartbeat at once (opening the stream),
 	// level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat
@@ -285,8 +287,10 @@ type DictationServiceHandler interface {
 	Start(context.Context, *connect.Request[v1.StartDictationRequest]) (*connect.Response[v1.StartDictationResponse], error)
 	// Stop ends the session. With flush the engine transcribes the speech it holds first
 	// and its phrases arrive on Session before ended (bounded: 1.5 s), session.stopping
-	// showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. An
-	// unknown or ended session is not an error.
+	// showing on Watch meanwhile, and it ends STOPPED; without flush it ends DISCARDED. With
+	// tail it listens on first (see StopDictationRequest.tail). A Stop on a session already
+	// stopping cuts any tail short and returns once the session has ended. An unknown or
+	// ended session is not an error.
 	Stop(context.Context, *connect.Request[v1.StopDictationRequest]) (*connect.Response[v1.StopDictationResponse], error)
 	// Session streams one session's events: a heartbeat at once (opening the stream),
 	// level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat
