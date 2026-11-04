@@ -270,6 +270,8 @@ const staticFields: FieldInit[] = [
     defaultValue: "both",
   },
   { key: "dictation.sounds", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.BOOL, title: "Sounds", description: "Plays a sound as dictation starts and stops, at the alert volume.", defaultValue: "true" },
+  { key: "dictation.spoken_symbols", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.BOOL, title: "Spoken symbols", description: "Words like “underscore”, “hashtag” and “comma” become the symbol: “my underscore variable” is my_variable.", defaultValue: "false" },
+  { key: "dictation.spoken_formatting", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.BOOL, title: "Spoken formatting", description: "“New line”, “new paragraph”, “open quote” and “close quote” become line breaks and quotation marks.", defaultValue: "true" },
   // Ember (docs/notes/ember-2-store.md).
   {
     key: "ember.enabled",

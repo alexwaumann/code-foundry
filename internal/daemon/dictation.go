@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/dictation"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
@@ -45,7 +46,10 @@ func openDictation(log *slog.Logger, p paths.Paths, b *bus.Bus, st *settings.Sto
 		Prefs: func() dictation.Prefs {
 			all := st.Settings()
 			s := all.Dictation
-			return dictation.Prefs{Anywhere: s.Anywhere, HoldKey: s.HoldKey, Sounds: s.Sounds, SoundVolume: all.Notifications.SoundVolume}
+			return dictation.Prefs{
+				Anywhere: s.Anywhere, HoldKey: s.HoldKey, Sounds: s.Sounds, SoundVolume: all.Notifications.SoundVolume,
+				Spoken: dictate.Spoken{Symbols: s.SpokenSymbols, Formatting: s.SpokenFormatting},
+			}
 		},
 		Enable: func() error {
 			_, err := st.Update(context.Background(), map[string]string{settings.KeyDictationEnabled: "true"})

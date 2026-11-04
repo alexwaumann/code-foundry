@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SettingFieldView, SettingPageView, SettingsSchemaView } from "@/api/settings";
+import { sectionAdvanced } from "./advancedFields";
 import { bucketKeybindings, fieldRows, highlightParts, isBound, matchField, pageSections, queryWords, searchGuiPages, searchSettings } from "./model";
 
 const base: Omit<SettingFieldView, "key" | "title" | "type" | "page" | "section"> = {
@@ -212,5 +213,14 @@ describe("searchGuiPages", () => {
       expect(searchGuiPages([memory], new Set(), [w]).hits.map((h) => h.section.id)).toEqual(["remembered"]);
     }
     expect(searchGuiPages([memory, skills], new Set(), ["forget"]).counts).toEqual({ memory: 1, skills: 0 });
+  });
+
+  it("finds a field behind a section's Advanced disclosure, unless it is hidden", () => {
+    const key = "dictation.spoken_symbols";
+    const field = { key, title: "Spoken symbols", description: "“underscore”", page: "general", section: "dictation" } as SettingFieldView;
+    const s: SettingsSchemaView = { groups: [], fields: [field], pages: [{ id: "general", title: "General", description: "", sections: [{ id: "dictation", title: "Dictation", description: "" }] }] };
+    expect(sectionAdvanced["general/dictation"]?.has(key)).toBe(true);
+    expect(searchSettings(s, ["underscore"]).hits.map((h) => h.field.key)).toEqual([key]);
+    expect(searchSettings(s, ["underscore"], new Set([key])).hits).toEqual([]);
   });
 });

@@ -156,8 +156,8 @@ type Session struct {
 	Stopping bool
 }
 
-// Prefs are the dictation settings the store does not act on itself: the snapshot carries
-// them to the GUI host, which already follows Watch.
+// Prefs are the dictation settings the store passes on: the snapshot carries them to the GUI
+// host, which already follows Watch. Spoken is the exception, which only the store reads.
 type Prefs struct {
 	// Anywhere is dictation.anywhere: the hold key works in every app, and the host
 	// stays in the menu bar with its window closed.
@@ -168,6 +168,9 @@ type Prefs struct {
 	Sounds bool
 	// SoundVolume is notifications.sound_volume, which the sounds play at.
 	SoundVolume int
+	// Spoken is dictation.spoken_symbols and dictation.spoken_formatting. Every phrase goes
+	// through it here, so a composer and a paste get the same text.
+	Spoken dictate.Spoken
 }
 
 // Accessibility is what the host reported macOS allows the hold key.
@@ -709,7 +712,7 @@ func (s *Store) handle(gen int, ev Event) {
 		}
 		if sess := s.session; sess != nil && sess.id == p.Session {
 			s.log.Debug("dictation phrase", "chars", len(p.Text), "infer_ms", p.InferMS)
-			s.emit(SessionEvent{SessionID: p.Session, Kind: SessionPhrase, Text: p.Text})
+			s.emit(SessionEvent{SessionID: p.Session, Kind: SessionPhrase, Text: s.prefs.Spoken.Apply(p.Text)})
 		}
 	case dictate.EventUnloaded:
 		var p dictate.UnloadedEvent

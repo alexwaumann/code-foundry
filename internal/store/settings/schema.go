@@ -199,66 +199,68 @@ var Groups = []Group{
 
 // Keys of the static fields that have consumers in the daemon or GUI.
 const (
-	KeyDefaultModel         = "threads.default_model"
-	KeyDefaultEffort        = "threads.default_effort"
-	KeyDefaultWorktree      = "threads.default_worktree"
-	KeyAutoName             = "threads.auto_name"
-	KeyUtilityModel         = "models.utility"
-	KeyCacheTTL             = "threads.cache_ttl_seconds"
-	KeyCloseGrace           = "threads.close_grace_seconds"
-	KeyScrollback           = "threads.scrollback_lines"
-	KeyGhPollInterval       = "github.poll_interval_seconds"
-	KeyDashboards           = "github.dashboards_enabled"
-	KeyFetchInterval        = "projects.fetch_interval_seconds"
-	KeyAutoPull             = "projects.auto_pull"
-	KeyBranchNaming         = "projects.branch_naming"
-	KeyBranchPrefix         = "projects.branch_prefix"
-	KeyBranchInstructions   = "projects.branch_instructions"
-	KeyBaseFromOrigin       = "projects.base_from_origin"
-	KeyEditorCommand        = "gitops.editor_command"
-	KeyTheme                = "appearance.theme"
-	KeyThemeDark            = "appearance.theme_dark"
-	KeyThemeLight           = "appearance.theme_light"
-	KeyFontFamily           = "appearance.font_family"
-	KeyFontSize             = "appearance.font_size"
-	KeyZoom                 = "appearance.zoom"
-	KeyDensity              = "appearance.density"
-	KeyThreadWidth          = "appearance.thread_width"
-	KeyBackdrop             = "appearance.backdrop"
-	KeyBackdropFile         = "appearance.backdrop_file"
-	KeyPanelKeepOpen        = "appearance.panel_keep_open"
-	KeyDockBadge            = "notifications.dock_badge"
-	KeyBounce               = "notifications.bounce"
-	KeySound                = "notifications.sound"
-	KeySoundVolume          = "notifications.sound_volume"
-	KeyAlertCooldown        = "notifications.cooldown_seconds"
-	KeyUpdateChannel        = "update.channel"
-	KeyClaudePath           = "advanced.claude_path"
-	KeyGhPath               = "advanced.gh_path"
-	KeyLogLevel             = "advanced.log_level"
-	KeyPluginRegistries     = "plugins.registries"
-	KeyEmberEnabled         = "ember.enabled"
-	KeyDictationEnabled     = "dictation.enabled"
-	KeyDictationAnywhere    = "dictation.anywhere"
-	KeyDictationHoldKey     = "dictation.hold_key"
-	KeyDictationSounds      = "dictation.sounds"
-	KeyEmberModel           = "ember.model"
-	KeyEmberEffort          = "ember.effort"
-	KeyEmberWorkerModels    = "ember.worker_models"
-	KeyEmberWorkerEffort    = "ember.worker_effort"
-	KeyEmberEpochTokens     = "ember.epoch_context_tokens"
-	KeyEmberEpochHours      = "ember.epoch_max_hours"
-	keybindingKeyPrefix     = GroupKeybindings + "."
-	defaultFontFamily       = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
-	defaultScrollback       = 10000
-	defaultCloseGrace       = 10
-	defaultCacheTTL         = 3600
-	defaultGhPollSeconds    = 60
-	defaultFetchSeconds     = 120
-	defaultSoundVolume      = 50
-	defaultAlertCooldown    = 60
-	defaultEmberEpochTokens = 400000
-	defaultEmberEpochHours  = 24
+	KeyDefaultModel              = "threads.default_model"
+	KeyDefaultEffort             = "threads.default_effort"
+	KeyDefaultWorktree           = "threads.default_worktree"
+	KeyAutoName                  = "threads.auto_name"
+	KeyUtilityModel              = "models.utility"
+	KeyCacheTTL                  = "threads.cache_ttl_seconds"
+	KeyCloseGrace                = "threads.close_grace_seconds"
+	KeyScrollback                = "threads.scrollback_lines"
+	KeyGhPollInterval            = "github.poll_interval_seconds"
+	KeyDashboards                = "github.dashboards_enabled"
+	KeyFetchInterval             = "projects.fetch_interval_seconds"
+	KeyAutoPull                  = "projects.auto_pull"
+	KeyBranchNaming              = "projects.branch_naming"
+	KeyBranchPrefix              = "projects.branch_prefix"
+	KeyBranchInstructions        = "projects.branch_instructions"
+	KeyBaseFromOrigin            = "projects.base_from_origin"
+	KeyEditorCommand             = "gitops.editor_command"
+	KeyTheme                     = "appearance.theme"
+	KeyThemeDark                 = "appearance.theme_dark"
+	KeyThemeLight                = "appearance.theme_light"
+	KeyFontFamily                = "appearance.font_family"
+	KeyFontSize                  = "appearance.font_size"
+	KeyZoom                      = "appearance.zoom"
+	KeyDensity                   = "appearance.density"
+	KeyThreadWidth               = "appearance.thread_width"
+	KeyBackdrop                  = "appearance.backdrop"
+	KeyBackdropFile              = "appearance.backdrop_file"
+	KeyPanelKeepOpen             = "appearance.panel_keep_open"
+	KeyDockBadge                 = "notifications.dock_badge"
+	KeyBounce                    = "notifications.bounce"
+	KeySound                     = "notifications.sound"
+	KeySoundVolume               = "notifications.sound_volume"
+	KeyAlertCooldown             = "notifications.cooldown_seconds"
+	KeyUpdateChannel             = "update.channel"
+	KeyClaudePath                = "advanced.claude_path"
+	KeyGhPath                    = "advanced.gh_path"
+	KeyLogLevel                  = "advanced.log_level"
+	KeyPluginRegistries          = "plugins.registries"
+	KeyEmberEnabled              = "ember.enabled"
+	KeyDictationEnabled          = "dictation.enabled"
+	KeyDictationAnywhere         = "dictation.anywhere"
+	KeyDictationHoldKey          = "dictation.hold_key"
+	KeyDictationSounds           = "dictation.sounds"
+	KeyDictationSpokenSymbols    = "dictation.spoken_symbols"
+	KeyDictationSpokenFormatting = "dictation.spoken_formatting"
+	KeyEmberModel                = "ember.model"
+	KeyEmberEffort               = "ember.effort"
+	KeyEmberWorkerModels         = "ember.worker_models"
+	KeyEmberWorkerEffort         = "ember.worker_effort"
+	KeyEmberEpochTokens          = "ember.epoch_context_tokens"
+	KeyEmberEpochHours           = "ember.epoch_max_hours"
+	keybindingKeyPrefix          = GroupKeybindings + "."
+	defaultFontFamily            = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
+	defaultScrollback            = 10000
+	defaultCloseGrace            = 10
+	defaultCacheTTL              = 3600
+	defaultGhPollSeconds         = 60
+	defaultFetchSeconds          = 120
+	defaultSoundVolume           = 50
+	defaultAlertCooldown         = 60
+	defaultEmberEpochTokens      = 400000
+	defaultEmberEpochHours       = 24
 )
 
 // emberEfforts are ember.effort's levels.
@@ -420,6 +422,19 @@ var staticFields = []Field{
 		Description: "Plays a sound as dictation starts and stops, at the alert volume.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Dictation.Sounds },
+	},
+	// Behind the section's Advanced disclosure (the GUI's advancedFields.ts).
+	{
+		Key: KeyDictationSpokenSymbols, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Spoken symbols",
+		Description: "Words like “underscore”, “hashtag” and “comma” become the symbol: “my underscore variable” is my_variable.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Dictation.SpokenSymbols },
+	},
+	{
+		Key: KeyDictationSpokenFormatting, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Spoken formatting",
+		Description: "“New line”, “new paragraph”, “open quote” and “close quote” become line breaks and quotation marks.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Dictation.SpokenFormatting },
 	},
 	// General › Updates.
 	{

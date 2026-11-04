@@ -153,6 +153,16 @@ func TestJoinPhrases(t *testing.T) {
 		{"closing punctuation", []string{"Well", ", then"}, "Well, then"},
 		{"after an opening bracket", []string{"Call (", "me"}, "Call (me"},
 		{"not ASCII", []string{"café", "“quoted”", "…"}, "café “quoted”…"},
+		// What the spoken commands leave: a phrase may be nothing but a line break.
+		{"a line break alone", []string{"One.", "\n", "Two."}, "One.\nTwo."},
+		{"a paragraph alone", []string{"One.", "\n\n", "Two."}, "One.\n\nTwo."},
+		{"a break ending a phrase", []string{"One\n ", " two"}, "One\ntwo"},
+		{"a break starting a phrase", []string{"One", "\ntwo"}, "One\ntwo"},
+		{"a break ending the text", []string{"One", "\n"}, "One\n"},
+		{"a symbol alone", []string{"Done", ",", "thanks"}, "Done, thanks"},
+		{"a quote opened in one phrase, closed in the next", []string{`He said "`, `hello`, `" and left`}, `He said "hello" and left`},
+		{"a closed quote keeps its space", []string{`"yes"`, "then"}, `"yes" then`},
+		{"a second quote opens after a space", []string{`"yes"`, `"no"`}, `"yes" "no"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

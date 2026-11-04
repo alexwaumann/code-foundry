@@ -52,8 +52,10 @@ const field: SettingFieldView = {
 const anywhere: SettingFieldView = { ...field, key: "dictation.anywhere", title: "Dictate anywhere" };
 const holdKey: SettingFieldView = { ...field, key: "dictation.hold_key", title: "Hold key", type: "enum", enumValues: ["left", "right", "either", "both"], enumLabels: ["Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"], defaultValue: "either", dependsOn: field.key };
 const sounds: SettingFieldView = { ...field, key: "dictation.sounds", title: "Sounds", defaultValue: "true", dependsOn: field.key };
+const symbols: SettingFieldView = { ...field, key: "dictation.spoken_symbols", title: "Spoken symbols", dependsOn: field.key };
+const formatting: SettingFieldView = { ...field, key: "dictation.spoken_formatting", title: "Spoken formatting", defaultValue: "true", dependsOn: field.key };
 const section = { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." };
-const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, sounds], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
+const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, sounds, symbols, formatting], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
 
 const M1 = { chip: "Apple M1 Pro", memoryBytes: 16 * 2 ** 30, m1Family: true };
 const NO_MODEL = { downloaded: false, sizeBytes: 874_188_075 };
@@ -117,6 +119,29 @@ describe("Settings › Dictation", () => {
     expect(sec.querySelector('[data-setting="dictation.sounds"] ~ [data-testid="dictation-model-row"]')).not.toBeNull();
     await publish(dictationSnap({ enabled: false, state: "disabled" }));
     expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
+  });
+
+  it("Advanced is closed under the card, opens a card of its own, and goes while dictation is off", async () => {
+    const { sec } = await mount(dictationSnap());
+    const toggle = within(sec).getByTestId("settings-advanced-toggle");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.textContent).toBe("Advanced");
+    // After the card, past the Model row.
+    expect(sec.querySelector('[data-testid="dictation-model-row"]')?.parentElement?.nextElementSibling?.contains(toggle)).toBe(true);
+    expect(sec.querySelector('[data-setting="dictation.spoken_symbols"]')).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    const card = within(sec).getByTestId("settings-advanced");
+    expect([...card.querySelectorAll("[data-setting]")].map((r) => r.getAttribute("data-setting"))).toEqual(["dictation.spoken_symbols", "dictation.spoken_formatting"]);
+    expect(within(card).getAllByRole("switch").map((s) => s.getAttribute("aria-checked"))).toEqual(["false", "true"]);
+    expect(card.querySelector('[data-testid="dictation-model-row"]')).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(sec.querySelector('[data-setting="dictation.spoken_symbols"]')).toBeNull();
+
+    await publish(dictationSnap({ enabled: false, state: "disabled" }));
+    expect(within(sec).queryByTestId("settings-advanced-toggle")).toBeNull();
   });
 
   it("off without the model: Needs the model, Download starts it, and when it finishes the size, the switch on and Ready", async () => {

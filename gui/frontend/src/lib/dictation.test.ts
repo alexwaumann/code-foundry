@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barHeight, decayLevels, downloadProgress, easeLevels, formatElapsed, gigabytes, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, phraseAtCaret, pushLevel } from "./dictation";
+import { barHeight, decayLevels, downloadProgress, easeLevels, formatElapsed, gigabytes, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, phraseAtCaret, phraseOnOneLine, pushLevel } from "./dictation";
 
 describe("phraseAtCaret", () => {
   it.each([
@@ -13,8 +13,30 @@ describe("phraseAtCaret", () => {
     { name: "punctuation after", before: "one", after: ".", text: "mid", want: " mid" },
     { name: "space after", before: "one", after: " two", text: "mid", want: " mid" },
     { name: "blank phrase", before: "x", after: "", text: "   ", want: "" },
+    // What the spoken commands leave, as joinPhrases treats it in gui/paste.go.
+    { name: "a line break alone", before: "One.", after: "", text: "\n", want: "\n" },
+    { name: "a paragraph alone", before: "One.", after: "", text: "\n\n", want: "\n\n" },
+    { name: "a break ending a phrase", before: "", after: "next", text: " One\n ", want: "One\n" },
+    { name: "a break starting a phrase", before: "One", after: "", text: "\ntwo", want: "\ntwo" },
+    { name: "a symbol alone", before: "Done", after: "", text: ",", want: "," },
+    { name: "after an opening bracket", before: "Call (", after: "", text: "me", want: "me" },
+    { name: "inside a quote just opened", before: 'He said "', after: "", text: "hello", want: "hello" },
+    { name: "closing a quote", before: 'He said "hello', after: "", text: '" and left', want: '" and left' },
+    { name: "after a closed quote", before: '"yes"', after: "", text: "then", want: " then" },
+    { name: "a second quote opens after a space", before: '"yes"', after: "", text: '"no"', want: ' "no"' },
   ])("$name", ({ before, after, text, want }) => {
     expect(phraseAtCaret(text, before, after)).toBe(want);
+  });
+});
+
+describe("phraseOnOneLine", () => {
+  it.each([
+    { text: "one two", want: "one two" },
+    { text: "one\ntwo", want: "one two" },
+    { text: "one\n\ntwo", want: "one two" },
+    { text: "\n", want: " " },
+  ])("$text", ({ text, want }) => {
+    expect(phraseOnOneLine(text)).toBe(want);
   });
 });
 

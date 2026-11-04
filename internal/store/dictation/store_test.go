@@ -411,6 +411,39 @@ func TestMissingEngineFailsAtOnce(t *testing.T) {
 	}
 }
 
+// Every phrase goes through the spoken commands in the store, whoever reads the session.
+func TestSessionPhrasesSpoken(t *testing.T) {
+	const said = "one comma two new line"
+	for _, tc := range []struct {
+		name   string
+		spoken dictate.Spoken
+		want   string
+	}{
+		{"off", dictate.Spoken{}, said},
+		{"formatting", dictate.Spoken{Formatting: true}, "one comma two\n"},
+		{"both", dictate.Spoken{Symbols: true, Formatting: true}, "one, two\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, setup{enabled: true, model: true, opts: func(o *dictation.Options) {
+				o.Prefs = func() dictation.Prefs { return dictation.Prefs{Spoken: tc.spoken} }
+			}})
+			h.waitState(dictation.Ready)
+			id, err := h.store.Start(context.Background(), "c1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			h.launcher.Last().Speak(said)
+			if err := h.store.Stop(context.Background(), id, true); err != nil {
+				t.Fatal(err)
+			}
+			want := []string{tc.want, "ended:stopped"}
+			if got := phrasesAndEnd(h.sessionEvents(id)); !slices.Equal(got, want) {
+				t.Errorf("events %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestSessionPhrasesAndFlush(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

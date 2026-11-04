@@ -4,8 +4,9 @@ field's size and pitch, and the constants of its spring and dot simulation. They
 gui/frontend/src/overlay/scope.ts and gui/overlay.go. The dictation engine's release tail
 (internal/dictate/tail.go) is a port of its release_tail and takes its constants, and the
 spacing of pasted text (gui/paste.go, cfCharBeforeCaret in gui/paste_darwin.go) of its join,
-with_smart_spacing and char_before_caret. That project is distributed under the MIT License
-below.
+with_smart_spacing and char_before_caret. Spoken symbols and spoken formatting
+(internal/dictate/spoken.go) port its English word lists and rules. That project is distributed
+under the MIT License below.
 
 MIT License
 

@@ -134,13 +134,14 @@ func decidePaste(f pasteFacts) pasteAction {
 	return pasteKeys
 }
 
-// joinPhrases makes one text of a session's phrases: each trimmed, one space between
-// them, none before closing punctuation or after an opening bracket. Capitalisation is
-// the engine's, as in a composer (phraseAtCaret in lib/dictation.ts).
+// joinPhrases makes one text of a session's phrases: each trimmed of spaces, one space
+// between them, none before closing punctuation, after an opening bracket or beside a line
+// break. A line break is a spoken command's, so it stays, even alone in a phrase.
+// Capitalisation is the engine's, as in a composer (phraseAtCaret in lib/dictation.ts).
 func joinPhrases(phrases []string) string {
 	var b strings.Builder
 	for _, p := range phrases {
-		p = strings.TrimSpace(p)
+		p = strings.TrimFunc(p, func(r rune) bool { return unicode.IsSpace(r) && r != '\n' })
 		if p == "" {
 			continue
 		}
@@ -155,7 +156,11 @@ func joinPhrases(phrases []string) string {
 func spaceBetween(before, next string) bool {
 	last, _ := utf8.DecodeLastRuneInString(before)
 	first, _ := utf8.DecodeRuneInString(next)
-	return !strings.ContainsRune(openingPunctuation, last) && !strings.ContainsRune(closingPunctuation, first)
+	// An odd count of straight quotes means one is open: it hugs the words inside it.
+	if (last == '"' || first == '"') && strings.Count(before, `"`)%2 == 1 {
+		return false
+	}
+	return last != '\n' && first != '\n' && !strings.ContainsRune(openingPunctuation, last) && !strings.ContainsRune(closingPunctuation, first)
 }
 
 // smartSpaced is text for a caret right after previous (docs/notes/dictation-smart-spacing.md);

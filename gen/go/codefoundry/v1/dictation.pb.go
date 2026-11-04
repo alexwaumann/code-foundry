@@ -1342,7 +1342,9 @@ func (x *DictationLevel) GetRms() float32 {
 	return 0
 }
 
-// DictationPhrase is one transcribed phrase, to insert at the caret.
+// DictationPhrase is one transcribed phrase, to insert at the caret. The spoken commands
+// have been applied (dictation.spoken_symbols, dictation.spoken_formatting), so a line break
+// in it is meant, and may be all there is: trim spaces only.
 type DictationPhrase struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
