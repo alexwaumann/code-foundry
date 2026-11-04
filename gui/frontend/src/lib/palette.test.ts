@@ -55,6 +55,9 @@ const ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/components/compose/Composer.tsx", match: "rounded-full bg-black/70 text-white", why: "the remove button sits on an image thumbnail, not on a theme surface" },
   { file: "/src/components/files/HtmlFrame.tsx", match: `visible && opaque && "bg-white"`, why: "an arbitrary HTML file (an opaque frame), once loaded, renders on a browser's white canvas, not the theme's pane" },
   { file: "/src/components/thread/InlineHtml.tsx", match: "z-40 bg-black/55", why: "the inline page modal's scrim dims the pane body under it, black in every theme" },
+  { file: "/src/overlay/scope.ts", match: "const css = (c: Rgb) =>", why: "a canvas takes a colour string: this formats a theme slot's colour, resolved in overlay/colours.ts" },
+  { file: "/src/overlay/scope.ts", match: "ctx.fillStyle = `rgba(", why: "a dot's theme colour, mixed per frame, at its brightness" },
+  { file: "/src/overlay/scope.ts", match: 'ctx.shadowColor = "rgba(0,0,0,.28)"', why: "the plate's shadow falls on other apps' windows, not on a theme surface; the approved design's value" },
 ];
 
 /** Literal colours kept in component stylesheets. `match` must appear in the line. */
