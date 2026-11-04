@@ -81,7 +81,10 @@ func themeVars(patch map[string]string) map[string]string {
 func TestUIPublishTheme(t *testing.T) {
 	live := theme.NewLive()
 	mux := http.NewServeMux()
-	r := NewUI(bus.New(), live, theme.NewReports()).Route()
+	var heard []string
+	r := NewUI(bus.New(), live, theme.NewReports()).WithThemePublished(func(_ context.Context, f theme.Frame) {
+		heard = append(heard, f.ID+" "+f.Vars["--cf-text"])
+	}).Route()
 	mux.Handle(r.Path, r.Handler)
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -114,6 +117,10 @@ func TestUIPublishTheme(t *testing.T) {
 	got, ok := live.Current()
 	if !ok || got.ID != "nord" || got.Scheme != "dark" || got.Vars["--cf-text"] != "#d8dee9" || got.Vars["--cf-accent-surface"] != "#88c0d01a" {
 		t.Fatalf("current %+v, %v", got, ok)
+	}
+	// And only the accepted one reached the listener.
+	if len(heard) != 1 || heard[0] != "nord #d8dee9" {
+		t.Fatalf("heard %q", heard)
 	}
 }
 

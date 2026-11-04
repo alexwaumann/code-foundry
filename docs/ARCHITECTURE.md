@@ -458,6 +458,10 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
   production use since threads run headless; its Observer and ScreenText hooks remain
   for a future program that wants them. `ScrollbackText` (scrollback + screen as plain
   text, from the emulator) serves plugin `terminal/read` with `scrollback`.
+* The emulator answers terminal queries itself, color queries included: the GUI's published
+  theme gives it default colors (`SetColors`), and xterm.js swallows the queries.
+  A reply from the GUI would land after the emulator's own replies and could reach the
+  shell as typed text (`docs/notes/terminal-color-replies.md`).
 * Resize is driven by the attached GUI terminal; the daemon applies it to the PTY and vt.
   With no attachment, size is the last known size.
 * Labels are opaque to the store; their contract lives in `internal/termlabel`: `kind`

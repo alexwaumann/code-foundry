@@ -88,6 +88,8 @@ type Manager struct {
 	closed bool
 	// extras is what others add to new terminals' environments (extras.go); nil: none.
 	extras atomic.Pointer[SpawnExtrasFunc]
+	// colors is what emulators report to color queries (colors.go); nil: not set yet.
+	colors atomic.Pointer[Colors]
 }
 
 var _ Store = (*Manager)(nil)
@@ -119,6 +121,7 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (Terminal, error) {
 	log := m.opts.Logger.With("terminal", info.ID, "pid", info.Pid)
 	a := newActor(info.ID, cmd, master, info, m.opts.Bus, log, m.opts, &m.drops)
 	a.observer = spec.Observer
+	a.colors = m.colors.Load()
 	ready := make(chan error, 1)
 	go a.run(ready)
 	if err := <-ready; err != nil {
@@ -136,6 +139,10 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (Terminal, error) {
 	}
 	m.actors[info.ID] = a
 	m.mu.Unlock()
+	// A SetColors between reading them above and joining m.actors missed this terminal.
+	if m.colors.Load() != a.colors {
+		m.applyColors(ctx, a)
+	}
 
 	bus.Publish(m.opts.Bus, TerminalUpdated{Terminal: info})
 	log.Info("terminal started", "argv", info.Argv, "cwd", info.Cwd, "size", fmt.Sprintf("%dx%d", info.Cols, info.Rows))

@@ -48,6 +48,7 @@ type actor struct {
 	// job's): what the SIGKILL escalation and Manager.Close finish off.
 	killed   atomic.Pointer[[]int]
 	observer Observer // Spec.Observer; may be nil. Called on the actor only.
+	colors   *Colors  // the colors at creation; may be nil. Set before run starts.
 	reqs     chan func()
 	done     chan struct{} // closed when run returns
 
@@ -110,6 +111,7 @@ func (a *actor) run(ready chan<- error) {
 	}
 	a.vt = vt
 	defer a.vt.Close()
+	a.setColors(a.colors)
 	a.compress = time.NewTimer(a.opts.CompressAfter)
 	defer a.compress.Stop()
 	ready <- nil

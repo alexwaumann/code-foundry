@@ -110,7 +110,7 @@ return `true` consume the queries before xterm's own handlers can reply:
 | DECRQM `CSI $p`, `CSI ? $p` | yes | built in | swallow |
 | DECRQSS `DCS $ q` | yes | built in | swallow |
 | OSC 4 palette query (`n;?` only) | yes | built in (its palette) | swallow; OSC 4 *sets* still reach xterm |
-| OSC 10/11/12 color query | yes (theme colors) | no reply (no default fg/bg configured) | **keep**: xterm is the only answer |
+| OSC 10/11/12 color query | yes (theme colors) | no reply (no default fg/bg configured) | **keep**: xterm is the only answer (swallowed since `terminal-color-replies.md`: the daemon has the theme now) |
 | Focus in/out `CSI I`/`CSI O` | yes (mode 1004) | cannot know focus | **keep**: an event, not a reply |
 | XTVERSION, kitty `CSI ?u`, DA3, XTWINOPS | no (xterm 6 lacks them, window ops are off) | built in / size handler | nothing to do |
 
@@ -134,8 +134,8 @@ Claude both use them. If the window gains focus during Claude's brief cooked-mod
 nothing.
 
 The tests (`queries.test.ts`) write each query into a real, opened xterm in jsdom
-(`matchMedia` stubbed) and assert that `onData` stays silent, and that OSC 10/11 are
-still answered. With the swallowing disabled, 11 of the cases fail. Kitty tracking still
+(`matchMedia` stubbed) and assert that `onData` stays silent, and that OSC 10/11 were
+still answered at the time (see `terminal-color-replies.md`). With the swallowing disabled, 11 of the cases fail. Kitty tracking still
 works alongside (an OSC 4 set followed by a kitty push).
 
 ## Verification
