@@ -7,7 +7,7 @@ const NOW = Date.UTC(2026, 10, 3, 12);
 const HOUR = 3_600_000;
 const HEAD = "a".repeat(40);
 
-const row = (o: Partial<PullRequestView> & { mergedAgoMs?: number } = {}) => prSummary(NOW, "o/r", 7, "t", { headSha: HEAD, ...o });
+const row = (o: Parameters<typeof prSummary>[4] = {}) => prSummary(NOW, "o/r", 7, "t", { headSha: HEAD, ...o });
 const seeded = (pr: PullRequestView, viewer = "me") => seedReadiness(seedDetail(pr), viewer, NOW);
 const ids = (pr: PullRequestView, viewer?: string) => seeded(pr, viewer).rows.map((r) => r.id);
 const titled = (pr: PullRequestView) => seeded(pr).rows.map((r) => r.title);

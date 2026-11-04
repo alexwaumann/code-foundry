@@ -5,7 +5,11 @@ vi.mock("@/api/gh", async (orig) => ({
   ...(await orig<typeof import("@/api/gh")>()),
   getPullRequestDetail: (slug: string, number: number, _refresh: boolean, _opts: unknown, signal: AbortSignal) =>
     new Promise((resolve, reject) => {
-      reads.list.push({ key: `${slug}#${String(number)}`, signal, finish: (fail) => (fail ? reject(new Error("paused until 12:00: rate limit")) : resolve({ pullRequest: { number } })) });
+      const finish = (fail?: boolean) => {
+        if (fail) reject(new Error("paused until 12:00: rate limit"));
+        else resolve({ pullRequest: { number } });
+      };
+      reads.list.push({ key: `${slug}#${String(number)}`, signal, finish });
     }),
 }));
 
