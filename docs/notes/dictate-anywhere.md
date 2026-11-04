@@ -80,14 +80,15 @@ text pastes into what has the keyboard there, and the overlay shows.
   case or spacing changes: `joinPhrases` trims, joins with a space, and leaves the
   engine's capitalisation, as `phraseAtCaret` does.
 * A press during another's flush waits for it, or the daemon would refuse the Start. It does
-  not wait for the paste.
+  not wait for the paste. A press during a tail cuts the tail first
+  (`dictation-release-tail.md`).
 * A session someone else holds gives way, as it does to a composer: flushed to its client.
 
 ### Sounds
 
 The start tone is `time.AfterFunc` after 40 ms and checks whether the keeper has decided
-the hold's end; so a tap of Option over 40 ms is audible, as the brief says. Stop goes out
-before the stop tone, so the daemon is dropping frames by the time it sounds.
+the hold's end; so a tap of Option over 40 ms is audible, as the brief says. The microphone
+stays open through the stop tone now: `dictation-release-tail.md` has why it does no harm.
 
 **The tones do not end up as text.** Fed through the real engine and model at full scale,
 a quarter and a twentieth, alone, before speech, after speech and both together, no tone
@@ -157,7 +158,8 @@ is on". The overlay's panel prepares on the same value.
 * The fixed identity is forgeable (`tcc-read-errors.md`). With this grant on it, any local
   program signed with that identifier could post events and read keys. The probe's note asked
   for this to be weighed before shipping; it is still a decision to make.
-* Audio in the tap's last 100 ms buffer at the release is not sent (`dictation-3-host.md`).
+* The tail counts from the Stop, so it covers the 100 ms buffer in flight at the release
+  (`dictation-3-host.md`, `dictation-release-tail.md`).
 * Press before a mic permission: the first hold asks. The prompt outlasts the hold.
 
 ## Verification
