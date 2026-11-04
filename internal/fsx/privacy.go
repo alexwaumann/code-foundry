@@ -31,20 +31,44 @@ func isPrivacyDenial(err error) bool { return errors.Is(err, syscall.EPERM) }
 // notPermitted is ReadFile's error for path (as asked) whose file real (symlinks
 // resolved, under root) macOS would not open, naming the app it checked.
 func notPermitted(root, path, real string, err error) error {
-	return &notPermittedError{msg: privacyMessage(root, path, real, tcc.ResponsibleApp()), err: err}
+	return &notPermittedError{msg: privacyMessage(root, path, real, tcc.Responsible()), err: err}
 }
 
-// privacyMessage explains a privacy denial of path (real once resolved, under root)
-// to app, the process macOS checked.
-func privacyMessage(root, path, real, app string) string {
+// restartDaemon is the last step of every fix: quitting the app leaves the daemon
+// running, and it is the process that was refused.
+const restartDaemon = "run Restart Daemon from the command palette"
+
+// privacyMessage explains a privacy denial of path (real once resolved, under root) to
+// app, the process macOS checked. A bundled app has its toggles in Files and Folders. A
+// bare executable, ours included, goes through Full Disk Access, and an entry made by
+// another build does nothing until it is removed and added again.
+func privacyMessage(root, path, real string, app tcc.App) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "macOS's privacy protection blocked reading %s: ", path)
-	if what := protectedArea(root, real); what != "" {
-		fmt.Fprintf(&b, "%q has no access to %s. Allow it in System Settings → Privacy & Security → Files and Folders (or Full Disk Access), then retry.", app, what)
+	what := protectedArea(root, real)
+	if what != "" {
+		fmt.Fprintf(&b, "%q has no access to %s. ", app.Name, what)
 	} else {
-		fmt.Fprintf(&b, "%q needs Full Disk Access to read it. Allow it in System Settings → Privacy & Security → Full Disk Access, then retry.", app)
+		fmt.Fprintf(&b, "%q needs Full Disk Access to read it. ", app.Name)
+	}
+	switch {
+	case !app.Bundled:
+		fmt.Fprintf(&b, "In System Settings → Privacy & Security → Full Disk Access, select %q and click − if it is listed, even if it is on. Then click +, press ⌘⇧G, enter %s, turn it on, and %s.",
+			app.Name, homePath(root, app.Path), restartDaemon)
+	case what != "":
+		fmt.Fprintf(&b, "Allow it in System Settings → Privacy & Security → Files and Folders (or Full Disk Access), then %s.", restartDaemon)
+	default:
+		fmt.Fprintf(&b, "Allow it in System Settings → Privacy & Security → Full Disk Access, then %s.", restartDaemon)
 	}
 	return b.String()
+}
+
+// homePath is p with root, the home directory, written as "~".
+func homePath(root, p string) string {
+	if Within(root, p) {
+		return "~" + p[len(root):]
+	}
+	return p
 }
 
 // protectedArea names the Files and Folders entry that covers real (a resolved path
