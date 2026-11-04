@@ -671,6 +671,93 @@ func (x *SearchEntry) GetFindHits() int32 {
 	return 0
 }
 
+// SearchActivity is what the app shows of agent searches outside the dialog: the sidebar's
+// search row. The EventService search source sends it on connect and again when it
+// changes, never for a step or a hit of a run, so holding it open all session costs
+// nothing. Always the whole state: a run a daemon restart lost is FAILED and unseen in
+// the next daemon's snapshot, so a client that replaces what it had cannot stay "running".
+type SearchActivity struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// How many agent searches run now.
+	Running int32 `protobuf:"varint,1,opt,name=running,proto3" json:"running,omitempty"`
+	// The newest running one's id; "" when none runs.
+	RunningId string `protobuf:"bytes,2,opt,name=running_id,json=runningId,proto3" json:"running_id,omitempty"`
+	// The finished agent search not shown yet that finished last; "" when none. A search
+	// the user stopped is never unseen.
+	UnseenId string `protobuf:"bytes,3,opt,name=unseen_id,json=unseenId,proto3" json:"unseen_id,omitempty"`
+	// How unseen_id ended (DONE, FAILED, STOPPED).
+	UnseenStatus SearchStatus `protobuf:"varint,4,opt,name=unseen_status,json=unseenStatus,proto3,enum=codefoundry.v1.SearchStatus" json:"unseen_status,omitempty"`
+	// unseen_id's hits, those whose thread still exists.
+	UnseenHits    int32 `protobuf:"varint,5,opt,name=unseen_hits,json=unseenHits,proto3" json:"unseen_hits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchActivity) Reset() {
+	*x = SearchActivity{}
+	mi := &file_codefoundry_v1_search_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchActivity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchActivity) ProtoMessage() {}
+
+func (x *SearchActivity) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_search_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchActivity.ProtoReflect.Descriptor instead.
+func (*SearchActivity) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SearchActivity) GetRunning() int32 {
+	if x != nil {
+		return x.Running
+	}
+	return 0
+}
+
+func (x *SearchActivity) GetRunningId() string {
+	if x != nil {
+		return x.RunningId
+	}
+	return ""
+}
+
+func (x *SearchActivity) GetUnseenId() string {
+	if x != nil {
+		return x.UnseenId
+	}
+	return ""
+}
+
+func (x *SearchActivity) GetUnseenStatus() SearchStatus {
+	if x != nil {
+		return x.UnseenStatus
+	}
+	return SearchStatus_SEARCH_STATUS_UNSPECIFIED
+}
+
+func (x *SearchActivity) GetUnseenHits() int32 {
+	if x != nil {
+		return x.UnseenHits
+	}
+	return 0
+}
+
 type StartAgentSearchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Question      string                 `protobuf:"bytes,1,opt,name=question,proto3" json:"question,omitempty"`
@@ -680,7 +767,7 @@ type StartAgentSearchRequest struct {
 
 func (x *StartAgentSearchRequest) Reset() {
 	*x = StartAgentSearchRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -692,7 +779,7 @@ func (x *StartAgentSearchRequest) String() string {
 func (*StartAgentSearchRequest) ProtoMessage() {}
 
 func (x *StartAgentSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -705,7 +792,7 @@ func (x *StartAgentSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartAgentSearchRequest.ProtoReflect.Descriptor instead.
 func (*StartAgentSearchRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{3}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StartAgentSearchRequest) GetQuestion() string {
@@ -724,7 +811,7 @@ type StartAgentSearchResponse struct {
 
 func (x *StartAgentSearchResponse) Reset() {
 	*x = StartAgentSearchResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -736,7 +823,7 @@ func (x *StartAgentSearchResponse) String() string {
 func (*StartAgentSearchResponse) ProtoMessage() {}
 
 func (x *StartAgentSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -749,7 +836,7 @@ func (x *StartAgentSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartAgentSearchResponse.ProtoReflect.Descriptor instead.
 func (*StartAgentSearchResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{4}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StartAgentSearchResponse) GetEntry() *SearchEntry {
@@ -768,7 +855,7 @@ type WatchSearchRequest struct {
 
 func (x *WatchSearchRequest) Reset() {
 	*x = WatchSearchRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -780,7 +867,7 @@ func (x *WatchSearchRequest) String() string {
 func (*WatchSearchRequest) ProtoMessage() {}
 
 func (x *WatchSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -793,7 +880,7 @@ func (x *WatchSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchSearchRequest.ProtoReflect.Descriptor instead.
 func (*WatchSearchRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{5}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *WatchSearchRequest) GetId() string {
@@ -813,7 +900,7 @@ type SearchAnswer struct {
 
 func (x *SearchAnswer) Reset() {
 	*x = SearchAnswer{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -825,7 +912,7 @@ func (x *SearchAnswer) String() string {
 func (*SearchAnswer) ProtoMessage() {}
 
 func (x *SearchAnswer) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -838,7 +925,7 @@ func (x *SearchAnswer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchAnswer.ProtoReflect.Descriptor instead.
 func (*SearchAnswer) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{6}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SearchAnswer) GetText() string {
@@ -863,7 +950,7 @@ type SearchStatusChange struct {
 
 func (x *SearchStatusChange) Reset() {
 	*x = SearchStatusChange{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -875,7 +962,7 @@ func (x *SearchStatusChange) String() string {
 func (*SearchStatusChange) ProtoMessage() {}
 
 func (x *SearchStatusChange) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -888,7 +975,7 @@ func (x *SearchStatusChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchStatusChange.ProtoReflect.Descriptor instead.
 func (*SearchStatusChange) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{7}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SearchStatusChange) GetStatus() SearchStatus {
@@ -952,7 +1039,7 @@ type SearchWatchEvent struct {
 
 func (x *SearchWatchEvent) Reset() {
 	*x = SearchWatchEvent{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -964,7 +1051,7 @@ func (x *SearchWatchEvent) String() string {
 func (*SearchWatchEvent) ProtoMessage() {}
 
 func (x *SearchWatchEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -977,7 +1064,7 @@ func (x *SearchWatchEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchWatchEvent.ProtoReflect.Descriptor instead.
 func (*SearchWatchEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SearchWatchEvent) GetVersion() uint64 {
@@ -1096,7 +1183,7 @@ type WatchRecentSearchesRequest struct {
 
 func (x *WatchRecentSearchesRequest) Reset() {
 	*x = WatchRecentSearchesRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1108,7 +1195,7 @@ func (x *WatchRecentSearchesRequest) String() string {
 func (*WatchRecentSearchesRequest) ProtoMessage() {}
 
 func (x *WatchRecentSearchesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1121,7 +1208,7 @@ func (x *WatchRecentSearchesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchRecentSearchesRequest.ProtoReflect.Descriptor instead.
 func (*WatchRecentSearchesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{10}
 }
 
 type WatchRecentSearchesEvent struct {
@@ -1135,7 +1222,7 @@ type WatchRecentSearchesEvent struct {
 
 func (x *WatchRecentSearchesEvent) Reset() {
 	*x = WatchRecentSearchesEvent{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1147,7 +1234,7 @@ func (x *WatchRecentSearchesEvent) String() string {
 func (*WatchRecentSearchesEvent) ProtoMessage() {}
 
 func (x *WatchRecentSearchesEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1160,7 +1247,7 @@ func (x *WatchRecentSearchesEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchRecentSearchesEvent.ProtoReflect.Descriptor instead.
 func (*WatchRecentSearchesEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{10}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *WatchRecentSearchesEvent) GetEntries() []*SearchEntry {
@@ -1186,7 +1273,7 @@ type StopSearchRequest struct {
 
 func (x *StopSearchRequest) Reset() {
 	*x = StopSearchRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1198,7 +1285,7 @@ func (x *StopSearchRequest) String() string {
 func (*StopSearchRequest) ProtoMessage() {}
 
 func (x *StopSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1211,7 +1298,7 @@ func (x *StopSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopSearchRequest.ProtoReflect.Descriptor instead.
 func (*StopSearchRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *StopSearchRequest) GetId() string {
@@ -1230,7 +1317,7 @@ type StopSearchResponse struct {
 
 func (x *StopSearchResponse) Reset() {
 	*x = StopSearchResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1242,7 +1329,7 @@ func (x *StopSearchResponse) String() string {
 func (*StopSearchResponse) ProtoMessage() {}
 
 func (x *StopSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1255,7 +1342,7 @@ func (x *StopSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopSearchResponse.ProtoReflect.Descriptor instead.
 func (*StopSearchResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StopSearchResponse) GetEntry() *SearchEntry {
@@ -1273,7 +1360,7 @@ type ListRecentSearchesRequest struct {
 
 func (x *ListRecentSearchesRequest) Reset() {
 	*x = ListRecentSearchesRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1285,7 +1372,7 @@ func (x *ListRecentSearchesRequest) String() string {
 func (*ListRecentSearchesRequest) ProtoMessage() {}
 
 func (x *ListRecentSearchesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1298,7 +1385,7 @@ func (x *ListRecentSearchesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRecentSearchesRequest.ProtoReflect.Descriptor instead.
 func (*ListRecentSearchesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{13}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{14}
 }
 
 type ListRecentSearchesResponse struct {
@@ -1310,7 +1397,7 @@ type ListRecentSearchesResponse struct {
 
 func (x *ListRecentSearchesResponse) Reset() {
 	*x = ListRecentSearchesResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1322,7 +1409,7 @@ func (x *ListRecentSearchesResponse) String() string {
 func (*ListRecentSearchesResponse) ProtoMessage() {}
 
 func (x *ListRecentSearchesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1335,7 +1422,7 @@ func (x *ListRecentSearchesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRecentSearchesResponse.ProtoReflect.Descriptor instead.
 func (*ListRecentSearchesResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{14}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListRecentSearchesResponse) GetEntries() []*SearchEntry {
@@ -1354,7 +1441,7 @@ type GetSearchRequest struct {
 
 func (x *GetSearchRequest) Reset() {
 	*x = GetSearchRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1366,7 +1453,7 @@ func (x *GetSearchRequest) String() string {
 func (*GetSearchRequest) ProtoMessage() {}
 
 func (x *GetSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1379,7 +1466,7 @@ func (x *GetSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSearchRequest.ProtoReflect.Descriptor instead.
 func (*GetSearchRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{15}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetSearchRequest) GetId() string {
@@ -1398,7 +1485,7 @@ type GetSearchResponse struct {
 
 func (x *GetSearchResponse) Reset() {
 	*x = GetSearchResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1410,7 +1497,7 @@ func (x *GetSearchResponse) String() string {
 func (*GetSearchResponse) ProtoMessage() {}
 
 func (x *GetSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1423,7 +1510,7 @@ func (x *GetSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSearchResponse.ProtoReflect.Descriptor instead.
 func (*GetSearchResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{16}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetSearchResponse) GetEntry() *SearchEntry {
@@ -1443,7 +1530,7 @@ type OpenSearchHitRequest struct {
 
 func (x *OpenSearchHitRequest) Reset() {
 	*x = OpenSearchHitRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1455,7 +1542,7 @@ func (x *OpenSearchHitRequest) String() string {
 func (*OpenSearchHitRequest) ProtoMessage() {}
 
 func (x *OpenSearchHitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1468,7 +1555,7 @@ func (x *OpenSearchHitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenSearchHitRequest.ProtoReflect.Descriptor instead.
 func (*OpenSearchHitRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *OpenSearchHitRequest) GetId() string {
@@ -1494,7 +1581,7 @@ type OpenSearchHitResponse struct {
 
 func (x *OpenSearchHitResponse) Reset() {
 	*x = OpenSearchHitResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1506,7 +1593,7 @@ func (x *OpenSearchHitResponse) String() string {
 func (*OpenSearchHitResponse) ProtoMessage() {}
 
 func (x *OpenSearchHitResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1519,7 +1606,7 @@ func (x *OpenSearchHitResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenSearchHitResponse.ProtoReflect.Descriptor instead.
 func (*OpenSearchHitResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *OpenSearchHitResponse) GetEntry() *SearchEntry {
@@ -1538,7 +1625,7 @@ type MarkSearchSeenRequest struct {
 
 func (x *MarkSearchSeenRequest) Reset() {
 	*x = MarkSearchSeenRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1550,7 +1637,7 @@ func (x *MarkSearchSeenRequest) String() string {
 func (*MarkSearchSeenRequest) ProtoMessage() {}
 
 func (x *MarkSearchSeenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1563,7 +1650,7 @@ func (x *MarkSearchSeenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkSearchSeenRequest.ProtoReflect.Descriptor instead.
 func (*MarkSearchSeenRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *MarkSearchSeenRequest) GetId() string {
@@ -1582,7 +1669,7 @@ type MarkSearchSeenResponse struct {
 
 func (x *MarkSearchSeenResponse) Reset() {
 	*x = MarkSearchSeenResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1594,7 +1681,7 @@ func (x *MarkSearchSeenResponse) String() string {
 func (*MarkSearchSeenResponse) ProtoMessage() {}
 
 func (x *MarkSearchSeenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1607,7 +1694,7 @@ func (x *MarkSearchSeenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkSearchSeenResponse.ProtoReflect.Descriptor instead.
 func (*MarkSearchSeenResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *MarkSearchSeenResponse) GetEntry() *SearchEntry {
@@ -1629,7 +1716,7 @@ type RecordFindSearchRequest struct {
 
 func (x *RecordFindSearchRequest) Reset() {
 	*x = RecordFindSearchRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1641,7 +1728,7 @@ func (x *RecordFindSearchRequest) String() string {
 func (*RecordFindSearchRequest) ProtoMessage() {}
 
 func (x *RecordFindSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1654,7 +1741,7 @@ func (x *RecordFindSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordFindSearchRequest.ProtoReflect.Descriptor instead.
 func (*RecordFindSearchRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RecordFindSearchRequest) GetQuery() string {
@@ -1680,7 +1767,7 @@ type RecordFindSearchResponse struct {
 
 func (x *RecordFindSearchResponse) Reset() {
 	*x = RecordFindSearchResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1692,7 +1779,7 @@ func (x *RecordFindSearchResponse) String() string {
 func (*RecordFindSearchResponse) ProtoMessage() {}
 
 func (x *RecordFindSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1705,7 +1792,7 @@ func (x *RecordFindSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordFindSearchResponse.ProtoReflect.Descriptor instead.
 func (*RecordFindSearchResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{22}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RecordFindSearchResponse) GetEntry() *SearchEntry {
@@ -1724,7 +1811,7 @@ type ForgetSearchRequest struct {
 
 func (x *ForgetSearchRequest) Reset() {
 	*x = ForgetSearchRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1736,7 +1823,7 @@ func (x *ForgetSearchRequest) String() string {
 func (*ForgetSearchRequest) ProtoMessage() {}
 
 func (x *ForgetSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1749,7 +1836,7 @@ func (x *ForgetSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgetSearchRequest.ProtoReflect.Descriptor instead.
 func (*ForgetSearchRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{23}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ForgetSearchRequest) GetId() string {
@@ -1767,7 +1854,7 @@ type ForgetSearchResponse struct {
 
 func (x *ForgetSearchResponse) Reset() {
 	*x = ForgetSearchResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1779,7 +1866,7 @@ func (x *ForgetSearchResponse) String() string {
 func (*ForgetSearchResponse) ProtoMessage() {}
 
 func (x *ForgetSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1792,7 +1879,7 @@ func (x *ForgetSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgetSearchResponse.ProtoReflect.Descriptor instead.
 func (*ForgetSearchResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{24}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{25}
 }
 
 type ClearSearchesRequest struct {
@@ -1803,7 +1890,7 @@ type ClearSearchesRequest struct {
 
 func (x *ClearSearchesRequest) Reset() {
 	*x = ClearSearchesRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1815,7 +1902,7 @@ func (x *ClearSearchesRequest) String() string {
 func (*ClearSearchesRequest) ProtoMessage() {}
 
 func (x *ClearSearchesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1828,7 +1915,7 @@ func (x *ClearSearchesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearSearchesRequest.ProtoReflect.Descriptor instead.
 func (*ClearSearchesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{25}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{26}
 }
 
 type ClearSearchesResponse struct {
@@ -1841,7 +1928,7 @@ type ClearSearchesResponse struct {
 
 func (x *ClearSearchesResponse) Reset() {
 	*x = ClearSearchesResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1853,7 +1940,7 @@ func (x *ClearSearchesResponse) String() string {
 func (*ClearSearchesResponse) ProtoMessage() {}
 
 func (x *ClearSearchesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1866,7 +1953,7 @@ func (x *ClearSearchesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearSearchesResponse.ProtoReflect.Descriptor instead.
 func (*ClearSearchesResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{26}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ClearSearchesResponse) GetRemoved() int32 {
@@ -1885,7 +1972,7 @@ type PromoteSearchRequest struct {
 
 func (x *PromoteSearchRequest) Reset() {
 	*x = PromoteSearchRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[27]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1897,7 +1984,7 @@ func (x *PromoteSearchRequest) String() string {
 func (*PromoteSearchRequest) ProtoMessage() {}
 
 func (x *PromoteSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[27]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1910,7 +1997,7 @@ func (x *PromoteSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromoteSearchRequest.ProtoReflect.Descriptor instead.
 func (*PromoteSearchRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{27}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *PromoteSearchRequest) GetId() string {
@@ -1929,7 +2016,7 @@ type PromoteSearchResponse struct {
 
 func (x *PromoteSearchResponse) Reset() {
 	*x = PromoteSearchResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[28]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1941,7 +2028,7 @@ func (x *PromoteSearchResponse) String() string {
 func (*PromoteSearchResponse) ProtoMessage() {}
 
 func (x *PromoteSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[28]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1954,7 +2041,7 @@ func (x *PromoteSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromoteSearchResponse.ProtoReflect.Descriptor instead.
 func (*PromoteSearchResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{28}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *PromoteSearchResponse) GetThreadId() string {
@@ -1979,7 +2066,7 @@ type ReportSearchHitRequest struct {
 
 func (x *ReportSearchHitRequest) Reset() {
 	*x = ReportSearchHitRequest{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[29]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1991,7 +2078,7 @@ func (x *ReportSearchHitRequest) String() string {
 func (*ReportSearchHitRequest) ProtoMessage() {}
 
 func (x *ReportSearchHitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[29]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2004,7 +2091,7 @@ func (x *ReportSearchHitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportSearchHitRequest.ProtoReflect.Descriptor instead.
 func (*ReportSearchHitRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{29}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ReportSearchHitRequest) GetSearchId() string {
@@ -2053,7 +2140,7 @@ type ReportSearchHitResponse struct {
 
 func (x *ReportSearchHitResponse) Reset() {
 	*x = ReportSearchHitResponse{}
-	mi := &file_codefoundry_v1_search_proto_msgTypes[30]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2065,7 +2152,7 @@ func (x *ReportSearchHitResponse) String() string {
 func (*ReportSearchHitResponse) ProtoMessage() {}
 
 func (x *ReportSearchHitResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_search_proto_msgTypes[30]
+	mi := &file_codefoundry_v1_search_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2078,7 +2165,7 @@ func (x *ReportSearchHitResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportSearchHitResponse.ProtoReflect.Descriptor instead.
 func (*ReportSearchHitResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{30}
+	return file_codefoundry_v1_search_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ReportSearchHitResponse) GetHit() *AgentSearchHit {
@@ -2155,7 +2242,15 @@ const file_codefoundry_v1_search_proto_rawDesc = "" +
 	"\x06unseen\x18\x11 \x01(\bR\x06unseen\x12\x18\n" +
 	"\aversion\x18\x12 \x01(\x04R\aversion\x12,\n" +
 	"\x12promoted_thread_id\x18\x13 \x01(\tR\x10promotedThreadId\x12\x1b\n" +
-	"\tfind_hits\x18\x14 \x01(\x05R\bfindHits\"5\n" +
+	"\tfind_hits\x18\x14 \x01(\x05R\bfindHits\"\xca\x01\n" +
+	"\x0eSearchActivity\x12\x18\n" +
+	"\arunning\x18\x01 \x01(\x05R\arunning\x12\x1d\n" +
+	"\n" +
+	"running_id\x18\x02 \x01(\tR\trunningId\x12\x1b\n" +
+	"\tunseen_id\x18\x03 \x01(\tR\bunseenId\x12A\n" +
+	"\runseen_status\x18\x04 \x01(\x0e2\x1c.codefoundry.v1.SearchStatusR\funseenStatus\x12\x1f\n" +
+	"\vunseen_hits\x18\x05 \x01(\x05R\n" +
+	"unseenHits\"5\n" +
 	"\x17StartAgentSearchRequest\x12\x1a\n" +
 	"\bquestion\x18\x01 \x01(\tR\bquestion\"M\n" +
 	"\x18StartAgentSearchResponse\x121\n" +
@@ -2278,7 +2373,7 @@ func file_codefoundry_v1_search_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_search_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_codefoundry_v1_search_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_codefoundry_v1_search_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_codefoundry_v1_search_proto_goTypes = []any{
 	(SearchMode)(0),                    // 0: codefoundry.v1.SearchMode
 	(SearchStatus)(0),                  // 1: codefoundry.v1.SearchStatus
@@ -2286,98 +2381,100 @@ var file_codefoundry_v1_search_proto_goTypes = []any{
 	(*AgentSearchHit)(nil),             // 3: codefoundry.v1.AgentSearchHit
 	(*AgentSearchStep)(nil),            // 4: codefoundry.v1.AgentSearchStep
 	(*SearchEntry)(nil),                // 5: codefoundry.v1.SearchEntry
-	(*StartAgentSearchRequest)(nil),    // 6: codefoundry.v1.StartAgentSearchRequest
-	(*StartAgentSearchResponse)(nil),   // 7: codefoundry.v1.StartAgentSearchResponse
-	(*WatchSearchRequest)(nil),         // 8: codefoundry.v1.WatchSearchRequest
-	(*SearchAnswer)(nil),               // 9: codefoundry.v1.SearchAnswer
-	(*SearchStatusChange)(nil),         // 10: codefoundry.v1.SearchStatusChange
-	(*SearchWatchEvent)(nil),           // 11: codefoundry.v1.SearchWatchEvent
-	(*WatchRecentSearchesRequest)(nil), // 12: codefoundry.v1.WatchRecentSearchesRequest
-	(*WatchRecentSearchesEvent)(nil),   // 13: codefoundry.v1.WatchRecentSearchesEvent
-	(*StopSearchRequest)(nil),          // 14: codefoundry.v1.StopSearchRequest
-	(*StopSearchResponse)(nil),         // 15: codefoundry.v1.StopSearchResponse
-	(*ListRecentSearchesRequest)(nil),  // 16: codefoundry.v1.ListRecentSearchesRequest
-	(*ListRecentSearchesResponse)(nil), // 17: codefoundry.v1.ListRecentSearchesResponse
-	(*GetSearchRequest)(nil),           // 18: codefoundry.v1.GetSearchRequest
-	(*GetSearchResponse)(nil),          // 19: codefoundry.v1.GetSearchResponse
-	(*OpenSearchHitRequest)(nil),       // 20: codefoundry.v1.OpenSearchHitRequest
-	(*OpenSearchHitResponse)(nil),      // 21: codefoundry.v1.OpenSearchHitResponse
-	(*MarkSearchSeenRequest)(nil),      // 22: codefoundry.v1.MarkSearchSeenRequest
-	(*MarkSearchSeenResponse)(nil),     // 23: codefoundry.v1.MarkSearchSeenResponse
-	(*RecordFindSearchRequest)(nil),    // 24: codefoundry.v1.RecordFindSearchRequest
-	(*RecordFindSearchResponse)(nil),   // 25: codefoundry.v1.RecordFindSearchResponse
-	(*ForgetSearchRequest)(nil),        // 26: codefoundry.v1.ForgetSearchRequest
-	(*ForgetSearchResponse)(nil),       // 27: codefoundry.v1.ForgetSearchResponse
-	(*ClearSearchesRequest)(nil),       // 28: codefoundry.v1.ClearSearchesRequest
-	(*ClearSearchesResponse)(nil),      // 29: codefoundry.v1.ClearSearchesResponse
-	(*PromoteSearchRequest)(nil),       // 30: codefoundry.v1.PromoteSearchRequest
-	(*PromoteSearchResponse)(nil),      // 31: codefoundry.v1.PromoteSearchResponse
-	(*ReportSearchHitRequest)(nil),     // 32: codefoundry.v1.ReportSearchHitRequest
-	(*ReportSearchHitResponse)(nil),    // 33: codefoundry.v1.ReportSearchHitResponse
-	(SearchSpeaker)(0),                 // 34: codefoundry.v1.SearchSpeaker
-	(*timestamppb.Timestamp)(nil),      // 35: google.protobuf.Timestamp
-	(*StreamHeartbeat)(nil),            // 36: codefoundry.v1.StreamHeartbeat
+	(*SearchActivity)(nil),             // 6: codefoundry.v1.SearchActivity
+	(*StartAgentSearchRequest)(nil),    // 7: codefoundry.v1.StartAgentSearchRequest
+	(*StartAgentSearchResponse)(nil),   // 8: codefoundry.v1.StartAgentSearchResponse
+	(*WatchSearchRequest)(nil),         // 9: codefoundry.v1.WatchSearchRequest
+	(*SearchAnswer)(nil),               // 10: codefoundry.v1.SearchAnswer
+	(*SearchStatusChange)(nil),         // 11: codefoundry.v1.SearchStatusChange
+	(*SearchWatchEvent)(nil),           // 12: codefoundry.v1.SearchWatchEvent
+	(*WatchRecentSearchesRequest)(nil), // 13: codefoundry.v1.WatchRecentSearchesRequest
+	(*WatchRecentSearchesEvent)(nil),   // 14: codefoundry.v1.WatchRecentSearchesEvent
+	(*StopSearchRequest)(nil),          // 15: codefoundry.v1.StopSearchRequest
+	(*StopSearchResponse)(nil),         // 16: codefoundry.v1.StopSearchResponse
+	(*ListRecentSearchesRequest)(nil),  // 17: codefoundry.v1.ListRecentSearchesRequest
+	(*ListRecentSearchesResponse)(nil), // 18: codefoundry.v1.ListRecentSearchesResponse
+	(*GetSearchRequest)(nil),           // 19: codefoundry.v1.GetSearchRequest
+	(*GetSearchResponse)(nil),          // 20: codefoundry.v1.GetSearchResponse
+	(*OpenSearchHitRequest)(nil),       // 21: codefoundry.v1.OpenSearchHitRequest
+	(*OpenSearchHitResponse)(nil),      // 22: codefoundry.v1.OpenSearchHitResponse
+	(*MarkSearchSeenRequest)(nil),      // 23: codefoundry.v1.MarkSearchSeenRequest
+	(*MarkSearchSeenResponse)(nil),     // 24: codefoundry.v1.MarkSearchSeenResponse
+	(*RecordFindSearchRequest)(nil),    // 25: codefoundry.v1.RecordFindSearchRequest
+	(*RecordFindSearchResponse)(nil),   // 26: codefoundry.v1.RecordFindSearchResponse
+	(*ForgetSearchRequest)(nil),        // 27: codefoundry.v1.ForgetSearchRequest
+	(*ForgetSearchResponse)(nil),       // 28: codefoundry.v1.ForgetSearchResponse
+	(*ClearSearchesRequest)(nil),       // 29: codefoundry.v1.ClearSearchesRequest
+	(*ClearSearchesResponse)(nil),      // 30: codefoundry.v1.ClearSearchesResponse
+	(*PromoteSearchRequest)(nil),       // 31: codefoundry.v1.PromoteSearchRequest
+	(*PromoteSearchResponse)(nil),      // 32: codefoundry.v1.PromoteSearchResponse
+	(*ReportSearchHitRequest)(nil),     // 33: codefoundry.v1.ReportSearchHitRequest
+	(*ReportSearchHitResponse)(nil),    // 34: codefoundry.v1.ReportSearchHitResponse
+	(SearchSpeaker)(0),                 // 35: codefoundry.v1.SearchSpeaker
+	(*timestamppb.Timestamp)(nil),      // 36: google.protobuf.Timestamp
+	(*StreamHeartbeat)(nil),            // 37: codefoundry.v1.StreamHeartbeat
 }
 var file_codefoundry_v1_search_proto_depIdxs = []int32{
-	34, // 0: codefoundry.v1.AgentSearchHit.speaker:type_name -> codefoundry.v1.SearchSpeaker
-	35, // 1: codefoundry.v1.AgentSearchHit.item_created_at:type_name -> google.protobuf.Timestamp
-	35, // 2: codefoundry.v1.AgentSearchHit.reported_at:type_name -> google.protobuf.Timestamp
+	35, // 0: codefoundry.v1.AgentSearchHit.speaker:type_name -> codefoundry.v1.SearchSpeaker
+	36, // 1: codefoundry.v1.AgentSearchHit.item_created_at:type_name -> google.protobuf.Timestamp
+	36, // 2: codefoundry.v1.AgentSearchHit.reported_at:type_name -> google.protobuf.Timestamp
 	2,  // 3: codefoundry.v1.AgentSearchStep.kind:type_name -> codefoundry.v1.AgentSearchStepKind
 	0,  // 4: codefoundry.v1.SearchEntry.mode:type_name -> codefoundry.v1.SearchMode
-	35, // 5: codefoundry.v1.SearchEntry.created_at:type_name -> google.protobuf.Timestamp
-	35, // 6: codefoundry.v1.SearchEntry.finished_at:type_name -> google.protobuf.Timestamp
+	36, // 5: codefoundry.v1.SearchEntry.created_at:type_name -> google.protobuf.Timestamp
+	36, // 6: codefoundry.v1.SearchEntry.finished_at:type_name -> google.protobuf.Timestamp
 	1,  // 7: codefoundry.v1.SearchEntry.status:type_name -> codefoundry.v1.SearchStatus
 	3,  // 8: codefoundry.v1.SearchEntry.hits:type_name -> codefoundry.v1.AgentSearchHit
 	4,  // 9: codefoundry.v1.SearchEntry.steps:type_name -> codefoundry.v1.AgentSearchStep
-	5,  // 10: codefoundry.v1.StartAgentSearchResponse.entry:type_name -> codefoundry.v1.SearchEntry
-	1,  // 11: codefoundry.v1.SearchStatusChange.status:type_name -> codefoundry.v1.SearchStatus
-	35, // 12: codefoundry.v1.SearchStatusChange.finished_at:type_name -> google.protobuf.Timestamp
-	5,  // 13: codefoundry.v1.SearchWatchEvent.snapshot:type_name -> codefoundry.v1.SearchEntry
-	4,  // 14: codefoundry.v1.SearchWatchEvent.step:type_name -> codefoundry.v1.AgentSearchStep
-	3,  // 15: codefoundry.v1.SearchWatchEvent.hit:type_name -> codefoundry.v1.AgentSearchHit
-	9,  // 16: codefoundry.v1.SearchWatchEvent.answer:type_name -> codefoundry.v1.SearchAnswer
-	10, // 17: codefoundry.v1.SearchWatchEvent.status:type_name -> codefoundry.v1.SearchStatusChange
-	36, // 18: codefoundry.v1.SearchWatchEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
-	5,  // 19: codefoundry.v1.WatchRecentSearchesEvent.entries:type_name -> codefoundry.v1.SearchEntry
-	36, // 20: codefoundry.v1.WatchRecentSearchesEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
-	5,  // 21: codefoundry.v1.StopSearchResponse.entry:type_name -> codefoundry.v1.SearchEntry
-	5,  // 22: codefoundry.v1.ListRecentSearchesResponse.entries:type_name -> codefoundry.v1.SearchEntry
-	5,  // 23: codefoundry.v1.GetSearchResponse.entry:type_name -> codefoundry.v1.SearchEntry
-	5,  // 24: codefoundry.v1.OpenSearchHitResponse.entry:type_name -> codefoundry.v1.SearchEntry
-	5,  // 25: codefoundry.v1.MarkSearchSeenResponse.entry:type_name -> codefoundry.v1.SearchEntry
-	5,  // 26: codefoundry.v1.RecordFindSearchResponse.entry:type_name -> codefoundry.v1.SearchEntry
-	3,  // 27: codefoundry.v1.ReportSearchHitResponse.hit:type_name -> codefoundry.v1.AgentSearchHit
-	6,  // 28: codefoundry.v1.SearchService.StartAgent:input_type -> codefoundry.v1.StartAgentSearchRequest
-	8,  // 29: codefoundry.v1.SearchService.Watch:input_type -> codefoundry.v1.WatchSearchRequest
-	12, // 30: codefoundry.v1.SearchService.WatchRecent:input_type -> codefoundry.v1.WatchRecentSearchesRequest
-	14, // 31: codefoundry.v1.SearchService.Stop:input_type -> codefoundry.v1.StopSearchRequest
-	16, // 32: codefoundry.v1.SearchService.ListRecent:input_type -> codefoundry.v1.ListRecentSearchesRequest
-	18, // 33: codefoundry.v1.SearchService.Get:input_type -> codefoundry.v1.GetSearchRequest
-	20, // 34: codefoundry.v1.SearchService.OpenHit:input_type -> codefoundry.v1.OpenSearchHitRequest
-	22, // 35: codefoundry.v1.SearchService.MarkSeen:input_type -> codefoundry.v1.MarkSearchSeenRequest
-	24, // 36: codefoundry.v1.SearchService.RecordFind:input_type -> codefoundry.v1.RecordFindSearchRequest
-	26, // 37: codefoundry.v1.SearchService.Forget:input_type -> codefoundry.v1.ForgetSearchRequest
-	28, // 38: codefoundry.v1.SearchService.Clear:input_type -> codefoundry.v1.ClearSearchesRequest
-	30, // 39: codefoundry.v1.SearchService.Promote:input_type -> codefoundry.v1.PromoteSearchRequest
-	32, // 40: codefoundry.v1.SearchService.Report:input_type -> codefoundry.v1.ReportSearchHitRequest
-	7,  // 41: codefoundry.v1.SearchService.StartAgent:output_type -> codefoundry.v1.StartAgentSearchResponse
-	11, // 42: codefoundry.v1.SearchService.Watch:output_type -> codefoundry.v1.SearchWatchEvent
-	13, // 43: codefoundry.v1.SearchService.WatchRecent:output_type -> codefoundry.v1.WatchRecentSearchesEvent
-	15, // 44: codefoundry.v1.SearchService.Stop:output_type -> codefoundry.v1.StopSearchResponse
-	17, // 45: codefoundry.v1.SearchService.ListRecent:output_type -> codefoundry.v1.ListRecentSearchesResponse
-	19, // 46: codefoundry.v1.SearchService.Get:output_type -> codefoundry.v1.GetSearchResponse
-	21, // 47: codefoundry.v1.SearchService.OpenHit:output_type -> codefoundry.v1.OpenSearchHitResponse
-	23, // 48: codefoundry.v1.SearchService.MarkSeen:output_type -> codefoundry.v1.MarkSearchSeenResponse
-	25, // 49: codefoundry.v1.SearchService.RecordFind:output_type -> codefoundry.v1.RecordFindSearchResponse
-	27, // 50: codefoundry.v1.SearchService.Forget:output_type -> codefoundry.v1.ForgetSearchResponse
-	29, // 51: codefoundry.v1.SearchService.Clear:output_type -> codefoundry.v1.ClearSearchesResponse
-	31, // 52: codefoundry.v1.SearchService.Promote:output_type -> codefoundry.v1.PromoteSearchResponse
-	33, // 53: codefoundry.v1.SearchService.Report:output_type -> codefoundry.v1.ReportSearchHitResponse
-	41, // [41:54] is the sub-list for method output_type
-	28, // [28:41] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	1,  // 10: codefoundry.v1.SearchActivity.unseen_status:type_name -> codefoundry.v1.SearchStatus
+	5,  // 11: codefoundry.v1.StartAgentSearchResponse.entry:type_name -> codefoundry.v1.SearchEntry
+	1,  // 12: codefoundry.v1.SearchStatusChange.status:type_name -> codefoundry.v1.SearchStatus
+	36, // 13: codefoundry.v1.SearchStatusChange.finished_at:type_name -> google.protobuf.Timestamp
+	5,  // 14: codefoundry.v1.SearchWatchEvent.snapshot:type_name -> codefoundry.v1.SearchEntry
+	4,  // 15: codefoundry.v1.SearchWatchEvent.step:type_name -> codefoundry.v1.AgentSearchStep
+	3,  // 16: codefoundry.v1.SearchWatchEvent.hit:type_name -> codefoundry.v1.AgentSearchHit
+	10, // 17: codefoundry.v1.SearchWatchEvent.answer:type_name -> codefoundry.v1.SearchAnswer
+	11, // 18: codefoundry.v1.SearchWatchEvent.status:type_name -> codefoundry.v1.SearchStatusChange
+	37, // 19: codefoundry.v1.SearchWatchEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	5,  // 20: codefoundry.v1.WatchRecentSearchesEvent.entries:type_name -> codefoundry.v1.SearchEntry
+	37, // 21: codefoundry.v1.WatchRecentSearchesEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	5,  // 22: codefoundry.v1.StopSearchResponse.entry:type_name -> codefoundry.v1.SearchEntry
+	5,  // 23: codefoundry.v1.ListRecentSearchesResponse.entries:type_name -> codefoundry.v1.SearchEntry
+	5,  // 24: codefoundry.v1.GetSearchResponse.entry:type_name -> codefoundry.v1.SearchEntry
+	5,  // 25: codefoundry.v1.OpenSearchHitResponse.entry:type_name -> codefoundry.v1.SearchEntry
+	5,  // 26: codefoundry.v1.MarkSearchSeenResponse.entry:type_name -> codefoundry.v1.SearchEntry
+	5,  // 27: codefoundry.v1.RecordFindSearchResponse.entry:type_name -> codefoundry.v1.SearchEntry
+	3,  // 28: codefoundry.v1.ReportSearchHitResponse.hit:type_name -> codefoundry.v1.AgentSearchHit
+	7,  // 29: codefoundry.v1.SearchService.StartAgent:input_type -> codefoundry.v1.StartAgentSearchRequest
+	9,  // 30: codefoundry.v1.SearchService.Watch:input_type -> codefoundry.v1.WatchSearchRequest
+	13, // 31: codefoundry.v1.SearchService.WatchRecent:input_type -> codefoundry.v1.WatchRecentSearchesRequest
+	15, // 32: codefoundry.v1.SearchService.Stop:input_type -> codefoundry.v1.StopSearchRequest
+	17, // 33: codefoundry.v1.SearchService.ListRecent:input_type -> codefoundry.v1.ListRecentSearchesRequest
+	19, // 34: codefoundry.v1.SearchService.Get:input_type -> codefoundry.v1.GetSearchRequest
+	21, // 35: codefoundry.v1.SearchService.OpenHit:input_type -> codefoundry.v1.OpenSearchHitRequest
+	23, // 36: codefoundry.v1.SearchService.MarkSeen:input_type -> codefoundry.v1.MarkSearchSeenRequest
+	25, // 37: codefoundry.v1.SearchService.RecordFind:input_type -> codefoundry.v1.RecordFindSearchRequest
+	27, // 38: codefoundry.v1.SearchService.Forget:input_type -> codefoundry.v1.ForgetSearchRequest
+	29, // 39: codefoundry.v1.SearchService.Clear:input_type -> codefoundry.v1.ClearSearchesRequest
+	31, // 40: codefoundry.v1.SearchService.Promote:input_type -> codefoundry.v1.PromoteSearchRequest
+	33, // 41: codefoundry.v1.SearchService.Report:input_type -> codefoundry.v1.ReportSearchHitRequest
+	8,  // 42: codefoundry.v1.SearchService.StartAgent:output_type -> codefoundry.v1.StartAgentSearchResponse
+	12, // 43: codefoundry.v1.SearchService.Watch:output_type -> codefoundry.v1.SearchWatchEvent
+	14, // 44: codefoundry.v1.SearchService.WatchRecent:output_type -> codefoundry.v1.WatchRecentSearchesEvent
+	16, // 45: codefoundry.v1.SearchService.Stop:output_type -> codefoundry.v1.StopSearchResponse
+	18, // 46: codefoundry.v1.SearchService.ListRecent:output_type -> codefoundry.v1.ListRecentSearchesResponse
+	20, // 47: codefoundry.v1.SearchService.Get:output_type -> codefoundry.v1.GetSearchResponse
+	22, // 48: codefoundry.v1.SearchService.OpenHit:output_type -> codefoundry.v1.OpenSearchHitResponse
+	24, // 49: codefoundry.v1.SearchService.MarkSeen:output_type -> codefoundry.v1.MarkSearchSeenResponse
+	26, // 50: codefoundry.v1.SearchService.RecordFind:output_type -> codefoundry.v1.RecordFindSearchResponse
+	28, // 51: codefoundry.v1.SearchService.Forget:output_type -> codefoundry.v1.ForgetSearchResponse
+	30, // 52: codefoundry.v1.SearchService.Clear:output_type -> codefoundry.v1.ClearSearchesResponse
+	32, // 53: codefoundry.v1.SearchService.Promote:output_type -> codefoundry.v1.PromoteSearchResponse
+	34, // 54: codefoundry.v1.SearchService.Report:output_type -> codefoundry.v1.ReportSearchHitResponse
+	42, // [42:55] is the sub-list for method output_type
+	29, // [29:42] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_search_proto_init() }
@@ -2387,7 +2484,7 @@ func file_codefoundry_v1_search_proto_init() {
 	}
 	file_codefoundry_v1_heartbeat_proto_init()
 	file_codefoundry_v1_thread_search_proto_init()
-	file_codefoundry_v1_search_proto_msgTypes[8].OneofWrappers = []any{
+	file_codefoundry_v1_search_proto_msgTypes[9].OneofWrappers = []any{
 		(*SearchWatchEvent_Snapshot)(nil),
 		(*SearchWatchEvent_Step)(nil),
 		(*SearchWatchEvent_Hit)(nil),
@@ -2401,7 +2498,7 @@ func file_codefoundry_v1_search_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_search_proto_rawDesc), len(file_codefoundry_v1_search_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   31,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

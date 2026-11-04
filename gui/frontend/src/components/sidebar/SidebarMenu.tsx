@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
+import { SearchNav } from "@/components/search/SearchNav";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui";
 
@@ -34,8 +35,8 @@ export function SidebarNewThread() {
 }
 
 /**
- * The menu pane right under the title band: New thread, Pull Requests and Projects in a
- * small pane drawn like the content pane beside it (surface fill, divider border, pane
+ * The menu pane right under the title band: New thread, Pull Requests, Projects and,
+ * while an agent search has something to say, its row, in a small pane drawn like the content pane beside it (surface fill, divider border, pane
  * radius), so the app's pages read apart from the thread list below. It runs from the
  * body's left gutter to the sidebar's edge, a shell gap from the window and from the
  * content pane. The rows keep rounded-md: 4px inside a 12px corner wants 8, which the
@@ -49,6 +50,7 @@ export function SidebarMenu() {
       <nav className="flex shrink-0 flex-col" aria-label="Pages">
         <PullRequestsNav />
         <ProjectsNav />
+        <SearchNav />
       </nav>
     </div>
   );

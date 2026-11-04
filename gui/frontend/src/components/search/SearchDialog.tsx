@@ -12,7 +12,7 @@ import { imeKeyDown } from "@/lib/ime";
 import { clearSearches, forgetSearch, startAgent } from "@/stores/agentSearch";
 import { useCommandsStore } from "@/stores/commands";
 import { toggleDictation } from "@/stores/dictation";
-import { dropSearchSession, lastSearchMode, pendingSearchStart, saveSearchSession, searchSessionAt, setSearchMode, trackSearchStart } from "@/stores/searchDialog";
+import { clearSearchTarget, dropSearchSession, lastSearchMode, pendingSearchStart, saveSearchSession, searchSessionAt, searchTarget, setSearchMode, trackSearchStart } from "@/stores/searchDialog";
 import type { SearchDialogApi, SearchModeProps } from "./types";
 import { SEARCH_MODES, type SearchMode } from "./modes";
 import type { RecentApi } from "./RecentSearches";
@@ -80,17 +80,24 @@ function SearchHeader({
 }
 
 /**
- * What the dialog opens with: the session of a close within RESTORE_MS (and its question's
+ * What the dialog opens with: the search it was asked to show (the sidebar's row; it opens
+ * like a restore, so another unseen search is cued, and where the last close left that
+ * same search is kept), else the session of a close within RESTORE_MS (and its question's
  * start, when the dialog closed before StartAgent answered), else the last mode and an
  * empty field.
  */
 function openingState(now: number) {
   const s = searchSessionAt(now);
+  const target = searchTarget();
+  if (target) {
+    const restore = s?.entryId === target.id ? { selectedN: s.selectedN, openedN: s.openedN, scrollTop: s.scrollTop } : { selectedN: restoreSelection(target.hits, null), openedN: null, scrollTop: 0 };
+    return { restored: true, mode: "agent" as const, query: target.query, entryId: target.id, seed: target, restore, pending: null };
+  }
   if (s) {
     const pending = s.entryId === null ? pendingSearchStart(s.query.trim()) : null;
-    return { restored: true, mode: s.mode, query: s.query, entryId: s.entryId, restore: { selectedN: s.selectedN, openedN: s.openedN, scrollTop: s.scrollTop }, pending };
+    return { restored: true, mode: s.mode, query: s.query, entryId: s.entryId, seed: null, restore: { selectedN: s.selectedN, openedN: s.openedN, scrollTop: s.scrollTop }, pending };
   }
-  return { restored: false, mode: lastSearchMode(), query: "", entryId: null, restore: null, pending: null };
+  return { restored: false, mode: lastSearchMode(), query: "", entryId: null, seed: null, restore: null, pending: null };
 }
 
 /**
@@ -101,7 +108,8 @@ function openingState(now: number) {
  * used is remembered. Remounted on every open: reopened within RESTORE_MS it shows what it
  * showed (mode, query selected, results, scroll, the next unopened hit); later it opens
  * empty on Recent searches. A finished agent search not shown yet (unseen) is shown
- * whatever the timer. ⌘⇧M dictates into the field.
+ * whatever the timer; search.open with an id (the sidebar's search row) shows that one.
+ * ⌘⇧M dictates into the field.
  */
 export function SearchDialog({
   modes = SEARCH_MODES,
@@ -114,12 +122,14 @@ export function SearchDialog({
   const [modeId, setModeId] = useState<SearchModeId>(init.mode);
   const mode = modes.find((m) => m.id === modeId) ?? modes[0];
   const [query, setQuery] = useState(init.query);
-  const [shown, setShown] = useState<{ id: string; seed: SearchEntryView | null } | null>(init.entryId ? { id: init.entryId, seed: null } : null);
+  const [shown, setShown] = useState<{ id: string; seed: SearchEntryView | null } | null>(init.entryId ? { id: init.entryId, seed: init.seed } : null);
   const [restore, setRestore] = useState(init.restore);
   const [starting, setStarting] = useState(init.pending !== null);
   const [startError, setStartError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(clearSearchTarget, []);
 
   // What a reopen within RESTORE_MS restores; saved when the dialog closes (unmounts).
   const session = useRef<SearchSession>({ mode: init.mode, query: init.query, entryId: init.entryId, selectedN: init.restore?.selectedN ?? null, openedN: init.restore?.openedN ?? null, scrollTop: init.restore?.scrollTop ?? 0, closedAtMs: 0 });

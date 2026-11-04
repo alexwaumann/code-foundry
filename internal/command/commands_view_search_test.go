@@ -1,6 +1,7 @@
 package command_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
@@ -37,6 +38,35 @@ func TestSearchOpen(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if !c.Available(tt.ctx) {
 				t.Errorf("unavailable in %+v", tt.ctx)
+			}
+		})
+	}
+}
+
+// The sidebar's search row opens the dialog on a search: the id rides ShowView's params.
+// Without one the params stay empty, as for the chord.
+func TestSearchOpenOnASearch(t *testing.T) {
+	tests := []struct {
+		name string
+		args map[string]string
+		want string
+	}{
+		{name: "no id"},
+		{name: "an id", args: map[string]string{"id": "q-0123456789ab"}, want: "q-0123456789ab"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := command.NewRegistry()
+			emit := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
+			if err := command.RegisterView(reg, command.ViewDeps{Emitter: emit}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := reg.Invoke(context.Background(), command.Context{}, "search.open", tt.args); err != nil {
+				t.Fatal(err)
+			}
+			got := emit.Intents()
+			if len(got) != 1 || got[0].GetShowView().GetName() != command.ViewSearch || got[0].GetShowView().GetParams()["id"] != tt.want {
+				t.Errorf("intents = %v, want one ShowView with id %q", got, tt.want)
 			}
 		})
 	}

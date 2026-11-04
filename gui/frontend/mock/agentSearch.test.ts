@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { MockSearches } from "./agentSearch";
+import { SearchStatus } from "../src/gen/codefoundry/v1/search_pb";
+import { MockSearches, type ActivityInit } from "./agentSearch";
 
 const world = () =>
   new MockSearches({
     thread: (id) => (id === "s-3" ? { name: "Fix resize race", archived: false } : undefined),
     items: () => [{ id: "s-3-i4", ordinal: 40n, payload: { case: "assistantText", value: { text: "Fixed: the actor applies a resize only after the pending writes drain. The race test passes." } } }],
     promote: () => "s-new-1",
+    publishActivity: (a) => {
+      published.push(a);
+    },
   });
+const published: ActivityInit[] = [];
 
 async function collect(it: AsyncGenerator<{ version?: bigint; event?: { case?: string } }>, n = 100): Promise<string[]> {
   const out: string[] = [];
@@ -18,6 +23,29 @@ async function collect(it: AsyncGenerator<{ version?: bigint; event?: { case?: s
 }
 
 describe("MockSearches", () => {
+  it("activity: a run's start and end alone, the unseen one before seen, none after; a restart fails what runs", async () => {
+    published.length = 0;
+    const s = world();
+    s.control(new URLSearchParams("stepMs=5"));
+    const e = s.startAgent("why the race?");
+    const id = e.id ?? "";
+    await collect(s.watch(id, new AbortController().signal));
+    expect(published).toEqual([
+      { running: 1, runningId: id, unseenId: "", unseenStatus: SearchStatus.UNSPECIFIED, unseenHits: 0 },
+      { running: 0, runningId: "", unseenId: id, unseenStatus: SearchStatus.DONE, unseenHits: 1 },
+    ]);
+    s.markSeen(id);
+    expect(s.activity()).toMatchObject({ running: 0, unseenId: "" });
+
+    s.control(new URLSearchParams("stepMs=1000"));
+    const lost = s.startAgent("lost").id ?? "";
+    expect(s.activity()).toMatchObject({ running: 1, runningId: lost });
+    s.restarted();
+    expect(s.activity()).toMatchObject({ running: 0, runningId: "", unseenId: lost, unseenStatus: SearchStatus.FAILED });
+    s.forget(lost);
+    expect(s.activity()).toMatchObject({ running: 0, unseenId: "" });
+  });
+
   it("Watch: one snapshot, then steps, the hit, the answer and the status with growing versions, then the end", async () => {
     const s = world();
     s.control(new URLSearchParams("stepMs=10"));

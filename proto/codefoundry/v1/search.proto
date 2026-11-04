@@ -178,6 +178,25 @@ message SearchEntry {
   int32 find_hits = 20;
 }
 
+// SearchActivity is what the app shows of agent searches outside the dialog: the sidebar's
+// search row. The EventService search source sends it on connect and again when it
+// changes, never for a step or a hit of a run, so holding it open all session costs
+// nothing. Always the whole state: a run a daemon restart lost is FAILED and unseen in
+// the next daemon's snapshot, so a client that replaces what it had cannot stay "running".
+message SearchActivity {
+  // How many agent searches run now.
+  int32 running = 1;
+  // The newest running one's id; "" when none runs.
+  string running_id = 2;
+  // The finished agent search not shown yet that finished last; "" when none. A search
+  // the user stopped is never unseen.
+  string unseen_id = 3;
+  // How unseen_id ended (DONE, FAILED, STOPPED).
+  SearchStatus unseen_status = 4;
+  // unseen_id's hits, those whose thread still exists.
+  int32 unseen_hits = 5;
+}
+
 message StartAgentSearchRequest {
   string question = 1;
 }

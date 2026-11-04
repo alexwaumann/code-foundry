@@ -327,7 +327,7 @@ Services (v1):
   ("settings:<page>"), a button on the toast (`docs/notes/memory-page.md`).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, settings,
-  update, action, plugin, skill, memory, ui; the thread source carries threads' pending requests only, a
+  update, action, plugin, skill, memory, search, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests. Live events pass

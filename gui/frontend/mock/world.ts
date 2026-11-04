@@ -826,6 +826,7 @@ export class World {
   );
   /** Agent search and the search history (mock/agentSearch.ts; SearchService). */
   readonly searches = new MockSearches({
+    publishActivity: (v) => this.events.publish({ source: EventSource.SEARCH, event: { event: { case: "search", value: v } } }),
     thread: (id) => {
       const t = this.threads.get(id);
       return t ? { name: t.name, archived: t.archivedAt !== null } : undefined;
@@ -3127,6 +3128,7 @@ export class World {
       t.attach.publish("end");
     }
     this.actions.restart();
+    this.searches.restarted();
     this.ember.endAll();
     this.events.endAll();
     this.termEvents.endAll();
@@ -4867,9 +4869,9 @@ export class World {
       },
       {
         // internal/command search.open: from anywhere.
-        cmd: { name: "search.open", title: "Search Threads", category: "View", description: "Find threads by name and messages across every thread (archived ones too), with a preview; Enter opens the message in its thread with the find bar on the match.", keybindings: ["cmd+shift+f"], args: [] },
+        cmd: { name: "search.open", title: "Search Threads", category: "View", description: "Find threads by name and messages across every thread (archived ones too), with a preview; Enter opens the message in its thread with the find bar on the match.", keybindings: ["cmd+shift+f"], args: [{ name: "id", type: ArgType.STRING, required: false, description: "An agent search to open on (q-…; search.recent lists them)" }] },
         when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "search.open" } } }))}`,
+        run: (_c, a) => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "search.open", params: a.id ? { id: a.id } : {} } } }))}`,
       },
       // internal/command canFindInThread: a thread view; the CLI always.
       ...(

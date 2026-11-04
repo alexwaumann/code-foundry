@@ -4,19 +4,34 @@
  * (components/search/SearchDialog.tsx) over every thread. Enter on a message opens its
  * thread with the thread's find bar on that match; Enter on a thread name opens the thread.
  */
+import { getSearch } from "@/api/search";
 import { handoffQuery, type SearchRow } from "@/lib/threadSearch";
+import { setSearchTarget } from "./searchDialog";
 import { openThreadFind } from "./threadFind";
 import { useUiStore } from "./ui";
 
 /**
  * search.open in this window: the palette's Find dialog. Deferred, so that picked in the
  * palette (which closes after a presenter runs) it reopens on the dialog. Works from any
- * view; the CLI's ShowView reaches every window.
+ * view; the CLI's ShowView reaches every window. With `id` it opens on that agent search,
+ * read first so the dialog has its question at once; one forgotten meanwhile, or a Find
+ * entry, opens the dialog as the chord does.
  */
-export function presentSearch(): boolean {
-  queueMicrotask(() => {
+export function presentSearch(id = ""): boolean {
+  const open = () => {
     useUiStore.getState().openSearchPalette();
-  });
+  };
+  if (id === "") {
+    queueMicrotask(open);
+    return true;
+  }
+  void getSearch(id).then(
+    (e) => {
+      if (e.mode === "agent") setSearchTarget(e);
+      open();
+    },
+    open,
+  );
   return true;
 }
 

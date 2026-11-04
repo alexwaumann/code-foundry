@@ -18,6 +18,7 @@ import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, su
 import { rankCommands } from "@/palette/rank";
 import { refreshCommands, useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
+import { useSearchDialogStore } from "@/stores/searchDialog";
 import { useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/utils";
 
@@ -336,6 +337,7 @@ export function CommandPalette() {
   const query = useUiStore((s) => s.palette.query);
   const commandName = useUiStore((s) => s.palette.commandName);
   const page = useUiStore((s) => s.palette.page);
+  const searchTargetSeq = useSearchDialogStore((s) => s.targetSeq);
   const runInThread = useUiStore((s) => s.palette.threadId ?? "");
   const context = useUiStore((s) => s.palette.context);
   const close = useUiStore((s) => s.closePalette);
@@ -378,7 +380,7 @@ export function CommandPalette() {
         ) : page === "files" ? (
           <FileFinder threadId={runInThread} />
         ) : page === "search" ? (
-          <SearchDialog />
+          <SearchDialog key={searchTargetSeq} />
         ) : (
           <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} initialContext={context} close={close} />
         )}

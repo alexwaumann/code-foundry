@@ -238,7 +238,7 @@ export function beginRename(threadId: string | null = getUiContext().activeThrea
  * registry (thread.rename is invoked when the inline edit is committed); this only
  * replaces the generic palette prompt. Return false to fall back to the default.
  */
-const commandPresenters: Readonly<Record<string, () => boolean>> = {
+const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string, string>>) => boolean>> = {
   "thread.rename": () => beginRename(),
   // The project picker, then the composer; the composer invokes thread.new.
   "thread.new": () => {
@@ -367,8 +367,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "thread.find.next": () => presentThreadFind("next") || true,
   "thread.find.previous": () => presentThreadFind("previous") || true,
   // Window-local: the palette's Find dialog over every thread (stores/threadSearch.ts), from
-  // any view. The CLI's reaches every window through ShowView.
-  "search.open": () => presentSearch(),
+  // any view, on the search `id` names (the sidebar's search row). The CLI's reaches every
+  // window through ShowView.
+  "search.open": (args) => presentSearch(args?.id),
   // Window-local: dictation into the focused composer, else the one dictating (it stops),
   // else the content pane's (stores/dictation.ts). The CLI's reaches every window through ShowView.
   "dictation.toggle": () => presentDictationToggle(),
@@ -404,8 +405,8 @@ function presentPluginShow(name: string): boolean {
 }
 
 /** Runs the command's presenter, if it has one; false means "invoke it normally". */
-export function presentCommand(name: string): boolean {
-  return commandPresenters[name]?.() ?? presentPluginShow(name);
+export function presentCommand(name: string, args?: Readonly<Record<string, string>>): boolean {
+  return commandPresenters[name]?.(args) ?? presentPluginShow(name);
 }
 
 /** Picked in the palette: runs its presenter instead of the arg prompts, if it has that kind. */
@@ -437,16 +438,16 @@ export function invokeStarted(name: string, args: Record<string, string> = {}, c
 }
 
 /** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */
-export function startCommand(c: CommandView): void {
-  if (presentCommand(c.name)) return;
+export function startCommand(c: CommandView, args?: Readonly<Record<string, string>>): void {
+  if (presentCommand(c.name, args)) return;
   if (promptedArgs(c).length > 0) useUiStore.getState().openPalette("", c.name);
   else invokeStarted(c.name);
 }
 
-/** startCommand for a command by name, when it is available in the current context. */
-export function startCommandNamed(name: string): boolean {
+/** startCommand for a command by name, when it is available in the current context. `args` reach its presenter. */
+export function startCommandNamed(name: string, args?: Readonly<Record<string, string>>): boolean {
   const c = useCommandsStore.getState().commands.find((x) => x.name === name && isStartable(x));
-  if (c) startCommand(c);
+  if (c) startCommand(c, args);
   return c !== undefined;
 }
 
