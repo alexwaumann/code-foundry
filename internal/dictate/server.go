@@ -56,12 +56,17 @@ type Server struct {
 	seg     *Segmenter
 	// emit sends an event; tests and --transcribe replace it.
 	emit func(name string, params any)
+	// tailTimer calls back on the loop after TailWait; set by Serve (nil: no bound).
+	tailTimer func(*releaseTail)
 
 	state     string
 	session   string
 	pending   []float32 // audio short of a whole VAD window
 	prompt    string    // the previous phrase's tail
 	unloadDue bool      // a memory-pressure warning arrived while listening
+	// tail is the session's release tail, while it runs: the audio goes there instead of the
+	// segmenter, and its end request is still to be answered.
+	tail *releaseTail
 }
 
 // NewServer writes replies and events to out.
@@ -87,6 +92,7 @@ type inboxItem struct {
 	err      error // a malformed line (msg unset), or fatal with done
 	done     bool  // the input ended (err: why, nil at EOF)
 	pressure Pressure
+	tailOver *releaseTail // this tail's TailWait is up
 }
 
 // inbox is an unbounded FIFO: the stdin reader never blocks on the loop, so the daemon
@@ -166,6 +172,9 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, pressure <-chan Pressu
 			}
 		}()
 	}
+	s.tailTimer = func(t *releaseTail) {
+		time.AfterFunc(TailWait, func() { q.push(inboxItem{tailOver: t}) })
+	}
 	defer s.backend.Unload()
 	s.emit(EventState, StateEvent{State: s.state})
 	for {
@@ -177,6 +186,10 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, pressure <-chan Pressu
 			return it.err
 		case it.pressure != 0:
 			s.onPressure(it.pressure)
+		case it.tailOver != nil:
+			if it.tailOver == s.tail {
+				s.finishTail()
+			}
 		case it.err != nil:
 			s.emit(EventError, ErrorEvent{Message: it.err.Error()})
 		default:
@@ -200,6 +213,9 @@ func (s *Server) handle(m Message) (exit bool) {
 	}
 	if m.IsNotification() {
 		s.emit(EventError, ErrorEvent{Message: fmt.Sprintf("%s is a request: it needs an id", m.Method)})
+		return false
+	}
+	if s.startTail(m) {
 		return false
 	}
 	result, err := s.call(m)
@@ -320,26 +336,61 @@ func (s *Server) end(p EndParams) {
 	if p.Session == "" || p.Session != s.session {
 		return // ended already (or never began): end is idempotent
 	}
-	s.closeSession(p.Flush)
+	s.closeSession(p.Flush || s.tail != nil) // what a tail heard was released, so it counts
+	if s.unloadDue {
+		s.pressureUnload()
+	}
+}
+
+// startTail takes an end that is a release, for the open session with no tail yet, and
+// reports whether it did. Its reply waits for the session to close (closeSession).
+func (s *Server) startTail(m Message) bool {
+	if m.Method != MethodEnd {
+		return false
+	}
+	var p EndParams
+	if unmarshalParams(m.Params, &p) != nil || !p.Tail || !p.Flush || p.Session == "" || p.Session != s.session || s.tail != nil {
+		return false
+	}
+	s.tail = newReleaseTail(*m.ID, time.Duration(p.ToneMS)*time.Millisecond, DefaultSegmentConfig)
+	if s.tailTimer != nil {
+		s.tailTimer(s.tail)
+	}
+	return true
+}
+
+// finishTail closes the session of a tail that is over.
+func (s *Server) finishTail() {
+	s.closeSession(true)
 	if s.unloadDue {
 		s.pressureUnload()
 	}
 }
 
 // closeSession ends the open session, if any. With flush the audio still pending is
-// scored and the open phrase transcribed (its phrase event goes out first).
+// scored and the open phrase transcribed (its phrase event goes out first). A tail hands
+// over the windows it keeps first; the rest of what it heard goes unheard. Its end request
+// is answered here, however the session closed.
 func (s *Server) closeSession(flush bool) {
 	if s.session == "" {
 		return
 	}
-	if flush {
+	tail := s.tail
+	s.tail = nil
+	switch {
+	case flush && tail != nil:
+		for i := range tail.kept() {
+			s.handleSeg(s.seg.Push(tail.audio[i*Window:(i+1)*Window], tail.probs[i]))
+		}
+		s.handleSeg(s.seg.Flush())
+	case flush:
 		if n := len(s.pending); n > 0 {
 			// The VAD pads a partial window with zeros; so does the phrase.
 			s.pending = append(s.pending, make([]float32, Window-n)...)
 			s.score()
 		}
 		s.handleSeg(s.seg.Flush())
-	} else if s.seg.InSpeech() {
+	case s.seg.InSpeech():
 		s.emit(EventSpeech, SpeechEvent{Session: s.session, Active: false})
 	}
 	s.seg.Reset()
@@ -347,6 +398,9 @@ func (s *Server) closeSession(flush bool) {
 	s.prompt = ""
 	s.session = ""
 	s.setState(s.idleState())
+	if tail != nil {
+		_ = s.enc.Reply(tail.id, nil)
+	}
 }
 
 func (s *Server) audio(p AudioParams) {
@@ -379,7 +433,13 @@ func (s *Server) score() {
 		if i < len(probs) {
 			p = probs[i]
 		}
-		s.handleSeg(s.seg.Push(s.pending[i*Window:(i+1)*Window], p))
+		window := s.pending[i*Window : (i+1)*Window]
+		if s.tail == nil {
+			s.handleSeg(s.seg.Push(window, p))
+		} else if s.tail.push(window, p) {
+			s.finishTail() // the rest of pending is past the tail
+			return
+		}
 	}
 	s.pending = append(s.pending[:0], s.pending[n:]...)
 }
