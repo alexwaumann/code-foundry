@@ -35,7 +35,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), wails("./bindings")],
   build: {
     // The dictation overlay's panel loads its own small page, not the app (gui/overlay.go).
-    rollupOptions: { input: { main: "index.html", "dictation-overlay": "dictation-overlay.html" } },
+    rolldownOptions: { input: { main: "index.html", "dictation-overlay": "dictation-overlay.html" } },
   },
   test: {
     environment: "jsdom",
