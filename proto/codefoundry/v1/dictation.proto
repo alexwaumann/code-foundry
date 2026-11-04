@@ -121,6 +121,9 @@ message DictationSnapshot {
   bool composer_target = 13;
   // What the host last reported; unset until it has (no host, or dictation off so far).
   DictationAccessibility accessibility = 14;
+  // dictation.other_audio: "do_nothing" or "lower" (the host ramps the default output down
+  // for a hold; docs/notes/dictation-other-audio.md).
+  string other_audio = 15;
 }
 
 // DictationAccessibility is what macOS allows the hold key, as the host sees it.

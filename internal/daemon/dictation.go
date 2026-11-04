@@ -48,7 +48,8 @@ func openDictation(log *slog.Logger, p paths.Paths, b *bus.Bus, st *settings.Sto
 			s := all.Dictation
 			return dictation.Prefs{
 				Anywhere: s.Anywhere, HoldKey: s.HoldKey, Sounds: s.Sounds, SoundVolume: all.Notifications.SoundVolume,
-				Spoken: dictate.Spoken{Symbols: s.SpokenSymbols, Formatting: s.SpokenFormatting},
+				OtherAudio: s.OtherAudio,
+				Spoken:     dictate.Spoken{Symbols: s.SpokenSymbols, Formatting: s.SpokenFormatting},
 			}
 		},
 		Enable: func() error {

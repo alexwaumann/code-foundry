@@ -230,6 +230,9 @@ type DictationSnapshot struct {
 	ComposerTarget bool `protobuf:"varint,13,opt,name=composer_target,json=composerTarget,proto3" json:"composer_target,omitempty"`
 	// What the host last reported; unset until it has (no host, or dictation off so far).
 	Accessibility *DictationAccessibility `protobuf:"bytes,14,opt,name=accessibility,proto3" json:"accessibility,omitempty"`
+	// dictation.other_audio: "do_nothing" or "lower" (the host ramps the default output down
+	// for a hold; docs/notes/dictation-other-audio.md).
+	OtherAudio    string `protobuf:"bytes,15,opt,name=other_audio,json=otherAudio,proto3" json:"other_audio,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -360,6 +363,13 @@ func (x *DictationSnapshot) GetAccessibility() *DictationAccessibility {
 		return x.Accessibility
 	}
 	return nil
+}
+
+func (x *DictationSnapshot) GetOtherAudio() string {
+	if x != nil {
+		return x.OtherAudio
+	}
+	return ""
 }
 
 // DictationAccessibility is what macOS allows the hold key, as the host sees it.
@@ -1778,7 +1788,7 @@ var File_codefoundry_v1_dictation_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\n" +
 	"\x1ecodefoundry/v1/dictation.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x17\n" +
-	"\x15WatchDictationRequest\"\xf1\x04\n" +
+	"\x15WatchDictationRequest\"\x92\x05\n" +
 	"\x11DictationSnapshot\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x124\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1e.codefoundry.v1.DictationStateR\x05state\x124\n" +
@@ -1795,7 +1805,9 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\x06sounds\x18\v \x01(\bR\x06sounds\x12!\n" +
 	"\fsound_volume\x18\f \x01(\x05R\vsoundVolume\x12'\n" +
 	"\x0fcomposer_target\x18\r \x01(\bR\x0ecomposerTarget\x12L\n" +
-	"\raccessibility\x18\x0e \x01(\v2&.codefoundry.v1.DictationAccessibilityR\raccessibility\"\x8e\x01\n" +
+	"\raccessibility\x18\x0e \x01(\v2&.codefoundry.v1.DictationAccessibilityR\raccessibility\x12\x1f\n" +
+	"\vother_audio\x18\x0f \x01(\tR\n" +
+	"otherAudio\"\x8e\x01\n" +
 	"\x16DictationAccessibility\x12\x18\n" +
 	"\agranted\x18\x01 \x01(\bR\agranted\x12\x1d\n" +
 	"\n" +

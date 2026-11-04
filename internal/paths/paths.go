@@ -214,6 +214,11 @@ func (p Paths) WindowBackground() string { return filepath.Join(p.home, "window-
 // (gui/windowframe.go).
 func (p Paths) WindowFrame() string { return filepath.Join(p.home, "window-frame.json") }
 
+// LoweredAudio is the directory of markers for an output volume the GUI host has lowered for
+// a hold, one file per device, which the next launch reads after a crash
+// (docs/notes/dictation-other-audio.md).
+func (p Paths) LoweredAudio() string { return filepath.Join(p.home, "audio-lowered") }
+
 // Ensure creates the home and logs directories with 0700 permissions and checks that
 // the socket path fits in sun_path.
 func (p Paths) Ensure() error {

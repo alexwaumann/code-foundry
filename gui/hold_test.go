@@ -253,6 +253,14 @@ func (f *fakeHoldOS) charBeforeCaret(pid int) (rune, bool) {
 	return f.before, f.beforeKnown
 }
 
+func (f *fakeHoldOS) lowerAudio(after time.Duration, released <-chan struct{}) {
+	f.log.add("lower after " + after.String())
+	go func() {
+		<-released
+		f.log.add("audio released")
+	}()
+}
+
 func (f *fakeHoldOS) pasteboard() pasteHost {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -536,6 +544,55 @@ type holdScript struct {
 	startErr         []error
 	phrases, flushed []string
 	endEarly         bool
+}
+
+// Other audio: a hold that goes somewhere asks for the audio to go down after the hold's
+// minimum, and every way a hold can end lets it go.
+func TestHoldLowersAudio(t *testing.T) {
+	lower := func(s *v1.DictationSnapshot) { s.OtherAudio = "lower" }
+	end := func(r *holdRig) { r.s.event(flagsAt(500, 0)) }
+	tests := []struct {
+		name  string
+		front frontApp
+		snap  func(*v1.DictationSnapshot)
+		end   func(*holdRig)
+		want  bool
+	}{
+		{"into another app", notesApp, lower, end, true},
+		{"into a composer", ownApp, func(s *v1.DictationSnapshot) { lower(s); s.ComposerTarget = true }, end, true},
+		{"a shortcut ends it early", notesApp, lower, func(r *holdRig) { r.s.event(keyAt(120, 123)) }, true},
+		{"the tap stops", notesApp, lower, func(r *holdRig) { r.s.stopTap("a test") }, true},
+		{"the setting is off", notesApp, nil, end, false},
+		{"nowhere to go", notesApp, func(s *v1.DictationSnapshot) { lower(s); s.Anywhere = false }, end, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newHoldRig(t)
+			r.os.set(func(s *fakeHoldOS) { s.front = tt.front })
+			r.s.update(holdUpdate{conn: r.conn, snap: holdSnapshot(tt.snap)})
+			r.s.event(flagsAt(0, flagLeftAlt))
+			waitLog := func(line string) {
+				t.Helper()
+				deadline := time.Now().Add(2 * time.Second)
+				for !slices.Contains(r.log.all(), line) {
+					if time.Now().After(deadline) {
+						t.Fatalf("no %q in %q", line, r.log.all())
+					}
+					time.Sleep(time.Millisecond)
+				}
+			}
+			if tt.want {
+				waitLog("lower after 300ms")
+			}
+			tt.end(r)
+			r.wait(t)
+			if tt.want {
+				waitLog("audio released")
+			} else if slices.Contains(r.log.all(), "lower after 300ms") {
+				t.Errorf("lowered: %q", r.log.all())
+			}
+		})
+	}
 }
 
 func TestHoldRuns(t *testing.T) {

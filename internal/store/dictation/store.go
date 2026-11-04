@@ -168,6 +168,8 @@ type Prefs struct {
 	Sounds bool
 	// SoundVolume is notifications.sound_volume, which the sounds play at.
 	SoundVolume int
+	// OtherAudio is dictation.other_audio: do_nothing or lower.
+	OtherAudio string
 	// Spoken is dictation.spoken_symbols and dictation.spoken_formatting. Every phrase goes
 	// through it here, so a composer and a paste get the same text.
 	Spoken dictate.Spoken

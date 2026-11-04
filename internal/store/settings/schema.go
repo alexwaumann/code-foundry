@@ -242,6 +242,7 @@ const (
 	KeyDictationAnywhere         = "dictation.anywhere"
 	KeyDictationHoldKey          = "dictation.hold_key"
 	KeyDictationSounds           = "dictation.sounds"
+	KeyDictationOtherAudio       = "dictation.other_audio"
 	KeyDictationSpokenSymbols    = "dictation.spoken_symbols"
 	KeyDictationSpokenFormatting = "dictation.spoken_formatting"
 	KeyEmberModel                = "ember.model"
@@ -422,6 +423,14 @@ var staticFields = []Field{
 		Description: "Plays a sound as dictation starts and stops, at the alert volume.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Dictation.Sounds },
+	},
+	{
+		Key: KeyDictationOtherAudio, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Other audio",
+		Description: "What music and video do while you dictate.",
+		Enum:        []string{OtherAudioDoNothing, OtherAudioLower},
+		EnumLabels:  []string{"Do nothing", "Lower"},
+		Default:     OtherAudioDoNothing,
+		bind:        func(s *Settings) any { return &s.Dictation.OtherAudio },
 	},
 	// Behind the section's Advanced disclosure (the GUI's advancedFields.ts).
 	{
