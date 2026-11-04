@@ -33,7 +33,7 @@ describe("rowSize", () => {
     expect(THREE_LINE_ROW).toBe(16 + 22 + 16 + 2 * 3);
   });
 
-  it("the gap between rows is 4px", () => {
-    expect(ROW_GAP).toBe(4);
+  it("the gap between rows is 8px", () => {
+    expect(ROW_GAP).toBe(8);
   });
 });

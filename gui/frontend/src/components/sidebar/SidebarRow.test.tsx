@@ -49,6 +49,15 @@ const MIN = 60_000;
 const flag = (level: "attention" | "error", reason: string, pluginName = "Lint") => ({ plugin: pluginName.toLowerCase(), pluginName, level, reason, setAtMs: null, untilSeen: false });
 const line1 = () => screen.getByTestId("row-line-1");
 const line3 = () => screen.getByTestId("row-line-3");
+/** Line 1 as it reads at rest: the hover actions' "Archive" is in the DOM but hidden. */
+const line1Text = () => line1().textContent.replace(screen.getByTestId("row-actions").textContent, "");
+/** How many row cards are open, under fake timers: Radix opens one on a timer even at delay 0. */
+const cardOpen = () => {
+  act(() => {
+    vi.advanceTimersByTime(50);
+  });
+  return screen.queryAllByTestId("thread-tooltip").filter((e) => e.getAttribute("data-state") !== "closed").length;
+};
 
 describe("SidebarRow three lines", () => {
   it("project and status, then the name, then the detail or branch, in the 60px box", () => {
@@ -59,7 +68,7 @@ describe("SidebarRow three lines", () => {
     expect(line1().className.split(" ")).toEqual(expect.arrayContaining(["h-4", "text-caption-sm"]));
     expect(line3().className.split(" ")).toEqual(expect.arrayContaining(["h-4", "text-caption-sm"]));
     expect(screen.getByTestId("thread-name").parentElement?.className).toContain("h-[22px]");
-    expect(line1().textContent).toBe("code-foundryQuestion");
+    expect(line1Text()).toBe("code-foundryQuestion");
     expect(line3().textContent).toBe("Which color?");
   });
 
@@ -114,13 +123,13 @@ describe("SidebarRow three lines", () => {
     const time = screen.getByTestId("row-time");
     expect(time.textContent).toBe("9m");
     expect(time.className.split(" ")).toEqual(expect.arrayContaining(["text-cf-sidebar-muted-foreground", "tabular-nums"]));
-    expect(line1().textContent).toBe("code-foundry9m");
+    expect(line1Text()).toBe("code-foundry9m");
     expect(screen.getByTestId("thread-body").getAttribute("data-status-line")).toBe("place");
   });
 
   it("idle without a known activity: nothing on the right", () => {
     renderRow({ status: "idle", lastActivityAtMs: null });
-    expect(line1().textContent).toBe("code-foundry");
+    expect(line1Text()).toBe("code-foundry");
   });
 
   it.each<[string, Partial<ThreadView>, string]>([
@@ -306,20 +315,26 @@ describe("SidebarRow line 3: detail or branch", () => {
 });
 
 describe("SidebarRow hover actions", () => {
-  it("Snooze and Archive buttons, 20px, rounded-sm, labelled, over the status", () => {
+  it("Snooze is the alarm clock, Archive a check and the word; labelled, muted, no background, over the status", () => {
     renderRow({ status: "attention", statusReason: "question: Which one?" });
     const actions = screen.getByTestId("row-actions");
     expect(actions.className.split(" ")).toEqual(expect.arrayContaining(["opacity-0", "group-hover/row:opacity-100"]));
     for (const [id, label, icon] of [
       ["row-snooze", "Snooze thread", "lucide-alarm-clock"],
-      ["row-archive", "Archive thread", "lucide-archive"],
+      ["row-archive", "Archive thread", "lucide-check"],
     ] as const) {
       const b = screen.getByTestId(id);
       expect(b.tagName).toBe("BUTTON");
       expect(b.getAttribute("aria-label")).toBe(label);
-      expect(b.className.split(" ")).toEqual(expect.arrayContaining(["size-5", "rounded-sm", "text-cf-icon-muted", "bg-cf-sidebar-row-selected"]));
+      expect(b.className.split(" ")).toEqual(expect.arrayContaining(["rounded-sm", "text-cf-icon-muted", "focus-visible:ring-1"]));
+      expect(b.className).not.toMatch(/(^|[\s:])bg-/);
       expect(b.querySelector("svg")?.getAttribute("class")).toContain(icon);
     }
+    expect(screen.getByTestId("row-snooze").className.split(" ")).toEqual(expect.arrayContaining(["size-5", "hover:text-cf-warning-text", "aria-expanded:text-cf-warning-text"]));
+    expect(screen.getByTestId("row-snooze").textContent).toBe("");
+    const archive = screen.getByTestId("row-archive");
+    expect(archive.textContent).toBe("Archive");
+    expect(archive.className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "font-medium", "hover:text-cf-success-text"]));
     expect(screen.getByTestId("row-status").parentElement?.className).toContain("group-hover/row:invisible");
   });
 
@@ -337,15 +352,21 @@ describe("SidebarRow hover actions", () => {
     expect(screen.getByTestId("row-snooze").tabIndex).toBe(0);
   });
 
-  it.each([
-    ["row-snooze", "Snooze thread"],
-    ["row-archive", "Archive thread"],
-  ])("%s: its tooltip opens at once, above", async (id, label) => {
+  it.each(["row-snooze", "row-archive"])("%s: no tooltip of its own, and the row's card stays open over it", (id) => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     renderRow({});
-    fireEvent.focus(screen.getByTestId(id));
-    const tip = await screen.findAllByText(label, { selector: "[data-testid$=-tip] *, [data-testid$=-tip]" });
-    expect(tip.length).toBeGreaterThan(0);
-    expect(screen.getByTestId(`${id}-tip`).getAttribute("data-side")).toBe("top");
+    const b = screen.getByTestId(id);
+    expect(b.hasAttribute("data-tip")).toBe(false);
+    fireEvent.pointerMove(screen.getByTestId("thread-name"), { pointerType: "mouse" });
+    expect(cardOpen()).toBe(1);
+    fireEvent.pointerOver(b, { pointerType: "mouse" });
+    fireEvent.pointerMove(b, { pointerType: "mouse" });
+    expect(cardOpen()).toBe(1);
+    fireEvent.focus(b);
+    expect(screen.queryByTestId(`${id}-tip`)).toBeNull();
   });
 
   it("Archive archives at once and does not select the row", () => {
@@ -394,13 +415,6 @@ describe("SidebarRow hover actions", () => {
         <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
       </TooltipProvider>,
     );
-    // Radix opens the card on a timer even at delay 0.
-    const cardOpen = () => {
-      act(() => {
-        vi.advanceTimersByTime(50);
-      });
-      return screen.queryAllByTestId("thread-tooltip").filter((e) => e.getAttribute("data-state") !== "closed").length;
-    };
     const trigger = screen.getByTestId("row-snooze");
     fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
     fireEvent.pointerUp(document, { pointerType: "mouse" });
@@ -418,6 +432,24 @@ describe("SidebarRow hover actions", () => {
     // A move over the row itself still opens it.
     fireEvent.pointerMove(screen.getByTestId("thread-name"), { pointerType: "mouse" });
     expect(cardOpen()).toBe(1);
+  });
+
+  it("a click on Snooze shuts an open card, though the menu's trigger prevents the press, and it stays shut", () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    renderRow({});
+    const trigger = screen.getByTestId("row-snooze");
+    fireEvent.pointerMove(trigger, { pointerType: "mouse" });
+    expect(cardOpen()).toBe(1);
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.pointerUp(document, { pointerType: "mouse" });
+    fireEvent.click(trigger);
+    expect(screen.getByTestId("row-snooze-menu")).toBeTruthy();
+    expect(cardOpen()).toBe(0);
+    fireEvent.pointerMove(trigger, { pointerType: "mouse" });
+    expect(cardOpen()).toBe(0);
   });
 
   it("a snoozed or archived row has no hover actions", () => {
@@ -679,19 +711,29 @@ describe("SidebarRow linked PRs tag", () => {
     expect(tag()?.querySelector("svg")?.getAttribute("aria-label")).toBe("draft");
   });
 
-  it("has no tooltip of its own; the row's card stays shut over it and opens again off it", () => {
+  it("no background: only the text colour, and an underline on hover", () => {
     dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(1, "open")]) });
     renderRow({ linkedPullRequests: [link(1)] });
-    expect(tag()?.hasAttribute("data-tip")).toBe(false);
-    expect(tag()?.hasAttribute("data-quiet")).toBe(true);
-    const open = () => screen.queryAllByTestId("thread-tooltip").filter((e) => e.getAttribute("data-state") !== "closed").length;
+    const cls = (tag() as HTMLElement).className.split(" ");
+    expect(cls).toEqual(expect.arrayContaining(["text-cf-success-text", "hover:underline", "cursor-pointer"]));
+    expect(cls.filter((c) => /(^|:)(bg-|rounded|px-)/.test(c))).toEqual([]);
+  });
+
+  it("has no tooltip of its own; the row's card opens over it and stays open coming from the row", () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(1, "open")]) });
+    renderRow({ linkedPullRequests: [link(1)] });
     const t = tag() as HTMLElement;
+    expect(t.hasAttribute("data-tip")).toBe(false);
+    expect(t.hasAttribute("data-quiet")).toBe(false);
     fireEvent.pointerMove(t, { pointerType: "mouse" });
-    fireEvent.pointerOver(t, { pointerType: "mouse" });
-    expect(open()).toBe(0);
-    // Off the tag onto the name: open at once.
+    expect(cardOpen()).toBe(1);
     fireEvent.pointerOver(screen.getByTestId("thread-name"), { pointerType: "mouse", relatedTarget: t });
-    expect(open()).toBe(1);
+    fireEvent.pointerOver(t, { pointerType: "mouse", relatedTarget: screen.getByTestId("thread-name") });
+    expect(cardOpen()).toBe(1);
   });
 
   it("the fresher read wins: a cached detail newer than the dashboard", () => {

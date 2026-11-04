@@ -89,7 +89,7 @@ test("Working section: the header sits on the rows' edge; cmd+4/cmd+5 skip hidde
   await expect(row(page, "s:s-5")).toHaveAttribute("aria-selected", "true");
 });
 
-test("thread rows sit 4px apart at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
+test("thread rows sit 8px apart at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
   await openApp(page);
   await page.getByTestId("snoozed-header").click();
   await expect(page.getByTestId("sidebar-snoozed-rows").locator("[data-row-key]")).toHaveCount(2);
@@ -110,9 +110,9 @@ test("thread rows sit 4px apart at both densities, each row's box (and its selec
     await mockPost(`settings/external?appearance.density=${density}`);
     await expect(page.locator("html")).toHaveAttribute("data-density", density);
     // Main list and the Working footer: three-line rows; Snoozed: one-line rows.
-    await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: three, gap: 4 });
-    expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: three, gap: 4 });
-    expect(await snoozed()).toEqual({ height: one, gap: 4 });
+    await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: three, gap: 8 });
+    expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: three, gap: 8 });
+    expect(await snoozed()).toEqual({ height: one, gap: 8 });
   }
   // The selection background is the row's own box: the gap under it stays the sidebar's.
   await row(page, "s:s-2").click();
@@ -196,6 +196,42 @@ test("hovering a thread row shows its card right of the sidebar, 260px wide; a c
   await expect(tip).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("row-menu")).toHaveCount(0);
+});
+
+test("a real pointer keeps the card open over the row's actions and PR tag", async ({ page }) => {
+  await mockPost(`link-pr?thread=s-3&slug=${encodeURIComponent("alexwaumann/code-foundry")}&number=145&ago=60000`);
+  await openApp(page);
+  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+  const r = row(page, "s:s-3");
+  await r.getByTestId("thread-name").hover();
+  await expect(tip).toHaveAttribute("data-thread-id", "s-3");
+  for (const id of ["row-snooze", "row-archive", "row-linked-prs"]) {
+    await r.getByTestId(id).hover();
+    await page.waitForTimeout(100);
+    await expect(tip).toHaveAttribute("data-thread-id", "s-3");
+  }
+});
+
+test("at the narrowest sidebar the actions never cover the project, on a selected row too, and the status under them is hidden", async ({ page }) => {
+  await openApp(page);
+  // The default width is the minimum (SIDEBAR_MIN).
+  expect((await page.getByTestId("sidebar").boundingBox())?.width).toBe(260);
+  for (const select of [false, true]) {
+    const r = row(page, "s:s-3");
+    if (select) await r.click();
+    // A name long enough to reach the actions: the project gives way, not the actions.
+    await r.getByTestId("row-project").evaluate((el) => {
+      el.textContent = "a-project-name-long-enough-to-run-under-the-actions";
+    });
+    await r.getByTestId("thread-name").hover();
+    await expect(r.getByTestId("row-actions")).toHaveCSS("opacity", "1");
+    const [project, actions] = [await r.getByTestId("row-project").boundingBox(), await r.getByTestId("row-actions").boundingBox()];
+    expect((project?.x ?? 0) + (project?.width ?? 0)).toBeLessThanOrEqual(actions?.x ?? 0);
+    await expect(r.getByTestId("row-time")).toHaveCSS("visibility", "hidden");
+  }
+  // A status word and its icon, not only a time.
+  await row(page, "s:s-2").getByTestId("thread-name").hover();
+  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveCSS("visibility", "hidden");
 });
 
 // A multi-project thread's card (workspace or N projects, the run-in project and where it runs, branch, model) and line 1: src/components/sidebar/SidebarRow.test.tsx ("a workspace thread…", "an unnamed set…", "a thread in its workspace's folder…", "line 1 of a multi-project thread").
