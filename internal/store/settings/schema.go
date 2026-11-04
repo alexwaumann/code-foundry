@@ -409,10 +409,10 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyDictationHoldKey, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Hold key",
-		Description: "Hold to dictate, release to finish. Both means the two Option keys pressed together.",
-		Enum:        []string{HoldKeyLeft, HoldKeyRight, HoldKeyEither, HoldKeyBoth},
-		EnumLabels:  []string{"Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"},
-		Default:     HoldKeyEither,
+		Description: "Hold to dictate, release to finish. Both means either Option key works.",
+		Enum:        []string{HoldKeyLeft, HoldKeyRight, HoldKeyBoth},
+		EnumLabels:  []string{"Left ⌥", "Right ⌥", "Both ⌥"},
+		Default:     HoldKeyBoth,
 		bind:        func(s *Settings) any { return &s.Dictation.HoldKey },
 	},
 	{

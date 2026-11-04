@@ -162,7 +162,7 @@ type Prefs struct {
 	// Anywhere is dictation.anywhere: the hold key works in every app, and the host
 	// stays in the menu bar with its window closed.
 	Anywhere bool
-	// HoldKey is dictation.hold_key: left, right, either or both.
+	// HoldKey is dictation.hold_key: left, right or both.
 	HoldKey string
 	// Sounds is dictation.sounds.
 	Sounds bool

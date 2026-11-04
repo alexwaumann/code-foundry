@@ -109,7 +109,7 @@ message DictationSnapshot {
   // dictation.anywhere: the hold key works in every app, and the GUI host stays in the
   // menu bar with its window closed.
   bool anywhere = 9;
-  // dictation.hold_key: "left", "right", "either" or "both" (the two pressed together).
+  // dictation.hold_key: "left", "right" or "both" (either one works).
   string hold_key = 10;
   // dictation.sounds: a sound as dictation starts and stops.
   bool sounds = 11;

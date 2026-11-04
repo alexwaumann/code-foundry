@@ -10,8 +10,8 @@ item and what closing the window does.
 
 ## Decisions
 
-* **Settings.** `dictation.anywhere` (off), `dictation.hold_key` (`left`, `right`, `either`,
-  `both`; default `either`) and `dictation.sounds` (on, at `notifications.sound_volume`). All
+* **Settings.** `dictation.anywhere` (off), `dictation.hold_key` (`left`, `right`, `both`,
+  which means either key works; default `both`) and `dictation.sounds` (on, at `notifications.sound_volume`). All
   live. A file without them reads the defaults with no issue, so no migration. A bad
   `hold_key` falls back to the default and is kept in the file with an "Ignored" comment,
   like any rejected value.
