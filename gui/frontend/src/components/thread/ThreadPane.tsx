@@ -17,7 +17,6 @@ import { useUiStore } from "@/stores/ui";
 import { cardFits } from "@/lib/threadInfo";
 import { useWidth } from "@/lib/useWidth";
 import { useElementHeight, useThreadActivity } from "./activity";
-import { AgentsStrip } from "./AgentsStrip";
 import { CiteLayer } from "./cite/CiteLayer";
 import { FindBar } from "./find/FindBar";
 import { FindLayer } from "./find/FindLayer";
@@ -27,6 +26,7 @@ import { HeaderActions } from "./HeaderActions";
 import { PaneOverlay } from "./InlineHtml";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
+import { WaitingStrip } from "./WaitingStrip";
 import "./thread.css";
 
 /**
@@ -164,7 +164,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
                 }
               />
               <div className="dock" ref={dockRef}>
-                <AgentsStrip threadId={threadId} />
+                <WaitingStrip key={`wait:${threadId}`} threadId={threadId} />
                 <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
               </div>
               <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />

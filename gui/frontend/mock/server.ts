@@ -61,6 +61,7 @@
  *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts) |
  *        /__mock/thread/agent-end?run=a1[&status=failed] (a subagent run of state=agents ends: mock/agents.ts) |
  *        /__mock/thread/shell-end[?status=failed] (the oldest background shell of state=agents|shells ends: mock/shells.ts) |
+ *        /__mock/thread/wake-fire?sub=…, /__mock/thread/wake-status?sub=…&status=… (state=waiting's wake rows: mock/wakes.ts) |
  *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts) |
  *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
@@ -626,6 +627,7 @@ function routes(router: ConnectRouter): void {
     search: (req) => guard(() => searchThreads(world, req)),
     // ThreadService.ListPrompts: the user's sent prompts (mock/prompts.ts).
     listPrompts: (req) => guard(() => listPrompts(world, req)),
+    listSubscriptions: (req) => guard(() => ({ subscriptions: world.logs.listWakes(req.subscriberThreadId) })),
     watchThread: (req, ctx) => tracked("ThreadService/WatchThread", guard(() => world.logs.watch(req.threadId, ctx.signal))),
     send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.logs.send(req.threadId, req.text, req.attachments, req.composerText) })),
     slashCommands: (req) => guard(() => ({ commands: world.logs.slashCommandsOf(req.threadId) })),
@@ -1444,6 +1446,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
       }
+      break;
+    case "POST /__mock/thread/wake-fire":
+      // sub=sub-pr: a one-shot fires, so its row goes (mock/wakes.ts).
+      json(res, world.logs.removeWake(q.get("sub") ?? "") ? 200 : 404, { ok: true });
+      break;
+    case "POST /__mock/thread/wake-status":
+      // id=s-r1&sub=sub-pr&status=…: a target's status changes (mock/wakes.ts).
+      world.logs.setWakeStatus(q.get("id") ?? "s-r1", q.get("sub") ?? "", q.get("status") ?? "");
+      json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/shell-end":
       // id=s-r1[&status=failed]: the oldest background shell ends (mock/shells.ts).

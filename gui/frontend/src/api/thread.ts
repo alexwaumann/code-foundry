@@ -22,6 +22,7 @@ import { PromptScope, type SentPrompt } from "@/gen/codefoundry/v1/thread_prompt
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toAgentRunViews, type AgentRunView } from "./agents";
+import { toWakeViews, type WakeSubscriptionView } from "./wakes";
 import { toMcpStatusView, type McpStatusView } from "./mcp";
 import { toSlashCommandViews, type SlashCommandView } from "./slashCommands";
 import { toUserThemeFile } from "./theme";
@@ -202,6 +203,8 @@ export type ThreadEventView =
       commands: SlashCommandView[];
       /** The thread's subagent runs in spawn order (docs/notes/agents-1-daemon.md). */
       agents: AgentRunView[];
+      /** The thread's wake subscriptions (docs/notes/wait-list-daemon.md). */
+      wakes?: WakeSubscriptionView[];
     }
   | { kind: "appended" | "updated"; threadId: string; seq: number; item: ThreadItemView }
   | { kind: "delta"; threadId: string; seq: number; itemId: string; ordinal: number; field: "text" | "input"; text: string }
@@ -212,6 +215,8 @@ export type ThreadEventView =
   | { kind: "commands"; threadId: string; seq: number; commands: SlashCommandView[] }
   /** Watch only: the thread's subagent runs changed (the whole list, in spawn order). */
   | { kind: "agents"; threadId: string; seq: number; agents: AgentRunView[] }
+  /** Watch only: the thread's wake subscriptions changed (the whole list). It has no seq: it does not advance the log's. */
+  | { kind: "wakes"; threadId: string; wakes: WakeSubscriptionView[] }
   /** EventService only: the pending requests of every thread that has any. */
   | { kind: "pendingSnapshot"; threads: ThreadPendingListView[] };
 
@@ -358,6 +363,7 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
         mcp: toMcpStatusView(e.value.mcp),
         commands: toSlashCommandViews(e.value.commands),
         agents: toAgentRunViews(e.value.agents),
+        wakes: toWakeViews(e.value.subscriptions),
       };
     case "appended":
     case "updated": {
@@ -376,6 +382,8 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
       return { kind: "commands", threadId: e.value.threadId, seq: Number(e.value.seq), commands: toSlashCommandViews(e.value.commands) };
     case "agents":
       return { kind: "agents", threadId: e.value.threadId, seq: Number(e.value.seq), agents: toAgentRunViews(e.value.agents) };
+    case "subscriptions":
+      return { kind: "wakes", threadId: e.value.threadId, wakes: toWakeViews(e.value.subscriptions) };
     case "pendingSnapshot":
       return {
         kind: "pendingSnapshot",
