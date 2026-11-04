@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Row, Section } from "@/lib/tree";
 import { ROW_HEIGHTS } from "@/stores/settings";
-import { HEADER_HEIGHT, ROW_GAP, rowSize, THREE_LINE_ROW } from "./rowSizes";
+import { HEADER_HEIGHT, rowGap, rowSize, THREE_LINE_ROW } from "./rowSizes";
 
 const thread = (section: Section): Row => ({ key: `s:${section}`, kind: "thread", section, threadId: section });
 const header: Row = { key: "h:working", kind: "header", section: "working", label: "Working", count: 2, collapsed: false };
@@ -33,7 +33,18 @@ describe("rowSize", () => {
     expect(THREE_LINE_ROW).toBe(16 + 22 + 16 + 2 * 3);
   });
 
-  it("the gap between rows is 8px", () => {
-    expect(ROW_GAP).toBe(8);
+});
+
+describe("rowGap", () => {
+  it.each<[Section, number]>([
+    ["pinned", 8],
+    ["attention", 8],
+    ["done", 8],
+    ["idle", 8],
+    ["working", 8],
+    ["snoozed", 2],
+    ["archived", 2],
+  ])("%s rows sit %ipx apart", (section, want) => {
+    expect(rowGap(section)).toBe(want);
   });
 });

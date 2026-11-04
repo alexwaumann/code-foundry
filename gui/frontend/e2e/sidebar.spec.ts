@@ -89,7 +89,7 @@ test("Working section: the header sits on the rows' edge; cmd+4/cmd+5 skip hidde
   await expect(row(page, "s:s-5")).toHaveAttribute("aria-selected", "true");
 });
 
-test("thread rows sit 8px apart at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
+test("thread rows sit 8px apart, snoozed rows 2px, at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
   await openApp(page);
   await page.getByTestId("snoozed-header").click();
   await expect(page.getByTestId("sidebar-snoozed-rows").locator("[data-row-key]")).toHaveCount(2);
@@ -112,7 +112,7 @@ test("thread rows sit 8px apart at both densities, each row's box (and its selec
     // Main list and the Working footer: three-line rows; Snoozed: one-line rows.
     await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: three, gap: 8 });
     expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: three, gap: 8 });
-    expect(await snoozed()).toEqual({ height: one, gap: 8 });
+    expect(await snoozed()).toEqual({ height: one, gap: 2 });
   }
   // The selection background is the row's own box: the gap under it stays the sidebar's.
   await row(page, "s:s-2").click();
@@ -256,3 +256,24 @@ test("a long permission prompt: line 3 cuts it off; the card wraps all of it bet
   expect(st && st.height >= 40).toBe(true);
   expect(name && st && project && name.y < st.y && st.y + st.height <= project.y).toBe(true);
 });
+
+/** SHOTS=<dir>: Snoozed and Archived open, their rows 2px apart under Working's 8px, WebKit, 1280x800 at 2x, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test.describe(`screenshots (${scheme})`, () => {
+    test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
+    test("the quiet sections' gap", async ({ page }, info) => {
+      const shots = process.env.SHOTS;
+      test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      await mockPost("thread/archive?id=s-3");
+      await mockPost("thread/archive?id=s-4");
+      await mockPost("thread/snooze?id=s-6&until=2h");
+      await openApp(page);
+      await page.getByTestId("snoozed-header").click();
+      await page.getByTestId("archived-header").click();
+      await expect(page.getByTestId("sidebar-archived-rows").locator("[data-row-key]")).toHaveCount(3);
+      await page.mouse.move(640, 400);
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(shots)}/quiet-row-gap-${scheme}.png` });
+    });
+  });
+}

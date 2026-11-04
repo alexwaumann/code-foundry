@@ -18,7 +18,7 @@ import { useUiStore } from "@/stores/ui";
 import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
 import { ResizeHandle } from "./ResizeHandle";
-import { HEADER_HEIGHT, ROW_GAP, rowSize } from "./rowSizes";
+import { HEADER_HEIGHT, ROW_GAP, rowGap, rowSize } from "./rowSizes";
 import { useSidebarDashboard } from "./useLinkedPrs";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
@@ -127,6 +127,8 @@ interface PanelRowsProps {
   scrollTo: RefObject<ScrollTo | null>;
   /** The scroll container's height: the main list fills what is left (undefined), a footer is sized to fit its rows up to a cap. */
   maxHeight?: number;
+  /** Space between this panel's rows (rowSizes.ts). */
+  gap: number;
   paddingStart: number;
   paddingEnd: number;
   testId: string;
@@ -138,7 +140,7 @@ interface PanelRowsProps {
  * list takes the remaining height; a footer's rows are as tall as they need, up to
  * `maxHeight`, then scroll inside the footer.
  */
-function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo, maxHeight, paddingStart, paddingEnd, testId, children }: PanelRowsProps) {
+function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo, maxHeight, gap, paddingStart, paddingEnd, testId, children }: PanelRowsProps) {
   const ref = useRef<HTMLDivElement>(null);
   // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
@@ -149,7 +151,7 @@ function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo,
     overscan: 10,
     // Space between rows, outside each row's box (rowSizes.ts). A panel holds thread rows
     // only (a footer's header sits above its panel), so it falls between threads.
-    gap: ROW_GAP,
+    gap,
     paddingStart,
     paddingEnd,
   });
@@ -350,6 +352,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
           onActivate={activate}
           scrollTo={panels[section].scrollTo}
           maxHeight={cap}
+          gap={rowGap(section)}
           paddingStart={0}
           paddingEnd={footers[section].length > 0 ? 4 : 0}
           testId={`sidebar-${section}-rows`}
@@ -388,6 +391,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
               cursorKey={shownCursor}
               onActivate={activate}
               scrollTo={scrollMain}
+              gap={ROW_GAP}
               paddingStart={4}
               paddingEnd={8}
               testId="sidebar-main"
