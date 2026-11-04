@@ -151,6 +151,12 @@ describe("a long user message's fold", () => {
     expect(screen.getByText("a long message")).toBeTruthy();
   });
 
+  it("images only: no bubble, so nothing folds; the tiles show above where a bubble would be", () => {
+    render(<Bubble text="" attachments={["/att/0a.png"]} />);
+    expect(screen.queryByTestId("thread-user-fold")).toBeNull();
+    expect(screen.getByRole("list", { name: "Attached files" })).toBeTruthy();
+  });
+
   it("the whole text stays in the DOM under the fold, and the toggle is no part of what find searches", () => {
     render(<Bubble text="find me here" findItem="m1" />);
     const root = screen.getByTestId("thread-user-content");

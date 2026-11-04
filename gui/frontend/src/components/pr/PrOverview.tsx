@@ -1,9 +1,9 @@
 import { ArrowDownUp, ChevronDown, ChevronRight, ExternalLink, FileCode2 } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import type { PullRequestCommentView, PullRequestDetailView, PullRequestLabelView, PullRequestReviewerView, ReviewThreadView } from "@/api/gh";
-import { FOLD_PX, FoldToggle, useTallerThan } from "@/components/ui/fold";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
+import { FOLD_PX, FoldToggle, useTallerThan } from "@/lib/fold";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { sectionOpenByDefault, toggleOrder, toggleSection, usePrPanelStore, type PrSection } from "@/stores/prPanel";

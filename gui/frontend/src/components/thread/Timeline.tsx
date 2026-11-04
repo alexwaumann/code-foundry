@@ -261,7 +261,7 @@ export function TimelineList<R extends ListRow>({
 
   // A row whose top is held on screen while it resizes (holdTop), and the spacer under the
   // rows that lets a held card at the bottom shrink without moving (lib/timelineHold.ts).
-  const held = useRef<{ el: HTMLElement; top: number; until: number; fold: boolean } | null>(null);
+  const held = useRef<{ el: HTMLElement; top: number; until: number; foldFrom?: number } | null>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
   // The spacer's height and the rows' height when it was last set.
   const spacer = useRef({ px: 0, rows: 0 });
@@ -270,7 +270,7 @@ export function TimelineList<R extends ListRow>({
     if (spacerRef.current) spacerRef.current.style.height = `${String(px)}px`;
   }, []);
   const holdTop = useCallback((el: HTMLElement) => {
-    held.current = { el, top: el.getBoundingClientRect().top, until: performance.now() + HOLD_MS, fold: false };
+    held.current = { el, top: el.getBoundingClientRect().top, until: performance.now() + HOLD_MS };
   }, []);
   /** Puts a held row's top back where it was; false when no row is held. */
   const restoreHeld = useCallback((): boolean => {
@@ -283,12 +283,16 @@ export function TimelineList<R extends ListRow>({
     }
     const moved = h.el.getBoundingClientRect().top - h.top;
     const still = Math.abs(moved) < 0.5;
-    if (still && !h.fold) return true;
+    const fold = h.foldFrom !== undefined;
+    if (still && !fold) return true;
+    const rows = innerRef.current?.offsetHeight ?? 0;
     if (!still) {
-      const next = heldScroll({ scrollTop: el.scrollTop, contentHeight: innerRef.current?.offsetHeight ?? 0, clientHeight: el.clientHeight }, moved);
-      if (!h.fold) setSpacer(next.spacer);
+      const next = heldScroll({ scrollTop: el.scrollTop, contentHeight: rows, clientHeight: el.clientHeight }, moved);
+      if (!fold) setSpacer(next.spacer);
       el.scrollTop = next.scrollTop;
     }
+    // A fold's row has its new height: the hold is over, or a stream under it would unpin the list.
+    if (fold && rows !== h.foldFrom) held.current = null;
     const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_SLACK;
     pinned.current = bottom;
     setAtBottom(bottom);
@@ -296,7 +300,7 @@ export function TimelineList<R extends ListRow>({
   }, [setSpacer]);
   const foldInPlace = useCallback(
     (el: HTMLElement, change: () => void) => {
-      held.current = { el, top: el.getBoundingClientRect().top, until: performance.now() + HOLD_MS, fold: true };
+      held.current = { el, top: el.getBoundingClientRect().top, until: performance.now() + HOLD_MS, foldFrom: innerRef.current?.offsetHeight ?? 0 };
       // The click on the fold's toggle counted as input in the list; the scrolls it causes are not.
       userInput.current = -Infinity;
       flushSync(change);
@@ -335,6 +339,7 @@ export function TimelineList<R extends ListRow>({
         if (i < 0) return false;
         if (align === "start") {
           pinned.current = false;
+          held.current = null;
           v.scrollToIndex(i, { align: "start" });
           return true;
         }
@@ -344,6 +349,7 @@ export function TimelineList<R extends ListRow>({
         // In view means clear of the composer floating over the list's bottom (bottomInset).
         if (at && at.top >= box.top && at.bottom <= box.bottom - insetRef.current) return true;
         pinned.current = false;
+        held.current = null;
         v.scrollToIndex(i, { align: "center" });
         return true;
       },
@@ -366,6 +372,7 @@ export function TimelineList<R extends ListRow>({
       scrollToRow: (index) => {
         if (index < 0 || index >= rowsRef.current.length) return;
         pinned.current = false;
+        held.current = null;
         v.scrollToIndex(index, { align: "start" });
       },
     }),

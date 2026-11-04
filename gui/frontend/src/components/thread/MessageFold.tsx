@@ -1,11 +1,12 @@
 import { useContext, useRef, type MouseEvent, type ReactNode } from "react";
-import { FOLD_PX, FOLD_SLACK_PX, FoldToggle, useTallerThan } from "@/components/ui/fold";
+import { FOLD_PX, FOLD_SLACK_PX, FoldToggle, useTallerThan } from "@/lib/fold";
 import { cn } from "@/lib/utils";
 import { messageFoldKey, setRowExpanded, useRowExpanded } from "@/stores/thread";
 import { FoldInPlaceContext, useThreadCtx } from "./context";
 import { FOLD_FADE_PX, FOLDED_ATTR, foldHides } from "./foldDom";
 
-const FADE = `linear-gradient(to bottom, #000 calc(100% - ${String(FOLD_FADE_PX)}px), transparent)`;
+/** Clear a little before the box's edge: the tops of a cut line would show as specks under the button. */
+const FADE = `linear-gradient(to bottom, black calc(100% - ${String(FOLD_FADE_PX)}px), transparent calc(100% - 6px))`;
 
 /**
  * A user message's text inside its bubble: shown whole when short; otherwise cut at
@@ -50,7 +51,7 @@ export function MessageFold({ foldKey, findItem, children }: { foldKey: string; 
       <div
         ref={boxRef}
         className={cn(!open && "overflow-y-clip")}
-        style={open ? undefined : { maxHeight: folded ? FOLD_PX : FOLD_PX + FOLD_SLACK_PX, ...(folded && { maskImage: FADE }) }}
+        style={open ? undefined : { maxHeight: folded ? FOLD_PX : FOLD_PX + FOLD_SLACK_PX, ...(folded && { maskImage: FADE, WebkitMaskImage: FADE }) }}
         data-testid="thread-user-fold"
         data-folded={folded}
         {...(folded && { [FOLDED_ATTR]: "" })}
