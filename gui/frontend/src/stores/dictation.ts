@@ -2,7 +2,7 @@
  * Dictation in the GUI (docs/notes/dictation-4-gui.md): the daemon's snapshot from one
  * shared DictationService.Watch (held while something on screen needs it), this window's
  * session (the composer that pressed the mic, its Session stream, its phrases), and
- * dictation.toggle's presentation (⌘⇧M). One composer dictates at a time: starting
+ * dictation.toggle's presentation. One composer dictates at a time: starting
  * another stops the first, and a session someone else holds (another window, the CLI) is
  * stopped before this one starts (the daemon refuses a second session).
  */
@@ -120,7 +120,7 @@ export function micAvailability(s: DictationView | null): MicAvailability {
 
 // ---------- composers ----------
 
-/** A mounted composer the mic and ⌘⇧M can dictate into. */
+/** A mounted composer the mic and dictation.toggle can dictate into. */
 export interface DictationTarget {
   clientId: string;
   /** Its root element: ⌘⇧M dictates into the composer that has the keyboard. */

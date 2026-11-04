@@ -5,7 +5,7 @@ import { leaveSidebar, mockPost, mockUrl, openApp, resetMock, row } from "./fixt
  * Dictation in the GUI (docs/notes/dictation-4-gui.md) against the mock's DictationService
  * (mock/dictation.ts), for what needs the browser: the settings search scrolling to the
  * section, the mic's place, phrases landing in the real editor, Escape in it, switching
- * composers across routes, and ⌘⇧M. The rest is unit-tested (see the pointers below).
+ * composers across routes, and a chord bound to dictation.toggle. The rest is unit-tested (see the pointers below).
  * A mock session plays levels and two phrases 1 s apart.
  */
 
@@ -120,7 +120,8 @@ test.describe("composer", () => {
     await expect.poll(async () => (await dictation()).calls.filter((c) => c.startsWith("stop "))).toHaveLength(1);
   });
 
-  test("⌘⇧M toggles the focused composer, else the content pane's", async ({ page }) => {
+  test("a chord bound to dictation.toggle toggles the focused composer, else the content pane's", async ({ page }) => {
+    await mockPost("settings/external?keybindings.dictation.toggle=cmd%2Bshift%2Bm");
     await mockPost("dictation?state=ready");
     await mockPost("dictation/script?phrases=");
     const card = await openThread(page);

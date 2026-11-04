@@ -5,7 +5,8 @@ import { useSettingsStore } from "@/stores/settings";
 import { KeybindingsPage } from "./KeybindingsPage";
 
 // The daemon lists a keybindings.<command> field per bindable command, in its category's
-// section; dictation.toggle's title and chord are checked in Go (commands_dictation_test.go).
+// section; dictation.toggle's title and its lack of a default chord are checked in Go
+// (commands_dictation_test.go).
 const dictate: SettingFieldView = {
   key: "keybindings.dictation.toggle",
   title: "Dictate",
@@ -14,7 +15,7 @@ const dictate: SettingFieldView = {
   group: "keybindings",
   enumValues: [],
   enumLabels: [],
-  defaultValue: "cmd+shift+m",
+  defaultValue: "",
   restartRequired: false,
   min: 0,
   max: 0,
@@ -34,7 +35,8 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("KeybindingsPage", () => {
-  it("lists a command by its title with its default chord", () => {
+  it("lists a command by its title with the chord a settings file gives it", () => {
+    useSettingsStore.setState({ snapshot: { values: { "keybindings.dictation.toggle": "cmd+shift+m" }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
     const { container } = render(<KeybindingsPage schema={schema} page={page} />);
     const row = container.querySelector<HTMLElement>('[data-setting="keybindings.dictation.toggle"]');
     if (!row) throw new Error("no row");

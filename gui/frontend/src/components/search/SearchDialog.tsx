@@ -10,7 +10,7 @@ import { openingSelection, unseenCue, unseenToRestore, type SearchModeId, type S
 import { phraseAtCaret } from "@/lib/dictation";
 import { imeKeyDown } from "@/lib/ime";
 import { clearSearches, forgetSearch, startAgent } from "@/stores/agentSearch";
-import { useCommandsStore } from "@/stores/commands";
+import { useDictateChord } from "@/stores/commands";
 import { toggleDictation } from "@/stores/dictation";
 import { clearSearchTarget, dropSearchSession, lastSearchMode, pendingSearchStart, saveSearchSession, searchSessionAt, searchTarget, setSearchMode, trackSearchStart } from "@/stores/searchDialog";
 import type { SearchDialogApi, SearchModeProps } from "./types";
@@ -109,7 +109,7 @@ function openingState(now: number) {
  * showed (mode, query selected, results, scroll, the next unopened hit); later it opens
  * empty on Recent searches. A finished agent search not shown yet (unseen) is shown
  * whatever the timer; search.open with an id (the sidebar's search row) shows that one.
- * ⌘⇧M dictates into the field.
+ * dictation.toggle's chord, if the user bound one, dictates into the field.
  */
 export function SearchDialog({
   modes = SEARCH_MODES,
@@ -259,7 +259,8 @@ export function SearchDialog({
     [list, selectedRecent?.id, pickRecent],
   );
 
-  // Dictation into the field: the composer's mic and pill, ⌘⇧M while the dialog is open.
+  // Dictation into the field: the composer's mic and pill, and a chord bound to
+  // dictation.toggle (none by default) while the dialog is open.
   const insert = useCallback((text: string) => {
     const el = inputRef.current;
     if (!el) return;
@@ -274,12 +275,12 @@ export function SearchDialog({
     });
   }, []);
   const dictation = useComposerDictation({ draftKey: "search-dialog", rootRef: headerRef, primary: false, insert });
-  const dictateChord = useCommandsStore((st) => st.commands.find((c) => c.name === "dictation.toggle")?.keybindings[0] ?? "");
+  const dictateChord = useDictateChord();
 
   const onKeyDownCapture = (e: React.KeyboardEvent) => {
     if (imeKeyDown(e.nativeEvent)) return;
     const chord = chordFromEvent(e.nativeEvent);
-    // The palette looks up no chords while it is open: ⌘⇧M is the dialog's.
+    // The palette looks up no chords while it is open: dictation.toggle's is the dialog's.
     if (chord && dictateChord && chord === dictateChord && dictation.availability !== "hidden") {
       e.preventDefault();
       e.stopPropagation();

@@ -31,6 +31,11 @@ export const useCommandsStore = create<CommandsState>()(() => ({
   error: null,
 }));
 
+/** The chord the user bound to dictation.toggle; "" when none, which is the default. */
+export function useDictateChord(): string {
+  return useCommandsStore((s) => s.commands.find((c) => c.name === "dictation.toggle")?.keybindings[0] ?? "");
+}
+
 let inflight: AbortController | null = null;
 
 /** Lists commands for ctx. A newer call aborts an older one still in flight. */

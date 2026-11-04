@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { SettingFieldView, SettingsSchemaView } from "@/api/settings";
 import { useSettingValue } from "@/stores/settings";
+import { useHiddenFields } from "./hiddenFields";
 import { fieldRows, rowBorder, type SectionFields } from "./model";
 import { sectionLinks } from "./sectionLinks";
 import { SettingRow, SettingRowPair } from "./SettingRow";
@@ -47,7 +48,8 @@ function FieldRow({ field, parent, underParent, className }: { field: SettingFie
 
 /** A page's section: its rows (single fields, side-by-side pairs) and any link row registered for it. */
 export function SettingsSection({ schema, pageId, section }: { schema: SettingsSchemaView; pageId: string; section: SectionFields }) {
-  const rows = fieldRows(section.fields);
+  const hidden = useHiddenFields(section.fields);
+  const rows = fieldRows(section.fields.filter((f) => !hidden.has(f.key)));
   const Link = sectionLinks[`${pageId}/${section.section.id}`];
   return (
     <SectionCard id={section.section.id} heading={section.section.title} description={section.section.description}>

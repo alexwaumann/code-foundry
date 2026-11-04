@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 // Agent search in the search dialog (docs/notes/search-6-agent-gui.md), only what needs a
-// browser: the chord and Tab between the modes through the real keymap and focus, ⌘⇧M
+// browser: the chord and Tab between the modes through the real keymap and focus, a bound chord
 // dictating into the dialog's field (not the composer), and Enter on a hit landing in its
 // thread with the quote revealed and marked by the cite layer. Event folding, restore,
 // Recent searches, the keys' commands and the Find additions are vitest
@@ -36,7 +36,8 @@ test("cmd+shift+f opens Agent search; Tab switches to Find and back with the que
   await expect(input(page)).toHaveValue("stale badge");
 });
 
-test("⌘⇧M while the dialog is open dictates into its field, with the composer's pill in the header", async ({ page }) => {
+test("a chord bound to dictation.toggle dictates into the open dialog's field, with the composer's pill in the header", async ({ page }) => {
+  await mockPost("settings/external?keybindings.dictation.toggle=cmd%2Bshift%2Bm");
   await mockPost("dictation?state=ready");
   await mockPost(`dictation/script?phrases=${encodeURIComponent("where did we decide|the badge fix?")}&gap=400`);
   await openApp(page);

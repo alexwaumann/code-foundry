@@ -33,7 +33,7 @@ const field: SettingFieldView = {
   key: "dictation.enabled",
   title: "Dictation",
   type: "bool",
-  description: "Adds a microphone button to every composer and the ⇧⌘M shortcut.",
+  description: "Adds a microphone button to every composer.",
   group: "dictation",
   enumValues: [],
   enumLabels: [],
@@ -48,8 +48,11 @@ const field: SettingFieldView = {
   dependsOn: "",
   row: "",
 };
+const anywhere: SettingFieldView = { ...field, key: "dictation.anywhere", title: "Dictate anywhere" };
+const holdKey: SettingFieldView = { ...field, key: "dictation.hold_key", title: "Hold key", type: "enum", enumValues: ["left", "right", "either", "both"], enumLabels: ["Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"], defaultValue: "either", dependsOn: field.key };
+const sounds: SettingFieldView = { ...field, key: "dictation.sounds", title: "Sounds", defaultValue: "true", dependsOn: field.key };
 const section = { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." };
-const schema: SettingsSchemaView = { groups: [], fields: [field], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
+const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, sounds], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
 
 const M1 = { chip: "Apple M1 Pro", memoryBytes: 16 * 2 ** 30, m1Family: true };
 const NO_MODEL = { downloaded: false, sizeBytes: 874_188_075 };
@@ -74,7 +77,7 @@ async function mount(s: ReturnType<typeof dictationSnap>) {
   fakeDictation.publish(s);
   render(
     <>
-      <SettingsSection schema={schema} pageId="general" section={{ section, fields: [field] }} />
+      <SettingsSection schema={schema} pageId="general" section={{ section, fields: schema.fields }} />
       <ConfirmDialog />
     </>,
   );
@@ -104,11 +107,22 @@ afterEach(() => {
 });
 
 describe("Settings › Dictation", () => {
+  it("off shows Dictate anywhere but not the hold key or sounds; on shows all three, above the Model row", async () => {
+    const { sec } = await mount(dictationSnap({ enabled: false, state: "disabled" }));
+    const rows = () => [...sec.querySelectorAll("[data-setting]")].map((r) => r.getAttribute("data-setting"));
+    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
+    await publish(dictationSnap());
+    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere", "dictation.hold_key", "dictation.sounds"]);
+    expect(sec.querySelector('[data-setting="dictation.sounds"] ~ [data-testid="dictation-model-row"]')).not.toBeNull();
+    await publish(dictationSnap({ enabled: false, state: "disabled" }));
+    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
+  });
+
   it("off without the model: Needs the model, Download starts it, and when it finishes the size, the switch on and Ready", async () => {
     const { sec, toggle, model } = await mount(dictationSnap({ enabled: false, state: "disabled", model: NO_MODEL }));
     expect(within(sec).getByRole("heading", { name: "Dictation" })).not.toBeNull();
     expect(sec.textContent).toContain("Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it.");
-    expect(toggle.textContent).toContain("Adds a microphone button to every composer and the ⇧⌘M shortcut. Needs the model below.");
+    expect(toggle.textContent).toContain("Adds a microphone button to every composer. Needs the model below.");
     expect(within(toggle).queryByTestId("dictation-chip")).toBeNull();
     expect(model.textContent).toContain("Whisper Large v3 Turbo, English. Downloaded once, kept in ~/.code-foundry/dictation.");
     expect(within(model).getByTestId("dictation-mac").textContent).toBe("This Mac: Apple M4 Pro · 48 GB");
@@ -169,7 +183,7 @@ describe("Settings › Dictation", () => {
       "On an M1 each phrase takes a few seconds to appear, and the model uses about 1.2 GB while loaded. Newer M-series chips are much quicker.",
     );
     await publish(dictationSnap({ hardware: M1, state: "unloaded" }));
-    expect(chip().textContent).toBe("Unloaded · reloads when you return");
+    expect(chip().textContent).toBe("Unloaded · reloads when you dictate");
     await publish(dictationSnap({ hardware: M1, state: "error", error: "the engine exited 3 times in a row: signal: killed" }));
     expect(chip().textContent).toBe("the engine exited 3 times in a row: signal: killed");
     expect(chip().getAttribute("data-state")).toBe("error");

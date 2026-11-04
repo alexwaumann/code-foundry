@@ -27,9 +27,9 @@ export interface ComposerDictation {
 
 /**
  * A composer's dictation (docs/notes/dictation-4-gui.md): holds the snapshot while
- * dictation is on, registers the composer for phrases and ⌘⇧M, and shows the marker in
+ * dictation is on, registers the composer for phrases and dictation.toggle, and shows the marker in
  * the prompt while it listens. `insert` puts a phrase at the caret; `setMarker` shows the
- * dot where the next one lands. `primary`: the content pane's composer (⌘⇧M dictates
+ * dot where the next one lands. `primary`: the content pane's composer (dictation.toggle dictates
  * there when no composer has the keyboard).
  */
 export function useComposerDictation({
