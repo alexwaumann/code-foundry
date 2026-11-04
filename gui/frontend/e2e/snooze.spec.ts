@@ -137,14 +137,14 @@ test("the hover snooze menu keeps the row's card shut, and clicking away leaves 
 test("Save for later: the row menu moves the thread under Snoozed, after the timed ones", async ({ page }) => {
   await openApp(page);
   await page.getByTestId("snoozed-header").click();
-  await row(page, "s:s-2").click({ button: "right" });
+  await row(page, "s:s-3").click({ button: "right" });
   await page.getByTestId("menu-snooze").hover();
   await page.getByTestId("snooze-save").click();
-  const saved = row(page, "s:s-2");
+  const saved = row(page, "s:s-3");
   await expect(saved).toHaveAttribute("data-section", "snoozed");
   await expect(saved.getByTestId("row-saved")).toHaveText("Saved");
   await expect(page.getByTestId("snoozed-count")).toHaveText("3");
-  await expect(list(page).locator('[data-section="snoozed"][data-row-kind="thread"]').last()).toHaveAttribute("data-row-key", "s:s-2");
+  await expect(list(page).locator('[data-section="snoozed"][data-row-kind="thread"]').last()).toHaveAttribute("data-row-key", "s:s-3");
 });
 
 /** SHOTS=<dir>: the PR's screenshots, WebKit, 1280x800 at 2x, dark and light. */
@@ -154,7 +154,7 @@ for (const scheme of ["dark", "light"] as const) {
     test("the menu, the saved row and the saved thread's page", async ({ page }, info) => {
       const dir = process.env.SHOTS;
       test.skip(!dir || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
-      await mockPost("/__mock/thread/snooze?id=s-9&save=true");
+      await mockPost("thread/snooze?id=s-9&save=true");
       await openApp(page);
       await page.getByTestId("snoozed-header").click();
       await row(page, "s:s-2").click({ button: "right" });
