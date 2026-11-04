@@ -63,7 +63,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"project.add", "project.add-workspace", "project.clone", "project.create", "project.github.publish", "project.delete",
 		"thread.new", "thread.list", "thread.reports", "thread.focus",
 		"thread.rename", "thread.regenerate-name", "thread.fork", "thread.remove", "thread.run-in", "thread.move", "thread.move.open", "thread.checkouts", "thread.placement.check", "thread.prompts", "thread.search", "thread.pin", "thread.archive", "thread.snooze",
-		"thread.get", "thread.label", "thread.report", "thread.budget", "thread.flags", "thread.flag.clear", "thread.restart", "thread.shell.stop", "thread.new-like", "thread.workspace", "thread.project.add", "thread.project.remove",
+		"thread.get", "thread.label", "thread.report", "thread.budget", "thread.flags", "thread.flag.clear", "thread.restart", "thread.shell.stop", "thread.stop-waiting", "thread.new-like", "thread.workspace", "thread.project.add", "thread.project.remove",
 		"thread.pr.link",
 		"thread.send", "thread.respond", "thread.interrupt", "thread.items", "thread.read", "thread.set-model", "thread.set-mode", "thread.set-effort", "thread.wait", "thread.reseed",
 		"thread.subscribe", "thread.unsubscribe", "thread.subscriptions",

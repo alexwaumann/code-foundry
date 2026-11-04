@@ -931,6 +931,12 @@ func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 		defer s.mu.Unlock()
 		r, ok := s.byID[id]
 		if !ok {
+			if h, held := s.heldOnlyLocked("")[id]; held {
+				s.forgetHeldLocked("", []string{id})
+				s.changedLocked(h.SubscriberID)
+				m.log.Info("held wake removed", "subscription", id)
+				return []Subscription{h}, nil
+			}
 			return nil, fmt.Errorf("%w: subscription %s", ErrNotFound, id)
 		}
 		s.removeLocked([]string{id})
@@ -986,6 +992,7 @@ func (m *Manager) Subscriptions(ctx context.Context, subscriber string) ([]Subsc
 			out = append(out, r.s)
 		}
 	}
+	out = slices.AppendSeq(out, maps.Values(s.heldOnlyLocked(subscriber)))
 	s.mu.Unlock()
 	for i := range out {
 		sub := &out[i]

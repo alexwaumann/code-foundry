@@ -15,3 +15,11 @@ func (s *Thread) StopShell(_ context.Context, r *connect.Request[v1.StopThreadSh
 	}
 	return connect.NewResponse(&v1.StopThreadShellResponse{Thread: s.current(r.Msg.GetThreadId())}), nil
 }
+
+// StopWaiting returns Current.
+func (s *Thread) StopWaiting(_ context.Context, r *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&v1.StopThreadWaitingResponse{Thread: s.current(r.Msg.GetThreadId())}), nil
+}

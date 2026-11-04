@@ -101,6 +101,9 @@ const (
 	// ThreadServiceListSubscriptionsProcedure is the fully-qualified name of the ThreadService's
 	// ListSubscriptions RPC.
 	ThreadServiceListSubscriptionsProcedure = "/codefoundry.v1.ThreadService/ListSubscriptions"
+	// ThreadServiceStopWaitingProcedure is the fully-qualified name of the ThreadService's StopWaiting
+	// RPC.
+	ThreadServiceStopWaitingProcedure = "/codefoundry.v1.ThreadService/StopWaiting"
 	// ThreadServiceWatchProcedure is the fully-qualified name of the ThreadService's Watch RPC.
 	ThreadServiceWatchProcedure = "/codefoundry.v1.ThreadService/Watch"
 	// ThreadServiceStageAttachmentProcedure is the fully-qualified name of the ThreadService's
@@ -324,6 +327,10 @@ type ThreadServiceClient interface {
 	Unsubscribe(context.Context, *connect.Request[v1.UnsubscribeThreadRequest]) (*connect.Response[v1.UnsubscribeThreadResponse], error)
 	// ListSubscriptions lists one subscriber's subscriptions, or every thread's.
 	ListSubscriptions(context.Context, *connect.Request[v1.ListThreadSubscriptionsRequest]) (*connect.Response[v1.ListThreadSubscriptionsResponse], error)
+	// Removes everything that would wake a thread: its subscriptions and the wakes on their
+	// way to it, and stops its background shells. Child threads and subagents run on
+	// (docs/notes/wait-list-daemon.md).
+	StopWaiting(context.Context, *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error)
 	// Watch streams changes to the thread list (every thread's record, not its items).
 	// The first event is a snapshot. WatchThread streams one thread's conversation.
 	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest]) (*connect.ServerStreamForClient[v1.ThreadListEvent], error)
@@ -663,6 +670,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("ListSubscriptions")),
 			connect.WithClientOptions(opts...),
 		),
+		stopWaiting: connect.NewClient[v1.StopThreadWaitingRequest, v1.StopThreadWaitingResponse](
+			httpClient,
+			baseURL+ThreadServiceStopWaitingProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("StopWaiting")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchThreadsRequest, v1.ThreadListEvent](
 			httpClient,
 			baseURL+ThreadServiceWatchProcedure,
@@ -847,6 +860,7 @@ type threadServiceClient struct {
 	subscribe         *connect.Client[v1.SubscribeThreadRequest, v1.SubscribeThreadResponse]
 	unsubscribe       *connect.Client[v1.UnsubscribeThreadRequest, v1.UnsubscribeThreadResponse]
 	listSubscriptions *connect.Client[v1.ListThreadSubscriptionsRequest, v1.ListThreadSubscriptionsResponse]
+	stopWaiting       *connect.Client[v1.StopThreadWaitingRequest, v1.StopThreadWaitingResponse]
 	watch             *connect.Client[v1.WatchThreadsRequest, v1.ThreadListEvent]
 	stageAttachment   *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 	readAttachment    *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
@@ -1017,6 +1031,11 @@ func (c *threadServiceClient) Unsubscribe(ctx context.Context, req *connect.Requ
 // ListSubscriptions calls codefoundry.v1.ThreadService.ListSubscriptions.
 func (c *threadServiceClient) ListSubscriptions(ctx context.Context, req *connect.Request[v1.ListThreadSubscriptionsRequest]) (*connect.Response[v1.ListThreadSubscriptionsResponse], error) {
 	return c.listSubscriptions.CallUnary(ctx, req)
+}
+
+// StopWaiting calls codefoundry.v1.ThreadService.StopWaiting.
+func (c *threadServiceClient) StopWaiting(ctx context.Context, req *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error) {
+	return c.stopWaiting.CallUnary(ctx, req)
 }
 
 // Watch calls codefoundry.v1.ThreadService.Watch.
@@ -1305,6 +1324,10 @@ type ThreadServiceHandler interface {
 	Unsubscribe(context.Context, *connect.Request[v1.UnsubscribeThreadRequest]) (*connect.Response[v1.UnsubscribeThreadResponse], error)
 	// ListSubscriptions lists one subscriber's subscriptions, or every thread's.
 	ListSubscriptions(context.Context, *connect.Request[v1.ListThreadSubscriptionsRequest]) (*connect.Response[v1.ListThreadSubscriptionsResponse], error)
+	// Removes everything that would wake a thread: its subscriptions and the wakes on their
+	// way to it, and stops its background shells. Child threads and subagents run on
+	// (docs/notes/wait-list-daemon.md).
+	StopWaiting(context.Context, *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error)
 	// Watch streams changes to the thread list (every thread's record, not its items).
 	// The first event is a snapshot. WatchThread streams one thread's conversation.
 	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error
@@ -1640,6 +1663,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("ListSubscriptions")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceStopWaitingHandler := connect.NewUnaryHandler(
+		ThreadServiceStopWaitingProcedure,
+		svc.StopWaiting,
+		connect.WithSchema(threadServiceMethods.ByName("StopWaiting")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceWatchHandler := connect.NewServerStreamHandler(
 		ThreadServiceWatchProcedure,
 		svc.Watch,
@@ -1850,6 +1879,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceUnsubscribeHandler.ServeHTTP(w, r)
 		case ThreadServiceListSubscriptionsProcedure:
 			threadServiceListSubscriptionsHandler.ServeHTTP(w, r)
+		case ThreadServiceStopWaitingProcedure:
+			threadServiceStopWaitingHandler.ServeHTTP(w, r)
 		case ThreadServiceWatchProcedure:
 			threadServiceWatchHandler.ServeHTTP(w, r)
 		case ThreadServiceStageAttachmentProcedure:
@@ -2023,6 +2054,10 @@ func (UnimplementedThreadServiceHandler) Unsubscribe(context.Context, *connect.R
 
 func (UnimplementedThreadServiceHandler) ListSubscriptions(context.Context, *connect.Request[v1.ListThreadSubscriptionsRequest]) (*connect.Response[v1.ListThreadSubscriptionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ListSubscriptions is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) StopWaiting(context.Context, *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.StopWaiting is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error {

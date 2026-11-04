@@ -118,7 +118,24 @@ func (m *Manager) holdLocked(p threadWakePart) (int, bool) {
 		s.held[p.t.ID] = map[string]Subscription{}
 	}
 	s.held[p.t.ID][p.sub.ID] = p.sub
+	s.changedLocked(p.sub.SubscriberID) // a one-shot is listed again (heldOnlyLocked)
 	return n, true
+}
+
+// heldOnlyLocked are the held wakes to subscriber ("": to every thread) whose
+// subscription is gone, by id: a one-shot goes when it fires, so a held wake is all that
+// is left of it, and it will wake the thread all the same. Subscriptions lists them and
+// Unsubscribe by id drops them. Callers hold s.mu.
+func (s *subscriptions) heldOnlyLocked(subscriber string) map[string]Subscription {
+	out := map[string]Subscription{}
+	for _, h := range s.held {
+		for id, sub := range h {
+			if _, kept := s.byID[id]; !kept && (subscriber == "" || sub.SubscriberID == subscriber) {
+				out[id] = sub
+			}
+		}
+	}
+	return out
 }
 
 // unholdLocked drops subscription sub's held wake about target: it fired again.
@@ -193,6 +210,7 @@ func (m *Manager) releaseLocked(t Thread, h map[string]Subscription) {
 	kids := m.childrenLocked(t.ID)
 	for _, id := range ids {
 		sub := h[id]
+		s.changedLocked(sub.SubscriberID) // no longer listed, if it was a one-shot
 		now := m.opts.Now().Round(0).Truncate(time.Millisecond)
 		joins := m.joinsBatchLocked(sub.SubscriberID)
 		if !joins && !s.allowLocked(sub.SubscriberID, now, m.opts.WakeLimit) {

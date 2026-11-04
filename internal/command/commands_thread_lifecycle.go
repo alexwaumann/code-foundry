@@ -390,6 +390,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		threadFlagClearCmd(b, idArg),
 		threadRestartCmd(b, idArg),
 		threadShellStopCmd(b, idArg),
+		threadStopWaitingCmd(b, idArg),
 		threadWorkspaceCmd(b, idArg),
 		threadProjectAdd(b, idArg),
 		threadProjectRemove(b, idArg),
