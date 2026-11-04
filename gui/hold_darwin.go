@@ -93,6 +93,8 @@ func (macHoldOS) startTap() (altListener, error) {
 
 func (macHoldOS) playTone(t holdTone, volume int) { playHoldTone(t, float64(clampVolume(volume))/100) }
 
+func (macHoldOS) charBeforeCaret(pid int) (rune, bool) { return charBeforeCaret(pid) }
+
 func (macHoldOS) pasteboard() pasteHost { return &generalPasteboard{} }
 
 func (macHoldOS) copyText(text string) error { return copyToClipboard(text) }

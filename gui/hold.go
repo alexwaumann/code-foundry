@@ -143,6 +143,9 @@ type holdOS interface {
 	startTap() (altListener, error)
 	// playTone plays a sound at volume percent. It returns at once.
 	playTone(t holdTone, volume int)
+	// charBeforeCaret is the character before the caret in app pid: false with text selected
+	// or when the app does not say. It waits on the app, bounded, so only the paste calls it.
+	charBeforeCaret(pid int) (rune, bool)
 	// pasteboard is a fresh pasteHost; copyText and typeText the other two ways text lands.
 	pasteboard() pasteHost
 	copyText(text string) error
@@ -204,6 +207,18 @@ type pasteJob struct {
 	pressed frontApp
 }
 
+// continuation is what the next dictation may join: the text landed last, while nobody has
+// touched anything since (inputs still reads revision) and the same app is in front.
+type continuation struct {
+	revision uint64
+	pid      int
+	inserted string
+}
+
+// countsAsInput says the user may have moved the caret: a key, a click, or a gap in what the
+// tap saw. The hold key's own events are flags events, which do not count.
+func countsAsInput(ev altEvent) bool { return ev.Kind != altEventFlags || ev.Dropped > 0 }
+
 // holdService runs the hold key. The fields from conn down belong to the goroutine in run;
 // tests call update, event and check from theirs.
 type holdService struct {
@@ -221,6 +236,9 @@ type holdService struct {
 	updates chan holdUpdate
 	pastes  chan pasteJob
 	ctx     context.Context // set by run; a background context in tests
+	// inputs counts what ends a continuation; continued belongs to the paste goroutine.
+	inputs    atomic.Uint64
+	continued *continuation
 
 	conn    dictationConn
 	snap    *v1.DictationSnapshot
@@ -400,8 +418,10 @@ func (s *holdService) tapEnded() {
 	s.tap = nil
 }
 
-// interrupt treats the tap as disabled, so the machine lets go of a hold.
+// interrupt treats the tap as disabled, so the machine lets go of a hold. Keys went by
+// unseen, so nothing can continue.
 func (s *holdService) interrupt(why string) {
+	s.inputs.Add(1)
 	for _, r := range s.hold.interrupt(why) {
 		s.act(r)
 	}
@@ -434,13 +454,17 @@ func (s *holdService) report(now time.Time) {
 
 // event is one event from the tap.
 func (s *holdService) event(ev altEvent) {
-	if !s.watch.heard {
+	// A click says nothing about keys: a tap that is deaf to them can still hear the mouse.
+	if !s.watch.heard && ev.Kind != altEventMouseDown {
 		// Heard at last: a row offering a restart can go now, not at the next check.
 		s.watch.heard = true
 		s.report(time.Now())
 	}
 	if ev.Dropped > 0 {
 		s.log.Warn("dictation: the event tap dropped events", "count", ev.Dropped)
+	}
+	if countsAsInput(ev) {
+		s.inputs.Add(1)
 	}
 	for _, r := range s.hold.Step(ev) {
 		s.act(r)
@@ -697,24 +721,43 @@ func (s *holdService) land(job pasteJob) {
 		Secure: s.os.secureInput(), Trusted: s.os.trusted(), Race: hasClipboardRace(front.Bundle),
 	})
 	s.log.Info("dictation: text", "action", action.String(), "runes", len([]rune(job.text)))
-	var err error
-	switch action {
-	case pasteNothing:
+	if action == pasteNothing {
 		return
+	}
+	var err error
+	revision := s.inputs.Load()
+	text := job.text
+	previous := s.continued
+	s.continued = nil
+	switch action {
 	case pasteClipboard:
 		if err := s.os.copyText(job.text); err != nil {
 			s.log.Warn("dictation: copy the text", "err", err)
 		}
 		return
 	case pasteTyped:
-		err = s.os.typeText(job.text)
+		text = s.fitCaret(text, front.PID, revision, previous)
+		err = s.os.typeText(text)
 	case pasteKeys:
-		err = pasteText(s.os.pasteboard(), job.text, s.pasteWait, func(line string) { s.log.Debug("dictation: paste", "step", line) })
+		text = s.fitCaret(text, front.PID, revision, previous)
+		err = pasteText(s.os.pasteboard(), text, s.pasteWait, func(line string) { s.log.Debug("dictation: paste", "step", line) })
 	}
 	if err != nil {
 		s.log.Warn("dictation: paste; leaving the text on the clipboard", "err", err)
 		if err := s.os.copyText(job.text); err != nil {
 			s.log.Warn("dictation: copy the text", "err", err)
 		}
+		return
 	}
+	s.continued = &continuation{revision: revision, pid: front.PID, inserted: text}
+}
+
+// fitCaret is text as it should arrive at the caret: joined to the dictation before it if
+// nothing has happened since, else spaced by what the app says is there.
+func (s *holdService) fitCaret(text string, pid int, revision uint64, previous *continuation) string {
+	if previous != nil && previous.revision == revision && previous.pid == pid {
+		return joinContinuation(previous.inserted, text)
+	}
+	before, known := s.os.charBeforeCaret(pid)
+	return smartSpaced(text, before, known)
 }

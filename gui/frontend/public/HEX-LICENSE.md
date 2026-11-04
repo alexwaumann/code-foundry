@@ -2,8 +2,10 @@ The dictation overlay's plate takes its structure from Hex (https://github.com/a
 its dimensions and placement (112 x 26 pt, 6 pt below the menu bar, under the notch), the dot
 field's size and pitch, and the constants of its spring and dot simulation. They live in
 gui/frontend/src/overlay/scope.ts and gui/overlay.go. The dictation engine's release tail
-(internal/dictate/tail.go) is a port of its release_tail and takes its constants. That
-project is distributed under the MIT License below.
+(internal/dictate/tail.go) is a port of its release_tail and takes its constants, and the
+spacing of pasted text (gui/paste.go, cfCharBeforeCaret in gui/paste_darwin.go) of its join,
+with_smart_spacing and char_before_caret. That project is distributed under the MIT License
+below.
 
 MIT License
 

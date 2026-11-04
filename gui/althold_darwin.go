@@ -78,6 +78,11 @@ static CGEventRef cfAltTapCallback(CGEventTapProxy proxy, CGEventType type, CGEv
 			cfAltTapSend(t, type == kCGEventFlagsChanged ? 0 : 1, event);
 		}
 		return event;
+	case kCGEventLeftMouseDown:
+	case kCGEventRightMouseDown:
+	case kCGEventOtherMouseDown:
+		cfAltTapSend(t, 4, NULL);
+		return event;
 	default:
 		return event;
 	}
@@ -109,7 +114,7 @@ static cfAltTap* cfAltTapCreate(int fd) {
 	}
 	fcntl(t->fd, F_SETNOSIGPIPE, 1);
 	fcntl(t->fd, F_SETFL, fcntl(t->fd, F_GETFL) | O_NONBLOCK);
-	CGEventMask mask = CGEventMaskBit(kCGEventFlagsChanged) | CGEventMaskBit(kCGEventKeyDown);
+	CGEventMask mask = CGEventMaskBit(kCGEventFlagsChanged) | CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventLeftMouseDown) | CGEventMaskBit(kCGEventRightMouseDown) | CGEventMaskBit(kCGEventOtherMouseDown);
 	t->port = CGEventTapCreate(kCGAnnotatedSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionListenOnly, mask, cfAltTapCallback, t);
 	if (t->port == NULL) {
 		close(t->fd);

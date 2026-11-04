@@ -116,6 +116,7 @@ func TestAltHold(t *testing.T) {
 		// A key that is not a modifier: any time.
 		{name: "a key early cancels", events: []altEvent{flagsAt(0, l), keyAt(100, 123), flagsAt(500, 0)}, want: []altReport{started, discarded(keyWhy)}},
 		{name: "a key late cancels", events: []altEvent{flagsAt(0, l), keyAt(9000, 14), flagsAt(9500, 0)}, want: []altReport{started, discarded(keyWhy)}},
+		{name: "a click changes nothing", events: []altEvent{flagsAt(0, l), {Kind: altEventMouseDown, At: ms(100)}, flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
 		{name: "a key before the press is nothing", events: []altEvent{keyAt(0, 14), flagsAt(10, l), flagsAt(510, 0)}, want: []altReport{started, counted(500)}},
 		{name: "a key after the release is nothing", events: []altEvent{flagsAt(0, l), flagsAt(500, 0), keyAt(510, 14)}, want: []altReport{started, counted(500)}},
 		{name: "two keys cancel once", events: []altEvent{flagsAt(0, l), keyAt(100, 14), keyAt(200, 15), flagsAt(500, 0)}, want: []altReport{started, discarded(keyWhy)}},
