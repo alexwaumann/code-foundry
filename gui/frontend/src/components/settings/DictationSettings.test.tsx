@@ -52,10 +52,11 @@ const field: SettingFieldView = {
 const anywhere: SettingFieldView = { ...field, key: "dictation.anywhere", title: "Dictate anywhere" };
 const holdKey: SettingFieldView = { ...field, key: "dictation.hold_key", title: "Hold key", type: "enum", enumValues: ["left", "right", "either", "both"], enumLabels: ["Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"], defaultValue: "either", dependsOn: field.key };
 const sounds: SettingFieldView = { ...field, key: "dictation.sounds", title: "Sounds", defaultValue: "true", dependsOn: field.key };
+const otherAudio: SettingFieldView = { ...field, key: "dictation.other_audio", title: "Other audio", type: "enum", enumValues: ["do_nothing", "lower"], enumLabels: ["Do nothing", "Lower"], defaultValue: "do_nothing", dependsOn: field.key };
 const symbols: SettingFieldView = { ...field, key: "dictation.spoken_symbols", title: "Spoken symbols", dependsOn: field.key };
 const formatting: SettingFieldView = { ...field, key: "dictation.spoken_formatting", title: "Spoken formatting", defaultValue: "true", dependsOn: field.key };
 const section = { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." };
-const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, sounds, symbols, formatting], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
+const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, sounds, otherAudio, symbols, formatting], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
 
 const M1 = { chip: "Apple M1 Pro", memoryBytes: 16 * 2 ** 30, m1Family: true };
 const NO_MODEL = { downloaded: false, sizeBytes: 874_188_075 };
@@ -110,13 +111,13 @@ afterEach(() => {
 });
 
 describe("Settings › Dictation", () => {
-  it("off shows Dictate anywhere but not the hold key or sounds; on shows all three, above the Model row", async () => {
+  it("off shows Dictate anywhere but not what depends on it; on shows them, above the Model row", async () => {
     const { sec } = await mount(dictationSnap({ enabled: false, state: "disabled" }));
     const rows = () => [...sec.querySelectorAll("[data-setting]")].map((r) => r.getAttribute("data-setting"));
     expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
     await publish(dictationSnap());
-    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere", "dictation.hold_key", "dictation.sounds"]);
-    expect(sec.querySelector('[data-setting="dictation.sounds"] ~ [data-testid="dictation-model-row"]')).not.toBeNull();
+    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere", "dictation.hold_key", "dictation.sounds", "dictation.other_audio"]);
+    expect(sec.querySelector('[data-setting="dictation.other_audio"] ~ [data-testid="dictation-model-row"]')).not.toBeNull();
     await publish(dictationSnap({ enabled: false, state: "disabled" }));
     expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
   });

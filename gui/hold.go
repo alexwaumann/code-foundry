@@ -44,6 +44,9 @@ const (
 	holdPhasePress   = "press"
 	holdPhaseRelease = "release"
 	holdPhaseDiscard = "discard"
+
+	// holdLowerAudio is dictation.other_audio's value that lowers the audio.
+	holdLowerAudio = "lower"
 )
 
 // holdRoute is where a press of the hold key goes.
@@ -146,6 +149,9 @@ type holdOS interface {
 	// charBeforeCaret is the character before the caret in app pid: false with text selected
 	// or when the app does not say. It waits on the app, bounded, so only the paste calls it.
 	charBeforeCaret(pid int) (rune, bool)
+	// lowerAudio lowers the default output once `after` has passed, until released closes.
+	// It returns at once.
+	lowerAudio(after time.Duration, released <-chan struct{})
 	// pasteboard is a fresh pasteHost; copyText and typeText the other two ways text lands.
 	pasteboard() pasteHost
 	copyText(text string) error
@@ -188,6 +194,10 @@ type holdRun struct {
 	facts holdFacts
 	// sounds is the volume to play at, 0 for none.
 	sounds int
+	// lower: dictation.other_audio says to lower the audio. decided closes when the keeper
+	// decides how the hold ends.
+	lower   bool
+	decided chan struct{}
 	// other is the session open at the press, which gives way to a system session.
 	other string
 	prev  *holdRun
@@ -495,10 +505,12 @@ func (s *holdService) begin() {
 			Anywhere:       s.snap.GetAnywhere(),
 			ComposerTarget: s.snap.GetComposerTarget(),
 		},
-		other: s.snap.GetSession().GetId(),
-		prev:  s.last,
-		end:   make(chan bool, 1),
-		done:  make(chan struct{}),
+		other:   s.snap.GetSession().GetId(),
+		prev:    s.last,
+		lower:   s.snap.GetOtherAudio() == holdLowerAudio,
+		decided: make(chan struct{}),
+		end:     make(chan bool, 1),
+		done:    make(chan struct{}),
 	}
 	if s.snap.GetSounds() {
 		r.sounds = clampVolume(int(s.snap.GetSoundVolume()))
@@ -511,6 +523,7 @@ func (s *holdService) finish(counted bool) {
 	if r := s.current; r != nil {
 		s.current = nil
 		r.over.Store(true)
+		close(r.decided)
 		r.end <- counted
 	}
 }
@@ -524,6 +537,10 @@ func (s *holdService) runHold(r *holdRun) {
 	s.log.Info("dictation: hold", "route", route.String())
 	if route == routeNowhere {
 		return
+	}
+	if r.lower {
+		// Only from here: a shortcut like Option+Left ends a hold sooner and must not dip it.
+		s.os.lowerAudio(altHoldMin, r.decided)
 	}
 	if r.sounds > 0 {
 		s.after(holdToneDelay, func() {

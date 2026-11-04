@@ -156,7 +156,13 @@ func main() {
 		}
 	}
 	// The hold key (hold.go): held in any app, it starts and ends a session.
-	hold := newMacHoldService(log)
+	// Other audio (duck.go): after application.New, so a second launch has ended and only this
+	// process can be lowering. Starting it puts back what a crash left low; quitting, or a
+	// signal, restores at once.
+	duck := newDucker(coreAudio{}, p.LoweredAudio(), log)
+	duck.start()
+	app.OnShutdown(duck.close)
+	hold := newMacHoldService(log, duck)
 	go hold.run(watchCtx)
 	go watchHostIntents(watchCtx, daemonService.connect, askAccessibility, log)
 	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), anywhere, overlayService, hold, log)

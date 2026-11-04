@@ -268,8 +268,8 @@ func DictationSnapshotToProto(s dictation.Snapshot) *v1.DictationSnapshot {
 	out := &v1.DictationSnapshot{
 		Enabled: s.Enabled, State: dictationStates[s.State], Error: s.Error, MicDenied: s.MicDenied,
 		Anywhere: s.Prefs.Anywhere, HoldKey: s.Prefs.HoldKey, Sounds: s.Prefs.Sounds, SoundVolume: int32(s.Prefs.SoundVolume),
-		ComposerTarget: s.ComposerTarget,
-		Model:          &v1.DictationModel{Name: s.Model.Name, SizeBytes: s.Model.Size, Downloaded: s.Model.Downloaded},
+		ComposerTarget: s.ComposerTarget, OtherAudio: s.Prefs.OtherAudio,
+		Model: &v1.DictationModel{Name: s.Model.Name, SizeBytes: s.Model.Size, Downloaded: s.Model.Downloaded},
 		Hardware: &v1.DictationHardware{
 			Chip: s.Hardware.Chip, MemoryBytes: s.Hardware.MemoryBytes, M1Family: s.Hardware.M1Family,
 		},

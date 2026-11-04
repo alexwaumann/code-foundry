@@ -487,6 +487,7 @@ func TestDictationFields(t *testing.T) {
 		{KeyDictationAnywhere, "false", "", Bool},
 		{KeyDictationHoldKey, HoldKeyBoth, KeyDictationEnabled, Enum},
 		{KeyDictationSounds, "true", KeyDictationEnabled, Bool},
+		{KeyDictationOtherAudio, OtherAudioDoNothing, KeyDictationEnabled, Enum},
 		{KeyDictationSpokenSymbols, "false", KeyDictationEnabled, Bool},
 		{KeyDictationSpokenFormatting, "true", KeyDictationEnabled, Bool},
 	}
@@ -503,6 +504,10 @@ func TestDictationFields(t *testing.T) {
 		!slices.Equal(f.EnumLabels, []string{"Left ⌥", "Right ⌥", "Both ⌥"}) {
 		t.Errorf("hold key = %v %v", f.Enum, f.EnumLabels)
 	}
+	f = field(t, KeyDictationOtherAudio)
+	if !slices.Equal(f.Enum, []string{"do_nothing", "lower"}) || !slices.Equal(f.EnumLabels, []string{"Do nothing", "Lower"}) {
+		t.Errorf("other audio = %v %v", f.Enum, f.EnumLabels)
+	}
 	// Option, never the PC name for the key.
 	for _, f := range staticFields {
 		if f.Group == GroupDictation && strings.Contains(strings.ToLower(f.Title+" "+f.Description+strings.Join(f.EnumLabels, " ")), "alt") {
@@ -514,7 +519,7 @@ func TestDictationFields(t *testing.T) {
 // A settings file from before dictate anywhere has none of the new keys: it reads with
 // the defaults and no issue. A bad value falls back to its default and is reported.
 func TestDictationSettingsFromFile(t *testing.T) {
-	want := Dictation{Enabled: true, HoldKey: HoldKeyBoth, Sounds: true, SpokenFormatting: true}
+	want := Dictation{Enabled: true, HoldKey: HoldKeyBoth, Sounds: true, OtherAudio: OtherAudioDoNothing, SpokenFormatting: true}
 	tests := []struct {
 		name   string
 		file   string
@@ -522,9 +527,11 @@ func TestDictationSettingsFromFile(t *testing.T) {
 		issues []string
 	}{
 		{"older file", "[dictation]\nenabled = true\n", want, nil},
-		{"no table", "", Dictation{HoldKey: HoldKeyBoth, Sounds: true, SpokenFormatting: true}, nil},
-		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"left\"\nsounds = false\nspoken_symbols = true\nspoken_formatting = false\n",
-			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyLeft, SpokenSymbols: true}, nil},
+		{"no table", "", Dictation{HoldKey: HoldKeyBoth, Sounds: true, OtherAudio: OtherAudioDoNothing, SpokenFormatting: true}, nil},
+		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"left\"\nsounds = false\nother_audio = \"lower\"\nspoken_symbols = true\nspoken_formatting = false\n",
+			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyLeft, OtherAudio: OtherAudioLower, SpokenSymbols: true}, nil},
+		// Pause is Hex's third choice, which this does not have.
+		{"unknown other audio", "[dictation]\nenabled = true\nother_audio = \"pause\"\n", want, []string{KeyDictationOtherAudio}},
 		// A value from the tip releases that had a fourth option: the default means the same.
 		{"retired either", "[dictation]\nenabled = true\nhold_key = \"either\"\n", want, []string{KeyDictationHoldKey}},
 		{"unknown hold key", "[dictation]\nenabled = true\nhold_key = \"alt\"\n", want, []string{KeyDictationHoldKey}},

@@ -55,15 +55,17 @@ import (
 )
 
 // macHoldOS is holdOS on macOS.
-type macHoldOS struct{}
+type macHoldOS struct {
+	duck *ducker
+}
 
 // newMacHoldService returns the hold key's service for this Mac.
-func newMacHoldService(log *slog.Logger) *holdService {
+func newMacHoldService(log *slog.Logger, duck *ducker) *holdService {
 	exe, err := os.Executable()
 	if err != nil {
 		log.Warn("dictation: this executable's path", "err", err)
 	}
-	return newHoldService(macHoldOS{}, accessibilityListName(C.cfAtLeastMacOS27() != 0), exe, log)
+	return newHoldService(macHoldOS{duck: duck}, accessibilityListName(C.cfAtLeastMacOS27() != 0), exe, log)
 }
 
 // askAccessibility is dictation.allow. Safe from any goroutine; returns at once.
@@ -94,6 +96,10 @@ func (macHoldOS) startTap() (altListener, error) {
 func (macHoldOS) playTone(t holdTone, volume int) { playHoldTone(t, float64(clampVolume(volume))/100) }
 
 func (macHoldOS) charBeforeCaret(pid int) (rune, bool) { return charBeforeCaret(pid) }
+
+func (m macHoldOS) lowerAudio(after time.Duration, released <-chan struct{}) {
+	m.duck.lower(after, released)
+}
 
 func (macHoldOS) pasteboard() pasteHost { return &generalPasteboard{} }
 

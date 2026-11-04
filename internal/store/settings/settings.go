@@ -56,6 +56,9 @@ type Dictation struct {
 	HoldKey string
 	// Sounds plays a sound as dictation starts and stops, at notifications.sound_volume.
 	Sounds bool
+	// OtherAudio is what other apps' sound does during a hold: OtherAudioDoNothing or
+	// OtherAudioLower.
+	OtherAudio string
 	// SpokenSymbols turns words like "underscore" and "comma" into the symbol.
 	SpokenSymbols bool
 	// SpokenFormatting turns "new line" and "open quote" into line breaks and quotation marks.
@@ -67,6 +70,12 @@ const (
 	HoldKeyLeft  = "left"
 	HoldKeyRight = "right"
 	HoldKeyBoth  = "both"
+)
+
+// dictation.other_audio's values.
+const (
+	OtherAudioDoNothing = "do_nothing"
+	OtherAudioLower     = "lower"
 )
 
 // Ember configures the resident agent (internal/store/ember).

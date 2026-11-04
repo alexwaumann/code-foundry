@@ -5,8 +5,9 @@ gui/frontend/src/overlay/scope.ts and gui/overlay.go. The dictation engine's rel
 (internal/dictate/tail.go) is a port of its release_tail and takes its constants, and the
 spacing of pasted text (gui/paste.go, cfCharBeforeCaret in gui/paste_darwin.go) of its join,
 with_smart_spacing and char_before_caret. Spoken symbols and spoken formatting
-(internal/dictate/spoken.go) port its English word lists and rules. That project is distributed
-under the MIT License below.
+(internal/dictate/spoken.go) port its English word lists and rules, and the volume ramp behind
+Other audio (gui/duck.go, gui/duck_darwin.go) ports its output ducking. That project is
+distributed under the MIT License below.
 
 MIT License
 
