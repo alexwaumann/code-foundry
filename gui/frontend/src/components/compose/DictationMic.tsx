@@ -5,7 +5,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
 import { barHeight, decayLevels, easeLevels, formatElapsed, LEVEL_BARS, LEVEL_GAP_MS, MIC_SETTINGS_URL, pushLevel } from "@/lib/dictation";
 import { cn } from "@/lib/utils";
-import { useCommandsStore } from "@/stores/commands";
+import { useDictateChord } from "@/stores/commands";
 import { onDictationLevel, stopDictationIn, toggleDictation, useDictationStore } from "@/stores/dictation";
 import type { ComposerDictation } from "./useComposerDictation";
 import "./dictation.css";
@@ -73,7 +73,8 @@ const MIC_CLASS =
 const PILL_CLASS = "cf-dict-pill inline-flex h-7 shrink-0 items-center gap-2 rounded-full pr-2.5 pl-[9px] text-body-sm outline-none focus-visible:ring-[3px] focus-visible:ring-cf-focus/50";
 
 /**
- * The composer's mic, beside its attach button: the idle mic (tooltip "Dictate ⌘⇧M"), the
+ * The composer's mic, beside its attach button: the idle mic (tooltip "Dictate", and the
+ * chord if the user bound one to dictation.toggle; it has none by default), the
  * listening pill (pulsing dot, live levels, elapsed m:ss; a click stops), "Loading model…"
  * while a Start waits for the model, or the mic disabled with the engine's failure in its
  * tooltip. Nothing while dictation is off or has no model. `stop`: data-compose-stop for
@@ -84,7 +85,7 @@ export function DictationMic({ dictation, disabled = false, className, stop = fa
   const loading = useDictationStore((s) => phase === "starting" && (s.snapshot?.state === "loading" || s.snapshot?.state === "unloaded"));
   const startedAt = useDictationStore((s) => (phase && s.active?.clientId === clientId ? s.active.startedAtMs : 0));
   const error = useDictationStore((s) => (availability === "error" ? s.snapshot?.error || "the engine failed" : ""));
-  const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "dictation.toggle")?.keybindings[0] ?? "");
+  const chord = useDictateChord();
   const stopAttrs = stop ? { "data-compose-stop": "" } : {};
   if (availability === "hidden" && !phase) return null;
 

@@ -44,15 +44,14 @@ type harness struct {
 	launcher *dictationtest.Launcher
 	dir      string
 	enabled  atomic.Bool
-	attended atomic.Bool
 	enables  atomic.Int32
 	sessions *bus.Subscription[dictation.SessionEvent]
 }
 
 type setup struct {
-	enabled, model, attended bool
-	launcher                 *dictationtest.Launcher
-	opts                     func(*dictation.Options)
+	enabled, model bool
+	launcher       *dictationtest.Launcher
+	opts           func(*dictation.Options)
 }
 
 func newHarness(t *testing.T, s setup) *harness {
@@ -62,7 +61,6 @@ func newHarness(t *testing.T, s setup) *harness {
 		h.launcher = &dictationtest.Launcher{}
 	}
 	h.enabled.Store(s.enabled)
-	h.attended.Store(s.attended)
 	if s.model {
 		if err := os.WriteFile(filepath.Join(h.dir, testModel.Name), modelBody(), 0o600); err != nil {
 			t.Fatal(err)
@@ -71,8 +69,7 @@ func newHarness(t *testing.T, s setup) *harness {
 	h.sessions = bus.Subscribe[dictation.SessionEvent](h.bus, 1024)
 	opts := dictation.Options{
 		Dir: h.dir, Bus: h.bus, Model: testModel, Clock: h.clock, Launch: h.launcher.Launch,
-		Enabled:  h.enabled.Load,
-		Attended: h.attended.Load,
+		Enabled: h.enabled.Load,
 		Enable: func() error {
 			h.enables.Add(1)
 			h.enabled.Store(true)
@@ -162,7 +159,7 @@ func TestStartupStates(t *testing.T) {
 		{"on with model loads", true, true, dictation.Ready, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newHarness(t, setup{enabled: tc.enabled, model: tc.model, attended: true})
+			h := newHarness(t, setup{enabled: tc.enabled, model: tc.model})
 			s := h.waitState(tc.want)
 			if s.Model.Downloaded != tc.model || s.Enabled != tc.enabled {
 				t.Errorf("snapshot %+v", s)
@@ -181,7 +178,7 @@ func TestStartupStates(t *testing.T) {
 }
 
 func TestEnableDisable(t *testing.T) {
-	h := newHarness(t, setup{model: true, attended: true})
+	h := newHarness(t, setup{model: true})
 	h.waitState(dictation.Disabled)
 	h.setEnabled(true)
 	h.waitState(dictation.Ready)
@@ -206,89 +203,75 @@ func TestEnableDisable(t *testing.T) {
 	}
 }
 
-func TestPresenceUnload(t *testing.T) {
+func TestModelStaysLoadedWhileIdle(t *testing.T) {
+	h := newHarness(t, setup{enabled: true, model: true})
+	h.waitState(dictation.Ready)
+	eng := h.launcher.Last()
+	h.clock.Advance(7 * 24 * time.Hour)
+	time.Sleep(20 * time.Millisecond)
+	h.waitState(dictation.Ready)
+	if eng.Exited() || !eng.Loaded() || h.launcher.Count() != 1 {
+		t.Errorf("exited %v, loaded %v, launches %d", eng.Exited(), eng.Loaded(), h.launcher.Count())
+	}
+}
+
+func TestPrefsPublish(t *testing.T) {
+	anywhere := dictation.Prefs{Anywhere: true, HoldKey: "either", Sounds: true}
 	for _, tc := range []struct {
-		name     string
-		attended bool
-		want     dictation.State
+		name    string
+		enabled bool
+		want    dictation.State
 	}{
-		{"attended stays loaded", true, dictation.Ready},
-		{"away unloads", false, dictation.Unloaded},
+		{"dictation on", true, dictation.Ready},
+		{"dictation off", false, dictation.Disabled},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newHarness(t, setup{enabled: true, model: true, attended: tc.attended})
-			h.waitState(dictation.Ready)
-			h.clock.Advance(dictation.UnloadAfter - time.Second)
-			h.waitState(dictation.Ready)
-			h.clock.Advance(time.Second)
+			var prefs atomic.Pointer[dictation.Prefs]
+			prefs.Store(&dictation.Prefs{HoldKey: "either", Sounds: true})
+			h := newHarness(t, setup{enabled: tc.enabled, model: true, opts: func(o *dictation.Options) {
+				o.Prefs = func() dictation.Prefs { return *prefs.Load() }
+			}})
 			h.waitState(tc.want)
-			away := tc.want == dictation.Unloaded
-			// Away stops the engine (freeing more than an unload in it would).
-			if eng := h.launcher.Last(); eng.Exited() != away {
-				t.Errorf("engine exited = %v", eng.Exited())
+			if got := h.store.Snapshot().Prefs; got != *prefs.Load() {
+				t.Fatalf("first snapshot's prefs %+v", got)
 			}
-			// Back: running and loaded again.
-			h.attended.Store(true)
-			h.store.AttendedChanged(true)
-			h.waitState(dictation.Ready)
-			want := 1
-			if away {
-				want = 2
+			changes := bus.Subscribe[dictation.Changed](h.bus, 16)
+			defer changes.Close()
+
+			// Reading the same settings again publishes nothing.
+			h.store.ConfigChanged()
+			select {
+			case c := <-changes.C():
+				t.Fatalf("published %+v with nothing changed", c.Snapshot)
+			case <-time.After(20 * time.Millisecond):
 			}
-			if !h.launcher.Last().Loaded() || h.launcher.Count() != want {
-				t.Errorf("launches %d, want %d", h.launcher.Count(), want)
+			launches := h.launcher.Count()
+
+			prefs.Store(&anywhere)
+			h.store.ConfigChanged()
+			select {
+			case c := <-changes.C():
+				if c.Snapshot.Prefs != anywhere || c.Snapshot.State != tc.want {
+					t.Errorf("published %+v", c.Snapshot)
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("no snapshot after the prefs changed")
+			}
+			// Only the snapshot: the engine is left alone.
+			if h.launcher.Count() != launches || (tc.enabled && h.launcher.Last().Exited()) {
+				t.Errorf("launches %d, want %d", h.launcher.Count(), launches)
 			}
 		})
 	}
 }
 
-func TestPresenceFlapDoesNotUnloadEarly(t *testing.T) {
-	h := newHarness(t, setup{enabled: true, model: true, attended: true})
-	h.waitState(dictation.Ready)
-	h.store.AttendedChanged(false)
-	h.clock.Advance(5 * time.Minute)
-	h.store.AttendedChanged(true)
-	h.store.AttendedChanged(false)
-	h.clock.Advance(9 * time.Minute) // 14 min since the first, 9 since the last
-	h.waitState(dictation.Ready)
-	h.clock.Advance(time.Minute)
-	h.waitState(dictation.Unloaded)
-}
-
-func TestIdleUnloadWaitsForSession(t *testing.T) {
-	h := newHarness(t, setup{enabled: true, model: true})
-	h.waitState(dictation.Ready)
-	id, err := h.store.Start(context.Background(), "cli")
-	if err != nil {
-		t.Fatal(err)
-	}
-	eng := h.launcher.Last()
-	// Keep it talking past the unload deadline: speech holds the silence stop off.
-	eng.Emit(dictate.EventSpeech, dictate.SpeechEvent{Session: id, Active: true})
-	h.wait("speech handled", func(dictation.Snapshot) bool { return true })
-	time.Sleep(20 * time.Millisecond)
-	h.clock.Advance(dictation.UnloadAfter)
-	if s := h.waitState(dictation.Listening); s.Session == nil || s.Session.ID != id {
-		t.Fatalf("session %+v", s.Session)
-	}
-	if eng.Exited() {
-		t.Fatal("stopped under an open session")
-	}
-	if err := h.store.Stop(context.Background(), id, false); err != nil {
-		t.Fatal(err)
-	}
-	h.waitState(dictation.Unloaded)
-	h.wait("engine exit", func(dictation.Snapshot) bool { return eng.Exited() })
-}
-
 func TestPressureUnloadReloadsOnStart(t *testing.T) {
-	h := newHarness(t, setup{enabled: true, model: true, attended: true})
+	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)
 	eng := h.launcher.Last()
 	eng.Emit(dictate.EventUnloaded, dictate.UnloadedEvent{Reason: "memory-pressure"})
 	h.waitState(dictation.Unloaded)
-	// Presence does not bring it back; the next use does.
-	h.store.AttendedChanged(true)
+	// It stays unloaded until it is used.
 	time.Sleep(20 * time.Millisecond)
 	h.waitState(dictation.Unloaded)
 	id, err := h.store.Start(context.Background(), "c1")
@@ -310,8 +293,49 @@ func TestPressureUnloadReloadsOnStart(t *testing.T) {
 	}
 }
 
+// The engine drops the model again before the store has handled load's reply: the
+// snapshot must not say Ready, and the next Start loads it once more.
+func TestPressureUnloadDuringLoadStaysUnloaded(t *testing.T) {
+	h := newHarness(t, setup{enabled: true, model: true})
+	h.waitState(dictation.Ready)
+	eng := h.launcher.Last()
+	eng.Emit(dictate.EventUnloaded, dictate.UnloadedEvent{Reason: "memory-pressure"})
+	h.waitState(dictation.Unloaded)
+
+	gate := make(chan struct{})
+	eng.SetLoadGate(gate)
+	started := make(chan error, 1)
+	go func() {
+		_, err := h.store.Start(context.Background(), "c1")
+		started <- err
+	}()
+	h.waitState(dictation.Loading)
+	eng.Emit(dictate.EventUnloaded, dictate.UnloadedEvent{Reason: "memory-pressure"})
+	h.waitState(dictation.Unloaded)
+	eng.SetLoadGate(nil)
+	close(gate)
+	select {
+	case err := <-started:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Start did not return")
+	}
+	h.waitState(dictation.Listening)
+	loads := 0
+	for _, c := range eng.Calls() {
+		if c == dictate.MethodLoad {
+			loads++
+		}
+	}
+	if loads != 3 {
+		t.Errorf("calls %v, want a third load", eng.Calls())
+	}
+}
+
 func TestPressureUnloadEndsSession(t *testing.T) {
-	h := newHarness(t, setup{enabled: true, model: true, attended: true})
+	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)
 	id, err := h.store.Start(context.Background(), "c1")
 	if err != nil {
@@ -325,7 +349,7 @@ func TestPressureUnloadEndsSession(t *testing.T) {
 }
 
 func TestCrashRestartsWithBackoffThenFails(t *testing.T) {
-	h := newHarness(t, setup{enabled: true, model: true, attended: true})
+	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)
 	id, err := h.store.Start(context.Background(), "c1")
 	if err != nil {
@@ -380,7 +404,7 @@ func TestCrashRestartsWithBackoffThenFails(t *testing.T) {
 
 func TestMissingEngineFailsAtOnce(t *testing.T) {
 	l := &dictationtest.Launcher{Fail: []error{fmt.Errorf("%w (/x/code-foundry-dictate)", dictation.ErrEngineMissing)}}
-	h := newHarness(t, setup{enabled: true, model: true, attended: true, launcher: l})
+	h := newHarness(t, setup{enabled: true, model: true, launcher: l})
 	s := h.waitState(dictation.Failed)
 	if s.Error == "" || h.clock.Pending() != 0 {
 		t.Errorf("snapshot %+v, pending timers %d", s, h.clock.Pending())
@@ -397,7 +421,7 @@ func TestSessionPhrasesAndFlush(t *testing.T) {
 		{"no flush drops it", false, []string{"hello there", "ended:stopped"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newHarness(t, setup{enabled: true, model: true, attended: true})
+			h := newHarness(t, setup{enabled: true, model: true})
 			h.waitState(dictation.Ready)
 			id, err := h.store.Start(context.Background(), "c1")
 			if err != nil {
@@ -439,7 +463,7 @@ func TestSessionPhrasesAndFlush(t *testing.T) {
 }
 
 func TestLevelsAreThrottled(t *testing.T) {
-	h := newHarness(t, setup{enabled: true, model: true, attended: true})
+	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)
 	id, err := h.store.Start(context.Background(), "c1")
 	if err != nil {
@@ -468,7 +492,7 @@ func TestLevelsAreThrottled(t *testing.T) {
 }
 
 func TestOneSessionAtATime(t *testing.T) {
-	h := newHarness(t, setup{enabled: true, model: true, attended: true})
+	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)
 	id, err := h.store.Start(context.Background(), "c1")
 	if err != nil {
@@ -523,7 +547,7 @@ func TestSilenceStop(t *testing.T) {
 		{"just under 30 s from the end of speech", []step{{0, frame}, {10 * time.Second, speak("one")}}, dictation.SilenceStop - time.Second, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newHarness(t, setup{enabled: true, model: true, attended: true})
+			h := newHarness(t, setup{enabled: true, model: true})
 			h.waitState(dictation.Ready)
 			id, err := h.store.Start(context.Background(), "c1")
 			if err != nil {
@@ -552,9 +576,10 @@ func TestStartLoadsWhenUnloaded(t *testing.T) {
 	gate := make(chan struct{})
 	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)
-	h.clock.Advance(dictation.UnloadAfter)
+	eng := h.launcher.Last()
+	eng.Emit(dictate.EventUnloaded, dictate.UnloadedEvent{Reason: "memory-pressure"})
 	h.waitState(dictation.Unloaded)
-	h.launcher.SetSetup(func(e *dictationtest.Engine) { e.SetLoadGate(gate) })
+	eng.SetLoadGate(gate)
 	var (
 		id  string
 		err error
@@ -582,7 +607,7 @@ func TestStartRefusals(t *testing.T) {
 		{"no model", true, false, dictation.ErrNoModel},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newHarness(t, setup{enabled: tc.enabled, model: tc.model, attended: true})
+			h := newHarness(t, setup{enabled: tc.enabled, model: tc.model})
 			if _, err := h.store.Start(context.Background(), "c1"); !errors.Is(err, tc.want) {
 				t.Errorf("Start = %v, want %v", err, tc.want)
 			}
@@ -591,7 +616,7 @@ func TestStartRefusals(t *testing.T) {
 }
 
 func TestMicDenied(t *testing.T) {
-	h := newHarness(t, setup{attended: true})
+	h := newHarness(t, setup{})
 	h.store.MicDenied(true)
 	if !h.store.Snapshot().MicDenied {
 		t.Error("not recorded")
@@ -603,7 +628,7 @@ func TestMicDenied(t *testing.T) {
 }
 
 func TestRemoveModel(t *testing.T) {
-	h := newHarness(t, setup{enabled: true, model: true, attended: true})
+	h := newHarness(t, setup{enabled: true, model: true})
 	h.waitState(dictation.Ready)
 	eng := h.launcher.Last()
 	if err := os.WriteFile(filepath.Join(h.dir, testModel.Name+".part"), []byte("x"), 0o600); err != nil {

@@ -107,6 +107,8 @@ describe("page layout", () => {
     };
     expect(pageSections(s, appearance).map((x) => x.fields.map((f) => f.key))).toEqual([["appearance.backdrop"]]);
     expect(searchSettings(s, ["backdrop"]).hits.map((h) => h.field.key)).toEqual(["appearance.backdrop"]);
+    // A row hidden now is not found either (hiddenFields.ts).
+    expect(searchSettings(s, ["backdrop"], new Set(["appearance.backdrop"])).counts).toEqual({ appearance: 0 });
     expect(searchSettings(s, ["image"]).counts).toEqual({ appearance: 0 });
   });
 

@@ -95,6 +95,8 @@ vi.mock("@/api/threadSearch", async (orig) => ({
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 
 const { useUiStore } = await import("@/stores/ui");
+const { useCommandsStore } = await import("@/stores/commands");
+const { DictateHint } = await import("./AgentSearch");
 const { useSearchDialogStore } = await import("@/stores/searchDialog");
 const { useCiteStore } = await import("@/stores/cite");
 const { useThreadStore } = await import("@/stores/thread");
@@ -215,6 +217,19 @@ afterEach(() => {
     useUiStore.getState().closePalette();
   });
   vi.restoreAllMocks();
+});
+
+describe("DictateHint", () => {
+  const toggle = (keybindings: string[]) => ({ name: "dictation.toggle", title: "Dictate", description: "", category: "Dictation", args: [], keybindings, available: true });
+  it.each([
+    ["no chord, the default", [], true, ""],
+    ["a bound chord", ["cmd+shift+m"], true, "⇧⌘Mdictate"],
+    ["a bound chord, dictation off", ["cmd+shift+m"], false, ""],
+  ])("%s", (_name, keybindings, canDictate, want) => {
+    useCommandsStore.setState({ commands: [toggle(keybindings)] });
+    const { container } = render(<DictateHint canDictate={canDictate} />);
+    expect(container.textContent).toBe(want);
+  });
 });
 
 describe("modes", () => {

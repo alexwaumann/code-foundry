@@ -37,8 +37,8 @@ const (
 	DictationState_DICTATION_STATE_LOADING DictationState = 4
 	// The model is loaded: Start is instant.
 	DictationState_DICTATION_STATE_READY DictationState = 5
-	// The model was unloaded (the user was away, or macOS was short of memory); it loads
-	// again when the user returns, or on the next Start.
+	// macOS was short of memory and the engine unloaded the model; it loads again on the
+	// next Start.
 	DictationState_DICTATION_STATE_UNLOADED DictationState = 6
 	// A session is open (session).
 	DictationState_DICTATION_STATE_LISTENING DictationState = 7
@@ -212,7 +212,14 @@ type DictationSnapshot struct {
 	// The host reported that macOS denied the microphone.
 	MicDenied bool `protobuf:"varint,7,opt,name=mic_denied,json=micDenied,proto3" json:"mic_denied,omitempty"`
 	// Set on a heartbeat, which carries nothing else.
-	Heartbeat     *StreamHeartbeat `protobuf:"bytes,8,opt,name=heartbeat,proto3" json:"heartbeat,omitempty"`
+	Heartbeat *StreamHeartbeat `protobuf:"bytes,8,opt,name=heartbeat,proto3" json:"heartbeat,omitempty"`
+	// dictation.anywhere: the hold key works in every app, and the GUI host stays in the
+	// menu bar with its window closed.
+	Anywhere bool `protobuf:"varint,9,opt,name=anywhere,proto3" json:"anywhere,omitempty"`
+	// dictation.hold_key: "left", "right", "either" or "both" (the two pressed together).
+	HoldKey string `protobuf:"bytes,10,opt,name=hold_key,json=holdKey,proto3" json:"hold_key,omitempty"`
+	// dictation.sounds: a sound as dictation starts and stops.
+	Sounds        bool `protobuf:"varint,11,opt,name=sounds,proto3" json:"sounds,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -301,6 +308,27 @@ func (x *DictationSnapshot) GetHeartbeat() *StreamHeartbeat {
 		return x.Heartbeat
 	}
 	return nil
+}
+
+func (x *DictationSnapshot) GetAnywhere() bool {
+	if x != nil {
+		return x.Anywhere
+	}
+	return false
+}
+
+func (x *DictationSnapshot) GetHoldKey() string {
+	if x != nil {
+		return x.HoldKey
+	}
+	return ""
+}
+
+func (x *DictationSnapshot) GetSounds() bool {
+	if x != nil {
+		return x.Sounds
+	}
+	return false
 }
 
 // DictationModel is the one Whisper model.
@@ -1460,7 +1488,7 @@ var File_codefoundry_v1_dictation_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\n" +
 	"\x1ecodefoundry/v1/dictation.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x17\n" +
-	"\x15WatchDictationRequest\"\x88\x03\n" +
+	"\x15WatchDictationRequest\"\xd7\x03\n" +
 	"\x11DictationSnapshot\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x124\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1e.codefoundry.v1.DictationStateR\x05state\x124\n" +
@@ -1470,7 +1498,11 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\x05error\x18\x06 \x01(\tR\x05error\x12\x1d\n" +
 	"\n" +
 	"mic_denied\x18\a \x01(\bR\tmicDenied\x12=\n" +
-	"\theartbeat\x18\b \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatR\theartbeat\"\xa2\x01\n" +
+	"\theartbeat\x18\b \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatR\theartbeat\x12\x1a\n" +
+	"\banywhere\x18\t \x01(\bR\banywhere\x12\x19\n" +
+	"\bhold_key\x18\n" +
+	" \x01(\tR\aholdKey\x12\x16\n" +
+	"\x06sounds\x18\v \x01(\bR\x06sounds\"\xa2\x01\n" +
 	"\x0eDictationModel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +

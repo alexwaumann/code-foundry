@@ -176,7 +176,8 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 // The File menu is custom too: the default role binds Close Window to cmd+w, and the
 // side panel owns cmd+w (close the active tab). With the role, any cmd+w the page left
 // unhandled closed the only window, which quits the app
-// (ApplicationShouldTerminateAfterLastWindowClosed). Close Window stays in the menu,
+// (ApplicationShouldTerminateAfterLastWindowClosed; with dictation.anywhere on the window
+// hides instead, menubar.go). Close Window stays in the menu,
 // without a key equivalent; the red traffic light still closes the window.
 //
 // Settings…, the Thread menu and the Help menu run commands in the window

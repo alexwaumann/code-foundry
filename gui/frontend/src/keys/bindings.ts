@@ -180,8 +180,8 @@ function terminalYields(chord: string): CommandView | undefined {
 /**
  * Commands whose chords also leave a focused text field (the settings search, which the
  * settings sheet focuses on open; a filter box): back and forward, as in Safari, and the
- * settings toggle, so cmd+, closes the sheet it just opened; and dictation, so ⌘⇧M works in
- * a side panel's PR review composer (a plain textarea); and search.open, which works from
+ * settings toggle, so cmd+, closes the sheet it just opened; and dictation, so a chord bound
+ * to it works in a side panel's PR review composer (a plain textarea); and search.open, which works from
  * anywhere (a thread's find bar included). Only cmd chords that do not move or delete text
  * (a user may rebind these to cmd+arrow).
  */

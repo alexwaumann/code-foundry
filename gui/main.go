@@ -108,6 +108,8 @@ func main() {
 		},
 	})
 	appService.window = window
+	// With dictation.anywhere on, closing the window leaves the app in the menu bar (menubar.go).
+	bar := installMenuBar(app, window, appService, log)
 	forwardFileDrops(window)
 	// The mouse's side buttons step back and forward like a browser's (mousebuttons.go).
 	forwardMouseButtons(window)
@@ -134,7 +136,7 @@ func main() {
 		}
 	})
 	// The host is the daemon's microphone for dictation (dictation.go).
-	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), log)
+	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), bar.setAnywhere, log)
 
 	if err := app.Run(); err != nil {
 		log.Error("wails app", "err", err)

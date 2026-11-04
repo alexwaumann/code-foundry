@@ -32,7 +32,7 @@ func newDictationServer(t *testing.T) (*dictationtest.Launcher, codefoundryv1con
 	l := &dictationtest.Launcher{}
 	st := dictation.New(dictation.Options{
 		Dir: dir, Bus: b, Model: model, Launch: l.Launch, Clock: dictationtest.NewClock(time.Unix(0, 0)),
-		Enabled: func() bool { return true }, Attended: func() bool { return true },
+		Enabled:  func() bool { return true },
 		Hardware: func() dictation.Hardware { return dictation.HardwareOf("Apple M4 Pro", 48<<30) },
 	})
 	t.Cleanup(st.Close)

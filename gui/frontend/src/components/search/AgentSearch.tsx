@@ -2,10 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Square } from "lucide-react";
 import type { AgentHitView, SearchEntryView } from "@/api/search";
 import { Kbd } from "@/components/ui/kbd";
+import { formatChord } from "@/keys/chord";
 import { ANSWER_ROW, defaultSelection, endedNote, footerModel, hasAnswerRow, moveHit, restoreSelection, resultRows, searchEnded, tookLabel } from "@/lib/agentSearch";
 import { canonicalModelName } from "@/lib/models";
 import { imeKeyDown } from "@/lib/ime";
 import { markSearchSeen, openAgentHit, promoteAgent, stopAgent } from "@/stores/agentSearch";
+import { useDictateChord } from "@/stores/commands";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { AnswerPane, AnswerRow, HitRow, SectionHeading, StepList, SummaryLine } from "./AgentParts";
 import { paintQuote, type PreviewSubject } from "./preview";
@@ -44,6 +46,13 @@ function Hint({ k, children }: { k: string; children: string }) {
       {children}
     </span>
   );
+}
+
+/** The dictate hint, only with a chord to show: dictation.toggle has none by default. */
+export function DictateHint({ canDictate }: { canDictate: boolean }) {
+  const chord = useDictateChord();
+  if (!canDictate || !chord) return null;
+  return <Hint k={formatChord(chord)}>dictate</Hint>;
 }
 
 /** The selected hit's message in the preview, its quote marked as a citation is. */
@@ -370,7 +379,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
         ) : (
           <Hint k="⏎">{sameQuestion && searchEnded(entry) ? "search again" : "search"}</Hint>
         )}
-        {canDictate && <Hint k="⌘⇧M">dictate</Hint>}
+        <DictateHint canDictate={canDictate} />
         {running && sameQuestion ? <Hint k="esc">close · keeps running</Hint> : dialog.modeCount > 1 && <Hint k="Tab">Find</Hint>}
         <span className="ml-auto" data-testid="search-model">
           {model}

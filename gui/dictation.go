@@ -59,11 +59,14 @@ type dictationWatcher struct {
 	retry time.Duration
 	// reopenWait is the pause between tries to reopen the microphone after a change.
 	reopenWait time.Duration
+	// anywhere gets dictation.anywhere from every snapshot (a heartbeat carries none, and
+	// a lost stream says nothing, so neither calls it). Nil in tests that do not care.
+	anywhere func(on bool)
 }
 
 // watchDictation runs the dictation watcher over the host's daemon client until ctx
 // ends, reconnecting when the daemon restarts (connectDaemon may start it).
-func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*client.Client, error), mic microphone, log *slog.Logger) {
+func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*client.Client, error), mic microphone, anywhere func(on bool), log *slog.Logger) {
 	w := dictationWatcher{
 		dial: func(ctx context.Context) (dictationConn, error) {
 			c, err := connectDaemon(ctx)
@@ -76,6 +79,7 @@ func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*c
 		log:        log,
 		retry:      dictationRetry,
 		reopenWait: micReopenWait,
+		anywhere:   anywhere,
 	}
 	w.run(ctx)
 }
@@ -135,6 +139,9 @@ func (w *dictationWatcher) once(parent context.Context) error {
 		snap := stream.Msg()
 		if snap.GetHeartbeat() == nil {
 			enabled, denied = snap.GetEnabled(), snap.GetMicDenied()
+			if w.anywhere != nil {
+				w.anywhere(snap.GetAnywhere())
+			}
 			id := ""
 			if snap.GetState() == v1.DictationState_DICTATION_STATE_LISTENING {
 				id = snap.GetSession().GetId()

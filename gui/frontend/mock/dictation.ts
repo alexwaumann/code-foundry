@@ -364,7 +364,7 @@ export class MockDictation {
           title: "Dictate",
           category: "Dictation",
           description: "Start or stop dictating into the focused composer. Speech is transcribed on this Mac; each phrase lands at the caret.",
-          keybindings: ["cmd+shift+m"],
+          keybindings: [],
           args: [],
         },
         when: usable,

@@ -21,6 +21,7 @@ vi.mock("@/stores/threadActions", async (orig) => {
 const { fakeDictation, dictationSnap } = await import("@/test/dictation");
 const { useSettingsStore } = await import("@/stores/settings");
 const { useComposeStore } = await import("@/stores/compose");
+const { useCommandsStore } = await import("@/stores/commands");
 const { resetDictationForTests, useDictationStore } = await import("@/stores/dictation");
 const { ThreadComposer } = await import("./ThreadComposer");
 
@@ -59,6 +60,25 @@ afterEach(() => {
 });
 
 describe("the thread composer's dictation", () => {
+  it.each([
+    ["no chord, the default", [], "Dictate"],
+    ["a chord the user bound", ["cmd+shift+m"], "Dictate ⇧⌘M"],
+  ])("the mic's tooltip with %s", async (_name, keybindings, want) => {
+    useCommandsStore.setState({ commands: [{ name: "dictation.toggle", title: "Dictate", description: "", category: "Dictation", args: [], keybindings, available: true }] });
+    await mount(dictationSnap());
+    vi.useFakeTimers();
+    try {
+      fireEvent.pointerMove(mic().parentElement as HTMLElement, { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(screen.getByRole("tooltip").textContent).toBe(want);
+    useCommandsStore.setState({ commands: [] });
+  });
+
   it("the placeholder says Listening… in an empty prompt", async () => {
     await mount(dictationSnap());
     expect(screen.getByTestId("composer-input").getAttribute("aria-placeholder")).not.toBe("Listening…");

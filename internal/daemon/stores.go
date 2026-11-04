@@ -359,7 +359,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
-	s.dictation = openDictation(log.With("store", "dictation"), p, s.bus, s.settings, pres)
+	s.dictation = openDictation(log.With("store", "dictation"), p, s.bus, s.settings)
 	if s.skills, err = newSkillStore(p, s.db, s.bus, s.settings, log.With("store", "skill")); err != nil {
 		return nil, err
 	}

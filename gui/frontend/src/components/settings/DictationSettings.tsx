@@ -1,8 +1,9 @@
 /**
  * Settings › General › Dictation (docs/notes/dictation-4-gui.md): the dictation.enabled
- * row's switch, state chip and "Needs the model below.", and the Model row after it (state
- * from DictationService.Watch, actions through the dictation.* commands). The section's
- * only setting is the switch; everything else is the daemon's snapshot.
+ * row's switch, state chip and "Needs the model below.", and the Model row at the end of
+ * the section (state from DictationService.Watch, actions through the dictation.*
+ * commands). The rows between them are plain settings (hiddenFields.ts hides two of them
+ * while dictation is off).
  */
 import type { DictationView } from "@/api/dictation";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,7 @@ export function DictationStateChip() {
     case "unloaded":
       return (
         <span className={CHIP} data-testid="dictation-chip" data-state="unloaded">
-          Unloaded · reloads when you return
+          Unloaded · reloads when you dictate
         </span>
       );
     case "loading":
@@ -104,7 +105,7 @@ function useModelDir(): string {
 function modelDescription(snap: DictationView | null, dir: string): string {
   const head = "Whisper Large v3 Turbo, English.";
   if (snap?.model.download) return `${head} Downloading. Dictation turns on when it finishes.`;
-  if (snap?.model.downloaded) return `${head} Loaded while dictation is on; freed after 10 minutes away from the app.`;
+  if (snap?.model.downloaded) return `${head} Stays loaded while dictation is on, so it starts at once.`;
   return `${head} Downloaded once, kept in ${dir}. Nothing you say leaves this Mac.`;
 }
 

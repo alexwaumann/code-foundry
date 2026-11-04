@@ -5,18 +5,17 @@
 // the Wails host's microphone frames go in, the engine's phrases come out on the bus.
 //
 // Lifecycle: with dictation.enabled on and the model on disk the engine runs with the
-// model loaded from daemon start, so pressing the mic is instant. Not attended for
-// UnloadAfter (internal/presence) stops the engine, freeing the model; attended again
-// starts it and loads the model. The
-// engine unloading it by itself (memory pressure) leaves it unloaded until the next
-// Start. A crash restarts the engine with backoff, MaxRestarts times, then the state is
-// Failed until dictation is turned off and on, or the model is removed.
+// model loaded from daemon start and keeps it loaded, however long the user is away, so
+// holding the key is instant (docs/notes/dictate-anywhere-settings.md). The engine
+// unloading it by itself (memory pressure) leaves it unloaded until the next Start. A
+// crash restarts the engine with backoff, MaxRestarts times, then the state is Failed
+// until dictation is turned off and on, or the model is removed.
 //
 //	Disabled ──enable──► NoModel ──Download──► Downloading ──ok (turns enabled on)──┐
 //	   ▲                                                                            ▼
 //	   └──disable── Ready ◄──load── Loading ◄──────────────────────────── (engine starts)
 //	                │  ▲                ▲
-//	          Start │  │ Stop/silence   └── attended again / Start ── Unloaded ◄── away 10 min
+//	          Start │  │ Stop/silence   └── Start ── Unloaded ◄── memory pressure
 //	                ▼  │
 //	              Listening            crash ×4 ──► Failed
 package dictation
@@ -42,9 +41,6 @@ import (
 
 // Timing.
 const (
-	// UnloadAfter is how long the user may be away from the app (not attended) before
-	// the model is unloaded (the engine stops).
-	UnloadAfter = 10 * time.Minute
 	// SilenceStop ends a session after this long without speech.
 	SilenceStop = 30 * time.Second
 	// FirstAudioWait ends a session that never gets a frame of audio. Silence counts
@@ -154,9 +150,22 @@ type Session struct {
 	StartedAt    time.Time
 }
 
+// Prefs are the dictation settings the store does not act on itself: the snapshot carries
+// them to the GUI host, which already follows Watch.
+type Prefs struct {
+	// Anywhere is dictation.anywhere: the hold key works in every app, and the host
+	// stays in the menu bar with its window closed.
+	Anywhere bool
+	// HoldKey is dictation.hold_key: left, right, either or both.
+	HoldKey string
+	// Sounds is dictation.sounds.
+	Sounds bool
+}
+
 // Snapshot is the store's published state.
 type Snapshot struct {
 	Enabled  bool
+	Prefs    Prefs
 	State    State
 	Model    ModelState
 	Hardware Hardware
@@ -195,14 +204,13 @@ type Options struct {
 	Dir string
 	Bus *bus.Bus
 	Log *slog.Logger
-	// Enabled reads dictation.enabled; ConfigChanged reads it again.
+	// Enabled reads dictation.enabled and Prefs the settings the snapshot carries;
+	// ConfigChanged reads both again. Nil Prefs reads as the zero Prefs.
 	Enabled func() bool
+	Prefs   func() Prefs
 	// Enable turns dictation.enabled on: a finished download calls it, so dictation is
 	// on once the model is there. Nil does nothing.
 	Enable func() error
-	// Attended reports whether the user is looking at the app now (presence); the
-	// daemon calls AttendedChanged on every change.
-	Attended func() bool
 	// Launch starts the engine.
 	Launch Launcher
 	// Client downloads the model from a URL source (default http.DefaultClient).
@@ -271,12 +279,9 @@ type Store struct {
 	failures int
 	failErr  string
 	retry    Timer
-	attended bool
-	idle     Timer
-	idleGen  int
-	// idleUnload: the user was away UnloadAfter; pressureUnload: the engine dropped
-	// the model. Either keeps it unloaded (until presence returns, or the next Start).
-	idleUnload     bool
+	prefs    Prefs
+	// pressureUnload: the engine dropped the model; it stays unloaded until the next
+	// Start.
 	pressureUnload bool
 	// handled counts the current engine's events handled; handledCh is closed and
 	// replaced after each (stopSession waits on it).
@@ -313,8 +318,8 @@ func New(opts Options) *Store {
 	if opts.Enabled == nil {
 		opts.Enabled = func() bool { return false }
 	}
-	if opts.Attended == nil {
-		opts.Attended = func() bool { return false }
+	if opts.Prefs == nil {
+		opts.Prefs = func() Prefs { return Prefs{} }
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	s := &Store{
@@ -323,11 +328,8 @@ func New(opts Options) *Store {
 	}
 	s.mu.Lock()
 	s.enabled = opts.Enabled()
+	s.prefs = opts.Prefs()
 	s.onDisk = s.modelOnDisk()
-	s.attended = opts.Attended()
-	if !s.attended {
-		s.armIdleLocked()
-	}
 	s.publishLocked()
 	s.mu.Unlock()
 	s.wg.Go(s.loop)
@@ -362,63 +364,28 @@ func (s *Store) modelOnDisk() bool {
 	return err == nil && fi.Mode().IsRegular() && fi.Size() == s.opts.Model.Size
 }
 
-// ConfigChanged reads dictation.enabled again: off stops the engine (ending a session),
-// on starts it. Off also clears a failure, so off and on retries.
+// ConfigChanged reads the settings again: dictation.enabled off stops the engine (ending
+// a session), on starts it, and off also clears a failure, so off and on retries. A new
+// Prefs is only published.
 func (s *Store) ConfigChanged() {
-	en := s.opts.Enabled()
+	en, prefs := s.opts.Enabled(), s.opts.Prefs()
 	s.mu.Lock()
-	if en == s.enabled {
+	if en == s.enabled && prefs == s.prefs {
 		s.mu.Unlock()
 		return
 	}
-	s.enabled = en
 	var eng Engine
-	if !en {
+	if en != s.enabled && !en {
 		eng = s.detachLocked(EndDisabled)
 		s.clearFailureLocked()
 	}
+	s.enabled, s.prefs = en, prefs
 	s.publishLocked()
 	s.mu.Unlock()
 	if eng != nil {
 		s.wg.Go(eng.Close)
 	}
 	s.poke()
-}
-
-// AttendedChanged follows presence: away for UnloadAfter unloads the model, back loads
-// it again.
-func (s *Store) AttendedChanged(attended bool) {
-	s.mu.Lock()
-	s.attended = attended
-	if attended {
-		s.stopIdleLocked()
-		s.idleUnload = false
-	} else {
-		s.armIdleLocked()
-	}
-	s.mu.Unlock()
-	s.poke()
-}
-
-func (s *Store) armIdleLocked() {
-	s.stopIdleLocked()
-	gen := s.idleGen
-	s.idle = s.clock.AfterFunc(UnloadAfter, func() {
-		s.mu.Lock()
-		if s.idleGen == gen && !s.attended {
-			s.idleUnload = true
-		}
-		s.mu.Unlock()
-		s.poke()
-	})
-}
-
-func (s *Store) stopIdleLocked() {
-	s.idleGen++
-	if s.idle != nil {
-		s.idle.Stop()
-		s.idle = nil
-	}
 }
 
 // MicDenied records what the host reported about the microphone permission.
@@ -563,7 +530,7 @@ func (s *Store) loop() {
 }
 
 // reconcile moves the engine towards what the state wants: running while enabled with
-// the model, loaded unless the user is away or the engine dropped it.
+// the model, loaded unless the engine dropped it.
 func (s *Store) reconcile() {
 	s.mu.Lock()
 	want := s.enabled && s.onDisk && s.dl == nil
@@ -576,12 +543,6 @@ func (s *Store) reconcile() {
 		if eng != nil {
 			eng.Close()
 		}
-		return
-	}
-	if s.eng == nil && s.idleUnload {
-		// Away: the engine stays down until the user returns or dictates.
-		s.publishLocked()
-		s.mu.Unlock()
 		return
 	}
 	if s.eng == nil {
@@ -608,9 +569,8 @@ func (s *Store) reconcile() {
 		s.log.Info("dictation engine started")
 	}
 	eng := s.eng
-	wantLoaded := !s.idleUnload && !s.pressureUnload
 	switch {
-	case wantLoaded && s.phase == phaseUnloaded:
+	case !s.pressureUnload && s.phase == phaseUnloaded:
 		s.phase = phaseLoading
 		s.publishLocked()
 		s.mu.Unlock()
@@ -633,20 +593,16 @@ func (s *Store) reconcile() {
 			eng.Close()
 			return
 		}
-		s.phase = phaseReady
+		// Not when the engine dropped it again straight after this reply (handle moved
+		// the phase): it stays unloaded, and the poke loads it if a Start has asked since.
+		if s.phase == phaseLoading {
+			s.phase = phaseReady
+		}
 		s.failures = 0
 		s.log.Info("dictation model loaded", "load_ms", res.LoadMS, "rss_bytes", res.RSSBytes)
 		s.publishLocked()
 		s.mu.Unlock()
-		s.poke() // presence may have moved while it loaded
-	case s.idleUnload && s.session == nil:
-		// Away: stop the engine rather than unload in it, which keeps ggml's and Metal's
-		// residue (about 170 MB; docs/notes/dictation-1-engine.md).
-		s.detachLocked(EndDisabled)
-		s.publishLocked()
-		s.mu.Unlock()
-		eng.Close()
-		s.log.Info("dictation engine stopped while the user is away")
+		s.poke()
 	default:
 		s.mu.Unlock()
 	}
@@ -800,14 +756,8 @@ func (s *Store) Start(ctx context.Context, clientID string) (string, error) {
 		if s.eng != nil && s.phase == phaseReady {
 			break
 		}
-		// Not loaded: whatever unloaded it, this use loads it again (an away user is
-		// unloaded again UnloadAfter from now).
-		if s.pressureUnload || s.idleUnload {
-			s.pressureUnload, s.idleUnload = false, false
-			if !s.attended {
-				s.armIdleLocked()
-			}
-		}
+		// Not loaded: if the engine dropped it, this use loads it again.
+		s.pressureUnload = false
 		changed := s.changed
 		s.mu.Unlock()
 		s.poke()
@@ -875,7 +825,6 @@ func (s *Store) stopSession(ctx context.Context, sessionID string, flush bool, w
 		s.publishLocked()
 	}
 	s.mu.Unlock()
-	s.poke() // an unload may have waited for the session
 }
 
 // Audio forwards one frame of the listening session to the engine and republishes its
@@ -1008,7 +957,7 @@ func (s *Store) stateLocked() State {
 		return Listening
 	case s.phase == phaseReady:
 		return Ready
-	case s.idleUnload && s.eng == nil, s.pressureUnload && s.phase == phaseUnloaded:
+	case s.pressureUnload && s.phase == phaseUnloaded:
 		return Unloaded
 	}
 	return Loading
@@ -1019,7 +968,7 @@ func (s *Store) stateLocked() State {
 func (s *Store) publishLocked() {
 	m := s.opts.Model
 	snap := &Snapshot{
-		Enabled: s.enabled, State: s.stateLocked(), Hardware: s.hw, MicDenied: s.micDenied,
+		Enabled: s.enabled, Prefs: s.prefs, State: s.stateLocked(), Hardware: s.hw, MicDenied: s.micDenied,
 		Model: ModelState{Name: m.Name, Title: m.Title, Size: m.Size, Downloaded: s.onDisk},
 		Error: s.dlErr,
 	}
@@ -1045,7 +994,7 @@ func (s *Store) publishLocked() {
 }
 
 func equal(a, b *Snapshot) bool {
-	if a.Enabled != b.Enabled || a.State != b.State || a.Hardware != b.Hardware || a.Error != b.Error ||
+	if a.Enabled != b.Enabled || a.Prefs != b.Prefs || a.State != b.State || a.Hardware != b.Hardware || a.Error != b.Error ||
 		a.MicDenied != b.MicDenied || a.Model.Downloaded != b.Model.Downloaded {
 		return false
 	}

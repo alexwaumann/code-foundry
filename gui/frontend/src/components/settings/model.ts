@@ -98,13 +98,13 @@ export interface SearchResult {
   counts: Readonly<Record<string, number>>;
 }
 
-/** The search across every page: the matching fields in display order and the count per page. */
-export function searchSettings(schema: SettingsSchemaView, words: readonly string[]): SearchResult {
+/** The search across every page: the matching fields in display order and the count per page. `hidden` keys are not found. */
+export function searchSettings(schema: SettingsSchemaView, words: readonly string[], hidden: ReadonlySet<string> = new Set()): SearchResult {
   const hits: SearchHit[] = [];
   const counts: Record<string, number> = {};
   for (const page of schema.pages) {
     const sections = new Map(page.sections.map((s) => [s.id, s]));
-    const fields = schema.fields.filter((f) => f.page === page.id && !OWNED_KEYS.has(f.key) && matchField(f, words));
+    const fields = schema.fields.filter((f) => f.page === page.id && !OWNED_KEYS.has(f.key) && !hidden.has(f.key) && matchField(f, words));
     // Section order first (fields keep their order within one).
     const order = new Map(page.sections.map((s, i) => [s.id, i]));
     fields.sort((a, b) => (order.get(a.section) ?? Infinity) - (order.get(b.section) ?? Infinity));

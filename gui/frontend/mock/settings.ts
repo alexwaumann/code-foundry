@@ -254,7 +254,22 @@ const staticFields: FieldInit[] = [
   { key: "projects.base_from_origin", group: "projects", page: "source", section: "projects", type: S.BOOL, title: "Branch from origin unless local is ahead", description: "Start a new worktree's branch from origin's copy of its base branch (the default branch when none is given), fetched first, unless the local branch is ahead of it or has diverged: then from the local branch. Off always starts from the local branch and never fetches. A remote branch, tag or commit given as the base is always used as is.", defaultValue: "true" },
   { key: "gitops.editor_command", group: "gitops", page: "source", section: "projects", type: S.STRING, title: "Editor command", description: "Command for Open in Editor, e.g. \"code\" or \"open -a Zed\". {path} stands for the worktree path; without it the path is appended. Empty picks an editor automatically.", defaultValue: "", placeholder: "auto-detect" },
   // General › Dictation (docs/notes/dictation-2-daemon.md); the rest of the section is DictationService's state.
-  { key: "dictation.enabled", group: "dictation", page: "general", section: "dictation", type: S.BOOL, title: "Dictation", description: "Adds a microphone button to every composer and the ⇧⌘M shortcut.", defaultValue: "false" },
+  { key: "dictation.enabled", group: "dictation", page: "general", section: "dictation", type: S.BOOL, title: "Dictation", description: "Adds a microphone button to every composer.", defaultValue: "false" },
+  { key: "dictation.anywhere", group: "dictation", page: "general", section: "dictation", type: S.BOOL, title: "Dictate anywhere", description: "The hold key works in every app and the text is pasted where you're typing. Code Foundry stays in the menu bar when you close its window. Off, the key works only while Code Foundry is in front.", defaultValue: "false" },
+  {
+    key: "dictation.hold_key",
+    group: "dictation",
+    page: "general",
+    section: "dictation",
+    dependsOn: "dictation.enabled",
+    type: S.ENUM,
+    title: "Hold key",
+    description: "Hold to dictate, release to finish. Both means the two Option keys pressed together.",
+    enumValues: ["left", "right", "either", "both"],
+    enumLabels: ["Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"],
+    defaultValue: "either",
+  },
+  { key: "dictation.sounds", group: "dictation", page: "general", section: "dictation", dependsOn: "dictation.enabled", type: S.BOOL, title: "Sounds", description: "Plays a sound as dictation starts and stops, at the alert volume.", defaultValue: "true" },
   // Ember (docs/notes/ember-2-store.md).
   {
     key: "ember.enabled",

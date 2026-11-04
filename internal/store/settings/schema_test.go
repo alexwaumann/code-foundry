@@ -478,6 +478,90 @@ func TestNotificationFields(t *testing.T) {
 	}
 }
 
+func TestDictationFields(t *testing.T) {
+	tests := []struct {
+		key, def, dependsOn string
+		typ                 Type
+	}{
+		{KeyDictationEnabled, "false", "", Bool},
+		{KeyDictationAnywhere, "false", "", Bool},
+		{KeyDictationHoldKey, HoldKeyEither, KeyDictationEnabled, Enum},
+		{KeyDictationSounds, "true", KeyDictationEnabled, Bool},
+	}
+	for _, tt := range tests {
+		f := field(t, tt.key)
+		// All live: the snapshot carries them to the host.
+		if f.Group != GroupDictation || f.Page != PageGeneral || f.Section != "dictation" || f.Type != tt.typ ||
+			f.Default != tt.def || f.DependsOn != tt.dependsOn || f.Restart {
+			t.Errorf("%s = %+v", tt.key, f)
+		}
+	}
+	f := field(t, KeyDictationHoldKey)
+	if !slices.Equal(f.Enum, []string{"left", "right", "either", "both"}) ||
+		!slices.Equal(f.EnumLabels, []string{"Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"}) {
+		t.Errorf("hold key = %v %v", f.Enum, f.EnumLabels)
+	}
+	// Option, never the PC name for the key.
+	for _, f := range staticFields {
+		if f.Group == GroupDictation && strings.Contains(strings.ToLower(f.Title+" "+f.Description+strings.Join(f.EnumLabels, " ")), "alt") {
+			t.Errorf("%s says Alt", f.Key)
+		}
+	}
+}
+
+// A settings file from before dictate anywhere has none of the new keys: it reads with
+// the defaults and no issue. A bad value falls back to its default and is reported.
+func TestDictationSettingsFromFile(t *testing.T) {
+	want := Dictation{Enabled: true, HoldKey: HoldKeyEither, Sounds: true}
+	tests := []struct {
+		name   string
+		file   string
+		want   Dictation
+		issues []string
+	}{
+		{"older file", "[dictation]\nenabled = true\n", want, nil},
+		{"no table", "", Dictation{HoldKey: HoldKeyEither, Sounds: true}, nil},
+		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"both\"\nsounds = false\n",
+			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyBoth}, nil},
+		{"unknown hold key", "[dictation]\nenabled = true\nhold_key = \"alt\"\n", want, []string{KeyDictationHoldKey}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := decode([]byte(tt.file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := resolve(raw, nil)
+			if r.settings.Dictation != tt.want {
+				t.Errorf("settings %+v, want %+v", r.settings.Dictation, tt.want)
+			}
+			var keys []string
+			for _, i := range r.issues {
+				keys = append(keys, i.Key)
+			}
+			if !slices.Equal(keys, tt.issues) {
+				t.Errorf("issues %v, want %v", r.issues, tt.issues)
+			}
+		})
+	}
+}
+
+// dictation.toggle lost its default chord: a file that binds it keeps its chord, and
+// "none" stays valid.
+func TestKeybindingOverrideWithoutDefault(t *testing.T) {
+	cmds := []CommandInfo{{Name: "dictation.toggle", Title: "Dictate", Category: "Dictation"}}
+	key := KeybindingKey("dictation.toggle")
+	for _, v := range []string{"cmd+shift+m", KeybindingNone} {
+		_, values, issues := resolveKeybindings(map[string]string{key: v}, cmds)
+		if values[key] != v || len(issues) != 0 {
+			t.Errorf("%s: values %v, issues %v", v, values, issues)
+		}
+	}
+	if _, values, _ := resolveKeybindings(nil, cmds); values[key] != "" {
+		t.Errorf("unbound value %q", values[key])
+	}
+}
+
 func TestDefaultWorktreeField(t *testing.T) {
 	f := field(t, KeyDefaultWorktree)
 	// Live (the composer reads every snapshot), in Threads, right after the default effort.

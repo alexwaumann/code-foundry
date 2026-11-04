@@ -58,6 +58,15 @@ func (b *dockBadge) set(label string) {
 	}
 }
 
+// redraw applies the label again, to a Dock tile made since (menubar_darwin.go).
+func (b *dockBadge) redraw() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.launched {
+		b.apply(b.label)
+	}
+}
+
 // didLaunch marks the app launched and applies a label set before then.
 func (b *dockBadge) didLaunch() {
 	b.mu.Lock()

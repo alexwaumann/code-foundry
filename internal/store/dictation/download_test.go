@@ -93,7 +93,7 @@ func TestDownload(t *testing.T) {
 			srv.ignoreRange = tc.ignoreRange
 			m := testModel
 			m.Sources = []dictation.Source{{URL: srv.URL + "/test.bin"}}
-			h := newHarness(t, setup{attended: true, opts: func(o *dictation.Options) { o.Model = m }})
+			h := newHarness(t, setup{opts: func(o *dictation.Options) { o.Model = m }})
 			if tc.part != nil {
 				if err := os.WriteFile(filepath.Join(h.dir, m.Name+".part"), tc.part, 0o600); err != nil {
 					t.Fatal(err)
@@ -140,7 +140,7 @@ func TestDownloadProgressAndCancel(t *testing.T) {
 	srv.hold = make(chan struct{})
 	m := testModel
 	m.Sources = []dictation.Source{{URL: srv.URL + "/test.bin"}}
-	h := newHarness(t, setup{attended: true, opts: func(o *dictation.Options) { o.Model = m }})
+	h := newHarness(t, setup{opts: func(o *dictation.Options) { o.Model = m }})
 	if _, err := h.store.Download(); err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestDownloadSources(t *testing.T) {
 			if tc.httpFirst {
 				m.Sources = []dictation.Source{hf, {GitHub: &testAsset}}
 			}
-			h := newHarness(t, setup{attended: true, opts: func(o *dictation.Options) { o.Model = m; o.Gh = gh }})
+			h := newHarness(t, setup{opts: func(o *dictation.Options) { o.Model = m; o.Gh = gh }})
 			if tc.part != nil {
 				if err := os.WriteFile(filepath.Join(h.dir, m.Name+".part"), tc.part, 0o600); err != nil {
 					t.Fatal(err)
@@ -281,7 +281,7 @@ func TestDownloadGitHubCancelAndResume(t *testing.T) {
 	gh := &dictationtest.Gh{Asset: testAsset, Body: body, Hold: make(chan struct{})}
 	m := testModel
 	m.Sources = []dictation.Source{{GitHub: &testAsset}, {URL: "http://invalid/test.bin"}}
-	h := newHarness(t, setup{attended: true, opts: func(o *dictation.Options) { o.Model = m; o.Gh = gh }})
+	h := newHarness(t, setup{opts: func(o *dictation.Options) { o.Model = m; o.Gh = gh }})
 	if _, err := h.store.Download(); err != nil {
 		t.Fatal(err)
 	}

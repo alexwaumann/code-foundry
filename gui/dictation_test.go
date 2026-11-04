@@ -403,6 +403,52 @@ func TestDictationWatcher(t *testing.T) {
 	}
 }
 
+// The host learns dictation.anywhere from snapshots only: a heartbeat carries no settings
+// and a lost stream says nothing, or the menu bar item would go with every daemon restart.
+func TestDictationWatcherAnywhere(t *testing.T) {
+	log := &eventLog{}
+	daemon := &fakeDaemon{log: log}
+	var (
+		mu  sync.Mutex
+		got []bool
+	)
+	w := dictationWatcher{
+		dial:  func(context.Context) (dictationConn, error) { return daemon, nil },
+		mic:   &fakeMic{log: log, perm: micGranted},
+		log:   slog.New(slog.DiscardHandler),
+		retry: time.Millisecond,
+		anywhere: func(on bool) {
+			mu.Lock()
+			defer mu.Unlock()
+			got = append(got, on)
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		w.run(ctx)
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+	on := snapState(v1.DictationState_DICTATION_STATE_READY, false)
+	on.Anywhere = true
+	daemon.stream(0) <- on
+	daemon.stream(0) <- snapHeartbeat
+	close(daemon.stream(0))
+	daemon.stream(1) <- snapHeartbeat
+	daemon.stream(1) <- snapReady
+	// One more through the channel: the step before it has been handled.
+	daemon.stream(1) <- snapHeartbeat
+	mu.Lock()
+	defer mu.Unlock()
+	if want := []bool{true, false}; !slices.Equal(got, want) {
+		t.Errorf("anywhere calls %v, want %v", got, want)
+	}
+}
+
 // waitLog waits for log to read want and stay so briefly (nothing more arrives).
 func waitLog(t *testing.T, step int, log *eventLog, want []string) {
 	t.Helper()

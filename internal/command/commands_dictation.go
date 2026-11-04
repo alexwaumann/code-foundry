@@ -13,8 +13,9 @@ import (
 )
 
 // dictation.* (docs/notes/dictation-2-daemon.md): voice dictation into the composers.
-// The GUI's mic and ⌘⇧M run dictation.toggle in the focused composer; the rest are for
-// the CLI and the settings page's model row.
+// The GUI's mic runs dictation.toggle in the focused composer (it has no default chord:
+// the hold key starts dictation, and a user may still bind one); the rest are for the
+// CLI and the settings page's model row.
 
 // ViewDictationToggle is the ShowView name of dictation.toggle: an action on the window's
 // focused composer, like ViewComposerHistory. The GUI presents the command itself in the
@@ -76,7 +77,7 @@ func DictationSummary(s *v1.DictationSnapshot) string {
 	case v1.DictationState_DICTATION_STATE_READY:
 		out = "ready"
 	case v1.DictationState_DICTATION_STATE_UNLOADED:
-		out = "unloaded; it loads again when you return to the app or dictate"
+		out = "unloaded; it loads again when you next dictate"
 	case v1.DictationState_DICTATION_STATE_LISTENING:
 		out = fmt.Sprintf("listening (session %s, for %s)", s.GetSession().GetId(), s.GetSession().GetClientId())
 	case v1.DictationState_DICTATION_STATE_ERROR:
@@ -119,7 +120,6 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 			Title:       "Dictate",
 			Description: "Start or stop dictating into the focused composer. Speech is transcribed on this Mac; each phrase lands at the caret.",
 			Category:    dictationCategory,
-			Keybindings: []string{"cmd+shift+m"},
 			When:        usable,
 			WhyUnavailable: func(Context) string {
 				if !status().GetEnabled() {

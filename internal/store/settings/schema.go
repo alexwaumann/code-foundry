@@ -239,6 +239,9 @@ const (
 	KeyPluginRegistries     = "plugins.registries"
 	KeyEmberEnabled         = "ember.enabled"
 	KeyDictationEnabled     = "dictation.enabled"
+	KeyDictationAnywhere    = "dictation.anywhere"
+	KeyDictationHoldKey     = "dictation.hold_key"
+	KeyDictationSounds      = "dictation.sounds"
 	KeyEmberModel           = "ember.model"
 	KeyEmberEffort          = "ember.effort"
 	KeyEmberWorkerModels    = "ember.worker_models"
@@ -394,9 +397,29 @@ var staticFields = []Field{
 	// (DictationService.Watch): the model, its download, this Mac.
 	{
 		Key: KeyDictationEnabled, Group: GroupDictation, Page: PageGeneral, Section: "dictation", Type: Bool, Title: "Dictation",
-		Description: "Adds a microphone button to every composer and the ⇧⌘M shortcut.",
+		Description: "Adds a microphone button to every composer.",
 		Default:     "false",
 		bind:        func(s *Settings) any { return &s.Dictation.Enabled },
+	},
+	{
+		Key: KeyDictationAnywhere, Group: GroupDictation, Page: PageGeneral, Section: "dictation", Type: Bool, Title: "Dictate anywhere",
+		Description: "The hold key works in every app and the text is pasted where you're typing. Code Foundry stays in the menu bar when you close its window. Off, the key works only while Code Foundry is in front.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Dictation.Anywhere },
+	},
+	{
+		Key: KeyDictationHoldKey, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Hold key",
+		Description: "Hold to dictate, release to finish. Both means the two Option keys pressed together.",
+		Enum:        []string{HoldKeyLeft, HoldKeyRight, HoldKeyEither, HoldKeyBoth},
+		EnumLabels:  []string{"Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"},
+		Default:     HoldKeyEither,
+		bind:        func(s *Settings) any { return &s.Dictation.HoldKey },
+	},
+	{
+		Key: KeyDictationSounds, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Bool, Title: "Sounds",
+		Description: "Plays a sound as dictation starts and stops, at the alert volume.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Dictation.Sounds },
 	},
 	// General › Updates.
 	{
