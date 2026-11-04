@@ -279,11 +279,11 @@ test("a long permission prompt: line 3 cuts it off; the card wraps all of it bet
   expect(name && st && project && name.y < st.y && st.y + st.height <= project.y).toBe(true);
 });
 
-/** SHOTS=<dir>: Snoozed and Archived open, their rows 2px apart under Working's 8px, WebKit, 1280x800 at 2x, dark and light. */
+/** SHOTS=<dir>: Snoozed and Archived open, 24px rows 2px apart under Working's 8px, WebKit, 1280x800 at 2x, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test.describe(`screenshots (${scheme})`, () => {
     test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
-    test("the quiet sections' gap", async ({ page }, info) => {
+    test("the quiet sections' rows", async ({ page }, info) => {
       const shots = process.env.SHOTS;
       test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
       await mockPost("thread/archive?id=s-3");
@@ -295,7 +295,7 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(page.getByTestId("sidebar-archived-rows").locator("[data-row-key]")).toHaveCount(3);
       await page.mouse.move(640, 400);
       await page.waitForTimeout(350);
-      await page.screenshot({ path: `${String(shots)}/quiet-row-gap-${scheme}.png` });
+      await page.screenshot({ path: `${String(shots)}/quiet-rows-tighter-${scheme}.png` });
     });
   });
 }
