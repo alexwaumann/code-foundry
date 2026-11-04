@@ -502,6 +502,23 @@ func TestShutdownWhileYielding(t *testing.T) {
 	}
 }
 
+// A refused request sets no lastEnd, so with a poll due nothing but the context can end
+// Run: shutdown must not spin on a poll that keeps being refused.
+func TestRunEndsWithAPollDue(t *testing.T) {
+	g, _ := changeDrivenWorld()
+	s, err := New(context.Background(), testOptions(openTestDB(t), (&fakeRunner{}).serve(g), nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	done := make(chan error, 1)
+	go func() { done <- s.Run(ctx) }()
+	if err := recv(t, done); err != nil {
+		t.Errorf("Run: %v", err)
+	}
+}
+
 // A caller that leaves takes its place in the queue with it. A job someone else waits
 // for, or one a client was promised, still runs; a job already running finishes.
 func TestCallerLeaves(t *testing.T) {
