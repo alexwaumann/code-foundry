@@ -148,6 +148,15 @@ func (g *fakeGitHub) failNext(op string, err error) {
 	g.fail[op] = err
 }
 
+// takeFail returns the error failNext set for op, once.
+func (g *fakeGitHub) takeFail(op string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	err := g.fail[op]
+	delete(g.fail, op)
+	return err
+}
+
 var (
 	repoBlockRE = regexp.MustCompile(`(?m)^  (r\d+): repository\(owner: \$\w+, name: \$\w+\) \{\n((?:    .*\n)*)  \}`)
 	branchRE    = regexp.MustCompile(`(b\d+): pullRequests\(headRefName: \$(\w+)`)
