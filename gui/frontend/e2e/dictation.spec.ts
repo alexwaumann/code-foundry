@@ -88,6 +88,19 @@ test.describe("composer", () => {
     expect((await dictation()).calls.at(-1)).toMatch(/^stop dict-\d+ false$/);
   });
 
+  test("a spoken line break starts a paragraph, and the caret goes on from it", async ({ page }) => {
+    // What the daemon sends for "First." "New line." "Second." (Go tests the words, vitest the slice.)
+    await mockPost("dictation?state=ready");
+    await mockPost(`dictation/script?phrases=${encodeURIComponent("First.|\n|Second.")}&gap=100`);
+    const card = await openThread(page);
+    await card.getByTestId("composer-input").click();
+    await card.getByTestId("dictation-mic").click();
+    await expect(prompt(card)).toHaveAttribute("data-value", "First.\nSecond.");
+    await expect(card.getByTestId("composer-input").locator("p")).toHaveCount(2);
+    await page.keyboard.type(" Typed");
+    await expect(prompt(card)).toHaveAttribute("data-value", "First.\nSecond. Typed");
+  });
+
   test("Escape in the prompt stops", async ({ page }) => {
     await mockPost("dictation?state=ready");
     await mockPost("dictation/script?phrases=&gap=1000");
@@ -139,9 +152,25 @@ test.describe("composer", () => {
   });
 });
 
-/** SHOTS=<dir>: the hold key's permission row, for the PR body, in both schemes. */
+/** SHOTS=<dir>: the hold key's permission row and the Advanced rows, for the PR body, in both schemes. */
 test.describe("shots", () => {
   for (const scheme of ["dark", "light"] as const) {
+    test(`the Advanced rows, ${scheme}`, async ({ page }) => {
+      const dir = process.env.SHOTS;
+      test.skip(!dir, "SHOTS=<dir> only");
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.setViewportSize({ width: 1440, height: 1200 });
+      await mockPost("dictation?state=ready&access=granted");
+      await openApp(page);
+      await page.keyboard.press("Meta+Comma");
+      const section = page.locator('[data-section="dictation"]');
+      await section.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500); // the settings sheet's fade
+      await section.screenshot({ path: `${dir ?? ""}/advanced-closed-${scheme}.png` });
+      await page.getByTestId("settings-advanced-toggle").click();
+      await expect(page.getByTestId("settings-advanced")).toBeVisible();
+      await section.screenshot({ path: `${dir ?? ""}/advanced-open-${scheme}.png` });
+    });
     test(`the permission row, ${scheme}`, async ({ page }) => {
       const dir = process.env.SHOTS;
       test.skip(!dir, "SHOTS=<dir> only");

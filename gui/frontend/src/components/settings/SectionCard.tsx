@@ -1,6 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import type { SettingFieldView, SettingsSchemaView } from "@/api/settings";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useSettingValue } from "@/stores/settings";
+import { sectionAdvanced } from "./advancedFields";
 import { useHiddenFields } from "./hiddenFields";
 import { fieldRows, rowBorder, type SectionFields } from "./model";
 import { sectionLinks } from "./sectionLinks";
@@ -8,9 +11,10 @@ import { SettingRow, SettingRowPair } from "./SettingRow";
 
 /**
  * A section: its heading and description above a bordered card of hairline-separated rows.
- * `aside` sits at the heading's right, on its last line (a count, a section-wide action).
+ * `aside` sits at the heading's right, on its last line (a count, a section-wide action);
+ * `after` follows the card (its Advanced disclosure).
  */
-export function SectionCard({ id, heading, description, aside, children }: { id: string; heading: string; description?: string; aside?: ReactNode; children: ReactNode }) {
+export function SectionCard({ id, heading, description, aside, after, children }: { id: string; heading: string; description?: string; aside?: ReactNode; after?: ReactNode; children: ReactNode }) {
   return (
     <section className="mt-6" data-testid="settings-section" data-section={id} aria-label={heading || undefined}>
       {(heading || description || aside) && (
@@ -23,6 +27,7 @@ export function SectionCard({ id, heading, description, aside, children }: { id:
         </div>
       )}
       <div className="overflow-hidden rounded-lg border border-cf-border">{children}</div>
+      {after}
     </section>
   );
 }
@@ -46,13 +51,41 @@ function FieldRow({ field, parent, underParent, className }: { field: SettingFie
   );
 }
 
-/** A page's section: its rows (single fields, side-by-side pairs) and any link row registered for it. */
+/** A section's Advanced fields: quiet text under its card, closed until asked, opening a card of its own. */
+function AdvancedFold({ schema, fields }: { schema: SettingsSchemaView; fields: readonly SettingFieldView[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="group mt-3 ml-0.5 flex items-center gap-1.5 text-cf-text-muted" data-testid="settings-advanced-toggle">
+        <ChevronRight className="size-4 shrink-0 group-data-[state=open]:rotate-90" aria-hidden />
+        <span className="text-label">Advanced</span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 overflow-hidden rounded-lg border border-cf-border" data-testid="settings-advanced">
+          {fields.map((f, i) => (
+            <FieldRow key={f.key} field={f} parent={schema.fields.find((p) => p.key === f.dependsOn)} underParent={false} className={rowBorder(i)} />
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/** A page's section: its rows (single fields, side-by-side pairs), any link row registered for it, and any Advanced fields. */
 export function SettingsSection({ schema, pageId, section }: { schema: SettingsSchemaView; pageId: string; section: SectionFields }) {
   const hidden = useHiddenFields(section.fields);
-  const rows = fieldRows(section.fields.filter((f) => !hidden.has(f.key)));
-  const Link = sectionLinks[`${pageId}/${section.section.id}`];
+  const id = `${pageId}/${section.section.id}`;
+  const shown = section.fields.filter((f) => !hidden.has(f.key));
+  const advanced = shown.filter((f) => sectionAdvanced[id]?.has(f.key));
+  const rows = fieldRows(shown.filter((f) => !advanced.includes(f)));
+  const Link = sectionLinks[id];
   return (
-    <SectionCard id={section.section.id} heading={section.section.title} description={section.section.description}>
+    <SectionCard
+      id={section.section.id}
+      heading={section.section.title}
+      description={section.section.description}
+      after={advanced.length > 0 ? <AdvancedFold schema={schema} fields={advanced} /> : undefined}
+    >
       {rows.map((row, i) => {
         const [first] = row;
         if (!first) return null;

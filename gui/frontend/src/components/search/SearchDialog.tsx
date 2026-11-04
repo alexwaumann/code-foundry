@@ -7,7 +7,7 @@ import { useComposerDictation } from "@/components/compose/useComposerDictation"
 import { Segmented } from "@/components/usage/Segmented";
 import { chordFromEvent } from "@/keys/chord";
 import { openingSelection, unseenCue, unseenToRestore, type SearchModeId, type SearchSession } from "@/lib/agentSearch";
-import { phraseAtCaret } from "@/lib/dictation";
+import { phraseAtCaret, phraseOnOneLine } from "@/lib/dictation";
 import { imeKeyDown } from "@/lib/ime";
 import { clearSearches, forgetSearch, startAgent } from "@/stores/agentSearch";
 import { useDictateChord } from "@/stores/commands";
@@ -267,7 +267,7 @@ export function SearchDialog({
     const v = el.value;
     const s = el.selectionStart ?? v.length;
     const e = el.selectionEnd ?? s;
-    const piece = phraseAtCaret(text, v.slice(0, s), v.slice(e));
+    const piece = phraseAtCaret(phraseOnOneLine(text), v.slice(0, s), v.slice(e));
     if (piece === "") return;
     setQuery(v.slice(0, s) + piece + v.slice(e));
     requestAnimationFrame(() => {

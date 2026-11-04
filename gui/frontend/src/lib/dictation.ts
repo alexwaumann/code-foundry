@@ -3,18 +3,31 @@
  * listening pill's level bars and clock, and the settings section's sizes.
  */
 
+/** Whether a phrase starting `text` takes a space after `before`, as joinPhrases in gui/paste.go decides for a paste. */
+function spaceBefore(text: string, before: string): boolean {
+  if (before === "" || /\s$/.test(before) || text.startsWith("\n")) return false;
+  // An odd count of straight quotes means one is open: it hugs the words inside it.
+  if ((before.endsWith('"') || text.startsWith('"')) && before.split('"').length % 2 === 0) return false;
+  return !/[([{“‘«]$/.test(before) && !/^[,.;:!?…)\]}”’»]/.test(text);
+}
+
 /**
  * A phrase as inserted at a caret with `before` and `after` around it (the paragraph's
- * text on either side): trimmed, a space in front unless the caret is at the start of the
- * line or after whitespace, and one after only when a word follows straight on. Its
- * capitalisation is the engine's. "" for a blank phrase.
+ * text on either side): trimmed of spaces, a space in front unless spaceBefore says not, and
+ * one after only when a word follows straight on. A line break in it is a spoken command's,
+ * so it stays, even alone. Its capitalisation is the engine's. "" for a blank phrase.
  */
 export function phraseAtCaret(text: string, before: string, after = ""): string {
-  const t = text.trim();
+  const t = text.replace(/^[^\S\n]+|[^\S\n]+$/g, "");
   if (t === "") return "";
-  const lead = before !== "" && !/\s$/.test(before) ? " " : "";
-  const trail = /^[\p{L}\p{N}]/u.test(after) ? " " : "";
+  const lead = spaceBefore(t, before) ? " " : "";
+  const trail = !t.endsWith("\n") && /^[\p{L}\p{N}]/u.test(after) ? " " : "";
   return `${lead}${t}${trail}`;
+}
+
+/** A phrase for a one-line field, where a spoken line break is a space. */
+export function phraseOnOneLine(text: string): string {
+  return text.replace(/\s*\n\s*/g, " ");
 }
 
 /** What the denied line's link opens: System Settings at Privacy & Security › Microphone. */

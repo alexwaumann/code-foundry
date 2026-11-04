@@ -56,6 +56,10 @@ type Dictation struct {
 	HoldKey string
 	// Sounds plays a sound as dictation starts and stops, at notifications.sound_volume.
 	Sounds bool
+	// SpokenSymbols turns words like "underscore" and "comma" into the symbol.
+	SpokenSymbols bool
+	// SpokenFormatting turns "new line" and "open quote" into line breaks and quotation marks.
+	SpokenFormatting bool
 }
 
 // dictation.hold_key's values.

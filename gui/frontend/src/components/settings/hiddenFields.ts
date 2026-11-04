@@ -6,7 +6,7 @@ import { useSettingsStore } from "@/stores/settings";
  * Fields left out altogether while the bool they depend on is off, in the section and in
  * the search. The other dependsOn fields stay and dim (SectionCard's FieldRow).
  */
-const HIDDEN_WHILE_OFF: ReadonlySet<string> = new Set(["dictation.hold_key", "dictation.sounds"]);
+const HIDDEN_WHILE_OFF: ReadonlySet<string> = new Set(["dictation.hold_key", "dictation.sounds", "dictation.spoken_symbols", "dictation.spoken_formatting"]);
 
 /** The keys of `fields` hidden now. */
 export function hiddenFieldKeys(fields: readonly SettingFieldView[], values: Readonly<Record<string, string>>): string[] {

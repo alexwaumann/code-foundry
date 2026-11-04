@@ -581,7 +581,9 @@ export const DictationLevelSchema: GenMessage<DictationLevel> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_dictation, 19);
 
 /**
- * DictationPhrase is one transcribed phrase, to insert at the caret.
+ * DictationPhrase is one transcribed phrase, to insert at the caret. The spoken commands
+ * have been applied (dictation.spoken_symbols, dictation.spoken_formatting), so a line break
+ * in it is meant, and may be all there is: trim spaces only.
  *
  * @generated from message codefoundry.v1.DictationPhrase
  */

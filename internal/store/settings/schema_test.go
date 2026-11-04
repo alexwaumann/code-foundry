@@ -487,6 +487,8 @@ func TestDictationFields(t *testing.T) {
 		{KeyDictationAnywhere, "false", "", Bool},
 		{KeyDictationHoldKey, HoldKeyBoth, KeyDictationEnabled, Enum},
 		{KeyDictationSounds, "true", KeyDictationEnabled, Bool},
+		{KeyDictationSpokenSymbols, "false", KeyDictationEnabled, Bool},
+		{KeyDictationSpokenFormatting, "true", KeyDictationEnabled, Bool},
 	}
 	for _, tt := range tests {
 		f := field(t, tt.key)
@@ -512,7 +514,7 @@ func TestDictationFields(t *testing.T) {
 // A settings file from before dictate anywhere has none of the new keys: it reads with
 // the defaults and no issue. A bad value falls back to its default and is reported.
 func TestDictationSettingsFromFile(t *testing.T) {
-	want := Dictation{Enabled: true, HoldKey: HoldKeyBoth, Sounds: true}
+	want := Dictation{Enabled: true, HoldKey: HoldKeyBoth, Sounds: true, SpokenFormatting: true}
 	tests := []struct {
 		name   string
 		file   string
@@ -520,9 +522,9 @@ func TestDictationSettingsFromFile(t *testing.T) {
 		issues []string
 	}{
 		{"older file", "[dictation]\nenabled = true\n", want, nil},
-		{"no table", "", Dictation{HoldKey: HoldKeyBoth, Sounds: true}, nil},
-		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"left\"\nsounds = false\n",
-			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyLeft}, nil},
+		{"no table", "", Dictation{HoldKey: HoldKeyBoth, Sounds: true, SpokenFormatting: true}, nil},
+		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"left\"\nsounds = false\nspoken_symbols = true\nspoken_formatting = false\n",
+			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyLeft, SpokenSymbols: true}, nil},
 		// A value from the tip releases that had a fourth option: the default means the same.
 		{"retired either", "[dictation]\nenabled = true\nhold_key = \"either\"\n", want, []string{KeyDictationHoldKey}},
 		{"unknown hold key", "[dictation]\nenabled = true\nhold_key = \"alt\"\n", want, []string{KeyDictationHoldKey}},

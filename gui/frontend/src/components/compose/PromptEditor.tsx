@@ -12,6 +12,7 @@ import { findTrigger, LEAF_CHAR, type TriggerChar } from "@/lib/completion";
 import { phraseAtCaret } from "@/lib/dictation";
 import { spacedAtCaret } from "@/lib/droppedPaths";
 import { chipInsertText, chipToken, parseLine, parsePrompt, proseOf, serializePrompt, type PromptPiece, type PromptTag } from "@/lib/prompt";
+import { dictatedSlice } from "./dictatedSlice";
 import { DictationLanding, dictationLandingKey, expireMeta, LANDED_MS, landedMeta, markerMeta } from "./dictationLanding";
 import { TagDraftContext, TAG_NODE, tagAttrs, tagOf } from "./tagContext";
 import { TagNode } from "./tagNode";
@@ -463,13 +464,14 @@ export function PromptEditor({
           const after = $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, LEAF_CHAR);
           const insert = phraseAtCaret(text, before, after);
           if (insert === "") return;
-          const lead = insert.length - insert.trimStart().length;
-          const words = insert.trim().length;
           const at = Date.now();
-          const tr = state.tr.insertText(insert, sel.from, sel.to);
-          const start = sel.from + lead;
-          tr.setSelection(TextSelection.create(tr.doc, sel.from + insert.length));
-          tr.setMeta(dictationLandingKey, landedMeta(start, start + words, at));
+          const tr = state.tr.replace(sel.from, sel.to, dictatedSlice(state.schema, insert));
+          const end = tr.mapping.map(sel.to);
+          tr.setSelection(TextSelection.create(tr.doc, end));
+          // A phrase that is only a line break has nothing to tint.
+          if (insert.trim() !== "") {
+            tr.setMeta(dictationLandingKey, landedMeta(sel.from + insert.length - insert.trimStart().length, end - (insert.length - insert.trimEnd().length), at));
+          }
           editor.view.dispatch(tr.scrollIntoView());
           setTimeout(() => {
             if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(dictationLandingKey, expireMeta(at)));
