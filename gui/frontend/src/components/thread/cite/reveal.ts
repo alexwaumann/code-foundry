@@ -1,6 +1,7 @@
 import { CITE_EDGE, locateQuote, type CitationBody } from "@/lib/citation";
 import { getTimeline } from "@/stores/cite";
-import { useThreadStore } from "@/stores/thread";
+import { messageFoldKey, setRowExpanded, useThreadStore } from "@/stores/thread";
+import { foldHides } from "../foldDom";
 import { lineRects, plainText, quoteItemSelector, type PlainText } from "./citeDom";
 
 /** The next animation frame. */
@@ -67,8 +68,9 @@ export function scrollToQuote(threadId: string, pane: HTMLElement, pt: PlainText
 /**
  * Brings a citation's quote into view in the timeline: in Ember's chat, opens the work row
  * its text folded into (a thread's folded turn still shows every text), scrolls the row
- * in, waits for it to render, finds the quote (lib/citation locateQuote) and scrolls it to
- * the middle. Resolves with
+ * in, waits for it to render, finds the quote (lib/citation locateQuote), opens a long
+ * message whose fold hides it (it stays open: the user went there) and scrolls it to the
+ * middle. Resolves with
  * the quote's offsets in the answer's plain text, or null when the answer is not in
  * this thread, its row does not render, or the quote is no longer in it.
  */
@@ -92,6 +94,11 @@ export async function revealQuote(threadId: string, pane: HTMLElement, cite: Cit
       const pt = plainText(root);
       const at = locateQuote(pt.text, cite);
       if (!at) return null;
+      if (foldHides(root, lineRects(pt, at.start, at.end))) {
+        setRowExpanded(threadId, messageFoldKey(cite.itemId), true);
+        await frame();
+        await frame();
+      }
       scrollToQuote(threadId, pane, pt, at);
       await frame();
       scrollToQuote(threadId, pane, plainText(pane.querySelector(quoteItemSelector(cite.itemId)) ?? root), at);

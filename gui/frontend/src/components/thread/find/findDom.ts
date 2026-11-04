@@ -1,7 +1,9 @@
 import { matchOffsets, type FindKey } from "@/lib/threadFind";
 import { getTimeline } from "@/stores/cite";
+import { openThreadFindMessage } from "@/stores/threadFind";
 import { highlightsSupported, lineRects, paintAll, plainText, rangeOf, type PlainText } from "../cite/citeDom";
 import { frame, scrollToQuote } from "../cite/reveal";
+import { foldHides } from "../foldDom";
 
 /**
  * The DOM side of the in-thread find (docs/notes/search-2-thread-find.md): the elements
@@ -79,7 +81,8 @@ export function clearMatches(): void {
 /**
  * Brings a match into view: its row first (the list stops following the bottom), then,
  * once the row renders, the match's lines to the middle of the list's visible part
- * (cite/reveal scrollToQuote) unless they are in view. False when its row does not render.
+ * (cite/reveal scrollToQuote) unless they are in view. A long message whose fold hides the
+ * match opens first; one whose match shows stays folded. False when its row does not render.
  */
 export async function revealMatch(threadId: string, pane: HTMLElement, key: FindKey, query: string, live: () => boolean): Promise<boolean> {
   const tl = getTimeline(threadId);
@@ -100,12 +103,23 @@ export async function revealMatch(threadId: string, pane: HTMLElement, key: Find
       // The virtualizer measures the rows it just mounted: settle, then place the match.
       await frame();
       if (!live()) return false;
-      const at = (r: Element) => {
+      const matchIn = (r: Element) => {
         const pt = findText(r);
         const ms = matchOffsets(pt.text, query);
         const m = ms[key.nth] ?? ms[ms.length - 1];
-        if (m) scrollToQuote(threadId, pane, pt, m);
+        return m ? { pt, m } : null;
       };
+      const at = (r: Element) => {
+        const hit = matchIn(r);
+        if (hit) scrollToQuote(threadId, pane, hit.pt, hit.m);
+      };
+      const hit = matchIn(pane.querySelector(findItemSelector(key.itemId)) ?? root);
+      if (hit && foldHides(root, lineRects(hit.pt, hit.m.start, hit.m.end))) {
+        openThreadFindMessage(threadId, key.itemId);
+        await frame();
+        await frame();
+        if (!live()) return false;
+      }
       at(pane.querySelector(findItemSelector(key.itemId)) ?? root);
       await frame();
       if (!live()) return false;

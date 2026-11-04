@@ -864,6 +864,7 @@ const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boole
       steer={steer}
       queued={it.queued === true}
       findItem={it.parentToolUseId === "" ? it.id : undefined}
+      foldKey={it.id}
     />
   );
   if (!it.resumeNote) return msg;

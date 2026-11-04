@@ -29,6 +29,16 @@ export const KeepRowContext = createContext<(rowKey: string) => void>(() => unde
 export const HoldTopContext = createContext<(el: HTMLElement) => void>(() => undefined);
 
 /**
+ * Runs a click's change to a long message's fold (MessageFold) with an element's top kept
+ * where it is on screen, in the same frame: no flash of the row at its new height. The list
+ * then follows the bottom only if the bottom still shows, and keeps no spacer (a message
+ * folded at the list's end settles over the composer). Outside a Timeline: just the change.
+ */
+export const FoldInPlaceContext = createContext<(el: HTMLElement, change: () => void) => void>((_el, change) => {
+  change();
+});
+
+/**
  * Where path chips (PathChip) resolve relative paths, when not the enclosing thread's: the
  * File tab's rendered markdown provides its tab's project and base (the thread checkout the
  * tab was opened from); Ember's chat a function that resolves only absolute paths under a

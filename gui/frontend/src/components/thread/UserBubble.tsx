@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { type PdfSummary, useAttachment, usePdfSummary } from "@/stores/attachments";
 import { useProjectsStore } from "@/stores/projects";
 import { CiteChip } from "./cite/CiteChip";
+import { MessageFold } from "./MessageFold";
 import { QueuedTag } from "./QueuedTag";
 
 /** The image chip's accent: green, the success token. */
@@ -168,7 +169,9 @@ function PrChip({ slug, number }: { slug: string; number: number }) {
  * the item carries, lib/userMessage) and citations (cite/CiteChip), attachments (images and PDFs) the text does not
  * refer to as tiles above it, and the time under it. `steer`: a message sent while the
  * turn ran (lib/threadTimeline): a smaller bubble inside the turn, "sent mid-turn · 14:12"
- * under it. `queued`: Claude has not read it yet (QueuedTag after the time).
+ * under it. `queued`: Claude has not read it yet (QueuedTag after the time). With `foldKey`,
+ * long text folds (MessageFold), in a steer or queued message too: where it sits does not
+ * make a long paste any shorter. Without, it shows whole (the search preview, the theme gallery).
  */
 export const UserBubble = memo(function UserBubble({
   text,
@@ -180,6 +183,7 @@ export const UserBubble = memo(function UserBubble({
   label,
   testId,
   findItem,
+  foldKey,
 }: {
   text: string;
   composerText: string;
@@ -192,10 +196,44 @@ export const UserBubble = memo(function UserBubble({
   testId?: string;
   /** The item id the find bar searches the bubble's text under (components/thread/find); absent: not searched (a subagent's prompt). */
   findItem?: string | undefined;
+  /** The message's own id, for its fold choice (MessageFold); absent: it does not fold. */
+  foldKey?: string | undefined;
 }) {
   const pieces = useMemo(() => parseUserMessage(text, composerText, attachments), [text, composerText, attachments]);
   const inline = useMemo(() => inlineAttachmentPaths(pieces), [pieces]);
   const extra = attachments.filter((p) => !inline.has(p));
+  const body = (
+    <>
+      {label && (
+        <span className="mb-0.5 flex items-center gap-1.5 text-caption whitespace-normal select-none" data-testid="thread-user-label">
+          {label}
+        </span>
+      )}
+      {pieces.map((p, i) => {
+        switch (p.kind) {
+          case "text":
+            return <span key={i}>{p.text}</span>;
+          case "skill":
+            return (
+              <span key={i} data-testid="thread-tag" data-tag-kind="skill" className={tagClass(false, TAG_ACCENT.skill)}>
+                <span className="truncate">/{p.name}</span>
+              </span>
+            );
+          case "file":
+            return <FileChip key={i} projectId={p.projectId} path={p.path} />;
+          case "thread":
+            return <ThreadChip key={i} id={p.id} name={p.name} />;
+          case "pr":
+            return <PrChip key={i} slug={p.slug} number={p.number} />;
+          case "cite":
+            return <CiteChip key={i} cite={p.cite} />;
+          case "image":
+          case "pdf":
+            return <AttachmentChip key={i} name={p.name} path={p.path} pdf={p.kind === "pdf"} />;
+        }
+      })}
+    </>
+  );
   return (
     <div className={cn("u", steer && "steer")} data-testid={testId ?? (steer ? "thread-steer" : "thread-user")}>
       {extra.length > 0 && (
@@ -206,35 +244,14 @@ export const UserBubble = memo(function UserBubble({
         </ul>
       )}
       {pieces.length > 0 && (
-        <div className={cn("bubble selectable", steer && "max-w-[72%] rounded-lg px-3 py-1.5 text-body-sm")} data-find-item={findItem}>
-          {label && (
-            <span className="mb-0.5 flex items-center gap-1.5 text-caption whitespace-normal select-none" data-testid="thread-user-label">
-              {label}
-            </span>
+        <div className={cn("bubble selectable", steer && "max-w-[72%] rounded-lg px-3 py-1.5 text-body-sm")}>
+          {foldKey === undefined ? (
+            body
+          ) : (
+            <MessageFold foldKey={foldKey} findItem={findItem}>
+              {body}
+            </MessageFold>
           )}
-          {pieces.map((p, i) => {
-            switch (p.kind) {
-              case "text":
-                return <span key={i}>{p.text}</span>;
-              case "skill":
-                return (
-                  <span key={i} data-testid="thread-tag" data-tag-kind="skill" className={tagClass(false, TAG_ACCENT.skill)}>
-                    <span className="truncate">/{p.name}</span>
-                  </span>
-                );
-              case "file":
-                return <FileChip key={i} projectId={p.projectId} path={p.path} />;
-              case "thread":
-                return <ThreadChip key={i} id={p.id} name={p.name} />;
-              case "pr":
-                return <PrChip key={i} slug={p.slug} number={p.number} />;
-              case "cite":
-                return <CiteChip key={i} cite={p.cite} />;
-              case "image":
-              case "pdf":
-                return <AttachmentChip key={i} name={p.name} path={p.path} pdf={p.kind === "pdf"} />;
-            }
-          })}
         </div>
       )}
       {steer ? (

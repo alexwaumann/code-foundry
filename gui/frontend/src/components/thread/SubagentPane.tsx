@@ -187,7 +187,7 @@ function PromptRow({ threadId, run }: { threadId: string; run: AgentRunView }) {
     </>
   );
   if (!prompt) return null;
-  return <UserBubble text={prompt} composerText="" attachments={[]} createdAtMs={call?.createdAtMs ?? run.startedAtMs} label={label} testId="subagent-prompt" />;
+  return <UserBubble text={prompt} composerText="" attachments={[]} createdAtMs={call?.createdAtMs ?? run.startedAtMs} label={label} testId="subagent-prompt" foldKey={`prompt:${run.toolUseId}`} />;
 }
 
 /** The run's line under its work: spinner "Working for …" / check "Worked for …" / cross and the error. */

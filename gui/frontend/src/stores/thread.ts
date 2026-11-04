@@ -435,6 +435,18 @@ export function setRowExpanded(threadId: string, rowKey: string, expanded: boole
   useThreadStore.setState((s) => ({ expanded: { ...s.expanded, [threadId]: { ...s.expanded[threadId], [rowKey]: expanded } } }));
 }
 
+/** What marks a long user message's fold choice among a thread's expanded rows. */
+const MESSAGE_FOLD = "msg:";
+
+/**
+ * A long user message's key among a thread's expanded rows (components/thread/MessageFold):
+ * `id` is its item id, or a subagent prompt's own id. Unlike a row's expansion, the choice
+ * outlives a visit to another thread (forgetTurnView).
+ */
+export function messageFoldKey(id: string): string {
+  return `${MESSAGE_FOLD}${id}`;
+}
+
 /** A thread's fold and expand choices: the user's (and a reveal's), by turn key and row key. */
 export interface TurnView {
   folds: Readonly<Record<string, boolean>>;
@@ -485,15 +497,17 @@ export function foldDeferredTurns(threadId: string): void {
 
 /**
  * The user left the thread (its timeline unmounted): its turns left open, its fold choices
- * and its rows' expanded state go, so the next visit shows every finished turn folded.
+ * and its rows' expanded state go, so the next visit shows every finished turn folded. The
+ * long messages they opened stay open (messageFoldKey): that is reading, not a view of the turn.
  */
 export function forgetTurnView(threadId: string): void {
   useThreadStore.setState((s) => {
     if (!(threadId in s.folds) && !(threadId in s.expanded) && !(threadId in s.deferred)) return s;
     const { [threadId]: _f, ...folds } = s.folds;
-    const { [threadId]: _e, ...expanded } = s.expanded;
+    const { [threadId]: rows, ...expanded } = s.expanded;
     const { [threadId]: _d, ...deferred } = s.deferred;
-    return { folds, expanded, deferred };
+    const messages = Object.entries(rows ?? {}).filter(([k]) => k.startsWith(MESSAGE_FOLD));
+    return { folds, expanded: messages.length > 0 ? { ...expanded, [threadId]: Object.fromEntries(messages) } : expanded, deferred };
   });
 }
 

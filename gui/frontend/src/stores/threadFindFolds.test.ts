@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildTurns, foldingTurn } from "@/lib/threadTimeline";
 import { registerTimeline } from "@/stores/cite";
-import { forgetTurnView, getThreadItems, setRowExpanded, setTurnFolded, structOf, useThreadStore } from "@/stores/thread";
+import { forgetTurnView, getThreadItems, messageFoldKey, setRowExpanded, setTurnFolded, structOf, useThreadStore } from "@/stores/thread";
 import { fixStalePrBadge, publishThread } from "@/test/threadWorld";
-import { closeThreadFind, openThreadFind, openThreadFindItem, putBackThreadFind, useThreadFindStore } from "./threadFind";
+import { closeThreadFind, openThreadFind, openThreadFindItem, openThreadFindMessage, putBackThreadFind, useThreadFindStore } from "./threadFind";
 
 const T = "s-1";
 let unregister: () => void = () => undefined;
@@ -44,6 +44,52 @@ afterEach(() => {
   unregister();
   useThreadFindStore.setState({ byThread: {} });
   useThreadStore.setState({ logs: {}, synced: {}, folds: {}, expanded: {} });
+});
+
+describe("a long message whose fold hides the current match", () => {
+  const M = "m-1";
+  const key = messageFoldKey(M);
+
+  it("opens, and folds again when the match leaves its item or the bar closes", () => {
+    openThreadFindItem(T, M);
+    openThreadFindMessage(T, M);
+    expect(view().expanded[key]).toBe(true);
+    openThreadFindItem(T, text);
+    expect(view().expanded[key]).toBeUndefined();
+    openThreadFindItem(T, M);
+    openThreadFindMessage(T, M);
+    closeThreadFind(T);
+    expect(view().expanded[key]).toBeUndefined();
+  });
+
+  it("stays open for the next match in it", () => {
+    openThreadFindItem(T, M);
+    openThreadFindMessage(T, M);
+    openThreadFindItem(T, M);
+    expect(view().expanded[key]).toBe(true);
+  });
+
+  it("a message the user opened stays open", () => {
+    setRowExpanded(T, key, true);
+    openThreadFindItem(T, M);
+    openThreadFindMessage(T, M);
+    closeThreadFind(T);
+    expect(view().expanded[key]).toBe(true);
+  });
+
+  it("the user's own Show less, then the match's next step: their later choice is not undone by the put back", () => {
+    openThreadFindItem(T, M);
+    openThreadFindMessage(T, M);
+    setRowExpanded(T, key, false);
+    closeThreadFind(T);
+    expect(view().expanded[key]).toBe(false);
+  });
+
+  it("nothing for a message that is no longer the current match's", () => {
+    openThreadFindItem(T, text);
+    openThreadFindMessage(T, M);
+    expect(view().expanded[key]).toBeUndefined();
+  });
 });
 
 describe("opening what hides a match, and putting it back", () => {

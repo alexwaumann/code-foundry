@@ -1,4 +1,5 @@
 import { type ReactNode, type SyntheticEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, type TimelineRow } from "@/lib/threadTimeline";
@@ -6,7 +7,7 @@ import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, struc
 import { registerTimeline } from "@/stores/cite";
 import { heldScroll, spacerAfterGrowth } from "@/lib/timelineHold";
 import { scrollIntent, type ScrollSample } from "@/lib/scrollIntent";
-import { HoldTopContext, KeepRowContext } from "./context";
+import { FoldInPlaceContext, HoldTopContext, KeepRowContext } from "./context";
 import { PromptRail } from "./PromptRail";
 import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
@@ -260,7 +261,7 @@ export function TimelineList<R extends ListRow>({
 
   // A row whose top is held on screen while it resizes (holdTop), and the spacer under the
   // rows that lets a held card at the bottom shrink without moving (lib/timelineHold.ts).
-  const held = useRef<{ el: HTMLElement; top: number; until: number } | null>(null);
+  const held = useRef<{ el: HTMLElement; top: number; until: number; fold: boolean } | null>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
   // The spacer's height and the rows' height when it was last set.
   const spacer = useRef({ px: 0, rows: 0 });
@@ -269,7 +270,7 @@ export function TimelineList<R extends ListRow>({
     if (spacerRef.current) spacerRef.current.style.height = `${String(px)}px`;
   }, []);
   const holdTop = useCallback((el: HTMLElement) => {
-    held.current = { el, top: el.getBoundingClientRect().top, until: performance.now() + HOLD_MS };
+    held.current = { el, top: el.getBoundingClientRect().top, until: performance.now() + HOLD_MS, fold: false };
   }, []);
   /** Puts a held row's top back where it was; false when no row is held. */
   const restoreHeld = useCallback((): boolean => {
@@ -281,15 +282,28 @@ export function TimelineList<R extends ListRow>({
       return false;
     }
     const moved = h.el.getBoundingClientRect().top - h.top;
-    if (Math.abs(moved) < 0.5) return true;
-    const next = heldScroll({ scrollTop: el.scrollTop, contentHeight: innerRef.current?.offsetHeight ?? 0, clientHeight: el.clientHeight }, moved);
-    setSpacer(next.spacer);
-    el.scrollTop = next.scrollTop;
+    const still = Math.abs(moved) < 0.5;
+    if (still && !h.fold) return true;
+    if (!still) {
+      const next = heldScroll({ scrollTop: el.scrollTop, contentHeight: innerRef.current?.offsetHeight ?? 0, clientHeight: el.clientHeight }, moved);
+      if (!h.fold) setSpacer(next.spacer);
+      el.scrollTop = next.scrollTop;
+    }
     const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_SLACK;
     pinned.current = bottom;
     setAtBottom(bottom);
     return true;
   }, [setSpacer]);
+  const foldInPlace = useCallback(
+    (el: HTMLElement, change: () => void) => {
+      held.current = { el, top: el.getBoundingClientRect().top, until: performance.now() + HOLD_MS, fold: true };
+      // The click on the fold's toggle counted as input in the list; the scrolls it causes are not.
+      userInput.current = -Infinity;
+      flushSync(change);
+      restoreHeld();
+    },
+    [restoreHeld],
+  );
 
   const toBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -536,7 +550,7 @@ export function TimelineList<R extends ListRow>({
                   style={{ position: "absolute", top: 0, left: inset, right: inset, transform: `translateY(${String(vi.start)}px)` }}
                 >
                   <RowBoundary threadId={threadId} row={row}>
-                    {renderRow(row)}
+                    <FoldInPlaceContext.Provider value={foldInPlace}>{renderRow(row)}</FoldInPlaceContext.Provider>
                   </RowBoundary>
                 </div>
               );
