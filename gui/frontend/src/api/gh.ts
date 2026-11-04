@@ -329,6 +329,8 @@ export interface PullRequestDetailView {
   lastError: string;
   /** The cached copy, served because the fetch from GitHub failed (lastError says why). */
   fetchFailed: boolean;
+  /** The cached copy, not current: a fetch is on its way, and pull_request_detail_updated says when it ended. */
+  refreshing: boolean;
 }
 
 /** pr.merge's method arg: a merge commit, squash, or rebase. */
@@ -652,6 +654,7 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
     fetchedAtMs: ms(d.fetchedAt),
     lastError: d.lastError,
     fetchFailed: d.fetchFailed,
+    refreshing: d.refreshing,
   };
 }
 
@@ -659,7 +662,7 @@ export function toReviewerCandidateView(c: ReviewerCandidate): ReviewerCandidate
   return { id: c.id, kind: reviewerKinds[c.kind], login: c.login, name: c.name, avatarUrl: c.avatarUrl, isRequested: c.isRequested };
 }
 
-/** GetPullRequestDetail: served from the daemon's cache unless refresh (see GhService). */
+/** GetPullRequestDetail: any cached copy answers at once, unless refresh (see GhService). */
 export async function getPullRequestDetail(
   repoSlug: string,
   number: number,

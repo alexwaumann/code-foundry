@@ -314,6 +314,19 @@ export function cards(m: PageModel): Card[] {
  * The header's freshness over both of the page's fetches: the older fetch time (the
  * project lists' only once they were fetched) and the first error.
  */
+/**
+ * What the page can say about a dashboard: "pending" before anything answered (a daemon's first
+ * poll on an empty cache), when empty lists mean "not known yet", not "none"; "failed" when
+ * the first polls fail; else "ready". A poll that found nothing publishes no dashboard event,
+ * so `polled` (the polled event's freshness) ends the wait; `reading`: the re-read of a poll
+ * that did find something is still in flight, and its rows are about to arrive.
+ */
+export function dashboardLoad(d: Pick<DashboardView, "fetchedAtMs" | "authenticated" | "dashboardsDisabled">, polled: Freshness, reading: boolean): "pending" | "failed" | "ready" {
+  if (d.fetchedAtMs !== null || !d.authenticated || d.dashboardsDisabled) return "ready";
+  if (polled.fetchedAtMs === null) return polled.lastError ? "failed" : "pending";
+  return reading ? "pending" : "ready";
+}
+
 export function olderFreshness(dashboard: Freshness, projects: Freshness): Freshness {
   const a = dashboard.fetchedAtMs;
   const b = projects.fetchedAtMs;

@@ -5,6 +5,7 @@ import type { AuthoredRow, AuthoredStatusKind } from "./authoredStatus";
 import {
   authoredSubtitle,
   cards,
+  dashboardLoad,
   groupByRepo,
   liveFilter,
   mergedCounts,
@@ -93,6 +94,23 @@ describe("mergedRows / mergedCounts", () => {
   it("an untracked repository's merges are never among the project search's hidden ones", () => {
     const untracked: MergedRowModel[] = [...rows, { pr: pr(71, {}, OTHER), involved: true }];
     expect(mergedCounts(untracked, list(project, 10), [SLUG, GP])).toEqual({ involved: 3, more: 9 });
+  });
+});
+
+describe("dashboardLoad", () => {
+  const cold = { fetchedAtMs: null, authenticated: true, dashboardsDisabled: false };
+  const polled = (fetchedAtMs: number | null, lastError = "") => ({ fetchedAtMs, lastError });
+  it.each([
+    { name: "never fetched, nothing heard", d: cold, p: polled(null), reading: false, want: "pending" },
+    { name: "never fetched, a poll failed", d: cold, p: polled(null, "github graphql: 502"), reading: false, want: "failed" },
+    { name: "a poll found nothing: no dashboard event follows", d: cold, p: polled(1000), reading: false, want: "ready" },
+    { name: "a poll found rows, their read in flight", d: cold, p: polled(1000), reading: true, want: "pending" },
+    { name: "fetched, a later poll failed", d: { ...cold, fetchedAtMs: 1000 }, p: polled(1000, "boom"), reading: false, want: "ready" },
+    { name: "fetched, a re-read in flight", d: { ...cold, fetchedAtMs: 1000 }, p: polled(1000), reading: true, want: "ready" },
+    { name: "not authenticated: the page says so", d: { ...cold, authenticated: false }, p: polled(null), reading: false, want: "ready" },
+    { name: "dashboards off: the page says so", d: { ...cold, dashboardsDisabled: true }, p: polled(null), reading: false, want: "ready" },
+  ])("$name: $want", ({ d, p, reading, want }) => {
+    expect(dashboardLoad(d, p, reading)).toBe(want);
   });
 });
 

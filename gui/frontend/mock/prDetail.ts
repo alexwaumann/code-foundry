@@ -266,6 +266,8 @@ export interface PrDetailHooks {
 
 export class PrDetailWorld {
   private readonly details = new Map<string, DetailInit>();
+  /** The details a next read serves as a stale copy (markStale); timer: the fetch behind it started. */
+  private readonly stale = new Map<string, { ms: number; timer: ReturnType<typeof setTimeout> | null; apply: ((now: DetailInit) => void) | null }>();
   private readonly candidates = new Map<string, CandidateInit[]>();
   private readonly reverts = new Map<string, { number: number; url: string }>();
   private readonly merges = new Map<string, { res: MergeOut; deleteAsked: boolean }>();
@@ -747,7 +749,38 @@ export class PrDetailWorld {
     this.h.count("GetPullRequestDetail");
     const d = this.detailOf(slug, number);
     if (refresh) d.fetchedAt = timestampFromDate(new Date());
-    return d;
+    return this.staleFirst(slug, number, d);
+  }
+
+  /** The daemon's stale-first read: the copy as it was, marked refreshing, and the fetch behind it starts (pr-stale). */
+  private staleFirst(slug: string, number: number, d: DetailInit): DetailInit {
+    const k = key(slug, number);
+    const stale = this.stale.get(k);
+    if (!stale) return d;
+    if (stale.timer === null) {
+      stale.timer = setTimeout(() => {
+        this.stale.delete(k);
+        const now = this.details.get(k);
+        if (!now) return;
+        stale.apply?.(now);
+        now.fetchedAt = timestampFromDate(new Date());
+        this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+      }, stale.ms);
+    }
+    return { ...d, refreshing: true };
+  }
+
+  /**
+   * The next read answers from the copy with refreshing set, and the refresh lands ms after
+   * that read (never, with a negative ms: the panel keeps saying so), adding body to the
+   * description as a change GitHub had. Used for stale-first reads: e2e/pr-stale-first.spec.ts.
+   */
+  markStale(slug: string, number: number, ms: number, body: string): boolean {
+    const d = this.details.get(key(slug, number));
+    if (!d) return false;
+    const apply = body ? (now: DetailInit) => void (now.body = `${now.body ?? ""}\n\n${body}`) : null;
+    this.stale.set(key(slug, number), { ms: ms < 0 ? 2 ** 31 - 1 : ms, timer: null, apply });
+    return true;
   }
 
   /**

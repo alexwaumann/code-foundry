@@ -102,6 +102,7 @@ function detail(s: Shape = {}): PullRequestDetailView {
     fetchedAtMs: NOW,
     lastError: "",
     fetchFailed: false,
+    refreshing: false,
     ...s.d,
   };
 }
@@ -478,11 +479,14 @@ describe("readiness rows in detail", () => {
 
 describe("detailFresh and awaitingApproval", () => {
   it.each([
-    { fetchFailed: false, want: true },
+    { fetchFailed: false, refreshing: false, want: true },
     // A stale copy is stale whatever it carries (a stored checksTruncated included).
-    { fetchFailed: true, want: false },
-  ])("fresh: fetchFailed $fetchFailed", ({ fetchFailed, want }) => {
-    expect(detailFresh({ fetchFailed })).toBe(want);
+    { fetchFailed: true, refreshing: false, want: false },
+    // So is the copy served ahead of a fetch: it may be a row from before a field.
+    { fetchFailed: false, refreshing: true, want: false },
+    { fetchFailed: true, refreshing: true, want: false },
+  ])("fresh: fetchFailed $fetchFailed, refreshing $refreshing", ({ fetchFailed, refreshing, want }) => {
+    expect(detailFresh({ fetchFailed, refreshing })).toBe(want);
   });
 
   it.each([

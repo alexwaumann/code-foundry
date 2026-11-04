@@ -116,6 +116,7 @@ function detailBase(pr: PullRequestView, t0: number): PullRequestDetailView {
     fetchedAtMs: t0 - 20_000,
     lastError: "",
     fetchFailed: false,
+    refreshing: false,
   };
 }
 

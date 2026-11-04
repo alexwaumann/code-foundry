@@ -169,6 +169,10 @@
  *        with failing checks on no dashboard, #139 awaiting the viewer's review); its commands
  *        are pr.merge, pr.revert, pr.review.request, pr.review, pr.comment and pr.refresh
  *        ("SubmitPullRequestReview" and "AddPullRequestComment" count in /__mock/gh/calls)
+ *   POST /__mock/gh/pr-stale?repo=o/r&number=145&ms=800&body=…   (the next read of the detail is a stale
+ *        copy, refreshing; the fetch lands ms later, adding body to the description; ms=-1: never)
+ *   POST /__mock/gh/dashboard-cold            (GetDashboard as a daemon before its first poll, until
+ *        /__mock/gh/dashboard-warm, which answers with the lists and publishes polled)
  *   POST /__mock/gh/pr-push?repo=o/r&number=145&sha=<40 hex>   (the detail's head moves;
  *        pull_request_detail_updated). The Code tab's diff and files: mock/prDiff.ts (one
  *        three-file diff for every pull request, #140's refused as too large; counts
@@ -1626,6 +1630,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, ok ? 200 : 404, { ok });
       break;
     }
+    case "POST /__mock/gh/pr-stale": {
+      const ok = world.gh.prDetails.markStale(q.get("repo") ?? "alexwaumann/code-foundry", Number(q.get("number") ?? "145"), Number(q.get("ms") ?? "500"), q.get("body") ?? "");
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
+    case "POST /__mock/gh/dashboard-cold":
+      world.gh.setCold(true);
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/gh/dashboard-warm":
+      world.gh.setCold(false);
+      json(res, 200, { ok: true });
+      break;
     case "POST /__mock/gh/pr-push": {
       // A poll saw a push to a pull request with a detail: its head moves (mock/prDiff.ts).
       const ok = world.gh.prDetails.push(q.get("repo") ?? "alexwaumann/code-foundry", Number(q.get("number") ?? "145"), q.get("sha") ?? "b0b0".padEnd(40, "0"));

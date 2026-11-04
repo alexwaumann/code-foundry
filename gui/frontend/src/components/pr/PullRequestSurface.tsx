@@ -60,6 +60,7 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
         })}
       </div>
       <div className="ml-auto flex min-w-0 items-center gap-2 overflow-hidden" data-testid="pr-inner-bar-end">
+        {d.refreshing && !d.fetchFailed && <Updating />}
         {inner === "activity" && (
           <>
             <span className="flex shrink-0 items-center gap-2 text-caption whitespace-nowrap tabular-nums @max-[400px]:hidden" data-testid="pr-timeline-counts">
@@ -81,6 +82,28 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
         )}
       </div>
     </div>
+  );
+}
+
+/** How long a refresh behind the copy shown stays silent: the usual one lands well before this. */
+export const UPDATING_AFTER_MS = 2_000;
+
+/** A copy that is taking its time to refresh (the fetch queues behind a running poll): quiet text, and nothing at all on a normal open. */
+function Updating() {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setLate(true);
+    }, UPDATING_AFTER_MS);
+    return () => {
+      clearTimeout(t);
+    };
+  }, []);
+  if (!late) return null;
+  return (
+    <span className="min-w-0 truncate text-caption text-cf-text-muted" role="status" data-testid="pr-updating">
+      Updating…
+    </span>
   );
 }
 

@@ -135,6 +135,8 @@ export class GhWorld {
   branches = new Map<string, PrInit[]>();
   details = new Map<string, DetailInit>();
   calls: Record<string, number> = {};
+  /** Answers as a daemon before its first poll (setCold). */
+  private cold = false;
   /** The pull request detail panel's fixtures (mock/prDetail.ts). */
   prDetails!: PrDetailWorld;
   /** The Code tab's diff and files (mock/prDiff.ts). */
@@ -183,6 +185,7 @@ export class GhWorld {
   reset(): void {
     this.t0 = Date.now();
     this.calls = {};
+    this.cold = false;
     this.authenticated = true;
     const now = new Date(this.t0);
     const cf = "alexwaumann/code-foundry";
@@ -506,7 +509,22 @@ export class GhWorld {
   /** Like the daemon: every list in full, whatever the projects; `tracked` only fills tracked_slugs. */
   getDashboard(tracked: string[]): DashboardInit {
     this.count("GetDashboard");
+    if (this.cold) return { ...this.coldDashboard(), authenticated: this.authenticated, trackedSlugs: tracked };
     return { ...this.dashboard, authenticated: this.authenticated, trackedSlugs: tracked };
+  }
+
+  /** What a daemon holds before its first poll: empty lists and no fetch time. */
+  private coldDashboard(): DashboardInit {
+    const none = { pullRequests: [], totalCount: 0, searchUrl: "" };
+    return { ...this.dashboard, authored: [], reviewRequested: [], reviewed: [], recentlyMerged: [], projectOpen: none, projectMerged: none, fetchedAt: undefined, projectsFetchedAt: undefined };
+  }
+
+  /** Answers as a daemon before its first poll, or (off) as one whose first poll just found the lists. */
+  setCold(on: boolean): void {
+    this.cold = on;
+    if (on) return;
+    this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
+    this.publishGh(this.polledEvent());
   }
 
   getRepoActivity(slug: string): ActivityInit {
@@ -531,6 +549,7 @@ export class GhWorld {
   /** The polled event: the daemon sends it after every poll and in its gh snapshot. */
   polledEvent(): GhEventInit {
     const d = this.dashboard;
+    if (this.cold) return { event: { case: "polled", value: {} } };
     return { event: { case: "polled", value: { fetchedAt: d.fetchedAt, lastError: d.lastError, projectsFetchedAt: d.projectsFetchedAt, projectsLastError: d.projectsLastError } } };
   }
 

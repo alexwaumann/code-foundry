@@ -115,16 +115,18 @@ function parsePullRequestKey(key: string): [string, number] {
 
 /**
  * How often an open detail is re-read: the daemon's default poll interval
- * (github.poll_interval_seconds). Reads are cache hits until the daemon's entry is older
- * than the poll interval; then the read fetches. That keeps a PR the poll does not cover
- * (not on a dashboard or watched branch, so no pull_request_detail_updated) from going stale.
+ * (github.poll_interval_seconds). Every read answers from the daemon's copy; once that is
+ * older than the poll interval the read also starts a fetch behind it. That keeps a PR the
+ * poll does not cover (not on a dashboard or watched branch, so no
+ * pull_request_detail_updated of its own) from going stale.
  */
 export const PULL_REQUEST_DETAIL_KEEPALIVE_MS = 60_000;
 
 /**
- * Key: pullRequestKey(slug, number). The daemon caches the detail and announces a change
- * (pull_request_detail_updated) when a poll sees the PR move or a review request is set;
- * the re-read then fetches from GitHub.
+ * Key: pullRequestKey(slug, number). The daemon answers with any copy it has, marked
+ * refreshing when it is not current, and announces (pull_request_detail_updated) when a poll
+ * sees the PR move, a write lands, or that fetch ended; the re-read replaces the data in
+ * place. A read waits for GitHub only with no copy, and right after a write made here.
  */
 export const pullRequestDetailResource = createResource(
   (key, signal) => {

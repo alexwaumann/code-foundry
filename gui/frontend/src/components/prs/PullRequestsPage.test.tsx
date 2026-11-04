@@ -67,6 +67,50 @@ function gh(ev: Parameters<typeof applyGhEvent>[0]) {
   });
 }
 
+describe("before the first poll", () => {
+  const empty = () => ({ ...world.dashboard, reviewRequested: [], reviewed: [], authored: [], recentlyMerged: [], projectOpen: { ...world.dashboard.projectOpen, pullRequests: [] }, projectMerged: { ...world.dashboard.projectMerged, pullRequests: [] }, viewer: null, fetchedAtMs: null, projectsFetchedAtMs: null });
+  const polled = (fetchedAtMs: number | null, lastError = "") => ({ kind: "polled" as const, fetchedAtMs, lastError, projectsFetchedAtMs: fetchedAtMs, projectsLastError: "" });
+  const gh = async (ev: Parameters<typeof applyGhEvent>[0]) => {
+    await act(async () => {
+      applyGhEvent(ev);
+      await Promise.resolve();
+    });
+    await settle(3);
+  };
+
+  it("shows the page's shape, not a claim that nothing is open, until a poll finds the rows", async () => {
+    const warm = world.dashboard;
+    world.dashboard = empty();
+    await openPage();
+    expect(screen.getByTestId("prs-loading").getAttribute("aria-busy")).toBe("true");
+    expect(screen.queryByTestId("prs-empty")).toBeNull();
+    expect(screen.queryByTestId("prs-updated")).toBeNull();
+
+    world.dashboard = warm;
+    await gh({ kind: "dashboard" });
+    await gh(polled(warm.fetchedAtMs));
+    expect(screen.queryByTestId("prs-loading")).toBeNull();
+    expect(screen.getByTestId("prs-review")).toBeTruthy();
+  });
+
+  it("a first poll that found nothing ends the wait with no dashboard event", async () => {
+    world.dashboard = empty();
+    await openPage();
+    await gh(polled(Date.now()));
+    expect(screen.queryByTestId("prs-loading")).toBeNull();
+    expect(screen.getByTestId("prs-empty")).toBeTruthy();
+  });
+
+  it("a first poll that failed says why, not that nothing is open", async () => {
+    world.dashboard = empty();
+    await openPage();
+    await gh(polled(null, "github graphql: 502 Bad Gateway"));
+    expect(screen.queryByTestId("prs-loading")).toBeNull();
+    expect(screen.queryByTestId("prs-empty")).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("Cannot load pull requests: github graphql: 502 Bad Gateway");
+  });
+});
+
 describe("the Pull Requests page", () => {
   it("the sidebar entry opens it: charts, the five cards, then every section with rows", async () => {
     await openPage();

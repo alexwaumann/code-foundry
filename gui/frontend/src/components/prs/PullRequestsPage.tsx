@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { GitPullRequest } from "lucide-react";
 import type { DashboardView, PullRequestView } from "@/api/gh";
 import { PanelToggle } from "@/components/panel/PanelToggle";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
@@ -13,7 +14,7 @@ import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
 import { ActivityCharts } from "./ActivityCharts";
 import { prKey } from "./format";
-import { capKey, cards, liveFilter, mergedSubtitle, olderFreshness, pageModel, sectionRows, SECTIONS, type PageModel, type Section } from "./pageModel";
+import { capKey, cards, dashboardLoad, liveFilter, mergedSubtitle, olderFreshness, pageModel, sectionRows, SECTIONS, type PageModel, type Section } from "./pageModel";
 import { Freshness, SectionTitle } from "./PrBits";
 import { AuthoredPrRow, MergedRow, NeedsReviewRow, OtherPrRow, PrTable, ReviewedByYouRow } from "./PrRows";
 import { needsReviewCount } from "./reviewQueue";
@@ -167,6 +168,33 @@ function Body({ d }: { d: DashboardView }) {
   );
 }
 
+/** Before the first answer: the page's own shape (two charts, five cards, a table's rows), so nothing jumps when it comes. */
+function PageLoading() {
+  return (
+    <div className="flex flex-col gap-6" data-testid="prs-loading" aria-busy="true" aria-label="Loading pull requests">
+      <div className="@container">
+        <div className="grid grid-cols-2 gap-4 @max-[760px]:grid-cols-1">
+          <Skeleton className="h-36 rounded-lg" />
+          <Skeleton className="h-36 rounded-lg" />
+        </div>
+      </div>
+      <div className="@container">
+        <div className="grid grid-cols-5 gap-3 @max-[640px]:grid-cols-3">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-4 w-48" />
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-9 w-full" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * The global Pull Requests page (docs/notes/prs-page-2-gui.md): activity charts, five
  * summary cards that filter the page, then the viewer's review queue and own pull requests
@@ -179,6 +207,7 @@ export function PullRequestsPage() {
   const projectsFresh = useProjectsFreshness(d?.projectsFetchedAtMs ?? null, d?.projectsLastError ?? "");
   // The page shows two fetches: the older time, and either's error.
   const fresh = olderFreshness(dashFresh, projectsFresh);
+  const load = d ? dashboardLoad(d, dashFresh, entry?.loading ?? false) : null;
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Pull Requests" data-testid="prs-page">
       <PaneHeader className="gap-3 px-5">
@@ -190,20 +219,22 @@ export function PullRequestsPage() {
               @{d.viewer.login}
             </span>
           )}
-          {d && <span aria-hidden>·</span>}
-          {d && <Freshness fetchedAtMs={fresh.fetchedAtMs} lastError={fresh.lastError} staleAfterMs={STALE_AFTER_MS} testId="prs-updated" />}
+          {d?.viewer && load === "ready" && <span aria-hidden>·</span>}
+          {load === "ready" && <Freshness fetchedAtMs={fresh.fetchedAtMs} lastError={fresh.lastError} staleAfterMs={STALE_AFTER_MS} testId="prs-updated" />}
         </span>
         <PanelToggle className="-mr-2" />
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        {d ? (
+        {load === "ready" && d ? (
           <div className="mx-auto max-w-6xl">
             <Body d={d} />
           </div>
-        ) : entry?.error ? (
-          <Banner tone="warn">Cannot load pull requests: {entry.error}</Banner>
+        ) : load === "failed" || entry?.error ? (
+          <Banner tone="warn">Cannot load pull requests: {entry?.error || dashFresh.lastError}</Banner>
         ) : (
-          <p className="text-body text-cf-text-muted">Loading…</p>
+          <div className="mx-auto max-w-6xl">
+            <PageLoading />
+          </div>
         )}
       </div>
     </section>
