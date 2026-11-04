@@ -18,7 +18,7 @@ describe("panelMax", () => {
     ["room beside the sidebar when that is less", 1400, 520, 1400 - 520 - PANE_GAPS - CONTENT_MIN],
     ["sidebar hidden", 1000, 0, 600],
     ["no room: below the minimum", 1000, 520, 1000 - 520 - PANE_GAPS - CONTENT_MIN],
-    ["900px minimum window, default sidebar", 900, SIDEBAR_DEFAULT, 900 - SIDEBAR_DEFAULT - PANE_GAPS - CONTENT_MIN],
+    ["940px minimum window, default sidebar", 940, SIDEBAR_DEFAULT, 940 - SIDEBAR_DEFAULT - PANE_GAPS - CONTENT_MIN],
   ];
   it.each(cases)("%s", (_name, windowWidth, sidebar, want) => {
     expect(panelMax(windowWidth, sidebar)).toBe(want);
@@ -39,8 +39,8 @@ describe("expandedPanelWidth", () => {
   const cases: [string, number, number, number][] = [
     ["the row beside the sidebar less the panel's two margins", 1400, SIDEBAR_DEFAULT, 1400 - SIDEBAR_DEFAULT - 2 * SHELL_GAP],
     ["sidebar hidden", 900, 0, 876],
-    ["900px window, default sidebar: stacks a split", 900, SIDEBAR_DEFAULT, 656],
-    ["800px window, default sidebar", 800, SIDEBAR_DEFAULT, 556],
+    ["940px window, default sidebar: stacks a split", 940, SIDEBAR_DEFAULT, 656],
+    ["800px window, default sidebar", 800, SIDEBAR_DEFAULT, 516],
     ["never negative", 200, SIDEBAR_MAX, 0],
   ];
   it.each(cases)("%s", (_name, windowWidth, sidebar, want) => {
@@ -92,6 +92,7 @@ describe("ui persistence", () => {
 
   const widths: [string, unknown, number][] = [
     ["a width saved under the old 180 minimum is raised", { sidebarWidth: 180 }, SIDEBAR_MIN],
+    ["a width saved under the old 220 minimum is raised", { sidebarWidth: 220 }, SIDEBAR_MIN],
     ["a width above the maximum is lowered", { sidebarWidth: 900 }, SIDEBAR_MAX],
     ["a width inside the bounds is kept, rounded", { sidebarWidth: 300.4 }, 300],
     ["no saved width keeps the default", { fontSize: 14 }, SIDEBAR_DEFAULT],

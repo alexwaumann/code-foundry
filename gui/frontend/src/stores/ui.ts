@@ -90,13 +90,13 @@ export type FocusRegion = "sidebar" | "content" | "palette" | "panel" | "bottom"
 export type PalettePage = "commands" | "projects" | "runin" | "prompts" | "files" | "search";
 
 /**
- * The sidebar band must fit the 80px traffic-light gutter and the app name
- * (components/sidebar/Sidebar.tsx).
+ * The sidebar band must fit the traffic-light gutter, the app name and the Back and Forward
+ * buttons, at every zoom (components/sidebar/Sidebar.tsx).
  */
-export const SIDEBAR_MIN = 220;
+export const SIDEBAR_MIN = 260;
 export const SIDEBAR_MAX = 520;
 /** The initial width, and what double-clicking the resize handle restores. */
-export const SIDEBAR_DEFAULT = 220;
+export const SIDEBAR_DEFAULT = 260;
 /** Side panel width bounds; the upper bound depends on the window and sidebar (panelMax). */
 export const PANEL_MIN = 280;
 export const PANEL_MAX_FRACTION = 0.6;
@@ -613,6 +613,12 @@ export const useUiStore = create<UiState>()(
     },
   ),
 );
+
+/** Whether stepHistory would find a live entry; it only reads, so a selector may call it. */
+export function canStepHistory(s: Pick<UiState, "history" | "historyIndex">, by: 1 | -1): boolean {
+  const { history, index } = pruneHistory(s.history, s.historyIndex);
+  return history[index + by] !== undefined;
+}
 
 /** Moves through history by one live entry (view.back, view.forward); false, after pruning, when there is none. */
 function stepHistory(by: 1 | -1): boolean {

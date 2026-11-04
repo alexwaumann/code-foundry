@@ -32,7 +32,7 @@ const BAND = 56;
 const HEADER = 44;
 const CENTER = 34;
 
-test("the sidebar starts at 220, a width saved by an older build resets once, and a dragged width is kept", async ({ page }) => {
+test("the sidebar starts at 260, a width saved by an older build resets once, and a dragged width is kept", async ({ page }) => {
   const width = async () => (await box(page, "sidebar")).width;
   // A store saved before version 4, at the old 280 default dragged to 360.
   await page.addInitScript(() => {
@@ -41,8 +41,8 @@ test("the sidebar starts at 220, a width saved by an older build resets once, an
     localStorage.setItem("code-foundry.ui", JSON.stringify({ state: { sidebarWidth: 360, workingCollapsed: true }, version: 3 }));
   });
   await openApp(page);
-  await expect.poll(width).toBe(220);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as unknown)).toMatchObject({ state: { sidebarWidth: 220, workingCollapsed: true }, version: 4 });
+  await expect.poll(width).toBe(260);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as unknown)).toMatchObject({ state: { sidebarWidth: 260, workingCollapsed: true }, version: 4 });
 
   // Dragging the handle: the width persists across a reload, capped at the maximum.
   const handle = page.getByRole("separator", { name: "Resize sidebar" });
@@ -53,11 +53,11 @@ test("the sidebar starts at 220, a width saved by an older build resets once, an
   await page.mouse.down();
   await page.mouse.move(hb.x + hb.width / 2 + 90, y, { steps: 4 });
   await page.mouse.up();
-  await expect.poll(width).toBe(310);
+  await expect.poll(width).toBe(350);
   await page.reload();
   await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
-  await expect.poll(width).toBe(310);
-  await page.mouse.move(310 + hb.width / 2, y);
+  await expect.poll(width).toBe(350);
+  await page.mouse.move(350 + hb.width / 2, y);
   await page.mouse.down();
   await page.mouse.move(1200, y, { steps: 4 });
   await page.mouse.up();
@@ -68,7 +68,7 @@ test("the sidebar starts at 220, a width saved by an older build resets once, an
 
   // Double-click restores the 220 default.
   await handle.dblclick();
-  await expect.poll(width).toBe(220);
+  await expect.poll(width).toBe(260);
 });
 
 /** SHOTS=<dir>: the PR's screenshots of the 220px default, WebKit, 1280x800, dark and light. */
@@ -85,14 +85,14 @@ for (const scheme of ["dark", "light"] as const) {
   });
 }
 
-test("the app name fits whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
+test("the app name and the history buttons fit whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
   await openApp(page);
   const title = page.getByTestId("sidebar-app-name");
   const setWidth = (w: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
   const setZoom = (z: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
   const fits = () => title.evaluate((el) => el.scrollWidth <= el.clientWidth);
-  await setWidth(220);
-  await expect.poll(async () => (await box(page, "sidebar")).width).toBe(220);
+  await setWidth(260);
+  await expect.poll(async () => (await box(page, "sidebar")).width).toBe(260);
   expect(await fits()).toBe(true);
   // Zoomed out, the gutter is wider in layout px (80 screen px over 0.9): the tightest case.
   await setZoom(90);
@@ -104,7 +104,7 @@ test("the app name fits whole at the minimum sidebar width, zoomed in and out", 
   await expect(title).toBeVisible();
 });
 
-test("the sidebar band holds only the empty traffic-light gutter and the app name, and drags the window", async ({ page }) => {
+test("the sidebar band holds the empty traffic-light gutter, the app name and the history buttons, and drags the window", async ({ page }) => {
   await openApp(page);
   const viewport = page.viewportSize();
   const band = await box(page, "sidebar-band");
@@ -113,7 +113,9 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   expect(band.height).toBe(BAND);
   expect(band.width).toBe((await box(page, "sidebar")).width);
   expect(await drag(page, '[data-testid="sidebar-band"]')).toBe("drag");
-  await expect(page.getByTestId("sidebar-band").locator("button")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-band").locator("button")).toHaveCount(2);
+  expect(await drag(page, '[data-testid="sidebar-back"]')).toBe("no-drag");
+  expect(await drag(page, '[data-testid="sidebar-forward"]')).toBe("no-drag");
 
   const gutter = await box(page, "traffic-light-gutter");
   expect([gutter.left, gutter.top, gutter.width, gutter.height]).toEqual([0, 0, 80, BAND]);
@@ -166,6 +168,34 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   expect([edge.top, edge.left, edge.width, edge.height]).toEqual([0, 0, viewport?.width, GAP]);
   expect(await drag(page, '[data-testid="window-drag-edge"]')).toBe("drag");
   expect(await drag(page, '[data-testid="content-pane"]')).toBe("");
+});
+
+test("the history buttons step through selections, float their tooltips down and clear the resize handle", async ({ page }) => {
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  await row(page, "s:s-2").click();
+  const back = page.getByTestId("sidebar-back");
+  const forward = page.getByTestId("sidebar-forward");
+  await expect(forward).toBeDisabled();
+
+  await back.hover();
+  const tip = page.locator('[data-slot="tooltip-content"]:not([data-state="closed"])');
+  await expect(tip).toHaveText("Back");
+  expect((await tip.boundingBox())?.y).toBeGreaterThan((await box(page, "sidebar-back")).bottom);
+
+  await back.click();
+  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
+  await expect(forward).toBeEnabled();
+
+  // The glyph ends on the sidebar's edge; the handle beyond it takes only the box's last 5px.
+  const f = await box(page, "sidebar-forward");
+  expect(f.right - 5).toBe((await box(page, "sidebar")).right);
+  const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest("button")?.dataset.testid, { x: f.left + f.width / 2, y: f.top + f.height / 2 });
+  expect(hit).toBe("sidebar-forward");
+
+  await forward.click();
+  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+  await expect(forward).toBeDisabled();
 });
 
 test("the panes start a shell gap (12px) from the top and their 44px headers drag the window, with the sidebar shown and hidden", async ({ page }) => {

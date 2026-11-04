@@ -2,6 +2,7 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, 
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { EmberRow } from "@/components/ember/EmberRow";
+import { HistoryButtons } from "@/components/sidebar/HistoryButtons";
 import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
@@ -424,31 +425,33 @@ function ThreadsUnavailable() {
 
 /**
  * The sidebar's share of the title band (components/window/titleBand.ts): the
- * traffic-light gutter, kept empty for the lights, then the app name. The whole band
- * drags the window (Wails runtime, `--wails-draggable`); the menu pane below it
- * (SidebarMenu) holds the nav rows. See docs/notes/sidebar-menu-pane.md.
+ * traffic-light gutter, kept empty for the lights, then the app name, then Back and
+ * Forward (HistoryButtons). The band drags the window, all but those buttons (Wails
+ * runtime, `--wails-draggable`); the menu pane below it (SidebarMenu) holds the nav rows.
+ * See docs/notes/sidebar-menu-pane.md.
  *
  * The band is a shell gap plus a pane header tall (56px). The name sits in the lower
  * 44px (pt-shell), so it centres on the pane headers beside it (TITLE_BAND_CENTER, 34px
  * down), as the traffic lights do (gui/trafficlights_darwin.go).
  *
  * The name is a span, not a heading: every page in the content pane has its own h1. At
- * 17px (text-brand, ~107px wide) it fits beside the gutter at SIDEBAR_MIN from 90% zoom
- * (the widest gutter in layout px) up, with the header's right padding only 4px (pr-1);
- * so it is not measured, and the overflow clip only guards against an unexpected font.
+ * 17px (text-brand, ~107px wide) it fits between the gutter and the buttons at SIDEBAR_MIN
+ * from 90% zoom (the widest gutter in layout px, 89: 89 + 12 + 107 + 43 leaves 9px) up; so
+ * it is not measured, and the overflow clip only guards against an unexpected font.
  */
 function SidebarBand() {
   const gutter = useUiStore((s) => trafficLightGutter(s.zoom));
   return (
     <div className="flex shrink-0 items-center bg-cf-chrome [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
-      <header className="flex h-full min-w-0 flex-1 items-center pt-shell pr-1 pl-3">
+      <header className="flex h-full min-w-0 flex-1 items-center pt-shell pl-3">
         <span
           className="min-w-0 overflow-hidden text-brand leading-none whitespace-nowrap text-cf-sidebar-foreground select-none"
           data-testid="sidebar-app-name"
         >
           Code Foundry
         </span>
+        <HistoryButtons />
       </header>
     </div>
   );

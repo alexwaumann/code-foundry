@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import { useCommandsStore } from "@/stores/commands";
-import { tooltipText } from "@/test/tooltip";
+import { hoverTooltipText, tooltipText } from "@/test/tooltip";
 import { CommandButton } from "./CommandButton";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
@@ -31,6 +31,14 @@ describe("CommandButton", () => {
     expect(b !== null).toBe(want.present);
     if (!b) return;
     expect((b as HTMLButtonElement).disabled).toBe(want.disabled);
+  });
+
+  it("disabled dims a listed command, and its tooltip still opens through the span around it", async () => {
+    useCommandsStore.setState({ commands: [cmd({})] });
+    render(<CommandButton command="terminal.new" icon={Plus} disabled data-testid="b" />);
+    const b = screen.getByTestId<HTMLButtonElement>("b");
+    expect(b.disabled).toBe(true);
+    expect(await hoverTooltipText(b.parentElement as HTMLElement)).toBe("New Terminal");
   });
 
   it("thread.new stays enabled where the daemon lists it unavailable (the project picker supplies the project)", () => {

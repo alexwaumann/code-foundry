@@ -295,7 +295,7 @@ test("Worktrees without threads: at the width Show diff leaves, the reason trunc
   await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", COPY);
   // A smaller window beside the panel: the page's content about 480px wide.
   const vp = page.viewportSize() ?? { width: 1280, height: 800 };
-  await page.setViewportSize({ width: 1100, height: vp.height });
+  await page.setViewportSize({ width: 1140, height: vp.height });
   await expect.poll(() => reason.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   // Why it stayed keeps its 10rem (160px) before the branch gives way.
   expect(await reason.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(159.5);

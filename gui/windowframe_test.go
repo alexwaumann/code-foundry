@@ -26,7 +26,7 @@ func TestPlaceWindow(t *testing.T) {
 		{
 			"first launch never goes below the minimum",
 			nil, []application.Rect{{X: 0, Y: 25, Width: 960, Height: 520}},
-			WindowFrame{X: 30, Y: 35, Width: 900, Height: 500},
+			WindowFrame{X: 10, Y: 35, Width: 940, Height: 500},
 		},
 		{
 			"a frame that still fits is kept",
@@ -56,7 +56,7 @@ func TestPlaceWindow(t *testing.T) {
 		{
 			"a frame below the minimum grows to it",
 			&WindowFrame{X: 10, Y: 50, Width: 400, Height: 300}, []application.Rect{laptop},
-			WindowFrame{X: 10, Y: 50, Width: 900, Height: 500},
+			WindowFrame{X: 10, Y: 50, Width: 940, Height: 500},
 		},
 	}
 	for _, tt := range tests {
