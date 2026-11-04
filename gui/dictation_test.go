@@ -235,6 +235,13 @@ func snapListening(id string, denied bool) *v1.DictationSnapshot {
 	return s
 }
 
+// snapHold is a session the hold key opened.
+func snapHold(id string) *v1.DictationSnapshot {
+	s := snapListening(id, false)
+	s.Session.ClientId = overlayClientID
+	return s
+}
+
 var (
 	snapDisabled  = snapState(v1.DictationState_DICTATION_STATE_DISABLED, false)
 	snapReady     = snapState(v1.DictationState_DICTATION_STATE_READY, false)
@@ -258,6 +265,8 @@ type dictStep struct {
 func permission(p micPermission) *micPermission { return &p }
 
 func TestDictationWatcher(t *testing.T) {
+	start := []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1"}
+	reopened := []string{"mic.stop", "mic.start", "frame:s1", "frame:s1"}
 	// Every log starts with the first Watch.
 	tests := []struct {
 		name   string
@@ -361,6 +370,42 @@ func TestDictationWatcher(t *testing.T) {
 					"mic.stop", "mic.start", "frame:s1", "frame:s1"}},
 				{snap: snapReady, want: []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1",
 					"mic.stop", "mic.start", "frame:s1", "frame:s1", "mic.stop", "audio.close"}},
+			},
+		},
+		{
+			name: "hardware that keeps changing: rides out three, then stops the session",
+			perm: micGranted,
+			steps: []dictStep{
+				{snap: snapListening("s1", false), want: start},
+				{change: true, want: slices.Concat(start, reopened)},
+				{change: true, want: slices.Concat(start, reopened, reopened)},
+				{change: true, want: slices.Concat(start, reopened, reopened, reopened)},
+				{change: true, want: slices.Concat(start, reopened, reopened, reopened, []string{"stop:s1", "mic.stop", "audio.close"})},
+			},
+		},
+		{
+			name: "a hold left open at connect: ended, and no microphone",
+			perm: micGranted,
+			steps: []dictStep{
+				{snap: snapHold("s1"), want: []string{"watch", "stop:s1"}},
+				{snap: snapReady, want: []string{"watch", "stop:s1"}},
+			},
+		},
+		{
+			name: "a hold that starts after connect is captured",
+			perm: micGranted,
+			steps: []dictStep{
+				{snap: snapReady, want: []string{"watch"}},
+				{snap: snapHold("s1"), want: start},
+			},
+		},
+		{
+			name: "a hold left open after a reconnect is ended too",
+			perm: micGranted,
+			steps: []dictStep{
+				{snap: snapReady, want: []string{"watch"}},
+				{end: true, want: []string{"watch", "watch"}},
+				{snap: snapHold("s1"), want: []string{"watch", "watch", "stop:s1"}},
 			},
 		},
 		{

@@ -238,6 +238,38 @@ func TestDictationService(t *testing.T) {
 	}
 }
 
+// A host that dies mid-session never closes its audio stream. The session must end with it:
+// left open, the next launch would capture for a hold nobody is making.
+func TestDictationAudioLostEndsTheSession(t *testing.T) {
+	_, c := newDictationServer(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	watch, err := c.Watch(ctx, connect.NewRequest(&v1.WatchDictationRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool {
+		return m.GetState() == v1.DictationState_DICTATION_STATE_READY
+	})
+	start, err := c.Start(ctx, connect.NewRequest(&v1.StartDictationRequest{ClientId: "system"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	audioCtx, lose := context.WithCancel(ctx)
+	defer lose()
+	audio := c.Audio(audioCtx)
+	if err := audio.Send(&v1.DictationAudioFrame{SessionId: start.Msg.GetSessionId(), Pcm: make([]byte, 640)}); err != nil {
+		t.Fatal(err)
+	}
+	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool {
+		return m.GetState() == v1.DictationState_DICTATION_STATE_LISTENING
+	})
+	lose()
+	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool {
+		return m.GetState() == v1.DictationState_DICTATION_STATE_READY
+	})
+}
+
 func TestDictationErrorCodes(t *testing.T) {
 	for _, tc := range []struct {
 		err  error
