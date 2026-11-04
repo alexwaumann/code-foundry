@@ -11,7 +11,7 @@ PR 2 (`save-for-later-2-gui.md`) is the GUI. Builds on `snooze-threads-1-daemon.
 
 Why: a sentinel date would need every reader of `snoozed_until` as a time to special-case
 it, and a missed one shows a nonsense date (the wake loop, time-left labels, `snoozed
-until:` in `thread detail`, the disconnected page). With a separate field those readers
+until:` in `thread get`, the disconnected page). With a separate field those readers
 stay correct untouched, and the ones that mean "is it put away" move to one helper. It
 costs one column. A timestamp over a bool costs nothing more and gives the saved rows an
 order, as `archived_at` does.
@@ -44,7 +44,7 @@ thread never wakes, at startup or on the tick.
   the same request.
 * Confirmation as a snooze, in its own words: "Save thread X for later? Claude is still
   working; saving ends the turn." Result: `saved thread X for later`.
-* `thread list` marks it `saved`; `thread detail` prints `saved for later`, no date.
+* `thread list` marks it `saved`; `thread get` prints `saved for later`, no date.
   `--clear` on a saved thread reports `unsnoozed thread X`, the verb the flag documents.
 
 ## Verification
