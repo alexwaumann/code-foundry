@@ -1,9 +1,10 @@
-import { ArrowDownUp, ChevronDown, ChevronRight, ChevronUp, ExternalLink, FileCode2 } from "lucide-react";
-import { useCallback, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { ArrowDownUp, ChevronDown, ChevronRight, ExternalLink, FileCode2 } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
 import type { PullRequestCommentView, PullRequestDetailView, PullRequestLabelView, PullRequestReviewerView, ReviewThreadView } from "@/api/gh";
-import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
+import { FOLD_PX, useTallerThan } from "@/lib/fold";
+import { FoldToggle } from "@/lib/FoldToggle";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { sectionOpenByDefault, toggleOrder, toggleSection, usePrPanelStore, type PrSection } from "@/stores/prPanel";
@@ -99,48 +100,20 @@ function Label({ l }: { l: PullRequestLabelView }) {
   );
 }
 
-/** How tall the description shows before it fades out behind Show all. */
-export const DESCRIPTION_FOLD_PX = 170;
-
 /**
- * Whether the element is taller than limit (read on mount and on resize). Give it the
- * unclipped content, not the folded wrapper: the wrapper stays at the fold whatever its
- * content does, so it would never see a shrink back under the limit.
- */
-function useTallerThan(limit: number): [(el: HTMLElement | null) => void, boolean] {
-  const [el, setEl] = useState<HTMLElement | null>(null);
-  const [taller, setTaller] = useState(false);
-  useLayoutEffect(() => {
-    if (!el) return;
-    const measure = () => {
-      setTaller(el.offsetHeight > limit + 24);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-    };
-  }, [el, limit]);
-  return [useCallback((e: HTMLElement | null) => {
-    setEl(e);
-  }, []), taller];
-}
-
-/**
- * The description: shown whole when short; otherwise cut at DESCRIPTION_FOLD_PX with a
+ * The description: shown whole when short; otherwise cut at FOLD_PX with a
  * fade and a centred Show all, which shows it whole in place (Show less folds it again).
  * Kept per panel tab.
  */
 function Description({ d, tabKey }: { d: PullRequestDetailView; tabKey: string }) {
   const extras = usePanelMarkdownExtras();
   const full = useSectionOpen(tabKey, "fullDescription");
-  const [ref, taller] = useTallerThan(DESCRIPTION_FOLD_PX);
+  const [ref, taller] = useTallerThan(FOLD_PX);
   const folded = taller && !full;
   if (!d.body.trim()) return <p className="text-caption italic">No description provided.</p>;
   return (
     <div className="flex flex-col">
-      <div className={cn("relative", folded && "overflow-hidden")} style={folded ? { maxHeight: DESCRIPTION_FOLD_PX } : undefined} data-testid="pr-description-body" data-folded={folded}>
+      <div className={cn("relative", folded && "overflow-hidden")} style={folded ? { maxHeight: FOLD_PX } : undefined} data-testid="pr-description-body" data-folded={folded}>
         <div ref={ref} data-testid="pr-description-content">
           <Markdown extras={extras}>{d.body}</Markdown>
         </div>
@@ -148,19 +121,14 @@ function Description({ d, tabKey }: { d: PullRequestDetailView; tabKey: string }
       </div>
       {taller && (
         <div className={cn("relative flex justify-center", folded ? "-mt-3" : "mt-1.5")}>
-          <Button
-            variant="outline"
-            size="xs"
-            className="bg-cf-surface"
-            aria-expanded={!folded}
-            data-testid="pr-description-toggle"
+          <FoldToggle
+            folded={folded}
+            label="Show all"
+            testId="pr-description-toggle"
             onClick={() => {
               toggleSection(tabKey, "fullDescription");
             }}
-          >
-            {folded ? "Show all" : "Show less"}
-            {folded ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
-          </Button>
+          />
         </div>
       )}
     </div>

@@ -10,7 +10,7 @@
  * does not.
  *
  * The session also holds what the current match opened (a folded question's row and turn,
- * Ember's work row) so closing it puts that back at once, before anything else forgets
+ * Ember's work row, a long message's fold) so closing it puts that back at once, before anything else forgets
  * the thread's fold choices.
  */
 import { useMemo } from "react";
@@ -18,7 +18,7 @@ import { create } from "zustand";
 import { findDoc, findMatches, matchIndex, stepIndex, type FindKey, type FindMatch, type FindPlace } from "@/lib/threadFind";
 import { getTimeline } from "./cite";
 import { getViewing } from "./subagentView";
-import { forgetTurnView, getTurnView, putTurnView, setRowExpanded, useThreadStore, type ThreadLog, type TurnView } from "./thread";
+import { forgetTurnView, getTurnView, messageFoldKey, putTurnView, setRowExpanded, useThreadStore, type ThreadLog, type TurnView } from "./thread";
 import { useUiStore } from "./ui";
 
 /** Where the next current match is picked when the matches are known (the find layer does it). */
@@ -248,6 +248,22 @@ export function openThreadFindItem(threadId: string, itemId: string): void {
   const after = getTurnView(threadId);
   const opened: Opened = { itemId, folds: changed(before.folds, after.folds), expanded: changed(before.expanded, after.expanded) };
   update(threadId, (cur) => (cur ? { ...cur, opened } : cur));
+}
+
+/**
+ * The current match is in the part of a long user message its fold hides (the find layer
+ * sees that once the row renders): the message opens, and goes back with the rest of what
+ * its item opened. Nothing for a message the user opened: it stays theirs.
+ */
+export function openThreadFindMessage(threadId: string, itemId: string): void {
+  const s = useThreadFindStore.getState().byThread[threadId];
+  const key = messageFoldKey(itemId);
+  const before = getTurnView(threadId).expanded[key];
+  if (s?.opened?.itemId !== itemId || before === true) return;
+  ownWrite(() => {
+    setRowExpanded(threadId, key, true);
+  });
+  update(threadId, (cur) => (cur?.opened ? { ...cur, opened: { ...cur.opened, expanded: { ...cur.opened.expanded, [key]: { before, set: true } } } } : cur));
 }
 
 // A change by the user (or the timeline) to any choice the find opened for the current
