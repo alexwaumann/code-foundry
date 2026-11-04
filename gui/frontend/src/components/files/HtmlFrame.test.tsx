@@ -37,6 +37,19 @@ function mount(thread: string | null, onResize?: (h: number) => void) {
 }
 
 describe("HtmlFrame", () => {
+  it("undoes the page zoom on the frame, and reports a page's height in layout px", () => {
+    document.documentElement.style.setProperty("--cf-zoom", "0.9");
+    try {
+      const heights: number[] = [];
+      const f = mount("t-1", (h) => heights.push(h));
+      expect(f.frame().className).toContain("[zoom:calc(1/var(--cf-zoom))]");
+      f.send({ type: "cf:resize", height: 270 });
+      expect(heights).toEqual([300]);
+    } finally {
+      document.documentElement.style.removeProperty("--cf-zoom");
+    }
+  });
+
   it("opens a thread's page same-origin and any other page opaque, each with a nonce of its own", () => {
     const a = mount("t-1");
     expect(a.frame().getAttribute("sandbox")).toBe(THREAD_PAGE_SANDBOX);
