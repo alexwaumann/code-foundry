@@ -29,16 +29,21 @@ static int cfNeedsDisclaim(void) {
 	}
 }
 
+// cfResponsiblePid is the pid macOS holds responsible for this process (0 if it cannot say).
+static int cfResponsiblePid(void) {
+	if (responsibility_get_pid_responsible_for_pid == NULL) return 0;
+	return responsibility_get_pid_responsible_for_pid(getpid());
+}
+
 // cfSpawnDisclaimed starts path with argv and envp as its own responsible process,
-// inheriting stdio. Returns posix_spawn's error (0 on success).
-static int cfSpawnDisclaimed(const char* path, char** argv, char** envp) {
+// inheriting stdio, and sets *pid. Returns posix_spawn's error (0 on success).
+static int cfSpawnDisclaimed(const char* path, char** argv, char** envp, pid_t* pid) {
 	posix_spawnattr_t attrs;
 	int rc = posix_spawnattr_init(&attrs);
 	if (rc != 0) return rc;
 	rc = responsibility_spawnattrs_setdisclaim(&attrs, 1);
 	if (rc == 0) {
-		pid_t pid;
-		rc = posix_spawn(&pid, path, NULL, &attrs, argv, envp);
+		rc = posix_spawn(pid, path, NULL, &attrs, argv, envp);
 	}
 	posix_spawnattr_destroy(&attrs);
 	return rc;
@@ -61,17 +66,23 @@ const envDisclaimed = "CODE_FOUNDRY_GUI_DISCLAIMED"
 // was started from (docs/notes/dictation-3-host.md). It reports whether it did: the
 // caller then exits. Called first thing in main, before any window or goroutine.
 func respawnDisclaimed(log *slog.Logger) bool {
+	_, ok := spawnDisclaimed(log)
+	return ok
+}
+
+// spawnDisclaimed is respawnDisclaimed's work, and returns the new process's pid.
+func spawnDisclaimed(log *slog.Logger) (int, bool) {
 	if os.Getenv(envDisclaimed) != "" {
 		_ = os.Unsetenv(envDisclaimed) // the daemon and its threads inherit the environment
-		return false
+		return 0, false
 	}
 	if C.cfNeedsDisclaim() == 0 {
-		return false
+		return 0, false
 	}
 	exe, err := os.Executable()
 	if err != nil {
 		log.Warn("respawn as responsible process", "err", err)
-		return false
+		return 0, false
 	}
 	argv := cStrings(os.Args)
 	defer freeCStrings(argv)
@@ -79,12 +90,18 @@ func respawnDisclaimed(log *slog.Logger) bool {
 	defer freeCStrings(envp)
 	path := C.CString(exe)
 	defer C.free(unsafe.Pointer(path))
-	if rc := C.cfSpawnDisclaimed(path, &argv[0], &envp[0]); rc != 0 {
+	var pid C.pid_t
+	if rc := C.cfSpawnDisclaimed(path, &argv[0], &envp[0], &pid); rc != 0 {
 		log.Warn("respawn as responsible process", "err", syscall.Errno(rc))
-		return false
+		return 0, false
 	}
 	log.Debug("respawned as its own responsible process")
-	return true
+	return int(pid), true
+}
+
+// responsiblePid is the pid macOS holds responsible for this process (0 if it cannot say).
+func responsiblePid() int {
+	return int(C.cfResponsiblePid())
 }
 
 // cStrings is a NULL-terminated array of C copies of ss.
