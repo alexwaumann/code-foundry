@@ -44,11 +44,24 @@ from the renders the user approved.
 
 ## Verification
 
-See the PR body. `make check` green, `make gui-e2e` run in full. New vitest cases in
+Live on a real `daemon --dev` with a scratch home, two real Claude threads and WebKit: the
+row menu's Snooze submenu listed "Pick a date and time" then "Save for later No alarm";
+picking it set `saved_at` with `snoozed_until` 0; the section read "Snoozed 2", with "Timed one
+1h" above "Keep for later Saved"; `--clear` from the CLI moved the row back to the main list
+live, and the section read 1.
+
+`make check` green, `make gui-e2e` run in full. New vitest cases in
 `lib/tree`, `lib/snooze`, `lib/thread`, `lib/ember`, `SidebarRow`, `ThreadMenuItems`,
 `SnoozeNote`, `SnoozeDialog`, `archiveCleanup`, `snoozeDialog`, `threadActions`, `threads`.
 `e2e/snooze.spec.ts` gains one flow across the daemon's stream, and a SHOTS-gated spec makes
 the PR's screenshots.
+
+## Gotchas
+
+* `. .playwright/drive.env` sets `CODE_FOUNDRY_HOME` in the shell but does not export it, so
+  a later `bin/code-foundry` call does not see it and goes to the real home, even though
+  `echo $CODE_FOUNDRY_HOME` prints the scratch path. Pass it on the command line of every
+  call, or use a wrapper that hard-codes it.
 
 ## Daemon restart
 
