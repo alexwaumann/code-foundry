@@ -609,7 +609,7 @@ func formatRuns(runs []*v1.ActionRun) string {
 	}
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "RUN\tACTION\tSTATE\tWHERE\tOWNER\tSTARTED")
+	_, _ = fmt.Fprintln(tw, "RUN\tACTION\tSTATE\tWHERE\tOWNER\tSTARTED\tPORTS")
 	for _, r := range runs {
 		state := "running"
 		if r.GetState() == v1.ActionRunState_ACTION_RUN_STATE_EXITED {
@@ -627,7 +627,11 @@ func formatRuns(runs []*v1.ActionRun) string {
 		if t := r.GetStartedAt(); t != nil {
 			started = t.AsTime().Local().Format("15:04:05")
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", r.GetId(), r.GetActionName(), state, where, owner, started)
+		ports := make([]string, len(r.GetPorts()))
+		for i, p := range r.GetPorts() {
+			ports[i] = "localhost:" + strconv.Itoa(int(p))
+		}
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", r.GetId(), r.GetActionName(), state, where, owner, started, strings.Join(ports, ", "))
 	}
 	_ = tw.Flush()
 	return strings.TrimRight(sb.String(), "\n")

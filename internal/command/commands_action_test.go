@@ -372,3 +372,33 @@ func TestActionLastRun(t *testing.T) {
 		})
 	}
 }
+
+func TestActionRunsPorts(t *testing.T) {
+	tests := []struct {
+		name  string
+		ports []uint32
+		want  string
+	}{
+		{"no port", nil, ""},
+		{"one", []uint32{5173}, "localhost:5173"},
+		{"several", []uint32{5173, 24678}, "localhost:5173, localhost:24678"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			act := &commandtest.Action{Runs: []*v1.ActionRun{{
+				Id: "r-1", ActionName: "Dev", ProjectId: "r1", State: v1.ActionRunState_ACTION_RUN_STATE_RUNNING, Ports: tt.ports,
+			}}}
+			res, err := actionRegistry(t, act, nil).Invoke(context.Background(), command.Context{}, "action.runs", map[string]string{"project": "r1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			lines := strings.Split(res.Message, "\n")
+			if len(lines) != 2 || !strings.HasSuffix(lines[0], "PORTS") {
+				t.Fatalf("table %q", lines)
+			}
+			if got := strings.TrimRight(lines[1], " "); !strings.HasSuffix(got, tt.want) || (tt.want == "" && strings.Contains(got, "localhost")) {
+				t.Errorf("row %q, want it to end in %q", got, tt.want)
+			}
+		})
+	}
+}

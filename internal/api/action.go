@@ -290,6 +290,9 @@ func actionRunToProto(r action.Run) *v1.ActionRun {
 		Trigger: actionTriggerToProto(r.Trigger), Output: strings.ToValidUTF8(r.Output, "\uFFFD"), OutputTruncated: r.Truncated,
 		State: v1.ActionRunState_ACTION_RUN_STATE_RUNNING,
 	}
+	for _, port := range r.Ports {
+		p.Ports = append(p.Ports, uint32(port))
+	}
 	if r.State == action.RunExited {
 		p.State, p.ExitCode = v1.ActionRunState_ACTION_RUN_STATE_EXITED, int32(r.ExitCode)
 	}

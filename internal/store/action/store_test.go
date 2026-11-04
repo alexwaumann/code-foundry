@@ -80,7 +80,7 @@ func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 	h.threads["s2"] = ThreadPlace{ProjectID: "web", Worktree: h.feat, Checkouts: map[string]string{"web": h.feat, "api": h.api}}
 	h.threads["ws"] = ThreadPlace{Worktree: root, Checkouts: map[string]string{"web": h.web, "api": h.api}}
 	opts := Options{
-		DB: d, Projects: h.projects, Terminals: h.terms, Bus: b, Log: discard, Shell: "/bin/sh",
+		DB: d, Projects: h.projects, Terminals: h.terms, Bus: b, Log: discard, Shell: "/bin/sh", PortProbe: &fakePortProbe{},
 		Thread: func(id string) (ThreadPlace, bool) {
 			h.mu.Lock()
 			defer h.mu.Unlock()

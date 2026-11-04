@@ -105,7 +105,7 @@
  *   sets and thread.new-like return the collision hints as warnings (mock/projectSets.ts);
  *   thread.workspace sets a thread's workspace reference; thread.project.add and .remove change a
  *   thread's set (its workspace reference goes; a dirty member's removal asks first).
- *   POST /__mock/thread-info?scenario=single|ws9|busy|child|nogit|unnamed|home|servers   (the thread info card's fixtures; World.addThreadInfo)
+ *   POST /__mock/thread-info?scenario=single|ws9|busy|child|nogit|unnamed|home|servers|child-server   (the thread info card's fixtures; World.addThreadInfo)
  *   POST /__mock/multi-thread?projects=repo-cf,repo-gp[&project=repo-gp&branch=feat/x&name=multi&workspace=login]
  *                                                 (a worktree-mode thread over several projects, its worktrees made)
  *   GET  /__mock/workspaces                       (id, name, members, root, default primary, files)
@@ -185,7 +185,11 @@
  *                                                 first on-worktree-create one)
  *   POST /__mock/action/run?thread=s-1&action=Test[&mode=terminal|background]   (or worktree=…
  *                                                 instead of thread: a run as the CLI or an agent
- *                                                 would start it, not through the GUI)
+ *                                                 would start it, not through the GUI; pnpm dev,
+ *                                                 action Dev, listens on 5173 after ~1.1 s)
+ *   POST /__mock/action/ports?run=r-…&ports=5173,24678   (or terminal=t-…: that running run listens
+ *                                                 on these ports now, as the probe reports; empty
+ *                                                 closes them; a run's end clears them)
  *   POST /__mock/skills?fail=skill.install&error=…   (that skill.* command fails with the message until
  *        cleared with an empty error); registries=none|default (Claude Code without the marketplace);
  *        listError=… (the marketplace list failed); pluginsError=…; epoch=1 (a read, like the hourly
@@ -845,7 +849,7 @@ async function* actionEvents(src: AsyncGenerator<{ source: EventSource; event: E
   }
 }
 
-/** Action controls: GET /__mock/actions, POST /__mock/action/{finish|setup|run}. */
+/** Action controls: GET /__mock/actions, POST /__mock/action/{finish|setup|run|ports}. */
 function actionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const modes: Record<string, ActionRunMode> = { terminal: ActionRunMode.TERMINAL, background: ActionRunMode.BACKGROUND };
   try {
@@ -863,11 +867,17 @@ function actionControl(res: ServerResponse, action: string, q: URLSearchParams):
         run = world.actions.run({ action: q.get("action") ?? "", threadId: q.get("thread") ?? "", worktreePath: q.get("worktree") ?? "", mode: modes[mode] ?? ActionRunMode.UNSPECIFIED });
         break;
       }
+      case "ports": {
+        const ports = (q.get("ports") ?? "").split(",").filter(Boolean).map(Number);
+        if (ports.some((p) => !Number.isInteger(p) || p < 1 || p > 65535)) throw new CommandError("invalid", "ports must be TCP ports, comma separated");
+        run = world.actions.setPorts({ run: q.get("run") ?? undefined, terminal: q.get("terminal") ?? undefined }, ports);
+        break;
+      }
       default:
         json(res, 404, { error: "unknown action control" });
         return;
     }
-    json(res, 200, { id: run.id, terminalId: run.terminalId, state: ActionRunState[run.state ?? 0], mode: ActionRunMode[run.mode ?? 0], exitCode: run.exitCode, output: run.output });
+    json(res, 200, { id: run.id, terminalId: run.terminalId, state: ActionRunState[run.state ?? 0], mode: ActionRunMode[run.mode ?? 0], exitCode: run.exitCode, output: run.output, ports: run.ports ?? [] });
   } catch (err) {
     json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
   }
@@ -1357,7 +1367,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       }
       break;
     case "POST /__mock/thread-info":
-      // scenario=single|ws9|busy|child|nogit|unnamed|home|servers: the thread info card's fixtures (World.addThreadInfo).
+      // scenario=single|ws9|busy|child|nogit|unnamed|home|servers|child-server: the thread info card's fixtures (World.addThreadInfo).
       try {
         json(res, 200, { id: world.addThreadInfo(q.get("scenario") ?? "single") });
       } catch (err) {

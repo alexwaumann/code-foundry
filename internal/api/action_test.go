@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -190,5 +191,25 @@ func TestActionWatch(t *testing.T) {
 	}
 	if id := next().GetRemovedId(); id != r.ActionID {
 		t.Fatalf("removed_id = %q", id)
+	}
+}
+
+func TestActionRunPortsToProto(t *testing.T) {
+	tests := []struct {
+		name  string
+		ports []int
+		want  []uint32
+	}{
+		{"none", nil, nil},
+		{"one", []int{5173}, []uint32{5173}},
+		{"several keep their order", []int{5173, 24678}, []uint32{5173, 24678}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := actionRunToProto(action.Run{ID: "r-1", ThreadID: "s-1", TerminalID: "t-1", Ports: tt.ports})
+			if !slices.Equal(got.GetPorts(), tt.want) || got.GetThreadId() != "s-1" || got.GetTerminalId() != "t-1" {
+				t.Errorf("run = %v, want ports %v", got, tt.want)
+			}
+		})
 	}
 }

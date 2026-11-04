@@ -2,6 +2,7 @@ package procscan
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os/exec"
 	"reflect"
@@ -113,5 +114,110 @@ func TestListeningInLive(t *testing.T) {
 	}
 	if got, err := ListeningIn(ctx, []int{999999}); err != nil || len(got) != 0 {
 		t.Errorf("ListeningIn(gone) = %v, %v; want empty", got, err)
+	}
+}
+
+func TestTreeGroups(t *testing.T) {
+	const self = 50
+	tests := []struct {
+		name  string
+		procs []Proc
+		roots []int
+		want  map[int][]int
+	}{
+		{"no roots", []Proc{{PID: 10, PPID: 1, PGID: 10}}, nil, map[int][]int{}},
+		{"the root's group is there even when its leader is gone", nil, []int{10}, map[int][]int{10: {10}}},
+		{"children in the root's group add nothing",
+			[]Proc{{PID: 10, PPID: 2, PGID: 10}, {PID: 11, PPID: 10, PGID: 10}, {PID: 12, PPID: 11, PGID: 10}},
+			[]int{10}, map[int][]int{10: {10}}},
+		{"a detached child: its own group, its parent in the tree",
+			[]Proc{{PID: 10, PPID: 2, PGID: 10}, {PID: 11, PPID: 10, PGID: 10}, {PID: 20, PPID: 11, PGID: 20}},
+			[]int{10}, map[int][]int{10: {10, 20}}},
+		{"a job-control shell: one group per job",
+			[]Proc{{PID: 10, PPID: 2, PGID: 10}, {PID: 20, PPID: 10, PGID: 20}, {PID: 30, PPID: 10, PGID: 30}},
+			[]int{10}, map[int][]int{10: {10, 20, 30}}},
+		{"a group member orphaned to launchd keeps its children in",
+			[]Proc{{PID: 10, PPID: 2, PGID: 10}, {PID: 11, PPID: 1, PGID: 10}, {PID: 20, PPID: 11, PGID: 20}},
+			[]int{10}, map[int][]int{10: {10, 20}}},
+		{"a member of a descendant's group, orphaned, keeps its children in",
+			[]Proc{{PID: 10, PPID: 2, PGID: 10}, {PID: 20, PPID: 10, PGID: 20}, {PID: 21, PPID: 1, PGID: 20}, {PID: 30, PPID: 21, PGID: 30}},
+			[]int{10}, map[int][]int{10: {10, 20, 30}}},
+		{"a double fork and setsid: no tie left",
+			[]Proc{{PID: 10, PPID: 2, PGID: 10}, {PID: 20, PPID: 1, PGID: 20}},
+			[]int{10}, map[int][]int{10: {10}}},
+		{"two trees stay apart",
+			[]Proc{{PID: 10, PPID: 2, PGID: 10}, {PID: 11, PPID: 10, PGID: 11}, {PID: 20, PPID: 2, PGID: 20}, {PID: 21, PPID: 20, PGID: 21}},
+			[]int{10, 20}, map[int][]int{10: {10, 11}, 20: {20, 21}}},
+		{"launchd's and the daemon's groups are not followed",
+			[]Proc{{PID: 10, PPID: 2, PGID: 10}, {PID: 11, PPID: 10, PGID: self}, {PID: 12, PPID: 10, PGID: 1},
+				{PID: self, PPID: 2, PGID: self}, {PID: 13, PPID: self, PGID: 13}, {PID: 14, PPID: 1, PGID: 1}, {PID: 15, PPID: 14, PGID: 15}},
+			[]int{10}, map[int][]int{10: {10}}},
+		{"a root that is launchd or the daemon is none", []Proc{{PID: 10, PPID: 1, PGID: 10}}, []int{0, 1, self}, map[int][]int{}},
+		{"a ppid cycle ends", []Proc{{PID: 10, PPID: 11, PGID: 10}, {PID: 11, PPID: 10, PGID: 11}}, []int{10}, map[int][]int{10: {10, 11}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := treeGroups(tt.procs, tt.roots, self)
+			for _, gs := range got {
+				slices.Sort(gs)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("treeGroups = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// ListeningUnder finds what a group probe misses: a listener its parent started in a
+// session of its own, as node's detached spawn does.
+func TestListeningUnderLive(t *testing.T) {
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("no python3")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+	listener := "import socket,time;s=socket.socket();s.bind(('127.0.0.1'," + strconv.Itoa(port) + "));s.listen();time.sleep(30)"
+	parent := "import subprocess,sys,time;p=subprocess.Popen([sys.executable,'-c'," + strconv.Quote(listener) + "],start_new_session=True);print(p.pid,flush=True);time.sleep(30)"
+	cmd := exec.Command(py, "-c", parent)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	var child int
+	if _, err := fmt.Fscan(out, &child); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = syscall.Kill(-child, syscall.SIGKILL) })
+	root := cmd.Process.Pid
+	ctx := context.Background()
+	var got map[int][]Listener
+	for range 50 {
+		if got, err = ListeningUnder(ctx, []int{root, 999999}); err != nil {
+			t.Fatal(err)
+		}
+		if len(got[root]) > 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if ps := Ports(got[root]); !slices.Equal(ps, []int{port}) {
+		t.Fatalf("ports under %d = %v, want [%d] (%v)", root, ps, port, got)
+	}
+	byGroup, err := ListeningIn(ctx, []int{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(byGroup) != 0 {
+		t.Errorf("the root's own group listens on %v: the child did not leave it", byGroup)
 	}
 }

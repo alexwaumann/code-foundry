@@ -1742,6 +1742,21 @@ export class World {
         this.publishThread(s);
         return s.id;
       }
+      case "child-server": {
+        // Servers roll up to the parent (docs/notes/action-run-ports.md): the parent s-ti-1 runs
+        // Debug daemon on 7788; its child s-ti-kid-srv runs Dev (a terminal, 5173 and 24678) and
+        // has the "servers" state's shells. Returns the parent; a second call starts nothing.
+        const p = single();
+        if (this.threads.has("s-ti-kid-srv")) return p.id;
+        const c = this.addThread({ ...base, id: "s-ti-kid-srv", projectId: "repo-cf", worktreePath: CF, name: "Serve the web preview", createdBy: p.id, createdByName: p.name, status: ThreadStatus.BUSY, statusReason: "working: Serve the web preview", branch: "cf/s-ti-kid-srv" });
+        this.logs.load(c.id, "servers");
+        this.publishThread(c);
+        const dev = this.actions.run({ action: "a-dev000000000", threadId: c.id });
+        this.actions.setPorts({ run: dev.id ?? "" }, [5173, 24678]);
+        const debug = this.actions.run({ action: "a-debug0000000", threadId: p.id, mode: ActionRunMode.BACKGROUND });
+        this.actions.setPorts({ run: debug.id ?? "" }, [7788]);
+        return p.id;
+      }
       case "nogit": {
         const s = this.addThread({ ...base, id: "s-ti-nogit", projectId: "repo-wr", worktreePath: WR, name: "Outline the essay" });
         this.publishThread(s);

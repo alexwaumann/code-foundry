@@ -15,6 +15,8 @@
  *   a-build0000000  Build         build      make build        terminal, exits 0 after ~1.5 s
  *   a-install00000  Install deps  configure  pnpm install      terminal, on worktree create, exits 0 after ~1.2 s
  *   a-debug0000000  Debug daemon  debug      make dev          terminal, runs until stopped
+ * pnpm dev listens on 5173 once Vite says so; /__mock/action/ports sets any run's ports, and a
+ * run's end clears them, as the daemon's probe does (docs/notes/action-run-ports.md).
  * Any other command prints two lines and exits after ~1.2 s with the code in "exit N"
  * (else 0); one containing "sleep infinity" or the word "dev" runs until stopped.
  * Store refusals read like internal/store/action's: the sentinel first ("failed
@@ -107,12 +109,16 @@ interface MockRun {
   waiters: (() => void)[];
   /** terminal.kill's SIGHUP does not end it; SIGKILL follows after KILL_GRACE_MS. */
   ignoresHangup: boolean;
+  /** The TCP ports it listens on (the daemon's probe), ascending; [] for none. */
+  ports: number[];
 }
 
 /** Output lines at times (ms after the start), then an exit; exit null runs until stopped. */
 interface Script {
   steps: { at: number; text: string }[];
   exit: { at: number; code: number } | null;
+  /** The ports it starts listening on, at a time. */
+  listen?: { at: number; ports: number[] };
   /** terminal.kill's SIGHUP does not end it (SIGKILL, 137, follows after KILL_GRACE_MS). */
   ignoresHangup?: boolean;
 }
@@ -234,6 +240,7 @@ const SCRIPTS: { match: (cmd: string) => boolean; script: (cwd: string) => Scrip
         `  ${G}➜${X}  ${D}Network: use ${B}--host${X}${D} to expose${X}`,
       ]),
       exit: null,
+      listen: { at: 1100, ports: [5173] },
     }),
   },
 ];
@@ -438,6 +445,7 @@ export class MockActions {
       trigger: r.trigger,
       output: withOutput ? r.output : "",
       outputTruncated: withOutput && r.outputTruncated,
+      ports: r.ports,
     };
   }
 
@@ -461,6 +469,7 @@ export class MockActions {
         finishedAt: r.finishedAt?.toISOString() ?? null,
         trigger: ActionRunTrigger[r.trigger],
         output: r.output,
+        ports: r.ports,
       })),
     };
   }
@@ -651,6 +660,7 @@ export class MockActions {
       timers: [],
       waiters: [],
       ignoresHangup: script.ignoresHangup === true,
+      ports: [],
     };
     this.runs.unshift(r);
     this.records.unshift({ runId: r.id, actionId: r.actionId, projectId: r.projectId, threadId: r.threadId, mode: r.mode, trigger: r.trigger, startedAt: r.startedAt });
@@ -666,6 +676,13 @@ export class MockActions {
           this.emit(r, step.text);
         }, step.at),
       );
+    const listen = script.listen;
+    if (listen) r.timers.push(
+        setTimeout(() => {
+          // Ports a test or fixture already set (setPorts) win over the script's.
+          if (r.ports.length === 0) this.listen(r, listen.ports);
+        }, listen.at),
+      );
     const exit = script.exit;
     if (exit) r.timers.push(
         setTimeout(() => {
@@ -673,6 +690,14 @@ export class MockActions {
         }, exit.at),
       );
     return r;
+  }
+
+  /** The probe found these ports: published only when they changed, as the daemon's setPorts. */
+  private listen(r: MockRun, ports: number[]): void {
+    const next = [...ports].sort((a, b) => a - b);
+    if (r.state !== ActionRunState.RUNNING || next.join() === r.ports.join()) return;
+    r.ports = next;
+    this.host.publish({ event: { case: "runUpdated", value: this.runMsg(r, false) } });
   }
 
   private emit(r: MockRun, text: string): void {
@@ -703,6 +728,7 @@ export class MockActions {
     r.state = ActionRunState.EXITED;
     r.exitCode = code;
     r.finishedAt = new Date();
+    r.ports = [];
     this.host.publish({ event: { case: "runUpdated", value: this.runMsg(r, false) } });
     this.host.publish({
       event: {
@@ -760,6 +786,15 @@ export class MockActions {
     if (!r) throw new CommandError("notfound", `no run ${ref.run ?? `in terminal ${ref.terminal ?? ""}`}`);
     if (r.state !== ActionRunState.RUNNING) throw new CommandError("unavailable", `run ${r.id} has already finished`);
     this.exitProcess(r, code);
+    return this.runMsg(r, true);
+  }
+
+  /** POST /__mock/action/ports: a running run (by run id or terminal id) listens on ports now; [] closes them. */
+  setPorts(ref: { run?: string; terminal?: string }, ports: number[]): RunInit {
+    const r = this.runs.find((x) => (ref.run ? x.id === ref.run : x.terminalId === ref.terminal));
+    if (!r) throw new CommandError("notfound", `no run ${ref.run ?? `in terminal ${ref.terminal ?? ""}`}`);
+    if (r.state !== ActionRunState.RUNNING) throw new CommandError("unavailable", `run ${r.id} has already finished`);
+    this.listen(r, ports);
     return this.runMsg(r, true);
   }
 

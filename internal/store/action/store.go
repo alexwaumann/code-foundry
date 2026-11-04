@@ -67,6 +67,9 @@ type Options struct {
 	KillGrace   time.Duration
 	HookTimeout time.Duration
 	Now         func() time.Time
+	// PortProbe finds the TCP ports running runs listen on. Default: procscan (sysctl and
+	// lsof).
+	PortProbe PortProbe
 }
 
 // Manager is the Store backed by SQLite, the project store and the terminal store.
@@ -75,7 +78,8 @@ type Manager struct {
 	log    *slog.Logger
 	ctx    context.Context // cancelled by Close
 	cancel context.CancelFunc
-	wg     sync.WaitGroup // run waiters and worktree-create sequences
+	wg     sync.WaitGroup // run waiters, worktree-create sequences and the port watch
+	ports  *portWatch
 
 	// mu guards everything below and serializes mutations. Reads use snap.
 	mu     sync.Mutex
@@ -117,6 +121,9 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
+	if opts.PortProbe == nil {
+		opts.PortProbe = procscanProbe{}
+	}
 	rows, err := loadActions(ctx, opts.DB)
 	if err != nil {
 		return nil, err
@@ -127,6 +134,12 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		m.byID[a.ID] = a
 	}
 	m.rebuild()
+	m.ports = newPortWatch(m)
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.ports.run(m.ctx)
+	}()
 	return m, nil
 }
 
@@ -353,6 +366,7 @@ func (m *Manager) ProjectRemoved(ctx context.Context, projectID string) {
 		m.rebuild()
 	}
 	m.mu.Unlock()
+	m.ports.changed()
 	slices.Sort(gone)
 	slices.Sort(dropped)
 	for _, id := range gone {

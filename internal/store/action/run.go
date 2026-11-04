@@ -31,7 +31,7 @@ const terminalGonePoll = time.Second
 type runRec struct {
 	run Run
 	out *tailBuffer // background runs
-	pid int         // background runs: the process (group leader)
+	pid int         // the process (group leader): the child, or the terminal's
 	// started is closed once the run is registered and published; finish waits for it.
 	started chan struct{}
 	// done is closed when the run has finished.
@@ -167,7 +167,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 		if err != nil {
 			return Run{}, fmt.Errorf("run action %s in a terminal: %w", a.Name, err)
 		}
-		rec.run.TerminalID = t.ID
+		rec.run.TerminalID, rec.pid = t.ID, t.Pid
 	case ModeBackground:
 		if err := m.startProcess(rec, env); err != nil {
 			m.wg.Done()
@@ -189,6 +189,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	close(rec.started)
 	out := rec.public(true)
 	m.mu.Unlock()
+	m.ports.changed()
 	m.record(ctx, out)
 	m.log.Info("action run started", "run", id, "action", a.ID, "name", a.Name, "mode", mode.String(),
 		"thread", owner.ThreadID, "worktree", owner.Worktree, "terminal", out.TerminalID)
@@ -266,7 +267,9 @@ func (m *Manager) finish(rec *runRec, code int) {
 		return
 	}
 	rec.run.State, rec.run.ExitCode, rec.run.FinishedAt = RunExited, code, m.opts.Now()
+	rec.run.Ports = nil
 	close(rec.done)
+	m.ports.changed()
 	r := rec.run
 	m.log.Info("action run finished", "run", r.ID, "action", r.ActionID, "name", r.ActionName, "mode", r.Mode.String(),
 		"exit", code, "took", r.FinishedAt.Sub(r.StartedAt).Round(time.Millisecond).String())

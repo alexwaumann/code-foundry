@@ -19,7 +19,8 @@
 // starts (RunRecord: action, thread, runner, start), which outlives a restart. Background runs are killed
 // when the store closes (daemon shutdown), when their project is unregistered
 // (ProjectRemoved), and by KillRuns (the daemon calls it when a thread or worktree goes
-// away). See docs/notes/actions-1-daemon.md.
+// away). See docs/notes/actions-1-daemon.md. The ports a running run listens on come from
+// a probe (ports.go, docs/notes/action-run-ports.md).
 package action
 
 import (
@@ -131,6 +132,9 @@ type Run struct {
 	Output string
 	// Truncated: the output began earlier than Output.
 	Truncated bool
+	// Ports are the TCP ports the run's processes listen on, ascending, as last probed:
+	// while it runs only. Never mutated in place.
+	Ports []int
 }
 
 // Finished reports whether the run has ended.
@@ -228,7 +232,8 @@ type Updated struct{ Action Action }
 // Removed is sent when an action is forgotten.
 type Removed struct{ ID string }
 
-// RunUpdated carries a run (without output) when it starts and when it finishes.
+// RunUpdated carries a run (without output) when it starts, when it finishes, and when
+// its ports change.
 type RunUpdated struct{ Run Run }
 
 // RunRemoved is sent when a run is forgotten (history cap, project unregistered).

@@ -72,7 +72,7 @@ export function terminalExited(id: string, code: number, at = Date.now()): void 
 
 /** The run of an action, as the action source's run_updated carries it. */
 export function actionRun(id: string, a: ActionView, owner: RunOwner, terminalId: string, o: Partial<ActionRunView> = {}): ActionRunView {
-  return { id, actionId: a.id, actionName: a.name, command: a.command, projectId: owner.projectId, threadId: owner.threadId ?? "", worktreePath: owner.worktree, mode: "terminal", terminalId, running: true, exitCode: 0, startedAtMs: Date.now(), finishedAtMs: null, trigger: "user", ...o };
+  return { id, actionId: a.id, actionName: a.name, command: a.command, projectId: owner.projectId, threadId: owner.threadId ?? "", worktreePath: owner.worktree, mode: "terminal", terminalId, running: true, exitCode: 0, startedAtMs: Date.now(), finishedAtMs: null, trigger: "user", ports: [], ...o };
 }
 
 /**
