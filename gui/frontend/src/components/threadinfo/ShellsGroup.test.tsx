@@ -31,7 +31,7 @@ const row = (port: number) => {
 };
 const words = (el: HTMLElement) =>
   [...within(el).getByTestId("ti-server-line").children]
-    .map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())
+    .map((c) => c.textContent.replace(/\s+/g, " ").trim())
     .join(" ");
 const buttonOf = (el: HTMLElement, id: string) => {
   const b = el.parentElement?.querySelector<HTMLElement>(`[data-testid="${id}"]`);
@@ -328,7 +328,7 @@ describe("narrow selectors", () => {
     });
     const settled = commits;
     updateThread(child, { statusReason: "working: something else" });
-    updateThread(parent, { lastActivityAtMs: 5 } as never);
+    updateThread(parent, { statusReason: "idle again" });
     addThreads(thread("s-stranger", { name: "Stranger", backgroundShells: [] }));
     act(() => {
       useActionsStore.setState((s) => {

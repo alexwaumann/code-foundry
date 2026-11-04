@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ActionRunView } from "@/api/actions";
-import type { BackgroundShellView, ThreadView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import type { LineageData } from "./lineage";
 import { rollupThreadIds, runSource, serverRows, serverSourceWords, shellSource, type ServerSource } from "./servers";
 
 const shell = (owner: string, task: string, ports: number[], command = `cmd ${task}`): ServerSource =>
-  shellSource(owner, { taskId: task, description: "", command, startedAtMs: 1, ports } as BackgroundShellView);
+  shellSource(owner, { taskId: task, description: "", command, startedAtMs: 1, ports });
 const run = (owner: string, id: string, ports: number[], o: Partial<ActionRunView> = {}): ServerSource =>
   runSource({ id, threadId: owner, actionName: "Dev", command: "pnpm dev", terminalId: "", startedAtMs: 1, ports, ...o } as ActionRunView);
 const rows = (r: ServerSource[]) => r.map((s) => [s.key, ...s.ports]);

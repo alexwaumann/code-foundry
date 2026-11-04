@@ -618,7 +618,9 @@ describe("a rolled-up terminal", () => {
     showTerminalIn("dev", P);
     await closeBottomTerminal("dev", KID);
     await closeBottomTerminal("dev");
-    expect(commands.invokeConfirmed.mock.calls.map((c) => c[0])).toEqual(["terminal.close", "terminal.close"]);
+    expect(commands.invokeConfirmed).toHaveBeenCalledTimes(2);
+    expect(commands.invokeConfirmed).toHaveBeenNthCalledWith(1, "terminal.close", { id: "dev" }, expect.anything());
+    expect(commands.invokeConfirmed).toHaveBeenNthCalledWith(2, "terminal.close", { id: "dev" }, expect.anything());
   });
 
   it("when the terminal goes, every panel showing it moves on: a neighbour takes over, a last tab hides", () => {

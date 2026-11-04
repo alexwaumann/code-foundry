@@ -150,7 +150,7 @@ describe("subtreeIds", () => {
   });
 
   it("a fork is no descendant: it has a parent, not a creator", () => {
-    const data = list(t("root"), t("fork", { parentId: "root" } as Partial<ThreadView>), t("kid", { createdBy: "root" }));
+    const data = list(t("root"), t("fork", { parentId: "root" }), t("kid", { createdBy: "root" }));
     expect(subtreeIds(data, "root")).toEqual(["root", "kid"]);
   });
 
