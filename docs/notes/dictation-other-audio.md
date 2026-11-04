@@ -85,3 +85,19 @@ Four ways out, from the likely to the unlikely:
 `TestVolumeElements`, `TestDecideRecovery`, quitting and crashing at each point of a hold,
 an absent device, a device lost mid-hold, a failed recovery write, no marker, and the loop on
 the real clock. `TestHoldLowersAudio` for the hold's side. No cgo in tests.
+
+Run live on an Apple M3 Pro, macOS 27, with the real `coreAudio` and `ducker` in a throwaway test
+binary (not committed), on this Mac's speakers, for a few seconds at a time:
+
+* **No permission was needed.** The volume reads and writes from an unbundled process with
+  nothing granted.
+* The built-in speakers have no channel volumes here, only the master (element 0), so the
+  fallback is what ran. The per-channel path has only run on the fake.
+* A hold: 0.080 fell to 0.016 (20%) in about a second, and came back to exactly 0.080.
+* `kill -9` while low: the volume stayed at 0.016 with a settled marker. The next run put it
+  back to 0.080 and removed the marker.
+
+**Not run live:** a real hold (nothing here is granted Accessibility), so neither the 300 ms in
+practice, Option+Left, nor the real tap stopping; a Bluetooth or USB output, or per-channel
+volumes; a hand on the volume keys during a hold; music actually playing. For Alex to try on a
+tip: music on, a long hold, Option+Left, volume keys mid-hold, AirPods, `kill -9` during a hold.
