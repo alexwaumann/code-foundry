@@ -2,6 +2,7 @@ package gh
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ import (
 // What this relies on: the only place a poll stops is admit, right before a request.
 // Code between two requests runs unbroken, so what a fingerprint response marks stale is
 // applied before any job can run (a job's fetch is never judged by an older fingerprint)
-// and the publish cannot be split. What a poll holds across a yield is what it asked
+// and a snapshot update and its events cannot be split. What a poll holds across a yield is what it asked
 // GitHub before the job ran, and a job that changes GitHub asks for another poll
 // (pollSoon, kept by pollAgain), while a merge shown meanwhile survives the publish
 // (mergedOverlay.apply). See docs/notes/pr-queue-priority.md.
@@ -78,6 +79,12 @@ wait:
 type notSent struct{ error }
 
 func (e notSent) Unwrap() error { return e.error }
+
+// isRefused reports whether err is a request admit refused during a pause.
+func isRefused(err error) bool {
+	var refused notSent
+	return errors.As(err, &refused)
+}
 
 // letWaitingIn runs the jobs someone waits for, oldest first, up to maxJobsAhead since
 // scheduled work last sent a request; the rest get their turn before its next one.

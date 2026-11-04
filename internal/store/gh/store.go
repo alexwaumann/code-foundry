@@ -138,6 +138,7 @@ type Store struct {
 	pollFailures   int
 	lastPoll       time.Time // when the last poll ended (or the cached poll's time after New)
 	statsNext      time.Time
+	statsAsked     bool // stats were asked for since the last plan (askStatsLocked)
 	statsFailures  int
 	authBad        bool
 	authNext       time.Time
@@ -198,8 +199,11 @@ type job struct {
 	// background: nobody waits for the result, so every job someone waits for goes first.
 	background bool
 	// read: a read, which leaves the queue when the last one waiting gives up (abandon).
-	read    bool
-	waiters []chan jobResult
+	read bool
+	// promised: a client was told this fetch is coming (submitBackground), so it runs
+	// whoever gives up.
+	promised bool
+	waiters  []chan jobResult
 }
 
 func (j *job) key() string {
@@ -321,9 +325,8 @@ func (s *Store) Track(slug string) error {
 		s.pollSoonLocked(now)
 	}
 	if a.Stats.FetchedAt.IsZero() {
-		// The next poll brings its stats (and refreshes the others). Zero, not now: a
-		// poll that started a moment ago and plans after this sees them due.
-		s.statsNext = time.Time{}
+		// The next poll brings its stats (and refreshes the others).
+		s.askStatsLocked()
 	}
 	s.mu.Unlock()
 	s.setTracked(key, true)
@@ -454,9 +457,10 @@ func (s *Store) submit(ctx context.Context, j *job) jobResult {
 
 // abandon takes ch off j's queued job, if it has not started. A read with nobody left
 // waiting leaves the queue, so a client that moved on does not hold up the one it moved to.
-// Any other job still runs (someone's write, a refresh a client was promised), but now
-// nobody waits for it, so it goes behind the jobs someone does. A job the worker claimed
-// is out of the queue, and its waiters are the worker's to read.
+// A refresh a client was promised still runs, behind the jobs someone waits for. A write
+// still runs and keeps its place: writes go out in the order they were asked for, or a
+// later one could be undone by an earlier one. A job the worker claimed is out of the
+// queue, and its waiters are the worker's to read.
 func (s *Store) abandon(j *job, ch chan jobResult) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -470,10 +474,13 @@ func (s *Store) abandon(j *job, ch chan jobResult) {
 	if len(q.waiters) == n || len(q.waiters) > 0 {
 		return // a later job of the same key, or someone else still waits
 	}
-	s.queue = slices.Delete(s.queue, i, i+1)
-	if !q.read {
+	switch {
+	case q.promised:
 		q.background = true
+		s.queue = slices.Delete(s.queue, i, i+1)
 		s.insertLocked(q)
+	case q.read:
+		s.queue = slices.Delete(s.queue, i, i+1)
 	}
 }
 
@@ -481,7 +488,7 @@ func (s *Store) abandon(j *job, ch chan jobResult) {
 // for, coalescing with an identical queued job. While the store is paused it queues
 // nothing and returns the pause's error.
 func (s *Store) submitBackground(j *job) error {
-	j.background = true
+	j.background, j.promised = true, true
 	s.mu.Lock()
 	err := cmpErr(s.stopped, s.pausedLocked())
 	if err == nil {
@@ -512,7 +519,7 @@ func (s *Store) enqueueLocked(j *job, ch chan jobResult) {
 	if i >= 0 {
 		q := s.queue[i]
 		if ch == nil {
-			q.read = false // a client was told a fetch is coming: it runs now, whoever gives up
+			q.promised = true // a client was told a fetch is coming: it runs now, whoever gives up
 			if j.run != nil {
 				q.run = j.run // and it says how it ended, as j would have
 			}

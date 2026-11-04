@@ -83,7 +83,6 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 		}
 		head = r.ExpectedHeadSHA
 	}
-	var unknown bool
 	res, err := submitFunc(ctx, s, "merge|"+k.String(), func(ctx context.Context) (MergeResult, error) {
 		data, err := s.call(ctx, queryMergePullRequest, map[string]any{"id": pr.ID, "method": string(r.Method), "head": head})
 		var pe *PartialError
@@ -97,7 +96,9 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 				"check GitHub before trying again (until %s a retry returns this error): %w",
 				k.number, now.Add(writeMemoTTL).Local().Format(time.TimeOnly), err)
 			s.full.merges.remember(k, writeMemo[mergeMemo]{err: err, at: now})
-			unknown = true
+			// It may have merged: clients re-read. On the worker, as a caller that left
+			// is not there to do it.
+			s.invalidateFull(k)
 			return MergeResult{}, err
 		case err != nil:
 			return MergeResult{}, err
@@ -109,9 +110,8 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 		return MergeResult{Merged: o.Merged || o.State == PullRequestMerged, SHA: o.SHA}, nil
 	})
 	if err != nil {
-		if unknown || errors.Is(err, ErrFailedPrecondition) {
-			// GitHub knows a state the cache does not (or may: it did not answer): let
-			// clients re-read.
+		if errors.Is(err, ErrFailedPrecondition) {
+			// GitHub knows a state the cache does not: let clients re-read.
 			s.invalidateFull(k)
 		}
 		return MergeResult{}, err

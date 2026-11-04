@@ -178,6 +178,9 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 		return
 	}
 	data, err := s.callDoc(ctx, queryPollProjects, doc, vars)
+	if isRefused(err) {
+		return // a job let in just now brought the pause on: as above
+	}
 	var partial *PartialError
 	if err != nil && !errors.As(err, &partial) {
 		if isServerTimeout(err) {
@@ -238,6 +241,9 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 		} else if dash {
 			delete(s.recheck, f.ID)
 		}
+	}
+	if isRefused(detailErr) {
+		return // the same, between the lists and their details
 	}
 
 	next := prev

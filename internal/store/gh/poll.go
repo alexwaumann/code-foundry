@@ -33,7 +33,8 @@ import (
 // A poll is one job, but it does not hold the worker: before each of its requests, jobs
 // someone waits for run first (yield.go). That happens inside call/callDoc and nowhere
 // else, so the code between two requests runs unbroken: a fingerprint response and what
-// it marks stale are one step, and so are the last request and the publish.
+// it marks stale are one step, and so are the snapshot update and its events. pollProjects
+// comes after them, with requests and yields of its own, then Polled and the schedule.
 
 // isGlobal reports errors handled by a store-wide pause rather than per-job backoff.
 func isGlobal(err error) bool {
@@ -129,7 +130,8 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 		headSet[k] = true
 	}
 	statsDue := s.opts.StatsInterval > 0 && len(tracked) > 0 && !now.Before(s.statsNext)
-	s.pollAgain = false // what was asked for so far is in this plan
+	s.pollAgain = false  // what was asked for so far is in this plan
+	s.statsAsked = false // and so are the stats (askStatsLocked left them due)
 	s.mu.Unlock()
 	// Watched pull requests are watched branches without the expiry (pr_watch.go); one
 	// whose head is not known yet waits for resolveWatchedHeads.
@@ -218,6 +220,23 @@ func (s *Store) nextStatsAt(t time.Time) time.Time {
 	return next
 }
 
+// askStatsLocked makes any poll planned from now on carry the stats. Zero, not now: a
+// poll that started a moment ago and plans after this sees them due. One already planned
+// read its counts before this, so statsAsked keeps its end from moving them on
+// (scheduleStatsLocked). Called with s.mu held.
+func (s *Store) askStatsLocked() {
+	s.statsNext = time.Time{}
+	s.statsAsked = true
+}
+
+// scheduleStatsLocked sets when the stats are next due, after a poll carried them,
+// unless they were asked for since it planned. Called with s.mu held.
+func (s *Store) scheduleStatsLocked(at time.Time) {
+	if !s.statsAsked {
+		s.statsNext = at
+	}
+}
+
 // statsDueNow makes the next poll carry the current month's stats (a merge went
 // through or was observed). The closed months keep their own schedule.
 func (s *Store) statsDueNow(reason string, attrs ...any) {
@@ -225,7 +244,7 @@ func (s *Store) statsDueNow(reason string, attrs ...any) {
 		return
 	}
 	s.mu.Lock()
-	s.statsNext = time.Time{} // due for any poll planned from now on (see Track)
+	s.askStatsLocked()
 	s.mu.Unlock()
 	s.log.Debug("gh stats due", append([]any{"reason", reason}, attrs...)...)
 }
@@ -828,7 +847,9 @@ func (s *Store) fetchFailing(ctx context.Context, reqs []ciRequest, cis map[stri
 // (plan.closed), and the REST commit searches into the global stats, which it returns,
 // and per-repository stats, which it adds to repoStats. The months fetched replace the
 // held ones; the others stay. A failed closed-month request leaves its months (and
-// ClosedAt) as they were, so the next stats poll asks again.
+// ClosedAt) as they were, so the next stats poll asks again. A request a pause refused
+// is no answer at all: applyStats returns nil and adds nothing, the held counts stay as
+// they are, and the stats stay due for the poll after the pause.
 func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res *pollResult, snap *Snapshot, repoStats map[string]MonthlyStats) *MonthlyStats {
 	sp, st := plan.stats, res.Stats
 	start := s.opts.Now()
@@ -840,7 +861,7 @@ func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res 
 		}
 		s.mu.Lock()
 		s.statsFailures++
-		s.statsNext = start.Add(backoff(cfg.PollInterval, s.opts.MaxBackoff, s.statsFailures, s.opts.Rand()))
+		s.scheduleStatsLocked(start.Add(backoff(cfg.PollInterval, s.opts.MaxBackoff, s.statsFailures, s.opts.Rand())))
 		s.mu.Unlock()
 		s.log.Warn("gh stats failed", "err", err)
 		g := snap.Dashboard.Stats
@@ -851,7 +872,7 @@ func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res 
 	for _, cp := range plan.closed {
 		r, err := s.fetchClosedStats(ctx, cp)
 		if err != nil {
-			if ctx.Err() != nil {
+			if ctx.Err() != nil || isRefused(err) {
 				return nil
 			}
 			s.log.Warn("gh closed-month stats failed; asked again with the next stats", "repos", len(cp.repos), "global", len(cp.stats.months) > 0, "err", err)
@@ -887,6 +908,9 @@ func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res 
 	if rr, ok := s.opts.Runner.(RESTRunner); ok {
 		for k, w := range windows {
 			n, err := s.searchCommits(ctx, rr, fmt.Sprintf("author:%s author-date:%s", sp.me, w.searchRange()))
+			if isRefused(err) {
+				return nil
+			}
 			if err != nil {
 				if ctx.Err() == nil {
 					s.log.Warn("gh commit search failed; using contributions", "month", w.Label, "err", err)
@@ -946,7 +970,7 @@ func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res 
 	}
 	s.mu.Lock()
 	s.statsFailures = 0
-	s.statsNext = s.nextStatsAt(start)
+	s.scheduleStatsLocked(s.nextStatsAt(start))
 	s.mu.Unlock()
 	return &global
 }
@@ -982,7 +1006,8 @@ func (s *Store) fetchClosedStats(ctx context.Context, cp *pollPlan) (*pollResult
 
 // searchCommits returns REST search/commits' total_count for q. REST search has its
 // own rate limit (30/min), so a rate-limit error here does not pause GraphQL polling;
-// only auth and network errors have global effects.
+// only auth and network errors have global effects. A pause does refuse it, like every
+// request: a pause may be the network's, and GitHub's secondary limits span both APIs.
 func (s *Store) searchCommits(ctx context.Context, rr RESTRunner, q string) (int, error) {
 	if err := s.admit(ctx, true); err != nil {
 		return 0, err

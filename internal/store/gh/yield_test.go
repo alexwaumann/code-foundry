@@ -35,6 +35,7 @@ type yieldWorld struct {
 	sent     []string
 	holdAt   string
 	after    bool // hold once the answer is computed, not before
+	noStats  bool // the next Poll answer loses its stats
 	entered  chan struct{}
 	release  chan struct{}
 	released sync.Once
@@ -59,6 +60,9 @@ func newYieldWorld(t *testing.T, mod func(*Options)) *yieldWorld {
 			data, err = g.respond(op, doc, vars)
 		}
 		w.note(op, false)
+		if op == "Poll" && err == nil {
+			data = w.loseStats(data)
+		}
 		return data, err
 	})
 	r := &restRunner{fakeRunner: w.f, rest: func(path string, _ map[string]string) (json.RawMessage, error) {
@@ -103,6 +107,26 @@ func newYieldWorld(t *testing.T, mod func(*Options)) *yieldWorld {
 	drain(w.polled)
 	drain(w.events)
 	return w
+}
+
+// loseStats takes the stats out of a Poll answer when a test asked for it, once.
+func (w *yieldWorld) loseStats(data json.RawMessage) json.RawMessage {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.noStats {
+		return data
+	}
+	w.noStats = false
+	var top map[string]json.RawMessage
+	if json.Unmarshal(data, &top) != nil {
+		return data
+	}
+	delete(top, monthAlias(0))
+	out, err := json.Marshal(top)
+	if err != nil {
+		return data
+	}
+	return out
 }
 
 // rawYieldRunner adds raw REST, which only the read paths' test reaches.
@@ -536,7 +560,7 @@ func TestRunEndsWithAPollDue(t *testing.T) {
 }
 
 // A caller that leaves takes a read with it. A job someone else waits for, a write, and
-// a refresh a client was promised still run, the last two behind the jobs someone waits
+// a refresh a client was promised still run, the refresh behind the jobs someone waits
 // for; a job already running finishes.
 func TestCallerLeaves(t *testing.T) {
 	lookup := func(w *yieldWorld) *job {
@@ -567,7 +591,7 @@ func TestCallerLeaves(t *testing.T) {
 			}
 			return w.goJob(t, leaving, "gone")
 		}},
-		{name: "a write: runs, behind the waited ones", wantSent: 1, setup: func(t *testing.T, w *yieldWorld, leaving context.Context) <-chan error {
+		{name: "a write: runs, and keeps its place", wantSent: 1, setup: func(t *testing.T, w *yieldWorld, leaving context.Context) <-chan error {
 			out := make(chan error, 1)
 			go func() { out <- w.testWrite(leaving, "write") }()
 			waitFor(t, "the write in the queue", func() bool { return w.queued() == 1 })
@@ -575,8 +599,8 @@ func TestCallerLeaves(t *testing.T) {
 		}, check: func(t *testing.T, w *yieldWorld) {
 			w.s.mu.Lock()
 			defer w.s.mu.Unlock()
-			if len(w.s.queue) != 1 || !w.s.queue[0].background {
-				t.Errorf("the write did not go behind the waited jobs")
+			if len(w.s.queue) != 1 || w.s.queue[0].background {
+				t.Errorf("the write left its place")
 			}
 		}},
 		{name: "another live waiter: runs", wantSent: 1, setup: func(t *testing.T, w *yieldWorld, leaving context.Context) <-chan error {
@@ -815,6 +839,238 @@ func TestWriteInAYieldSurvivesThePublish(t *testing.T) {
 	w.waitPolled(t) // the poll the write asked for
 	if n := w.f.count("Poll"); n <= polls {
 		t.Errorf("%d polls after the write, was %d", n, polls)
+	}
+}
+
+// Writes go out in the order they were asked for, whoever gave up: convert to draft,
+// mark ready must not end on the draft.
+func TestAbandonedWriteKeepsItsPlace(t *testing.T) {
+	w := newYieldWorld(t, nil)
+	calls := w.f.ncalls()
+	w.holdGitHub("Poll", false)
+	w.kickPoll(t)
+	w.waitHeld(t)
+	leaving, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	first := make(chan error, 1)
+	go func() { first <- w.testWrite(leaving, "first") }()
+	waitFor(t, "the first write in the queue", func() bool { return w.queued() == 1 })
+	cancel()
+	if err := recv(t, first); !errors.Is(err, context.Canceled) {
+		t.Fatalf("first: %v", err)
+	}
+	second := make(chan error, 1)
+	go func() { second <- w.testWrite(context.Background(), "second") }()
+	waitFor(t, "the second write in the queue", func() bool { return w.queued() == 2 })
+	w.free()
+	if err := recv(t, second); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := w.f.snapshot()
+	var names []string
+	for _, c := range got[calls:] {
+		if c.op == opLookup {
+			names = append(names, c.vars["name"].(string))
+		}
+	}
+	if !slices.Equal(names, []string{"first", "second"}) {
+		t.Errorf("writes went out as %v", names)
+	}
+}
+
+// Stats asked for while a stats poll runs are not its to answer: it read its counts
+// before the request, so its end leaves them due, on success and on failure. Without a
+// request the schedule stands.
+func TestStatsAskedDuringAStatsPoll(t *testing.T) {
+	ask := func(t *testing.T, w *yieldWorld) { w.s.statsDueNow("test") }
+	track := func(t *testing.T, w *yieldWorld) {
+		w.g.setRepo("o/new", &fakeRepo{branch: "main", sha: "n1"})
+		if err := w.s.Track("o/new"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tests := []struct {
+		name    string
+		stage   string
+		ask     func(*testing.T, *yieldWorld)
+		noStats bool
+		want    bool
+	}{
+		{name: "merge during Poll", stage: "Poll", ask: ask, want: true},
+		{name: "merge during PullRequestDetails", stage: "PullRequestDetails", ask: ask, want: true},
+		{name: "merge during DefaultBranchChecks", stage: "DefaultBranchChecks", ask: ask, want: true},
+		{name: "merge during PollStats", stage: "PollStats", ask: ask, want: true},
+		{name: "merge during search/commits", stage: "search/commits", ask: ask, want: true},
+		{name: "track during PollStats", stage: "PollStats", ask: track, want: true},
+		{name: "merge during a poll whose stats failed", stage: "Poll", ask: ask, noStats: true, want: true},
+		{name: "nothing asked", stage: "PollStats"},
+		{name: "nothing asked, stats failed", stage: "Poll", noStats: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := newYieldWorld(t, nil)
+			w.moveEverything(t, 1)
+			w.mu.Lock()
+			w.noStats = tt.noStats
+			w.mu.Unlock()
+			w.holdGitHub(tt.stage, false)
+			w.kickPoll(t)
+			w.waitHeld(t)
+			if tt.ask != nil {
+				tt.ask(t, w)
+			}
+			w.free()
+			w.waitPolled(t)
+			settleWorker(t, w.s)
+			drain(w.polled)
+			from := w.nsent()
+			w.kickPoll(t)
+			w.waitPolled(t)
+			sent := w.sentSince(from)
+			if got := slices.Contains(sent, "search/commits"); got != tt.want {
+				t.Errorf("sent %v: next poll carries stats = %v, want %v", sent, got, tt.want)
+			}
+		})
+	}
+}
+
+// A search or closed-month request a pause refused is no answer: the counts stay what
+// they were and the stats stay due, so the poll after the pause brings them.
+func TestRefusedStatsAreNotAResult(t *testing.T) {
+	for _, stage := range []string{"DefaultBranchChecks", "PollStats"} {
+		t.Run("pause after "+stage, func(t *testing.T) {
+			w := newYieldWorld(t, func(o *Options) { o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour })
+			before := w.s.Snapshot()
+			if m := before.Dashboard.Stats.Months[1]; m.Commits != 7 || m.Source != CommitsFromSearch {
+				t.Fatalf("setup: %+v", m)
+			}
+			w.moveEverything(t, 1)
+			w.g.failNext(opLookup, &RateLimitError{Secondary: true, Msg: "slow down"})
+			w.holdGitHub(stage, false)
+			w.kickPoll(t)
+			w.waitHeld(t)
+			job := w.goJob(t, context.Background(), "limited")
+			from := w.nsent()
+			w.free()
+			if err := recv(t, job); !errors.Is(err, ErrRateLimited) {
+				t.Fatalf("job: %v", err)
+			}
+			w.waitPolled(t)
+			if sent := w.sentSince(from); len(sent) != 1 || sent[0] != opLookup {
+				t.Errorf("sent %v during the pause", sent)
+			}
+			after := w.s.Snapshot()
+			if !sameJSON(before.Dashboard.Stats, after.Dashboard.Stats) {
+				t.Errorf("stats moved:\n%+v\n%+v", before.Dashboard.Stats, after.Dashboard.Stats)
+			}
+			if !sameJSON(before.Repos["o/r"].Activity.Stats, after.Repos["o/r"].Activity.Stats) {
+				t.Errorf("repository stats moved")
+			}
+			w.s.mu.Lock()
+			due := !w.s.opts.Now().Before(w.s.statsNext)
+			w.s.pauseUntil = time.Time{} // the pause ends
+			w.s.mu.Unlock()
+			if !due {
+				t.Error("the stats are no longer due")
+			}
+			from = w.nsent()
+			w.kickPoll(t)
+			w.waitPolled(t)
+			if sent := w.sentSince(from); !slices.Contains(sent, "search/commits") {
+				t.Errorf("sent %v after the pause, want the stats", sent)
+			}
+			stats := w.s.Snapshot().Dashboard.Stats
+			if !stats.FetchedAt.After(before.Dashboard.Stats.FetchedAt) || stats.Months[1].Source != CommitsFromSearch {
+				t.Errorf("after the pause: %+v", stats)
+			}
+		})
+	}
+}
+
+// A job let in just before the project lists' requests brings a pause on: the lists wait
+// for the next poll, as when the poll's own request did it, and show no error.
+func TestPauseInAYieldLeavesTheProjectListsAlone(t *testing.T) {
+	tests := []struct {
+		name  string
+		stage string // the job goes in right after this request
+		move  func(*yieldWorld)
+		never string
+	}{
+		{name: "before the lists' request", stage: "Poll", never: "PollProjects"},
+		{name: "before their details", stage: "PollProjects", never: "PullRequestDetails", move: func(w *yieldWorld) {
+			w.g.addPR(fakePR("PR_new", "o/r", 20, time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)), sectionProjectOpen)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := newYieldWorld(t, func(o *Options) { o.SecondaryBackoff, o.MaxBackoff = time.Hour, time.Hour })
+			before := w.s.Snapshot().Projects
+			if tt.move != nil {
+				tt.move(w)
+			}
+			w.g.failNext(opLookup, &RateLimitError{Secondary: true, Msg: "slow down"})
+			w.holdGitHub(tt.stage, false)
+			w.kickPoll(t)
+			w.waitHeld(t)
+			job := w.goJob(t, context.Background(), "limited")
+			from := w.nsent()
+			w.free()
+			if err := recv(t, job); !errors.Is(err, ErrRateLimited) {
+				t.Fatalf("job: %v", err)
+			}
+			p := w.waitPolled(t)
+			if sent := w.sentSince(from); slices.Contains(sent, tt.never) {
+				t.Errorf("sent %v during the pause", sent)
+			}
+			after := w.s.Snapshot().Projects
+			if p.ProjectsLastError != "" || after.LastError != "" {
+				t.Errorf("projects error: %q, Polled %q", after.LastError, p.ProjectsLastError)
+			}
+			if !sameJSON(before, after) || !after.FetchedAt.Equal(before.FetchedAt) {
+				t.Errorf("the lists moved:\n%+v\n%+v", before, after)
+			}
+		})
+	}
+}
+
+// A merge GitHub did not confirm leaves clients re-reading even when its caller left
+// while it ran: the worker does it. Under -race this also holds the caller's return
+// apart from the job's end.
+func TestMergeCallerLeavesWhileRunning(t *testing.T) {
+	g, w, s, _, events := mergeWorld(t)
+	if _, err := s.FullPullRequest(context.Background(), "o/r", 1, false); err != nil {
+		t.Fatal(err)
+	}
+	entered, release := make(chan struct{}), make(chan struct{})
+	w.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+		if op == "MergePullRequest" {
+			close(entered)
+			<-release
+			return nil, fmt.Errorf("%w: connection reset", ErrNetwork)
+		}
+		return g.respond(op, doc, vars)
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	merge := make(chan error, 1)
+	go func() {
+		_, err := s.MergePullRequest(ctx, "o/r", 1, MergeRequest{Method: MergeSquash})
+		merge <- err
+	}()
+	<-entered
+	drain(events)
+	cancel()
+	if err := recv(t, merge); !errors.Is(err, context.Canceled) {
+		t.Fatalf("merge: %v", err)
+	}
+	close(release)
+	select {
+	case e := <-events.C():
+		if e.Number != 1 {
+			t.Errorf("event = %+v", e)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("clients were not told to re-read")
 	}
 }
 
