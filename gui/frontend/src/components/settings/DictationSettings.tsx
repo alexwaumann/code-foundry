@@ -184,21 +184,23 @@ function accessState(a: DictationAccessibilityView, stuck: boolean): AccessState
   return stuck ? "stuck" : "ask";
 }
 
-/** Whether the time since Allow has run out; it turns true by itself, on screen. */
+/** Whether the time since the last Allow has run out; it turns true by itself, on screen. */
 function useAllowRanOut(): boolean {
   const allowedAtMs = useDictationStore((s) => s.allowedAtMs);
-  const [, tick] = useState(0);
+  const [ranOutFor, setRanOutFor] = useState(0);
   useEffect(() => {
-    const left = allowedAtMs + ALLOW_ADVICE_MS - Date.now();
-    if (allowedAtMs === 0 || left <= 0) return undefined;
-    const t = setTimeout(() => {
-      tick((n) => n + 1);
-    }, left);
+    if (allowedAtMs === 0) return undefined;
+    const t = setTimeout(
+      () => {
+        setRanOutFor(allowedAtMs);
+      },
+      Math.max(0, allowedAtMs + ALLOW_ADVICE_MS - Date.now()),
+    );
     return () => {
       clearTimeout(t);
     };
   }, [allowedAtMs]);
-  return allowedAtMs !== 0 && Date.now() >= allowedAtMs + ALLOW_ADVICE_MS;
+  return allowedAtMs !== 0 && ranOutFor === allowedAtMs;
 }
 
 function accessDescription(state: AccessState, a: DictationAccessibilityView): string {
