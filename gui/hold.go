@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -660,6 +661,7 @@ func followSession(ctx context.Context, conn dictationConn, id string) (*holdSes
 // pasteLoop lands texts one at a time, off the tap's thread and off the main thread:
 // reading the pasteboard can wait on its owner, and a paste takes about 650 ms.
 func (s *holdService) pasteLoop(ctx context.Context) {
+	runtime.LockOSThread() // pasteHost's calls come from one thread
 	for {
 		select {
 		case <-ctx.Done():

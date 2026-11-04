@@ -125,7 +125,9 @@ static cfAltTap* cfAltTapCreate(int fd) {
 	CGEventTapEnable(t->port, true);
 	// A hidden app can be napped, and a napped callback misses its deadline and gets the
 	// tap disabled. Idle sleep stays allowed.
-	t->activity = [[[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep reason:@"Listening for the dictation hold key"] retain];
+	@autoreleasepool {
+		t->activity = [[[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep reason:@"Listening for the dictation hold key"] retain];
+	}
 	return t;
 }
 
@@ -147,8 +149,10 @@ static void cfAltTapStop(cfAltTap* t) {
 
 // cfAltTapFree closes the tap and the pipe (the reader then sees EOF), and frees t.
 static void cfAltTapFree(cfAltTap* t) {
-	[[NSProcessInfo processInfo] endActivity:(id)t->activity];
-	[(id)t->activity release];
+	@autoreleasepool {
+		[[NSProcessInfo processInfo] endActivity:(id)t->activity];
+		[(id)t->activity release];
+	}
 	CFRunLoopTimerInvalidate(t->health);
 	CFRelease(t->health);
 	CGEventTapEnable(t->port, false);
