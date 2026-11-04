@@ -55,6 +55,10 @@ func TestAttendedAcknowledge(t *testing.T) {
 		turnEnds   step = "turn ends" // wait for the first turn's result to be processed
 		isFinished step = "finished"  // the status is (and stays) NeedsAttention "finished"
 		isIdle     step = "idle"      // the status becomes Idle "at prompt"
+		stop       step = "stop"      // close the thread: its runner detaches
+		silent     step = "silent"    // presence becomes attended; the runner hears nothing (a lost signal)
+		restart    step = "restart"   // the daemon restarts: running threads stop, status from the database
+		archive    step = "archive"   // archive the thread
 	)
 	tests := []struct {
 		name     string
@@ -69,6 +73,24 @@ func TestAttendedAcknowledge(t *testing.T) {
 		{"finished unwatched, viewer opens while away: finished; user returns: seen", false, []step{turnEnds, isFinished, watch, isFinished, attend, isIdle}},
 		{"finished unwatched, viewer opens while attended: seen", true, []step{turnEnds, isFinished, watch, isIdle}},
 		{"attended viewer, user leaves before the turn ends: finished", true, []step{watch, leave, turnEnds, isFinished, attend, isIdle}},
+		// With no runner the store acknowledges (seenStoppedLocked).
+		{"stopped, no viewer: still finished", true, []step{turnEnds, isFinished, stop, isFinished}},
+		{"stopped, viewer opens while attended: seen", true, []step{turnEnds, isFinished, stop, watch, isIdle}},
+		{"stopped, viewer opens while attended: seen for good", true, []step{turnEnds, isFinished, stop, watch, isIdle, restart, isIdle}},
+		{"stopped, viewer opens while away: finished; user returns: seen", false, []step{turnEnds, isFinished, stop, watch, isFinished, attend, isIdle}},
+		{"stopped, no viewer, user returns: still finished", false, []step{turnEnds, isFinished, stop, attend, isFinished}},
+		{"stopped, viewer closed before the user returns: still finished", false, []step{turnEnds, isFinished, stop, watch, unwatch, attend, isFinished}},
+		{"daemon restart, viewer opens while attended: seen for good", true, []step{turnEnds, isFinished, restart, isFinished, watch, isIdle, restart, isIdle}},
+		{"daemon restart, no viewer: still finished", true, []step{turnEnds, isFinished, restart, isFinished}},
+		// The runner detaches with a viewer there while attended and never acknowledged.
+		{"viewer, signal lost, runner detaches: seen", false, []step{watch, turnEnds, isFinished, silent, stop, isIdle}},
+		{"viewer, signal lost, runner detaches: seen for good", false, []step{watch, turnEnds, isFinished, silent, stop, isIdle, restart, isIdle}},
+		{"viewer, away, runner detaches: finished", false, []step{watch, turnEnds, isFinished, stop, isFinished}},
+		{"viewer closed, signal lost, runner detaches: finished", false, []step{watch, turnEnds, isFinished, unwatch, silent, stop, isFinished}},
+		// An archived thread keeps its status.
+		{"viewer, signal lost, archive detaches the runner: finished", false, []step{watch, turnEnds, isFinished, silent, archive, isFinished}},
+		{"archived, viewer opens while attended: finished", true, []step{turnEnds, isFinished, archive, watch, isFinished}},
+		{"archived, viewer open, user returns: finished", false, []step{turnEnds, isFinished, archive, watch, attend, isFinished}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -92,6 +114,19 @@ func TestAttendedAcknowledge(t *testing.T) {
 					setAttended(e, att, true)
 				case leave:
 					setAttended(e, att, false)
+				case stop:
+					if err := e.m.Close(e.ctx(), s.ID); err != nil {
+						t.Fatal(err)
+					}
+					e.waitFor(s.ID, "stopped", stopped)
+				case silent:
+					att.Store(true)
+				case restart:
+					e.restart(func(o *Options) { o.Attended = att.Load })
+				case archive:
+					if _, err := e.m.Archive(e.ctx(), s.ID, true); err != nil {
+						t.Fatal(err)
+					}
 				case turnEnds:
 					e.waitItems(s.ID, "turn end", hasTurnEnd)
 					e.waitFor(s.ID, "the turn's end", func(s Thread) bool { return s.Status != StatusBusy && s.Status != StatusUnknown })

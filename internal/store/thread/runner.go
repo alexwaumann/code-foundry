@@ -176,7 +176,8 @@ func timerC(t *time.Timer) <-chan time.Time {
 // watching the thread's items, on every result while at least one viewer watches, and
 // when presence becomes attended while one watches, each only while presence is
 // attended (attended.go); and when the user answers a request, always. Pending
-// requests are unaffected: they last until answered or withdrawn.
+// requests are unaffected: they last until answered or withdrawn. A thread with no
+// runner is acknowledged by the store instead (Manager.seenStoppedLocked).
 func (r *runner) acknowledge() { r.st.sd.Acknowledge() }
 
 func (r *runner) acknowledgeIfViewed() {

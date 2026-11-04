@@ -25,6 +25,10 @@ import (
 //     rate limit (subscriptions_fire.go), while Claude does not work, until the next
 //     message or until seen.
 //
+// "Seen" outlives the process: finish saves the status, and a stopped thread with a
+// viewer while attended has the same reasons cleared on the record
+// (Manager.seenStoppedLocked, attended.go).
+//
 // The runner feeds it; all methods run on the runner goroutine. The GUI classifies the
 // reasons by prefix ("permission:", "question:", "finished", "error:"): keep them.
 type streamStatus struct {
@@ -71,8 +75,9 @@ func (d *streamStatus) Status() (Status, string) {
 	return StatusIdle, "at prompt"
 }
 
-// Acknowledge clears "finished" (and a turn error, and the budget stop once its turn
-// ended): the user has seen it.
+// Acknowledge clears "finished" (and a turn error, the wake limit, and the budget stop
+// once its turn ended): the user has seen it. clearedWhenSeen is the same list for a
+// thread with no runner.
 func (d *streamStatus) Acknowledge() {
 	d.unseen, d.turnError, d.wakeLimit = false, "", false
 	if d.budgetEnded {
