@@ -29,9 +29,6 @@ const (
 	// altHoldMin is how long the key must stay down to count. Under it, it was a tap. It is
 	// also how long a modifier can still cancel the hold.
 	altHoldMin = 300 * time.Millisecond
-	// altBothWindow is how close the two Alts must go down to be one press of both. A real
-	// press measured 83 ms.
-	altBothWindow = 150 * time.Millisecond
 )
 
 // altEventKind matches cfAltRecord's kind in althold_darwin.go.
@@ -83,10 +80,9 @@ func pumpAltEvents(r io.Reader, out chan<- altEvent) {
 type holdKeyMode int
 
 const (
-	holdEither holdKeyMode = iota // the zero value, as the setting's default
+	holdBoth holdKeyMode = iota // either Option key: the zero value, as the setting's default
 	holdLeft
 	holdRight
-	holdBoth
 )
 
 // parseHoldKey reads dictation.hold_key. The daemon validates it; anything else (an older
@@ -97,10 +93,8 @@ func parseHoldKey(s string) holdKeyMode {
 		return holdLeft
 	case "right":
 		return holdRight
-	case "both":
-		return holdBoth
 	}
-	return holdEither
+	return holdBoth
 }
 
 // altReportKind is what happened to a hold.
@@ -125,7 +119,6 @@ type holdPhase int
 
 const (
 	phaseIdle    holdPhase = iota // nothing down that matters
-	phaseArming                   // holdBoth: one key down, waiting for the other
 	phaseHolding                  // a hold runs
 	phaseWaiting                  // this press will not start or count: wait for the keys to come up
 )
@@ -138,9 +131,7 @@ const (
 //
 //   - A clean press starts the hold at once, so the session opens on the press. With other
 //     modifiers already down it was a chord, and nothing starts.
-//   - holdBoth starts on the second key, which must go down within altBothWindow of the
-//     first, and ends when either comes up.
-//   - holdEither runs from the first key down to the last key up, and the other side going
+//   - holdBoth runs from the first key down to the last key up, and the other side going
 //     down at any time changes nothing. For holdLeft and holdRight the other side is a
 //     modifier like any other.
 //   - A hold shorter than altHoldMin is discarded at the release.
@@ -153,9 +144,8 @@ type altHold struct {
 	left, right bool
 	flags       uint64 // as of the last flags event
 
-	phase   holdPhase
-	armedAt time.Duration // holdBoth: when the first key went down
-	start   time.Duration
+	phase holdPhase
+	start time.Duration
 }
 
 // SetMode changes which keys make a hold. A hold in progress is discarded.
@@ -173,11 +163,8 @@ func (h *altHold) SetMode(m holdKeyMode) []altReport {
 func (h *altHold) Step(ev altEvent) []altReport {
 	switch ev.Kind {
 	case altEventKeyDown:
-		switch h.phase {
-		case phaseHolding:
+		if h.phase == phaseHolding {
 			return h.cancel("a key was pressed during the hold")
-		case phaseArming:
-			h.phase = phaseWaiting
 		}
 	case altEventFlags:
 		return h.flagsChanged(ev)
@@ -200,18 +187,6 @@ func (h *altHold) flagsChanged(ev altEvent) []altReport {
 	switch h.phase {
 	case phaseIdle:
 		return h.idle(ev, leftDown, rightDown)
-	case phaseArming:
-		switch {
-		case pressed != 0:
-			h.phase = phaseWaiting
-		case !h.left && !h.right:
-			h.phase = phaseIdle
-		case h.left && h.right:
-			if ev.At-h.armedAt <= altBothWindow {
-				return h.begin(ev.At)
-			}
-			h.phase = phaseWaiting
-		}
 	case phaseHolding:
 		if !h.triggerDown() {
 			return h.release(ev.At)
@@ -252,9 +227,6 @@ func (h *altHold) idle(ev altEvent, leftDown, rightDown bool) []altReport {
 	case other || ev.Flags&heldModifiers != 0:
 		h.phase = phaseWaiting
 		return nil
-	case h.mode == holdBoth && !(h.left && h.right):
-		h.phase, h.armedAt = phaseArming, ev.At
-		return nil
 	}
 	return h.begin(ev.At)
 }
@@ -271,8 +243,6 @@ func (h *altHold) triggerDown() bool {
 		return h.left
 	case holdRight:
 		return h.right
-	case holdBoth:
-		return h.left && h.right
 	}
 	return h.left || h.right
 }
@@ -289,7 +259,7 @@ func (h *altHold) keysUp() bool {
 }
 
 func (h *altHold) release(at time.Duration) []altReport {
-	h.settle() // holdBoth: the other key may still be on its way up
+	h.settle()
 	held := at - h.start
 	if held < altHoldMin {
 		return []altReport{{

@@ -407,7 +407,7 @@ func (s *fakeSessionStream) Close() error                   { return nil }
 func holdSnapshot(edit func(*v1.DictationSnapshot)) *v1.DictationSnapshot {
 	s := &v1.DictationSnapshot{
 		Enabled: true, State: v1.DictationState_DICTATION_STATE_READY, Model: &v1.DictationModel{Downloaded: true},
-		Anywhere: true, HoldKey: "either", Sounds: true, SoundVolume: 50,
+		Anywhere: true, HoldKey: "both", Sounds: true, SoundVolume: 50,
 		Accessibility: &v1.DictationAccessibility{Granted: true, ListName: "Accessibility", Executable: "/exe"},
 	}
 	if edit != nil {

@@ -51,8 +51,8 @@ type Dictation struct {
 	// Anywhere makes the hold key work in every app and keeps the GUI host in the menu
 	// bar with its window closed.
 	Anywhere bool
-	// HoldKey is the Option key that dictates while held: HoldKeyLeft, HoldKeyRight,
-	// HoldKeyEither or HoldKeyBoth (the two pressed together).
+	// HoldKey is the Option key that dictates while held: HoldKeyLeft, HoldKeyRight
+	// or HoldKeyBoth (either one works).
 	HoldKey string
 	// Sounds plays a sound as dictation starts and stops, at notifications.sound_volume.
 	Sounds bool
@@ -60,10 +60,9 @@ type Dictation struct {
 
 // dictation.hold_key's values.
 const (
-	HoldKeyLeft   = "left"
-	HoldKeyRight  = "right"
-	HoldKeyEither = "either"
-	HoldKeyBoth   = "both"
+	HoldKeyLeft  = "left"
+	HoldKeyRight = "right"
+	HoldKeyBoth  = "both"
 )
 
 // Ember configures the resident agent (internal/store/ember).

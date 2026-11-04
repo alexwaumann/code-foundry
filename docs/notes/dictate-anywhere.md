@@ -24,11 +24,9 @@ The PR that finishes "dictate anywhere": hold Option, speak, release, and the te
 * **On press, the session starts and the mic opens.** A hold under 300 ms is a Stop without
   flush, so it ends DISCARDED. Hex's rule stopped at the release, so the 300 ms is only
   judged then; there is no timer in the machine.
-* **`both` ends when either key comes up.** Hex's does too, as both are required. It starts
-  on the second key, so its 300 ms runs from there. The window is 150 ms, inclusive.
 * **Modifiers cancel only before 300 ms; a key at any time.** With `left` or `right` the
-  other Option is a modifier like any other. With `either` it is nothing at any time, and
-  the hold runs from the first key down to the last key up.
+  other Option is a modifier like any other. With `both` (either key works) it is
+  nothing at any time, and the hold runs from the first key down to the last key up.
 * **A press with a modifier already down is a chord**, and starts nothing. It must end
   before another can start, so Option left down after Control comes up stays nothing.
 * **Why never names a key.** `altReport.Why` reaches a log, and logs of what was pressed
@@ -190,7 +188,7 @@ Run live, Apple M3 Pro, macOS 27, scratch homes, nothing granted:
 
 * A real tap in this build: the C changes (health timer, App Nap, the stop flag) have only
   been compiled. The run loop is the risky one.
-* Real Option presses: a hold of each mode, both within 150 ms, Option+arrow still reaching
+* Real Option presses: a hold of each mode, Option+arrow still reaching
   the app.
 * Whether the rebuilt tap hears anything after a grant in the same process, or the Restart
   row appears instead.
@@ -200,3 +198,11 @@ Run live, Apple M3 Pro, macOS 27, scratch homes, nothing granted:
   pasteboard was not touched here.
 * A real microphone with a hold, the tones through real speakers, the plate during a hold.
 * A real Chromium 155/156 app.
+
+## Hold key options (follow-up)
+
+`dictation.hold_key` is `left`, `right` or `both`, and `both` means either key works. The first
+version also had `either` and a `both` that needed the two keys together, from a misread
+request. A saved `either` is now an unknown value: it falls back to the default, which means
+the same, and the file keeps it under an "Ignored" comment. A saved `both` changes meaning
+from together to either. Only tip releases ever had those options, so no migration.

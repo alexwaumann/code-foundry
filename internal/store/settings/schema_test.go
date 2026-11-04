@@ -485,7 +485,7 @@ func TestDictationFields(t *testing.T) {
 	}{
 		{KeyDictationEnabled, "false", "", Bool},
 		{KeyDictationAnywhere, "false", "", Bool},
-		{KeyDictationHoldKey, HoldKeyEither, KeyDictationEnabled, Enum},
+		{KeyDictationHoldKey, HoldKeyBoth, KeyDictationEnabled, Enum},
 		{KeyDictationSounds, "true", KeyDictationEnabled, Bool},
 	}
 	for _, tt := range tests {
@@ -497,8 +497,8 @@ func TestDictationFields(t *testing.T) {
 		}
 	}
 	f := field(t, KeyDictationHoldKey)
-	if !slices.Equal(f.Enum, []string{"left", "right", "either", "both"}) ||
-		!slices.Equal(f.EnumLabels, []string{"Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"}) {
+	if !slices.Equal(f.Enum, []string{"left", "right", "both"}) ||
+		!slices.Equal(f.EnumLabels, []string{"Left ⌥", "Right ⌥", "Both ⌥"}) {
 		t.Errorf("hold key = %v %v", f.Enum, f.EnumLabels)
 	}
 	// Option, never the PC name for the key.
@@ -512,7 +512,7 @@ func TestDictationFields(t *testing.T) {
 // A settings file from before dictate anywhere has none of the new keys: it reads with
 // the defaults and no issue. A bad value falls back to its default and is reported.
 func TestDictationSettingsFromFile(t *testing.T) {
-	want := Dictation{Enabled: true, HoldKey: HoldKeyEither, Sounds: true}
+	want := Dictation{Enabled: true, HoldKey: HoldKeyBoth, Sounds: true}
 	tests := []struct {
 		name   string
 		file   string
@@ -520,9 +520,11 @@ func TestDictationSettingsFromFile(t *testing.T) {
 		issues []string
 	}{
 		{"older file", "[dictation]\nenabled = true\n", want, nil},
-		{"no table", "", Dictation{HoldKey: HoldKeyEither, Sounds: true}, nil},
-		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"both\"\nsounds = false\n",
-			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyBoth}, nil},
+		{"no table", "", Dictation{HoldKey: HoldKeyBoth, Sounds: true}, nil},
+		{"set", "[dictation]\nenabled = true\nanywhere = true\nhold_key = \"left\"\nsounds = false\n",
+			Dictation{Enabled: true, Anywhere: true, HoldKey: HoldKeyLeft}, nil},
+		// A value from the tip releases that had a fourth option: the default means the same.
+		{"retired either", "[dictation]\nenabled = true\nhold_key = \"either\"\n", want, []string{KeyDictationHoldKey}},
 		{"unknown hold key", "[dictation]\nenabled = true\nhold_key = \"alt\"\n", want, []string{KeyDictationHoldKey}},
 	}
 	for _, tt := range tests {

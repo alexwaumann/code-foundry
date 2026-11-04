@@ -220,7 +220,7 @@ type DictationSnapshot struct {
 	// dictation.anywhere: the hold key works in every app, and the GUI host stays in the
 	// menu bar with its window closed.
 	Anywhere bool `protobuf:"varint,9,opt,name=anywhere,proto3" json:"anywhere,omitempty"`
-	// dictation.hold_key: "left", "right", "either" or "both" (the two pressed together).
+	// dictation.hold_key: "left", "right" or "both" (either one works).
 	HoldKey string `protobuf:"bytes,10,opt,name=hold_key,json=holdKey,proto3" json:"hold_key,omitempty"`
 	// dictation.sounds: a sound as dictation starts and stops.
 	Sounds bool `protobuf:"varint,11,opt,name=sounds,proto3" json:"sounds,omitempty"`

@@ -20,7 +20,7 @@ func keyAt(at int, code uint32) altEvent {
 }
 
 func TestParseHoldKey(t *testing.T) {
-	for in, want := range map[string]holdKeyMode{"left": holdLeft, "right": holdRight, "both": holdBoth, "either": holdEither, "": holdEither, "alt": holdEither} {
+	for in, want := range map[string]holdKeyMode{"left": holdLeft, "right": holdRight, "both": holdBoth, "either": holdBoth, "": holdBoth, "alt": holdBoth} {
 		if got := parseHoldKey(in); got != want {
 			t.Errorf("parseHoldKey(%q) = %d, want %d", in, got, want)
 		}
@@ -44,8 +44,8 @@ func TestAltHold(t *testing.T) {
 		want   []altReport
 	}{
 		// A plain hold, for each mode.
-		{name: "either: left held counts", events: []altEvent{flagsAt(0, l), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
-		{name: "either: right held counts", events: []altEvent{flagsAt(0, r), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
+		{name: "both: left held counts", events: []altEvent{flagsAt(0, l), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
+		{name: "both: right held counts", events: []altEvent{flagsAt(0, r), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
 		{name: "left: left held counts", mode: holdLeft, events: []altEvent{flagsAt(0, l), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
 		{name: "left: right does nothing", mode: holdLeft, events: []altEvent{flagsAt(0, r), flagsAt(500, 0)}},
 		{name: "right: right held counts", mode: holdRight, events: []altEvent{flagsAt(0, r), flagsAt(500, 0)}, want: []altReport{started, counted(500)}},
@@ -54,27 +54,6 @@ func TestAltHold(t *testing.T) {
 		// The 300 ms line.
 		{name: "exactly the minimum counts", events: []altEvent{flagsAt(0, l), flagsAt(300, 0)}, want: []altReport{started, counted(300)}},
 		{name: "just under the minimum is discarded", events: []altEvent{flagsAt(0, l), flagsAt(299, 0)}, want: []altReport{started, short(299)}},
-
-		// Both keys.
-		{
-			name: "both: starts on the second key, counted from it", mode: holdBoth,
-			events: []altEvent{flagsAt(0, l), flagsAt(83, l|r), flagsAt(583, r), flagsAt(600, 0)},
-			want:   []altReport{started, counted(500)},
-		},
-		{name: "both: right first", mode: holdBoth, events: []altEvent{flagsAt(0, r), flagsAt(100, l|r), flagsAt(600, l), flagsAt(610, 0)}, want: []altReport{started, counted(500)}},
-		{name: "both: exactly the window", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(150, l|r), flagsAt(650, 0)}, want: []altReport{started, counted(500)}},
-		{name: "both: one ms past the window starts nothing", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(151, l|r), flagsAt(650, r), flagsAt(660, 0)}},
-		{name: "both: one key alone starts nothing", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(900, 0)}},
-		{name: "both: the first key up in time starts nothing", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(50, 0), flagsAt(100, r), flagsAt(900, 0)}},
-		{
-			name: "both: ends at the first key up, and the other cannot start one", mode: holdBoth,
-			events: []altEvent{flagsAt(0, l), flagsAt(10, l|r), flagsAt(500, l), flagsAt(520, l|r), flagsAt(900, l), flagsAt(910, 0)},
-			want:   []altReport{started, counted(490)},
-		},
-		{name: "both: a short press is discarded", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(10, l|r), flagsAt(200, r), flagsAt(210, 0)}, want: []altReport{started, short(190)}},
-		{name: "both: a modifier while arming ends it", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(50, l|flagShift), flagsAt(60, l|r|flagShift), flagsAt(500, 0)}},
-		{name: "both: a key while arming ends it", mode: holdBoth, events: []altEvent{flagsAt(0, l), keyAt(50, 40), flagsAt(60, l|r), flagsAt(500, 0)}},
-		{name: "both: a modifier cancels early", mode: holdBoth, events: []altEvent{flagsAt(0, l), flagsAt(50, l|r), flagsAt(100, l|r|flagCommand)}, want: []altReport{started, discarded("Command pressed early in the hold")}},
 
 		// A modifier: only the first 300 ms.
 		{
@@ -105,12 +84,12 @@ func TestAltHold(t *testing.T) {
 
 		// The other Option key.
 		{
-			name:   "either: the other side early is no cancel, and the hold lasts to the last key up",
+			name:   "both: the other side early is no cancel, and the hold lasts to the last key up",
 			events: []altEvent{flagsAt(0, l), flagsAt(100, l|r), flagsAt(400, r), flagsAt(700, 0)},
 			want:   []altReport{started, counted(700)},
 		},
 		{
-			name:   "either: the other side 15.7 s in is no cancel",
+			name:   "both: the other side 15.7 s in is no cancel",
 			events: []altEvent{flagsAt(0, l), flagsAt(15700, l|r), flagsAt(15900, l), flagsAt(16000, 0)},
 			want:   []altReport{started, counted(16000)},
 		},
@@ -148,7 +127,7 @@ func TestAltHold(t *testing.T) {
 			events: []altEvent{flagsAt(0, flagControl), flagsAt(100, flagControl|l), flagsAt(150, l), flagsAt(900, 0)},
 		},
 		{
-			name:   "either: the other side going down in a cancelled press starts nothing",
+			name:   "both: the other side going down in a cancelled press starts nothing",
 			events: []altEvent{flagsAt(0, l), keyAt(50, 14), flagsAt(100, l|r), flagsAt(600, r), flagsAt(900, 0)},
 			want:   []altReport{started, discarded(keyWhy)},
 		},
@@ -207,7 +186,7 @@ func TestAltHold(t *testing.T) {
 func TestAltHoldSetMode(t *testing.T) {
 	var h altHold
 	h.Step(flagsAt(0, flagLeftAlt))
-	if got := h.SetMode(holdEither); got != nil {
+	if got := h.SetMode(holdBoth); got != nil {
 		t.Errorf("same mode: %+v", got)
 	}
 	got := h.SetMode(holdRight)

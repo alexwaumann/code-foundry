@@ -95,7 +95,7 @@ export type DictationSnapshot = Message<"codefoundry.v1.DictationSnapshot"> & {
   anywhere: boolean;
 
   /**
-   * dictation.hold_key: "left", "right", "either" or "both" (the two pressed together).
+   * dictation.hold_key: "left", "right" or "both" (either one works).
    *
    * @generated from field: string hold_key = 10;
    */
