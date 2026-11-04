@@ -250,9 +250,14 @@ export async function interruptThread(threadId: string): Promise<boolean> {
   return (await runCommandForResult(THREAD_COMMANDS.interrupt, { id: threadId }, { ctx: threadContext(threadId), quiet: true })) !== null;
 }
 
-/** Stops one of the thread's own background shells (thread.shell.stop); its note lands in the timeline. */
+/**
+ * Stops one of the thread's own background shells (thread.shell.stop); its note lands in
+ * the timeline. NotFound is no failure: the shell ended just as it was pressed.
+ */
 export async function stopShell(threadId: string, taskId: string): Promise<boolean> {
-  return (await runCommandForResult(THREAD_COMMANDS.stopShell, { id: threadId, task: taskId }, { ctx: threadContext(threadId), quiet: true })) !== null;
+  const failure = { gone: false };
+  const res = await runCommandForResult(THREAD_COMMANDS.stopShell, { id: threadId, task: taskId }, { ctx: threadContext(threadId), quiet: true, expected: (err) => (failure.gone = isNotFound(err)) });
+  return res !== null || failure.gone;
 }
 
 /**

@@ -15,7 +15,9 @@ const LABEL = "shrink-0 font-medium whitespace-nowrap text-cf-info-text";
  * background", then each run as "name · activity". Shown only while
  * Thread.background_agents_running is above 0 and the thread is not archived: foreground
  * runs are covered by their spinning timeline rows, and background shells by the thread
- * info card's Shells group (docs/notes/thread-header-crumb.md).
+ * info card's Shells group (docs/notes/thread-header-crumb.md). Ember's chat only: a
+ * thread's pane has the waiting strip, whose rows name the same runs
+ * (docs/notes/waiting-strip.md).
  */
 export function AgentsStrip({ threadId }: { threadId: string }) {
   const agents = useThreadsStore((s) => {

@@ -28,6 +28,8 @@
  * once when idle ("Set effort to …" after ~300 ms), else when the turn ends
  * (Thread.effort_pending meanwhile).
  */
+import { waitingReason } from "./liveCount";
+import { sampleWakes, scriptWaiting, type WakeInit } from "./wakes";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
@@ -143,8 +145,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * item and the daemon's process_ended turn end; mock/world.ts stops the thread with status
  * error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "servers" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "html-repeat" | "theme" | "bridge" | "pagelib";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "servers", "stopped", "crashed", "html", "html-idle", "html-scroll", "long", "html-repeat", "theme", "bridge", "pagelib"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "waiting" | "servers" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "html-repeat" | "theme" | "bridge" | "pagelib";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "waiting", "servers", "stopped", "crashed", "html", "html-idle", "html-scroll", "long", "html-repeat", "theme", "bridge", "pagelib"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -289,6 +291,8 @@ export class MockThreadLogs {
   private slash = new Map<string, SlashCommandInit[]>();
   /** Subagent runs per thread in spawn order (mock/agents.ts); absent: none. */
   private agents = new Map<string, AgentRunInit[]>();
+  /** Wake subscriptions per thread in creation order (mock/wakes.ts); absent: none. */
+  private wakes = new Map<string, WakeInit[]>();
   /** Running background shells per thread, oldest first (mock/shells.ts); absent: none. */
   private shells = new Map<string, ShellCall[]>();
   /** Every thread event, for the Watch streams. */
@@ -327,6 +331,7 @@ export class MockThreadLogs {
     this.mcp.clear();
     this.slash.clear();
     this.agents.clear();
+    this.wakes.clear();
     this.shells.clear();
     this.calls = [];
     this.failRespond = "";
@@ -353,10 +358,51 @@ export class MockThreadLogs {
   }
 
   /** ListItems' snapshot. */
-  snapshotValue(id: string): { threadId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit; commands: SlashCommandInit[]; agents: AgentRunInit[] } {
+  snapshotValue(id: string): { threadId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit; commands: SlashCommandInit[]; agents: AgentRunInit[]; subscriptions: WakeInit[] } {
     this.world.worktreeOf(id);
     const l = this.log(id);
-    return { threadId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id), commands: this.slash.get(id) ?? [], agents: this.agents.get(id) ?? [] };
+    return { threadId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id), commands: this.slash.get(id) ?? [], agents: this.agents.get(id) ?? [], subscriptions: this.wakes.get(id) ?? [] };
+  }
+
+  /** ListSubscriptions: the thread's, or every thread's for "". */
+  listWakes(id: string): WakeInit[] {
+    return id ? (this.wakes.get(id) ?? []) : [...this.wakes.values()].flat();
+  }
+
+  /** Replaces the thread's subscriptions and publishes the Watch's `subscriptions` event (the whole list, no seq). */
+  private setWakes(id: string, wakes: WakeInit[]): void {
+    if (wakes.length > 0) this.wakes.set(id, wakes);
+    else this.wakes.delete(id);
+    this.publish(id, { event: { case: "subscriptions", value: { threadId: id, subscriptions: wakes } } });
+  }
+
+  /** thread.unsubscribe by id, and POST /__mock/thread/wake-fire: false when no thread has it. */
+  removeWake(sub: string): boolean {
+    for (const [id, wakes] of this.wakes) {
+      if (!wakes.some((w) => w.id === sub)) continue;
+      this.setWakes(id, wakes.filter((w) => w.id !== sub));
+      return true;
+    }
+    return false;
+  }
+
+  /** POST /__mock/thread/wake-status: the target's words change. */
+  setWakeStatus(id: string, sub: string, status: string): void {
+    this.setWakes(id, (this.wakes.get(id) ?? []).map((w) => (w.id === sub ? { ...w, targetStatus: status } : w)));
+  }
+
+  /** The thread's running shells by name, for thread.stop-waiting's question. */
+  shellNames(id: string): string[] {
+    return (this.shells.get(id) ?? []).map((c) => c.command || c.description);
+  }
+
+  /** thread.stop-waiting: its wakes go, its shells stop. Subagents run on. */
+  stopWaiting(id: string): { wakes: number; shells: number } {
+    const wakes = this.wakes.get(id)?.length ?? 0;
+    const running = [...(this.shells.get(id) ?? [])];
+    this.setWakes(id, []);
+    for (const c of running) this.stopShell(id, c.taskId);
+    return { wakes, shells: running.length };
   }
 
   /** The thread's subagent runs in spawn order ([] for none). Throws for an unknown thread. */
@@ -558,7 +604,8 @@ export class MockThreadLogs {
   private seen(id: string): void {
     const l = this.log(id);
     const last = l.items[l.items.length - 1];
-    if (l.watchers > 0 && l.pending.length === 0 && last?.payload?.case === "turnEnd" && this.world.statusOf(id) !== ThreadStatus.ERROR) this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
+    // A thread reading waiting stays so: the overlay outlives a look, like the daemon's (mock/wakes.ts).
+    if (l.watchers > 0 && l.pending.length === 0 && last?.payload?.case === "turnEnd" && this.world.statusOf(id) !== ThreadStatus.ERROR && !this.wakes.has(id)) this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
   }
 
   private item(id: string, payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}): ItemInit {
@@ -816,6 +863,7 @@ export class MockThreadLogs {
     this.generation++;
     this.logs.delete(id);
     this.agents.delete(id);
+    this.wakes.delete(id);
     this.shells.delete(id);
     // Checked at the start of its last turn (the status outlives the process); a thread
     // whose Claude never started has none.
@@ -859,6 +907,17 @@ export class MockThreadLogs {
       this.shells.set(id, shells);
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
+      this.world.agentsChanged(id);
+      return;
+    }
+    if (state === "waiting") {
+      // Everything that can wake a thread (mock/wakes.ts), idle at its prompt.
+      const { shells, runs } = scriptWaiting({ cwd, it, tool });
+      this.shells.set(id, shells);
+      this.agents.set(id, runs);
+      this.wakes.set(id, sampleWakes(id));
+      l.seq = l.items.length;
+      this.world.setStatus(id, ThreadStatus.IDLE, waitingReason({ children: 2, subagents: 1, shells: 1 }));
       this.world.agentsChanged(id);
       return;
     }

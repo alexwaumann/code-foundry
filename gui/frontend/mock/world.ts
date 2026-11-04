@@ -4197,12 +4197,42 @@ export class World {
           args: [{ name: "subscription", type: ArgType.STRING, required: false, description: "Subscription id (sub-…)" }],
         },
         when: always,
-        // The mock keeps only Ember's timers (mock/ember.ts): the Board's × cancels one by id.
+        // By id only: Ember's timers (mock/ember.ts, the Board's ×) and a thread's wakes (mock/wakes.ts, the waiting strip's ×).
         run: (_ctx, args) => {
           const id = args.subscription ?? "";
           if (!id) throw new CommandError("invalid", "give a subscription id");
-          if (!this.ember.removeTimer(id)) throw new CommandError("notfound", `subscription ${id} not found`);
+          if (!this.ember.removeTimer(id) && !this.logs.removeWake(id)) throw new CommandError("notfound", `subscription ${id} not found`);
+          this.logs.calls.push(`unsubscribe ${id}`);
           return `removed ${id}`;
+        },
+      },
+      {
+        cmd: {
+          name: "thread.stop-waiting",
+          title: "Stop Waiting",
+          category: "Thread",
+          description: "Remove everything that would wake a thread and stop its background shells. Child threads keep working and subagents run to their end.",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "shown-digest", type: ArgType.STRING, required: false, description: "Set by the confirmation" },
+          ],
+          // Like the daemon: only shells ask, named.
+          confirmIf: (ctx, args) => this.logs.shellNames(args.id || (ctx?.activeThreadId ?? "")).length > 0,
+          confirm: (ctx, args) => {
+            const names = this.logs.shellNames(args.id || (ctx?.activeThreadId ?? ""));
+            return `This stops ${String(names.length)} background shell${names.length === 1 ? "" : "s"}: ${names.join(", ")}. Its other wakes go too; child threads keep working.`;
+          },
+          confirmLabel: "Stop waiting",
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const id = args.id || (ctx?.activeThreadId ?? "");
+          // Like the daemon: what wakes Ember runs its board.
+          if (id === EMBER_THREAD) throw new CommandError("unavailable", `thread ${id} is the resident ember thread: its wakes and timers run its board`);
+          const { wakes, shells } = this.logs.stopWaiting(id);
+          this.logs.calls.push(`stop waiting ${id}`);
+          return `thread ${id}: removed ${String(wakes)} wakes, stopping ${String(shells)} shells`;
         },
       },
       {

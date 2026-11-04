@@ -20,10 +20,12 @@ import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream, type StreamStatus } from "@/api/stream";
 import { resettleStreamSlots, type StreamPriority } from "@/api/streamSlots";
 import type { AgentRunView } from "@/api/agents";
+import type { WakeSubscriptionView } from "@/api/wakes";
 import type { McpStatusView } from "@/api/mcp";
 import { shareCommands, type SlashCommandView } from "@/api/slashCommands";
 import { watchThread, type ThreadEventView, type ThreadItemView, type ThreadPendingListView, type ThreadPendingView } from "@/api/thread";
 import { shareAgents } from "@/lib/agents";
+import { shareWakes } from "@/lib/waitList";
 import { shareMcp } from "@/lib/mcp";
 import { inlinePage } from "@/lib/inlinePage";
 import { timelineKey } from "@/lib/threadTimeline";
@@ -48,6 +50,8 @@ export interface ThreadLog {
    * by identity (lib/agents shareAgents); empty when it never ran one.
    */
   agents: readonly AgentRunView[];
+  /** Its wake subscriptions (docs/notes/wait-list-daemon.md); an unchanged list keeps its identity. Absent: none. */
+  wakes?: readonly WakeSubscriptionView[];
 }
 
 export interface ThreadState {
@@ -156,6 +160,7 @@ function byOrdinal(byId: Readonly<Record<string, ThreadItemView>>): string[] {
 
 const NO_COMMANDS: readonly SlashCommandView[] = [];
 const NO_AGENTS: readonly AgentRunView[] = [];
+const NO_WAKES: readonly WakeSubscriptionView[] = [];
 
 /** A snapshot over the previous log, keeping unchanged items (and arrays) by identity. */
 function replaceLog(
@@ -166,6 +171,7 @@ function replaceLog(
   mcp: McpStatusView | null,
   commands: readonly SlashCommandView[],
   agents: readonly AgentRunView[],
+  wakes: readonly WakeSubscriptionView[] = NO_WAKES,
 ): ThreadLog {
   const byId: Record<string, ThreadItemView> = {};
   for (const it of items) {
@@ -181,6 +187,7 @@ function replaceLog(
     mcp: shareMcp(prev?.mcp ?? null, mcp),
     commands: shareCommands(prev?.commands ?? NO_COMMANDS, commands),
     agents: shareAgents(prev?.agents ?? NO_AGENTS, agents),
+    wakes: shareWakes(prev?.wakes ?? NO_WAKES, wakes),
   };
 }
 
@@ -200,7 +207,8 @@ function putItem(log: ThreadLog, it: ThreadItemView, seq: number): ThreadLog {
  */
 export function applyThreadEvent(log: ThreadLog | undefined, ev: ThreadEventView): ThreadLog | undefined {
   if (ev.kind === "pendingSnapshot") return log;
-  if (ev.kind === "snapshot") return replaceLog(log, ev.seq, ev.items, ev.pending, ev.mcp, ev.commands, ev.agents);
+  if (ev.kind === "snapshot") return replaceLog(log, ev.seq, ev.items, ev.pending, ev.mcp, ev.commands, ev.agents, ev.wakes);
+  if (ev.kind === "wakes") return log && { ...log, wakes: shareWakes(log.wakes ?? NO_WAKES, ev.wakes) }; // no seq: the list is whole, the last one wins
   if (!log || ev.seq <= log.seq) return log;
   switch (ev.kind) {
     case "appended":
