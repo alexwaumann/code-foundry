@@ -57,6 +57,7 @@ import "C"
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -82,6 +83,13 @@ type overlayWindow struct {
 	app    *application.App
 	log    *slog.Logger
 	window *application.WebviewWindow
+
+	mu sync.Mutex
+	// loaded: the page has loaded and the webview's background is cleared. Until then the
+	// panel would show as an opaque rectangle.
+	loaded bool
+	// waiting: a show arrived before that; the load finishes it.
+	waiting bool
 }
 
 func newOverlayWindow(app *application.App, log *slog.Logger) *overlayWindow {
@@ -121,15 +129,37 @@ func (o *overlayWindow) prepare() {
 	})
 	// The window is created on the main thread, queued ahead of this.
 	application.InvokeSync(func() { C.cfOverlayConfigure(o.window.NativeWindow()) })
+	// As for the main window: the webview paints its own empty-page colour until told not
+	// to, Wails' transparent backdrop or not.
 	o.window.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
-		o.log.Debug("dictation overlay: page loaded")
+		application.InvokeSync(func() { clearWebViewBackground(o.window.NativeWindow()) })
+		o.mu.Lock()
+		defer o.mu.Unlock()
+		o.loaded = true
+		if o.waiting {
+			o.waiting = false
+			o.orderIn()
+		}
 	})
 }
 
-// show places the panel on the pointer's screen, orders it in without taking focus (Wails
-// uses orderFrontRegardless for a non-activating panel) and hands the page the session.
+// show orders the panel in and hands the page the session. A page still loading asks for
+// the session itself (OverlayService.PageReady).
 func (o *overlayWindow) show(sessionID string) {
 	o.prepare()
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if !o.loaded {
+		o.waiting = true
+		return
+	}
+	o.orderIn()
+	o.window.EmitEvent(EventOverlayBegin, sessionID)
+}
+
+// orderIn places the panel on the pointer's screen and orders it in without taking focus
+// (Wails uses orderFrontRegardless for a non-activating panel).
+func (o *overlayWindow) orderIn() {
 	application.InvokeSync(func() {
 		var screens [overlayMaxScreens]C.cfOverlayScreen
 		var px, py C.double
@@ -145,10 +175,12 @@ func (o *overlayWindow) show(sessionID string) {
 		C.cfOverlayPlace(o.window.NativeWindow(), C.double(f.X), C.double(f.Y), C.double(f.Width), C.double(f.Height))
 	})
 	o.window.Show()
-	o.window.EmitEvent(EventOverlayBegin, sessionID)
 }
 
 func (o *overlayWindow) hide() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.waiting = false
 	if o.window != nil {
 		o.window.Hide()
 	}
