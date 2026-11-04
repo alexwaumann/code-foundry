@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
-import { AlarmClock, Archive, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
@@ -7,7 +7,7 @@ import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Chip } from "@/components/thread/Chip";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Tip, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agentsLabel } from "@/lib/agents";
 import { useNow, useNowSelect } from "@/lib/clock";
 import { formatElapsed } from "@/lib/elapsed";
@@ -150,8 +150,8 @@ function RowStatus({ id }: { id: string }) {
   );
 }
 
-const ACTION_BUTTON =
-  "flex size-5 shrink-0 items-center justify-center rounded-sm bg-cf-sidebar-row-selected text-cf-icon-muted outline-none hover:text-cf-sidebar-foreground focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:text-cf-sidebar-foreground";
+/** A row action's look: no background, muted at rest; each action adds its own hover foreground. */
+const ACTION_BUTTON = "flex shrink-0 items-center justify-center rounded-sm text-cf-icon-muted outline-none focus-visible:ring-1 focus-visible:ring-cf-focus";
 
 /** Keeps a click (and a double click) on a row's own control from reaching the row: no select, no rename. */
 const stop = (e: SyntheticEvent) => {
@@ -191,32 +191,29 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
       }}
     >
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <Tip label="Snooze thread" side="top" delay={0} data-testid="row-snooze-tip">
-          <DropdownMenuTrigger asChild>
-            <button type="button" tabIndex={tab} aria-label="Snooze thread" className={ACTION_BUTTON} data-testid="row-snooze">
-              <AlarmClock className="size-3.5" aria-hidden />
-            </button>
-          </DropdownMenuTrigger>
-        </Tip>
+        <DropdownMenuTrigger asChild>
+          <button type="button" tabIndex={tab} aria-label="Snooze thread" className={cn(ACTION_BUTTON, "size-5 hover:text-cf-warning-text aria-expanded:text-cf-warning-text")} data-testid="row-snooze">
+            <AlarmClock className="size-3.5" aria-hidden />
+          </button>
+        </DropdownMenuTrigger>
         <DropdownMenuContent align="start" data-testid="row-snooze-menu" onClick={stop} onDoubleClick={stop}>
           <SnoozePresetItems id={id} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} />
         </DropdownMenuContent>
       </DropdownMenu>
-      <Tip label="Archive thread" side="top" delay={0} data-testid="row-archive-tip">
-        <button
-          type="button"
-          tabIndex={tab}
-          aria-label="Archive thread"
-          className={ACTION_BUTTON}
-          data-testid="row-archive"
-          onClick={(e) => {
-            e.stopPropagation();
-            void archiveThread(id, true);
-          }}
-        >
-          <Archive className="size-3.5" aria-hidden />
-        </button>
-      </Tip>
+      <button
+        type="button"
+        tabIndex={tab}
+        aria-label="Archive thread"
+        className={cn(ACTION_BUTTON, "h-5 gap-[3px] px-1 text-caption-sm font-medium hover:text-cf-success-text")}
+        data-testid="row-archive"
+        onClick={(e) => {
+          e.stopPropagation();
+          void archiveThread(id, true);
+        }}
+      >
+        <Check className="size-3 shrink-0" aria-hidden />
+        Archive
+      </button>
     </span>
   );
 }
@@ -240,7 +237,7 @@ function LineProject({ id, cursor }: { id: string; cursor: boolean }) {
         {inFolder ? set : project}
       </span>
       {pinned && <Pin className="ml-1 size-3 shrink-0 text-cf-icon-muted" aria-label="pinned" data-testid="row-pinned" />}
-      <span className={cn("relative ml-auto flex shrink-0 items-center justify-end pl-1.5 group-hover/row:min-w-[50px]", actionsShown && "min-w-[50px]")}>
+      <span className={cn("relative ml-auto flex shrink-0 items-center justify-end pl-1.5 group-hover/row:min-w-[97px]", actionsShown && "min-w-[97px]")}>
         <span className={cn("flex min-w-0 items-center group-hover/row:invisible", actionsShown && "invisible")}>
           <RowStatus id={id} />
         </span>
@@ -562,34 +559,31 @@ function ThreadTipBody({ id }: { id: string }) {
  * A thread row's hover card, open at once (delayDuration 0, not the app root's 500 ms).
  * Pointer only: the rows are not focusable (the list uses aria-activedescendant), so
  * keyboard navigation never opens it, nor does focus coming back to a row action, nor a move
- * over the row's portalled snooze menu; a click or right-click closes it. Not while
- * renaming, and not over a badge with a tooltip of its own (data-tip) or one that wants
- * none (data-quiet, the linked PR tag).
+ * over the row's portalled snooze menu; a click or right-click closes it. It stays open over
+ * everything in the row, its actions and the linked PR tag too. Not while renaming.
  */
-/** Elements inside a row over which the hover card does not open: a Tip's trigger, the linked PR tag. */
-const QUIET = "[data-tip], [data-quiet]";
-const QUIET_HOVERED = "[data-tip]:hover, [data-quiet]:hover";
-
 function ThreadTooltip({ id, children }: { id: string; children: ReactElement }) {
   const enabled = useContext(RowTooltipsEnabled);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   const [open, setOpen] = useState(false);
-  // Typed as Radix's trigger (a button); asChild puts it on the row's div.
-  const ref = useRef<HTMLButtonElement>(null);
   const allowed = enabled && !renaming;
   return (
     <Tooltip
       open={open && allowed}
       onOpenChange={(o) => {
-        // Not over a badge with its own tooltip (Tip) or one that wants none (the linked PR tag).
-        setOpen(o && allowed && !ref.current?.querySelector(QUIET_HOVERED));
+        setOpen(o && allowed);
       }}
       disableHoverableContent
       delayDuration={0}
     >
       <TooltipTrigger
         asChild
-        ref={ref}
+        // Any press in the row shuts the card. Radix's own close is not enough: it skips a press
+        // that is default-prevented, as the one opening the snooze menu is, and RowActions stops
+        // the click, so the card would stay open behind the menu.
+        onPointerDownCapture={() => {
+          setOpen(false);
+        }}
         // Pointer only: focus never opens the card. The snooze menu hands focus back to its
         // button as it closes, which opened the card with nothing hovered (and kept it open).
         onFocus={(e) => {
@@ -599,13 +593,6 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
         // tree; they are not over the row, so Radix must not see them.
         onPointerMove={(e) => {
           if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) e.preventDefault();
-        }}
-        onPointerOver={(e) => {
-          if (!(e.target instanceof Element) || !e.currentTarget.contains(e.target)) return;
-          if (e.target.closest(QUIET)) setOpen(false);
-          // Back off a quiet element onto the row: Radix opens on a pointer move only once per
-          // visit of the trigger, and that one was refused over the tag; open it here.
-          else if (allowed && e.relatedTarget instanceof Element && e.relatedTarget.closest(QUIET) && ref.current?.contains(e.relatedTarget)) setOpen(true);
         }}
       >
         {children}

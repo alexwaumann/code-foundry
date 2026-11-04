@@ -198,6 +198,39 @@ test("hovering a thread row shows its card right of the sidebar, 260px wide; a c
   await expect(page.getByTestId("row-menu")).toHaveCount(0);
 });
 
+test("a real pointer keeps the card open over the row's actions and PR tag", async ({ page }) => {
+  await mockPost(`link-pr?thread=s-3&slug=${encodeURIComponent("alexwaumann/code-foundry")}&number=145&ago=60000`);
+  await openApp(page);
+  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+  const r = row(page, "s:s-3");
+  await r.getByTestId("thread-name").hover();
+  await expect(tip).toHaveAttribute("data-thread-id", "s-3");
+  for (const id of ["row-snooze", "row-archive", "row-linked-prs"]) {
+    await r.getByTestId(id).hover();
+    await page.waitForTimeout(100);
+    await expect(tip).toHaveAttribute("data-thread-id", "s-3");
+  }
+});
+
+test("at the narrowest sidebar the actions never cover the project, on a selected row too, and the status under them is hidden", async ({ page }) => {
+  await openApp(page);
+  // The default width is the minimum (SIDEBAR_MIN).
+  expect((await page.getByTestId("sidebar").boundingBox())?.width).toBe(260);
+  for (const select of [false, true]) {
+    const r = row(page, "s:s-3");
+    if (select) await r.click();
+    // A name long enough to reach the actions: the project gives way, not the actions.
+    await r.getByTestId("row-project").evaluate((el) => {
+      el.textContent = "a-project-name-long-enough-to-run-under-the-actions";
+    });
+    await r.getByTestId("thread-name").hover();
+    await expect(r.getByTestId("row-actions")).toHaveCSS("opacity", "1");
+    const [project, actions] = [await r.getByTestId("row-project").boundingBox(), await r.getByTestId("row-actions").boundingBox()];
+    expect((project?.x ?? 0) + (project?.width ?? 0)).toBeLessThanOrEqual(actions?.x ?? 0);
+    await expect(r.getByTestId("row-time")).toHaveCSS("visibility", "hidden");
+  }
+});
+
 // A multi-project thread's card (workspace or N projects, the run-in project and where it runs, branch, model) and line 1: src/components/sidebar/SidebarRow.test.tsx ("a workspace thread…", "an unnamed set…", "a thread in its workspace's folder…", "line 1 of a multi-project thread").
 
 // The status line's words, tones and times for every kind, and none for working or idle:

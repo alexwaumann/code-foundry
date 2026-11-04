@@ -1,4 +1,3 @@
-import type { Tone } from "@/components/pr/model";
 import { toneText } from "@/components/pr/tones";
 import { prStateLook } from "@/components/prs/prState";
 import { threadKey } from "@/lib/tree";
@@ -10,16 +9,6 @@ import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { linkedPrTag, linkedPrTagText } from "./linkedPrTag";
 import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
-
-/** The chip's tint per tone; the text colour is the PR surfaces' (pr/tones `toneText`). */
-const toneTint: Readonly<Record<Tone, string>> = {
-  success: "bg-cf-success-surface hover:bg-cf-success/30",
-  merged: "bg-cf-highlight-surface hover:bg-cf-highlight/30",
-  draft: "bg-cf-text-muted/15 hover:bg-cf-text-muted/25",
-  neutral: "bg-cf-text-muted/15 hover:bg-cf-text-muted/25",
-  failure: "bg-cf-error-surface hover:bg-cf-error/30",
-  pending: "bg-cf-warning-surface hover:bg-cf-warning/30",
-};
 
 /** Selects thread `id` (and puts the list's cursor on it) unless it is selected already, so its panel and card show. */
 function selectThread(id: string): void {
@@ -54,8 +43,9 @@ function openLinked(id: string, keys: readonly string[], shown: string | null): 
 /**
  * The thread's linked pull requests, closed ones left out (linkedPrTag): one shows its
  * state icon and bare number in the state's colour; several show the worst state's icon and
- * colour and "+N", N all of them. No tooltip of its own, and the row's hover card stays shut
- * over it (data-quiet): a click is what it is for.
+ * colour and "+N", N all of them. Text and icon carry the colour, with no background; an
+ * underline on hover says it is clickable. No tooltip of its own: the row's hover card stays
+ * open over it.
  */
 export function LinkedPrsBadge({ id }: { id: string }) {
   const keys = useLinkKeys(id);
@@ -70,12 +60,11 @@ export function LinkedPrsBadge({ id }: { id: string }) {
   return (
     // The click stops here: the row's own click would also focus the prompt and open a flag's surface.
     <span
-      className={cn("flex shrink-0 cursor-pointer items-center gap-0.5 rounded-sm px-1 text-caption-sm font-medium tabular-nums", toneText[tag.tone], toneTint[tag.tone])}
+      className={cn("flex shrink-0 cursor-pointer items-center gap-0.5 text-caption-sm font-medium tabular-nums hover:underline", toneText[tag.tone])}
       data-testid="row-linked-prs"
       data-kind={tag.kind}
       data-state={tag.state}
       data-tone={tag.tone}
-      data-quiet=""
       {...warm}
       onClick={(e) => {
         e.stopPropagation();
