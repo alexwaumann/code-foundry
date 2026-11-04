@@ -188,6 +188,33 @@ func projectsWorld() (*fakeGitHub, time.Time) {
 	return g, t0
 }
 
+// A poll that spends the budget ends there: its project lists wait out the pause like
+// the next poll, even for a repository tracked while the poll was in flight.
+func TestPollProjectsWaitsOutThePause(t *testing.T) {
+	reset := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
+	f := &fakeRunner{}
+	var s *Store
+	ready := make(chan struct{})
+	f.set(func(string, map[string]any) (json.RawMessage, error) {
+		<-ready
+		if err := s.Track("a/b"); err != nil {
+			t.Error(err)
+		}
+		return json.RawMessage(fmt.Sprintf(`{"rateLimit":{"limit":5000,"cost":1,"remaining":10,"resetAt":%q},
+			"viewer":{"id":"V","login":"octocat"}}`, reset.Format(time.RFC3339))), nil
+	})
+	s = startStore(t, testOptions(openTestDB(t), f, nil))
+	close(ready)
+	waitFor(t, "the poll's end", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return !s.lastPoll.IsZero()
+	})
+	if n := f.countSince(0, "PollProjects"); n != 0 {
+		t.Errorf("PollProjects during the pause = %d, want none", n)
+	}
+}
+
 func TestPollProjects(t *testing.T) {
 	b := bus.New()
 	dash := bus.Subscribe[DashboardUpdated](b, 64)
