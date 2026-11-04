@@ -34,7 +34,7 @@ launcher still runs.
 
 ## Change
 
-* `internal/tcc`: `ResponsibleApp()` names the app macOS checks for this process
+* `internal/tcc`: `Responsible()` names the app macOS checks for this process
   (`responsibility_get_pid_responsible_for_pid`, weak-linked libSystem SPI already used by
   `gui/responsible_darwin.go`, plus `proc_pidpath`; outermost `.app` name, else the
   executable name). It is read on every call because responsibility drifts when the
@@ -43,7 +43,7 @@ launcher still runs.
 * `fsx.ReadFile`: EPERM from `open` is an `ErrNotPermitted` error (it still unwraps to
   the `PathError`, so `fs.ErrPermission` matches). The message names the file, the app,
   and the area: "your Documents folder", iCloud Drive, "files managed by Dropbox", else
-  Full Disk Access. It also says where to allow it.
+  Full Disk Access. It also says how to allow it, which depends on the app (see below).
 * `api`: `ErrNotPermitted` is `PermissionDenied` (was `Internal`) for `ReadFile` and
   `PreviewFile`. The file tab already shows the daemon's message with Retry.
 * `PreviewFile` on a refused file the preview guards anyway (`~/Library` holds iCloud Drive
@@ -98,10 +98,30 @@ version and signed the same way meets the first build's requirement while anothe
 identifier's requirement fails. That run used a separate `.cli` identifier for the CLI;
 the shared one was re-checked with `make package` afterwards.
 
-**Not verified:** that tccd honours the requirement across two real builds, that a grant
-given under the GUI holds for the daemon after the GUI quits, and that a managed Mac's MDM
-accepts these signatures. All need a grant answered by hand on real releases. If tccd does not keep the grant, restore the "each update needs it again"
-sentence in `fsx.privacyMessage`, which this change removed.
+## Checked on a managed Mac, on real releases
+
+* The microphone did not ask again across an update, so TCC honours the identifier
+  requirement. A file in `~/Documents` did not ask again across an update, or after quitting
+  and reopening with the daemon left running, but Full Disk Access may explain that.
+* "Don't Allow" sticks: no new prompt, every retry fails, in the file tab and in Claude's
+  shell alike.
+* **Files and Folders is not a way back for a bare executable.** "Code Foundry" was listed
+  (exec icon, file name) with a Full Disk Access row and a Google Drive toggle, and no folder
+  toggles, not even for a folder it could read. Turning Full Disk Access on for it and
+  restarting did not help.
+* **Removing the entry and adding it again did.** The likely reason: the entry kept the
+  signature of the build that made it, here one from before this change, and the toggle
+  does not refresh it. So the message tells a bare executable to click − even if the entry is
+  on, and gives the path for +. A bundled app keeps the Files and Folders advice.
+* `tccutil reset <service> <identifier>` fails with "No such bundle identifier" for a bare
+  executable, so it is no recovery path.
+
+Every message ends with Restart Daemon because ⌘Q leaves the daemon running. Whether the
+restart is strictly needed was not separated out: the working sequence included one.
+
+Still not known: whether an entry made by a build with the fixed identity keeps working
+across later updates once it is the one in use, and whether a user who never had an old
+entry can get folder toggles.
 
 Options not taken: a helper process for the microphone so the daemon goes back to the
 terminal's identity (still drifts when the terminal quits).

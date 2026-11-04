@@ -36,31 +36,40 @@ import (
 	"unsafe"
 )
 
-// ResponsibleApp is the name macOS shows in System Settings → Privacy & Security for
-// the process responsible for this one: an app bundle's name ("iTerm", "Code Foundry"),
-// else the executable's file name. It is read on each call: the responsible process
-// changes when the one that started the daemon exits.
-func ResponsibleApp() string {
+// App is a process macOS checks, as System Settings → Privacy & Security lists it.
+type App struct {
+	// Name is an app bundle's name ("iTerm"), else the executable's file name.
+	Name string
+	// Path is its executable.
+	Path string
+	// Bundled says it is inside an app bundle. Only a bundle gets folder toggles that
+	// can be relied on: an entry for a bare executable keeps the signature of the build
+	// that made it, and has to be removed and added again (docs/notes/tcc-read-errors.md).
+	Bundled bool
+}
+
+// Responsible is the process responsible for this one. It is read on each call: the
+// responsible process changes when the one that started the daemon exits.
+func Responsible() App {
 	buf := make([]byte, C.PROC_PIDPATHINFO_MAXSIZE)
 	n := C.cfResponsiblePath((*C.char)(unsafe.Pointer(&buf[0])), C.int(len(buf)))
 	if n > 0 {
-		return AppName(string(buf[:n]))
+		return appAt(string(buf[:n]))
 	}
 	exe, err := os.Executable()
 	if err != nil {
-		return "code-foundry"
+		return App{Name: "code-foundry"}
 	}
-	return AppName(exe)
+	return appAt(exe)
 }
 
-// AppName is the name System Settings lists for the executable at exe: the outermost
-// app bundle holding it, without ".app", else the executable's file name.
-func AppName(exe string) string {
-	parts := strings.Split(filepath.Clean(exe), "/")
-	for _, p := range parts {
+// appAt is the App of the executable at exe: the outermost app bundle holding it, without
+// ".app", else the bare executable.
+func appAt(exe string) App {
+	for _, p := range strings.Split(filepath.Clean(exe), "/") {
 		if name, ok := strings.CutSuffix(p, ".app"); ok && name != "" {
-			return name
+			return App{Name: name, Path: exe, Bundled: true}
 		}
 	}
-	return filepath.Base(exe)
+	return App{Name: filepath.Base(exe), Path: exe}
 }

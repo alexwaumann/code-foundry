@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+
+	"github.com/alexwaumann/code-foundry/internal/tcc"
 )
 
 func TestProtectedArea(t *testing.T) {
@@ -36,23 +38,33 @@ func TestProtectedArea(t *testing.T) {
 
 func TestPrivacyMessage(t *testing.T) {
 	const root = "/Users/me"
+	iterm := tcc.App{Name: "iTerm", Path: "/Applications/iTerm.app/Contents/MacOS/iTerm2", Bundled: true}
+	gui := tcc.App{Name: "Code Foundry", Path: "/Users/me/.code-foundry/app/Code Foundry"}
+	cli := tcc.App{Name: "code-foundry", Path: "/Users/me/.code-foundry/app/code-foundry"}
 	tests := []struct {
-		name, path, real, app, want string
+		name, path, real string
+		app              tcc.App
+		want             string
 	}{
 		{
-			name: "a folder under Files and Folders, a terminal responsible",
-			path: "/Users/me/Documents/a.pdf", real: "/Users/me/Documents/a.pdf", app: "iTerm",
-			want: `macOS's privacy protection blocked reading /Users/me/Documents/a.pdf: "iTerm" has no access to your Documents folder. Allow it in System Settings → Privacy & Security → Files and Folders (or Full Disk Access), then retry.`,
+			name: "a bundled app has toggles in Files and Folders",
+			path: "/Users/me/Documents/a.pdf", real: "/Users/me/Documents/a.pdf", app: iterm,
+			want: `macOS's privacy protection blocked reading /Users/me/Documents/a.pdf: "iTerm" has no access to your Documents folder. Allow it in System Settings → Privacy & Security → Files and Folders (or Full Disk Access), then run Restart Daemon from the command palette.`,
 		},
 		{
-			name: "a symlink into a protected folder is judged by where it leads",
-			path: "/Users/me/proj/notes.md", real: "/Users/me/Desktop/notes.md", app: "Code Foundry",
-			want: `macOS's privacy protection blocked reading /Users/me/proj/notes.md: "Code Foundry" has no access to your Desktop folder. Allow it in System Settings → Privacy & Security → Files and Folders (or Full Disk Access), then retry.`,
+			name: "a bundled app, a file only Full Disk Access opens",
+			path: "/Users/me/.Trash/old.txt", real: "/Users/me/.Trash/old.txt", app: iterm,
+			want: `macOS's privacy protection blocked reading /Users/me/.Trash/old.txt: "iTerm" needs Full Disk Access to read it. Allow it in System Settings → Privacy & Security → Full Disk Access, then run Restart Daemon from the command palette.`,
 		},
 		{
-			name: "only Full Disk Access opens it",
-			path: "/Users/me/.Trash/old.txt", real: "/Users/me/.Trash/old.txt", app: "code-foundry",
-			want: `macOS's privacy protection blocked reading /Users/me/.Trash/old.txt: "code-foundry" needs Full Disk Access to read it. Allow it in System Settings → Privacy & Security → Full Disk Access, then retry.`,
+			name: "a bare executable is removed and added again; a symlink is judged by where it leads",
+			path: "/Users/me/proj/notes.md", real: "/Users/me/Desktop/notes.md", app: gui,
+			want: `macOS's privacy protection blocked reading /Users/me/proj/notes.md: "Code Foundry" has no access to your Desktop folder. In System Settings → Privacy & Security → Full Disk Access, select "Code Foundry" and click − if it is listed, even if it is on. Then click +, press ⌘⇧G, enter ~/.code-foundry/app/Code Foundry, turn it on, and run Restart Daemon from the command palette.`,
+		},
+		{
+			name: "the daemon answering for itself, a file only Full Disk Access opens",
+			path: "/Users/me/.Trash/old.txt", real: "/Users/me/.Trash/old.txt", app: cli,
+			want: `macOS's privacy protection blocked reading /Users/me/.Trash/old.txt: "code-foundry" needs Full Disk Access to read it. In System Settings → Privacy & Security → Full Disk Access, select "code-foundry" and click − if it is listed, even if it is on. Then click +, press ⌘⇧G, enter ~/.code-foundry/app/code-foundry, turn it on, and run Restart Daemon from the command palette.`,
 		},
 	}
 	for _, tt := range tests {
@@ -61,6 +73,15 @@ func TestPrivacyMessage(t *testing.T) {
 				t.Errorf("got  %s\nwant %s", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestHomePath(t *testing.T) {
+	if got := homePath("/Users/me", "/Users/me/.code-foundry/app/x"); got != "~/.code-foundry/app/x" {
+		t.Errorf("under home: %q", got)
+	}
+	if got := homePath("/Users/me", "/opt/bin/x"); got != "/opt/bin/x" {
+		t.Errorf("outside home: %q", got)
 	}
 }
 
