@@ -154,6 +154,14 @@ func (s *Store) pollProjects(ctx context.Context, cfg Config) {
 			plan.sections[i].first = n
 		}
 	}
+	// This cycle's own request may have brought a pause on: the lists wait for the next
+	// poll, which waits it out, and stay what they were.
+	s.mu.Lock()
+	paused := s.opts.Now().Before(s.pauseUntil)
+	s.mu.Unlock()
+	if paused {
+		return
+	}
 	prev := s.Snapshot().Projects
 	failed := func(err error) {
 		if ctx.Err() != nil {
