@@ -1,5 +1,6 @@
 import { useContext, useRef, type MouseEvent, type ReactNode } from "react";
-import { FOLD_PX, FOLD_SLACK_PX, FoldToggle, useTallerThan } from "@/lib/fold";
+import { FOLD_PX, FOLD_SLACK_PX, useTallerThan } from "@/lib/fold";
+import { FoldToggle } from "@/lib/FoldToggle";
 import { cn } from "@/lib/utils";
 import { messageFoldKey, setRowExpanded, useRowExpanded } from "@/stores/thread";
 import { FoldInPlaceContext, useThreadCtx } from "./context";

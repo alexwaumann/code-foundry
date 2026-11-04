@@ -5,8 +5,9 @@ description. Sketch variant A (the top bubble).
 
 ## What it is
 
-- `lib/fold.tsx` holds what the PR description and the bubble share: `FOLD_PX`
-  (170), `FOLD_SLACK_PX` (24), `useTallerThan` and `FoldToggle`. The description only moved
+- `lib/fold.ts` and `lib/FoldToggle.tsx` hold what the PR description and the bubble
+  share: `FOLD_PX` (170), `FOLD_SLACK_PX` (24), `useTallerThan` and the toggle. Not in
+  `components/ui`, which `@cf/ui` must re-export whole. The description only moved
   onto them; it still says Show all and fades to its surface.
 - `components/thread/MessageFold.tsx` is the bubble's box. The fade is a CSS mask on the text,
   because the bubble is tinted and has no colour to fade to.

@@ -1,7 +1,4 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCallback, useLayoutEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 /** How tall long text shows before it fades out behind its toggle (a PR's description, a long user message). */
 export const FOLD_PX = 170;
@@ -31,14 +28,4 @@ export function useTallerThan(limit: number): [(el: HTMLElement | null) => void,
   return [useCallback((e: HTMLElement | null) => {
     setEl(e);
   }, []), taller];
-}
-
-/** The toggle of folded text: `label` and a chevron down while folded, "Show less" and a chevron up once open. */
-export function FoldToggle({ folded, label, testId, className, onClick }: { folded: boolean; label: string; testId: string; className?: string; onClick: (e: React.MouseEvent<HTMLButtonElement>) => void }) {
-  return (
-    <Button variant="outline" size="xs" className={cn("bg-cf-surface", className)} aria-expanded={!folded} data-testid={testId} onClick={onClick}>
-      {folded ? label : "Show less"}
-      {folded ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
-    </Button>
-  );
 }
