@@ -131,6 +131,11 @@ message ActionRun {
   string output = 15;
   // The output began earlier than what `output` holds.
   bool output_truncated = 16;
+  // The TCP ports the run's processes listen on, ascending, while it runs; empty once it
+  // has ended. The daemon's probe is periodic, so a port shows up to 10 s late, and a
+  // process that left the run's process tree entirely (a daemon) is not counted. See
+  // docs/notes/action-run-ports.md.
+  repeated uint32 ports = 17;
 }
 
 message ListActionsRequest {
@@ -280,7 +285,7 @@ message ActionEvent {
     Action updated = 2;
     // An action was deleted (or its project unregistered).
     string removed_id = 3;
-    // A run started or finished (without output).
+    // A run started, finished, or its ports changed (without output).
     ActionRun run_updated = 4;
     // A run was forgotten (history cap, or its project unregistered).
     string run_removed_id = 5;

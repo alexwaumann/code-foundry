@@ -17,6 +17,8 @@ type Action struct {
 	Err error
 	// Actions is what List returns (filtered by project).
 	Actions []*v1.Action
+	// Runs is List's runs (filtered by project).
+	Runs []*v1.ActionRun
 	// Started is what Run returns; its owner fields and mode are filled from the
 	// request (mode BACKGROUND when unspecified). Default: run r1 of the action.
 	Started *v1.ActionRun
@@ -49,6 +51,11 @@ func (f *Action) List(_ context.Context, r *connect.Request[v1.ListActionsReques
 	for _, a := range f.Actions {
 		if r.Msg.GetProjectId() == "" || a.GetProjectId() == r.Msg.GetProjectId() {
 			out.Actions = append(out.Actions, a)
+		}
+	}
+	for _, run := range f.Runs {
+		if r.Msg.GetProjectId() == "" || run.GetProjectId() == r.Msg.GetProjectId() {
+			out.Runs = append(out.Runs, run)
 		}
 	}
 	for _, l := range f.LastRuns {

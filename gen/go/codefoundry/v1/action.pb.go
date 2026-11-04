@@ -445,8 +445,13 @@ type ActionRun struct {
 	Output string `protobuf:"bytes,15,opt,name=output,proto3" json:"output,omitempty"`
 	// The output began earlier than what `output` holds.
 	OutputTruncated bool `protobuf:"varint,16,opt,name=output_truncated,json=outputTruncated,proto3" json:"output_truncated,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The TCP ports the run's processes listen on, ascending, while it runs; empty once it
+	// has ended. The daemon's probe is periodic, so a port shows up to 10 s late, and a
+	// process that left the run's process tree entirely (a daemon) is not counted. See
+	// docs/notes/action-run-ports.md.
+	Ports         []uint32 `protobuf:"varint,17,rep,packed,name=ports,proto3" json:"ports,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ActionRun) Reset() {
@@ -589,6 +594,13 @@ func (x *ActionRun) GetOutputTruncated() bool {
 		return x.OutputTruncated
 	}
 	return false
+}
+
+func (x *ActionRun) GetPorts() []uint32 {
+	if x != nil {
+		return x.Ports
+	}
+	return nil
 }
 
 type ListActionsRequest struct {
@@ -1814,7 +1826,7 @@ type ActionEvent_RemovedId struct {
 }
 
 type ActionEvent_RunUpdated struct {
-	// A run started or finished (without output).
+	// A run started, finished, or its ports changed (without output).
 	RunUpdated *ActionRun `protobuf:"bytes,4,opt,name=run_updated,json=runUpdated,proto3,oneof"`
 }
 
@@ -2022,7 +2034,7 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xf2\x04\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x88\x05\n" +
 	"\tActionRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\taction_id\x18\x02 \x01(\tR\bactionId\x12\x1f\n" +
@@ -2045,7 +2057,8 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"finishedAt\x12:\n" +
 	"\atrigger\x18\x0e \x01(\x0e2 .codefoundry.v1.ActionRunTriggerR\atrigger\x12\x16\n" +
 	"\x06output\x18\x0f \x01(\tR\x06output\x12)\n" +
-	"\x10output_truncated\x18\x10 \x01(\bR\x0foutputTruncated\"3\n" +
+	"\x10output_truncated\x18\x10 \x01(\bR\x0foutputTruncated\x12\x14\n" +
+	"\x05ports\x18\x11 \x03(\rR\x05ports\"3\n" +
 	"\x12ListActionsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\"\xb4\x01\n" +
