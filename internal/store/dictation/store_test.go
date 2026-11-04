@@ -856,6 +856,24 @@ func TestHostReports(t *testing.T) {
 	if got := h.store.Snapshot().Accessibility; got == nil || !got.Granted {
 		t.Errorf("accessibility %+v", got)
 	}
+	inputs := dictation.Inputs{Devices: []dictate.Input{{UID: "mac", Name: "Mac", Transport: dictate.TransportBuiltIn}}, Default: "mac"}
+	h.store.ReportInputs(inputs)
+	if got := h.store.Snapshot().Inputs; got == nil || got.Default != "mac" || len(got.Devices) != 1 {
+		t.Errorf("inputs %+v", got)
+	}
+	changes := bus.Subscribe[dictation.Changed](h.bus, 16)
+	defer changes.Close()
+	h.store.ReportInputs(dictation.Inputs{Devices: []dictate.Input{{UID: "mac", Name: "Mac", Transport: dictate.TransportBuiltIn}}, Default: "mac"})
+	select {
+	case c := <-changes.C():
+		t.Errorf("published the same inputs: %+v", c.Snapshot)
+	default:
+	}
+	inputs.LidClosed = true
+	h.store.ReportInputs(inputs)
+	if got := h.store.Snapshot().Inputs; got == nil || !got.LidClosed {
+		t.Errorf("inputs %+v", got)
+	}
 	h.store.ComposerTarget(true)
 	if !h.store.Snapshot().ComposerTarget {
 		t.Error("composer target not recorded")

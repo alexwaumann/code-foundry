@@ -10,8 +10,9 @@ import { useEffect, useState } from "react";
 import type { DictationAccessibilityView, DictationView } from "@/api/dictation";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { downloadProgress, gigabytes, megabytes, memorySize } from "@/lib/dictation";
+import { downloadProgress, gigabytes, megabytes, memorySize, microphoneDescription } from "@/lib/dictation";
 import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
 import { runCommandForResult } from "@/stores/commands";
@@ -95,6 +96,65 @@ export function DictationNeedsModel() {
   const snap = useSnapshot();
   if (!snap || snap.model.downloaded) return null;
   return <> Needs the model below.</>;
+}
+
+/** Radix Select reserves "" for "no value"; dictation.microphone's "" is the system default. */
+const SYSTEM_DEFAULT = "__cf_system_default__";
+
+/** A row of the Microphone menu's quiet note; only in the list, not the trigger (which copies the item's text). */
+function MicrophoneNote({ text }: { text: string }) {
+  return <span className="ml-auto text-caption [[data-slot=select-value]_&]:hidden">{text}</span>;
+}
+
+const TRANSPORT_NOTES: Readonly<Partial<Record<string, string>>> = { bluetooth: "Bluetooth", usb: "USB" };
+
+/**
+ * dictation.microphone: System default, then what the host says is connected. The chosen
+ * microphone stays in the list while it is away, so the row can name it.
+ */
+export function DictationMicrophoneEditor({ field, value, pending, invalid, commit }: EditorProps) {
+  const snap = useSnapshot();
+  const mic = snap?.microphone;
+  const devices = mic?.devices ?? [];
+  const away = value !== "" && !devices.some((d) => d.uid === value);
+  return (
+    <Select
+      value={value === "" ? SYSTEM_DEFAULT : value}
+      disabled={pending}
+      onValueChange={(v) => {
+        commit(v === SYSTEM_DEFAULT ? "" : v);
+      }}
+    >
+      <SelectTrigger className="w-full" aria-label={field.title} aria-invalid={invalid || undefined} data-value={value}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SYSTEM_DEFAULT}>System default</SelectItem>
+        {(devices.length > 0 || away) && <SelectSeparator />}
+        {devices.map((d) => {
+          const note = TRANSPORT_NOTES[d.transport];
+          return (
+            <SelectItem key={d.uid} value={d.uid} className="*:[span]:last:w-full">
+              {d.name}
+              {note && <MicrophoneNote text={note} />}
+            </SelectItem>
+          );
+        })}
+        {away && (
+          <SelectItem value={value} className="*:[span]:last:w-full">
+            {mic?.chosenName || "That microphone"}
+            <MicrophoneNote text="Not connected" />
+          </SelectItem>
+        )}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** What the Microphone row says now; the setting's own description until the host has said what is connected. */
+export function DictationMicrophoneDescription({ fallback }: { fallback: string }) {
+  const snap = useSnapshot();
+  return <>{snap?.microphone ? microphoneDescription(snap.microphone) : fallback}</>;
 }
 
 /** Where the model is kept: next to the settings file (~/.code-foundry/dictation). */

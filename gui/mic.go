@@ -49,8 +49,10 @@ type microphone interface {
 	// RequestAccess asks macOS for the microphone, which prompts when the permission is
 	// undetermined, and reports whether it was granted. It returns early with ctx.
 	RequestAccess(ctx context.Context) (granted bool, err error)
-	// Start opens the microphone.
-	Start() (micCapture, error)
+	// Inputs is the Mac's input devices now. It never opens one.
+	Inputs() inputList
+	// Start opens the input with this UID, or the system default with "".
+	Start(uid string) (micCapture, error)
 }
 
 // micCapture is an open microphone.

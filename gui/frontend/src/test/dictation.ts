@@ -68,6 +68,7 @@ export function dictationSnap(o: Partial<Omit<DictationView, "model" | "hardware
     error: "",
     micDenied: false,
     accessibility: null,
+    microphone: null,
     composerTarget: false,
     ...rest,
     model: { name: "ggml-large-v3-turbo-q8_0.bin", sizeBytes: 874_188_075, downloaded: true, download: null, ...model },

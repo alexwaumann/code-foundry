@@ -59,6 +59,8 @@ const (
 	// DictationServiceAccessibilityProcedure is the fully-qualified name of the DictationService's
 	// Accessibility RPC.
 	DictationServiceAccessibilityProcedure = "/codefoundry.v1.DictationService/Accessibility"
+	// DictationServiceInputsProcedure is the fully-qualified name of the DictationService's Inputs RPC.
+	DictationServiceInputsProcedure = "/codefoundry.v1.DictationService/Inputs"
 	// DictationServiceComposerTargetProcedure is the fully-qualified name of the DictationService's
 	// ComposerTarget RPC.
 	DictationServiceComposerTargetProcedure = "/codefoundry.v1.DictationService/ComposerTarget"
@@ -108,6 +110,9 @@ type DictationServiceClient interface {
 	// accessibility on Watch. Nothing is stored: a restarted daemon has none until the host
 	// reports again.
 	Accessibility(context.Context, *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error)
+	// Inputs is the host reporting the Mac's input devices; it shows as inputs on Watch. Nothing
+	// is stored: a restarted daemon has none until the host reports again.
+	Inputs(context.Context, *connect.Request[v1.DictationInputsRequest]) (*connect.Response[v1.DictationInputsResponse], error)
 	// ComposerTarget is the window saying whether a composer can take dictation now (the
 	// choice dictation.toggle makes); it shows as composer_target on Watch, so the host can
 	// route a press of the hold key without asking the window.
@@ -185,6 +190,12 @@ func NewDictationServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(dictationServiceMethods.ByName("Accessibility")),
 			connect.WithClientOptions(opts...),
 		),
+		inputs: connect.NewClient[v1.DictationInputsRequest, v1.DictationInputsResponse](
+			httpClient,
+			baseURL+DictationServiceInputsProcedure,
+			connect.WithSchema(dictationServiceMethods.ByName("Inputs")),
+			connect.WithClientOptions(opts...),
+		),
 		composerTarget: connect.NewClient[v1.DictationComposerTargetRequest, v1.DictationComposerTargetResponse](
 			httpClient,
 			baseURL+DictationServiceComposerTargetProcedure,
@@ -206,6 +217,7 @@ type dictationServiceClient struct {
 	audio          *connect.Client[v1.DictationAudioFrame, v1.DictationAudioResponse]
 	micDenied      *connect.Client[v1.DictationMicDeniedRequest, v1.DictationMicDeniedResponse]
 	accessibility  *connect.Client[v1.DictationAccessibilityRequest, v1.DictationAccessibilityResponse]
+	inputs         *connect.Client[v1.DictationInputsRequest, v1.DictationInputsResponse]
 	composerTarget *connect.Client[v1.DictationComposerTargetRequest, v1.DictationComposerTargetResponse]
 }
 
@@ -259,6 +271,11 @@ func (c *dictationServiceClient) Accessibility(ctx context.Context, req *connect
 	return c.accessibility.CallUnary(ctx, req)
 }
 
+// Inputs calls codefoundry.v1.DictationService.Inputs.
+func (c *dictationServiceClient) Inputs(ctx context.Context, req *connect.Request[v1.DictationInputsRequest]) (*connect.Response[v1.DictationInputsResponse], error) {
+	return c.inputs.CallUnary(ctx, req)
+}
+
 // ComposerTarget calls codefoundry.v1.DictationService.ComposerTarget.
 func (c *dictationServiceClient) ComposerTarget(ctx context.Context, req *connect.Request[v1.DictationComposerTargetRequest]) (*connect.Response[v1.DictationComposerTargetResponse], error) {
 	return c.composerTarget.CallUnary(ctx, req)
@@ -308,6 +325,9 @@ type DictationServiceHandler interface {
 	// accessibility on Watch. Nothing is stored: a restarted daemon has none until the host
 	// reports again.
 	Accessibility(context.Context, *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error)
+	// Inputs is the host reporting the Mac's input devices; it shows as inputs on Watch. Nothing
+	// is stored: a restarted daemon has none until the host reports again.
+	Inputs(context.Context, *connect.Request[v1.DictationInputsRequest]) (*connect.Response[v1.DictationInputsResponse], error)
 	// ComposerTarget is the window saying whether a composer can take dictation now (the
 	// choice dictation.toggle makes); it shows as composer_target on Watch, so the host can
 	// route a press of the hold key without asking the window.
@@ -381,6 +401,12 @@ func NewDictationServiceHandler(svc DictationServiceHandler, opts ...connect.Han
 		connect.WithSchema(dictationServiceMethods.ByName("Accessibility")),
 		connect.WithHandlerOptions(opts...),
 	)
+	dictationServiceInputsHandler := connect.NewUnaryHandler(
+		DictationServiceInputsProcedure,
+		svc.Inputs,
+		connect.WithSchema(dictationServiceMethods.ByName("Inputs")),
+		connect.WithHandlerOptions(opts...),
+	)
 	dictationServiceComposerTargetHandler := connect.NewUnaryHandler(
 		DictationServiceComposerTargetProcedure,
 		svc.ComposerTarget,
@@ -409,6 +435,8 @@ func NewDictationServiceHandler(svc DictationServiceHandler, opts ...connect.Han
 			dictationServiceMicDeniedHandler.ServeHTTP(w, r)
 		case DictationServiceAccessibilityProcedure:
 			dictationServiceAccessibilityHandler.ServeHTTP(w, r)
+		case DictationServiceInputsProcedure:
+			dictationServiceInputsHandler.ServeHTTP(w, r)
 		case DictationServiceComposerTargetProcedure:
 			dictationServiceComposerTargetHandler.ServeHTTP(w, r)
 		default:
@@ -458,6 +486,10 @@ func (UnimplementedDictationServiceHandler) MicDenied(context.Context, *connect.
 
 func (UnimplementedDictationServiceHandler) Accessibility(context.Context, *connect.Request[v1.DictationAccessibilityRequest]) (*connect.Response[v1.DictationAccessibilityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.DictationService.Accessibility is not implemented"))
+}
+
+func (UnimplementedDictationServiceHandler) Inputs(context.Context, *connect.Request[v1.DictationInputsRequest]) (*connect.Response[v1.DictationInputsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.DictationService.Inputs is not implemented"))
 }
 
 func (UnimplementedDictationServiceHandler) ComposerTarget(context.Context, *connect.Request[v1.DictationComposerTargetRequest]) (*connect.Response[v1.DictationComposerTargetResponse], error) {

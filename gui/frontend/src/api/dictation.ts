@@ -45,6 +45,26 @@ export interface DictationView {
   accessibility: DictationAccessibilityView | null;
   /** The daemon's word on whether a composer can take dictation (what this window told it). */
   composerTarget: boolean;
+  /** The Mac's inputs and what the settings choose among them, as the host last said; null before it has. */
+  microphone: DictationMicrophoneView | null;
+}
+
+/** An input device. `transport` says what the menu notes: "bluetooth", "usb", or something it leaves out. */
+export interface DictationInputView {
+  uid: string;
+  name: string;
+  transport: string;
+}
+
+/** The Microphone row's facts: which of its descriptions, and the names in it. */
+export interface DictationMicrophoneView {
+  devices: DictationInputView[];
+  state: "plain" | "avoiding" | "named" | "missing";
+  /** While avoiding: what is listened to, and the Bluetooth default passed over. */
+  listeningName: string;
+  defaultName: string;
+  /** The last name seen for the chosen microphone, connected or not. */
+  chosenName: string;
 }
 
 /** What macOS allows the hold key. */
@@ -83,6 +103,19 @@ const endMap: Record<DictationEndReason, DictationEndView> = {
   [DictationEndReason.DISCARDED]: "discarded",
 };
 
+function toMicrophoneView(s: DictationSnapshot): DictationMicrophoneView | null {
+  const inputs = s.inputs;
+  const pick = s.microphonePick;
+  if (!inputs || !pick) return null;
+  return {
+    devices: inputs.devices.map((d) => ({ uid: d.uid, name: d.name, transport: d.transport })),
+    state: pick.state === "avoiding" || pick.state === "named" || pick.state === "missing" ? pick.state : "plain",
+    listeningName: pick.name,
+    defaultName: pick.defaultName,
+    chosenName: inputs.microphoneName,
+  };
+}
+
 export function toDictationView(s: DictationSnapshot): DictationView {
   const m = s.model;
   const d = m?.download;
@@ -104,6 +137,7 @@ export function toDictationView(s: DictationSnapshot): DictationView {
       ? { granted: s.accessibility.granted, tapSilent: s.accessibility.tapSilent, listName: s.accessibility.listName, executable: s.accessibility.executable }
       : null,
     composerTarget: s.composerTarget,
+    microphone: toMicrophoneView(s),
   };
 }
 

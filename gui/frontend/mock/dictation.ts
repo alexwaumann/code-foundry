@@ -6,10 +6,12 @@
  * first when the script has one. Download fills in over about 1.5 s and turns dictation on.
  *
  * Controls (mock/server.ts):
- *   POST /__mock/dictation?state=off|no-model|downloading|download-failed|ready|unloaded|listening|error[&m1=true][&denied=true][&access=none|missing|granted|silent]
+ *   POST /__mock/dictation?state=off|no-model|downloading|download-failed|ready|unloaded|listening|error[&m1=true][&denied=true][&access=none|missing|granted|silent][&mic=none|plain|avoiding|named|missing]
  *        (off: dictation off, no model; downloading: a static 557 MB of 874 MB; download-failed:
  *        off, no model, every source failed; listening: the CLI holds a session; unloaded: Start
- *        loads for loadMs first; access: what the host would report about the hold key, none by default)
+ *        loads for loadMs first; access: what the host would report about the hold key, none by default;
+ *        mic: what the host would report about the inputs, none by default; named and missing
+ *        mean dictation.microphone is the Shure, which the test sets through settings/external)
  *   POST /__mock/dictation/script?phrases=One.|Two.[&gap=1000][&flush=Tail.][&loadMs=800][&silence=1]
  *        (silence=1: the session ends "silence" after its phrases)
  *   POST /__mock/dictation/end?reason=silence|stopped|disabled|error   (the open session ends)
@@ -33,6 +35,18 @@ const MODEL_SIZE = 874_188_075;
 const M4 = { chip: "Apple M4 Pro", memoryBytes: 48 * 2 ** 30, m1Family: false };
 const M1 = { chip: "Apple M1 Pro", memoryBytes: 16 * 2 ** 30, m1Family: true };
 const DEFAULT_PHRASES = ["Then add a table test for the race.", "And run it with the detector on."];
+
+const MAC = { uid: "mac", name: "MacBook Pro Microphone", transport: "built_in" };
+const PODS = { uid: "pods", name: "AirPods Pro", transport: "bluetooth" };
+const SHURE = { uid: "shure", name: "Shure MV7", transport: "usb" };
+type MockMic = "plain" | "avoiding" | "named" | "missing";
+/** What each `mic` control reports. */
+const MICS: Record<MockMic, Pick<SnapshotInit, "inputs" | "microphonePick">> = {
+  plain: { inputs: { devices: [MAC, PODS, SHURE], defaultUid: "mac" }, microphonePick: { state: "plain" } },
+  avoiding: { inputs: { devices: [MAC, PODS, SHURE], defaultUid: "pods" }, microphonePick: { state: "avoiding", name: MAC.name, defaultName: PODS.name } },
+  named: { inputs: { devices: [MAC, PODS, SHURE], defaultUid: "mac", microphoneName: SHURE.name }, microphonePick: { state: "named" } },
+  missing: { inputs: { devices: [MAC, PODS], defaultUid: "mac", microphoneName: SHURE.name }, microphonePick: { state: "missing" } },
+};
 
 export interface DictationCommandEntry {
   cmd: {
@@ -67,6 +81,7 @@ export class MockDictation {
   private error = "";
   private micDenied = false;
   private access: Pick<NonNullable<SnapshotInit["accessibility"]>, "granted" | "tapSilent"> | null = null;
+  private mic: MockMic | null = null;
   private composerTarget = false;
   private hardware = M4;
   private session: MockSession | null = null;
@@ -95,6 +110,7 @@ export class MockDictation {
     this.error = "";
     this.micDenied = false;
     this.access = null;
+    this.mic = null;
     this.composerTarget = false;
     this.hardware = M4;
     this.script = { phrases: DEFAULT_PHRASES, gapMs: 1000, flush: "", loadMs: 800, silence: false };
@@ -137,6 +153,7 @@ export class MockDictation {
       micDenied: this.micDenied,
       accessibility: this.access ? { ...this.access, listName: "Device Control and Data Access", executable: "/Users/you/.code-foundry/app/Code Foundry" } : undefined,
       composerTarget: this.composerTarget,
+      ...(this.mic ? MICS[this.mic] : {}),
     };
   }
 
@@ -311,6 +328,9 @@ export class MockDictation {
     const state = q.get("state");
     if (q.has("m1")) this.hardware = q.get("m1") === "true" ? M1 : M4;
     if (q.has("denied")) this.micDenied = q.get("denied") === "true";
+    const mic = q.get("mic");
+    if (mic === "none") this.mic = null;
+    else if (mic === "plain" || mic === "avoiding" || mic === "named" || mic === "missing") this.mic = mic;
     const access = q.get("access");
     if (access !== null) this.access = access === "none" ? null : { granted: access !== "missing", tapSilent: access === "silent" };
     if (state !== null) {

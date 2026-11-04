@@ -31,6 +31,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -170,6 +171,9 @@ type Prefs struct {
 	SoundVolume int
 	// OtherAudio is dictation.other_audio: do_nothing or lower.
 	OtherAudio string
+	// Microphone is dictation.microphone, AvoidBluetooth dictation.avoid_bluetooth.
+	Microphone     string
+	AvoidBluetooth bool
 	// Spoken is dictation.spoken_symbols and dictation.spoken_formatting. Every phrase goes
 	// through it here, so a composer and a paste get the same text.
 	Spoken dictate.Spoken
@@ -182,6 +186,17 @@ type Accessibility struct {
 	TapSilent bool
 	// ListName is what System Settings calls the list; Executable is the host's path.
 	ListName, Executable string
+}
+
+// Inputs is what the host reported about the Mac's input devices.
+type Inputs struct {
+	Devices []dictate.Input
+	// Default is the system default input's UID.
+	Default   string
+	LidClosed bool
+	// MicrophoneName is the last name seen for dictation.microphone's device, which may not
+	// be connected.
+	MicrophoneName string
 }
 
 // Snapshot is the store's published state.
@@ -200,6 +215,8 @@ type Snapshot struct {
 	ComposerTarget bool
 	// Accessibility is the host's last report; nil before the first.
 	Accessibility *Accessibility
+	// Inputs is the host's last report; nil before the first.
+	Inputs *Inputs
 }
 
 // Changed is published on the bus with every new snapshot.
@@ -322,6 +339,7 @@ type Store struct {
 	micDenied bool
 	composer  bool
 	access    *Accessibility
+	inputs    *Inputs
 	// changed is closed and replaced on every publish (Start waits on it).
 	changed chan struct{}
 }
@@ -448,6 +466,23 @@ func (s *Store) ReportAccessibility(a Accessibility) {
 		s.access = &a
 		s.publishLocked()
 	}
+}
+
+// ReportInputs records what the host reported about the input devices.
+func (s *Store) ReportInputs(in Inputs) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !sameInputs(s.inputs, &in) {
+		s.inputs = &in
+		s.publishLocked()
+	}
+}
+
+func sameInputs(a, b *Inputs) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Default == b.Default && a.LidClosed == b.LidClosed && a.MicrophoneName == b.MicrophoneName && slices.Equal(a.Devices, b.Devices)
 }
 
 // ---- download ------------------------------------------------------------------
@@ -1090,7 +1125,7 @@ func (s *Store) publishLocked() {
 	m := s.opts.Model
 	snap := &Snapshot{
 		Enabled: s.enabled, Prefs: s.prefs, State: s.stateLocked(), Hardware: s.hw, MicDenied: s.micDenied,
-		ComposerTarget: s.composer, Accessibility: s.access,
+		ComposerTarget: s.composer, Accessibility: s.access, Inputs: s.inputs,
 		Model: ModelState{Name: m.Name, Title: m.Title, Size: m.Size, Downloaded: s.onDisk},
 		Error: s.dlErr,
 	}
@@ -1118,6 +1153,9 @@ func (s *Store) publishLocked() {
 func equal(a, b *Snapshot) bool {
 	if a.Enabled != b.Enabled || a.Prefs != b.Prefs || a.State != b.State || a.Hardware != b.Hardware || a.Error != b.Error ||
 		a.MicDenied != b.MicDenied || a.ComposerTarget != b.ComposerTarget || a.Model.Downloaded != b.Model.Downloaded {
+		return false
+	}
+	if !sameInputs(a.Inputs, b.Inputs) {
 		return false
 	}
 	if (a.Accessibility == nil) != (b.Accessibility == nil) || (a.Accessibility != nil && *a.Accessibility != *b.Accessibility) {

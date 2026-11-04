@@ -54,6 +54,10 @@ type Dictation struct {
 	// HoldKey is the Option key that dictates while held: HoldKeyLeft, HoldKeyRight
 	// or HoldKeyBoth (either one works).
 	HoldKey string
+	// Microphone is the input to listen to, by device UID; "" follows the system default.
+	Microphone string
+	// AvoidBluetooth passes over a Bluetooth system default when another input is usable.
+	AvoidBluetooth bool
 	// Sounds plays a sound as dictation starts and stops, at notifications.sound_volume.
 	Sounds bool
 	// OtherAudio is what other apps' sound does during a hold: OtherAudioDoNothing or

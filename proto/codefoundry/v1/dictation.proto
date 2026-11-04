@@ -61,6 +61,9 @@ service DictationService {
   // accessibility on Watch. Nothing is stored: a restarted daemon has none until the host
   // reports again.
   rpc Accessibility(DictationAccessibilityRequest) returns (DictationAccessibilityResponse) {}
+  // Inputs is the host reporting the Mac's input devices; it shows as inputs on Watch. Nothing
+  // is stored: a restarted daemon has none until the host reports again.
+  rpc Inputs(DictationInputsRequest) returns (DictationInputsResponse) {}
   // ComposerTarget is the window saying whether a composer can take dictation now (the
   // choice dictation.toggle makes); it shows as composer_target on Watch, so the host can
   // route a press of the hold key without asking the window.
@@ -124,6 +127,44 @@ message DictationSnapshot {
   // dictation.other_audio: "do_nothing" or "lower" (the host ramps the default output down
   // for a hold; docs/notes/dictation-other-audio.md).
   string other_audio = 15;
+  // dictation.microphone: a device UID, "" for the system default.
+  string microphone = 16;
+  // dictation.avoid_bluetooth.
+  bool avoid_bluetooth = 17;
+  // What the host last reported; unset until it has (no host, or dictation off so far).
+  DictationInputs inputs = 18;
+  // What those two settings choose among those inputs (docs/notes/dictation-microphone.md);
+  // unset without inputs.
+  DictationMicrophonePick microphone_pick = 19;
+}
+
+// DictationInput is one input device.
+message DictationInput {
+  // kAudioDevicePropertyDeviceUID, which stays the same across connections.
+  string uid = 1;
+  string name = 2;
+  // "built_in", "bluetooth", "usb", "virtual", "continuity" or "other".
+  string transport = 3;
+}
+
+// DictationInputs is the Mac's input devices, as the host sees them.
+message DictationInputs {
+  repeated DictationInput devices = 1;
+  // The system default input's UID.
+  string default_uid = 2;
+  // A MacBook's lid is closed, so its built-in microphone is off though listed.
+  bool lid_closed = 3;
+  // The last name seen for dictation.microphone's device, which may not be connected.
+  string microphone_name = 4;
+}
+
+// DictationMicrophonePick is the input a session would open now.
+message DictationMicrophonePick {
+  // "plain", "avoiding", "named" or "missing".
+  string state = 1;
+  // While avoiding: what is listened to, and the Bluetooth default passed over.
+  string name = 2;
+  string default_name = 3;
 }
 
 // DictationAccessibility is what macOS allows the hold key, as the host sees it.
@@ -289,6 +330,12 @@ message DictationAccessibilityRequest {
 }
 
 message DictationAccessibilityResponse {}
+
+message DictationInputsRequest {
+  DictationInputs inputs = 1;
+}
+
+message DictationInputsResponse {}
 
 message DictationComposerTargetRequest {
   bool available = 1;

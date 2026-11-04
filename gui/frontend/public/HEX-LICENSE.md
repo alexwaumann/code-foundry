@@ -6,8 +6,9 @@ gui/frontend/src/overlay/scope.ts and gui/overlay.go. The dictation engine's rel
 spacing of pasted text (gui/paste.go, cfCharBeforeCaret in gui/paste_darwin.go) of its join,
 with_smart_spacing and char_before_caret. Spoken symbols and spoken formatting
 (internal/dictate/spoken.go) port its English word lists and rules, and the volume ramp behind
-Other audio (gui/duck.go, gui/duck_darwin.go) ports its output ducking. That project is
-distributed under the MIT License below.
+Other audio (gui/duck.go, gui/duck_darwin.go) ports its output ducking. Choosing a microphone
+(internal/dictate/microphone.go, gui/inputs.go, gui/inputs_darwin.go) ports its rules for
+Bluetooth, closed lids and stand-ins. That project is distributed under the MIT License below.
 
 MIT License
 

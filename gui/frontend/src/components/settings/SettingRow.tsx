@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { SettingFieldView } from "@/api/settings";
 import { Tip } from "@/components/ui/tooltip";
 import { Highlight } from "./Highlight";
-import { keyDescriptionTails, keyEditors, keyTitleChips, tallKeyEditors } from "./keyEditors";
+import { keyDescriptions, keyDescriptionTails, keyEditors, keyTitleChips, tallKeyEditors } from "./keyEditors";
 import { displayValue } from "./model";
 import { useSettingField } from "./useSettingField";
 
@@ -94,6 +94,7 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
   const state = useSettingField(field);
   const TitleChip = keyTitleChips[field.key];
   const DescriptionTail = keyDescriptionTails[field.key];
+  const Description = words ? undefined : keyDescriptions[field.key];
   return (
     <div
       className={cn(
@@ -119,7 +120,7 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
         </div>
         {field.description && (
           <p className="mt-0.5 text-caption">
-            <Highlight text={field.description} words={words} />
+            {Description ? <Description fallback={field.description} /> : <Highlight text={field.description} words={words} />}
             {DescriptionTail && <DescriptionTail />}
           </p>
         )}

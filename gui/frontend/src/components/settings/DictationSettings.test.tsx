@@ -51,12 +51,14 @@ const field: SettingFieldView = {
 };
 const anywhere: SettingFieldView = { ...field, key: "dictation.anywhere", title: "Dictate anywhere" };
 const holdKey: SettingFieldView = { ...field, key: "dictation.hold_key", title: "Hold key", type: "enum", enumValues: ["left", "right", "either", "both"], enumLabels: ["Left ⌥", "Right ⌥", "Either ⌥", "Both ⌥"], defaultValue: "either", dependsOn: field.key };
+const microphone: SettingFieldView = { ...field, key: "dictation.microphone", title: "Microphone", type: "string", description: "Follows the input chosen in System Settings.", defaultValue: "", dependsOn: field.key };
+const avoid: SettingFieldView = { ...field, key: "dictation.avoid_bluetooth", title: "Avoid Bluetooth microphones", defaultValue: "true", dependsOn: field.key };
 const sounds: SettingFieldView = { ...field, key: "dictation.sounds", title: "Sounds", defaultValue: "true", dependsOn: field.key };
 const otherAudio: SettingFieldView = { ...field, key: "dictation.other_audio", title: "Other audio", type: "enum", enumValues: ["do_nothing", "lower"], enumLabels: ["Do nothing", "Lower"], defaultValue: "do_nothing", dependsOn: field.key };
 const symbols: SettingFieldView = { ...field, key: "dictation.spoken_symbols", title: "Spoken symbols", dependsOn: field.key };
 const formatting: SettingFieldView = { ...field, key: "dictation.spoken_formatting", title: "Spoken formatting", defaultValue: "true", dependsOn: field.key };
 const section = { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." };
-const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, sounds, otherAudio, symbols, formatting], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
+const schema: SettingsSchemaView = { groups: [], fields: [field, anywhere, holdKey, microphone, sounds, otherAudio, avoid, symbols, formatting], pages: [{ id: "general", title: "General", description: "", sections: [section] }] };
 
 const M1 = { chip: "Apple M1 Pro", memoryBytes: 16 * 2 ** 30, m1Family: true };
 const NO_MODEL = { downloaded: false, sizeBytes: 874_188_075 };
@@ -116,7 +118,7 @@ describe("Settings › Dictation", () => {
     const rows = () => [...sec.querySelectorAll("[data-setting]")].map((r) => r.getAttribute("data-setting"));
     expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
     await publish(dictationSnap());
-    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere", "dictation.hold_key", "dictation.sounds", "dictation.other_audio"]);
+    expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere", "dictation.hold_key", "dictation.microphone", "dictation.sounds", "dictation.other_audio"]);
     expect(sec.querySelector('[data-setting="dictation.other_audio"] ~ [data-testid="dictation-model-row"]')).not.toBeNull();
     await publish(dictationSnap({ enabled: false, state: "disabled" }));
     expect(rows()).toEqual(["dictation.enabled", "dictation.anywhere"]);
@@ -134,8 +136,8 @@ describe("Settings › Dictation", () => {
     fireEvent.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     const card = within(sec).getByTestId("settings-advanced");
-    expect([...card.querySelectorAll("[data-setting]")].map((r) => r.getAttribute("data-setting"))).toEqual(["dictation.spoken_symbols", "dictation.spoken_formatting"]);
-    expect(within(card).getAllByRole("switch").map((s) => s.getAttribute("aria-checked"))).toEqual(["false", "true"]);
+    expect([...card.querySelectorAll("[data-setting]")].map((r) => r.getAttribute("data-setting"))).toEqual(["dictation.avoid_bluetooth", "dictation.spoken_symbols", "dictation.spoken_formatting"]);
+    expect(within(card).getAllByRole("switch").map((s) => s.getAttribute("aria-checked"))).toEqual(["true", "false", "true"]);
     expect(card.querySelector('[data-testid="dictation-model-row"]')).toBeNull();
 
     fireEvent.click(toggle);
@@ -143,6 +145,54 @@ describe("Settings › Dictation", () => {
 
     await publish(dictationSnap({ enabled: false, state: "disabled" }));
     expect(within(sec).queryByTestId("settings-advanced-toggle")).toBeNull();
+  });
+
+  describe("the Microphone row", () => {
+    const mac = { uid: "mac", name: "MacBook Pro Microphone", transport: "built_in" };
+    const pods = { uid: "pods", name: "AirPods Pro", transport: "bluetooth" };
+    const shure = { uid: "shure", name: "Shure MV7", transport: "usb" };
+    const facts = { state: "plain" as const, listeningName: "", defaultName: "", chosenName: "" };
+    const row = (sec: HTMLElement) => {
+      const r = sec.querySelector<HTMLElement>('[data-setting="dictation.microphone"]');
+      if (!r) throw new Error("no row");
+      return r;
+    };
+    const setMicrophone = (uid: string) => {
+      useSettingsStore.setState((s) => ({ snapshot: s.snapshot && { ...s.snapshot, values: { ...s.snapshot.values, "dictation.microphone": uid } } }));
+    };
+
+    it("says what it does, and follows the host's reports", async () => {
+      const { sec } = await mount(dictationSnap());
+      expect(row(sec).textContent).toContain("Follows the input chosen in System Settings.");
+      expect(within(row(sec)).getByRole("combobox").textContent).toBe("System default");
+
+      await publish(dictationSnap({ microphone: { ...facts, state: "avoiding", devices: [mac, pods], listeningName: mac.name, defaultName: pods.name } }));
+      expect(row(sec).textContent).toContain("AirPods Pro are Bluetooth, so Code Foundry listens to MacBook Pro Microphone.");
+      expect(within(row(sec)).getByRole("combobox").textContent).toBe("System default");
+    });
+
+    it("a named microphone shows by name, and one that is away stays named", async () => {
+      const { sec } = await mount(dictationSnap({ microphone: { ...facts, state: "named", devices: [mac, shure], chosenName: shure.name } }));
+      await act(async () => {
+        setMicrophone("shure");
+        await Promise.resolve();
+      });
+      expect(row(sec).textContent).toContain("Always listens to this microphone while it is connected.");
+      expect(within(row(sec)).getByRole("combobox").getAttribute("data-value")).toBe("shure");
+
+      await act(async () => {
+        fakeDictation.publish(dictationSnap({ microphone: { ...facts, state: "missing", devices: [mac], chosenName: shure.name } }));
+        await vi.waitFor(() => {
+          expect(useDictationStore.getState().snapshot?.microphone?.state).toBe("missing");
+        });
+      });
+      expect(row(sec).textContent).toContain("Shure MV7 isn’t connected, so Code Foundry is using the system default.");
+    });
+
+    it("off, the row goes", async () => {
+      const { sec } = await mount(dictationSnap({ enabled: false, state: "disabled" }));
+      expect(sec.querySelector('[data-setting="dictation.microphone"]')).toBeNull();
+    });
   });
 
   it("off without the model: Needs the model, Download starts it, and when it finishes the size, the switch on and Ready", async () => {

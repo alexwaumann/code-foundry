@@ -219,6 +219,10 @@ func (p Paths) WindowFrame() string { return filepath.Join(p.home, "window-frame
 // (docs/notes/dictation-other-audio.md).
 func (p Paths) LoweredAudio() string { return filepath.Join(p.home, "audio-lowered") }
 
+// InputNames is the last name seen for each input device, so the settings page can name a
+// microphone that is not connected.
+func (p Paths) InputNames() string { return filepath.Join(p.home, "input-names.json") }
+
 // Ensure creates the home and logs directories with 0700 permissions and checks that
 // the socket path fits in sun_path.
 func (p Paths) Ensure() error {

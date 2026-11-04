@@ -2,8 +2,10 @@ package main
 
 /*
 #cgo CFLAGS: -x objective-c
-#cgo LDFLAGS: -framework AVFoundation -framework Foundation
+#cgo LDFLAGS: -framework AVFoundation -framework AudioToolbox -framework CoreAudio -framework CoreFoundation -framework Foundation
 #import <AVFoundation/AVFoundation.h>
+#import <AudioToolbox/AudioToolbox.h>
+#import <CoreAudio/CoreAudio.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -94,15 +96,43 @@ static void cfMicSinkClose(CFMicSink* s) {
 	pthread_mutex_unlock(&s->mu);
 }
 
-// cfMicStart opens the default input with AVAudioEngine and writes its audio to fd
-// (duplicated) as 16 kHz mono int16 little-endian, converted by AVAudioConverter on the
-// tap's thread. A configuration change (AVAudioEngineConfigurationChangeNotification:
-// a headset connected, the default input switched; the engine has stopped) writes one
-// byte to changeFd (duplicated, non-blocking). NULL with *err (malloc'd) on failure.
-static cfMic* cfMicStart(int fd, int changeFd, char** err) {
+// cfMicPin points the input node's audio unit at the device with this UID. It must come before
+// the node's format is read: the format is the device's. NULL, or the failure (malloc'd).
+static char* cfMicPin(AVAudioInputNode* input, const char* text) {
+	CFStringRef uid = CFStringCreateWithCString(kCFAllocatorDefault, text, kCFStringEncodingUTF8);
+	if (uid == NULL) return strdup("a bad device UID");
+	AudioObjectPropertyAddress a = {kAudioHardwarePropertyTranslateUIDToDevice, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
+	AudioObjectID device = 0;
+	UInt32 size = sizeof device;
+	OSStatus rc = AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, sizeof uid, &uid, &size, &device);
+	CFRelease(uid);
+	if (rc != noErr || device == 0) return strdup("that input is not connected");
+	AudioUnit unit = input.audioUnit;
+	if (unit == NULL) return strdup("the input node has no audio unit");
+	if (AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &device, sizeof device) != noErr) {
+		return strdup("the input node refused that device");
+	}
+	return NULL;
+}
+
+// cfMicStart opens an input with AVAudioEngine, the device with UID uid or, with NULL, the
+// default, and writes its audio to fd (duplicated) as 16 kHz mono int16 little-endian, converted
+// by AVAudioConverter on the tap's thread. A configuration change
+// (AVAudioEngineConfigurationChangeNotification: a headset connected, the default input
+// switched; the engine has stopped) writes one byte to changeFd (duplicated, non-blocking).
+// NULL with *err (malloc'd) on failure.
+static cfMic* cfMicStart(int fd, int changeFd, const char* uid, char** err) {
 	@autoreleasepool {
 		AVAudioEngine* engine = [[AVAudioEngine alloc] init];
 		AVAudioInputNode* input = [engine inputNode];
+		if (uid != NULL) {
+			char* failed = cfMicPin(input, uid);
+			if (failed != NULL) {
+				[engine release];
+				*err = failed;
+				return NULL;
+			}
+		}
 		AVAudioFormat* inFmt = [input outputFormatForBus:0];
 		if (inFmt.sampleRate <= 0 || inFmt.channelCount == 0) {
 			[engine release];
@@ -227,6 +257,9 @@ func (m *avMicrophone) do(f func()) {
 	<-done
 }
 
+// Inputs is the Mac's inputs now.
+func (m *avMicrophone) Inputs() inputList { return listInputs() }
+
 // Permission is the microphone permission now.
 func (m *avMicrophone) Permission() micPermission {
 	var status C.int
@@ -274,8 +307,8 @@ func (m *avMicrophone) RequestAccess(ctx context.Context) (bool, error) {
 	}
 }
 
-// Start opens the microphone.
-func (m *avMicrophone) Start() (micCapture, error) {
+// Start opens the input with this UID, or the system default with "".
+func (m *avMicrophone) Start(uid string) (micCapture, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
 		return nil, fmt.Errorf("open microphone: %w", err)
@@ -289,7 +322,12 @@ func (m *avMicrophone) Start() (micCapture, error) {
 		mic  *C.cfMic
 		cerr *C.char
 	)
-	m.do(func() { mic = C.cfMicStart(C.int(w.Fd()), C.int(cw.Fd()), &cerr) })
+	var cuid *C.char
+	if uid != "" {
+		cuid = C.CString(uid)
+		defer C.free(unsafe.Pointer(cuid))
+	}
+	m.do(func() { mic = C.cfMicStart(C.int(w.Fd()), C.int(cw.Fd()), cuid, &cerr) })
 	// The C side holds its own copies of the write ends; it closes them on stop, which
 	// ends the readers below.
 	_, _ = w.Close(), cw.Close()

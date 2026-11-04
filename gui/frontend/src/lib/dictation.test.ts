@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barHeight, decayLevels, downloadProgress, easeLevels, formatElapsed, gigabytes, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, phraseAtCaret, phraseOnOneLine, pushLevel } from "./dictation";
+import { barHeight, decayLevels, downloadProgress, easeLevels, formatElapsed, gigabytes, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, microphoneDescription, deviceVerb, phraseAtCaret, phraseOnOneLine, pushLevel } from "./dictation";
 
 describe("phraseAtCaret", () => {
   it.each([
@@ -37,6 +37,36 @@ describe("phraseOnOneLine", () => {
     { text: "\n", want: " " },
   ])("$text", ({ text, want }) => {
     expect(phraseOnOneLine(text)).toBe(want);
+  });
+});
+
+describe("deviceVerb", () => {
+  it.each([
+    ["AirPods Pro", "are"],
+    ["Alex’s AirPods", "are"],
+    ["Galaxy Buds2", "is"],
+    ["Galaxy Buds", "are"],
+    ["Sony Headphones", "are"],
+    ["Beats Solo", "are"],
+    ["Jabra Evolve", "is"],
+    ["iPhone", "is"],
+    ["Bose QC45", "is"],
+  ])("%s", (name, want) => {
+    expect(deviceVerb(name)).toBe(want);
+  });
+});
+
+describe("microphoneDescription", () => {
+  const facts = { listeningName: "", defaultName: "", chosenName: "" };
+  it.each([
+    { state: "plain" as const, want: "Follows the input chosen in System Settings." },
+    { state: "avoiding" as const, defaultName: "AirPods Pro", listeningName: "MacBook Pro Microphone", want: "AirPods Pro are Bluetooth, so Code Foundry listens to MacBook Pro Microphone." },
+    { state: "avoiding" as const, defaultName: "Jabra Evolve", listeningName: "Shure MV7", want: "Jabra Evolve is Bluetooth, so Code Foundry listens to Shure MV7." },
+    { state: "named" as const, want: "Always listens to this microphone while it is connected." },
+    { state: "missing" as const, chosenName: "Shure MV7", want: "Shure MV7 isn’t connected, so Code Foundry is using the system default." },
+    { state: "missing" as const, want: "That microphone isn’t connected, so Code Foundry is using the system default." },
+  ])("$state $want", ({ want, ...m }) => {
+    expect(microphoneDescription({ ...facts, ...m })).toBe(want);
   });
 });
 
