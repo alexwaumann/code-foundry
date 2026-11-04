@@ -130,7 +130,7 @@ func (s *Store) PullRequestFile(ctx context.Context, slug, ref, filePath string)
 		segs[i] = url.PathEscape(sg)
 	}
 	p := "repos/" + url.PathEscape(owner) + "/" + url.PathEscape(name) + "/contents/" + strings.Join(segs, "/")
-	return submitFunc(ctx, s, "file|"+key+"|"+fk.ref+"|"+clean, func(ctx context.Context) (PullRequestFile, error) {
+	return submitRead(ctx, s, "file|"+key+"|"+fk.ref+"|"+clean, func(ctx context.Context) (PullRequestFile, error) {
 		res, err := s.restRaw(ctx, rr, p, map[string]string{"ref": fk.ref}, acceptRaw, PullRequestFileMax)
 		var f PullRequestFile
 		switch {

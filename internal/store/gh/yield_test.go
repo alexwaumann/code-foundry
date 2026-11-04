@@ -66,7 +66,7 @@ func newYieldWorld(t *testing.T, mod func(*Options)) *yieldWorld {
 		w.note(path, false)
 		return json.RawMessage(`{"total_count": 7}`), nil
 	}}
-	opts := testOptions(openTestDB(t), r, b)
+	opts := testOptions(openTestDB(t), rawYieldRunner{r}, b)
 	opts.MinGap = time.Millisecond
 	opts.StatsInterval = time.Hour
 	opts.HistoryInterval = time.Millisecond // the closed months ride along with every stats poll
@@ -103,6 +103,13 @@ func newYieldWorld(t *testing.T, mod func(*Options)) *yieldWorld {
 	drain(w.polled)
 	drain(w.events)
 	return w
+}
+
+// rawYieldRunner adds raw REST, which only the read paths' test reaches.
+type rawYieldRunner struct{ *restRunner }
+
+func (r rawYieldRunner) RESTRaw(context.Context, string, map[string]string, string, int64) (RawResponse, error) {
+	return RawResponse{}, nil
 }
 
 // note logs a request on its way out (start) and holds it where holdGitHub asked.
@@ -209,6 +216,15 @@ func (w *yieldWorld) queued() int {
 
 // testJob is a click: it queues id, sends one request, and returns its error.
 func (w *yieldWorld) testJob(ctx context.Context, id string) error {
+	_, err := submitRead(ctx, w.s, id, func(ctx context.Context) (int, error) {
+		_, err := w.s.call(ctx, queryLookupRepository, map[string]any{"owner": "o", "name": id})
+		return 0, err
+	})
+	return err
+}
+
+// testWrite is testJob as a write: it is not a read, whoever goes away.
+func (w *yieldWorld) testWrite(ctx context.Context, id string) error {
 	_, err := submitFunc(ctx, w.s, id, func(ctx context.Context) (int, error) {
 		_, err := w.s.call(ctx, queryLookupRepository, map[string]any{"owner": "o", "name": id})
 		return 0, err
@@ -519,8 +535,9 @@ func TestRunEndsWithAPollDue(t *testing.T) {
 	}
 }
 
-// A caller that leaves takes its place in the queue with it. A job someone else waits
-// for, or one a client was promised, still runs; a job already running finishes.
+// A caller that leaves takes a read with it. A job someone else waits for, a write, and
+// a refresh a client was promised still run, the last two behind the jobs someone waits
+// for; a job already running finishes.
 func TestCallerLeaves(t *testing.T) {
 	lookup := func(w *yieldWorld) *job {
 		return &job{kind: jobFunc, id: "shared", run: func(ctx context.Context) (any, error) {
@@ -541,13 +558,26 @@ func TestCallerLeaves(t *testing.T) {
 		{name: "already gone: never queued", wantSent: 0, setup: func(t *testing.T, w *yieldWorld, leaving context.Context) <-chan error {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			if err := w.testJob(ctx, "gone"); !errors.Is(err, context.Canceled) {
+			// A write, which would stay in the queue: nobody asked for it any more.
+			if err := w.testWrite(ctx, "gone"); !errors.Is(err, context.Canceled) {
 				t.Errorf("dead context: %v", err)
 			}
 			if n := w.queued(); n != 0 {
 				t.Errorf("queued %d", n)
 			}
 			return w.goJob(t, leaving, "gone")
+		}},
+		{name: "a write: runs, behind the waited ones", wantSent: 1, setup: func(t *testing.T, w *yieldWorld, leaving context.Context) <-chan error {
+			out := make(chan error, 1)
+			go func() { out <- w.testWrite(leaving, "write") }()
+			waitFor(t, "the write in the queue", func() bool { return w.queued() == 1 })
+			return out
+		}, check: func(t *testing.T, w *yieldWorld) {
+			w.s.mu.Lock()
+			defer w.s.mu.Unlock()
+			if len(w.s.queue) != 1 || !w.s.queue[0].background {
+				t.Errorf("the write did not go behind the waited jobs")
+			}
 		}},
 		{name: "another live waiter: runs", wantSent: 1, setup: func(t *testing.T, w *yieldWorld, leaving context.Context) <-chan error {
 			out := w.goJob(t, leaving, "shared")
@@ -614,6 +644,72 @@ func TestCallerLeaves(t *testing.T) {
 			settleWorker(t, w.s)
 			if n := w.count(w.sentSince(from), opLookup); n != tt.wantSent {
 				t.Errorf("%d requests, want %d", n, tt.wantSent)
+			}
+		})
+	}
+}
+
+// Every read a client can walk away from gives up its place, on any path to the queue.
+func TestEveryReadLeavesWithItsCaller(t *testing.T) {
+	tests := []struct {
+		name string
+		read func(ctx context.Context, s *Store) error
+	}{
+		{"detail", func(ctx context.Context, s *Store) error {
+			_, err := s.FullPullRequest(ctx, "o/r", 8, false)
+			return err
+		}},
+		{"diff", func(ctx context.Context, s *Store) error {
+			_, err := s.PullRequestDiff(ctx, "o/r", 8, false)
+			return err
+		}},
+		{"file", func(ctx context.Context, s *Store) error {
+			_, err := s.PullRequestFile(ctx, "o/r", strings.Repeat("a", 40), "a.go")
+			return err
+		}},
+		{"pull request", func(ctx context.Context, s *Store) error {
+			_, err := s.PullRequest(ctx, "o/r", 8)
+			return err
+		}},
+		{"checks", func(ctx context.Context, s *Store) error {
+			_, err := s.Checks(ctx, "o/r", "main")
+			return err
+		}},
+		{"reviewer candidates", func(ctx context.Context, s *Store) error {
+			_, err := s.ReviewerCandidates(ctx, "o/r", 8, "ab")
+			return err
+		}},
+		{"repository search", func(ctx context.Context, s *Store) error {
+			_, err := s.SearchRepositories(ctx, "code")
+			return err
+		}},
+		{"repository lookup", func(ctx context.Context, s *Store) error {
+			_, err := s.LookupRepository(ctx, "o", "other")
+			return err
+		}},
+		{"publish owners", func(ctx context.Context, s *Store) error {
+			_, err := s.PublishOwners(ctx)
+			return err
+		}},
+		{"a poll asked for", func(ctx context.Context, s *Store) error { return s.Refresh(ctx, "o/any") }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := newYieldWorld(t, nil)
+			w.holdGitHub("Poll", false)
+			w.kickPoll(t)
+			w.waitHeld(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			out := make(chan error, 1)
+			go func() { out <- tt.read(ctx, w.s) }()
+			waitFor(t, "the read in the queue", func() bool { return w.queued() == 1 })
+			cancel()
+			if err := recv(t, out); !errors.Is(err, context.Canceled) {
+				t.Errorf("read: %v", err)
+			}
+			if n := w.queued(); n != 0 {
+				t.Errorf("%d jobs queued after the caller left", n)
 			}
 		})
 	}

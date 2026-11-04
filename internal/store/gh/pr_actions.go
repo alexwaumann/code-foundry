@@ -43,7 +43,7 @@ func (s *Store) ReviewerCandidates(ctx context.Context, slug string, number int,
 	}
 	owner, name := splitSlug(k.slug)
 	query = strings.TrimSpace(query)
-	return submitFunc(ctx, s, "candidates|"+k.String()+"|"+query, func(ctx context.Context) (ReviewerCandidates, error) {
+	return submitRead(ctx, s, "candidates|"+k.String()+"|"+query, func(ctx context.Context) (ReviewerCandidates, error) {
 		data, err := s.call(ctx, queryReviewerCandidates, reviewerCandidatesVars(owner, name, k.number, query))
 		if err != nil && !isPartial(err) {
 			return ReviewerCandidates{}, err

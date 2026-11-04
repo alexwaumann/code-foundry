@@ -372,7 +372,7 @@ func (s *Store) Refresh(ctx context.Context, slug string) error {
 	if _, err := NormalizeSlug(slug); err != nil {
 		return err
 	}
-	return s.submit(ctx, &job{kind: jobPoll}).err
+	return s.submit(ctx, &job{kind: jobPoll, read: true}).err
 }
 
 // PullRequest implements Service.
@@ -391,7 +391,7 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 	if ok && s.opts.Now().Sub(cached.FetchedAt) < s.opts.DetailTTL && !s.moved.movedSince(fullKey{key, number}, cached.FetchedAt) {
 		return cached, nil
 	}
-	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number})
+	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number, read: true})
 	if res.err != nil {
 		if ok && ctx.Err() == nil {
 			cached.LastError = res.err.Error()
@@ -418,7 +418,7 @@ func (s *Store) Checks(ctx context.Context, slug, ref string) (RefChecks, error)
 	if ok && s.opts.Now().Sub(cached.FetchedAt) < s.opts.DetailTTL {
 		return cached, nil
 	}
-	res := s.submit(ctx, &job{kind: jobChecks, slug: key, ref: ref})
+	res := s.submit(ctx, &job{kind: jobChecks, slug: key, ref: ref, read: true})
 	if res.err != nil {
 		if ok && ctx.Err() == nil {
 			cached.LastError = res.err.Error()

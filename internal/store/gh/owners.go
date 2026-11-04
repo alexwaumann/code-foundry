@@ -140,7 +140,7 @@ func (s *Store) PublishOwners(ctx context.Context) ([]PublishOwner, error) {
 		owners   []PublishOwner
 		complete bool
 	}
-	r, err := submitFunc(ctx, s, "publish-owners", func(ctx context.Context) (result, error) {
+	r, err := submitRead(ctx, s, "publish-owners", func(ctx context.Context) (result, error) {
 		data, err := s.call(ctx, queryPublishOwners, nil)
 		if err != nil && !isPartial(err) { // an SSO-protected org may come back as a partial error
 			return result{}, err
