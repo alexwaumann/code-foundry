@@ -277,6 +277,16 @@ func (h *Filesystem) WriteFile(_ context.Context, req *connect.Request[v1.WriteF
 	}), nil
 }
 
+// CheckEdit says whether the File tab could edit and save a file, for view.panel.file
+// --edit: its path and whether it is missing, or why not. Not an RPC: the GUI asks by reading.
+func (h *Filesystem) CheckEdit(_ context.Context, base, path string) (string, bool, error) {
+	t, err := h.writer.Editable(base, path)
+	if err != nil {
+		return "", false, fileError(err)
+	}
+	return t.Path, t.Missing, nil
+}
+
 // fileError is fsx.ReadFile's or Writer.Write's error as a Connect error.
 func fileError(err error) error {
 	switch {

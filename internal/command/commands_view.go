@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 
 	"connectrpc.com/connect"
 
@@ -91,6 +92,8 @@ type ViewDeps struct {
 	Viewed func(threadID string) bool
 	// Files backs view.panel.file's check (FilesystemService.ReadFile).
 	Files FileReader
+	// FileEdits backs view.panel.file --edit's check (Filesystem.CheckEdit).
+	FileEdits FileEditChecker
 	// Diffs backs view.panel.diff's check (ProjectService.GetWorktreeFileDiff).
 	Diffs FileDiffer
 	// Projects finds a thread's project's GitHub repository for view.panel.pr
@@ -106,6 +109,13 @@ type ViewDeps struct {
 	// Workspaces resolves view.projects --workspace (an id or a name) to its id. Nil: the
 	// value goes to the GUI as given.
 	Workspaces WorkspaceLister
+}
+
+// noFileEdits is FileEdits when nothing backs it.
+type noFileEdits struct{}
+
+func (noFileEdits) CheckEdit(context.Context, string, string) (string, bool, error) {
+	return "", false, connect.NewError(connect.CodeUnimplemented, errors.New("no file checks here"))
 }
 
 // pageFocusArg is the page verbs' --focus.
@@ -155,6 +165,9 @@ func (d ViewDeps) showPageWith(uctx Context, a Args, name string, params map[str
 func RegisterView(r *Registry, d ViewDeps) error {
 	if d.Files == nil {
 		d.Files = codefoundryv1connect.UnimplementedFilesystemServiceHandler{}
+	}
+	if d.FileEdits == nil {
+		d.FileEdits = noFileEdits{}
 	}
 	if d.Diffs == nil {
 		d.Diffs = codefoundryv1connect.UnimplementedProjectServiceHandler{}

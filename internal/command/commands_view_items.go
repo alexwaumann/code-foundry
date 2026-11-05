@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 
@@ -24,7 +25,8 @@ import (
 // ShowView names of the item verbs. Their ShowView carries the item in params.
 const (
 	// ViewPanelFile opens a file's File tab: params path (absolute), line (1-based,
-	// optional), project and base (the thread's project and checkout).
+	// optional), project and base (the thread's project and checkout). --edit adds edit
+	// and thread (who asked), and note, create and focus when they apply.
 	ViewPanelFile = "panel.file"
 	// ViewPanelDiff opens a changed file's Diff tab: params project, worktree, path
 	// (worktree-relative) and scope ("working" | "branch").
@@ -43,6 +45,13 @@ type FileReader interface {
 // (ProjectService.GetWorktreeFileDiff).
 type FileDiffer interface {
 	GetWorktreeFileDiff(context.Context, *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error)
+}
+
+// FileEditChecker says whether the File tab can edit a file (Filesystem.CheckEdit): its
+// path, and whether it is missing (a new file), or a refusal fit to show. Neither ever
+// holds anything from inside the file.
+type FileEditChecker interface {
+	CheckEdit(ctx context.Context, base, path string) (resolved string, missing bool, err error)
 }
 
 // ProjectLister lists the registered projects (ProjectService.List).
@@ -93,9 +102,11 @@ func (d ViewDeps) itemCommands() []Command {
 			Args: []ArgSpec{
 				{Name: "path", Type: Path, Required: true, Positional: true, Description: "File to show: absolute, ~/…, or relative to the current directory; under the home directory"},
 				{Name: "line", Type: Int, Description: "1-based line to scroll to and mark"},
+				{Name: "edit", Type: Bool, Description: "Ask the user to edit the file: the tab opens editing, with a band naming this thread and Save and tell thread, whose message says only that it was saved"},
+				{Name: "note", Type: String, Description: fmt.Sprintf("With --edit: what to put where, shown as plain text in the band; at most %d characters", maxEditNote)},
 				thread, focus,
 			},
-			Run: item(ViewPanelFile, d.fileCheck),
+			Run: d.runPanelFile,
 		},
 		{
 			Name:      "view.panel.diff",
@@ -133,14 +144,85 @@ func (d ViewDeps) itemCommands() []Command {
 	}
 }
 
+// maxEditNote is the longest --note, in characters: a band above a file, not a message.
+const maxEditNote = 500
+
+// runPanelFile is view.panel.file. An --edit is asked by the thread running it, which may
+// not be the thread whose panel opens: the message goes back to the one that asked.
+func (d ViewDeps) runPanelFile(ctx context.Context, uctx Context, a Args) (Result, error) {
+	id := a.String("thread")
+	if id == "" {
+		return Result{}, InvalidArg("thread", "needs a thread whose panel to open it in (--thread, or run it inside a thread)")
+	}
+	asker := id
+	if uctx.ActiveView == "" && uctx.CallerThreadID != "" {
+		asker = uctx.CallerThreadID
+	}
+	return showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+		switch {
+		case a.Bool("edit"):
+			return d.editCheck(ctx, t, a, asker)
+		case a.Given("note"):
+			return nil, InvalidArg("note", "only with --edit: it tells the user what to put in the file")
+		}
+		return d.fileCheck(ctx, t, a)
+	})
+}
+
+// editCheck is view.panel.file --edit's check: the tab could edit and save the file, or
+// make it (docs/notes/file-edit-3-agent.md). A file the agent may not read comes through
+// here, so nothing from inside it reaches the params, the result or an error.
+func (d ViewDeps) editCheck(ctx context.Context, t *v1.Thread, a Args, asker string) (map[string]string, error) {
+	line, err := fileLine(a)
+	if err != nil {
+		return nil, err
+	}
+	note := strings.TrimSpace(a.String("note"))
+	if n := utf8.RuneCountInString(note); n > maxEditNote {
+		return nil, InvalidArg("note", "%d characters, at most %d: say what to put where, in a line or two", n, maxEditNote)
+	}
+	base := t.GetWorktreePath()
+	path, missing, err := d.FileEdits.CheckEdit(ctx, base, a.Path("path"))
+	if err != nil {
+		var ce *connect.Error
+		if errors.As(err, &ce) && ce.Code() == connect.CodeInvalidArgument {
+			return nil, InvalidArg("path", "%s", strings.TrimPrefix(ce.Message(), "invalid argument: "))
+		}
+		return nil, err
+	}
+	params := map[string]string{"path": path, "project": t.GetProjectId(), "base": base, "edit": "1", "thread": asker}
+	if line > 0 {
+		params["line"] = strconv.Itoa(line)
+	}
+	if note != "" {
+		params["note"] = note
+	}
+	if missing {
+		params["create"] = "1"
+	}
+	if a.Bool("focus") {
+		params["focus"] = "1"
+	}
+	return params, nil
+}
+
+// fileLine is the file verbs' --line: 0 for none.
+func fileLine(a Args) (int, error) {
+	line := a.Int("line")
+	if line < 0 || (a.Given("line") && line == 0) {
+		return 0, InvalidArg("line", "want a line number from 1, got %d", line)
+	}
+	return line, nil
+}
+
 // fileCheck is view.panel.file's check: the file exists (and is not a directory) where
 // the File tab would read it, under the home directory (ReadFile refuses anything else,
 // symlinks followed). The path is absolute: the CLI resolves a relative one against its
 // own directory, a thread's worktree when the model runs it.
 func (d ViewDeps) fileCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
-	line := a.Int("line")
-	if line < 0 || (a.Given("line") && line == 0) {
-		return nil, InvalidArg("line", "want a line number from 1, got %d", line)
+	line, err := fileLine(a)
+	if err != nil {
+		return nil, err
 	}
 	base := t.GetWorktreePath()
 	res, err := d.Files.ReadFile(ctx, connect.NewRequest(&v1.ReadFileRequest{BaseDir: base, Path: a.Path("path"), MaxBytes: 1}))

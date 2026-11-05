@@ -107,6 +107,9 @@ type Deps struct {
 	// Files reads a file as the File tab does (FilesystemService.ReadFile), for
 	// view.panel.file. Nil makes it fail with Unimplemented.
 	Files command.FileReader
+	// FileEdits checks a file the File tab is to edit (Filesystem.CheckEdit), for
+	// view.panel.file --edit. Nil makes it fail with Unimplemented.
+	FileEdits command.FileEditChecker
 	// FileDiffs reads a worktree file's diff as the Diff tab does
 	// (ProjectService.GetWorktreeFileDiff), for view.panel.diff. Nil makes it fail with
 	// Unimplemented.
@@ -191,7 +194,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterThemeEdit(r, d.Emitter, d.Themes),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Thread: d.Thread, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, command.ViewDeps{
-			Emitter: d.Emitter, Thread: d.Thread, Viewed: d.Presence.Viewed, Files: d.Files, Diffs: d.FileDiffs,
+			Emitter: d.Emitter, Thread: d.Thread, Viewed: d.Presence.Viewed, Files: d.Files, FileEdits: d.FileEdits, Diffs: d.FileDiffs,
 			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh, Inline: d.Thread, Settings: d.Settings,
 			Workspaces: d.Workspace,
 		}),
