@@ -246,15 +246,18 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, proc, origin string) 
 	cancel()
 	w.Flush()
 	t.hangUp(c, websocket.StatusNormalClosure, "", stopRead)
-	if w.err != nil {
-		return "write failed"
+	switch {
+	case errors.Is(w.err, context.DeadlineExceeded), errors.Is(w.err, context.Canceled):
+		return "write timeout"
+	case w.err != nil:
+		return "client gone"
 	}
 	return "served"
 }
 
 // readUntilGone reads the socket until it is closed, calling gone on anything it reads:
 // past the head and the body, any data counts as the client's close. This is CloseRead
-// without its data path, which waits on itself for 20 s before it cancels (ws-tunnel.md).
+// without its data path, which waits on itself before it cancels (docs/notes/ws-tunnel.md).
 // A reader must run for ping, pong and close frames to be seen at all.
 func readUntilGone(ctx context.Context, c *websocket.Conn, gone func()) {
 	for {

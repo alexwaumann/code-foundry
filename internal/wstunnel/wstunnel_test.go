@@ -612,7 +612,7 @@ func TestStuckClientHitsTheWriteDeadline(t *testing.T) {
 	if err := r.tunnel.Drain(ctx); err != nil {
 		t.Error(err)
 	}
-	if !strings.Contains(r.logs.String(), "write failed") {
+	if !strings.Contains(r.logs.String(), `reason="write timeout"`) {
 		t.Errorf("logs: %s", r.logs.String())
 	}
 }
@@ -671,7 +671,7 @@ func TestLogsOpenAndClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	logs := r.logs.String()
-	for _, want := range []string{"tunnel open", "tunnel closed", "procedure=" + wstunneltest.Stream, "origin=" + origin, "level=INFO"} {
+	for _, want := range []string{"tunnel open", "tunnel closed", "procedure=" + wstunneltest.Stream, "origin=" + origin, "level=INFO", `reason="client gone"`} {
 		if !strings.Contains(logs, want) {
 			t.Errorf("logs lack %q: %s", want, logs)
 		}
