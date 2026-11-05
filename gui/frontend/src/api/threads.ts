@@ -6,12 +6,17 @@ import {
   ThreadFlagLevel,
   ThreadKind,
   ThreadReportStatus,
+  ThreadSetupPhase,
+  ThreadSetupStepKind,
+  ThreadSetupStepStatus,
   ThreadState,
   ThreadStatus,
   type AgentRun,
   type Thread,
   type ThreadFlag,
   type ThreadListEvent,
+  type ThreadSetup,
+  type ThreadSetupStep,
   type UsageBucket,
 } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
 import { ThreadService } from "@/gen/codefoundry/v1/thread_pb";
@@ -55,6 +60,51 @@ export interface ThreadMoveView {
   /** The checkout it will run in, and a worktree's branch; "" until the placement is made. */
   worktreePath: string;
   branch: string;
+}
+
+/** Where a thread's setup stands (ThreadSetup.phase). */
+export type ThreadSetupPhaseView = "running" | "done" | "failed" | "cancelled";
+/** What a setup step does: name the branch, fetch one project's start point, make one project's worktree, start Claude. */
+export type ThreadSetupStepKindView = "name" | "fetch" | "worktree" | "start";
+/** How a setup step stands. "warning": it failed and the setup goes on without it (a fetch). */
+export type ThreadSetupStepStatusView = "pending" | "running" | "done" | "warning" | "failed";
+
+/** One step of a thread's setup (ThreadSetupStep). */
+export interface ThreadSetupStepView {
+  kind: ThreadSetupStepKindView;
+  /** The project a fetch or worktree step is for; "" for name and start. */
+  projectId: string;
+  projectName: string;
+  /** fetch: what is fetched ("origin/main"), a guess until it starts. worktree: its start point, once made. */
+  ref: string;
+  /** name and worktree: the branch, once named. */
+  branch: string;
+  status: ThreadSetupStepStatusView;
+  startedAtMs: number | null;
+  endedAtMs: number | null;
+  /** With "failed", and with a fetch's "warning": git's own text. */
+  error: string;
+  /** With "warning": what went wrong in a line ("Could not reach origin"). */
+  warning: string;
+  /** With a fetch's "warning": the commit time of ref's tip on disk, which the branch starts from instead; null when there is no such ref. */
+  refAtMs: number | null;
+}
+
+/**
+ * What Create is doing or did to set the thread up (Thread.setup, docs/notes/instant-threads-1-daemon.md):
+ * every step is listed from the start, and one with nothing to do leaves the list. A retry
+ * sets steps back to pending and restarts the times, so read it fresh each time. The rules
+ * that read it are lib/threadSetup.
+ */
+export interface ThreadSetupView {
+  phase: ThreadSetupPhaseView;
+  startedAtMs: number | null;
+  endedAtMs: number | null;
+  steps: ThreadSetupStepView[];
+  /** With "failed": why, in full. */
+  error: string;
+  /** Create's caller did not wait for it: only such a setup takes messages and can be cancelled. */
+  background: boolean;
 }
 
 /** View model for a thread (Claude Code session plus its worktree and status). Generated types stay inside src/api. */
@@ -125,6 +175,8 @@ export interface ThreadView {
    * projectId and workspaceId change only once it moved (docs/notes/move-no-project-1-daemon.md).
    */
   pendingMove: ThreadMoveView | null;
+  /** Thread.setup; null for a thread made without one (a fork, a resident thread, an older row). */
+  setup: ThreadSetupView | null;
   /** The user pinned the thread (thread.pin): it sits in the sidebar's Pinned section. */
   pinned: boolean;
   /**
@@ -416,6 +468,85 @@ const permissionMap: Record<PermissionMode, PermissionModeView> = {
   [PermissionMode.AUTO]: "auto",
 };
 
+function setupStepKind(k: ThreadSetupStepKind): ThreadSetupStepKindView | null {
+  switch (k) {
+    case ThreadSetupStepKind.NAME:
+      return "name";
+    case ThreadSetupStepKind.FETCH:
+      return "fetch";
+    case ThreadSetupStepKind.WORKTREE:
+      return "worktree";
+    case ThreadSetupStepKind.START:
+      return "start";
+    default:
+      return null;
+  }
+}
+
+function setupStepStatus(st: ThreadSetupStepStatus): ThreadSetupStepStatusView {
+  switch (st) {
+    case ThreadSetupStepStatus.RUNNING:
+      return "running";
+    case ThreadSetupStepStatus.DONE:
+      return "done";
+    case ThreadSetupStepStatus.WARNING:
+      return "warning";
+    case ThreadSetupStepStatus.FAILED:
+      return "failed";
+    default:
+      return "pending";
+  }
+}
+
+function setupPhase(p: ThreadSetupPhase): ThreadSetupPhaseView | null {
+  switch (p) {
+    case ThreadSetupPhase.RUNNING:
+      return "running";
+    case ThreadSetupPhase.DONE:
+      return "done";
+    case ThreadSetupPhase.FAILED:
+      return "failed";
+    case ThreadSetupPhase.CANCELLED:
+      return "cancelled";
+    default:
+      return null;
+  }
+}
+
+function toThreadSetupStepView(st: ThreadSetupStep): ThreadSetupStepView[] {
+  const kind = setupStepKind(st.kind);
+  if (kind === null) return [];
+  return [
+    {
+      kind,
+      projectId: st.projectId,
+      projectName: st.projectName,
+      ref: st.ref,
+      branch: st.branch,
+      status: setupStepStatus(st.status),
+      startedAtMs: st.startedAt ? Number(timestampMs(st.startedAt)) : null,
+      endedAtMs: st.endedAt ? Number(timestampMs(st.endedAt)) : null,
+      error: st.error,
+      warning: st.warning,
+      refAtMs: st.refAt ? Number(timestampMs(st.refAt)) : null,
+    },
+  ];
+}
+
+/** Thread.setup; null without one. */
+export function toThreadSetupView(s: ThreadSetup | undefined): ThreadSetupView | null {
+  const phase = s ? setupPhase(s.phase) : null;
+  if (!s || phase === null) return null;
+  return {
+    phase,
+    startedAtMs: s.startedAt ? Number(timestampMs(s.startedAt)) : null,
+    endedAtMs: s.endedAt ? Number(timestampMs(s.endedAt)) : null,
+    steps: s.steps.flatMap(toThreadSetupStepView),
+    error: s.error,
+    background: s.background,
+  };
+}
+
 export function toThreadView(s: Thread): ThreadView {
   return {
     id: s.id,
@@ -444,6 +575,7 @@ export function toThreadView(s: Thread): ThreadView {
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pendingMove: s.pendingMove ? { projectId: s.pendingMove.projectId, workspaceId: s.pendingMove.workspaceId, worktreePath: s.pendingMove.worktreePath, branch: s.pendingMove.branch } : null,
+    setup: toThreadSetupView(s.setup),
     pinned: s.pinned,
     archivedAtMs: s.archivedAt ? timestampMs(s.archivedAt) : null,
     snoozedUntilMs: s.snoozedUntil ? timestampMs(s.snoozedUntil) : null,

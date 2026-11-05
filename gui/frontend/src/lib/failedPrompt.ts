@@ -21,6 +21,8 @@ export interface FailedPromptInput {
   pending: number;
   /** Claude Code deleted the transcript: nothing can be sent. */
   transcriptMissing: boolean;
+  /** The thread's setup did not finish (lib/threadSetup): its failure shows in the timeline, and the message is no failed send. Absent: it did. */
+  setupUnfinished?: boolean;
 }
 
 export interface FailedPrompt {
@@ -102,11 +104,11 @@ function lineOf(r: Reason): string {
  * status counts only when it changed at or after the prompt (an older failure's status
  * says nothing about a prompt just sent). Subagent items, a wake message (the daemon's, not
  * the user's) and a message Claude has not read yet never qualify; nor does anything while
- * prompts are docked or the transcript is gone.
+ * prompts are docked, the transcript is gone or the thread's setup did not finish.
  */
 export function failedPrompt(input: FailedPromptInput): FailedPrompt | null {
   const { order, byId, state, status } = input;
-  if (input.pending > 0 || input.transcriptMissing) return null;
+  if (input.pending > 0 || input.transcriptMissing || input.setupUnfinished) return null;
   const running = state !== "disconnected" && state !== "closing";
   if (running && (status === "busy" || state === "starting")) return null;
   // Walking back from the end: the first error after the prompt, the last turn end.

@@ -9,7 +9,7 @@ import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { ActionIcon, ActionRunMode } from "../src/gen/codefoundry/v1/action_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { ProjectEventSchema, ProjectSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/project_pb";
-import { PermissionMode, PlacementOutcome, ThreadFlagLevel, ThreadKind, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { PermissionMode, PlacementOutcome, ThreadFlagLevel, ThreadKind, ThreadSetupPhase, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
@@ -32,6 +32,7 @@ import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
 import { agentCounts, agentsCommands, listRuns, type AgentRunInit } from "./agents";
 import { backgroundRun, waitingReason } from "./liveCount";
+import { SETUP_BRANCH, setupMessage, setupRowState, setupScript } from "./setup";
 import { shellCommands } from "./shells";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
@@ -197,6 +198,12 @@ interface MockThread {
   moveIn: number;
   /** Mock-only: seconds left before a STARTING/CLOSING thread settles. */
   settleIn: number;
+  /** Thread.setup: POST /__mock/thread/setup (mock/setup.ts); null for none. */
+  setup: ReturnType<typeof setupMessage> | null;
+  /** Mock-only: where a scripted setup's thread runs once placed, kept while it has no cwd. */
+  setupPlace: { worktreePath: string; checkoutPaths: Record<string, string> } | null;
+  /** Thread.name_provisional: the name is the first prompt's cut until the naming model's title lands. */
+  nameProvisional: boolean;
   /** Mock-only: seconds until an unnamed thread gets `pendingName` (background naming). */
   nameIn: number;
   pendingName: string;
@@ -2162,6 +2169,9 @@ export class World {
       projectIds: [],
       branch: "",
       checkoutPaths: {},
+      setup: null,
+      setupPlace: null,
+      nameProvisional: false,
       workspaceId: "",
       pendingWorktreePath: "",
       pendingMove: null,
@@ -2297,6 +2307,8 @@ export class World {
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
       ...(s.pendingMove ? { pendingMove: s.pendingMove } : {}),
+      ...(s.setup ? { setup: s.setup } : {}),
+      nameProvisional: s.nameProvisional,
       pinned: s.pinned,
       flags: s.flags.map((f) => ({ ...f, setAt: timestampFromDate(f.setAt) })),
       ...(s.owner ? { owner: s.owner } : {}),
@@ -2537,6 +2549,33 @@ export class World {
     const s = this.threads.get(id);
     if (!s || !s.flags.some((f) => f.untilSeen)) return;
     s.flags = s.flags.filter((f) => !f.untilSeen);
+    this.publishThread(s);
+  }
+
+  /**
+   * Puts a thread where a setup in `state` (mock/setup.ts SETUP_SCRIPTS) has it: its setup,
+   * state, status and timeline, its cwd gone until a placement landed. Held, so the clock
+   * leaves it there. Scripting the next state moves it on, as a step or a retry would.
+   * `queued`: a message sent during the setup waits in its timeline.
+   */
+  scriptSetup(id: string, state: string, queued: boolean): void {
+    const s = this.thread(id);
+    const script = setupScript(state);
+    const row = setupRowState(script.phase);
+    s.setupPlace ??= { worktreePath: s.worktreePath, checkoutPaths: s.checkoutPaths };
+    const placed = script.placed === true;
+    s.held = true;
+    s.setup = setupMessage(script, new Date());
+    s.state = row.state;
+    this.setStatus(s, row.status, row.reason);
+    s.disconnectReason = row.state === ThreadState.DISCONNECTED ? row.reason : "";
+    s.lastError = script.error ?? "";
+    s.worktreePath = placed ? s.setupPlace.worktreePath : "";
+    s.checkoutPaths = placed ? s.setupPlace.checkoutPaths : {};
+    s.createdWorktree = placed;
+    s.branch = placed ? SETUP_BRANCH : "";
+    s.nameProvisional = !placed && s.setup.phase === ThreadSetupPhase.RUNNING;
+    this.logs.loadSetup(id, row.state === ThreadState.DISCONNECTED, queued);
     this.publishThread(s);
   }
 

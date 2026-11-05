@@ -32,6 +32,8 @@ function shape(rows: readonly TimelineRow[]): string[] {
         return `note:${r.kind}`;
       case "strip":
         return `strip(${String(r.steps)})[${shape(r.nodes).join(" ")}]`;
+      case "setup":
+        return `setup${r.folded ? "(folded)" : ""}`;
       default:
         return `${r.type}:${r.id}`;
     }

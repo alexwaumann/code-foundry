@@ -379,7 +379,7 @@ type CardTone = TipStatusTone | "emerald";
 const tipStatusIcons: Readonly<Record<CardTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX, emerald: CircleCheck };
 
 /** The kinds whose card status says how long the thread has been so ("for 6m"): Claude's prompts and errors, not a plugin's flag or a deleted transcript. */
-const timedCardKinds: ReadonlySet<StatusLineKind> = new Set<StatusLineKind>(["input", "question", "plan", "snoozeEnded", "error", "interrupted", "crashed"]);
+const timedCardKinds: ReadonlySet<StatusLineKind> = new Set<StatusLineKind>(["input", "question", "plan", "snoozeEnded", "error", "interrupted", "crashed", "setupFailed"]);
 
 /** "for 6m" (or "6m ago", `ago`) since `at`, muted, on the shared clock while the card is open. */
 function TipElapsed({ at, ago }: { at: number; ago: boolean }) {

@@ -72,10 +72,25 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
         return sameFlags(a[k], b[k]);
       case "backgroundShells":
         return sameShells(a[k], b[k]);
+      case "setup":
+        return sameSetup(a[k], b[k]);
       default:
         return a[k] === b[k];
     }
   });
+}
+
+/** A thread's setup by value, steps included (every Updated event carries new objects). */
+function sameSetup(a: ThreadView["setup"], b: ThreadView["setup"]): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  const { steps: aSteps, ...aRest } = a;
+  const { steps: bSteps, ...bRest } = b;
+  return (
+    (Object.keys(aRest) as (keyof typeof aRest)[]).every((k) => aRest[k] === bRest[k]) &&
+    aSteps.length === bSteps.length &&
+    aSteps.every((x, i) => (Object.keys(x) as (keyof typeof x)[]).every((k) => x[k] === bSteps[i]?.[k]))
+  );
 }
 
 /** A recorded checkout by value (every Updated event carries new objects). */

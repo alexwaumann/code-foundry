@@ -52,6 +52,7 @@ import { CodeRunContext } from "./codeContext";
 import { KeepRowContext, TextMarkdownContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
 import { QueuedTag } from "./QueuedTag";
+import { SetupRow } from "./SetupRow";
 import { AgentOpen } from "./AgentOpen";
 import { HtmlRow } from "./InlineHtml";
 import { ThemeCardRow } from "./ThemeCard";
@@ -920,7 +921,10 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
   const keep = useContext(KeepRowContext);
   const live = row.id === "";
   const it = useThreadItem(threadId, row.id);
-  const start = useThreadStore((s) => (live && row.since ? (s.logs[threadId]?.byId[row.since]?.createdAtMs ?? null) : null));
+  const sent = useThreadStore((s) => (live && row.since ? (s.logs[threadId]?.byId[row.since]?.createdAtMs ?? null) : null));
+  // The first turn's work starts when the setup ends, not when its message was sent.
+  const setupEnd = useThreadsStore((s) => (live ? (s.byId[threadId]?.setup?.endedAtMs ?? null) : null));
+  const start = sent !== null && setupEnd !== null ? Math.max(sent, setupEnd) : sent;
   const now = useLiveNow(live);
   const models = useModelChoices();
   if (live) {
@@ -991,6 +995,8 @@ export function TimelineRowView({ row }: { row: TimelineRow }) {
       return <UserRow id={row.id} />;
     case "header":
       return <HeaderRow row={row} />;
+    case "setup":
+      return <SetupRow row={row} />;
     default:
       return <WorkNodeView node={row} />;
   }

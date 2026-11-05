@@ -4,7 +4,9 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, type TimelineRow } from "@/lib/threadTimeline";
 import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, structOf, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
+import { setupRowPhase } from "@/lib/threadSetup";
 import { registerTimeline } from "@/stores/cite";
+import { useThreadsStore } from "@/stores/threads";
 import { heldScroll, spacerAfterGrowth } from "@/lib/timelineHold";
 import { scrollIntent, type ScrollSample } from "@/lib/scrollIntent";
 import { FoldInPlaceContext, HoldTopContext, KeepRowContext } from "./context";
@@ -63,8 +65,9 @@ function useRows(threadId: string, working: boolean, strips: boolean): TimelineR
   const keys = useTimelineKeys(threadId);
   const folds = useTurnFolds(threadId);
   const deferred = useDeferredTurns(threadId);
+  const setup = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup));
   const turns = useMemo(() => buildTurns(keys.map(decodeTimelineKey)), [keys]);
-  return useMemo(() => buildRows(turns, { fold: (k) => folds[k], deferred: (e) => deferred[e] === true, working, strips }), [turns, folds, deferred, working, strips]);
+  return useMemo(() => buildRows(turns, { fold: (k) => folds[k], deferred: (e) => deferred[e] === true, working, strips, setup }), [turns, folds, deferred, working, strips, setup]);
 }
 
 /**
@@ -546,7 +549,8 @@ export function TimelineList<R extends ListRow>({
               if (!row) return null;
               // The last row of a turn before the next one gets the space between turns.
               const next = rows[vi.index + 1];
-              const turnEnd = row.type !== "user" && row.type !== "system" && (next?.type === "user" || next?.type === "system");
+              // Not the setup's row: it takes no height until its lines show, and a space there would move the message below.
+              const turnEnd = row.type !== "user" && row.type !== "system" && row.type !== "setup" && (next?.type === "user" || next?.type === "system");
               return (
                 <div
                   key={vi.key}

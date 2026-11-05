@@ -25,9 +25,14 @@
  * - while the thread is on a turn, each run of work between two texts (steers, notes,
  *   permission requests and questions) collapses into one strip row showing the latest
  *   step and the run's step count (`stripRuns`, docs/notes/live-tool-strip.md). Finished
- *   turns are unaffected.
+ *   turns are unaffected;
+ * - a thread's setup (lib/threadSetup) is one row under its first user message, above the
+ *   turn: its checklist while it runs, and once done a fold line like a turn's. A setup that
+ *   did not finish has a synthetic turn end after the message: the turn never ran, so it has
+ *   no header (docs/notes/instant-threads-3-gui.md).
  */
 import type { RequestStateView, ThreadItemKind, ToolStatusView } from "@/api/thread";
+import { SETUP_FOLD_KEY, type SetupRowPhase } from "./threadSetup";
 
 /** What the timeline needs to know about an item; text and inputs are read by the rows. */
 export interface TimelineItem {
@@ -101,6 +106,11 @@ export type StripStep = Extract<WorkNode, { type: "tool" } | { type: "group" }>;
 export type TimelineRow =
   | { type: "user"; key: string; id: string }
   | WorkNode
+  /**
+   * The thread's setup, under its first user message (lib/threadSetup): one row, so a step
+   * changing rebuilds nothing. `folded` is the done fold line's, under SETUP_FOLD_KEY.
+   */
+  | { type: "setup"; key: string; folded: boolean }
   | {
       /**
        * A turn's header, under its user message(s) and above its work. Finished: "Worked
@@ -392,6 +402,8 @@ export interface TimelineOptions {
    * deferTurnFolds). The user's choice still wins. Absent: none.
    */
   deferred?: (turnEndId: string) => boolean;
+  /** The thread's setup row (lib/threadSetup setupRowPhase); absent or "": none. */
+  setup?: SetupRowPhase;
 }
 
 /**
@@ -417,23 +429,31 @@ function isNoteTurn(t: TimelineTurn): boolean {
 export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions): TimelineRow[] {
   const rows: TimelineRow[] = [];
   const last = turns[turns.length - 1];
+  const setup = opts.setup ?? "";
+  // No Claude yet, so no turn runs, whatever the thread's state says: the setup's row is the live one.
+  const working = opts.working && setup !== "running" && setup !== "stopped";
   // The open turn while the thread works; none when the last turn ended (nothing runs
   // after a turn_end) or is a system note (Claude starts a turn that has no item yet).
-  const live = opts.working && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
+  const live = working && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
   // The open turn the thread is on (also while a request waits): its work runs as strips.
   const stripped = opts.strips && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
   turns.forEach((t) => {
     const folded = t.end !== "" && (opts.fold(t.key) ?? (opts.deferred?.(t.end) ? false : defaultFolded(t)));
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
-    if (t.end || t === live) {
+    if ((t.end && setup !== "stopped") || t === live) {
       const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
       rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals, since: t.user[t.user.length - 1] ?? t.key });
     }
     if (t === stripped) rows.push(...stripRuns(t.body));
     else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
   });
+  // Under the first message, or at the end for a thread without one (made with no prompt).
+  if (setup !== "") {
+    const first = rows.findIndex((r) => r.type === "user");
+    rows.splice(first < 0 ? rows.length : first + 1, 0, { type: "setup", key: SETUP_FOLD_KEY, folded: opts.fold(SETUP_FOLD_KEY) ?? true });
+  }
   // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
-  if (opts.working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });
+  if (working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });
   return linkRepeatShows(rows);
 }
 

@@ -50,6 +50,7 @@ import { scriptEmberChat, scriptEmberRestartCut, scriptEmberRestartWake, type Em
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
+import { SETUP_PROMPT } from "./setup";
 import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
 import { scriptServers, scriptShells, shellSummary, type ShellCall } from "./shells";
 
@@ -855,6 +856,24 @@ export class MockThreadLogs {
       this.finish(id);
     })();
     return resolved;
+  }
+
+  /**
+   * A thread put in a setup (World.scriptSetup): its first message and, for a setup that did
+   * not finish, the turn end the daemon closes it with. Watchers get a new snapshot, as for a
+   * retry (ItemsReset, which deletes that turn end). The message keeps its id across states.
+   */
+  loadSetup(id: string, closed: boolean, queued: boolean): void {
+    this.generation++;
+    const l = this.log(id);
+    const promptId = `${id}-setup-prompt`;
+    const prompt = l.items.find((x) => x.id === promptId) ?? this.item(id, { case: "userMessage", value: { text: SETUP_PROMPT, attachments: [] } }, { id: promptId, at: new Date(Date.now() - 3000) });
+    const extra = queued ? [l.items.find((x) => x.id === `${promptId}-queued`) ?? this.item(id, { case: "userMessage", value: { text: "Also check the badge's tooltip.", attachments: [], queued: true } }, { id: `${promptId}-queued` })] : [];
+    const end = closed ? [this.item(id, { case: "turnEnd", value: { subtype: "process_ended", interrupted: true, durationMs: BigInt(5000) } }, { id: `turn-synth-${promptId}` })] : [];
+    l.items = [prompt, ...extra, ...end];
+    l.pending = [];
+    l.seq++;
+    this.publish(id, this.snapshot(id));
   }
 
   /** (Re)builds the scripted conversation in `state` (the sketch's three states, or idle: both turns done). */

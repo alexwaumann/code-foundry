@@ -5,6 +5,7 @@
  */
 import type { ThreadFlagView, ThreadView } from "@/api/threads";
 import { formatAgo, threadBadge, statusKind, statusNote, topFlag } from "./thread";
+import { hasSetupWork, setupCurrentStep, setupFailure } from "./threadSetup";
 import { isWaiting } from "./waiting";
 
 /**
@@ -25,6 +26,10 @@ import { isWaiting } from "./waiting";
  * - "transcriptDeleted": "Transcript deleted" (red, a trash icon before it), then the place:
  *   Claude Code deleted the thread's transcript, so it cannot continue
  *   (docs/notes/transcript-deleted.md). Wins over everything: the thread is stopped for good.
+ * - "settingUp": "Setting up" (sky), the step it is on as its detail: a thread's setup runs,
+ *   with more to do than start Claude (lib/threadSetup; only that reads as "working").
+ * - "setupFailed": "Setup failed" (red), why in a line as its detail; "setupCancelled":
+ *   "Cancelled" (muted): the user stopped it, so it wants nothing of them.
  */
 export type StatusLineKind =
   | "place"
@@ -40,7 +45,10 @@ export type StatusLineKind =
   | "waiting"
   | "flagAttention"
   | "flagError"
-  | "transcriptDeleted";
+  | "transcriptDeleted"
+  | "settingUp"
+  | "setupFailed"
+  | "setupCancelled";
 
 export type StatusTone = "muted" | "sky" | "amber" | "emerald" | "red";
 
@@ -72,6 +80,9 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   flagAttention: "amber",
   flagError: "red",
   transcriptDeleted: "red",
+  settingUp: "sky",
+  setupFailed: "red",
+  setupCancelled: "muted",
 };
 
 /** Whether "project @ branch" follows the status text (or stands alone, for "place"). */
@@ -83,10 +94,11 @@ const PLACE: StatusLine = { kind: "place", detail: "", at: null };
 const TRANSCRIPT_DELETED: StatusLine = { kind: "transcriptDeleted", detail: "", at: null };
 
 export function statusLine(
-  s: (Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> & Partial<Pick<ThreadView, "flags" | "transcriptMissing">>) | undefined,
+  s: (Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> & Partial<Pick<ThreadView, "flags" | "transcriptMissing" | "setup">>) | undefined,
 ): StatusLine {
   if (!s) return PLACE;
   if (s.transcriptMissing) return TRANSCRIPT_DELETED;
+  if (s.setup?.phase === "failed") return { kind: "setupFailed", detail: setupFailure(s.setup), at: null };
   const flag = topFlag(s);
   const badge = threadBadge(s);
   if (badge === "attention" || badge === "error") {
@@ -103,6 +115,8 @@ export function statusLine(
       // would re-render forever.
       flag,
     };
+  if (s.setup?.phase === "cancelled") return { kind: "setupCancelled", detail: "", at: null };
+  if (s.setup?.phase === "running" && hasSetupWork(s.setup)) return { kind: "settingUp", detail: setupCurrentStep(s.setup), at: null };
   if (isWaiting(s)) return { kind: "waiting", detail: "", at: null };
   return badge === "busy" ? { kind: "working", detail: "", at: null } : PLACE;
 }
@@ -144,6 +158,9 @@ const words: Readonly<Record<StatusLineKind, string>> = {
   flagAttention: "",
   flagError: "",
   transcriptDeleted: "Transcript deleted",
+  settingUp: "Setting up",
+  setupFailed: "Setup failed",
+  setupCancelled: "Cancelled",
 };
 
 /** The status text before the place: "" for "place". `now` only matters when `at` is set. */
