@@ -7,14 +7,13 @@ PR 4; until then a session is opened from the CLI (`dictation start`).
 
 ## What shipped
 
-* `gui/mic_darwin.go`: AVAudioEngine's input node, tapped at its own format and
-  converted to 16 kHz mono int16 by an AVAudioConverter on the tap's thread
-  (`downmix = YES`; the input block returns `NoDataNow`, not end of stream, so the
-  resampler keeps its state between buffers). Every AVFoundation call runs on one
-  goroutine locked to its thread (`avMicrophone`, the terminal actor's `reqs chan
-  func()`). Neither callback enters Go: the tap writes samples to a pipe and the
-  permission reply writes one byte to another. Each write end is a `dup` the C side owns,
-  with `F_SETNOSIGPIPE`.
+* `gui/mic_darwin.go`: an input-only AUHAL unit since `dictation-auhal.md`; this PR shipped
+  AVAudioEngine's input node. Audio is converted to 16 kHz mono int16 by an AVAudioConverter
+  on a drain queue (the input block returns `NoDataNow`, not end of stream, so the resampler
+  keeps its state between buffers). Every C call runs on one goroutine locked to its thread
+  (`avMicrophone`, the terminal actor's `reqs chan func()`). No callback enters Go: the drain
+  writes samples to a pipe and the permission reply writes one byte to another. Each write end
+  is a `dup` the C side owns, with `F_SETNOSIGPIPE`.
 * `gui/mic.go` (pure Go, tested): `pumpFrames` reads the pipe, cuts it into 20 ms frames
   (640 bytes), computes each frame's RMS (0..1 of full scale) and drops frames when 2 s
   are already waiting. The audio thread never waits on the daemon.
@@ -79,15 +78,17 @@ PR 4; until then a session is opened from the CLI (`dictation start`).
   the call sits in a `-Wdeprecated-declarations` pragma. The tap's buffer size must be
   100 to 400 ms. Frames therefore come in bursts of five every 100 ms, and the daemon's
   50 ms level throttle passes about **10 levels a second**, not 20. PR 4's bars should
-  ease between levels.
+  ease between levels. (The tap is gone since `dictation-auhal.md`: audio now comes about
+  every 20 ms.)
 * Speech from the MacBook's speakers into its own microphone measured RMS 0.02–0.045,
   silence about 0.003. PR 4 should map levels on a log (dBFS) scale.
 * Not handled: a device change mid-session (AirPods connecting,
   `AVAudioEngineConfigurationChangeNotification`) stops the engine. Frames stop and the
   session ends after 30 s of silence. Opening a Bluetooth headset's microphone switches
   it to its call profile while listening. Both are left for PR 5.
-* Audio still in the tap's buffer (≤ 100 ms) when a session stops is not sent: the
-  daemon drops frames for a stopping session anyway.
+* Audio still buffered (≤ 100 ms in the tap; about 20 ms in the ring since
+  `dictation-auhal.md`) when a session stops is not sent: the daemon drops frames for a
+  stopping session anyway.
 
 ## Verification
 

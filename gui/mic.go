@@ -13,7 +13,7 @@ const (
 	micSampleRate = 16000
 	micFrameBytes = micSampleRate / 50 * 2
 	// micFrameBuffer is how many frames wait for the daemon (2 s) before new ones are
-	// dropped: the pipe from the audio thread must never stop being read.
+	// dropped: the pipe from the drain queue must never stop being read.
 	micFrameBuffer = 100
 )
 
@@ -59,9 +59,9 @@ type microphone interface {
 type micCapture interface {
 	// Frames delivers the audio; it is closed once Stop has run (or capture failed).
 	Frames() <-chan micFrame
-	// Changed receives when the audio hardware's configuration changed (a headset
-	// connected, the default input switched). The capture then delivers nothing more;
-	// the caller stops it and opens a new one.
+	// Changed receives when the hardware under this capture moved (its device went away or
+	// changed rate, or the default input switched while following it). What it delivers
+	// from then on is not to be trusted; the caller stops it and opens a new one.
 	Changed() <-chan struct{}
 	// Stop closes the microphone. Safe to call more than once.
 	Stop()
@@ -104,7 +104,7 @@ func pcmRMS(pcm []byte) float32 {
 
 // pumpFrames reads samples from r until it ends, sending them on out as frames with
 // their levels, and closes out. A frame that does not fit in out is dropped: the
-// writer on the other side of r is the audio thread, which must not wait on the
+// writer on the other side of r is the microphone's drain, which must not wait on the
 // daemon.
 func pumpFrames(r io.Reader, out chan<- micFrame) {
 	defer close(out)
