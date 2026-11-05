@@ -108,7 +108,8 @@ type Context struct {
 	ActiveWorkspaceID string
 	// CallerThreadID is ActiveThreadID as the caller sent it, before Invoke overlaid an
 	// explicit thread arg (--id): the thread a CLI call runs in ($CODE_FOUNDRY_THREAD),
-	// or the GUI's active thread. Invoke sets it for Run; When does not see it.
+	// or the GUI's active thread. Invoke sets it for ConfirmIf, DynamicConfirm and Run;
+	// When does not see it.
 	CallerThreadID string
 }
 

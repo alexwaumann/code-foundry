@@ -48,7 +48,7 @@ func TestThreadSnooze(t *testing.T) {
 		wantUntil time.Duration
 	}{
 		{name: "an idle thread snoozes without asking", ctx: command.Context{ActiveThreadID: "s5"}, args: map[string]string{"until": "2099-01-02T15:04:00Z"},
-			current: idle, wantMsg: farMsg, wantReqs: []proto.Message{get, snoozeFar}},
+			current: idle, wantMsg: farMsg, wantReqs: []proto.Message{get, &v1.SnoozeThreadRequest{Id: "s5", Until: timestamppb.New(far), ByThreadId: "s5"}}},
 		{name: "a duration is from now", args: map[string]string{"id": "s5", "until": "90m"},
 			current: idle, wantUntil: 90 * time.Minute},
 		{name: "a finished turn snoozes without asking", args: map[string]string{"id": "s5", "until": "2099-01-02T15:04:00Z"},

@@ -125,6 +125,7 @@ func (r *runner) maybeRestart() {
 // beginRestart closes the old process's stdin; respawn follows its exit (maybeExited).
 func (r *runner) beginRestart(user bool) {
 	st := r.st
+	r.m.dropPutAway(r.id, "Claude restarted") // a forced restart ends the turn with no result
 	st.wantRestart, st.restartInterrupted, st.userRestart = false, false, user
 	if st.restartForce != nil {
 		st.restartForce.Stop()

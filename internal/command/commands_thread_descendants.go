@@ -72,7 +72,7 @@ func subtreeTargets(ctx context.Context, b ThreadBackend, root string, archived,
 func archiveTarget(a Args) bool { return !a.Has("archived") || a.Bool("archived") }
 
 // archiveSubtree is thread.archive with descendants-of.
-func archiveSubtree(ctx context.Context, b ThreadBackend, a Args) (Result, error) {
+func archiveSubtree(ctx context.Context, b ThreadBackend, c Context, a Args) (Result, error) {
 	archived := archiveTarget(a)
 	targets, rootName, err := subtreeTargets(ctx, b, a.String("descendants-of"), archived, a.Bool("include-root"))
 	if err != nil {
@@ -89,7 +89,7 @@ func archiveSubtree(ctx context.Context, b ThreadBackend, a Args) (Result, error
 	for i, s := range targets {
 		ids[i] = s.GetId()
 	}
-	return archiveThreads(ctx, b, ids, a), nil
+	return archiveThreads(ctx, b, c, ids, a), nil
 }
 
 // archiveSubtreeConfirm is thread.archive's confirmation with descendants-of: always

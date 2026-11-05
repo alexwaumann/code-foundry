@@ -18,19 +18,28 @@ import (
 // call runs cmd on the runner's goroutine. errProcessGone when the runner finished
 // before taking it.
 func (r *runner) call(ctx context.Context, cmd threadCmd) (Item, error) {
+	rep, err := r.exchange(ctx, cmd)
+	if err != nil {
+		return Item{}, err
+	}
+	return rep.item, rep.err
+}
+
+// exchange is call for a command whose answer is more than an item.
+func (r *runner) exchange(ctx context.Context, cmd threadCmd) (threadReply, error) {
 	cmd.ctx, cmd.reply = ctx, make(chan threadReply, 1)
 	select {
 	case r.st.cmds <- cmd:
 	case <-r.done:
-		return Item{}, errProcessGone
+		return threadReply{}, errProcessGone
 	case <-ctx.Done():
-		return Item{}, ctx.Err()
+		return threadReply{}, ctx.Err()
 	}
 	select {
 	case rep := <-cmd.reply:
-		return rep.item, rep.err
+		return rep, nil
 	case <-ctx.Done():
-		return Item{}, ctx.Err()
+		return threadReply{}, ctx.Err()
 	}
 }
 
@@ -203,6 +212,8 @@ func (m *Manager) Interrupt(ctx context.Context, id, by string) error {
 	if err != nil || r == nil {
 		return err
 	}
+	// First: the turn may end before the interrupt reaches Claude, and not as interrupted.
+	m.dropPutAway(id, "the thread was interrupted")
 	conn, err := r.st.connection()
 	if err != nil {
 		return err

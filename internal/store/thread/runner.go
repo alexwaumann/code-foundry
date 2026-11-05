@@ -68,6 +68,10 @@ type runner struct {
 	memNote, memHash string
 
 	closing bool
+	// puttingAway: the end of a turn began this close (putaway.go): the status stays as
+	// it began, so a turn Claude starts on the way out (a background task ended) raises
+	// no attention.
+	puttingAway bool
 	// disconnectAs is the disconnect reason a close the daemon began itself records
 	// instead of ReasonClosed (ReasonIdle); empty for a Close.
 	disconnectAs string
@@ -402,6 +406,9 @@ func (r *runner) publishStatus() {
 // readStatus reads the status, its request and the running tool from the stream.
 func (r *runner) readStatus() {
 	r.status, r.reason = r.st.sd.Status()
+	if r.puttingAway {
+		r.status, r.reason = r.closeStatus, r.closeReason
+	}
 	r.ask = r.st.sd.asking()
 	r.tool = busyToolFor(r.status, r.reason, r.st.proj.busy.line(r.cwd))
 	r.handled = r.st.proj.w.log.handledThrough()

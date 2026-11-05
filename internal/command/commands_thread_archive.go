@@ -16,7 +16,9 @@ import (
 // while the thread's background agents or shells run, since they stop with it, or
 // while a hidden thread below it that the daemon archives with it is working or
 // waiting (commands_thread_sidebar.go); idle, finished, errored and stopped threads
-// archive at once, and unarchiving never asks (nor cascades).
+// archive at once, and unarchiving never asks (nor cascades). A thread archiving itself
+// mid-turn is not asked about its own turn either: nothing is cut off, it is archived
+// when the turn ends (Deferred, docs/notes/self-put-away.md).
 // With ids it acts on several threads (commands_thread_bulk.go), with descendants-of on
 // a thread's subtree (commands_thread_descendants.go).
 // See docs/notes/archive-threads-1-daemon.md and docs/notes/thread-lifecycle.md.
@@ -25,7 +27,8 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 		Name:  "thread.archive",
 		Title: "Archive or Unarchive Thread",
 		Description: "Archive a thread: Claude is closed, its terminals removed, and it is unpinned and listed apart. " +
-			"Without archived, toggles. Pinning or sending a message unarchives it too.",
+			"Without archived, toggles. Pinning or sending a message unarchives it too. " +
+			"On itself mid-turn: at turn's end.",
 		Category: "Thread",
 		Args: []ArgSpec{
 			positional(optionalID(idArg)),
@@ -37,10 +40,10 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 		When:    hasThreadOrCLI,
 		Confirm: "Archive thread {id}? Claude is still working; archiving ends the turn.",
 		ConfirmIf: func(ctx context.Context, c Context, a Args) bool {
-			return notSelf(c, a, "archiving") == nil && archiveConfirm(ctx, b, a) != ""
+			return notSelf(c, a, "archiving") == nil && archiveConfirm(ctx, b, c, a) != ""
 		},
-		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
-			return archiveConfirm(ctx, b, a)
+		DynamicConfirm: func(ctx context.Context, c Context, a Args) string {
+			return archiveConfirm(ctx, b, c, a)
 		},
 		Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 			if err := notSelf(c, a, "archiving"); err != nil {
@@ -50,7 +53,7 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 				if a.Has("ids") {
 					return Result{}, InvalidArg("ids", "give ids or descendants-of, not both")
 				}
-				return archiveSubtree(ctx, b, a)
+				return archiveSubtree(ctx, b, c, a)
 			}
 			if a.Bool("include-root") {
 				return Result{}, InvalidArg("include-root", "include-root goes with descendants-of")
@@ -60,7 +63,7 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 				return Result{}, err
 			}
 			if a.Has("ids") {
-				return archiveThreads(ctx, b, ids, a), nil
+				return archiveThreads(ctx, b, c, ids, a), nil
 			}
 			id := ids[0]
 			archived := a.Bool("archived")
@@ -71,11 +74,14 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 				}
 				archived = cur.Msg.GetThread().GetArchivedAt() == nil
 			}
-			res, err := b.Archive(ctx, connect.NewRequest(&v1.ArchiveThreadRequest{Id: id, Archived: archived}))
+			res, err := b.Archive(ctx, connect.NewRequest(&v1.ArchiveThreadRequest{Id: id, Archived: archived, ByThreadId: askingThread(c)}))
 			if err != nil {
 				return Result{}, err
 			}
 			s := res.Msg.GetThread()
+			if res.Msg.GetDeferred() {
+				return deferredResult("archive", "will archive thread "+threadLabel(s), s, ""), nil
+			}
 			verb := "unarchived"
 			if s.GetArchivedAt() != nil {
 				verb = "archived"
@@ -89,7 +95,7 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 // none: unarchiving, or archiving a thread that is not mid-turn (archiveInterrupts).
 // An unknown thread needs none either: Run reports it. Given ids, archiveManyConfirm;
 // given descendants-of, archiveSubtreeConfirm.
-func archiveConfirm(ctx context.Context, b ThreadBackend, a Args) string {
+func archiveConfirm(ctx context.Context, b ThreadBackend, c Context, a Args) string {
 	if a.String("descendants-of") != "" {
 		if a.Has("ids") {
 			return "" // Run refuses
@@ -101,7 +107,7 @@ func archiveConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 		return ""
 	}
 	if a.Has("ids") {
-		return archiveManyConfirm(ctx, b, ids, a)
+		return archiveManyConfirm(ctx, b, c, ids, a)
 	}
 	res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: ids[0]}))
 	if err != nil {
@@ -115,15 +121,17 @@ func archiveConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	if !archiving {
 		return ""
 	}
-	return archiveOneConfirm(ctx, b, s)
+	return archiveOneConfirm(ctx, b, c, s)
 }
 
 // archiveOneConfirm is the confirmation for archiving s, or "" when it needs none:
 // what archiving cuts off in s (archiveInterrupts) and the hidden threads below it
-// still working that it archives too (hiddenWorking), in one question.
-func archiveOneConfirm(ctx context.Context, b ThreadBackend, s *v1.Thread) string {
+// still working that it archives too (hiddenWorking), in one question. A thread
+// archiving itself mid-turn cuts off nothing of its own (waitsForTurn), but the threads
+// below it still go with it when the turn ends.
+func archiveOneConfirm(ctx context.Context, b ThreadBackend, c Context, s *v1.Thread) string {
 	var parts []string
-	if why, ends := archiveInterrupts(s); why != "" {
+	if why, ends := archiveInterrupts(s); why != "" && !waitsForTurn(c, s) {
 		parts = append(parts, why+"; archiving "+ends+".")
 	}
 	if kids := hiddenWorking(ctx, b, []string{s.GetId()}); len(kids) > 0 {

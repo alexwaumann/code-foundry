@@ -90,6 +90,11 @@ func (d *streamStatus) AtPrompt() bool {
 	return d.started && !d.busy && !d.compacting && len(d.pending) == 0
 }
 
+// midTurn: a turn is running or about to, so a put-away of itself waits (putaway.go).
+func (d *streamStatus) midTurn() bool {
+	return d.busy || d.compacting || len(d.pending) > 0 || (!d.started && d.waiting)
+}
+
 func (d *streamStatus) initialized() { d.started = true }
 
 // sent: a message went to Claude. The user's own message also clears the wake-limit

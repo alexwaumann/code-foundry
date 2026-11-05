@@ -18,6 +18,14 @@ import (
 // clears ArchivedAt, of this thread alone: the thread stays disconnected until the
 // user reconnects it.
 func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread, error) {
+	return m.archive(ctx, id, archived, nil)
+}
+
+// archive is Archive. closing, set by a turn's end (finishPutAway), is the process that
+// end began closing: the thread's own close then only waits for it, and comes before the
+// cascade, so a message that started the thread again (closeAway) finds the threads below
+// it untouched.
+func (m *Manager) archive(ctx context.Context, id string, archived bool, closing *runner) (Thread, error) {
 	if !archived {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -25,6 +33,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 		if err != nil {
 			return Thread{}, err
 		}
+		m.dropPutAwayLocked(rec, "the thread was unarchived")
 		if m.unarchiveLocked(rec) {
 			m.commitLocked(rec, true)
 		}
@@ -35,6 +44,11 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 	}
 	if err := m.refuseResident(id, "archived"); err != nil {
 		return Thread{}, err
+	}
+	if closing != nil {
+		if err := m.closeAway(ctx, id, closing); err != nil {
+			return Thread{}, err
+		}
 	}
 	tried := map[string]bool{}
 	var failed []CascadeFailure
@@ -49,13 +63,13 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 			tried[t.ID] = true
 			was[i], _ = m.interrupted(t.ID) // gone meanwhile: archiveFrom says so
 			m.unwatchForArchive(t.ID)       // before its close: its settle must wake no one
-			m.markArchiving(t.ID, was[i])
+			m.markPuttingAway(t.ID, was[i], ReasonArchived)
 		}
 		for _, t := range targets {
 			m.requestClose(t.ID)
 		}
 		for i, t := range targets {
-			_, changed, err := m.archiveFrom(ctx, t.ID, was[i])
+			_, changed, err := m.archiveFrom(ctx, t.ID, was[i], nil)
 			if err != nil {
 				m.log.Warn("archive a hidden thread with the thread above it", "thread", t.ID, "root", id, "err", err)
 				failed = append(failed, CascadeFailure{ID: t.ID, Err: err})
@@ -68,7 +82,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 		}
 	}
 	cascade()
-	s, changed, err := m.archiveOne(ctx, id)
+	s, changed, err := m.archiveOne(ctx, id, closing)
 	if err != nil {
 		return Thread{}, err
 	}
@@ -144,57 +158,20 @@ func (e *CascadeError) Unwrap() error { return ErrFailedPrecondition }
 // the close cut off leaves the thread idle ReasonArchived instead of error
 // ReasonInterrupted. A Reconnect that wins the race between the close and that last
 // step makes it fail rather than archive a live thread.
-func (m *Manager) archiveOne(ctx context.Context, id string) (Thread, bool, error) {
+func (m *Manager) archiveOne(ctx context.Context, id string, closing *runner) (Thread, bool, error) {
 	wasInterrupted, err := m.interrupted(id)
 	if err != nil {
 		return Thread{}, false, err
 	}
 	m.unwatchForArchive(id) // before the close: its settle must wake no one
-	m.markArchiving(id, wasInterrupted)
-	return m.archiveFrom(ctx, id, wasInterrupted)
-}
-
-// markArchiving notes that an archive is about to close thread id (record.archiving),
-// unless it was interrupted before: the close's end (detach) then publishes the turn it
-// cuts off as idle "archived" rather than error "interrupted", which a board showed
-// for the seconds the shells and strays took to stop. archiveFrom clears it.
-func (m *Manager) markArchiving(id string, wasInterrupted bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if rec, ok := m.recs[id]; ok && !wasInterrupted {
-		rec.archiving = true
-	}
-}
-
-// endArchiving clears record.archiving; when the archive failed and the thread did not
-// start again, a turn it cut off reads error "interrupted" after all.
-func (m *Manager) endArchiving(id string, failed bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	rec, ok := m.recs[id]
-	if !ok || !rec.archiving {
-		return
-	}
-	rec.archiving = false
-	if failed && rec.run == nil && rec.s.ArchivedAt.IsZero() && rec.s.Status == StatusIdle && rec.s.StatusReason == ReasonArchived {
-		rec.s.setStatus(StatusError, ReasonInterrupted, m.opts.Now())
-		m.commitLocked(rec, true)
-	}
-}
-
-// archivedStatus turns a turn the archive's close cut off (error "interrupted") into
-// idle "archived".
-func archivedStatus(s *Thread, now time.Time) bool {
-	if s.Status != StatusError || s.StatusReason != ReasonInterrupted {
-		return false
-	}
-	return s.setStatus(StatusIdle, ReasonArchived, now)
+	m.markPuttingAway(id, wasInterrupted, ReasonArchived)
+	return m.archiveFrom(ctx, id, wasInterrupted, closing)
 }
 
 // archiveFrom is archiveOne with whether the thread was interrupted before its close
 // began (interrupted) read already, and its wakes forgotten (unwatchForArchive).
-func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted bool) (_ Thread, _ bool, err error) {
-	defer func() { m.endArchiving(id, err != nil) }() // after m.mu's unlock below
+func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted bool, closing *runner) (_ Thread, _ bool, err error) {
+	defer func() { m.endPuttingAway(id, err != nil) }() // after m.mu's unlock below
 	// A setup under way ends first, either way: then there is a process to close, or none.
 	if err := m.endSetupToArchive(ctx, id); err != nil {
 		return Thread{}, false, err
@@ -202,7 +179,7 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 	if _, ok := m.Snapshot().Thread(id); !ok && m.createFailed(id) {
 		return Thread{}, false, nil // nothing to archive, and no failure of the archive's
 	}
-	if err := m.Close(ctx, id); err != nil {
+	if err := m.closeAway(ctx, id, closing); err != nil {
 		return Thread{}, false, err
 	}
 	if err := m.removeShells(ctx, id); err != nil {
@@ -220,7 +197,7 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 	}
 	// The close cut off a turn (or a pending request): the archive stopped it, not a
 	// failure, so it reads idle "archived" rather than error "interrupted".
-	stopped := !wasInterrupted && archivedStatus(&rec.s, m.opts.Now())
+	stopped := !wasInterrupted && putAwayStatus(&rec.s, ReasonArchived, m.opts.Now())
 	unsnoozed := m.unsnoozeLocked(rec) // archive and snooze are exclusive
 	woke := clearSnoozeEnded(&rec.s, m.opts.Now())
 	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned && !unsnoozed && !stopped && !woke {

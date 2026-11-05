@@ -121,12 +121,7 @@ type ThemeDeleted struct {
 // themeCaller is the thread a theme write comes from: the CLI's thread
 // ($CODE_FOUNDRY_THREAD; ActiveView is empty only there), "" for the user's own terminal
 // or the GUI.
-func themeCaller(uctx Context) string {
-	if uctx.ActiveView != "" {
-		return ""
-	}
-	return uctx.CallerThreadID
-}
+func themeCaller(uctx Context) string { return askingThread(uctx) }
 
 // themeErr maps the store's errors onto the command's.
 func themeErr(arg string, err error) error {

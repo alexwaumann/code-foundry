@@ -66,6 +66,8 @@ func notSelf(c Context, a Args, verb string) error {
 type ThreadsResult struct {
 	Done   []string        `json:"done"`
 	Failed []ThreadFailure `json:"failed"`
+	// Deferred are the ones of Done that wait for their turn's end (thread.archive).
+	Deferred []string `json:"deferred,omitempty"`
 }
 
 // ThreadFailure is one thread a command given ids could not act on.
@@ -216,24 +218,37 @@ func removeThreads(ctx context.Context, b ThreadBackend, ids []string) Result {
 }
 
 // archiveThreads is thread.archive given ids: it archives each (archived=false
-// unarchives each); unlike one id it does not toggle, since a list may mix both.
-func archiveThreads(ctx context.Context, b ThreadBackend, ids []string, a Args) Result {
+// unarchives each); unlike one id it does not toggle, since a list may mix both. The
+// thread this runs in, among them mid-turn, is archived when its turn ends: it counts as
+// done and a line, and --json's deferred, say so.
+func archiveThreads(ctx context.Context, b ThreadBackend, c Context, ids []string, a Args) Result {
 	archived := archiveTarget(a)
 	verb := "archived"
 	if !archived {
 		verb = "unarchived"
 	}
-	return eachThread(ctx, ids, verb, func(ctx context.Context, id string) error {
-		_, err := b.Archive(ctx, connect.NewRequest(&v1.ArchiveThreadRequest{Id: id, Archived: archived}))
+	var later []string
+	res := eachThread(ctx, ids, verb, func(ctx context.Context, id string) error {
+		r, err := b.Archive(ctx, connect.NewRequest(&v1.ArchiveThreadRequest{Id: id, Archived: archived, ByThreadId: askingThread(c)}))
+		if err == nil && r.Msg.GetDeferred() {
+			later = append(later, id)
+		}
 		return err
 	})
+	if len(later) > 0 {
+		out, _ := res.JSON.(ThreadsResult)
+		out.Deferred = later
+		res.JSON = out
+		res.Message += "\n" + strings.Join(later, ", ") + ": " + whenTurnEnds
+	}
+	return res
 }
 
 // archiveManyConfirm is thread.archive's confirmation given ids, or "" when it needs
 // none: unarchiving, or no thread among them mid-turn or running background work
 // (archiveInterrupts, the rule for one thread). It reads them in one list; a thread
 // not in it needs none (Run reports it).
-func archiveManyConfirm(ctx context.Context, b ThreadBackend, ids []string, a Args) string {
+func archiveManyConfirm(ctx context.Context, b ThreadBackend, c Context, ids []string, a Args) string {
 	if a.Has("archived") && !a.Bool("archived") {
 		return ""
 	}
@@ -247,7 +262,7 @@ func archiveManyConfirm(ctx context.Context, b ThreadBackend, ids []string, a Ar
 	}
 	if len(ids) == 1 {
 		if s, ok := byID[ids[0]]; ok {
-			return archiveOneConfirm(ctx, b, s)
+			return archiveOneConfirm(ctx, b, c, s)
 		}
 		return ""
 	}
@@ -257,7 +272,7 @@ func archiveManyConfirm(ctx context.Context, b ThreadBackend, ids []string, a Ar
 		if !ok {
 			continue
 		}
-		if why, _ := archiveInterrupts(s); why != "" {
+		if why, _ := archiveInterrupts(s); why != "" && !waitsForTurn(c, s) {
 			busy = append(busy, threadNameOrID(s)+" ("+why+")")
 		}
 	}
