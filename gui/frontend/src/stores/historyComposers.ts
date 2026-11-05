@@ -4,6 +4,7 @@
  * Kept apart from stores/promptHistory.ts so stores/views.ts and keys/bindings.ts do not
  * pull the compose store in.
  */
+import { getViewing } from "./subagentView";
 import { useUiStore } from "./ui";
 
 /** Where a composer's Project scope reads: its thread, or its project set (none: the threads without a project). */
@@ -45,7 +46,7 @@ export function historyComposer(draftKey: string): HistoryComposer | undefined {
 /**
  * composer.history in this window: the picker of the composer that has the keyboard, else
  * the palette's prompts page (deferred: picked in the palette, the palette closes after
- * the presenter runs).
+ * the presenter runs). A subagent's view has no composer to put one back in: nothing.
  */
 export function presentPromptHistory(): boolean {
   const active = document.activeElement;
@@ -57,6 +58,7 @@ export function presentPromptHistory(): boolean {
       }
     }
   }
+  if (getViewing() !== null) return true;
   queueMicrotask(() => {
     useUiStore.getState().openPromptsPalette();
   });

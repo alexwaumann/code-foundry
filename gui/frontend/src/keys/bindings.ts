@@ -23,9 +23,9 @@ import { presentSearch } from "@/stores/threadSearch";
 import { presentDictationToggle } from "@/stores/dictation";
 import { cancelSetup } from "@/stores/setupActions";
 import { presentSnooze } from "@/stores/snoozeDialog";
-import { leaveSubagent } from "@/stores/subagentView";
+import { getViewing, leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
-import { toggleThreadInfo } from "@/stores/threadInfoOverlay";
+import { toggleThreadInfo, useCardRoom } from "@/stores/threadInfoOverlay";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -125,8 +125,37 @@ export function isViewActionChord(chord: string): boolean {
  */
 const contextSupplied: ReadonlySet<string> = new Set(["thread.new"]);
 
-/** Whether the GUI can start this command here (see contextSupplied). */
+/**
+ * What a subagent's view does not start from the keyboard, the palette or a command button
+ * (docs/notes/subagent-as-thread.md): the thread's menu, its composer's controls, and the
+ * card's rows that act on it, which the view leaves out. The thread stays selected, so the
+ * daemon lists them: this is the view's own read-only rule. The sidebar row's menu stays,
+ * as it names its thread and runs by name.
+ */
+const notInSubagent: ReadonlySet<string> = new Set([
+  "composer.history",
+  "git.pull",
+  "git.push",
+  "thread.archive",
+  "thread.fork",
+  "thread.interrupt",
+  "thread.move.open",
+  "thread.pin",
+  "thread.regenerate-name",
+  "thread.remove",
+  "thread.rename",
+  "thread.restart",
+  "thread.run-in",
+  "thread.set-effort",
+  "thread.set-mode",
+  "thread.set-model",
+  "thread.snooze",
+  "thread.stop-waiting",
+]);
+
+/** Whether the GUI can start this command here (see contextSupplied, notInSubagent). */
 export function isStartable(c: CommandView): boolean {
+  if (notInSubagent.has(c.name) && getViewing() !== null) return false;
   return c.available || contextSupplied.has(c.name);
 }
 
@@ -482,6 +511,8 @@ const quietCommands: ReadonlySet<string> = new Set(["terminal.new", "thread.inte
  */
 export function chordFires(chord: string, target: Element | null): boolean {
   if (/^(cmd|ctrl|alt)\+/.test(chord)) return true;
+  // The floating card takes Escape first (ThreadInfoOverlay): it closes, and a subagent's view stays.
+  if (chord === "escape" && useCardRoom.getState().overlayFor !== null) return false;
   return Boolean(target?.closest('[data-region="content"]')) && !target?.closest("[data-keys-local]");
 }
 

@@ -14,12 +14,12 @@ const OWNS_ESCAPE = 'input, textarea, select, [contenteditable=""], [contentedit
  * does not reflow), as wide as the inline card and inset by the same gap, scrolling inside. A non-modal region: Escape (outside a
  * field or menu), a press outside it, another thread or room again hide it.
  */
-export function ThreadInfoOverlay({ threadId }: { threadId: string }) {
+export function ThreadInfoOverlay({ threadId, runId }: { threadId: string; runId?: string }) {
   const shown = useCardRoom((s) => s.overlayFor === threadId);
-  return shown ? <Overlay threadId={threadId} /> : null;
+  return shown ? <Overlay threadId={threadId} runId={runId} /> : null;
 }
 
-function Overlay({ threadId }: { threadId: string }) {
+function Overlay({ threadId, runId }: { threadId: string; runId?: string | undefined }) {
   const ref = useRef<HTMLElement>(null);
   // A press inside, menus and hover cards the card portals out included (React events follow the tree).
   const inside = useRef(false);
@@ -66,7 +66,7 @@ function Overlay({ threadId }: { threadId: string }) {
         inside.current = true;
       }}
     >
-      <ThreadInfoContent threadId={threadId} />
+      <ThreadInfoContent threadId={threadId} runId={runId} />
     </section>
   );
 }

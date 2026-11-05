@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Folders, House, Layers, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
@@ -58,13 +58,15 @@ function Sep() {
   return <ChevronRight className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />;
 }
 
+/** A crumb segment that is a link. */
+export const CRUMB_LINK = "min-w-0 cursor-pointer truncate rounded-sm px-1 text-cf-text-muted outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus";
+
 /** The parent segment: a click opens that thread; a removed creator is plain text, "Thread removed" on hover. */
 function ParentSegment({ parent }: { parent: CrumbParent }) {
-  const className = "min-w-0 truncate rounded-sm px-1 text-cf-text-muted";
   if (!parent.exists)
     return (
       <Tip label="Thread removed">
-        <span className={cn(className, "opacity-60")} data-testid="thread-crumb-parent" data-removed="true">
+        <span className="min-w-0 truncate rounded-sm px-1 text-cf-text-muted opacity-60" data-testid="thread-crumb-parent" data-removed="true">
           {parent.name}
         </span>
       </Tip>
@@ -72,7 +74,7 @@ function ParentSegment({ parent }: { parent: CrumbParent }) {
   return (
     <button
       type="button"
-      className={cn(className, "cursor-pointer outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus")}
+      className={CRUMB_LINK}
       data-testid="thread-crumb-parent"
       data-id={parent.id}
       onClick={() => {
@@ -92,8 +94,11 @@ function ParentSegment({ parent }: { parent: CrumbParent }) {
  * the Projects view on a click (view.projects --workspace or --project: the workspace's,
  * else the primary project's); no project, or a removed one, is plain text. The branch and
  * the rest of the place are the thread info card's.
+ *
+ * `run`: the crumb of one of the thread's subagent runs (SubagentPane), read-only: no move
+ * picker, and `run.parent` (the way back up to this thread) in the parent's place.
  */
-function ThreadCrumb({ id }: { id: string }) {
+export function ThreadCrumb({ id, run }: { id: string; run?: { parent: ReactNode } }) {
   const input = usePlaceInput(id);
   const wsName = useWorkspacesStore((s) => (input.workspaceId ? (s.byId[input.workspaceId]?.name ?? null) : null));
   // Primitives over the projects (shallow): a status refresh elsewhere does not re-render the crumb.
@@ -107,7 +112,7 @@ function ThreadCrumb({ id }: { id: string }) {
   );
   const parent = useThreadsStore(useShallow((s) => crumbParent(s.byId[id] ?? { createdBy: "", createdByName: "", parentId: "" }, s)));
   // No project: the place opens the move picker (MovePicker); while it moves, "Moving to <name>…".
-  const movable = useCanMove(id) && icon === "house";
+  const movable = useCanMove(id) && icon === "house" && run === undefined;
   const moving = useMovingTo(id);
   // view.projects' args (--workspace or --project); null: plain text.
   const args: Record<string, string> | null = workspace ? { workspace } : project ? { project } : null;
@@ -139,11 +144,18 @@ function ThreadCrumb({ id }: { id: string }) {
         <span className="flex min-w-0 items-center gap-1.5 px-1">{content}</span>
       )}
       <Sep />
-      {parent && (
+      {run ? (
         <>
-          <ParentSegment parent={parent} />
+          {run.parent}
           <Sep />
         </>
+      ) : (
+        parent && (
+          <>
+            <ParentSegment parent={parent} />
+            <Sep />
+          </>
+        )
       )}
     </span>
   );

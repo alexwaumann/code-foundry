@@ -139,7 +139,7 @@ describe("a long user message's fold", () => {
   it.each([
     { name: "a steer", props: { steer: true } },
     { name: "a queued message", props: { queued: true } },
-    { name: "a subagent's prompt", props: { label: "Prompt from parent", testId: "subagent-prompt" } },
+    { name: "a subagent's prompt", props: { testId: "subagent-prompt" } },
   ])("$name folds like any message", ({ props }) => {
     render(<Bubble {...props} />);
     expect(box().dataset.folded).toBe("true");

@@ -21,7 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useCreator, useLiveCount } from "@/stores/lineage";
 import { useModelChoices } from "@/stores/settings";
-import { openAgentRun } from "@/stores/subagentActions";
+import { goUpFromSubagent, openAgentRun } from "@/stores/subagentActions";
 import { useThreadStore } from "@/stores/thread";
 import { interruptThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
@@ -99,9 +99,11 @@ function useChildRows(threadId: string): readonly string[] {
  * once (delay 0) like the sidebar's, and names the model as the app does (canonicalModelName):
  * a run that asked for none used its thread's model, as the subagent view says. A child
  * thread's card also says where it works; a run's does not, as the daemon records no cwd per
- * run and its thread's place could be wrong (docs/notes/lineage-card-place.md).
+ * run and its thread's place could be wrong (docs/notes/lineage-card-place.md). `inert`: a
+ * row that opens nothing, only its hover card (a run's own runs: the stream never carries
+ * their work).
  */
-function LineageItem({ threadId, row, sub = false }: { threadId: string; row: LineageRow; sub?: boolean }) {
+function LineageItem({ threadId, row, sub = false, inert = false }: { threadId: string; row: LineageRow; sub?: boolean; inert?: boolean }) {
   // A finished row's time is fixed: only a live one ticks.
   const live = row.state === "working" || row.state === "attention";
   const now = useNowSelect(1000, (n) => (live ? n : 0));
@@ -143,7 +145,8 @@ function LineageItem({ threadId, row, sub = false }: { threadId: string; row: Li
           sub={sub}
           icon={<Dot state={row.state} />}
           meta={elapsed ? <span className={cn(stoppable && "group-focus-within/li:invisible group-hover/li:invisible")}>{elapsed}</span> : null}
-          onActivate={open}
+          hoverable={inert}
+          onActivate={inert ? undefined : open}
           testId="ti-lineage-row"
           data-kind={row.kind}
           data-id={row.id}
@@ -228,24 +231,14 @@ function LineageLabel({ threadId }: { threadId: string }) {
   );
 }
 
-/**
- * Lineage: the creator first (a child thread), then each running or waiting subagent run
- * and child thread, newest first, then "Previous agents" folding
- * the finished ones. Absent without a creator, runs or children.
- */
-export function LineageGroup({ threadId }: { threadId: string }) {
-  const hasParent = useThreadsStore((s) => Boolean(s.byId[threadId]?.createdBy));
-  const agents = useAgentRows(threadId);
-  const children = useChildRows(threadId);
-  const { live, previous } = useMemo(() => splitLineage([...agents, ...children].map((r) => JSON.parse(r) as LineageRow)), [agents, children]);
+/** The rows under the label: the live ones, then "Previous agents" folding the finished ones. */
+function LineageRows({ threadId, rows, inert = false }: { threadId: string; rows: readonly string[]; inert?: boolean }) {
+  const { live, previous } = useMemo(() => splitLineage(rows.map((r) => JSON.parse(r) as LineageRow)), [rows]);
   const [open, setOpen] = useState(false);
-  if (!hasParent && agents.length === 0 && children.length === 0) return null;
   return (
-    <Group testId="ti-lineage">
-      <LineageLabel threadId={threadId} />
-      <ParentRow threadId={threadId} />
+    <>
       {live.map((r) => (
-        <LineageItem key={`${r.kind}:${r.id}`} threadId={threadId} row={r} />
+        <LineageItem key={`${r.kind}:${r.id}`} threadId={threadId} row={r} inert={inert} />
       ))}
       {previous.length > 0 && (
         <Row
@@ -261,7 +254,63 @@ export function LineageGroup({ threadId }: { threadId: string }) {
           <span className="text-cf-text-muted">Previous agents</span>
         </Row>
       )}
-      {open && previous.map((r) => <LineageItem key={`${r.kind}:${r.id}`} threadId={threadId} row={r} sub />)}
+      {open && previous.map((r) => <LineageItem key={`${r.kind}:${r.id}`} threadId={threadId} row={r} sub inert={inert} />)}
+    </>
+  );
+}
+
+/**
+ * Lineage: the creator first (a child thread), then each running or waiting subagent run
+ * and child thread, newest first, then "Previous agents" folding
+ * the finished ones. Absent without a creator, runs or children.
+ */
+export function LineageGroup({ threadId }: { threadId: string }) {
+  const hasParent = useThreadsStore((s) => Boolean(s.byId[threadId]?.createdBy));
+  const agents = useAgentRows(threadId);
+  const children = useChildRows(threadId);
+  const rows = useMemo(() => [...agents, ...children], [agents, children]);
+  if (!hasParent && rows.length === 0) return null;
+  return (
+    <Group testId="ti-lineage">
+      <LineageLabel threadId={threadId} />
+      <ParentRow threadId={threadId} />
+      <LineageRows threadId={threadId} rows={rows} />
+    </Group>
+  );
+}
+
+/**
+ * A subagent's Lineage (its read-only card): the thread it reports to with that thread's
+ * state, a click going back up, then the runs this one started. Those rows open nothing:
+ * a run's own runs have no view. No menu: nothing here acts on a thread.
+ */
+export function RunLineageGroup({ threadId, runId }: { threadId: string; runId: string }) {
+  const name = useThreadsStore((s) => s.byId[threadId]?.name || threadId);
+  const state = useThreadsStore((s) => childRowState(lineageStatus(s.byId[threadId])));
+  const all = useAgentRows(threadId);
+  const parents = useThreadStore(useShallow((s) => (s.logs[threadId]?.agents ?? []).map((r) => r.parentId)));
+  const rows = useMemo(() => all.filter((_, i) => parents[i] === runId), [all, parents, runId]);
+  const running = useMemo(() => rows.filter((r) => (JSON.parse(r) as LineageRow).state === "working").length, [rows]);
+  return (
+    <Group testId="ti-lineage">
+      <Row testId="ti-lineage-label">
+        <span className="text-cf-text-muted">Lineage{running > 0 && ` · ${String(running)} running`}</span>
+      </Row>
+      <Row
+        icon={<CornerLeftUp />}
+        meta={
+          <span className="inline-flex items-center gap-1">
+            <ArrowRight aria-hidden />
+            {parentWord(state)}
+          </span>
+        }
+        onActivate={() => void goUpFromSubagent()}
+        testId="ti-parent"
+        data-id={threadId}
+      >
+        {name}
+      </Row>
+      <LineageRows threadId={threadId} rows={rows} inert />
     </Group>
   );
 }

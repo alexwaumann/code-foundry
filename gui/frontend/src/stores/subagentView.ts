@@ -8,7 +8,7 @@
  * Opened through thread.agent.open (stores/subagentActions.ts: the Agent rows' Open, the
  * strip's names, the thread info card's agent rows; the daemon answers with UiIntent.ShowAgentRun,
  * which reaches every window like the CLI's), left through thread.agent.up (Escape, the
- * header's back button and crumb, the plate's Back; this window's own, presented locally
+ * crumb, the composer's Back; this window's own, presented locally
  * like view.panel.toggle, the CLI's through ShowView "agent.up").
  *
  * No command imports here: the command context (stores/context.ts) reads this store.

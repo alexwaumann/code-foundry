@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
-import { agentPrompt, footerParts, lastTextId, reportIsLastText, runItems, runNodes, turnOfCall } from "./subagentView";
-import type { TimelineItem } from "./threadTimeline";
+import { agentPrompt, headerParts, lastTextId, reportIsLastText, runFolded, runItems, runNodes, shownNodes, turnOfCall } from "./subagentView";
+import type { TimelineItem, WorkNode } from "./threadTimeline";
 
 /** The read-only subagent view's pure helpers. */
 
@@ -103,7 +103,7 @@ describe("reportIsLastText", () => {
   });
 });
 
-describe("footerParts", () => {
+describe("headerParts", () => {
   const NOW = 1_000_000;
   const run = (o: Partial<AgentRunView>) =>
     ({ status: "running", startedAtMs: NOW - 252_000, resumedAtMs: null, endedAtMs: null, durationMs: 0, toolUses: 23, totalTokens: 48_200, error: "", ...o }) as AgentRunView;
@@ -111,9 +111,31 @@ describe("footerParts", () => {
     ["running", run({}), "Opus 4.8", ["Working for 4m 12s", "23 tools", "48.2K tokens", "Opus 4.8"]],
     ["done", run({ status: "done", durationMs: 38_000, toolUses: 1, totalTokens: 6_100 }), "haiku", ["Worked for 38s", "1 tool", "6.1K tokens", "haiku"]],
     ["done, no counters or model", run({ status: "done", durationMs: 0, startedAtMs: null, toolUses: 0, totalTokens: 0 }), "", ["Worked"]],
-    ["failed", run({ status: "failed", error: "Stopped: process exited with code 1" }), "opus", ["Stopped: process exited with code 1"]],
-    ["failed without an error", run({ status: "failed" }), "opus", ["Failed"]],
+    ["failed", run({ status: "failed", durationMs: 63_000, toolUses: 9, totalTokens: 12_000 }), "opus", ["Failed after 1m 03s", "9 tools", "12K tokens", "opus"]],
+    ["failed, no time", run({ status: "failed", durationMs: 0, startedAtMs: null, toolUses: 0, totalTokens: 0 }), "", ["Failed"]],
   ])("%s", (_name, r, model, want) => {
-    expect(footerParts(r, model, NOW)).toEqual(want);
+    expect(headerParts(r, model, NOW)).toEqual(want);
+  });
+});
+
+describe("runFolded", () => {
+  it.each([
+    ["running, the reader's choice ignored", "running", true, false],
+    ["done by default", "done", undefined, true],
+    ["failed by default", "failed", undefined, true],
+    ["done, opened", "done", false, false],
+  ] as const)("%s", (_name, status, choice, want) => {
+    expect(runFolded(status, choice)).toBe(want);
+  });
+});
+
+describe("shownNodes", () => {
+  const nodes = [{ type: "text", id: "t0", key: "t0" }, { type: "tool", id: "b", key: "b" }, { type: "text", id: "t1", key: "t1" }] as unknown as WorkNode[];
+  it.each([
+    ["open: everything", false, false, ["t0", "b", "t1"]],
+    ["folded: its last text", true, false, ["t1"]],
+    ["folded with a report of its own: nothing", true, true, []],
+  ])("%s", (_name, folded, report, want) => {
+    expect(shownNodes(nodes, folded, report).map((n) => n.key)).toEqual(want);
   });
 });

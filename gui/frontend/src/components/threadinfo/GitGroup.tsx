@@ -482,9 +482,11 @@ function ChangesSubRow({ d }: { d: MemberChanges }) {
 /**
  * The git group. The branch, git state and Changes rows need the cwd's checkout; the pull
  * requests do not: they are the thread's own links, and outlive the worktree an archive
- * cleans up. Absent with neither.
+ * cleans up. Absent with neither. `readOnly` (a subagent's card): no git state row, whose
+ * Push, Pull, Rebase, Fix and Resolve act on the checkout or send the thread a prompt. What
+ * is left only shows or copies.
  */
-export function GitGroup({ threadId }: { threadId: string }) {
+export function GitGroup({ threadId, readOnly = false }: { threadId: string; readOnly?: boolean }) {
   const { git, wt } = useCwdCheckout(threadId);
   const prs = usePrRows(threadId);
   const checkout = git && wt !== undefined;
@@ -495,7 +497,7 @@ export function GitGroup({ threadId }: { threadId: string }) {
       {prs.map((r) => (
         <PrRowView key={`${r.slug}#${String(r.number)}`} row={r} />
       ))}
-      {checkout && <GitStateRowView threadId={threadId} />}
+      {checkout && !readOnly && <GitStateRowView threadId={threadId} />}
       {checkout && <ChangesRow threadId={threadId} />}
     </Group>
   );
