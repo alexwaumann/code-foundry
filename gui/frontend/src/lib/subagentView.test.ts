@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
 import { agentPrompt, headerParts, lastTextId, reportIsLastText, runFolded, runItems, runNodes, shownNodes, turnOfCall } from "./subagentView";
-import type { TimelineItem } from "./threadTimeline";
+import type { TimelineItem, WorkNode } from "./threadTimeline";
 
 /** The read-only subagent view's pure helpers. */
 

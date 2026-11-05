@@ -11,7 +11,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { goUpFromSubagent, SUBAGENT_COMMANDS } from "@/stores/subagentActions";
 
 /** Why this run takes no message, in the prompt's place. */
-export function subagentComposerText(status: AgentRunView["status"], parent: string): string {
+function subagentComposerText(status: AgentRunView["status"], parent: string): string {
   switch (status) {
     case "done":
       return `This agent finished and handed its report to ${parent}.`;
