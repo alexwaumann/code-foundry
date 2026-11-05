@@ -26,6 +26,7 @@ export default defineConfig({
         path.resolve(import.meta.dirname, "../../internal/store/thread/testdata"),
         path.resolve(import.meta.dirname, "../../internal/bridge"),
         path.resolve(import.meta.dirname, "../../internal/skills/files"),
+        path.resolve(import.meta.dirname, "../../pluginsdk/ui"),
       ],
     },
   },

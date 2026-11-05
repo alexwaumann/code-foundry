@@ -179,10 +179,9 @@ GUI; it is available exactly where the surface is.
 
 ## Icons
 
-The GUI draws these lucide icons (header and surface icons, glyphs, buttons, notices;
-`ui.Icons` in the SDK, `ui.KnownIcon(name)`); any other name draws a plain circle:
-
-{{cf.icons}}
+Header and surface icons, glyphs, buttons and notices take any lucide icon by its kebab name
+(`refresh-cw`); any other name draws a plain circle. Check one with `ui.KnownIcon(name)`, or
+`grep -o "[a-z0-9-]*git[a-z0-9-]*" reference/icons.md` for names with a word in them.
 
 ## When clauses
 

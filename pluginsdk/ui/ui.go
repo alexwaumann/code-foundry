@@ -182,7 +182,7 @@ type Tab struct {
 	Badge *Pill  `json:"badge,omitempty"`
 }
 
-// Glyph is a status or an allowlisted lucide icon. A status glyph's tooltip is the status
+// Glyph is a status or a lucide icon. A status glyph's tooltip is the status
 // in words unless Hint says more.
 type Glyph struct {
 	Status Status `json:"status,omitempty"`
