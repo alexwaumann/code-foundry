@@ -3,6 +3,7 @@ package preview
 import (
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
@@ -34,7 +35,8 @@ var homeMarkers = []string{filepath.Base(paths.New("").Token()), filepath.Base(p
 // The temp folders (WithTemp) can be read too, and hold config homes of their own: a
 // scratch daemon's lives in /tmp. So they are walked for markers as home is. A temp folder
 // is never a tree itself, as it is everyone's: a file directly in one gets a grant of its
-// own, and one in a folder below it that folder.
+// own, and one in a folder below it that folder. For the same reason a grant there serves
+// only the temp folders: a link planted beside a page does not reach into home.
 type Floor struct {
 	home  string
 	temps []string // temp folders, as spelled and resolved (fsx.TempRoots)
@@ -72,6 +74,11 @@ func realPath(p string) string {
 // reaches reports whether p is under home or a temp folder: nothing outside them is served.
 func (f Floor) reaches(p string) bool {
 	return fsx.ReadRoots{Home: f.home, Temp: f.temps}.Allows(p)
+}
+
+// inTemp reports whether p is under a temp folder.
+func (f Floor) inTemp(p string) bool {
+	return slices.ContainsFunc(f.temps, func(t string) bool { return fsx.Within(t, p) })
 }
 
 // checkouts are a config home's trees of the user's own work, the ones a write may reach.

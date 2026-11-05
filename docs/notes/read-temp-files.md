@@ -44,10 +44,11 @@ home directory". The file viewer now reads there. Only reads: everything else st
 
 - Open in editor and Open in Finder stay on the File tab of a temp file and fail with a toast
   ("outside your home directory"): the gitops rule was kept on purpose.
-- A link from a temp tree into home is served, unless the floor guards the target, because the
-  route has one rule: home or temp. A page in temp can therefore read an unguarded home file
-  through a link someone placed beside it. Tightening it means a temp grant serves only temp, and
-  PreviewFile refusing what the route would 404.
+- A grant in a temp folder serves only the temp folders, so a link from a temp tree into home is
+  404 even when the floor would not guard the target. Temp is writable by anything on the
+  machine, and a page there has the network, so a link planted beside it must not reach an
+  unguarded home file. A home grant may still follow a link into temp. The File tab reads such a
+  link as before: the check is on what a page can fetch, not on what the user opens.
 - A temp page is on the pages origin like any other preview, so it shares that origin's storage.
 - `/tmp/claude-<uid>` is an ordinary folder to the floor: a page directly in it gets the whole
   folder as its tree.

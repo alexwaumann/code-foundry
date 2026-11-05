@@ -229,6 +229,7 @@ func TestHandlerTemp(t *testing.T) {
 		"private/tmp/foo/ssh":       "home/.ssh",
 		"private/tmp/foo/token.txt": "private/tmp/cf-drive/daemon.token",
 		"private/tmp/outfile.html":  "elsewhere/secret.txt",
+		"private/tmp/homefile.html": "home/notes.txt",
 	} {
 		if err := os.Symlink(at(target), at(link)); err != nil {
 			t.Fatal(err)
@@ -257,6 +258,10 @@ func TestHandlerTemp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	homeLink, err := g.GrantFile(at("tmp/homefile.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	srv := httptest.NewServer(Handler(g, nil, slog.Default()))
 	t.Cleanup(srv.Close)
 	tests := []struct {
@@ -271,12 +276,13 @@ func TestHandlerTemp(t *testing.T) {
 		{"a link out", tree + "/out.txt", 404, ""},
 		{"a linked folder out", tree + "/outdir/secret.txt", 404, ""},
 		{"a link within the temp folder", tree + "/up.txt", 200, "sibling"},
-		{"a link into home", tree + "/home.txt", 200, "home"},
+		{"a link into home", tree + "/home.txt", 404, ""},
 		{"a link into ~/.ssh", tree + "/ssh/id_rsa", 404, ""},
 		{"a link to a daemon's token", tree + "/token.txt", 404, ""},
 		{"one file", one + "/direct.html", 200, "<p>direct</p>"},
 		{"one file, its sibling", one + "/sibling.txt", 404, ""},
 		{"one file, a link out", link + "/outfile.html", 404, ""},
+		{"one file, a link into home", homeLink + "/homefile.html", 404, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

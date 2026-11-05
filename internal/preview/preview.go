@@ -7,6 +7,7 @@
 // GET /preview/<grant>/<path> on the loopback listener, mounted outside the bearer check.
 // A grant reads only its tree, never above it, outside the home directory and the temp
 // folders or inside a guarded folder (symlinks resolved), and lasts until the daemon stops.
+// A grant in a temp folder reads only the temp folders: anyone can plant a link there.
 //
 // The route is served on the daemon's pages listener, not the API's
 // (docs/notes/bridge-1-daemon.md). Its CSP sandbox keeps scripts and forms on and allows
@@ -205,7 +206,7 @@ func resolve(floor Floor, dir, rel string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !floor.reaches(real) || floor.Guarded(real) {
+	if !floor.reaches(real) || (floor.inTemp(dir) && !floor.inTemp(real)) || floor.Guarded(real) {
 		return "", fs.ErrNotExist
 	}
 	fi, err := os.Stat(real)
