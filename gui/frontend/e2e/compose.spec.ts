@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
+import { BACKGROUND, composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
 
 /** A 1x1 transparent PNG. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
@@ -169,6 +169,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   expect((await invocations()).at(-1)?.args).toEqual({
+    ...BACKGROUND,
     project: "repo-cf",
     "new-worktree": "true",
     base: "release/v0.3",

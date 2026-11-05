@@ -4,6 +4,9 @@ import { MOCK_PORT, MOCK_TOKEN } from "../playwright.config";
 export const mockUrl = `http://127.0.0.1:${String(MOCK_PORT)}`;
 export const CF = "/Users/dev/src/code-foundry";
 
+/** What every send from the composer adds to thread.new's args (docs/notes/instant-threads-4-composer.md). */
+export const BACKGROUND = { "background-setup": "true", "draft-json": expect.any(String) as unknown as string };
+
 /** App URL pointed at the e2e mock daemon via the dev-only query override. */
 export const appPath = `/?daemon=${encodeURIComponent(mockUrl)}&token=${MOCK_TOKEN}`;
 

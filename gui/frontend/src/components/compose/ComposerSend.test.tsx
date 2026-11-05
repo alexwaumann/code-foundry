@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_DRAFT_JSON_BYTES, parseSetupDraft } from "@/lib/setupDraft";
 import { getDraft, updateDraft } from "@/stores/compose";
+import { useUiStore } from "@/stores/ui";
 import { daemon, lastInvocation, refuse } from "@/test/daemonFakes";
 import { CF, updateProject } from "@/test/projectsWorld";
-import { composeIn, openPicker, optionTexts, pickOption, promptValue, seedComposer, send, settle } from "@/test/composerWorld";
+import { BACKGROUND, composeIn, openPicker, optionTexts, pickOption, promptValue, seedComposer, send, settle } from "@/test/composerWorld";
 import { SelectedComposer } from "@/test/SelectedComposer";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
@@ -44,6 +46,7 @@ describe("a project's composer (compose.spec.ts)", () => {
     type("repo-cf", "Add a dark mode toggle\nin settings");
     await send();
     expect(lastInvocation("thread.new")?.args).toEqual({
+      ...BACKGROUND,
       project: "repo-cf",
       "new-worktree": "true",
       model: "claude-sonnet-5[1m]",
@@ -129,7 +132,7 @@ describe("a failed start and the Work in picker (compose.spec.ts)", () => {
     });
     expect(screen.queryByTestId("composer-error")).toBeNull();
     await send();
-    expect(lastInvocation("thread.new")?.args).toEqual({ project: "repo-cf", worktree: CF, model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto", prompt: "Please work" });
+    expect(lastInvocation("thread.new")?.args).toEqual({ ...BACKGROUND, project: "repo-cf", worktree: CF, model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto", prompt: "Please work" });
     // The new thread replaces the composer.
     expect(screen.getByTestId("selected-thread").textContent).toBe("s-new-1");
   });
@@ -237,5 +240,44 @@ describe("thread tags (composer-threads.spec.ts)", () => {
     const args = lastInvocation("thread.new")?.args;
     expect(args?.prompt).toBe('[Thread "Fix resize race" (id s-3)] hit the same bug');
     expect(args?.["composer-prompt"]).toBe("[Fix resize race](cf-thread://s-3) hit the same bug");
+  });
+});
+
+describe("sending in the background (docs/notes/instant-threads-4-composer.md)", () => {
+  beforeEach(() => {
+    seedComposer({ "threads.default_worktree": "new" });
+  });
+
+  it("thread.new answers at once, and draft-json puts everything back", async () => {
+    composeIn("repo-cf");
+    render(<SelectedComposer />);
+    await settle();
+    type("repo-cf", "Add a dark mode toggle");
+    await send();
+    const args = lastInvocation("thread.new")?.args;
+    expect(args?.["background-setup"]).toBe("true");
+    expect(parseSetupDraft(args?.["draft-json"] ?? "")).toMatchObject({ v: 1, target: { kind: "project", projectId: "repo-cf" }, text: "Add a dark mode toggle", attachments: [], permission: "auto" });
+  });
+
+  it("a draft over the cap still sends, with Discard's first to fall back on", async () => {
+    composeIn("repo-cf");
+    render(<SelectedComposer />);
+    await settle();
+    const huge = "x".repeat(MAX_DRAFT_JSON_BYTES + 1);
+    type("repo-cf", huge);
+    await send();
+    const args = lastInvocation("thread.new")?.args;
+    expect(args?.prompt).toBe(huge);
+    expect(parseSetupDraft(args?.["draft-json"] ?? "")?.text).toBeNull();
+  });
+
+  it("no hints in the reply toast nothing, and the thread opens", async () => {
+    daemon.handlers.set("thread.new", () => ({ message: "", resultJson: JSON.stringify({ id: "s-new" }), warnings: [] }));
+    composeIn("repo-cf");
+    render(<SelectedComposer />);
+    await settle();
+    type("repo-cf", "Go");
+    await send();
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-new" });
   });
 });

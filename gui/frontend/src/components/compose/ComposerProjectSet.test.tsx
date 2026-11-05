@@ -6,6 +6,7 @@ import { composeIn, composeInWorkspace, composeTarget, updateDraft, useComposeSt
 import { useSettingsStore } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { card } from "@/test/cardFakes";
+import { BACKGROUND } from "@/test/composerWorld";
 import { daemon, invocationsOf, lastInvocation, refuse, resetDaemon } from "@/test/daemonFakes";
 import { addThreads, addWorkspace, addWorktrees, HOME, removeWorkspace, seedWorld, SK, thread, worktree, WR } from "@/test/projectsWorld";
 import { ThreadTitle } from "@/components/thread/ThreadParts";
@@ -188,7 +189,7 @@ describe("the composer's project set", () => {
     await tick();
     expect(screen.getByTestId("composer-primary").textContent).toBe("ghostty-playground");
     await sendPrompt("Share the login types");
-    expect(lastInvocation("thread.new")?.args).toEqual({ project: "repo-gp", projects: "repo-cf,repo-gp", "new-worktree": "false", ...DEFAULTS, prompt: "Share the login types" });
+    expect(lastInvocation("thread.new")?.args).toEqual({ ...BACKGROUND, project: "repo-gp", projects: "repo-cf,repo-gp", "new-worktree": "false", ...DEFAULTS, prompt: "Share the login types" });
     // The new thread replaces the composer.
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-new-1" });
   });
@@ -222,7 +223,7 @@ describe("the composer's project set", () => {
     expect(screen.getByTestId("composer-worktree").textContent).toContain("fix/resize");
     expect(screen.queryByTestId("composer-base")).toBeNull();
     await sendPrompt("Fix the resize glitch");
-    expect(lastInvocation("thread.new")?.args).toEqual({ project: "repo-cf", projects: "repo-cf,repo-gp", "new-worktree": "true", branch: "fix/resize", ...DEFAULTS, prompt: "Fix the resize glitch" });
+    expect(lastInvocation("thread.new")?.args).toEqual({ ...BACKGROUND, project: "repo-cf", projects: "repo-cf,repo-gp", "new-worktree": "true", branch: "fix/resize", ...DEFAULTS, prompt: "Fix the resize glitch" });
   });
 
   it("Branch from: Default branches first, the branches every project has, the rule as a footer; every project gets the pick", async () => {
@@ -243,7 +244,7 @@ describe("the composer's project set", () => {
     await tick();
     expect(screen.getByTestId("composer-base").textContent).toContain("From release/v0.3");
     await sendPrompt("Backport the fix");
-    expect(lastInvocation("thread.new")?.args).toEqual({ project: "repo-cf", projects: "repo-cf:release/v0.3,repo-gp:release/v0.3", "new-worktree": "true", ...DEFAULTS, prompt: "Backport the fix" });
+    expect(lastInvocation("thread.new")?.args).toEqual({ ...BACKGROUND, project: "repo-cf", projects: "repo-cf:release/v0.3,repo-gp:release/v0.3", "new-worktree": "true", ...DEFAULTS, prompt: "Backport the fix" });
   });
 
   it("Branch from: no footer while projects.base_from_origin is off", async () => {
@@ -290,7 +291,7 @@ describe("the composer's project set", () => {
     // A base applies to every git project, whichever runs the thread: Branch from stays.
     expect(screen.getByTestId("composer-base").textContent).toContain("From defaults");
     await sendPrompt("Ship the shop banner");
-    expect(lastInvocation("thread.new")?.args).toEqual({ project: "workspace", projects: "repo-cf,repo-dot", workspace: ws.id, "new-worktree": "true", ...DEFAULTS, prompt: "Ship the shop banner" });
+    expect(lastInvocation("thread.new")?.args).toEqual({ ...BACKGROUND, project: "workspace", projects: "repo-cf,repo-dot", workspace: ws.id, "new-worktree": "true", ...DEFAULTS, prompt: "Ship the shop banner" });
   });
 
   it("the workspace chip's × takes its members with it; Clear empties the set; every × goes to the prompt", async () => {
@@ -543,7 +544,7 @@ describe("Save as workspace and New thread on this branch", () => {
     fireEvent.click(option(runIn, "ghostty-playground"));
     await tick();
     await sendPrompt("Add the error cases");
-    expect(lastInvocation("thread.new-like")?.args).toEqual({ id: "s-parser", project: "repo-gp", ...DEFAULTS, prompt: "Add the error cases" });
+    expect(lastInvocation("thread.new-like")?.args).toEqual({ ...BACKGROUND, id: "s-parser", project: "repo-gp", ...DEFAULTS, prompt: "Add the error cases" });
   });
 
   it("New thread on this branch from the title menu: one project in place, no primary", async () => {
