@@ -1028,7 +1028,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	}
 	argv, env, extras, mem := m.claudeCommand(ctx, cs, l, grants{}, true)
 	r.memNote, r.memHash = mem.note, mem.hash
-	if err := m.spawnStream(ctx, rec, r, argv, env, first); err != nil {
+	if err := m.spawnStream(ctx, s, r, argv, env, first); err != nil {
 		return err
 	}
 	now := m.opts.Now()

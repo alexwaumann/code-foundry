@@ -182,8 +182,7 @@ func (r *runner) pid() int { return r.st.proc.Pid() }
 // spawnStream starts a thread's claude and prepares its runner (spawn starts run). msgs
 // go out once Claude answers its handshake, in order; the items of all but the first are
 // in the timeline already.
-func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv, env []string, msgs []*outgoing) error {
-	s := rec.s
+func (m *Manager) spawnStream(ctx context.Context, s Thread, r *runner, argv, env []string, msgs []*outgoing) error {
 	log, err := m.thread(ctx, s.ID)
 	if err != nil {
 		return err

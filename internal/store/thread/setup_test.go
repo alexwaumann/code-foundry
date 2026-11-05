@@ -536,8 +536,8 @@ func TestSetupRestartFailsAThreadInSetup(t *testing.T) {
 	if !slices.ContainsFunc(e.items(s.ID).Items, func(it Item) bool { return it.Kind == KindTurnEnd }) {
 		t.Errorf("its turn stayed open:\n%s", describeItems(e.items(s.ID).Items))
 	}
-	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "hello"}); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("Send = %v", err)
+	if _, err := e.m.Reconnect(e.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
+		t.Errorf("Reconnect = %v", err)
 	}
 	// Once more: it stays failed, with nothing new.
 	e.restart()
@@ -665,8 +665,8 @@ var refusedWithoutProcess = []struct {
 	name string
 	call func(e *env, id string) error
 }{
-	{"send", func(e *env, id string) error {
-		_, err := e.m.Send(e.ctx(), id, Message{Text: "hi"})
+	{"a wake", func(e *env, id string) error {
+		_, err := e.m.Send(e.ctx(), id, Message{Text: "woken", Origin: OriginWake})
 		return err
 	}},
 	{"reconnect", func(e *env, id string) error {
@@ -810,6 +810,16 @@ func TestSetupRefusalsAfterItFailed(t *testing.T) {
 			}
 		})
 	}
+	t.Run("what says to try again", func(t *testing.T) {
+		_, err := e.m.Reconnect(e.ctx(), s.ID)
+		if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "try its setup again") {
+			t.Errorf("Reconnect = %v", err)
+		}
+		_, restarted, err := e.m.Restart(e.ctx(), s.ID)
+		if restarted || !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "try its setup again") {
+			t.Errorf("Restart = %v %v", restarted, err)
+		}
+	})
 	t.Run("what only goes to the row", func(t *testing.T) {
 		if _, err := e.m.SetEffort(e.ctx(), s.ID, "high"); err != nil {
 			t.Errorf("SetEffort = %v", err)
@@ -871,7 +881,7 @@ func TestSetupRemoveDuringIt(t *testing.T) {
 // A Remove that lands while the worktrees are being made, again and again: nothing writes
 // to the record it took, and what was made goes with the thread (run with -race).
 func TestSetupRemoveRacesIt(t *testing.T) {
-	e, _ := newWorktreeEnv(t, nil)
+	e, rr := newWorktreeEnv(t, nil)
 	e.namer = func(string) (string, error) { return "Title: T\nBranch: fix/t", nil }
 	for i := range 20 {
 		s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "do x", NewWorktree: &NewWorktree{}, BackgroundSetup: true})
@@ -884,6 +894,18 @@ func TestSetupRemoveRacesIt(t *testing.T) {
 		}
 		if _, ok := e.m.Snapshot().Thread(s.ID); ok {
 			t.Fatal("the thread is still there")
+		}
+		// A setup past its spawn hands its worktree to the thread, and the daemon's
+		// Options.Removed takes it from there. Anything less has gone here.
+		if s, _ := e.m.Removed(s.ID); s.ID != "" && s.WorktreePath != "" {
+			if r, _ := rr.Snapshot().Project("r1"); len(r.Worktrees) > 1 {
+				if err := rr.RemoveWorktree(e.ctx(), project.RemoveWorktreeOptions{ProjectID: "r1", Path: r.Worktrees[1].Path, Force: true}); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		if r, _ := rr.Snapshot().Project("r1"); len(r.Worktrees) != 1 {
+			t.Fatalf("round %d left %+v", i, r.Worktrees)
 		}
 	}
 }
@@ -973,13 +995,74 @@ func TestSetupArchiveWaitsForIt(t *testing.T) {
 	}
 }
 
+// A stop does not fail a background setup, the next start does: the row stays running, and
+// what it made stays on it.
 func TestSetupShutdownDuringIt(t *testing.T) {
-	e, rr := newWorktreeEnv(t, nil)
-	inSetup(t, e, rr, CreateOptions{InitialPrompt: "do x"})
+	var held *heldProjects
+	e, _ := newWorktreeEnv(t, nil, func(o *Options) {
+		held = &heldProjects{recordingProjects: o.Projects.(*recordingProjects), holding: "r2"}
+		o.Projects = held
+	})
+	e.addGitProject(t, "r2", "other")
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectIDs: []string{"r1", "r2"}, InitialPrompt: "do x", NewWorktree: &NewWorktree{}, BackgroundSetup: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.waitFor(s.ID, "r1's worktree", func(s Thread) bool { return stepStatus(s, SetupStepWorktree, "r1") == SetupStepDone })
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := e.m.Shutdown(ctx); err != nil {
 		t.Fatalf("Shutdown = %v", err)
+	}
+	rows, err := loadThreads(e.ctx(), e.m.opts.DB)
+	if err != nil || len(rows) != 1 || !rows[0].SettingUp() || len(rows[0].Setup.Made) != 1 {
+		t.Fatalf("rows = %+v, %v", rows, err)
+	}
+	if slices.ContainsFunc(held.Calls, func(c string) bool { return strings.HasPrefix(c, "RemoveWorktree") }) {
+		t.Errorf("a stop took what it made: %q", held.Calls)
+	}
+	e.open()
+	got, err := e.m.Get(e.ctx(), s.ID)
+	if err != nil || got.Setup.Phase != SetupFailed || got.Setup.Error != SetupRestarted || len(got.Setup.Made) != 1 {
+		t.Errorf("after the stop: %+v, %v", got.Setup, err)
+	}
+}
+
+// A Create that waits sees a stop as ErrClosed, and leaves nothing: no thread, no row, no
+// worktree.
+func TestSetupShutdownDuringWaitedCreate(t *testing.T) {
+	var held *heldProjects
+	e, _ := newWorktreeEnv(t, nil, func(o *Options) {
+		held = &heldProjects{recordingProjects: o.Projects.(*recordingProjects), holding: "r2"}
+		o.Projects = held
+	})
+	e.addGitProject(t, "r2", "other")
+	errc := make(chan error, 1)
+	go func() {
+		_, err := e.m.Create(context.Background(), CreateOptions{ProjectIDs: []string{"r1", "r2"}, InitialPrompt: "do x", NewWorktree: &NewWorktree{}})
+		errc <- err
+	}()
+	for len(e.m.Snapshot().Threads) == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	id := e.m.Snapshot().Threads[0].ID
+	e.waitFor(id, "r1's worktree", func(s Thread) bool { return stepStatus(s, SetupStepWorktree, "r1") == SetupStepDone })
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := e.m.Shutdown(ctx); err != nil {
+		t.Fatalf("Shutdown = %v", err)
+	}
+	if err := waitChan(t, errc, "Create to end"); !errors.Is(err, ErrClosed) {
+		t.Errorf("Create = %v", err)
+	}
+	if !slices.ContainsFunc(held.Calls, func(c string) bool { return strings.HasPrefix(c, "RemoveWorktree r1") }) {
+		t.Errorf("calls %q", held.Calls)
+	}
+	if n := len(e.m.Snapshot().Threads); n != 0 {
+		t.Errorf("%d threads", n)
+	}
+	if rows, err := loadThreads(context.Background(), e.m.opts.DB); err != nil || len(rows) != 0 {
+		t.Errorf("rows %+v, %v", rows, err)
 	}
 }
 
