@@ -75,11 +75,13 @@ func Flip(t testing.TB, path string, makes ...Maker) {
 	})
 }
 
-// Bounds of Hammer. Reads win a flip within a few dozen tries, so these are generous, and a
-// machine under load only makes fewer tries: it can miss a bug, not fail a good build.
+// Bounds of Hammer. Reads win a flip within a few dozen tries, so these leave room, and a
+// machine under load only makes fewer tries: it can miss a bug, not fail a good build. They
+// stay short because a flip is a stream of file events, which the system shares with every
+// FSEvents test running beside this one.
 const (
-	hammerTries = 3000
-	hammerTime  = 400 * time.Millisecond
+	hammerTries = 1000
+	hammerTime  = 150 * time.Millisecond
 	hammerHang  = 30 * time.Second
 )
 
