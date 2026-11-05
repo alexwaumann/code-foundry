@@ -15,16 +15,16 @@ func TestCompactHold(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		st   streamState
+		st   *streamState
 		want string
 	}{
-		{"at the prompt", streamState{initialized: true, sd: sd(false, false)}, ""},
-		{"before the handshake", streamState{sd: sd(false, false)}, "is starting"},
-		{"a restart under way", streamState{initialized: true, restart: restartClosing, sd: sd(false, false)}, "is restarting"},
-		{"a restart wanted", streamState{initialized: true, wantRestart: true, sd: sd(false, false)}, "is restarting"},
-		{"mid-turn", streamState{initialized: true, sd: sd(true, false)}, "is in the middle of a turn"},
-		{"compacting", streamState{initialized: true, sd: sd(true, true)}, "is already compacting"},
-		{"a pending request", streamState{initialized: true, sd: sd(true, false), pending: map[string]*claudestream.PermissionRequest{"r": nil}}, "is waiting for an answer"},
+		{"at the prompt", &streamState{initialized: true, sd: sd(false, false)}, ""},
+		{"before the handshake", &streamState{sd: sd(false, false)}, "is starting"},
+		{"a restart under way", &streamState{initialized: true, restart: restartClosing, sd: sd(false, false)}, "is restarting"},
+		{"a restart wanted", &streamState{initialized: true, wantRestart: true, sd: sd(false, false)}, "is restarting"},
+		{"mid-turn", &streamState{initialized: true, sd: sd(true, false)}, "is in the middle of a turn"},
+		{"compacting", &streamState{initialized: true, sd: sd(true, true)}, "is already compacting"},
+		{"a pending request", &streamState{initialized: true, sd: sd(true, false), pending: map[string]*claudestream.PermissionRequest{"r": nil}}, "is waiting for an answer"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

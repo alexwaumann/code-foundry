@@ -13,13 +13,12 @@ import (
 // composer's chip and the thread info card's row (docs/notes/compact-button.md).
 func threadCompact(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.compact",
-		Title: "Compact Thread",
-		Description: "Have Claude replace a thread's conversation with its summary (/compact). " +
-			"A thread whose Claude is not running starts with it. Refused while the thread works or compacts.",
-		Category: "Thread",
-		Args:     []ArgSpec{positional(idArg)},
-		When:     hasThread,
+		Name:        "thread.compact",
+		Title:       "Compact Thread",
+		Description: "Send /compact to a thread; a stopped one starts with it. Refused mid-turn.",
+		Category:    "Thread",
+		Args:        []ArgSpec{positional(idArg)},
+		When:        hasThread,
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			id := a.String("id")
 			res, err := b.Compact(ctx, connect.NewRequest(&v1.CompactThreadRequest{ThreadId: id}))
