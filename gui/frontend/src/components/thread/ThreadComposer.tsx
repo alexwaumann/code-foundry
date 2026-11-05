@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlarmClockOff, ArrowUp, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
+import { ArrowUp, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
 import { CompletionCard } from "@/components/compose/CompletionCard";
@@ -22,7 +22,7 @@ import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { useNow } from "@/lib/clock";
 import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
-import { snoozeTimeShort } from "@/lib/snooze";
+import { isSnoozed } from "@/lib/snooze";
 import { statusLine, statusText } from "@/lib/statusLine";
 import { setupUnfinished, setupWaitedFor } from "@/lib/threadSetup";
 
@@ -39,7 +39,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
 import { useSlashCommands } from "@/stores/thread";
-import { interruptThread, sendThreadDraft, snoozeThread, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
+import { interruptThread, sendThreadDraft, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
 import { useUiStore } from "@/stores/ui";
 import { registerCiteTarget } from "@/stores/cite";
 import { cancelSetup } from "@/stores/setupActions";
@@ -85,12 +85,6 @@ function useThreadSources(threadId: string) {
   }, [noProject, projectIds, paths]);
 }
 
-/** "Snoozed until Thu 9:00 AM" for a snoozed thread, on the shared 30 s clock. */
-function SnoozedUntil({ until }: { until: number }) {
-  const now = useNow(30_000);
-  return <span data-testid="thread-snoozed">Snoozed until {snoozeTimeShort(until, now)}</span>;
-}
-
 /** "Snooze ended · 2 min ago" in amber, like the sidebar row's line 2, for a woken thread. */
 function SnoozeEnded({ at }: { at: number | null }) {
   const now = useNow(30_000);
@@ -102,34 +96,20 @@ function SnoozeEnded({ at }: { at: number | null }) {
 }
 
 /**
- * The composer's snooze line above the prompt: a snoozed thread says until when and a
- * saved one "Saved for later", with Unsnooze (a message unsnoozes too); a thread the daemon woke says "Snooze ended · <ago>"
- * (the header's Snooze button snoozes again). Nothing otherwise.
+ * The composer's line above the prompt for a thread the daemon woke: "Snooze ended · <ago>"
+ * (the header's Snooze button snoozes again). Nothing otherwise; a thread still snoozed has
+ * the dock's strip instead (SnoozeStrip).
  */
 export function SnoozeNote({ threadId }: { threadId: string }) {
-  const snoozedUntil = useThreadsStore((s) => s.byId[threadId]?.snoozedUntilMs ?? null);
-  const saved = useThreadsStore((s) => (s.byId[threadId]?.savedAtMs ?? null) !== null);
   const wokeAt = useThreadsStore((s) => {
-    const l = statusLine(s.byId[threadId]);
-    return l.kind === "snoozeEnded" ? (l.at ?? 0) : null;
+    const t = s.byId[threadId];
+    const l = statusLine(t);
+    return l.kind === "snoozeEnded" && !(t && isSnoozed(t)) ? (l.at ?? 0) : null;
   });
-  if (snoozedUntil === null && !saved && wokeAt === null) return null;
+  if (wokeAt === null) return null;
   return (
     <div className="col-span-2 flex min-w-0 items-center gap-2 px-4 pt-2 text-caption" data-testid="thread-snooze-note">
-      {saved ? <span data-testid="thread-saved">Saved for later</span> : snoozedUntil !== null ? <SnoozedUntil until={snoozedUntil} /> : <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />}
-      {(saved || snoozedUntil !== null) && (
-        <button
-          type="button"
-          className="btn outline ml-auto"
-          data-testid="thread-unsnooze"
-          onClick={() => {
-            void snoozeThread(threadId, null);
-          }}
-        >
-          <AlarmClockOff aria-hidden />
-          Unsnooze
-        </button>
-      )}
+      <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />
     </div>
   );
 }

@@ -12,8 +12,9 @@ import { useUiStore } from "./ui";
 /**
  * Selects the thread `by` rows from the current one in sidebar order, wrapping; from a
  * page, next selects the first row and previous the last. A hidden thread selected starts
- * from its creator's row, as cmd+shift+a does. Rows of a collapsed section and hidden
- * threads do not count (cmd+1..9's order; Ember's row is not in it). The selection goes
+ * from its creator's row, as cmd+shift+a does. Only rows on screen count: those of a
+ * collapsed section and hidden threads do not, the open thread's row under a collapsed
+ * header does (cmd+1..9's order; Ember's row is not in it). The selection goes
  * through `select`, so it lands in the window's history. Returns whether one was selected.
  */
 export function jumpToNeighbour(by: 1 | -1): boolean {

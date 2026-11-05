@@ -14,8 +14,9 @@ import { openAgentRun, useCanOpenAgents } from "@/stores/subagentActions";
 import { stopShell } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { removeWake, stopWaiting, useWaitListCurrent, useWaitShells, useWakes } from "@/stores/waitList";
+import { DOCK_STRIP, DOCK_STRIP_ICON, DockStripLine } from "./DockStrip";
 
-const ICON = "size-3.5 shrink-0 text-cf-text-muted";
+const ICON = DOCK_STRIP_ICON;
 const ROW = "flex min-h-8 min-w-0 items-center gap-2.5 border-t border-cf-border py-1 pr-2 pl-3";
 const NAME = "min-w-0 flex-1 truncate";
 const STATUS = "max-w-1/2 shrink-0 truncate text-cf-text-muted";
@@ -193,16 +194,10 @@ export function WaitingStrip({ threadId }: { threadId: string }) {
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="waiting-strip min-w-0 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised text-body-sm"
+      className={DOCK_STRIP}
       data-testid="waiting-strip"
     >
-      <div className="flex min-w-0 items-center gap-2.5 py-1.5 pr-2 pl-3">
-        <Hourglass className={ICON} aria-hidden />
-        <Tip label={sentence} whenTruncated>
-          <span className="min-w-0 flex-1 truncate" role="status" data-testid="waiting-sentence">
-            {sentence}
-          </span>
-        </Tip>
+      <DockStripLine icon={Hourglass} sentence={sentence} testId="waiting-sentence">
         {wakes.length + shells.length > 0 && (
           <Button
             variant="outline"
@@ -226,7 +221,7 @@ export function WaitingStrip({ threadId }: { threadId: string }) {
             </Button>
           </CollapsibleTrigger>
         </Tip>
-      </div>
+      </DockStripLine>
       <CollapsibleContent>
         <ul className="max-h-64 overflow-y-auto" data-testid="waiting-rows">
           {orderWakes(wakes).map((w) => (

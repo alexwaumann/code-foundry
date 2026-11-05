@@ -25,6 +25,7 @@ import { HeaderActions } from "./HeaderActions";
 import { PaneOverlay } from "./InlineHtml";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
+import { SnoozeStrip } from "./SnoozeStrip";
 import { WaitingStrip } from "./WaitingStrip";
 import "./thread.css";
 
@@ -151,6 +152,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
               />
               <div className="dock" ref={dockRef}>
                 <WaitingStrip key={`wait:${threadId}`} threadId={threadId} />
+                <SnoozeStrip key={`snooze:${threadId}`} threadId={threadId} />
                 <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
               </div>
               <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />

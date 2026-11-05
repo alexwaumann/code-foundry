@@ -280,6 +280,100 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
     expect(screen.getByTestId("archived-count").textContent).toBe("1");
   });
 
+  describe("the open thread's row under a collapsed header", () => {
+    const open = (id: string) => {
+      act(() => {
+        useUiStore.getState().select({ kind: "thread", id });
+      });
+    };
+
+    it.each([
+      ["Snoozed", "s-8", "snoozed", "2"],
+      ["Archived", "s-7", "archived", "1"],
+    ])("%s: the row shows under the collapsed header, selected, and goes when the window moves on", (_name, id, section, count) => {
+      render(<Sidebar />);
+      expect(rowOf(`s:${id}`)).toBeNull();
+      open(id);
+      const row = rowOf(`s:${id}`) as HTMLElement;
+      expect(screen.getByTestId(`sidebar-${section}-rows`).contains(row)).toBe(true);
+      expect(row.getAttribute("data-section")).toBe(section);
+      expect(row.getAttribute("aria-selected")).toBe("true");
+      // The header stays collapsed, with every thread's count.
+      expect(screen.getByTestId(`${section}-header`).getAttribute("aria-expanded")).toBe("false");
+      expect(screen.getByTestId(`${section}-count`).textContent).toBe(count);
+      open("s-2");
+      expect(rowOf(`s:${id}`)).toBeNull();
+      expect(screen.getByTestId(`${section}-count`).textContent).toBe(count);
+      open(id);
+      act(() => {
+        useUiStore.getState().select(HOME);
+      });
+      expect(rowOf(`s:${id}`)).toBeNull();
+    });
+
+    it("only the open thread's: the section's others stay out, and expanding shows them as ever", () => {
+      render(<Sidebar />);
+      open("s-9");
+      expect(rowKeys()).toEqual([...DEFAULT_ORDER.slice(0, -1), "s:s-9", "# Archived 1"]);
+      fireEvent.click(screen.getByTestId("snoozed-header"));
+      expect(rowKeys()).toEqual([...DEFAULT_ORDER.slice(0, -1), "s:s-8", "s:s-9", "# Archived 1"]);
+      fireEvent.click(screen.getByTestId("snoozed-header"));
+      expect(rowKeys()).toEqual([...DEFAULT_ORDER.slice(0, -1), "s:s-9", "# Archived 1"]);
+    });
+
+    it("the arrows start from it and walk to it, and past it to the next footer's", () => {
+      render(<Sidebar />);
+      open("s-8");
+      list().focus();
+      press("ArrowUp");
+      expect(active()).toBe("row-s:s-1");
+      press("ArrowDown");
+      expect(active()).toBe("row-s:s-8");
+      expect(rowOf("s:s-8")?.getAttribute("data-cursor")).toBe("true");
+      // The last row: it stays.
+      press("ArrowDown");
+      expect(active()).toBe("row-s:s-8");
+      press("End");
+      expect(active()).toBe("row-s:s-8");
+    });
+
+    it("Working is not affected: a working thread open under its collapsed header has no row", () => {
+      useUiStore.setState({ workingCollapsed: true });
+      render(<Sidebar />);
+      open("s-5");
+      expect(rowOf("s:s-5")).toBeNull();
+      expect(screen.getByTestId("working-header").getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("a child thread never shows, snoozed or archived; its creator's row does not come either", () => {
+      addThreads(thread("child-z", { createdBy: "s-8", snoozedUntilMs: Date.now() + 60_000 }), thread("child-a", { createdBy: "s-7", archivedAtMs: Date.now() }));
+      render(<Sidebar />);
+      for (const id of ["child-z", "child-a"]) {
+        open(id);
+        expect(rowOf(`s:${id}`)).toBeNull();
+        expect(rowOf("s:s-8")).toBeNull();
+        expect(rowOf("s:s-7")).toBeNull();
+      }
+      expect(screen.getByTestId("snoozed-count").textContent).toBe("2");
+      expect(screen.getByTestId("archived-count").textContent).toBe("1");
+    });
+
+    it.each([
+      ["woken", "s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() }, "snoozed", "attention"],
+      ["unarchived", "s-7", { archivedAtMs: null, statusReason: "finished" }, "archived", "done"],
+    ])("%s while open, it just moves to the main list", (_name, id, change, from, to) => {
+      render(<Sidebar />);
+      open(id);
+      setThread(id, change as Partial<ThreadView>);
+      expect(screen.getByTestId("thread-list").querySelectorAll(`[data-row-key="s:${id}"]`)).toHaveLength(1);
+      expect(rowOf(`s:${id}`)?.getAttribute("data-section")).toBe(to);
+      expect(rowOf(`s:${id}`)?.getAttribute("aria-selected")).toBe("true");
+      expect(screen.getByTestId("sidebar-main").contains(rowOf(`s:${id}`))).toBe(true);
+      if (from === "snoozed") expect(screen.getByTestId("snoozed-count").textContent).toBe("1");
+      else expect(screen.queryByTestId("sidebar-archived")).toBeNull();
+    });
+  });
+
   it("their rows sit 2px apart; the main list's and Working's stay 8px apart", () => {
     setThread("s-8", { statusReason: "finished" });
     setThread("s-6", { archivedAtMs: Date.now() });

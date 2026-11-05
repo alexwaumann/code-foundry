@@ -6,7 +6,7 @@ import { decodeThreadListKeys, deriveContext, encodeThreadListKey, getListOption
 import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
-import { useUiStore } from "./ui";
+import { HOME, useUiStore } from "./ui";
 
 function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
@@ -119,7 +119,7 @@ describe("the sidebar list's keys", () => {
 
   it("getListThreads and getListOptions read the stores (archive and snooze times, hidden and orphaned threads, the collapsed states)", () => {
     useThreadsStore.setState({ byId: { s1: thread({ archivedAtMs: 5 }), s2: thread({ id: "s2", snoozedUntilMs: 7 }), s3: thread({ id: "s3", createdBy: "s1" }), s4: thread({ id: "s4", createdBy: "gone" }) }, order: ["s1", "s2", "s3", "s4"] });
-    useUiStore.setState({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true });
+    useUiStore.setState({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true, selection: HOME });
     expect(getListThreads()).toEqual([
       { id: "s1", pinned: false, group: "idle", archivedAtMs: 5, snoozedUntilMs: null, statusChangedAtMs: 100, lastActivityAtMs: 200 },
       { id: "s2", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 7, statusChangedAtMs: 100, lastActivityAtMs: 200 },
@@ -128,6 +128,9 @@ describe("the sidebar list's keys", () => {
       // Its creator was removed: shown.
       { id: "s4", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, statusChangedAtMs: 100, lastActivityAtMs: 200 },
     ]);
-    expect(getListOptions()).toEqual({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true });
+    expect(getListOptions()).toEqual({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true, openThreadId: null });
+    // The open thread keeps its row under a collapsed header, so cmd+1..9 count it as the sidebar shows it.
+    useUiStore.setState({ selection: { kind: "thread", id: "s2" } });
+    expect(getListOptions().openThreadId).toBe("s2");
   });
 });

@@ -7,6 +7,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
 import { sidebarAnchor } from "@/lib/inSidebar";
+import { isSnoozed } from "@/lib/snooze";
 import { zoomFactor } from "@/lib/zoom";
 import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
 import { useShownEmberThreadId } from "@/stores/ember";
@@ -35,13 +36,25 @@ interface ListRows {
   main: Row[];
   /** A footer's header, or null when the footer is empty (not rendered). */
   headers: Readonly<Record<FooterSection, HeaderRow | null>>;
-  /** A footer's thread rows; none when it is collapsed. */
+  /** A footer's thread rows; when it is collapsed none, or the open thread's alone. */
   footers: Readonly<Record<FooterSection, Row[]>>;
 }
 
 function splitFooter(rows: readonly Row[]): [HeaderRow | null, Row[]] {
   const [first, ...rest] = rows;
   return first?.kind === "header" ? [first, rest] : [null, [...rows]];
+}
+
+/**
+ * The open thread's id while it is snoozed or archived (ListOptions.openThreadId), else null:
+ * no other thread changes the list, so moving between live threads does not rebuild it.
+ */
+function useOpenPutAwayId(): string | null {
+  const id = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : null));
+  return useThreadsStore((s) => {
+    const t = id === null ? undefined : s.byId[id];
+    return t !== undefined && (t.archivedAtMs !== null || isSnoozed(t)) ? t.id : null;
+  });
 }
 
 /**
@@ -55,9 +68,10 @@ function useListRows(): ListRows {
   const workingCollapsed = useUiStore((s) => s.workingCollapsed);
   const snoozedCollapsed = useUiStore((s) => s.snoozedCollapsed);
   const archivedCollapsed = useUiStore((s) => s.archivedCollapsed);
+  const openThreadId = useOpenPutAwayId();
   const [stable] = useState(rowCache);
   return useMemo(() => {
-    const sec = buildSections(decodeThreadListKeys(threadKeys), { workingCollapsed, snoozedCollapsed, archivedCollapsed });
+    const sec = buildSections(decodeThreadListKeys(threadKeys), { workingCollapsed, snoozedCollapsed, archivedCollapsed, openThreadId });
     const rows = stable([...sec.main, ...FOOTERS.flatMap((f) => sec[f])]);
     const headers: Record<FooterSection, HeaderRow | null> = { working: null, snoozed: null, archived: null };
     const footers: Record<FooterSection, Row[]> = { working: [], snoozed: [], archived: [] };
@@ -67,7 +81,7 @@ function useListRows(): ListRows {
       at += sec[f].length;
     }
     return { rows, main: rows.slice(0, sec.main.length), headers, footers };
-  }, [stable, threadKeys, workingCollapsed, snoozedCollapsed, archivedCollapsed]);
+  }, [stable, threadKeys, workingCollapsed, snoozedCollapsed, archivedCollapsed, openThreadId]);
 }
 
 /**
@@ -193,9 +207,10 @@ function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, maxHeig
  * pinned to the bottom whatever the main list's scroll, the Working footer (expanded by
  * default, up to 40% of the sidebar body), the Snoozed footer (collapsed by default, up to
  * 25%) and the Archived footer (collapsed by default, up to 30%), each its header and then
- * its rows, which scroll inside it once they reach the cap. A footer without threads is
- * not rendered. Keyboard and cmd+N walk one order across the four (buildSections). See
- * docs/notes/archive-threads-2-sidebar.md and snooze-threads-2-sidebar.md.
+ * its rows, which scroll inside it once they reach the cap. A collapsed Snoozed or Archived
+ * footer still shows the open thread's row. A footer without threads is not rendered.
+ * Keyboard and cmd+N walk one order across the four (buildSections). See
+ * docs/notes/archive-threads-2-sidebar.md, snooze-threads-2-sidebar.md and open-row-snooze-strip.md.
  */
 function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const { rows, main, headers, footers } = useListRows();

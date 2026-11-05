@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { threadGroup } from "./thread";
-import { bandSortTimes, buildRows, buildSections, rowCache, nextAfter, placeThread, threadKey, threadOrder, type ListThread, type Row } from "./tree";
+import { bandSortTimes, buildRows, buildSections, rowCache, neighbourIn, nextAfter, placeThread, threadKey, threadOrder, type ListThread, type Row } from "./tree";
 
 const W = [
   { projectId: "r1", path: "/src/app" },
@@ -267,6 +267,69 @@ describe("buildSections: the Snoozed footer", () => {
   });
 });
 
+describe("buildSections: the open thread under a collapsed footer", () => {
+  const threads = [
+    thread("live"),
+    thread("work", { group: "working" }),
+    thread("zz1", { snoozedUntilMs: 5000 }),
+    thread("zz2", { snoozedUntilMs: 9000 }),
+    thread("saved", { snoozedUntilMs: null, savedAtMs: 100 }),
+    thread("old", { archivedAtMs: 100 }),
+    thread("older", { archivedAtMs: 50 }),
+    thread("child", { snoozedUntilMs: 7000, hidden: true }),
+    thread("child-old", { archivedAtMs: 70, hidden: true }),
+  ];
+  const collapsed = { workingCollapsed: true, snoozedCollapsed: true, archivedCollapsed: true };
+
+  it.each([
+    ["a snoozed thread", "zz2", ["# Snoozed 3 (collapsed)", ...s("zz2")], ["# Archived 2 (collapsed)"]],
+    ["a thread saved for later", "saved", ["# Snoozed 3 (collapsed)", ...s("saved")], ["# Archived 2 (collapsed)"]],
+    ["an archived thread", "older", ["# Snoozed 3 (collapsed)"], ["# Archived 2 (collapsed)", ...s("older")]],
+    ["a live thread", "live", ["# Snoozed 3 (collapsed)"], ["# Archived 2 (collapsed)"]],
+    ["a working thread: Working is not affected", "work", ["# Snoozed 3 (collapsed)"], ["# Archived 2 (collapsed)"]],
+    ["a hidden snoozed child: that rule wins", "child", ["# Snoozed 3 (collapsed)"], ["# Archived 2 (collapsed)"]],
+    ["a hidden archived child: that rule wins", "child-old", ["# Snoozed 3 (collapsed)"], ["# Archived 2 (collapsed)"]],
+    ["nothing open", null, ["# Snoozed 3 (collapsed)"], ["# Archived 2 (collapsed)"]],
+    ["an unknown id", "gone", ["# Snoozed 3 (collapsed)"], ["# Archived 2 (collapsed)"]],
+  ])("%s", (_name, openThreadId, snoozed, archived) => {
+    const sec = buildSections(threads, { ...collapsed, openThreadId });
+    expect(shape(sec.snoozed)).toEqual(snoozed);
+    expect(shape(sec.archived)).toEqual(archived);
+    expect(shape(sec.working)).toEqual(["# Working 1 (collapsed)"]);
+    expect(shape(sec.main)).toEqual(s("live"));
+  });
+
+  it("an expanded section is unchanged, in its order", () => {
+    const open = buildSections(threads, { openThreadId: "zz2" });
+    expect(open).toEqual(buildSections(threads));
+    expect(shape(open.snoozed)).toEqual(["# Snoozed 3", ...s("zz1", "zz2", "saved")]);
+  });
+
+  it("the row is in the keyboard order, where it shows", () => {
+    expect(threadOrder(threads, { ...collapsed, openThreadId: "zz1" })).toEqual(["live", "zz1"]);
+    expect(threadOrder(threads, { ...collapsed, openThreadId: "older" })).toEqual(["live", "older"]);
+    expect(neighbourIn(threadOrder(threads, { ...collapsed, openThreadId: "zz1" }), "zz1", 1)).toBe("live");
+  });
+
+  it.each([
+    ["woken", { snoozedUntilMs: null }],
+    ["unarchived", { archivedAtMs: null }],
+  ])("%s while open, it just moves to the main list, in one place", (_name, change) => {
+    const id = "snoozedUntilMs" in change ? "zz1" : "old";
+    const moved = buildSections(
+      threads.map((t) => (t.id === id ? { ...t, ...change } : t)),
+      { ...collapsed, openThreadId: id },
+    );
+    expect(shape(moved.main).sort()).toEqual(s(id, "live").sort());
+    expect(shape(moved.snoozed)).toEqual(id === "zz1" ? ["# Snoozed 2 (collapsed)"] : ["# Snoozed 3 (collapsed)"]);
+    expect(shape(moved.archived)).toEqual(id === "old" ? ["# Archived 1 (collapsed)"] : ["# Archived 2 (collapsed)"]);
+  });
+
+  it("a section of only the hidden open thread has no footer", () => {
+    expect(buildSections([thread("a"), thread("c", { snoozedUntilMs: 1, hidden: true })], { snoozedCollapsed: true, openThreadId: "c" }).snoozed).toEqual([]);
+  });
+});
+
 describe("buildSections: hidden threads (a thread's children, docs/notes/hidden-children-2-gui.md)", () => {
   // One shown and one hidden thread in every section.
   const threads = [
@@ -354,6 +417,17 @@ describe("rowCache", () => {
     expect(byKey(second, threadKey("s3"))).toBe(byKey(first, threadKey("s3")));
     expect(byKey(second, threadKey("s2"))).toMatchObject({ section: "archived" });
     expect(byKey(second, "h:archived")).not.toBe(byKey(first, "h:archived"));
+  });
+
+  it("the open row coming and going under a collapsed header leaves every other row object, and the header's, alone", () => {
+    const stable = rowCache();
+    const list = [thread("a"), thread("b"), thread("z1", { snoozedUntilMs: 5 }), thread("z2", { snoozedUntilMs: 9 })];
+    const closed = stable(buildRows(list, { snoozedCollapsed: true }));
+    const open = stable(buildRows(list, { snoozedCollapsed: true, openThreadId: "z2" }));
+    expect(open.map((r) => r.key)).toEqual([...closed.map((r) => r.key), "s:z2"]);
+    closed.forEach((r, i) => {
+      expect(open[i]).toBe(r);
+    });
   });
 
   it("snoozing a thread moves only that row (a new object in the snoozed section)", () => {
