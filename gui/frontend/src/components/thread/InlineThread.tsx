@@ -6,6 +6,7 @@ import { useElementHeight, useThreadActivity } from "./activity";
 import { ThreadContext } from "./context";
 import { PaneOverlay } from "./InlineHtml";
 import { Timeline } from "./Timeline";
+import { SnoozeStrip } from "./SnoozeStrip";
 import { ThreadComposer } from "./ThreadComposer";
 import "./thread.css";
 
@@ -49,6 +50,7 @@ export function InlineThread({ threadId, readOnly = false, placeholder }: { thre
           <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={readOnly ? 0 : dockHeight} inset={INLINE_INSET} />
           {!readOnly && (
             <div className="dock" ref={dockRef}>
+              <SnoozeStrip key={`snooze:${threadId}`} threadId={threadId} />
               <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} placeholder={placeholder} focusRequests={false} />
             </div>
           )}

@@ -45,8 +45,8 @@ test("Snoozed section: stacked between Working and Archived; quiet rows at the l
 // (src/components/thread/ThreadMenuItems.test.tsx, src/lib/snooze.test.ts), the daemon asking only
 // mid-turn (internal/command/commands_thread_snooze_test.go) and the retry confirmed
 // (src/stores/commands.test.ts, src/components/confirm/ConfirmDialog.test.tsx), its panels dropped and
-// the window landing home, whoever snoozed it (src/stores/archiveCleanup.test.ts), the composer's
-// "Snoozed until …" and Unsnooze (src/components/thread/SnoozeNote.test.tsx), the title menu's Unsnooze
+// the window landing home, whoever snoozed it (src/stores/archiveCleanup.test.ts), the dock's
+// strip, "Snoozed until …" and Dismiss snooze (src/components/thread/SnoozeStrip.test.tsx), the title menu's Unsnooze
 // (ThreadMenuItems.test.tsx), back in the main list's waiting band (src/components/sidebar/Sidebar.test.tsx).
 
 // Pick a date and time: the dialog for the row's thread and the local time it sends, unit-tested in
@@ -96,6 +96,51 @@ test("the keyboard walks main → Working → Snoozed → Archived; collapsed se
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Meta+Shift+a");
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+});
+
+// The row showing, the header's state and count, the arrows, children and a wake: src/components/sidebar/Sidebar.test.tsx
+// and src/lib/tree.test.ts. This is what the real list and the keymap do with it.
+test("the open thread keeps its one-line row under the collapsed header, and cmd+N counts it", async ({ page }) => {
+  await openApp(page);
+  await page.getByTestId("snoozed-header").click();
+  await row(page, "s:s-9").click();
+  await page.getByTestId("snoozed-header").click();
+  await expect(page.getByTestId("snoozed-header")).toHaveAttribute("aria-expanded", "false");
+  const footer = await box(page, "sidebar-snoozed");
+  const r = await row(page, "s:s-9").evaluate((el) => el.getBoundingClientRect().toJSON() as DOMRect);
+  // Header, then the one row and the panel's 4px below it.
+  expect(footer.height).toBe(26 + 24 + 4);
+  expect(r.bottom).toBeLessThanOrEqual(footer.bottom);
+  // s-2, s-6, s-4, s-3, s-5, s-1, the open s-9, then s-7: the row counts, so cmd+8 is s-7.
+  await page.getByTestId("archived-header").click();
+  await page.keyboard.press("Meta+8");
+  await expect(row(page, "s:s-7")).toHaveAttribute("aria-selected", "true");
+  await expect(row(page, "s:s-9")).toHaveCount(0);
+});
+
+// What the strip says and does: src/components/thread/SnoozeStrip.test.tsx. This is the dock's geometry.
+test("the snooze and waiting strips stack on the composer, and the list clears them; dismissed, the dock and the list follow", async ({ page }) => {
+  await mockPost("thread?state=waiting");
+  await mockPost("thread/snooze?id=s-r1&save=true");
+  await openApp(page);
+  await page.getByTestId("snoozed-header").click();
+  await row(page, "s:s-r1").click();
+  await page.getByTestId("snoozed-header").click();
+  await expect(page.getByTestId("snooze-strip")).toBeVisible();
+  await expect(page.getByTestId("waiting-strip")).toBeVisible();
+  const waiting = await box(page, "waiting-strip");
+  const snooze = await box(page, "snooze-strip");
+  const composer = await box(page, "thread-composer");
+  expect(snooze.top - waiting.bottom).toBe(8);
+  expect(composer.top - snooze.bottom).toBe(8);
+  // The dock's height is the list's bottom inset: the last row scrolls clear of the strips.
+  const dock = () => page.locator(".dock").evaluate((el) => el.getBoundingClientRect().height);
+  const both = await dock();
+  await page.getByTestId("snooze-dismiss").click();
+  await expect(page.getByTestId("snooze-strip")).toHaveCount(0);
+  await expect(row(page, "s:s-r1")).toHaveAttribute("data-section", /^(?!snoozed).*/);
+  await expect.poll(dock).toBe(both - snooze.height - 8);
+  expect((await box(page, "waiting-strip")).bottom).toBe((await box(page, "thread-composer")).top - 8);
 });
 
 // The palette's Snooze opening the custom dialog for the selected thread: src/stores/snoozeDialog.test.ts;
@@ -165,7 +210,7 @@ for (const scheme of ["dark", "light"] as const) {
       await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");
       await row(page, "s:s-9").click();
-      await expect(page.getByTestId("thread-saved")).toBeVisible();
+      await expect(page.getByTestId("snooze-sentence")).toHaveText("Saved for later");
       await page.mouse.move(640, 300);
       await page.waitForTimeout(350);
       await page.screenshot({ path: `${String(dir)}/saved-${scheme}.png` });

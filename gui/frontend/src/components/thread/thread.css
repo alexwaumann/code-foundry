@@ -931,12 +931,12 @@ html[data-thread-width="full"] {
   max-width: var(--thread-dock);
   margin: 0 auto;
 }
-/* The agents' strip (Ember) and the waiting strip sit on the composer (docs/sketches/agents-panel). */
-.cf-thread .dock:has(> .agents-strip, > .waiting-strip) {
+/* The agents' strip (Ember) and the dock strips (waiting, snoozed) sit on the composer, 8px apart when there are two (docs/sketches/agents-panel). */
+.cf-thread .dock:has(> .agents-strip, > .dock-strip) {
   padding-top: 8px;
 }
 .cf-thread .dock > .agents-strip,
-.cf-thread .dock > .waiting-strip {
+.cf-thread .dock > .dock-strip {
   margin-bottom: 8px;
 }
 .cf-thread .ccard {

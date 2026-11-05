@@ -4,7 +4,8 @@
  * change first), then idle ones (most recent activity first) (the main list); then the working ones
  * under a collapsible Working header, the snoozed ones under a collapsible Snoozed header
  * and the archived ones under a collapsible Archived header (the three footers,
- * buildSections), as rows for virtual lists. No project, worktree or terminal
+ * buildSections; the thread open in the content pane keeps its row under a collapsed Snoozed
+ * or Archived header), as rows for virtual lists. No project, worktree or terminal
  * rows: worktrees live on the Projects page, and shells in their owner's bottom panel
  * (stores/bottomPanel.ts). Pure functions over the minimal inputs that affect structure, so
  * the sidebar only rebuilds when membership, order, pin, group or a band's sort time changes
@@ -100,10 +101,12 @@ export const FOOTERS: readonly FooterSection[] = ["working", "snoozed", "archive
 export interface ListOptions {
   /** The Working section is collapsed: its header stays, its rows are not in the list. */
   workingCollapsed?: boolean;
-  /** The Archived section is collapsed: its header stays, its rows are not in the list. */
+  /** The Archived section is collapsed: its header stays, its rows are not in the list but for openThreadId's. */
   archivedCollapsed?: boolean;
-  /** The Snoozed section is collapsed: its header stays, its rows are not in the list. */
+  /** The Snoozed section is collapsed: its header stays, its rows are not in the list but for openThreadId's. */
   snoozedCollapsed?: boolean;
+  /** The thread open in the content pane: under a collapsed Snoozed or Archived header its row stays. It changes nothing else. */
+  openThreadId?: string | null;
 }
 
 /** A footer's header (Working, Snoozed, Archived): a toggle, with the number of threads under it (shown or not). */
@@ -166,8 +169,8 @@ export function placeThread(s: { worktreePath: string }, worktrees: readonly Wor
 
 /**
  * The sidebar's four panels: the main list (scrolls on its own) and the three footers pinned
- * below it, each footer its header row followed by its rows (none when collapsed); a
- * footer without threads is empty (no header).
+ * below it, each footer its header row followed by its rows (when collapsed none, or the
+ * open thread's alone); a footer without threads is empty (no header).
  */
 export interface Sections {
   main: Row[];
@@ -189,7 +192,9 @@ export interface Sections {
  * Archived: every archived thread (pinned or not, whatever its group; it appears nowhere
  * else; a thread is never both, but archived wins) under an Archived header, most recently
  * archived first. A footer has its header only when it has threads; collapsed, the header
- * alone. A hidden thread (ListThread.hidden) is in none of them and counts in no header.
+ * alone, except that a collapsed Snoozed or Archived header keeps the open thread's row
+ * (ListOptions.openThreadId) under it, its count still every thread's. A hidden thread
+ * (ListThread.hidden) is in none of them and counts in no header, open or not.
  */
 export function buildSections(threads: readonly ListThread[], opts: ListOptions = {}): Sections {
   const newest = threads.filter((s) => s.hidden !== true).reverse();
@@ -197,14 +202,16 @@ export function buildSections(threads: readonly ListThread[], opts: ListOptions 
   const unpinned = (...groups: ThreadGroup[]) => groups.flatMap((g) => live.filter((s) => !s.pinned && s.group === g));
   const byStatus = (...groups: ThreadGroup[]) => groups.flatMap((g) => byRecent(unpinned(g), (s) => s.statusChangedAtMs));
   const rowsOf = (section: Section, list: readonly ListThread[]): Row[] => list.map((s) => ({ key: threadKey(s.id), kind: "thread", section, threadId: s.id }));
-  const footer = (section: FooterSection, label: string, list: readonly ListThread[], collapsed: boolean): Row[] =>
-    list.length === 0 ? [] : [{ key: headerKey(section), kind: "header", section, label, count: list.length, collapsed }, ...(collapsed ? [] : rowsOf(section, list))];
+  const footer = (section: FooterSection, label: string, list: readonly ListThread[], collapsed: boolean, whenCollapsed: readonly ListThread[] = []): Row[] =>
+    list.length === 0 ? [] : [{ key: headerKey(section), kind: "header", section, label, count: list.length, collapsed }, ...rowsOf(section, collapsed ? whenCollapsed : list)];
+  const openIn = (list: readonly ListThread[]) => list.filter((s) => s.id === opts.openThreadId);
   // Stable sort: equal archive times keep newest-created first.
   const archived = newest.filter((s) => s.archivedAtMs !== null).sort((a, b) => (b.archivedAtMs ?? 0) - (a.archivedAtMs ?? 0));
   // Stable sorts: equal times keep newest-created first. Saved threads have no wake, so they follow the timed ones.
   const putAway = newest.filter((s) => s.archivedAtMs === null);
   const timed = putAway.filter((s) => s.snoozedUntilMs !== null).sort((a, b) => (a.snoozedUntilMs ?? 0) - (b.snoozedUntilMs ?? 0));
   const saved = putAway.filter((s) => s.snoozedUntilMs === null && isSnoozed(s)).sort((a, b) => (b.savedAtMs ?? 0) - (a.savedAtMs ?? 0));
+  const snoozed = [...timed, ...saved];
   return {
     main: [
       ...rowsOf("pinned", live.filter((s) => s.pinned)),
@@ -213,8 +220,8 @@ export function buildSections(threads: readonly ListThread[], opts: ListOptions 
       ...rowsOf("idle", byRecent(unpinned("idle"), (s) => s.lastActivityAtMs)),
     ],
     working: footer("working", "Working", unpinned("working"), opts.workingCollapsed === true),
-    snoozed: footer("snoozed", "Snoozed", [...timed, ...saved], opts.snoozedCollapsed === true),
-    archived: footer("archived", "Archived", archived, opts.archivedCollapsed === true),
+    snoozed: footer("snoozed", "Snoozed", snoozed, opts.snoozedCollapsed === true, openIn(snoozed)),
+    archived: footer("archived", "Archived", archived, opts.archivedCollapsed === true, openIn(archived)),
   };
 }
 
@@ -250,15 +257,15 @@ export function rowCache(): (rows: readonly Row[]) => Row[] {
   };
 }
 
-/** Thread ids in sidebar order (cmd+1..9, cmd+shift+a); a collapsed section's threads are not in it. */
+/** Thread ids in sidebar order (cmd+1..9, cmd+shift+a): the rows on screen, so of a collapsed section only the open thread's, when it keeps its row. */
 export function threadOrder(threads: readonly ListThread[], opts: ListOptions = {}): string[] {
   return buildRows(threads, opts).flatMap((r) => (r.kind === "thread" ? [r.threadId] : []));
 }
 
 /**
  * The id `by` rows from `current` in `order`, wrapping at both ends (thread.previous and
- * thread.next, macOS tab switching). From an id not in the order (a page, a thread in a
- * collapsed section): the first row going down, the last going up. Null when empty.
+ * thread.next, macOS tab switching). From an id not in the order (a page, the row of a
+ * hidden thread's creator in a collapsed section): the first row going down, the last going up. Null when empty.
  */
 export function neighbourIn(order: readonly string[], current: string | null, by: 1 | -1): string | null {
   if (order.length === 0) return null;

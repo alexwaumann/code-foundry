@@ -45,7 +45,7 @@ export interface ViewAction {
   run: () => void;
 }
 
-/** Selects the Nth thread in sidebar order (rows of a collapsed section and hidden threads do not count). */
+/** Selects the Nth thread in sidebar order: only rows on screen count (not a collapsed section's, but for the open thread's, nor hidden threads). */
 function jumpTo(n: number): void {
   const id = threadOrder(getListThreads(), getListOptions())[n - 1];
   if (id !== undefined) useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });

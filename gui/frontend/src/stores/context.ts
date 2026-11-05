@@ -192,5 +192,10 @@ export function getListThreads(): ListThread[] {
 /** The sidebar list's display options read imperatively, so cmd+1..9 and cmd+shift+a see the rendered list. */
 export function getListOptions(): ListOptions {
   const ui = useUiStore.getState();
-  return { workingCollapsed: ui.workingCollapsed, snoozedCollapsed: ui.snoozedCollapsed, archivedCollapsed: ui.archivedCollapsed };
+  return {
+    workingCollapsed: ui.workingCollapsed,
+    snoozedCollapsed: ui.snoozedCollapsed,
+    archivedCollapsed: ui.archivedCollapsed,
+    openThreadId: ui.selection.kind === "thread" ? ui.selection.id : null,
+  };
 }
