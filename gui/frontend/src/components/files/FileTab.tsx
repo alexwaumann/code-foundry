@@ -1,17 +1,22 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { FileImage, FileQuestion, FileText, FileX, Folder, SquareArrowOutUpRight, TriangleAlert, type LucideIcon } from "lucide-react";
-import { readFile, type FileReadView } from "@/api/files";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileImage, FileQuestion, FileText, FileX, Folder, Pencil, SquareArrowOutUpRight, TriangleAlert, type LucideIcon } from "lucide-react";
+import { canEdit, readFile, type FileReadView } from "@/api/files";
+import type { CodeFileEdit } from "@/components/code/CodeFile";
+import type { EditorHandle } from "@/lib/codeEditor";
 import { FinderIcon } from "@/components/icons/AppIcon";
+import { usePanelKey } from "@/components/panel/panelKeyContext";
 import { ago } from "@/components/pr/model";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/lib/clock";
 import { dirPart, extOf, fileName, relativeTo, resolvePath } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
 import { setPreviewMode, useCodeViewStore, type PreviewMode } from "@/stores/codeView";
-import type { FileTarget } from "@/surfaces/fileTarget";
+import { discardDraft, editClock, editorDetached, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
+import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
 import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
-import { FileActions, FileHeader, HeaderMeta, ModeSwitch, WrapToggle } from "./FileHeader";
+import { ConflictBand, EditButtons, EditFailedBand, EditStatus } from "./FileEditBar";
+import { FileActions, FileHeader, HeaderAction, HeaderMeta, ModeSwitch, WrapToggle } from "./FileHeader";
 import { findMissing } from "./findMissing";
 import { fileIconOf, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, tooLargeHeading, truncatedNotice } from "./fileKind";
 import { HtmlPreview } from "./HtmlPreview";
@@ -42,7 +47,10 @@ function SavedAgo({ ms }: { ms: number | null }) {
  * for once in the checkout (findMissing: a model's path written from a subfolder or cut
  * short), and the file found is the tab's. Read again when the tab shows, on
  * Refresh, when the worktree changes and when the thread edits the file (useTabRead);
- * outside every project, whenever the file is written (useFileChanges).
+ * outside every project, whenever the file is written (useFileChanges). The pencil edits
+ * a whole text file in place (stores/fileEdit.ts): while it does, the tab shows the
+ * session's version, and those reads only go through observeRead, so none of them can
+ * replace a draft.
  */
 export function FileTab({ target }: { target: FileTarget }) {
   const { project, base, path, line, page } = target;
@@ -50,7 +58,16 @@ export function FileTab({ target }: { target: FileTarget }) {
   // A path not found at base is looked for once in the checkout (findMissing); what that
   // found (or null) is read from then on, so a refresh does not search again.
   const found = useRef<{ key: string; path: string | null } | null>(null);
-  const read = useTabRead<FileReadView>(key, async (signal) => {
+  const panelKey = usePanelKey();
+  const tabId = fileTab(target).id;
+  const editKey = fileEditKey(panelKey, tabId);
+  const readTarget = async (signal: AbortSignal): Promise<FileReadView> => {
+    // An edit session is bound to its file: no fallback, and the tab stays there after it.
+    const pinned = editPath(editKey);
+    if (pinned !== null) {
+      found.current = { key, path: pinned };
+      return readFile(base, pinned, undefined, signal);
+    }
     const tried = found.current?.key === key ? found.current : null;
     const first = await readFile(base, tried?.path ?? path, undefined, signal);
     if (tried || !first.notFound || !project) return first;
@@ -59,11 +76,28 @@ export function FileTab({ target }: { target: FileTarget }) {
     if (alt === null) return first;
     const second = await readFile(base, alt, undefined, signal);
     return second.notFound ? first : second;
+  };
+  const read = useTabRead<FileReadView>(key, async (signal) => {
+    const started = editClock();
+    const view = await readTarget(signal);
+    noteRead(view, started);
+    return view;
   });
-  const { reload } = read;
+  const { reload, replace } = read;
   const later = useDebounced(reload);
-  const file = read.data;
+  const session = useFileEdit(editKey);
+  const editing = session?.view != null;
+  const dirty = session?.dirty === true;
+  const file = session?.view ?? read.data;
   const abs = file?.path || resolvePath(base, path);
+  useEffect(() => {
+    if (read.data) observeRead(editKey, read.data);
+  }, [editKey, read.data]);
+  // What a save wrote is what the viewer shows when editing stops.
+  const savedView = session?.view;
+  useEffect(() => {
+    if (savedView) replace(savedView);
+  }, [savedView, replace]);
   useOnWindowVisible(later);
   useWorktreeChanges(project, project ? base : null, later);
   useToolEdits(project ? abs : "", later);
@@ -77,7 +111,9 @@ export function FileTab({ target }: { target: FileTarget }) {
   const place = useMemo<FilePlace>(() => ({ project, dir: base || dirPart(abs), file: abs }), [project, base, abs]);
 
   const kind = previewKindOf(abs);
-  const mode = useCodeViewStore((s) => (kind ? s.preview[kind] : "source"));
+  const storedMode = useCodeViewStore((s) => (kind ? s.preview[kind] : "source"));
+  // Editing is on the source, for this tab only: the remembered choice stays for the viewer.
+  const mode = editing ? "source" : storedMode;
   const text = file?.text ?? null;
   const lines = useMemo(() => (text === null ? 0 : lineCount(text)), [text]);
   const rendered = kind !== null && text !== null && mode === "rendered";
@@ -86,6 +122,60 @@ export function FileTab({ target }: { target: FileTarget }) {
     setDims({ w, h });
   }, []);
   const [pages, setPages] = useState<number | null>(null);
+
+  const editable = canEdit(file);
+  const startEditing = useCallback(() => {
+    if (read.data) void startEdit(editKey, { panelKey, tabId, base }, read.data);
+  }, [read.data, editKey, panelKey, tabId, base]);
+  // Asked to open editing (the tab's `edit` param), once per asking: the pencil can turn it off.
+  const asked = useRef(false);
+  const wantsEdit = target.edit === true;
+  useEffect(() => {
+    if (!wantsEdit) asked.current = false;
+    else if (editable && !asked.current) {
+      asked.current = true;
+      startEditing();
+    }
+  }, [wantsEdit, editable, startEditing]);
+  const leaveEdit = () => {
+    stopEdit(editKey);
+    reload();
+  };
+  // The pencil puts the keyboard in the editor; a tab coming back to a draft leaves it where it is.
+  const onPencil = () => {
+    if (dirty) return;
+    if (editing) leaveEdit();
+    else {
+      focusNextEditor(editKey);
+      startEditing();
+    }
+  };
+  const seed = session?.seed ?? "";
+  const seedLines = useMemo(() => lineCount(seed), [seed]);
+  const onDraft = useCallback((t: string) => {
+    noteDraft(editKey, t);
+  }, [editKey]);
+  const onOpening = useCallback((stateKey: string) => {
+    editorOpening(editKey, stateKey);
+  }, [editKey]);
+  const onDetached = useCallback((stateKey: string) => {
+    editorDetached(editKey, stateKey);
+  }, [editKey]);
+  const onReady = useCallback((editor: EditorHandle) => {
+    noteEditor(editKey, editor);
+  }, [editKey]);
+  // Buttons that go disabled or away under the pointer would drop the keyboard on the body.
+  const backToEditor = () => {
+    focusEditor(editKey);
+  };
+  // The next document's editor takes the keyboard, and the viewer is current if there is none.
+  const startOver = (replaced: Promise<void>) => {
+    focusNextEditor(editKey);
+    void replaced.then(reload);
+  };
+  const stateKey = editing ? session.stateKey : undefined;
+  const revision = session?.revision ?? 0;
+  const edit = useMemo<CodeFileEdit>(() => ({ active: stateKey !== undefined, stateKey, revision, onChange: onDraft, onOpening, onDetached, onReady }), [stateKey, revision, onDraft, onOpening, onDetached, onReady]);
 
   const meta = !file ? null : file.notFound || file.isDir ? null : file.pdf ? (
     pdfMeta(file.size, file.truncated ? null : pages)
@@ -110,25 +200,60 @@ export function FileTab({ target }: { target: FileTarget }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="file-tab" data-path={abs} data-mode={kind ? mode : undefined} data-loading={read.loading || undefined}>
-      <FileHeader icon={fileIconOf(abs, file?.mime)} name={name} dir={dir} fullPath={abs} actions={<FileActions place={place} line={line} onRefresh={reload} />}>
-        {kind && text !== null && (
+      <FileHeader
+        icon={fileIconOf(abs, file?.mime)}
+        name={name}
+        dir={dir}
+        fullPath={abs}
+        actions={<FileActions place={place} line={line} onRefresh={reload} extra={editable && <HeaderAction icon={Pencil} label="Edit" pressed={editing} testId="file-edit" onClick={onPencil} />} />}
+      >
+        {kind && text !== null && !dirty && (
           <ModeSwitch
             options={MODES}
             value={mode}
             onChange={(m) => {
+              if (editing && m === "source") return;
+              if (editing) leaveEdit();
               setPreviewMode(kind, m);
             }}
             label="Show as"
             testId="file-mode"
           />
         )}
+        {editing && <EditStatus dirty={dirty} />}
         {meta && <HeaderMeta testId="file-meta">{meta}</HeaderMeta>}
         <span className="flex-1" />
         {text !== null && !rendered && <WrapToggle />}
+        {editing && (
+          <EditButtons
+            dirty={dirty}
+            gone={session.conflict === "deleted"}
+            busy={session.busy}
+            onDiscard={() => {
+              startOver(discardDraft(editKey));
+            }}
+            onSave={() => {
+              void saveFile(editKey).then(backToEditor);
+            }}
+          />
+        )}
       </FileHeader>
+      {session?.conflict && (
+        <ConflictBand
+          conflict={session.conflict}
+          busy={session.busy}
+          onReload={() => {
+            startOver(reloadDraft(editKey));
+          }}
+          onOverwrite={() => {
+            void saveFile(editKey, { force: true }).then(backToEditor);
+          }}
+        />
+      )}
+      {session?.failure && <EditFailedBand message={session.failure} />}
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
-      <FileBody file={file} error={read.error} reload={reload} place={place} name={name} abs={abs} text={text} lines={lines} line={line} page={page} rendered={rendered ? kind : null} onSize={onSize} onPages={setPages} />
+      <FileBody file={file} error={read.error} reload={reload} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} rendered={rendered ? kind : null} edit={edit} onSize={onSize} onPages={setPages} />
     </div>
   );
 }
@@ -145,6 +270,7 @@ function FileBody({
   line,
   page,
   rendered,
+  edit,
   onSize,
   onPages,
 }: {
@@ -159,6 +285,7 @@ function FileBody({
   line: number | undefined;
   page: FileTarget["page"];
   rendered: "markdown" | "html" | null;
+  edit: CodeFileEdit;
   onSize: (w: number, h: number) => void;
   onPages: (pages: number) => void;
 }) {
@@ -228,5 +355,5 @@ function FileBody({
     );
   if (rendered === "markdown") return <MarkdownPreview text={text} dir={dirPart(abs)} project={place.project} base={place.dir} />;
   if (rendered === "html") return <HtmlPreview path={abs} text={text} name={name} page={page} />;
-  return <CodeBody name={name} text={text} lines={lines} line={line} />;
+  return <CodeBody name={name} text={text} lines={lines} line={line} edit={edit} />;
 }

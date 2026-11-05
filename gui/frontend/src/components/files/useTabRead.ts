@@ -28,6 +28,8 @@ export interface TabRead<T> {
   loading: boolean;
   /** Reads again now (stable). */
   reload: () => void;
+  /** Takes `data` as the last good read, for what the tab itself just wrote (stable). */
+  replace: (data: T) => void;
 }
 
 /** How long event-driven re-reads wait for more events. */
@@ -58,9 +60,12 @@ export function useTabRead<T>(key: string, read: (signal: AbortSignal) => Promis
   const reload = useCallback(() => {
     setNonce((n) => n + 1);
   }, []);
+  const replace = useCallback((data: T) => {
+    setState((s) => ({ ...s, data, error: null }));
+  }, []);
   // Another key's answer is not this one's: until the new key answers there is nothing.
   const same = state.key === key;
-  return { data: same ? state.data : null, error: same ? state.error : null, loading: !same || state.nonce !== nonce, reload };
+  return { data: same ? state.data : null, error: same ? state.error : null, loading: !same || state.nonce !== nonce, reload, replace };
 }
 
 /** `f` (stable) debounced by `ms`; the pending call is dropped on unmount. */

@@ -9,6 +9,13 @@ export interface ConfirmRequest {
   title: string;
   message: string;
   confirmLabel: string;
+  /** The way out, when "Cancel" does not say what it keeps. */
+  cancelLabel?: string;
+  /**
+   * A third answer between the two (requestChoice), drawn destructive; the confirm button
+   * then is the plain default, since Enter on it is the safe answer.
+   */
+  alternateLabel?: string;
   /** Centered in the window instead of near the top (questions about the content under it). */
   centered?: boolean;
   /** The command being confirmed and its args, when a command asks (runCommand). */
@@ -60,7 +67,7 @@ export function secondStagePresenter(command: string): ConfirmPresenter | undefi
 }
 
 interface ConfirmState {
-  pending: (ConfirmRequest & { resolve: (yes: boolean) => void }) | null;
+  pending: (ConfirmRequest & { resolve: (yes: boolean) => void; alternate?: () => void }) | null;
 }
 
 export const useConfirmStore = create<ConfirmState>()(() => ({ pending: null }));
@@ -71,6 +78,35 @@ export function requestConfirm(req: ConfirmRequest): Promise<boolean> {
   return new Promise((resolve) => {
     useConfirmStore.setState({ pending: { ...req, resolve } });
   });
+}
+
+/** How a three-way prompt was answered: its confirm button, its alternate one, or dismissed. */
+export type ConfirmChoice = "confirm" | "alternate" | "cancel";
+
+/** Opens the confirm dialog with `alternateLabel`'s third button. */
+export function requestChoice(req: ConfirmRequest & { alternateLabel: string }): Promise<ConfirmChoice> {
+  useConfirmStore.getState().pending?.resolve(false);
+  return new Promise((resolve) => {
+    useConfirmStore.setState({
+      pending: {
+        ...req,
+        resolve: (yes) => {
+          resolve(yes ? "confirm" : "cancel");
+        },
+        alternate: () => {
+          resolve("alternate");
+        },
+      },
+    });
+  });
+}
+
+/** Answers the open prompt with its alternate button. */
+export function answerAlternate(): void {
+  const p = useConfirmStore.getState().pending;
+  if (!p?.alternate) return;
+  useConfirmStore.setState({ pending: null });
+  p.alternate();
 }
 
 /** Answers the open prompt. */

@@ -24,6 +24,14 @@ describe("fileTab", () => {
     expect(fileOfTab(t)).toEqual({ project: "web", base: "/w", path: "/w/src/a.ts", line: 12 });
   });
 
+  it("a tab can ask to open editing, and the param round-trips without changing the tab's id", () => {
+    const t = fileTab({ project: "", base: "/w", path: "a.ts", edit: true });
+    expect(t.params.edit).toBe("1");
+    expect(fileOfTab(t)?.edit).toBe(true);
+    expect(t.id).toBe(fileTab({ project: "", base: "/w", path: "a.ts" }).id);
+    expect(fileOfTab(fileTab({ project: "", base: "/w", path: "a.ts" }))).not.toHaveProperty("edit");
+  });
+
   it("a no-project file, no line, a bad line", () => {
     const t = fileTab({ project: "", base: "/Users/me", path: "notes.md", line: 0 });
     expect(t.params).toEqual({ project: "", base: "/Users/me", path: "/Users/me/notes.md" });

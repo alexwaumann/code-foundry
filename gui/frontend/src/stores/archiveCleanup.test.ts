@@ -1,10 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { FileReadView } from "@/api/files";
 import type { ThreadView } from "@/api/threads";
 import { newlyArchived, newlyRemoved, newlySnoozed, putAwaySelected, startArchiveCleanup } from "./archiveCleanup";
 import { useBottomStore } from "./bottomPanel";
-import { emptyEntry, makeTab, usePanelStore } from "./panel";
+import { fileEditKey, noteDraft, startEdit, useFileEditStore } from "./fileEdit";
+import { allTabs, emptyEntry, makeTab, usePanelStore } from "./panel";
 import { applyThreadListEvent, emptyThreads, replaceThreads, useThreadsStore } from "./threads";
 import { HOME, useUiStore, type Selection } from "./ui";
+
+// The library's memory of a draft (lib/codeEditor.ts).
+const dropped = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/codeEditor", () => ({
+  loadCodeEditor: () => Promise.resolve(),
+  draftText: () => "draft",
+  forgetDraft: (k: string) => {
+    dropped.push(k);
+  },
+}));
 
 const thread = (id: string, archivedAtMs: number | null = null, snoozedUntilMs: number | null = null) =>
   ({ id, createdAtMs: 1, archivedAtMs, snoozedUntilMs, linkedPullRequests: [], usage: [], agentRuns: [] }) as unknown as ThreadView;
@@ -125,6 +137,55 @@ describe("startArchiveCleanup", () => {
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: snoozed("b", 43) })); // another time
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("b") })); // woke
     expect(usePanelStore.getState().byKey["thread:b"]?.open).toBe(true);
+  });
+
+  describe("a File tab with unsaved edits", () => {
+    const file = { ...makeTab("files", "File"), id: "files:env", title: ".env" };
+    const key = fileEditKey("thread:a", file.id);
+    const view: FileReadView = { path: "/w/.env", size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null };
+    const session = () => useFileEditStore.getState().sessions[key];
+
+    beforeEach(async () => {
+      dropped.length = 0;
+      usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:a": { open: false, groups: [{ tabs: [tab, file], activeTabId: tab.id }] } } }));
+      await startEdit(key, { panelKey: "thread:a", tabId: file.id, base: "/w" }, view);
+    });
+    afterEach(() => {
+      useFileEditStore.setState({ sessions: {} });
+    });
+
+    it.each([
+      ["archive", thread("a", 42)],
+      ["snooze", snoozed("a", 42)],
+      ["save for later", saved("a")],
+    ])("%s keeps it, draft and all, in a panel that shows it on return; the clean tabs go", (_name, next) => {
+      noteDraft(key, "SECRET=draft\n");
+      useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: next }));
+      const entry = usePanelStore.getState().byKey["thread:a"];
+      expect(entry?.open).toBe(true);
+      expect(entry?.groups).toEqual([{ tabs: [file], activeTabId: file.id }]);
+      expect(session()?.dirty).toBe(true);
+      expect(dropped).toEqual([]);
+    });
+
+    it("a clean one goes with the rest", () => {
+      useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", 42) }));
+      expect(usePanelStore.getState().byKey["thread:a"]).toEqual(emptyEntry);
+      expect(session()).toBeUndefined();
+    });
+
+    it.each<[string, Parameters<typeof applyThreadListEvent>[1]]>([
+      ["a removed event", { kind: "removed", id: "a" }],
+      ["a snapshot without the thread", { kind: "snapshot", threads: [thread("b")], retiredUsage: [] }],
+    ])("the thread removed (%s) drops the draft: nothing could reach it again", (_name, event) => {
+      noteDraft(key, "SECRET=draft\n");
+      const stateKey = session()?.stateKey ?? "";
+      useThreadsStore.setState((s) => applyThreadListEvent(s, event));
+      expect(session()).toBeUndefined();
+      expect(dropped).toContain(stateKey);
+      // Its panel entry stays, as it did: only the draft had to go.
+      expect(allTabs(usePanelStore.getState().byKey["thread:a"] ?? emptyEntry).map((t) => t.id)).toContain(file.id);
+    });
   });
 
   it("a thread with no stored panels gets no entries", () => {

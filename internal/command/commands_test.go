@@ -75,7 +75,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
 		"view.settings", "view.help", "notifications.test", "theme.list", "theme.set-dark", "theme.set-light", "theme.pick", "theme.edit", "theme.show", "theme.save", "theme.duplicate", "theme.delete", "theme.ask", "theme.check", "theme.set-scheme", "theme.restore", "theme.reset",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
-		"view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.back", "view.forward", "thread.previous", "thread.next", "composer.history", "composer.stage", "view.thread-info", "file.find", "thread.find", "thread.find.next", "thread.find.previous", "search.open",
+		"view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.back", "view.forward", "thread.previous", "thread.next", "composer.history", "composer.stage", "view.thread-info", "file.find", "file.save", "thread.find", "thread.find.next", "thread.find.previous", "search.open",
 		"view.panel.file", "view.panel.diff", "view.panel.pr", "view.inline", "view.panel.page",
 		"workspace.new", "workspace.list", "workspace.add-project", "workspace.remove-project", "workspace.rename", "workspace.set-primary", "workspace.set-root", "workspace.remove", "workspace.reveal", "workspace.open.editor",
 		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.stop", "action.runs", "action.last",

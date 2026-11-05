@@ -2,11 +2,12 @@ import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { answerConfirm, useConfirmStore } from "@/stores/confirm";
+import { answerAlternate, answerConfirm, useConfirmStore } from "@/stores/confirm";
 
 /**
  * Asks before a destructive command runs (Command.requires_confirmation). The confirm
- * button has focus, so Enter confirms and Escape cancels.
+ * button has focus, so Enter confirms and Escape cancels. A three-way prompt
+ * (requestChoice) also has its alternate, which is then the destructive one.
  */
 export function ConfirmDialog() {
   const pending = useConfirmStore((s) => s.pending);
@@ -39,10 +40,15 @@ export function ConfirmDialog() {
             }}
             data-testid="confirm-cancel"
           >
-            Cancel
+            {pending?.cancelLabel ?? "Cancel"}
           </Button>
+          {pending?.alternateLabel && (
+            <Button variant="destructive" size="sm" onClick={answerAlternate} data-testid="confirm-alternate">
+              {pending.alternateLabel}
+            </Button>
+          )}
           <Button
-            variant="destructive"
+            variant={pending?.alternateLabel ? "default" : "destructive"}
             size="sm"
             autoFocus
             onClick={() => {

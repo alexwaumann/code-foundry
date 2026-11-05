@@ -2,6 +2,7 @@ import type { CommandView, UiContextView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
 import { sidebarAnchor } from "@/lib/inSidebar";
 import { lastInputWasKeyboard } from "@/lib/inputModality";
+import { keyTarget } from "@/lib/keyTarget";
 import { canNewLike, canRunElsewhere } from "@/lib/threadRow";
 import { nextAfter, threadOrder } from "@/lib/tree";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
@@ -14,6 +15,7 @@ import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
 import { presentPromptHistory } from "@/stores/historyComposers";
+import { canSaveFile, presentFileSave } from "@/stores/fileEdit";
 import { presentFileFinder } from "@/stores/fileFinder";
 import { presentThreadFind } from "@/stores/threadFind";
 import { presentSearch } from "@/stores/threadSearch";
@@ -133,13 +135,15 @@ export function isStartable(c: CommandView): boolean {
  * thread with somewhere else to run and thread.new-like only for one with a project or
  * workspace (lib/threadRow; the daemon's availability is the same rule, this keeps a list
  * fetched before the thread changed honest), thread.move.open only for one the move picker
- * takes (lib/move canMove).
+ * takes (lib/move canMove), file.save only over a tab that is editing.
  */
 export function inPalette(c: CommandView): boolean {
   if (c.name === "thread.run-in" && !canRunElsewhere(activeThread())) return false;
   if (c.name === "thread.new-like" && !canNewLike(activeThread())) return false;
   // thread.move.open: not for an archived, resident or moving thread either (lib/move canMove).
   if (c.name === "thread.move.open" && !canMoveThread(getUiContext().activeThreadId)) return false;
+  // file.save: only with a File tab editing in front of it.
+  if (c.name === "file.save" && !canSaveFile()) return false;
   return isStartable(c) && !c.noPalette;
 }
 
@@ -168,13 +172,22 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
 }
 
 /**
+ * Commands for the File tab's code editor: it yields their chords, a prompt or a shell does
+ * not. cmd+S in a prompt belongs to its prompt history picker, and a save must not leave a
+ * file from a field the user was typing something else in.
+ */
+const editorOnly: ReadonlySet<string> = new Set(["file.save"]);
+
+/**
  * The command a focused terminal (a bottom panel shell) or thread prompt
  * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
- * thread.rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
+ * thread.rename, cmd+j and cmd+t still fire while typing to Claude or a shell. The code
+ * editor (`code`) yields the same, and its own commands.
  */
-function terminalYields(chord: string): CommandView | undefined {
+function terminalYields(chord: string, code = false): CommandView | undefined {
   if (!terminalYieldable(chord)) return undefined;
-  return commandBindings(useCommandsStore.getState().commands).get(chord);
+  const c = commandBindings(useCommandsStore.getState().commands).get(chord);
+  return c && (code || !editorOnly.has(c.name)) ? c : undefined;
 }
 
 /**
@@ -197,6 +210,28 @@ function fieldYields(chord: string): CommandView | undefined {
   if (!terminalYieldable(chord) || editingChord(chord)) return undefined;
   const c = commandBindings(useCommandsStore.getState().commands).get(chord);
   return c && fieldYielded.has(c.name) ? c : undefined;
+}
+
+/**
+ * What the File tab's code editor keeps for itself: the cmd chords of the library's keymap
+ * (@pierre/diffs editor/command.js) that the app also binds or could. Its other cmd chords
+ * are clipboard and history (terminalYieldable) or move the caret (editingChord).
+ */
+const codeEditorChords: ReadonlySet<string> = new Set(["cmd+f", "cmd+alt+f", "cmd+g", "cmd+shift+g", "cmd+d", "cmd+[", "cmd+]", "cmd+/"]);
+
+/**
+ * Whether the keys go to the File tab's code editor (or its find field): the host is what
+ * `e.target` shows, the shadow root holds what has focus. Like a thread prompt, it types
+ * and yields the cmd chords bound to commands (cmd+s among them), but not its own.
+ */
+function inCodeEditor(e: KeyboardEvent, target: Element | null): boolean {
+  return Boolean(target?.closest("[data-code-editor]")) && isEditable(keyTarget(e));
+}
+
+/** The chord is bound to one of `names`. */
+function chordOf(chord: string, names: ReadonlySet<string>): boolean {
+  const c = commandBindings(useCommandsStore.getState().commands).get(chord);
+  return c !== undefined && names.has(c.name);
 }
 
 /** Some listed command declares the chord, whether or not it is available in this context. */
@@ -361,6 +396,9 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
   // Window-local: the palette's file finder over the selected thread (stores/fileFinder.ts).
   // The CLI's reaches every window through ShowView.
   "file.find": () => presentFileFinder(),
+  // Window-local, and only here: saves the File tab in front (stores/fileEdit.ts). The daemon
+  // refuses every other caller, so an agent cannot save a user's half-typed draft.
+  "file.save": () => presentFileSave(),
   // Window-local: the find bar of the thread in the content pane, or a step through its
   // matches (stores/threadFind.ts). The CLI's reach every window through ShowView.
   "thread.find": () => presentThreadFind("open") || true,
@@ -463,8 +501,9 @@ function isEditable(el: Element | null): boolean {
  * Key precedence:
  *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win
  *     (cmd+1..9 belong to the project picker while it is open).
- *  2. A focused terminal or a thread prompt's text ([data-chord-yield]) consumes everything
- *     else, except cmd chords bound to commands (see terminalYields).
+ *  2. A focused terminal, a thread prompt's text ([data-chord-yield]) or the File tab's code
+ *     editor consumes everything else, except cmd chords bound to commands (see
+ *     terminalYields); the editor keeps its own (see codeEditorChords).
  *  3. A focused text field (palette input, rename field) consumes everything else, except
  *     view.back and view.forward's cmd chords outside the palette (see fieldYielded).
  *  4. F2 renames the selected thread (the cursor row inside the tree); command
@@ -488,16 +527,18 @@ export function handleKeyDown(e: KeyboardEvent): void {
   }
   const target = e.target instanceof Element ? e.target : null;
   const shell = Boolean(target?.closest("[data-terminal-host]"));
+  const code = inCodeEditor(e, target);
+  if (code && (codeEditorChords.has(chord) || editingChord(chord))) return;
   // Only the prompt's text yields: a composer button or picker keeps the usual keys
   // (F2 renames).
-  if (shell || (isEditable(target) && target?.closest("[data-chord-yield]"))) {
+  if (shell || code || (isEditable(target) && target?.closest("[data-chord-yield]"))) {
     if (useUiStore.getState().palette.open) return;
-    const yielded = terminalYields(chord);
+    const yielded = terminalYields(chord, code);
     if (yielded) {
       e.preventDefault();
       e.stopPropagation();
       startCommand(yielded);
-    } else if (terminalYieldable(chord) && (shell || declaredChord(chord) || (useCommandsStore.getState().contextKey === null && !editingChord(chord)))) {
+    } else if (terminalYieldable(chord) && !chordOf(chord, editorOnly) && (shell || declaredChord(chord) || (useCommandsStore.getState().contextKey === null && !editingChord(chord)))) {
       // Focusing a shell or selecting a thread changes the context (a Projects-page shell
       // brings its worktree): cmd+t or cmd+r right after it must not be lost to the
       // debounced re-list. In a prompt only for a chord some command declares: the

@@ -9,6 +9,7 @@ import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import { activatePanelTab, emptyGroup, focusPanelGroup, movePanelTab, usePanelGroup, usePanelPicking, type GroupIndex, type Tab } from "@/stores/panel";
 import { surfaceOf } from "@/surfaces/registry";
+import type { SurfaceSpec } from "@/surfaces/types";
 import { bodyDomId, closeTab, liftedTab, tabDomId } from "./actions";
 import { tabMoveIndex } from "./keys";
 import { usePanelDrop } from "./panelDrop";
@@ -17,6 +18,11 @@ import { revealElement, revealTab } from "./reveal";
 /** The active tab (and the "+" while picking): full tint in the focused group, lighter in the other one. */
 const ACTIVE_FOCUSED = "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50";
 const ACTIVE_UNFOCUSED = "bg-cf-control-hover/40 text-cf-text dark:bg-cf-control-hover/25";
+
+/** The amber dot of a tab with unsaved work; its own component, so only surfaces that have the hook call it. */
+function UnsavedDot({ useUnsaved, panelKey, tab }: { useUnsaved: NonNullable<SurfaceSpec["useUnsaved"]>; panelKey: string; tab: Tab }) {
+  return useUnsaved(panelKey, tab) ? <span role="img" aria-label="Unsaved edits" className="size-1.5 shrink-0 rounded-full bg-cf-warning" data-testid="tab-unsaved" /> : null;
+}
 
 /**
  * One tab, sortable: a pointer drag (past 4px, so clicks, the × and middle click work as
@@ -47,7 +53,8 @@ function TabButton({
   focusable: boolean;
   drop?: "before" | "after" | "first" | undefined;
 }) {
-  const Icon = surfaceOf(tab.kind)?.icon;
+  const surface = surfaceOf(tab.kind);
+  const Icon = surface?.icon;
   const data = useMemo(() => ({ kind: "tab", group }), [group]);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id, data });
   return (
@@ -88,6 +95,7 @@ function TabButton({
       >
         {Icon && <Icon className="size-3.5 shrink-0" aria-hidden />}
         <span className="truncate">{tab.title}</span>
+        {surface?.useUnsaved && <UnsavedDot useUnsaved={surface.useUnsaved} panelKey={panelKey} tab={tab} />}
       </button>
       <Tip label="Close tab">
         <button

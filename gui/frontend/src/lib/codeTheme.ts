@@ -58,6 +58,16 @@ export function codeThemeOf(theme: Theme): ThemeRegistration {
       "gitDecoration.addedResourceForeground": hex(theme, "--cf-diff-addition-surface"),
       "gitDecoration.deletedResourceForeground": hex(theme, "--cf-diff-deletion-surface"),
       "gitDecoration.modifiedResourceForeground": hex(theme, "--cf-info"),
+      // The editor's own colours (a File tab that edits). Left unset the library draws a
+      // pale box around the active line (a mix of bg and fg) and orange find matches. A
+      // line highlight background, whatever its colour, is what asks it for a soft tint of
+      // the info colour instead; the box goes with the border.
+      "editor.lineHighlightBackground": hex(theme, "--cf-surface"),
+      "editor.lineHighlightBorder": "transparent",
+      "editorCursor.foreground": fg,
+      "editor.selectionBackground": theme.slots["--cf-selection"] ?? fg,
+      "editor.findMatchBackground": theme.slots["--cf-selection"] ?? fg,
+      "editor.findMatchHighlightBackground": theme.slots["--cf-accent-surface"] ?? fg,
     },
     tokenColors: SCOPES.map(([v, scope, fontStyle]) => ({
       scope: [...scope],

@@ -1,6 +1,7 @@
 /** What the side panel's strips, bodies and keys share: closing a tab, hiding the panel, ids. */
 import { allTabs, closePanelTab, getPanel, isSplit, movePanelTabToGroup, togglePanel, type GroupIndex } from "@/stores/panel";
 import { useUiStore } from "@/stores/ui";
+import { surfaceOf } from "@/surfaces/registry";
 
 /** Asks the panel's <aside> to take focus (SidePanel answers panelFocusSeq). */
 export function refocusPanel(): void {
@@ -13,8 +14,21 @@ export function refocusPanel(): void {
  * thread's prompt, or the page's focus root), and a kept one takes it back (the closed
  * tab's × had it), so keys keep working: cmd+w hides it, the letters open a surface. So
  * does a split that collapsed because a group lost its last tab: that group's strip is gone.
+ * A surface may ask first (SurfaceSpec.beforeClose: unsaved edits).
  */
 export function closeTab(panelKey: string, id: string): void {
+  const tab = allTabs(getPanel(panelKey)).find((t) => t.id === id);
+  const asked = tab ? (surfaceOf(tab.kind)?.beforeClose?.(panelKey, tab) ?? true) : true;
+  if (asked === true) {
+    closeNow(panelKey, id);
+    return;
+  }
+  void asked.then((yes) => {
+    if (yes) closeNow(panelKey, id);
+  });
+}
+
+function closeNow(panelKey: string, id: string): void {
   const hadFocus = useUiStore.getState().focus === "panel";
   const wasSplit = isSplit(getPanel(panelKey));
   closePanelTab(panelKey, id);

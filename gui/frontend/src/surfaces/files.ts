@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { FileText } from "lucide-react";
 import { FileTab } from "@/components/files/FileTab";
+import { confirmCloseFile, fileEditKey, useFileDirty } from "@/stores/fileEdit";
 import { lastTabOf } from "@/stores/filePanel";
 import { usePanelStore } from "@/stores/panel";
 import { FILE_KIND, fileOfTab } from "./fileTarget";
@@ -13,7 +14,8 @@ import type { SurfaceContext, SurfaceSpec } from "./types";
  * tab's Open file, path chips), one per file: params { project, base, path, line? }
  * (surfaces/fileTarget.ts). F (and the list) bring back the panel's last File tab, so the
  * entry is live only while the panel has one; dimmed otherwise, and hidden for a thread
- * without a project until it has one.
+ * without a project until it has one. A tab editing its file marks unsaved edits in its
+ * strip and asks before it closes (stores/fileEdit.ts).
  */
 export const filesSurface: SurfaceSpec = {
   kind: FILE_KIND,
@@ -22,6 +24,8 @@ export const filesSurface: SurfaceSpec = {
   hotkey: "f",
   available: (ctx: SurfaceContext) => (lastTabOf(FILE_KIND, ctx.panelKey) ? "enabled" : noProjectNow(ctx.selection) ? "hidden" : "disabled"),
   watches: [...NO_PROJECT_WATCHES, usePanelStore],
+  beforeClose: confirmCloseFile,
+  useUnsaved: (panelKey, tab) => useFileDirty(fileEditKey(panelKey, tab.id)),
   render: (tab) => {
     const target = fileOfTab(tab);
     return target ? createElement(FileTab, { target }) : null;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from "react";
 import { chordFromEvent } from "@/keys/chord";
+import { keyTarget } from "@/lib/keyTarget";
 import { cn } from "@/lib/utils";
 import {
   activeTab,
@@ -29,7 +30,7 @@ import { SplitDivider } from "./SplitDivider";
 import { keepPanelFocus, surfaceContext } from "./surfaceList";
 import { TabGroup } from "./TabGroup";
 
-function isEditable(el: EventTarget): boolean {
+function isEditable(el: EventTarget | null): boolean {
   return el instanceof HTMLElement && (el.isContentEditable || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement);
 }
 
@@ -98,7 +99,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
     if (!chord) return;
     if (chord === "escape" && liftedTab(e.currentTarget)) return;
     // cmd+w and cmd+alt+\ apply in text fields too (they are no editing chords); letters do not.
-    if (chord !== "cmd+w" && chord !== FOCUS_OTHER_GROUP_CHORD && isEditable(e.target)) return;
+    if (chord !== "cmd+w" && chord !== FOCUS_OTHER_GROUP_CHORD && isEditable(keyTarget(e.nativeEvent))) return;
     // The panel's own keys (cmd+w, cmd+alt+\, the surface letters, Escape while picking)
     // are never offered to a surface.
     if (!isPanelChord(chord, isPicking(getPanel(panelKey))) && surfaceKey(panelKey, chord)) {

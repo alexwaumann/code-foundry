@@ -7,11 +7,14 @@
  * not found.
  *
  *   POST /__mock/fs/write?path=…&text=…   (a file's new contents on disk; reset restores the fixtures)
- *   GET  /__mock/fs/calls                 ("read <path>", "diff <worktree> <file> <scope>")
+ *   POST /__mock/fs/remove?path=…         (the file goes)
+ *   POST /__mock/fs/refuse?code=…&message=…   (the next WriteFile fails with that Connect code name)
+ *   GET  /__mock/fs/text?path=…           ({ text }: a file's contents on disk, null when absent)
+ *   GET  /__mock/fs/calls                 ("read <path>", "write <path> [force]", "diff <worktree> <file> <scope>")
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import type { PreviewFileResponseSchema, ReadFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
+import type { PreviewFileResponseSchema, ReadFileResponseSchema, WriteFileRequest, WriteFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { DiffScope, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { readFileSync } from "node:fs";
 import { HOME } from "./filesystem";
@@ -19,6 +22,7 @@ import { pagelibPages } from "./pagelib";
 import { testPdf } from "./pdf";
 
 type ReadInit = MessageInitShape<typeof ReadFileResponseSchema>;
+type WriteInit = MessageInitShape<typeof WriteFileResponseSchema>;
 type PreviewInit = MessageInitShape<typeof PreviewFileResponseSchema>;
 type DiffInit = MessageInitShape<typeof GetWorktreeFileDiffResponseSchema>;
 
@@ -299,13 +303,32 @@ function olderOf(path: string, now: string): string {
 
 export class MockFiles {
   private disk = fixtures();
+  private refusal: ConnectError | null = null;
   readonly calls: string[] = [];
 
   constructor(private readonly detailOf: (path: string) => DetailFiles | undefined) {}
 
   reset(): void {
     this.disk = fixtures();
+    this.refusal = null;
     this.calls.length = 0;
+  }
+
+  /** The file goes, as `rm` would. */
+  remove(path: string): void {
+    this.disk.delete(path);
+  }
+
+  /** The next WriteFile fails with this code ("failed_precondition") and message. */
+  refuseNextWrite(code: string, message: string): void {
+    const name = code.replace(/(^|_)([a-z])/g, (_, _sep: string, c: string) => c.toUpperCase()) as keyof typeof Code;
+    this.refusal = new ConnectError(message, Code[name]);
+  }
+
+  /** A file's contents as text; null when nothing is there. */
+  textOf(path: string): string | null {
+    const e = this.onDisk(path);
+    return e ? new TextDecoder().decode(e.data) : null;
   }
 
   /** Writes a file's contents; with `touch`, only its modification time moves (touch(1); `s` is ignored). */
@@ -401,6 +424,26 @@ export class MockFiles {
       mimeType: e.mime,
       modifiedAt,
     };
+  }
+
+  /** internal/fsx Writer: a changed or vanished file is a conflict, nothing written; force writes whatever is there. */
+  writeFile(req: WriteFileRequest): WriteInit {
+    const abs = req.path.startsWith("/") ? normalize(req.path) : normalize(`${req.baseDir}/${req.path}`);
+    this.calls.push(`write ${abs}${req.force ? " force" : ""}`);
+    const refusal = this.refusal;
+    this.refusal = null;
+    if (refusal) throw refusal;
+    const e = this.onDisk(abs);
+    if (e?.dir) throw new ConnectError(`${abs} is a directory`, Code.InvalidArgument);
+    if (!req.force) {
+      if (!e) return { resolvedPath: abs, conflict: true, notFound: true };
+      const modifiedAt = BigInt(e.modifiedAt ?? FIXTURE_MTIME);
+      const size = BigInt(e.size ?? e.data.length);
+      if (modifiedAt !== req.modifiedAt || size !== req.size) return { resolvedPath: abs, modifiedAt, size, conflict: true };
+    }
+    this.write(abs, new TextDecoder().decode(req.contents));
+    const now = this.onDisk(abs);
+    return { resolvedPath: abs, modifiedAt: BigInt(now?.modifiedAt ?? 0), size: BigInt(now?.data.length ?? 0) };
   }
 
   fileDiff(worktree: string, file: string, oldPath: string, scope: DiffScope): DiffInit {
