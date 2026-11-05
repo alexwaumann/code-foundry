@@ -11,6 +11,37 @@ import type { EditorFactory } from "@pierre/diffs/react";
 
 type EditModule = typeof import("@pierre/diffs/edit");
 
+/** The library's editor, as the file view attaches it. */
+export type CodeEditor = InstanceType<EditModule["Editor"]>;
+
+/** A place in a document, zero-based. */
+export interface EditorPlace {
+  line: number;
+  character: number;
+}
+
+/** What the app asks of an editor on screen. */
+export interface EditorHandle {
+  /** Takes the keyboard, at a place or where the caret was. */
+  focus: (at?: EditorPlace) => void;
+  /** Where the caret is; null before there is one. */
+  caret: () => EditorPlace | null;
+}
+
+export function editorHandle(editor: Pick<CodeEditor, "focus" | "getViewState">): EditorHandle {
+  return {
+    focus: (at) => {
+      editor.focus(at && { lineNumber: at.line + 1, character: at.character });
+    },
+    caret: () => {
+      const s = editor.getViewState().selections?.at(-1);
+      if (!s) return null;
+      const { line, character } = s.direction === -1 ? s.start : s.end;
+      return { line, character };
+    },
+  };
+}
+
 let edit: EditModule | null = null;
 
 /** Loads the editor. Call before a CodeFile turns `edit.active` on. */

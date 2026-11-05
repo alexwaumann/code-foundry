@@ -4935,10 +4935,12 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find" } } }))}`,
       },
       {
-        // internal/command file.save: always; a window with no tab editing ignores it.
-        cmd: { name: "file.save", title: "Save File", category: "View", description: "Save the file being edited in the focused File tab. Does nothing when no tab is editing.", keybindings: ["cmd+s"], args: [] },
+        // internal/command file.save: listed for the chord; the window presents it, and anything that invokes it is refused.
+        cmd: { name: "file.save", title: "Save File", category: "View", description: "Save the file being edited in the focused File tab. Only from the window: refused from the CLI.", keybindings: ["cmd+s"], args: [] },
         when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.save" } } }))}`,
+        run: () => {
+          throw new ConnectError("file.save: unavailable: only the user can save a draft, from the window", Code.FailedPrecondition);
+        },
       },
       {
         // internal/command search.open: from anywhere.

@@ -16,6 +16,16 @@ const status = (page: Page) => page.getByTestId("file-edit-status");
 const editor = (page: Page): Locator => file(page).locator('[data-content][contenteditable="true"]');
 const line = (page: Page, n: number) => editor(page).locator(`[data-line="${String(n)}"]`);
 
+/** The tab's draft key, for asking the library about it. */
+async function stateKey(page: Page): Promise<string> {
+  return page.evaluate(`__cfModule("/src/stores/fileEdit.ts").then((m) => Object.values(m.useFileEditStore.getState().sessions)[0]?.stateKey ?? "")`);
+}
+
+/** The text the library holds for a key, on or off screen. */
+async function held(page: Page, key: string): Promise<string | null> {
+  return page.evaluate(`__cfModule("/src/lib/codeEditor.ts").then((m) => m.draftText(${JSON.stringify(key)}))`);
+}
+
 async function disk(path: string): Promise<string | null> {
   const res = await fetch(`${mockUrl}/__mock/fs/text?path=${encodeURIComponent(path)}`);
   return ((await res.json()) as { text: string | null }).text;
@@ -159,6 +169,116 @@ test("Keep editing puts the caret back in the editor", async ({ page }) => {
   await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
   await page.keyboard.type("b");
   await expect(line(page, 1)).toContainText("abimport");
+});
+
+test("contents leave the library: on leaving a saved tab, on Discard, on the pencil, on closing", async ({ page }) => {
+  const env = `${CF}/.env`;
+  await writeDisk(env, "SECRET=1\n");
+  await openFile(page, ".env");
+  const thenLeft = async (leave: () => Promise<void>, key: string) => {
+    await leave();
+    await expect.poll(() => held(page, key)).toBeNull();
+  };
+
+  await startEditing(page);
+  await page.keyboard.type("x");
+  const saved = await stateKey(page);
+  await page.keyboard.press("Meta+s");
+  await expect(status(page)).toHaveText("Editing");
+  expect(await held(page, saved)).toContain("xSECRET");
+  await thenLeft(() => tabs(page).filter({ hasText: "Changes" }).click(), saved);
+
+  await tabs(page).filter({ hasText: ".env" }).click();
+  await expect(status(page)).toHaveText("Editing");
+  await line(page, 1).click();
+  await page.keyboard.type("y");
+  const discarded = await stateKey(page);
+  await thenLeft(() => file(page).getByTestId("file-discard").click(), discarded);
+
+  const stopped = await stateKey(page);
+  await expect.poll(() => held(page, stopped)).not.toBeNull();
+  await thenLeft(() => file(page).getByTestId("file-edit").click(), stopped);
+
+  await startEditing(page);
+  await page.keyboard.type("z");
+  const closed = await stateKey(page);
+  await page.keyboard.press("Meta+w");
+  await thenLeft(() => page.getByTestId("confirm-alternate").click(), closed);
+});
+
+test("cmd+S saves the editor with the keyboard, not the focused group's tab, and never a hidden draft", async ({ page }) => {
+  const a = `${CF}/a.txt`;
+  const b = `${CF}/b.txt`;
+  await writeDisk(a, "a\n");
+  await writeDisk(b, "b\n");
+  await openFile(page, "a.txt");
+  await startEditing(page);
+  await page.keyboard.type("A");
+  // a.txt and a dirty b.txt side by side, then the keyboard in a.txt with group focus on b's.
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.splitPanel("current"))`);
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: "b.txt" })}))`);
+  const shown = (path: string) => page.locator(`[data-testid="file-tab"][data-path="${path}"]`);
+  await shown(b).getByTestId("file-edit").click();
+  await page.keyboard.type("B");
+  await expect(shown(b).getByTestId("file-edit-status")).toHaveText("Unsaved");
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => {
+    const tab = m.allTabs(m.getPanel("current")).find((t) => t.title === "b.txt");
+    m.movePanelTabToGroup("current", tab.id, 0);
+  })`);
+  await expect(shown(a)).toBeVisible();
+  await expect(shown(b)).toBeVisible();
+  await shown(a).locator('[data-content][contenteditable="true"]').evaluate((el) => {
+    (el as HTMLElement).focus();
+  });
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.focusPanelGroup("current", 0))`);
+  await page.keyboard.press("Meta+s");
+  await expect.poll(() => disk(a)).toBe("Aa\n");
+  expect(await disk(b)).toBe("b\n");
+
+  // The panel closed, with the keyboard nowhere near: b's draft stays a draft.
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.togglePanel("current", false))`);
+  await expect(page.getByTestId("side-panel")).toHaveCount(0);
+  await page.locator("body").click();
+  await page.keyboard.press("Meta+s");
+  await page.waitForTimeout(200);
+  expect(await disk(b)).toBe("b\n");
+});
+
+test("a clean document following the file keeps the keyboard and the caret", async ({ page }) => {
+  const notes = `${CF}/notes.txt`;
+  await writeDisk(notes, "one\ntwo\n");
+  await openFile(page, "notes.txt");
+  await startEditing(page);
+  await line(page, 2).click();
+  await page.keyboard.press("End");
+  await writeDisk(notes, "one\ntwo!\nthree\n");
+  await page.evaluate(`document.dispatchEvent(new Event("visibilitychange"))`);
+  await page.evaluate(`document.querySelector('[data-testid="file-refresh"]').click()`);
+  await expect(line(page, 3)).toContainText("three");
+  await expect(file(page).locator("diffs-container")).toBeFocused();
+  await page.keyboard.type("X");
+  await expect(line(page, 2)).toContainText("twoX!");
+});
+
+test("moving a clean tab to the other group keeps its document and undo", async ({ page }) => {
+  const notes = `${CF}/notes.txt`;
+  await writeDisk(notes, "one\n");
+  await openFile(page, "notes.txt");
+  await startEditing(page);
+  await page.keyboard.type("x");
+  await page.keyboard.press("Meta+s");
+  await expect(status(page)).toHaveText("Editing");
+  const key = await stateKey(page);
+  const id = await file(page).evaluate((el) => el.closest<HTMLElement>('[data-testid="panel-body"]')?.dataset.tabId ?? "");
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => { m.splitPanel("current"); m.movePanelTabToGroup("current", ${JSON.stringify(id)}, 1); })`);
+  await expect(editor(page)).toBeVisible();
+  await page.waitForTimeout(100);
+  expect(await stateKey(page)).toBe(key);
+  await editor(page).evaluate((el) => {
+    (el as HTMLElement).focus();
+  });
+  await page.keyboard.press("Meta+z");
+  await expect(status(page)).toHaveText("Unsaved");
 });
 
 test("a draft survives leaving the tab, and a long file edits through the virtualizer", async ({ page }) => {

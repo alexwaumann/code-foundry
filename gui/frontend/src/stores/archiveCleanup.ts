@@ -2,7 +2,9 @@
  * When a thread is archived or snoozed (from this window, another one, or the CLI), its
  * side panel and bottom panel entries are reset: the side panel's tabs go and it is
  * closed, and the bottom panel is closed (the daemon removed the thread's shells, so its
- * tabs went on their own). Reacting to the threads store rather than wrapping
+ * tabs went on their own). A File tab with unsaved edits stays, and its panel opens, so the
+ * user finds it on coming back: this can happen from another window or the CLI, with no one
+ * to ask. Removing a thread drops its drafts, since nothing can reach them after. Reacting to the threads store rather than wrapping
  * archiveThread / snoozeThread makes every archive and snooze behave the same. Only a
  * transition counts (not archived or snoozed to so, on a thread this window already
  * knew), so panels opened later on an archived or snoozed thread are left alone, a
@@ -19,7 +21,8 @@
 import type { ThreadView } from "@/api/threads";
 import { isSnoozed } from "@/lib/snooze";
 import { emptyBottom, useBottomStore } from "./bottomPanel";
-import { emptyEntry, keyOf, usePanelStore } from "./panel";
+import { dropPanelDrafts, unsavedTabs } from "./fileEdit";
+import { emptyEntry, keyOf, usePanelStore, type PanelEntry } from "./panel";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { HOME, useUiStore, type Selection } from "./ui";
 
@@ -43,11 +46,21 @@ export function newlySnoozed(prev: ThreadsData, next: ThreadsData): string[] {
   return newly(prev, next, isSnoozed);
 }
 
-/** Resets a thread's side panel (no tabs, closed) and bottom panel (closed) entries. */
+/** A side panel after a reset: nothing, or only its tabs with unsaved edits, showing. */
+function resetEntry(key: string, entry: PanelEntry): PanelEntry {
+  const kept = unsavedTabs(key, entry);
+  const first = kept[0];
+  return first ? { open: true, groups: [{ tabs: kept, activeTabId: first.id }] } : emptyEntry;
+}
+
+/** Resets a thread's side panel (no tabs but unsaved ones, closed without any) and bottom panel (closed) entries. */
 export function resetThreadPanels(id: string): void {
   const key = keyOf({ kind: "thread", id });
   if (key === null) return;
-  if (key in usePanelStore.getState().byKey) usePanelStore.setState((s) => ({ byKey: { ...s.byKey, [key]: emptyEntry } }));
+  usePanelStore.setState((s) => {
+    const entry = s.byKey[key];
+    return entry ? { byKey: { ...s.byKey, [key]: resetEntry(key, entry) } } : s;
+  });
   if (key in useBottomStore.getState().byKey) useBottomStore.setState((s) => ({ byKey: { ...s.byKey, [key]: emptyBottom } }));
 }
 
@@ -70,7 +83,10 @@ export function startArchiveCleanup(): () => void {
   return useThreadsStore.subscribe((s, prev) => {
     const putAway = new Set([...newlyArchived(prev, s), ...newlySnoozed(prev, s)]);
     for (const id of putAway) resetThreadPanels(id);
-    for (const id of newlyRemoved(prev, s)) putAway.add(id);
+    for (const id of newlyRemoved(prev, s)) {
+      putAway.add(id);
+      dropPanelDrafts(keyOf({ kind: "thread", id }) ?? "");
+    }
     const ui = useUiStore.getState();
     if (putAwaySelected(ui.selection, putAway)) ui.select(HOME);
   });

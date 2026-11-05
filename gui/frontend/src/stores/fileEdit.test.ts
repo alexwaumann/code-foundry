@@ -6,10 +6,13 @@ import {
   canSaveFile,
   confirmCloseFile,
   discardDraft,
+  dropPanelDrafts,
   editClock,
   editorDetached,
+  editorOpening,
   fileEditKey,
   noteDraft,
+  noteEditor,
   noteRead,
   observeRead,
   presentFileSave,
@@ -17,6 +20,7 @@ import {
   saveFile,
   startEdit,
   stopEdit,
+  unsavedTabs,
   useFileEditStore,
 } from "./fileEdit";
 import { closePanelTab, openSurface, usePanelStore, type Tab } from "./panel";
@@ -57,6 +61,7 @@ async function editing(text: string | null = null, v = view()): Promise<void> {
   if (!s) throw new Error("no session");
   lib.attached.add(s.stateKey);
   lib.drafts.set(s.stateKey, text ?? s.seed);
+  noteEditor(KEY, { focus: vi.fn(), caret: () => null });
   if (text !== null) noteDraft(KEY, text);
 }
 
@@ -118,6 +123,7 @@ describe("a read while editing", () => {
     ["a newer time, dirty", () => view({ modifiedAtMs: 101, text: "theirs" }), true, { conflict: "changed", revision: 0 }],
     ["another size, dirty", () => view({ size: 9, text: "theirs" }), true, { conflict: "changed", revision: 0 }],
     ["gone, dirty", gone, true, { conflict: "deleted", revision: 0 }],
+    ["gone, clean", gone, false, { conflict: "deleted", revision: 0 }],
     ["the same version, clean", () => view(), false, { conflict: null, revision: 0 }],
     ["a new version, clean", () => view({ modifiedAtMs: 101, text: "theirs" }), false, { conflict: null, revision: 1 }],
   ])("%s", async (_name, read, dirty, want) => {
@@ -142,7 +148,6 @@ describe("a read while editing", () => {
   });
 
   it.each([
-    ["gone", gone],
     ["no longer text it can keep", () => view({ modifiedAtMs: 101, lossless: false })],
     ["now too large", () => view({ modifiedAtMs: 101, truncated: true })],
   ])("a clean document leaves edit mode when the file is %s", async (_name, read) => {
@@ -157,6 +162,26 @@ describe("a read while editing", () => {
     observeRead(KEY, view());
     expect(edit()?.conflict).toBeNull();
   });
+
+  it.each([
+    ["dirty", "a=2\n"],
+    ["clean", null],
+  ])("a read of another file is no news about this one, %s", async (_name, text) => {
+    await editing(text);
+    observeRead(KEY, view({ path: "/w/other/.env", size: 9, modifiedAtMs: 500, text: "elsewhere" }));
+    observeRead(KEY, view({ path: "/w/other/.env", notFound: true, text: null, lossless: false }));
+    expect(edit()).toMatchObject({ conflict: null, revision: 0, path: "/w/.env", view: { path: "/w/.env" } });
+  });
+
+  it("a read that left before a clean document followed the file cannot take it back", async () => {
+    await editing();
+    const started = editClock();
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
+    const stale = view();
+    noteRead(stale, started);
+    observeRead(KEY, stale);
+    expect(edit()).toMatchObject({ seed: "theirs", revision: 1 });
+  });
 });
 
 describe("saveFile", () => {
@@ -165,7 +190,7 @@ describe("saveFile", () => {
     api.write.mockResolvedValue(written());
     await expect(saveFile(KEY)).resolves.toBe("saved");
     expect(api.write).toHaveBeenCalledWith("/w", "/w/.env", "a=22\n", expect.objectContaining({ size: 4, modifiedAtMs: 100 }), {});
-    expect(edit()).toMatchObject({ dirty: false, conflict: null, saving: false, view: { text: "a=22\n", size: 5, modifiedAtMs: 200 } });
+    expect(edit()).toMatchObject({ dirty: false, conflict: null, busy: false, view: { text: "a=22\n", size: 5, modifiedAtMs: 200 } });
     // The document is not fed back: a new `file` prop would reset the caret and history.
     expect(edit()?.seed).toBe("a=1\n");
   });
@@ -208,6 +233,33 @@ describe("saveFile", () => {
     await saving;
   });
 
+  it("a read that left during the write and answers after it is no conflict", async () => {
+    await editing("a=22\n");
+    let finish: (answer: FileWriteView) => void = () => undefined;
+    api.write.mockReturnValue(
+      new Promise<FileWriteView>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const saving = saveFile(KEY);
+    const started = editClock();
+    finish(written());
+    await saving;
+    noteDraft(KEY, "a=222\n");
+    const stale = view();
+    noteRead(stale, started);
+    observeRead(KEY, stale);
+    expect(edit()?.conflict).toBeNull();
+  });
+
+  it("writes to the file the session started on", async () => {
+    await editing("a=22\n");
+    observeRead(KEY, view({ path: "/w/other/.env" }));
+    api.write.mockResolvedValue(written());
+    await saveFile(KEY);
+    expect(api.write.mock.lastCall?.[1]).toBe("/w/.env");
+  });
+
   it("what was typed during the write stays unsaved", async () => {
     await editing("a=22\n");
     const key = edit()?.stateKey ?? "";
@@ -227,7 +279,7 @@ describe("saveFile", () => {
     const key = edit()?.stateKey ?? "";
     api.write.mockResolvedValue(answer);
     await expect(saveFile(KEY)).resolves.toBe("conflict");
-    expect(edit()).toMatchObject({ conflict, dirty: true, saving: false, view: { size: 4, modifiedAtMs: 100 } });
+    expect(edit()).toMatchObject({ conflict, dirty: true, busy: false, view: { size: 4, modifiedAtMs: 100 } });
     expect(lib.drafts.get(key)).toBe("a=22\n");
   });
 
@@ -250,7 +302,7 @@ describe("saveFile", () => {
     const key = edit()?.stateKey ?? "";
     api.write.mockRejectedValue(err);
     await expect(saveFile(KEY)).resolves.toBe("failed");
-    expect(edit()).toMatchObject({ failure: message, dirty: true, saving: false });
+    expect(edit()).toMatchObject({ failure: `Could not save: ${message}`, dirty: true, busy: false });
     expect(lib.drafts.get(key)).toBe("a=22\n");
   });
 
@@ -308,19 +360,99 @@ describe("Discard and Reload", () => {
     expect(edit()?.seed).toBe("theirs");
   });
 
-  it("Discard against a deleted file leaves edit mode", async () => {
-    await editing("a=22\n");
+  it.each([
+    ["dirty", "a=22\n"],
+    ["clean", null],
+  ])("Discard against a deleted file leaves edit mode, %s", async (_name, text) => {
+    await editing(text);
     observeRead(KEY, gone());
+    await discardDraft(KEY);
+    expect(edit()).toBeUndefined();
+    expect(api.read).not.toHaveBeenCalled();
+  });
+
+  it("Discard during a conflict, the file gone since, still gives the draft up, as asked", async () => {
+    await editing("a=22\n");
+    observeRead(KEY, view({ modifiedAtMs: 101 }));
     api.read.mockResolvedValue(gone());
     await discardDraft(KEY);
     expect(edit()).toBeUndefined();
   });
 
-  it("a failed reload keeps the draft and says why", async () => {
+  it("Reload never gives a draft up: a file gone by then says so, and the draft stays", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    observeRead(KEY, view({ modifiedAtMs: 101 }));
+    api.read.mockResolvedValue(gone());
+    await reloadDraft(KEY);
+    expect(edit()).toMatchObject({ conflict: "deleted", dirty: true, busy: false, stateKey: key });
+    expect(lib.drafts.get(key)).toBe("a=22\n");
+  });
+
+  it("nor does a file that is no longer text it can edit", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    observeRead(KEY, view({ modifiedAtMs: 101 }));
+    api.read.mockResolvedValue(view({ modifiedAtMs: 101, lossless: false }));
+    await reloadDraft(KEY);
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key, failure: "Could not reload: the file on disk is no longer text this tab can edit." });
+  });
+
+  it("a failed reload keeps the draft and says what failed", async () => {
     await editing("a=22\n");
     api.read.mockRejectedValue(new Error("the daemon went"));
     await reloadDraft(KEY);
-    expect(edit()).toMatchObject({ dirty: true, failure: "the daemon went" });
+    expect(edit()).toMatchObject({ dirty: true, busy: false, failure: "Could not reload: the daemon went" });
+  });
+});
+
+describe("a write and a reload never overlap", () => {
+  const hold = <T,>(fn: { mockReturnValue: (p: Promise<T>) => unknown }) => {
+    let finish: (answer: T) => void = () => undefined;
+    fn.mockReturnValue(
+      new Promise<T>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    return (answer: T) => {
+      finish(answer);
+    };
+  };
+
+  it("Reload waits out an Overwrite: the disk, the document and the baseline stay together", async () => {
+    await editing("mine\n");
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs\n" }));
+    const finish = hold<FileWriteView>(api.write);
+    const saving = saveFile(KEY, { force: true });
+    await reloadDraft(KEY);
+    await discardDraft(KEY);
+    expect(api.read).not.toHaveBeenCalled();
+    finish(written());
+    await saving;
+    expect(edit()).toMatchObject({ dirty: false, conflict: null, revision: 0, view: { text: "mine\n", modifiedAtMs: 200 } });
+  });
+
+  it("Overwrite waits out a Reload", async () => {
+    await editing("mine\n");
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs\n" }));
+    const finish = hold<FileReadView>(api.read);
+    const reloading = reloadDraft(KEY);
+    await expect(saveFile(KEY, { force: true })).resolves.toBe("skipped");
+    expect(api.write).not.toHaveBeenCalled();
+    finish(view({ modifiedAtMs: 101, text: "theirs\n" }));
+    await reloading;
+    expect(edit()).toMatchObject({ dirty: false, seed: "theirs\n", busy: false });
+  });
+
+  it("a write answering for a document the session let go touches nothing of the new one", async () => {
+    await editing();
+    const old = edit()?.stateKey ?? "";
+    const finish = hold<FileWriteView>(api.write);
+    const saving = saveFile(KEY, { force: true });
+    detach(old);
+    finish(written());
+    await saving;
+    expect(edit()).toMatchObject({ view: null, busy: false });
   });
 });
 
@@ -371,10 +503,24 @@ describe("the tab going", () => {
     expect(lib.drafts.has(key)).toBe(false);
   });
 
-  it("its panel going does too", async () => {
+  it("a removed thread's drafts go with it, and only its", async () => {
     await editing("a=22\n");
-    usePanelStore.setState({ byKey: {} });
+    const key = edit()?.stateKey ?? "";
+    lib.attached.delete(key);
+    dropPanelDrafts("thread:other");
+    expect(edit()).toBeDefined();
+    dropPanelDrafts(PANEL);
     expect(edit()).toBeUndefined();
+    expect(lib.drafts.has(key)).toBe(false);
+  });
+
+  it("a panel names its dirty tabs, for a reset to keep", async () => {
+    await editing();
+    const entry = usePanelStore.getState().byKey[PANEL];
+    if (!entry) throw new Error("no panel");
+    expect(unsavedTabs(PANEL, entry)).toEqual([]);
+    noteDraft(KEY, "a=2\n");
+    expect(unsavedTabs(PANEL, entry)).toEqual([tab]);
   });
 
   it("two panels showing one file have a draft each", async () => {
@@ -453,6 +599,18 @@ describe("file.save", () => {
     useUiStore.setState({ selection: { kind: "thread", id: "s1" } });
   };
 
+  /** The editor's DOM as CodeFile draws it, with the keyboard in it. */
+  const focusOn = (stateKey: string) => {
+    const wrap = document.createElement("div");
+    wrap.setAttribute("data-code-editor", stateKey);
+    const host = document.createElement("div");
+    host.tabIndex = -1;
+    wrap.append(host);
+    document.body.append(wrap);
+    host.focus();
+    return wrap;
+  };
+
   it("with nothing editing is handled and does nothing", () => {
     select();
     expect(presentFileSave()).toBe(true);
@@ -472,6 +630,58 @@ describe("file.save", () => {
     });
   });
 
+  it("with the keyboard in an editor, saves that one, whatever group has focus", async () => {
+    select();
+    await editing("a=22\n");
+    const other = fileEditKey(PANEL, "files:y");
+    usePanelStore.setState({
+      byKey: {
+        [PANEL]: { open: true, focused: 1, groups: [{ tabs: [tab], activeTabId: TAB }, { tabs: [{ ...tab, id: "files:y" }], activeTabId: "files:y" }] },
+      },
+    });
+    await startEdit(other, { panelKey: PANEL, tabId: "files:y", base: "/w" }, view({ path: "/w/b.txt" }));
+    const b = useFileEditStore.getState().sessions[other];
+    lib.drafts.set(b?.stateKey ?? "", "b\n");
+    noteDraft(other, "b\n");
+    noteEditor(other, { focus: vi.fn(), caret: () => null });
+    const wrap = focusOn(edit()?.stateKey ?? "");
+    api.write.mockResolvedValue(written());
+    presentFileSave();
+    wrap.remove();
+    expect(api.write).toHaveBeenCalledTimes(1);
+    expect(api.write.mock.lastCall?.[1]).toBe("/w/.env");
+    await vi.waitFor(() => {
+      expect(edit()?.dirty).toBe(false);
+    });
+  });
+
+  it("with the keyboard in a clean editor, saves nothing rather than the tab beside it", async () => {
+    select();
+    await editing();
+    const wrap = focusOn(edit()?.stateKey ?? "");
+    presentFileSave();
+    wrap.remove();
+    expect(api.write).not.toHaveBeenCalled();
+  });
+
+  it("a draft the user cannot see is not saved: the panel closed", async () => {
+    select();
+    await editing("a=22\n");
+    usePanelStore.setState({ byKey: { [PANEL]: { open: false, groups: [{ tabs: [tab], activeTabId: TAB }] } } });
+    expect(canSaveFile()).toBe(false);
+    presentFileSave();
+    expect(api.write).not.toHaveBeenCalled();
+  });
+
+  it("nor its editor gone from the screen", async () => {
+    select();
+    await editing("a=22\n");
+    detach(edit()?.stateKey ?? "");
+    expect(canSaveFile()).toBe(false);
+    presentFileSave();
+    expect(api.write).not.toHaveBeenCalled();
+  });
+
   it("not a tab behind another one", async () => {
     select();
     await editing("a=22\n");
@@ -479,6 +689,58 @@ describe("file.save", () => {
     expect(canSaveFile()).toBe(false);
     presentFileSave();
     expect(api.write).not.toHaveBeenCalled();
+  });
+});
+
+describe("the keyboard", () => {
+  it("a clean re-read keeps it, and the caret, in the new editor", async () => {
+    await editing();
+    const wrap = document.createElement("div");
+    wrap.setAttribute("data-code-editor", edit()?.stateKey ?? "");
+    const host = document.createElement("div");
+    host.tabIndex = -1;
+    wrap.append(host);
+    document.body.append(wrap);
+    host.focus();
+    noteEditor(KEY, { focus: vi.fn(), caret: () => ({ line: 3, character: 7 }) });
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
+    wrap.remove();
+    const next = { focus: vi.fn(), caret: () => null };
+    noteEditor(KEY, next);
+    expect(next.focus).toHaveBeenCalledWith({ line: 3, character: 7 });
+  });
+
+  it("a clean re-read with the keyboard elsewhere leaves it there", async () => {
+    await editing();
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
+    const next = { focus: vi.fn(), caret: () => null };
+    noteEditor(KEY, next);
+    expect(next.focus).not.toHaveBeenCalled();
+  });
+});
+
+describe("a draft the library let go", () => {
+  it("Save says so instead of doing nothing", async () => {
+    await editing("a=22\n");
+    lib.drafts.clear();
+    await expect(saveFile(KEY)).resolves.toBe("failed");
+    expect(edit()?.failure).toContain("gone");
+    expect(api.write).not.toHaveBeenCalled();
+  });
+
+  it("the tab coming back says so, on the last version, not marked Unsaved", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    lib.drafts.clear();
+    editorOpening(KEY, key);
+    expect(edit()).toMatchObject({ dirty: false, seed: "a=1\n", revision: 1 });
+    expect(edit()?.failure).toContain("gone");
+  });
+
+  it("a draft still there is left alone", async () => {
+    await editing("a=22\n");
+    editorOpening(KEY, edit()?.stateKey ?? "");
+    expect(edit()).toMatchObject({ dirty: true, failure: null, revision: 0 });
   });
 });
 

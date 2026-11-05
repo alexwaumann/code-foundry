@@ -5,11 +5,11 @@
  * works in the dev server and in the bundled development build the e2e suite runs against,
  * where `/src/…` URLs do not exist. Production builds drop it (main.tsx gates it on DEV).
  */
-const modules = import.meta.glob(["/src/stores/*.ts", "/src/api/*.ts", "!/src/**/*.test.ts"]);
+const modules = import.meta.glob(["/src/stores/*.ts", "/src/api/*.ts", "/src/lib/codeEditor.ts", "!/src/**/*.test.ts"]);
 
 export function devModule(path: string): Promise<unknown> {
   const load = modules[path];
-  if (!load) return Promise.reject(new Error(`__cfModule: no module ${path} (src/stores/*.ts and src/api/*.ts only)`));
+  if (!load) return Promise.reject(new Error(`__cfModule: no module ${path} (src/stores/*.ts, src/api/*.ts and src/lib/codeEditor.ts only)`));
   return load();
 }
 

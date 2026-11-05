@@ -396,8 +396,8 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
   // Window-local: the palette's file finder over the selected thread (stores/fileFinder.ts).
   // The CLI's reaches every window through ShowView.
   "file.find": () => presentFileFinder(),
-  // Window-local: saves the focused File tab (stores/fileEdit.ts), whose draft only this
-  // window has. The CLI's reaches every window through ShowView.
+  // Window-local, and only here: saves the File tab in front (stores/fileEdit.ts). The daemon
+  // refuses every other caller, so an agent cannot save a user's half-typed draft.
   "file.save": () => presentFileSave(),
   // Window-local: the find bar of the thread in the content pane, or a step through its
   // matches (stores/threadFind.ts). The CLI's reach every window through ShowView.

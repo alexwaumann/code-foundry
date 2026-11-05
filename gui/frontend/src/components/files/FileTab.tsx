@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileImage, FileQuestion, FileText, FileX, Folder, Pencil, SquareArrowOutUpRight, TriangleAlert, type LucideIcon } from "lucide-react";
 import { canEdit, readFile, type FileReadView } from "@/api/files";
 import type { CodeFileEdit } from "@/components/code/CodeFile";
+import type { EditorHandle } from "@/lib/codeEditor";
 import { FinderIcon } from "@/components/icons/AppIcon";
 import { usePanelKey } from "@/components/panel/panelKeyContext";
 import { ago } from "@/components/pr/model";
@@ -10,11 +11,11 @@ import { useNow } from "@/lib/clock";
 import { dirPart, extOf, fileName, relativeTo, resolvePath } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
 import { setPreviewMode, useCodeViewStore, type PreviewMode } from "@/stores/codeView";
-import { discardDraft, editClock, editorDetached, fileEditKey, focusEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
+import { discardDraft, editClock, editorDetached, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
 import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
-import { ConflictBand, EditButtons, EditStatus, SaveFailedBand } from "./FileEditBar";
+import { ConflictBand, EditButtons, EditFailedBand, EditStatus } from "./FileEditBar";
 import { FileActions, FileHeader, HeaderAction, HeaderMeta, ModeSwitch, WrapToggle } from "./FileHeader";
 import { findMissing } from "./findMissing";
 import { fileIconOf, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, tooLargeHeading, truncatedNotice } from "./fileKind";
@@ -57,24 +58,33 @@ export function FileTab({ target }: { target: FileTarget }) {
   // A path not found at base is looked for once in the checkout (findMissing); what that
   // found (or null) is read from then on, so a refresh does not search again.
   const found = useRef<{ key: string; path: string | null } | null>(null);
-  const read = useTabRead<FileReadView>(key, async (signal) => {
-    const started = editClock();
+  const panelKey = usePanelKey();
+  const tabId = fileTab(target).id;
+  const editKey = fileEditKey(panelKey, tabId);
+  const readTarget = async (signal: AbortSignal): Promise<FileReadView> => {
+    // An edit session is bound to its file: no fallback, and the tab stays there after it.
+    const pinned = editPath(editKey);
+    if (pinned !== null) {
+      found.current = { key, path: pinned };
+      return readFile(base, pinned, undefined, signal);
+    }
     const tried = found.current?.key === key ? found.current : null;
     const first = await readFile(base, tried?.path ?? path, undefined, signal);
-    noteRead(first, started);
     if (tried || !first.notFound || !project) return first;
     const alt = await findMissing(project, base, first.path || resolvePath(base, path), signal);
     found.current = { key, path: alt };
     if (alt === null) return first;
     const second = await readFile(base, alt, undefined, signal);
-    noteRead(second, started);
     return second.notFound ? first : second;
+  };
+  const read = useTabRead<FileReadView>(key, async (signal) => {
+    const started = editClock();
+    const view = await readTarget(signal);
+    noteRead(view, started);
+    return view;
   });
   const { reload, replace } = read;
   const later = useDebounced(reload);
-  const panelKey = usePanelKey();
-  const tabId = fileTab(target).id;
-  const editKey = fileEditKey(panelKey, tabId);
   const session = useFileEdit(editKey);
   const editing = session?.view != null;
   const dirty = session?.dirty === true;
@@ -127,17 +137,16 @@ export function FileTab({ target }: { target: FileTarget }) {
       startEditing();
     }
   }, [wantsEdit, editable, startEditing]);
-  // The pencil puts the keyboard in the editor; a tab coming back to a draft leaves it where it is.
-  const focusOnReady = useRef(false);
   const leaveEdit = () => {
     stopEdit(editKey);
     reload();
   };
+  // The pencil puts the keyboard in the editor; a tab coming back to a draft leaves it where it is.
   const onPencil = () => {
     if (dirty) return;
     if (editing) leaveEdit();
     else {
-      focusOnReady.current = true;
+      focusNextEditor(editKey);
       startEditing();
     }
   };
@@ -146,13 +155,14 @@ export function FileTab({ target }: { target: FileTarget }) {
   const onDraft = useCallback((t: string) => {
     noteDraft(editKey, t);
   }, [editKey]);
+  const onOpening = useCallback((stateKey: string) => {
+    editorOpening(editKey, stateKey);
+  }, [editKey]);
   const onDetached = useCallback((stateKey: string) => {
     editorDetached(editKey, stateKey);
   }, [editKey]);
-  const onReady = useCallback((focus: () => void) => {
-    noteEditor(editKey, focus);
-    if (focusOnReady.current) focus();
-    focusOnReady.current = false;
+  const onReady = useCallback((editor: EditorHandle) => {
+    noteEditor(editKey, editor);
   }, [editKey]);
   // Buttons that go disabled or away under the pointer would drop the keyboard on the body.
   const backToEditor = () => {
@@ -160,12 +170,12 @@ export function FileTab({ target }: { target: FileTarget }) {
   };
   // The next document's editor takes the keyboard, and the viewer is current if there is none.
   const startOver = (replaced: Promise<void>) => {
-    focusOnReady.current = true;
+    focusNextEditor(editKey);
     void replaced.then(reload);
   };
   const stateKey = editing ? session.stateKey : undefined;
   const revision = session?.revision ?? 0;
-  const edit = useMemo<CodeFileEdit>(() => ({ active: stateKey !== undefined, stateKey, revision, onChange: onDraft, onDetached, onReady }), [stateKey, revision, onDraft, onDetached, onReady]);
+  const edit = useMemo<CodeFileEdit>(() => ({ active: stateKey !== undefined, stateKey, revision, onChange: onDraft, onOpening, onDetached, onReady }), [stateKey, revision, onDraft, onOpening, onDetached, onReady]);
 
   const meta = !file ? null : file.notFound || file.isDir ? null : file.pdf ? (
     pdfMeta(file.size, file.truncated ? null : pages)
@@ -217,7 +227,8 @@ export function FileTab({ target }: { target: FileTarget }) {
         {editing && (
           <EditButtons
             dirty={dirty}
-            saving={session.saving}
+            gone={session.conflict === "deleted"}
+            busy={session.busy}
             onDiscard={() => {
               startOver(discardDraft(editKey));
             }}
@@ -230,6 +241,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       {session?.conflict && (
         <ConflictBand
           conflict={session.conflict}
+          busy={session.busy}
           onReload={() => {
             startOver(reloadDraft(editKey));
           }}
@@ -238,7 +250,7 @@ export function FileTab({ target }: { target: FileTarget }) {
           }}
         />
       )}
-      {session?.failure && <SaveFailedBand message={session.failure} />}
+      {session?.failure && <EditFailedBand message={session.failure} />}
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
       <FileBody file={file} error={read.error} reload={reload} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} rendered={rendered ? kind : null} edit={edit} onSize={onSize} onPages={setPages} />

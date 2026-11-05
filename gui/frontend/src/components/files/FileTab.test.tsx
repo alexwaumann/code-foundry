@@ -21,7 +21,14 @@ vi.mock("@/api/files", async (orig) => ({
     const abs = path.startsWith("/") ? path : `${base}/${path}`;
     reads.push(abs);
     const f = files.get(abs) ?? { notFound: true };
-    return Promise.resolve({ path: abs, size: 0, truncated: false, binary: true, mime: "", modifiedAtMs: null, notFound: false, isDir: false, text: null, lossless: false, image: null, pdf: null, ...f });
+    const view = { path: abs, size: 0, truncated: false, binary: true, mime: "", modifiedAtMs: null, notFound: false, isDir: false, text: null, lossless: false, image: null, pdf: null, ...f };
+    return held.on
+      ? new Promise((resolve) => {
+          held.pending.push(() => {
+            resolve(view);
+          });
+        })
+      : Promise.resolve(view);
   },
 }));
 // searchFiles (findMissing's retry) lists `listed`, checkout-relative, filtered by file name.
@@ -60,6 +67,8 @@ vi.mock("@/components/code/CodeFile", () => ({
 // The library's draft: what the stand-in above was last told is what a save reads.
 const draft = vi.hoisted(() => ({ text: null as string | null }));
 vi.mock("@/lib/codeEditor", () => ({ loadCodeEditor: () => Promise.resolve(), draftText: () => draft.text, forgetDraft: () => undefined, createCodeEditor: () => undefined }));
+// Held, readFile's next answers wait for release(): a read still out while something else happens.
+const held = vi.hoisted(() => ({ on: false, pending: [] as (() => void)[] }));
 // The worktree detail a project's File tab watches (worktree_detail_updated re-reads it).
 const detail = vi.hoisted(() => ({ computedAtMs: 1 }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({
@@ -88,6 +97,8 @@ afterEach(() => {
   useFileEditStore.setState({ sessions: {} });
   writes.fn.mockReset();
   draft.text = null;
+  held.on = false;
+  held.pending = [];
   localStorage.clear();
 });
 
@@ -377,11 +388,37 @@ describe("editing", () => {
     });
     expect(writes.fn).toHaveBeenCalledWith("/Users/me/w", ENV, "A=22\n", expect.objectContaining({ size: 4, modifiedAtMs: 100 }), {});
     expect(screen.getByTestId("file-meta").textContent).toContain("5 B");
+    // The editor keeps the text it started from: a new one would reset its document.
+    expect(screen.getByTestId("code-file").textContent).toBe("A=1\n");
     // Now on disk, the re-read sees what it wrote: no band.
     files.set(ENV, text({ text: "A=22\n", size: 5, modifiedAtMs: 200 }));
     await refresh();
     expect(screen.queryByTestId("file-conflict")).toBeNull();
     expect(screen.getByTestId("draft")).toBeTruthy();
+  });
+
+  it("a read that left before a save and answers after it raises nothing", async () => {
+    files.set(ENV, text());
+    writes.fn.mockResolvedValue({ path: ENV, size: 5, modifiedAtMs: 200, conflict: false, notFound: false });
+    openTab();
+    await editing();
+    type("A=22\n");
+    held.on = true;
+    fireEvent.click(screen.getByTestId("file-refresh"));
+    await waitFor(() => {
+      expect(held.pending).toHaveLength(1);
+    });
+    fireEvent.click(screen.getByTestId("file-save"));
+    await waitFor(() => {
+      expect(status()).toBe("Editing");
+    });
+    type("A=222\n");
+    await act(async () => {
+      for (const release of held.pending) release();
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("file-conflict")).toBeNull();
+    expect(status()).toBe("Unsaved");
   });
 
   it("every read while dirty leaves the editor's text alone and raises the band on a change", async () => {
@@ -408,6 +445,7 @@ describe("editing", () => {
     await refresh();
     expect(screen.getByTestId("file-conflict").textContent).toContain("Deleted on disk");
     expect(screen.queryByTestId("file-reload")).toBeNull();
+    expect(screen.getByTestId<HTMLButtonElement>("file-discard").disabled).toBe(false);
     expect(screen.queryByTestId("file-not-found")).toBeNull();
     expect(screen.getByTestId("draft")).toBeTruthy();
     writes.fn.mockResolvedValue({ path: ENV, size: 4, modifiedAtMs: 300, conflict: false, notFound: false });
@@ -416,6 +454,78 @@ describe("editing", () => {
       expect(screen.queryByTestId("file-conflict")).toBeNull();
     });
     expect(writes.fn.mock.lastCall?.[4]).toEqual({ force: true });
+  });
+
+  it("a file deleted under a clean document says so too, and Discard is there to leave", async () => {
+    files.set(ENV, text());
+    openTab();
+    await editing();
+    files.delete(ENV);
+    await refresh();
+    expect(screen.getByTestId("file-conflict").textContent).toContain("Deleted on disk");
+    expect(screen.getByTestId("draft")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("file-discard"));
+    expect(await screen.findByTestId("file-not-found")).toBeTruthy();
+  });
+
+  it("a session stays on its file: its reads have no fallback to a file of that name, and Overwrite stays there", async () => {
+    const short = "/Users/me/w/src/a.ts";
+    const other = "/Users/me/w/lib/src/a.ts";
+    files.set(short, text({ text: "mine\n" }));
+    files.set(other, text({ text: "another file\n" }));
+    listed.paths = ["lib/src/a.ts"];
+    writes.fn.mockResolvedValue({ path: short, size: 5, modifiedAtMs: 300, conflict: false, notFound: false });
+    openTab("src/a.ts", { project: "p1" });
+    await editing();
+    type("mine too\n");
+    files.delete(short);
+    await refresh();
+    expect(screen.getByTestId("file-conflict").textContent).toContain("Deleted on disk");
+    expect(screen.getByTestId("file-tab").getAttribute("data-path")).toBe(short);
+    expect(listed.calls).toEqual([]);
+    expect(reads).not.toContain(other);
+    fireEvent.click(screen.getByTestId("file-overwrite"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("file-conflict")).toBeNull();
+    });
+    expect(writes.fn.mock.lastCall?.[1]).toBe(short);
+    // Editing over, the tab is still on the file just saved, gone or not.
+    files.set(short, text({ text: "mine too\n", size: 5, modifiedAtMs: 300 }));
+    fireEvent.click(await pencil());
+    await waitFor(() => {
+      expect(screen.queryByTestId("draft")).toBeNull();
+    });
+    files.delete(short);
+    await refresh();
+    expect(screen.getByTestId("file-tab").getAttribute("data-path")).toBe(short);
+    expect(listed.calls).toEqual([]);
+  });
+
+  it("the band's actions wait for a write that is out", async () => {
+    files.set(ENV, text());
+    openTab();
+    await editing();
+    type("A=2\n");
+    files.set(ENV, text({ text: "theirs\n", size: 7, modifiedAtMs: 150 }));
+    await refresh();
+    let finish: (v: unknown) => void = () => undefined;
+    writes.fn.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    fireEvent.click(screen.getByTestId("file-overwrite"));
+    await waitFor(() => {
+      expect(screen.getByTestId<HTMLButtonElement>("file-reload").disabled).toBe(true);
+    });
+    expect(screen.getByTestId<HTMLButtonElement>("file-overwrite").disabled).toBe(true);
+    await act(async () => {
+      finish({ path: ENV, size: 4, modifiedAtMs: 300, conflict: false, notFound: false });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("file-conflict")).toBeNull();
+    });
   });
 
   it("while clean, a re-read still follows the file", async () => {
@@ -438,7 +548,7 @@ describe("editing", () => {
     await editing();
     type("A=2\n");
     fireEvent.click(screen.getByTestId("file-save"));
-    expect((await screen.findByTestId("file-save-failed")).textContent).toContain("the file is read-only: make it writable first");
+    expect((await screen.findByTestId("file-edit-failed")).textContent).toBe("Could not save: the file is read-only: make it writable first");
     expect(status()).toBe("Unsaved");
   });
 

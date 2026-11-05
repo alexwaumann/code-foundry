@@ -19,7 +19,6 @@ import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
 import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
-import { presentFileSave } from "./fileEdit";
 import { presentFileFinder } from "./fileFinder";
 import { presentSearch } from "./threadSearch";
 import { presentThreadFind } from "./threadFind";
@@ -206,9 +205,6 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
     case "file.find":
       // file.find: the palette's file finder over the selected thread (nothing on a page).
       return presentFileFinder();
-    case "file.save":
-      // file.save: saves the focused File tab; with nothing editing, nothing happens.
-      return presentFileSave();
     case "thread.find":
       // thread.find: the find bar of the thread in the content pane (nothing on a page).
       return presentThreadFind("open");

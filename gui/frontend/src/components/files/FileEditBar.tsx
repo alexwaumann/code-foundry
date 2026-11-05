@@ -15,15 +15,19 @@ export function EditStatus({ dirty }: { dirty: boolean }) {
   );
 }
 
-/** Row two's Discard and Save, both off while there is nothing to discard or save. The chord shown is file.save's, wherever the user put it. */
-export function EditButtons({ dirty, saving, onDiscard, onSave }: { dirty: boolean; saving: boolean; onDiscard: () => void; onSave: () => void }) {
+/**
+ * Row two's Discard and Save, both off while there is nothing to discard or save or a write
+ * or reload is out. A file that went can be discarded clean too: there is nothing else
+ * to do with the tab. The chord shown is file.save's, wherever the user put it.
+ */
+export function EditButtons({ dirty, gone, busy, onDiscard, onSave }: { dirty: boolean; gone: boolean; busy: boolean; onDiscard: () => void; onSave: () => void }) {
   const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "file.save")?.keybindings[0]);
   return (
     <span className="flex shrink-0 items-center gap-1">
-      <Button variant="ghost" size="xs" disabled={!dirty || saving} onClick={onDiscard} data-testid="file-discard">
+      <Button variant="ghost" size="xs" disabled={!(dirty || gone) || busy} onClick={onDiscard} data-testid="file-discard">
         Discard
       </Button>
-      <Button size="xs" disabled={!dirty || saving} onClick={onSave} data-testid="file-save">
+      <Button size="xs" disabled={!dirty || busy} onClick={onSave} data-testid="file-save">
         Save
         {chord && <span className="font-normal opacity-70">{formatChord(chord)}</span>}
       </Button>
@@ -36,31 +40,32 @@ const BAND = "flex shrink-0 items-center gap-2 border-b border-cf-divider px-3 p
 /**
  * Under the header, when the file moved on from the draft: the draft stays, and the user
  * says which one wins. Reload takes what is on disk; Overwrite saves with force, which makes
- * a deleted file again.
+ * a deleted file again (row two's Discard gives up on it). Both wait for a write or reload
+ * that is out: answering over it would leave the document and the disk apart.
  */
-export function ConflictBand({ conflict, onReload, onOverwrite }: { conflict: EditConflict; onReload: () => void; onOverwrite: () => void }) {
+export function ConflictBand({ conflict, busy, onReload, onOverwrite }: { conflict: EditConflict; busy: boolean; onReload: () => void; onOverwrite: () => void }) {
   return (
     <div className={cn(BAND, "bg-cf-warning-surface text-cf-warning-text")} role="status" data-testid="file-conflict" data-conflict={conflict}>
       <TriangleAlert className="size-3 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{conflict === "deleted" ? "Deleted on disk" : "Changed on disk"}</span>
       {conflict === "changed" && (
-        <Button variant="ghost" size="xs" onClick={onReload} data-testid="file-reload">
+        <Button variant="ghost" size="xs" disabled={busy} onClick={onReload} data-testid="file-reload">
           Reload
         </Button>
       )}
-      <Button variant="outline" size="xs" onClick={onOverwrite} data-testid="file-overwrite">
+      <Button variant="outline" size="xs" disabled={busy} onClick={onOverwrite} data-testid="file-overwrite">
         Overwrite
       </Button>
     </div>
   );
 }
 
-/** Under the header, when a save failed: the daemon's message, whole. The draft is still there. */
-export function SaveFailedBand({ message }: { message: string }) {
+/** Under the header, when a save or a reload failed: the message, whole. The draft is still there. */
+export function EditFailedBand({ message }: { message: string }) {
   return (
-    <div className={cn(BAND, "bg-cf-error-surface text-cf-error-text")} role="alert" data-testid="file-save-failed">
+    <div className={cn(BAND, "bg-cf-error-surface text-cf-error-text")} role="alert" data-testid="file-edit-failed">
       <TriangleAlert className="size-3 shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1 break-words">Could not save: {message}</span>
+      <span className="min-w-0 flex-1 break-words">{message}</span>
     </div>
   );
 }

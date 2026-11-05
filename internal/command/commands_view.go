@@ -149,7 +149,7 @@ func (d ViewDeps) showPageWith(uctx Context, a Args, name string, params map[str
 //     composer.stage (commands_composer_stage.go), text in a thread's composer;
 //   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
 //   - file.find (commands_view_file_find.go), the file finder over the thread on screen,
-//     and file.save (commands_view_file_save.go), which saves the focused File tab's edit.
+//     and file.save (commands_view_file_save.go), the window's own save of a File tab.
 //
 // Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, d ViewDeps) error {

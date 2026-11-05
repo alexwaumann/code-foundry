@@ -1,6 +1,6 @@
-import { memo, useEffect, useMemo, useRef } from "react";
-import { EditProvider, File, type FileEditChangeHandler, type FileOptions, type SelectedLineRange } from "@pierre/diffs/react";
-import { createCodeEditor } from "@/lib/codeEditor";
+import { memo, useCallback, useEffect, useMemo } from "react";
+import { EditProvider, File, type EditorFactory, type FileEditChangeHandler, type FileOptions, type SelectedLineRange } from "@pierre/diffs/react";
+import { createCodeEditor, editorHandle, type CodeEditor, type EditorHandle } from "@/lib/codeEditor";
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { useCodeViewStore } from "@/stores/codeView";
@@ -21,10 +21,24 @@ export interface CodeFileEdit {
   revision: number;
   /** The document changed. */
   onChange: (text: string) => void;
+  /** An editor is about to open on `stateKey`. */
+  onOpening: (stateKey: string) => void;
   /** The editor let go of `stateKey`: its tab left, it was turned off, or its document started over. */
   onDetached: (stateKey: string) => void;
   /** The editor is ready, after attaching to a file. */
-  onReady?: ((focus: () => void) => void) | undefined;
+  onReady: (editor: EditorHandle) => void;
+}
+
+// How many mounted views hold each draft key. Mounts come and go in one commit (StrictMode's
+// second run; a tab moved to the other group, whose new editor resumes the key), so an
+// editor has let go of a key only when, once the commit is over, no view holds it.
+const holders = new Map<string, number>();
+
+function hold(stateKey: string, change: 1 | -1): number {
+  const n = (holders.get(stateKey) ?? 0) + change;
+  if (n > 0) holders.set(stateKey, n);
+  else holders.delete(stateKey);
+  return n;
 }
 
 export interface CodeFileProps {
@@ -58,7 +72,7 @@ export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbe
   );
   const host = useCodeHost();
   return (
-    <div ref={host} className={cn("cf-code-view", className)} data-code-editor={edit?.active ? "" : undefined}>
+    <div ref={host} className={cn("cf-code-view", className)} data-code-editor={edit?.active ? edit.stateKey : undefined}>
       {edit ? (
         <EditableFile file={file} options={options} selectedLines={selectedLines} edit={edit} />
       ) : selectedLines === undefined ? (
@@ -72,7 +86,7 @@ export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbe
 
 /** The File tab's view of a file: the library's File under its editor context. */
 function EditableFile({ file, options, selectedLines, edit }: { file: { name: string; contents: string }; options: FileOptions<undefined, undefined>; selectedLines: SelectedLineRange | null | undefined; edit: CodeFileEdit }) {
-  const { active, stateKey, revision, onChange, onDetached, onReady } = edit;
+  const { active, stateKey, revision, onChange, onOpening, onDetached, onReady } = edit;
   const onEditChange = useMemo<FileEditChangeHandler<undefined, undefined>>(
     () => (event) => {
       onChange(event.editor.getText());
@@ -81,30 +95,32 @@ function EditableFile({ file, options, selectedLines, edit }: { file: { name: st
   );
   const editorOptions = useMemo(
     () => ({
-      onAttach: (editor: { focus: () => void }) => {
-        onReady?.(() => {
-          editor.focus();
-        });
+      onAttach: (editor: CodeEditor) => {
+        onReady(editorHandle(editor));
       },
     }),
     [onReady],
   );
-  // A passive effect: the library lets go in the commit, so its draft can be dropped by
-  // now. A microtask later, and only if nothing took the key up again: StrictMode runs this
-  // cleanup and the effect back to back on a new component, whose editor stays.
-  const held = useRef<string | null>(null);
+  const createEditor = useCallback<EditorFactory<undefined, undefined>>(
+    (type, options, key) => {
+      if (key !== undefined) onOpening(key);
+      return createCodeEditor(type, options, key);
+    },
+    [onOpening],
+  );
+  // A passive effect: the library lets go in the commit, so its draft can be dropped by now.
   useEffect(() => {
     if (!active || stateKey === undefined) return;
-    held.current = stateKey;
+    hold(stateKey, 1);
     return () => {
-      held.current = null;
+      hold(stateKey, -1);
       queueMicrotask(() => {
-        if (held.current !== stateKey) onDetached(stateKey);
+        if (!holders.has(stateKey)) onDetached(stateKey);
       });
     };
   }, [active, stateKey, onDetached]);
   return (
-    <EditProvider createEditor={createCodeEditor}>
+    <EditProvider createEditor={createEditor}>
       {/* While editing, the only selection is the caret's. */}
       <File key={revision} file={file} options={options} selectedLines={active ? null : selectedLines} edit={active} editStateKey={stateKey} editorOptions={editorOptions} onEditChange={onEditChange} />
     </EditProvider>
