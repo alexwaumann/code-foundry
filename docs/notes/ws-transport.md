@@ -108,8 +108,9 @@ To back out: empty `TUNNELLED_STREAMS`. WatchBoard is back on fetch; the tunnel 
 - Built app on a scratch home, debug logs: `tunnel open` with `wails://localhost` and the procedure,
   and no `tunnel refused`. The socket held for 1m43s with no reconnect. By `nettop`, one
   connection's bytes out stayed flat while a board change brought it 267 bytes in. SIGTERM and
-  SIGKILL of the daemon: the host started a new one on a new port and token, and the board was
-  back in under a second (SIGTERM: `tunnel closed` before `listeners closed, closing stores`).
+  SIGKILL of the daemon: the host started a new one on a new port and token, and `tunnel open`
+  followed within 0.1 s of `daemon started`. SIGTERM took 0.5 s end to end, with `tunnel closed`
+  before `listeners closed, closing stores`; SIGKILL's start was not timed.
   `WatchBoard` was the only `tunnel open`; `EventService/Watch` and `ThreadService/WatchThread`
   showed their `OPTIONS` preflights.
 - `daemon --dev` in WebKit: a CLI `ember.task.add` reached `useEmberStore`, with

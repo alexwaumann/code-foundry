@@ -46,6 +46,10 @@ export function serveTunnel(server: Server, port: number): () => void {
       return;
     }
     sockets.handleUpgrade(req, socket, head, (ws) => {
+      // An unhandled "error" would end the mock, and with it a worker's whole run.
+      ws.on("error", () => {
+        ws.terminate();
+      });
       ws.once("message", (first: RawData) => {
         const { headers } = JSON.parse((first as Buffer).toString()) as { headers: Record<string, string> };
         ws.once("message", (body: RawData) => {
