@@ -1,10 +1,10 @@
-import { memo, useContext, useEffect, useRef, useState } from "react";
+import { memo, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Ban, Check, ChevronRight, Circle, CircleX, LoaderCircle, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { ThreadSetupStepStatusView, ThreadSetupView } from "@/api/threads";
 import { Tip } from "@/components/ui/tooltip";
 import { setupLabelText, setupLineTime, setupRevealAt, setupView, SETUP_FOLD_KEY, type SetupLine } from "@/lib/threadSetup";
 import type { TimelineRow } from "@/lib/threadTimeline";
-import { setTurnFolded } from "@/stores/thread";
+import { noteSetupShown, setTurnFolded, useSetupShown } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
 import { FoldInPlaceContext, useThreadCtx } from "./context";
 
@@ -96,7 +96,13 @@ export const SetupRow = memo(function SetupRow({ row }: { row: Extract<TimelineR
   const foldRef = useRef<HTMLDivElement>(null);
   const setup = useThreadsStore((s) => s.byId[threadId]?.setup ?? null);
   const now = useSetupNow(setup);
-  const view = setupView(setup, now);
+  const shown = useSetupShown(threadId);
+  const view = setupView(setup, now, shown);
+  // What is on screen now stays there, whatever later times say. A folded fold shows no line.
+  const onScreen = view.kind === "live" || view.kind === "failed" || (view.kind === "done" && !row.folded) ? view.lines.map((l) => l.key).join("\n") : "";
+  useLayoutEffect(() => {
+    if (onScreen) noteSetupShown(threadId, onScreen.split("\n"));
+  }, [threadId, onScreen]);
   switch (view.kind) {
     case "none":
       return null;
@@ -145,7 +151,6 @@ export const SetupRow = memo(function SetupRow({ row }: { row: Extract<TimelineR
               type="button"
               className="fold text-caption"
               aria-expanded={!row.folded}
-              aria-label={row.folded ? "Show the setup's steps" : "Hide the setup's steps"}
               data-testid="thread-setup-fold"
               onClick={() => {
                 const change = () => {

@@ -9,7 +9,7 @@ import { ThreadInfoCard } from "@/components/threadinfo/ThreadInfoCard";
 import { ThreadInfoOverlay } from "@/components/threadinfo/ThreadInfoOverlay";
 import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
-import { startThreadWatch } from "@/stores/thread";
+import { startThreadWatch, useSetupShown } from "@/stores/thread";
 import { holdThreadPane, useThreadFindOpen } from "@/stores/threadFind";
 import { useShownRun } from "@/stores/subagentView";
 import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
@@ -87,7 +87,8 @@ function WatchedThread({ threadId }: { threadId: string }) {
 function ThreadBody({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   // A thread made with no prompt still has its setup's row to show.
-  const setupRow = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup) !== "");
+  const shown = useSetupShown(threadId).size > 0;
+  const setupRow = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup, shown) !== "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
   const [dockRef, dockHeight] = useElementHeight();
   const bodyRef = useRef<HTMLDivElement>(null);

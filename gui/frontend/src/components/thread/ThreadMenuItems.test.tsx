@@ -201,6 +201,18 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     expect(ids()).not.toEqual(expect.arrayContaining(["menu-new-like"]));
   });
 
+  it("Save as workspace goes while a setup has not finished: the daemon refuses thread.workspace there, after the workspace was made", () => {
+    const setup = (phase: "running" | "failed" | "cancelled" | "done") => ({ phase, startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true });
+    const offered = () => within(openTitleMenu()).queryAllByTestId("menu-save-workspace").length;
+    for (const phase of ["running", "failed", "cancelled"] as const) {
+      setThread({ projectIds: ["web", "api"], setup: setup(phase) });
+      expect(offered()).toBe(0);
+      cleanup();
+    }
+    setThread({ projectIds: ["web", "api"], setup: setup("done") });
+    expect(offered()).toBe(1);
+  });
+
   it("no Regenerate name for a resident thread; disabled while a naming call runs", () => {
     setThread({ resident: "ember" });
     expect(within(openTitleMenu()).queryByTestId("menu-regenerate-name")).toBeNull();

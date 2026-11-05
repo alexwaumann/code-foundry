@@ -13,12 +13,29 @@ import { formatDuration } from "./toolSummary";
 /** How long a step runs before the checklist shows: a fast thread never flashes one. */
 export const SETUP_REVEAL_MS = 300;
 
+/** Setup.error of a thread the daemon lost during its setup (internal/store/thread/setup.go SetupRestarted). */
+export const SETUP_RESTARTED = "Code Foundry restarted during setup";
+
+/** What a setup a restart cut off says, in place of the step it was on: nothing went wrong there. */
+const RESTARTED_TITLE = "Setup stopped when Code Foundry restarted";
+
+/** What the row has shown of the thread's setup (stores/thread setupShown): line keys. */
+export type SetupShown = ReadonlySet<string>;
+
+/** Nothing shown yet. */
+export const NOTHING_SHOWN: SetupShown = new Set();
+
 /** The turn-fold key of the setup's fold line (stores/thread setTurnFolded): forgotten on leaving the thread, so it is folded on every visit. */
 export const SETUP_FOLD_KEY = "setup";
 
 /** A setup that ran and ended without Claude, or still runs: the thread cannot take most things yet. */
 export function setupUnfinished(s: ThreadSetupView | null | undefined): boolean {
   return s != null && s.phase !== "done";
+}
+
+/** A setup running with its creator waiting on it: it takes no messages and no cancel, and its failure takes the thread. */
+export function setupWaitedFor(s: ThreadSetupView | null | undefined): boolean {
+  return s?.phase === "running" && !s.background;
 }
 
 /** A setup that failed or was cancelled: nothing ran, and nothing will until it is tried again. */
@@ -44,7 +61,9 @@ export function hasSetupWork(s: ThreadSetupView): boolean {
  * When the checklist shows, epoch ms; null while no step has earned it. The first moment
  * a step has been running SETUP_REVEAL_MS, so steps that ended sooner never count, or the
  * end of a step that warned, which always shows. It may be ahead of now: a running step
- * reaches it unless it ends first. Only times decide, so a line once shown stays.
+ * reaches it unless it ends first. Times can change under it: a retry puts steps back, and a
+ * late snapshot says a running step ended before its 300ms were up. So what has been on
+ * screen is kept apart (SetupShown), and a line once shown stays whatever this says.
  */
 export function setupRevealAt(s: ThreadSetupView): number | null {
   let at: number | null = null;
@@ -65,21 +84,27 @@ export function setupRevealAt(s: ThreadSetupView): number | null {
  * turn's own header as if there were no setup; "running" a row with the live header held
  * back; "done" a fold line; "stopped" a row and no header for the turn that never ran.
  * A setup that only starts Claude has nothing to tell while it runs or once done: "Working"
- * says it. One that took no time either, so a fast thread has no fold line.
+ * says it. One that took no time either, so a fast thread has no fold line. `shown`: the
+ * row has shown its checklist, which stays through the run whatever the times say now.
  */
 export type SetupRowPhase = "" | "running" | "done" | "stopped";
 
-export function setupRowPhase(s: ThreadSetupView | null | undefined): SetupRowPhase {
+export function setupRowPhase(s: ThreadSetupView | null | undefined, shown = false): SetupRowPhase {
   if (!s) return "";
   switch (s.phase) {
     case "failed":
     case "cancelled":
       return "stopped";
     case "running":
-      return hasSetupWork(s) ? "running" : "";
+      return hasSetupWork(s) || shown ? "running" : "";
     case "done":
-      return hasSetupWork(s) && setupRevealAt(s) !== null ? "done" : "";
+      return shown || (hasSetupWork(s) && setupRevealAt(s) !== null) ? "done" : "";
   }
+}
+
+/** A step a restart cut off: it failed, but nothing is wrong with what it was doing. */
+function restartedStep(st: Pick<ThreadSetupStepView, "status" | "error">): boolean {
+  return st.status === "failed" && st.error === SETUP_RESTARTED;
 }
 
 /** A line's words: what comes before and after the part in mono ("Fetched", "origin/main", ""). */
@@ -127,11 +152,12 @@ function warningWords(st: ThreadSetupStepView, nowMs: number): SetupLabel {
 /** A step's words, in the tense its status has. */
 function stepWords(st: ThreadSetupStepView, nowMs: number): SetupLabel {
   const failed = st.status === "failed";
+  if (restartedStep(st)) return words(RESTARTED_TITLE);
   const done = st.status === "done";
   switch (st.kind) {
     case "name":
       if (failed) return words("Could not name the branch");
-      if (done) return st.branch ? { before: "Named the branch ", code: st.branch, after: "" } : words("Named the branch");
+      if (done) return st.branch ? { before: st.existing ? "Using the branch " : "Named the branch ", code: st.branch, after: "" } : words("Named the branch");
       return words("Naming the branch");
     case "fetch":
       if (st.status === "warning") return warningWords(st, nowMs);
@@ -151,7 +177,8 @@ function stepLine(st: ThreadSetupStepView, nowMs: number, project = ""): SetupLi
     label: stepWords(st, nowMs),
     startedAtMs: st.startedAtMs,
     endedAtMs: st.endedAtMs,
-    error: st.status === "failed" ? st.error : "",
+    // The line itself says a restart stopped it.
+    error: st.status === "failed" && !restartedStep(st) ? st.error : "",
   };
 }
 
@@ -230,7 +257,11 @@ export function setupFoldWarning(s: ThreadSetupView, nowMs: number): string {
   const warned = s.steps.filter((st) => st.status === "warning");
   const only = warned[0];
   if (!only) return "";
-  if (warned.length > 1) return `${String(warned.length)} projects on an old base`;
+  if (warned.length > 1) {
+    // A project with no such ref on disk is on no old base: it started from what it has.
+    const old = warned.every((st) => st.refAtMs !== null && st.ref);
+    return `${String(warned.length)} projects ${old ? "on an old base" : "could not fetch"}`;
+  }
   const w = warningWords(only, nowMs);
   if (w.code) return `using ${w.code}${w.after}`;
   return w.before.charAt(0).toLowerCase() + w.before.slice(1);
@@ -253,11 +284,33 @@ function setupTookMs(s: ThreadSetupView): number | null {
   return s.startedAtMs !== null && s.endedAtMs !== null ? s.endedAtMs - s.startedAtMs : null;
 }
 
-export function setupView(s: ThreadSetupView | null | undefined, nowMs: number): SetupView {
+/** The setup's own error as a line, where no step says why it failed; before the steps that never ran. */
+function withSetupError(s: ThreadSetupView, lines: readonly SetupLine[]): SetupLine[] {
+  if (lines.some((l) => l.status === "failed")) return [...lines];
+  const restarted = s.error === SETUP_RESTARTED;
+  const why: SetupLine = {
+    key: "setup-error",
+    status: "failed",
+    project: "",
+    label: words(restarted ? RESTARTED_TITLE : "Setup failed"),
+    startedAtMs: null,
+    endedAtMs: null,
+    error: restarted ? "" : s.error,
+  };
+  const at = lines.findIndex((l) => l.status === "pending");
+  return at < 0 ? [...lines, why] : [...lines.slice(0, at), why, ...lines.slice(at)];
+}
+
+/**
+ * What the row shows now. `shown` are the lines it has shown of this thread's setup: they
+ * stay, and once it has shown any the checklist does, through a retry or a late snapshot.
+ */
+export function setupView(s: ThreadSetupView | null | undefined, nowMs: number, shown: SetupShown = NOTHING_SHOWN): SetupView {
   if (!s) return { kind: "none" };
+  const seen = shown.size > 0;
   switch (s.phase) {
     case "failed":
-      return { kind: "failed", lines: setupLines(s, nowMs) };
+      return { kind: "failed", lines: withSetupError(s, setupLines(s, nowMs)) };
     case "cancelled": {
       const ms = setupTookMs(s);
       // Whole seconds, but for a cancel inside the first one, which "0s" would misstate.
@@ -265,14 +318,14 @@ export function setupView(s: ThreadSetupView | null | undefined, nowMs: number):
       return { kind: "cancelled", label: took ? `Setup cancelled after ${took}` : "Setup cancelled" };
     }
     case "done": {
-      if (setupRowPhase(s) !== "done") return { kind: "none" };
+      if (setupRowPhase(s, seen) !== "done") return { kind: "none" };
       const took = formatDuration(setupTookMs(s) ?? 0);
       return { kind: "done", label: took ? `Set up in ${took}` : "Set up", warning: setupFoldWarning(s, nowMs), lines: setupLines(s, nowMs) };
     }
     case "running": {
       const at = setupRevealAt(s);
-      if (!hasSetupWork(s) || at === null || at > nowMs) return { kind: "none" };
-      const lines = setupLines(s, nowMs).filter((l) => l.endedAtMs === null || l.endedAtMs >= at || l.status === "warning");
+      if (!seen && (!hasSetupWork(s) || at === null || at > nowMs)) return { kind: "none" };
+      const lines = setupLines(s, nowMs).filter((l) => l.endedAtMs === null || (at !== null && l.endedAtMs >= at) || l.status === "warning" || shown.has(l.key));
       return { kind: "live", elapsed: s.startedAtMs === null ? "" : wholeSeconds(nowMs - s.startedAtMs), lines };
     }
   }
@@ -287,5 +340,13 @@ export function setupCurrentStep(s: ThreadSetupView): string {
 /** Why a setup failed, in a line: its first failed step's ("Could not create the worktree"), else the first line of its error. */
 export function setupFailure(s: ThreadSetupView): string {
   const st = s.steps.find((x) => x.status === "failed");
-  return st ? setupLabelText(stepWords(st, 0)) : (s.error.split("\n")[0] ?? "");
+  if (st) return setupLabelText(stepWords(st, 0));
+  return s.error === SETUP_RESTARTED ? RESTARTED_TITLE : (s.error.split("\n")[0] ?? "");
+}
+
+/** The composer's note on a setup that did not finish (components/thread/SetupNote.tsx); null otherwise, and while one runs. */
+export function setupNoteLine(s: ThreadSetupView | null | undefined): string | null {
+  if (s?.phase === "cancelled") return "Setup cancelled, so your message was not sent.";
+  if (s?.phase === "failed") return `${setupFailure(s) || "Setup failed"}, so your message was not sent.`;
+  return null;
 }

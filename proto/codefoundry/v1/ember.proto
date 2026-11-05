@@ -124,6 +124,8 @@ message EmberTaskThread {
   repeated EmberTaskDescendant descendants = 16;
   // Saved for later (Thread.saved_at): put away with no wake time, so the board says so.
   bool saved = 17;
+  // Thread.setup, so the board says what a worker's setup is doing.
+  ThreadSetup setup = 18;
 }
 
 // EmberTaskDescendant is a thread below a task's worker thread, as the board shows it.

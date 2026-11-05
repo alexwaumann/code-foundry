@@ -26,6 +26,7 @@ import { ImagePreview } from "./ImagePreview";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { PdfPreview } from "./PdfPreview";
 import { FileEmptyState, FileLoading, NoticeBar } from "./states";
+import { useFileHold } from "./useFileHold";
 import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useToolEdits, useWorktreeChanges } from "./useTabRead";
 
 const MODES = [
@@ -90,6 +91,8 @@ export function FileTab({ target }: { target: FileTarget }) {
   });
   const { reload, replace } = read;
   const later = useDebounced(reload);
+  // Opened before its thread had a checkout: the project's file, not the thread's.
+  const held = useFileHold(target, panelKey);
   const session = useFileEdit(editKey);
   const editing = session?.view != null;
   const dirty = session?.dirty === true;
@@ -128,7 +131,7 @@ export function FileTab({ target }: { target: FileTarget }) {
   }, []);
   const [pages, setPages] = useState<number | null>(null);
 
-  const editable = canEdit(file);
+  const editable = held === null && canEdit(file);
   const startEditing = useCallback(() => {
     if (read.data) void startEdit(editKey, { panelKey, tabId, base }, read.data, { create: wantsNew });
   }, [read.data, editKey, panelKey, tabId, base, wantsNew]);
@@ -139,7 +142,7 @@ export function FileTab({ target }: { target: FileTarget }) {
   const wantsEdit = target.edit === true;
   const creating = session?.creating === true;
   // A file to make has nothing to show yet: the document is on its way, not "File not found".
-  const opening = wantsEdit && wantsNew && file?.notFound === true;
+  const opening = held === null && wantsEdit && wantsNew && file?.notFound === true;
   useEffect(() => {
     if (!wantsEdit) asked.current = null;
     else if ((editable || opening) && asked.current !== asking) {
@@ -251,6 +254,7 @@ export function FileTab({ target }: { target: FileTarget }) {
           />
         )}
       </FileHeader>
+      {held && <NoticeBar testId="file-held">{held}</NoticeBar>}
       {ask && editing && (
         <FileRequestBand
           ask={ask}

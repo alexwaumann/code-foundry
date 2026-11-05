@@ -37,6 +37,24 @@ describe("RowMenu: Fork (docs/notes/transcript-deleted.md)", () => {
   });
 });
 
+describe("RowMenu: a setup that has not finished", () => {
+  const setup = (phase: "running" | "failed" | "done") => ({ phase, startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true });
+  const terminal = () => screen.queryAllByRole("menuitem", { name: "New terminal here" }).length;
+  const fork = () => screen.queryAllByTestId("menu-fork").length;
+
+  it.each<[string, Partial<ThreadView>, number, number]>([
+    ["running with no checkout: neither", { worktreePath: "", setup: setup("running") }, 0, 0],
+    ["failed with no checkout: neither", { worktreePath: "", setup: setup("failed") }, 0, 0],
+    ["failed after its worktree landed: a terminal has a place to run, a fork still needs Claude", { worktreePath: "/w/x", setup: setup("failed") }, 1, 0],
+    ["done: both", { worktreePath: "/w/x", setup: setup("done") }, 1, 1],
+    ["no setup: both", {}, 1, 1],
+  ])("%s", (_n, o, terminals, forks) => {
+    openMenu(o);
+    expect(terminal()).toBe(terminals);
+    expect(fork()).toBe(forks);
+  });
+});
+
 describe("RowMenu: a child thread (docs/notes/no-sidebar-override-1-gui.md)", () => {
   it("has no Show or Hide in sidebar item: a child stays its creator's", () => {
     openMenu({ createdBy: "s-0" });

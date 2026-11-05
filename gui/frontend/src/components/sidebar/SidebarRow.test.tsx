@@ -1156,7 +1156,7 @@ describe("SidebarRow: a thread whose transcript Claude Code deleted", () => {
 });
 
 describe("a thread's setup", () => {
-  const step = (kind: "worktree" | "fetch", status: "running" | "failed" | "pending", ref = "") => ({ kind, projectId: "cf", projectName: "code-foundry", ref, branch: "", status, startedAtMs: null, endedAtMs: null, error: "", warning: "", refAtMs: null });
+  const step = (kind: "worktree" | "fetch", status: "running" | "failed" | "pending", ref = "") => ({ kind, projectId: "cf", projectName: "code-foundry", ref, branch: "", status, startedAtMs: null, endedAtMs: null, error: "", warning: "", refAtMs: null, existing: false });
   const setup = (phase: "running" | "failed" | "cancelled", steps: ReturnType<typeof step>[] = []) => ({ phase, startedAtMs: NOW, endedAtMs: null, steps, error: "", background: true });
 
   it("running: Setting up in Working's place, the step on line 3 instead of a branch", () => {

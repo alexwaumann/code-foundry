@@ -76,8 +76,11 @@ describe("a thread with no checkout yet", () => {
     expect(queryByTestId("mcp-refresh")).toBeNull();
   });
 
-  it("shows nothing in the waiting strip, failed or running", () => {
-    useThreadsStore.setState({ byId: { s: thread({ state: "disconnected", status: "error", statusReason: "setup failed", setup: setup("failed") }) }, order: ["s"] });
+  it.each<[string, Partial<ThreadView>]>([
+    ["failed", { state: "disconnected", status: "error", statusReason: "setup failed", setup: setup("failed") }],
+    ["running", {}],
+  ])("shows nothing in the waiting strip: %s", (_n, o) => {
+    useThreadsStore.setState({ byId: { s: thread(o) }, order: ["s"] });
     const { container } = render(
       <TooltipProvider>
         <WaitingStrip threadId="s" />

@@ -35,3 +35,8 @@ export function orOutdatedDaemon(err: unknown): unknown {
 export function isNotFound(err: unknown): boolean {
   return err instanceof ConnectError && err.code === Code.NotFound;
 }
+
+/** True for a Connect FailedPrecondition: the daemon's word that the moment for this has passed. */
+export function isFailedPrecondition(err: unknown): boolean {
+  return err instanceof ConnectError && err.code === Code.FailedPrecondition;
+}

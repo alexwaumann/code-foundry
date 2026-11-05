@@ -50,7 +50,7 @@ import { scriptEmberChat, scriptEmberRestartCut, scriptEmberRestartWake, type Em
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
-import { SETUP_PROMPT } from "./setup";
+import { SETUP_PROMPT, type SetupMessage } from "./setup";
 import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
 import { scriptServers, scriptShells, shellSummary, type ShellCall } from "./shells";
 
@@ -91,6 +91,8 @@ export interface ThreadWorld {
   worktreeOf(id: string): string;
   /** Claude runs for the thread (CONNECTED). Internal to the daemon: the GUI never shows it. */
   isConnected(id: string): boolean;
+  /** A setup that has not finished keeps the message (World.heldBySetup). */
+  heldBySetup(id: string, m: SetupMessage): boolean;
   /**
    * Starts a stopped thread for a message, as the daemon's Send does (STARTING, back in the
    * thread list; a thread already starting just queues); `ready` runs once Claude is up.
@@ -863,12 +865,14 @@ export class MockThreadLogs {
    * not finish, the turn end the daemon closes it with. Watchers get a new snapshot, as for a
    * retry (ItemsReset, which deletes that turn end). The message keeps its id across states.
    */
-  loadSetup(id: string, closed: boolean, queued: boolean): void {
+  loadSetup(id: string, closed: boolean, queued: boolean, first: SetupMessage | null = null): void {
     this.generation++;
     const l = this.log(id);
     const promptId = `${id}-setup-prompt`;
-    const prompt = l.items.find((x) => x.id === promptId) ?? this.item(id, { case: "userMessage", value: { text: SETUP_PROMPT, attachments: [] } }, { id: promptId, at: new Date(Date.now() - 3000) });
+    const prompt = l.items.find((x) => x.id === promptId) ?? this.item(id, { case: "userMessage", value: first ?? { text: SETUP_PROMPT, attachments: [] } }, { id: promptId, at: new Date(Date.now() - 3000) });
     const extra = queued ? [l.items.find((x) => x.id === `${promptId}-queued`) ?? this.item(id, { case: "userMessage", value: { text: "Also check the badge's tooltip.", attachments: [], queued: true } }, { id: `${promptId}-queued` })] : [];
+    // Messages sent during the setup stay, as on the daemon's row.
+    extra.push(...l.items.filter((x) => x.payload?.case === "userMessage" && x.payload.value.queued === true && x.id !== `${promptId}-queued`));
     const end = closed ? [this.item(id, { case: "turnEnd", value: { subtype: "process_ended", interrupted: true, durationMs: BigInt(5000) } }, { id: `turn-synth-${promptId}` })] : [];
     l.items = [prompt, ...extra, ...end];
     l.pending = [];
@@ -1479,6 +1483,8 @@ export class MockThreadLogs {
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
     // Like the daemon's: nothing is recorded for a thread whose transcript is gone.
     this.world.refuseTranscriptMissing(id);
+    const held = this.world.heldBySetup(id, { text, attachments, composerText });
+    if (held) return this.append(id, this.item(id, { case: "userMessage", value: { text, attachments, composerText, queued: true } }));
     if (this.world.statusOf(id) === ThreadStatus.BUSY) {
       for (const x of this.log(id).items) if (x.streaming) this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(new Date()) });
     }

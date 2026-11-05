@@ -24,9 +24,14 @@ import { useNow } from "@/lib/clock";
 import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
 import { snoozeTimeShort } from "@/lib/snooze";
 import { statusLine, statusText } from "@/lib/statusLine";
+import { setupUnfinished, setupWaitedFor } from "@/lib/threadSetup";
 
 const PLACEHOLDER = "Reply or ask anything. @ files and threads, / skills and commands";
 const BUSY_PLACEHOLDER = "Steer the agent mid-turn. @ files and threads, / skills and commands";
+/** A setup in the background, or one that stopped: the daemon keeps what is sent for Claude. */
+const SETUP_PLACEHOLDER = "Add to your message. It goes in once Claude starts.";
+/** A setup its creator waits for: the daemon takes nothing, since its failure takes the thread too. */
+const BLOCKING_PLACEHOLDER = "You can reply once Claude has started.";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
 import { getPanel } from "@/stores/panel";
@@ -37,9 +42,11 @@ import { useSlashCommands } from "@/stores/thread";
 import { interruptThread, sendThreadDraft, snoozeThread, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
 import { useUiStore } from "@/stores/ui";
 import { registerCiteTarget } from "@/stores/cite";
+import { cancelSetup } from "@/stores/setupActions";
 import { ColdCacheNote } from "./ColdCacheNote";
 import { FailedPromptNote } from "./FailedPromptNote";
 import { RetryNote } from "./RetryNote";
+import { SetupNote } from "./SetupNote";
 import { TranscriptDeletedNote } from "./TranscriptDeleted";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
@@ -191,10 +198,14 @@ export function ThreadComposer({
   const transcriptMissing = useThreadsStore((s) => s.byId[threadId]?.transcriptMissing === true);
   // The daemon refuses a model, effort or permission change while a setup runs: spawn may be reading them.
   const settingUp = useThreadsStore((s) => s.byId[threadId]?.setup?.phase === "running");
+  // Only a background setup takes messages and can be cancelled; the other is its creator's.
+  const setupBlocks = useThreadsStore((s) => setupWaitedFor(s.byId[threadId]?.setup));
+  const setupHoldsMessages = useThreadsStore((s) => setupUnfinished(s.byId[threadId]?.setup)) && !setupBlocks;
+  const [cancelling, setCancelling] = useState(false);
   const inputOff = sending || transcriptMissing;
   const hostFiles = useHostFiles({ draftKey, editorRef, disabled: inputOff, startDir: worktreePath });
-  // The daemon takes a message in any state but that one: a stopped thread starts on it.
-  const canSend = !inputOff && (text.trim() !== "" || hasAttachments);
+  // The daemon takes a message in any state but those two: a stopped thread starts on it.
+  const canSend = !inputOff && !setupBlocks && (text.trim() !== "" || hasAttachments);
 
   useEffect(() => {
     void loadSkills(sources.skills);
@@ -311,7 +322,7 @@ export function ThreadComposer({
   const send = () => {
     // Dictating: stop, let the last phrase land, then send what the prompt holds.
     if (dictation.phase) {
-      if (!inputOff) void dictation.flush().then(() => sendThreadDraft(threadId));
+      if (!inputOff && !setupBlocks) void dictation.flush().then(() => sendThreadDraft(threadId));
       return;
     }
     if (canSend) void sendThreadDraft(threadId);
@@ -367,6 +378,7 @@ export function ThreadComposer({
       >
         {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
         <SnoozeNote threadId={threadId} />
+        <SetupNote threadId={threadId} />
         <RetryNote threadId={threadId} />
         <FailedPromptNote threadId={threadId} pending={pending.length} focusEditor={() => editorRef.current?.focusCollapsed()} />
         {/* A cold cache means nothing once the conversation is gone. */}
@@ -394,7 +406,16 @@ export function ThreadComposer({
               placeholder={
                 transcriptMissing
                   ? "Transcript deleted"
-                  : (picker.placeholder ?? (dictation.listening ? LISTENING_PLACEHOLDER : busy ? (busyPlaceholder ?? BUSY_PLACEHOLDER) : (placeholder ?? PLACEHOLDER)))
+                  : (picker.placeholder ??
+                    (dictation.listening
+                      ? LISTENING_PLACEHOLDER
+                      : setupBlocks
+                        ? BLOCKING_PLACEHOLDER
+                        : setupHoldsMessages
+                          ? SETUP_PLACEHOLDER
+                          : busy
+                            ? (busyPlaceholder ?? BUSY_PLACEHOLDER)
+                            : (placeholder ?? PLACEHOLDER)))
               }
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
@@ -488,7 +509,24 @@ export function ThreadComposer({
           />
         </div>
         <div className="col-start-2 flex items-end gap-1.5 pr-2 pb-2">
-          {busy && (
+          {settingUp && !setupBlocks && (
+            <button
+              type="button"
+              className="intr"
+              disabled={cancelling}
+              data-testid="thread-setup-cancel"
+              onClick={() => {
+                setCancelling(true);
+                void cancelSetup(threadId).finally(() => {
+                  setCancelling(false);
+                });
+              }}
+            >
+              <i aria-hidden />
+              Cancel
+            </button>
+          )}
+          {busy && !settingUp && (
             <button
               type="button"
               className="intr"
@@ -506,7 +544,7 @@ export function ThreadComposer({
             <span className="flex">
               <button
                 type="button"
-                disabled={!canSend && !(dictation.listening && !inputOff)}
+                disabled={!canSend && !(dictation.listening && !inputOff && !setupBlocks)}
                 aria-label={phase === "attaching" ? "Attaching files…" : sending ? "Sending…" : "Send"}
                 data-testid="thread-send"
                 data-phase={phase}

@@ -572,6 +572,17 @@ export function clearDraft(key: string): void {
   });
 }
 
+/** Takes a draft out as it is, its object URLs alive, for what moves its attachments elsewhere; null without one. */
+export function takeDraft(key: string): Draft | null {
+  const d = useComposeStore.getState().drafts[key] ?? null;
+  if (!d) return null;
+  useComposeStore.setState((s) => {
+    const { [key]: _taken, ...drafts } = s.drafts;
+    return { drafts };
+  });
+  return d;
+}
+
 /** Opens the project picker (thread.new's GUI presentation; see keys/bindings.ts). */
 export function openNewThreadPicker(): void {
   const ui = useUiStore.getState();
@@ -725,7 +736,7 @@ export function composeNoProject(): void {
 }
 
 /** A target's display name (the project's or the workspace's, else its id; "No project"; a like draft's thread). */
-function targetName(t: ComposeTarget): string {
+export function targetName(t: ComposeTarget): string {
   switch (t.kind) {
     case "project":
       return useProjectsStore.getState().byId[t.projectId]?.name ?? t.projectId;
@@ -816,6 +827,18 @@ function selectTarget(to: ComposeTarget): void {
   else if (to.kind === "workspace") composeInWorkspace(to.workspaceId);
   else if (to.kind === "like") composeLike(to.threadId);
   else composeNoProject();
+}
+
+/**
+ * Shows a target's composer with its draft as it stands. Not composeIn, which resets an
+ * empty draft's set: a draft being put back has its set from its own snapshot.
+ */
+export function showComposer(to: ComposeTarget): void {
+  const ui = useUiStore.getState();
+  if (to.kind === "workspace") composeInWorkspace(to.workspaceId);
+  else if (to.kind === "project") ui.select({ kind: "compose", projectId: to.projectId });
+  else if (to.kind === "like") ui.select({ kind: "compose", projectId: useThreadsStore.getState().byId[to.threadId]?.projectId ?? "", likeThreadId: to.threadId });
+  else ui.select({ kind: "compose", projectId: "", noProject: true });
 }
 
 /** The composer target a compose selection shows. */

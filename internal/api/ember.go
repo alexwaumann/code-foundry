@@ -139,6 +139,7 @@ func EmberTaskToProto(t ember.Task) *v1.EmberTask {
 			ReportStatus: v1.ThreadReportStatus(w.Report.Status), ReportSummary: w.Report.Summary, ReportAt: optionalTime(w.Report.At),
 			CreatedAt: optionalTime(w.CreatedAt), LastActivityAt: optionalTime(w.LastActivityAt), Archived: w.Archived, Saved: w.Saved, Removed: w.Removed,
 			DescendantsWorking: int32(w.Team.Working), DescendantsWaiting: int32(w.Team.Waiting), DescendantsTotal: int32(w.Team.Total),
+			Setup: setupToProto(w.Setup),
 		}
 		for _, m := range w.Team.Members {
 			out.Thread.Descendants = append(out.Thread.Descendants, &v1.EmberTaskDescendant{

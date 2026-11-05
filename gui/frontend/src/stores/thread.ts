@@ -28,6 +28,7 @@ import { shareAgents } from "@/lib/agents";
 import { shareWakes } from "@/lib/waitList";
 import { shareMcp } from "@/lib/mcp";
 import { inlinePage } from "@/lib/inlinePage";
+import { NOTHING_SHOWN, type SetupShown } from "@/lib/threadSetup";
 import { timelineKey } from "@/lib/threadTimeline";
 
 /** One thread's conversation as the Watch delivered it. */
@@ -67,6 +68,8 @@ export interface ThreadState {
   synced: Readonly<Record<string, true>>;
   /** Turns the user folded (true) or unfolded (false), by thread and turn key; absent: the default. */
   folds: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
+  /** The lines a thread's setup row has shown while the thread was on screen, so a line once shown stays (lib/threadSetup setupView). */
+  setupShown: Readonly<Record<string, SetupShown>>;
   /** Rows the user expanded (true) or collapsed (false), by thread and row key; absent: the row's default. */
   expanded: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
   /**
@@ -108,7 +111,7 @@ export interface ThreadWatchState {
   error: string | null;
 }
 
-export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watches: {}, synced: {}, folds: {}, expanded: {}, deferred: {}, answering: {}, pageModals: {}, pageFlash: {} }));
+export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watches: {}, synced: {}, folds: {}, setupShown: {}, expanded: {}, deferred: {}, answering: {}, pageModals: {}, pageFlash: {} }));
 
 function sameArray<T>(a: readonly T[], b: readonly T[], eq: (x: T, y: T) => boolean = Object.is): boolean {
   return a === b || (a.length === b.length && a.every((x, i) => eq(x, b[i] as T)));
@@ -490,6 +493,20 @@ export function setTurnFolded(threadId: string, turnKey: string, folded: boolean
   useThreadStore.setState((s) => ({ folds: { ...s.folds, [threadId]: { ...s.folds[threadId], [turnKey]: folded } } }));
 }
 
+/** Keeps the lines the setup's row shows of a thread; a line once shown stays. */
+export function noteSetupShown(threadId: string, keys: readonly string[]): void {
+  useThreadStore.setState((s) => {
+    const was = s.setupShown[threadId] ?? NOTHING_SHOWN;
+    if (keys.every((k) => was.has(k))) return s;
+    return { setupShown: { ...s.setupShown, [threadId]: new Set([...was, ...keys]) } };
+  });
+}
+
+/** What the setup's row has shown of a thread (narrow selector). */
+export function useSetupShown(threadId: string): SetupShown {
+  return useThreadStore((s) => s.setupShown[threadId] ?? NOTHING_SHOWN);
+}
+
 /** Expands (true) or collapses (false) a row of a thread. */
 export function setRowExpanded(threadId: string, rowKey: string, expanded: boolean): void {
   useThreadStore.setState((s) => ({ expanded: { ...s.expanded, [threadId]: { ...s.expanded[threadId], [rowKey]: expanded } } }));
@@ -562,12 +579,13 @@ export function foldDeferredTurns(threadId: string): void {
  */
 export function forgetTurnView(threadId: string): void {
   useThreadStore.setState((s) => {
-    if (!(threadId in s.folds) && !(threadId in s.expanded) && !(threadId in s.deferred)) return s;
+    if (!(threadId in s.folds) && !(threadId in s.expanded) && !(threadId in s.deferred) && !(threadId in s.setupShown)) return s;
     const { [threadId]: _f, ...folds } = s.folds;
+    const { [threadId]: _s, ...setupShown } = s.setupShown;
     const { [threadId]: rows, ...expanded } = s.expanded;
     const { [threadId]: _d, ...deferred } = s.deferred;
     const messages = Object.entries(rows ?? {}).filter(([k]) => k.startsWith(MESSAGE_FOLD));
-    return { folds, expanded: messages.length > 0 ? { ...expanded, [threadId]: Object.fromEntries(messages) } : expanded, deferred };
+    return { folds, setupShown, expanded: messages.length > 0 ? { ...expanded, [threadId]: Object.fromEntries(messages) } : expanded, deferred };
   });
 }
 

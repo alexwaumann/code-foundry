@@ -9,6 +9,7 @@
 import { create } from "zustand";
 import { toast } from "sonner";
 import { canSaveAsWorkspace, matchingWorkspace, WORKSPACE_PRIMARY } from "@/lib/projectSet";
+import { setupUnfinished } from "@/lib/threadSetup";
 import { runCommand, runCommandForResult } from "./commands";
 import { THREAD_COMMANDS, threadContext } from "./threadActions";
 import { useThreadsStore } from "./threads";
@@ -31,9 +32,11 @@ export function useCanSaveAsWorkspace(threadId: string): boolean {
     const t = s.byId[threadId];
     return t !== undefined && t.projectId === "" && t.workspaceId !== "";
   });
+  // The daemon refuses thread.workspace there, and the workspace would be made first.
+  const unfinished = useThreadsStore((s) => setupUnfinished(s.byId[threadId]?.setup));
   return useWorkspacesStore((s) => {
     const projectIds = ids ? ids.split("\u0000") : [];
-    return canSaveAsWorkspace(
+    return !unfinished && canSaveAsWorkspace(
       projectIds,
       s.order.map((id) => ({ id, members: s.byId[id]?.members.map((m) => m.projectId) ?? [] })),
       inFolder,

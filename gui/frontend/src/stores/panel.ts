@@ -726,6 +726,26 @@ export function dropPanelTabParams(target: PanelTarget, id: string, names: reado
   update(target, (e) => dropParams(e, id, names));
 }
 
+/** The thread whose panel a target is; "" for any other panel. */
+export function panelThreadId(target: PanelTarget): string {
+  const key = resolve(target) ?? "";
+  return key.startsWith("thread:") ? key.slice("thread:".length) : "";
+}
+
+/**
+ * Puts `tab` where tab `id` is, active if that one was: a tab that became another file. One
+ * that shows the new file already stays, and the old one closes.
+ */
+export function replacePanelTab(target: PanelTarget, id: string, tab: Tab): void {
+  update(target, (e) => {
+    const g = groupOf(e, id);
+    if (g === null) return e;
+    if (groupOf(e, tab.id) !== null) return closeTab(e, id, true);
+    const grp = groupAt(e, g);
+    return withGroup(e, g, { ...grp, tabs: grp.tabs.map((t) => (t.id === id ? tab : t)), activeTabId: grp.activeTabId === id ? tab.id : grp.activeTabId });
+  });
+}
+
 /** Sets one of a tab's params. */
 export function setPanelTabParam(target: PanelTarget, id: string, name: string, value: string): void {
   update(target, (e) => withParams(e, id, (params) => ({ ...params, [name]: value })));

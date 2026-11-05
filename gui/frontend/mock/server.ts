@@ -87,6 +87,7 @@
  *   POST /__mock/missing-rpc?rpc=ProjectService/ListRefs&rpc=ThreadService/StageAttachment
  *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/thread-new?delay=700            (how long thread.new takes to make a worktree)
+ *   POST /__mock/thread-setup?state=failed       (where the next background thread.new stops: mock/setup.ts)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
  *   POST /__mock/worktree/dirty?path=…&modified=2   (the worktree has modified files; 0: clean)
  *   POST /__mock/worktree/refresh-error?path=…&error=could%20not%20reach%20origin&ago=840000
@@ -1592,6 +1593,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/workspaces":
       json(res, 200, [...world.workspaces.values()]);
+      break;
+    case "POST /__mock/thread-setup":
+      world.nextSetup = q.get("state") ?? world.nextSetup;
+      world.refuseRetry = q.get("refuse-retry") ?? world.refuseRetry;
+      world.cancelTooLate = q.get("cancel-late") === "1" || world.cancelTooLate;
+      json(res, 200, { nextSetup: world.nextSetup });
       break;
     case "POST /__mock/thread-new":
       if (q.has("delay")) world.worktreeDelayMs = Number(q.get("delay"));

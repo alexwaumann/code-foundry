@@ -30,7 +30,16 @@ export interface FileTarget {
   edit?: boolean;
   /** A thread asked the user to edit this file (view.panel.file --edit); gone once saved or dismissed. With `edit`. */
   ask?: FileAsk;
+  /**
+   * The thread whose panel this tab opened in while it had no checkout of its own, so the
+   * file is the project's: read-only until it moves to the thread's worktree
+   * (components/files/useFileHold).
+   */
+  heldFor?: string;
 }
+
+/** The param heldFor lives in. */
+export const HELD_PARAM = "heldFor";
 
 /** Who asked for a file to be edited, and what they said. The note is model text: plain text only. */
 export interface FileAsk {
@@ -49,7 +58,7 @@ export interface FileAsk {
 export const ASK_PARAMS = ["edit", "askId", "asker", "note", "askSaved"] as const;
 
 /**
- * A File tab: params { project, base, path, line?, page?, title?, edit?, askId?, asker?, note?, askSaved? } with the path made
+ * A File tab: params { project, base, path, line?, page?, title?, edit?, heldFor?, askId?, asker?, note?, askSaved? } with the path made
  * absolute against base when it can be, keyed by that path alone, titled with the page's
  * title or the file's name.
  */
@@ -62,6 +71,7 @@ export function fileTab(t: FileTarget): Tab {
     if (t.page.title) params.title = t.page.title;
   }
   if (t.edit) params.edit = "1";
+  if (t.heldFor) params[HELD_PARAM] = t.heldFor;
   if (t.ask) {
     params.askId = t.ask.id;
     params.asker = t.ask.thread;
@@ -83,6 +93,7 @@ export function fileOfTab(tab: Pick<Tab, "params">): FileTarget | null {
     ...(Number.isInteger(line) && line > 0 ? { line } : {}),
     ...(tab.params.page === "1" ? { page: { title: tab.params.title ?? "" } } : {}),
     ...(tab.params.edit === "1" ? { edit: true } : {}),
+    ...(tab.params[HELD_PARAM] ? { heldFor: tab.params[HELD_PARAM] } : {}),
     ...(tab.params.asker ? { ask: { id: tab.params.askId ?? "", thread: tab.params.asker, note: tab.params.note ?? "", ...(tab.params.askSaved ? { saved: tab.params.askSaved } : {}) } } : {}),
   };
 }
