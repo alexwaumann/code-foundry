@@ -113,7 +113,7 @@ describe("tipStatusTone", () => {
 
 describe("a thread's setup", () => {
   const started = 1000;
-  const fetching = { kind: "fetch", projectId: "p", projectName: "p", ref: "origin/main", branch: "", status: "running", startedAtMs: started, endedAtMs: null, error: "", warning: "", refAtMs: null } as const;
+  const fetching = { kind: "fetch", projectId: "p", projectName: "p", ref: "origin/main", branch: "", status: "running", startedAtMs: started, endedAtMs: null, error: "", warning: "", refAtMs: null, existing: false } as const;
   const failedStep = { ...fetching, kind: "worktree", status: "failed", endedAtMs: started, error: "fatal: no" } as const;
   const start = { ...fetching, kind: "start", projectId: "", projectName: "", ref: "", status: "running" } as const;
   const setup = (phase: "running" | "done" | "failed" | "cancelled", steps: readonly (typeof fetching | typeof failedStep | typeof start)[]) => ({ phase, startedAtMs: started, endedAtMs: null, steps: [...steps], error: "", background: true });

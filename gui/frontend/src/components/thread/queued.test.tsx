@@ -1,9 +1,13 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ThreadEventView, ThreadItemView } from "@/api/thread";
+import type { ThreadView } from "@/api/threads";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey } from "@/lib/threadTimeline";
 import { applyThreadEvent, structOf, useThreadStore, type ThreadLog } from "@/stores/thread";
+import { useThreadsStore } from "@/stores/threads";
 import { ThreadContext } from "./context";
+import { QueuedTag } from "./QueuedTag";
 import { TimelineRowView } from "./rows";
 
 // A message Claude has not read yet (docs/notes/orch-queued-placement.md): tagged
@@ -98,5 +102,36 @@ describe("a queued message", () => {
     const log = logOf([user("u1", 1), text("m1", 2), user("w", 3, { wake, queued: true })]);
     const c = show(log as ThreadLog);
     expect(c.querySelector('[data-testid="thread-wake-note"] [data-testid="thread-queued"]')).not.toBeNull();
+  });
+});
+
+describe("QueuedTag's words", () => {
+  const seed = (setup: ThreadView["setup"]) => {
+    useThreadsStore.setState({ byId: { s: { id: "s", setup } as ThreadView }, order: ["s"] });
+  };
+  const hover = async () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <ThreadContext.Provider value={{ threadId: "s", cwd: "" }}>
+          <QueuedTag />
+        </ThreadContext.Provider>
+      </TooltipProvider>,
+    );
+    fireEvent.focus(screen.getByTestId("thread-queued"));
+    return (await screen.findByRole("tooltip")).textContent;
+  };
+  const setup = (phase: "running" | "failed" | "cancelled" | "done") => ({ phase, startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true });
+
+  it.each(["running", "failed", "cancelled"] as const)("a setup that is %s: it goes once Claude starts", async (phase) => {
+    seed(setup(phase));
+    expect(await hover()).toContain("Goes to Claude once it starts");
+  });
+
+  it.each<[string, ThreadView["setup"]]>([
+    ["done", setup("done")],
+    ["none", null],
+  ])("setup %s: Claude reads it at its next tool call", async (_n, s) => {
+    seed(s);
+    expect(await hover()).toContain("Read by Claude at its next tool call");
   });
 });

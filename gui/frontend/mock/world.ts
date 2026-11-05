@@ -32,7 +32,7 @@ import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
 import { agentCounts, agentsCommands, listRuns, type AgentRunInit } from "./agents";
 import { backgroundRun, waitingReason } from "./liveCount";
-import { SETUP_BRANCH, setupMessage, setupRowState, setupScript } from "./setup";
+import { isSetupStopped, SETUP_BRANCH, SETUP_PROMPT, setupMessage, setupRowState, setupScript, type SetupHold, type SetupMessage } from "./setup";
 import { shellCommands } from "./shells";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
@@ -202,6 +202,8 @@ interface MockThread {
   setup: ReturnType<typeof setupMessage> | null;
   /** Mock-only: where a scripted setup's thread runs once placed, kept while it has no cwd. */
   setupPlace: { worktreePath: string; checkoutPaths: Record<string, string> } | null;
+  /** What undoing the send gives back; null for a thread that kept nothing (a blocking or scripted one). */
+  setupHold: SetupHold | null;
   /** Thread.name_provisional: the name is the first prompt's cut until the naming model's title lands. */
   nameProvisional: boolean;
   /** Mock-only: seconds until an unnamed thread gets `pendingName` (background naming). */
@@ -771,6 +773,7 @@ export class World {
       worktreeOf: (id) => this.thread(id).worktreePath,
       modelOf: (id) => this.thread(id).model,
       isConnected: (id) => this.thread(id).state === ThreadState.CONNECTED,
+      heldBySetup: (id, m) => this.heldBySetup(id, m),
       start: (id, ready) => {
         this.startThread(id, ready);
       },
@@ -958,6 +961,12 @@ export class World {
   attachments = new Map<string, { name: string; mimeType: string; size: number; pages: number }>();
   /** The bytes of staged PDFs, which ReadAttachment serves back (staged images read as the scripted PNG). */
   attachmentBytes = new Map<string, Uint8Array>();
+  /** The setup state the next thread.new with background-setup stops in; "": it finishes at once (POST /__mock/thread-setup). */
+  nextSetup = "";
+  /** thread.setup.retry's refusal; "": it runs (POST /__mock/thread-setup?refuse-retry=…). */
+  refuseRetry = "";
+  /** The next thread.setup.cancel comes too late (POST /__mock/thread-setup?cancel-late=1). */
+  cancelTooLate = false;
   /** How long thread.new takes to create a worktree (ms). */
   worktreeDelayMs = 700;
   /** thread.move: how long placing and naming take (POST /__mock/thread/move-delay). */
@@ -992,6 +1001,9 @@ export class World {
     this.attachmentBytes.clear();
     this.logs.reset();
     this.worktreeDelayMs = 700;
+    this.nextSetup = "";
+    this.refuseRetry = "";
+    this.cancelTooLate = false;
     this.terminalNewDelayMs = 0;
     this.terminalNewFail = null;
     this.moveFail = null;
@@ -2171,6 +2183,7 @@ export class World {
       checkoutPaths: {},
       setup: null,
       setupPlace: null,
+      setupHold: null,
       nameProvisional: false,
       workspaceId: "",
       pendingWorktreePath: "",
@@ -2575,8 +2588,50 @@ export class World {
     s.createdWorktree = placed;
     s.branch = placed ? SETUP_BRANCH : "";
     s.nameProvisional = !placed && s.setup.phase === ThreadSetupPhase.RUNNING;
-    this.logs.loadSetup(id, row.state === ThreadState.DISCONNECTED, queued);
+    this.logs.loadSetup(id, row.state === ThreadState.DISCONNECTED, queued, s.setupHold?.first ?? null);
     this.publishThread(s);
+  }
+
+  /** Whether a setup that has not finished keeps a message, as the daemon's Send does: it queues, and after a failure or a cancel tries again. */
+  heldBySetup(id: string, m: SetupMessage): boolean {
+    const s = this.thread(id);
+    const phase = s.setup?.phase;
+    if (phase === undefined || phase === ThreadSetupPhase.DONE) return false;
+    if (phase === ThreadSetupPhase.RUNNING && s.setup?.background !== true) throw new CommandError("unavailable", `thread ${id} is still being set up; it cannot be sent to yet`);
+    s.setupHold ??= { draftJson: "", first: null, queued: [] };
+    s.setupHold.queued.push(m);
+    if (phase !== ThreadSetupPhase.RUNNING) this.scriptSetup(id, "running", false);
+    return true;
+  }
+
+  /** thread.setup.retry: back to running, or refused as scripted. */
+  retrySetup(id: string): void {
+    const s = this.thread(id);
+    if (!isSetupStopped(s.setup?.phase)) throw new CommandError("unavailable", `thread ${id} has no setup to try again`);
+    if (this.refuseRetry) throw new CommandError("unavailable", this.refuseRetry);
+    this.scriptSetup(id, "running", false);
+  }
+
+  /** thread.setup.cancel: what a running background setup made goes; too late once it is done. */
+  cancelSetup(id: string): void {
+    const s = this.thread(id);
+    if (s.setup?.phase === ThreadSetupPhase.DONE || this.cancelTooLate) {
+      this.cancelTooLate = false;
+      throw new CommandError("unavailable", `thread ${id} finished its setup: it was too late to cancel it, and Claude is starting; interrupt it instead`);
+    }
+    if (s.setup?.phase !== ThreadSetupPhase.RUNNING) throw new CommandError("unavailable", `thread ${id}'s setup is not running`);
+    if (s.setup.background !== true) throw new CommandError("unavailable", `thread ${id}'s creator is waiting for its setup; stop that call instead`);
+    this.scriptSetup(id, "cancelled", false);
+  }
+
+  /** thread.setup.discard: the thread goes, and what it kept comes back. No tombstone, as the daemon leaves none. */
+  discardSetup(id: string): string {
+    const s = this.thread(id);
+    if (!isSetupStopped(s.setup?.phase)) throw new CommandError("unavailable", `only a failed or cancelled setup can be discarded; thread ${id} has none`);
+    const hold = s.setupHold;
+    const out = { draftJson: hold?.draftJson ?? "", error: s.setup?.error ?? "", first: hold?.first ?? { text: SETUP_PROMPT, composerText: "", attachments: [] }, queued: hold?.queued ?? [], keptWorktrees: [] };
+    this.removeOne(s);
+    return JSON.stringify(out);
   }
 
   /** busyTool: the running tool to show (Thread.busy_tool); kept only while busy and not compacting. Omitted: unchanged (dropped when the status no longer allows one). */
@@ -3244,9 +3299,11 @@ export class World {
     let baseRef = "";
     const created = args["new-worktree"] === "true";
     if (created) requireGit(project, "a new worktree");
+    // A scripted background setup: Create answers at once, and the script is where it stands.
+    const scripted = args["background-setup"] === "true" ? this.nextSetup : "";
     if (created) {
       baseRef = args.base || (project.remotes.length > 0 ? `origin/${project.defaultBranch}` : project.defaultBranch);
-      await settle(this.worktreeDelayMs);
+      if (!scripted) await settle(this.worktreeDelayMs);
       if (prompt.includes("FAIL")) {
         throw new CommandError("unavailable", project.remotes.length > 0 ? `create worktree: git fetch origin ${baseRef.replace(/^origin\//, "")}: exit status 128` : `create worktree: git worktree add: invalid reference: ${baseRef}`);
       }
@@ -3269,9 +3326,14 @@ export class World {
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
       baseRef,
       createdWorktree: created,
-      firstMessage: first,
+      firstMessage: scripted ? null : first,
       ...lineage,
     });
+    if (scripted) {
+      this.nextSetup = "";
+      s.setupHold = { draftJson: args["draft-json"] ?? "", first, queued: [] };
+      this.scriptSetup(s.id, scripted, false);
+    }
     // Like the daemon's WorktreeCreated: the project's on-worktree-create actions, in the background.
     if (created) this.actions.worktreeCreated(s.id, project.id, path);
     // Like the daemon: every new thread is focused (unless focus=false); the GUI skips a hidden one (stores/intents.ts).
@@ -4022,6 +4084,8 @@ export class World {
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
             { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
+            { name: "background-setup", type: ArgType.BOOL, required: false, description: "Return at once and set the thread up in the background (the GUI sets it)" },
+            { name: "draft-json", type: ArgType.STRING, required: false, description: "The composer's draft, kept until setup ends (the GUI sets it)" },
             { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)", defaultToThreadEnv: true },
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves)", defaultValue: "true" },
           ],
@@ -4031,6 +4095,20 @@ export class World {
           this.worktreeOf(ctx) !== null || Boolean(ctx?.activeProjectId && this.projects.has(ctx.activeProjectId)) || ctx?.activeView === "compose" || (ctx?.activeView === "" && activeThread(ctx) !== undefined),
         run: (ctx, args) => this.newThread(ctx, args),
       },
+      ...(
+        [
+          ["thread.setup.retry", "Try Setup Again", (id: string) => { this.retrySetup(id); return { message: `trying the setup of thread ${id} again`, resultJson: "{}" }; }],
+          ["thread.setup.cancel", "Cancel Setup", (id: string) => { this.cancelSetup(id); return { message: `cancelled the setup of thread ${id}`, resultJson: "{}" }; }],
+          ["thread.setup.discard", "Discard Thread", (id: string) => ({ message: `discarded thread ${id}`, resultJson: this.discardSetup(id) })],
+        ] as const
+      ).map(([name, title, act]) => ({
+        cmd: { name, title, category: "Thread", description: title, keybindings: [], noPalette: true, args: [{ name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" }] },
+        when: (ctx: UiContext | undefined) => activeThread(ctx) !== undefined,
+        run: async (ctx: UiContext | undefined, args: Record<string, string>) => {
+          await Promise.resolve();
+          return act(args.id ?? ctx?.activeThreadId ?? "");
+        },
+      })),
       {
         cmd: { name: "thread.fork", title: "Fork Thread", category: "Thread", description: "Start a new thread that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
         when: (ctx) => activeThread(ctx) !== undefined,
@@ -4337,6 +4415,8 @@ export class World {
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
             { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
+            { name: "background-setup", type: ArgType.BOOL, required: false, description: "Return at once and set the thread up in the background (the GUI sets it)" },
+            { name: "draft-json", type: ArgType.STRING, required: false, description: "The composer's draft, kept until setup ends (the GUI sets it)" },
             { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window", defaultValue: "true" },
           ],

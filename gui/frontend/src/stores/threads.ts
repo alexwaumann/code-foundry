@@ -184,10 +184,17 @@ function withOwned(data: ThreadsData, prev: ThreadsData): ThreadsData {
   return { ...data, owned: prev.owned && sameOrder(prev.owned, owned) ? prev.owned : owned };
 }
 
+/**
+ * Threads the user sent away that the daemon has not taken yet (hideThread): whatever still
+ * arrives of them is ignored until its Removed.
+ */
+const leaving = new Set<string>();
+
 /** Replaces the whole set (List result or snapshot), keeping identity for unchanged threads. */
 export function replaceThreads(prev: ThreadsData, list: readonly ThreadView[]): ThreadsData {
   const byId: Record<string, ThreadView> = {};
   for (const s of list) {
+    if (leaving.has(s.id)) continue;
     const old = prev.byId[s.id];
     byId[s.id] = old && sameThread(old, s) ? old : s;
   }
@@ -203,6 +210,7 @@ export function applyThreadListEvent(prev: ThreadsData, ev: ThreadListEventView)
       return replaceThreads(prev, ev.threads);
     case "updated": {
       const s = ev.thread;
+      if (leaving.has(s.id)) return prev;
       const old = prev.byId[s.id];
       if (old && sameThread(old, s)) return prev;
       const byId = { ...prev.byId, [s.id]: s };
@@ -211,6 +219,7 @@ export function applyThreadListEvent(prev: ThreadsData, ev: ThreadListEventView)
       return { byId, order, owned: prev.owned ?? NO_OWNED };
     }
     case "removed": {
+      leaving.delete(ev.id);
       if (!(ev.id in prev.byId)) return prev;
       const { [ev.id]: _removed, ...byId } = prev.byId;
       const order = prev.order.filter((id) => id !== ev.id);
@@ -230,6 +239,20 @@ export const useThreadsStore = create<ThreadsState>()(() => ({
   retiredUsage: [],
   epoch: 0,
 }));
+
+/**
+ * Takes a thread off the lists now, ahead of the daemon, which may have a worktree to
+ * remove first. Returns what brings it back, should the daemon refuse.
+ */
+export function hideThread(id: string): () => void {
+  const was = useThreadsStore.getState().byId[id];
+  useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "removed", id }));
+  leaving.add(id);
+  return () => {
+    leaving.delete(id);
+    if (was) useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: was }));
+  };
+}
 
 /**
  * The thread needs the user: needs-attention, in any state, or a plugin's flag on it

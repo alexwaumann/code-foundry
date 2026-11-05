@@ -3,6 +3,7 @@ import type { ThreadSetupStepView, ThreadSetupView } from "@/api/threads";
 import {
   hasSetupWork,
   isUnplaced,
+  SETUP_RESTARTED,
   SETUP_REVEAL_MS,
   setupCurrentStep,
   setupFailure,
@@ -10,18 +11,20 @@ import {
   setupLabelText,
   setupLines,
   setupLineTime,
+  setupNoteLine,
   setupRevealAt,
   setupRowPhase,
   setupStopped,
   setupUnfinished,
   setupView,
+  setupWaitedFor,
   type SetupView,
 } from "./threadSetup";
 
 const NOW = 1_000_000;
 
 function step(kind: ThreadSetupStepView["kind"], status: ThreadSetupStepView["status"], over: Partial<ThreadSetupStepView> = {}): ThreadSetupStepView {
-  return { kind, projectId: "", projectName: "", ref: "", branch: "", status, startedAtMs: null, endedAtMs: null, error: "", warning: "", refAtMs: null, ...over };
+  return { kind, projectId: "", projectName: "", ref: "", branch: "", status, startedAtMs: null, endedAtMs: null, error: "", warning: "", refAtMs: null, existing: false, ...over };
 }
 
 function setup(phase: ThreadSetupView["phase"], steps: ThreadSetupStepView[], over: Partial<ThreadSetupView> = {}): ThreadSetupView {
@@ -324,5 +327,118 @@ describe("predicates", () => {
   it("counts a setup as work when it does more than start Claude", () => {
     expect(hasSetupWork(setup("running", [pending("start")]))).toBe(false);
     expect(hasSetupWork(setup("running", [pending("worktree"), pending("start")]))).toBe(true);
+  });
+});
+
+describe("what has been shown stays", () => {
+  const fast = (ended: number) => step("fetch", "done", { ref: "origin/main", startedAtMs: NOW - 400, endedAtMs: NOW - 400 + ended });
+
+  it("a snapshot saying a step ended before its 300ms were up keeps the row it showed", () => {
+    const shown = new Set(["fetch:"]);
+    const late = setup("running", [fast(290), step("start", "pending")]);
+    expect(setupView(late, NOW).kind).toBe("none");
+    const view = setupView(late, NOW, shown);
+    expect(view.kind === "live" && view.lines.map((l) => l.key)).toEqual(["fetch:", "start:"]);
+  });
+
+  it("a retry keeps the failed rows, though nothing has run its 300ms yet", () => {
+    const retried = setup("running", [step("fetch", "pending", { ref: "origin/main" }), step("worktree", "pending"), step("start", "pending")]);
+    expect(setupView(retried, NOW).kind).toBe("none");
+    const view = setupView(retried, NOW, new Set(["fetch:", "worktree:", "start:"]));
+    expect(view.kind === "live" && view.lines.map((l) => l.status)).toEqual(["pending", "pending", "pending"]);
+  });
+
+  it("a step that was never shown still stays out", () => {
+    const later = setup("running", [step("name", "done", { startedAtMs: NOW - 2000, endedAtMs: NOW - 1900 }), step("fetch", "running", { startedAtMs: NOW - 1000 }), step("start", "pending")]);
+    const view = setupView(later, NOW, new Set(["fetch:"]));
+    expect(view.kind === "live" && view.lines.map((l) => l.key)).toEqual(["fetch:", "start:"]);
+  });
+
+  it("gives a setup that showed its rows a fold line, however fast it turned out", () => {
+    const done = setup("done", [fast(100), step("start", "done", { startedAtMs: NOW - 300, endedAtMs: NOW - 200 })], { endedAtMs: NOW - 200 });
+    expect(setupRowPhase(done)).toBe("");
+    expect(setupRowPhase(done, true)).toBe("done");
+    expect(setupView(done, NOW, new Set(["fetch:"])).kind).toBe("done");
+  });
+
+  it("keeps the row of a setup whose work left the list", () => {
+    const left = setup("running", [step("start", "running", { startedAtMs: NOW })]);
+    expect(setupRowPhase(left)).toBe("");
+    expect(setupRowPhase(left, true)).toBe("running");
+  });
+});
+
+describe("a setup a restart cut off", () => {
+  const restarted = (st: ReturnType<typeof step>) => setup("failed", [step("name", "done", { branch: "cf/x", startedAtMs: NOW - 900, endedAtMs: NOW - 800 }), st, step("start", "pending")], { error: SETUP_RESTARTED, endedAtMs: NOW });
+
+  it("says so on the step it was on, with no box repeating it", () => {
+    const view = setupView(restarted(step("fetch", "failed", { ref: "origin/main", error: SETUP_RESTARTED, startedAtMs: NOW - 900, endedAtMs: NOW })), NOW);
+    expect(view.kind === "failed" && view.lines.map((l) => [l.status, setupLabelText(l.label), l.error])).toEqual([
+      ["done", "Named the branch cf/x", ""],
+      ["failed", "Setup stopped when Code Foundry restarted", ""],
+      ["pending", "Starting Claude", ""],
+    ]);
+  });
+
+  it("titles the sidebar and the note with it", () => {
+    const s = restarted(step("worktree", "failed", { error: SETUP_RESTARTED }));
+    expect(setupFailure(s)).toBe("Setup stopped when Code Foundry restarted");
+    expect(setupNoteLine(s)).toBe("Setup stopped when Code Foundry restarted, so your message was not sent.");
+  });
+
+  it("a real failure beside it keeps its own words", () => {
+    const s = restarted(step("worktree", "failed", { error: "fatal: nope" }));
+    expect(setupFailure(s)).toBe("Could not create the worktree");
+  });
+
+  it("shows the setup's error where no step explains it, before the steps that never ran", () => {
+    const s = setup("failed", [step("name", "done", { startedAtMs: NOW - 900, endedAtMs: NOW - 800 }), step("start", "pending")], { error: SETUP_RESTARTED });
+    const view = setupView(s, NOW);
+    expect(view.kind === "failed" && view.lines.map((l) => setupLabelText(l.label))).toEqual(["Named the branch", "Setup stopped when Code Foundry restarted", "Starting Claude"]);
+    expect(setupFailure(s)).toBe("Setup stopped when Code Foundry restarted");
+  });
+
+  it("any other error with no step behind it shows in the box", () => {
+    const view = setupView(setup("failed", [step("start", "pending")], { error: "the disk is full" }), NOW);
+    expect(view.kind === "failed" && view.lines[0]).toMatchObject({ status: "failed", error: "the disk is full", label: { before: "Setup failed" } });
+  });
+});
+
+describe("wording", () => {
+  it("says Using for a branch that was there, Named for one that was made", () => {
+    const line = (existing: boolean) => setupLabelText(setupLines(setup("running", [step("name", "done", { branch: "dev", existing })]), NOW)[0]?.label ?? { before: "", code: "", after: "" });
+    expect(line(true)).toBe("Using the branch dev");
+    expect(line(false)).toBe("Named the branch dev");
+  });
+
+  it.each<[string, (number | null)[], string]>([
+    ["every project on an old base", [NOW - 3_600_000, NOW - 7_200_000], "2 projects on an old base"],
+    ["no ref on disk anywhere: no old base was used", [null, null], "2 projects could not fetch"],
+    ["some with one and some without", [NOW - 3_600_000, null], "2 projects could not fetch"],
+  ])("the fold's warning: %s", (_n, ages, want) => {
+    const warned = ages.map((refAtMs, i) => step("fetch", "warning", { projectId: `p${String(i)}`, ref: "origin/main", warning: "Could not reach origin", refAtMs, endedAtMs: NOW }));
+    expect(setupFoldWarning(setup("done", warned), NOW)).toBe(want);
+  });
+});
+
+describe("setupNoteLine", () => {
+  it.each<[string, ThreadSetupView | null, string | null]>([
+    ["failed", setup("failed", [step("worktree", "failed")]), "Could not create the worktree, so your message was not sent."],
+    ["failed with nothing to say why", setup("failed", []), "Setup failed, so your message was not sent."],
+    ["cancelled", setup("cancelled", []), "Setup cancelled, so your message was not sent."],
+    ["running", setup("running", []), null],
+    ["done", setup("done", []), null],
+    ["no setup", null, null],
+  ])("%s", (_n, s, want) => {
+    expect(setupNoteLine(s)).toBe(want);
+  });
+});
+
+describe("setupWaitedFor", () => {
+  it("is a setup running with its creator waiting on it", () => {
+    expect(setupWaitedFor(setup("running", [], { background: false }))).toBe(true);
+    expect(setupWaitedFor(setup("running", []))).toBe(false);
+    expect(setupWaitedFor(setup("failed", [], { background: false }))).toBe(false);
+    expect(setupWaitedFor(null)).toBe(false);
   });
 });

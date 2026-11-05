@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, type TimelineRow } from "@/lib/threadTimeline";
-import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, structOf, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
+import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, structOf, useDeferredTurns, useSetupShown, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
 import { setupRowPhase } from "@/lib/threadSetup";
 import { registerTimeline } from "@/stores/cite";
 import { useThreadsStore } from "@/stores/threads";
@@ -65,7 +65,8 @@ function useRows(threadId: string, working: boolean, strips: boolean): TimelineR
   const keys = useTimelineKeys(threadId);
   const folds = useTurnFolds(threadId);
   const deferred = useDeferredTurns(threadId);
-  const setup = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup));
+  const shown = useSetupShown(threadId).size > 0;
+  const setup = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup, shown));
   const turns = useMemo(() => buildTurns(keys.map(decodeTimelineKey)), [keys]);
   return useMemo(() => buildRows(turns, { fold: (k) => folds[k], deferred: (e) => deferred[e] === true, working, strips, setup }), [turns, folds, deferred, working, strips, setup]);
 }

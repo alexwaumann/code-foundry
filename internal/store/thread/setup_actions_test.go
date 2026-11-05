@@ -572,6 +572,92 @@ func TestCancelAtEachStage(t *testing.T) {
 	}
 }
 
+// A clean stop cuts off whatever runs. Nothing says so on the step at the time: the next
+// start gives it the reason, and "context canceled" reaches nobody.
+func TestStoppedDaemonGivesTheStepTheRestart(t *testing.T) {
+	tests := []struct {
+		name string
+		hold func(t *testing.T, e *env, rr *recordingProjects) (string, SetupStepKind)
+	}{
+		{"a fetch", func(t *testing.T, e *env, rr *recordingProjects) (string, SetupStepKind) {
+			s, _ := inSetup(t, e, rr, CreateOptions{InitialPrompt: "do x"})
+			return s.ID, SetupStepFetch
+		}},
+		{"a worktree add", func(t *testing.T, e *env, _ *recordingProjects) (string, SetupStepKind) {
+			s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r2", InitialPrompt: "do x", NewWorktree: &NewWorktree{}, BackgroundSetup: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			waitInStack(t, "(*heldProjects).CreateWorktree")
+			return s.ID, SetupStepWorktree
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, rr := newWorktreeEnv(t, nil, func(o *Options) {
+				o.Projects = &heldProjects{recordingProjects: o.Projects.(*recordingProjects), holding: "r2"}
+			})
+			e.addGitProject(t, "r2", "other")
+			id, kind := tt.hold(t, e, rr)
+			e.restart()
+			got, err := e.m.Get(e.ctx(), id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Setup.Phase != SetupFailed || got.Setup.Error != SetupRestarted {
+				t.Fatalf("setup %+v", got.Setup)
+			}
+			i := slices.IndexFunc(got.Setup.Steps, func(st SetupStep) bool { return st.Status == SetupStepFailed })
+			if i < 0 {
+				t.Fatalf("no failed step: %+v", got.Setup.Steps)
+			}
+			if st := got.Setup.Steps[i]; st.Kind != kind || st.Error != SetupRestarted {
+				t.Errorf("failed step %+v, want kind %v with the restart", st, kind)
+			}
+		})
+	}
+}
+
+// A step the setup stopped keeps its time until the setup has ended: a cancel's cleanup
+// can take a while, and a step that lost its time looks like one that never ran.
+func TestStoppedStepsKeepTheirTimes(t *testing.T) {
+	e, rr := newWorktreeEnv(t, nil)
+	s, _ := inSetup(t, e, rr, CreateOptions{InitialPrompt: "do x"})
+	waitForStep(t, e, s.ID, SetupStepFetch, "r1", SetupStepRunning)
+	tr := &setupTracker{m: e.m, id: s.ID}
+	tr.progress("r1")(project.WorktreeEvent{Kind: project.WorktreeFetchEnded, Remote: "origin", Err: context.Canceled})
+	got, _ := e.m.Get(e.ctx(), s.ID)
+	st := got.Setup.step(SetupStepFetch, "r1")
+	if st.Status != SetupStepRunning || st.StartedAt.IsZero() || st.Warning != "" {
+		t.Errorf("fetch %+v", st)
+	}
+}
+
+func TestArchiveCancelsABackgroundSetup(t *testing.T) {
+	e, rr := newWorktreeEnv(t, nil)
+	s, _ := inSetup(t, e, rr, CreateOptions{InitialPrompt: "do x"}) // its fetch never ends by itself
+	got, err := e.m.Archive(e.ctx(), s.ID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ArchivedAt.IsZero() || got.Setup.Phase != SetupCancelled {
+		t.Errorf("archived at %v, setup %+v", got.ArchivedAt, got.Setup)
+	}
+	if n := worktreeCount(rr, "r1"); n != 1 {
+		t.Errorf("r1 has %d worktrees", n)
+	}
+	if e.spawnCount() != 0 {
+		t.Errorf("%d spawns", e.spawnCount())
+	}
+	// A retry brings it back, as for any stopped setup.
+	if _, err := e.m.RetrySetup(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if back, _ := e.m.Get(e.ctx(), s.ID); !back.ArchivedAt.IsZero() {
+		t.Errorf("archived at %v after a retry", back.ArchivedAt)
+	}
+}
+
 func TestCancelRefusals(t *testing.T) {
 	e, rr := newWorktreeEnv(t, nil)
 	done := e.create(CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{}})

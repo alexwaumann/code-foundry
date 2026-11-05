@@ -6,7 +6,7 @@ import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { EmberService, EmberTaskState, type EmberBoard, type EmberStatus, type EmberTask, type EmberTaskDescendant, type EmberTaskThread, type EmberTimer } from "@/gen/codefoundry/v1/ember_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
-import { reportStatusMap, stateMap, statusMap, type ThreadReportStatusView, type ThreadStateView, type ThreadStatusView } from "./threads";
+import { reportStatusMap, stateMap, statusMap, toThreadSetupView, type ThreadReportStatusView, type ThreadSetupView, type ThreadStateView, type ThreadStatusView } from "./threads";
 
 export type EmberTaskStateView = "todo" | "doing" | "blocked" | "done" | "cancelled";
 
@@ -34,6 +34,8 @@ export interface EmberTaskThreadView {
   descendantsTotal: number;
   /** The first ten of them, in tree order. */
   descendants: readonly EmberTaskDescendantView[];
+  /** Thread.setup; null without one. */
+  setup: ThreadSetupView | null;
 }
 
 /** A thread below a task's worker thread (a lead's worker). */
@@ -141,6 +143,7 @@ function toTaskThreadView(t: EmberTaskThread): EmberTaskThreadView {
     descendantsWaiting: t.descendantsWaiting,
     descendantsTotal: t.descendantsTotal,
     descendants: t.descendants.map(toDescendantView),
+    setup: toThreadSetupView(t.setup),
   };
 }
 

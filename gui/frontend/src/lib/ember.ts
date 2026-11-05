@@ -36,7 +36,7 @@ export function flameState(t: { state: ThreadStateView; status: ThreadStatusView
 // ---------- worker threads ----------
 
 /** A worker thread as the board's words read it: a task's thread or one of its team. */
-type WorkerLike = Pick<EmberTaskThreadView, "state" | "status" | "statusReason" | "reportStatus" | "reportSummary"> & { archived?: boolean; saved?: boolean; removed?: boolean };
+type WorkerLike = Pick<EmberTaskThreadView, "state" | "status" | "statusReason" | "reportStatus" | "reportSummary"> & Partial<Pick<EmberTaskThreadView, "setup">> & { archived?: boolean; saved?: boolean; removed?: boolean };
 
 /**
  * A task's worker is working: on a turn, starting, or waiting on its own child threads
@@ -66,7 +66,7 @@ export interface Words {
  * A worker thread's status in the sidebar's words and colours (lib/lineage's set), or
  * archived / saved for later / removed. A lead waiting on its child threads is Working: its team is.
  */
-export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusReason" | "archived" | "saved" | "removed">): Words {
+export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusReason" | "archived" | "saved" | "removed" | "setup">): Words {
   if (th.removed === true) return { text: "Removed", tone: "muted" };
   if (th.archived === true) return { text: "Archived", tone: "muted" };
   if (th.saved === true) return { text: "Saved", tone: "muted" };

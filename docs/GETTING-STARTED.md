@@ -56,6 +56,16 @@ classifier decide. You can change all three in a running thread too.
 A choice applies to that thread only; the next one starts from the default again. Set
 the default for every project under Settings › Threads › **New threads work in**.
 
+### Right after you send
+
+The thread opens at once with your message, while its copy of the project is made. A
+line per step shows anything that takes a moment. You can add to your message meanwhile:
+it goes in when Claude starts. **Cancel** stops it and removes what it made.
+
+If a step fails, or you cancelled, the thread says why and your message waits. **Try
+again** picks up where it stopped, **Edit** brings everything back to the new-thread
+composer as if you had never sent it, and **Remove** forgets the thread.
+
 ### While it runs
 
 The sidebar lists your threads. A thread whose second line is amber is waiting on you:

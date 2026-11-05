@@ -88,6 +88,8 @@ export interface ThreadSetupStepView {
   warning: string;
   /** With a fetch's "warning": the commit time of ref's tip on disk, which the branch starts from instead; null when there is no such ref. */
   refAtMs: number | null;
+  /** name: the branch was there to check out, so nothing was named. */
+  existing: boolean;
 }
 
 /**
@@ -529,6 +531,7 @@ function toThreadSetupStepView(st: ThreadSetupStep): ThreadSetupStepView[] {
       error: st.error,
       warning: st.warning,
       refAtMs: st.refAt ? timestampMs(st.refAt) : null,
+      existing: st.existing,
     },
   ];
 }

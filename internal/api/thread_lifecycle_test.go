@@ -410,3 +410,30 @@ func TestThreadSnooze(t *testing.T) {
 		})
 	}
 }
+
+// A background setup that runs in a checkout has its place at once, so its hints go out as a
+// blocking create's do; one that makes worktrees has none yet.
+func TestCreateHintsOfABackgroundSetup(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		background bool
+		path       string
+		want       int
+	}{
+		{"blocking", false, "/w", 1},
+		{"background in a checkout", true, "/w", 1},
+		{"background making worktrees", true, "", 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c := newThreadServer(t)
+			fake.SetHints("r1 @ main is also open in other")
+			res, err := c.Create(context.Background(), connect.NewRequest(&v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: tt.path, BackgroundSetup: tt.background}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := len(res.Msg.GetHints()); got != tt.want {
+				t.Errorf("hints = %v, want %d", res.Msg.GetHints(), tt.want)
+			}
+		})
+	}
+}

@@ -431,7 +431,8 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
   const last = turns[turns.length - 1];
   const setup = opts.setup ?? "";
   // No Claude yet, so no turn runs, whatever the thread's state says: the setup's row is the live one.
-  const working = opts.working && setup !== "running" && setup !== "stopped";
+  const noClaude = setup === "running" || setup === "stopped";
+  const working = opts.working && !noClaude;
   // The open turn while the thread works; none when the last turn ended (nothing runs
   // after a turn_end) or is a system note (Claude starts a turn that has no item yet).
   const live = working && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
@@ -440,7 +441,8 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
   turns.forEach((t) => {
     const folded = t.end !== "" && (opts.fold(t.key) ?? (opts.deferred?.(t.end) ? false : defaultFolded(t)));
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
-    if ((t.end && setup !== "stopped") || t === live) {
+    // A turn end with no Claude behind it is a setup's that stopped, in a retry's first moments too.
+    if ((t.end && !noClaude) || t === live) {
       const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
       rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals, since: t.user[t.user.length - 1] ?? t.key });
     }

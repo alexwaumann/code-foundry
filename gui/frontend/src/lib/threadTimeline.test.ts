@@ -681,6 +681,11 @@ describe("a thread's setup row", () => {
     expect(shape(buildRows(buildTurns(items), { ...start, setup: "stopped" }))).toEqual(["user:u1", "setup(folded)"]);
   });
 
+  it("a retry's first moments: the synthetic turn end is still there with the setup running, and no Interrupted header shows", () => {
+    const items = [user("u1"), end("e1")];
+    expect(shape(buildRows(buildTurns(items), { ...open, setup: "running" }))).toEqual(["user:u1", "setup(folded)"]);
+  });
+
   it("keeps a message sent during the setup under the row, before a retry and after", () => {
     const queued = user("u2");
     expect(shape(buildRows(buildTurns([user("u1"), queued]), { ...start, setup: "running" }))).toEqual(["user:u1", "setup(folded)", "user:u2"]);

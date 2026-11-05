@@ -764,7 +764,9 @@ type ThreadSetupStep struct {
 	Warning string `protobuf:"bytes,10,opt,name=warning,proto3" json:"warning,omitempty"`
 	// With a fetch's WARNING: the commit time of ref's tip as it is on disk, which the
 	// branch starts from instead; unset when there is no such ref.
-	RefAt         *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=ref_at,json=refAt,proto3" json:"ref_at,omitempty"`
+	RefAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=ref_at,json=refAt,proto3" json:"ref_at,omitempty"`
+	// name: the branch was there to check out, so nothing was named.
+	Existing      bool `protobuf:"varint,12,opt,name=existing,proto3" json:"existing,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -874,6 +876,13 @@ func (x *ThreadSetupStep) GetRefAt() *timestamppb.Timestamp {
 		return x.RefAt
 	}
 	return nil
+}
+
+func (x *ThreadSetupStep) GetExisting() bool {
+	if x != nil {
+		return x.Existing
+	}
+	return false
 }
 
 // ThreadSetup is Thread.setup. Every step is listed, pending, from the start.
@@ -7430,7 +7439,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1ccodefoundry/v1/project.proto\"\xca\x03\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1ccodefoundry/v1/project.proto\"\xe6\x03\n" +
 	"\x0fThreadSetupStep\x127\n" +
 	"\x04kind\x18\x01 \x01(\x0e2#.codefoundry.v1.ThreadSetupStepKindR\x04kind\x12\x1d\n" +
 	"\n" +
@@ -7445,7 +7454,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x05error\x18\t \x01(\tR\x05error\x12\x18\n" +
 	"\awarning\x18\n" +
 	" \x01(\tR\awarning\x121\n" +
-	"\x06ref_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x05refAt\"\xa4\x02\n" +
+	"\x06ref_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x05refAt\x12\x1a\n" +
+	"\bexisting\x18\f \x01(\bR\bexisting\"\xa4\x02\n" +
 	"\vThreadSetup\x126\n" +
 	"\x05phase\x18\x01 \x01(\x0e2 .codefoundry.v1.ThreadSetupPhaseR\x05phase\x129\n" +
 	"\n" +

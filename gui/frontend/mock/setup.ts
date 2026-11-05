@@ -3,6 +3,12 @@
  * /__mock/thread/setup?id=…&state=… puts a thread where the daemon's setup would have it.
  * Each state is a script: the steps, relative to now, and what the row reads then. Adding
  * one is adding an entry to SETUP_SCRIPTS; World.scriptSetup applies it.
+ *
+ * The composer's side (docs/notes/instant-threads-4-composer.md): POST
+ * /__mock/thread-setup?state=… makes the next thread.new with background-setup stop in that
+ * state, and thread.setup.retry, .cancel and .discard (World's next to scriptSetup) move a
+ * thread on as the daemon would. thread.send holds a message while a setup has not finished.
+ * A setup with no state scripted ends before the thread is seen, as a fast one does.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -21,6 +27,20 @@ export const SETUP_PROMPT = "The PR badge in the sidebar stays green after a for
 
 const { NAME, FETCH, WORKTREE, START } = ThreadSetupStepKind;
 const { PENDING, RUNNING, DONE, WARNING, FAILED } = ThreadSetupStepStatus;
+
+/** A message a setup holds, as thread.send and thread.new take it (DiscardThreadSetupResponse's first and queued). */
+export interface SetupMessage {
+  text: string;
+  attachments: string[];
+  composerText: string;
+}
+
+/** What a setup keeps to undo a send: the composer's snapshot and the messages, on the mock's thread. */
+export interface SetupHold {
+  draftJson: string;
+  first: SetupMessage | null;
+  queued: SetupMessage[];
+}
 
 /** A step as a script writes it: started and ended are ms before now, unset when it has not. */
 type ScriptStep = Omit<StepInit, "startedAt" | "endedAt" | "refAt"> & { started?: number; ended?: number; refAgo?: number };
@@ -142,6 +162,11 @@ export function setupScript(state: string): SetupScript {
   const script = SETUP_SCRIPTS[state];
   if (!script) throw new CommandError("invalid", `state must be one of ${Object.keys(SETUP_SCRIPTS).join(", ")}`);
   return script;
+}
+
+/** A setup that failed or was cancelled: what Try again and Edit act on. */
+export function isSetupStopped(phase: ThreadSetupPhase | undefined): boolean {
+  return phase === ThreadSetupPhase.FAILED || phase === ThreadSetupPhase.CANCELLED;
 }
 
 /** Where the row stands in a phase, as the daemon leaves it (internal/store/thread/setup.go). */

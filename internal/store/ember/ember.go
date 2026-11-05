@@ -138,6 +138,8 @@ type TaskThread struct {
 	LastActivityAt time.Time
 	Archived       bool
 	Saved          bool // saved for later (Thread.SavedAt)
+	// Setup is Thread.Setup; nil without one.
+	Setup *thread.Setup
 	// Removed: the thread is gone; the task keeps its id.
 	Removed bool
 	// Team is the threads below it (team.go), for an open task only; zero otherwise.

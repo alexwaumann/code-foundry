@@ -21,6 +21,7 @@ import { presentFileFinder } from "@/stores/fileFinder";
 import { presentThreadFind } from "@/stores/threadFind";
 import { presentSearch } from "@/stores/threadSearch";
 import { presentDictationToggle } from "@/stores/dictation";
+import { cancelSetup } from "@/stores/setupActions";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
@@ -153,7 +154,7 @@ function activeThread() {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-like", "thread.run-in", "thread.move.open", "thread.snooze", "project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-like", "thread.interrupt", "thread.run-in", "thread.move.open", "thread.snooze", "project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -275,6 +276,8 @@ export function beginRename(threadId: string | null = getUiContext().activeThrea
  * replaces the generic palette prompt. Return false to fall back to the default.
  */
 const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string, string>>) => boolean>> = {
+  // While a setup runs there is no Claude to interrupt: Cancel has that place, on its key too.
+  "thread.interrupt": () => presentInterrupt(),
   "thread.rename": () => beginRename(),
   // The project picker, then the composer; the composer invokes thread.new.
   "thread.new": () => {
@@ -443,6 +446,15 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
 function presentPluginShow(name: string): boolean {
   const m = allSurfaces().find((s) => s.showCommand === name);
   return m ? showView(`panel.${m.kind}`) : false;
+}
+
+/** thread.interrupt on the selected thread: false for a thread with no setup running, which the daemon interrupts as usual. */
+function presentInterrupt(): boolean {
+  const sel = useUiStore.getState().selection;
+  const setup = sel.kind === "thread" ? useThreadsStore.getState().byId[sel.id]?.setup : null;
+  if (sel.kind !== "thread" || setup?.phase !== "running") return false;
+  if (setup.background) void cancelSetup(sel.id);
+  return true;
 }
 
 /** Runs the command's presenter, if it has one; false means "invoke it normally". */

@@ -1,12 +1,17 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileReadView } from "@/api/files";
 import type { CodeFileEdit } from "@/components/code/CodeFile";
 import { PanelKeyContext } from "@/components/panel/panelKeyContext";
+import type { ThreadView } from "@/api/threads";
 import { useCodeViewStore } from "@/stores/codeView";
 import { useFileEditStore } from "@/stores/fileEdit";
+import { openFileInPanel } from "@/stores/filePanel";
+import { activeTab, getPanel, usePanelStore } from "@/stores/panel";
+import { useProjectsStore } from "@/stores/projects";
+import { useThreadsStore } from "@/stores/threads";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
-import type { FileTarget } from "@/surfaces/fileTarget";
+import { fileOfTab, type FileTarget } from "@/surfaces/fileTarget";
 import { FileTab } from "./FileTab";
 
 // readFile answers from `files`; pdf.js does not run in jsdom (no canvas), so lib/pdf is a
@@ -606,5 +611,141 @@ describe("editing", () => {
     expect(screen.getByTestId("code-file").getAttribute("data-editing")).toBe("");
     expect(status()).toBe("Unsaved");
     expect((await screen.findByTestId("file-conflict")).textContent).toContain("Changed on disk");
+  });
+});
+
+describe("a file opened before its thread had a checkout", () => {
+  const MAIN = "/src/web";
+  const WT = "/w/web-cf-x";
+  const FILE = `${MAIN}/src/app.ts`;
+  const MOVED = `${WT}/src/app.ts`;
+  const KEY = "thread:s";
+  const body = (o: Partial<FileReadView> = {}): Partial<FileReadView> => ({ text: "A=1\n", binary: false, lossless: true, mime: "text/plain", size: 4, modifiedAtMs: 100, ...o });
+  const setup = (phase: "running" | "failed" | "done") => ({ phase, startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true });
+  const put = (o: Partial<ThreadView>) => {
+    useThreadsStore.setState({ byId: { s: { id: "s", name: "t", projectId: "web", projectIds: ["web"], worktreePath: "", checkoutPaths: [], createdWorktree: false, branch: "", workspaceId: "", setup: setup("running"), ...o } as ThreadView }, order: ["s"] });
+  };
+  const landed = { worktreePath: WT, createdWorktree: true, branch: "cf/x", checkoutPaths: [{ projectId: "web", path: WT }], setup: setup("done") };
+  const openHeld = () => {
+    put({});
+    openFileInPanel(KEY, { project: "web", base: MAIN, path: FILE });
+    return active();
+  };
+  const active = () => {
+    const tab = activeTab(getPanel(KEY));
+    const target = tab ? fileOfTab(tab) : null;
+    if (!target) throw new Error("no file tab");
+    return target;
+  };
+  const show = (target: FileTarget) =>
+    render(
+      <PanelKeyContext.Provider value={KEY}>
+        <FileTab target={target} />
+      </PanelKeyContext.Provider>,
+    );
+
+  beforeEach(() => {
+    useProjectsStore.setState({ byId: { web: { id: "web", name: "web", path: MAIN, git: true, githubSlug: "", remotes: [], worktrees: [{ path: MAIN, branch: "main", head: "a", isMain: true }] } } as never, order: ["web"] });
+    files.set(FILE, body());
+  });
+
+  afterEach(() => {
+    usePanelStore.setState({ byKey: {} });
+    useThreadsStore.setState({ byId: {}, order: [] });
+  });
+
+  it("opens held, read-only and says so: nothing can reach the main checkout", async () => {
+    const target = openHeld();
+    expect(target.heldFor).toBe("s");
+    show(target);
+    await screen.findByTestId("code-file");
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+    expect(screen.getByTestId("file-held").textContent).toBe("Read-only until this thread's worktree is ready");
+  });
+
+  it("a thread asking for an edit does not open an editor on it either", async () => {
+    put({});
+    openFileInPanel(KEY, { project: "web", base: MAIN, path: FILE, edit: true });
+    show(active());
+    await screen.findByTestId("code-file");
+    expect(useFileEditStore.getState().sessions).toEqual({});
+  });
+
+  it("a file outside the project is nothing of the checkout's, and is not held", () => {
+    put({});
+    openFileInPanel(KEY, { project: "", base: "/tmp", path: "/tmp/x.md" });
+    expect(active().heldFor).toBeUndefined();
+  });
+
+  it("a thread with its worktree opens as usual", () => {
+    put(landed);
+    openFileInPanel(KEY, { project: "web", base: WT, path: MOVED });
+    expect(active().heldFor).toBeUndefined();
+  });
+
+  it("moves to the worktree when the thread lands, and a save writes there", async () => {
+    files.set(MOVED, body());
+    const target = openHeld();
+    const first = show(target);
+    await screen.findByTestId("code-file");
+    act(() => {
+      put(landed);
+    });
+    await waitFor(() => {
+      expect(active().base).toBe(WT);
+    });
+    expect(active()).toMatchObject({ project: "web", base: WT, path: MOVED });
+    expect(active().heldFor).toBeUndefined();
+    first.unmount();
+
+    writes.fn.mockResolvedValue({ path: MOVED, size: 5, modifiedAtMs: 200, conflict: false, notFound: false });
+    show(active());
+    fireEvent.click(await screen.findByTestId("file-edit"));
+    await screen.findByTestId("file-edit-status");
+    draft.text = "A=22\n";
+    fireEvent.change(await screen.findByTestId("draft"), { target: { value: "A=22\n" } });
+    fireEvent.click(screen.getByTestId("file-save"));
+    await waitFor(() => {
+      expect(writes.fn).toHaveBeenCalledTimes(1);
+    });
+    expect(writes.fn.mock.calls[0]?.slice(0, 2)).toEqual([WT, MOVED]);
+  });
+
+  it("stays read-only for good when the file is not in the worktree", async () => {
+    const target = openHeld();
+    show(target);
+    await screen.findByTestId("code-file");
+    act(() => {
+      put(landed);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("file-held").textContent).toBe("Read-only: this is the project's own checkout, and the file is not in this thread's worktree");
+    });
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+    expect(active().base).toBe(MAIN);
+    expect(writes.fn).not.toHaveBeenCalled();
+  });
+
+  it("is the thread's own file when the thread runs right there", async () => {
+    const target = openHeld();
+    show(target);
+    await screen.findByTestId("code-file");
+    act(() => {
+      put({ worktreePath: MAIN, checkoutPaths: [{ projectId: "web", path: MAIN }], setup: setup("done") });
+    });
+    await waitFor(() => {
+      expect(active().heldFor).toBeUndefined();
+    });
+    expect(active().base).toBe(MAIN);
+  });
+
+  it("still waits on a setup that failed before it had a worktree", async () => {
+    const target = openHeld();
+    act(() => {
+      put({ setup: setup("failed") });
+    });
+    show(target);
+    await screen.findByTestId("code-file");
+    expect(screen.getByTestId("file-held").textContent).toBe("Read-only until this thread's worktree is ready");
   });
 });

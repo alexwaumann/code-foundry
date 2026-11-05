@@ -61,6 +61,7 @@ import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
 import { useProjectsStore } from "./projects";
+import { noteSentFrom, setupDraftJson } from "./setupActions";
 import { THREAD_COMMANDS } from "./threadActions";
 import { useSettingsStore } from "./settings";
 import { useThreadsStore } from "./threads";
@@ -572,6 +573,17 @@ export function clearDraft(key: string): void {
   });
 }
 
+/** Takes a draft out as it is, its object URLs alive, for what moves its attachments elsewhere; null without one. */
+export function takeDraft(key: string): Draft | null {
+  const d = useComposeStore.getState().drafts[key] ?? null;
+  if (!d) return null;
+  useComposeStore.setState((s) => {
+    const { [key]: _taken, ...drafts } = s.drafts;
+    return { drafts };
+  });
+  return d;
+}
+
 /** Opens the project picker (thread.new's GUI presentation; see keys/bindings.ts). */
 export function openNewThreadPicker(): void {
   const ui = useUiStore.getState();
@@ -725,7 +737,7 @@ export function composeNoProject(): void {
 }
 
 /** A target's display name (the project's or the workspace's, else its id; "No project"; a like draft's thread). */
-function targetName(t: ComposeTarget): string {
+export function targetName(t: ComposeTarget): string {
   switch (t.kind) {
     case "project":
       return useProjectsStore.getState().byId[t.projectId]?.name ?? t.projectId;
@@ -816,6 +828,18 @@ function selectTarget(to: ComposeTarget): void {
   else if (to.kind === "workspace") composeInWorkspace(to.workspaceId);
   else if (to.kind === "like") composeLike(to.threadId);
   else composeNoProject();
+}
+
+/**
+ * Shows a target's composer with its draft as it stands. Not composeIn, which resets an
+ * empty draft's set: a draft being put back has its set from its own snapshot.
+ */
+export function showComposer(to: ComposeTarget): void {
+  const ui = useUiStore.getState();
+  if (to.kind === "workspace") composeInWorkspace(to.workspaceId);
+  else if (to.kind === "project") ui.select({ kind: "compose", projectId: to.projectId });
+  else if (to.kind === "like") ui.select({ kind: "compose", projectId: useThreadsStore.getState().byId[to.threadId]?.projectId ?? "", likeThreadId: to.threadId });
+  else ui.select({ kind: "compose", projectId: "", noProject: true });
 }
 
 /** The composer target a compose selection shows. */
@@ -930,11 +954,14 @@ export function noGitCheckout(r: Pick<ProjectView, "git" | "path" | "worktrees">
 }
 
 /**
- * Sends a draft: stages its attachments one by one, then invokes thread.new. On success the
- * draft is cleared and the new thread selected (the daemon's FocusThread intent usually
- * got there first). On failure the draft stays, with the error. `shownHints` are the
- * collision hints the composer showed under its chips; the daemon's after-create hints
- * that repeat one of them are not toasted again (lib/collisionHints unshownHints).
+ * Sends a draft: stages its attachments one by one, then invokes thread.new, which answers
+ * as soon as the thread exists: its setup runs in the background and shows in the thread
+ * (docs/notes/instant-threads-4-composer.md), with the draft kept for the setup's Edit. On
+ * success the draft is cleared and the new thread selected (the daemon's FocusThread intent
+ * usually got there first). What the daemon refuses at once makes no thread: the draft stays,
+ * with the error. `shownHints` are the collision hints the composer showed under its chips;
+ * the daemon's after-create hints that repeat one of them are not toasted again
+ * (lib/collisionHints unshownHints). A background setup's reply has none.
  */
 export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }, shownHints: readonly string[] = []): Promise<boolean> {
   const key = draftKey(target);
@@ -982,6 +1009,10 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       },
       sent.map((a) => a.stagedPath ?? ""),
     );
+    // The thread opens at once and sets itself up in the background; this is what puts the draft back should the send be undone.
+    args["background-setup"] = "true";
+    const draftJson = setupDraftJson(target, cur);
+    if (draftJson) args["draft-json"] = draftJson;
     // "New thread on this branch" is its own command (the daemon copies the thread's set, branch, workspace and mode).
     const command = place.kind === "like" ? THREAD_COMMANDS.newLike : THREAD_COMMANDS.create;
     const res = await invokeConfirmed(command, args, getUiContext(composeSelection(target, place)));
@@ -994,6 +1025,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     // the thread exists; not again when the composer already showed the line.
     for (const w of unshownHints(res.warnings ?? [], shownHints)) toast.warning(w);
     const id = createdThreadId(res.resultJson);
+    if (id) noteSentFrom(id, target);
     const ui = useUiStore.getState();
     // Replace the composer with the new thread unless the user has moved on.
     if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true });

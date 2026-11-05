@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { appPath, CF, emit, expectAttention, invocations, mockPost, openApp, openProjectPage, openProjects, openStreams, resetMock, row } from "./fixtures";
+import { appPath, BACKGROUND, CF, emit, expectAttention, invocations, mockPost, openApp, openProjectPage, openProjects, openStreams, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -113,7 +113,7 @@ test("new thread: a checkout's New thread here on its project page opens the com
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ project: "repo-cf", worktree: FIX_RESIZE, model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto", prompt: "Fix the resize race" });
+  expect(last?.args).toEqual({ ...BACKGROUND, project: "repo-cf", worktree: FIX_RESIZE, model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto", prompt: "Fix the resize race" });
   // The thread is the newest row, in that worktree, selected and shown.
   const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();

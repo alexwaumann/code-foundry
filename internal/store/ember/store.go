@@ -663,7 +663,7 @@ func taskThread(threads *thread.Snapshot, id string) *TaskThread {
 	}
 	return &TaskThread{
 		ID: id, Name: t.Name, State: t.State, Status: t.Status, StatusReason: t.StatusReason, Report: t.Report,
-		CreatedAt: t.CreatedAt, LastActivityAt: t.LastActivityAt, Archived: !t.ArchivedAt.IsZero(), Saved: !t.SavedAt.IsZero(),
+		CreatedAt: t.CreatedAt, LastActivityAt: t.LastActivityAt, Archived: !t.ArchivedAt.IsZero(), Saved: !t.SavedAt.IsZero(), Setup: t.Setup,
 	}
 }
 

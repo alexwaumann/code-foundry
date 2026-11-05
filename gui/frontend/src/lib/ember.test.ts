@@ -47,6 +47,7 @@ const MIN = 60_000;
 
 function thread(over: Partial<EmberTaskThreadView> = {}): EmberTaskThreadView {
   return {
+    setup: null,
     id: "s-w",
     name: "Worker",
     state: "connected",

@@ -199,6 +199,7 @@ export class EmberWorld {
       descendantsWaiting: team.filter(teamAsks).length,
       descendantsTotal: team.length,
       descendants,
+      setup: null,
     };
   }
 

@@ -334,6 +334,19 @@ func (m *Manager) waitSetup(ctx context.Context, id string) error {
 	return m.endSetup(ctx, id, false)
 }
 
+// endSetupToArchive ends thread id's setup stage for an Archive. One in the background is
+// cancelled, what it made going with it, so a slow fetch does not hold the Archive up; a
+// retry brings the thread back. One whose caller waits is that caller's: it is waited for.
+// A cancel that comes too late has a stage finishing, or nothing left to wait for.
+func (m *Manager) endSetupToArchive(ctx context.Context, id string) error {
+	if s, ok := m.Snapshot().Thread(id); ok && s.SettingUp() && s.Setup.Background {
+		if _, _, err := m.CancelSetup(ctx, id); err != nil {
+			m.log.Info("archive: the setup was not cancelled", "thread", id, "err", err)
+		}
+	}
+	return m.waitSetup(ctx, id)
+}
+
 // stopSetup stops thread id's setup stage, if one runs, and waits for it to end.
 func (m *Manager) stopSetup(ctx context.Context, id string) error {
 	return m.endSetup(ctx, id, true)

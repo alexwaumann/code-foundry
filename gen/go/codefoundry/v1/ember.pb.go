@@ -467,7 +467,9 @@ type EmberTaskThread struct {
 	// oldest first), at most 10.
 	Descendants []*EmberTaskDescendant `protobuf:"bytes,16,rep,name=descendants,proto3" json:"descendants,omitempty"`
 	// Saved for later (Thread.saved_at): put away with no wake time, so the board says so.
-	Saved         bool `protobuf:"varint,17,opt,name=saved,proto3" json:"saved,omitempty"`
+	Saved bool `protobuf:"varint,17,opt,name=saved,proto3" json:"saved,omitempty"`
+	// Thread.setup, so the board says what a worker's setup is doing.
+	Setup         *ThreadSetup `protobuf:"bytes,18,opt,name=setup,proto3" json:"setup,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -619,6 +621,13 @@ func (x *EmberTaskThread) GetSaved() bool {
 		return x.Saved
 	}
 	return false
+}
+
+func (x *EmberTaskThread) GetSetup() *ThreadSetup {
+	if x != nil {
+		return x.Setup
+	}
+	return nil
 }
 
 // EmberTaskDescendant is a thread below a task's worker thread, as the board shows it.
@@ -1132,7 +1141,7 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x123\n" +
 	"\adone_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x06doneAt\x127\n" +
 	"\x06thread\x18\f \x01(\v2\x1f.codefoundry.v1.EmberTaskThreadR\x06thread\x12\x16\n" +
-	"\x06branch\x18\r \x01(\tR\x06branch\"\x8f\x06\n" +
+	"\x06branch\x18\r \x01(\tR\x06branch\"\xc2\x06\n" +
 	"\x0fEmberTaskThread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
@@ -1152,7 +1161,8 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	"\x13descendants_waiting\x18\x0e \x01(\x05R\x12descendantsWaiting\x12+\n" +
 	"\x11descendants_total\x18\x0f \x01(\x05R\x10descendantsTotal\x12E\n" +
 	"\vdescendants\x18\x10 \x03(\v2#.codefoundry.v1.EmberTaskDescendantR\vdescendants\x12\x14\n" +
-	"\x05saved\x18\x11 \x01(\bR\x05saved\"\x93\x03\n" +
+	"\x05saved\x18\x11 \x01(\bR\x05saved\x121\n" +
+	"\x05setup\x18\x12 \x01(\v2\x1b.codefoundry.v1.ThreadSetupR\x05setup\"\x93\x03\n" +
 	"\x13EmberTaskDescendant\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
@@ -1232,7 +1242,8 @@ var file_codefoundry_v1_ember_proto_goTypes = []any{
 	(ThreadState)(0),               // 14: codefoundry.v1.ThreadState
 	(ThreadStatus)(0),              // 15: codefoundry.v1.ThreadStatus
 	(ThreadReportStatus)(0),        // 16: codefoundry.v1.ThreadReportStatus
-	(*StreamHeartbeat)(nil),        // 17: codefoundry.v1.StreamHeartbeat
+	(*ThreadSetup)(nil),            // 17: codefoundry.v1.ThreadSetup
+	(*StreamHeartbeat)(nil),        // 18: codefoundry.v1.StreamHeartbeat
 }
 var file_codefoundry_v1_ember_proto_depIdxs = []int32{
 	13, // 0: codefoundry.v1.EmberStatus.epoch_started_at:type_name -> google.protobuf.Timestamp
@@ -1250,29 +1261,30 @@ var file_codefoundry_v1_ember_proto_depIdxs = []int32{
 	13, // 12: codefoundry.v1.EmberTaskThread.created_at:type_name -> google.protobuf.Timestamp
 	13, // 13: codefoundry.v1.EmberTaskThread.last_activity_at:type_name -> google.protobuf.Timestamp
 	5,  // 14: codefoundry.v1.EmberTaskThread.descendants:type_name -> codefoundry.v1.EmberTaskDescendant
-	15, // 15: codefoundry.v1.EmberTaskDescendant.status:type_name -> codefoundry.v1.ThreadStatus
-	16, // 16: codefoundry.v1.EmberTaskDescendant.report_status:type_name -> codefoundry.v1.ThreadReportStatus
-	14, // 17: codefoundry.v1.EmberTaskDescendant.state:type_name -> codefoundry.v1.ThreadState
-	13, // 18: codefoundry.v1.EmberTaskDescendant.last_activity_at:type_name -> google.protobuf.Timestamp
-	1,  // 19: codefoundry.v1.EmberBoard.status:type_name -> codefoundry.v1.EmberStatus
-	3,  // 20: codefoundry.v1.EmberBoard.tasks:type_name -> codefoundry.v1.EmberTask
-	17, // 21: codefoundry.v1.EmberBoard.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
-	7,  // 22: codefoundry.v1.EmberBoard.timers:type_name -> codefoundry.v1.EmberTimer
-	13, // 23: codefoundry.v1.EmberTimer.next_at:type_name -> google.protobuf.Timestamp
-	13, // 24: codefoundry.v1.EmberTimer.created_at:type_name -> google.protobuf.Timestamp
-	1,  // 25: codefoundry.v1.GetEmberStatusResponse.status:type_name -> codefoundry.v1.EmberStatus
-	3,  // 26: codefoundry.v1.ListEmberTasksResponse.tasks:type_name -> codefoundry.v1.EmberTask
-	8,  // 27: codefoundry.v1.EmberService.GetStatus:input_type -> codefoundry.v1.GetEmberStatusRequest
-	10, // 28: codefoundry.v1.EmberService.ListTasks:input_type -> codefoundry.v1.ListEmberTasksRequest
-	12, // 29: codefoundry.v1.EmberService.WatchBoard:input_type -> codefoundry.v1.WatchEmberBoardRequest
-	9,  // 30: codefoundry.v1.EmberService.GetStatus:output_type -> codefoundry.v1.GetEmberStatusResponse
-	11, // 31: codefoundry.v1.EmberService.ListTasks:output_type -> codefoundry.v1.ListEmberTasksResponse
-	6,  // 32: codefoundry.v1.EmberService.WatchBoard:output_type -> codefoundry.v1.EmberBoard
-	30, // [30:33] is the sub-list for method output_type
-	27, // [27:30] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	17, // 15: codefoundry.v1.EmberTaskThread.setup:type_name -> codefoundry.v1.ThreadSetup
+	15, // 16: codefoundry.v1.EmberTaskDescendant.status:type_name -> codefoundry.v1.ThreadStatus
+	16, // 17: codefoundry.v1.EmberTaskDescendant.report_status:type_name -> codefoundry.v1.ThreadReportStatus
+	14, // 18: codefoundry.v1.EmberTaskDescendant.state:type_name -> codefoundry.v1.ThreadState
+	13, // 19: codefoundry.v1.EmberTaskDescendant.last_activity_at:type_name -> google.protobuf.Timestamp
+	1,  // 20: codefoundry.v1.EmberBoard.status:type_name -> codefoundry.v1.EmberStatus
+	3,  // 21: codefoundry.v1.EmberBoard.tasks:type_name -> codefoundry.v1.EmberTask
+	18, // 22: codefoundry.v1.EmberBoard.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	7,  // 23: codefoundry.v1.EmberBoard.timers:type_name -> codefoundry.v1.EmberTimer
+	13, // 24: codefoundry.v1.EmberTimer.next_at:type_name -> google.protobuf.Timestamp
+	13, // 25: codefoundry.v1.EmberTimer.created_at:type_name -> google.protobuf.Timestamp
+	1,  // 26: codefoundry.v1.GetEmberStatusResponse.status:type_name -> codefoundry.v1.EmberStatus
+	3,  // 27: codefoundry.v1.ListEmberTasksResponse.tasks:type_name -> codefoundry.v1.EmberTask
+	8,  // 28: codefoundry.v1.EmberService.GetStatus:input_type -> codefoundry.v1.GetEmberStatusRequest
+	10, // 29: codefoundry.v1.EmberService.ListTasks:input_type -> codefoundry.v1.ListEmberTasksRequest
+	12, // 30: codefoundry.v1.EmberService.WatchBoard:input_type -> codefoundry.v1.WatchEmberBoardRequest
+	9,  // 31: codefoundry.v1.EmberService.GetStatus:output_type -> codefoundry.v1.GetEmberStatusResponse
+	11, // 32: codefoundry.v1.EmberService.ListTasks:output_type -> codefoundry.v1.ListEmberTasksResponse
+	6,  // 33: codefoundry.v1.EmberService.WatchBoard:output_type -> codefoundry.v1.EmberBoard
+	31, // [31:34] is the sub-list for method output_type
+	28, // [28:31] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_ember_proto_init() }

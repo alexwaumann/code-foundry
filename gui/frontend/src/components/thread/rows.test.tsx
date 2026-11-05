@@ -1,8 +1,10 @@
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
+import type { ThreadView } from "@/api/threads";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey } from "@/lib/threadTimeline";
 import { structOf, useThreadStore } from "@/stores/thread";
+import { useThreadsStore } from "@/stores/threads";
 import { ThreadContext } from "./context";
 import { TimelineRowView } from "./rows";
 
@@ -369,6 +371,27 @@ describe("a finished turn with nothing to fold", () => {
     vi.setSystemTime(1 + 3_400);
     const c = show([hi], { working: true });
     expect(c.querySelector('[data-testid="thread-working"]')?.textContent).toBe("Working·3s");
+  });
+});
+
+describe("the first turn after a setup", () => {
+  const hi: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "hi", attachments: [], composerText: "" };
+
+  afterEach(() => {
+    vi.useRealTimers();
+    useThreadsStore.setState({ byId: {}, order: [] });
+  });
+
+  it.each<[string, number | null, string]>([
+    ["counts from the setup's end, not the message", 1 + 7_000, "Working·2s"],
+    ["counts from the message when the setup ended before it", 0, "Working·9s"],
+    ["counts from the message on a thread with no setup", null, "Working·9s"],
+  ])("%s", (_n, endedAtMs, want) => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(1 + 9_400);
+    useThreadsStore.setState({ byId: { s: { id: "s", setup: endedAtMs === null ? null : { phase: "done", startedAtMs: 1, endedAtMs, steps: [], error: "", background: true } } as ThreadView }, order: ["s"] });
+    const c = show([hi], { working: true });
+    expect(c.querySelector('[data-testid="thread-working"]')?.textContent).toBe(want);
   });
 });
 
