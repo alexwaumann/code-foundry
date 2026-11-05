@@ -461,6 +461,47 @@ func TestPutAwaySelfTurnOnTheWayOut(t *testing.T) {
 	}
 }
 
+// A message sent after the turn's end starts a new process. However late the put-away gets
+// there (a slow thread below it holds an archive up), it must only wait for the process
+// the turn's end closed: the new one is the user's turn, and the threads below and the
+// shells stay.
+func TestPutAwayAtTurnEndGivesWayToANewProcess(t *testing.T) {
+	for _, form := range []struct {
+		name string
+		p    PutAway
+	}{
+		{name: "archive", p: PutAway{Kind: PutAwayArchive}},
+		{name: "snooze", p: PutAway{Kind: PutAwaySnooze, Until: time.Now().Add(time.Hour)}},
+		{name: "save", p: PutAway{Kind: PutAwaySave}},
+	} {
+		t.Run(form.name, func(t *testing.T) {
+			e := newFixtureEnvAt(t, fixturePath("write-allow"), nil)
+			s := e.asking(e.create(CreateOptions{Name: "Lead", InitialPrompt: "write"}).ID)
+			kid := e.asking(e.create(CreateOptions{Name: "Worker", InitialPrompt: "write", CreatedBy: s.ID}).ID)
+			gone := &runner{id: s.ID, done: make(chan struct{})}
+			close(gone.done)
+			_, err := e.m.applyPutAway(e.ctx(), s.ID, form.p, gone)
+			if !errors.Is(err, ErrFailedPrecondition) {
+				t.Fatalf("err = %v, want ErrFailedPrecondition", err)
+			}
+			got, err := e.m.Get(e.ctx(), s.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.State != StateConnected || !got.ArchivedAt.IsZero() || got.Snoozed() {
+				t.Errorf("thread = %v archived %v snoozed %v, want it left running", got.State, got.ArchivedAt, got.Snoozed())
+			}
+			below, err := e.m.Get(e.ctx(), kid.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if below.State != StateConnected || !below.ArchivedAt.IsZero() {
+				t.Errorf("the thread below = %v archived %v, want it left running", below.State, below.ArchivedAt)
+			}
+		})
+	}
+}
+
 // A thread not mid-turn is put away at once, as any caller's would be.
 func TestPutAwaySelfNotMidTurn(t *testing.T) {
 	for _, f := range putAwayForms {

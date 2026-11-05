@@ -31,6 +31,11 @@ func (s Thread) Snoozed() bool { return !s.SnoozedUntil.IsZero() || !s.SavedAt.I
 // thread. Unsnoozing only clears SnoozedUntil and SavedAt: the thread stays disconnected
 // and gets no attention.
 func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Thread, error) {
+	return m.snooze(ctx, id, until, nil)
+}
+
+// snooze is Snooze; closing as in archive.
+func (m *Manager) snooze(ctx context.Context, id string, until time.Time, closing *runner) (Thread, error) {
 	if until.IsZero() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -49,7 +54,7 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 	if err != nil {
 		return Thread{}, err
 	}
-	s, err := m.putAway(ctx, id, func(s *Thread) {
+	s, err := m.putAway(ctx, id, closing, func(s *Thread) {
 		s.SnoozedUntil, s.SavedAt = until, time.Time{}
 	})
 	if err != nil {
@@ -65,7 +70,12 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 // and clears SnoozedUntil, so wakeSnoozed never sees it. It lasts until a call that
 // unsnoozes.
 func (m *Manager) SaveForLater(ctx context.Context, id string) (Thread, error) {
-	s, err := m.putAway(ctx, id, func(s *Thread) {
+	return m.saveForLater(ctx, id, nil)
+}
+
+// saveForLater is SaveForLater; closing as in archive.
+func (m *Manager) saveForLater(ctx context.Context, id string, closing *runner) (Thread, error) {
+	s, err := m.putAway(ctx, id, closing, func(s *Thread) {
 		s.SnoozedUntil = time.Time{}
 		if s.SavedAt.IsZero() {
 			s.SavedAt = m.opts.Now().Round(0).Truncate(time.Millisecond)
@@ -81,7 +91,7 @@ func (m *Manager) SaveForLater(ctx context.Context, id string) (Thread, error) {
 // putAway is the part of a snooze both forms share: it closes the thread, removes its
 // shells, then under m.mu applies set, unpins and unarchives it and clears a "snooze
 // ended" status. A turn the close cut off reads idle ReasonSnoozed (markPuttingAway).
-func (m *Manager) putAway(ctx context.Context, id string, set func(*Thread)) (_ Thread, err error) {
+func (m *Manager) putAway(ctx context.Context, id string, closing *runner, set func(*Thread)) (_ Thread, err error) {
 	if err := m.refuseResident(id, "snoozed"); err != nil {
 		return Thread{}, err
 	}
@@ -94,7 +104,7 @@ func (m *Manager) putAway(ctx context.Context, id string, set func(*Thread)) (_ 
 	}
 	m.markPuttingAway(id, wasInterrupted, ReasonSnoozed)
 	defer func() { m.endPuttingAway(id, err != nil) }() // after m.mu's unlock below
-	if err := m.Close(ctx, id); err != nil {
+	if err := m.closeAway(ctx, id, closing); err != nil {
 		return Thread{}, err
 	}
 	if err := m.removeShells(ctx, id); err != nil {

@@ -27,7 +27,7 @@ one the user confirmed.
 `thread.interrupt` does. When that is the target, the store's `PutAwaySelf` asks the runner:
 
 - Mid-turn, it records `record.putAway` and returns at once ("will archive ... when this turn
-  ends"; `--json` has `deferred: true`). No confirmation, as nothing of the thread's is cut off.
+  ends"; `--json` has `deferred: true`). No confirmation, as the turn itself is not cut off; background agents and shells still running at turn end do stop, as agreed for an explicit request.
 - Otherwise it is the plain call, as before, but on the store's context (below).
 
 At a turn's end (`putAwayAtTurnEnd`, a `Result` that leaves Claude at its prompt) the runner
@@ -50,7 +50,12 @@ check goes through a `threadCmd`: it is ordered exactly against the stream's eve
 **The close begins on the runner goroutine, at the result.** Not in the goroutine that follows.
 Nothing is published first, so no "finished" can escape, and a message sent from then on finds
 the process closing, waits, and starts it again. The put-away then fails ("was started while
-being archived") and the user's message wins; that failure is only logged.
+being archived") and the user's message wins; that failure is only logged. The put-away carries
+the process the turn's end closed and only ever waits for that one, before an archive's cascade:
+a thread below it can hold the archive up for CloseTimeout, and a plain `Close` after that would
+shut the process the user's message started. Known limits when the message wins: the wakes went
+before the close, so the thread's subscriptions stay gone. And a turn that ends with a background
+agent's prompt pending is not at its prompt, so the put-away waits for the next turn's end.
 
 **Wakes go before the close, on the runner too.** `Archive` unwatches a thread only after its
 cascade, which can wait out hidden threads for up to CloseTimeout, past the debounce that

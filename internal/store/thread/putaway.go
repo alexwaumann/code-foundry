@@ -80,7 +80,7 @@ func (m *Manager) PutAwaySelf(ctx context.Context, id string, p PutAway) (_ Thre
 			return s, true, err
 		}
 	}
-	s, err := m.applyPutAway(m.ctx, id, p)
+	s, err := m.applyPutAway(m.ctx, id, p, nil)
 	return s, false, err
 }
 
@@ -106,14 +106,40 @@ func (m *Manager) refusePutAway(id string, p *PutAway) error {
 	return nil
 }
 
-func (m *Manager) applyPutAway(ctx context.Context, id string, p PutAway) (Thread, error) {
+// applyPutAway runs p. closing: as in archive; nil closes whatever process the thread has.
+func (m *Manager) applyPutAway(ctx context.Context, id string, p PutAway, closing *runner) (Thread, error) {
 	switch p.Kind {
 	case PutAwaySnooze:
-		return m.Snooze(ctx, id, p.Until)
+		return m.snooze(ctx, id, p.Until, closing)
 	case PutAwaySave:
-		return m.SaveForLater(ctx, id)
+		return m.saveForLater(ctx, id, closing)
 	}
-	return m.Archive(ctx, id, true)
+	return m.archive(ctx, id, true, closing)
+}
+
+// closeAway closes thread id for a put-away: Close, or with closing (the process a turn's
+// end began closing) only the wait for it. Whatever process the thread has after that was
+// started by a message sent since, which wins: closing it would cut off the user's turn,
+// so the put-away fails, before it touches the thread's shells.
+func (m *Manager) closeAway(ctx context.Context, id string, closing *runner) error {
+	if closing == nil {
+		return m.Close(ctx, id)
+	}
+	select {
+	case <-closing.done:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rec, err := m.record(id)
+	if err != nil {
+		return err
+	}
+	if rec.run != nil || rec.s.State != StateDisconnected {
+		return fmt.Errorf("%w: thread %s was started again after its turn's end", ErrFailedPrecondition, id)
+	}
+	return nil
 }
 
 // onPutAway takes a thread's put-away of itself on the runner goroutine, where whether a
@@ -166,18 +192,18 @@ func (r *runner) putAwayAtTurnEnd(e *claudestream.Result) {
 	r.acknowledge()
 	r.puttingAway = true
 	r.beginClose()
-	r.m.finishPutAway(r.id, *p)
+	r.m.finishPutAway(r, *p)
 }
 
 // finishPutAway runs the put-away the end of a turn began. Off the runner goroutine: it
 // waits for the runner to finish. The request that asked for it is long gone, so a
 // failure can only be logged; the thread stays stopped, idle, in the main list.
-func (m *Manager) finishPutAway(id string, p PutAway) {
+func (m *Manager) finishPutAway(r *runner, p PutAway) {
 	m.wg.Add(1) // this runner is still counted: no race with Shutdown's Wait
 	go func() {
 		defer m.wg.Done()
-		if _, err := m.applyPutAway(m.ctx, id, p); err != nil {
-			m.log.Warn("put a thread away at its turn's end", "thread", id, "what", p.Kind.String(), "err", err)
+		if _, err := m.applyPutAway(m.ctx, r.id, p, r); err != nil {
+			m.log.Warn("put a thread away at its turn's end", "thread", r.id, "what", p.Kind.String(), "err", err)
 		}
 	}()
 }

@@ -18,6 +18,14 @@ import (
 // clears ArchivedAt, of this thread alone: the thread stays disconnected until the
 // user reconnects it.
 func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread, error) {
+	return m.archive(ctx, id, archived, nil)
+}
+
+// archive is Archive. closing, set by a turn's end (finishPutAway), is the process that
+// end began closing: the thread's own close then only waits for it, and comes before the
+// cascade, so a message that started the thread again (closeAway) finds the threads below
+// it untouched.
+func (m *Manager) archive(ctx context.Context, id string, archived bool, closing *runner) (Thread, error) {
 	if !archived {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -36,6 +44,11 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 	}
 	if err := m.refuseResident(id, "archived"); err != nil {
 		return Thread{}, err
+	}
+	if closing != nil {
+		if err := m.closeAway(ctx, id, closing); err != nil {
+			return Thread{}, err
+		}
 	}
 	tried := map[string]bool{}
 	var failed []CascadeFailure
@@ -56,7 +69,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 			m.requestClose(t.ID)
 		}
 		for i, t := range targets {
-			_, changed, err := m.archiveFrom(ctx, t.ID, was[i])
+			_, changed, err := m.archiveFrom(ctx, t.ID, was[i], nil)
 			if err != nil {
 				m.log.Warn("archive a hidden thread with the thread above it", "thread", t.ID, "root", id, "err", err)
 				failed = append(failed, CascadeFailure{ID: t.ID, Err: err})
@@ -69,7 +82,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 		}
 	}
 	cascade()
-	s, changed, err := m.archiveOne(ctx, id)
+	s, changed, err := m.archiveOne(ctx, id, closing)
 	if err != nil {
 		return Thread{}, err
 	}
@@ -145,19 +158,19 @@ func (e *CascadeError) Unwrap() error { return ErrFailedPrecondition }
 // the close cut off leaves the thread idle ReasonArchived instead of error
 // ReasonInterrupted. A Reconnect that wins the race between the close and that last
 // step makes it fail rather than archive a live thread.
-func (m *Manager) archiveOne(ctx context.Context, id string) (Thread, bool, error) {
+func (m *Manager) archiveOne(ctx context.Context, id string, closing *runner) (Thread, bool, error) {
 	wasInterrupted, err := m.interrupted(id)
 	if err != nil {
 		return Thread{}, false, err
 	}
 	m.unwatchForArchive(id) // before the close: its settle must wake no one
 	m.markPuttingAway(id, wasInterrupted, ReasonArchived)
-	return m.archiveFrom(ctx, id, wasInterrupted)
+	return m.archiveFrom(ctx, id, wasInterrupted, closing)
 }
 
 // archiveFrom is archiveOne with whether the thread was interrupted before its close
 // began (interrupted) read already, and its wakes forgotten (unwatchForArchive).
-func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted bool) (_ Thread, _ bool, err error) {
+func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted bool, closing *runner) (_ Thread, _ bool, err error) {
 	defer func() { m.endPuttingAway(id, err != nil) }() // after m.mu's unlock below
 	// A setup under way ends first, either way: then there is a process to close, or none.
 	if err := m.endSetupToArchive(ctx, id); err != nil {
@@ -166,7 +179,7 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 	if _, ok := m.Snapshot().Thread(id); !ok && m.createFailed(id) {
 		return Thread{}, false, nil // nothing to archive, and no failure of the archive's
 	}
-	if err := m.Close(ctx, id); err != nil {
+	if err := m.closeAway(ctx, id, closing); err != nil {
 		return Thread{}, false, err
 	}
 	if err := m.removeShells(ctx, id); err != nil {
