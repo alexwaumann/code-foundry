@@ -1,3 +1,4 @@
+import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpStatusView } from "@/api/mcp";
 import type { SlashCommandView } from "@/api/slashCommands";
@@ -16,12 +17,14 @@ import {
   setPageModalSource,
   foldDeferredTurns,
   forgetTurnView,
-  KEPT_LOGS,
+  KEPT_LOG_BUDGET,
+  logsOverBudget,
   openThreadWatches,
   sameItem,
   setRowExpanded,
   setTurnFolded,
   startThreadWatch,
+  useThreadPending,
   useThreadStore,
   WATCH_BATCH_MS,
   watchTurnEnds,
@@ -327,21 +330,62 @@ describe("startThreadWatch", () => {
     expect(useThreadStore.getState().watches).toEqual({});
   });
 
-  it("keeps the logs of the last KEPT_LOGS watched threads only", async () => {
-    const ids = Array.from({ length: KEPT_LOGS + 2 }, (_, i) => `t${String(i)}`);
-    for (const id of ids) {
-      watched.events = [{ ...snapshot(1, [text("a", 1)]), threadId: id }];
+  it("keeps logs up to the budget, dropping the oldest, and sizes a thread that grew when it is left", async () => {
+    const big = "x".repeat(Math.ceil(KEPT_LOG_BUDGET * 0.4));
+    const visit = async (id: string, body: string) => {
+      watched.events = [{ ...snapshot(1, [text("a", 1, body)]), threadId: id }];
       const stop = startThreadWatch(id);
       await vi.advanceTimersByTimeAsync(WATCH_BATCH_MS);
       stop();
-    }
-    expect(Object.keys(useThreadStore.getState().logs).sort()).toEqual(ids.slice(-KEPT_LOGS).sort());
-    // Watching an old one again moves it to the front.
-    const stop = startThreadWatch(ids[ids.length - KEPT_LOGS] ?? "");
-    stop();
-    watched.events = [];
-    startThreadWatch("new")();
-    expect(Object.keys(useThreadStore.getState().logs)).toContain(ids[ids.length - KEPT_LOGS]);
+    };
+    const kept = () => Object.keys(useThreadStore.getState().logs).sort();
+    await visit("a", big);
+    await visit("b", big);
+    expect(kept()).toEqual(["a", "b"]);
+    await visit("c", big);
+    expect(kept()).toEqual(["b", "c"]);
+    // Many small logs fit where few large ones did: the budget is size, not a count.
+    for (const id of ["d", "e", "f", "g", "h", "i"]) await visit(id, "small");
+    expect(kept()).toEqual(["b", "c", "d", "e", "f", "g", "h", "i"]);
+    // Visiting an old one again makes it the most recent.
+    await visit("b", big);
+    await visit("j", big);
+    expect(kept()).toEqual(["b", "d", "e", "f", "g", "h", "i", "j"]);
+  });
+});
+
+describe("logsOverBudget", () => {
+  const sizes: Readonly<Record<string, number>> = { a: 40, b: 40, c: 40, huge: 500 };
+  const size = (id: string) => sizes[id] ?? 0;
+  it.each<[string, string[], string[], string[]]>([
+    ["all fit", ["a", "b"], [], []],
+    ["the oldest past the budget go", ["a", "b", "c"], [], ["c"]],
+    ["everything older than the point it ran out goes", ["huge", "a", "b"], [], ["a", "b"]],
+    ["the most recent closed one stays however large", ["huge"], [], []],
+    ["an open log counts, but never goes", ["huge", "a"], ["huge"], []],
+    ["after an open log, the most recent closed one is still the one kept", ["huge", "a", "b"], ["huge"], ["b"]],
+    ["an open log past the budget is not dropped", ["a", "huge"], ["huge"], []],
+  ])("%s", (_name, recent, open, want) => {
+    expect(logsOverBudget(recent, size, (id) => open.includes(id), 100)).toEqual(want);
+  });
+});
+
+describe("pending requests while a kept log catches up", () => {
+  const read = () => renderHook(() => useThreadPending("s")).result.current.map((p) => p.requestId);
+  const kept = apply(undefined, snapshot(1, [text("a", 1)], [pend("old")])) as ThreadLog;
+  beforeEach(() => {
+    useThreadStore.setState({ logs: { s: kept }, pending: {}, synced: {} });
+  });
+
+  it("reads the EventService's until the Watch syncs, then the Watch's", () => {
+    useThreadStore.setState({ pending: { s: { threadId: "s", seq: 9, pending: [pend("live")] } } });
+    expect(read()).toEqual(["live"]);
+    useThreadStore.setState({ synced: { s: true } });
+    expect(read()).toEqual(["old"]);
+  });
+
+  it("shows no request the kept log still has once the EventService has none", () => {
+    expect(read()).toEqual([]);
   });
 });
 
