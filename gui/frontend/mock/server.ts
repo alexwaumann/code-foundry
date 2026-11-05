@@ -6,7 +6,8 @@
  *
  * Serves Health, Terminal, Project, Filesystem, Thread, Command, Ui, Action and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
- * permissive CORS. Non-RPC control endpoints for tests live under /__mock/:
+ * permissive CORS, and the streams the GUI tunnels over a WebSocket at /stream/ (mock/tunnel.ts).
+ * Non-RPC control endpoints for tests live under /__mock/:
  *
  *   GET  /__mock/invocations | writes | resizes | threads | streams
  *   GET  /__mock/waits                            (every thread.wait invoked, held until its caller aborts it: mock/bridge.ts)
@@ -291,6 +292,7 @@ import { MockFiles, WELCOME_PAGE } from "./files";
 import { mockPaint, mockThemeJson, publishMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
+import { serveTunnel } from "./tunnel";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { renameProjectIn } from "./projectRename";
@@ -1929,6 +1931,8 @@ const server = createServer((req, res) => {
 server.requestTimeout = 0;
 server.keepAliveTimeout = 60_000;
 
+const dropTunnels = serveTunnel(server, port);
+
 server.listen(port, "127.0.0.1", () => {
   world.start();
   const url = `http://127.0.0.1:${String(port)}`;
@@ -1939,6 +1943,8 @@ server.listen(port, "127.0.0.1", () => {
 
 function shutdown(): void {
   world.stop();
+  // Upgraded sockets have left the server's connection list, and close() would wait for them.
+  dropTunnels();
   server.closeAllConnections();
   server.close(() => process.exit(0));
 }

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { EmberService } from "@/gen/codefoundry/v1/ember_pb";
+import { EventService } from "@/gen/codefoundry/v1/events_pb";
 import { HealthService } from "@/gen/codefoundry/v1/health_pb";
 import { DaemonConnection, jsonRequested } from "./endpoint";
 
@@ -39,5 +41,46 @@ describe("the wire format", () => {
   it("is JSON with ?json=1 in a development build", async () => {
     window.history.replaceState(null, "", "/?json=1");
     expect(await sentType()).toBe("application/json");
+  });
+});
+
+describe("which transport a call takes", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Runs one call on stubs that fail at once, and says which of them it reached. */
+  async function reached(call: (conn: DaemonConnection) => Promise<unknown>): Promise<{ socket: string[]; fetch: string[] }> {
+    const socket: string[] = [];
+    class StubSocket {
+      onclose: ((e: { code: number }) => void) | null = null;
+      constructor(url: string) {
+        socket.push(url);
+        queueMicrotask(() => this.onclose?.({ code: 1006 }));
+      }
+      close() {
+        // The stub is already closed.
+      }
+    }
+    vi.stubGlobal("WebSocket", StubSocket);
+    const fetchStub = vi.fn<typeof fetch>(() => Promise.reject(new TypeError("no network in a test")));
+    vi.stubGlobal("fetch", fetchStub);
+    await call(new DaemonConnection(() => Promise.resolve({ baseUrl: "http://127.0.0.1:1", token: "t" }))).catch(() => undefined);
+    return { socket, fetch: fetchStub.mock.calls.map(([url]) => url as string) };
+  }
+
+  it("is the socket for EmberService/WatchBoard", async () => {
+    const got = await reached(async (conn) => (await conn.client(EmberService)).watchBoard({})[Symbol.asyncIterator]().next());
+    expect(got).toEqual({ socket: ["ws://127.0.0.1:1/stream/codefoundry.v1.EmberService/WatchBoard"], fetch: [] });
+  });
+
+  it("is fetch for a stream not on the list", async () => {
+    const got = await reached(async (conn) => (await conn.client(EventService)).watch({})[Symbol.asyncIterator]().next());
+    expect(got).toEqual({ socket: [], fetch: ["http://127.0.0.1:1/codefoundry.v1.EventService/Watch"] });
+  });
+
+  it("is fetch for a unary call of a service with a listed stream", async () => {
+    const got = await reached(async (conn) => (await conn.client(EmberService)).getStatus({}));
+    expect(got).toEqual({ socket: [], fetch: ["http://127.0.0.1:1/codefoundry.v1.EmberService/GetStatus"] });
   });
 });

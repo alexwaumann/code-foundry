@@ -1,7 +1,8 @@
-import { Code, ConnectError, createClient, type Client, type Interceptor } from "@connectrpc/connect";
+import { Code, ConnectError, createClient, type Client, type Interceptor, type Transport } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import type { DescService } from "@bufbuild/protobuf";
 import { GetDaemonEndpoint } from "../../bindings/github.com/alexwaumann/code-foundry/gui/daemonservice";
+import { wsFetch } from "./wsFetch";
 
 /** Where the daemon's loopback listener is and how to authenticate to it. */
 export interface DaemonEndpoint {
@@ -48,6 +49,28 @@ function binaryWire(): boolean {
   return !(import.meta.env.DEV && typeof window !== "undefined" && jsonRequested(window.location.search));
 }
 
+/**
+ * The streams on the WebSocket tunnel (docs/notes/ws-transport.md); everything else uses fetch.
+ * Temporary: later PRs add to it, and the last one removes it once every long-lived stream is on.
+ */
+const TUNNELLED_STREAMS: ReadonlySet<string> = new Set(["EmberService/WatchBoard"]);
+
+/** Unary calls over fetch, and each stream over the tunnel or fetch by its procedure. */
+function daemonTransport(ep: DaemonEndpoint): Transport {
+  const auth: Interceptor = (next) => (req) => {
+    req.header.set("Authorization", `Bearer ${ep.token}`);
+    return next(req);
+  };
+  const options = { baseUrl: ep.baseUrl, interceptors: [auth], useBinaryFormat: binaryWire() };
+  const http = createConnectTransport(options);
+  const tunnel = createConnectTransport({ ...options, fetch: wsFetch });
+  return {
+    unary: (method, signal, timeoutMs, header, input, contextValues) => http.unary(method, signal, timeoutMs, header, input, contextValues),
+    stream: (method, signal, timeoutMs, header, input, contextValues) =>
+      (TUNNELLED_STREAMS.has(`${method.parent.name}/${method.name}`) ? tunnel : http).stream(method, signal, timeoutMs, header, input, contextValues),
+  };
+}
+
 function defaultResolver(): EndpointResolver {
   if (import.meta.env.DEV && typeof window !== "undefined") {
     const env = import.meta.env as { VITE_DAEMON_URL?: string; VITE_DAEMON_TOKEN?: string };
@@ -87,12 +110,7 @@ export class DaemonConnection {
     const key = `${ep.baseUrl}\n${ep.token}\n${service.typeName}`;
     const cached = this.clients.get(key);
     if (cached) return cached as Client<T>;
-    const auth: Interceptor = (next) => (req) => {
-      req.header.set("Authorization", `Bearer ${ep.token}`);
-      return next(req);
-    };
-    const transport = createConnectTransport({ baseUrl: ep.baseUrl, interceptors: [auth], useBinaryFormat: binaryWire() });
-    const client = createClient(service, transport);
+    const client = createClient(service, daemonTransport(ep));
     this.clients.set(key, client);
     return client;
   }
