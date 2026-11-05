@@ -25,10 +25,9 @@ func keptClause(kept []string) string {
 
 func threadSetupRetry(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.setup.retry",
-		Title: "Try Setup Again",
-		Description: "Run a failed or cancelled setup again, in the background. After a failure it goes on at the step that failed: " +
-			"what is done stays done and the branch keeps its name. After a cancel it starts over.",
+		Name:         "thread.setup.retry",
+		Title:        "Try Setup Again",
+		Description:  "Run a failed or cancelled setup again, in the background: from the step that failed, or from the start after a cancel.",
 		Category:     "Thread",
 		NoPalette:    true,
 		NoKeybinding: true,
@@ -47,10 +46,9 @@ func threadSetupRetry(b ThreadBackend, idArg ArgSpec) Command {
 
 func threadSetupCancel(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.setup.cancel",
-		Title: "Cancel Setup",
-		Description: "Stop a thread's running setup and remove what it made: its worktrees and new branches, never work in them or " +
-			"what another thread holds. Once Claude is starting it is too late: use thread.interrupt.",
+		Name:         "thread.setup.cancel",
+		Title:        "Cancel Setup",
+		Description:  "Stop a thread's running setup and remove what it made. Once Claude is starting it is too late: use thread.interrupt.",
 		Category:     "Thread",
 		NoPalette:    true,
 		NoKeybinding: true,
@@ -69,11 +67,9 @@ func threadSetupCancel(b ThreadBackend, idArg ArgSpec) Command {
 
 func threadSetupDiscard(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.setup.discard",
-		Title: "Discard Thread",
-		Description: "Undo the send of a thread whose setup failed or was cancelled: what the setup made goes and the thread is " +
-			"forgotten, as if it had never been made. Returns its draft, its error and the messages queued behind the first; " +
-			"their attachments stay on disk.",
+		Name:         "thread.setup.discard",
+		Title:        "Discard Thread",
+		Description:  "Forget a thread whose setup failed or was cancelled, and what it made, as if it had never been sent. Gives back its draft and messages.",
 		Category:     "Thread",
 		NoPalette:    true,
 		NoKeybinding: true,

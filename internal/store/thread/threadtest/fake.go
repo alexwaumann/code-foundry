@@ -28,14 +28,14 @@ type Fake struct {
 	// KeptWorktrees is what CancelSetup answers, and SetupDraft what DiscardSetup does.
 	KeptWorktrees []string
 	SetupDraft    thread.SetupDraft
-	mu      sync.Mutex
-	next    int
-	staged  int
-	byID    map[string]thread.Thread
-	snap    *thread.Snapshot
-	calls   []string
-	retired []thread.UsageBucket
-	items   map[string]*thread.ItemsSnapshot
+	mu            sync.Mutex
+	next          int
+	staged        int
+	byID          map[string]thread.Thread
+	snap          *thread.Snapshot
+	calls         []string
+	retired       []thread.UsageBucket
+	items         map[string]*thread.ItemsSnapshot
 	// Watchers counts WatchItems calls whose ctx has not ended, by thread.
 	watchers map[string]int
 	mcpErrs  map[string]string

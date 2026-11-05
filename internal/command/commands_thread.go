@@ -129,7 +129,8 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			NoPalette: true,
 			Title:     "Send to Thread",
 			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
-				"A thread whose Claude is not running starts with it.",
+				"A thread whose Claude is not running starts with it. During a setup it waits behind the first prompt; " +
+				"after a failed or cancelled setup it tries the setup again.",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
