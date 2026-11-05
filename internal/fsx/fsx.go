@@ -1,6 +1,7 @@
 // Package fsx holds the filesystem rules the daemon applies to user-typed paths: the
-// home-directory boundary every project path must stay inside, and directory
-// completion for the GUI's path prompts (FilesystemService.ListDirectories).
+// home-directory boundary every project path must stay inside, directory completion for
+// the GUI's path prompts (FilesystemService.ListDirectories), and the file viewer's reads
+// and writes.
 package fsx
 
 import (
