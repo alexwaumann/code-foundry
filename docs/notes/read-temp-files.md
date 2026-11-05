@@ -16,8 +16,13 @@ home directory". The file viewer now reads there. Only reads: everything else st
 - `fsx.TempRoots(home)` is `/tmp` and `os.TempDir()`, each spelled and resolved, deduped. The
   spelled forms stay because a missing file has no resolved path: `/tmp/nope` must be NotFound,
   not a refusal. On macOS both are symlinks (`/tmp` to `/private/tmp`, `$TMPDIR` through `/var`).
-- A root that holds home is dropped, spelled or resolved. A `TMPDIR` of `/`, home or a parent of
-  home would otherwise open everything to the file viewer. A relative `TMPDIR` is dropped too.
+- `os.TempDir()` counts only if it is a folder of the user's own or a sticky one, so a `TMPDIR` of
+  `/private`, `/var` or `/etc` opens nothing. A real `$TMPDIR` is the user's and `/private/tmp` is
+  sticky. A relative or missing `TMPDIR` is dropped too.
+- A root that holds home is dropped, spelled or resolved: a `TMPDIR` of `/`, home or a parent of
+  home would otherwise open everything to the file viewer. So is a root under home, which home's
+  rules already cover: `TMPDIR=~/proj/.tmp` would otherwise make `~/proj` hold a temp folder, and
+  its previews drop to one file.
 - `fsx.ReadFile` takes `ReadRoots{Home, Temp}` rather than two strings: `Home` also expands `~`
   and names places in the privacy messages, so it must stay distinct. `Filesystem.WithTemp` and
   `Floor.WithTemp` are additive, so a test or caller that sets neither stays home-only.
@@ -32,7 +37,9 @@ home directory". The file viewer now reads there. Only reads: everything else st
   `/tmp/x.html` can be repointed, so it is no page. A path outside home by spelling only (home
   reached through some other link) keeps its pencil and its bridge, as before.
 - The File tab hides the pencil on `outside_home` (`canEdit`) rather than letting a save fail
-  after the user typed. `view.panel.file --edit` is refused by `CheckEdit` as before.
+  after the user typed. `view.panel.file --edit` refuses on `outside_home` too, after `CheckEdit`:
+  `/tmp/l.txt` linked to `~/notes.txt` passes `CheckEdit`, because `WriteFile` goes by the real
+  file alone, and the verb would report a tab that never opens an editor.
 - `view.panel.page` refuses `outside_home`, because `page=1` is what gives a tab the thread's
   bridge. It also covers `~/link.html` pointing into temp, which a check on the path alone would
   miss. A missing temp page answers "no file at", not the refusal.
@@ -40,16 +47,46 @@ home directory". The file viewer now reads there. Only reads: everything else st
 - A plain File tab of a temp page has no bridge: `usePageThread` finds no html item and no page
   flag, so every call answers "this page is not shown in a thread".
 
+## Reading what anyone can write
+
+Temp is writable by anything on the machine, so a check on a path says nothing about what a later
+open gets. Flipping `/tmp/foo/x.txt` between a file and a link served `daemon.token` within about
+30 requests. So in a temp folder the open comes first and the checks are on the open file.
+
+- `ReadFile`: a `real` under home is opened as it is (nobody else can swap a home file), and a
+  `real` in temp through a Root at the deepest temp folder holding it. The open file's stat
+  decides what it is. This is why the File tab can still read a `/tmp` link into home.
+- The route, temp grant (`preview/open.go`): a grant is a name in a temp folder, not a resolved
+  path or an inode. `fsx.OpenTree` walks to it from the temp folder with `O_NOFOLLOW`, so a tree
+  swapped for a link is 404 and one swapped for a real folder serves that folder, which is all
+  its owner could have put there anyway. An agent's `rm -rf` and rebuild keeps its tab working
+  with no new grant, which binding an inode would not. Files open through a Root on that folder.
+- A one-file grant takes the file at its name: `Lstat` after the open must be the same file.
+- The Floor speaks of paths, so before it is asked the real path must lead to the open file
+  (`realOf`). That keeps a config home below a tree guarded. An atomic rewrite landing between
+  the open and that check is a 404 for one request.
+- The route, home grant: checks then opens, as before, and the real file must be under home
+  unless the grant is in temp. A bridged `~/proj/index.html` cannot load `build/app.js` through
+  `~/proj/build -> /tmp/foo`, and `~/site/l.html -> /tmp/a.html -> ~/real.html` serves only while
+  it leads home, so repointing `/tmp/a.html` gives a 404, not temp's bytes at a home URL.
+  `PreviewFile` refuses such a link up front rather than hand out a URL that 404s.
+- Nothing blocks on a FIFO. `os.OpenRoot` and `Root.OpenRoot` open with no `O_NONBLOCK`, so
+  `OpenTree` makes its Root from the walked descriptor (`/dev/fd/<n>`). `Root.OpenFile` takes
+  `O_NONBLOCK` and opens folders on the way with `O_DIRECTORY`; `os.ReadDir` does too.
+- A hard link in temp to a home file the Floor does not guard is served: nothing tells it from a
+  file. Linking needs the way into home, which macOS's default home permissions close to others.
+
 ## Gotchas
 
 - Open in editor and Open in Finder stay on the File tab of a temp file and fail with a toast
   ("outside your home directory"): the gitops rule was kept on purpose.
-- A grant in a temp folder serves only the temp folders, so a link from a temp tree into home is
-  404 even when the floor would not guard the target. Temp is writable by anything on the
-  machine, and a page there has the network, so a link planted beside it must not reach an
-  unguarded home file. A home grant may still follow a link into temp. The File tab reads such a
-  link as before: the check is on what a page can fetch, not on what the user opens.
-- A temp page is on the pages origin like any other preview, so it shares that origin's storage.
+- A plain temp page has an opaque origin and no storage, like any File tab page. A page can still
+  `fetch()` its own grant, as the route sends `Access-Control-Allow-Origin: *`, and it has the
+  network, so what a grant serves is what a stranger's page can send anywhere.
+- A link in a temp folder can 404 in the preview and still read in the File tab, as the check is
+  on what a page can fetch, not on what the user opens. A link out of the tree, a one-file grant's
+  link, a folder spelled through a link inside temp and an absolute link (a Root takes none, even
+  inside its tree) are all 404. A relative link inside the tree works.
 - `/tmp/claude-<uid>` is an ordinary folder to the floor: a page directly in it gets the whole
   folder as its tree.
 - The daemon's `$TMPDIR` is what counts. A daemon started without one has only `/tmp`.
