@@ -654,3 +654,52 @@ describe("foldingTurn", () => {
     expect(foldingTurn(turns, "nope")).toBe("");
   });
 });
+
+describe("a thread's setup row", () => {
+  const start = { fold: () => undefined, working: true };
+
+  it("sits under the first message, above the turn", () => {
+    const items = [user("u1"), tool("Bash"), text("t1"), end("e1")];
+    expect(shape(buildRows(buildTurns(items), { ...open, setup: "done" }))).toEqual(["user:u1", "setup(folded)", "header(folded 1)", "final:t1"]);
+  });
+
+  it("holds the live header back while the setup runs: no turn runs yet", () => {
+    expect(shape(buildRows(buildTurns([user("u1")]), { ...start, setup: "running" }))).toEqual(["user:u1", "setup(folded)"]);
+  });
+
+  it("brings the live header in below it once the setup is done", () => {
+    expect(shape(buildRows(buildTurns([user("u1")]), { ...start, setup: "done" }))).toEqual(["user:u1", "setup(folded)", "live(u1,0)"]);
+  });
+
+  it("no row and the turn's own header when there is nothing to tell", () => {
+    expect(shape(buildRows(buildTurns([user("u1")]), { ...start, setup: "" }))).toEqual(["user:u1", "live(u1,0)"]);
+  });
+
+  it("no header for the turn a setup that did not finish closed, lingering working or not", () => {
+    const items = [user("u1"), end("e1")];
+    expect(shape(buildRows(buildTurns(items), { ...open, setup: "stopped" }))).toEqual(["user:u1", "setup(folded)"]);
+    expect(shape(buildRows(buildTurns(items), { ...start, setup: "stopped" }))).toEqual(["user:u1", "setup(folded)"]);
+  });
+
+  it("keeps a message sent during the setup under the row, before a retry and after", () => {
+    const queued = user("u2");
+    expect(shape(buildRows(buildTurns([user("u1"), queued]), { ...start, setup: "running" }))).toEqual(["user:u1", "setup(folded)", "user:u2"]);
+    expect(shape(buildRows(buildTurns([user("u1"), queued, end("e1")]), { ...open, setup: "stopped" }))).toEqual(["user:u1", "setup(folded)", "user:u2"]);
+  });
+
+  it("sits after a creator's note, under the message", () => {
+    const note = item("note", { id: "n1" });
+    expect(shape(buildRows(buildTurns([note, user("u1")]), { ...start, setup: "running" }))).toEqual(["system:n1", "user:u1", "setup(folded)"]);
+  });
+
+  it("stands alone in a thread made with no prompt, and the live header follows it once done", () => {
+    expect(shape(buildRows([], { ...start, setup: "running" }))).toEqual(["setup(folded)"]);
+    expect(shape(buildRows([], { ...start, setup: "stopped" }))).toEqual(["setup(folded)"]);
+    expect(shape(buildRows([], { ...start, setup: "done" }))).toEqual(["setup(folded)", "live(,0)"]);
+  });
+
+  it("is folded by default and opens on the user's choice, which is the turn folds' store", () => {
+    const opened = { fold: (k: string) => (k === "setup" ? false : undefined), working: false, setup: "done" as const };
+    expect(shape(buildRows(buildTurns([user("u1")]), opened))).toEqual(["user:u1", "setup"]);
+  });
+});

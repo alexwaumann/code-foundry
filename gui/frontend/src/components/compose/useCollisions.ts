@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { collisions, type Checkout, type Collision, type HintProject, type HintThread } from "@/lib/collisionHints";
 import { isRunningThread, isWorkingThread } from "@/lib/thread";
+import { isUnplaced } from "@/lib/threadSetup";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 
@@ -20,7 +21,8 @@ function useThreadKeys(): string[] {
       const now = Date.now();
       return s.order.flatMap((id) => {
         const t = s.byId[id];
-        if (!t || !isRunningThread(t, now)) return [];
+        // A thread with no checkout yet holds none: its members would resolve to their main checkouts.
+        if (!t || !isRunningThread(t, now) || isUnplaced(t)) return [];
         const recorded = t.checkoutPaths.map((c) => c.projectId + PAIR + c.path).join(LIST);
         return [[t.id, t.name, t.projectId, t.projectIds.join(","), t.worktreePath, t.createdWorktree ? "1" : "", t.branch, isWorkingThread(t) ? "1" : "", recorded].join(SEP)];
       });

@@ -254,7 +254,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
             </li>
           </ul>
         ) : (
-          <p className="text-center text-caption">{thread ? "A terminal can start here once the thread has a checkout." : "Start one with New terminal on a project or worktree row."}</p>
+          <p className="text-center text-caption">{thread ? "A terminal can start here once the worktree is ready." : "Start one with New terminal on a project or worktree row."}</p>
         )}
       </div>
     </div>

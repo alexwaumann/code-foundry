@@ -110,3 +110,37 @@ describe("tipStatusTone", () => {
     expect(statusText(l, NOW)).toBe(text);
   });
 });
+
+describe("a thread's setup", () => {
+  const started = 1000;
+  const fetching = { kind: "fetch", projectId: "p", projectName: "p", ref: "origin/main", branch: "", status: "running", startedAtMs: started, endedAtMs: null, error: "", warning: "", refAtMs: null } as const;
+  const failedStep = { ...fetching, kind: "worktree", status: "failed", endedAtMs: started, error: "fatal: no" } as const;
+  const start = { ...fetching, kind: "start", projectId: "", projectName: "", ref: "", status: "running" } as const;
+  const setup = (phase: "running" | "done" | "failed" | "cancelled", steps: readonly (typeof fetching | typeof failedStep | typeof start)[]) => ({ phase, startedAtMs: started, endedAtMs: null, steps: [...steps], error: "", background: true });
+  const row = { state: "starting", status: "busy", statusReason: "setting up", statusChangedAtMs: null } as const;
+
+  it.each<[string, Parameters<typeof statusLine>[0], StatusLineKind, string, string]>([
+    ["running: the step it is on", { ...row, setup: setup("running", [fetching]) }, "settingUp", "Fetching origin/main", "Setting up · Fetching origin/main"],
+    ["only starting Claude reads as working", { ...row, setup: setup("running", [start]) }, "working", "", "Working"],
+    ["failed: why", { ...row, state: "disconnected", status: "error", statusReason: "setup failed", setup: setup("failed", [failedStep]) }, "setupFailed", "Could not create the worktree", "Setup failed · Could not create the worktree"],
+    ["cancelled: quiet", { ...row, state: "disconnected", status: "idle", statusReason: "setup cancelled", setup: setup("cancelled", []) }, "setupCancelled", "", "Cancelled"],
+    ["done: as any thread", { ...row, state: "connected", statusReason: "working", setup: setup("done", [fetching]) }, "working", "", "Working"],
+    ["a deleted transcript still wins", { ...row, transcriptMissing: true, setup: setup("failed", [failedStep]) }, "transcriptDeleted", "", "Transcript deleted"],
+  ])("%s", (_, s, kind, detail, text) => {
+    const l = statusLine(s);
+    expect([l.kind, l.detail, statusText(l, NOW)]).toEqual([kind, detail, text]);
+  });
+
+  it("is red when it failed, sky while it runs, and leaves a cancel out of the hover card", () => {
+    expect(statusTones.setupFailed).toBe("red");
+    expect(statusTones.settingUp).toBe("sky");
+    expect(tipStatusTone("setupCancelled")).toBeNull();
+    expect(tipStatusTone("setupFailed")).toBe("red");
+  });
+
+  it("wins over a plugin's flag when it failed, as Claude's own errors do", () => {
+    const flag = { plugin: "lint", pluginName: "Lint", level: "error", reason: "x", setAtMs: null, untilSeen: false } as const;
+    expect(statusLine({ ...row, state: "disconnected", status: "error", statusReason: "setup failed", flags: [flag], setup: setup("failed", [failedStep]) }).kind).toBe("setupFailed");
+    expect(statusLine({ ...row, flags: [flag], setup: setup("running", [fetching]) }).kind).toBe("flagError");
+  });
+});

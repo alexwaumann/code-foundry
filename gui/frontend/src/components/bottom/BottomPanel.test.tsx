@@ -20,7 +20,7 @@ const { attach } = await import("@/test/terminalHost");
 const { ACTION_IDS, action, actionTerminal, fakeActionCommands, seedActions, terminalExited, terminalRemoved, terminalUpdated } = await import("@/test/actionsWorld");
 const { CF, DOT, FEAT, GP, seedWorld } = await import("@/test/projectsWorld");
 const { runAction } = await import("@/stores/actionActions");
-const { closeEmptyPanels, newWorktreeTerminal, showTerminalIn, toggleBottomFromHere } = await import("@/stores/bottomActions");
+const { closeEmptyPanels, newWorktreeTerminal, showBottomIfUnplaced, showTerminalIn, toggleBottomFromHere } = await import("@/stores/bottomActions");
 const { getBottom, useBottomStore } = await import("@/stores/bottomPanel");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useActionStopsStore } = await import("@/stores/actionStops");
@@ -308,6 +308,53 @@ describe("an action run's tab (e2e/actions.spec.ts)", () => {
     expect(bottom()?.dataset.panelKey).toBe("view:projects");
     expect([...document.querySelectorAll('[data-kind="action"]')].map((e) => e.textContent)).toEqual(["Build"]);
     expect(screen.getByTestId("action-echo").textContent).toBe("$ make build");
+  });
+});
+
+describe("a thread with no checkout yet", () => {
+  const unplaced = () => {
+    act(() => {
+      useThreadsStore.setState((s) => {
+        const t = s.byId["s-3"];
+        return t ? { byId: { ...s.byId, "s-3": { ...t, worktreePath: "", checkoutPaths: [], state: "starting", setup: { phase: "running", startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true } } } } : s;
+      });
+    });
+  };
+
+  it("cmd+j opens the panel on an empty state that says when, starting no shell; cmd+t does the same, and a checkout brings back New Terminal", async () => {
+    fakeTerminalNew();
+    renderPanel();
+    select({ kind: "thread", id: "s-3" });
+    unplaced();
+    await settle();
+    act(() => {
+      toggleBottomFromHere();
+    });
+    await settle();
+    expect(invocationsOf("terminal.new")).toHaveLength(0);
+    expect(screen.getByTestId("bottom-empty").textContent).toContain("A terminal can start here once the worktree is ready.");
+    expect(screen.queryByTestId("bottom-empty-new")).toBeNull();
+    expect(screen.queryByTestId("bottom-new-terminal")).toBeNull();
+    act(() => {
+      toggleBottomFromHere();
+    });
+    await settle();
+    let shown = false;
+    act(() => {
+      shown = showBottomIfUnplaced();
+    });
+    await settle();
+    expect(shown).toBe(true);
+    expect(invocationsOf("terminal.new")).toHaveLength(0);
+    expect(screen.getByTestId("bottom-empty")).toBeTruthy();
+    act(() => {
+      useThreadsStore.setState((s) => {
+        const t = s.byId["s-3"];
+        return t ? { byId: { ...s.byId, "s-3": { ...t, worktreePath: CF, setup: null } } } : s;
+      });
+    });
+    expect(screen.getByTestId("bottom-empty-new")).toBeTruthy();
+    expect(showBottomIfUnplaced()).toBe(false);
   });
 });
 

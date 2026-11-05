@@ -182,6 +182,25 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     expect(within(openTitleMenu()).getByTestId("menu-clear-flags").textContent).toBe("Clear flag");
   });
 
+  it("a setup that runs takes neither Snooze, Run in nor New thread on this branch; after a failure it snoozes", () => {
+    const setup = (phase: "running" | "failed") => ({ phase, startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true });
+    const ids = () => screen.getAllByRole("menuitem").map((m) => m.dataset.testid);
+    setThread({ projectIds: ["api", "web"], worktreePath: "", setup: setup("running") });
+    openRowMenu();
+    expect(ids()).not.toEqual(expect.arrayContaining(["menu-snooze"]));
+    expect(ids()).not.toEqual(expect.arrayContaining(["menu-run-in"]));
+    expect(ids()).not.toEqual(expect.arrayContaining(["menu-new-like"]));
+    expect(ids()).not.toEqual(expect.arrayContaining(["menu-fork"]));
+    expect(screen.queryByRole("menuitem", { name: "New terminal here" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Remove" })).toBeTruthy();
+    cleanup();
+    setThread({ projectIds: ["api", "web"], worktreePath: "", setup: setup("failed") });
+    openRowMenu();
+    expect(ids()).toEqual(expect.arrayContaining(["menu-snooze"]));
+    expect(ids()).not.toEqual(expect.arrayContaining(["menu-run-in"]));
+    expect(ids()).not.toEqual(expect.arrayContaining(["menu-new-like"]));
+  });
+
   it("no Regenerate name for a resident thread; disabled while a naming call runs", () => {
     setThread({ resident: "ember" });
     expect(within(openTitleMenu()).queryByTestId("menu-regenerate-name")).toBeNull();
