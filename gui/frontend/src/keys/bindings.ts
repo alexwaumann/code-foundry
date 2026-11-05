@@ -172,13 +172,22 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
 }
 
 /**
+ * Commands for the File tab's code editor: it yields their chords, a prompt or a shell does
+ * not. cmd+S in a prompt belongs to its prompt history picker, and a save must not leave a
+ * file from a field the user was typing something else in.
+ */
+const editorOnly: ReadonlySet<string> = new Set(["file.save"]);
+
+/**
  * The command a focused terminal (a bottom panel shell) or thread prompt
  * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
- * thread.rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
+ * thread.rename, cmd+j and cmd+t still fire while typing to Claude or a shell. The code
+ * editor (`code`) yields the same, and its own commands.
  */
-function terminalYields(chord: string): CommandView | undefined {
+function terminalYields(chord: string, code = false): CommandView | undefined {
   if (!terminalYieldable(chord)) return undefined;
-  return commandBindings(useCommandsStore.getState().commands).get(chord);
+  const c = commandBindings(useCommandsStore.getState().commands).get(chord);
+  return c && (code || !editorOnly.has(c.name)) ? c : undefined;
 }
 
 /**
@@ -217,6 +226,12 @@ const codeEditorChords: ReadonlySet<string> = new Set(["cmd+f", "cmd+alt+f", "cm
  */
 function inCodeEditor(e: KeyboardEvent, target: Element | null): boolean {
   return Boolean(target?.closest("[data-code-editor]")) && isEditable(keyTarget(e));
+}
+
+/** The chord is bound to one of `names`. */
+function chordOf(chord: string, names: ReadonlySet<string>): boolean {
+  const c = commandBindings(useCommandsStore.getState().commands).get(chord);
+  return c !== undefined && names.has(c.name);
 }
 
 /** Some listed command declares the chord, whether or not it is available in this context. */
@@ -518,12 +533,12 @@ export function handleKeyDown(e: KeyboardEvent): void {
   // (F2 renames).
   if (shell || code || (isEditable(target) && target?.closest("[data-chord-yield]"))) {
     if (useUiStore.getState().palette.open) return;
-    const yielded = terminalYields(chord);
+    const yielded = terminalYields(chord, code);
     if (yielded) {
       e.preventDefault();
       e.stopPropagation();
       startCommand(yielded);
-    } else if (terminalYieldable(chord) && (shell || declaredChord(chord) || (useCommandsStore.getState().contextKey === null && !editingChord(chord)))) {
+    } else if (terminalYieldable(chord) && !chordOf(chord, editorOnly) && (shell || declaredChord(chord) || (useCommandsStore.getState().contextKey === null && !editingChord(chord)))) {
       // Focusing a shell or selecting a thread changes the context (a Projects-page shell
       // brings its worktree): cmd+t or cmd+r right after it must not be lost to the
       // debounced re-list. In a prompt only for a chord some command declares: the

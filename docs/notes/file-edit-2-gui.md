@@ -70,6 +70,10 @@ cmd+shift+g, cmd+d, cmd+[, cmd+] and cmd+/, which are the library's. So Back and
 not work from the editor, on purpose: those chords indent there. The global view actions
 (cmd+k, cmd+b, cmd+1..9, zoom) still win; the library binds none of them.
 
+`file.save` is `editorOnly`: a thread prompt and a shell do not yield it, so cmd+S in a prompt
+stays the prompt history picker's scope switch. With focus elsewhere (the header, the page) it
+saves the tab in front; in a text field it does nothing.
+
 ## Gotchas
 
 * `onEditComplete` with no handler reverts, which is what we want: the tab never accepts,

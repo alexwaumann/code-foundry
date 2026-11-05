@@ -176,6 +176,15 @@ describe("keys in the File tab's code editor", () => {
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
+  it("cmd+S in a thread's prompt is the prompt's: its history picker's scope, not a save", () => {
+    const prompt = document.createElement("div");
+    prompt.setAttribute("data-chord-yield", "");
+    prompt.setAttribute("contenteditable", "true");
+    document.body.append(prompt);
+    expect(press(prompt, { key: "s", code: "KeyS", metaKey: true }).defaultPrevented).toBe(false);
+    expect(press(prompt, { key: "j", code: "KeyJ", metaKey: true }).defaultPrevented).toBe(true);
+  });
+
   it("its find field is the same", () => {
     expect(presses(editor.find, "f", "KeyF", { metaKey: true }).defaultPrevented).toBe(false);
     expect(presses(editor.find, "s", "KeyS", { metaKey: true }).defaultPrevented).toBe(true);
