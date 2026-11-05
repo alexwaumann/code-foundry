@@ -115,10 +115,11 @@ func gitEnv(base []string) []string {
 }
 
 // killGroup kills process group pgid. A group that is gone is os.ErrProcessDone, which
-// tells exec.Cmd the process ended by itself.
+// tells exec.Cmd the process ended by itself. So is EPERM: macOS answers that for a group
+// of zombies, and a group git started is the daemon's own to signal.
 func killGroup(pgid int) error {
 	err := syscall.Kill(-pgid, syscall.SIGKILL)
-	if errors.Is(err, syscall.ESRCH) {
+	if errors.Is(err, syscall.ESRCH) || errors.Is(err, syscall.EPERM) {
 		return os.ErrProcessDone
 	}
 	return err

@@ -344,7 +344,8 @@ type Store interface {
 	RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) error
 	// AbandonWorktree removes what a `git worktree add` that never finished left behind
 	// (worktree_abandon.go). Only for a path a WorktreeAdding event named: it was free
-	// when the add began.
+	// when the add began. An error means something may have stayed: whatever cannot be
+	// shown to be half made is left alone.
 	AbandonWorktree(ctx context.Context, opts AbandonWorktreeOptions) error
 	// DeleteBranch deletes a branch no worktree has checked out (branch_delete.go).
 	DeleteBranch(ctx context.Context, opts DeleteBranchOptions) (DeleteBranchResult, error)

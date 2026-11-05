@@ -450,6 +450,9 @@ type threadLog struct {
 	// taken and handled: the highest ordinal of a top-level message Claude took in, and
 	// that ordinal as of the last top-level turn end (handled.go).
 	taken, handled int64
+	// held are the queued messages the row has until Claude does (Setup.Queued): no process
+	// ending stops them being queued (closeUnfinished).
+	held map[string]bool
 }
 
 func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *threadLog {
@@ -516,6 +519,35 @@ func (t *threadLog) append(it Item) Item {
 	t.noteHandledLocked(it)
 	t.publishLocked(func(seq uint64) ThreadEvent { return ItemAppended{ThreadID: t.id, Seq: seq, Item: it} }, it.Kind)
 	return it
+}
+
+// holdQueued marks message id as on the row, before its item is written.
+func (t *threadLog) holdQueued(id string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.held == nil {
+		t.held = map[string]bool{}
+	}
+	t.held[id] = true
+}
+
+// releaseQueued ends holdQueued for ids, or for every message without any.
+func (t *threadLog) releaseQueued(ids ...string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(ids) == 0 {
+		clear(t.held)
+	}
+	for _, id := range ids {
+		delete(t.held, id)
+	}
+}
+
+// queuedHeld reports whether message id is on the row.
+func (t *threadLog) queuedHeld(id string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.held[id]
 }
 
 // dropItem takes item id out of the log, as if it had never been written. Only for what
@@ -726,16 +758,14 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 			m.log.Error("persist MCP status", "thread", id, "err", err)
 		}
 	}
+	for _, q := range queued {
+		t.holdQueued(q.ItemID)
+	}
 	m.threads[id] = t
 	if idle {
 		// A run the daemon lost (a crash) left items and its turn open; nothing will
 		// finish them.
-		w := itemWriter{log: t, save: func(it Item) { m.saveItem(id, it) }}
-		closeLostRun(w, "the thread's process ended")
-		for _, q := range queued {
-			// Still on their way: the row has them for the next start (Setup.Queued).
-			w.change(q.ItemID, func(x *Item) { x.Queued = true })
-		}
+		closeLostRun(itemWriter{log: t, save: func(it Item) { m.saveItem(id, it) }}, "the thread's process ended")
 	}
 	return t, nil
 }

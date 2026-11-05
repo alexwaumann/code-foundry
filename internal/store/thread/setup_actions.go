@@ -158,12 +158,15 @@ func (m *Manager) runRetry(j *setupJob) {
 	go func() { _ = m.finishSetup(j) }()
 }
 
-// setupResume is what a retried setup keeps of the run before: the branch once named,
-// the worktrees made, the fetches that ended. A nil one is a first run.
+// setupResume is what a retried setup keeps of the run before: the branch once named and
+// whether it existed then, the worktrees made, the projects whose branch the run made
+// (own), the fetches that ended. A nil one is a first run.
 type setupResume struct {
-	branch  string
-	made    []madeWorktree
-	fetched map[string]bool
+	branch   string
+	existing bool
+	made     []madeWorktree
+	own      map[string]bool
+	fetched  map[string]bool
 }
 
 // named reports whether the run before named the branch.
@@ -200,16 +203,17 @@ func (r *setupResume) withMade(made []madeWorktree) []madeWorktree {
 // resumeOf reads what s's run left, and forgets worktrees that went since (by hand, or
 // with an archive), so their steps run again.
 func resumeOf(s Thread) (r *setupResume, gone []string) {
-	r = &setupResume{fetched: map[string]bool{}}
+	r = &setupResume{fetched: map[string]bool{}, own: map[string]bool{}}
 	for _, st := range s.Setup.Steps {
 		switch {
 		case st.Kind == SetupStepName && st.Status == SetupStepDone:
-			r.branch = st.Branch
+			r.branch, r.existing = st.Branch, st.Existing
 		case st.Kind == SetupStepFetch && (st.Status == SetupStepDone || st.Status == SetupStepWarning):
 			r.fetched[st.ProjectID] = true
 		}
 	}
 	for _, w := range madeOf(s.Setup) {
+		r.own[w.projectID] = w.ownBranch
 		if isDir(w.path) {
 			r.made = append(r.made, w)
 		} else {
@@ -217,6 +221,57 @@ func resumeOf(s Thread) (r *setupResume, gone []string) {
 		}
 	}
 	return r, gone
+}
+
+// resumeBranch is the branch a retried setup goes on, and whether it is there to check
+// out, as pickBranch decides for a first run. A name stays what it was while it still means
+// what it did. But a new branch has no reservation between runs, so it may exist by now,
+// and not by this setup's doing (the projects it made it in do not count):
+//
+//   - One the user typed is taken as existing, its base dropped, as a first run would take
+//     it now. So a thread there already is shared: asking for a branch by name asks for
+//     that, and it is what thread.new --branch does.
+//   - A generated one was never asked for, and whoever has it is unrelated work: the setup
+//     picks again, as if it had come second the first time, starting over with what it made
+//     on the old name, since one thread has one branch.
+func (m *Manager) resumeBranch(ctx context.Context, w *worktreePlan, t *setupTracker) (branch string, existing bool, release func(), err error) {
+	r := w.resume
+	none := func() {}
+	if r.existing {
+		return r.branch, true, none, nil
+	}
+	var all, others []string
+	for _, p := range w.git {
+		all = append(all, p.Path)
+		if !r.own[p.ID] {
+			others = append(others, p.Path)
+		}
+	}
+	if strings.TrimSpace(w.nw.Branch) != "" {
+		existing = m.userBranchExists(ctx, others, r.branch)
+		t.renamed(r.branch, existing)
+		return r.branch, existing, none, nil
+	}
+	if release, ok := m.reserveBranch(others, r.branch); ok {
+		if !m.branchExists(ctx, others, r.branch) {
+			return r.branch, false, release, nil
+		}
+		release()
+	}
+	m.log.Info("the branch a failed setup named was taken meanwhile; picking another", "thread", w.id, "branch", r.branch)
+	if kept := m.rollback(ctx, w.id, r.made); len(kept) > 0 {
+		return "", false, none, fmt.Errorf("%w: branch %s was taken meanwhile, and %s has work on it", ErrFailedPrecondition, r.branch, strings.Join(kept, ", "))
+	}
+	lost := make([]string, len(r.made))
+	for i, made := range r.made {
+		lost[i] = made.projectID
+	}
+	t.lost(lost)
+	r.made, r.own = nil, map[string]bool{}
+	branch, existing, release = m.pickBranch(ctx, all, w.bc, r.branch, w.id)
+	r.branch, r.existing = branch, existing
+	t.renamed(branch, existing)
+	return branch, existing, release, nil
 }
 
 // replan decides what a retried setup still has to do. A placement that landed stands,
@@ -228,8 +283,8 @@ func (m *Manager) replan(j *setupJob, t *setupTracker) error {
 	if !ok {
 		return m.notFound(j.id)
 	}
-	m.abandonAdds(j.ctx, s)
-	t.edit(func(c *Setup, _ time.Time) { c.Adding = nil })
+	left, _ := m.abandonAdds(j.ctx, s)
+	t.edit(func(c *Setup, _ time.Time) { c.Adding = left }) // what stays fails the add, and says so
 	if s.WorktreePath != "" && isDir(s.WorktreePath) && m.requireCheckouts(s) == nil {
 		j.p = placedOf(s)
 		return nil
@@ -412,33 +467,51 @@ func (m *Manager) cleanSetup(ctx context.Context, id string) []string {
 		return nil
 	}
 	kept := m.rollback(ctx, id, madeOf(s.Setup))
-	m.abandonAdds(ctx, s)
+	_, stayed := m.abandonAdds(ctx, s)
 	m.update(id, true, func(r *record) {
 		r.s.Setup = r.s.Setup.edit(func(c *Setup) { c.Made, c.Adding = nil, nil })
 	})
-	return kept
+	return append(kept, stayed...)
 }
 
 // abandonAdds removes what the adds on s's record left, unless a thread has the path by
-// now. Only the daemon's death leaves one there.
-func (m *Manager) abandonAdds(ctx context.Context, s Thread) {
+// now. Only the daemon's death leaves one there. left are the adds that could not be
+// undone, and stayed their paths still on disk.
+func (m *Manager) abandonAdds(ctx context.Context, s Thread) (left []SetupAdd, stayed []string) {
 	ctx = context.WithoutCancel(ctx)
 	for _, a := range s.Setup.Adding {
-		m.abandonAdd(ctx, s.ID, a)
+		if m.abandonAdd(ctx, s.ID, a) {
+			continue
+		}
+		left = append(left, a)
+		if pathExists(a.Path) {
+			stayed = append(stayed, a.Path)
+		}
 	}
+	return left, stayed
 }
 
-func (m *Manager) abandonAdd(ctx context.Context, id string, a SetupAdd) {
-	unlock := m.lockWorktree(a.ProjectID, a.Branch)
+// abandonAdd is abandonAdds for a, under the lock that makes or shares its worktree; false
+// when it could not.
+func (m *Manager) abandonAdd(ctx context.Context, id string, a SetupAdd) bool {
+	unlock, err := m.lockWorktree(ctx, a.ProjectID, a.Branch)
+	if err != nil {
+		return false
+	}
 	defer unlock()
 	if who, held := m.heldElsewhere(id, a.Path); held {
 		m.log.Info("half-made worktree left: another thread has the path", "thread", id, "path", a.Path, "holder", who)
-		return
+		return true
 	}
-	if err := m.opts.Projects.AbandonWorktree(ctx, project.AbandonWorktreeOptions{ProjectID: a.ProjectID, Path: a.Path, Branch: a.Branch, Head: a.Head}); err != nil &&
-		!errors.Is(err, project.ErrNotFound) {
+	o := project.AbandonWorktreeOptions{ProjectID: a.ProjectID, Path: a.Path, Branch: a.Branch, Head: a.Head}
+	if m.branchHeld(id, a.ProjectID, a.Branch) {
+		o.Head = "" // another thread's, as in rollbackOne
+	}
+	if err := m.opts.Projects.AbandonWorktree(ctx, o); err != nil {
 		m.log.Warn("remove what a lost worktree add left", "thread", id, "project", a.ProjectID, "path", a.Path, "err", err)
+		return false
 	}
+	return true
 }
 
 // discardUnmadeTimeout bounds how long the threads of Creates lost with the daemon wait
@@ -525,6 +598,7 @@ func (m *Manager) sendToSetup(ctx context.Context, id string, log *threadLog, o 
 	if o.itemID, err = newUUID(); err != nil {
 		return Item{}, false, err
 	}
+	log.holdQueued(o.itemID)
 	u := userItem(o.itemID, o)
 	u.Queued = true
 	it = w.add(u)
@@ -548,10 +622,12 @@ func (m *Manager) sendToSetup(ctx context.Context, id string, log *threadLog, o 
 		}
 	default:
 		m.mu.Unlock()
+		log.releaseQueued(o.itemID) // not the row's: the process has it from here
 		return it, false, nil
 	}
 	m.mu.Unlock()
 	if err != nil {
+		log.releaseQueued(o.itemID)
 		if deleteItem(ctx, m.opts.DB, id, it.ID) == nil {
 			log.dropItem(it.ID) // refused: it did not land
 		}

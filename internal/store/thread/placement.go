@@ -616,9 +616,19 @@ func (m *Manager) placeWorktrees(ctx context.Context, p placedThread, w *worktre
 	todo := w.resume.left(w.todo())
 	var pf *prefetches
 	if w.resume.named() {
-		// It stays what it was. Whether it is new now depends on each project: made in
-		// one, not yet in another (makeWorktree looks).
-		branch, fresh, p.namerCalled = w.resume.branch, pl.newBranch, true
+		var existing bool
+		var release func()
+		var err error
+		if branch, existing, release, err = m.resumeBranch(ctx, w, t); err != nil {
+			return p, err
+		}
+		defer release() // the worktrees are made (or rolled back) by then
+		todo = w.resume.left(w.todo())
+		fresh, p.namerCalled = !existing, true
+		if existing && (base != "" || len(bases) > 0) {
+			m.log.Info("branch exists; checking it out and ignoring the base", "thread", w.id, "branch", branch, "base", base)
+			base, bases = "", nil
+		}
 	} else if pl.newBranch {
 		paths := make([]string, len(git))
 		for i, r := range git {
@@ -646,7 +656,7 @@ func (m *Manager) placeWorktrees(ctx context.Context, p placedThread, w *worktre
 		var release func()
 		branch, existing, release = m.pickBranch(ctx, paths, bc, sl.branch, w.id)
 		defer release() // the worktrees are made (or rolled back) by then
-		t.named(branch)
+		t.named(branch, existing)
 		if existing && (base != "" || len(bases) > 0) {
 			m.log.Info("branch exists; checking it out and ignoring the base", "thread", w.id, "branch", branch, "base", base)
 			base, bases = "", nil
@@ -881,7 +891,10 @@ func (m *Manager) makeWorktrees(ctx context.Context, id string, projects []proje
 // this one did, so nothing is. A worktree that exists is noted on t, under the same lock
 // a cleanup takes: it is about to be someone else's too.
 func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, base string, fresh, fromOrigin, prefetched, fetched bool, t *setupTracker) (madeWorktree, bool, error) {
-	unlock := m.lockWorktree(r.ID, branch)
+	unlock, err := m.lockWorktree(ctx, r.ID, branch)
+	if err != nil {
+		return madeWorktree{}, false, err
+	}
 	defer unlock()
 	if fresh && m.opts.RefExists(ctx, r.Path, "refs/heads/"+branch) {
 		m.log.Info("new branch was made meanwhile by another create; sharing it", "project", r.ID, "branch", branch)
@@ -940,7 +953,10 @@ func (m *Manager) rollback(ctx context.Context, id string, made []madeWorktree) 
 // rollbackOne is rollback for w, under the lock that makes or shares it; true when it
 // stays.
 func (m *Manager) rollbackOne(ctx context.Context, id string, w madeWorktree) bool {
-	unlock := m.lockWorktree(w.projectID, w.branch)
+	unlock, err := m.lockWorktree(ctx, w.projectID, w.branch)
+	if err != nil {
+		return true
+	}
 	defer unlock()
 	if who, held := m.heldElsewhere(id, w.path); held {
 		m.log.Info("worktree kept: another thread has it", "thread", id, "project", w.projectID, "path", w.path, "holder", who)
@@ -950,11 +966,13 @@ func (m *Manager) rollbackOne(ctx context.Context, id string, w madeWorktree) bo
 	if w.ownBranch && !m.branchHeld(id, w.projectID, w.branch) {
 		o.DeleteMadeBranch = w.branch
 	}
-	err := m.opts.Projects.RemoveWorktree(ctx, o)
+	err = m.opts.Projects.RemoveWorktree(ctx, o)
 	var dirty *project.UncommittedError
 	switch {
-	case err == nil, errors.Is(err, project.ErrNotFound):
+	case err == nil:
 		return false
+	case errors.Is(err, project.ErrNotFound):
+		return isDir(w.path) // gone from the listing is not gone from the disk
 	case errors.As(err, &dirty):
 		m.log.Info("worktree kept: it has work in it", "thread", id, "project", w.projectID, "path", w.path)
 	default:
@@ -985,12 +1003,18 @@ func (m *Manager) branchHeld(id, pid, branch string) bool {
 	})
 }
 
-// lockWorktree serializes making (project, branch)'s worktree within the store.
-func (m *Manager) lockWorktree(projectID, branch string) (unlock func()) {
-	v, _ := m.wtLocks.LoadOrStore(projectID+"\x00"+branch, &sync.Mutex{})
-	mu := v.(*sync.Mutex)
-	mu.Lock()
-	return mu.Unlock
+// lockWorktree serializes making (project, branch)'s worktree within the store. The wait
+// ends with ctx: another add on that branch can hold it for as long as git takes, and a
+// cancelled setup does not wait for that.
+func (m *Manager) lockWorktree(ctx context.Context, projectID, branch string) (unlock func(), err error) {
+	v, _ := m.wtLocks.LoadOrStore(projectID+"\x00"+branch, make(chan struct{}, 1))
+	held := v.(chan struct{})
+	select {
+	case held <- struct{}{}:
+		return func() { <-held }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 // ensureMembers makes s's other members' checkouts whole before it starts and returns
@@ -1123,7 +1147,10 @@ func (m *Manager) remakeOnHead(ctx context.Context, s Thread, r project.Project,
 	if last == "" {
 		return madeWorktree{}, "", false, nil
 	}
-	unlock := m.lockWorktree(r.ID, last)
+	unlock, err := m.lockWorktree(ctx, r.ID, last)
+	if err != nil {
+		return madeWorktree{}, "", false, err
+	}
 	defer unlock()
 	if wt, ok := m.memberWorktree(r, last); ok {
 		m.log.Info("another worktree has the last branch of a removed member; the thread takes it over", "thread", s.ID, "project", r.ID, "branch", last, "path", wt.Path)

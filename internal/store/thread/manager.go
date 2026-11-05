@@ -370,8 +370,8 @@ type Manager struct {
 		sync.Mutex
 		keys map[shellKey]bool
 	}
-	// wtLocks serialize making one (project, branch) worktree (placement.go): key ->
-	// *sync.Mutex.
+	// wtLocks serialize making one (project, branch) worktree (placement.go): key -> a
+	// chan struct{} of one, held while full.
 	wtLocks sync.Map
 	// branchRes are the auto-named new branches Creates picked and are making now
 	// (reserveBranch, branchname.go): "<repo path>\x00<branch>".

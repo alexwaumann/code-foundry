@@ -232,9 +232,13 @@ func (m *Manager) saveItem(id string, it Item) {
 
 // closeUnfinished completes items a run left open: streaming text stays as it is,
 // running tool calls become errors, pending requests are cancelled, queued messages
-// stay where they are (Claude never read them).
+// stay where they are (Claude never read them) and stop being queued, unless the row still
+// has them for the next process (Setup.Queued): those are still on their way.
 func closeUnfinished(w itemWriter, why string) {
 	for _, it := range w.log.unfinished() {
+		if it.Queued && w.log.queuedHeld(it.ID) {
+			continue
+		}
 		w.change(it.ID, func(x *Item) {
 			x.Streaming, x.Queued = false, false
 			if x.Tool != nil && x.Tool.Status == ToolRunning {
@@ -669,6 +673,7 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 		r.m.clearPendingFirst(r.id)
 	}
 	if o.setupQueued {
+		st.log.releaseQueued(id)
 		r.m.clearSetupQueued(r.id, id)
 	}
 	if seed != "" {
@@ -1149,6 +1154,7 @@ func (r *runner) maybeExited() {
 		}
 	}
 	st.sd.pending = nil
+	st.log.releaseQueued() // the row lets go of them below (finish)
 	closeUnfinished(st.proj.w, "the thread's process ended")
 	// A turn still open had no result: a close or archive while busy, a crash.
 	st.proj.cutTurn(r.m.opts.Now())

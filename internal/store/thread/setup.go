@@ -94,7 +94,10 @@ type SetupStep struct {
 	// Ref is what a fetch fetches ("origin/main"), a worktree's start point once made.
 	Ref string `json:"ref,omitempty"`
 	// Branch is the branch of a name or worktree step, once named.
-	Branch    string          `json:"branch,omitempty"`
+	Branch string `json:"branch,omitempty"`
+	// Existing, on a name step: the branch was there to check out, so its base is ignored.
+	// Not on the API.
+	Existing  bool            `json:"existing,omitempty"`
 	Status    SetupStepStatus `json:"status"`
 	StartedAt time.Time       `json:"started_at,omitzero"`
 	EndedAt   time.Time       `json:"ended_at,omitzero"`
@@ -433,19 +436,30 @@ func (t *setupTracker) titled(title string, namerCalled bool) {
 	})
 }
 
-// named ends the name step with branch, which every worktree step goes on.
-func (t *setupTracker) named(branch string) {
+// named ends the name step with branch, which every worktree step goes on. existing: it
+// was there to check out.
+func (t *setupTracker) named(branch string, existing bool) {
 	t.edit(func(s *Setup, now time.Time) {
-		if st := s.step(SetupStepName, ""); st != nil {
-			st.Branch = branch
-			st.end(SetupStepDone, now)
-		}
-		for i := range s.Steps {
-			if s.Steps[i].Kind == SetupStepWorktree {
-				s.Steps[i].Branch = branch
-			}
-		}
+		s.name(branch, existing)
+		s.step(SetupStepName, "").end(SetupStepDone, now)
 	})
+}
+
+// renamed is named for a retry whose branch changed: the step ended with the run before.
+func (t *setupTracker) renamed(branch string, existing bool) {
+	t.edit(func(s *Setup, _ time.Time) { s.name(branch, existing) })
+}
+
+// name puts branch on the name step and every worktree step.
+func (s *Setup) name(branch string, existing bool) {
+	if st := s.step(SetupStepName, ""); st != nil {
+		st.Branch, st.Existing = branch, existing
+	}
+	for i := range s.Steps {
+		if s.Steps[i].Kind == SetupStepWorktree {
+			s.Steps[i].Branch = branch
+		}
+	}
 }
 
 // progress is the project store's Progress for project id's steps.

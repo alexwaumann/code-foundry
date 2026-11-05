@@ -683,7 +683,9 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	// Killed, git cannot clean up after itself. Nobody has seen this worktree yet.
 	undo := func() {
 		if ctx.Err() != nil {
-			g.undoAdd(context.WithoutCancel(ctx), m, AbandonWorktreeOptions{Path: path, Branch: adding.Branch, Head: adding.Head})
+			if err := g.undoAdd(context.WithoutCancel(ctx), m, AbandonWorktreeOptions{Path: path, Branch: adding.Branch, Head: adding.Head}); err != nil {
+				g.log.Warn("a killed worktree add left something behind", "project", m.ID, "path", path, "err", err)
+			}
 		}
 	}
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {

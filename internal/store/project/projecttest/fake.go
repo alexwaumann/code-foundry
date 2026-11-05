@@ -45,6 +45,8 @@ type Fake struct {
 	// Remotes are given to projects created by Register (cloned). Nil, the default,
 	// registers local-only projects; Put sets any remotes directly.
 	Remotes []string
+	// Abandons are AbandonWorktree's calls.
+	Abandons []project.AbandonWorktreeOptions
 	// MakeDirs makes CreateWorktree create the worktree's directory, for callers that
 	// start processes in it.
 	MakeDirs bool
@@ -353,6 +355,7 @@ func (f *Fake) RemoveWorktree(_ context.Context, o project.RemoveWorktreeOptions
 func (f *Fake) AbandonWorktree(_ context.Context, o project.AbandonWorktreeOptions) error {
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "AbandonWorktree "+o.ProjectID+" "+o.Path+" "+o.Branch)
+	f.Abandons = append(f.Abandons, o)
 	r, ok := f.projects[o.ProjectID]
 	if !ok {
 		f.mu.Unlock()

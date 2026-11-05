@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -179,8 +180,9 @@ func TestAbandonWorktree(t *testing.T) {
 			t.Fatal(err)
 		}
 		writeFile(t, filepath.Join(w.Path, "work.txt"), "work\n")
-		if err := h.store.AbandonWorktree(ctx, AbandonWorktreeOptions{ProjectID: r.ID, Path: w.Path, Branch: "cf/whole", Head: strings.TrimSpace(head)}); err != nil {
-			t.Fatal(err)
+		err = h.store.AbandonWorktree(ctx, AbandonWorktreeOptions{ProjectID: r.ID, Path: w.Path, Branch: "cf/whole", Head: strings.TrimSpace(head)})
+		if !errors.Is(err, ErrFailedPrecondition) {
+			t.Errorf("AbandonWorktree = %v: it has to say something stayed", err)
 		}
 		if _, err := os.Stat(filepath.Join(w.Path, "work.txt")); err != nil {
 			t.Errorf("the work went: %v", err)
@@ -198,6 +200,123 @@ func TestAbandonWorktree(t *testing.T) {
 		}
 		if _, err := os.Stat(dir); err != nil {
 			t.Errorf("it took %s: %v", dir, err)
+		}
+	})
+}
+
+// listingRunner breaks `git worktree list` on demand and nothing else.
+type listingRunner struct {
+	next ExecRunner
+	mode atomic.Int32
+}
+
+const (
+	listingWorks = iota
+	listingFails
+	listingGarbled
+)
+
+func (r *listingRunner) Run(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) > 1 && args[0] == "worktree" && args[1] == "list" {
+		switch r.mode.Load() {
+		case listingFails:
+			return nil, errors.New("git is busy")
+		case listingGarbled:
+			return []byte("HEAD before any worktree\x00"), nil
+		}
+	}
+	return r.next.Run(ctx, dir, args...)
+}
+
+// A listing that cannot be read says nothing about the path: nothing is touched, and the
+// caller hears that something stayed. Not listed is not the same thing.
+func TestAbandonWorktreeFailsClosed(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		mode int32
+	}{{"the listing fails", listingFails}, {"the listing is garbled", listingGarbled}} {
+		t.Run(mode.name, func(t *testing.T) {
+			f := newFixture(t)
+			runner := &listingRunner{}
+			h := startHarness(t, "", Options{Runner: runner})
+			ctx := context.Background()
+			r, err := h.store.Register(ctx, f.project)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "cf/work", BaseRef: "main"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			work := filepath.Join(w.Path, "work.txt")
+			writeFile(t, work, "uncommitted\n")
+			head := git(t, f.project, "rev-parse", "main")
+
+			runner.mode.Store(mode.mode)
+			err = h.store.AbandonWorktree(ctx, AbandonWorktreeOptions{ProjectID: r.ID, Path: w.Path, Branch: "cf/work", Head: head})
+			runner.mode.Store(listingWorks)
+			if !errors.Is(err, ErrFailedPrecondition) {
+				t.Errorf("AbandonWorktree = %v", err)
+			}
+			if _, err := os.Stat(work); err != nil {
+				t.Errorf("the work went: %v", err)
+			}
+			if out := git(t, f.project, "worktree", "list", "--porcelain"); !strings.Contains(out, w.Path) {
+				t.Errorf("git lost it:\n%s", out)
+			}
+			if out := git(t, f.project, "branch", "--list", "cf/work"); out == "" {
+				t.Error("the branch went")
+			}
+		})
+	}
+}
+
+// Only what is shown to be half made is forced: git's own "initializing" lock, or an empty
+// directory. A lock of someone's and a folder git does not list stay.
+func TestAbandonWorktreeLeavesWhatItCannotPlace(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	ctx := context.Background()
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("a worktree someone locked", func(t *testing.T) {
+		w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "cf/locked", BaseRef: "main"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		git(t, f.project, "worktree", "lock", "--reason", "mine", w.Path)
+		writeFile(t, filepath.Join(w.Path, "work.txt"), "work\n")
+		if err := h.store.AbandonWorktree(ctx, AbandonWorktreeOptions{ProjectID: r.ID, Path: w.Path}); !errors.Is(err, ErrFailedPrecondition) {
+			t.Errorf("AbandonWorktree = %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(w.Path, "work.txt")); err != nil {
+			t.Errorf("the work went: %v", err)
+		}
+	})
+	path := h.store.DefaultWorktreePath(r.ID, "cf/folder")
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("an empty folder", func(t *testing.T) {
+		if err := h.store.AbandonWorktree(ctx, AbandonWorktreeOptions{ProjectID: r.ID, Path: path}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("it stayed: %v", err)
+		}
+	})
+	t.Run("a folder with something in it", func(t *testing.T) {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(path, "mine.txt"), "mine\n")
+		if err := h.store.AbandonWorktree(ctx, AbandonWorktreeOptions{ProjectID: r.ID, Path: path}); !errors.Is(err, ErrFailedPrecondition) {
+			t.Errorf("AbandonWorktree = %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(path, "mine.txt")); err != nil {
+			t.Errorf("it went: %v", err)
 		}
 	})
 }
@@ -259,6 +378,32 @@ func TestRemoveWorktreeDeleteMadeBranch(t *testing.T) {
 				t.Errorf("branch stays = %v, want %v", got, c.branchStays)
 			}
 		})
+	}
+}
+
+// A group with only a zombie in it has nothing left to kill: macOS answers EPERM, which
+// must read as done, or exec.Cmd takes it for a failed cancel.
+func TestKillGroupOfAZombie(t *testing.T) {
+	cmd := exec.Command("/usr/bin/true")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = cmd.Wait() }()
+	pid := strconv.Itoa(cmd.Process.Pid)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		out, err := exec.Command("ps", "-o", "stat=", "-p", pid).Output()
+		if err == nil && strings.HasPrefix(strings.TrimSpace(string(out)), "Z") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no zombie: %q, %v", out, err)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if err := killGroup(cmd.Process.Pid); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		t.Errorf("killGroup = %v", err)
 	}
 }
 

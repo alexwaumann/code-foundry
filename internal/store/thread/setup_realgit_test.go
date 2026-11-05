@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -340,6 +341,150 @@ func TestRetrySeesWhatTheUserJustFixed(t *testing.T) {
 	done := e.waitFor(s.ID, "the retry to end", func(s Thread) bool { return s.Setup.Phase != SetupRunning })
 	if done.Setup.Phase != SetupDone || done.Branch != "main" {
 		t.Errorf("setup %+v", done.Setup)
+	}
+}
+
+// flakyGit is the real project store with a worktree add that fails on demand: a first run
+// that fails after naming, with git as it is.
+type flakyGit struct {
+	*project.Git
+	fail atomic.Bool
+}
+
+func (f *flakyGit) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptions) (project.Worktree, error) {
+	if f.fail.Load() {
+		return project.Worktree{}, &project.GitError{Stderr: "fatal: not today\n", ExitCode: 128}
+	}
+	return f.Git.CreateWorktree(ctx, o)
+}
+
+// newFlakyGit is newRealGit with adds failing until healed.
+func newFlakyGit(t *testing.T) (*env, *realRepo, *flakyGit) {
+	t.Helper()
+	var fg *flakyGit
+	e, r := newRealGit(t, func(o *Options) {
+		fg = &flakyGit{Git: o.Projects.(*project.Git)}
+		fg.fail.Store(true)
+		o.Projects = fg
+	})
+	return e, r, fg
+}
+
+// onOrigin puts branch on origin with a commit of its own, and nowhere here, not even as a
+// remote-tracking ref: pushed from another clone. It returns the commit.
+func (r *realRepo) onOrigin(branch string) string {
+	r.t.Helper()
+	r.git("switch", "-q", "-c", branch)
+	if err := os.WriteFile(filepath.Join(r.path, "theirs.txt"), []byte("theirs\n"), 0o644); err != nil {
+		r.t.Fatal(err)
+	}
+	r.git("add", ".")
+	r.git("commit", "-q", "-m", "theirs")
+	tip := r.git("rev-parse", "HEAD")
+	r.git("push", "-q", "origin", branch)
+	r.git("switch", "-q", "main")
+	r.git("branch", "-q", "-D", branch)
+	r.git("update-ref", "-d", "refs/remotes/origin/"+branch)
+	return tip
+}
+
+// checkedOutOrigins fails unless branch is origin's commit, tracking it, in the worktree.
+func (r *realRepo) checkedOutOrigins(s Thread, branch, tip string) {
+	r.t.Helper()
+	if s.Branch != branch {
+		r.t.Errorf("branch %q", s.Branch)
+	}
+	if got := r.git("rev-parse", branch); got != tip {
+		r.t.Errorf("%s is at %s, origin's at %s: made anew from the base", branch, got, tip)
+	}
+	if got := r.git("rev-parse", "--abbrev-ref", branch+"@{upstream}"); got != "origin/"+branch {
+		r.t.Errorf("upstream %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(s.WorktreePath, "theirs.txt")); err != nil {
+		r.t.Errorf("origin's work is not there: %v", err)
+	}
+}
+
+// A branch on origin only, with a base given: the first run saw it existed and dropped the
+// base, and a retry must not forget that.
+func TestRetryChecksOutOriginsBranch(t *testing.T) {
+	e, r, fg := newFlakyGit(t)
+	tip := r.onOrigin("feat/x")
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: r.id, InitialPrompt: "do x", NewWorktree: &NewWorktree{Branch: "feat/x", BaseRef: "main"}, BackgroundSetup: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = e.waitFor(s.ID, "the setup to fail", func(s Thread) bool { return s.Setup.Phase == SetupFailed })
+	if !s.Setup.step(SetupStepName, "").Existing {
+		t.Fatalf("name step %+v", s.Setup.step(SetupStepName, ""))
+	}
+	fg.fail.Store(false)
+	if _, err := e.m.RetrySetup(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	r.checkedOutOrigins(e.waitFor(s.ID, "the retry to land", func(s Thread) bool { return s.Setup.Phase != SetupRunning }), "feat/x", tip)
+}
+
+// The same for a typed branch that appeared on origin after the first run: it is what a
+// first run now would check out.
+func TestRetryChecksOutATypedBranchThatAppeared(t *testing.T) {
+	e, r, fg := newFlakyGit(t)
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: r.id, InitialPrompt: "do x", NewWorktree: &NewWorktree{Branch: "feat/y", BaseRef: "main"}, BackgroundSetup: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = e.waitFor(s.ID, "the setup to fail", func(s Thread) bool { return s.Setup.Phase == SetupFailed })
+	if s.Setup.step(SetupStepName, "").Existing {
+		t.Fatalf("name step %+v", s.Setup.step(SetupStepName, ""))
+	}
+	tip := r.onOrigin("feat/y")
+	fg.fail.Store(false)
+	if _, err := e.m.RetrySetup(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	done := e.waitFor(s.ID, "the retry to land", func(s Thread) bool { return s.Setup.Phase != SetupRunning })
+	r.checkedOutOrigins(done, "feat/y", tip)
+	if !done.Setup.step(SetupStepName, "").Existing {
+		t.Errorf("name step %+v", done.Setup.step(SetupStepName, ""))
+	}
+}
+
+// A fails after naming fix/login, an unrelated thread gets the same name and lands: Try
+// again on A must not land in B's worktree.
+func TestRetryDoesNotLandInAnUnrelatedThreadsWorktree(t *testing.T) {
+	e, r, fg := newFlakyGit(t)
+	e.namer = func(string) (string, error) { return "Title: Fix login\nBranch: fix/login", nil }
+	a, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: r.id, InitialPrompt: "do x", NewWorktree: &NewWorktree{}, BackgroundSetup: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a = e.waitFor(a.ID, "the setup to fail", func(s Thread) bool { return s.Setup.Phase == SetupFailed })
+	if got := a.Setup.step(SetupStepName, "").Branch; got != "fix/login" {
+		t.Fatalf("named %q", got)
+	}
+	fg.fail.Store(false)
+	b := e.create(CreateOptions{ProjectID: r.id, InitialPrompt: "do y", NewWorktree: &NewWorktree{}})
+	if b.Branch != "fix/login" {
+		t.Fatalf("B on %q", b.Branch)
+	}
+	if _, err := e.m.RetrySetup(e.ctx(), a.ID); err != nil {
+		t.Fatal(err)
+	}
+	done := e.waitFor(a.ID, "the retry to land", func(s Thread) bool { return s.Setup.Phase != SetupRunning })
+	if done.Branch != "fix/login-2" || done.WorktreePath == b.WorktreePath {
+		t.Errorf("A on %q at %q, B at %q", done.Branch, done.WorktreePath, b.WorktreePath)
+	}
+	for _, kind := range []SetupStepKind{SetupStepName, SetupStepWorktree} {
+		pid := ""
+		if kind == SetupStepWorktree {
+			pid = r.id
+		}
+		if st := done.Setup.step(kind, pid); st == nil || st.Branch != "fix/login-2" {
+			t.Errorf("step %+v", st)
+		}
+	}
+	if got := r.worktrees(); len(got) != 3 {
+		t.Errorf("worktrees %q", got)
 	}
 }
 

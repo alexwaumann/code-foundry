@@ -43,10 +43,27 @@ rollback's rules below, which are better for it too.
   hold a branch (`branchHeld`).
 - **What a killed add leaves is undone in two places.** Live, by `CreateWorktree`, the one who
   knows the path was free. After a daemon death, from `Setup.Adding`, written before git
-  starts and dropped when the add ends. `undoAdd` looks first: git locks a worktree until its
-  checkout is done, so an unlocked one is whole, and goes without force or not at all. Only
-  a locked or unlisted one gets `--force --force` and `RemoveAll`. Paths outside the
-  worktree root are refused.
+  starts and dropped when the add ends.
+- **`undoAdd` only forces what it can show is half made**, and fails closed on the rest. Its
+  evidence is `git worktree list`: locked with the reason `initializing` is half made, and gets
+  `--force --force` and `RemoveAll`. Listed otherwise (whole, or locked by someone) goes
+  without force or not at all. Not listed, only an empty directory goes. A list that cannot
+  be read or parsed touches nothing: "listing failed" was once read as "not listed", which
+  deleted uncommitted work. Whatever stays is an error, reported in `kept_worktrees`, and a
+  retry keeps the add on the row. The other delete paths were checked for the same shape:
+  `dropStaleWorktrees` returns on a failed list, a branch whose tip cannot be read stays, and
+  a worktree `RemoveWorktree` does not find counts as kept while it is on disk.
+- **A named branch stays what it was while it means what it did.** A new branch has no
+  reservation between runs, so `resumeBranch` looks again, leaving out the projects this setup
+  made it in. `SetupStep.Existing` (off the API) keeps what the first run saw, base dropped
+  included, even if origin cannot be reached now.
+  - A name the user typed that exists now is taken as existing and its base dropped, and a
+    thread already there is **shared**. That is the rule a first run applies to the same
+    `--branch`: asking for a branch by name asks for that branch.
+  - A generated name that was taken is **picked again** through `pickBranch`, reservations
+    included. Nobody asked for that name, so whoever has it is unrelated work. A worktree this
+    setup made on the old name goes first, since one thread has one branch; if it has work in
+    it the retry fails and says so. The steps and the row show the branch used.
 - **The retry's reopened turn: the old turn end is deleted.** Moving the message after it
   leaves an empty turn, and changing its kind leaves a second failure display for PR 3 to hide.
   So `dropItem` removes it, `ItemsReset` tells watchers, and `WatchThread` sends a new
@@ -97,22 +114,41 @@ rollback's rules below, which are better for it too.
   the process is gone and allow that bound.
 - `spawnStream` read `rec.s` without `m.mu`: a race the moment anything writes the record during
   a spawn, as a queued message does. It takes the thread now.
-- A restart's `closeLostRun` clears `Queued` on items. `Manager.thread` puts it back for what is on
-  the row, so a queued message still reads as queued after the restart.
+- A message on the row stays `Queued` through every process end but one. `closeUnfinished` runs at
+  each spawn, at a load and at a stop, and clearing the flag there made a queued message read as
+  not queued after a failed start, and raised `taken`, so `HandledThrough` covered a message Claude
+  had not read. `threadLog.held` marks what the row has, from before the item is written. The
+  exception is a Claude that dies before its handshake: the row lets go of the messages, as of
+  the first prompt, and the flag goes with them, or it would read as queued for ever.
+- A second namer starts from a transcript line, which the fake never writes, and `namedForGood`
+  stops it anyway once there is a title. So those tests use a namer that gives no title, call
+  `startNaming` themselves and count after Shutdown, which waits for naming.
+- `lockWorktree` is a channel so a wait can end with its ctx. A cleanup's ctx never ends, so it
+  still waits; nothing holds that lock long while the worktree it guards exists.
 - A daemon killed mid-add does not kill git, which is in its own session: it can finish, or
   clean up by itself and leave the branch. `undoAdd` deals with all of those.
 - A lost blocking setup keeps its row until its projects have listed worktrees, Removing, for a
   moment in the snapshot after a start. If they never do within 2 minutes the thread goes without
   its cleanup, and the abandoned sweep is the backstop.
 - Attachments are still reaped at 7 days, so a Try again or a draft after that finds them gone.
+
+## Accepted
+
+- **`git worktree remove` without force deletes ignored files** in a failed setup's worktree.
+  Setup never got to run anything there (the on-worktree-create actions run after spawn), so only
+  someone who went in by hand can have put them there, and keeping such worktrees would also
+  catch `node_modules`.
+- **A PR 1 row in flight at the upgrade has no `background` field and is discarded** at the start,
+  as a blocking one. `--background-setup` was a CLI-only flag and nothing else sent it.
 - The fake replays one capture, so a queued message stays `Queued` in its timelines: only real
   `command_lifecycle` frames clear the flag, by the same path as a message queued behind the
   handshake.
 
 ## For PRs 3 and 4
 
-The exact surface is in the PR body. Two things not to assume: steps go back to pending, and a
-retry changes `started_at`, so "Set up in 6.8s" is the last run's.
+The exact surface is in the PR body. Things not to assume: steps go back to pending, a retry
+changes `started_at`, so "Set up in 6.8s" is the last run's, and a retry can change the branch
+a generated name gave, so read it from the steps again.
 
 ## Seen end to end
 

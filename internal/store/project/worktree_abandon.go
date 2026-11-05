@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -29,58 +30,83 @@ func (g *Git) AbandonWorktree(ctx context.Context, opts AbandonWorktreeOptions) 
 	}
 	ctx, cancel := context.WithTimeout(ctx, worktreeTimeout)
 	defer cancel()
-	g.undoAdd(ctx, m, opts)
+	if err := g.undoAdd(ctx, m, opts); err != nil {
+		return err
+	}
 	g.forgetMade(ctx, g.now(), opts.Path)
 	return g.sched.wait(ctx, jobKey{kind: jobReconcile, projectID: m.ID})
 }
 
-// undoAdd takes away what the add of o.Path left. git locks a worktree until its checkout
-// is done, so one it lists unlocked is whole and may have been worked in (an add that
-// finished as the daemon died, a worktree made there since): that goes as any worktree
-// does, only when git finds nothing to lose, and its branch stays with it when it does
-// not. Anything else is only half there: the worktree (the second --force is for the
-// lock), the directory should git not take it for one, its entry, then the branch while it
-// is where the add put it.
-func (g *Git) undoAdd(ctx context.Context, m *projectMeta, o AbandonWorktreeOptions) {
-	if entry, ok := g.worktreeEntry(ctx, m, o.Path); ok && !entry.Locked {
-		if _, err := g.runner.Run(ctx, m.Path, "worktree", "remove", o.Path); err != nil {
-			g.log.Info("worktree kept: git would lose something in it", "project", m.ID, "path", o.Path, "err", err)
-			return
+// undoAdd takes away what the add of o.Path left, and only what it can tell the add left,
+// so anything else is an error and stays. What git lists says which it is, and when it
+// cannot be read nothing is touched: a worktree that merely went unlisted would lose
+// its work.
+//
+//   - Listed, locked "initializing": half checked out, and nothing was ever worked on. The
+//     worktree goes (the second --force is for the lock), the directory should git not take
+//     it for one, its entry, then the branch while it is where the add put it.
+//   - Listed otherwise: whole (an add that finished as the daemon died, a worktree made
+//     there since), or locked by someone. It goes as any worktree does, only when git finds
+//     nothing to lose, and its branch stays with it when it does not.
+//   - Not listed: an add killed before its entry leaves an empty directory, so only that
+//     goes.
+func (g *Git) undoAdd(ctx context.Context, m *projectMeta, o AbandonWorktreeOptions) error {
+	entry, listed, err := g.worktreeEntry(ctx, m, o.Path)
+	switch {
+	case err != nil:
+		return fmt.Errorf("%w: %s stays: %w", ErrFailedPrecondition, o.Path, err)
+	case !listed:
+		if err := os.Remove(o.Path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("%w: %s stays: git does not list it, and it is not empty: %w", ErrFailedPrecondition, o.Path, err)
 		}
-		g.deleteUntouchedBranch(ctx, m, o.Branch, o.Head)
-		return
-	}
-	if _, err := g.runner.Run(ctx, m.Path, "worktree", "remove", "--force", "--force", o.Path); err != nil {
-		g.log.Debug("a half-made worktree is not one to git", "project", m.ID, "path", o.Path, "err", err)
-	}
-	if err := os.RemoveAll(o.Path); err != nil {
-		g.log.Warn("removing a half-made worktree failed", "project", m.ID, "path", o.Path, "err", err)
-	}
-	if _, err := g.runner.Run(ctx, m.Path, "worktree", "unlock", o.Path); err != nil {
-		g.log.Debug("no lock on a half-made worktree", "project", m.ID, "path", o.Path, "err", err)
-	}
-	if _, err := g.runner.Run(ctx, m.Path, "worktree", "prune"); err != nil {
-		g.log.Warn("pruning a half-made worktree failed", "project", m.ID, "path", o.Path, "err", err)
+	case entry.LockReason != lockInitializing:
+		if _, err := g.runner.Run(ctx, m.Path, "worktree", "remove", o.Path); err != nil {
+			return fmt.Errorf("%w: %s stays: %w", ErrFailedPrecondition, o.Path, err)
+		}
+	default:
+		g.removeHalfMade(ctx, m, o.Path)
 	}
 	g.deleteUntouchedBranch(ctx, m, o.Branch, o.Head)
-	g.log.Info("half-made worktree removed", "project", m.ID, "path", o.Path, "branch", o.Branch)
+	g.log.Info("what a worktree add left is gone", "project", m.ID, "path", o.Path, "branch", o.Branch)
+	return nil
 }
 
-// worktreeEntry is path's entry in `git worktree list`, read now.
-func (g *Git) worktreeEntry(ctx context.Context, m *projectMeta, path string) (listedWorktree, bool) {
+// lockInitializing is the reason git locks a worktree for while an add checks it out. Its
+// messages are C locale's here (gitEnv).
+const lockInitializing = "initializing"
+
+// removeHalfMade removes a worktree git listed as being added.
+func (g *Git) removeHalfMade(ctx context.Context, m *projectMeta, path string) {
+	if _, err := g.runner.Run(ctx, m.Path, "worktree", "remove", "--force", "--force", path); err != nil {
+		g.log.Debug("a half-made worktree is not one to git", "project", m.ID, "path", path, "err", err)
+	}
+	if err := os.RemoveAll(path); err != nil {
+		g.log.Warn("removing a half-made worktree failed", "project", m.ID, "path", path, "err", err)
+	}
+	if _, err := g.runner.Run(ctx, m.Path, "worktree", "unlock", path); err != nil {
+		g.log.Debug("no lock on a half-made worktree", "project", m.ID, "path", path, "err", err)
+	}
+	if _, err := g.runner.Run(ctx, m.Path, "worktree", "prune"); err != nil {
+		g.log.Warn("pruning a half-made worktree failed", "project", m.ID, "path", path, "err", err)
+	}
+}
+
+// worktreeEntry is path's entry in `git worktree list`, read now. An error says the list
+// could not be read, which says nothing about path.
+func (g *Git) worktreeEntry(ctx context.Context, m *projectMeta, path string) (listedWorktree, bool, error) {
 	out, err := g.runner.Run(ctx, m.Path, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
-		return listedWorktree{}, false
+		return listedWorktree{}, false, err
 	}
 	all, err := parseWorktreeList(out)
 	if err != nil {
-		return listedWorktree{}, false
+		return listedWorktree{}, false, err
 	}
 	i := slices.IndexFunc(all, func(e listedWorktree) bool { return samePath(e.Path, path) })
 	if i < 0 {
-		return listedWorktree{}, false
+		return listedWorktree{}, false, nil
 	}
-	return all[i], true
+	return all[i], true, nil
 }
 
 // deleteUntouchedBranch deletes branch while its tip is still head: made for a worktree

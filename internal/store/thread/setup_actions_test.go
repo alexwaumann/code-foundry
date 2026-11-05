@@ -1,14 +1,17 @@
 package thread
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -281,10 +284,7 @@ func TestRetryAfterARestart(t *testing.T) {
 	})
 	e.addGitProject(t, "r2", "other")
 	var named atomic.Int32
-	e.namer = func(string) (string, error) {
-		named.Add(1)
-		return "Title: Fix login\nBranch: fix/login", nil
-	}
+	e.namer = untitledNamer(&named)
 	s, err := e.m.Create(e.ctx(), twoProjects())
 	if err != nil {
 		t.Fatal(err)
@@ -333,11 +333,36 @@ func TestRetryAfterARestart(t *testing.T) {
 		t.Errorf("branch %q, named %q", done.Branch, lost.Setup.step(SetupStepName, "").Branch)
 	}
 	e.waitUserText("do x")
-	// No second naming once Claude got the message: the row said it ran.
-	time.Sleep(50 * time.Millisecond)
-	if n := named.Load(); n != 1 {
-		t.Errorf("namer ran %d times after the start", n)
+	noSecondNamer(t, e, s.ID, &named)
+}
+
+// untitledNamer counts its calls and names nothing, so the thread stays provisional and
+// only namingTried keeps a second call away: a title would end naming by itself.
+func untitledNamer(n *atomic.Int32) func(string) (string, error) {
+	return func(string) (string, error) {
+		n.Add(1)
+		return "", errors.New("no name today")
 	}
+}
+
+// noSecondNamer does what the runner does when it reads the first message in the
+// transcript, which the fake never writes, then waits for any naming to end: Shutdown waits
+// for it, so the count is final.
+func noSecondNamer(t *testing.T, e *env, id string, named *atomic.Int32) {
+	t.Helper()
+	if s, _ := e.m.Get(e.ctx(), id); s.namedForGood() {
+		t.Fatalf("named %q: this proves nothing", s.Name)
+	}
+	e.m.startNaming(id, "do x")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := e.m.Shutdown(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := named.Load(); n != 1 {
+		t.Errorf("namer ran %d times", n)
+	}
+	e.open()
 }
 
 // The thread a Like copied is gone by the retry: that is a setup failure saying so.
@@ -403,10 +428,7 @@ func TestRetryThatFails(t *testing.T) {
 func TestRetryAfterASpawnFailure(t *testing.T) {
 	e, _ := newWorktreeEnv(t, nil, func(o *Options) { o.Claude = "/nonexistent/claude" })
 	var named atomic.Int32
-	e.namer = func(string) (string, error) {
-		named.Add(1)
-		return "Title: Fix login\nBranch: fix/login", nil
-	}
+	e.namer = untitledNamer(&named)
 	s := failedSpawn(t, e)
 	e.restart(func(o *Options) { o.Claude = fakeClaudeBin })
 	if _, err := e.m.RetrySetup(e.ctx(), s.ID); err != nil {
@@ -420,10 +442,7 @@ func TestRetryAfterASpawnFailure(t *testing.T) {
 		t.Errorf("%d worktrees made", n)
 	}
 	e.waitUserText("do x")
-	time.Sleep(50 * time.Millisecond)
-	if n := named.Load(); n != 1 {
-		t.Errorf("namer ran %d times", n)
-	}
+	noSecondNamer(t, e, s.ID, &named)
 }
 
 // A worktree made by the first run that went since (by hand, with an archive) is made again.
@@ -855,9 +874,9 @@ func TestCleanupKeepsAWorktreeAnotherThreadHolds(t *testing.T) {
 
 // branchesOfWorktrees is a RefExists that knows the branches the fake's worktrees are on.
 func branchesOfWorktrees(rr *recordingProjects) func(context.Context, string, string) bool {
-	return func(_ context.Context, _, ref string) bool {
+	return func(_ context.Context, dir, ref string) bool {
 		for _, p := range rr.Snapshot().Projects {
-			if slices.ContainsFunc(p.Worktrees, func(w project.Worktree) bool { return ref == "refs/heads/"+w.Branch }) {
+			if p.Path == dir && slices.ContainsFunc(p.Worktrees, func(w project.Worktree) bool { return ref == "refs/heads/"+w.Branch }) {
 				return true
 			}
 		}
@@ -1199,7 +1218,8 @@ func TestBlockingSetupDiscardedAtStart(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	s := e.m.Snapshot().Threads[0]
-	time.Sleep(20 * time.Millisecond)
+	waitForStep(t, e, s.ID, SetupStepFetch, "r1", SetupStepRunning)
+	s, _ = e.m.Get(e.ctx(), s.ID)
 	// As the daemon's death leaves the row: running, with a worktree made and an add begun.
 	row := s
 	made, path := filepath.Join(e.projects.WorktreeRoot, "made"), filepath.Join(e.projects.WorktreeRoot, "half")
@@ -1264,7 +1284,7 @@ func TestArchiveCascadeOverAFailedCreate(t *testing.T) {
 		a, err := e.m.Archive(context.Background(), parent.ID, true)
 		got <- res{a, err}
 	}()
-	time.Sleep(30 * time.Millisecond)
+	waitInStack(t, "(*Manager).endSetup") // Archive is waiting for the child's setup
 	rr.mu.Lock()
 	rr.err = errors.New("git says no")
 	rr.mu.Unlock()
@@ -1278,6 +1298,364 @@ func TestArchiveCascadeOverAFailedCreate(t *testing.T) {
 	}
 	if r.t.ArchivedAt.IsZero() {
 		t.Errorf("parent %+v", r.t)
+	}
+}
+
+// waitInStack waits for a goroutine to be inside fn: a gate on where another call has got
+// to, for code with nothing else to watch.
+func waitInStack(t *testing.T, fn string) {
+	t.Helper()
+	buf := make([]byte, 8<<20)
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if n := runtime.Stack(buf, true); bytes.Contains(buf[:n], []byte(fn)) {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("nothing got to %s", fn)
+}
+
+// flagsOf follows item id's Queued flag through the bus until stop is closed.
+func flagsOf(sub *bus.Subscription[ThreadEvent], id string, stop <-chan struct{}) <-chan []bool {
+	out := make(chan []bool, 1)
+	go func() {
+		var flags []bool
+		for {
+			select {
+			case ev := <-sub.C():
+				if u, ok := ev.(ItemUpdated); ok && u.Item.ID == id {
+					flags = append(flags, u.Item.Queued)
+				}
+			case <-stop:
+				out <- flags
+				return
+			}
+		}
+	}()
+	return out
+}
+
+func (t *threadLog) takenAndHandled() (int64, int64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.taken, t.handled
+}
+
+// A message behind a setup whose start fails stays queued, in the log and on disk, and
+// no turn counts it read: only Claude taking it does that. Try again sends it.
+func TestQueuedThroughAFailedStart(t *testing.T) {
+	e, rr := newWorktreeEnv(t, nil, func(o *Options) { o.Claude = "/nonexistent/claude" })
+	s, release := inSetup(t, e, rr, CreateOptions{InitialPrompt: "first"})
+	q, err := e.m.Send(e.ctx(), s.ID, Message{Text: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub := bus.Subscribe[ThreadEvent](e.bus, 1024)
+	defer sub.Close()
+	stop := make(chan struct{})
+	flags := flagsOf(sub, q.ID, stop)
+	release()
+	e.waitFor(s.ID, "the start to fail", func(s Thread) bool { return s.Setup.Phase == SetupFailed })
+	log := e.m.mustLog(t, s.ID)
+	if it, _ := log.get(q.ID); !it.Queued {
+		t.Errorf("not queued after the failure: %+v", it)
+	}
+	if rows, err := loadItems(e.ctx(), e.m.opts.DB, s.ID); err != nil || !slices.ContainsFunc(rows, func(it Item) bool { return it.ID == q.ID && it.Queued }) {
+		t.Errorf("not queued on disk: %v", err)
+	}
+	if taken, handled := log.takenAndHandled(); taken >= q.Ordinal || handled >= q.Ordinal {
+		t.Errorf("taken %d, handled %d, message %d: a turn counts it read", taken, handled, q.Ordinal)
+	}
+	if got, _ := e.m.Get(e.ctx(), s.ID); got.HandledThrough >= q.Ordinal {
+		t.Errorf("handled through %d, message %d", got.HandledThrough, q.Ordinal)
+	}
+	e.m.opts.Claude = fakeClaudeBin
+	if _, err := e.m.RetrySetup(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.waitFor(s.ID, "the message to go out", func(s Thread) bool { return s.Setup.Phase == SetupDone && len(s.Setup.Queued) == 0 })
+	e.sentUser("second")
+	// Claude is working when it arrives, so it is queued there until it reads it.
+	close(stop)
+	for i, f := range <-flags {
+		if !f {
+			t.Errorf("update %d cleared the flag", i)
+		}
+	}
+}
+
+// Through a restart too: nothing writes it as read, so the new log counts it right.
+func TestQueuedThroughARestart(t *testing.T) {
+	e, rr := newWorktreeEnv(t, nil)
+	s, _ := inSetup(t, e, rr, CreateOptions{InitialPrompt: "first"})
+	q, err := e.m.Send(e.ctx(), s.ID, Message{Text: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.restart()
+	log := e.m.mustLog(t, s.ID)
+	if it, _ := log.get(q.ID); !it.Queued {
+		t.Errorf("not queued after the restart: %+v", it)
+	}
+	if taken, handled := log.takenAndHandled(); taken >= q.Ordinal || handled >= q.Ordinal {
+		t.Errorf("taken %d, handled %d, message %d", taken, handled, q.Ordinal)
+	}
+}
+
+// A Claude that dies before its handshake ends what waited for it, the first message too:
+// the row lets go, and so does the flag, or it would read as queued for ever.
+func TestQueuedEndsWithAProcessThatNeverAnswered(t *testing.T) {
+	gate := initGate(t)
+	var rr *recordingProjects
+	e := newFixtureEnvAt(t, hangFixture(t), []string{"CF_FAKE_CLAUDE_INIT_GATE=" + gate.path}, func(o *Options) {
+		rr = &recordingProjects{Fake: o.Projects.(*projecttest.Fake)}
+		rr.WorktreeRoot = t.TempDir()
+		o.Projects = rr
+		o.SlugTimeout = 300 * time.Millisecond
+		o.RefExists = func(context.Context, string, string) bool { return false }
+	})
+	t.Cleanup(gate.open)
+	s, release := inSetup(t, e, rr, CreateOptions{InitialPrompt: "first"})
+	q, err := e.m.Send(e.ctx(), s.ID, Message{Text: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release()
+	e.waitFor(s.ID, "the spawn", func(s Thread) bool { return s.Setup.Phase == SetupDone && s.State == StateStarting })
+	if err := syscall.Kill(e.pid(s.ID), syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	got := e.waitFor(s.ID, "the process to end", func(s Thread) bool { return s.State == StateDisconnected })
+	if len(got.Setup.Queued) != 0 || got.PendingFirst != nil {
+		t.Errorf("row: %+v, %+v", got.Setup.Queued, got.PendingFirst)
+	}
+	if it, _ := e.m.mustLog(t, s.ID).get(q.ID); it.Queued {
+		t.Errorf("queued for ever: %+v", it)
+	}
+}
+
+func TestRetryNewBranchTakenMeanwhile(t *testing.T) {
+	t.Run("a generated name in another project", func(t *testing.T) {
+		e, flaky, named := flakyEnv(t)
+		e.m.opts.RefExists = branchesOfWorktrees(flaky.recordingProjects)
+		a := failedOnR2(t, e, flaky)
+		first := a.Setup.step(SetupStepName, "").Branch
+		flaky.heal()
+		// An unrelated thread gets the same name in r2, where A has no branch.
+		b := e.create(CreateOptions{ProjectID: "r2", InitialPrompt: "do y", NewWorktree: &NewWorktree{}})
+		if b.Branch != first {
+			t.Fatalf("B on %q, A named %q", b.Branch, first)
+		}
+		if _, err := e.m.RetrySetup(e.ctx(), a.ID); err != nil {
+			t.Fatal(err)
+		}
+		done := e.waitFor(a.ID, "the retry to land", func(s Thread) bool { return s.Setup.Phase == SetupDone })
+		if done.Branch == first || done.Branch == "" {
+			t.Fatalf("A on %q beside B", done.Branch)
+		}
+		// One thread, one branch: the worktree on the old name went, and every row says so.
+		for _, id := range []string{"r1", "r2"} {
+			if p, _ := done.CheckoutPath(id); p == "" || p == a.Setup.Made[0].Path || p == b.WorktreePath {
+				t.Errorf("%s's checkout %q", id, p)
+			}
+			if st := done.Setup.step(SetupStepWorktree, id); st.Branch != done.Branch || st.Status != SetupStepDone {
+				t.Errorf("step %+v", st)
+			}
+		}
+		if st := done.Setup.step(SetupStepName, ""); st.Branch != done.Branch || st.Status != SetupStepDone {
+			t.Errorf("name step %+v", st)
+		}
+		if countCalls(flaky.Calls, "DeleteMadeBranch r1 "+first) != 1 {
+			t.Errorf("calls %q", flaky.Calls)
+		}
+		if n := named.Load(); n != 2 { // A's and B's: a pick needs no namer
+			t.Errorf("namer ran %d times", n)
+		}
+	})
+	t.Run("a typed name is shared, as a first run shares it", func(t *testing.T) {
+		e, flaky, _ := flakyEnv(t)
+		e.m.opts.RefExists = branchesOfWorktrees(flaky.recordingProjects)
+		flaky.fail("r1")
+		a, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "do x", NewWorktree: &NewWorktree{Branch: "fix/typed", BaseRef: "main"}, BackgroundSetup: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.waitFor(a.ID, "the setup to fail", func(s Thread) bool { return s.Setup.Phase == SetupFailed })
+		flaky.heal()
+		b := e.create(CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{Branch: "fix/typed"}})
+		if _, err := e.m.RetrySetup(e.ctx(), a.ID); err != nil {
+			t.Fatal(err)
+		}
+		done := e.waitFor(a.ID, "the retry to land", func(s Thread) bool { return s.Setup.Phase == SetupDone })
+		if done.Branch != "fix/typed" || done.WorktreePath != b.WorktreePath {
+			t.Errorf("A on %q at %q, B at %q", done.Branch, done.WorktreePath, b.WorktreePath)
+		}
+		if !done.Setup.step(SetupStepName, "").Existing {
+			t.Errorf("name step %+v", done.Setup.step(SetupStepName, ""))
+		}
+	})
+	t.Run("a generated name another setup has reserved", func(t *testing.T) {
+		e, flaky, _ := flakyEnv(t)
+		flaky.fail("r1")
+		a, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "do x", NewWorktree: &NewWorktree{}, BackgroundSetup: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		a = e.waitFor(a.ID, "the setup to fail", func(s Thread) bool { return s.Setup.Phase == SetupFailed })
+		first := a.Setup.step(SetupStepName, "").Branch
+		flaky.heal()
+		r, _ := flaky.Snapshot().Project("r1")
+		release, ok := e.m.reserveBranch([]string{r.Path}, first)
+		if !ok {
+			t.Fatal("not free")
+		}
+		defer release()
+		if _, err := e.m.RetrySetup(e.ctx(), a.ID); err != nil {
+			t.Fatal(err)
+		}
+		done := e.waitFor(a.ID, "the retry to land", func(s Thread) bool { return s.Setup.Phase == SetupDone })
+		if done.Branch == first {
+			t.Errorf("A on the reserved %q", done.Branch)
+		}
+	})
+}
+
+// What the first run saw stands when a retry cannot see it: origin had the branch, and now
+// cannot be reached. It is still to be checked out, not made anew from the base.
+func TestRetryRemembersTheBranchExisted(t *testing.T) {
+	e, flaky, _ := flakyEnv(t)
+	var reachable atomic.Bool
+	reachable.Store(true)
+	e.m.opts.FetchBranch = func(context.Context, string, string) bool { return reachable.Load() }
+	flaky.fail("r1")
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "do x", NewWorktree: &NewWorktree{Branch: "feat/x", BaseRef: "main"}, BackgroundSetup: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = e.waitFor(s.ID, "the setup to fail", func(s Thread) bool { return s.Setup.Phase == SetupFailed })
+	if !s.Setup.step(SetupStepName, "").Existing {
+		t.Fatalf("name step %+v", s.Setup.step(SetupStepName, ""))
+	}
+	flaky.heal()
+	reachable.Store(false)
+	if _, err := e.m.RetrySetup(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.waitFor(s.ID, "the retry to land", func(s Thread) bool { return s.Setup.Phase == SetupDone })
+	created := flaky.created()
+	if len(created) != 1 || created[0].Branch != "feat/x" {
+		t.Fatalf("created %+v", created)
+	}
+	// makeWorktree asks origin for its own look, which fails too: only the base is checked here.
+	if got := created[0].BaseRef; got != "" {
+		t.Errorf("base %q: the first run dropped it", got)
+	}
+}
+
+// A branch nobody else has keeps its name, and a retry leaves the reservation free.
+func TestRetryKeepsAFreeName(t *testing.T) {
+	e, flaky, _ := flakyEnv(t)
+	e.m.opts.RefExists = branchesOfWorktrees(flaky.recordingProjects)
+	a := failedOnR2(t, e, flaky)
+	first := a.Setup.step(SetupStepName, "").Branch
+	flaky.heal()
+	if _, err := e.m.RetrySetup(e.ctx(), a.ID); err != nil {
+		t.Fatal(err)
+	}
+	done := e.waitFor(a.ID, "the retry to land", func(s Thread) bool { return s.Setup.Phase == SetupDone })
+	if done.Branch != first || countCalls(flaky.Calls, "RemoveWorktree") != 0 {
+		t.Errorf("on %q, was %q; calls %q", done.Branch, first, flaky.Calls)
+	}
+	r, _ := flaky.Snapshot().Project("r2")
+	release, ok := e.m.reserveBranch([]string{r.Path}, first)
+	if !ok {
+		t.Fatal("the reservation stayed")
+	}
+	release()
+}
+
+// abandonRefused is a project store that cannot undo an add.
+type abandonRefused struct{ *recordingProjects }
+
+func (p abandonRefused) AbandonWorktree(context.Context, project.AbandonWorktreeOptions) error {
+	return fmt.Errorf("%w: it stays", project.ErrFailedPrecondition)
+}
+
+// An add that could not be undone is reported as kept, and stays on the record for a retry.
+func TestAddThatCouldNotBeUndone(t *testing.T) {
+	var held *heldProjects
+	e, rr := newWorktreeEnv(t, nil, func(o *Options) {
+		held = &heldProjects{recordingProjects: o.Projects.(*recordingProjects), holding: "r2"}
+		o.Projects = held
+	})
+	e.addGitProject(t, "r2", "other")
+	s, err := e.m.Create(e.ctx(), twoProjects())
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := e.waitFor(s.ID, "r1's worktree", func(s Thread) bool { return stepStatus(s, SetupStepWorktree, "r1") == SetupStepDone })
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := e.m.Shutdown(ctx); err != nil {
+		t.Fatal(err)
+	}
+	half := filepath.Join(t.TempDir(), "half")
+	if err := os.MkdirAll(half, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	row.Setup = row.Setup.edit(func(c *Setup) {
+		c.Adding = []SetupAdd{{ProjectID: "r2", Path: half, Branch: "b", Head: "abc"}}
+	})
+	if err := saveThread(ctx, e.m.opts.DB, row); err != nil {
+		t.Fatal(err)
+	}
+	e.open(func(o *Options) { o.Projects = abandonRefused{rr} })
+	d, err := e.m.DiscardSetup(e.ctx(), s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(d.Kept, half) {
+		t.Errorf("kept %q", d.Kept)
+	}
+}
+
+// A branch another thread is on stays, even when a lost add made it: only the worktree's
+// remains go, as in a rollback.
+func TestAbandonAddKeepsABranchAThreadHolds(t *testing.T) {
+	e, flaky, _ := flakyEnv(t)
+	b := e.create(CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{Branch: "fix/held"}})
+	if b.Branch != "fix/held" {
+		t.Fatalf("B on %q", b.Branch)
+	}
+	s := Thread{ID: "s-a", Setup: &Setup{Adding: []SetupAdd{{ProjectID: "r1", Path: filepath.Join(t.TempDir(), "half"), Branch: "fix/held", Head: "abc"}}}}
+	e.m.abandonAdds(e.ctx(), s)
+	if len(flaky.Abandons) != 1 || flaky.Abandons[0].Head != "" {
+		t.Errorf("abandons %+v", flaky.Abandons)
+	}
+}
+
+// A cancel does not wait behind another add on the same branch.
+func TestCancelDoesNotWaitForTheWorktreeLock(t *testing.T) {
+	e, rr := newWorktreeEnv(t, nil)
+	unlock, err := e.m.lockWorktree(e.ctx(), "r1", "fix/held")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "do x", NewWorktree: &NewWorktree{Branch: "fix/held"}, BackgroundSetup: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitInStack(t, "(*Manager).lockWorktree")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	got, _, err := e.m.CancelSetup(ctx, s.ID)
+	if err != nil || got.Setup.Phase != SetupCancelled {
+		t.Fatalf("CancelSetup = %+v, %v", got.Setup, err)
+	}
+	if n := worktreeCount(rr, "r1"); n != 1 {
+		t.Errorf("r1 has %d worktrees", n)
 	}
 }
 
