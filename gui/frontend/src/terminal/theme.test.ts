@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { sameTheme, terminalTheme, watchTerminalTheme } from "./theme";
+import { contrast } from "@/themes/color";
+import { themes } from "@/themes";
+import { resolveSlots } from "@/themes/slots";
+import { findColors, sameTheme, terminalFindColors, terminalTheme, watchTerminalTheme } from "./theme";
 
 // A stand-in for src/index.css: the scheme is the `dark` class on <html>.
 const css = `
@@ -44,7 +47,40 @@ describe("terminalTheme", () => {
   });
 });
 
+describe("findColors", () => {
+  it.each(themes.map((t) => ({ id: t.id, slots: resolveSlots(t) })))("$id: the text reads on both tints, and the current match stands out", ({ slots }) => {
+    const surface = slots["--cf-surface"] ?? "";
+    const text = slots["--terminal-fg"] ?? "";
+    const { match, active, border } = findColors(surface, slots["--cf-warning"] ?? "", text);
+    for (const c of [match, active, border]) expect(c).toMatch(/^#[0-9a-f]{6}$/);
+    const floor = Math.min(4.5, contrast(text, surface) * 0.8);
+    expect(contrast(text, match)).toBeGreaterThanOrEqual(floor);
+    expect(contrast(text, active)).toBeGreaterThanOrEqual(floor);
+    expect(contrast(active, surface)).toBeGreaterThan(contrast(match, surface));
+    expect(contrast(match, surface)).toBeGreaterThan(1.03);
+    expect(contrast(border, surface)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("flattens a translucent colour onto the surface", () => {
+    expect(findColors("#000000", "#ffffff80", "#ffffff").border).toBe("#808080");
+  });
+
+  it("falls back for what is not a hex colour (jsdom has no theme)", () => {
+    expect(terminalFindColors().active).toMatch(/^#[0-9a-f]{6}$/);
+  });
+});
+
 describe("watchTerminalTheme", () => {
+  it("reports a warning colour that changed alone: the find's colours come from it", async () => {
+    cleanup = install();
+    const seen: string[] = [];
+    const stop = watchTerminalTheme((t) => seen.push(t.background ?? ""));
+    document.documentElement.style.setProperty("--cf-warning", "#112233");
+    await Promise.resolve();
+    expect(seen).toEqual(["#ffffff"]);
+    stop();
+  });
+
   it("reports a new palette when the scheme class flips, not on unrelated changes", async () => {
     cleanup = install();
     const seen: string[] = [];

@@ -58,25 +58,27 @@ export interface FindColors {
   border: string;
 }
 
-/** The text on a match is whatever the program printed, in `foreground` most of the time. */
-const FIND_TEXT_CONTRAST = 4.5;
+/** How strong the current match's tint and every match's start, of the warning colour over the surface. */
+const ACTIVE_TINT = 0.6;
+const MATCH_TINT = 0.26;
+/** What the foreground should keep on a tint: 4.5:1, or most of what it has on the surface where that is less (Solarized). */
+const TEXT_CONTRAST = 4.5;
+const TEXT_CONTRAST_KEPT = 0.8;
 
 /**
  * The warning colour over the surface, as the thread's find tints its matches, opaque
  * because a decoration replaces the cell's background. A cell's text keeps its colour, so
- * each tint backs off until the terminal's foreground reads on it; on a light theme, whose
- * warning is dark, that is well before a solid fill.
+ * the current match's tint backs off until the terminal's foreground reads on it, which on
+ * a muted theme is well before a solid fill, and every other match stays at most half of it.
  */
 export function findColors(surface: string, warning: string, foreground: string): FindColors {
   const under = flatten(surface, "#000000");
   const border = flatten(warning, under);
   const text = flatten(foreground, under);
-  const tint = (strength: number) => {
-    let at = strength;
-    while (at > 0.1 && contrast(text, over(border, at, under)) < FIND_TEXT_CONTRAST) at -= 0.02;
-    return over(border, at, under);
-  };
-  return { match: tint(0.26), active: tint(0.6), border };
+  const floor = Math.min(TEXT_CONTRAST, contrast(text, under) * TEXT_CONTRAST_KEPT);
+  let strength = ACTIVE_TINT;
+  while (strength > 0.1 && contrast(text, over(border, strength, under)) < floor) strength -= 0.02;
+  return { match: over(border, Math.min(MATCH_TINT, strength / 2), under), active: over(border, strength, under), border };
 }
 
 /** Under jsdom, and for a variable that is not a hex colour, which no theme slot is not. */

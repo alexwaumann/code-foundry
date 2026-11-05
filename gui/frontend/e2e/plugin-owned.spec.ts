@@ -75,3 +75,19 @@ test("the Shell tab attaches the plugin's terminal; Open in bottom panel moves i
   await expect(bottom.locator('[data-tab-id="t-hello-clock"]')).toHaveCount(0);
   await expect(term.getByTestId("plugin-terminal-host")).toHaveAttribute("data-terminal-id", "t-hello-clock");
 });
+
+test("cmd+f in the plugin's terminal opens the find bar on it, and Escape gives the keyboard back", async ({ page }) => {
+  await openDemoTab(page, "shell");
+  const host = surface(page).getByTestId("plugin-terminal-host");
+  await expectTerminalText(page, /\d\d:\d\d:\d\d/);
+  await host.locator(".xterm-screen").click();
+  await page.keyboard.press("Meta+f");
+  const field = surface(page).getByTestId("terminal-find-input");
+  await expect(field).toBeFocused();
+  await expect(page.getByTestId("thread-find")).toHaveCount(0);
+  await page.keyboard.type(":");
+  await expect(surface(page).getByTestId("terminal-find-count")).toHaveText(/^\d+ of \d+$/);
+  await page.keyboard.press("Escape");
+  await expect(field).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-terminal-host]")?.getAttribute("data-testid"))).toBe("plugin-terminal-host");
+});

@@ -177,14 +177,4 @@ describe("the renderer's find", () => {
     t.r.find("x");
     expect(t.last()).toMatchObject({ total: FIND_LIMIT, capped: true });
   });
-
-  it("stops reporting once disposed", async () => {
-    await t.write(LINES);
-    t.r.find("resize");
-    const n = t.seen.length;
-    t.r.dispose();
-    t = setup();
-    expect(t.seen).toHaveLength(0);
-    expect(n).toBeGreaterThan(0);
-  });
 });

@@ -809,7 +809,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 
 * React 19, Vite, TypeScript strict, Tailwind v4, shadcn/ui, Zustand, `cmdk` for the palette.
 * `@xterm/xterm` with `addon-webgl` (falls back to xterm's DOM renderer on context loss), `addon-fit`,
-  `addon-web-links`. Terminal rendering sits behind a small `TerminalRenderer` interface so
+  `addon-web-links`, `addon-search`. Terminal rendering sits behind a small `TerminalRenderer` interface so
   a libghostty-vt-fed grid renderer can replace it later.
 * State discipline: sliced Zustand stores, one per daemon service. Streams update slices;
   components subscribe to the narrowest selector. Lists are virtualized. No global
@@ -866,7 +866,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   cmd+g / cmd+shift+g) opens a find bar over the card's column: matches counted from the
   items (messages, Claude's rendered text, answered questions), painted the same way where
   rows render, ticks along the scrollbar, a folded question opened and put back
-  (`components/thread/find`, `docs/notes/search-2-thread-find.md`).
+  (`components/thread/find`, `docs/notes/search-2-thread-find.md`). With the keyboard in a
+  terminal the same chords are `terminal.find` and its siblings: the same bar over the
+  terminal, searching its scrollback, or only the screen in the alternate screen (vim, less)
+  (`terminal/find.ts`, `docs/notes/terminal-find.md`).
 * Only visible views are watched or attached: one Watch per thread on screen
   (`stores/thread.ts` `startThreadWatch` counts its holders), one Attach per terminal
   view (a plugin terminal shown in the bottom panel is not attached in its node too).

@@ -3,6 +3,7 @@ import { deepActiveElement } from "@/lib/keyTarget";
 import type { FindResults } from "@/terminal/renderer";
 import { NO_RESULTS } from "@/terminal/results";
 import { useTerminalsStore } from "./terminals";
+import { useUiStore } from "./ui";
 
 /**
  * The terminal's find (docs/notes/terminal-find.md), one session per terminal with its bar
@@ -53,7 +54,11 @@ export function setTerminalFindQuery(id: string, query: string): void {
 }
 
 export function setTerminalFindResults(id: string, results: FindResults): void {
-  update(id, (s) => (s ? { ...s, results } : s));
+  update(id, (s) => {
+    if (!s) return s;
+    const r = s.results;
+    return r.index === results.index && r.total === results.total && r.capped === results.capped ? s : { ...s, results };
+  });
 }
 
 /** The bar acted on focus requests up to `seq`. */
@@ -104,9 +109,24 @@ export function presentTerminalFind(action: "open" | "next" | "previous"): boole
   const last = lastKeyboard !== null && hosts.has(lastKeyboard) ? lastKeyboard : null;
   const id = keyboardTerminal() ?? last ?? hosts.keys().next().value;
   if (id === undefined) return false;
-  if (action === "open") openTerminalFind(id);
-  else stepTerminalFind(id, action === "next" ? 1 : -1);
+  afterPalette(() => {
+    if (action === "open") openTerminalFind(id);
+    else stepTerminalFind(id, action === "next" ? 1 : -1);
+  });
   return true;
+}
+
+/** Picked in the palette, which then hands the keyboard back to the terminal (ui closePalette): the bar takes it after that. */
+function afterPalette(run: () => void): void {
+  if (!useUiStore.getState().palette.open) {
+    run();
+    return;
+  }
+  const stop = useUiStore.subscribe((s) => {
+    if (s.palette.open) return;
+    stop();
+    setTimeout(run, 0);
+  });
 }
 
 // A terminal that goes takes its session with it (a closed tab; an exited one stays until then).

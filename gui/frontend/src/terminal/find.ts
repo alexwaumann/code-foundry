@@ -6,16 +6,21 @@ import { NO_RESULTS } from "./results";
 import { terminalFindColors, type FindColors } from "./theme";
 
 /**
- * How many matches are highlighted and counted. Past it the addon stops, from the top of
- * the buffer: each match is a marker and a decoration, built on every keystroke.
+ * How many matches are highlighted and counted. Past it the addon stops, counting from the
+ * top of the buffer, so the newest matches are the ones that go without a highlight: high
+ * enough that only a query of a letter or two gets there in a full scrollback. Each match
+ * is a marker and a decoration: about 250 ms to build 20,000 in WebKit, and each marker is
+ * called for every line a full scrollback drops.
  */
-export const FIND_LIMIT = 5000;
+export const FIND_LIMIT = 20000;
 
 /**
- * The longest the count lags a terminal that keeps printing. The addon searches again only
- * after 200 ms without output, which a build log or a spinner never gives it.
+ * How long the count may lag a terminal that keeps printing. The addon searches again only
+ * after 200 ms without output, which a build log or a spinner never gives it. At least a
+ * second, and ten searches' time, so a big search takes a tenth of the main thread at most.
  */
-const MAX_STALE_MS = 1000;
+const MIN_STALE_MS = 1000;
+const STALE_SEARCHES = 10;
 
 /** Arguments the addon has and its typings leave out (it is pinned): how it searches again itself, the viewport left alone and the query kept. */
 interface AddonInternals {
@@ -37,8 +42,8 @@ export class TerminalFind {
   private readonly subs: IDisposable[];
   private query = "";
   private colors: FindColors = terminalFindColors();
-  private results = NO_RESULTS;
   private searchedAt = 0;
+  private staleMs = MIN_STALE_MS;
 
   constructor(
     private readonly term: Terminal,
@@ -51,15 +56,12 @@ export class TerminalFind {
         this.publish({ index: resultIndex, total: resultCount, capped: resultCount >= FIND_LIMIT });
       }),
       term.onWriteParsed(() => {
-        if (this.query !== "" && Date.now() - this.searchedAt >= MAX_STALE_MS) this.searchAgain();
+        if (this.query !== "" && Date.now() - this.searchedAt >= this.staleMs) this.searchAgain();
       }),
     ];
   }
 
   private publish(results: FindResults): void {
-    const r = this.results;
-    if (r.index === results.index && r.total === results.total && r.capped === results.capped) return;
-    this.results = results;
     for (const cb of this.listeners) cb(results);
   }
 
@@ -117,9 +119,11 @@ export class TerminalFind {
 
   /** Every match again, the current one kept (the addon looks at the selection's start first) and the viewport left alone. */
   private searchAgain(): void {
-    this.searchedAt = Date.now();
+    const start = Date.now();
     this.addon.clearDecorations();
     this.internals.findPrevious(this.query, this.options, { noScroll: true });
+    this.searchedAt = Date.now();
+    this.staleMs = Math.max(MIN_STALE_MS, (this.searchedAt - start) * STALE_SEARCHES);
   }
 
   /** The selection colour for a palette about to be applied: the current match's while there is a query. */
