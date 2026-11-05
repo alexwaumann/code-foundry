@@ -101,6 +101,8 @@ gen/go/                    generated Go (connect-go + protobuf-go)
 gui/frontend/src/gen/      generated TS (protobuf-es + connect-es)
 internal/
   daemon/                  bootstrap, listeners (UDS + loopback), token file, lifecycle
+  wstunnel/                one Connect server stream over one WebSocket, replayed through
+                           the loopback listener's bearer check and handlers
   presence/                whether the user is looking at the app (GUI clients' visibility
                            and focus), with ordered subscribers
   api/                     Connect service handlers. Thin. One file per service.
@@ -183,6 +185,7 @@ Transport:
 |---|---|---|
 | CLI, Wails host | Unix socket `$CONFIG/daemon.sock` | filesystem permissions (0600) |
 | Frontend | `http://127.0.0.1:<random port>` | bearer token from `$CONFIG/daemon.token` (0600) |
+| Frontend streams (route only: no client yet) | `ws://127.0.0.1:<same port>/stream/<procedure>`, one WebSocket per stream, never on the Unix socket or the pages listener (`internal/wstunnel`, `docs/notes/ws-tunnel.md`) | `allowedOrigin` before the upgrade, then the same bearer token in the first frame |
 | CLI inside a thread | `CODE_FOUNDRY_ENDPOINT` (the loopback listener) | `CODE_FOUNDRY_TOKEN`; both set in every thread's Claude env, never auto-starts a daemon |
 | CLI inside Agent search's hidden run | `CODE_FOUNDRY_ENDPOINT` | `CODE_FOUNDRY_TOKEN` is a token scoped to that search (`internal/capability`): `thread.search`, `thread.read` and its own `search.report` only, revoked when the run ends (`docs/notes/search-5-agent-daemon.md`) |
 

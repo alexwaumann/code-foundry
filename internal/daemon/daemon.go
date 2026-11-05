@@ -11,6 +11,8 @@
 //     pages.port and kept, so the next start can take it again and pages keep their
 //     origin.
 //
+// The loopback listener also carries the GUI's streams over WebSockets (internal/wstunnel).
+//
 // Both listeners speak HTTP/1.1 and HTTP/2 with prior knowledge (h2c), so Connect
 // streaming works over either.
 package daemon
@@ -397,8 +399,9 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	defer cancelRequests()
 	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
 	pageRoutes := newPageRoutes(grants, liveTheme, log)
+	tunnel := newTunnel(log.With("component", "wstunnel"), token, caps, pagesPort, opts.DevOrigins, mux)
 	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback",
-		loopbackHost(port, loopbackHandler(token, caps, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux))))
+		loopbackHost(port, loopbackHandler(token, caps, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux, tunnel))))
 	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", loopbackHost(pagesPort, pagesHandler(pageRoutes))))
 
 	errc := make(chan error, 3)
@@ -430,6 +433,10 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 			log.Warn("graceful shutdown incomplete", "err", err)
 			_ = s.Close()
 		}
+	}
+	// Shutdown does not wait for hijacked connections, and a tunnel's handler reads the stores.
+	if err := tunnel.Drain(shutdownCtx); err != nil {
+		log.Warn("graceful shutdown incomplete", "err", err)
 	}
 	log.Info("listeners closed, closing stores")
 	return runErr
