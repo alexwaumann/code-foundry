@@ -44,6 +44,8 @@ $P cli eval '() => window.__cfModule("/src/stores/ui.ts").then((m) => m.useUiSto
   (the mock checks no token on these).
 - Dev mode: prefix every `bin/code-foundry` call with the printed `CODE_FOUNDRY_HOME`. A bare
   call starts a daemon on the real home and replaces the user's.
+- The GUI speaks binary protobuf. Add `&json=1` to `$DRIVE_URL` to read its RPCs as JSON in network
+  captures; the app behaves the same, but do not take timings that way.
 - Sketching inside the real app: inject DOM/CSS with `eval`, using `var(--cf-*)` tokens and
   the type-role classes, then screenshot each variant.
 - Full command reference (same version as the binary):

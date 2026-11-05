@@ -34,6 +34,20 @@ export function overrideEndpoint(
   return null;
 }
 
+/** Whether `?json=1` asks for JSON on the wire. */
+export function jsonRequested(search: string): boolean {
+  return new URLSearchParams(search).get("json") === "1";
+}
+
+/**
+ * Binary protobuf, which Connect-Web does not default to: parsing a large thread as JSON
+ * costs about five times the rest of its load (docs/notes/binary-transport.md). Development
+ * builds take `?json=1` to read the traffic in the inspector; production ignores it.
+ */
+function binaryWire(): boolean {
+  return !(import.meta.env.DEV && typeof window !== "undefined" && jsonRequested(window.location.search));
+}
+
 function defaultResolver(): EndpointResolver {
   if (import.meta.env.DEV && typeof window !== "undefined") {
     const env = import.meta.env as { VITE_DAEMON_URL?: string; VITE_DAEMON_TOKEN?: string };
@@ -77,7 +91,7 @@ export class DaemonConnection {
       req.header.set("Authorization", `Bearer ${ep.token}`);
       return next(req);
     };
-    const transport = createConnectTransport({ baseUrl: ep.baseUrl, interceptors: [auth] });
+    const transport = createConnectTransport({ baseUrl: ep.baseUrl, interceptors: [auth], useBinaryFormat: binaryWire() });
     const client = createClient(service, transport);
     this.clients.set(key, client);
     return client;

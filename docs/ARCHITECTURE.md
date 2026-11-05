@@ -173,7 +173,9 @@ Module path: `github.com/alexwaumann/code-foundry`.
 ## 4. Protocol
 
 Protobuf schemas under `proto/`, compiled with `buf`. Server is `connect-go`; the browser
-client is `@connectrpc/connect-web`; the Go client is `connect-go`.
+client is `@connectrpc/connect-web`; the Go client is `connect-go`. Both speak binary protobuf:
+Connect-Web defaults to JSON, so `api/endpoint.ts` asks for binary (`?json=1` in a development
+build reads the traffic as JSON; `docs/notes/binary-transport.md`).
 
 Transport:
 
