@@ -251,3 +251,99 @@ func TestFloorOtherHomes(t *testing.T) {
 		})
 	}
 }
+
+// tempFloor is a floor with a temp folder as macOS has it: base/tmp, a link, and
+// base/private/tmp behind it.
+func tempFloor(t *testing.T) (f Floor, at func(string) string) {
+	t.Helper()
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at = func(p string) string { return filepath.Join(base, p) }
+	if err := os.MkdirAll(at("private/tmp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(at("private/tmp"), at("tmp")); err != nil {
+		t.Fatal(err)
+	}
+	home := at("home")
+	return NewFloor(home, paths.New(filepath.Join(home, ".code-foundry"))).WithTemp([]string{at("tmp"), at("private/tmp")}), at
+}
+
+// A temp folder is everyone's, so it is never a tree; what is below it may be, unless it
+// holds a config home, which a scratch daemon's may do there as anywhere.
+func TestFloorTemp(t *testing.T) {
+	f, at := tempFloor(t)
+	for _, p := range []string{
+		"private/tmp/foo/sub/page.html", "private/tmp/page.html", "elsewhere/page.html",
+		"private/tmp/cf-drive/daemon.token", "private/tmp/cf-drive/db.sqlite", "private/tmp/cf-drive/page.html",
+		"private/tmp/cf-drive/worktrees/app/index.html", "private/tmp/cf-drive/pages/s-1/page.html",
+		"private/tmp/holder/cf-1/pages.port", "home/.ssh/id_rsa",
+	} {
+		write(t, at(p), "x")
+	}
+	for link, target := range map[string]string{
+		"private/tmp/loop":   "private/tmp",
+		"private/tmp/up":     "private",
+		"private/tmp/to-ssh": "home/.ssh",
+		"private/tmp/to-cf":  "private/tmp/cf-drive",
+	} {
+		if err := os.Symlink(at(target), at(link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scopes := []struct {
+		name, dir string
+		want      bool
+	}{
+		{"the temp folder", "tmp", false},
+		{"the temp folder, resolved", "private/tmp", false},
+		{"above it", "private", false},
+		{"a folder in it", "tmp/foo", true},
+		{"a folder in it, resolved", "private/tmp/foo", true},
+		{"deeper", "private/tmp/foo/sub", true},
+		{"a link back to it", "tmp/loop", false},
+		{"a link above it", "tmp/up", false},
+		{"a config home", "tmp/cf-drive", false},
+		{"a config home, resolved", "private/tmp/cf-drive", false},
+		{"a link to a config home", "tmp/to-cf", false},
+		{"what holds a config home", "tmp/holder", false},
+		{"a config home's worktree", "tmp/cf-drive/worktrees/app", true},
+		{"a link to a guarded folder", "tmp/to-ssh", false},
+		{"elsewhere", "elsewhere", false},
+	}
+	for _, tt := range scopes {
+		t.Run("scope "+tt.name, func(t *testing.T) {
+			if got := f.ScopeOK(at(tt.dir)); got != tt.want {
+				t.Errorf("ScopeOK(%s) = %t, want %t", tt.dir, got, tt.want)
+			}
+		})
+	}
+	guarded := []struct {
+		name, p string
+		want    bool
+	}{
+		{"a page", "tmp/page.html", false},
+		{"a token", "tmp/cf-drive/daemon.token", true},
+		{"a token, resolved", "private/tmp/cf-drive/daemon.token", true},
+		{"a database", "tmp/cf-drive/db.sqlite", true},
+		{"a file beside them", "tmp/cf-drive/page.html", true},
+		{"a checkout", "tmp/cf-drive/worktrees/app/index.html", false},
+		{"pages", "tmp/cf-drive/pages/s-1/page.html", false},
+		{"a home below a folder", "tmp/holder/cf-1/pages.port", true},
+		{"through a link to ~/.ssh", "tmp/to-ssh/id_rsa", true},
+	}
+	for _, tt := range guarded {
+		t.Run("guarded "+tt.name, func(t *testing.T) {
+			if got := f.Guarded(at(tt.p)); got != tt.want {
+				t.Errorf("Guarded(%s) = %t, want %t", tt.p, got, tt.want)
+			}
+		})
+	}
+	// Without the temp folders the floor is home's alone.
+	home := NewFloor(at("home"), paths.New(at("home/.code-foundry")))
+	if home.ScopeOK(at("tmp/foo")) {
+		t.Error("a floor without temp folders took a tree in one")
+	}
+}

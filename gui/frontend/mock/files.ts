@@ -51,6 +51,9 @@ const PNG = Uint8Array.from(
   Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVQIW2P8z8DwnwEIGBkZGRgYGAA2sAQB7sfJ5gAAAABJRU5ErkJggg==", "base64"),
 );
 /** The daemon's caps: at most 1 MiB of a text file, at most 32 MiB of anything else. */
+/** The temp folders, as spelled and resolved (fsx.TempRoots): readable, unlike the rest outside home. */
+const TEMP_ROOTS = ["/tmp", "/private/tmp"];
+const inTemp = (abs: string) => TEMP_ROOTS.some((t) => abs === t || abs.startsWith(`${t}/`));
 const TEXT_MAX = MiB;
 const READ_MAX = 32 * MiB;
 /** The 2×2 PNG grown past 1 MiB with bytes after its end, which decoders ignore: whole only under the larger cap. */
@@ -375,7 +378,7 @@ export class MockFiles {
     return text(generated(c.file.path));
   }
 
-  /** Grants mock/preview-<n> ids per scope: code-foundry's checkout for its files, else the file's directory. */
+  /** Grants mock/preview-<n> ids per scope: code-foundry's checkout for its files, else the file's directory (a temp folder is no tree: the response names the file alone). */
   private grants = new Map<string, string>();
 
   previewFile(baseDir: string, path: string): PreviewInit {
@@ -391,7 +394,8 @@ export class MockFiles {
     }
     const rel = abs.slice(scope.length + 1);
     this.calls.push(`preview ${abs}`);
-    return { url: `/preview/${grant}/${rel.split("/").map(encodeURIComponent).join("/")}`, scope };
+    const single = TEMP_ROOTS.includes(scope);
+    return { url: `/preview/${grant}/${rel.split("/").map(encodeURIComponent).join("/")}`, scope: single ? abs : scope, singleFile: single };
   }
 
   /** GET /preview/<grant>/<path>: the file under the grant's scope (a directory serves its index.html), or undefined. */
@@ -418,11 +422,12 @@ export class MockFiles {
     }
     abs = normalize(abs);
     this.calls.push(`read ${abs}`);
-    if (abs !== HOME && !abs.startsWith(`${HOME}/`)) throw new ConnectError(`${abs} is outside the home directory`, Code.InvalidArgument);
+    const outsideHome = abs !== HOME && !abs.startsWith(`${HOME}/`);
+    if (outsideHome && !inTemp(abs)) throw new ConnectError(`${abs} is outside your home directory and the temp folders`, Code.InvalidArgument);
     const e = this.onDisk(abs);
-    if (!e) return { resolvedPath: abs, notFound: true };
+    if (!e) return { resolvedPath: abs, notFound: true, outsideHome };
     const modifiedAt = BigInt(e.modifiedAt ?? FIXTURE_MTIME);
-    if (e.dir) return { resolvedPath: abs, isDir: true, size: BigInt(e.size ?? 0), modifiedAt };
+    if (e.dir) return { resolvedPath: abs, isDir: true, size: BigInt(e.size ?? 0), modifiedAt, outsideHome };
     const size = e.size ?? e.data.length;
     // Zero is 1 MiB; text never more than 1 MiB, anything else up to 32 MiB.
     const cap = e.binary ? READ_MAX : TEXT_MAX;
@@ -435,6 +440,7 @@ export class MockFiles {
       binary: e.binary ?? false,
       mimeType: e.mime,
       modifiedAt,
+      outsideHome,
     };
   }
 

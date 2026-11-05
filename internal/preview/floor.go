@@ -30,8 +30,14 @@ var homeMarkers = []string{filepath.Base(paths.New("").Token()), filepath.Base(p
 // (~/.code-foundry). Any other, another daemon's CODE_FOUNDRY_HOME, is found by its
 // markers (homeMarkers): Guarded stats them in p's ancestors, and ScopeOK also in the
 // tree's direct children, every time it is asked.
+//
+// The temp folders (WithTemp) can be read too, and hold config homes of their own: a
+// scratch daemon's lives in /tmp. So they are walked for markers as home is. A temp folder
+// is never a tree itself, as it is everyone's: a file directly in one gets a grant of its
+// own, and one in a folder below it that folder.
 type Floor struct {
 	home  string
+	temps []string // temp folders, as spelled and resolved (fsx.TempRoots)
 	homes []string // config homes known up front
 	creds []string // trees no grant may read
 }
@@ -48,6 +54,12 @@ func NewFloor(home string, p paths.Paths) Floor {
 	return f
 }
 
+// WithTemp returns the floor with the temp folders temps (fsx.TempRoots) within reach.
+func (f Floor) WithTemp(temps []string) Floor {
+	f.temps = temps
+	return f
+}
+
 // realPath is p with its symlinks resolved (/tmp is /private/tmp), or p cleaned when it
 // does not exist yet.
 func realPath(p string) string {
@@ -57,8 +69,10 @@ func realPath(p string) string {
 	return filepath.Clean(p)
 }
 
-// Home is the home directory no grant reaches outside of.
-func (f Floor) Home() string { return f.home }
+// reaches reports whether p is under home or a temp folder: nothing outside them is served.
+func (f Floor) reaches(p string) bool {
+	return fsx.ReadRoots{Home: f.home, Temp: f.temps}.Allows(p)
+}
 
 // checkouts are a config home's trees of the user's own work, the ones a write may reach.
 func checkouts(h paths.Paths) []string { return []string{h.Worktrees(), h.Projects()} }
@@ -140,8 +154,9 @@ func (f Floor) inHomeByName(p string, open func(paths.Paths) []string) bool {
 			return true
 		}
 	}
-	// Homes nobody named: p itself or an ancestor holding a marker, up to home.
-	for d := p; fsx.Within(f.home, d); d = filepath.Dir(d) {
+	// Homes nobody named: p itself or an ancestor holding a marker, up to home or the
+	// temp folder.
+	for d := p; f.reaches(d); d = filepath.Dir(d) {
 		if isHome(d) && inHome(d, p, open) {
 			return true
 		}
@@ -152,24 +167,25 @@ func (f Floor) inHomeByName(p string, open func(paths.Paths) []string) bool {
 	return false
 }
 
-// ScopeOK reports whether dir may be a grant's whole tree: strictly below home, not
-// guarded, and holding nothing guarded (so not an ancestor of a config home). A home
+// ScopeOK reports whether dir may be a grant's whole tree: strictly below home or a temp
+// folder, not guarded, and holding nothing guarded (so not an ancestor of a config home). A home
 // deeper than dir's direct children is not looked for; the route still 404s it, since
 // Guarded finds it from the served path.
 func (f Floor) ScopeOK(dir string) bool {
-	if fsx.Within(dir, f.home) || !fsx.Within(f.home, dir) || f.Guarded(dir) {
+	if !f.reaches(dir) || f.Guarded(dir) {
 		return false
 	}
 	roots := append(f.homes[:len(f.homes):len(f.homes)], f.creds...)
+	roots = append(append(roots, f.home), f.temps...)
 	for _, g := range roots {
 		if fsx.Within(dir, g) {
 			return false
 		}
 	}
-	// The same by identity: dir, however it is spelled, is no ancestor of home or of a
-	// guarded tree.
+	// The same by identity: dir, however it is spelled, is no ancestor of home, of a temp
+	// folder or of a guarded tree, nor a link to one.
 	if fi, err := os.Stat(dir); err == nil {
-		for _, g := range append(roots, f.home) {
+		for _, g := range roots {
 			if ancestorOf(fi, g) {
 				return false
 			}

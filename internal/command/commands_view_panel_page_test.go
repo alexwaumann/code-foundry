@@ -54,6 +54,8 @@ func TestPanelPage(t *testing.T) {
 		{name: "not an html file", args: map[string]string{"path": "/wt/main.go"}, files: &commandtest.Files{Files: []string{"/wt/main.go"}}, argErr: "path"},
 		{name: "missing", args: map[string]string{"path": "/wt/nope.html"}, files: &commandtest.Files{}, code: connect.CodeNotFound},
 		{name: "a directory", args: map[string]string{"path": "/wt/site.html"}, files: &commandtest.Files{Dirs: []string{"/wt/site.html"}}, argErr: "path"},
+		{name: "in a temp folder: no bridge there", args: map[string]string{"path": "/tmp/page.html"},
+			files: &commandtest.Files{Files: []string{"/tmp/page.html"}, OutsideHome: []string{"/tmp/page.html"}}, argErr: "path"},
 		{name: "outside home", args: map[string]string{"path": "/etc/page.html"},
 			files: &commandtest.Files{Err: connect.NewError(connect.CodeInvalidArgument, errors.New("outside the home directory"))}, code: connect.CodeInvalidArgument},
 	}

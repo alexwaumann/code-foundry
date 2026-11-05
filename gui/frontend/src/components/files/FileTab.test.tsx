@@ -21,7 +21,7 @@ vi.mock("@/api/files", async (orig) => ({
     const abs = path.startsWith("/") ? path : `${base}/${path}`;
     reads.push(abs);
     const f = files.get(abs) ?? { notFound: true };
-    const view = { path: abs, size: 0, truncated: false, binary: true, mime: "", modifiedAtMs: null, notFound: false, isDir: false, text: null, lossless: false, image: null, pdf: null, ...f };
+    const view = { path: abs, size: 0, truncated: false, binary: true, mime: "", modifiedAtMs: null, notFound: false, isDir: false, outsideHome: false, text: null, lossless: false, image: null, pdf: null, ...f };
     return held.on
       ? new Promise((resolve) => {
           held.pending.push(() => {

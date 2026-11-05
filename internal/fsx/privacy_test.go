@@ -137,7 +137,7 @@ func TestReadFileUnreadableIsNotPrivacy(t *testing.T) {
 	if err := os.WriteFile(p, []byte("x"), 0o000); err != nil {
 		t.Fatal(err)
 	}
-	_, err = ReadFile(root, "", p, 0)
+	_, err = ReadFile(ReadRoots{Home: root}, "", p, 0)
 	if err == nil || errors.Is(err, ErrNotPermitted) || !errors.Is(err, fs.ErrPermission) {
 		t.Fatalf("ReadFile(mode 000) = %v, want a plain permission error", err)
 	}

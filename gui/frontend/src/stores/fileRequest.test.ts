@@ -44,7 +44,7 @@ const SECRET = "API_KEY=sk-live-4242\n";
 const ENV = "/w/.env";
 const PANEL = "thread:s-1";
 const ASK = { id: "ask-1", thread: "s-1", note: "Put the key on line 2" };
-const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: ENV, realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
+const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: ENV, realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, outsideHome: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
 const missing = () => view({ notFound: true, text: null, lossless: false, size: 0, modifiedAtMs: null });
 const written = (over: Partial<FileWriteView> = {}): FileWriteView => ({ path: ENV, size: SECRET.length, modifiedAtMs: 200, conflict: false, notFound: false, ...over });
 

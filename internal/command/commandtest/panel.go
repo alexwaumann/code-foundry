@@ -21,6 +21,8 @@ type Files struct {
 	Dirs  []string
 	// Contents are a file's contents by path (default "x").
 	Contents map[string]string
+	// OutsideHome are the Files read as outside the home directory.
+	OutsideHome []string
 }
 
 var _ command.FileReader = (*Files)(nil)
@@ -40,6 +42,7 @@ func (f *Files) ReadFile(_ context.Context, r *connect.Request[v1.ReadFileReques
 	switch {
 	case slices.Contains(f.Files, res.ResolvedPath):
 		res.Contents, res.Size = []byte("x"), 1
+		res.OutsideHome = slices.Contains(f.OutsideHome, res.ResolvedPath)
 		if c, ok := f.Contents[res.ResolvedPath]; ok {
 			res.Contents, res.Size = []byte(c), int64(len(c))
 		}

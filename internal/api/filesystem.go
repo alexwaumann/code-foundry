@@ -23,7 +23,9 @@ import (
 
 // Filesystem implements codefoundryv1connect.FilesystemServiceHandler.
 type Filesystem struct {
-	root     string
+	root string
+	// temp are the temp folders ReadFile and PreviewFile also read (WithTemp).
+	temp     []string
 	projects project.Store
 	files    *fsx.FileIndex
 	grants   *preview.Grants
@@ -56,6 +58,17 @@ func (h *Filesystem) WithPagesOrigin(origin string) *Filesystem {
 	h.pagesOrigin = origin
 	return h
 }
+
+// WithTemp lets ReadFile and PreviewFile read the temp folders temps (fsx.TempRoots), where
+// agents write what they want shown. The preview's grants need them too
+// (preview.Floor.WithTemp). Nothing else here leaves home.
+func (h *Filesystem) WithTemp(temps []string) *Filesystem {
+	h.temp = temps
+	return h
+}
+
+// readRoots are the trees the file viewer reads.
+func (h *Filesystem) readRoots() fsx.ReadRoots { return fsx.ReadRoots{Home: h.root, Temp: h.temp} }
 
 // Route mounts the service.
 func (h *Filesystem) Route(opts ...connect.HandlerOption) Route {
@@ -244,16 +257,17 @@ func (h *Filesystem) resolve(projectID, path string) (resolvedCheckout, error) {
 	return resolvedCheckout{project: r, named: filepath.Clean(dir), dir: real, git: git}, nil
 }
 
-// ReadFile reads one file under home for the file viewer.
+// ReadFile reads one file under home or a temp folder for the file viewer.
 func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
 	m := req.Msg
-	f, err := fsx.ReadFile(h.root, m.GetBaseDir(), m.GetPath(), m.GetMaxBytes())
+	f, err := fsx.ReadFile(h.readRoots(), m.GetBaseDir(), m.GetPath(), m.GetMaxBytes())
 	if err != nil {
 		return nil, fileError(err)
 	}
 	out := &v1.ReadFileResponse{
 		Contents: f.Contents, Size: f.Size, Truncated: f.Truncated, Binary: f.Binary, MimeType: f.MIMEType,
 		ResolvedPath: f.Path, NotFound: f.NotFound, IsDir: f.IsDir, RealPath: f.RealPath, Mode: uint32(f.Mode),
+		OutsideHome: f.OutsideHome,
 	}
 	if !f.ModifiedAt.IsZero() {
 		out.ModifiedAt = f.ModifiedAt.UnixMilli()
@@ -304,11 +318,11 @@ func fileError(err error) error {
 
 // PreviewFile grants the HTML preview a URL for one file (see package preview): the
 // grant's scope is the registered checkout holding the file, else its directory, else
-// (home itself, an ancestor of the config home) the file alone. A file in a guarded
-// folder (the config home outside its checkouts, ~/.ssh, ~/Library) is refused.
+// (home itself, a temp folder, an ancestor of the config home) the file alone. A file in a
+// guarded folder (the config home outside its checkouts, ~/.ssh, ~/Library) is refused.
 func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
 	m := req.Msg
-	f, err := fsx.ReadFile(h.root, m.GetBaseDir(), m.GetPath(), 1)
+	f, err := fsx.ReadFile(h.readRoots(), m.GetBaseDir(), m.GetPath(), 1)
 	if err != nil {
 		return nil, h.previewReadError(m.GetBaseDir(), m.GetPath(), err)
 	}
@@ -362,7 +376,7 @@ func (h *Filesystem) previewReadError(baseDir, path string, err error) error {
 // previewScope is what a preview of file may read: the deepest registered project or
 // worktree path holding it (so "../assets/app.css" from docs/ resolves), else the file's
 // own directory, as long as the grants allow that tree (never home, an ancestor of the
-// config home, or a guarded folder). Otherwise it is the file alone (single).
+// config home, a temp folder or a guarded folder). Otherwise it is the file alone (single).
 func (h *Filesystem) previewScope(file string) (scope string, single bool) {
 	best := ""
 	consider := func(p string) {

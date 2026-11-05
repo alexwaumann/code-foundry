@@ -2,6 +2,7 @@ package preview
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -202,4 +203,98 @@ func TestHandler(t *testing.T) {
 			t.Errorf("status %d", res.StatusCode)
 		}
 	})
+}
+
+// A file directly in a temp folder gets a grant of its own, one in a folder below it that
+// tree; symlinks are held to the same roots as a home grant's.
+func TestHandlerTemp(t *testing.T) {
+	f, at := tempFloor(t)
+	for p, s := range map[string]string{
+		"private/tmp/direct.html":           "<p>direct</p>",
+		"private/tmp/sibling.txt":           "sibling",
+		"private/tmp/foo/index.html":        "<h1>foo</h1>",
+		"private/tmp/foo/sub/deep.txt":      "deep",
+		"private/tmp/cf-drive/daemon.token": "t",
+		"elsewhere/secret.txt":              "no",
+		"home/notes.txt":                    "home",
+		"home/.ssh/id_rsa":                  "key",
+	} {
+		write(t, at(p), s)
+	}
+	for link, target := range map[string]string{
+		"private/tmp/foo/out.txt":   "elsewhere/secret.txt",
+		"private/tmp/foo/outdir":    "elsewhere",
+		"private/tmp/foo/up.txt":    "private/tmp/sibling.txt",
+		"private/tmp/foo/home.txt":  "home/notes.txt",
+		"private/tmp/foo/ssh":       "home/.ssh",
+		"private/tmp/foo/token.txt": "private/tmp/cf-drive/daemon.token",
+		"private/tmp/outfile.html":  "elsewhere/secret.txt",
+	} {
+		if err := os.Symlink(at(target), at(link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g := NewGrants(f)
+	for _, dir := range []string{"tmp", "private/tmp", "private", "elsewhere"} {
+		if _, err := g.Grant(at(dir)); !errors.Is(err, ErrGuarded) {
+			t.Errorf("Grant(%s) = %v, want ErrGuarded", dir, err)
+		}
+	}
+	for _, file := range []string{"elsewhere/secret.txt", "tmp/cf-drive/daemon.token"} {
+		if _, err := g.GrantFile(at(file)); !errors.Is(err, ErrGuarded) {
+			t.Errorf("GrantFile(%s) = %v, want ErrGuarded", file, err)
+		}
+	}
+	tree, err := g.Grant(at("tmp/foo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	one, err := g.GrantFile(at("tmp/direct.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	link, err := g.GrantFile(at("tmp/outfile.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(Handler(g, nil, slog.Default()))
+	t.Cleanup(srv.Close)
+	tests := []struct {
+		name, path string
+		status     int
+		body       string
+	}{
+		{"a page in the tree", tree + "/index.html", 200, "<h1>foo</h1>"},
+		{"the folder's index", tree + "/", 200, "<h1>foo</h1>"},
+		{"a subfolder", tree + "/sub/deep.txt", 200, "deep"},
+		{"above the tree", tree + "/../sibling.txt", 404, ""},
+		{"a link out", tree + "/out.txt", 404, ""},
+		{"a linked folder out", tree + "/outdir/secret.txt", 404, ""},
+		{"a link within the temp folder", tree + "/up.txt", 200, "sibling"},
+		{"a link into home", tree + "/home.txt", 200, "home"},
+		{"a link into ~/.ssh", tree + "/ssh/id_rsa", 404, ""},
+		{"a link to a daemon's token", tree + "/token.txt", 404, ""},
+		{"one file", one + "/direct.html", 200, "<p>direct</p>"},
+		{"one file, its sibling", one + "/sibling.txt", 404, ""},
+		{"one file, a link out", link + "/outfile.html", 404, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := srv.Client().Get(srv.URL + Prefix + tt.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = res.Body.Close() }()
+			b, err := io.ReadAll(res.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.StatusCode != tt.status {
+				t.Fatalf("status %d, want %d", res.StatusCode, tt.status)
+			}
+			if tt.status == 200 && string(b) != tt.body {
+				t.Errorf("body %q, want %q", b, tt.body)
+			}
+		})
+	}
 }

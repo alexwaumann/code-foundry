@@ -2,11 +2,11 @@
 // daemon's bearer token (an <iframe src> carries no headers), so the GUI asks
 // FilesystemService.PreviewFile for a grant: an unguessable id bound to one directory
 // tree (the registered checkout holding the file, else its directory) or, when that
-// directory is too broad for the Floor (home itself, an ancestor of the config home), to
-// the one file. The grant goes in the URL and is the credential for
+// directory is too broad for the Floor (home itself, a temp folder, an ancestor of the
+// config home), to the one file. The grant goes in the URL and is the credential for
 // GET /preview/<grant>/<path> on the loopback listener, mounted outside the bearer check.
-// A grant reads only its tree, never above it, outside the home directory or inside a
-// guarded folder (symlinks resolved), and lasts until the daemon stops.
+// A grant reads only its tree, never above it, outside the home directory and the temp
+// folders or inside a guarded folder (symlinks resolved), and lasts until the daemon stops.
 //
 // The route is served on the daemon's pages listener, not the API's
 // (docs/notes/bridge-1-daemon.md). Its CSP sandbox keeps scripts and forms on and allows
@@ -78,7 +78,7 @@ func (g *Grants) Grant(dir string) (string, error) {
 // GrantFile returns the id that serves file (absolute, cleaned) and nothing else, for a
 // file whose directory may not be a tree; ErrGuarded when the file itself is guarded.
 func (g *Grants) GrantFile(file string) (string, error) {
-	if g.floor.Guarded(file) || !fsx.Within(g.floor.Home(), file) {
+	if g.floor.Guarded(file) || !g.floor.reaches(file) {
 		return "", fmt.Errorf("%w: %s", ErrGuarded, file)
 	}
 	return g.mint(entry{dir: filepath.Dir(file), file: file})
@@ -146,8 +146,8 @@ func escapeSegment(s string) string {
 }
 
 // Handler serves GET /preview/<grant>/<path> from the grant's directory (only its file,
-// for a one-file grant). A file whose symlinks lead outside the home directory or into a
-// guarded folder (the Floor: the config home's token and database, ~/.ssh, compared by
+// for a one-file grant). A file whose symlinks lead outside the home directory and the temp
+// folders or into a guarded folder (the Floor: the config home's token and database, ~/.ssh, compared by
 // file identity, so a folded spelling or a hard link is no way around it), or a path
 // above the grant's directory, is 404 like a missing one. A directory serves its
 // index.html. Responses are never cached (the thread edits these files), carry no
@@ -205,7 +205,7 @@ func resolve(floor Floor, dir, rel string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !fsx.Within(floor.Home(), real) || floor.Guarded(real) {
+	if !floor.reaches(real) || floor.Guarded(real) {
 		return "", fs.ErrNotExist
 	}
 	fi, err := os.Stat(real)

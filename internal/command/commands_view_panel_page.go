@@ -11,10 +11,11 @@ import (
 
 // view.panel.page: an HTML page in a thread's side panel only, with no card in its
 // conversation (docs/notes/page-verbs.md). It takes view.inline --panel's panel half
-// alone: the File tab's ShowView (view.panel.file's check, so the same home-directory rule
-// and the same frame, reloaded on every edit), with params page=1 and the title, which tell
-// the GUI the tab is the thread's page. Without a card in the log, that flag is what gives
-// the page its thread's bridge and storage (components/files/usePageThread.ts).
+// alone: the File tab's ShowView (view.panel.file's check and the same frame, reloaded on
+// every edit), with params page=1 and the title, which tell the GUI the tab is the thread's
+// page. Without a card in the log, that flag is what gives the page its thread's bridge and
+// storage (components/files/usePageThread.ts). So, as for view.inline, the file must be under
+// home: view.panel.file also shows the temp folders, as plain pages without the bridge.
 
 // panelPageCommand is view.panel.page.
 func (d ViewDeps) panelPageCommand() Command {
@@ -59,16 +60,21 @@ func (d ViewDeps) runPanelPage(ctx context.Context, uctx Context, a Args) (Resul
 }
 
 // pageCheck is view.panel.page's check: an .html or .htm file (as view.inline's), then
-// view.panel.file's, plus the params that make the tab the thread's page.
+// view.panel.file's, plus home only (a temp folder is everyone's, and the bridge acts as the
+// thread) and the params that make the tab the thread's page.
 func (d ViewDeps) pageCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
 	switch strings.ToLower(filepath.Ext(a.Path("path"))) {
 	case ".html", ".htm":
 	default:
 		return nil, InvalidArg("path", "%s is not an .html or .htm file (view.panel.file shows any file)", a.Path("path"))
 	}
-	params, err := d.fileCheck(ctx, t, a)
+	params, outsideHome, err := d.readCheck(ctx, t, a)
 	if err != nil {
 		return nil, err
+	}
+	if outsideHome {
+		return nil, InvalidArg("path", "%s is outside your home directory, and a page with the thread's bridge must be under it: "+
+			"move it there, or show it without the bridge with view.panel.file", a.Path("path"))
 	}
 	params["page"] = "1"
 	if title := strings.TrimSpace(a.String("title")); title != "" {
