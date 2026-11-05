@@ -43,14 +43,24 @@ instruction to the model, not a claim to the user.
   A failed send is then a failure band ("Saved, but X was not told: why") and the request is over:
   the user can say it in the thread. A close dialog that saved but could not tell keeps the tab,
   to show that.
-* **"Saved" must be true.** `askSaved` records that a write landed since this request. Save and
+* **"Saved" must be true.** `askSaved` is the version (size and time) a write of ours left on disk
+  since this request, and Save and tell compares it with the version the document is on. So it
+  means "what is on disk now is our write": a document that started over on someone else's
+  version, a file that went, or a New file after a reload cannot tell, with nothing to clear in
+  any of those paths, and a tab that left and came back to the same version still can. Save and
   tell needs something to write, or that: after row two's Save or Overwrite it only tells. On a
-  clean document with no write it is off, and cmd+S does nothing, as anywhere; Dismiss is there
-  for a file that needed nothing. The flag is in the params, so it survives a reload and a new
-  request starts without it.
+  clean document with no such write it is off, and cmd+S does nothing, as anywhere; Dismiss is
+  there for a file that needed nothing.
 * **Where the file really is.** ReadFile reports `real_path` and `mode`, and while a request is
   up the band states it when a symlink leads elsewhere and when group or others can read the
-  file. A warning and a fact, not a refusal, and no claim either way about the agent.
+  file. A warning and a fact, not a refusal, and no claim either way about the agent. They live
+  in `session.where`, not `view`: a chmod or a re-link moves neither size nor time, so every read
+  refreshes them, and the baseline must not move. A link's target is anyone's text, so it is
+  cleaned, cut from the middle to 72 characters, and said to be unusual if cleaning changed it.
+  The facts share the note's scrolling box, ahead of the note, which cannot push them out of it.
+* **A request nobody has seen.** A File tab with a request that is not showing has an accent dot
+  in the strip (`SurfaceSpec.waiting`), for as long as the request stands and the tab is not the
+  active one: seen and left, it is still a thread waiting.
 * **While the band is up, Save and tell has the chord.** cmd+S and the palette's Save File do it
   and the close dialog's button says it. Row two's Save writes alone and shows no chord then: two
   buttons showing ⌘S would be a lie.
@@ -129,12 +139,21 @@ the bytes grew: the file went from 7,912 to 8,172.
 * **A child thread's request.** A thread's panel only shows when the thread does, and children
   are not in the sidebar, so a child's `--edit` waits unseen. Like every panel verb.
 * **No window open:** the verb says nothing was shown, and the request is gone.
-* **Two windows** each hold the request; finishing it in one leaves the other's band up.
+* **Two windows** each hold the request; finishing it in one leaves the other's band up, and that
+  window's panel store, written back to localStorage, can bring the finished request back after a
+  reload.
+* **A 160px stacked group** hides the buttons; unsplit at the minimum window they stay visible.
+* **A symlink whose target vanished after the verb** gives a New file that can only conflict: a
+  create finds the link. The draft stays.
+* **A project under a symlinked directory** shows the link fact on every request.
+* **Invisible characters that are not control characters** (Hangul fillers, braille blanks) survive
+  cleaning and can make a note that looks empty.
+* **Plain `view.panel.file`** still swaps a tab under the editor in use: only `--edit` goes behind.
 * A dirty New file's draft is lost on reload, like every draft; the tab comes back empty.
 
 ## Checked
 
-Vitest and Go table tests; each of 17 mutations of the rules above fails a test, among them the
+Vitest and Go table tests; each of 26 mutations of the rules above fails a test, among them the
 `--focus` gate, which an editor left over from an earlier test used to hide. `e2e/file-request.spec.ts`
 for the keyboard, the mark, the find field and a hostile note. A scratch dev daemon (own
 `CODE_FOUNDRY_HOME`, repos under home, WebKit on it) took the real CLI: all refusals and a
@@ -144,7 +163,10 @@ surviving a reload and a dismissed one not; a removed asker's failure band with 
 60 newlines and U+202E in a note, leaving a 163px band; a `.env` symlink to a 0644 file, with both
 facts shown and the save landing in the target; cmd+S on it untouched doing nothing; row two's Save
 turning Save and tell on; a repeat request, same note, after the pencil. No marker reached the
-daemon's log or its home.
+daemon's log or its home. Then the three ways "saved" went false, each with no message sent: saved,
+deleted, reloaded to New file; saved, typed, written from outside, Reload; saved, written from
+outside, followed. A chain of four 200-character folders under a link ending in U+202E left a 161px
+band in a 500px window, the end of the path readable; a chmod showed on the next read.
 
 Not tested: the Wails window (everything ran in WebKit), and the real config home from the CLI,
 which the Go tests cover with the real floor.
