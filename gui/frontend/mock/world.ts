@@ -4935,6 +4935,12 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find" } } }))}`,
       },
       {
+        // internal/command file.save: always; a window with no tab editing ignores it.
+        cmd: { name: "file.save", title: "Save File", category: "View", description: "Save the file being edited in the focused File tab. Does nothing when no tab is editing.", keybindings: ["cmd+s"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.save" } } }))}`,
+      },
+      {
         // internal/command search.open: from anywhere.
         cmd: { name: "search.open", title: "Search Threads", category: "View", description: "Find threads by name and messages across every thread (archived ones too), with a preview; Enter opens the message in its thread with the find bar on the match.", keybindings: ["cmd+shift+f"], args: [{ name: "id", type: ArgType.STRING, required: false, description: "An agent search to open on (q-…; search.recent lists them)" }] },
         when: always,

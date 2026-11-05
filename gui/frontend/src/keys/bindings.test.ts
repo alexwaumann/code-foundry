@@ -6,7 +6,7 @@ import { contextKey, getUiContext } from "@/stores/context";
 import { useThreadsStore } from "@/stores/threads";
 import { HOME, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
-import { chordFires, commandBindings, handleKeyDown, inPalette, isGlobalChord, openRunInPicker } from "./bindings";
+import { chordFires, commandBindings, handleKeyDown, inPalette, installKeybindings, isGlobalChord, openRunInPicker } from "./bindings";
 
 const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
 // The re-list a chord on a stale list waits for: a test sets what it lists.
@@ -90,6 +90,107 @@ function press(target: Element, init: KeyboardEventInit): KeyboardEvent {
   target.dispatchEvent(e);
   return e;
 }
+
+/**
+ * The File tab's editor as the document has it: a contenteditable in a shadow root, whose
+ * host is all `e.target` shows a listener outside it.
+ */
+function codeEditor(): { host: HTMLElement; content: HTMLElement; find: HTMLInputElement } {
+  const wrap = document.createElement("div");
+  wrap.setAttribute("data-code-editor", "");
+  const host = document.createElement("div");
+  wrap.append(host);
+  const root = host.attachShadow({ mode: "open" });
+  const content = document.createElement("div");
+  content.contentEditable = "true";
+  content.setAttribute("contenteditable", "true");
+  const find = document.createElement("input");
+  root.append(content, find);
+  document.body.append(wrap);
+  return { host, content, find };
+}
+
+describe("keys in the File tab's code editor", () => {
+  const presses = (el: Element, key: string, code: string, mods: KeyboardEventInit = {}) => press(el, { key, code, composed: true, ...mods });
+  let installed: () => void;
+  let editor: ReturnType<typeof codeEditor>;
+
+  beforeEach(() => {
+    installed = installKeybindings();
+    editor = codeEditor();
+    useCommandsStore.setState({
+      commands: [
+        cmd({ name: "thread.find", keybindings: ["cmd+f"] }),
+        cmd({ name: "thread.find.next", keybindings: ["cmd+g"] }),
+        cmd({ name: "view.back", keybindings: ["cmd+["] }),
+        cmd({ name: "view.help", keybindings: ["cmd+/"] }),
+        cmd({ name: "file.save", keybindings: ["cmd+s"] }),
+        cmd({ name: "x.open", keybindings: ["cmd+j"] }),
+        cmd({ name: "x.bare", keybindings: ["f"] }),
+      ],
+      contextKey: contextKey(getUiContext()),
+    });
+    runCommandForResult.mockClear();
+  });
+
+  afterEach(() => {
+    installed();
+    document.body.replaceChildren();
+    useCommandsStore.setState({ commands: [] });
+  });
+
+  it.each([
+    ["cmd+F, the editor's find", "f", "KeyF"],
+    ["cmd+G, its find again", "g", "KeyG"],
+    ["cmd+[, its outdent", "[", "BracketLeft"],
+    ["cmd+/, its comment toggle", "/", "Slash"],
+    ["cmd+A, its select all", "a", "KeyA"],
+    ["cmd+Z, its undo", "z", "KeyZ"],
+    ["cmd+V, its paste", "v", "KeyV"],
+  ])("%s stays with it", (_name, key, code) => {
+    const e = presses(editor.content, key, code, { metaKey: true });
+    expect(e.defaultPrevented).toBe(false);
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("a bare key is text, even one a command binds", () => {
+    const e = presses(editor.content, "f", "KeyF");
+    expect(e.defaultPrevented).toBe(false);
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("F2 and Escape are the editor's too", () => {
+    expect(presses(editor.content, "F2", "F2").defaultPrevented).toBe(false);
+    expect(presses(editor.content, "Escape", "Escape").defaultPrevented).toBe(false);
+  });
+
+  it("a chord bound to a command goes through, as in a thread's prompt", () => {
+    const e = presses(editor.content, "j", "KeyJ", { metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    expect(runCommandForResult).toHaveBeenCalledWith("x.open", {}, expect.anything());
+  });
+
+  it("cmd+S is handled there, and never asks the daemon: the window saves", () => {
+    const e = presses(editor.content, "s", "KeyS", { metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("its find field is the same", () => {
+    expect(presses(editor.find, "f", "KeyF", { metaKey: true }).defaultPrevented).toBe(false);
+    expect(presses(editor.find, "s", "KeyS", { metaKey: true }).defaultPrevented).toBe(true);
+  });
+
+  it("outside the editor, cmd+F is still the app's", () => {
+    expect(press(document.body, { key: "f", code: "KeyF", metaKey: true }).defaultPrevented).toBe(true);
+  });
+});
+
+describe("file.save in the palette", () => {
+  it("is listed only over a tab that is editing", () => {
+    expect(inPalette(cmd({ name: "file.save" }))).toBe(false);
+  });
+});
 
 describe("commandBindings", () => {
   it("binds only available commands, first binding wins, chords normalized", () => {

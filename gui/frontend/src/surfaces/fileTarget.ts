@@ -26,10 +26,12 @@ export interface FileTarget {
    * other file.
    */
   page?: { title: string };
+  /** The tab opens with its editor on, when the file is one it can edit. */
+  edit?: boolean;
 }
 
 /**
- * A File tab: params { project, base, path, line?, page?, title? } with the path made
+ * A File tab: params { project, base, path, line?, page?, title?, edit? } with the path made
  * absolute against base when it can be, keyed by that path alone, titled with the page's
  * title or the file's name.
  */
@@ -41,6 +43,7 @@ export function fileTab(t: FileTarget): Tab {
     params.page = "1";
     if (t.page.title) params.title = t.page.title;
   }
+  if (t.edit) params.edit = "1";
   return { id: tabId(FILE_KIND, { path }), kind: FILE_KIND, title: t.page?.title || fileName(path) || path, params };
 }
 
@@ -55,6 +58,7 @@ export function fileOfTab(tab: Pick<Tab, "params">): FileTarget | null {
     path,
     ...(Number.isInteger(line) && line > 0 ? { line } : {}),
     ...(tab.params.page === "1" ? { page: { title: tab.params.title ?? "" } } : {}),
+    ...(tab.params.edit === "1" ? { edit: true } : {}),
   };
 }
 

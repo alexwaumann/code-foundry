@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { DIFFS_TAG_NAME } from "@pierre/diffs";
-import { CodeFile } from "@/components/code/CodeFile";
+import { CodeFile, type CodeFileEdit } from "@/components/code/CodeFile";
 import { CodeScroll } from "@/components/code/CodeDiff";
 
 /** Above this many lines the file lays out only its visible lines (the library's virtualizer). */
@@ -48,14 +48,14 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
 /**
  * A text file as code: line numbers, the codeView store's wrap, scrolling inside the tab.
  * `line` is marked with the library's selection (controlled, so a click does not move it)
- * and scrolled to; a long file goes through CodeScroll.
+ * and scrolled to; a long file goes through CodeScroll. `edit` is the File tab's editor.
  */
-export function CodeBody({ name, text, lines, line }: { name: string; text: string; lines: number; line?: number }) {
+export function CodeBody({ name, text, lines, line, edit }: { name: string; text: string; lines: number; line?: number | undefined; edit?: CodeFileEdit | undefined }) {
   const box = useRef<HTMLDivElement>(null);
   const virtual = lines > VIRTUALIZE_LINES;
   const selected = useMemo(() => (line ? { start: line, end: line } : null), [line]);
   useScrollToLine(box, line, virtual);
-  const code = <CodeFile name={name} contents={text} selectedLines={selected} />;
+  const code = edit ? <CodeFile name={name} contents={text} selectedLines={selected} edit={edit} /> : <CodeFile name={name} contents={text} selectedLines={selected} />;
   return virtual ? (
     <div ref={box} className="flex min-h-0 flex-1 flex-col" data-testid="file-code" data-virtual="">
       <CodeScroll className="min-h-0 flex-1 overflow-auto">{code}</CodeScroll>

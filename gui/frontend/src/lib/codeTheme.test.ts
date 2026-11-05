@@ -3,6 +3,7 @@ import { themes } from "@/themes";
 import { codeThemeName, codeThemeOf } from "./codeTheme";
 
 const HEX = /^#[0-9a-f]{6}$/i;
+const COLOUR = /^(#[0-9a-f]{6}([0-9a-f]{2})?|rgba?\(.*\)|transparent)$/i;
 
 describe("codeThemeOf", () => {
   it.each(themes.map((t) => [t.id, t] as const))("%s is a complete Shiki theme", (_, theme) => {
@@ -11,7 +12,7 @@ describe("codeThemeOf", () => {
     expect(t.type).toBe(theme.scheme);
     expect(t.colors?.["editor.background"]).toBe(theme.slots["--cf-surface"]);
     expect(t.colors?.["editor.foreground"]).toBe(theme.vars["--syn-fg"]);
-    for (const v of Object.values(t.colors ?? {})) expect(v).toMatch(HEX);
+    for (const v of Object.values(t.colors ?? {})) expect(v).toMatch(COLOUR);
     expect(t.tokenColors?.length).toBeGreaterThan(0);
     for (const rule of t.tokenColors ?? []) {
       expect(rule.scope?.length).toBeGreaterThan(0);
@@ -22,6 +23,15 @@ describe("codeThemeOf", () => {
     expect(colourOf("comment")).toBe(theme.vars["--syn-com"]);
     expect(colourOf("keyword")).toBe(theme.vars["--syn-kw"]);
     expect(colourOf("string")).toBe(theme.vars["--syn-str"]);
+  });
+
+  it.each(themes.map((t) => [t.id, t] as const))("%s gives the editor its own colours: no box around the active line", (_, theme) => {
+    const c = codeThemeOf(theme).colors;
+    expect(c?.["editor.lineHighlightBorder"]).toBe("transparent");
+    expect(c?.["editor.lineHighlightBackground"]).toBeTruthy();
+    expect(c?.["editorCursor.foreground"]).toBe(theme.vars["--syn-fg"]);
+    expect(c?.["editor.selectionBackground"]).toBe(theme.slots["--cf-selection"]);
+    expect(c?.["editor.findMatchHighlightBackground"]).toBe(theme.slots["--cf-accent-surface"]);
   });
 
   it("names every theme distinctly", () => {

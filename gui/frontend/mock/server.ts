@@ -133,10 +133,13 @@
  *                                                 projects: project=a&path=x&project=b&path=y)
  *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project,…> <query>")
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
- *   FilesystemService.ReadFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
+ *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
  *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
- *   GET  /__mock/fs/calls                         ("read <path>", "diff <worktree> <file> <working|branch>")
+ *   POST /__mock/fs/remove?path=…                 (the file goes)
+ *   POST /__mock/fs/refuse?code=…&message=…       (the next WriteFile fails: code as in failed_precondition)
+ *   GET  /__mock/fs/text?path=…                   ({ text }: a file's contents, null when absent)
+ *   GET  /__mock/fs/calls                         ("read <path>", "write <path> [force]", "diff <worktree> <file> <working|branch>")
  *   thread.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
  *   GET  /__mock/gitops
@@ -470,6 +473,7 @@ function routes(router: ConnectRouter): void {
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
     searchFiles: (req) => searchFilesSlow(world.projects, req),
     readFile: (req) => mockFiles.readFile(req.baseDir, req.path, req.maxBytes),
+    writeFile: (req) => mockFiles.writeFile(req),
     previewFile: (req) => mockFiles.previewFile(req.baseDir, req.path),
   });
 
@@ -1812,6 +1816,17 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/fs/write":
       mockFiles.write(q.get("path") ?? "", q.get("text") ?? "", q.get("touch") === "1");
       json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/fs/remove":
+      mockFiles.remove(q.get("path") ?? "");
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/fs/refuse":
+      mockFiles.refuseNextWrite(q.get("code") ?? "", q.get("message") ?? "");
+      json(res, 200, { ok: true });
+      break;
+    case "GET /__mock/fs/text":
+      json(res, 200, { text: mockFiles.textOf(q.get("path") ?? "") });
       break;
     case "GET /__mock/fs/calls":
       json(res, 200, mockFiles.calls);

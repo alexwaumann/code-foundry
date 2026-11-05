@@ -1,21 +1,27 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { FileReadView } from "@/api/files";
+import type { CodeFileEdit } from "@/components/code/CodeFile";
+import { PanelKeyContext } from "@/components/panel/panelKeyContext";
 import { useCodeViewStore } from "@/stores/codeView";
+import { useFileEditStore } from "@/stores/fileEdit";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
+import type { FileTarget } from "@/surfaces/fileTarget";
 import { FileTab } from "./FileTab";
 
 // readFile answers from `files`; pdf.js does not run in jsdom (no canvas), so lib/pdf is a
 // fake that opens any blob as 3 pages and never draws.
 const files = vi.hoisted(() => new Map<string, Partial<FileReadView>>());
 const reads = vi.hoisted(() => [] as string[]);
+const writes = vi.hoisted(() => ({ fn: vi.fn() }));
 vi.mock("@/api/files", async (orig) => ({
   ...(await orig<typeof import("@/api/files")>()),
+  writeFile: writes.fn,
   readFile: (base: string, path: string) => {
     const abs = path.startsWith("/") ? path : `${base}/${path}`;
     reads.push(abs);
     const f = files.get(abs) ?? { notFound: true };
-    return Promise.resolve({ path: abs, size: 0, truncated: false, binary: true, mime: "", modifiedAtMs: null, notFound: false, isDir: false, text: null, image: null, pdf: null, ...f });
+    return Promise.resolve({ path: abs, size: 0, truncated: false, binary: true, mime: "", modifiedAtMs: null, notFound: false, isDir: false, text: null, lossless: false, image: null, pdf: null, ...f });
   },
 }));
 // searchFiles (findMissing's retry) lists `listed`, checkout-relative, filtered by file name.
@@ -33,13 +39,27 @@ const loadPdf = vi.hoisted(() =>
 vi.mock("@/lib/pdf", () => ({ loadPdf }));
 // The code view is @pierre/diffs' (a real browser draws and scrolls it: e2e/file-tabs.spec.ts):
 // a stand-in that shows the text and the line it was asked to mark.
+// With an editor on, it takes "typing" through a text box the test fills.
 vi.mock("@/components/code/CodeFile", () => ({
-  CodeFile: ({ contents, selectedLines }: { contents: string; selectedLines?: { start: number } | null }) => (
-    <pre data-testid="code-file" data-selected={selectedLines?.start}>
-      {contents}
-    </pre>
+  CodeFile: ({ contents, selectedLines, edit }: { contents: string; selectedLines?: { start: number } | null; edit?: CodeFileEdit }) => (
+    <>
+      <pre data-testid="code-file" data-selected={selectedLines?.start} data-editing={edit?.active ? "" : undefined}>
+        {contents}
+      </pre>
+      {edit?.active && (
+        <textarea
+          data-testid="draft"
+          onChange={(e) => {
+            edit.onChange(e.target.value);
+          }}
+        />
+      )}
+    </>
   ),
 }));
+// The library's draft: what the stand-in above was last told is what a save reads.
+const draft = vi.hoisted(() => ({ text: null as string | null }));
+vi.mock("@/lib/codeEditor", () => ({ loadCodeEditor: () => Promise.resolve(), draftText: () => draft.text, forgetDraft: () => undefined, createCodeEditor: () => undefined }));
 // The worktree detail a project's File tab watches (worktree_detail_updated re-reads it).
 const detail = vi.hoisted(() => ({ computedAtMs: 1 }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({
@@ -65,6 +85,9 @@ afterEach(() => {
   reads.length = 0;
   loadPdf.mockClear();
   useCodeViewStore.setState({ diffStyle: "unified", wrap: false, preview: { markdown: "rendered", html: "rendered" } });
+  useFileEditStore.setState({ sessions: {} });
+  writes.fn.mockReset();
+  draft.text = null;
   localStorage.clear();
 });
 
@@ -247,5 +270,231 @@ describe("FileTab", () => {
     await waitFor(() => {
       expect(reads.filter((r) => r === path)).toHaveLength(before + 1);
     });
+  });
+});
+
+describe("editing", () => {
+  const ENV = "/Users/me/w/.env";
+  const text = (over: Partial<FileReadView> = {}): Partial<FileReadView> => ({ text: "A=1\n", lossless: true, binary: false, mime: "text/plain", size: 4, modifiedAtMs: 100, ...over });
+  const pencil = () => screen.findByTestId("file-edit");
+  const status = () => screen.getByTestId("file-edit-status").textContent;
+  const openTab = (path = ".env", over: Partial<FileTarget> = {}) =>
+    render(
+      <PanelKeyContext value="thread:a">
+        <FileTab target={{ project: "", base: "/Users/me/w", path, ...over }} />
+      </PanelKeyContext>,
+    );
+  const type = (value: string) => {
+    draft.text = value;
+    fireEvent.change(screen.getByTestId("draft"), { target: { value } });
+  };
+  const editing = async () => {
+    fireEvent.click(await pencil());
+    await screen.findByTestId("draft");
+  };
+  const refresh = async () => {
+    fireEvent.click(screen.getByTestId("file-refresh"));
+    await waitFor(() => {
+      expect(screen.getByTestId("file-tab").getAttribute("data-loading")).toBeNull();
+    });
+  };
+
+  it.each<[string, string, Partial<FileReadView>, boolean]>([
+    ["whole text", ENV, text(), true],
+    ["an empty file", ENV, text({ text: "", size: 0 }), true],
+    ["truncated", "/Users/me/w/big.log", text({ truncated: true, size: 4 * MiB }), false],
+    ["binary", "/Users/me/w/tool", { binary: true, text: null, size: 9 }, false],
+    ["a folder", "/Users/me/w/docs", { isDir: true, text: null }, false],
+    ["invalid UTF-8", ENV, text({ text: "caf\ufffd", lossless: false }), false],
+    ["a PDF", "/Users/me/w/spec.pdf", { mime: "application/pdf", pdf: new Uint8Array([1]), size: 1 }, false],
+    ["an image", "/Users/me/w/logo.png", { mime: "image/png", image: new Uint8Array([1]), binary: true, size: 1 }, false],
+  ])("the pencil, for %s", async (_name, path, f, offered) => {
+    files.set(path, f);
+    openTab(path);
+    await waitFor(() => {
+      expect(screen.getByTestId("file-tab").getAttribute("data-loading")).toBeNull();
+    });
+    expect(screen.queryByTestId("file-edit") !== null).toBe(offered);
+  });
+
+  it("no pencil for a file that is not there", async () => {
+    openTab("nope.txt");
+    await screen.findByTestId("file-not-found");
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+  });
+
+  it("the pencil is first in the row, pressed while editing, and turns the same view into the editor", async () => {
+    files.set(ENV, text());
+    openTab();
+    expect((await pencil()).getAttribute("aria-pressed")).toBe("false");
+    const actions = screen.getByTestId("file-edit").parentElement;
+    expect(actions?.querySelector("button")).toBe(screen.getByTestId("file-edit"));
+    fireEvent.click(await pencil());
+    await screen.findByTestId("draft");
+    expect((await pencil()).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("code-file").textContent).toBe("A=1\n");
+  });
+
+  it("clean: Editing, both buttons off; dirty: Unsaved with Save and Discard on, the meta between", async () => {
+    files.set(ENV, text());
+    openTab();
+    await editing();
+    expect(status()).toBe("Editing");
+    expect(screen.getByTestId<HTMLButtonElement>("file-save").disabled).toBe(true);
+    expect(screen.getByTestId<HTMLButtonElement>("file-discard").disabled).toBe(true);
+    type("A=2\n");
+    expect(status()).toBe("Unsaved");
+    expect(screen.getByTestId<HTMLButtonElement>("file-save").disabled).toBe(false);
+    expect(screen.getByTestId<HTMLButtonElement>("file-discard").disabled).toBe(false);
+    const bar = screen.getByTestId("file-header-bar").textContent;
+    expect(bar.indexOf("Unsaved")).toBeLessThan(bar.indexOf("line"));
+    expect(bar.indexOf("line")).toBeLessThan(bar.indexOf("Discard"));
+  });
+
+  it("the pencil on a clean document goes back to the viewer; on a dirty one it drops nothing", async () => {
+    files.set(ENV, text());
+    openTab();
+    await editing();
+    type("A=2\n");
+    fireEvent.click(await pencil());
+    expect(status()).toBe("Unsaved");
+    expect(screen.getByTestId("code-file").getAttribute("data-editing")).toBe("");
+    type("A=1\n");
+    fireEvent.click(await pencil());
+    expect(screen.queryByTestId("file-edit-status")).toBeNull();
+    expect(screen.getByTestId("code-file").getAttribute("data-editing")).toBeNull();
+  });
+
+  it("Save writes the draft against the read, and stays in edit mode with the new baseline", async () => {
+    files.set(ENV, text());
+    writes.fn.mockResolvedValue({ path: ENV, size: 5, modifiedAtMs: 200, conflict: false, notFound: false });
+    openTab();
+    await editing();
+    type("A=22\n");
+    fireEvent.click(screen.getByTestId("file-save"));
+    await waitFor(() => {
+      expect(status()).toBe("Editing");
+    });
+    expect(writes.fn).toHaveBeenCalledWith("/Users/me/w", ENV, "A=22\n", expect.objectContaining({ size: 4, modifiedAtMs: 100 }), {});
+    expect(screen.getByTestId("file-meta").textContent).toContain("5 B");
+    // Now on disk, the re-read sees what it wrote: no band.
+    files.set(ENV, text({ text: "A=22\n", size: 5, modifiedAtMs: 200 }));
+    await refresh();
+    expect(screen.queryByTestId("file-conflict")).toBeNull();
+    expect(screen.getByTestId("draft")).toBeTruthy();
+  });
+
+  it("every read while dirty leaves the editor's text alone and raises the band on a change", async () => {
+    files.set(ENV, text());
+    openTab();
+    await editing();
+    type("A=2\n");
+    await refresh();
+    expect(screen.queryByTestId("file-conflict")).toBeNull();
+    files.set(ENV, text({ text: "theirs\n", size: 7, modifiedAtMs: 150 }));
+    await refresh();
+    expect(screen.getByTestId("file-conflict").textContent).toContain("Changed on disk");
+    expect(screen.getByTestId("code-file").textContent).toBe("A=1\n");
+    expect(screen.getByTestId("file-reload")).toBeTruthy();
+    expect(screen.getByTestId("file-overwrite")).toBeTruthy();
+  });
+
+  it("a file deleted under a draft says so, keeps the editor, and offers only Overwrite", async () => {
+    files.set(ENV, text());
+    openTab();
+    await editing();
+    type("A=2\n");
+    files.delete(ENV);
+    await refresh();
+    expect(screen.getByTestId("file-conflict").textContent).toContain("Deleted on disk");
+    expect(screen.queryByTestId("file-reload")).toBeNull();
+    expect(screen.queryByTestId("file-not-found")).toBeNull();
+    expect(screen.getByTestId("draft")).toBeTruthy();
+    writes.fn.mockResolvedValue({ path: ENV, size: 4, modifiedAtMs: 300, conflict: false, notFound: false });
+    fireEvent.click(screen.getByTestId("file-overwrite"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("file-conflict")).toBeNull();
+    });
+    expect(writes.fn.mock.lastCall?.[4]).toEqual({ force: true });
+  });
+
+  it("while clean, a re-read still follows the file", async () => {
+    files.set(ENV, text());
+    openTab();
+    await editing();
+    files.set(ENV, text({ text: "theirs\n", size: 7, modifiedAtMs: 150 }));
+    await refresh();
+    await waitFor(() => {
+      expect(screen.getByTestId("code-file").textContent).toBe("theirs\n");
+    });
+    expect(screen.queryByTestId("file-conflict")).toBeNull();
+    expect(status()).toBe("Editing");
+  });
+
+  it("a refused save shows the daemon's words and keeps the draft", async () => {
+    files.set(ENV, text());
+    writes.fn.mockRejectedValue(new Error("the file is read-only: make it writable first"));
+    openTab();
+    await editing();
+    type("A=2\n");
+    fireEvent.click(screen.getByTestId("file-save"));
+    expect((await screen.findByTestId("file-save-failed")).textContent).toContain("the file is read-only: make it writable first");
+    expect(status()).toBe("Unsaved");
+  });
+
+  it("a rendered kind moves to Source for this tab only; the switch goes while dirty and comes back; Rendered leaves edit mode", async () => {
+    const md = "/Users/me/w/README.md";
+    files.set(md, text({ text: "# Title\n" }));
+    openTab(md);
+    expect(await screen.findByTestId("file-markdown")).toBeTruthy();
+    await editing();
+    expect(screen.getByTestId("file-tab").getAttribute("data-mode")).toBe("source");
+    expect(screen.queryByTestId("file-markdown")).toBeNull();
+    expect(useCodeViewStore.getState().preview.markdown).toBe("rendered");
+    expect(screen.getByTestId("file-mode")).toBeTruthy();
+    // Source is where it already is: nothing leaves edit mode.
+    fireEvent.click(screen.getByTestId("file-mode-source"));
+    expect(status()).toBe("Editing");
+    type("# Other\n");
+    expect(screen.queryByTestId("file-mode")).toBeNull();
+    type("# Title\n");
+    fireEvent.click(screen.getByTestId("file-mode-rendered"));
+    expect(await screen.findByTestId("file-markdown")).toBeTruthy();
+    expect(screen.queryByTestId("file-edit-status")).toBeNull();
+  });
+
+  it("a tab can open with its editor on, and the pencil can still turn it off", async () => {
+    files.set(ENV, text());
+    openTab(".env", { edit: true });
+    await screen.findByTestId("draft");
+    fireEvent.click(await pencil());
+    await waitFor(() => {
+      expect(screen.queryByTestId("draft")).toBeNull();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("draft")).toBeNull();
+  });
+
+  it("opening with its editor on does nothing for a file it cannot edit", async () => {
+    files.set(ENV, text({ lossless: false }));
+    openTab(".env", { edit: true });
+    await screen.findByTestId("code-file");
+    expect(screen.queryByTestId("draft")).toBeNull();
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+  });
+
+  it("the draft's editor stays across a remount of the tab, with its version", async () => {
+    files.set(ENV, text());
+    const first = openTab();
+    await editing();
+    type("A=2\n");
+    first.unmount();
+    files.set(ENV, text({ text: "theirs\n", size: 7, modifiedAtMs: 150 }));
+    openTab();
+    expect(screen.getByTestId("code-file").getAttribute("data-editing")).toBe("");
+    expect(status()).toBe("Unsaved");
+    expect((await screen.findByTestId("file-conflict")).textContent).toContain("Changed on disk");
   });
 });

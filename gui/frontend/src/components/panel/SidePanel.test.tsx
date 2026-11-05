@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { createElement, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The + runs view.panel.new-tab through its local presenter: the daemon is never asked.
@@ -11,18 +11,28 @@ vi.mock("@/api/command", async (orig) => {
 });
 import { create } from "zustand";
 import type { CommandView } from "@/api/command";
+import type { FileReadView } from "@/api/files";
 import { useCommandsStore } from "@/stores/commands";
+import { answerAlternate, answerConfirm, useConfirmStore } from "@/stores/confirm";
+import { fileEditKey, noteDraft, startEdit, useFileEditStore } from "@/stores/fileEdit";
 import { KEYS, useSettingsStore } from "@/stores/settings";
-import { closePanelTab, getPanel, isPicking, makeTab, openSurface, startPanelPicking, usePanelStore } from "@/stores/panel";
+import { activatePanelTab, allTabs, closePanelTab, getPanel, isPicking, makeTab, openSurface, startPanelPicking, usePanelStore } from "@/stores/panel";
 import { PANEL_MIN, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { diffSurface } from "@/surfaces/diff";
+import { fileTab } from "@/surfaces/fileTarget";
 import { filesSurface } from "@/surfaces/files";
 import { pullRequestSurface } from "@/surfaces/pullrequest";
 import { revealTab } from "./reveal";
 import { SidePanel } from "./SidePanel";
 
 const KEY = "thread:a";
+
+/** A text field in a shadow root, as the File tab's editor is (jsdom has no isContentEditable). */
+function mountEditor(host: HTMLDivElement | null): void {
+  if (!host || host.shadowRoot) return;
+  host.attachShadow({ mode: "open" }).append(document.createElement("textarea"));
+}
 
 const newTabCommand: CommandView = { name: "view.panel.new-tab", title: "New Side Panel Tab", description: "", category: "View", args: [], keybindings: [], available: true };
 
@@ -430,6 +440,97 @@ describe("appearance.panel_keep_open", () => {
 
 // From e2e/panel.spec.ts: closing tabs, the strip's keyboard and the + (what is left there is
 // computed CSS, native button keys and real focus).
+describe("a tab with unsaved edits", () => {
+  const tab = fileTab({ project: "", base: "/w", path: "/w/.env" });
+  const editKey = fileEditKey(KEY, tab.id);
+  const view: FileReadView = { path: "/w/.env", size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null };
+
+  beforeEach(async () => {
+    vi.spyOn(filesSurface, "render").mockReturnValue(null);
+    openSurface(KEY, tab);
+    await startEdit(editKey, { panelKey: KEY, tabId: tab.id, base: "/w" }, view);
+  });
+
+  afterEach(() => {
+    useFileEditStore.setState({ sessions: {} });
+    useConfirmStore.setState({ pending: null });
+  });
+
+  it("shows the dot beside its name, only while dirty", () => {
+    render(<SidePanel />);
+    expect(screen.queryByTestId("tab-unsaved")).toBeNull();
+    act(() => {
+      noteDraft(editKey, "a=2\n");
+    });
+    expect(screen.getByTestId("tab-unsaved")).toBeTruthy();
+    expect(screen.getByRole("tab").textContent).toContain(".env");
+    act(() => {
+      noteDraft(editKey, "a=1\n");
+    });
+    expect(screen.queryByTestId("tab-unsaved")).toBeNull();
+  });
+
+  it.each([
+    ["the ×", () => { fireEvent.click(screen.getByRole("button", { name: "Close .env" })); }],
+    ["a middle click", () => { fireEvent(screen.getByRole("tab").parentElement as Element, new MouseEvent("auxclick", { bubbles: true, button: 1 })); }],
+    ["cmd+w", () => { fireEvent.keyDown(screen.getByRole("tab"), { key: "w", code: "KeyW", metaKey: true }); }],
+  ])("%s asks first, and keeps the tab until told", async (_name, close) => {
+    render(<SidePanel />);
+    act(() => {
+      noteDraft(editKey, "a=2\n");
+    });
+    close();
+    expect(useConfirmStore.getState().pending?.title).toBe("Save changes to .env?");
+    expect(allTabs(getPanel(KEY)).map((t) => t.id)).toEqual([tab.id]);
+    await act(async () => {
+      answerAlternate();
+      await Promise.resolve();
+    });
+    expect(allTabs(getPanel(KEY))).toEqual([]);
+    expect(useFileEditStore.getState().sessions[editKey]).toBeUndefined();
+  });
+
+  it("Keep editing leaves it open", async () => {
+    render(<SidePanel />);
+    act(() => {
+      noteDraft(editKey, "a=2\n");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close .env" }));
+    await act(async () => {
+      answerConfirm(false);
+      await Promise.resolve();
+    });
+    expect(allTabs(getPanel(KEY)).map((t) => t.id)).toEqual([tab.id]);
+  });
+
+  it("a clean one closes without a word", () => {
+    render(<SidePanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Close .env" }));
+    expect(useConfirmStore.getState().pending).toBeNull();
+    expect(allTabs(getPanel(KEY))).toEqual([]);
+  });
+});
+
+describe("typing in a surface's shadow root", () => {
+  it("never reaches the panel's letters: the focused element is inside, whatever e.target shows", () => {
+    const editor = (): ReactNode => createElement("div", { ref: mountEditor, "data-testid": "host" });
+    vi.spyOn(filesSurface, "render").mockImplementation(editor);
+    openSurface(KEY, fileTab({ project: "", base: "/w", path: "/w/a.ts" }));
+    openSurface(KEY, makeTab("diff", "Diff", { path: "x" }));
+    activatePanelTab(KEY, fileTab({ project: "", base: "/w", path: "/w/a.ts" }).id);
+    render(<SidePanel />);
+    const content = screen.getByTestId("host").shadowRoot?.firstElementChild;
+    if (!content) throw new Error("no editor");
+    const active = () => getPanel(KEY).groups[0]?.activeTabId;
+    const before = active();
+    content.dispatchEvent(new KeyboardEvent("keydown", { key: "d", code: "KeyD", bubbles: true, composed: true, cancelable: true }));
+    expect(active()).toBe(before);
+    // Off the editor, the same letter opens the Diff tab.
+    fireEvent.keyDown(screen.getByTestId("host"), { key: "d", code: "KeyD" });
+    expect(active()).not.toBe(before);
+  });
+});
+
 describe("closing tabs", () => {
   const files = makeTab("files", "Files");
   const diff = makeTab("diff", "Diff");

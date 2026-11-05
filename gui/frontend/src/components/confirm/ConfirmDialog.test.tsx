@@ -19,7 +19,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 
 const { ConfirmDialog } = await import("./ConfirmDialog");
 const { runCommand } = await import("@/stores/commands");
-const { requestConfirm, useConfirmStore } = await import("@/stores/confirm");
+const { requestChoice, requestConfirm, useConfirmStore } = await import("@/stores/confirm");
 
 const ctx = { activeTerminalId: "", activeThreadId: "", activeProjectId: "", activeWorktreePath: "", activeView: "settings", activeWorkspaceId: "" };
 const clear = new NeedsConfirm({ command: "memory.clear", title: "Memory: Forget All Preferences", message: "Forget every remembered preference? New threads get none.", confirmLabel: "Forget all" });
@@ -33,6 +33,47 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("ConfirmDialog", () => {
+  describe("a three-way prompt", () => {
+    const ask = () => {
+      let done!: Promise<string>;
+      act(() => {
+        done = requestChoice({ title: "Save changes to .env?", message: "Unsaved edits are lost if you discard them.", confirmLabel: "Save", alternateLabel: "Discard", cancelLabel: "Keep editing" });
+      });
+      return { done };
+    };
+
+    it("Enter's answer is the safe one, and the destructive one is the alternate", () => {
+      render(<ConfirmDialog />);
+      ask();
+      expect(screen.getByTestId("confirm-ok").textContent).toBe("Save");
+      expect(document.activeElement).toBe(screen.getByTestId("confirm-ok"));
+      expect(screen.getByTestId("confirm-ok").getAttribute("data-variant")).toBe("default");
+      expect(screen.getByTestId("confirm-alternate").textContent).toBe("Discard");
+      expect(screen.getByTestId("confirm-cancel").textContent).toBe("Keep editing");
+    });
+
+    it.each([
+      ["confirm-ok", "confirm"],
+      ["confirm-alternate", "alternate"],
+      ["confirm-cancel", "cancel"],
+    ])("%s answers %s", async (button, want) => {
+      render(<ConfirmDialog />);
+      const { done } = ask();
+      fireEvent.click(screen.getByTestId(button));
+      await expect(done).resolves.toBe(want);
+    });
+  });
+
+  it("a plain prompt has no third button and stays destructive", () => {
+    render(<ConfirmDialog />);
+    act(() => {
+      void requestConfirm({ title: "t", message: "m", confirmLabel: "Remove" });
+    });
+    expect(screen.queryByTestId("confirm-alternate")).toBeNull();
+    expect(screen.getByTestId("confirm-cancel").textContent).toBe("Cancel");
+    expect(screen.getByTestId("confirm-ok").getAttribute("data-variant")).toBe("destructive");
+  });
+
   it("names who asked when it was not the user (a page's or a plugin's call)", async () => {
     render(<ConfirmDialog />);
     let done!: Promise<boolean>;

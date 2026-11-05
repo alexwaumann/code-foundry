@@ -1,10 +1,11 @@
 import { create } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
-import { ReadFileResponseSchema } from "@/gen/codefoundry/v1/filesystem_pb";
+import { ReadFileResponseSchema, WriteFileResponseSchema } from "@/gen/codefoundry/v1/filesystem_pb";
 import { DiffScope, FileVersionSchema, GetWorktreeFileDiffResponseSchema } from "@/gen/codefoundry/v1/project_pb";
 import { toFileDiffView } from "./fileDiff";
 import type { DaemonConnection } from "./endpoint";
-import { isImageMime, readFile, READ_MAX_BYTES, toFileReadView } from "./files";
+import { canEdit, isImageMime, readFile, READ_MAX_BYTES, toFileReadView, writeFile, type FileReadView } from "./files";
 
 const enc = new TextEncoder();
 
@@ -23,6 +24,7 @@ describe("toFileReadView", () => {
       notFound: false,
       isDir: false,
       text: "# Héllo\n",
+      lossless: true,
       image: null,
       pdf: null,
     });
@@ -79,6 +81,80 @@ describe("toFileReadView", () => {
     expect(READ_MAX_BYTES).toBe(32 * 1024 * 1024);
     expect(asked).toEqual([{ baseDir: "/x", path: "a.pdf", maxBytes: 33_554_432n }]);
     expect(v.pdf).toEqual(new Uint8Array([1]));
+  });
+});
+
+describe("lossless", () => {
+  const read = (contents: Uint8Array) => toFileReadView(create(ReadFileResponseSchema, { contents, size: BigInt(contents.length), mimeType: "text/plain", resolvedPath: "/x/a" }));
+
+  it.each([
+    ["plain text", enc.encode("a=1\n"), true, "a=1\n"],
+    ["CRLF and non-ASCII", enc.encode("é\r\n€\r\n"), true, "é\r\n€\r\n"],
+    ["empty", new Uint8Array(), true, ""],
+    ["a byte order mark", Uint8Array.of(0xef, 0xbb, 0xbf, 0x61), false, "a"],
+    ["invalid UTF-8 (Latin-1)", Uint8Array.of(0x63, 0x61, 0x66, 0xe9), false, "caf\ufffd"],
+    ["a sequence cut short", Uint8Array.of(0x61, 0xe2, 0x82), false, "a\ufffd"],
+  ])("%s", (_name, bytes, lossless, text) => {
+    const v = read(bytes);
+    expect([v.lossless, v.text]).toEqual([lossless, text]);
+  });
+
+  it("is false for anything without text", () => {
+    expect(toFileReadView(create(ReadFileResponseSchema, { binary: true, contents: new Uint8Array([0]) })).lossless).toBe(false);
+    expect(toFileReadView(create(ReadFileResponseSchema, { notFound: true })).lossless).toBe(false);
+  });
+});
+
+describe("canEdit", () => {
+  const text: FileReadView = { path: "/x/a.ts", size: 2, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a\n", lossless: true, image: null, pdf: null };
+  it.each<[string, Partial<FileReadView>, boolean]>([
+    ["whole text", {}, true],
+    ["empty text", { text: "", size: 0 }, true],
+    ["truncated", { truncated: true }, false],
+    ["binary", { binary: true, text: null, lossless: false }, false],
+    ["a folder", { isDir: true, text: null, lossless: false }, false],
+    ["missing", { notFound: true, text: null, lossless: false }, false],
+    ["invalid UTF-8 or a BOM", { lossless: false }, false],
+    ["an SVG, shown as a picture", { image: new Uint8Array([1]) }, false],
+    ["a PDF", { pdf: new Uint8Array([1]) }, false],
+  ])("%s", (_name, over, want) => {
+    expect(canEdit({ ...text, ...over })).toBe(want);
+  });
+  it("no read yet", () => {
+    expect(canEdit(null)).toBe(false);
+  });
+});
+
+describe("writeFile", () => {
+  function connected(answer: () => unknown) {
+    const asked: unknown[] = [];
+    const client = {
+      writeFile: (req: unknown) => {
+        asked.push(req);
+        return answer();
+      },
+    };
+    return { asked, conn: { client: () => Promise.resolve(client) } as unknown as DaemonConnection };
+  }
+  const version = { size: 5, modifiedAtMs: 1_700_000_000_000 };
+
+  it("sends the text as UTF-8 with the version it replaces, and takes the new one", async () => {
+    const { asked, conn } = connected(() => Promise.resolve(create(WriteFileResponseSchema, { resolvedPath: "/x/.env", size: 9n, modifiedAt: 1_700_000_000_500n })));
+    const r = await writeFile("/x", ".env", "é=1\r\n", version, {}, conn);
+    expect(asked).toEqual([{ baseDir: "/x", path: ".env", contents: enc.encode("é=1\r\n"), modifiedAt: 1_700_000_000_000n, size: 5n, force: false }]);
+    expect(r).toEqual({ path: "/x/.env", size: 9, modifiedAtMs: 1_700_000_000_500, conflict: false, notFound: false });
+  });
+
+  it("force goes through; a conflict is an answer", async () => {
+    const { asked, conn } = connected(() => Promise.resolve(create(WriteFileResponseSchema, { resolvedPath: "/x/a", conflict: true, notFound: true })));
+    const r = await writeFile("/x", "a", "b", { size: 0, modifiedAtMs: null }, { force: true }, conn);
+    expect(asked).toEqual([{ baseDir: "/x", path: "a", contents: enc.encode("b"), modifiedAt: 0n, size: 0n, force: true }]);
+    expect([r.conflict, r.notFound, r.modifiedAtMs]).toEqual([true, true, null]);
+  });
+
+  it("a refusal stays an error with its message", async () => {
+    const { conn } = connected(() => Promise.reject(new ConnectError("the file is read-only", Code.FailedPrecondition)));
+    await expect(writeFile("/x", "a", "b", version, {}, conn)).rejects.toThrow("the file is read-only");
   });
 });
 

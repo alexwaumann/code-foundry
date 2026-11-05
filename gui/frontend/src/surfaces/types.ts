@@ -57,6 +57,13 @@ export interface SurfaceSpec {
    * prevents the default). cmd+w and the panel's letters are the panel's, not offered here.
    */
   onKey?: (chord: string, tab: Tab) => boolean;
+  /**
+   * Asked before one of the surface's tabs closes, by any of the closing gestures. `true`
+   * closes it at once; a promise (a question to the user) closes it if it answers true.
+   */
+  beforeClose?: (panelKey: string, tab: Tab) => true | Promise<boolean>;
+  /** A hook: the tab holds unsaved work, which its strip marks. */
+  useUnsaved?: (panelKey: string, tab: Tab) => boolean;
   /** The tab body. Mounted under key={tab.id}, so each tab gets fresh component state. */
   render: (tab: Tab) => ReactNode;
   /** The tab the empty state and the hotkey open; null when there is nothing to open. */

@@ -23,6 +23,12 @@ export interface FileReadView {
   isDir: boolean;
   /** The decoded contents of a text file; null for binary, folders and missing files. */
   text: string | null;
+  /**
+   * `text` is the bytes exactly (valid UTF-8, no byte order mark), so writing it back
+   * changes only what was edited. False for a file with invalid bytes or a BOM, whose text
+   * lost them to the decode, and for anything without text.
+   */
+  lossless: boolean;
   /** The bytes of an image (mime image/*); null otherwise. */
   image: Uint8Array | null;
   /** The bytes of a PDF (mime application/pdf); null otherwise. */
@@ -40,17 +46,40 @@ export const READ_MAX_BYTES = 32 * 1024 * 1024;
 export const PDF_MIME = "application/pdf";
 
 const utf8 = new TextDecoder("utf-8");
+const encoder = new TextEncoder();
+const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+const BOM = 0xfeff;
+
+/** A text file's bytes as the tab shows them, and whether they survive the round trip (FileReadView.lossless). */
+function decodeText(bytes: Uint8Array): { text: string; lossless: boolean } {
+  try {
+    const text = strictUtf8.decode(bytes);
+    return text.charCodeAt(0) === BOM ? { text: text.slice(1), lossless: false } : { text, lossless: true };
+  } catch {
+    return { text: utf8.decode(bytes), lossless: false };
+  }
+}
 
 /** Whether a MIME type is an image the webview can show (`image/svg+xml` included). */
 export function isImageMime(mime: string): boolean {
   return mime.startsWith("image/");
 }
 
+/**
+ * Whether the File tab offers to edit a read: whole text whose bytes survive the round
+ * trip. A truncated read would save without the rest of the file, and the daemon does not
+ * know a read was truncated; a file with invalid UTF-8 or a BOM would lose those bytes.
+ * Images (an SVG is text) show as pictures, so there is no code to edit.
+ */
+export function canEdit(file: FileReadView | null): boolean {
+  return file !== null && file.text !== null && file.lossless && !file.truncated && !file.binary && !file.notFound && !file.isDir && file.image === null && file.pdf === null;
+}
+
 export function toFileReadView(r: ReadFileResponse): FileReadView {
   const image = isImageMime(r.mimeType);
   const pdf = r.mimeType === PDF_MIME;
   const present = !r.notFound && !r.isDir;
-  const text = !r.binary && !r.notFound && !r.isDir ? utf8.decode(r.contents) : null;
+  const decoded = !r.binary && !r.notFound && !r.isDir ? decodeText(r.contents) : null;
   return {
     path: r.resolvedPath,
     size: Number(r.size),
@@ -60,7 +89,8 @@ export function toFileReadView(r: ReadFileResponse): FileReadView {
     modifiedAtMs: r.modifiedAt > 0n ? Number(r.modifiedAt) : null,
     notFound: r.notFound,
     isDir: r.isDir,
-    text,
+    text: decoded?.text ?? null,
+    lossless: decoded?.lossless ?? false,
     image: image && present ? r.contents : null,
     pdf: pdf && present ? r.contents : null,
   };
@@ -75,6 +105,43 @@ export async function readFile(baseDir: string, path: string, conn: DaemonConnec
   const c = await conn.client(FilesystemService);
   try {
     return toFileReadView(await c.readFile({ baseDir, path, maxBytes: BigInt(READ_MAX_BYTES) }, { signal }));
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}
+
+/** Which version of a file a write replaces: what its read reported. */
+export interface FileVersion {
+  size: number;
+  modifiedAtMs: number | null;
+}
+
+/** FilesystemService.WriteFile's answer. A conflict wrote nothing. */
+export interface FileWriteView extends FileVersion {
+  /** Absolute, cleaned path as asked for (before following symlinks). */
+  path: string;
+  /** The file is not the version asked for; size and time are of what is there. */
+  conflict: boolean;
+  /** With conflict: nothing is at the path. */
+  notFound: boolean;
+}
+
+/**
+ * Replaces a file's contents with `text`, as UTF-8, if it is still `version` (`force`
+ * writes whatever is there, and makes a file that went). `path` as for readFile. A conflict
+ * is an answer, not an error. A refusal is an error with a message fit to show:
+ * FailedPrecondition (read-only, locked, an unwritable folder), ResourceExhausted (disk
+ * full), PermissionDenied (macOS privacy), InvalidArgument (over 1 MiB, a config home
+ * file). A daemon older than the RPC fails with OutdatedDaemonError.
+ */
+export async function writeFile(baseDir: string, path: string, text: string, version: FileVersion, opts: { force?: boolean } = {}, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileWriteView> {
+  const c = await conn.client(FilesystemService);
+  try {
+    const r = await c.writeFile(
+      { baseDir, path, contents: encoder.encode(text), modifiedAt: BigInt(version.modifiedAtMs ?? 0), size: BigInt(version.size), force: opts.force ?? false },
+      { signal },
+    );
+    return { path: r.resolvedPath, size: Number(r.size), modifiedAtMs: r.modifiedAt > 0n ? Number(r.modifiedAt) : null, conflict: r.conflict, notFound: r.notFound };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }
