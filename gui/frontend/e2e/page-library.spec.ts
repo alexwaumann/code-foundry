@@ -85,7 +85,7 @@ test("a Tailwind-runtime page styles itself with the app's tokens, arbitrary val
   const box = tw.locator("#box");
   // Rows near the viewport's edge remount while the timeline measures and pins to the bottom,
   // and a remounted card's frame loads again: in view, and a poll that rides a detach.
-  await card(page, "tailwind").scrollIntoViewIfNeeded();
+  await expect(() => card(page, "tailwind").scrollIntoViewIfNeeded({ timeout: 1000 })).toPass();
   await expect.poll(() => box.evaluate((el) => getComputedStyle(el).width).catch(() => "detached")).toBe("217px");
   expect(await box.evaluate((el) => getComputedStyle(el).padding)).toBe("13px");
   expect(await box.evaluate((el) => getComputedStyle(el).borderRadius)).toBe("12px");
