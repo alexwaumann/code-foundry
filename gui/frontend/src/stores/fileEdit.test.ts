@@ -432,6 +432,17 @@ describe("a write and a reload never overlap", () => {
     expect(edit()).toMatchObject({ dirty: false, conflict: null, revision: 0, view: { text: "mine\n", modifiedAtMs: 200 } });
   });
 
+  it("Discard waits out a Save", async () => {
+    await editing("mine\n");
+    const finish = hold<FileWriteView>(api.write);
+    const saving = saveFile(KEY);
+    await discardDraft(KEY);
+    expect(edit()?.revision).toBe(0);
+    finish(written());
+    await saving;
+    expect(edit()).toMatchObject({ dirty: false, view: { text: "mine\n" } });
+  });
+
   it("Overwrite waits out a Reload", async () => {
     await editing("mine\n");
     observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs\n" }));
