@@ -156,6 +156,31 @@ describe("runStream", () => {
   });
 });
 
+describe("an attempt's end", () => {
+  it("aborts its stream when the consumer throws, so the retry does not leave it open", async () => {
+    const signals: AbortSignal[] = [];
+    async function* open(signal: AbortSignal) {
+      signals.push(signal);
+      yield 1;
+      await new Promise(() => undefined);
+    }
+    const onError = vi.fn();
+    const stop = runStream({
+      open,
+      onEvent: () => {
+        throw new Error("a bad event");
+      },
+      onError,
+      sleep: () => new Promise(() => undefined),
+    });
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalled();
+    });
+    expect(signals[0]?.aborted).toBe(true);
+    stop();
+  });
+});
+
 describe("transport failures", () => {
   // connect-web wraps a rejected fetch as Unknown with the TypeError as its cause.
   const fetchFailed = ConnectError.from(new TypeError("Load failed"));
