@@ -1160,14 +1160,20 @@ describe("a thread's setup", () => {
   const setup = (phase: "running" | "failed" | "cancelled", steps: ReturnType<typeof step>[] = []) => ({ phase, startedAtMs: NOW, endedAtMs: null, steps, error: "", background: true });
 
   it("running: Setting up in Working's place, the step on line 3 instead of a branch", () => {
-    const body = renderRow({ worktreePath: "", state: "starting", status: "busy", statusReason: "setting up", statusChangedAtMs: NOW - 12_000, setup: setup("running", [step("fetch", "running", "origin/main"), step("worktree", "pending")]) });
-    expect(body.dataset.statusLine).toBe("settingUp");
-    expect(body.dataset.threadBadge).toBe("busy");
-    expect(screen.getByTestId("row-status-word").textContent).toBe("Setting up");
-    expect(screen.getByTestId("row-status").className).toContain("text-cf-info-text");
-    expect(screen.getByTestId("row-time").textContent).toMatch(/^1[0-9]s$/);
-    expect(screen.getByTestId("row-detail").textContent).toBe("Fetching origin/main");
-    expect(screen.queryByTestId("row-branch")).toBeNull();
+    // The clock held at NOW, as for Working's time: under load the file takes long enough to reach this that the time moved on.
+    vi.useFakeTimers({ now: NOW });
+    try {
+      const body = renderRow({ worktreePath: "", state: "starting", status: "busy", statusReason: "setting up", statusChangedAtMs: NOW - 12_000, setup: setup("running", [step("fetch", "running", "origin/main"), step("worktree", "pending")]) });
+      expect(body.dataset.statusLine).toBe("settingUp");
+      expect(body.dataset.threadBadge).toBe("busy");
+      expect(screen.getByTestId("row-status-word").textContent).toBe("Setting up");
+      expect(screen.getByTestId("row-status").className).toContain("text-cf-info-text");
+      expect(screen.getByTestId("row-time").textContent).toBe("12s");
+      expect(screen.getByTestId("row-detail").textContent).toBe("Fetching origin/main");
+      expect(screen.queryByTestId("row-branch")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("running: no Snooze on the row, which the daemon would refuse", () => {
