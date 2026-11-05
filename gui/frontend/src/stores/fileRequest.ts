@@ -61,8 +61,9 @@ export function askerLabel(name: string | undefined, unnamed = "A thread"): stri
 export function fileFacts(file: FileReadView): string[] {
   const facts: string[] = [];
   if (file.realPath && file.realPath !== file.path) facts.push(`This path is a link: the file is really ${tildify(file.realPath)}.`);
-  const who = [...(file.mode & 0o040 ? ["Group"] : []), ...(file.mode & 0o004 ? ["Others"] : [])].join(" and ");
-  if (who) facts.push(`${who} can read this file (${file.mode.toString(8).padStart(4, "0")}).`);
+  const group = (file.mode & 0o040) !== 0;
+  const others = (file.mode & 0o004) !== 0;
+  if (group || others) facts.push(`${group && others ? "Group and others" : group ? "Group" : "Others"} can read this file (${file.mode.toString(8).padStart(4, "0")}).`);
   return facts;
 }
 

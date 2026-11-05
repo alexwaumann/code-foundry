@@ -186,7 +186,7 @@ describe("the band", () => {
   });
 
   it.each([
-    ["a link", { realPath: "/Users/me/Public/drop.txt", mode: 0o644 }, ["This path is a link: the file is really ~/Public/drop.txt.", "Group and Others can read this file (0644)."]],
+    ["a link", { realPath: "/Users/me/Public/drop.txt", mode: 0o644 }, ["This path is a link: the file is really ~/Public/drop.txt.", "Group and others can read this file (0644)."]],
     ["group only", { mode: 0o640 }, ["Group can read this file (0640)."]],
     ["others only", { mode: 0o604 }, ["Others can read this file (0604)."]],
     ["neither", { mode: 0o600 }, []],
