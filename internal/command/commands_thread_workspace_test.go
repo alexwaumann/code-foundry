@@ -43,6 +43,10 @@ func TestThreadWorkspaceAndNewLike(t *testing.T) {
 			wantMsg:   "created thread s1 in  (no project)", // the fake's thread has none, as a like of a no-project thread
 			wantReqs:  []proto.Message{&v1.CreateThreadRequest{LikeThreadId: "s-src", InitialPrompt: "next step", PermissionMode: auto}},
 			wantFocus: true},
+		{name: "new-like: set up in the background", cmd: "thread.new-like", args: map[string]string{"id": "s-src", "background-setup": "true", "draft-json": "{}"},
+			wantMsg:   "created thread s1; it is being set up",
+			wantReqs:  []proto.Message{&v1.CreateThreadRequest{LikeThreadId: "s-src", PermissionMode: auto, BackgroundSetup: true, DraftJson: "{}"}},
+			wantFocus: true},
 		{name: "new-like: another primary and the composer's options", cmd: "thread.new-like",
 			args: map[string]string{"id": "s-src", "project": "api", "model": "claude-opus-4-8[1m]", "effort": "low", "permission": "supervised",
 				"prompt": "p", "composer-prompt": "p [/x](cf-skill://x)", "attachments": "/a/1.png, /a/2.pdf", "name": "n", "focus": "false"},

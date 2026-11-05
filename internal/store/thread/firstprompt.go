@@ -22,8 +22,9 @@ type PendingFirst struct {
 	Composer    string            `json:"composer,omitempty"`
 	Prompt      string            `json:"prompt"`
 	Attachments []firstAttachment `json:"attachments,omitempty"`
-	// ItemID is the user item's id once it is in the timeline (a message queued behind
-	// it, or a start for a message, wrote it first); "" before.
+	// ItemID is the user item's id once it is in the timeline (Create writes it at once;
+	// a row from before that gets it from a message queued behind it, or a start for a
+	// message); "" before.
 	ItemID string `json:"item_id,omitempty"`
 	// By is the item's SentBy: the creator thread of a thread another thread created.
 	By string `json:"by,omitempty"`

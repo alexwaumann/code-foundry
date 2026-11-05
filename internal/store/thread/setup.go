@@ -2,6 +2,7 @@ package thread
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -267,6 +268,13 @@ func (t *Thread) failSetup(now time.Time, why string) {
 	t.Setup = t.Setup.failed(now, why)
 }
 
+// setupWhy is err as a setup tells it: without the thread's own prefix and the error
+// classes, which mean something to a caller, not to someone reading the timeline.
+func setupWhy(id string, err error) string {
+	why := strings.TrimPrefix(err.Error(), "thread "+id+": ")
+	return strings.ReplaceAll(why, ErrFailedPrecondition.Error()+": ", "")
+}
+
 // setupRefusal is the refusal of doing ("sent to", "forked") to a thread that needs
 // Claude or its checkouts while it has neither; nil for any other thread.
 func setupRefusal(t Thread, doing string) error {
@@ -424,7 +432,7 @@ func (t *setupTracker) made(w madeWorktree) {
 func (t *setupTracker) worktreeFailed(projectID string, err error) {
 	t.edit(func(s *Setup, now time.Time) {
 		if st := s.step(SetupStepWorktree, projectID); st != nil {
-			st.Error = strings.TrimSpace(project.GitText(err))
+			st.Error = setupWhy(t.id, errors.New(project.GitText(err)))
 			st.end(SetupStepFailed, now)
 		}
 	})

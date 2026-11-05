@@ -137,7 +137,7 @@ type Thread struct {
 	// holds ProjectID when that is set (CleanProjectIDs), and is empty for a thread
 	// without a project. Persisted (threads.project_ids). Copy on write.
 	ProjectIDs   []string
-	WorktreePath string // the cwd
+	WorktreePath string // the cwd; "" until a setup making its worktrees placed it (unplaced)
 	// CheckoutPaths is every member's checkout by project id: the primary's is
 	// WorktreePath (kept equal whenever the cwd moves to a project's checkout), and ""
 	// is a member with none recorded, resolved by the creation rule at the next start

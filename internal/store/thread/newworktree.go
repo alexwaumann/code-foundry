@@ -15,11 +15,11 @@ import (
 // New-worktree threads (CreateOptions.NewWorktree; the worktrees themselves, one per
 // member with git of the thread's set, are placement.go's).
 //
-// Create makes the worktrees synchronously so a failure reaches the caller before
-// anything is persisted (the GUI composer keeps its draft). The branch follows the
+// Create makes the worktrees in its setup stage (setup.go). The branch follows the
 // projects.branch_naming mode (branchname.go) from the namer's reply for the first
 // prompt (and the explicit name, and a --branch slug), else cf/<thread id>. Only the
-// branch waits for the namer, bounded by Options.SlugTimeout. The namer is called once
+// branch waits for the namer, bounded by Options.SlugTimeout, and the bases are fetched
+// while it does (startPrefetches). The namer is called once
 // per thread: a reply that arrives in time names the branch and the thread; one that
 // arrives later only names the thread then (the branch stays cf/<id>; the row keeps
 // its provisional name, else its placeholder, until then). The provisional name never

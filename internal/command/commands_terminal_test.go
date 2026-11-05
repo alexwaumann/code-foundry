@@ -75,6 +75,8 @@ func TestTerminalNewOwner(t *testing.T) {
 			thread: &v1.Thread{WorktreePath: "/cf-test/home"}, wantCwd: "/cf-test/home", wantLabels: termlabel.Shell("s1", "", "/cf-test/home")},
 		{name: "thread lookup fails", ctx: command.Context{ActiveThreadID: "s1"},
 			threadErr: connect.NewError(connect.CodeNotFound, errors.New("no such thread")), wantMsg: "no such thread"},
+		{name: "a thread still being set up has nowhere to start", ctx: command.Context{ActiveThreadID: "s1"}, thread: &v1.Thread{Id: "s1", ProjectId: "r1"},
+			wantMsg: "thread s1 has no checkout yet"},
 		// Else the context's worktree.
 		{name: "worktree in the GUI", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: feat, ActiveView: "projects"},
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},

@@ -1043,8 +1043,8 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	m.wg.Add(1)
 	m.mu.Unlock()
 	if len(first) > 0 && first[0].itemID == "" {
-		// A new thread's prompt goes into the timeline now, before the handshake (the
-		// row is written, so the item can be): a start that fails leaves the message,
+		// A row's first message with no item yet (Create writes its own at once) goes into
+		// the timeline now, before the handshake: a start that fails leaves the message,
 		// then why, for the user to copy or send again. sendMessage delivers it under
 		// this id. Before run starts, so nothing else writes the log yet. The row's
 		// pending first message keeps the id, so a later start does not write it again

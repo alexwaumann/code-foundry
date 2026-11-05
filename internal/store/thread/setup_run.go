@@ -132,7 +132,7 @@ func (m *Manager) releaseSetup(id string) {
 // failSetup ends thread id's setup with err: its message's turn never ran, so it ends
 // here, and the thread settles with the reason.
 func (m *Manager) failSetup(id string, err error) {
-	why := strings.TrimPrefix(err.Error(), "thread "+id+": ")
+	why := setupWhy(id, err)
 	if log, lerr := m.thread(context.Background(), id); lerr == nil {
 		closeOpenTurn(itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}, m.opts.Now())
 	} else {

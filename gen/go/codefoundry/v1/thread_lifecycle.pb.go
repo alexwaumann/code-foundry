@@ -92,7 +92,8 @@ type ThreadState int32
 const (
 	ThreadState_THREAD_STATE_UNSPECIFIED ThreadState = 0
 	// Process spawned, the stream-json initialize handshake not yet done. Messages sent
-	// meanwhile wait for it.
+	// meanwhile wait for it. Also a thread whose setup runs (Thread.setup): no process yet,
+	// and a message is refused.
 	ThreadState_THREAD_STATE_STARTING ThreadState = 1
 	// Claude is running.
 	ThreadState_THREAD_STATE_CONNECTED ThreadState = 2
@@ -342,8 +343,10 @@ const (
 	// when it was closed or the daemon stopped mid-turn, "crashed" when it died or exited
 	// on its own (no one stopped it); or
 	// Claude did not start for a message (status_reason "did not start"; the timeline has
-	// an error item saying why). Set only on a DISCONNECTED thread; the next start
-	// replaces it. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
+	// an error item saying why); or its setup failed (status_reason "setup failed";
+	// Thread.setup says why, and it does not start by itself). Set only on a DISCONNECTED
+	// thread; the next start replaces it. Claude-reported API errors stay NEEDS_ATTENTION
+	// "error: <code>".
 	ThreadStatus_THREAD_STATUS_ERROR ThreadStatus = 4
 )
 

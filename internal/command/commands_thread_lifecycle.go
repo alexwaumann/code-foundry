@@ -97,6 +97,9 @@ func noProjectAlone(a Args) error {
 // Project ids are named through name.
 func createdMessage(req *v1.CreateThreadRequest, res *v1.CreateThreadResponse, name func(string) string) string {
 	s := res.GetThread()
+	if req.GetBackgroundSetup() {
+		return "created thread " + threadLabel(s) + "; it is being set up" // nothing is placed yet
+	}
 	msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
 	if n := len(s.GetProjectIds()); n > 1 {
 		msg += fmt.Sprintf(" (%d projects: %s; thread checkouts lists them)", n, strings.Join(mapNames(s.GetProjectIds(), name), ", "))

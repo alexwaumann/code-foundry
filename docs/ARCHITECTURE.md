@@ -659,6 +659,14 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   expiry is that plus the `threads.cache_ttl_seconds` setting, and the composer says
   when the next message re-reads a cold context
   (`docs/notes/rendered-threads-cold-cache.md`).
+* **Create has two stages** (`setup.go`, `setup_run.go`, `docs/notes/instant-threads-1-daemon.md`).
+  The fast one refuses what needs no slow work, with nothing made, then publishes the thread
+  with its provisional name and its first message in the timeline. The setup stage names the
+  branch while it fetches the bases, makes the worktrees and spawns, recording each step in
+  `Thread.Setup` (`threads.setup`). A caller either waits for it (a failure removes the
+  thread and what was made, and is the call's error) or passes `background_setup` (a failure
+  stays on the thread, `setup failed`). While it runs the thread is STARTING with a
+  reservation and busy "setting up"; in worktree mode it has no cwd and no checkouts.
 * Auto-naming via an independent `claude -p` call producing a short natural title
   ("Fix the login redirect") and, for a new worktree or workspace, its branch in the same
   call, in the `projects.branch_naming` mode: `semantic` (default, `<type>/<slug>`, the

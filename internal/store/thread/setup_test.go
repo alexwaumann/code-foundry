@@ -3,6 +3,7 @@ package thread
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -994,5 +995,25 @@ func TestSetupBackgroundRewritesRefsOnceThereAreWorktrees(t *testing.T) {
 	e.waitUserText("read " + done.WorktreePath + "/a.go")
 	if it := e.items(s.ID).Items; !slices.ContainsFunc(it, func(i Item) bool { return i.Text == "read cf-file://r1/a.go" }) {
 		t.Errorf("the item changed:\n%s", describeItems(it))
+	}
+}
+
+func TestSetupWhy(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"a refusal", fmt.Errorf("%w: repo's main checkout is on main", ErrFailedPrecondition), "repo's main checkout is on main"},
+		{"a spawn", errors.New("thread s1: spawn claude: not found"), "spawn claude: not found"},
+		{"a project's", classified{kind: ErrFailedPrecondition, err: fmt.Errorf("create worktree x in web: %w", fmt.Errorf("%w: fatal: no room", ErrFailedPrecondition))},
+			"create worktree x in web: fatal: no room"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := setupWhy("s1", tt.err); got != tt.want {
+				t.Errorf("setupWhy = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
