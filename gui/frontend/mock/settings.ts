@@ -279,7 +279,7 @@ const staticFields: FieldInit[] = [
     dependsOn: "dictation.enabled",
     type: S.ENUM,
     title: "Other audio",
-    description: "What music and video do while you dictate.",
+    description: "What audio from this Mac does while you dictate.",
     enumValues: ["do_nothing", "lower"],
     enumLabels: ["Do nothing", "Lower"],
     defaultValue: "do_nothing",
