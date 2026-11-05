@@ -97,7 +97,7 @@ func TestScopedTokenOnTheLoopbackAPI(t *testing.T) {
 	ran = nil
 	mu.Unlock()
 	// Any other RPC or path: 403.
-	for _, path := range []string{"/codefoundry.v1.SearchService/Report", "/codefoundry.v1.ThreadService/List",
+	for _, path := range []string{"/codefoundry.v1.FilesystemService/WriteFile", "/codefoundry.v1.SearchService/Report", "/codefoundry.v1.ThreadService/List",
 		"/codefoundry.v1.HealthService/Version", "/codefoundry.v1.EventService/Watch", "/anything"} {
 		req, _ := http.NewRequest(http.MethodPost, srv.URL+path, strings.NewReader("{}"))
 		req.Header.Set("Authorization", "Bearer "+tok)

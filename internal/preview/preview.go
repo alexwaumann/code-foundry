@@ -63,6 +63,9 @@ func (g *Grants) Allows(dir string) bool { return g.floor.ScopeOK(dir) }
 // Guarded reports whether no grant may serve p (Floor.Guarded).
 func (g *Grants) Guarded(p string) bool { return g.floor.Guarded(p) }
 
+// ConfigHome is Floor.InConfigHome: whether a write may not reach p.
+func (g *Grants) ConfigHome(p string) bool { return g.floor.InConfigHome(p) }
+
 // Grant returns the id that serves the tree dir (absolute, cleaned), minting one on first
 // use; ErrGuarded when the Floor does not allow dir as a tree.
 func (g *Grants) Grant(dir string) (string, error) {

@@ -972,6 +972,190 @@ func (x *ReadFileResponse) GetIsDir() bool {
 	return false
 }
 
+type WriteFileRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absolute directory a relative path is resolved against. Ignored for an absolute
+	// path.
+	BaseDir string `protobuf:"bytes,1,opt,name=base_dir,json=baseDir,proto3" json:"base_dir,omitempty"`
+	// Absolute, "~/"-prefixed, or relative to base_dir.
+	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// The file's new contents, at most 1 MiB. Never logged.
+	Contents []byte `protobuf:"bytes,3,opt,name=contents,proto3" json:"contents,omitempty"`
+	// What the read saw: ReadFileResponse.modified_at, unix milliseconds. Ignored with
+	// force or create.
+	ModifiedAt int64 `protobuf:"varint,4,opt,name=modified_at,json=modifiedAt,proto3" json:"modified_at,omitempty"`
+	// What the read saw: ReadFileResponse.size. Ignored with force or create.
+	Size int64 `protobuf:"varint,5,opt,name=size,proto3" json:"size,omitempty"`
+	// Write whatever is there now (the viewer's Overwrite), even if the file is gone.
+	Force bool `protobuf:"varint,6,opt,name=force,proto3" json:"force,omitempty"`
+	// Create a file that does not exist. Not with force.
+	Create        bool `protobuf:"varint,7,opt,name=create,proto3" json:"create,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteFileRequest) Reset() {
+	*x = WriteFileRequest{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteFileRequest) ProtoMessage() {}
+
+func (x *WriteFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteFileRequest.ProtoReflect.Descriptor instead.
+func (*WriteFileRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *WriteFileRequest) GetBaseDir() string {
+	if x != nil {
+		return x.BaseDir
+	}
+	return ""
+}
+
+func (x *WriteFileRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WriteFileRequest) GetContents() []byte {
+	if x != nil {
+		return x.Contents
+	}
+	return nil
+}
+
+func (x *WriteFileRequest) GetModifiedAt() int64 {
+	if x != nil {
+		return x.ModifiedAt
+	}
+	return 0
+}
+
+func (x *WriteFileRequest) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *WriteFileRequest) GetForce() bool {
+	if x != nil {
+		return x.Force
+	}
+	return false
+}
+
+func (x *WriteFileRequest) GetCreate() bool {
+	if x != nil {
+		return x.Create
+	}
+	return false
+}
+
+type WriteFileResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Modification time, unix milliseconds: of the file as written, so a later edit's
+	// baseline matches, or of the file found there on a conflict. Zero with not_found.
+	ModifiedAt int64 `protobuf:"varint,1,opt,name=modified_at,json=modifiedAt,proto3" json:"modified_at,omitempty"`
+	// Size in bytes: as modified_at. Zero with not_found.
+	Size int64 `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
+	// Absolute, cleaned path as asked for (before following symlinks).
+	ResolvedPath string `protobuf:"bytes,3,opt,name=resolved_path,json=resolvedPath,proto3" json:"resolved_path,omitempty"`
+	// Nothing was written: the file is not what the request expected.
+	Conflict bool `protobuf:"varint,4,opt,name=conflict,proto3" json:"conflict,omitempty"`
+	// With conflict: no file is at resolved_path (a symlink that leads nowhere, or a loop,
+	// counts).
+	NotFound      bool `protobuf:"varint,5,opt,name=not_found,json=notFound,proto3" json:"not_found,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteFileResponse) Reset() {
+	*x = WriteFileResponse{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteFileResponse) ProtoMessage() {}
+
+func (x *WriteFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteFileResponse.ProtoReflect.Descriptor instead.
+func (*WriteFileResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *WriteFileResponse) GetModifiedAt() int64 {
+	if x != nil {
+		return x.ModifiedAt
+	}
+	return 0
+}
+
+func (x *WriteFileResponse) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *WriteFileResponse) GetResolvedPath() string {
+	if x != nil {
+		return x.ResolvedPath
+	}
+	return ""
+}
+
+func (x *WriteFileResponse) GetConflict() bool {
+	if x != nil {
+		return x.Conflict
+	}
+	return false
+}
+
+func (x *WriteFileResponse) GetNotFound() bool {
+	if x != nil {
+		return x.NotFound
+	}
+	return false
+}
+
 type PreviewFileRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Absolute directory a relative path is resolved against. Ignored for an absolute
@@ -985,7 +1169,7 @@ type PreviewFileRequest struct {
 
 func (x *PreviewFileRequest) Reset() {
 	*x = PreviewFileRequest{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -997,7 +1181,7 @@ func (x *PreviewFileRequest) String() string {
 func (*PreviewFileRequest) ProtoMessage() {}
 
 func (x *PreviewFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1010,7 +1194,7 @@ func (x *PreviewFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewFileRequest.ProtoReflect.Descriptor instead.
 func (*PreviewFileRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{13}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PreviewFileRequest) GetBaseDir() string {
@@ -1045,7 +1229,7 @@ type PreviewFileResponse struct {
 
 func (x *PreviewFileResponse) Reset() {
 	*x = PreviewFileResponse{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1057,7 +1241,7 @@ func (x *PreviewFileResponse) String() string {
 func (*PreviewFileResponse) ProtoMessage() {}
 
 func (x *PreviewFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1070,7 +1254,7 @@ func (x *PreviewFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewFileResponse.ProtoReflect.Descriptor instead.
 func (*PreviewFileResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{14}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PreviewFileResponse) GetUrl() string {
@@ -1169,7 +1353,23 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"modifiedAt\x12#\n" +
 	"\rresolved_path\x18\a \x01(\tR\fresolvedPath\x12\x1b\n" +
 	"\tnot_found\x18\b \x01(\bR\bnotFound\x12\x15\n" +
-	"\x06is_dir\x18\t \x01(\bR\x05isDir\"C\n" +
+	"\x06is_dir\x18\t \x01(\bR\x05isDir\"\xc0\x01\n" +
+	"\x10WriteFileRequest\x12\x19\n" +
+	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1a\n" +
+	"\bcontents\x18\x03 \x01(\fR\bcontents\x12\x1f\n" +
+	"\vmodified_at\x18\x04 \x01(\x03R\n" +
+	"modifiedAt\x12\x12\n" +
+	"\x04size\x18\x05 \x01(\x03R\x04size\x12\x14\n" +
+	"\x05force\x18\x06 \x01(\bR\x05force\x12\x16\n" +
+	"\x06create\x18\a \x01(\bR\x06create\"\xa6\x01\n" +
+	"\x11WriteFileResponse\x12\x1f\n" +
+	"\vmodified_at\x18\x01 \x01(\x03R\n" +
+	"modifiedAt\x12\x12\n" +
+	"\x04size\x18\x02 \x01(\x03R\x04size\x12#\n" +
+	"\rresolved_path\x18\x03 \x01(\tR\fresolvedPath\x12\x1a\n" +
+	"\bconflict\x18\x04 \x01(\bR\bconflict\x12\x1b\n" +
+	"\tnot_found\x18\x05 \x01(\bR\bnotFound\"C\n" +
 	"\x12PreviewFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\"^\n" +
@@ -1182,13 +1382,14 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"SkillScope\x12\x1b\n" +
 	"\x17SKILL_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10SKILL_SCOPE_USER\x10\x01\x12\x17\n" +
-	"\x13SKILL_SCOPE_PROJECT\x10\x022\xd5\x03\n" +
+	"\x13SKILL_SCOPE_PROJECT\x10\x022\xa9\x04\n" +
 	"\x11FilesystemService\x12d\n" +
 	"\x0fListDirectories\x12&.codefoundry.v1.ListDirectoriesRequest\x1a'.codefoundry.v1.ListDirectoriesResponse\"\x00\x12U\n" +
 	"\n" +
 	"ListSkills\x12!.codefoundry.v1.ListSkillsRequest\x1a\".codefoundry.v1.ListSkillsResponse\"\x00\x12X\n" +
 	"\vSearchFiles\x12\".codefoundry.v1.SearchFilesRequest\x1a#.codefoundry.v1.SearchFilesResponse\"\x00\x12O\n" +
-	"\bReadFile\x12\x1f.codefoundry.v1.ReadFileRequest\x1a .codefoundry.v1.ReadFileResponse\"\x00\x12X\n" +
+	"\bReadFile\x12\x1f.codefoundry.v1.ReadFileRequest\x1a .codefoundry.v1.ReadFileResponse\"\x00\x12R\n" +
+	"\tWriteFile\x12 .codefoundry.v1.WriteFileRequest\x1a!.codefoundry.v1.WriteFileResponse\"\x00\x12X\n" +
 	"\vPreviewFile\x12\".codefoundry.v1.PreviewFileRequest\x1a#.codefoundry.v1.PreviewFileResponse\"\x00B\xc7\x01\n" +
 	"\x12com.codefoundry.v1B\x0fFilesystemProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
@@ -1205,7 +1406,7 @@ func file_codefoundry_v1_filesystem_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_filesystem_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(SkillScope)(0),                 // 0: codefoundry.v1.SkillScope
 	(*ListDirectoriesRequest)(nil),  // 1: codefoundry.v1.ListDirectoriesRequest
@@ -1221,8 +1422,10 @@ var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(*SearchFilesResponse)(nil),     // 11: codefoundry.v1.SearchFilesResponse
 	(*ReadFileRequest)(nil),         // 12: codefoundry.v1.ReadFileRequest
 	(*ReadFileResponse)(nil),        // 13: codefoundry.v1.ReadFileResponse
-	(*PreviewFileRequest)(nil),      // 14: codefoundry.v1.PreviewFileRequest
-	(*PreviewFileResponse)(nil),     // 15: codefoundry.v1.PreviewFileResponse
+	(*WriteFileRequest)(nil),        // 14: codefoundry.v1.WriteFileRequest
+	(*WriteFileResponse)(nil),       // 15: codefoundry.v1.WriteFileResponse
+	(*PreviewFileRequest)(nil),      // 16: codefoundry.v1.PreviewFileRequest
+	(*PreviewFileResponse)(nil),     // 17: codefoundry.v1.PreviewFileResponse
 }
 var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	2,  // 0: codefoundry.v1.ListDirectoriesResponse.entries:type_name -> codefoundry.v1.DirectoryEntry
@@ -1235,14 +1438,16 @@ var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	5,  // 7: codefoundry.v1.FilesystemService.ListSkills:input_type -> codefoundry.v1.ListSkillsRequest
 	9,  // 8: codefoundry.v1.FilesystemService.SearchFiles:input_type -> codefoundry.v1.SearchFilesRequest
 	12, // 9: codefoundry.v1.FilesystemService.ReadFile:input_type -> codefoundry.v1.ReadFileRequest
-	14, // 10: codefoundry.v1.FilesystemService.PreviewFile:input_type -> codefoundry.v1.PreviewFileRequest
-	3,  // 11: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
-	7,  // 12: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
-	11, // 13: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
-	13, // 14: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
-	15, // 15: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
+	14, // 10: codefoundry.v1.FilesystemService.WriteFile:input_type -> codefoundry.v1.WriteFileRequest
+	16, // 11: codefoundry.v1.FilesystemService.PreviewFile:input_type -> codefoundry.v1.PreviewFileRequest
+	3,  // 12: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
+	7,  // 13: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
+	11, // 14: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
+	13, // 15: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
+	15, // 16: codefoundry.v1.FilesystemService.WriteFile:output_type -> codefoundry.v1.WriteFileResponse
+	17, // 17: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
+	12, // [12:18] is the sub-list for method output_type
+	6,  // [6:12] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -1259,7 +1464,7 @@ func file_codefoundry_v1_filesystem_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_filesystem_proto_rawDesc), len(file_codefoundry_v1_filesystem_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   15,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

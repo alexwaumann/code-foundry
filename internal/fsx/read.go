@@ -97,7 +97,7 @@ func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) 
 			return FileContents{Path: p, NotFound: true}, nil
 		}
 		if isPrivacyDenial(err) { // TCC lets a stat through and refuses the open
-			return FileContents{}, notPermitted(root, p, real, err)
+			return FileContents{}, notPermitted(root, p, real, reading, err)
 		}
 		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
 	}

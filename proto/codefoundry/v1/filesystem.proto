@@ -66,6 +66,35 @@ service FilesystemService {
   // capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse) {}
 
+  // WriteFile replaces one file for the file viewer, or creates it. path is as for
+  // ReadFile, and symlinks are written through: the file they lead to is replaced, never
+  // the link, and it must be under the home directory too.
+  //
+  // Editing: modified_at and size say what the read saw. A file that differs from them,
+  // or that is gone, is conflict, not an error, and nothing is written; force skips the
+  // check, and writes a file that is gone anew (mode 0600). Creating: create makes a file
+  // that does not exist, mode 0600, in a directory that does; anything already at path is
+  // conflict. Neither flag on a missing file is conflict with not_found.
+  //
+  // The write is atomic (a temp file beside the target, then a rename) and keeps the
+  // existing file's mode, setuid, setgid and sticky included, and its group. A group the
+  // user cannot give the new file loses its access instead of passing to another. It
+  // replaces the file: another hard link keeps the old contents, and extended attributes
+  // and ACLs are not carried over, so a deny ACL no longer applies and access can widen.
+  //
+  // A symlink that leads nowhere, a loop included, is a file that is gone, except that it
+  // is never replaced. InvalidArgument: a path outside the home directory, or relative
+  // without an absolute base_dir; a name too long, or a path holding a NUL; a directory or
+  // anything else that is not a regular file; contents over 1 MiB; create with force;
+  // create or force in a directory that does not exist; force on a symlink that leads
+  // nowhere; a path in the config home outside its checkouts (what lies below its
+  // worktrees and projects folders, not those names themselves). Only the file written
+  // counts: a symlink in the config home leading out of it may be written through.
+  // FailedPrecondition: the file has no owner write bit (even with force), the file or
+  // its folder is locked, or the folder or volume takes no writes. ResourceExhausted: the
+  // disk is full. PermissionDenied: macOS's privacy protection refused the write.
+  rpc WriteFile(WriteFileRequest) returns (WriteFileResponse) {}
+
   // PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
   // listener that serves the file, and everything else under its scope, without the
   // bearer token: the scope is the registered checkout holding the file, else its
@@ -237,6 +266,40 @@ message ReadFileResponse {
   bool not_found = 8;
   // resolved_path is a directory; only size and modified_at are set.
   bool is_dir = 9;
+}
+
+message WriteFileRequest {
+  // Absolute directory a relative path is resolved against. Ignored for an absolute
+  // path.
+  string base_dir = 1;
+  // Absolute, "~/"-prefixed, or relative to base_dir.
+  string path = 2;
+  // The file's new contents, at most 1 MiB. Never logged.
+  bytes contents = 3;
+  // What the read saw: ReadFileResponse.modified_at, unix milliseconds. Ignored with
+  // force or create.
+  int64 modified_at = 4;
+  // What the read saw: ReadFileResponse.size. Ignored with force or create.
+  int64 size = 5;
+  // Write whatever is there now (the viewer's Overwrite), even if the file is gone.
+  bool force = 6;
+  // Create a file that does not exist. Not with force.
+  bool create = 7;
+}
+
+message WriteFileResponse {
+  // Modification time, unix milliseconds: of the file as written, so a later edit's
+  // baseline matches, or of the file found there on a conflict. Zero with not_found.
+  int64 modified_at = 1;
+  // Size in bytes: as modified_at. Zero with not_found.
+  int64 size = 2;
+  // Absolute, cleaned path as asked for (before following symlinks).
+  string resolved_path = 3;
+  // Nothing was written: the file is not what the request expected.
+  bool conflict = 4;
+  // With conflict: no file is at resolved_path (a symlink that leads nowhere, or a loop,
+  // counts).
+  bool not_found = 5;
 }
 
 message PreviewFileRequest {

@@ -61,6 +61,117 @@ func TestFloor(t *testing.T) {
 	}
 }
 
+// TestFloorInConfigHome covers what a write may not reach: the config home, known or found
+// by its markers, outside its checkouts. Nothing of the credential list counts.
+func TestFloorInConfigHome(t *testing.T) {
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := func(rel string) string { return filepath.Join(home, rel) }
+	for _, rel := range []string{
+		".code-foundry/daemon.token", ".code-foundry/db.sqlite", ".code-foundry/projects/app/main.go",
+		".code-foundry/worktrees/app/wt/main.go", ".code-foundry/pages/s-1/form.html",
+		"cf-1/daemon.token", "cf-1/worktrees/app/main.go",
+		".code-foundry/worktrees/app/test-home/daemon.token",
+		".ssh/id_ed25519", ".aws/credentials", ".config/gh/hosts.yml", "src/app/main.go",
+	} {
+		write(t, h(rel), "x")
+	}
+	for link, target := range map[string]string{
+		".code-foundry/projects/app/token": ".code-foundry/daemon.token",
+		"src/app/cf":                       ".code-foundry",
+	} {
+		if err := os.Symlink(h(target), h(link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A daemon with its own home knows the default one and finds cf-1 by its token.
+	f := NewFloor(home, paths.New(h("cf-2")))
+
+	tests := []struct {
+		name string
+		p    string
+		want bool
+	}{
+		{"default home", h(".code-foundry"), true},
+		{"token", h(".code-foundry/daemon.token"), true},
+		{"database", h(".code-foundry/db.sqlite"), true},
+		{"a new file", h(".code-foundry/new.txt"), true},
+		{"a thread's page", h(".code-foundry/pages/s-1/form.html"), true},
+		{"its folder of worktrees", h(".code-foundry/worktrees"), true},
+		{"a worktree's file", h(".code-foundry/worktrees/app/wt/main.go"), false},
+		{"a project's file", h(".code-foundry/projects/app/main.go"), false},
+		{"a new file in a project", h(".code-foundry/projects/app/new.go"), false},
+		{"a link out of a project to the token", h(".code-foundry/projects/app/token"), true},
+		{"a linked config home", h("src/app/cf/daemon.token"), true},
+		{"a linked config home's project", h("src/app/cf/projects/app/main.go"), false},
+		{"own home, not on disk", h("cf-2/db.sqlite"), true},
+		{"another home's token", h("cf-1/daemon.token"), true},
+		{"another home's worktree", h("cf-1/worktrees/app/main.go"), false},
+		{"a test home inside a worktree", h(".code-foundry/worktrees/app/test-home/daemon.token"), true},
+		{"ssh key", h(".ssh/id_ed25519"), false},
+		{"aws credentials", h(".aws/credentials"), false},
+		{"gh token", h(".config/gh/hosts.yml"), false},
+		{"a project elsewhere", h("src/app/main.go"), false},
+		{"a sibling with the same prefix", h(".code-foundry-notes/a.md"), false},
+		{"outside home", "/etc/hosts", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := f.InConfigHome(tc.p); got != tc.want {
+				t.Errorf("InConfigHome(%s) = %v, want %v", tc.p, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestFloorInConfigHomeOpenRoots covers the folders checkouts go in, which do not exist
+// until first use: a write may reach below them but never take their names, while a grant
+// may still name them.
+func TestFloorInConfigHomeOpenRoots(t *testing.T) {
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := func(rel string) string { return filepath.Join(home, rel) }
+	write(t, h(".code-foundry/daemon.token"), "x")
+	write(t, h("cf-1/daemon.token"), "x")
+	write(t, h("cf-3/daemon.token"), "x")
+	write(t, h("cf-3/worktrees/app/main.go"), "x")
+	f := NewFloor(home, paths.New(h(".code-foundry")))
+
+	tests := []struct {
+		name          string
+		p             string
+		want, guarded bool
+	}{
+		{"projects, missing", h(".code-foundry/projects"), true, false},
+		{"worktrees, missing", h(".code-foundry/worktrees"), true, false},
+		{"worktrees, another case", h(".code-foundry/WORKTREES"), true, false},
+		{"projects, another case", h(".code-foundry/Projects"), true, false},
+		{"pages, missing", h(".code-foundry/pages"), true, false},
+		{"below missing projects", h(".code-foundry/projects/app/main.go"), false, false},
+		{"below missing worktrees", h(".code-foundry/worktrees/app/main.go"), false, false},
+		{"below worktrees, another case", h(".code-foundry/WORKTREES/app/main.go"), false, false},
+		{"a found home's projects, missing", h("cf-1/projects"), true, false},
+		{"a found home's worktrees, existing", h("cf-3/worktrees"), true, false},
+		{"below a found home's worktrees", h("cf-3/worktrees/app/main.go"), false, false},
+		{"not an open root", h(".code-foundry/logs"), true, true},
+		{"a folder of that name elsewhere", h("src/projects"), false, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := f.InConfigHome(tc.p); got != tc.want {
+				t.Errorf("InConfigHome(%s) = %v, want %v", tc.p, got, tc.want)
+			}
+			if got := f.Guarded(tc.p); got != tc.guarded {
+				t.Errorf("Guarded(%s) = %v, want %v", tc.p, got, tc.guarded)
+			}
+		})
+	}
+}
+
 // TestFloorOtherHomes covers two daemons side by side: a test daemon under a custom
 // CODE_FOUNDRY_HOME must not serve the default home, or another custom home it was never
 // told about, to its pages.

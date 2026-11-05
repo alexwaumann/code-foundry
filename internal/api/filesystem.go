@@ -27,6 +27,7 @@ type Filesystem struct {
 	projects project.Store
 	files    *fsx.FileIndex
 	grants   *preview.Grants
+	writer   *fsx.Writer
 	// pagesOrigin is where the preview route is served (the daemon's pages listener);
 	// PreviewFile's URLs are on it. Empty: root-relative URLs.
 	pagesOrigin string
@@ -39,10 +40,14 @@ var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
 // (the user's home directory, symlinks resolved; see fsx.HomeRoot), marks the
 // registered projects, and lists skills (root/.claude for the user's) and
 // files of their checkouts. PreviewFile mints its grants in grants, the table the
-// preview route (preview.Handler) serves from.
+// preview route (preview.Handler) serves from, and WriteFile keeps out of the config
+// homes they know.
 func NewFilesystem(root string, projects project.Store, grants *preview.Grants) *Filesystem {
 	log := slog.Default().With("api", "filesystem")
-	return &Filesystem{root: root, projects: projects, files: fsx.NewFileIndex(log), grants: grants, log: log}
+	return &Filesystem{
+		root: root, projects: projects, files: fsx.NewFileIndex(log), grants: grants,
+		writer: &fsx.Writer{Root: root, Protected: grants.ConfigHome}, log: log,
+	}
 }
 
 // WithPagesOrigin makes PreviewFile's URLs absolute on origin
@@ -244,7 +249,7 @@ func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFil
 	m := req.Msg
 	f, err := fsx.ReadFile(h.root, m.GetBaseDir(), m.GetPath(), m.GetMaxBytes())
 	if err != nil {
-		return nil, readFileError(err)
+		return nil, fileError(err)
 	}
 	out := &v1.ReadFileResponse{
 		Contents: f.Contents, Size: f.Size, Truncated: f.Truncated, Binary: f.Binary, MimeType: f.MIMEType,
@@ -256,13 +261,33 @@ func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFil
 	return connect.NewResponse(out), nil
 }
 
-// readFileError is fsx.ReadFile's error as a Connect error.
-func readFileError(err error) error {
+// WriteFile writes one file under home for the file viewer. A file that changed since
+// the read is a plain field of the response, for the viewer to offer Reload or Overwrite.
+func (h *Filesystem) WriteFile(_ context.Context, req *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error) {
+	m := req.Msg
+	f, err := h.writer.Write(fsx.WriteRequest{
+		BaseDir: m.GetBaseDir(), Path: m.GetPath(), Contents: m.GetContents(),
+		ModifiedAt: m.GetModifiedAt(), Size: m.GetSize(), Force: m.GetForce(), Create: m.GetCreate(),
+	})
+	if err != nil {
+		return nil, fileError(err)
+	}
+	return connect.NewResponse(&v1.WriteFileResponse{
+		ModifiedAt: f.ModifiedAt, Size: f.Size, ResolvedPath: f.Path, Conflict: f.Conflict, NotFound: f.NotFound,
+	}), nil
+}
+
+// fileError is fsx.ReadFile's or Writer.Write's error as a Connect error.
+func fileError(err error) error {
 	switch {
 	case errors.Is(err, fsx.ErrInvalidArgument):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, fsx.ErrNotPermitted):
 		return connect.NewError(connect.CodePermissionDenied, err)
+	case errors.Is(err, fsx.ErrNotWritable):
+		return connect.NewError(connect.CodeFailedPrecondition, err)
+	case errors.Is(err, fsx.ErrDiskFull):
+		return connect.NewError(connect.CodeResourceExhausted, err)
 	}
 	return connect.NewError(connect.CodeInternal, err)
 }
@@ -321,7 +346,7 @@ func (h *Filesystem) previewReadError(baseDir, path string, err error) error {
 			return previewGuardedError(p)
 		}
 	}
-	return readFileError(err)
+	return fileError(err)
 }
 
 // previewScope is what a preview of file may read: the deepest registered project or

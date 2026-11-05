@@ -93,6 +93,27 @@ func TestFloorFoldedNames(t *testing.T) {
 			}
 		})
 	}
+	// A write spelled with a folded name is held to the home it names.
+	for p, want := range map[string]bool{
+		h("cf-teſt/daemon.token"):             true,
+		h("cf-teſt/new.txt"):                  true,
+		h("proj/token"):                       true,
+		h("proj/d/home/db.sqlite"):            true,
+		h("proj/d/home/pages/s-1/p.html"):     true,
+		h("proj/worktree/index.html"):         false,
+		h("cf-teſt/worktrees/app/index.html"): false,
+		h("cf-teſt/worktrees/app/new.txt"):    false,
+		h(".ßh/known_hosts"):                  false,
+		h("cf-teſt/worktrees"):                true,
+		h("cf-teſt/projects"):                 true,
+		h("cf-teſt/PROJECTS"):                 true,
+		h("proj/d/home/projects"):             true,
+		h("cf-teſt/projectſ"):                 true,
+	} {
+		if got := f.InConfigHome(p); got != want {
+			t.Errorf("InConfigHome(%s) = %v, want %v", p, got, want)
+		}
+	}
 	// A scope spelled with a folded name is the guarded tree it names.
 	for _, dir := range []string{h(".ßh"), h("cf-teſt"), h("proj/eszett"), h("proj/d")} {
 		if f.ScopeOK(dir) {

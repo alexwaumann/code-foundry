@@ -60,15 +60,20 @@ func realPath(p string) string {
 // Home is the home directory no grant reaches outside of.
 func (f Floor) Home() string { return f.home }
 
-// inHome reports whether p lies in the config home root outside the trees that may be
-// read: its checkouts and the pages threads write to show (paths.Pages).
-func inHome(root, p string) bool {
+// checkouts are a config home's trees of the user's own work, the ones a write may reach.
+func checkouts(h paths.Paths) []string { return []string{h.Worktrees(), h.Projects()} }
+
+// readable are a config home's trees that may be read: its checkouts and the pages
+// threads write to show (paths.Pages).
+func readable(h paths.Paths) []string { return append(checkouts(h), h.Pages()) }
+
+// inHome reports whether p lies in the config home root outside its open trees.
+func inHome(root, p string, open func(paths.Paths) []string) bool {
 	if !fsx.Within(root, p) {
 		return false
 	}
-	h := paths.New(root)
-	for _, open := range []string{h.Worktrees(), h.Projects(), h.Pages()} {
-		if fsx.Within(open, p) {
+	for _, o := range open(paths.New(root)) {
+		if fsx.Within(o, p) {
 			return false
 		}
 	}
@@ -93,21 +98,51 @@ func (f Floor) Guarded(p string) bool {
 	return f.guardedByName(p) || f.guardedByIdentity(p)
 }
 
+// InConfigHome reports whether p (absolute, cleaned) lies in a config home outside its
+// checkouts, the part of the floor that also holds for a write: a user may edit ~/.ssh,
+// but the daemon's token and database are not theirs to edit. Pages count as the config
+// home here, though a grant may read them. Like Guarded it decides by file identity. A
+// hard link to a file in a config home does not count: a write replaces the name it is
+// given, and the file behind the link's other names stays as it was.
+//
+// A checkout is what lies strictly below a tree, so p's directory is asked too: a file
+// made at the name projects, which does not exist until first use, would break the
+// clones that later want that folder there. A name in a config home's own directory is
+// always the config home's.
+func (f Floor) InConfigHome(p string) bool {
+	return f.inHomeOutsideCheckouts(p) || f.inHomeOutsideCheckouts(filepath.Dir(p))
+}
+
+// inHomeOutsideCheckouts reports whether p lies in a config home outside the trees of
+// checkouts.
+func (f Floor) inHomeOutsideCheckouts(p string) bool {
+	return f.inHomeByName(p, checkouts) || below(f.homeGuards(checkouts), realPath(p))
+}
+
 // guardedByName is Guarded on the spelling of p.
 func (f Floor) guardedByName(p string) bool {
-	for _, h := range f.homes {
-		if inHome(h, p) {
-			return true
-		}
+	if f.inHomeByName(p, readable) {
+		return true
 	}
 	for _, c := range f.creds {
 		if fsx.Within(c, p) {
 			return true
 		}
 	}
+	return false
+}
+
+// inHomeByName reports whether p, as spelled, lies in a config home outside its open
+// trees.
+func (f Floor) inHomeByName(p string, open func(paths.Paths) []string) bool {
+	for _, h := range f.homes {
+		if inHome(h, p, open) {
+			return true
+		}
+	}
 	// Homes nobody named: p itself or an ancestor holding a marker, up to home.
 	for d := p; fsx.Within(f.home, d); d = filepath.Dir(d) {
-		if isHome(d) && inHome(d, p) {
+		if isHome(d) && inHome(d, p, open) {
 			return true
 		}
 		if d == filepath.Dir(d) {
