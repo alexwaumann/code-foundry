@@ -85,10 +85,23 @@ function nextStateKey(key: string): string {
   return `${key}\u0000${String(stateKeys)}`;
 }
 
+const editors = new Map<string, () => void>();
+
+/** How to put the keyboard in the tab's editor, once it is on screen. */
+export function noteEditor(key: string, focus: () => void): void {
+  editors.set(key, focus);
+}
+
+/** Puts the keyboard back in the tab's editor, if it is on screen. */
+export function focusEditor(key: string): void {
+  editors.get(key)?.();
+}
+
 /** Ends a session and drops its draft (an editor still on screen drops it in editorDetached). */
 function end(key: string): void {
   const was = session(key);
   if (!was) return;
+  editors.delete(key);
   useFileEditStore.setState((s) => {
     const { [key]: _gone, ...rest } = s.sessions;
     return { sessions: rest };
@@ -256,6 +269,7 @@ export function editorDetached(key: string, stateKey: string): void {
     forgetDraft(stateKey);
     return;
   }
+  editors.delete(key);
   if (s.dirty) return;
   forgetDraft(stateKey);
   patch(key, { view: null, seed: "", stateKey: nextStateKey(key) });
@@ -281,7 +295,13 @@ async function askClose(key: string, panelKey: string, tab: Tab, name: string): 
     cancelLabel: "Keep editing",
     centered: true,
   });
-  if (answer === "cancel") return false;
+  if (answer === "cancel") {
+    // After the dialog hands focus back, which it cannot do into a shadow root.
+    requestAnimationFrame(() => {
+      focusEditor(key);
+    });
+    return false;
+  }
   if (answer === "alternate") return true;
   if ((await saveFile(key)) === "saved") return true;
   activatePanelTab(panelKey, tab.id);

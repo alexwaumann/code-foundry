@@ -10,7 +10,7 @@ import { useNow } from "@/lib/clock";
 import { dirPart, extOf, fileName, relativeTo, resolvePath } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
 import { setPreviewMode, useCodeViewStore, type PreviewMode } from "@/stores/codeView";
-import { discardDraft, editClock, editorDetached, fileEditKey, noteDraft, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
+import { discardDraft, editClock, editorDetached, fileEditKey, focusEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
 import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
@@ -128,7 +128,7 @@ export function FileTab({ target }: { target: FileTarget }) {
     }
   }, [wantsEdit, editable, startEditing]);
   // The pencil puts the keyboard in the editor; a tab coming back to a draft leaves it where it is.
-  const focusEditor = useRef(false);
+  const focusOnReady = useRef(false);
   const leaveEdit = () => {
     stopEdit(editKey);
     reload();
@@ -137,7 +137,7 @@ export function FileTab({ target }: { target: FileTarget }) {
     if (dirty) return;
     if (editing) leaveEdit();
     else {
-      focusEditor.current = true;
+      focusOnReady.current = true;
       startEditing();
     }
   };
@@ -150,9 +150,19 @@ export function FileTab({ target }: { target: FileTarget }) {
     editorDetached(editKey, stateKey);
   }, [editKey]);
   const onReady = useCallback((focus: () => void) => {
-    if (focusEditor.current) focus();
-    focusEditor.current = false;
-  }, []);
+    noteEditor(editKey, focus);
+    if (focusOnReady.current) focus();
+    focusOnReady.current = false;
+  }, [editKey]);
+  // Buttons that go disabled or away under the pointer would drop the keyboard on the body.
+  const backToEditor = () => {
+    focusEditor(editKey);
+  };
+  // The next document's editor takes the keyboard, and the viewer is current if there is none.
+  const startOver = (replaced: Promise<void>) => {
+    focusOnReady.current = true;
+    void replaced.then(reload);
+  };
   const stateKey = editing ? session.stateKey : undefined;
   const revision = session?.revision ?? 0;
   const edit = useMemo<CodeFileEdit>(() => ({ active: stateKey !== undefined, stateKey, revision, onChange: onDraft, onDetached, onReady }), [stateKey, revision, onDraft, onDetached, onReady]);
@@ -209,10 +219,10 @@ export function FileTab({ target }: { target: FileTarget }) {
             dirty={dirty}
             saving={session.saving}
             onDiscard={() => {
-              void discardDraft(editKey).then(reload);
+              startOver(discardDraft(editKey));
             }}
             onSave={() => {
-              void saveFile(editKey);
+              void saveFile(editKey).then(backToEditor);
             }}
           />
         )}
@@ -221,10 +231,10 @@ export function FileTab({ target }: { target: FileTarget }) {
         <ConflictBand
           conflict={session.conflict}
           onReload={() => {
-            void reloadDraft(editKey).then(reload);
+            startOver(reloadDraft(editKey));
           }}
           onOverwrite={() => {
-            void saveFile(editKey, { force: true });
+            void saveFile(editKey, { force: true }).then(backToEditor);
           }}
         />
       )}

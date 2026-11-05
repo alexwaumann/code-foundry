@@ -135,6 +135,32 @@ test("a write from outside never reaches a draft: the band offers Reload and Ove
   await expect(status(page)).toHaveText("Editing");
 });
 
+test("a rendered file edits as source: the editor mounts in place of the preview", async ({ page }) => {
+  await openFile(page, "README.md");
+  await expect(file(page).getByTestId("file-markdown")).toBeVisible();
+  await startEditing(page);
+  await expect(file(page)).toHaveAttribute("data-mode", "source");
+  await page.keyboard.type("Hello ");
+  await expect(status(page)).toHaveText("Unsaved");
+  await page.keyboard.press("Meta+s");
+  await expect.poll(() => disk(`${CF}/README.md`)).toMatch(/^Hello # code-foundry/);
+  await file(page).getByTestId("file-edit").click();
+  await expect(file(page).getByTestId("file-markdown")).toContainText("Hello");
+});
+
+test("Keep editing puts the caret back in the editor", async ({ page }) => {
+  await openFile(page, "src/app.ts");
+  await startEditing(page);
+  await line(page, 1).click();
+  await page.keyboard.press("Home");
+  await page.keyboard.type("a");
+  await page.keyboard.press("Meta+w");
+  await page.getByTestId("confirm-cancel").click();
+  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
+  await page.keyboard.type("b");
+  await expect(line(page, 1)).toContainText("abimport");
+});
+
 test("a draft survives leaving the tab, and a long file edits through the virtualizer", async ({ page }) => {
   const long = `${CF}/long.txt`;
   await writeDisk(long, `${Array.from({ length: 600 }, (_, i) => `line ${String(i + 1)}`).join("\n")}\n`);

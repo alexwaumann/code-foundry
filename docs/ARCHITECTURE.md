@@ -399,6 +399,8 @@ Services (v1):
   ReadFile and WriteFile serve the file viewer: WriteFile replaces a file atomically
   anywhere under home except the config home outside its checkouts, and answers a file
   that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).
+  The File tab's editor calls it directly; a draft lives only in the window's memory, so
+  `file.save` carries no contents and a window saves its own tab (`docs/notes/file-edit-2-gui.md`).
 * `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, Watch. Per-project
   actions (name unique per project ignoring case, command, icon, in terminal or in the
   background, run on worktree create, position; SQLite, cascading with the project) and

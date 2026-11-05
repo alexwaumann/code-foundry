@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { EditProvider, File, type FileEditChangeHandler, type FileOptions, type SelectedLineRange } from "@pierre/diffs/react";
 import { createCodeEditor } from "@/lib/codeEditor";
 import { useCodeTheme } from "@/lib/codeTheme";
@@ -89,11 +89,18 @@ function EditableFile({ file, options, selectedLines, edit }: { file: { name: st
     }),
     [onReady],
   );
-  // A passive effect: the library lets go in the commit, so its draft can be dropped by now.
+  // A passive effect: the library lets go in the commit, so its draft can be dropped by
+  // now. A microtask later, and only if nothing took the key up again: StrictMode runs this
+  // cleanup and the effect back to back on a new component, whose editor stays.
+  const held = useRef<string | null>(null);
   useEffect(() => {
     if (!active || stateKey === undefined) return;
+    held.current = stateKey;
     return () => {
-      onDetached(stateKey);
+      held.current = null;
+      queueMicrotask(() => {
+        if (held.current !== stateKey) onDetached(stateKey);
+      });
     };
   }, [active, stateKey, onDetached]);
   return (
