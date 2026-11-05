@@ -150,6 +150,14 @@ describe("Save and tell", () => {
     expect(edit()?.failure).toContain("Saved, but the thread was not told");
   });
 
+  it("a removed thread answers with a failing result, not an error: that is a failure too", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    api.send.mockResolvedValue({ message: "thread Set up billing (s-1) was removed at 2026-11-04 22:44:22\nno report\ncost: $0.07", resultJson: "", exitCode: 1 });
+    await expect(saveAndTell(KEY)).resolves.toBe("untold");
+    expect(edit()?.failure).toBe("Saved, but Set up billing was not told: thread Set up billing (s-1) was removed at 2026-11-04 22:44:22");
+  });
+
   it("twice in a row writes and sends once", async () => {
     await asked(SECRET);
     api.write.mockResolvedValue(written());
@@ -185,11 +193,13 @@ describe("Save and tell", () => {
 
   it("a newer request that came during the write stands", async () => {
     await asked(SECRET);
-    const out = Promise.withResolvers<FileWriteView>();
-    api.write.mockReturnValue(out.promise);
+    let done: (v: FileWriteView) => void = () => undefined;
+    api.write.mockReturnValue(new Promise<FileWriteView>((r) => {
+      done = r;
+    }));
     const told = saveAndTell(KEY);
     openFileInPanel(PANEL, { ...target, ask: { thread: "s-1", note: "And line 3" } });
-    out.resolve(written());
+    done(written());
     await told;
     expect(tab().params.note).toBe("And line 3");
   });

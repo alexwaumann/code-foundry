@@ -150,6 +150,8 @@ export async function deliverThreadPrompt(threadId: string, text: string): Promi
   const release = holdFailedNotice(threadId);
   try {
     const res = await invokeConfirmed(THREAD_COMMANDS.send, { id: threadId, text }, threadContext(threadId));
+    // A removed thread answers with its report and a failing exit code, not an error.
+    if (res?.exitCode) throw new Error(res.message.split("\n")[0]);
     if (!res) release();
     return res !== null;
   } catch (err) {

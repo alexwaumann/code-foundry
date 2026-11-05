@@ -89,6 +89,8 @@ export interface UiContextView {
 export interface InvokeResultView {
   message: string;
   resultJson: string;
+  /** What the CLI would exit with, when not 0: a command that failed without an error (a removed thread's answer). */
+  exitCode?: number;
   /** Notes about the result the CLI prints as "warning: " lines (thread.new's collision hints); absent when none. */
   warnings?: string[];
 }
@@ -182,5 +184,5 @@ export async function invokeCommand(
 ): Promise<InvokeResultView> {
   const c = await conn.client(CommandService);
   const res = await c.invoke({ name, context: toUiContext(ctx), args, confirmed: opts.confirmed ?? false }, { signal: opts.signal });
-  return { message: res.message, resultJson: res.resultJson, ...(res.warnings.length > 0 ? { warnings: [...res.warnings] } : {}) };
+  return { message: res.message, resultJson: res.resultJson, ...(res.exitCode !== 0 ? { exitCode: res.exitCode } : {}), ...(res.warnings.length > 0 ? { warnings: [...res.warnings] } : {}) };
 }
