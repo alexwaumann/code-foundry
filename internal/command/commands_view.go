@@ -114,8 +114,8 @@ type ViewDeps struct {
 // noFileEdits is FileEdits when nothing backs it.
 type noFileEdits struct{}
 
-func (noFileEdits) CheckEdit(context.Context, string, string) (string, bool, error) {
-	return "", false, connect.NewError(connect.CodeUnimplemented, errors.New("no file checks here"))
+func (noFileEdits) CheckEdit(context.Context, string, string) (string, error) {
+	return "", connect.NewError(connect.CodeUnimplemented, errors.New("no file checks here"))
 }
 
 // pageFocusArg is the page verbs' --focus.

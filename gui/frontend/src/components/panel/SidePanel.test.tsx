@@ -443,7 +443,7 @@ describe("appearance.panel_keep_open", () => {
 describe("a tab with unsaved edits", () => {
   const tab = fileTab({ project: "", base: "/w", path: "/w/.env" });
   const editKey = fileEditKey(KEY, tab.id);
-  const view: FileReadView = { path: "/w/.env", size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null };
+  const view: FileReadView = { path: "/w/.env", realPath: "/w/.env", mode: 0o600, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null };
 
   beforeEach(async () => {
     vi.spyOn(filesSurface, "render").mockReturnValue(null);

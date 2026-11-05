@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
@@ -26,7 +27,7 @@ import (
 const (
 	// ViewPanelFile opens a file's File tab: params path (absolute), line (1-based,
 	// optional), project and base (the thread's project and checkout). --edit adds edit
-	// and thread (who asked), and note, create and focus when they apply.
+	// and thread (who asked), and note and focus when they apply.
 	ViewPanelFile = "panel.file"
 	// ViewPanelDiff opens a changed file's Diff tab: params project, worktree, path
 	// (worktree-relative) and scope ("working" | "branch").
@@ -47,11 +48,11 @@ type FileDiffer interface {
 	GetWorktreeFileDiff(context.Context, *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error)
 }
 
-// FileEditChecker says whether the File tab can edit a file (Filesystem.CheckEdit): its
-// path, and whether it is missing (a new file), or a refusal fit to show. Neither ever
-// holds anything from inside the file.
+// FileEditChecker says whether the File tab can edit a file, or make it where nothing is
+// (Filesystem.CheckEdit): its path, or a refusal fit to show, which holds nothing from
+// inside the file.
 type FileEditChecker interface {
-	CheckEdit(ctx context.Context, base, path string) (resolved string, missing bool, err error)
+	CheckEdit(ctx context.Context, base, path string) (resolved string, err error)
 }
 
 // ProjectLister lists the registered projects (ProjectService.List).
@@ -94,7 +95,10 @@ func (d ViewDeps) itemCommands() []Command {
 			NoPalette: true,
 			Title:     "Show File in Side Panel",
 			Description: "Open a file in a File tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"text with syntax colours and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively.",
+				"text with syntax colours and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively. " +
+				"With --edit the user edits it instead: for a secret, or a file you cannot read, never ask for the value in chat or try to read the file; " +
+				"run this with --line and a --note saying what to put where, then end your turn: a message tells you when it is saved, and you continue without reading its values. " +
+				"A missing file starts empty and is made on save, in a directory that must exist. Refused for what the tab cannot edit: tell the user.",
 			Category:     "View",
 			NoKeybinding: true,
 			// Any thread: a thread without a project reads files under home.
@@ -103,7 +107,7 @@ func (d ViewDeps) itemCommands() []Command {
 				{Name: "path", Type: Path, Required: true, Positional: true, Description: "File to show: absolute, ~/…, or relative to the current directory; under the home directory"},
 				{Name: "line", Type: Int, Description: "1-based line to scroll to and mark"},
 				{Name: "edit", Type: Bool, Description: "Ask the user to edit the file: the tab opens editing, with a band naming this thread and Save and tell thread, whose message says only that it was saved"},
-				{Name: "note", Type: String, Description: fmt.Sprintf("With --edit: what to put where, shown as plain text in the band; at most %d characters", maxEditNote)},
+				{Name: "note", Type: String, Description: fmt.Sprintf("With --edit: what to put where, shown as one plain paragraph in the band, quoted as yours; at most %d characters", maxEditNote)},
 				thread, focus,
 			},
 			Run: d.runPanelFile,
@@ -174,7 +178,7 @@ func (d ViewDeps) runPanelFile(ctx context.Context, uctx Context, a Args) (Resul
 }
 
 // editNext follows --edit's message: what the model does now.
-const editNext = "; the user is asked to edit it: end your turn, a message says when it is saved"
+const editNext = "; the user is asked to edit it: end your turn, a message says when it is saved; then continue without reading its values"
 
 // editCheck is view.panel.file --edit's check: the tab could edit and save the file, or
 // make it (docs/notes/file-edit-3-agent.md). A file the agent may not read comes through
@@ -184,12 +188,12 @@ func (d ViewDeps) editCheck(ctx context.Context, t *v1.Thread, a Args, asker str
 	if err != nil {
 		return nil, err
 	}
-	note := strings.TrimSpace(a.String("note"))
+	note := plainNote(a.String("note"))
 	if n := utf8.RuneCountInString(note); n > maxEditNote {
 		return nil, InvalidArg("note", "%d characters, at most %d: say what to put where, in a line or two", n, maxEditNote)
 	}
 	base := t.GetWorktreePath()
-	path, missing, err := d.FileEdits.CheckEdit(ctx, base, a.Path("path"))
+	path, err := d.FileEdits.CheckEdit(ctx, base, a.Path("path"))
 	if err != nil {
 		var ce *connect.Error
 		if errors.As(err, &ce) && ce.Code() == connect.CodeInvalidArgument {
@@ -204,13 +208,44 @@ func (d ViewDeps) editCheck(ctx context.Context, t *v1.Thread, a Args, asker str
 	if note != "" {
 		params["note"] = note
 	}
-	if missing {
-		params["create"] = "1"
-	}
 	if a.Bool("focus") {
 		params["focus"] = "1"
 	}
 	return params, nil
+}
+
+// maxNoteMarks is the most combining marks a note's character keeps: enough for any script,
+// too few to paint over what is around it.
+const maxNoteMarks = 3
+
+// plainNote is what a note may show. A note is model text, and a model's input can be
+// written by anyone, so it gets no layout of its own: one paragraph, its white space
+// collapsed, with no control, format or bidi characters and no towers of combining marks.
+// The band cleans it again (lib/plainText.ts), and a thread's name with it.
+func plainNote(s string) string {
+	var b strings.Builder
+	space, marks := false, 0
+	for _, r := range s {
+		switch {
+		case unicode.IsSpace(r):
+			space = b.Len() > 0
+			continue
+		case unicode.Is(unicode.C, r) || r == utf8.RuneError:
+			continue
+		case unicode.Is(unicode.M, r):
+			if marks++; marks > maxNoteMarks {
+				continue
+			}
+		default:
+			marks = 0
+		}
+		if space {
+			b.WriteByte(' ')
+			space = false
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // fileLine is the file verbs' --line: 0 for none.

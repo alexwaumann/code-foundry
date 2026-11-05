@@ -9,11 +9,15 @@
  * failed or conflicted; a send that fails leaves the save standing and says so.
  *
  * While a tab has a request, Save and tell is what cmd+S, the palette's Save File and the
- * close dialog's Save do. Row two's Save writes and leaves the request up.
+ * close dialog's Save do. Row two's Save writes and leaves the request up. "Saved" must be
+ * true: with no write since the request and nothing to write, there is nothing to tell, and
+ * cmd+S does nothing, as anywhere.
  */
+import type { FileReadView } from "@/api/files";
 import { errorMessage } from "@/api/stream";
 import { fileName, relativeTo } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
+import { plainName } from "@/lib/plainText";
 import { ASK_PARAMS, fileOfTab, type FileAsk } from "@/surfaces/fileTarget";
 import { requestChoice } from "./confirm";
 import { fileEditKey, fileEditOf, focusEditor, focusedEdit, noteEditFailure, returnFromPalette, saveFile, type FileEdit, type SaveOutcome } from "./fileEdit";
@@ -32,23 +36,39 @@ function askOf(s: FileEdit | undefined): FileAsk | null {
 }
 
 /**
- * Whether Save and tell can run now. A clean document with a file behind it has nothing to
- * write and only tells: the user saved with row two's Save, or it needed nothing. One with
- * no file yet has nothing to say, and a conflict is settled first.
+ * Whether Save and tell can run now: something to write, or a write that landed since the
+ * request (row two's Save, Overwrite), which only needs telling. A conflict is settled first.
  */
-export function canTell(s: FileEdit): boolean {
-  return s.view !== null && !s.busy && s.conflict === null && (s.dirty || !s.creating);
+export function canTell(s: FileEdit, ask: FileAsk): boolean {
+  return s.view !== null && !s.busy && s.conflict === null && (s.dirty || ask.saved === true);
 }
 
-/** What the thread is told: the path as the user sees it and nothing else. */
+/** What the thread is told: the path as the user sees it, nothing from the file, and not to go and read it. */
 export function savedMessage(path: string, project: string, base: string): string {
-  return `I saved ${(project ? relativeTo(path, base) : null) ?? tildify(path)}.`;
+  return `I saved ${(project ? relativeTo(path, base) : null) ?? tildify(path)}. Continue without reading its values.`;
+}
+
+/** Who asked, as a sentence's subject. The name is model-settable, so it is quoted and cleaned. */
+export function askerLabel(name: string | undefined, unnamed = "A thread"): string {
+  const shown = plainName(name ?? "");
+  return shown ? `Thread "${shown}"` : unnamed;
+}
+
+/**
+ * What the user should know about where this file really is, as facts: where a save lands
+ * when a link leads elsewhere, and who else can read it. Neither is a refusal.
+ */
+export function fileFacts(file: FileReadView): string[] {
+  const facts: string[] = [];
+  if (file.realPath && file.realPath !== file.path) facts.push(`This path is a link: the file is really ${tildify(file.realPath)}.`);
+  const who = [...(file.mode & 0o040 ? ["Group"] : []), ...(file.mode & 0o004 ? ["Others"] : [])].join(" and ");
+  if (who) facts.push(`${who} can read this file (${file.mode.toString(8).padStart(4, "0")}).`);
+  return facts;
 }
 
 /** The request is over, unless a newer one took its place while a write was out. */
 function finish(s: FileEdit, ask: FileAsk): void {
-  const now = askOf(s);
-  if (now?.thread === ask.thread && now.note === ask.note) dropPanelTabParams(s.panelKey, s.tabId, ASK_PARAMS);
+  if (askOf(s)?.id === ask.id) dropPanelTabParams(s.panelKey, s.tabId, ASK_PARAMS);
 }
 
 /** "saved" and told; "untold" when the write stood and the thread did not hear; otherwise the write's outcome and nothing was sent. */
@@ -58,15 +78,14 @@ export type TellOutcome = SaveOutcome | "untold";
 export async function saveAndTell(key: string): Promise<TellOutcome> {
   const s = fileEditOf(key);
   const ask = askOf(s);
-  if (!s || !ask || !canTell(s)) return "skipped";
+  if (!s || !ask || !canTell(s, ask)) return "skipped";
   const project = tabOf(s)?.params.project ?? "";
   const written = s.dirty ? await saveFile(key) : "saved";
   if (written !== "saved") return written;
   finish(s, ask);
   const why = await tell(ask.thread, savedMessage(s.path, project, s.base));
   if (why === null) return "saved";
-  const name = useThreadsStore.getState().byId[ask.thread]?.name;
-  noteEditFailure(key, `Saved, but ${name || "the thread"} was not told: ${why}`);
+  noteEditFailure(key, `Saved, but ${askerLabel(useThreadsStore.getState().byId[ask.thread]?.name, "the thread")} was not told: ${why}`);
   return "untold";
 }
 

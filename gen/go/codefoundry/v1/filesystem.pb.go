@@ -874,7 +874,12 @@ type ReadFileResponse struct {
 	// Nothing exists at resolved_path; the other fields are empty.
 	NotFound bool `protobuf:"varint,8,opt,name=not_found,json=notFound,proto3" json:"not_found,omitempty"`
 	// resolved_path is a directory; only size and modified_at are set.
-	IsDir         bool `protobuf:"varint,9,opt,name=is_dir,json=isDir,proto3" json:"is_dir,omitempty"`
+	IsDir bool `protobuf:"varint,9,opt,name=is_dir,json=isDir,proto3" json:"is_dir,omitempty"`
+	// Where the file really is, symlinks followed; with not_found, where it would be, when
+	// its directory exists. A write lands here.
+	RealPath string `protobuf:"bytes,10,opt,name=real_path,json=realPath,proto3" json:"real_path,omitempty"`
+	// The real file's permission bits (0644); 0 with not_found.
+	Mode          uint32 `protobuf:"varint,11,opt,name=mode,proto3" json:"mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -970,6 +975,20 @@ func (x *ReadFileResponse) GetIsDir() bool {
 		return x.IsDir
 	}
 	return false
+}
+
+func (x *ReadFileResponse) GetRealPath() string {
+	if x != nil {
+		return x.RealPath
+	}
+	return ""
+}
+
+func (x *ReadFileResponse) GetMode() uint32 {
+	if x != nil {
+		return x.Mode
+	}
+	return 0
 }
 
 type WriteFileRequest struct {
@@ -1342,7 +1361,7 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\x0fReadFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1b\n" +
-	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes\"\x8f\x02\n" +
+	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes\"\xc0\x02\n" +
 	"\x10ReadFileResponse\x12\x1a\n" +
 	"\bcontents\x18\x01 \x01(\fR\bcontents\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1c\n" +
@@ -1353,7 +1372,10 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"modifiedAt\x12#\n" +
 	"\rresolved_path\x18\a \x01(\tR\fresolvedPath\x12\x1b\n" +
 	"\tnot_found\x18\b \x01(\bR\bnotFound\x12\x15\n" +
-	"\x06is_dir\x18\t \x01(\bR\x05isDir\"\xc0\x01\n" +
+	"\x06is_dir\x18\t \x01(\bR\x05isDir\x12\x1b\n" +
+	"\treal_path\x18\n" +
+	" \x01(\tR\brealPath\x12\x12\n" +
+	"\x04mode\x18\v \x01(\rR\x04mode\"\xc0\x01\n" +
 	"\x10WriteFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1a\n" +

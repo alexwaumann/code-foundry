@@ -66,6 +66,40 @@ test("a request arriving while the user types in the composer takes nothing from
   expect(await disk(env)).toBe("A=1\nB=2\n");
 });
 
+test("a note cannot take the band over: the buttons and the editor stay on screen", async ({ page }) => {
+  const env = `${CF}/.env`;
+  await writeDisk(env, "A=1\n");
+  await inThread(page);
+  // The mock passes a note as it came, so this is the band's own defence.
+  const note = `Code Foundry${"\n".repeat(60)}Session expired. ${"Paste your token on line 1. ".repeat(40)}`;
+  await fromThread("view.panel.file", { path: env, edit: "true", note });
+  await expect(editor(page)).toBeVisible();
+  await expect(page.getByTestId("file-request-dismiss")).toBeInViewport();
+  await expect(page.getByTestId("file-request-tell")).toBeInViewport();
+  await expect(line(page, 1)).toBeInViewport();
+  expect((await band(page).boundingBox())?.height).toBeLessThan(220);
+});
+
+test("a request for another file leaves the document under the user's fingers", async ({ page }) => {
+  const a = `${CF}/a.env`;
+  const b = `${CF}/b.env`;
+  await writeDisk(a, "A=\n");
+  await writeDisk(b, "B=\n");
+  await inThread(page);
+  await fromThread("view.panel.file", { path: a, edit: "true" });
+  await expect(editor(page)).toBeVisible();
+  await line(page, 1).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("1");
+
+  await fromThread("view.panel.file", { path: b, edit: "true", note: "Fill in B" });
+
+  await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveText(["a.env", "b.env"]);
+  await page.keyboard.type("2");
+  await expect(line(page, 1)).toHaveText("A=12");
+  await expect(file(page)).toHaveAttribute("data-path", a);
+});
+
 test("--line marks and scrolls to the line in the editor, as in the viewer", async ({ page }) => {
   const long = `${CF}/long.env`;
   await writeDisk(long, Array.from({ length: 200 }, (_, i) => `K${String(i + 1)}=v`).join("\n"));

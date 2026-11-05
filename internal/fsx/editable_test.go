@@ -14,10 +14,9 @@ func TestEditable(t *testing.T) {
 	long := strings.Repeat(marker+"\n", MaxReadBytes/len(marker)+1)
 	tests := []struct {
 		name    string
-		make    func(h *writeHome) string
-		missing bool
-		want    error
-		says    string
+		make func(h *writeHome) string
+		want error
+		says string
 	}{
 		{name: "a text file", make: func(h *writeHome) string { return h.file(h.at("proj/.env"), "KEY="+marker+"\n", 0o600) }},
 		{name: "an empty file", make: func(h *writeHome) string { return h.file(h.at("proj/.env"), "", 0o600) }},
@@ -27,8 +26,8 @@ func TestEditable(t *testing.T) {
 		{name: "through a symlink", make: func(h *writeHome) string {
 			return h.link(h.file(h.at("proj/real"), marker, 0o600), h.at("proj/link"))
 		}},
-		{name: "a new file", missing: true, make: func(h *writeHome) string { return h.at("proj/.env") }},
-		{name: "a new file through a linked folder", missing: true, make: func(h *writeHome) string {
+		{name: "a new file", make: func(h *writeHome) string { return h.at("proj/.env") }},
+		{name: "a new file through a linked folder", make: func(h *writeHome) string {
 			return h.link(h.at("proj"), h.at("linked")) + "/.env"
 		}},
 		{name: "no directory", want: ErrInvalidArgument, says: "directory", make: func(h *writeHome) string { return h.at("proj/nope/.env") }},
@@ -83,8 +82,8 @@ func TestEditable(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got.Path != path || got.Missing != tt.missing {
-				t.Errorf("got %+v, want path %s missing %v", got, path, tt.missing)
+			if got != path {
+				t.Errorf("got %s, want %s", got, path)
 			}
 		})
 	}
@@ -95,7 +94,7 @@ func TestEditableRelative(t *testing.T) {
 	h := newWriteHome(t)
 	h.file(h.at("proj/.env"), "A=1\n", 0o600)
 	got, err := h.w.Editable(h.at("proj"), ".env")
-	if err != nil || got.Path != h.at("proj/.env") || got.Missing {
-		t.Fatalf("got %+v, %v", got, err)
+	if err != nil || got != h.at("proj/.env") {
+		t.Fatalf("got %s, %v", got, err)
 	}
 }

@@ -24,15 +24,15 @@ const secret = "MARKER-sk-live-4242"
 // realEdits is the check the daemon runs, on a real folder, mapped as the handler maps it.
 type realEdits struct{ w *fsx.Writer }
 
-func (r realEdits) CheckEdit(_ context.Context, base, path string) (string, bool, error) {
-	t, err := r.w.Editable(base, path)
+func (r realEdits) CheckEdit(_ context.Context, base, path string) (string, error) {
+	p, err := r.w.Editable(base, path)
 	switch {
 	case errors.Is(err, fsx.ErrInvalidArgument):
-		return "", false, connect.NewError(connect.CodeInvalidArgument, err)
+		return "", connect.NewError(connect.CodeInvalidArgument, err)
 	case err != nil:
-		return "", false, connect.NewError(connect.CodeFailedPrecondition, err)
+		return "", connect.NewError(connect.CodeFailedPrecondition, err)
 	}
-	return t.Path, t.Missing, nil
+	return p, nil
 }
 
 // editHome is a home with a checkout holding one file of each kind; the config home is its
@@ -84,10 +84,12 @@ func TestPanelFileEdit(t *testing.T) {
 			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1", "line": "3", "note": "Put the key on line 3"}},
 		{name: "the longest note", args: map[string]string{"path": "wt/.env", "edit": "true", "note": long[:500]},
 			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1", "note": long[:500]}},
+		{name: "a note is one plain paragraph", args: map[string]string{"path": "wt/.env", "edit": "true", "note": "Code Foundry" + strings.Repeat("\n", 60) + "Session\u202e\u200b  expired"},
+			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1", "note": "Code Foundry Session expired"}},
 		{name: "a blank note is none", args: map[string]string{"path": "wt/.env", "edit": "true", "note": "   "},
 			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1"}},
 		{name: "a missing file", args: map[string]string{"path": "wt/new.env", "edit": "true"},
-			wantParams: map[string]string{"path": "wt/new.env", "edit": "1", "thread": "s-aaaaaaaaaaa1", "create": "1"}},
+			wantParams: map[string]string{"path": "wt/new.env", "edit": "1", "thread": "s-aaaaaaaaaaa1"}},
 		{name: "a note without edit", args: map[string]string{"path": "wt/.env", "note": "hi"}, argErr: "note", says: "--edit"},
 		{name: "a note too long", args: map[string]string{"path": "wt/.env", "edit": "true", "note": long}, argErr: "note", says: "at most 500"},
 		{name: "line 0", args: map[string]string{"path": "wt/.env", "edit": "true", "line": "0"}, argErr: "line"},
@@ -141,6 +143,38 @@ func TestPanelFileEdit(t *testing.T) {
 		})
 	}
 }
+
+// plainNote leaves a note no way to lay itself out.
+func TestPlainNote(t *testing.T) {
+	tests := []struct{ name, in, want string }{
+		{"plain text", "Put the key on line 2.", "Put the key on line 2."},
+		{"newlines, tabs and a line separator", "a\n\n\tb\u2028c\r\nd", "a b c d"},
+		{"leading and trailing space", "\n  a  \n", "a"},
+		{"control characters", "a\x00\x1b[31mb\x7f", "a[31mb"},
+		{"bidi overrides and isolates", "a\u202eb\u2066c\u200fd", "abcd"},
+		{"zero-width and tag characters", "a\u200bb\ufeffc\U000e0041d", "abcd"},
+		{"a tower of combining marks", "a" + strings.Repeat("\u0301", 480) + "b", "a\u0301\u0301\u0301b"},
+		{"marks a language needs", "Việt ngữ, कि", "Việt ngữ, कि"},
+		{"invalid UTF-8", "a\xffb", "ab"},
+		{"only what goes", "\n\u202e\n", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 1, edits: fixedEdits{}})
+			if _, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.file", map[string]string{"path": "/wt/.env", "edit": "true", "note": tt.in}); err != nil {
+				t.Fatal(err)
+			}
+			if got := emit.Intents()[0].GetShowView().GetParams()["note"]; got != tt.want {
+				t.Errorf("note = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// fixedEdits takes any path.
+type fixedEdits struct{}
+
+func (fixedEdits) CheckEdit(_ context.Context, _, path string) (string, error) { return path, nil }
 
 // --edit needs a thread, as the verb does; the message goes to the thread that asked.
 func TestPanelFileEditThreads(t *testing.T) {

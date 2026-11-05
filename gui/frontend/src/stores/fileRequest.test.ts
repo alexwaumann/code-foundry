@@ -5,7 +5,7 @@ import { fileTab } from "@/surfaces/fileTarget";
 import { answerAlternate, answerConfirm, useConfirmStore } from "./confirm";
 import { fileEditKey, noteDraft, noteEditor, observeRead, saveFile, startEdit, useFileEditStore } from "./fileEdit";
 import { openFileInPanel } from "./filePanel";
-import { canTell, confirmCloseFile, dismissAsk, presentFileSave, saveAndTell, savedMessage } from "./fileRequest";
+import { canTell, confirmCloseFile, dismissAsk, fileFacts, presentFileSave, saveAndTell, savedMessage } from "./fileRequest";
 import { allTabs, getPanel, keyOf, usePanelStore, type Tab } from "./panel";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
@@ -43,8 +43,8 @@ vi.mock("./commands", async (orig) => ({
 const SECRET = "API_KEY=sk-live-4242\n";
 const ENV = "/w/.env";
 const PANEL = "thread:s-1";
-const ASK = { thread: "s-1", note: "Put the key on line 2" };
-const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: ENV, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
+const ASK = { id: "ask-1", thread: "s-1", note: "Put the key on line 2" };
+const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: ENV, realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
 const missing = () => view({ notFound: true, text: null, lossless: false, size: 0, modifiedAtMs: null });
 const written = (over: Partial<FileWriteView> = {}): FileWriteView => ({ path: ENV, size: SECRET.length, modifiedAtMs: 200, conflict: false, notFound: false, ...over });
 
@@ -59,9 +59,9 @@ const tab = (): Tab => {
 };
 
 /** A thread's request open on `read`, the editor on screen, the document `text` if given. */
-async function asked(text: string | null = null, read = view(), over: Partial<typeof target> & { create?: boolean } = {}): Promise<void> {
+async function asked(text: string | null = null, read = view(), over: Partial<typeof target> = {}): Promise<void> {
   openFileInPanel(PANEL, { ...target, ...over });
-  await startEdit(KEY, { panelKey: PANEL, tabId, base: "/w" }, read, { create: over.create === true });
+  await startEdit(KEY, { panelKey: PANEL, tabId, base: "/w" }, read, { create: true });
   const s = edit();
   if (!s) throw new Error("no session");
   lib.drafts.set(s.stateKey, text ?? s.seed);
@@ -90,7 +90,7 @@ describe("Save and tell", () => {
     api.write.mockResolvedValue(written());
     await expect(saveAndTell(KEY)).resolves.toBe("saved");
     expect(calls).toEqual(["write", "send thread.send"]);
-    expect(sentArgs()).toEqual([{ id: "s-1", text: "I saved .env." }]);
+    expect(sentArgs()).toEqual([{ id: "s-1", text: "I saved .env. Continue without reading its values." }]);
     expect(tab().params.asker).toBeUndefined();
     expect(tab().params.note).toBeUndefined();
     expect(tab().params.edit).toBeUndefined();
@@ -106,9 +106,9 @@ describe("Save and tell", () => {
   });
 
   it.each([
-    ["a project's file by its path in the checkout", "/w/config/.env", "repo", "/w", "I saved config/.env."],
-    ["a file outside the checkout under home", "/Users/me/.aws/credentials", "repo", "/w", "I saved ~/.aws/credentials."],
-    ["a thread without a project", "/Users/me/.aws/credentials", "", "/Users/me", "I saved ~/.aws/credentials."],
+    ["a project's file by its path in the checkout", "/w/config/.env", "repo", "/w", "I saved config/.env. Continue without reading its values."],
+    ["a file outside the checkout under home", "/Users/me/.aws/credentials", "repo", "/w", "I saved ~/.aws/credentials. Continue without reading its values."],
+    ["a thread without a project", "/Users/me/.aws/credentials", "", "/Users/me", "I saved ~/.aws/credentials. Continue without reading its values."],
   ])("names %s", (_name, path, project, base, want) => {
     expect(savedMessage(path, project, base)).toBe(want);
   });
@@ -136,7 +136,7 @@ describe("Save and tell", () => {
     api.write.mockResolvedValue(written());
     api.send.mockRejectedValue(new Error("thread s-1 not found"));
     await expect(saveAndTell(KEY)).resolves.toBe("untold");
-    expect(edit()).toMatchObject({ dirty: false, failure: expect.stringContaining("Saved, but Set up billing was not told") as string });
+    expect(edit()).toMatchObject({ dirty: false, failure: expect.stringContaining('Saved, but Thread "Set up billing" was not told') as string });
     expect(edit()?.failure).toContain("not found");
     expect(tab().params.asker).toBeUndefined();
   });
@@ -155,7 +155,7 @@ describe("Save and tell", () => {
     api.write.mockResolvedValue(written());
     api.send.mockResolvedValue({ message: "thread Set up billing (s-1) was removed at 2026-11-04 22:44:22\nno report\ncost: $0.07", resultJson: "", exitCode: 1 });
     await expect(saveAndTell(KEY)).resolves.toBe("untold");
-    expect(edit()?.failure).toBe("Saved, but Set up billing was not told: thread Set up billing (s-1) was removed at 2026-11-04 22:44:22");
+    expect(edit()?.failure).toBe('Saved, but Thread "Set up billing" was not told: thread Set up billing (s-1) was removed at 2026-11-04 22:44:22');
   });
 
   it("twice in a row writes and sends once", async () => {
@@ -166,7 +166,7 @@ describe("Save and tell", () => {
     expect(calls).toEqual(["write", "send thread.send"]);
   });
 
-  it("after row two's Save only tells: the file is what the user wants", async () => {
+  it("after row two's Save only tells: a write landed for this request", async () => {
     await asked(SECRET);
     api.write.mockResolvedValue(written());
     await saveFile(KEY);
@@ -176,16 +176,40 @@ describe("Save and tell", () => {
     expect(calls).toEqual(["write", "send thread.send"]);
   });
 
+  it("after Overwrite too", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written({ conflict: true }));
+    await saveFile(KEY);
+    expect(tab().params.askSaved).toBeUndefined();
+    api.write.mockResolvedValue(written());
+    await saveFile(KEY, { force: true });
+    expect(tab().params.askSaved).toBe("1");
+  });
+
+  it("a write that failed did not land: nothing to tell", async () => {
+    await asked(SECRET);
+    api.write.mockRejectedValue(new Error("read-only"));
+    await saveFile(KEY);
+    expect(tab().params.askSaved).toBeUndefined();
+  });
+
+  it("on an untouched document there is nothing to say: no write, no message, and the request stands", async () => {
+    await asked();
+    await expect(saveAndTell(KEY)).resolves.toBe("skipped");
+    expect(calls).toEqual([]);
+    expect(tab().params.asker).toBe("s-1");
+  });
+
   it.each([
     ["while a write is out", { busy: true }],
     ["with a conflict up", { conflict: "changed" as const }],
-    ["with nothing to make yet", { creating: true, dirty: false }],
+    ["with nothing written", { dirty: false }],
   ])("cannot run %s", async (_name, over) => {
-    await asked();
+    await asked("typed\n");
     const s = edit();
     if (!s) throw new Error("no session");
-    expect(canTell(s)).toBe(true);
-    expect(canTell({ ...s, ...over })).toBe(false);
+    expect(canTell(s, ASK)).toBe(true);
+    expect(canTell({ ...s, ...over }, ASK)).toBe(false);
     useFileEditStore.setState({ sessions: { [KEY]: { ...s, ...over } } });
     await expect(saveAndTell(KEY)).resolves.toBe("skipped");
     expect(calls).toEqual([]);
@@ -198,10 +222,19 @@ describe("Save and tell", () => {
       done = r;
     }));
     const told = saveAndTell(KEY);
-    openFileInPanel(PANEL, { ...target, ask: { thread: "s-1", note: "And line 3" } });
+    openFileInPanel(PANEL, { ...target, ask: { ...ASK, id: "ask-2", note: "And line 3" } });
     done(written());
     await told;
     expect(tab().params.note).toBe("And line 3");
+    expect(tab().params.askSaved).toBeUndefined();
+  });
+});
+
+describe("fileFacts", () => {
+  it("a new file through a linked folder is one too; a mode of 0 says nothing", () => {
+    expect(fileFacts(view({ realPath: "/Users/me/Public/.env", mode: 0 }))).toEqual(["This path is a link: the file is really ~/Public/.env."]);
+    expect(fileFacts(view({ realPath: "", mode: 0 }))).toEqual([]);
+    expect(fileFacts(view({ realPath: ENV, mode: 0o600 }))).toEqual([]);
   });
 });
 
@@ -231,7 +264,7 @@ describe("a request's life", () => {
   it("a repeat request shows the new note and leaves the draft alone", async () => {
     await asked("half typed\n");
     const before = edit();
-    openFileInPanel(PANEL, { ...target, ask: { thread: "s-1", note: "Line 3 too" }, line: 3 });
+    openFileInPanel(PANEL, { ...target, ask: { ...ASK, id: "ask-2", note: "Line 3 too" }, line: 3 });
     expect(tab().params.note).toBe("Line 3 too");
     expect(tab().params.line).toBe("3");
     expect(edit()).toBe(before);
@@ -281,6 +314,14 @@ describe("a request's life", () => {
 });
 
 describe("cmd+S", () => {
+  it("on an untouched file does nothing, as anywhere, and the request stands", async () => {
+    await asked();
+    presentFileSave();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls).toEqual([]);
+    expect(tab().params.asker).toBe("s-1");
+  });
+
   it("is Save and tell while the request stands, a plain save after", async () => {
     usePanelStore.setState({ byKey: {} });
     await asked("one\n");
@@ -302,7 +343,7 @@ describe("cmd+S", () => {
 });
 
 describe("a new file", () => {
-  const fresh = (text: string | null = null) => asked(text, missing(), { create: true });
+  const fresh = (text: string | null = null) => asked(text, missing());
 
   it("is an empty document marked as such", async () => {
     await fresh();
@@ -324,7 +365,6 @@ describe("a new file", () => {
     expect(calls).toEqual(["write", "send thread.send"]);
     expect(api.write).toHaveBeenCalledWith("/w", ENV, SECRET, expect.anything(), { create: true });
     expect(edit()).toMatchObject({ creating: false, dirty: false });
-    expect(tab().params.create).toBeUndefined();
   });
 
   it("a file that appeared is a conflict: nothing replaced, nothing sent", async () => {

@@ -34,7 +34,12 @@ func LooksBinary(b []byte) bool {
 // FileContents is ReadFile's result.
 type FileContents struct {
 	// Path is the absolute, cleaned path asked for (symlinks not followed).
-	Path       string
+	Path string
+	// RealPath is Path with its symlinks followed. NotFound: where it would be, "" without
+	// its directory.
+	RealPath string
+	// Mode is the real file's permission bits.
+	Mode       fs.FileMode
 	NotFound   bool
 	IsDir      bool
 	Contents   []byte
@@ -71,6 +76,9 @@ func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) 
 			return FileContents{}, fmt.Errorf("%w: %s is outside your home directory", ErrInvalidArgument, path)
 		}
 		out.NotFound = true
+		if dir, err := filepath.EvalSymlinks(filepath.Dir(p)); err == nil {
+			out.RealPath = filepath.Join(dir, filepath.Base(p))
+		}
 		return out, nil
 	}
 	if err != nil {
@@ -83,6 +91,7 @@ func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) 
 	if err != nil {
 		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
 	}
+	out.RealPath, out.Mode = real, fi.Mode().Perm()
 	out.Size, out.ModifiedAt = fi.Size(), fi.ModTime()
 	switch {
 	case fi.IsDir():

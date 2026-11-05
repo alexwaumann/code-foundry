@@ -253,7 +253,7 @@ func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFil
 	}
 	out := &v1.ReadFileResponse{
 		Contents: f.Contents, Size: f.Size, Truncated: f.Truncated, Binary: f.Binary, MimeType: f.MIMEType,
-		ResolvedPath: f.Path, NotFound: f.NotFound, IsDir: f.IsDir,
+		ResolvedPath: f.Path, NotFound: f.NotFound, IsDir: f.IsDir, RealPath: f.RealPath, Mode: uint32(f.Mode),
 	}
 	if !f.ModifiedAt.IsZero() {
 		out.ModifiedAt = f.ModifiedAt.UnixMilli()
@@ -278,13 +278,13 @@ func (h *Filesystem) WriteFile(_ context.Context, req *connect.Request[v1.WriteF
 }
 
 // CheckEdit says whether the File tab could edit and save a file, for view.panel.file
-// --edit: its path and whether it is missing, or why not. Not an RPC: the GUI asks by reading.
-func (h *Filesystem) CheckEdit(_ context.Context, base, path string) (string, bool, error) {
-	t, err := h.writer.Editable(base, path)
+// --edit: its path, or why not. Not an RPC: the GUI asks by reading.
+func (h *Filesystem) CheckEdit(_ context.Context, base, path string) (string, error) {
+	p, err := h.writer.Editable(base, path)
 	if err != nil {
-		return "", false, fileError(err)
+		return "", fileError(err)
 	}
-	return t.Path, t.Missing, nil
+	return p, nil
 }
 
 // fileError is fsx.ReadFile's or Writer.Write's error as a Connect error.

@@ -17,7 +17,7 @@ import { blankFile, canEdit, readFile, writeFile, type FileReadView } from "@/ap
 import { errorMessage } from "@/api/stream";
 import { draftText, forgetDraft, loadCodeEditor, type EditorHandle, type EditorPlace } from "@/lib/codeEditor";
 import { deepActiveElement } from "@/lib/keyTarget";
-import { activeTab, allTabs, getPanel, keyOf, usePanelStore, type PanelEntry, type Tab } from "./panel";
+import { activeTab, allTabs, focusedGroup, getPanel, groupOf, keyOf, setPanelTabParam, usePanelStore, type PanelEntry, type Tab } from "./panel";
 import { useUiStore } from "./ui";
 
 /** What is wrong with the draft's baseline: the file was changed, or is gone. */
@@ -154,6 +154,15 @@ useUiStore.subscribe((s, prev) => {
   if (s.palette.open && !prev.palette.open) paletteEditor = editorWithFocus();
 });
 
+/** Whether an editor in the group `tabId` opens in has the keyboard, and is another tab's: opening it there would swap the document under the user's fingers. */
+export function editorHasKeyboard(panelKey: string, tabId: string): boolean {
+  const at = editorWithFocus();
+  const s = at === null ? undefined : session(at);
+  if (s?.panelKey !== panelKey || s.tabId === tabId) return false;
+  const e = getPanel(panelKey);
+  return groupOf(e, s.tabId) === (groupOf(e, tabId) ?? focusedGroup(e));
+}
+
 /** The session whose editor the user was in: the palette's, while it covers the window. */
 function editorInUse(): string | null {
   if (!useUiStore.getState().palette.open) return editorWithFocus();
@@ -285,7 +294,7 @@ function follow(key: string, was: FileEdit, view: FileReadView): void {
 export async function startEdit(key: string, target: { panelKey: string; tabId: string; base: string }, read: FileReadView, opts: { create?: boolean } = {}): Promise<void> {
   await loadCodeEditor();
   const creating = opts.create === true && read.notFound;
-  const view = creating ? blankFile(read.path) : read;
+  const view = creating ? blankFile(read.path, read.realPath) : read;
   if (session(key) || !canEdit(view)) return;
   useFileEditStore.setState((s) => ({
     sessions: {
@@ -321,7 +330,7 @@ export function observeRead(key: string, view: FileReadView): void {
   const s = session(key);
   if (!s || s.busy || view.path !== s.path || (readStarts.get(view) ?? Infinity) < s.readsFrom) return;
   if (s.creating && view.notFound) {
-    if (!s.view) adopt(key, s, blankFile(s.path), true);
+    if (!s.view) adopt(key, s, blankFile(s.path, view.realPath), true);
     else if (s.conflict !== null) patch(key, { conflict: null });
   } else if (!s.view) {
     if (canEdit(view)) adopt(key, s, view);
@@ -339,6 +348,11 @@ export function observeRead(key: string, view: FileReadView): void {
 /** Says what went wrong in the tab, as a sentence, in the band a failed save uses. */
 export function noteEditFailure(key: string, failure: string): void {
   patch(key, { failure });
+}
+
+/** The request standing on a session's tab, by its id (surfaces/fileTarget.ts FileAsk). */
+function askIdOf(s: FileEdit): string | undefined {
+  return allTabs(getPanel(s.panelKey)).find((t) => t.id === s.tabId)?.params.askId;
 }
 
 export type SaveOutcome = "saved" | "conflict" | "failed" | "skipped";
@@ -363,6 +377,7 @@ export async function saveFile(key: string, opts: { force?: boolean } = {}): Pro
   const { view } = s;
   // Overwrite wins over whatever appeared; anything else must not replace it.
   const how = s.creating && opts.force !== true ? { create: true } : opts;
+  const ask = askIdOf(s);
   clock += 1;
   patch(key, { busy: true, failure: null, readsFrom: clock });
   // The answer is about this document: the session may have let it go meanwhile (a clean tab left the screen).
@@ -373,6 +388,7 @@ export async function saveFile(key: string, opts: { force?: boolean } = {}): Pro
   try {
     const r = await writeFile(s.base, s.path, text, view, how);
     clock += 1;
+    if (!r.conflict && ask !== undefined && askIdOf(s) === ask) setPanelTabParam(s.panelKey, s.tabId, "askSaved", "1");
     const now = current();
     if (!now) {
       patch(key, { busy: false, readsFrom: clock });
@@ -448,6 +464,7 @@ export function editorDetached(key: string, stateKey: string): void {
   }
   editors.delete(key);
   if (s.dirty) return;
+  heldReads.delete(key);
   forgetDraft(stateKey);
   patch(key, { view: null, seed: "", stateKey: nextStateKey() });
 }

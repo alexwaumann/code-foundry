@@ -8,64 +8,54 @@ import (
 	"unicode/utf8"
 )
 
-// EditTarget is what Editable found: nothing of the file's contents.
-type EditTarget struct {
-	// Path is the absolute, cleaned path asked for (symlinks not followed).
-	Path string
-	// Missing: no file is there, and a create can make one.
-	Missing bool
-}
-
 // byteOrderMark is UTF-8's, which the File tab's decode would drop.
 var byteOrderMark = []byte{0xEF, 0xBB, 0xBF}
 
 // Editable asks what Write and the File tab's editor would, before an agent sends the user
 // to a tab that cannot save (view.panel.file --edit): Write's reach, then the rule of canEdit
-// in gui/frontend/src/api/files.ts. Paths are as for ReadFile.
+// in gui/frontend/src/api/files.ts. Paths are as for ReadFile. It returns the absolute, cleaned
+// path asked for, where nothing may be yet: a create can make it.
 //
-// The file may be one the agent is not to read, so the answer and every error say only what
-// is wrong with it, by its path: no contents, and no size. A path Write would not reach, a
+// The file may be one the agent is not to read, so an error says only which rule it failed,
+// by its path: no contents, and no size. A path Write would not reach, a
 // directory, anything else that is not a regular file, a symlink leading nowhere, a missing
 // directory, binary contents, an image, more than MaxReadBytes, invalid UTF-8 and a byte
 // order mark all wrap ErrInvalidArgument. A file with no owner write bit is an
 // ErrNotWritable error.
-func (w *Writer) Editable(baseDir, path string) (EditTarget, error) {
+func (w *Writer) Editable(baseDir, path string) (string, error) {
 	if strings.IndexByte(path, 0) >= 0 || strings.IndexByte(baseDir, 0) >= 0 {
-		return EditTarget{}, fmt.Errorf("%w: the path holds a NUL", ErrInvalidArgument)
+		return "", fmt.Errorf("%w: the path holds a NUL", ErrInvalidArgument)
 	}
 	p, err := ResolveReadPath(w.Root, baseDir, path)
 	if err != nil {
-		return EditTarget{}, err
+		return "", err
 	}
 	t, err := w.locate(p, path)
 	if err != nil {
-		return EditTarget{}, err
+		return "", err
 	}
 	switch {
 	case t.noDir:
-		return EditTarget{}, fmt.Errorf("%w: the directory of %s does not exist", ErrInvalidArgument, p)
+		return "", fmt.Errorf("%w: the directory of %s does not exist", ErrInvalidArgument, p)
 	case t.info == nil:
-		return EditTarget{Path: p, Missing: true}, nil
+		return p, nil
 	case t.info.IsDir():
-		return EditTarget{}, fmt.Errorf("%w: %s is a directory, not a file", ErrInvalidArgument, p)
+		return "", fmt.Errorf("%w: %s is a directory, not a file", ErrInvalidArgument, p)
 	case t.info.Mode()&fs.ModeSymlink != 0: // locate resolved the rest
-		return EditTarget{}, fmt.Errorf("%w: %s is a symlink that leads nowhere", ErrInvalidArgument, p)
+		return "", fmt.Errorf("%w: %s is a symlink that leads nowhere", ErrInvalidArgument, p)
 	case !t.info.Mode().IsRegular():
-		return EditTarget{}, fmt.Errorf("%w: %s is not a regular file", ErrInvalidArgument, p)
+		return "", fmt.Errorf("%w: %s is not a regular file", ErrInvalidArgument, p)
 	case t.info.Mode()&0o200 == 0:
-		return EditTarget{}, refused(ErrNotWritable, fmt.Sprintf("%s is read-only", p), nil)
+		return "", refused(ErrNotWritable, fmt.Sprintf("%s is read-only", p), nil)
 	}
 	f, err := ReadFile(w.Root, baseDir, path, 0)
 	if err != nil {
-		return EditTarget{}, err
-	}
-	if f.NotFound { // removed since the look above
-		return EditTarget{Path: p, Missing: true}, nil
+		return "", err
 	}
 	if why := notEditable(f); why != "" {
-		return EditTarget{}, fmt.Errorf("%w: %s %s", ErrInvalidArgument, p, why)
+		return "", fmt.Errorf("%w: %s %s", ErrInvalidArgument, p, why)
 	}
-	return EditTarget{Path: p}, nil
+	return p, nil // a file removed since the look above reads as text: the tab makes it again
 }
 
 // notEditable is why the File tab's editor would not take a read, "" when it would.

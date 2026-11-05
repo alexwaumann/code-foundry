@@ -5,8 +5,8 @@
  * app's selection, or --thread), a ShowView with the item in its params, and --focus an
  * explicit FocusThread first. The mock checks only what it knows: the thread, a path in
  * its worktree for a diff, and a GitHub repository for a pull request. It does not read
- * files or diffs, and of view.panel.file --edit's refusals only --note without --edit, which
- * are Go's to test; a path `exists` does not know is a new file.
+ * files or diffs, and of view.panel.file --edit's refusals only --note without --edit: they are
+ * Go's to test, as is cleaning the note.
  */
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { CommandError } from "./errors";
@@ -29,13 +29,6 @@ type Command = {
 };
 
 const lead = "in a thread's side panel (from a thread: its own; in the app: the selected one): ";
-
-let exists: (path: string) => boolean = () => true;
-
-/** What says whether a file is on the mock's disk (mock/server.ts owns it). */
-export function setFileExists(fn: (path: string) => boolean): void {
-  exists = fn;
-}
 
 /** The four item verbs over `lookup`, emitting through `emit`. */
 export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, emit: (i: UiIntentInit) => number): Command[] {
@@ -74,7 +67,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           if (args.note && args.edit !== "true") throw new CommandError("invalid", "only with --edit");
           const asked =
             args.edit === "true"
-              ? { edit: "1", thread: id, ...(args.note ? { note: args.note } : {}), ...(exists(path) ? {} : { create: "1" }), ...(args.focus === "true" ? { focus: "1" } : {}) }
+              ? { edit: "1", thread: id, ...(args.note ? { note: args.note } : {}), ...(args.focus === "true" ? { focus: "1" } : {}) }
               : {};
           return { path, project: t.projectId, base: t.worktreePath, ...(args.line ? { line: args.line } : {}), ...asked };
         }),

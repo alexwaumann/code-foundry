@@ -147,7 +147,7 @@ describe("startArchiveCleanup", () => {
   describe("a File tab with unsaved edits", () => {
     const file = { ...makeTab("files", "File"), id: "files:env", title: ".env" };
     const key = fileEditKey("thread:a", file.id);
-    const view: FileReadView = { path: "/w/.env", size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null };
+    const view: FileReadView = { path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null };
     const session = () => useFileEditStore.getState().sessions[key];
 
     beforeEach(async () => {
@@ -204,7 +204,7 @@ describe("startArchiveCleanup", () => {
     beforeEach(async () => {
       useThreadsStore.setState({ availability: "available" });
       usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [file], activeTabId: file.id }] } } });
-      await startEdit(key, { panelKey: "thread:a", tabId: file.id, base: "/w" }, { path: "/w/.env", size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null } satisfies FileReadView);
+      await startEdit(key, { panelKey: "thread:a", tabId: file.id, base: "/w" }, { path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null } satisfies FileReadView);
       noteDraft(key, "SECRET=draft\n");
     });
     afterEach(() => {

@@ -11,17 +11,18 @@ import { allTabs, getPanel, openSurface, usePanelStore, type PanelTarget, type T
  * shows the panel; an open tab of the same file moves to the new line. A tab that is its
  * thread's page (view.panel.page) stays one when the file opens again another way (a
  * path chip), so its bridge keeps working, and a thread's open request to edit it stays
- * until it is saved or dismissed; a new request replaces it. False with no panel.
+ * until it is saved or dismissed; a new request replaces it. `behind` leaves the tab's group
+ * showing what it shows. False with no panel.
  */
-export function openFileInPanel(target: PanelTarget, file: FileTarget): boolean {
+export function openFileInPanel(target: PanelTarget, file: FileTarget, opts: { behind?: boolean } = {}): boolean {
   const id = fileTab(file).id;
   const old = allTabs(getPanel(target)).find((t) => t.id === id);
   const was = old ? fileOfTab(old) : null;
   const keeps = {
     ...(was?.page && !file.page ? { page: was.page } : {}),
-    ...(was?.ask && !file.ask ? { ask: was.ask, edit: true, ...(was.create ? { create: true } : {}) } : {}),
+    ...(was?.ask && !file.ask ? { ask: was.ask, edit: true } : {}),
   };
-  return openSurface(target, fileTab({ ...file, ...keeps }));
+  return openSurface(target, fileTab({ ...file, ...keeps }), opts);
 }
 
 /** Opens (or activates) a changed file's Diff tab in a panel; an open one takes the new scope. */

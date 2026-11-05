@@ -42,7 +42,7 @@ vi.mock("@/api/files", async (orig) => ({
   readFile: api.read,
 }));
 
-const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: "/w/.env", size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
+const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
 const gone = () => view({ notFound: true, text: null, lossless: false, size: 0, modifiedAtMs: null });
 const written = (over: Partial<FileWriteView> = {}): FileWriteView => ({ path: "/w/.env", size: 5, modifiedAtMs: 200, conflict: false, notFound: false, ...over });
 
@@ -852,6 +852,16 @@ describe("the keyboard", () => {
     await saveFile(KEY);
     await new Promise((r) => setTimeout(r, 300));
     expect(edit()).toMatchObject({ revision: 0, conflict: null });
+  });
+
+  it("a held read does not put contents back once a clean tab has left the screen", async () => {
+    await editing();
+    const wrap = inFind();
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
+    wrap.remove();
+    detach(edit()?.stateKey ?? "");
+    await new Promise((r) => setTimeout(r, 300));
+    expect(edit()).toMatchObject({ view: null, seed: "" });
   });
 
   it("a replace in the find field made the document dirty: the held read is the conflict it is", async () => {

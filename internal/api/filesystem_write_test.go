@@ -112,21 +112,20 @@ func TestFilesystemCheckEdit(t *testing.T) {
 	tests := []struct {
 		name, path string
 		code       connect.Code // 0: editable
-		missing    bool
 	}{
 		{name: "the daemon's token", path: "~/.code-foundry/daemon.token", code: connect.CodeInvalidArgument},
 		{name: "a new file in the config home", path: "~/.code-foundry/notes.md", code: connect.CodeInvalidArgument},
 		{name: "a symlink into the config home", path: "~/src/app/token", code: connect.CodeInvalidArgument},
 		{name: "a checkout in the config home", path: "~/.code-foundry/projects/app/main.go"},
 		{name: "aws credentials", path: "~/.aws/credentials"},
-		{name: "a new file", path: "~/src/app/.env", missing: true},
+		{name: "a new file", path: "~/src/app/.env"},
 		{name: "no directory", path: "~/src/nope/.env", code: connect.CodeInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			root, _ := writeHome(t)
 			h := NewFilesystem(root, projecttest.New(nil), testGrants(root))
-			got, missing, err := h.CheckEdit(context.Background(), "", tt.path)
+			got, err := h.CheckEdit(context.Background(), "", tt.path)
 			if tt.code != 0 {
 				if connect.CodeOf(err) != tt.code {
 					t.Fatalf("err = %v, want %v", err, tt.code)
@@ -136,8 +135,8 @@ func TestFilesystemCheckEdit(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if want := filepath.Join(root, tt.path[2:]); got != want || missing != tt.missing {
-				t.Errorf("got %q, missing %v; want %q, %v", got, missing, want, tt.missing)
+			if want := filepath.Join(root, tt.path[2:]); got != want {
+				t.Errorf("got %q, want %q", got, want)
 			}
 		})
 	}

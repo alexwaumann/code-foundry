@@ -9,7 +9,7 @@ import { useFileEditStore } from "@/stores/fileEdit";
 import { openFileInPanel } from "@/stores/filePanel";
 import { allTabs, usePanelStore } from "@/stores/panel";
 import { useThreadsStore } from "@/stores/threads";
-import { fileOfTab, type FileTarget } from "@/surfaces/fileTarget";
+import { fileOfTab, type FileAsk, type FileTarget } from "@/surfaces/fileTarget";
 import { FileTab } from "./FileTab";
 
 const disk = vi.hoisted(() => new Map<string, Partial<FileReadView>>());
@@ -19,7 +19,7 @@ vi.mock("@/api/files", async (orig) => ({
   writeFile: api.write,
   readFile: (_base: string, path: string) => {
     const f = disk.get(path) ?? { notFound: true };
-    return Promise.resolve({ path, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, text: null, lossless: false, image: null, pdf: null, ...f });
+    return Promise.resolve({ path, realPath: path, mode: 0o600, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, text: null, lossless: false, image: null, pdf: null, ...f });
   },
 }));
 vi.mock("@/api/filesystem", async (orig) => ({
@@ -57,7 +57,8 @@ vi.mock("@/components/code/CodeFile", () => ({
 
 const PANEL = "thread:s-1";
 const ENV = "/Users/me/w/.env";
-const target: FileTarget = { project: "repo", base: "/Users/me/w", path: ENV, edit: true, ask: { thread: "s-1", note: "" } };
+const ask = (over: Partial<FileAsk> = {}): FileAsk => ({ id: "ask-1", thread: "s-1", note: "", ...over });
+const target: FileTarget = { project: "repo", base: "/Users/me/w", path: ENV, edit: true, ask: ask() };
 const thread = (id: string, name: string) => ({ id, name, projectId: "repo", worktreePath: "/Users/me/w", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: [], agentRuns: [] }) as unknown as ThreadView;
 const text = { text: "A=1\n", lossless: true, size: 4, modifiedAtMs: 100 };
 
@@ -103,26 +104,27 @@ describe("the band", () => {
   it("names the thread, and follows a rename by id", async () => {
     asked();
     await screen.findByTestId("draft");
-    expect(band()?.textContent).toContain("Set up billing asked you to edit this file");
+    expect(band()?.textContent).toContain('Thread "Set up billing" asked you to edit this file');
     act(() => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", "Billing keys") } }));
     });
-    expect(band()?.textContent).toContain("Billing keys asked you to edit this file");
+    expect(band()?.textContent).toContain('Thread "Billing keys" asked you to edit this file');
   });
 
   it("says who asked when that is another thread than the panel's", async () => {
-    asked({ ask: { thread: "s-2", note: "" } });
+    asked({ ask: ask({ thread: "s-2" }) });
     await screen.findByTestId("draft");
-    expect(band()?.textContent).toContain("Another asked you to edit this file");
+    expect(band()?.textContent).toContain('Thread "Another" asked you to edit this file');
   });
 
   it("shows the note as text, and none when there is none", async () => {
     const note = "**Bold** <img src=x onerror=alert(1)> [link](http://x) <b>b</b>";
-    asked({ ask: { thread: "s-1", note } });
+    asked({ ask: ask({ note }) });
     await screen.findByTestId("draft");
     const shown = screen.getByTestId("file-request-note");
     expect(shown.textContent).toBe(note);
     expect(shown.children).toHaveLength(0);
+    expect(shown.tagName).toBe("BLOCKQUOTE");
     cleanup();
     usePanelStore.setState({ byKey: {} });
     asked();
@@ -130,8 +132,17 @@ describe("the band", () => {
     expect(screen.queryByTestId("file-request-note")).toBeNull();
   });
 
+  it("gives a note and a name no layout of their own, whatever reached the tab", async () => {
+    useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", `Code Foundry\n\n\u202e${"x".repeat(80)}`) } }));
+    asked({ ask: ask({ note: `Code Foundry${"\n".repeat(60)}Session\u202e expired${"\u0301".repeat(400)}` }) });
+    await screen.findByTestId("draft");
+    expect(screen.getByTestId("file-request-note").textContent).toBe("Code Foundry Session expired\u0301\u0301\u0301");
+    expect(band()?.textContent).toContain(`Thread "Code Foundry ${"x".repeat(35)}…" asked you to edit this file`);
+    expect(band()?.textContent).not.toContain("\u202e");
+  });
+
   it("says nothing about who can read what", async () => {
-    asked({ ask: { thread: "s-1", note: "" } });
+    asked({ ask: ask() });
     await screen.findByTestId("draft");
     expect(band()?.textContent).not.toMatch(/private|cannot (read|see)|can't (read|see)|hidden|secret/i);
   });
@@ -147,6 +158,54 @@ describe("the band", () => {
       expect(band()).toBeNull();
     });
     expect(screen.getByTestId("file-save").textContent).toContain("⌘S");
+  });
+
+  it("a clean document never saved for this request has nothing to tell: only Dismiss", async () => {
+    asked();
+    await screen.findByTestId("draft");
+    expect(tell().disabled).toBe(true);
+    expect(screen.getByTestId<HTMLButtonElement>("file-request-dismiss").disabled).toBe(false);
+  });
+
+  it("row two's Save opens the way: the thread can be told, truthfully", async () => {
+    asked();
+    await screen.findByTestId("draft");
+    type("A=2\n");
+    api.write.mockResolvedValue({ path: ENV, size: 4, modifiedAtMs: 200, conflict: false, notFound: false });
+    fireEvent.click(screen.getByTestId("file-save"));
+    await waitFor(() => {
+      expect(screen.getByTestId("file-edit-status").textContent).toBe("Editing");
+    });
+    expect(api.send).not.toHaveBeenCalled();
+    expect(tell().disabled).toBe(false);
+    fireEvent.click(tell());
+    await waitFor(() => {
+      expect(api.send).toHaveBeenCalledTimes(1);
+    });
+    expect(api.write).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["a link", { realPath: "/Users/me/Public/drop.txt", mode: 0o644 }, ["This path is a link: the file is really ~/Public/drop.txt.", "Group and Others can read this file (0644)."]],
+    ["group only", { mode: 0o640 }, ["Group can read this file (0640)."]],
+    ["others only", { mode: 0o604 }, ["Others can read this file (0604)."]],
+    ["neither", { mode: 0o600 }, []],
+  ])("states where the file really is and who can read it: %s", async (_name, facts, want) => {
+    disk.set(ENV, { ...text, ...facts });
+    asked();
+    await screen.findByTestId("draft");
+    expect(screen.queryAllByTestId("file-request-fact").map((p) => p.textContent)).toEqual(want);
+  });
+
+  it("the facts go with the band", async () => {
+    disk.set(ENV, { ...text, mode: 0o644 });
+    asked();
+    await screen.findByTestId("draft");
+    fireEvent.click(screen.getByTestId("file-request-dismiss"));
+    await waitFor(() => {
+      expect(band()).toBeNull();
+    });
+    expect(screen.queryAllByTestId("file-request-fact")).toEqual([]);
   });
 
   it("Dismiss hides it, sends nothing, leaves the tab editing, and it does not return", async () => {
@@ -174,7 +233,7 @@ describe("the band", () => {
     await waitFor(() => {
       expect(band()).toBeNull();
     });
-    expect(api.send).toHaveBeenCalledWith({ id: "s-1", text: "I saved .env." });
+    expect(api.send).toHaveBeenCalledWith({ id: "s-1", text: "I saved .env. Continue without reading its values." });
     expect(screen.getByTestId("file-edit-status").textContent).toBe("Editing");
   });
 
@@ -198,7 +257,7 @@ describe("the band", () => {
     api.send.mockRejectedValue(new Error("thread s-1 not found"));
     fireEvent.click(tell());
     const failed = await screen.findByTestId("file-edit-failed");
-    expect(failed.textContent).toBe("Saved, but Set up billing was not told: thread s-1 not found");
+    expect(failed.textContent).toBe('Saved, but Thread "Set up billing" was not told: thread s-1 not found');
     expect(screen.getByTestId("file-edit-status").textContent).toBe("Editing");
   });
 
@@ -214,12 +273,12 @@ describe("the band", () => {
   });
 
   it("a repeat request shows the new note over a draft, which stays", async () => {
-    asked({ ask: { thread: "s-1", note: "First" } });
+    asked({ ask: ask({ note: "First" }) });
     await screen.findByTestId("draft");
     type("half typed\n");
     const before = useFileEditStore.getState().sessions;
     act(() => {
-      openFileInPanel(PANEL, { ...target, ask: { thread: "s-1", note: "Second" } });
+      openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2", note: "Second" }) });
     });
     expect(screen.getByTestId("file-request-note").textContent).toBe("Second");
     expect(useFileEditStore.getState().sessions).toBe(before);
@@ -227,11 +286,46 @@ describe("the band", () => {
   });
 });
 
+describe("a repeat request", () => {
+  it("brings editing and the band back after the pencil turned them off, the same note or not", async () => {
+    asked({ ask: ask({ note: "Same" }) });
+    await screen.findByTestId("draft");
+    fireEvent.click(screen.getByTestId("file-edit"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("draft")).toBeNull();
+    });
+    expect(band()).toBeNull();
+    act(() => {
+      openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2", note: "Same" }) });
+    });
+    await screen.findByTestId("draft");
+    expect(band()).not.toBeNull();
+  });
+
+  it("forgets that a write landed for the one before: this one has none", async () => {
+    asked({ ask: ask({ saved: true }) });
+    await screen.findByTestId("draft");
+    expect(tell().disabled).toBe(false);
+    act(() => {
+      openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2" }) });
+    });
+    expect(tell().disabled).toBe(true);
+  });
+});
+
 describe("a new file", () => {
   const fresh = () => {
     disk.delete(ENV);
-    return asked({ create: true });
+    return asked();
   };
+
+  it("a file deleted before the tab opened takes this path, so the request can be answered", async () => {
+    disk.delete(ENV);
+    asked();
+    await screen.findByTestId("draft");
+    expect(band()).not.toBeNull();
+    expect(screen.getByTestId("file-edit-status").textContent).toBe("New file");
+  });
 
   it("is an empty document marked New file, with no pencil, no meta and no File not found", async () => {
     fresh();
@@ -271,7 +365,7 @@ describe("a new file", () => {
       expect(screen.getByTestId("file-edit-status").textContent).toBe("Editing");
     });
     expect(api.write).toHaveBeenCalledWith("/Users/me/w", ENV, "A=1\n", expect.anything(), { create: true });
-    expect(api.send).toHaveBeenCalledWith({ id: "s-1", text: "I saved .env." });
+    expect(api.send).toHaveBeenCalledWith({ id: "s-1", text: "I saved .env. Continue without reading its values." });
     expect(screen.getByTestId("file-edit")).not.toBeNull();
   });
 });

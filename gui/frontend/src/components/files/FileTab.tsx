@@ -12,7 +12,7 @@ import { dirPart, extOf, fileName, relativeTo, resolvePath } from "@/lib/filePat
 import { tildify } from "@/lib/path";
 import { setPreviewMode, useCodeViewStore, type PreviewMode } from "@/stores/codeView";
 import { discardDraft, editClock, editorDetached, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
-import { canTell, dismissAsk, saveAndTell } from "@/stores/fileRequest";
+import { canTell, dismissAsk, fileFacts, saveAndTell } from "@/stores/fileRequest";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
 import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
@@ -53,11 +53,11 @@ function SavedAgo({ ms }: { ms: number | null }) {
  * a whole text file in place (stores/fileEdit.ts): while it does, the tab shows the
  * session's version, and those reads only go through observeRead, so none of them can
  * replace a draft. A thread can ask the user to edit it (`ask`, stores/fileRequest.ts): the
- * tab opens editing under a band, and `create` starts an empty document where no file is.
+ * tab opens editing under a band, on an empty document where no file is.
  */
 export function FileTab({ target }: { target: FileTarget }) {
   const { project, base, path, line, page, ask } = target;
-  const wantsNew = target.create === true;
+  const wantsNew = ask !== undefined;
   const key = `${base}\u0000${path}`;
   // A path not found at base is looked for once in the checkout (findMissing); what that
   // found (or null) is read from then on, so a refresh does not search again.
@@ -132,19 +132,21 @@ export function FileTab({ target }: { target: FileTarget }) {
   const startEditing = useCallback(() => {
     if (read.data) void startEdit(editKey, { panelKey, tabId, base }, read.data, { create: wantsNew });
   }, [read.data, editKey, panelKey, tabId, base, wantsNew]);
-  // Asked to open editing (the tab's `edit` param), once per asking: the pencil can turn it off.
-  const asked = useRef(false);
+  // Asked to open editing (the tab's `edit` param), once per asking: the pencil can turn it
+  // off, and a thread's next request turns it on again (a session already there stays).
+  const asked = useRef<string | null>(null);
+  const asking = ask?.id ?? "";
   const wantsEdit = target.edit === true;
   const creating = session?.creating === true;
   // A file to make has nothing to show yet: the document is on its way, not "File not found".
   const opening = wantsEdit && wantsNew && file?.notFound === true;
   useEffect(() => {
-    if (!wantsEdit) asked.current = false;
-    else if ((editable || opening) && !asked.current) {
-      asked.current = true;
+    if (!wantsEdit) asked.current = null;
+    else if ((editable || opening) && asked.current !== asking) {
+      asked.current = asking;
       startEditing();
     }
-  }, [wantsEdit, editable, opening, startEditing]);
+  }, [wantsEdit, asking, editable, opening, startEditing]);
   const leaveEdit = () => {
     stopEdit(editKey);
     reload();
@@ -249,10 +251,11 @@ export function FileTab({ target }: { target: FileTarget }) {
           />
         )}
       </FileHeader>
-      {ask && editing && (
+      {ask && editing && file && (
         <FileRequestBand
           ask={ask}
-          canTell={canTell(session)}
+          canTell={canTell(session, ask)}
+          facts={fileFacts(file)}
           onTell={() => {
             void saveAndTell(editKey).then(backToEditor);
           }}

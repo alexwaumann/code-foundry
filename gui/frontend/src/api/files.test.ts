@@ -12,10 +12,12 @@ const enc = new TextEncoder();
 describe("toFileReadView", () => {
   it("decodes a text file as UTF-8", () => {
     const v = toFileReadView(
-      create(ReadFileResponseSchema, { contents: enc.encode("# Héllo\n"), size: 9n, mimeType: "text/markdown", modifiedAt: 1_700_000_000_000n, resolvedPath: "/Users/dev/a/README.md" }),
+      create(ReadFileResponseSchema, { contents: enc.encode("# Héllo\n"), size: 9n, mimeType: "text/markdown", modifiedAt: 1_700_000_000_000n, resolvedPath: "/Users/dev/a/README.md", realPath: "/Users/dev/b/README.md", mode: 0o644 }),
     );
     expect(v).toEqual({
       path: "/Users/dev/a/README.md",
+      realPath: "/Users/dev/b/README.md",
+      mode: 0o644,
       size: 9,
       truncated: false,
       binary: false,
@@ -106,7 +108,7 @@ describe("lossless", () => {
 });
 
 describe("canEdit", () => {
-  const text: FileReadView = { path: "/x/a.ts", size: 2, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a\n", lossless: true, image: null, pdf: null };
+  const text: FileReadView = { path: "/x/a.ts", realPath: "/x/a.ts", mode: 0o644, size: 2, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a\n", lossless: true, image: null, pdf: null };
   it.each<[string, Partial<FileReadView>, boolean]>([
     ["whole text", {}, true],
     ["empty text", { text: "", size: 0 }, true],

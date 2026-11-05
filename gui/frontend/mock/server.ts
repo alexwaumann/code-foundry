@@ -281,7 +281,6 @@ import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles, WELCOME_PAGE } from "./files";
-import { setFileExists } from "./panelItemVerbs";
 import { mockPaint, mockThemeJson, publishMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
@@ -313,7 +312,6 @@ const mockFiles = new MockFiles((path) => {
   if (!d) return undefined;
   return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
 });
-setFileExists((path) => mockFiles.textOf(path) !== null);
 
 /**
  * MOCK_SCENARIO=status-kinds: the status-kinds threads (World.addStatusKinds) in the world from
