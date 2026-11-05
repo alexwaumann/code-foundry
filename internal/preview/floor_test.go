@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
@@ -345,5 +346,20 @@ func TestFloorTemp(t *testing.T) {
 	home := NewFloor(at("home"), paths.New(at("home/.code-foundry")))
 	if home.ScopeOK(at("tmp/foo")) {
 		t.Error("a floor without temp folders took a tree in one")
+	}
+}
+
+// A TMPDIR inside a project is no temp folder (fsx.TempRoots), so the project stays a tree.
+func TestFloorTempDirInHome(t *testing.T) {
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	proj := filepath.Join(home, "proj")
+	write(t, filepath.Join(proj, ".tmp", "x"), "x")
+	t.Setenv("TMPDIR", filepath.Join(proj, ".tmp"))
+	f := NewFloor(home, paths.New(filepath.Join(home, ".code-foundry"))).WithTemp(fsx.TempRoots(home))
+	if !f.ScopeOK(proj) {
+		t.Errorf("%s stopped being a tree with its own .tmp as TMPDIR", proj)
 	}
 }

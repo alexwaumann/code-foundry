@@ -41,6 +41,9 @@ func tempFilesystem(t *testing.T) (h *Filesystem, at func(string) string) {
 	if err := os.Symlink(at("outside/secret.html"), at("private/tmp/foo/out.html")); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Symlink(at("private/tmp/foo/page.html"), at("home/to-temp.html")); err != nil {
+		t.Fatal(err)
+	}
 	temps := []string{at("tmp"), at("private/tmp")}
 	home := at("home")
 	grants := preview.NewGrants(preview.NewFloor(home, paths.New(filepath.Join(home, ".code-foundry"))).WithTemp(temps))
@@ -95,6 +98,7 @@ func TestFilesystemPreviewTemp(t *testing.T) {
 		{name: "in a folder: the folder", path: "tmp/foo/page.html", scope: "tmp/foo"},
 		{name: "missing", path: "tmp/nope.html", code: connect.CodeNotFound},
 		{name: "a link out", path: "tmp/foo/out.html", code: connect.CodeInvalidArgument, wantMsg: "temp folders"},
+		{name: "a link from home into temp", path: "home/to-temp.html", code: connect.CodeInvalidArgument, wantMsg: "links into a temp folder"},
 		{name: "a config home in temp", path: "tmp/cf-drive/page.html", code: connect.CodeInvalidArgument, wantMsg: "protected folder"},
 		{name: "a token in temp", path: "tmp/cf-drive/daemon.token", code: connect.CodeInvalidArgument, wantMsg: "protected folder"},
 	}

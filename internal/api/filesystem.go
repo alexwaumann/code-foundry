@@ -319,7 +319,8 @@ func fileError(err error) error {
 // PreviewFile grants the HTML preview a URL for one file (see package preview): the
 // grant's scope is the registered checkout holding the file, else its directory, else
 // (home itself, a temp folder, an ancestor of the config home) the file alone. A file in a
-// guarded folder (the config home outside its checkouts, ~/.ssh, ~/Library) is refused.
+// guarded folder (the config home outside its checkouts, ~/.ssh, ~/Library), or a link from
+// outside the temp folders into one, is refused.
 func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
 	m := req.Msg
 	f, err := fsx.ReadFile(h.readRoots(), m.GetBaseDir(), m.GetPath(), 1)
@@ -334,6 +335,10 @@ func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.Prev
 	}
 	if h.previewGuarded(f.Path) {
 		return nil, previewGuardedError(f.Path)
+	}
+	if f.OutsideHome && !h.readRoots().InTemp(f.Path) { // the route would 404 it
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("%s links into a temp folder, so it cannot be previewed from here: open %s", f.Path, f.RealPath))
 	}
 	scope, single := h.previewScope(f.Path)
 	var grant, rel string
