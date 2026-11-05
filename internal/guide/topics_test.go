@@ -40,8 +40,9 @@ func TestWriteTopic(t *testing.T) {
 	// commands are detailed: thread.search (docs/notes/search-3-index.md), which agents use
 	// to find earlier work, took it to 26,700, thread.find and its next and previous to
 	// 26,759, file.save to 26,809, thread.setup.retry, cancel and discard to 27,380,
-	// thread.compact to 27,476.
-	if n := guide.Len(); n > 27_550 {
+	// thread.compact to 27,476, terminal.find and its next and previous and the clauses on a
+	// thread putting itself away to 27,611.
+	if n := guide.Len(); n > 27_700 {
 		t.Errorf("the guide has %d bytes after the split", n)
 	}
 }

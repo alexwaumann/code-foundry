@@ -727,7 +727,11 @@ func TestMoveHoldsTheIdleStop(t *testing.T) {
 			first := make(chan string, 1)
 			r.idleReq <- idleCheck{now: time.Now(), done: first}
 			for len(r.idleReq) > 0 {
+				// Not with m.mu held: the loop may be on its way to it from another event
+				// (a tick's startNaming), and would never come back for the request.
+				e.m.mu.Unlock()
 				time.Sleep(time.Millisecond)
+				e.m.mu.Lock()
 			}
 			second := make(chan string, 1)
 			r.cdReq <- cdRequest{path: filepath.Join(t.TempDir(), "gone")}
