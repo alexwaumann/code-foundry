@@ -197,7 +197,7 @@ export interface PrRow {
   project: string;
 }
 
-/** A linked pull request as the card reads it: the link and its cached detail (null until loaded). */
+/** A linked pull request as the card reads it: the link and the freshest read the GUI holds (null until there is one). */
 export interface PrInput {
   slug: string;
   number: number;
@@ -229,7 +229,7 @@ const STATE_ORDER: Readonly<Record<PrRowState, number>> = {
 
 /**
  * The card's pull request rows: one per linked pull request, never a closed one (nor one
- * whose detail has not loaded: its state is unknown). Grouped by project, the cwd's
+ * not read yet: its state is unknown). Grouped by project, the cwd's
  * first, then the set's order (other repositories last); in a project open and draft ones
  * before merged ones, newest number first. `projects` maps a lower-case GitHub slug to the
  * member's id and name.

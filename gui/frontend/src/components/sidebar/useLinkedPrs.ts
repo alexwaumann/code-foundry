@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
+import type { PullRequestView } from "@/api/gh";
 import { branchPullRequestsResource, DASHBOARD_KEY, dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useThreadsStore } from "@/stores/threads";
 import { newestFirst } from "@/surfaces/linkedprsTarget";
@@ -26,11 +27,11 @@ const numberOf = (key: string): number => Number(key.slice(key.lastIndexOf("#") 
 /**
  * What the GUI already holds on each linked pull request, without reading anything new:
  * its cached detail (the thread info card's and the PR tab's reads), the
- * viewer's dashboard and any branch's list on screen; the freshest read wins. Each
- * selector returns the stores' own objects, so a row re-renders only when one of its
- * pull requests is re-read.
+ * viewer's dashboard and any branch's list on screen; the freshest read wins, null when
+ * none has it. Each selector returns the stores' own objects, so a row re-renders only
+ * when one of its pull requests is re-read. `keys` must be stable between renders.
  */
-export function useLinkedPrFacts(keys: readonly string[]): LinkedPrFact[] {
+export function useLinkedPrViews(keys: readonly string[]): (PullRequestView | null)[] {
   const detail = pullRequestDetailResource.store(useShallow((s) => keys.map((k) => s.entries[k]?.data?.pullRequest ?? null)));
   const dashboard = dashboardResource.store(
     useShallow((s) => {
@@ -45,8 +46,14 @@ export function useLinkedPrFacts(keys: readonly string[]): LinkedPrFact[] {
       return keys.map((k) => findLinkedPr(lists, k));
     }),
   );
+  return useMemo(() => keys.map((_, i) => fresher(detail[i] ?? null, fresher(dashboard[i] ?? null, branches[i] ?? null))), [keys, detail, dashboard, branches]);
+}
+
+/** The tag's and the sidebar card's facts on each linked pull request (useLinkedPrViews). */
+export function useLinkedPrFacts(keys: readonly string[]): LinkedPrFact[] {
+  const views = useLinkedPrViews(keys);
   return keys.map((k, i) => {
-    const pr = fresher(detail[i] ?? null, fresher(dashboard[i] ?? null, branches[i] ?? null));
+    const pr = views[i] ?? null;
     return { number: numberOf(k), state: linkedPrState(pr), title: pr?.title ?? "" };
   });
 }

@@ -1733,6 +1733,13 @@ export class World {
         this.publishThread(s);
         return s.id;
       }
+      case "archived": {
+        // As an archive leaves it: the thread stopped, its worktree cleaned up, its links kept.
+        const s = single();
+        this.archiveThread(s.id, true);
+        this.dropWorktree(s.worktreePath);
+        return s.id;
+      }
       case "child": {
         const p = single();
         const c = this.addThread({ ...base, id: "s-ti-child", projectId: "repo-cf", worktreePath: CF, name: "Port the rotation to web", createdBy: p.id, createdByName: p.name, status: ThreadStatus.BUSY, statusReason: "working: Port the rotation to web" });
@@ -1836,7 +1843,7 @@ export class World {
         return s.id;
       }
       default:
-        throw new CommandError("invalid", "scenario must be single, ws9, busy, child, nogit, unnamed or home");
+        throw new CommandError("invalid", "scenario must be single, archived, ws9, busy, child, nogit, unnamed or home");
     }
   }
 
