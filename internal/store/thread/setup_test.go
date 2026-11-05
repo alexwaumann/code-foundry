@@ -12,6 +12,8 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
 )
 
 // gateFetches makes every fetch wait until release is called (or its ctx ends), and
@@ -671,6 +673,10 @@ var refusedWithoutProcess = []struct {
 		_, err := e.m.Reconnect(e.ctx(), id)
 		return err
 	}},
+	{"workspace", func(e *env, id string) error {
+		_, err := e.m.SetWorkspace(e.ctx(), id, "")
+		return err
+	}},
 	{"fork", func(e *env, id string) error {
 		_, err := e.m.Fork(e.ctx(), id, "")
 		return err
@@ -699,6 +705,32 @@ var refusedWithoutProcess = []struct {
 		_, err := e.m.Create(e.ctx(), CreateOptions{Like: id})
 		return err
 	}},
+}
+
+// A workspace's folder exists before the worktrees do, but a thread that will run there
+// is as unplaced as any until they are made: its members are not their main checkouts,
+// whose branches would link their pull requests to it for good.
+func TestSetupWorkspaceFolderIsNoPlacement(t *testing.T) {
+	ws := workspacetest.New(nil)
+	ws.Dir, ws.MakeDirs = t.TempDir(), true
+	e, rr := newWorktreeEnv(t, nil, func(o *Options) { o.Workspaces = ws })
+	ws.Put(workspace.Workspace{ID: "w-login", Name: "login", Members: []string{"r1"}, DefaultPrimary: "r1"})
+	if err := ws.EnsureDirs(t.Context(), ""); err != nil {
+		t.Fatal(err)
+	}
+	s, release := inSetup(t, e, rr, CreateOptions{WorkspaceID: "login", ProjectID: workspace.PrimaryWorkspace, InitialPrompt: "do x"})
+	if !s.unplaced() || s.WorktreePath != "" || len(s.CheckoutPaths) != 0 {
+		t.Errorf("placed before its worktrees: cwd %q, checkouts %v", s.WorktreePath, s.CheckoutPaths)
+	}
+	if got := ListedCheckouts(s, e.projects.Snapshot()); len(got) != 0 {
+		t.Errorf("checkouts during setup: %+v", got)
+	}
+	release()
+	done := e.waitFor(s.ID, "the setup to end", func(s Thread) bool { return s.Setup.Phase == SetupDone })
+	w, _ := ws.Snapshot().Workspace("w-login")
+	if done.WorktreePath != w.Dir() {
+		t.Errorf("cwd %q, want the workspace's folder %q", done.WorktreePath, w.Dir())
+	}
 }
 
 func TestSetupRefusalsWhileItRuns(t *testing.T) {

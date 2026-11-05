@@ -762,7 +762,13 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 			return Thread{}, err
 		}
 	}
-	s = p.apply(s)
+	shown := p
+	if w != nil {
+		// Its cwd comes with its worktrees, even a workspace's folder that exists now: a
+		// path here would read as a landed placement, and each member as its main checkout.
+		shown.path = ""
+	}
+	s = shown.apply(s)
 	if s.Name == "" {
 		// Until the namer answers (provisional.go); namingTried stays false so it runs.
 		s.nameProvisionally(o.ComposerPrompt, o.InitialPrompt)

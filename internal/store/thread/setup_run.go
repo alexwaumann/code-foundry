@@ -179,6 +179,7 @@ func (m *Manager) discardCreate(id string) {
 	m.rebuildLocked()
 	bus.Publish[Event](m.opts.Bus, Removed{ID: id})
 	m.forgetLocked(id, "not created")
+	m.releaseHeldLocked(rec.s.CreatedBy) // a lead's wake held for this child (subscriptions_hold.go)
 	m.removeThreadTmp(id)
 }
 

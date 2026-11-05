@@ -209,6 +209,9 @@ func (f *Fake) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptio
 	if o.Fetch && o.BaseFromOrigin {
 		f.fetch(ctx, o)
 	}
+	if err := ctx.Err(); err != nil {
+		return project.Worktree{}, err // as git, which never starts on a dead context
+	}
 	if o.Progress != nil {
 		o.Progress(project.WorktreeEvent{Kind: project.WorktreeAdding})
 	}
