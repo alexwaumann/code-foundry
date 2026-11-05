@@ -733,11 +733,12 @@ func (s *holdService) pasteLoop(ctx context.Context) {
 // happened to it, never what it was.
 func (s *holdService) land(job pasteJob) {
 	front := s.os.frontmost()
-	action := decidePaste(pasteFacts{
+	facts := pasteFacts{
 		Text: job.text, Pressed: job.pressed, Front: front,
 		Secure: s.os.secureInput(), Trusted: s.os.trusted(), Race: hasClipboardRace(front.Bundle),
-	})
-	s.log.Info("dictation: text", "action", action.String(), "runes", len([]rune(job.text)))
+	}
+	action := decidePaste(facts)
+	s.log.Info("dictation: text", "action", action.String(), "runes", len([]rune(job.text)), "app", front.Name, "why", clipboardReason(facts))
 	if action == pasteNothing {
 		return
 	}
@@ -757,7 +758,7 @@ func (s *holdService) land(job pasteJob) {
 		err = s.os.typeText(text)
 	case pasteKeys:
 		text = s.fitCaret(text, front.PID, revision, previous)
-		err = pasteText(s.os.pasteboard(), text, s.pasteWait, func(line string) { s.log.Debug("dictation: paste", "step", line) })
+		err = pasteText(s.os.pasteboard(), text, s.pasteWait, func(line string) { s.log.Info("dictation: paste", "step", line) })
 	}
 	if err != nil {
 		s.log.Warn("dictation: paste; leaving the text on the clipboard", "err", err)
@@ -775,6 +776,8 @@ func (s *holdService) fitCaret(text string, pid int, revision uint64, previous *
 	if previous != nil && previous.revision == revision && previous.pid == pid {
 		return joinContinuation(previous.inserted, text)
 	}
+	started := time.Now()
 	before, known := s.os.charBeforeCaret(pid)
+	s.log.Info("dictation: read the caret", "known", known, "ms", time.Since(started).Milliseconds())
 	return smartSpaced(text, before, known)
 }

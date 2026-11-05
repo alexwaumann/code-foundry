@@ -134,6 +134,22 @@ func decidePaste(f pasteFacts) pasteAction {
 	return pasteKeys
 }
 
+// clipboardReason says why decidePaste left the text on the clipboard, for the log. It names
+// apps and never the text.
+func clipboardReason(f pasteFacts) string {
+	switch {
+	case f.Pressed.PID == 0:
+		return "no app in front at the press"
+	case f.Front.PID != f.Pressed.PID:
+		return "the app in front changed from " + f.Pressed.Name + " to " + f.Front.Name
+	case f.Secure:
+		return "secure input is on"
+	case !f.Trusted:
+		return "Accessibility is not granted"
+	}
+	return ""
+}
+
 // joinPhrases makes one text of a session's phrases: each trimmed of spaces, one space
 // between them, none before closing punctuation, after an opening bracket or beside a line
 // break. A line break is a spoken command's, so it stays, even alone in a phrase.

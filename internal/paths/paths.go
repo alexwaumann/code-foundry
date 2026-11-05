@@ -117,6 +117,9 @@ func (p Paths) Logs() string { return filepath.Join(p.home, "logs") }
 // DaemonLog is the daemon's JSON log file.
 func (p Paths) DaemonLog() string { return filepath.Join(p.Logs(), "daemon.log") }
 
+// GUILog is the GUI's stderr.
+func (p Paths) GUILog() string { return filepath.Join(p.Logs(), "gui.log") }
+
 // Worktrees is where New Worktree puts worktrees: <Worktrees>/<owner>/<repo>/<branch>.
 // git creates the directories on demand.
 func (p Paths) Worktrees() string { return filepath.Join(p.home, "worktrees") }
