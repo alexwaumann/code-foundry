@@ -326,6 +326,9 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
       } catch (err) {
         failure = ctl.signal.reason instanceof Error && !isAbort(ctl.signal.reason) ? ctl.signal.reason : err;
       } finally {
+        // The attempt is over however it ended: a consumer that threw left the stream open,
+        // and nothing else closes it (connect-web's iterator has no return).
+        ctl.abort();
         ticket.release();
         clearTimeout(watchdog);
         outer.signal.removeEventListener("abort", onAbort);

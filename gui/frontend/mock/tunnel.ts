@@ -9,6 +9,9 @@ import { WebSocketServer, type RawData, type WebSocket } from "ws";
 
 const PREFIX = "/stream/";
 
+/** websocket.StatusPolicyViolation, which the daemon answers a bad opening frame with. */
+const BAD_REQUEST = 1008;
+
 function flatHeaders(headers: IncomingHttpHeaders): Record<string, string> {
   return Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : (v ?? "")]));
 }
@@ -50,10 +53,24 @@ export function serveTunnel(server: Server, port: number): () => void {
       ws.on("error", () => {
         ws.terminate();
       });
-      ws.once("message", (first: RawData) => {
-        const { headers } = JSON.parse((first as Buffer).toString()) as { headers: Record<string, string> };
-        ws.once("message", (body: RawData) => {
-          replay(ws, port, pathname.slice(PREFIX.length - 1), headers, body);
+      // A text head, then a binary body, or the socket closes, as in the daemon's readRequest:
+      // a client that gets this wrong must fail here too, and must not end the mock.
+      ws.once("message", (first: RawData, firstBinary: boolean) => {
+        let headers: Record<string, string>;
+        try {
+          if (firstBinary) throw new Error("a binary head");
+          ({ headers } = JSON.parse((first as Buffer).toString()) as { headers: Record<string, string> });
+        } catch {
+          ws.close(BAD_REQUEST);
+          return;
+        }
+        ws.once("message", (body: RawData, bodyBinary: boolean) => {
+          try {
+            if (!bodyBinary) throw new Error("a text body");
+            replay(ws, port, pathname.slice(PREFIX.length - 1), headers, body);
+          } catch {
+            ws.close(BAD_REQUEST);
+          }
         });
       });
     });

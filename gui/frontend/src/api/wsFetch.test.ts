@@ -11,9 +11,11 @@ class FakeSocket {
   binaryType = "blob";
   sent: (string | Uint8Array)[] = [];
   closeCalls = 0;
+  readyState = 1;
   onopen: (() => void) | null = null;
   onmessage: ((e: { data: string | ArrayBuffer }) => void) | null = null;
   onclose: ((e: { code: number }) => void) | null = null;
+  onerror: (() => void) | null = null;
 
   constructor(readonly url: string) {
     FakeSocket.all.push(this);
@@ -143,6 +145,29 @@ describe("the body", () => {
     ws.frame(1);
     ws.closed(code);
     await expect(reader.read()).rejects.toBeInstanceOf(TypeError);
+  });
+
+  it("rejects a socket that errors and never closes, and stops counting it", async () => {
+    const before = openSocketCount();
+    const { res, ws } = open();
+    ws.readyState = 3;
+    ws.onerror?.();
+    await expect(res).rejects.toBeInstanceOf(TypeError);
+    expect(openSocketCount()).toBe(before);
+    ws.closed(1006); // and counts it once if close follows after all
+    expect(openSocketCount()).toBe(before);
+  });
+
+  it("errors the body when a socket errors mid-stream, and counts it until it closes", async () => {
+    const before = openSocketCount();
+    const { res, ws } = open();
+    ws.head();
+    const reader = (await res).body?.getReader();
+    ws.onerror?.();
+    await expect(reader?.read()).rejects.toBeInstanceOf(TypeError);
+    expect(openSocketCount()).toBe(before + 1);
+    ws.closed(1006);
+    expect(openSocketCount()).toBe(before);
   });
 
   it("errors on a second head", async () => {

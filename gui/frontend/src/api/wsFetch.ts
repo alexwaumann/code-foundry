@@ -16,6 +16,9 @@ const STREAM_PREFIX = "/stream";
 /** A normal close: the handler returned, and the end of stream is already in the body. */
 const CLOSE_NORMAL = 1000;
 
+/** WebSocket.CLOSED, which a test's fake socket need not define. */
+const SOCKET_CLOSED = 3;
+
 /** Past this many open sockets something is leaking one: nothing here caps them. */
 export const OPEN_SOCKETS_WARNING = 150;
 
@@ -55,6 +58,13 @@ export const wsFetch: typeof fetch = (input, init) =>
     ws.binaryType = "arraybuffer";
     openSockets++;
     if (openSockets === OPEN_SOCKETS_WARNING + 1) console.warn(`more than ${String(OPEN_SOCKETS_WARNING)} WebSockets open`);
+
+    // Once per socket: a refused one can fire error and never close.
+    let counted = true;
+    const uncount = () => {
+      if (counted) openSockets--;
+      counted = false;
+    };
 
     // Set once the head has arrived: the body's end, which from then on replaces the promise.
     let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
@@ -118,8 +128,14 @@ export const wsFetch: typeof fetch = (input, init) =>
         fail(new TypeError("a WebSocket stream sent a bad head", { cause }));
       }
     };
+    // A socket WebKit refuses outright (a restricted port) fires this and no close event, so
+    // close alone would leave the caller pending, with no retry. Otherwise close follows.
+    ws.onerror = () => {
+      fail(new TypeError("a WebSocket stream failed"));
+      if (ws.readyState === SOCKET_CLOSED) uncount();
+    };
     ws.onclose = (e) => {
-      openSockets--;
+      uncount();
       if (finished) return;
       if (controller && e.code === CLOSE_NORMAL) {
         finish();
