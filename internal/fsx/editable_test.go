@@ -13,7 +13,7 @@ const marker = "MARKER-sk-live-4242"
 func TestEditable(t *testing.T) {
 	long := strings.Repeat(marker+"\n", MaxReadBytes/len(marker)+1)
 	tests := []struct {
-		name    string
+		name string
 		make func(h *writeHome) string
 		want error
 		says string
