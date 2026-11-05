@@ -144,6 +144,37 @@ func TestPanelFileEdit(t *testing.T) {
 	}
 }
 
+// A link in a temp folder into home passes CheckEdit, as Write takes it, but its tab is
+// read-only (outside_home): --edit must say so rather than report a tab that opens no editor.
+func TestPanelFileEditOutsideHome(t *testing.T) {
+	const path = "/tmp/l.txt"
+	tests := []struct {
+		name    string
+		outside []string
+		argErr  string
+	}{
+		{name: "in home", outside: nil},
+		{name: "reached through a temp folder", outside: []string{path}, argErr: "path"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := &commandtest.Files{Files: []string{path}, OutsideHome: tt.outside}
+			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 1, files: files, edits: fixedEdits{}})
+			_, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.file", map[string]string{"path": path, "edit": "true"})
+			if checkItemErr(t, err, 0, tt.argErr) {
+				if !strings.Contains(err.Error(), "temp folder") {
+					t.Errorf("err = %v, want it to say why", err)
+				}
+				sameIntents(t, emit.Intents(), nil)
+				return
+			}
+			if len(emit.Intents()) != 1 {
+				t.Errorf("intents = %v, want the tab", emit.Intents())
+			}
+		})
+	}
+}
+
 // plainNote leaves a note no way to lay itself out.
 func TestPlainNote(t *testing.T) {
 	tests := []struct{ name, in, want string }{

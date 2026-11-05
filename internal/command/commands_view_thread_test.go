@@ -65,6 +65,9 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 	}
 	if d.edits != nil {
 		deps.FileEdits = d.edits
+		if d.files == nil { // --edit also reads where the path leads
+			deps.Files = &commandtest.Files{}
+		}
 	}
 	if d.diffs != nil {
 		deps.FileDiffs = d.diffs

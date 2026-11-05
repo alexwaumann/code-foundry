@@ -106,11 +106,12 @@ type FilesystemServiceClient interface {
 	// ReadFile reads one file for the file viewer. path is absolute, or relative to
 	// base_dir (a thread's worktree, or the home directory); "~/" is the home
 	// directory. Symlinks are followed, and the file they lead to must be under the
-	// home directory or a temp folder (/tmp, $TMPDIR), where agents write; a missing path
-	// too: InvalidArgument otherwise (also for a relative path without an absolute
-	// base_dir). A temp folder is for reading: see outside_home. A missing path is not_found and a directory is_dir, not
-	// errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
-	// capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
+	// home directory or a temp folder (/tmp, $TMPDIR), where agents write, and so must a
+	// path that does not exist: InvalidArgument otherwise (also for a relative path without
+	// an absolute base_dir). A temp folder is only for reading: see outside_home. A missing
+	// path is not_found and a directory is_dir, not errors. Contents are at most max_bytes
+	// (zero means 1 MiB): a text file is always capped at 1 MiB, any other file (images,
+	// PDFs) at 32 MiB.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 	// WriteFile replaces one file for the file viewer, or creates it. path is as for
 	// ReadFile, and symlinks are written through: the file they lead to is replaced, never
@@ -150,9 +151,9 @@ type FilesystemServiceClient interface {
 	// (symlinks resolved); it lasts until the daemon stops. A scope is never home itself, a
 	// temp folder, the config home or an ancestor of it, or a credentials folder: a file
 	// whose directory is one of those gets a grant for the file alone (single_file). path is
-	// as for ReadFile: InvalidArgument when ReadFile refuses it, relative without an absolute base_dir, not a
-	// regular file, or in a protected folder (the config home outside its checkouts,
-	// ~/.ssh, ~/Library and other credential folders).
+	// as for ReadFile: InvalidArgument when ReadFile refuses it, when it is not a regular
+	// file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
+	// ~/Library and other credential folders).
 	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
 }
 
@@ -299,11 +300,12 @@ type FilesystemServiceHandler interface {
 	// ReadFile reads one file for the file viewer. path is absolute, or relative to
 	// base_dir (a thread's worktree, or the home directory); "~/" is the home
 	// directory. Symlinks are followed, and the file they lead to must be under the
-	// home directory or a temp folder (/tmp, $TMPDIR), where agents write; a missing path
-	// too: InvalidArgument otherwise (also for a relative path without an absolute
-	// base_dir). A temp folder is for reading: see outside_home. A missing path is not_found and a directory is_dir, not
-	// errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
-	// capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
+	// home directory or a temp folder (/tmp, $TMPDIR), where agents write, and so must a
+	// path that does not exist: InvalidArgument otherwise (also for a relative path without
+	// an absolute base_dir). A temp folder is only for reading: see outside_home. A missing
+	// path is not_found and a directory is_dir, not errors. Contents are at most max_bytes
+	// (zero means 1 MiB): a text file is always capped at 1 MiB, any other file (images,
+	// PDFs) at 32 MiB.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 	// WriteFile replaces one file for the file viewer, or creates it. path is as for
 	// ReadFile, and symlinks are written through: the file they lead to is replaced, never
@@ -343,9 +345,9 @@ type FilesystemServiceHandler interface {
 	// (symlinks resolved); it lasts until the daemon stops. A scope is never home itself, a
 	// temp folder, the config home or an ancestor of it, or a credentials folder: a file
 	// whose directory is one of those gets a grant for the file alone (single_file). path is
-	// as for ReadFile: InvalidArgument when ReadFile refuses it, relative without an absolute base_dir, not a
-	// regular file, or in a protected folder (the config home outside its checkouts,
-	// ~/.ssh, ~/Library and other credential folders).
+	// as for ReadFile: InvalidArgument when ReadFile refuses it, when it is not a regular
+	// file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
+	// ~/Library and other credential folders).
 	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
 }
 

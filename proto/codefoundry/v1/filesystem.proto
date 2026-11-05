@@ -273,8 +273,10 @@ message ReadFileResponse {
   string real_path = 10;
   // The real file's permission bits (0644); 0 with not_found.
   uint32 mode = 11;
-  // The file is outside the home directory, or was reached through a temp folder: it can
-  // be read and nothing else (WriteFile, a page with the bridge) takes it.
+  // The file is outside the home directory, or was reached through a temp folder, so what
+  // the path leads to can change. The File tab offers no editing and no page gets the
+  // bridge. WriteFile goes by the real file alone: it refuses one outside home, and takes a
+  // link in a temp folder that leads into home.
   bool outside_home = 12;
 }
 

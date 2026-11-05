@@ -201,6 +201,15 @@ func (d ViewDeps) editCheck(ctx context.Context, t *v1.Thread, a Args, asker str
 		}
 		return nil, err
 	}
+	// Write takes a link in a temp folder that leads into home, but the tab shows such a file
+	// read-only (canEdit): anything could repoint the link while the user typed.
+	res, err := d.Files.ReadFile(ctx, connect.NewRequest(&v1.ReadFileRequest{BaseDir: base, Path: a.Path("path"), MaxBytes: 1}))
+	if err != nil {
+		return nil, err
+	}
+	if res.Msg.GetOutsideHome() {
+		return nil, InvalidArg("path", "%s is reached through a temp folder, so the tab cannot edit it: pass the path it leads to", path)
+	}
 	params := map[string]string{"path": path, "project": t.GetProjectId(), "base": base, "edit": "1", "thread": asker}
 	if line > 0 {
 		params["line"] = strconv.Itoa(line)

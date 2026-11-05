@@ -514,8 +514,10 @@ export type ReadFileResponse = Message<"codefoundry.v1.ReadFileResponse"> & {
   mode: number;
 
   /**
-   * The file is outside the home directory, or was reached through a temp folder: it can
-   * be read and nothing else (WriteFile, a page with the bridge) takes it.
+   * The file is outside the home directory, or was reached through a temp folder, so what
+   * the path leads to can change. The File tab offers no editing and no page gets the
+   * bridge. WriteFile goes by the real file alone: it refuses one outside home, and takes a
+   * link in a temp folder that leads into home.
    *
    * @generated from field: bool outside_home = 12;
    */
@@ -819,11 +821,12 @@ export const FilesystemService: GenService<{
    * ReadFile reads one file for the file viewer. path is absolute, or relative to
    * base_dir (a thread's worktree, or the home directory); "~/" is the home
    * directory. Symlinks are followed, and the file they lead to must be under the
-   * home directory or a temp folder (/tmp, $TMPDIR), where agents write; a missing path
-   * too: InvalidArgument otherwise (also for a relative path without an absolute
-   * base_dir). A temp folder is for reading: see outside_home. A missing path is not_found and a directory is_dir, not
-   * errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
-   * capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
+   * home directory or a temp folder (/tmp, $TMPDIR), where agents write, and so must a
+   * path that does not exist: InvalidArgument otherwise (also for a relative path without
+   * an absolute base_dir). A temp folder is only for reading: see outside_home. A missing
+   * path is not_found and a directory is_dir, not errors. Contents are at most max_bytes
+   * (zero means 1 MiB): a text file is always capped at 1 MiB, any other file (images,
+   * PDFs) at 32 MiB.
    *
    * @generated from rpc codefoundry.v1.FilesystemService.ReadFile
    */
@@ -879,9 +882,9 @@ export const FilesystemService: GenService<{
    * (symlinks resolved); it lasts until the daemon stops. A scope is never home itself, a
    * temp folder, the config home or an ancestor of it, or a credentials folder: a file
    * whose directory is one of those gets a grant for the file alone (single_file). path is
-   * as for ReadFile: InvalidArgument when ReadFile refuses it, relative without an absolute base_dir, not a
-   * regular file, or in a protected folder (the config home outside its checkouts,
-   * ~/.ssh, ~/Library and other credential folders).
+   * as for ReadFile: InvalidArgument when ReadFile refuses it, when it is not a regular
+   * file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
+   * ~/Library and other credential folders).
    *
    * @generated from rpc codefoundry.v1.FilesystemService.PreviewFile
    */

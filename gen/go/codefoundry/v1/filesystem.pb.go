@@ -880,8 +880,10 @@ type ReadFileResponse struct {
 	RealPath string `protobuf:"bytes,10,opt,name=real_path,json=realPath,proto3" json:"real_path,omitempty"`
 	// The real file's permission bits (0644); 0 with not_found.
 	Mode uint32 `protobuf:"varint,11,opt,name=mode,proto3" json:"mode,omitempty"`
-	// The file is outside the home directory, or was reached through a temp folder: it can
-	// be read and nothing else (WriteFile, a page with the bridge) takes it.
+	// The file is outside the home directory, or was reached through a temp folder, so what
+	// the path leads to can change. The File tab offers no editing and no page gets the
+	// bridge. WriteFile goes by the real file alone: it refuses one outside home, and takes a
+	// link in a temp folder that leads into home.
 	OutsideHome   bool `protobuf:"varint,12,opt,name=outside_home,json=outsideHome,proto3" json:"outside_home,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
