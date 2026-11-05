@@ -3053,6 +3053,11 @@ export class World {
     t.attach.publish({ event: { case: "output", value: { data: enc.encode(s) } } });
   }
 
+  /** Program output on a terminal, as if its process printed it (mock-only). */
+  print(id: string, text: string): void {
+    this.output(this.term(id), text);
+  }
+
   private publishTerm(t: MockTerm): void {
     this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
   }
@@ -5086,6 +5091,18 @@ export class World {
       ).map(([name, title, description, chord]) => ({
         cmd: { name, title, category: "View", description, keybindings: [chord], args: [] },
         when: (ctx: UiContext | undefined) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId)),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`,
+      })),
+      // internal/command canFindInTerminal: a terminal with the keyboard; the CLI always.
+      ...(
+        [
+          ["terminal.find", "Find in Terminal", "Find text in the terminal's scrollback, or only its screen under a full-screen program like vim (case-sensitive once the query has a capital letter).", "cmd+f"],
+          ["terminal.find.next", "Find Next in Terminal", "Go to the next match of the terminal's find bar (opens the bar when it is closed).", "cmd+g"],
+          ["terminal.find.previous", "Find Previous in Terminal", "Go to the previous match of the terminal's find bar (opens the bar when it is closed).", "cmd+shift+g"],
+        ] as const
+      ).map(([name, title, description, chord]) => ({
+        cmd: { name, title, category: "View", description, keybindings: [chord], args: [] },
+        when: (ctx: UiContext | undefined) => !ctx?.activeView || Boolean(ctx.activeTerminalId),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`,
       })),
       {

@@ -37,6 +37,12 @@ class FakeRenderer implements TerminalRenderer {
     for (const cb of this.resizeCbs) cb(this.size);
   }
   focus(): void {}
+  find(): void {}
+  findStep(): void {}
+  clearFind(): void {}
+  onFindResults(): Disposable {
+    return { dispose: () => undefined };
+  }
   onData(cb: (d: Uint8Array) => void): Disposable {
     this.dataCbs.add(cb);
     return { dispose: () => this.dataCbs.delete(cb) };

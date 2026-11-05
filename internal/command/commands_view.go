@@ -304,5 +304,5 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 	}
 	cmds = append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
-	return r.RegisterAll(append(cmds, d.threadFindCommands()...)...)
+	return r.RegisterAll(append(append(cmds, d.threadFindCommands()...), d.terminalFindCommands()...)...)
 }

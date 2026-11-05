@@ -12,6 +12,13 @@ export interface TermSize {
   rows: number;
 }
 
+/** What a find matches: `index` is the current match's, -1 for none. `capped`: `total` is the highlight limit, a floor. */
+export interface FindResults {
+  index: number;
+  total: number;
+  capped: boolean;
+}
+
 export interface TerminalRenderer {
   /** Attaches to a container. Call once. */
   mount(el: HTMLElement): void;
@@ -38,5 +45,17 @@ export interface TerminalRenderer {
   /** The viewport asked for a new grid size (container resize, font change). */
   onResize(cb: (size: TermSize) => void): Disposable;
   setFontSize(px: number): void;
+  /**
+   * Finds `query` (smart case) in the scrollback, or only the screen in the alternate
+   * screen: every match highlighted, one current. It stays searched across new output and
+   * reset(), until the query changes; "" is clearFind().
+   */
+  find(query: string): void;
+  /** Makes the next (1) or previous (-1) match current, wrapping. */
+  findStep(dir: 1 | -1): void;
+  /** Drops the query and everything it highlighted. */
+  clearFind(): void;
+  /** Every change of what the query matches. */
+  onFindResults(cb: (results: FindResults) => void): Disposable;
   dispose(): void;
 }

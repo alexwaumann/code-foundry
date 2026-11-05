@@ -3,6 +3,8 @@ import type { CommandView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
+import { registerTerminalFindHost, useTerminalFindStore } from "@/stores/terminalFind";
+import { useThreadFindStore } from "@/stores/threadFind";
 import { useThreadsStore } from "@/stores/threads";
 import { HOME, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
@@ -703,5 +705,135 @@ describe("inPalette", () => {
       useThreadsStore.setState({ byId: { s1: thread("s1", { ...home, ...over }) }, order: ["s1"] });
       expect(inPalette(cmd({ name: "thread.move.open" }))).toBe(want);
     }
+  });
+});
+
+describe("the find chords, by where the keyboard is", () => {
+  const FIND = [cmd({ name: "thread.find", keybindings: ["cmd+f"] }), cmd({ name: "thread.find.next", keybindings: ["cmd+g"] }), cmd({ name: "thread.find.previous", keybindings: ["cmd+shift+g"] })];
+  // Unavailable, as the list says until the debounced re-list catches a focus change up.
+  const TERMINAL = [cmd({ name: "terminal.find", keybindings: ["cmd+f"], available: false }), cmd({ name: "terminal.find.next", keybindings: ["cmd+g"], available: false }), cmd({ name: "terminal.find.previous", keybindings: ["cmd+shift+g"], available: false })];
+  let installed: () => void;
+  let release: () => void;
+  let step: ReturnType<typeof vi.fn<(dir: 1 | -1) => void>>;
+
+  const list = (...commands: CommandView[]) => {
+    useCommandsStore.setState({ commands, contextKey: contextKey(getUiContext()) });
+  };
+  const terminalOpen = () => "t1" in useTerminalFindStore.getState().byTerminal;
+  const threadOpen = () => "s-1" in useThreadFindStore.getState().byThread;
+
+  /** A terminal's box with xterm's textarea, which has the keyboard. */
+  function shell(): HTMLTextAreaElement {
+    const box = document.createElement("div");
+    box.dataset.terminalBox = "t1";
+    const host = document.createElement("div");
+    host.dataset.terminalHost = "";
+    const textarea = document.createElement("textarea");
+    host.append(textarea);
+    box.append(host);
+    document.body.append(box);
+    textarea.focus();
+    return textarea;
+  }
+
+  function prompt(): HTMLElement {
+    const el = document.createElement("div");
+    el.dataset.chordYield = "";
+    el.setAttribute("contenteditable", "true");
+    document.body.append(el);
+    el.focus();
+    return el;
+  }
+
+  beforeEach(() => {
+    installed = installKeybindings();
+    step = vi.fn<(dir: 1 | -1) => void>();
+    release = registerTerminalFindHost("t1", { step });
+    useThreadsStore.setState({ byId: { "s-1": thread("s-1") }, order: ["s-1"] });
+    useUiStore.getState().select({ kind: "thread", id: "s-1" });
+    list(...FIND, ...TERMINAL);
+  });
+
+  afterEach(() => {
+    installed();
+    release();
+    document.body.replaceChildren();
+    useTerminalFindStore.setState({ byTerminal: {} });
+    useThreadFindStore.setState({ byThread: {} });
+    useThreadsStore.setState({ byId: {}, order: [] });
+    useUiStore.getState().select(HOME);
+  });
+
+  it("cmd+f in a terminal opens its bar, not the thread's", () => {
+    const e = press(shell(), { key: "f", code: "KeyF", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    expect(terminalOpen()).toBe(true);
+    expect(threadOpen()).toBe(false);
+  });
+
+  it("cmd+f in the thread's prompt stays the thread's, with a terminal on screen", () => {
+    shell();
+    press(prompt(), { key: "f", code: "KeyF", metaKey: true });
+    expect(threadOpen()).toBe(true);
+    expect(terminalOpen()).toBe(false);
+  });
+
+  it("cmd+g and cmd+shift+g step the terminal's open bar, and open a closed one", () => {
+    const textarea = shell();
+    press(textarea, { key: "g", code: "KeyG", metaKey: true });
+    expect(terminalOpen()).toBe(true);
+    expect(step).not.toHaveBeenCalled();
+    press(textarea, { key: "g", code: "KeyG", metaKey: true });
+    press(textarea, { key: "g", code: "KeyG", metaKey: true, shiftKey: true });
+    expect(step.mock.calls).toEqual([[1], [-1]]);
+  });
+
+  it("xterm leaves the chords to the app", () => {
+    expect(isGlobalChord("cmd+f")).toBe(true);
+    expect(isGlobalChord("cmd+shift+g")).toBe(true);
+  });
+
+  it("the keymap does not give a shared chord to the terminal's command", () => {
+    const bindings = commandBindings(useCommandsStore.getState().commands);
+    expect(bindings.get("cmd+f")?.name).toBe("thread.find");
+    list(...FIND, ...TERMINAL.map((c) => ({ ...c, available: true })), cmd({ name: "thread.find.first" }));
+    expect(commandBindings(useCommandsStore.getState().commands).get("cmd+f")?.name).toBe("thread.find");
+  });
+
+  it("a rebound terminal.find moves with the user, and cmd+f in a terminal falls back to the thread's", () => {
+    list(...FIND, cmd({ name: "terminal.find", keybindings: ["cmd+shift+y"] }));
+    const textarea = shell();
+    press(textarea, { key: "f", code: "KeyF", metaKey: true });
+    expect(threadOpen()).toBe(true);
+    expect(terminalOpen()).toBe(false);
+    press(textarea, { key: "y", code: "KeyY", metaKey: true, shiftKey: true });
+    expect(terminalOpen()).toBe(true);
+  });
+
+  it("a rebound thread.find leaves cmd+f to the terminal, and to nothing outside it", () => {
+    list(cmd({ name: "thread.find", keybindings: ["cmd+shift+y"] }), ...TERMINAL);
+    press(prompt(), { key: "f", code: "KeyF", metaKey: true });
+    expect(threadOpen()).toBe(false);
+    expect(terminalOpen()).toBe(false);
+    press(shell(), { key: "f", code: "KeyF", metaKey: true });
+    expect(terminalOpen()).toBe(true);
+  });
+
+  it("a user's ctrl chord for it beats the program; a bare key never does", () => {
+    list(...FIND, cmd({ name: "terminal.find", keybindings: ["ctrl+f"] }), cmd({ name: "terminal.find.next", keybindings: ["n"] }));
+    expect(isGlobalChord("ctrl+f")).toBe(true);
+    expect(isGlobalChord("n")).toBe(false);
+    const textarea = shell();
+    expect(press(textarea, { key: "n", code: "KeyN" }).defaultPrevented).toBe(false);
+    expect(terminalOpen()).toBe(false);
+    press(textarea, { key: "f", code: "KeyF", ctrlKey: true });
+    expect(terminalOpen()).toBe(true);
+  });
+
+  it("the palette open keeps the chord from a terminal", () => {
+    useUiStore.getState().openPalette();
+    press(shell(), { key: "f", code: "KeyF", metaKey: true });
+    expect(terminalOpen()).toBe(false);
+    useUiStore.getState().closePalette();
   });
 });

@@ -32,6 +32,9 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "thread.find", view: command.ViewThreadFind},
 		{command: "thread.find.next", view: command.ViewThreadFindNext},
 		{command: "thread.find.previous", view: command.ViewThreadFindPrevious},
+		{command: "terminal.find", view: command.ViewTerminalFind},
+		{command: "terminal.find.next", view: command.ViewTerminalFindNext},
+		{command: "terminal.find.previous", view: command.ViewTerminalFindPrevious},
 		{command: "search.open", view: command.ViewSearch},
 	}
 	for _, tt := range tests {
@@ -41,8 +44,8 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 			if err := command.RegisterView(reg, command.ViewDeps{Emitter: emit, Thread: &commandtest.Thread{}}); err != nil {
 				t.Fatal(err)
 			}
-			// A thread in a worktree.
-			uctx := command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "thread"}
+			// A thread in a worktree, the keyboard in a shell of its bottom panel.
+			uctx := command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "thread", ActiveTerminalID: "t1"}
 			res, err := reg.Invoke(context.Background(), uctx, tt.command, nil)
 			if err != nil {
 				t.Fatal(err)

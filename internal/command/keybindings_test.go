@@ -55,10 +55,26 @@ func TestKeybindingsAreUniqueAndNotReserved(t *testing.T) {
 			if slices.Contains(command.ReservedChords, chord) {
 				t.Errorf("%s binds reserved chord %q", l.Command.Name, k)
 			}
-			if prev, ok := owner[chord]; ok {
+			if prev, ok := owner[chord]; ok && command.SharedChords[prev] != l.Command.Name && command.SharedChords[l.Command.Name] != prev {
 				t.Errorf("%s and %s both bind %q", prev, l.Command.Name, chord)
 			}
 			owner[chord] = l.Command.Name
+		}
+	}
+}
+
+// A shared chord is the same chord on both commands: the GUI resolves it by where the
+// keyboard is, and a command it names must exist.
+func TestSharedChordsMatch(t *testing.T) {
+	f := newFixture(t)
+	for name, other := range command.SharedChords {
+		a, ok := f.reg.Get(name)
+		b, okOther := f.reg.Get(other)
+		if !ok || !okOther {
+			t.Fatalf("%s or %s is not registered", name, other)
+		}
+		if !slices.Equal(a.Keybindings, b.Keybindings) {
+			t.Errorf("%s keybindings = %v, %s has %v", name, a.Keybindings, other, b.Keybindings)
 		}
 	}
 }

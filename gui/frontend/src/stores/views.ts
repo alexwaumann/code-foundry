@@ -21,6 +21,7 @@ import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
 import { presentFileFinder } from "./fileFinder";
 import { presentSearch } from "./threadSearch";
+import { presentTerminalFind } from "@/stores/terminalFind";
 import { presentThreadFind } from "./threadFind";
 import { presentDictationHold, presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";
@@ -212,6 +213,13 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
       return presentThreadFind("next");
     case "thread.find.previous":
       return presentThreadFind("previous");
+    case "terminal.find":
+      // terminal.find: the find bar of the terminal with the keyboard, else of the one on screen.
+      return presentTerminalFind("open");
+    case "terminal.find.next":
+      return presentTerminalFind("next");
+    case "terminal.find.previous":
+      return presentTerminalFind("previous");
     case "search.open":
       // search.open: the palette's Find dialog over every thread, whatever the window shows,
       // on the agent search in `id` when it names one.

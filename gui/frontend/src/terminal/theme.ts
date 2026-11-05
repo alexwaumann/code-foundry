@@ -1,4 +1,7 @@
 import type { ITheme } from "@xterm/xterm";
+import { themes } from "@/themes";
+import { contrast, flatten, over, parseHex, toHex } from "@/themes/color";
+import { resolveSlots, type ThemeFile } from "@/themes/slots";
 
 /**
  * xterm ITheme keys and the CSS variables on <html> they come from (the active theme's
@@ -50,6 +53,49 @@ export function sameTheme(a: ITheme | undefined, b: ITheme): boolean {
   return VARS.every(([key]) => a[key] === b[key]);
 }
 
+/** The find's colours as #RRGGBB, what xterm's decorations take: every match, the current one, the current one's outline. */
+export interface FindColors {
+  match: string;
+  active: string;
+  border: string;
+}
+
+/** How strong the current match's tint and every match's start, of the warning colour over the surface. */
+const ACTIVE_TINT = 0.6;
+const MATCH_TINT = 0.26;
+/** What the foreground should keep on a tint: 4.5:1, or most of what it has on the surface where that is less (Solarized). */
+const TEXT_CONTRAST = 4.5;
+const TEXT_CONTRAST_KEPT = 0.8;
+
+/**
+ * The warning colour over the surface, as the thread's find tints its matches, opaque
+ * because a decoration replaces the cell's background. A cell's text keeps its colour, so
+ * the current match's tint backs off until the terminal's foreground reads on it, which on
+ * a muted theme is well before a solid fill, and every other match stays at most half of it.
+ */
+export function findColors(surface: string, warning: string, foreground: string): FindColors {
+  const under = toHex(parseHex(surface).rgb);
+  const border = flatten(warning, under);
+  const text = flatten(foreground, under);
+  const floor = Math.min(TEXT_CONTRAST, contrast(text, under) * TEXT_CONTRAST_KEPT);
+  let strength = ACTIVE_TINT;
+  while (strength > 0.1 && contrast(text, over(border, strength, under)) < floor) strength -= 0.02;
+  return { match: over(border, Math.min(MATCH_TINT, strength / 2), under), active: over(border, strength, under), border };
+}
+
+const fromSlots = (read: (name: string) => string | undefined) => findColors(read("--cf-surface") ?? "", read("--cf-warning") ?? "", read("--terminal-fg") ?? "");
+
+/** The find's colours for the active theme; with no theme on the document (jsdom), the catalog's first. */
+export function terminalFindColors(root: Element = document.documentElement): FindColors {
+  const style = getComputedStyle(root);
+  try {
+    return fromSlots((name) => style.getPropertyValue(name).trim());
+  } catch {
+    const slots = resolveSlots(themes[0] as ThemeFile);
+    return fromSlots((name) => slots[name]);
+  }
+}
+
 /**
  * Calls `onChange` with the new palette whenever something on <html> that can change it
  * changes: the `dark` class (lib/theme.ts), `data-theme`, or inline variables. Watching
@@ -58,11 +104,16 @@ export function sameTheme(a: ITheme | undefined, b: ITheme): boolean {
  */
 export function watchTerminalTheme(onChange: (theme: ITheme) => void): () => void {
   const root = document.documentElement;
+  const warning = () => getComputedStyle(root).getPropertyValue("--cf-warning").trim();
   let current = terminalTheme(root);
+  // Not in the palette, but the find's colours are made from it (terminalFindColors).
+  let currentWarning = warning();
   const mo = new MutationObserver(() => {
     const next = terminalTheme(root);
-    if (sameTheme(current, next)) return;
+    const nextWarning = warning();
+    if (sameTheme(current, next) && currentWarning === nextWarning) return;
     current = next;
+    currentWarning = nextWarning;
     onChange(next);
   });
   mo.observe(root, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });
