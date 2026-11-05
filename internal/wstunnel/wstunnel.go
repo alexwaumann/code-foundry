@@ -16,6 +16,7 @@
 package wstunnel
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -23,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -158,7 +160,8 @@ func (t *Tunnel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer t.open.Done()
 	// InsecureSkipVerify only because Origin has passed AllowOrigin above: the library's
 	// own check passes an empty Origin and refuses wails://localhost, the production page.
-	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true, CompressionMode: websocket.CompressionDisabled})
+	hj := &hijackCapture{ResponseWriter: w}
+	c, err := websocket.Accept(hj, r, &websocket.AcceptOptions{InsecureSkipVerify: true, CompressionMode: websocket.CompressionDisabled})
 	if err != nil {
 		return // Accept has answered.
 	}
@@ -167,8 +170,22 @@ func (t *Tunnel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log := t.opts.Log.With("procedure", proc, "origin", origin)
 	log.Info("tunnel open")
 	start := time.Now()
-	reason := t.serve(r, c, proc, origin)
+	reason := t.serve(r, c, hj.conn, proc, origin)
 	log.Info("tunnel closed", "reason", reason, "dur", time.Since(start).Round(time.Millisecond).String())
+}
+
+// hijackCapture keeps the connection Accept hijacks, the one thing hangUp can always close: the
+// library's Close can sit in a read with no deadline.
+type hijackCapture struct {
+	http.ResponseWriter
+	conn net.Conn
+}
+
+// Hijack hijacks through any wrapper of the writer (the daemon's statusRecorder).
+func (h *hijackCapture) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	c, rw, err := http.NewResponseController(h.ResponseWriter).Hijack()
+	h.conn = c
+	return c, rw, err
 }
 
 // procedure is the one value everything downstream uses: the path of the server-streaming
@@ -207,7 +224,7 @@ func procedure(u *url.URL) (string, bool) {
 // which closes the socket when it ends, is detached from r's, and so are writes
 // (response.send). The client going cancels the handler; the handler's context ending does
 // not touch the socket.
-func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, proc, origin string) string {
+func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, origin string) string {
 	read, stopRead := context.WithCancel(context.Background())
 	defer stopRead()
 
@@ -215,9 +232,10 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, proc, origin string) 
 	defer cancelFirst()
 	header, body, err := readRequest(first, c)
 	if err != nil {
-		// A deadline or an oversized message has closed the socket already.
+		// A deadline or an oversized message has only sent the close frame: the socket is
+		// still open, and hangUp ends it.
 		go readUntilGone(read, c, func() {})
-		t.hangUp(c, websocket.StatusPolicyViolation, "bad request", stopRead)
+		t.hangUp(c, conn, websocket.StatusPolicyViolation, "bad request", stopRead)
 		return "no request"
 	}
 
@@ -245,7 +263,7 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, proc, origin string) 
 	t.opts.Next.ServeHTTP(w, req)
 	cancel()
 	w.Flush()
-	t.hangUp(c, websocket.StatusNormalClosure, "", stopRead)
+	t.hangUp(c, conn, websocket.StatusNormalClosure, "", stopRead)
 	switch {
 	case errors.Is(w.err, context.DeadlineExceeded), errors.Is(w.err, context.Canceled):
 		return "write timeout"
@@ -269,11 +287,15 @@ func readUntilGone(ctx context.Context, c *websocket.Conn, gone func()) {
 	}
 }
 
-// hangUp closes the socket with code. Close waits 5 s for a client's answer and CloseNow
-// cannot cut that short, but ending readUntilGone closes the socket under it, so
-// FinalTimeout bounds a client that never answers.
-func (t *Tunnel) hangUp(c *websocket.Conn, code websocket.StatusCode, reason string, stopRead context.CancelFunc) {
-	timer := time.AfterFunc(t.opts.FinalTimeout, stopRead)
+// hangUp closes the socket with code. Close waits for a client's answer, 5 s at best and with
+// no deadline at all while it skips the rest of a frame a client never finishes, and CloseNow
+// cannot cut that short. Closing the connection under it can, so FinalTimeout bounds any
+// client that does not answer.
+func (t *Tunnel) hangUp(c *websocket.Conn, conn net.Conn, code websocket.StatusCode, reason string, stopRead context.CancelFunc) {
+	timer := time.AfterFunc(t.opts.FinalTimeout, func() {
+		stopRead()
+		_ = conn.Close()
+	})
 	defer timer.Stop()
 	_ = c.Close(code, reason)
 }

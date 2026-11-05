@@ -63,8 +63,8 @@ Each value is validated once and that same value is used:
   - On a data message it calls `Close` from its own goroutine, which by the library's source
     waits 5 s for the read lock it holds, then 15 s for itself to exit. The handler was still
     running after 8 s, when the test gave up.
-- `Close` waits 5 s for the client's answer, and `CloseNow` cannot interrupt a running `Close`. What
-  does is ending the reader, whose context closes the socket: that is how `hangUp` bounds it.
+- `Close` waits 5 s for the client's answer, and `CloseNow` cannot interrupt a running `Close`.
+  Closing the hijacked `net.Conn` does: that is how `hangUp` bounds it.
 - `Write` closes the socket when its context ends, so no write may run on the handler's context.
 - Connect writes the end of stream and flushes it inside the handler, not after it returns. So
   the "final flush" has no call site of its own: every `send` is detached and gets `WriteTimeout`,
@@ -92,3 +92,9 @@ before `closing stores`. curl with forged headers: 403 for no Origin, `null` and
 Origins; 421 for a forged Host; 404 for unary, encoded paths and a query, and on the pages listener
 and the Unix socket; 307 for a dot segment, which `ServeMux` only redirects; 426 for a POST with a
 valid token and no upgrade.
+
+- `Conn.Close` is not bounded by itself. After an oversized message the library has only sent its
+  close frame, and `waitCloseHandshake` then skips the rest of the frame with no deadline, so a
+  client that declares a big frame and stops sending held a tunnel, with no token, past every
+  timeout. Ending the read does not reach it. `hangUp` closes the hijacked `net.Conn` from its
+  timer, which `hijackCapture` keeps from `Accept`.
