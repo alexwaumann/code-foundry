@@ -524,7 +524,7 @@ func TestCancelAtEachStage(t *testing.T) {
 				t.Errorf("%d turn ends: a wait has no reaction to count", n)
 			}
 			if slices.ContainsFunc(got.Setup.Steps, func(st SetupStep) bool {
-				return st.Status == SetupStepRunning || st.Status == SetupStepFailed
+				return st.Status == SetupStepRunning || st.Status == SetupStepFailed || st.Status == SetupStepWarning
 			}) {
 				t.Errorf("steps %+v", got.Setup.Steps)
 			}

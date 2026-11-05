@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -291,7 +290,9 @@ func gitFetchBranch(ctx context.Context, dir, branch string) bool {
 	ctx, cancel := context.WithTimeout(ctx, fetchBranchTimeout)
 	defer cancel()
 	refspec := "+refs/heads/" + branch + ":refs/remotes/origin/" + branch
-	return exec.CommandContext(ctx, "git", "-C", dir, "fetch", "--quiet", "--no-tags", "origin", refspec).Run() == nil
+	// project's runner: a cancelled fetch goes with its remote helper and ssh.
+	_, err := project.ExecRunner{}.Run(ctx, dir, "fetch", "--quiet", "--no-tags", "origin", refspec)
+	return err == nil
 }
 
 // Rows from before the branch column (migration 0027) have none. backfillBranches

@@ -2,6 +2,7 @@ package thread
 
 import (
 	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -467,6 +468,10 @@ func (t *setupTracker) progress(projectID string) func(project.WorktreeEvent) {
 				}
 				if ev.Err == nil {
 					st.end(SetupStepDone, now)
+					return
+				}
+				if errors.Is(ev.Err, context.Canceled) {
+					st.reset() // it says nothing about the remote: the setup stopped it
 					return
 				}
 				st.Warning, st.Error, st.RefAt = "Could not reach "+ev.Remote, project.GitText(ev.Err), ev.RefAt

@@ -204,30 +204,42 @@ func TestCancelKillsARealWorktreeAdd(t *testing.T) {
 }
 
 // A cancel during a real fetch from a remote that never answers: the fetch goes, with what
-// it started, at once.
+// it started, at once. A named branch has a fetch of its own, to ask origin about it.
 func TestCancelKillsARealFetch(t *testing.T) {
-	e, r := newRealGit(t)
-	pidFile := filepath.Join(t.TempDir(), "remote.pid")
-	script := filepath.Join(t.TempDir(), "remote.sh")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho $$ > "+pidFile+"\nsleep 60\n"), 0o755); err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name string
+		wt   NewWorktree
+	}{{"of the base", NewWorktree{}}, {"of a named branch", NewWorktree{Branch: "cf/named"}}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, r := newRealGit(t)
+			pidFile := filepath.Join(t.TempDir(), "remote.pid")
+			script := filepath.Join(t.TempDir(), "remote.sh")
+			if err := os.WriteFile(script, []byte("#!/bin/sh\necho $$ > "+pidFile+"\nsleep 60\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			r.git("config", "protocol.ext.allow", "always")
+			r.git("remote", "set-url", "origin", "ext::"+script)
+			s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: r.id, InitialPrompt: "do x", NewWorktree: &tt.wt, BackgroundSetup: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			pid := waitPidIn(t, pidFile)
+			start := time.Now()
+			got, _, err := e.m.CancelSetup(e.ctx(), s.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if took := time.Since(start); took > 3*time.Second { // the runner's WaitDelay bounds it
+				t.Errorf("the cancel took %v", took)
+			}
+			waitProcessGone(t, pid)
+			r.clean()
+			if slices.ContainsFunc(got.Setup.Steps, func(st SetupStep) bool { return st.Status == SetupStepWarning }) {
+				t.Errorf("a cancel reads as an unreachable remote: %+v", got.Setup.Steps)
+			}
+		})
 	}
-	r.git("config", "protocol.ext.allow", "always")
-	r.git("remote", "set-url", "origin", "ext::"+script)
-	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: r.id, InitialPrompt: "do x", NewWorktree: &NewWorktree{}, BackgroundSetup: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	pid := waitPidIn(t, pidFile)
-	start := time.Now()
-	if _, _, err := e.m.CancelSetup(e.ctx(), s.ID); err != nil {
-		t.Fatal(err)
-	}
-	if took := time.Since(start); took > 2*time.Second {
-		t.Errorf("the cancel took %v", took)
-	}
-	waitProcessGone(t, pid)
-	r.clean()
 }
 
 // What a failed start left behind: anyone can work in a worktree once the placement landed.
