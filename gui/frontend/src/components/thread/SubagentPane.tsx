@@ -184,7 +184,7 @@ function ReportRow({ run }: { run: AgentRunView }) {
 /** Why a failed run failed, in its own words. */
 function ErrorRow({ run }: { run: AgentRunView }) {
   return (
-    <div className="a-md selectable break-words whitespace-pre-wrap text-cf-error-text" role="alert" data-testid="subagent-error">
+    <div className="a-md selectable text-body break-words whitespace-pre-wrap text-cf-error-text" role="alert" data-testid="subagent-error">
       {run.error}
     </div>
   );
