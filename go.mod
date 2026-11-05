@@ -27,7 +27,7 @@ require (
 
 require (
 	github.com/alexwaumann/code-foundry/pluginsdk v0.0.0-00010101000000-000000000000
-	github.com/coder/websocket v1.8.14 // indirect
+	github.com/coder/websocket v1.8.14
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect

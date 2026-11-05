@@ -55,7 +55,7 @@ func TestScopedTokenOnTheLoopbackAPI(t *testing.T) {
 	now := time.Unix(1000, 0)
 	var clock sync.Mutex
 	caps := capability.NewRegistry(func() time.Time { clock.Lock(); defer clock.Unlock(); return now })
-	srv := httptest.NewServer(loopbackHandler("daemon-secret", caps, []string{"/preview/"}, 0, nil, mux))
+	srv := httptest.NewServer(loopbackHandler("daemon-secret", caps, []string{"/preview/"}, 0, nil, mux, http.NotFoundHandler()))
 	t.Cleanup(srv.Close)
 	tok, revoke, err := caps.Issue(capability.Scope{Search: "q-0123456789ab"}, time.Minute)
 	if err != nil {

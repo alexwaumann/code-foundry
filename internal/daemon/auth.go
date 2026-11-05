@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/capability"
+	"github.com/alexwaumann/code-foundry/internal/wstunnel"
 )
 
 // newToken returns 32 random bytes, hex encoded.
@@ -79,14 +81,28 @@ func requireBearer(token string, caps *capability.Registry, next http.Handler) h
 // bearer token (or one of caps' scoped tokens, requireBearer). The paths the pages listener serves (pagesHandler) are 404 here, token or
 // not: a page loads them from its own origin, never the API's. pagesPort is that
 // listener's port, whose origin CORS refuses even when listed in devOrigins
-// (allowedOrigin).
-func loopbackHandler(token string, caps *capability.Registry, pagePrefixes []string, pagesPort int, devOrigins []string, rest http.Handler) http.Handler {
+// (allowedOrigin). tunnel (newTunnel) serves the GUI's streams at wstunnel.Prefix, outside
+// cors: CORS only adds headers, which would not stop a socket, so it checks allowedOrigin
+// itself.
+func loopbackHandler(token string, caps *capability.Registry, pagePrefixes []string, pagesPort int, devOrigins []string, rest, tunnel http.Handler) http.Handler {
 	m := http.NewServeMux()
 	for _, prefix := range pagePrefixes {
 		m.Handle(prefix, http.NotFoundHandler())
 	}
+	m.Handle(wstunnel.Prefix, tunnel)
 	m.Handle("/", cors(pagesPort, devOrigins, requireBearer(token, caps, rest)))
 	return m
+}
+
+// newTunnel is the WebSocket tunnel for the GUI's streams (docs/notes/ws-tunnel.md): the
+// pages origin stops at allowedOrigin before any upgrade, and a call that passes runs behind
+// the same bearer check as over HTTP, with the token from the tunnel's first frame.
+func newTunnel(log *slog.Logger, token string, caps *capability.Registry, pagesPort int, devOrigins []string, rest http.Handler) *wstunnel.Tunnel {
+	return wstunnel.New(wstunnel.Options{
+		AllowOrigin: func(origin string) bool { return allowedOrigin(origin, pagesPort, devOrigins) },
+		Next:        requireBearer(token, caps, rest),
+		Log:         log,
+	})
 }
 
 // Headers a Connect/gRPC-Web browser client sends and reads. Mirrors connectrpc.com/cors.
