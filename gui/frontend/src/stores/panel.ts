@@ -118,6 +118,14 @@ export function tabId(kind: SurfaceKind, params: Readonly<Record<string, string>
   return query ? `${kind}?${query}` : kind;
 }
 
+/**
+ * A pull request tab's id: lower case, as GitHub slugs are case-insensitive, so `Octo/Hello`
+ * and `octo/hello` are one tab. The tab's slug param keeps the spelling it was opened with.
+ */
+export function pullRequestTabId(slug: string, number: string): string {
+  return tabId("pullrequest", { number, slug: slug.toLowerCase() });
+}
+
 /** A tab with its id derived from kind + params. */
 export function makeTab(kind: SurfaceKind, title: string, params: Readonly<Record<string, string>> = {}): Tab {
   return { id: tabId(kind, params), kind, title, params };
@@ -543,22 +551,26 @@ function tabV4(t: Tab): Tab | null {
 }
 
 /**
- * Version 3 to 4: the side panel's Worktree, Usage, Linked PRs, Threads and Agents
- * surfaces are gone (tabV4). A group's active tab and pickFrom follow their tab's new id;
- * a group whose active tab went shows its first tab left; a split whose group emptied is
- * one group again. Input repaired by sanitizePanelState first.
+ * Every stored tab through `rewrite` (null drops it). A group's active tab and pickFrom
+ * follow their tab's new id; a group whose active tab went shows its first tab left; a
+ * split whose group emptied is one group again. Tabs that end up with one id are one tab,
+ * the first of them, whichever groups they were in.
  */
-export function migratePanelV3(byKey: Readonly<Record<string, PanelEntry>>): Record<string, PanelEntry> {
+function rewriteTabs(byKey: Readonly<Record<string, PanelEntry>>, rewrite: (t: Tab) => Tab | null): Record<string, PanelEntry> {
   const out: Record<string, PanelEntry> = {};
   for (const [key, e] of Object.entries(byKey)) {
+    const seen = new Set<string>();
     const groups = e.groups.map((g): PanelGroup => {
       const ids = new Map<string, string>();
       const tabs: Tab[] = [];
       for (const t of g.tabs) {
-        const next = tabV4(t);
+        const next = rewrite(t);
         if (!next) continue;
-        ids.set(t.id, next.id);
-        tabs.push(next);
+        if (!seen.has(next.id)) {
+          seen.add(next.id);
+          tabs.push(next);
+        }
+        if (tabs.some((x) => x.id === next.id)) ids.set(t.id, next.id);
       }
       const pickFrom = g.pickFrom === undefined ? undefined : ids.get(g.pickFrom);
       const active = g.activeTabId === null ? null : (ids.get(g.activeTabId) ?? null);
@@ -567,14 +579,28 @@ export function migratePanelV3(byKey: Readonly<Record<string, PanelEntry>>): Rec
       return { tabs, activeTabId: active ?? tabs[0]?.id ?? null };
     });
     const kept = groups.filter((g) => g.tabs.length > 0);
+    const emptied = groups.some((g, i) => g.tabs.length === 0 && (e.groups[i]?.tabs.length ?? 0) > 0);
     const { focused: _focused, ratio: _ratio, ...rest } = e;
-    if (groups.length > 1 && kept.length < 2) {
-      out[key] = { ...rest, groups: [kept[0] ?? emptyGroup] };
-    } else {
-      out[key] = { ...e, groups };
-    }
+    out[key] = groups.length > 1 && emptied ? { ...rest, groups: [kept[0] ?? emptyGroup] } : { ...e, groups };
   }
   return out;
+}
+
+/**
+ * Version 3 to 4: the side panel's Worktree, Usage, Linked PRs, Threads and Agents
+ * surfaces are gone (tabV4). Input repaired by sanitizePanelState first.
+ */
+export function migratePanelV3(byKey: Readonly<Record<string, PanelEntry>>): Record<string, PanelEntry> {
+  return rewriteTabs(byKey, tabV4);
+}
+
+/**
+ * Version 4 to 5: pull request tabs take their lower-case id, keeping the slug they show;
+ * two tabs of one pull request (`Alex/Repo`, `alex/repo`) become one. Input repaired by
+ * sanitizePanelState first.
+ */
+export function migratePanelV4(byKey: Readonly<Record<string, PanelEntry>>): Record<string, PanelEntry> {
+  return rewriteTabs(byKey, (t) => (t.kind === "pullrequest" ? { ...t, id: pullRequestTabId(t.params.slug ?? "", t.params.number ?? "") } : t));
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -638,12 +664,14 @@ export const usePanelStore = create<PanelState>()(
     // 2: worktree tabs name their project with `project`, not `repo` (migratePanelV1).
     // 3: tab groups; the flat tab list is the first group (migratePanelV2).
     // 4: Worktree tabs are Changes tabs; the removed surfaces' tabs go (migratePanelV3).
-    version: 4,
+    // 5: pull request tabs have lower-case ids (migratePanelV4).
+    version: 5,
     migrate: (persisted, version) => {
       const byKey = ((persisted ?? {}) as { byKey?: Record<string, PanelEntryV2> }).byKey ?? {};
-      if (version >= 4) return { byKey }; // a store from a newer build: merge repairs what it can
+      if (version >= 5) return { byKey }; // a store from a newer build: merge repairs what it can
       const v3 = version >= 3 ? byKey : migratePanelV2(version < 2 ? migratePanelV1(byKey) : byKey);
-      return { byKey: migratePanelV3(sanitizePanelState(v3)) };
+      const v4 = version >= 4 ? v3 : migratePanelV3(sanitizePanelState(v3));
+      return { byKey: migratePanelV4(sanitizePanelState(v4)) };
     },
     // Every rehydrate, migrated or not, goes through sanitizePanelState: a store another
     // build wrote is never trusted as is.

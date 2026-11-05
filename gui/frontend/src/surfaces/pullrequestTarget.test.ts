@@ -55,6 +55,13 @@ describe("pull request tabs", () => {
     expect(prRefOfTab(tab)).toEqual({ slug: "alex/cf", number: 145 });
   });
 
+  it("has one id however the slug is spelled, and keeps the spelling in its params", () => {
+    const tab = pullRequestTab({ slug: "Alex/CF", number: 145 });
+    expect(tab.id).toBe(pullRequestTab({ slug: "alex/cf", number: 145 }).id);
+    expect(tab.id).not.toBe(pullRequestTab({ slug: "alex/cf", number: 146 }).id);
+    expect(prRefOfTab(tab)).toEqual({ slug: "Alex/CF", number: 145 });
+  });
+
   it.each<Record<string, string>>([{}, { slug: "x", number: "1" }, { slug: "a/b", number: "0" }, { slug: "a/b", number: "abc" }])("rejects %j", (params) => {
     expect(prRefOfTab({ params })).toBeNull();
   });

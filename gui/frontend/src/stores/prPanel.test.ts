@@ -14,8 +14,10 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
 const { pullRequestDetailResource, pullRequestKey } = await import("./gh");
-const { makeTab, closePanelTab, openSurface, usePanelStore } = await import("./panel");
-const { clearConfirmedRequests, prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setAutoMerge, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
+const { makeTab, closePanelTab, moveTabToGroup, openSurface, usePanelStore } = await import("./panel");
+const { openPullRequestLink } = await import("@/components/pr/prLinks");
+const { pullRequestTab } = await import("@/surfaces/pullrequestTarget");
+const { clearConfirmedRequests, openPullRequestInPanel, prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setAutoMerge, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
 
 const SLUG = "acme/repo";
 const view = (body: string, lastError = "") => ({ body, lastError }) as PullRequestDetailView;
@@ -251,6 +253,59 @@ describe("setAutoMerge", () => {
     expect(invokeCommand).toHaveBeenLastCalledWith("pr.auto-merge", expect.anything(), { "repo-slug": "Acme/Repo", number: "5", off: "true" });
     expect(usePrPanelStore.getState().mergeMethods).toEqual({ "acme/repo": "rebase" });
     getPullRequestDetail.mockReset();
+  });
+});
+
+describe("one tab for a pull request, however its slug is spelled", () => {
+  const panel = () => usePanelStore.getState().byKey["thread:a"];
+  const tabs = () => panel()?.groups.flatMap((g) => g.tabs) ?? [];
+  const shown = (slug: string) => {
+    const id = pullRequestTab({ slug, number: 5 }).id;
+    expect(tabs().filter((t) => t.id === id)).toHaveLength(1);
+    expect(tabs().find((t) => t.id === id)?.params.slug).toBe(slug);
+    return id;
+  };
+
+  it.each([
+    ["a mixed-case tab, then lower case", "Acme/Repo", "acme/repo"],
+    ["a lower-case tab, then mixed case", "acme/repo", "Acme/Repo"],
+    ["two other spellings", "ACME/repo", "acme/REPO"],
+  ])("%s: it switches to the first and keeps its slug", (_name, first, second) => {
+    openPullRequestInPanel({ slug: first, number: 5 }, "thread:a");
+    openPullRequestInPanel({ slug: "acme/repo", number: 6 }, "thread:a");
+    openPullRequestInPanel({ slug: second, number: 5 }, "thread:a");
+    expect(tabs()).toHaveLength(2);
+    expect(panel()?.groups[0]?.activeTabId).toBe(shown(first));
+  });
+
+  it("a link in another case lands on the tab", () => {
+    openPullRequestInPanel({ slug: "Acme/Repo", number: 5 }, "thread:a");
+    expect(openPullRequestLink("thread:a")("https://github.com/acme/repo/pull/5")).toBe(true);
+    expect(tabs()).toHaveLength(1);
+    shown("Acme/Repo");
+  });
+
+  it("in a split panel it switches to the group that holds the tab", () => {
+    openPullRequestInPanel({ slug: "Acme/Repo", number: 5 }, "thread:a");
+    openPullRequestInPanel({ slug: "acme/repo", number: 6 }, "thread:a");
+    const held = pullRequestTab({ slug: "Acme/Repo", number: 5 });
+    usePanelStore.setState((s) => {
+      const e = s.byKey["thread:a"];
+      if (!e) throw new Error("no panel");
+      return { byKey: { "thread:a": { ...moveTabToGroup(e, held.id, 1), focused: 0 } } };
+    });
+    openPullRequestInPanel({ slug: "acme/repo", number: 5 }, "thread:a");
+    expect(panel()?.groups[1]?.tabs).toHaveLength(1);
+    expect(panel()?.groups[1]?.activeTabId).toBe(shown("Acme/Repo"));
+    expect(panel()?.focused).toBe(1);
+  });
+
+  it("a revert whose new pull request is open already switches to its tab", async () => {
+    openPullRequestInPanel({ slug: "Acme/Repo", number: 5 }, "thread:a");
+    invokeCommand.mockResolvedValueOnce({ message: "Opened #5", resultJson: JSON.stringify({ number: 5, url: "https://github.com/acme/repo/pull/5" }) });
+    await revertPullRequest({ slug: "acme/repo", number: 3 }, "thread:a");
+    expect(tabs()).toHaveLength(1);
+    shown("Acme/Repo");
   });
 });
 

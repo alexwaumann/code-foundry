@@ -14,6 +14,7 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useViewsStore } = await import("@/stores/views");
 const { pullRequestSurface } = await import("./pullrequest");
+const { pullRequestTab } = await import("./pullrequestTarget");
 
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
 const wt = (path: string, branch: string, isMain = false): WorktreeView => ({ projectId: "r1", path, branch, head: "abc", detached: false, isMain, status });
@@ -53,6 +54,11 @@ describe("Pull request surface availability", () => {
     });
     expect(getBranchPullRequests).toHaveBeenLastCalledWith("alex/cf", "fix/resize", undefined, expect.anything());
     expect(pullRequestSurface.openDefault({ selection: { kind: "thread", id: "s1" }, panelKey: "thread:s1" })?.title).toBe("#145");
+    // The panel's own tab of it, in the spelling it shows, not a second one in the daemon's.
+    const held = pullRequestTab({ slug: "Alex/CF", number: 145 });
+    usePanelStore.setState({ byKey: { "thread:s1": { open: true, groups: [{ tabs: [held], activeTabId: held.id }] } } });
+    expect(pullRequestSurface.openDefault({ selection: { kind: "thread", id: "s1" }, panelKey: "thread:s1" })).toEqual(held);
+    usePanelStore.setState({ byKey: { "thread:s1": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
 
     act(() => {
       useProjectsStore.setState({ byId: { r1: project("feat/nopr") } });

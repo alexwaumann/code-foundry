@@ -289,6 +289,13 @@ describe("a ShowView scoped to a thread", () => {
       untouched();
     });
 
+    it("panel.pr switches to the tab it opened, in any letter case", () => {
+      showItem("panel.pr", { slug: "Owner/Web", number: "42" });
+      showItem("panel.pr", { slug: "owner/web", number: "42" });
+      expect(usePanelStore.getState().byKey["thread:b"]?.groups[0]?.tabs).toHaveLength(1);
+      expect(active("thread:b")).toMatchObject({ params: { slug: "Owner/Web", number: "42" } });
+    });
+
     it.each([
       ["panel.file", {}],
       ["panel.diff", { project: "web", path: "a.go" }],
