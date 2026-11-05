@@ -168,7 +168,7 @@ func main() {
 	// The input devices (inputs.go): the settings row follows them.
 	inputs := newInputReporter(&coreAudioInputs{}, p.InputNames(), log)
 	go inputs.run(watchCtx)
-	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), anywhere, overlayService, hold, inputs, log)
+	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(log), anywhere, overlayService, hold, inputs, log)
 
 	if err := app.Run(); err != nil {
 		log.Error("wails app", "err", err)

@@ -323,7 +323,7 @@ func (w *dictationWatcher) capture(ctx, connCtx context.Context, conn dictationC
 		case <-ctx.Done():
 			return
 		case <-mic.Changed():
-			// AirPods connecting, say: the old capture is dead. Open the new input and keep
+			// AirPods connecting, say: the old capture is stale. Open the new input and keep
 			// streaming to the same session, or end it so the mic returns to idle now.
 			if reopens++; reopens > micMostReopens {
 				w.log.Warn("dictation: the audio hardware keeps changing; stopping the session", "session", id)
