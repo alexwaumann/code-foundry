@@ -398,13 +398,17 @@ func TestRetryThatFails(t *testing.T) {
 	}
 }
 
-// A spawn that failed left the placement on the row: only the start is left, and a retry
-// needs nothing the plan needed.
+// A spawn that failed left the placement on the row: only the start is left, even after a
+// restart, which forgets that the namer ran.
 func TestRetryAfterASpawnFailure(t *testing.T) {
 	e, _ := newWorktreeEnv(t, nil, func(o *Options) { o.Claude = "/nonexistent/claude" })
+	var named atomic.Int32
+	e.namer = func(string) (string, error) {
+		named.Add(1)
+		return "Title: Fix login\nBranch: fix/login", nil
+	}
 	s := failedSpawn(t, e)
 	e.restart(func(o *Options) { o.Claude = fakeClaudeBin })
-	e.projects.Put(project.Project{ID: "r1", Path: e.wt, Name: "repo2", Git: true, Worktrees: e.m.opts.Projects.Snapshot().Projects[0].Worktrees})
 	if _, err := e.m.RetrySetup(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -416,6 +420,10 @@ func TestRetryAfterASpawnFailure(t *testing.T) {
 		t.Errorf("%d worktrees made", n)
 	}
 	e.waitUserText("do x")
+	time.Sleep(50 * time.Millisecond)
+	if n := named.Load(); n != 1 {
+		t.Errorf("namer ran %d times", n)
+	}
 }
 
 // A worktree made by the first run that went since (by hand, with an archive) is made again.

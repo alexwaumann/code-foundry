@@ -273,10 +273,13 @@ func (m *Manager) refreshProjects(ctx context.Context, s Thread) {
 	}
 }
 
-// placedOf is the placement that landed on s.
+// placedOf is the placement that landed on s. A name step that ended means the namer ran,
+// which a restart has forgotten: it does not run again once Claude has the message.
 func placedOf(s Thread) placedThread {
+	st := s.Setup.step(SetupStepName, "")
 	return placedThread{projectIDs: s.ProjectIDs, projectID: s.ProjectID, path: s.WorktreePath, baseRef: s.BaseRef, branch: s.Branch,
-		createdWorktree: s.CreatedWorktree, workspaceID: s.WorkspaceID, checkouts: s.CheckoutPaths, made: madeOf(s.Setup)}
+		createdWorktree: s.CreatedWorktree, workspaceID: s.WorkspaceID, checkouts: s.CheckoutPaths, made: madeOf(s.Setup),
+		namerCalled: st != nil && st.Status == SetupStepDone}
 }
 
 // lost forgets the worktrees of projects ids and makes their steps pending again.
