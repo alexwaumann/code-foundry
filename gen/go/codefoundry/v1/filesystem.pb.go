@@ -1084,7 +1084,8 @@ type WriteFileResponse struct {
 	ResolvedPath string `protobuf:"bytes,3,opt,name=resolved_path,json=resolvedPath,proto3" json:"resolved_path,omitempty"`
 	// Nothing was written: the file is not what the request expected.
 	Conflict bool `protobuf:"varint,4,opt,name=conflict,proto3" json:"conflict,omitempty"`
-	// With conflict: no file is at resolved_path (a symlink that leads nowhere counts).
+	// With conflict: no file is at resolved_path (a symlink that leads nowhere, or a loop,
+	// counts).
 	NotFound      bool `protobuf:"varint,5,opt,name=not_found,json=notFound,proto3" json:"not_found,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

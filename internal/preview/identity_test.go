@@ -104,6 +104,11 @@ func TestFloorFoldedNames(t *testing.T) {
 		h("cf-teſt/worktrees/app/index.html"): false,
 		h("cf-teſt/worktrees/app/new.txt"):    false,
 		h(".ßh/known_hosts"):                  false,
+		h("cf-teſt/worktrees"):                true,
+		h("cf-teſt/projects"):                 true,
+		h("cf-teſt/PROJECTS"):                 true,
+		h("proj/d/home/projects"):             true,
+		h("cf-teſt/projectſ"):                 true,
 	} {
 		if got := f.InConfigHome(p); got != want {
 			t.Errorf("InConfigHome(%s) = %v, want %v", p, got, want)

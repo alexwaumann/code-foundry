@@ -122,13 +122,22 @@ type FilesystemServiceClient interface {
 	// conflict. Neither flag on a missing file is conflict with not_found.
 	//
 	// The write is atomic (a temp file beside the target, then a rename) and keeps the
-	// existing file's mode. It replaces the file: another hard link keeps the old contents,
-	// and extended attributes are not carried over. InvalidArgument: a path outside the
-	// home directory, or relative without an absolute base_dir; a directory or anything
-	// else that is not a regular file; contents over 1 MiB; create with force; create or
-	// force in a directory that does not exist; force on a symlink that leads nowhere; a
-	// path in the config home outside its checkouts (its worktrees and projects).
-	// PermissionDenied: macOS's privacy protection refused the write.
+	// existing file's mode, setuid, setgid and sticky included, and its group. A group the
+	// user cannot give the new file loses its access instead of passing to another. It
+	// replaces the file: another hard link keeps the old contents, and extended attributes
+	// and ACLs are not carried over, so a deny ACL no longer applies and access can widen.
+	//
+	// A symlink that leads nowhere, a loop included, is a file that is gone, except that it
+	// is never replaced. InvalidArgument: a path outside the home directory, or relative
+	// without an absolute base_dir; a name too long, or a path holding a NUL; a directory or
+	// anything else that is not a regular file; contents over 1 MiB; create with force;
+	// create or force in a directory that does not exist; force on a symlink that leads
+	// nowhere; a path in the config home outside its checkouts (what lies below its
+	// worktrees and projects folders, not those names themselves). Only the file written
+	// counts: a symlink in the config home leading out of it may be written through.
+	// FailedPrecondition: the file has no owner write bit (even with force), the file or
+	// its folder is locked, or the folder or volume takes no writes. ResourceExhausted: the
+	// disk is full. PermissionDenied: macOS's privacy protection refused the write.
 	WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error)
 	// PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
 	// listener that serves the file, and everything else under its scope, without the
@@ -305,13 +314,22 @@ type FilesystemServiceHandler interface {
 	// conflict. Neither flag on a missing file is conflict with not_found.
 	//
 	// The write is atomic (a temp file beside the target, then a rename) and keeps the
-	// existing file's mode. It replaces the file: another hard link keeps the old contents,
-	// and extended attributes are not carried over. InvalidArgument: a path outside the
-	// home directory, or relative without an absolute base_dir; a directory or anything
-	// else that is not a regular file; contents over 1 MiB; create with force; create or
-	// force in a directory that does not exist; force on a symlink that leads nowhere; a
-	// path in the config home outside its checkouts (its worktrees and projects).
-	// PermissionDenied: macOS's privacy protection refused the write.
+	// existing file's mode, setuid, setgid and sticky included, and its group. A group the
+	// user cannot give the new file loses its access instead of passing to another. It
+	// replaces the file: another hard link keeps the old contents, and extended attributes
+	// and ACLs are not carried over, so a deny ACL no longer applies and access can widen.
+	//
+	// A symlink that leads nowhere, a loop included, is a file that is gone, except that it
+	// is never replaced. InvalidArgument: a path outside the home directory, or relative
+	// without an absolute base_dir; a name too long, or a path holding a NUL; a directory or
+	// anything else that is not a regular file; contents over 1 MiB; create with force;
+	// create or force in a directory that does not exist; force on a symlink that leads
+	// nowhere; a path in the config home outside its checkouts (what lies below its
+	// worktrees and projects folders, not those names themselves). Only the file written
+	// counts: a symlink in the config home leading out of it may be written through.
+	// FailedPrecondition: the file has no owner write bit (even with force), the file or
+	// its folder is locked, or the folder or volume takes no writes. ResourceExhausted: the
+	// disk is full. PermissionDenied: macOS's privacy protection refused the write.
 	WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error)
 	// PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
 	// listener that serves the file, and everything else under its scope, without the

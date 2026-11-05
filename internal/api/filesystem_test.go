@@ -108,6 +108,8 @@ func TestReadFileErrorCodes(t *testing.T) {
 	}{
 		{"outside home", fmt.Errorf("%w: /etc/hosts is outside your home directory", fsx.ErrInvalidArgument), connect.CodeInvalidArgument},
 		{"macOS privacy", fmt.Errorf("wrapped: %w", fsx.ErrNotPermitted), connect.CodePermissionDenied},
+		{"not writable", fmt.Errorf("wrapped: %w", fsx.ErrNotWritable), connect.CodeFailedPrecondition},
+		{"disk full", fmt.Errorf("wrapped: %w", fsx.ErrDiskFull), connect.CodeResourceExhausted},
 		{"anything else", errors.New("fsx: read /x: input/output error"), connect.CodeInternal},
 	}
 	for _, tt := range tests {

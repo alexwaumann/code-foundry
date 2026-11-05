@@ -99,7 +99,7 @@ func TestFloorInConfigHome(t *testing.T) {
 		{"database", h(".code-foundry/db.sqlite"), true},
 		{"a new file", h(".code-foundry/new.txt"), true},
 		{"a thread's page", h(".code-foundry/pages/s-1/form.html"), true},
-		{"its folder of worktrees", h(".code-foundry/worktrees"), false},
+		{"its folder of worktrees", h(".code-foundry/worktrees"), true},
 		{"a worktree's file", h(".code-foundry/worktrees/app/wt/main.go"), false},
 		{"a project's file", h(".code-foundry/projects/app/main.go"), false},
 		{"a new file in a project", h(".code-foundry/projects/app/new.go"), false},
@@ -121,6 +121,52 @@ func TestFloorInConfigHome(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := f.InConfigHome(tc.p); got != tc.want {
 				t.Errorf("InConfigHome(%s) = %v, want %v", tc.p, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestFloorInConfigHomeOpenRoots covers the folders checkouts go in, which do not exist
+// until first use: a write may reach below them but never take their names, while a grant
+// may still name them.
+func TestFloorInConfigHomeOpenRoots(t *testing.T) {
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := func(rel string) string { return filepath.Join(home, rel) }
+	write(t, h(".code-foundry/daemon.token"), "x")
+	write(t, h("cf-1/daemon.token"), "x")
+	write(t, h("cf-3/daemon.token"), "x")
+	write(t, h("cf-3/worktrees/app/main.go"), "x")
+	f := NewFloor(home, paths.New(h(".code-foundry")))
+
+	tests := []struct {
+		name          string
+		p             string
+		want, guarded bool
+	}{
+		{"projects, missing", h(".code-foundry/projects"), true, false},
+		{"worktrees, missing", h(".code-foundry/worktrees"), true, false},
+		{"worktrees, another case", h(".code-foundry/WORKTREES"), true, false},
+		{"projects, another case", h(".code-foundry/Projects"), true, false},
+		{"pages, missing", h(".code-foundry/pages"), true, false},
+		{"below missing projects", h(".code-foundry/projects/app/main.go"), false, false},
+		{"below missing worktrees", h(".code-foundry/worktrees/app/main.go"), false, false},
+		{"below worktrees, another case", h(".code-foundry/WORKTREES/app/main.go"), false, false},
+		{"a found home's projects, missing", h("cf-1/projects"), true, false},
+		{"a found home's worktrees, existing", h("cf-3/worktrees"), true, false},
+		{"below a found home's worktrees", h("cf-3/worktrees/app/main.go"), false, false},
+		{"not an open root", h(".code-foundry/logs"), true, true},
+		{"a folder of that name elsewhere", h("src/projects"), false, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := f.InConfigHome(tc.p); got != tc.want {
+				t.Errorf("InConfigHome(%s) = %v, want %v", tc.p, got, tc.want)
+			}
+			if got := f.Guarded(tc.p); got != tc.guarded {
+				t.Errorf("Guarded(%s) = %v, want %v", tc.p, got, tc.guarded)
 			}
 		})
 	}

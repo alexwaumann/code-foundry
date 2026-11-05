@@ -284,6 +284,10 @@ func fileError(err error) error {
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, fsx.ErrNotPermitted):
 		return connect.NewError(connect.CodePermissionDenied, err)
+	case errors.Is(err, fsx.ErrNotWritable):
+		return connect.NewError(connect.CodeFailedPrecondition, err)
+	case errors.Is(err, fsx.ErrDiskFull):
+		return connect.NewError(connect.CodeResourceExhausted, err)
 	}
 	return connect.NewError(connect.CodeInternal, err)
 }

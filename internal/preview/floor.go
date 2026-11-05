@@ -104,7 +104,18 @@ func (f Floor) Guarded(p string) bool {
 // home here, though a grant may read them. Like Guarded it decides by file identity. A
 // hard link to a file in a config home does not count: a write replaces the name it is
 // given, and the file behind the link's other names stays as it was.
+//
+// A checkout is what lies strictly below a tree, so p's directory is asked too: a file
+// made at the name projects, which does not exist until first use, would break the
+// clones that later want that folder there. A name in a config home's own directory is
+// always the config home's.
 func (f Floor) InConfigHome(p string) bool {
+	return f.inHomeOutsideCheckouts(p) || f.inHomeOutsideCheckouts(filepath.Dir(p))
+}
+
+// inHomeOutsideCheckouts reports whether p lies in a config home outside the trees of
+// checkouts.
+func (f Floor) inHomeOutsideCheckouts(p string) bool {
 	return f.inHomeByName(p, checkouts) || below(f.homeGuards(checkouts), realPath(p))
 }
 
