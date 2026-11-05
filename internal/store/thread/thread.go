@@ -779,6 +779,10 @@ type Store interface {
 	// inside the running turn). A thread that is not running starts with it as its first prompt; its item is
 	// returned at once, and a start that fails is told in the timeline (lifecycle.go).
 	Send(ctx context.Context, id string, msg Message) (Item, error)
+	// Compact sends /compact to the thread; a stopped thread starts with it. Refused
+	// while the thread works, compacts, starts or restarts, waits for an answer, or has
+	// no conversation yet (compact.go).
+	Compact(ctx context.Context, id string) (Item, error)
 	// Respond answers a pending permission request or question.
 	Respond(ctx context.Context, id, requestID string, d Decision) (Item, error)
 	// Interrupt stops the running turn; a no-op when the thread is not running. by is

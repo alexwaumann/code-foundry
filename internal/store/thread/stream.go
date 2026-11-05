@@ -62,6 +62,9 @@ type outgoing struct {
 	// setupQueued: a message sent during the setup (Setup.Queued), taken off the row once
 	// it went out.
 	setupQueued bool
+	// compact: Compact's /compact. Refused unless Claude is at its prompt, and nothing
+	// goes before it (compact.go).
+	compact bool
 }
 
 // streamState is the runner's process half. Every field is touched only by
@@ -610,12 +613,18 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	// The first message of a fresh session a reseed asked for starts with its prefix
 	// (reseed.go); o keeps the prompt as it was, should this send fail.
 	prompt, seed := o.prompt, r.seed
+	if o.compact {
+		seed = "" // the next message gets it
+	}
 	if seed != "" {
 		prompt = seed + "\n\n" + prompt
 	}
 	// A resumed conversation whose app memory changed since it started gets the new list
 	// first (memory.go): the item keeps it apart, so the user's message shows as typed.
 	memNote := r.memNote
+	if o.compact {
+		memNote = "" // the next message gets it
+	}
 	if memNote != "" {
 		prompt = memNote + "\n\n" + prompt
 	}
@@ -777,6 +786,8 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		// The process is on its way out: Send waits for it, then starts a new one.
 		cmd.reply <- threadReply{err: errProcessGone}
 		return
+	case cmd.send != nil && cmd.send.compact && r.st.compactHold() != "":
+		rep.err = compactRefusal(r.id, r.st.compactHold())
 	case cmd.send != nil && (r.st.restart != restartNone || r.st.wantRestart):
 		// Sent once the restarted process is up (onRestarted).
 		r.st.held = append(r.st.held, cmd)

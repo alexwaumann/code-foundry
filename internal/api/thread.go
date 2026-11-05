@@ -189,6 +189,15 @@ func (h *Thread) Send(ctx context.Context, req *connect.Request[v1.SendThreadMes
 	return connect.NewResponse(&v1.SendThreadMessageResponse{Item: itemToProto(it)}), nil
 }
 
+// Compact sends /compact to the thread.
+func (h *Thread) Compact(ctx context.Context, req *connect.Request[v1.CompactThreadRequest]) (*connect.Response[v1.CompactThreadResponse], error) {
+	it, err := h.store.Compact(ctx, req.Msg.GetThreadId())
+	if err != nil {
+		return nil, threadError(err)
+	}
+	return connect.NewResponse(&v1.CompactThreadResponse{Item: itemToProto(it)}), nil
+}
+
 // Respond answers a pending request.
 func (h *Thread) Respond(ctx context.Context, req *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error) {
 	m := req.Msg

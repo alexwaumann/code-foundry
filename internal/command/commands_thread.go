@@ -47,6 +47,7 @@ type ThreadBackend interface {
 	// The conversation.
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
 	Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error)
+	Compact(context.Context, *connect.Request[v1.CompactThreadRequest]) (*connect.Response[v1.CompactThreadResponse], error)
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
 	Interrupt(context.Context, *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error)
 	SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error)
@@ -115,7 +116,7 @@ var threadDecisions = map[string]v1.ThreadDecision{
 	"deny":          v1.ThreadDecision_THREAD_DECISION_DENY,
 }
 
-// RegisterThread registers thread.send, thread.respond, thread.interrupt,
+// RegisterThread registers thread.send, thread.compact, thread.respond, thread.interrupt,
 // thread.items, thread.read, thread.set-model, thread.set-mode, thread.set-effort, thread.wait,
 // thread.subscribe, thread.unsubscribe and thread.subscriptions.
 func RegisterThread(r *Registry, b ThreadBackend) error {
@@ -181,6 +182,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				return waitThread(ctx, b, id, "settled", item.GetId(), limit, sent+"; ")
 			},
 		},
+		threadCompact(b, idArg),
 		Command{
 			Name:      "thread.respond",
 			NoPalette: true,
