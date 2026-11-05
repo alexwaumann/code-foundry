@@ -1044,7 +1044,7 @@ type Thread struct {
 	// e.g. "waiting on 2 child threads and 1 subagent", "waiting on 1 shell". A waiting
 	// row loads as NEEDS_ATTENTION "finished" after a daemon restart. Persisted with status: a DISCONNECTED thread keeps the status and reason it had when its process
 	// ended (a busy one becomes ERROR "interrupted", or "crashed" when its process died on
-	// its own, or IDLE "archived" when an archive stopped it), across daemon restarts. Empty when
+	// its own, or IDLE "archived" or "snoozed" when an archive or a snooze stopped it), across daemon restarts. Empty when
 	// unknown.
 	StatusReason string `protobuf:"bytes,18,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
 	// Permission mode passed to claude; re-passed on Reconnect.
@@ -6549,7 +6549,11 @@ type ArchiveThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Archive (true) or unarchive (false).
-	Archived      bool `protobuf:"varint,2,opt,name=archived,proto3" json:"archived,omitempty"`
+	Archived bool `protobuf:"varint,2,opt,name=archived,proto3" json:"archived,omitempty"`
+	// The thread that asks for it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the
+	// user. When it is id, a thread archiving itself: mid-turn that waits for the turn's
+	// end (ArchiveThreadResponse.deferred; docs/notes/self-put-away.md).
+	ByThreadId    string `protobuf:"bytes,3,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6598,9 +6602,19 @@ func (x *ArchiveThreadRequest) GetArchived() bool {
 	return false
 }
 
+func (x *ArchiveThreadRequest) GetByThreadId() string {
+	if x != nil {
+		return x.ByThreadId
+	}
+	return ""
+}
+
 type ArchiveThreadResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Thread *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
+	// The thread asked this of itself mid-turn: it is archived when the turn ends, so
+	// thread is as it is now.
+	Deferred      bool `protobuf:"varint,2,opt,name=deferred,proto3" json:"deferred,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6640,6 +6654,13 @@ func (x *ArchiveThreadResponse) GetThread() *Thread {
 		return x.Thread
 	}
 	return nil
+}
+
+func (x *ArchiveThreadResponse) GetDeferred() bool {
+	if x != nil {
+		return x.Deferred
+	}
+	return false
 }
 
 type SetThreadWorkspaceRequest struct {
@@ -6746,7 +6767,10 @@ type SnoozeThreadRequest struct {
 	Until *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=until,proto3" json:"until,omitempty"`
 	// Save the thread for later: a snooze with no wake time (Thread.saved_at). Not with
 	// until (INVALID_ARGUMENT).
-	Save          bool `protobuf:"varint,3,opt,name=save,proto3" json:"save,omitempty"`
+	Save bool `protobuf:"varint,3,opt,name=save,proto3" json:"save,omitempty"`
+	// The thread that asks for it, as ArchiveThreadRequest.by_thread_id. Unsnoozing is
+	// never deferred.
+	ByThreadId    string `protobuf:"bytes,4,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6802,9 +6826,19 @@ func (x *SnoozeThreadRequest) GetSave() bool {
 	return false
 }
 
+func (x *SnoozeThreadRequest) GetByThreadId() string {
+	if x != nil {
+		return x.ByThreadId
+	}
+	return ""
+}
+
 type SnoozeThreadResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Thread *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
+	// The thread asked this of itself mid-turn: it is snoozed when the turn ends, so
+	// thread is as it is now.
+	Deferred      bool `protobuf:"varint,2,opt,name=deferred,proto3" json:"deferred,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6844,6 +6878,13 @@ func (x *SnoozeThreadResponse) GetThread() *Thread {
 		return x.Thread
 	}
 	return nil
+}
+
+func (x *SnoozeThreadResponse) GetDeferred() bool {
+	if x != nil {
+		return x.Deferred
+	}
+	return false
 }
 
 type LabelThreadRequest struct {
@@ -7920,23 +7961,29 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06pinned\x18\x02 \x01(\bR\x06pinned\"C\n" +
 	"\x11PinThreadResponse\x12.\n" +
-	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"B\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"d\n" +
 	"\x14ArchiveThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
-	"\barchived\x18\x02 \x01(\bR\barchived\"G\n" +
+	"\barchived\x18\x02 \x01(\bR\barchived\x12 \n" +
+	"\fby_thread_id\x18\x03 \x01(\tR\n" +
+	"byThreadId\"c\n" +
 	"\x15ArchiveThreadResponse\x12.\n" +
-	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"I\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12\x1a\n" +
+	"\bdeferred\x18\x02 \x01(\bR\bdeferred\"I\n" +
 	"\x19SetThreadWorkspaceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
 	"\tworkspace\x18\x02 \x01(\tR\tworkspace\"L\n" +
 	"\x1aSetThreadWorkspaceResponse\x12.\n" +
-	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"k\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"\x8d\x01\n" +
 	"\x13SnoozeThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x120\n" +
 	"\x05until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\x12\x12\n" +
-	"\x04save\x18\x03 \x01(\bR\x04save\"F\n" +
+	"\x04save\x18\x03 \x01(\bR\x04save\x12 \n" +
+	"\fby_thread_id\x18\x04 \x01(\tR\n" +
+	"byThreadId\"b\n" +
 	"\x14SnoozeThreadResponse\x12.\n" +
-	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"d\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12\x1a\n" +
+	"\bdeferred\x18\x02 \x01(\bR\bdeferred\"d\n" +
 	"\x12LabelThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05clear\x18\x02 \x01(\bR\x05clear\x12\x10\n" +

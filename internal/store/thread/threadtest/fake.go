@@ -385,6 +385,28 @@ func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Thread, er
 	})
 }
 
+// PutAwaySelf records "PutAwaySelf <id> <kind>". A busy thread is deferred, unchanged (the
+// fake has no turn to end); otherwise it is the plain call, recorded as such too.
+func (f *Fake) PutAwaySelf(ctx context.Context, id string, p thread.PutAway) (thread.Thread, bool, error) {
+	deferred := false
+	s, err := f.mutate("PutAwaySelf "+id+" "+p.Kind.String(), id, func(s *thread.Thread) error {
+		deferred = s.Status == thread.StatusBusy
+		return nil
+	})
+	if err != nil || deferred {
+		return s, deferred, err
+	}
+	switch p.Kind {
+	case thread.PutAwaySnooze:
+		s, err = f.Snooze(ctx, id, p.Until)
+	case thread.PutAwaySave:
+		s, err = f.SaveForLater(ctx, id)
+	default:
+		s, err = f.Archive(ctx, id, true)
+	}
+	return s, false, err
+}
+
 // Archive records "Archive <id> <archived>". Archiving disconnects a live thread
 // (reason "closed"), unpins and unsnoozes it and sets ArchivedAt to Now unless already
 // set; unarchiving clears ArchivedAt only. No shells are involved, and nothing cascades.

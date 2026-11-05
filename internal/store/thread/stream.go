@@ -149,11 +149,12 @@ type threadCmd struct {
 	// ctx is the caller's: a send held across a restart is dropped once it is done.
 	ctx       context.Context
 	send      *outgoing
-	effort    *string // SetEffort
-	restart   bool    // Restart (restart.go)
-	reseed    *seed   // Reseed (reseed.go)
-	wakeLimit bool    // the wake limit was reached (subscriptions_fire.go)
-	verb      *Item   // ShowHTML, ShowTheme: an item a verb adds (html.go verbItem)
+	effort    *string  // SetEffort
+	restart   bool     // Restart (restart.go)
+	reseed    *seed    // Reseed (reseed.go)
+	wakeLimit bool     // the wake limit was reached (subscriptions_fire.go)
+	verb      *Item    // ShowHTML, ShowTheme: an item a verb adds (html.go verbItem)
+	putAway   *PutAway // PutAwaySelf (putaway.go)
 	// reuse, with verb, may answer with an item already in the log instead.
 	reuse     func(itemWriter) (Item, bool)
 	requestID string
@@ -165,6 +166,7 @@ type threadReply struct {
 	item      Item
 	thread    Thread // SetEffort's, Restart's
 	restarted bool   // Restart's: a restart was asked of the running process
+	deferred  bool   // PutAwaySelf's: it waits for the turn's end
 	err       error
 }
 
@@ -535,6 +537,7 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		if last := r.st.proj.last; last.tokens > 0 {
 			r.m.recordContext(r.id, last.tokens, last.model)
 		}
+		r.putAwayAtTurnEnd(e) // putaway.go
 	case *claudestream.CommandsChanged:
 		r.onSlashCommands(e.Commands, true)
 	case *claudestream.ConversationReset:
@@ -772,6 +775,9 @@ func (r *runner) resolveItem(id string, fn func(*Request)) (Item, bool) {
 
 func (r *runner) onThreadCmd(cmd threadCmd) {
 	var rep threadReply
+	if cmd.send != nil && cmd.send.origin != OriginWake {
+		r.m.dropPutAway(r.id, "a message came during the turn") // someone took the thread over
+	}
 	switch {
 	case cmd.send != nil && (r.closing || r.finished):
 		// The process is on its way out: Send waits for it, then starts a new one.
@@ -795,6 +801,8 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		rep.item = r.onWakeLimit()
 	case cmd.verb != nil:
 		rep.item = r.onVerbItem(*cmd.verb, cmd.reuse)
+	case cmd.putAway != nil:
+		rep.deferred = r.onPutAway(*cmd.putAway)
 	default:
 		rep.item, rep.err = r.respond(cmd.requestID, cmd.decision)
 	}

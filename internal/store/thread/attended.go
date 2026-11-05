@@ -66,7 +66,7 @@ func (m *Manager) seenLocked(rec *record) {
 // its status. It reports whether it changed the status; the caller commits, persisted.
 // Callers hold m.mu.
 func (m *Manager) seenStoppedLocked(rec *record) bool {
-	if rec.run != nil || rec.archiving || !rec.s.ArchivedAt.IsZero() || m.viewers[rec.s.ID] == 0 || !m.attended() {
+	if rec.run != nil || (rec.away != nil && rec.away.reason == ReasonArchived) || !rec.s.ArchivedAt.IsZero() || m.viewers[rec.s.ID] == 0 || !m.attended() {
 		return false
 	}
 	if raw := rec.rawStatus(); !clearedWhenSeen(raw.st, raw.reason) {

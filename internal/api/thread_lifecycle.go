@@ -152,6 +152,13 @@ func (h *Thread) Pin(ctx context.Context, req *connect.Request[v1.PinThreadReque
 
 // Archive archives (closing it and its shells, unpinning) or unarchives a thread.
 func (h *Thread) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
+	if req.Msg.GetArchived() && bySelf(req.Msg.GetByThreadId(), req.Msg.GetId()) {
+		s, deferred, err := h.store.PutAwaySelf(ctx, req.Msg.GetId(), thread.PutAway{Kind: thread.PutAwayArchive})
+		if err != nil {
+			return nil, threadError(err)
+		}
+		return connect.NewResponse(&v1.ArchiveThreadResponse{Thread: threadToProto(s), Deferred: deferred}), nil
+	}
 	s, err := h.store.Archive(ctx, req.Msg.GetId(), req.Msg.GetArchived())
 	if err != nil {
 		return nil, threadError(err)
@@ -161,11 +168,15 @@ func (h *Thread) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThr
 
 // Snooze snoozes a thread until req.until (closing it and its shells, unpinning,
 // unarchiving), saves it for later (req.save: the same with no wake time), or unsnoozes
-// it (neither).
+// it (neither). A thread doing either to itself goes through snoozeSelf.
 func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
+	self := bySelf(req.Msg.GetByThreadId(), req.Msg.GetId())
 	if req.Msg.GetSave() {
 		if req.Msg.GetUntil() != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("give until or save, not both"))
+		}
+		if self {
+			return h.snoozeSelf(ctx, req.Msg.GetId(), thread.PutAway{Kind: thread.PutAwaySave})
 		}
 		s, err := h.store.SaveForLater(ctx, req.Msg.GetId())
 		if err != nil {
@@ -179,12 +190,28 @@ func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThrea
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("until: %w", err))
 		}
 		until = t.AsTime()
+		if self {
+			return h.snoozeSelf(ctx, req.Msg.GetId(), thread.PutAway{Kind: thread.PutAwaySnooze, Until: until})
+		}
 	}
 	s, err := h.store.Snooze(ctx, req.Msg.GetId(), until)
 	if err != nil {
 		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: threadToProto(s)}), nil
+}
+
+// bySelf reports whether a request about thread id comes from that thread (by is empty
+// for the user).
+func bySelf(by, id string) bool { return by != "" && by == id }
+
+// snoozeSelf is a thread snoozing itself: mid-turn that waits for the turn's end.
+func (h *Thread) snoozeSelf(ctx context.Context, id string, p thread.PutAway) (*connect.Response[v1.SnoozeThreadResponse], error) {
+	s, deferred, err := h.store.PutAwaySelf(ctx, id, p)
+	if err != nil {
+		return nil, threadError(err)
+	}
+	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: threadToProto(s), Deferred: deferred}), nil
 }
 
 // Close ends the process gracefully; it returns once the thread is DISCONNECTED. No

@@ -402,9 +402,12 @@ type record struct {
 	// startFails counts the failed starts since the last one that came up: wakes
 	// back off (wakebackoff.go).
 	startFails failedStarts
-	// archiving is set while an archive closes the thread (archive.go markArchiving):
-	// the close's end publishes a cut-off turn as idle "archived" at once.
-	archiving bool
+	// away is set while an archive or a snooze closes the thread (putaway.go
+	// markPuttingAway): the close's end publishes a cut-off turn as idle at once.
+	away *awayClose
+	// putAway is what the thread asked of itself mid-turn, carried out when the turn
+	// ends (putaway.go). In memory only: a daemon restart loses the turn anyway.
+	putAway *PutAway
 	// moving is set while a Move places the thread or waits for its set_cwd (move.go):
 	// a second Move is refused meanwhile.
 	moving bool
@@ -1444,10 +1447,11 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 			// The process is gone: the next spawn gets the current extras.
 			rec.envPrint = nil
 			rec.s.PluginEnvStale, rec.s.PluginEnvChange = false, ""
+			m.dropPutAwayLocked(rec, "Claude's process ended") // the turn it waited for is over
 		}
 		fn(&rec.s)
-		if rec.archiving {
-			archivedStatus(&rec.s, m.opts.Now())
+		if rec.away != nil && putAwayStatus(&rec.s, rec.away.reason, m.opts.Now()) {
+			rec.away.cut = true
 		}
 		m.seenStoppedLocked(rec)
 	})

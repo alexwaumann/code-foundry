@@ -212,7 +212,7 @@ message Thread {
   // e.g. "waiting on 2 child threads and 1 subagent", "waiting on 1 shell". A waiting
   // row loads as NEEDS_ATTENTION "finished" after a daemon restart. Persisted with status: a DISCONNECTED thread keeps the status and reason it had when its process
   // ended (a busy one becomes ERROR "interrupted", or "crashed" when its process died on
-  // its own, or IDLE "archived" when an archive stopped it), across daemon restarts. Empty when
+  // its own, or IDLE "archived" or "snoozed" when an archive or a snooze stopped it), across daemon restarts. Empty when
   // unknown.
   string status_reason = 18;
   // Permission mode passed to claude; re-passed on Reconnect.
@@ -1344,10 +1344,17 @@ message ArchiveThreadRequest {
   string id = 1;
   // Archive (true) or unarchive (false).
   bool archived = 2;
+  // The thread that asks for it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the
+  // user. When it is id, a thread archiving itself: mid-turn that waits for the turn's
+  // end (ArchiveThreadResponse.deferred; docs/notes/self-put-away.md).
+  string by_thread_id = 3;
 }
 
 message ArchiveThreadResponse {
   Thread thread = 1;
+  // The thread asked this of itself mid-turn: it is archived when the turn ends, so
+  // thread is as it is now.
+  bool deferred = 2;
 }
 
 message SetThreadWorkspaceRequest {
@@ -1367,10 +1374,16 @@ message SnoozeThreadRequest {
   // Save the thread for later: a snooze with no wake time (Thread.saved_at). Not with
   // until (INVALID_ARGUMENT).
   bool save = 3;
+  // The thread that asks for it, as ArchiveThreadRequest.by_thread_id. Unsnoozing is
+  // never deferred.
+  string by_thread_id = 4;
 }
 
 message SnoozeThreadResponse {
   Thread thread = 1;
+  // The thread asked this of itself mid-turn: it is snoozed when the turn ends, so
+  // thread is as it is now.
+  bool deferred = 2;
 }
 
 message LabelThreadRequest {

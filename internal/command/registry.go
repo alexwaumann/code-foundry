@@ -188,6 +188,7 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 	if err := checkRequired(c.Args, args); err != nil {
 		return Result{}, fmt.Errorf("%s: %w", name, err)
 	}
+	eff.CallerThreadID = uctx.ActiveThreadID
 	if c.Confirm != "" && !o.confirmed && (c.ConfirmIf == nil || c.ConfirmIf(ctx, eff, args)) {
 		msg := renderConfirm(c.Confirm, c.Args, args)
 		if c.DynamicConfirm != nil {
@@ -204,7 +205,6 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 	if o.confirmed {
 		ctx = context.WithValue(ctx, confirmedKey{}, true)
 	}
-	eff.CallerThreadID = uctx.ActiveThreadID
 	res, err := c.Run(ctx, eff, args)
 	return res, shortIDHint(c.Args, args, err)
 }

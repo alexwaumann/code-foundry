@@ -56,6 +56,9 @@ type Thread struct {
 	// FailIDs are the thread ids Remove and Archive fail for, with these errors (the
 	// call is recorded first).
 	FailIDs map[string]error
+	// Deferred makes Archive and Snooze answer deferred, the thread as it is, for a thread
+	// asking it of itself (by_thread_id is its id).
+	Deferred bool
 	// Cascade is List's answer to a filter with archive_cascade_of, by that id (none
 	// when absent): the hidden threads archiving it takes along.
 	Cascade map[string][]*v1.Thread
@@ -276,6 +279,9 @@ func (s *Thread) Archive(_ context.Context, r *connect.Request[v1.ArchiveThreadR
 		cur = proto.CloneOf(s.Current)
 	}
 	cur.Id = r.Msg.GetId()
+	if s.Deferred && r.Msg.GetArchived() && r.Msg.GetByThreadId() == cur.Id {
+		return connect.NewResponse(&v1.ArchiveThreadResponse{Thread: cur, Deferred: true}), nil
+	}
 	if !r.Msg.GetArchived() {
 		cur.ArchivedAt = nil
 	} else {
@@ -299,6 +305,9 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 		cur = proto.CloneOf(s.Current)
 	}
 	cur.Id = r.Msg.GetId()
+	if s.Deferred && r.Msg.GetByThreadId() == cur.Id && (r.Msg.GetUntil() != nil || r.Msg.GetSave()) {
+		return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: cur, Deferred: true}), nil
+	}
 	cur.SnoozedUntil, cur.SavedAt = r.Msg.GetUntil(), nil
 	if r.Msg.GetSave() {
 		cur.SavedAt = timestamppb.New(time.UnixMilli(1))

@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -311,6 +313,75 @@ func TestThreadWatchSendsSnapshotThenEvents(t *testing.T) {
 	}
 	if !stream.Receive() || stream.Msg().GetRemovedId() != "s-a" {
 		t.Fatalf("third event = %v (%v)", stream.Msg(), stream.Err())
+	}
+}
+
+// A request is a thread's own put-away only when by_thread_id is the thread: the store
+// then decides whether it waits for the turn's end.
+func TestThreadPutAwaySelf(t *testing.T) {
+	until := timestamppb.New(time.Now().Add(time.Hour))
+	archive := func(c codefoundryv1connect.ThreadServiceClient, by string, archived bool) (bool, error) {
+		res, err := c.Archive(context.Background(), connect.NewRequest(&v1.ArchiveThreadRequest{Id: "s-1", Archived: archived, ByThreadId: by}))
+		if err != nil {
+			return false, err
+		}
+		return res.Msg.GetDeferred(), nil
+	}
+	snooze := func(r *v1.SnoozeThreadRequest) func(codefoundryv1connect.ThreadServiceClient, string, bool) (bool, error) {
+		return func(c codefoundryv1connect.ThreadServiceClient, by string, _ bool) (bool, error) {
+			req := proto.CloneOf(r)
+			req.Id, req.ByThreadId = "s-1", by
+			res, err := c.Snooze(context.Background(), connect.NewRequest(req))
+			if err != nil {
+				return false, err
+			}
+			return res.Msg.GetDeferred(), nil
+		}
+	}
+	tests := []struct {
+		name         string
+		do           func(codefoundryv1connect.ThreadServiceClient, string, bool) (bool, error)
+		archived     bool
+		by           string
+		status       thread.Status
+		wantCall     string
+		wantDeferred bool
+	}{
+		{name: "archive, by itself, mid-turn", do: archive, archived: true, by: "s-1", status: thread.StatusBusy, wantCall: "PutAwaySelf s-1 archive", wantDeferred: true},
+		{name: "archive, by itself, at the prompt", do: archive, archived: true, by: "s-1", status: thread.StatusIdle, wantCall: "PutAwaySelf s-1 archive"},
+		{name: "archive, by another thread", do: archive, archived: true, by: "s-2", status: thread.StatusBusy, wantCall: "Archive s-1 true"},
+		{name: "archive, by the user", do: archive, archived: true, status: thread.StatusBusy, wantCall: "Archive s-1 true"},
+		{name: "unarchive, by itself", do: archive, by: "s-1", status: thread.StatusBusy, wantCall: "Archive s-1 false"},
+		{name: "snooze, by itself, mid-turn", do: snooze(&v1.SnoozeThreadRequest{Until: until}), by: "s-1", status: thread.StatusBusy, wantCall: "PutAwaySelf s-1 snooze", wantDeferred: true},
+		{name: "snooze, by the user", do: snooze(&v1.SnoozeThreadRequest{Until: until}), status: thread.StatusBusy, wantCall: "Snooze s-1 "},
+		{name: "save, by itself, mid-turn", do: snooze(&v1.SnoozeThreadRequest{Save: true}), by: "s-1", status: thread.StatusBusy, wantCall: "PutAwaySelf s-1 save", wantDeferred: true},
+		{name: "save, by the user", do: snooze(&v1.SnoozeThreadRequest{Save: true}), status: thread.StatusBusy, wantCall: "SaveForLater s-1"},
+		{name: "unsnooze, by itself", do: snooze(&v1.SnoozeThreadRequest{}), by: "s-1", status: thread.StatusBusy, wantCall: "Snooze s-1 -"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c := newThreadServer(t)
+			fake.Put(thread.Thread{ID: "s-1", Status: tt.status})
+			deferred, err := tt.do(c, tt.by, tt.archived)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if deferred != tt.wantDeferred {
+				t.Errorf("deferred = %v, want %v", deferred, tt.wantDeferred)
+			}
+			if calls := fake.Calls(); len(calls) == 0 || !strings.HasPrefix(calls[0], tt.wantCall) {
+				t.Errorf("calls = %v, want first %q", calls, tt.wantCall)
+			}
+		})
+	}
+}
+
+// An empty id is not "the thread itself" for an empty by_thread_id.
+func TestThreadArchiveEmptyIDIsNotSelf(t *testing.T) {
+	fake, c := newThreadServer(t)
+	_, _ = c.Archive(context.Background(), connect.NewRequest(&v1.ArchiveThreadRequest{Archived: true}))
+	if calls := fake.Calls(); len(calls) != 1 || strings.HasPrefix(calls[0], "PutAwaySelf") {
+		t.Errorf("calls = %v, want the plain archive", calls)
 	}
 }
 

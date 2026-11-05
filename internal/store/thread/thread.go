@@ -718,6 +718,10 @@ type Store interface {
 	// SaveForLater snoozes a thread with no wake time: everything Snooze does, but it
 	// sets SavedAt (kept when already set) and clears SnoozedUntil, and nothing wakes it.
 	SaveForLater(ctx context.Context, id string) (Thread, error)
+	// PutAwaySelf is Archive(true), Snooze or SaveForLater as the thread asks them of
+	// itself. Mid-turn it reports deferred and the end of the turn carries it out
+	// (putaway.go); otherwise it is the plain call, which outlives ctx.
+	PutAwaySelf(ctx context.Context, id string, p PutAway) (t Thread, deferred bool, err error)
 	// StageAttachment stores an image or PDF for a message and returns its absolute
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes
 	// (an image) or MaxPDFAttachmentBytes (a PDF). pages is the client's page count
