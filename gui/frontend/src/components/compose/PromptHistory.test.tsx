@@ -80,6 +80,18 @@ describe("the thread composer's picker (prompt-history-picker.spec.ts)", () => {
     await settle();
   };
 
+  it("a row under a pointer at rest is not selected; a real move selects it", async () => {
+    await mount();
+    await key("ArrowUp");
+    const second = items()[1];
+    if (!second) throw new Error("no second row");
+    fireEvent.pointerMove(document.body, { clientX: 200, clientY: 200 });
+    fireEvent.pointerMove(second, { clientX: 200, clientY: 200 });
+    expect(items()[0]?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.pointerMove(second, { clientX: 200, clientY: 201 });
+    expect(items()[1]?.getAttribute("aria-selected")).toBe("true");
+  });
+
   it("Up on the empty composer opens it in This thread, newest first; the arrows wrap; Escape closes", async () => {
     await mount();
     expect(card()).toBeNull();
@@ -241,5 +253,38 @@ describe("composer.history's palette page (prompt-history-picker.spec.ts)", () =
     await settle(10);
     expect(useUiStore.getState().palette.open).toBe(false);
     expect(getDraft(threadDraftKey(ID)).text).toBe(SECOND);
+  });
+
+  it("the first row is selected once each answer lands, typing or deleting", async () => {
+    act(() => {
+      useUiStore.getState().select({ kind: "thread", id: ID });
+    });
+    render(<CommandPalette />);
+    act(() => {
+      useUiStore.getState().openPromptsPalette();
+    });
+    await answered();
+    const palette = screen.getByTestId("palette");
+    const input = within(palette).getByPlaceholderText("Search previous prompts…");
+    const selectedRow = () => items().findIndex((i) => i.getAttribute("data-selected") === "true");
+    const search = async (q: string) => {
+      act(() => {
+        fireEvent.change(input, { target: { value: q } });
+      });
+      await answered(200);
+    };
+    await search("force");
+    expect(items()).toHaveLength(1);
+    expect(selectedRow()).toBe(0);
+    // The older row stays in the list, but is not first once the filter widens.
+    await search("");
+    expect(items()).toHaveLength(2);
+    expect(selectedRow()).toBe(0);
+    // The selected row leaves the list.
+    await search("force");
+    expect(selectedRow()).toBe(0);
+    await search("suite");
+    expect(items()).toHaveLength(1);
+    expect(selectedRow()).toBe(0);
   });
 });
