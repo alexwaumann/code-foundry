@@ -174,8 +174,8 @@ func (t *Tunnel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // procedure is the one value everything downstream uses: the path of the server-streaming
 // procedure u names, or false. Only a name the generated code registered passes, so no
 // path reaches another route, and a unary or client-streaming procedure stops here, before
-// the upgrade: it would need a body the tunnel never reads, and unary calls stay on HTTP.
-// Anything percent-encoded is refused rather than decoded into a name.
+// the upgrade: unary calls stay on HTTP, and a client stream's later messages would never be
+// read. Anything percent-encoded is refused rather than decoded into a name.
 func procedure(u *url.URL) (string, bool) {
 	name, ok := strings.CutPrefix(u.Path, Prefix)
 	if !ok || u.RawPath != "" || u.RawQuery != "" {
