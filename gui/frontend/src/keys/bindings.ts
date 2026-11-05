@@ -18,6 +18,7 @@ import { presentPromptHistory } from "@/stores/historyComposers";
 import { canSaveFile } from "@/stores/fileEdit";
 import { presentFileSave } from "@/stores/fileRequest";
 import { presentFileFinder } from "@/stores/fileFinder";
+import { presentTerminalFind } from "@/stores/terminalFind";
 import { presentThreadFind } from "@/stores/threadFind";
 import { presentSearch } from "@/stores/threadSearch";
 import { presentDictationToggle } from "@/stores/dictation";
@@ -185,14 +186,23 @@ function activeThread() {
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
 const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-like", "thread.interrupt", "thread.run-in", "thread.move.open", "thread.snooze", "project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
 
+/**
+ * Commands that share their chords with another (internal/command SharedChords): they run
+ * only while the keyboard is in a terminal, where they win over it, so cmd+f finds in the
+ * terminal there and in the thread everywhere else. Decided by where the keyboard is, not
+ * by availability: the list can be a debounce behind a focus change, and a plugin's terminal
+ * node is in no context.
+ */
+const terminalScoped: ReadonlySet<string> = new Set(["terminal.find", "terminal.find.next", "terminal.find.previous"]);
+
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
-/** chord -> command, from Command.keybindings. Only startable commands bind. */
+/** chord -> command, from Command.keybindings. Only startable commands bind; a terminal's own are in terminalCommand. */
 export function commandBindings(commands: readonly CommandView[]): Map<string, CommandView> {
   if (bindingCache?.commands === commands) return bindingCache.map;
   const map = new Map<string, CommandView>();
   for (const c of commands) {
-    if (!isStartable(c)) continue;
+    if (!isStartable(c) || terminalScoped.has(c.name)) continue;
     for (const k of c.keybindings) {
       const chord = normalizeChord(k);
       if (chord && !map.has(chord)) map.set(chord, c);
@@ -200,6 +210,30 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
   }
   bindingCache = { commands, map };
   return map;
+}
+
+let terminalCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
+
+/**
+ * The command of terminalScoped this chord runs in a terminal. Any chord with cmd, ctrl or
+ * alt: unlike a command's chord in a shell (terminalYieldable), a user who binds ctrl+f here
+ * means this terminal's find, not the program's. A bare key stays the program's.
+ */
+function terminalCommand(chord: string): CommandView | undefined {
+  if (!/^(cmd|ctrl|alt)\+/.test(chord)) return undefined;
+  const { commands } = useCommandsStore.getState();
+  if (terminalCache?.commands !== commands) {
+    const map = new Map<string, CommandView>();
+    for (const c of commands) {
+      if (!terminalScoped.has(c.name)) continue;
+      for (const k of c.keybindings) {
+        const bound = normalizeChord(k);
+        if (bound && !map.has(bound)) map.set(bound, c);
+      }
+    }
+    terminalCache = { commands, map };
+  }
+  return terminalCache.map.get(chord);
 }
 
 /**
@@ -272,7 +306,7 @@ function declaredChord(chord: string): boolean {
 
 /** True when the chord must reach the app even while xterm has focus. */
 export function isGlobalChord(chord: string): boolean {
-  return viewActionMap.has(chord) || terminalYields(chord) !== undefined;
+  return viewActionMap.has(chord) || terminalCommand(chord) !== undefined || terminalYields(chord) !== undefined;
 }
 
 /**
@@ -439,6 +473,11 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
   "thread.find": () => presentThreadFind("open") || true,
   "thread.find.next": () => presentThreadFind("next") || true,
   "thread.find.previous": () => presentThreadFind("previous") || true,
+  // Window-local: the find bar of the terminal with the keyboard, or a step through its
+  // matches (stores/terminalFind.ts). The CLI's reach every window through ShowView.
+  "terminal.find": () => presentTerminalFind("open") || true,
+  "terminal.find.next": () => presentTerminalFind("next") || true,
+  "terminal.find.previous": () => presentTerminalFind("previous") || true,
   // Window-local: the palette's Find dialog over every thread (stores/threadSearch.ts), from
   // any view, on the search `id` names (the sidebar's search row). The CLI's reaches every
   // window through ShowView.
@@ -549,7 +588,8 @@ function isEditable(el: Element | null): boolean {
  *     (cmd+1..9 belong to the project picker while it is open).
  *  2. A focused terminal, a thread prompt's text ([data-chord-yield]) or the File tab's code
  *     editor consumes everything else, except cmd chords bound to commands (see
- *     terminalYields); the editor keeps its own (see codeEditorChords).
+ *     terminalYields); the editor keeps its own (see codeEditorChords). In a terminal its
+ *     own commands come first (see terminalCommand).
  *  3. A focused text field (palette input, rename field) consumes everything else, except
  *     view.back and view.forward's cmd chords outside the palette (see fieldYielded).
  *  4. F2 renames the selected thread (the cursor row inside the tree); command
@@ -579,7 +619,7 @@ export function handleKeyDown(e: KeyboardEvent): void {
   // (F2 renames).
   if (shell || code || (isEditable(target) && target?.closest("[data-chord-yield]"))) {
     if (useUiStore.getState().palette.open) return;
-    const yielded = terminalYields(chord, code);
+    const yielded = (shell ? terminalCommand(chord) : undefined) ?? terminalYields(chord, code);
     if (yielded) {
       e.preventDefault();
       e.stopPropagation();
@@ -591,7 +631,7 @@ export function handleKeyDown(e: KeyboardEvent): void {
       // others edit (cmd+arrows, cmd+backspace) and must not be held. Before the first
       // list (the window opens on the composer, its prompt focused) nothing is declared
       // yet: a chord that does not edit waits for it, as it would outside the prompt.
-      startWhenListed(e, chord);
+      startWhenListed(e, chord, shell);
     }
     return;
   }
@@ -626,7 +666,7 @@ export function handleKeyDown(e: KeyboardEvent): void {
  * list is for an older context, re-list now and look the chord up again. Nothing happens
  * when the list is current (the chord is simply unbound).
  */
-function startWhenListed(e: KeyboardEvent, chord: string): void {
+function startWhenListed(e: KeyboardEvent, chord: string, shell = false): void {
   const ctx = getUiContext();
   if (useCommandsStore.getState().contextKey === contextKey(ctx)) return;
   e.preventDefault();
@@ -635,7 +675,7 @@ function startWhenListed(e: KeyboardEvent, chord: string): void {
   void refreshCommands(ctx)
     .then(() => whenListed(ctx))
     .then(() => {
-      const late = commandBindings(useCommandsStore.getState().commands).get(chord);
+      const late = (shell ? terminalCommand(chord) : undefined) ?? commandBindings(useCommandsStore.getState().commands).get(chord);
       if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
     });
 }

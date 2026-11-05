@@ -1,4 +1,4 @@
-import { Terminal, type IDisposable } from "@xterm/xterm";
+import { Terminal, type IDisposable, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -6,7 +6,8 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { chordFromEvent } from "@/keys/chord";
 import { copyText } from "@/lib/clipboard";
-import type { Disposable, TermSize, TerminalRenderer } from "./renderer";
+import { TerminalFind } from "./find";
+import type { Disposable, FindResults, TermSize, TerminalRenderer } from "./renderer";
 import { DEFAULT_TERMINAL_FONT_FAMILY, onBundledFontLoaded } from "./fonts";
 import { KeyboardModes, shiftEnterSequence } from "./keyboard";
 import { swallowDaemonAnsweredQueries } from "./queries";
@@ -47,6 +48,7 @@ export class XtermRenderer implements TerminalRenderer {
   private mounted = false;
   /** Kitty keyboard / modifyOtherKeys state the program asked for (see keyboard.ts). */
   readonly keyboardModes = new KeyboardModes();
+  private readonly search: TerminalFind;
   kind: RendererKind = "dom";
 
   constructor(private readonly opts: XtermRendererOptions) {
@@ -67,15 +69,24 @@ export class XtermRenderer implements TerminalRenderer {
         for (const cb of this.resizeListeners) cb(size);
       }),
     );
+    this.search = new TerminalFind(this.term, (color) => {
+      this.applyTheme(terminalTheme(), color);
+    });
     // The palette is the document's CSS variables (theme.ts); follow them when the scheme
     // (or, later, the theme) on <html> changes.
     const stopTheme = watchTerminalTheme((theme) => {
-      this.term.options.theme = theme;
+      this.search.retheme();
+      this.applyTheme(theme, this.search.selectionColor);
     });
-    this.disposables.push({ dispose: stopTheme });
+    this.disposables.push({ dispose: stopTheme }, { dispose: () => { this.search.dispose(); } });
     this.term.attachCustomKeyEventHandler((e) => this.keyHandler(e));
     this.trackKeyboardModes();
     this.disposables.push(...swallowDaemonAnsweredQueries(this.term));
+  }
+
+  /** The palette, with the find's current match as the selection's colour while there is one (terminal/find.ts). */
+  private applyTheme(theme: ITheme, selection: string | null): void {
+    this.term.options.theme = selection === null ? theme : { ...theme, selectionBackground: selection, selectionInactiveBackground: selection };
   }
 
   /**
@@ -207,6 +218,7 @@ export class XtermRenderer implements TerminalRenderer {
   }
 
   reset(): void {
+    this.search.reset();
     this.term.reset();
     this.term.clear();
     this.keyboardModes.reset();
@@ -278,6 +290,22 @@ export class XtermRenderer implements TerminalRenderer {
     if (this.term.options.fontSize === px) return;
     this.term.options.fontSize = px;
     this.fit();
+  }
+
+  find(query: string): void {
+    this.search.search(query);
+  }
+
+  findStep(dir: 1 | -1): void {
+    this.search.step(dir);
+  }
+
+  clearFind(): void {
+    this.search.clear();
+  }
+
+  onFindResults(cb: (results: FindResults) => void): Disposable {
+    return this.search.onResults(cb);
   }
 
   /** appearance.font_family (with fallbacks). Changes cell metrics, so it refits. */

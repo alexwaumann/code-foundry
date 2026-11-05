@@ -10,7 +10,7 @@
  * Every Attach opens live (an empty snapshot); `attach.exit(id, code)` sends the exit frame.
  */
 import type { AttachEventView } from "@/api/terminal";
-import type { Disposable, TermSize, TerminalRenderer } from "@/terminal/renderer";
+import type { Disposable, FindResults, TermSize, TerminalRenderer } from "@/terminal/renderer";
 
 class FakeXterm implements TerminalRenderer {
   size: TermSize = { cols: 80, rows: 24 };
@@ -37,8 +37,31 @@ class FakeXterm implements TerminalRenderer {
   setFontSize(): void {}
   setFontFamily(): void {}
   setScrollback(): void {}
+  find(query: string): void {
+    finds.calls.push(`find ${query}`);
+  }
+  findStep(dir: 1 | -1): void {
+    finds.calls.push(`step ${String(dir)}`);
+  }
+  clearFind(): void {
+    finds.calls.push("clear");
+  }
+  onFindResults(cb: (results: FindResults) => void): Disposable {
+    finds.publish = cb;
+    return {
+      dispose: () => {
+        finds.publish = null;
+      },
+    };
+  }
   dispose(): void {}
 }
+
+/** What the host asked of the renderer's find, in order, and its renderer's way to report matches. */
+export const finds = {
+  calls: [] as string[],
+  publish: null as ((results: FindResults) => void) | null,
+};
 
 export const xtermFakes = { XtermRenderer: FakeXterm };
 

@@ -6,9 +6,11 @@ import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
 import { isGlobalChord } from "@/keys/bindings";
 import { cn } from "@/lib/utils";
 import { useScrollbackLines, useTerminalFontFamily } from "@/stores/settings";
+import { noteTerminalKeyboard, registerTerminalFindHost, setTerminalFindResults, useTerminalFindQuery } from "@/stores/terminalFind";
 import { useUiStore } from "@/stores/ui";
 import { AttachController, type AttachState } from "@/terminal/attach";
 import { XtermRenderer, type RendererKind } from "@/terminal/xterm";
+import { TerminalFindBar } from "./TerminalFindBar";
 
 interface DevHook {
   renderer: XtermRenderer;
@@ -46,7 +48,7 @@ function simulateWebglLoss(host: HTMLElement): () => void {
   };
 }
 
-function Overlay({ state }: { state: AttachState }) {
+function Overlay({ state, finding }: { state: AttachState; finding: boolean }) {
   if (state.phase === "exited") {
     return (
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center" data-testid="exit-overlay">
@@ -61,7 +63,7 @@ function Overlay({ state }: { state: AttachState }) {
   }
   if (state.phase === "connecting" || state.phase === "reconnecting") {
     return (
-      <div className="pointer-events-none absolute top-3 right-4 flex items-center gap-2 rounded-md border bg-cf-surface-overlay/90 px-2.5 py-1 text-caption">
+      <div className={cn("pointer-events-none absolute right-4 flex items-center gap-2 rounded-md border bg-cf-surface-overlay/90 px-2.5 py-1 text-caption", finding ? "top-14" : "top-3")}>
         {state.phase === "connecting" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5 animate-spin" />}
         {state.phase === "connecting" ? "Attaching…" : "Reconnecting…"}
       </div>
@@ -89,6 +91,11 @@ function Overlay({ state }: { state: AttachState }) {
  *
  * Focus is the parent's call (`ref.focus()`). The host's focus counts for the region
  * around it (the bottom panel's "bottom").
+ *
+ * The find bar is the host's, so every terminal has one (a plugin's node too). Its query is
+ * the terminal's (stores/terminalFind.ts) and the renderer searches whichever terminal is
+ * attached: the store outlives a tab switch and an unmounted panel, the renderer's matches
+ * do not. The bar stays out of [data-terminal-host]: it is a field, not the shell.
  */
 export function TerminalHost({
   ref,
@@ -124,6 +131,10 @@ export function TerminalHost({
   // after the parent may have focused the first.
   const refocus = useRef(false);
   const priority = useRef(streamPriority);
+  // The terminal the renderer's results are of (null: none attached).
+  const attached = useRef(terminalId);
+  // null while the terminal's find is closed.
+  const findQuery = useTerminalFindQuery(terminalId);
 
   useImperativeHandle(ref, () => ({ focus: () => ctlRef.current?.renderer.focus() }), []);
 
@@ -149,6 +160,9 @@ export function TerminalHost({
       },
       setState,
     );
+    const findResults = renderer.onFindResults((results) => {
+      if (attached.current !== null) setTerminalFindResults(attached.current, results);
+    });
     const hook = { renderer, controller };
     ctlRef.current = hook;
     if (import.meta.env.DEV) window.__cfTerminal = hook;
@@ -171,6 +185,7 @@ export function TerminalHost({
       stopSimulation();
       ro.disconnect();
       cancelAnimationFrame(raf);
+      findResults.dispose();
       controller.dispose();
       renderer.dispose();
       ctlRef.current = null;
@@ -183,9 +198,27 @@ export function TerminalHost({
   useEffect(() => {
     const ctl = ctlRef.current?.controller;
     if (!ctl) return;
+    attached.current = terminalId;
     if (terminalId === null) ctl.detach();
     else ctl.attach(terminalId);
   }, [terminalId]);
+
+  // After the attach above, whose reset() empties the buffer: the query (this terminal's,
+  // after a tab switch) goes on the new one, and is searched again once its snapshot is in.
+  useEffect(() => {
+    const renderer = ctlRef.current?.renderer;
+    if (findQuery) renderer?.find(findQuery);
+    else renderer?.clearFind();
+  }, [terminalId, findQuery]);
+
+  useEffect(() => {
+    if (terminalId === null || hidden) return;
+    return registerTerminalFindHost(terminalId, {
+      step: (dir) => {
+        ctlRef.current?.renderer.findStep(dir);
+      },
+    });
+  }, [terminalId, hidden]);
 
   useEffect(() => {
     ctlRef.current?.renderer.setFontSize(fontSize);
@@ -200,7 +233,13 @@ export function TerminalHost({
   }, [scrollback]);
 
   return (
-    <div className={cn("relative min-h-0 flex-1 bg-cf-surface py-1 pl-2", hidden && "hidden")}>
+    <div
+      className={cn("relative min-h-0 flex-1 bg-cf-surface py-1 pl-2", hidden && "hidden")}
+      data-terminal-box={terminalId ?? undefined}
+      onFocus={() => {
+        if (terminalId !== null) noteTerminalKeyboard(terminalId);
+      }}
+    >
       <div
         ref={hostRef}
         className="h-full w-full"
@@ -211,7 +250,16 @@ export function TerminalHost({
         data-attach-phase={state.phase}
         data-terminal-id={state.terminalId ?? undefined}
       />
-      {(exitOverlay || state.phase !== "exited") && <Overlay state={state} />}
+      {(exitOverlay || state.phase !== "exited") && <Overlay state={state} finding={findQuery !== null} />}
+      {terminalId !== null && findQuery !== null && (
+        <TerminalFindBar
+          key={terminalId}
+          terminalId={terminalId}
+          onClosed={() => {
+            ctlRef.current?.renderer.focus();
+          }}
+        />
+      )}
     </div>
   );
 }
