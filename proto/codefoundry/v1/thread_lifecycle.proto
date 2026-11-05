@@ -104,6 +104,8 @@ message ThreadSetupStep {
   // With a fetch's WARNING: the commit time of ref's tip as it is on disk, which the
   // branch starts from instead; unset when there is no such ref.
   google.protobuf.Timestamp ref_at = 11;
+  // name: the branch was there to check out, so nothing was named.
+  bool existing = 12;
 }
 
 // ThreadSetup is Thread.setup. Every step is listed, pending, from the start.

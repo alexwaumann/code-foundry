@@ -971,9 +971,19 @@ func TestSetupSpawnFailureIsTheStartStep(t *testing.T) {
 	}
 }
 
-func TestSetupArchiveWaitsForIt(t *testing.T) {
+// A setup its caller waits for is that caller's: Archive waits too. A background one is
+// cancelled (TestArchiveCancelsABackgroundSetup).
+func TestSetupArchiveWaitsForABlockingOne(t *testing.T) {
 	e, rr := newWorktreeEnv(t, nil)
-	s, release := inSetup(t, e, rr, CreateOptions{InitialPrompt: "do x"})
+	started, release := gateFetches(rr)
+	t.Cleanup(release)
+	created := make(chan error, 1)
+	go func() {
+		_, err := e.m.Create(context.Background(), CreateOptions{ProjectID: "r1", InitialPrompt: "do x", NewWorktree: &NewWorktree{}})
+		created <- err
+	}()
+	waitChan(t, started, "the fetch to start")
+	s := e.m.Snapshot().Threads[0]
 	type res struct {
 		t   Thread
 		err error
@@ -989,6 +999,9 @@ func TestSetupArchiveWaitsForIt(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 	}
 	release()
+	if err := waitChan(t, created, "Create to end"); err != nil {
+		t.Fatal(err)
+	}
 	r := waitChan(t, got, "Archive to end")
 	if r.err != nil || r.t.ArchivedAt.IsZero() {
 		t.Fatalf("Archive = %+v, %v", r.t, r.err)

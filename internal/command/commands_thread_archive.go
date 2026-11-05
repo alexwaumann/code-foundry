@@ -142,8 +142,11 @@ func archiveOneConfirm(ctx context.Context, b ThreadBackend, s *v1.Thread) strin
 // thread's background agents and shells running after its turn ("1 background agent
 // and 2 shells are running", "stops them"), or Claude's turn to report one that just
 // ended (the wake hold); "" otherwise (idle, a finished or failed turn, closing,
-// stopped).
+// stopped, and a setup in the background: no Claude yet, and a retry brings it back).
 func archiveInterrupts(s *v1.Thread) (why, ends string) {
+	if su := s.GetSetup(); su.GetBackground() && su.GetPhase() == v1.ThreadSetupPhase_THREAD_SETUP_PHASE_RUNNING {
+		return "", ""
+	}
 	if why := midTurn(s); why != "" {
 		return why, "ends the turn"
 	}

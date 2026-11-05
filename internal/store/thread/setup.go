@@ -96,7 +96,6 @@ type SetupStep struct {
 	// Branch is the branch of a name or worktree step, once named.
 	Branch string `json:"branch,omitempty"`
 	// Existing, on a name step: the branch was there to check out, so its base is ignored.
-	// Not on the API.
 	Existing  bool            `json:"existing,omitempty"`
 	Status    SetupStepStatus `json:"status"`
 	StartedAt time.Time       `json:"started_at,omitzero"`
@@ -485,7 +484,9 @@ func (t *setupTracker) progress(projectID string) func(project.WorktreeEvent) {
 					return
 				}
 				if errors.Is(ev.Err, context.Canceled) {
-					st.reset() // it says nothing about the remote: the setup stopped it
+					// It says nothing about the remote: the setup stopped it. It stays running,
+					// with its time, until the setup says how it ended: a cancel puts it back
+					// to pending, the next start after a daemon stop fails it with the reason.
 					return
 				}
 				st.Warning, st.Error, st.RefAt = "Could not reach "+ev.Remote, project.GitText(ev.Err), ev.RefAt
@@ -535,6 +536,14 @@ func (t *setupTracker) made(w madeWorktree) {
 // holds records that the setup is about to work in a worktree it did not make.
 func (t *setupTracker) holds(path string) {
 	t.edit(func(s *Setup, _ time.Time) { s.Held = append(s.Held, path) })
+}
+
+// worktreeStopped ends project id's add when the setup was stopped, not git: its step
+// stays as it is until the setup says how it ended, as a stopped fetch's does.
+func (t *setupTracker) worktreeStopped(projectID string) {
+	t.edit(func(s *Setup, _ time.Time) {
+		s.Adding = slices.DeleteFunc(s.Adding, func(a SetupAdd) bool { return a.ProjectID == projectID })
+	})
 }
 
 // worktreeFailed fails project id's worktree step with git's text. Its add is over: git

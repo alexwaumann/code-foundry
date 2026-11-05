@@ -851,6 +851,8 @@ func (m *Manager) makeWorktrees(ctx context.Context, id string, projects []proje
 			ran := pf.await(r.ID)
 			mw, ok, err := m.makeWorktree(ctx, r, branch, base(r.ID), fresh, fromOrigin, ran, fetched != nil && fetched(r.ID), t)
 			switch {
+			case err != nil && ctx.Err() != nil:
+				t.worktreeStopped(r.ID) // whatever git said, the setup stopped it
 			case err != nil:
 				t.worktreeFailed(r.ID, err)
 			case ok:

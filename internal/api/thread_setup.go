@@ -21,7 +21,7 @@ func setupToProto(s *thread.Setup) *v1.ThreadSetup {
 		p.Steps = append(p.Steps, &v1.ThreadSetupStep{
 			Kind: v1.ThreadSetupStepKind(st.Kind), ProjectId: st.ProjectID, ProjectName: st.ProjectName, Ref: st.Ref, Branch: st.Branch,
 			Status: v1.ThreadSetupStepStatus(st.Status), StartedAt: setupTime(st.StartedAt), EndedAt: setupTime(st.EndedAt),
-			Error: st.Error, Warning: st.Warning, RefAt: setupTime(st.RefAt),
+			Error: st.Error, Warning: st.Warning, RefAt: setupTime(st.RefAt), Existing: st.Existing,
 		})
 	}
 	return p
