@@ -524,11 +524,11 @@ function toThreadSetupStepView(st: ThreadSetupStep): ThreadSetupStepView[] {
       ref: st.ref,
       branch: st.branch,
       status: setupStepStatus(st.status),
-      startedAtMs: st.startedAt ? Number(timestampMs(st.startedAt)) : null,
-      endedAtMs: st.endedAt ? Number(timestampMs(st.endedAt)) : null,
+      startedAtMs: st.startedAt ? timestampMs(st.startedAt) : null,
+      endedAtMs: st.endedAt ? timestampMs(st.endedAt) : null,
       error: st.error,
       warning: st.warning,
-      refAtMs: st.refAt ? Number(timestampMs(st.refAt)) : null,
+      refAtMs: st.refAt ? timestampMs(st.refAt) : null,
     },
   ];
 }
@@ -539,8 +539,8 @@ export function toThreadSetupView(s: ThreadSetup | undefined): ThreadSetupView |
   if (!s || phase === null) return null;
   return {
     phase,
-    startedAtMs: s.startedAt ? Number(timestampMs(s.startedAt)) : null,
-    endedAtMs: s.endedAt ? Number(timestampMs(s.endedAt)) : null,
+    startedAtMs: s.startedAt ? timestampMs(s.startedAt) : null,
+    endedAtMs: s.endedAt ? timestampMs(s.endedAt) : null,
     steps: s.steps.flatMap(toThreadSetupStepView),
     error: s.error,
     background: s.background,

@@ -189,6 +189,8 @@ export function ThreadComposer({
   // Claude Code deleted the transcript: the thread cannot continue, so nothing is typed,
   // attached or sent; the card's note offers Archive and Remove (TranscriptDeleted.tsx).
   const transcriptMissing = useThreadsStore((s) => s.byId[threadId]?.transcriptMissing === true);
+  // The daemon refuses a model, effort or permission change while a setup runs: spawn may be reading them.
+  const settingUp = useThreadsStore((s) => s.byId[threadId]?.setup?.phase === "running");
   const inputOff = sending || transcriptMissing;
   const hostFiles = useHostFiles({ draftKey, editorRef, disabled: inputOff, startDir: worktreePath });
   // The daemon takes a message in any state but that one: a stopped thread starts on it.
@@ -413,6 +415,7 @@ export function ThreadComposer({
         <div className="col-start-1 flex min-w-0 flex-wrap items-center gap-0.5 px-2 pb-2">
           <ComposerPicker
             label="Model"
+            disabled={settingUp}
             icon={ClaudeMarkBrand}
             text={model ? choiceLabel(modelChoices, model) : "Default"}
             value={model}
@@ -426,6 +429,7 @@ export function ThreadComposer({
           {/* Claude has no live effort switch: the daemon restarts it with --resume, after the turn when one runs. */}
           <ComposerPicker
             label="Effort"
+            disabled={settingUp}
             icon={Gauge}
             text={effort ? choiceLabel(EFFORT_CHOICES, effort) : "Default"}
             value={effort}
@@ -438,6 +442,7 @@ export function ThreadComposer({
           />
           <ComposerPicker
             label="Permissions"
+            disabled={settingUp}
             icon={ShieldCheck}
             text={permission ? choiceLabel(PERMISSION_CHOICES, permission) : "Default"}
             value={permission}

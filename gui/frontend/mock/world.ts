@@ -3168,6 +3168,8 @@ export class World {
     const s = ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined;
     if (ctx?.activeThreadId) {
       if (!s) throw new CommandError("notfound", `thread ${ctx.activeThreadId} not found`);
+      // Its worktree is still being made, or its setup failed before it was.
+      if (!cwd && !s.worktreePath) throw new CommandError("unavailable", `thread ${s.id} has no checkout yet`);
       return { labels: shellLabels(s.id, s.projectId, s.worktreePath), cwd: cwd || s.worktreePath };
     }
     const exact = ctx?.activeProjectId ? this.projects.get(ctx.activeProjectId)?.worktrees.find((w) => w.path === ctx.activeWorktreePath) : undefined;

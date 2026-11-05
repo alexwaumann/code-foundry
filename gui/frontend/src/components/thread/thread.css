@@ -819,7 +819,6 @@ html[data-thread-width="full"] {
   padding: 8px 10px;
   border: 1px solid color-mix(in oklab, var(--t-red) 22%, var(--cf-border));
   background: color-mix(in oklab, var(--t-red) 8%, transparent);
-  color: var(--cf-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

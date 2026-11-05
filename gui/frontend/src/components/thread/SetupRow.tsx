@@ -68,7 +68,7 @@ function StepLine({ line, now }: { line: SetupLine; now: number }) {
         {time && <span className="meta">{time}</span>}
       </div>
       {line.error && (
-        <div className="setup-error rounded-md text-code" data-testid="thread-setup-error">
+        <div className="setup-error rounded-md text-caption font-mono text-cf-text" data-testid="thread-setup-error">
           {line.error}
         </div>
       )}

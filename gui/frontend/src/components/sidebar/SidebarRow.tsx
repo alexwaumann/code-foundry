@@ -162,6 +162,8 @@ const stop = (e: SyntheticEvent) => {
 function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean; onShownChange: (shown: boolean) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  // The daemon refuses a snooze while a setup runs: spawn may be reading the row.
+  const settingUp = useThreadsStore((s) => s.byId[id]?.setup?.phase === "running");
   const shown = menuOpen || focused;
   useEffect(() => {
     onShownChange(shown);
@@ -184,16 +186,18 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
         if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
       }}
     >
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <button type="button" tabIndex={tab} aria-label="Snooze thread" className={cn(ACTION_BUTTON, "size-5 hover:text-cf-warning-text aria-expanded:text-cf-warning-text")} data-testid="row-snooze">
-            <AlarmClock className="size-3.5" aria-hidden />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" data-testid="row-snooze-menu" onClick={stop} onDoubleClick={stop}>
-          <SnoozePresetItems id={id} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} />
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {!settingUp && (
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button type="button" tabIndex={tab} aria-label="Snooze thread" className={cn(ACTION_BUTTON, "size-5 hover:text-cf-warning-text aria-expanded:text-cf-warning-text")} data-testid="row-snooze">
+              <AlarmClock className="size-3.5" aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" data-testid="row-snooze-menu" onClick={stop} onDoubleClick={stop}>
+            <SnoozePresetItems id={id} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       <button
         type="button"
         tabIndex={tab}

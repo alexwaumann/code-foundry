@@ -29,7 +29,7 @@ import { attentionIds, useThreadsStore } from "@/stores/threads";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
-import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
+import { markTerminalNewFromHere, showBottomIfUnplaced, toggleBottomFromHere } from "@/stores/bottomActions";
 import { expandPanelCommand, historyCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
@@ -386,8 +386,10 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
     return true;
   },
   // Not a presentation: terminal.new still runs as usual (false). Started here (cmd+t,
-  // the palette, a button), the shell it starts takes focus in the bottom panel.
+  // the palette, a button), the shell it starts takes focus in the bottom panel. A thread
+  // with no checkout yet has none to start one in: its panel says so.
   "terminal.new": () => {
+    if (showBottomIfUnplaced()) return true;
     markTerminalNewFromHere();
     return false;
   },

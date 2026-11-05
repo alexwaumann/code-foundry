@@ -68,7 +68,7 @@ export const SETUP_SCRIPTS: Readonly<Record<string, SetupScript>> = {
     started: 21_000,
     steps: [
       { kind: NAME, branch: SETUP_BRANCH, status: DONE, started: 21_000, ended: 19_800 },
-      { kind: FETCH, ...cf, ref: REF, status: WARNING, started: 21_000, ended: 1000, warning: "Could not reach origin", error: "fatal: unable to access origin", refAgo: 2 * 3_600_000 },
+      { kind: FETCH, ...cf, ref: REF, status: WARNING, started: 21_000, ended: 1000, warning: "Could not reach origin", error: "fatal: unable to access origin", refAgo: 2 * 3_600_000 + 60_000 },
       { kind: WORKTREE, ...cf, branch: SETUP_BRANCH, status: RUNNING, started: 1000 },
       { kind: START, status: PENDING },
     ],
@@ -117,7 +117,7 @@ export const SETUP_SCRIPTS: Readonly<Record<string, SetupScript>> = {
     ended: 0,
     placed: true,
     steps: allDone.map((st) =>
-      st.kind === FETCH ? { ...st, status: WARNING, warning: "Could not reach origin", error: "fatal: unable to access origin", refAgo: 2 * 3_600_000 } : st,
+      st.kind === FETCH ? { ...st, status: WARNING, warning: "Could not reach origin", error: "fatal: unable to access origin", refAgo: 2 * 3_600_000 + 60_000 } : st,
     ),
   },
   // Nothing to make: only Claude's start, which shows nothing and leaves no fold line.
@@ -133,7 +133,7 @@ export function setupMessage(script: SetupScript, now: Date): SetupInit {
     ...at("endedAt", script.ended),
     error: script.error ?? "",
     background: true,
-    steps: script.steps.map(({ started, ended, refAgo, ...st }) => ({ ...st, ...at("startedAt", started), ...at("endedAt", ended), ...at("refAt", refAgo) })),
+    steps: script.steps.map(({ started, ended, refAgo, ...st }) => ({ ...st, ...at("startedAt", started), ...at("endedAt", ended), ...at("refAt", refAgo) }) as StepInit),
   };
 }
 

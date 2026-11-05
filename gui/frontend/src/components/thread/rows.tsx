@@ -930,7 +930,7 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
   if (live) {
     const parts = ["Working"];
     if (row.steps > 0) parts.push(stepsLabel(row.steps));
-    if (start !== null) parts.push(formatDuration(Math.max(0, now - start)).replace(/\.\ds$/, "s"));
+    if (start !== null) parts.push(formatDuration(Math.max(0, now - start)).replace(/\.\ds$/, "s") || "0s");
     return (
       <div className="thead" data-testid="thread-turn-header" data-live>
         <span className="line text-caption" data-testid="thread-working">
