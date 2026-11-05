@@ -196,6 +196,29 @@ static uint32_t cfStringForRange(AXUIElementRef focused, CFRange range) {
 	return cfLastScalar((CFStringRef)value);
 }
 
+// cfPasswordField reports whether pid's focused element is a password field, 0 when the app
+// does not say: a paste into a field we cannot see is what the user asked for.
+static int cfPasswordField(int pid) {
+	AXUIElementRef app = AXUIElementCreateApplication(pid);
+	if (app == NULL) return 0;
+	AXUIElementSetMessagingTimeout(app, CF_AX_TIMEOUT);
+	CFTypeRef focused = NULL;
+	AXError err = AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute, &focused);
+	CFRelease(app);
+	if (err != kAXErrorSuccess || focused == NULL) return 0;
+	int secure = 0;
+	if (CFGetTypeID(focused) == AXUIElementGetTypeID()) {
+		AXUIElementSetMessagingTimeout((AXUIElementRef)focused, CF_AX_TIMEOUT);
+		CFTypeRef subrole = NULL;
+		if (AXUIElementCopyAttributeValue((AXUIElementRef)focused, kAXSubroleAttribute, &subrole) == kAXErrorSuccess && subrole != NULL) {
+			secure = CFGetTypeID(subrole) == CFStringGetTypeID() && CFEqual(subrole, kAXSecureTextFieldSubrole);
+			CFRelease(subrole);
+		}
+	}
+	CFRelease(focused);
+	return secure;
+}
+
 // cfCharBeforeCaret is the character just before the insertion point of pid's focused text
 // element: 0 with text selected, at the very start, or when the app does not say. It only
 // reads, and never prompts. Not on the tap's thread or the main thread: it waits on the app.
@@ -254,6 +277,9 @@ func frontmostApp() frontApp {
 	defer C.free(unsafe.Pointer(bundle))
 	return frontApp{PID: int(pid), Name: C.GoString(name), Bundle: C.GoString(bundle)}
 }
+
+// passwordField reports whether a password field has the keyboard in app pid.
+func passwordField(pid int) bool { return C.cfPasswordField(C.int(pid)) != 0 }
 
 // copyToClipboard leaves text on the clipboard as a normal entry.
 func copyToClipboard(text string) error {

@@ -120,14 +120,14 @@ func TestDecidePaste(t *testing.T) {
 	}{
 		{"same app", pasteFacts{Text: "hi", Pressed: app, Front: app, Trusted: true}, pasteKeys},
 		{"nothing said", pasteFacts{Pressed: app, Front: app, Trusted: true}, pasteNothing},
-		{"nothing said in a password field", pasteFacts{Pressed: app, Front: app, Secure: true}, pasteNothing},
+		{"nothing said in a password field", pasteFacts{Pressed: app, Front: app, Password: true}, pasteNothing},
 		{"another app in front", pasteFacts{Text: "hi", Pressed: app, Front: other, Trusted: true}, pasteClipboard},
-		{"secure input", pasteFacts{Text: "hi", Pressed: app, Front: app, Secure: true, Trusted: true}, pasteClipboard},
+		{"a password field", pasteFacts{Text: "hi", Pressed: app, Front: app, Password: true, Trusted: true}, pasteClipboard},
 		{"the grant went", pasteFacts{Text: "hi", Pressed: app, Front: app}, pasteClipboard},
 		{"no app at the press", pasteFacts{Text: "hi", Trusted: true}, pasteClipboard},
 		{"the clipboard race", pasteFacts{Text: "hi", Pressed: app, Front: app, Trusted: true, Race: true}, pasteTyped},
 		{"the race, but another app in front", pasteFacts{Text: "hi", Pressed: app, Front: other, Trusted: true, Race: true}, pasteClipboard},
-		{"the race, but secure input", pasteFacts{Text: "hi", Pressed: app, Front: app, Secure: true, Trusted: true, Race: true}, pasteClipboard},
+		{"the race, but a password field", pasteFacts{Text: "hi", Pressed: app, Front: app, Password: true, Trusted: true, Race: true}, pasteClipboard},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -396,7 +396,7 @@ func TestClipboardReason(t *testing.T) {
 		{"it pastes", pasteFacts{Pressed: slack, Front: slack, Trusted: true}, ""},
 		{"nothing in front", pasteFacts{Front: slack, Trusted: true}, "no app in front at the press"},
 		{"moved on", pasteFacts{Pressed: slack, Front: chrome, Trusted: true}, "the app in front changed from Slack to Chrome"},
-		{"secure input", pasteFacts{Pressed: slack, Front: slack, Secure: true, Trusted: true}, "secure input is on"},
+		{"a password field", pasteFacts{Pressed: slack, Front: slack, Password: true, Trusted: true}, "a password field has the keyboard"},
 		{"no grant", pasteFacts{Pressed: slack, Front: slack}, "Accessibility is not granted"},
 	}
 	for _, tt := range tests {

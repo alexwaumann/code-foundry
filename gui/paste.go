@@ -110,8 +110,10 @@ func (a pasteAction) String() string {
 type pasteFacts struct {
 	Text           string
 	Pressed, Front frontApp
-	// Secure: secure event input is on, so a password field probably has the keyboard.
-	Secure bool
+	// Password: a password field has the keyboard in the app in front. Secure event input
+	// does not say that: it is system-wide, so any app holding it (a terminal's Secure
+	// Keyboard Entry, a password manager) would stop every paste everywhere.
+	Password bool
 	// Trusted: Accessibility is still granted. Without it macOS drops Cmd+V silently, and
 	// the old clipboard coming back would then lose the text.
 	Trusted bool
@@ -126,7 +128,7 @@ func decidePaste(f pasteFacts) pasteAction {
 	switch {
 	case f.Text == "":
 		return pasteNothing
-	case f.Pressed.PID == 0, f.Front.PID != f.Pressed.PID, f.Secure, !f.Trusted:
+	case f.Pressed.PID == 0, f.Front.PID != f.Pressed.PID, f.Password, !f.Trusted:
 		return pasteClipboard
 	case f.Race:
 		return pasteTyped
@@ -142,8 +144,8 @@ func clipboardReason(f pasteFacts) string {
 		return "no app in front at the press"
 	case f.Front.PID != f.Pressed.PID:
 		return "the app in front changed from " + f.Pressed.Name + " to " + f.Front.Name
-	case f.Secure:
-		return "secure input is on"
+	case f.Password:
+		return "a password field has the keyboard"
 	case !f.Trusted:
 		return "Accessibility is not granted"
 	}

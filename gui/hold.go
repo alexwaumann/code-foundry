@@ -146,6 +146,9 @@ type holdOS interface {
 	startTap() (altListener, error)
 	// playTone plays a sound at volume percent. It returns at once.
 	playTone(t holdTone, volume int)
+	// passwordField reports whether the focused element of app pid is a password field. It
+	// waits on the app, bounded, so only the paste calls it.
+	passwordField(pid int) bool
 	// charBeforeCaret is the character before the caret in app pid: false with text selected
 	// or when the app does not say. It waits on the app, bounded, so only the paste calls it.
 	charBeforeCaret(pid int) (rune, bool)
@@ -735,7 +738,7 @@ func (s *holdService) land(job pasteJob) {
 	front := s.os.frontmost()
 	facts := pasteFacts{
 		Text: job.text, Pressed: job.pressed, Front: front,
-		Secure: s.os.secureInput(), Trusted: s.os.trusted(), Race: hasClipboardRace(front.Bundle),
+		Password: s.os.passwordField(front.PID), Trusted: s.os.trusted(), Race: hasClipboardRace(front.Bundle),
 	}
 	action := decidePaste(facts)
 	s.log.Info("dictation: text", "action", action.String(), "runes", len([]rune(job.text)), "app", front.Name, "why", clipboardReason(facts))

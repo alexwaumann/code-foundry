@@ -97,6 +97,8 @@ func (macHoldOS) playTone(t holdTone, volume int) { playHoldTone(t, float64(clam
 
 func (macHoldOS) charBeforeCaret(pid int) (rune, bool) { return charBeforeCaret(pid) }
 
+func (macHoldOS) passwordField(pid int) bool { return passwordField(pid) }
+
 func (m macHoldOS) lowerAudio(after time.Duration, released <-chan struct{}) {
 	m.duck.lower(after, released)
 }

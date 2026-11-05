@@ -166,16 +166,17 @@ func (l *holdLog) all() []string {
 type fakeHoldOS struct {
 	log *holdLog
 
-	mu      sync.Mutex
-	front   frontApp
-	secure  bool
-	trust   bool
-	age     time.Duration
-	taps    []*fakeTap
-	tapErr  error
-	board   pasteHost
-	typeErr error
-	blockIn chan struct{} // frontmost waits on it when set
+	mu       sync.Mutex
+	front    frontApp
+	secure   bool
+	password bool
+	trust    bool
+	age      time.Duration
+	taps     []*fakeTap
+	tapErr   error
+	board    pasteHost
+	typeErr  error
+	blockIn  chan struct{} // frontmost waits on it when set
 	// before and beforeKnown are what charBeforeCaret says; beforeWait holds it up when set.
 	before      rune
 	beforeKnown bool
@@ -236,6 +237,12 @@ func (f *fakeHoldOS) playTone(t holdTone, _ int) {
 	} else {
 		f.log.add("tone stop")
 	}
+}
+
+func (f *fakeHoldOS) passwordField(int) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.password
 }
 
 func (f *fakeHoldOS) charBeforeCaret(pid int) (rune, bool) {
@@ -656,7 +663,7 @@ func TestHoldRuns(t *testing.T) {
 			name: "system: a password field leaves it on the clipboard", front: inNotes,
 			conn:   holdScript{flushed: []string{"Text."}},
 			events: []altEvent{press, release},
-			atLand: func(s *fakeHoldOS) { s.secure = true },
+			atLand: func(s *fakeHoldOS) { s.password = true },
 			want:   []string{"copy Text.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{
@@ -929,7 +936,7 @@ func TestHoldLandFitsTheCaret(t *testing.T) {
 		{
 			name:  "a text left on the clipboard ends it, unspaced",
 			edit:  func(f *fakeHoldOS) { f.before, f.beforeKnown = 'a', true },
-			steps: []func(*holdRig){land("One,"), os(func(f *fakeHoldOS) { f.secure = true }), land("And two."), os(func(f *fakeHoldOS) { f.secure = false }), land("And three.")},
+			steps: []func(*holdRig){land("One,"), os(func(f *fakeHoldOS) { f.password = true }), land("And two."), os(func(f *fakeHoldOS) { f.password = false }), land("And three.")},
 			want:  []string{caret, "paste  One,", "copy And two.", caret, "paste  And three."},
 		},
 		{

@@ -208,3 +208,14 @@ version also had `either` and a `both` that needed the two keys together, from a
 request. A saved `either` is now an unknown value: it falls back to the default, which means
 the same, and the file keeps it under an "Ignored" comment. A saved `both` changes meaning
 from together to either. Only tip releases ever had those options, so no migration.
+
+## Secure input does not mean a password field
+
+The paste used to leave text on the clipboard whenever `IsSecureEventInputEnabled` was true, on
+the reading that a password field had the keyboard. That state is system-wide: a user's Mac had
+some other app holding it, so nothing pasted anywhere, and the log said so once it could. Secure
+input hides keystrokes from taps; it does not stop a posted Cmd+V. The paste now asks the app in
+front whether its focused element is a password field (`AXSecureTextField`), and an app that does
+not say gets the paste. The tap's watch still reads secure input, where the system-wide meaning
+is the right one.
+

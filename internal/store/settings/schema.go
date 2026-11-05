@@ -434,7 +434,7 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyDictationOtherAudio, Group: GroupDictation, Page: PageGeneral, Section: "dictation", DependsOn: KeyDictationEnabled, Type: Enum, Title: "Other audio",
-		Description: "What music and video do while you dictate.",
+		Description: "What audio from this Mac does while you dictate.",
 		Enum:        []string{OtherAudioDoNothing, OtherAudioLower},
 		EnumLabels:  []string{"Do nothing", "Lower"},
 		Default:     OtherAudioDoNothing,
