@@ -26,14 +26,20 @@ vi.mock("@/stores/thread", async (orig) => ({ ...(await orig<typeof import("@/st
 
 const { SubagentPane } = await import("./SubagentPane");
 const { ThreadPane } = await import("./ThreadPane");
-const { installKeybindings } = await import("@/keys/bindings");
+const { inPalette, installKeybindings, isStartable } = await import("@/keys/bindings");
+const { insertTagInto } = await import("@/stores/cite");
+const { getDraft } = await import("@/stores/compose");
+const { putInThreadComposer } = await import("@/stores/composerText");
+const { presentDictationToggle } = await import("@/stores/dictation");
+const { historyComposer, presentPromptHistory } = await import("@/stores/historyComposers");
+const { threadDraftKey } = await import("@/lib/threadDraft");
 const { useCommandsStore } = await import("@/stores/commands");
 const { getViewing, showAgentRun, useSubagentViewStore } = await import("@/stores/subagentView");
 const { useThreadStore } = await import("@/stores/thread");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 
-/** The read-only subagent view (SubagentPane.tsx): header, lineage, prompt, work, footer, report, plate, Escape. */
+/** The read-only subagent view (SubagentPane.tsx): header, lineage, prompt, turn header, work, report, composer stand-in, Escape. */
 
 const NOW = Date.now();
 
@@ -99,8 +105,9 @@ beforeEach(() => {
   runCommand.mockClear();
   useThreadsStore.setState({ byId: { s1: { id: "s1", name: "Agents panel", projectId: "", worktreePath: "/w", workspaceId: "", projectIds: [], branch: "", model: "claude-opus-4-8", state: "connected", status: "idle", linkedPullRequests: [] } as unknown as ThreadView }, order: ["s1"] });
   useUiStore.setState({ selection: { kind: "thread", id: "s1" }, windowWidth: 1400, promptFocusSeq: 0, palette: { ...useUiStore.getState().palette, open: false } });
-  useCommandsStore.setState({ commands: [cmd("thread.agent.up", { keybindings: ["escape"] }), cmd("thread.agent.open"), cmd("view.panel.toggle"), cmd("view.bottom.toggle"), cmd("thread.archive"), cmd("thread.rename")] });
+  useCommandsStore.setState({ commands: [cmd("thread.agent.up", { keybindings: ["escape"] }), cmd("thread.agent.open"), cmd("view.panel.toggle"), cmd("view.bottom.toggle"), cmd("view.thread-info"), cmd("thread.archive"), cmd("thread.rename")] });
   useSubagentViewStore.setState({ viewing: null, focusSeq: 0 });
+  useThreadStore.setState({ folds: {} });
   setLog([run("a1"), NESTED], ITEMS);
 });
 
@@ -116,60 +123,106 @@ function show(runId = "a1") {
 }
 
 describe("SubagentPane", () => {
-  it("a running run: crumb, Read-only, live status, lineage, prompt, its own rows, footer, plate", () => {
+  const head = () => tid("thread-turn-header");
+  const rowTypes = () => [...tid("subagent-list").querySelectorAll("[data-row-type]")].map((r) => r.getAttribute("data-row-type"));
+  const say = () => tid("subagent-composer-text").textContent;
+
+  it("a running run: crumb, a thread's toggles, lineage, plain prompt, live turn header above its rows, composer card", () => {
     show();
     expect(tid("subagent-crumb-parent").textContent).toBe("Agents panel");
     expect(tid("subagent-name").textContent).toBe("PR 1: daemon task frames");
-    expect(tid("subagent-readonly").textContent).toBe("Read-only");
-    expect(tid("subagent-status").getAttribute("data-status")).toBe("running");
-    expect(tid("subagent-status").textContent).toMatch(/^Running · 4m 1\ds$/);
-    // No thread actions: only the panel toggle.
-    expect(screen.queryByTestId("thread-title")).toBeNull();
-    expect([...tid("pane-actions").querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["panel-toggle"]);
+    // No thread actions: no title menu, no back arrow, no chip, no status; a thread's three toggles.
+    for (const gone of ["thread-title", "subagent-back", "subagent-readonly", "subagent-status", "subagent-lineage-back", "thread-user-label", "subagent-footer", "subagent-plate"]) expect(screen.queryByTestId(gone), gone).toBeNull();
+    expect([...tid("pane-actions").querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["thread-info-toggle", "bottom-toggle", "panel-toggle"]);
     expect(tid("subagent-lineage-parent").textContent).toBe("Agents panel");
     expect(tid("subagent-lineage-meta").textContent).toBe("background · general-purpose · Opus · high · launched by turn 1's Agent call, 4 min ago");
-    expect(tid("subagent-lineage-back").textContent).toBe("Back to Agents panel");
-    expect(tid("thread-user-label").textContent).toBe("Prompt from Agents panel");
     expect(tid("subagent-prompt").textContent).toContain(PROMPT);
-    // The run's own items only (not the parent's message, not the nested run's), in order.
-    expect([...tid("subagent-list").querySelectorAll("[data-row-type]")].map((r) => r.getAttribute("data-row-type"))).toEqual(["lineage", "prompt", "tool", "tool", "text", "footer"]);
+    expect(tid("subagent-prompt").textContent).not.toContain("Prompt from");
+    // The run's own items only (not the parent's message, not the nested run's), in order, under the header.
+    expect(rowTypes()).toEqual(["lineage", "prompt", "head", "tool", "tool", "text"]);
     // The nested Agent call shows with its run's chips, not openable, one line with nothing under it.
     const nested = screen.getAllByTestId("thread-tool")[1]?.closest("[data-tool]");
     expect(nested?.getAttribute("data-tool")).toBe("Agent");
     expect(nested?.querySelector('[data-testid="thread-agent-open"]')).toBeNull();
     expect(nested?.querySelector('[data-testid="thread-tool"]')?.tagName).toBe("DIV");
     expect(nested?.querySelectorAll("[data-tool]")).toHaveLength(0);
-    expect(tid("subagent-footer").textContent).toMatch(/^Working for 4m 1\ds·23 tools·48\.2K tokens·Opus$/);
-    expect(tid("subagent-plate-text").textContent).toBe("Read-only. A subagent takes its instructions from its parent thread. To steer it, send a follow-up to Agents panel.");
-    expect(tid("subagent-plate-chord").textContent).toBe("esc");
+    expect(head().hasAttribute("data-live")).toBe(true);
+    expect(head().querySelector("button")).toBeNull();
+    expect(head().textContent).toMatch(/^Working for 4m 1\ds·23 tools·48\.2K tokens·Opus$/);
+    expect(say()).toBe("Subagents take instructions from Agents panel, so this one cannot be steered.");
+    expect(tid("subagent-composer-chord").textContent).toBe("esc");
+    expect(tid("subagent-composer-back").textContent).toContain("Back to Agents panel");
     expect(screen.queryByTestId("subagent-report")).toBeNull();
   });
 
-  it("a done run: its status, footer and report, not twice when it is the last text", () => {
-    setLog([run("a1", { status: "done", durationMs: 38_000, toolUses: 4, totalTokens: 6_100, endedAtMs: NOW - 5 * 60_000, summary: "Added the task frames." }), NESTED], ITEMS);
+  it("the composer's chips are facts: the run's model, its effort, its type, no controls", () => {
+    show();
+    expect(tid("subagent-model").textContent).toBe("Opus");
+    expect(tid("subagent-effort").textContent).toBe("High");
+    expect(tid("subagent-type").textContent).toBe("general-purpose");
+    expect([...tid("subagent-composer").querySelectorAll("button, input, [contenteditable]")].map((b) => b.getAttribute("data-testid"))).toEqual(["subagent-composer-back"]);
+  });
+
+  it("a run without a model, effort or type: the thread's model, no empty chips", () => {
+    setLog([run("a1", { model: "", effort: "", agentType: "" }), NESTED], ITEMS);
+    show();
+    expect(tid("subagent-model").textContent).toBe("Opus 4.8");
+    expect(screen.queryByTestId("subagent-effort")).toBeNull();
+    expect(screen.queryByTestId("subagent-type")).toBeNull();
+  });
+
+  it("a done run folds to its header and answer; the chevron opens its work and the choice is kept for the visit", () => {
+    setLog([run("a1", { status: "done", durationMs: 38_000, toolUses: 4, totalTokens: 6_100, endedAtMs: NOW - 5 * 60_000, summary: "Tests pass" }), NESTED], ITEMS);
     const { unmount } = show();
-    expect(tid("subagent-status").textContent).toBe("Done · 5 min ago");
-    expect(tid("subagent-footer").textContent).toBe("Worked for 38s·4 tools·6.1K tokens·Opus");
-    expect(tid("subagent-report").textContent).toBe("Report handed back to Agents panelAdded the task frames.");
-    expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent finished and handed its report to Agents panel.");
-    unmount();
-    setLog([run("a1", { status: "done", summary: "Tests pass" }), NESTED], ITEMS);
-    show();
+    expect(head().textContent).toBe("Worked for 38s·4 tools·6.1K tokens·Opus");
+    expect(head().getAttribute("data-folded")).toBe("true");
+    // Its report is its last text: shown once, the rest of its work folded.
+    expect(rowTypes()).toEqual(["lineage", "prompt", "head", "text"]);
     expect(screen.queryByTestId("subagent-report")).toBeNull();
+    expect(say()).toBe("This agent finished and handed its report to Agents panel.");
+    fireEvent.click(screen.getByRole("button", { name: "Show this agent's work" }));
+    expect(rowTypes()).toEqual(["lineage", "prompt", "head", "tool", "tool", "text"]);
+    unmount();
+    show();
+    expect(head().hasAttribute("data-folded")).toBe(false);
   });
 
-  it("a failed run: its status, the error in the footer, the plate", () => {
-    setLog([run("a1", { status: "failed", error: "Stopped: process exited with code 1", endedAtMs: NOW - 3 * 60_000 }), NESTED], ITEMS);
+  it("a done run whose report is not its last text: the report stands for it folded, and follows its work open", () => {
+    setLog([run("a1", { status: "done", summary: "Added the task frames." }), NESTED], ITEMS);
     show();
-    expect(tid("subagent-status").textContent).toBe("Failed · 3 min ago");
-    expect(tid("subagent-footer").textContent).toBe("Stopped: process exited with code 1");
-    expect(tid("subagent-footer").getAttribute("data-status")).toBe("failed");
-    expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent failed. Its parent Agents panel was told.");
+    expect(rowTypes()).toEqual(["lineage", "prompt", "head", "report"]);
+    expect(tid("subagent-report").textContent).toBe("Added the task frames.");
+    fireEvent.click(head().querySelector("button") as HTMLButtonElement);
+    expect(rowTypes()).toEqual(["lineage", "prompt", "head", "tool", "tool", "text", "report"]);
+  });
+
+  it("a done run with nothing to fold: its header is plain text", () => {
+    setLog([run("a1", { status: "done", summary: "Tests pass" })], [user, call("a1"), text("t1", "toolu_a1", "Tests pass")]);
+    show();
+    expect(head().querySelector("button")).toBeNull();
+    expect(rowTypes()).toEqual(["lineage", "prompt", "head", "text"]);
+  });
+
+  it("a failed run: a red header, its error in view while folded, the composer says so", () => {
+    setLog([run("a1", { status: "failed", error: "Stopped: process exited with code 1", durationMs: 63_000, endedAtMs: NOW - 3 * 60_000 }), NESTED], ITEMS);
+    show();
+    expect(head().getAttribute("data-status")).toBe("failed");
+    expect(head().textContent).toContain("Failed after 1m 03s");
+    expect(head().querySelector(".t-red")?.textContent).toBe("Failed after 1m 03s");
+    expect(tid("subagent-error").textContent).toBe("Stopped: process exited with code 1");
+    expect(tid("subagent-error").getAttribute("role")).toBe("alert");
+    expect(say()).toBe("This agent failed, and Agents panel was told.");
+  });
+
+  it("a failed run without an error: the header alone says it", () => {
+    setLog([run("a1", { status: "failed" }), NESTED], ITEMS);
+    show();
+    expect(head().textContent).toContain("Failed");
+    expect(screen.queryByTestId("subagent-error")).toBeNull();
   });
 
   it("the run ending while viewed turns the view done in place: its running tool stops, the handback call is no row, the report shows", () => {
     show();
-    expect(tid("subagent-status").getAttribute("data-status")).toBe("running");
     const handback = tool("h1", "toolu_a1", { name: "SubagentHandback", inputJson: JSON.stringify({ message: "Added task frame handling." }) });
     act(() => {
       setLog(
@@ -177,16 +230,15 @@ describe("SubagentPane", () => {
         [...ITEMS.map((it) => (it.id === "b1" ? { ...it, status: "done" } as ThreadItemView : it)), handback],
       );
     });
-    expect(tid("subagent-status").getAttribute("data-status")).toBe("done");
-    expect(tid("subagent-status").textContent).toBe("Done · just now");
-    expect(tid("subagent-footer").getAttribute("data-status")).toBe("done");
-    expect(tid("subagent-footer").textContent).toBe("Worked for 4m 12s·23 tools·48.2K tokens·Opus");
+    expect(head().getAttribute("data-status")).toBe("done");
+    expect(head().textContent).toBe("Worked for 4m 12s·23 tools·48.2K tokens·Opus");
+    fireEvent.click(head().querySelector("button") as HTMLButtonElement);
     const tools = [...tid("subagent-pane").querySelectorAll("[data-tool]")];
     expect(tools.map((t) => t.getAttribute("data-tool"))).not.toContain("SubagentHandback");
     expect(tools.find((t) => t.getAttribute("data-tool") === "Bash")?.getAttribute("data-status")).toBe("done");
     expect(tid("subagent-pane").querySelector('[data-testid="thread-text"][data-streaming="true"]')).toBeNull();
-    expect(tid("subagent-report").textContent).toBe("Report handed back to Agents panelAdded task frame handling to the thread store with 14 table tests; make check is green.");
-    expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent finished and handed its report to Agents panel.");
+    expect(tid("subagent-report").textContent).toBe("Added task frame handling to the thread store with 14 table tests; make check is green.");
+    expect(say()).toBe("This agent finished and handed its report to Agents panel.");
   });
 
   it("a run failing while viewed turns red in place", () => {
@@ -194,10 +246,9 @@ describe("SubagentPane", () => {
     act(() => {
       setLog([run("a1", { status: "failed", error: "Stopped: the agent was killed", endedAtMs: Date.now() }), NESTED], ITEMS);
     });
-    expect(tid("subagent-status").getAttribute("data-status")).toBe("failed");
-    expect(tid("subagent-footer").getAttribute("data-status")).toBe("failed");
-    expect(tid("subagent-footer").textContent).toContain("Stopped: the agent was killed");
-    expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent failed. Its parent Agents panel was told.");
+    expect(head().getAttribute("data-status")).toBe("failed");
+    expect(tid("subagent-error").textContent).toBe("Stopped: the agent was killed");
+    expect(say()).toBe("This agent failed, and Agents panel was told.");
     expect(screen.queryByTestId("subagent-report")).toBeNull();
   });
 
@@ -207,7 +258,7 @@ describe("SubagentPane", () => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, s1: { ...s.byId.s1, name: "" } as ThreadView } }));
     });
     expect(tid("subagent-crumb-parent").textContent).toBe("s1");
-    expect(tid("thread-user-label").textContent).toBe("Prompt from s1");
+    expect(tid("subagent-composer-back").textContent).toContain("Back to s1");
   });
 
   it("a progress tick re-renders the run's own rows, not the work rows", () => {
@@ -216,12 +267,12 @@ describe("SubagentPane", () => {
     act(() => {
       setLog([run("a1", { toolUses: 24, activity: "Editing" }), NESTED], ITEMS);
     });
-    expect(tid("subagent-footer").textContent).toContain("24 tools");
+    expect(head().textContent).toContain("24 tools");
     expect(tid("subagent-list").querySelectorAll('[data-row-type="tool"]')[0]).toBe(before);
   });
 
-  it("the back buttons, the crumb and the note's links go back up (thread.agent.up)", () => {
-    for (const id of ["subagent-back", "subagent-crumb-parent", "subagent-lineage-parent", "subagent-lineage-back", "subagent-plate-back"]) {
+  it("the crumb, the note's name and the composer's Back go back up (thread.agent.up)", () => {
+    for (const id of ["subagent-crumb-parent", "subagent-lineage-parent", "subagent-composer-back"]) {
       act(() => {
         showAgentRun("s1", "a1");
       });
@@ -230,7 +281,63 @@ describe("SubagentPane", () => {
       expect(getViewing(), id).toBeNull();
       unmount();
     }
-    expect(useUiStore.getState().promptFocusSeq).toBe(5);
+    expect(useUiStore.getState().promptFocusSeq).toBe(3);
+  });
+
+  it("the crumb takes no move: a no-project thread's place is plain text here", () => {
+    show();
+    expect(screen.queryByTestId("thread-move-trigger")).toBeNull();
+    expect(tid("thread-crumb").querySelectorAll("button")).toHaveLength(1);
+  });
+
+  it("nothing aimed at a composer lands: no drop target, no dictation target, no cite target, no history picker", () => {
+    show();
+    expect(tid("subagent-pane").querySelector("[data-file-drop-target]")).toBeNull();
+    expect(tid("subagent-pane").querySelector("[contenteditable]")).toBeNull();
+    expect(screen.queryByTestId("thread-composer")).toBeNull();
+    expect(presentDictationToggle()).toBe(false);
+    expect(insertTagInto(threadDraftKey("s1"), { tagKind: "file", projectId: "r1", path: "a.go" })).toBe(false);
+    expect(historyComposer(threadDraftKey("s1"))).toBeUndefined();
+    const open = vi.spyOn(useUiStore.getState(), "openPromptsPalette");
+    presentPromptHistory();
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it("a request for the prompt leaves the keyboard in the view, so Escape still works", () => {
+    show();
+    (document.activeElement as HTMLElement).blur();
+    act(() => {
+      useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+    });
+    expect(document.activeElement).toBe(tid("subagent-pane"));
+    (document.activeElement as HTMLElement).blur();
+    act(() => {
+      useUiStore.setState((s) => ({ contentFocusSeq: s.contentFocusSeq + 1 }));
+    });
+    expect(document.activeElement).toBe(tid("subagent-pane"));
+  });
+
+  it("the thread's verbs do not start from the keyboard or the palette here; viewing ones do", () => {
+    show();
+    const commands = useCommandsStore.getState().commands;
+    const named = (n: string) => commands.find((c) => c.name === n) as CommandView;
+    expect(isStartable(named("thread.rename"))).toBe(false);
+    expect(inPalette(named("thread.archive"))).toBe(false);
+    expect(isStartable(named("view.thread-info"))).toBe(true);
+    act(() => {
+      useSubagentViewStore.setState({ viewing: null });
+    });
+    expect(isStartable(named("thread.rename"))).toBe(true);
+  });
+
+  it("Ask Claude from a page goes back up to the prompt the text went to", () => {
+    show();
+    act(() => {
+      putInThreadComposer("s1", "fix these errors");
+    });
+    expect(getViewing()).toBeNull();
+    expect(getDraft(threadDraftKey("s1")).text).toContain("fix these errors");
   });
 
   it("takes the keyboard when it opens, and Escape goes back up", () => {
@@ -283,18 +390,17 @@ describe("SubagentPane: the mock's done Explore and failed run", () => {
     );
     show("a0");
     expect(tid("subagent-name").textContent).toBe("Find the header chip pattern");
-    expect(tid("subagent-status").textContent).toBe("Done · 5 min ago");
     expect(tid("subagent-lineage-meta").textContent).toMatch(/^foreground · Explore · Haiku · launched by turn 1's Agent call, [56] min ago$/);
+    expect(tid("thread-turn-header").textContent).toBe("Worked for 12s·6 tools·9.4K tokens·Haiku");
+    fireEvent.click(screen.getByRole("button", { name: "Show this agent's work" }));
     expect(screen.getByTestId("thread-group").textContent).toBe("Read 1 file, searched code onceHeaderActions.tsx");
     expect(tid("subagent-pane").querySelectorAll("[data-tool]")).toHaveLength(0);
-    expect(tid("subagent-footer").getAttribute("data-status")).toBe("done");
-    expect(tid("subagent-footer").textContent).toBe("Worked for 12s·6 tools·9.4K tokens·Haiku");
     expect(screen.getAllByTestId("thread-text").map((t) => t.textContent).join("")).toContain(EXPLORE_REPORT);
     expect(screen.queryByTestId("subagent-report")).toBeNull();
-    expect(tid("subagent-plate-text").textContent).toBe("Read-only. This agent finished and handed its report to Agents panel.");
+    expect(tid("subagent-composer-text").textContent).toBe("This agent finished and handed its report to Agents panel.");
   });
 
-  it("a failed run: its two Bash rows, the last one failed; the error in the footer, no report", () => {
+  it("a failed run: its two Bash rows, the last one failed; the error under them, no report", () => {
     const a3 = run("a3", { toolUseId: "toolu_a3", description: "Screenshot the panel in Wails", agentType: "claude", model: "", background: true, status: "failed", error: "Stopped: process exited with code 1", toolUses: 9, totalTokens: 12_000, durationMs: 63_000, startedAtMs: NOW - 246_000, endedAtMs: NOW - 183_000 });
     setLog(
       [a3],
@@ -306,13 +412,12 @@ describe("SubagentPane: the mock's done Explore and failed run", () => {
       ],
     );
     show("a3");
-    expect(tid("subagent-status").getAttribute("data-status")).toBe("failed");
-    expect(tid("subagent-status").textContent).toBe("Failed · 3 min ago");
+    expect(tid("thread-turn-header").getAttribute("data-status")).toBe("failed");
+    fireEvent.click(screen.getByRole("button", { name: "Show this agent's work" }));
     const bash = [...tid("subagent-pane").querySelectorAll('[data-tool="Bash"]')];
     expect(bash).toHaveLength(2);
     expect(bash[1]?.getAttribute("data-status")).toBe("error");
-    expect(tid("subagent-footer").getAttribute("data-status")).toBe("failed");
-    expect(tid("subagent-footer").textContent).toContain("Stopped: process exited with code 1");
+    expect(tid("subagent-error").textContent).toBe("Stopped: process exited with code 1");
     expect(screen.queryByTestId("subagent-report")).toBeNull();
   });
 });

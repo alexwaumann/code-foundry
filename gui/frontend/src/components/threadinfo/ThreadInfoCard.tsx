@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
-import { ContextGroup } from "./ContextGroup";
+import { ContextGroup, RunContextGroup } from "./ContextGroup";
 import { GitGroup } from "./GitGroup";
-import { LineageGroup } from "./LineageGroup";
+import { LineageGroup, RunLineageGroup } from "./LineageGroup";
 import { McpGroup } from "./McpGroup";
 import { PlaceGroup } from "./PlaceGroup";
 import { ShellsGroup } from "./ShellsGroup";
@@ -26,20 +26,34 @@ import { ShellsGroup } from "./ShellsGroup";
  * Without room beside the conversation the same content floats over it instead
  * (ThreadInfoOverlay), which scrolls only itself.
  */
-export function ThreadInfoCard({ threadId }: { threadId: string }) {
+export function ThreadInfoCard({ threadId, runId }: { threadId: string; runId?: string }) {
   return (
     <aside
       className="pointer-events-none absolute top-(--ti-find,0px) right-[calc(var(--ti-gutter)-var(--ti-inset)-var(--timeline-sb,0px))] flex max-h-[calc(var(--timeline-h)-var(--ti-find,0px))] w-[calc(var(--ti-card)-var(--ti-gutter))] flex-col overflow-y-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       aria-label="Thread info"
       data-testid="thread-info"
     >
-      <ThreadInfoContent threadId={threadId} className="pointer-events-auto rounded-lg border bg-cf-sidebar" />
+      <ThreadInfoContent threadId={threadId} runId={runId} className="pointer-events-auto rounded-lg border bg-cf-sidebar" />
     </aside>
   );
 }
 
-/** The card's groups, in the inline column's box or the overlay's. */
-export function ThreadInfoContent({ threadId, className }: { threadId: string; className?: string }) {
+/**
+ * The card's groups, in the inline column's box or the overlay's. `runId`: the card of one
+ * of the thread's subagent runs (SubagentPane), read-only: where it runs and what it may be
+ * viewed in, its lineage, and its own context and cost. No shells, MCP or actions, which
+ * are the thread's, and nothing that changes the thread (docs/notes/subagent-as-thread.md).
+ */
+export function ThreadInfoContent({ threadId, runId, className }: { threadId: string; runId?: string | undefined; className?: string }) {
+  if (runId !== undefined)
+    return (
+      <div className={cn("flex flex-none flex-col py-1", className)} data-testid="thread-info-card" data-read-only="">
+        <PlaceGroup threadId={threadId} readOnly />
+        <GitGroup threadId={threadId} readOnly />
+        <RunLineageGroup threadId={threadId} runId={runId} />
+        <RunContextGroup threadId={threadId} runId={runId} />
+      </div>
+    );
   return (
     <div className={cn("flex flex-none flex-col py-1", className)} data-testid="thread-info-card">
       <PlaceGroup threadId={threadId} />

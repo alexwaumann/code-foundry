@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, type ReactNode } from "react";
+import { memo, useMemo, useState } from "react";
 import { ArrowDown, FileText, ImageIcon } from "lucide-react";
 import { AttachmentLightbox } from "@/components/compose/AttachmentLightbox";
 import { ChipFace, PdfTile } from "@/components/compose/attachmentFaces";
@@ -180,7 +180,6 @@ export const UserBubble = memo(function UserBubble({
   createdAtMs,
   steer = false,
   queued = false,
-  label,
   testId,
   findItem,
   foldKey,
@@ -191,8 +190,6 @@ export const UserBubble = memo(function UserBubble({
   createdAtMs: number | null;
   steer?: boolean;
   queued?: boolean;
-  /** A small muted line inside the bubble, above the text (a subagent's "Prompt from <parent>"). */
-  label?: ReactNode;
   testId?: string;
   /** The item id the find bar searches the bubble's text under (components/thread/find); absent: not searched (a subagent's prompt). */
   findItem?: string | undefined;
@@ -204,11 +201,6 @@ export const UserBubble = memo(function UserBubble({
   const extra = attachments.filter((p) => !inline.has(p));
   const body = (
     <>
-      {label && (
-        <span className="mb-0.5 flex items-center gap-1.5 text-caption whitespace-normal select-none" data-testid="thread-user-label">
-          {label}
-        </span>
-      )}
       {pieces.map((p, i) => {
         switch (p.kind) {
           case "text":

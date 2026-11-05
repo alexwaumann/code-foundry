@@ -5,6 +5,7 @@
  * prompt takes focus, so the user reads it, edits it and sends it themselves.
  */
 import { getDraft, updateDraft } from "./compose";
+import { leaveSubagent } from "./subagentView";
 import { threadDraftKey } from "./threadActions";
 import { useUiStore } from "./ui";
 
@@ -13,6 +14,8 @@ export function putInThreadComposer(threadId: string, text: string): void {
   const key = threadDraftKey(threadId);
   const cur = getDraft(key).text.trimEnd();
   updateDraft(key, { text: cur ? `${cur}\n\n${text}` : text, error: null });
+  // A subagent's view has no prompt: its parent's is where the text went.
+  leaveSubagent();
   const ui = useUiStore.getState();
   if (ui.selection.kind === "thread" && ui.selection.id === threadId) useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
   else ui.select({ kind: "thread", id: threadId }, { focusPrompt: true });

@@ -902,6 +902,49 @@ function Parts({ parts, red }: { parts: readonly string[]; red?: boolean }) {
   ));
 }
 
+/** A running turn's header line: a sky spinner, then its parts, the first one shimmering. Never a button. */
+export function LiveTurnHead({ parts, status }: { parts: readonly string[]; status?: string }) {
+  return (
+    <div className="thead" data-testid="thread-turn-header" data-live data-status={status}>
+      <span className="line text-caption" data-testid="thread-working">
+        <span className="ico">
+          <LoaderCircle className="t-sky animate-spin" aria-hidden />
+        </span>
+        {parts.map((p, i) => (
+          <span key={i} className="contents">
+            {i > 0 && <span className="sep">·</span>}
+            <span className={i === 0 ? "shimmer" : "tabular-nums"}>{p}</span>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A finished turn's header line: its parts behind a chevron whose click folds or unfolds
+ * the work below it; plain text with nothing to fold. `what` names it to a screen reader
+ * ("turn", "agent").
+ */
+export function TurnHead({ parts, red, folded, foldable, what, status, onToggle }: { parts: readonly string[]; red: boolean; folded: boolean; foldable: boolean; what: string; status?: string; onToggle: () => void }) {
+  return (
+    <div className="thead" data-testid="thread-turn-header" data-folded={folded || undefined} data-status={status}>
+      {foldable ? (
+        <button type="button" className="fold text-caption" aria-expanded={!folded} aria-label={`${folded ? "Show" : "Hide"} this ${what}'s work`} onClick={onToggle}>
+          <span className="ico">
+            <ChevronRight aria-hidden />
+          </span>
+          <Parts parts={parts} red={red} />
+        </button>
+      ) : (
+        <span className="line text-caption" data-testid="thread-turn-header-line">
+          <Parts parts={parts} red={red} />
+        </span>
+      )}
+    </div>
+  );
+}
+
 function stepsLabel(steps: number): string {
   return `${String(steps)} ${steps === 1 ? "step" : "steps"}`;
 }
@@ -931,21 +974,7 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
     const parts = ["Working"];
     if (row.steps > 0) parts.push(stepsLabel(row.steps));
     if (start !== null) parts.push(formatDuration(Math.max(0, now - start)).replace(/\.\ds$/, "s") || "0s");
-    return (
-      <div className="thead" data-testid="thread-turn-header" data-live>
-        <span className="line text-caption" data-testid="thread-working">
-          <span className="ico">
-            <LoaderCircle className="t-sky animate-spin" aria-hidden />
-          </span>
-          {parts.map((p, i) => (
-            <span key={i} className="contents">
-              {i > 0 && <span className="sep">·</span>}
-              <span className={i === 0 ? "shimmer" : "tabular-nums"}>{p}</span>
-            </span>
-          ))}
-        </span>
-      </div>
-    );
+    return <LiveTurnHead parts={parts} />;
   }
   if (it?.kind !== "turnEnd") return null;
   const took = formatDuration(it.durationMs);
@@ -962,29 +991,17 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
   if (cost) parts.push(cost);
   if (it.model) parts.push(canonicalModelName(models, it.model));
   return (
-    <div className="thead" data-testid="thread-turn-header" data-folded={row.folded || undefined}>
-      {row.steps === 0 ? (
-        <span className="line text-caption" data-testid="thread-turn-header-line">
-          <Parts parts={parts} red={it.isError} />
-        </span>
-      ) : (
-        <button
-          type="button"
-          className="fold text-caption"
-          aria-expanded={!row.folded}
-          aria-label={row.folded ? "Show this turn's work" : "Hide this turn's work"}
-          onClick={() => {
-            keep(row.key);
-            setTurnFolded(threadId, row.turn, !row.folded);
-          }}
-        >
-          <span className="ico">
-            <ChevronRight aria-hidden />
-          </span>
-          <Parts parts={parts} red={it.isError} />
-        </button>
-      )}
-    </div>
+    <TurnHead
+      parts={parts}
+      red={it.isError}
+      folded={row.folded}
+      foldable={row.steps > 0}
+      what="turn"
+      onToggle={() => {
+        keep(row.key);
+        setTurnFolded(threadId, row.turn, !row.folded);
+      }}
+    />
   );
 });
 

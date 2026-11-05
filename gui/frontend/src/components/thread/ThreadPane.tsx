@@ -7,16 +7,14 @@ import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { ThreadInfoCard } from "@/components/threadinfo/ThreadInfoCard";
 import { ThreadInfoOverlay } from "@/components/threadinfo/ThreadInfoOverlay";
+import { useInfoRoom } from "@/components/threadinfo/useInfoRoom";
 import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
 import { startThreadWatch, useSetupShown } from "@/stores/thread";
 import { holdThreadPane, useThreadFindOpen } from "@/stores/threadFind";
 import { useShownRun } from "@/stores/subagentView";
-import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
-import { cardFits } from "@/lib/threadInfo";
 import { setupRowPhase } from "@/lib/threadSetup";
-import { useWidth } from "@/lib/useWidth";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { CiteLayer } from "./cite/CiteLayer";
 import { FindBar } from "./find/FindBar";
@@ -95,23 +93,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   const infoOpen = useUiStore((s) => s.threadInfoOpen);
   const findOpen = useThreadFindOpen(threadId);
-  // The card shows inline only while the conversation keeps CONVERSATION_MIN beside it; else the toggle floats it (ThreadInfoOverlay).
-  const [rowRef, rowWidth] = useWidth(1280);
-  const infoFits = cardFits(rowWidth);
-  useEffect(() => {
-    setCardRoom(infoFits);
-  }, [infoFits]);
-  // Another thread hides the overlay (unless it was shown for that one: the sidebar's linked PRs tag).
-  useEffect(() => {
-    if (useCardRoom.getState().overlayFor !== threadId) hideThreadInfoOverlay();
-  }, [threadId]);
-  useEffect(
-    () => () => {
-      setCardRoom(true);
-      hideThreadInfoOverlay();
-    },
-    [],
-  );
+  const [rowRef, infoFits] = useInfoRoom(threadId);
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">

@@ -283,9 +283,22 @@ export function agentCounts(runs: readonly AgentRunInit[]): { agentsRunning: num
   return { agentsRunning: running.length, backgroundAgentsRunning: running.filter((r) => r.background && (r.spawnDepth ?? 1) <= 1).length };
 }
 
+/** One run's usage as the daemon prices it: one bucket of `model`, all output for simplicity; `usd` 0 is unpriced. */
+function runUsage(model: string, output: bigint, usd: number): Pick<AgentRunListInit, "usage" | "costUsd" | "unpriced"> {
+  const unpriced = usd === 0;
+  return { usage: [{ model, day: "2026-11-05", requests: 12n, output, costUsd: usd, outputCostUsd: usd, unpriced }], costUsd: usd, unpriced };
+}
+
+/** The scripted runs' own usage (thread s-r1's "agents" state): a2 has none yet, a3's model has no known rate. */
+const RUN_USAGE: Readonly<Record<string, ReturnType<typeof runUsage>>> = {
+  a0: runUsage("claude-haiku-5-5", 9_400n, 0.06),
+  a1: runUsage("claude-opus-4-8", 48_200n, 0.84),
+  a3: runUsage("claude-next", 12_000n, 0),
+};
+
 /**
  * The thread list's agent_runs for a thread's runs, like the daemon's Thread.agent_runs:
- * open while running, closed once ended, no usage (the mock prices none per run).
+ * open while running, closed once ended, with the run's own usage (RUN_USAGE).
  */
 export function listRuns(runs: readonly AgentRunInit[]): AgentRunListInit[] {
   return runs.map((r) => ({
@@ -298,6 +311,7 @@ export function listRuns(runs: readonly AgentRunInit[]): AgentRunListInit[] {
     status: r.status === ThreadAgentStatus.RUNNING ? AgentRunStatus.OPEN : AgentRunStatus.CLOSED,
     spawnDepth: r.spawnDepth ?? 1,
     ...(r.startedAt ? { startedAt: r.startedAt } : {}),
+    ...RUN_USAGE[r.id ?? ""],
   }));
 }
 

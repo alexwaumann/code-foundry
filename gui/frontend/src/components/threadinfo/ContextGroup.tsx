@@ -7,6 +7,7 @@ import { cacheMinutesLeft, cacheSuffix, cardUsd, contextPercent, foldUsd, USD_SH
 import { fmtShare, fmtTok, totalUsage, usageByModel } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { useModelChoices } from "@/stores/settings";
+import { useThreadStore } from "@/stores/thread";
 import { sameUsage, useThreadsStore } from "@/stores/threads";
 import { Group, HOVER_CARD, Row } from "./Row";
 
@@ -27,6 +28,11 @@ function ContextRow({ threadId }: { threadId: string }) {
   const reread = useThreadsStore((s) => s.byId[threadId]?.contextRereadUsd ?? 0);
   // Re-renders when the minute count changes, not on every tick.
   const minutes = useNowSelect(15_000, (now) => cacheMinutesLeft(expires, now));
+  return <ContextRowView tokens={tokens} window={window} minutes={minutes} reread={reread} />;
+}
+
+/** The Context row's face: `minutes` is the warm cache's time left, null for no cache to speak of. */
+function ContextRowView({ tokens, window, minutes, reread }: { tokens: number; window: number; minutes: number | null; reread: number }) {
   const suffix = cacheSuffix(minutes);
   const pct = contextPercent(tokens, window);
   const warm = minutes !== null && minutes > 0;
@@ -73,11 +79,12 @@ function ContextRow({ threadId }: { threadId: string }) {
   );
 }
 
-/** The thread's usage buckets, kept by identity while their content is the same (the Usage sheet's rule). */
-function useUsage(threadId: string): readonly UsageBucketView[] {
+/** A thread's usage buckets, or `runId`'s own, kept by identity while their content is the same (the Usage sheet's rule). */
+function useUsage(threadId: string, runId?: string): readonly UsageBucketView[] {
   const last = useRef<readonly UsageBucketView[]>(NONE);
   return useThreadsStore((s) => {
-    const next = s.byId[threadId]?.usage ?? NONE;
+    const t = s.byId[threadId];
+    const next = (runId === undefined ? t?.usage : t?.agentRuns.find((r) => r.id === runId)?.usage) ?? NONE;
     if (!sameUsage(last.current, next)) last.current = next;
     return last.current;
   });
@@ -89,7 +96,11 @@ function useUsage(threadId: string): readonly UsageBucketView[] {
  * reads saved against reading those tokens as input, then the requests.
  */
 function UsageRow({ threadId }: { threadId: string }) {
-  const usage = useUsage(threadId);
+  return <UsageRowView usage={useUsage(threadId)} />;
+}
+
+/** The Usage row and its fold over any buckets: a thread's, or one subagent run's. */
+function UsageRowView({ usage }: { usage: readonly UsageBucketView[] }) {
   const total = useMemo(() => totalUsage(usage), [usage]);
   const models = useMemo(() => usageByModel(usage), [usage]);
   const saved = useMemo(() => usage.reduce((s, b) => s + b.cacheSavingsUsd, 0), [usage]);
@@ -169,6 +180,22 @@ export function ContextGroup({ threadId }: { threadId: string }) {
     <Group testId="ti-context-group">
       <ContextRow threadId={threadId} />
       <UsageRow threadId={threadId} />
+    </Group>
+  );
+}
+
+/**
+ * A subagent's Context and Usage (its read-only card): the tokens of its latest request
+ * against the thread's window, and the run's own cost from Thread.agent_runs, matched to
+ * the live run by id. No cache words: a run's cache is not the thread's.
+ */
+export function RunContextGroup({ threadId, runId }: { threadId: string; runId: string }) {
+  const tokens = useThreadStore((s) => s.logs[threadId]?.agents.find((r) => r.id === runId)?.totalTokens ?? 0);
+  const window = useThreadsStore((s) => s.byId[threadId]?.contextWindow ?? 0);
+  return (
+    <Group testId="ti-context-group">
+      <ContextRowView tokens={tokens} window={window} minutes={null} reread={0} />
+      <UsageRowView usage={useUsage(threadId, runId)} />
     </Group>
   );
 }

@@ -461,6 +461,46 @@ function ProjectRow({ threadId }: { threadId: string }) {
   );
 }
 
+/**
+ * The project row of a read-only card (a subagent's): the same words and notes as
+ * ProjectRow, without its menu, so nothing here adds a project or moves the thread.
+ */
+function ProjectFactRow({ threadId }: { threadId: string }) {
+  const { cwdProjectId, members } = useMembers(threadId);
+  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
+  const named = useWorkspacesStore((s) => workspaceId !== "" && s.byId[workspaceId] !== undefined);
+  const worktreeMode = useThreadsStore((s) => s.byId[threadId]?.createdWorktree ?? false);
+  const name = useProjectsStore((s) => s.byId[cwdProjectId]?.name ?? cwdProjectId);
+  const git = useProjectsStore((s) => s.byId[cwdProjectId]?.git ?? false);
+  const notes = useProjectNotes(threadId);
+  if (!cwdProjectId) return null;
+  const noted = notes.flags.length > 0 || notes.envChange !== null;
+  const more = moreProjects(members.length, named);
+  const row = (
+    <Row
+      icon={<ProjectIcon projectId={cwdProjectId} />}
+      hoverable={noted}
+      meta={
+        <>
+          {noted && <NotesMark {...notes} />}
+          {worktreeMode && git ? "Fresh copy" : "Project folder"}
+        </>
+      }
+      testId="ti-project"
+    >
+      <span className={cn(!named && "font-medium")}>{name}</span>
+      {more && <span className="text-cf-text-muted"> {more}</span>}
+    </Row>
+  );
+  return noted ? (
+    <Tip label={<ProjectNotes {...notes} />} side="left">
+      {row}
+    </Tip>
+  ) : (
+    row
+  );
+}
+
 /** "Open in Finder": a click reveals the cwd; the ellipsis's menu offers Finder, the installed editors and a terminal. */
 function OpenInRow({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
@@ -746,16 +786,19 @@ function ActionRow({ threadId }: { threadId: string }) {
   );
 }
 
-/** The card's first group: the workspace, the cwd's project, Open in, and the action. */
-export function PlaceGroup({ threadId }: { threadId: string }) {
+/**
+ * The card's first group: the workspace, the cwd's project, Open in, and the action.
+ * `readOnly` (a subagent's card): the facts and Open in, nothing that changes the thread.
+ */
+export function PlaceGroup({ threadId, readOnly = false }: { threadId: string; readOnly?: boolean }) {
   const has = useThreadsStore((s) => Boolean(s.byId[threadId]?.worktreePath));
   if (!has) return null;
   return (
     <Group testId="ti-place">
       <WorkspaceRow threadId={threadId} />
-      <ProjectRow threadId={threadId} />
+      {readOnly ? <ProjectFactRow threadId={threadId} /> : <ProjectRow threadId={threadId} />}
       <OpenInRow threadId={threadId} />
-      <ActionRow threadId={threadId} />
+      {!readOnly && <ActionRow threadId={threadId} />}
     </Group>
   );
 }

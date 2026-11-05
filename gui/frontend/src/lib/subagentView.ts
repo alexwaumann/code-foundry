@@ -1,7 +1,7 @@
 /**
  * The read-only subagent view's pure helpers: which of the thread's items are a run's own
- * (a filter over the same log the thread's timeline shows), its rows, the turn whose
- * Agent call launched it, and its prompt and footer.
+ * (a filter over the same log the thread's timeline shows), its rows and fold, the turn
+ * whose Agent call launched it, and its prompt and turn header.
  */
 import type { AgentRunView } from "@/api/agents";
 import { agentElapsedMs, fmtElapsed } from "./agents";
@@ -87,18 +87,39 @@ function toolsLabel(n: number): string {
 }
 
 /**
- * The footer's parts: "Working for 4m 12s · 23 tools · 48.2K tokens · Opus 4.8" while it
- * runs, "Worked for 38s · …" once done (counters left out when Claude reported none); a
- * failed run's line is its error (the footer draws the cross). `model` is the display
- * name, "" to leave it out.
+ * The turn header's parts: "Working for 4m 12s · 23 tools · 48.2K tokens · Opus 4.8" while
+ * it runs, "Worked for 38s · …" once done, "Failed after 12s · …" once failed (counters
+ * left out when Claude reported none). `model` is the display name, "" to leave it out.
  */
-export function footerParts(run: Pick<AgentRunView, "status" | "startedAtMs" | "resumedAtMs" | "endedAtMs" | "durationMs" | "toolUses" | "totalTokens" | "error">, model: string, now: number): string[] {
-  if (run.status === "failed") return [run.error || "Failed"];
+export function headerParts(run: Pick<AgentRunView, "status" | "startedAtMs" | "resumedAtMs" | "endedAtMs" | "durationMs" | "toolUses" | "totalTokens">, model: string, now: number): string[] {
   const ms = agentElapsedMs(run, now);
-  const running = run.status === "running";
-  const parts = [ms === null ? (running ? "Working" : "Worked") : `${running ? "Working" : "Worked"} for ${fmtElapsed(ms)}`];
+  const failed = run.status === "failed";
+  const word = run.status === "running" ? "Working" : failed ? "Failed" : "Worked";
+  const parts = [ms === null ? word : `${word} ${failed ? "after" : "for"} ${fmtElapsed(ms)}`];
   if (run.toolUses > 0) parts.push(toolsLabel(run.toolUses));
   if (run.totalTokens > 0) parts.push(`${fmtTok(run.totalTokens)} tokens`);
   if (model) parts.push(model);
   return parts;
+}
+
+/** A run's fold key among its thread's turn folds (stores/thread setTurnFolded), forgotten with them on leaving the thread. */
+export function runFoldKey(runId: string): string {
+  return `run:${runId}`;
+}
+
+/** Whether a run's work is folded: a running run never, a finished one unless the reader opened it. */
+export function runFolded(status: AgentRunView["status"], choice: boolean | undefined): boolean {
+  return status !== "running" && (choice ?? true);
+}
+
+/**
+ * What a run's rows keep of its work: all of it when open; folded, only what it answered,
+ * as a finished turn's fold keeps its final text. That is its last text, unless a report of
+ * its own follows (`report`), which then says it.
+ */
+export function shownNodes(nodes: readonly WorkNode[], folded: boolean, report: boolean): readonly WorkNode[] {
+  if (!folded) return nodes;
+  if (report) return [];
+  const last = lastTextId(nodes);
+  return nodes.filter((n) => n.type === "text" && n.id === last);
 }

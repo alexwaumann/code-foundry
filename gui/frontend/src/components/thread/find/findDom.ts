@@ -16,11 +16,10 @@ import { foldHides } from "../foldDom";
 export const FIND_ITEM_ATTR = "data-find-item";
 
 /**
- * Text find leaves out: inside a user bubble, the tags and the subagent prompt's label; in
- * an answer, an unloaded local image's chip (data-find-skip: the data counts no text for
+ * Text find leaves out: inside a user bubble, the tags; in an answer, an unloaded local image's chip (data-find-skip: the data counts no text for
  * an image).
  */
-const FIND_SKIP = '[data-testid="thread-tag"], [data-testid="thread-user-label"], [data-find-skip]';
+const FIND_SKIP = '[data-testid="thread-tag"], [data-find-skip]';
 
 export function findItemSelector(itemId: string): string {
   return `[${FIND_ITEM_ATTR}="${CSS.escape(itemId)}"]`;
