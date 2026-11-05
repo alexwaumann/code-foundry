@@ -164,9 +164,9 @@ Check every message about an event ends with `pluginsdk.WakeHint(...)`.
 
 ## What plugintest does not do
 
-It does not evaluate `when` clauses, check command buttons against the permissions,
-coalesce views, keep log buffers, or store secrets from forms. Those are the daemon's:
-after `go test ./...` passes, run the plugin for real (the skill's loop, steps 5 to 7)
+It does not evaluate `when` clauses, ask a command's `confirm`, check command buttons
+against the permissions, coalesce views, keep log buffers, or store secrets from forms. Those are the daemon's:
+after `go test ./...` passes, run the plugin for real (the skill's loop, steps 5 and 6)
 and check `code-foundry plugin list` (state, NOTE), `plugin logs <name>` (no refused
 views or calls), `plugin surface` for each surface and `plugin act` for each event.
 `plugin surface` prints the view the host accepted and the elements an act can name.

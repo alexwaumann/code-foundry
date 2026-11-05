@@ -17,12 +17,6 @@ sending them: an older host refuses the view.
 
 ## columns
 
-```json
-{"key": "run", "columns": {"collapse": "stack", "items": [
-  {"key": "run-main", "weight": 2, "children": [{"key": "run-log", "log": {"text": "…"}}]},
-  {"key": "run-side", "children": [{"key": "run-facts", "pairs": {"items": []}}]}]}}
-```
-
 ```go
 run := ui.NewColumns("run",
 	ui.NewColumn("run-main", logNode).WithWeight(2),
@@ -51,12 +45,6 @@ run.Columns.Collapse = ui.CollapseStack // the default; ui.CollapseFirst drops t
 
 ## pane
 
-```json
-{"key": "out", "pane": {"height": 320, "children": [{"key": "out-log", "log": {"text": "…"}}, {"key": "out-list", "list": {"rows": []}}]}}
-{"key": "chat-box", "pane": {"height": "fill", "minHeight": 320, "noScroll": true, "children": [
-  {"key": "chat", "thread": {"threadId": "s-1f2e3d4c5b6a", "height": "fill"}}]}}
-```
-
 ```go
 out := ui.NewPane("out", ui.HeightPx(320), logNode, listNode)
 chat := ui.Node{Key: "chat-box", Pane: &ui.Pane{Height: ui.HeightFill, MinHeight: 320, NoScroll: true,
@@ -79,12 +67,6 @@ shrinks to the pane (down to 4 lines), so its newest lines stay in view; beside 
 nodes it keeps its `rows` and the pane scrolls, so give it rows that fit.
 
 ## grid
-
-```json
-{"key": "cards", "grid": {"minWidth": 200, "items": [
-  {"key": "c-build", "children": [{"key": "c-build-card", "section": {"card": true, "title": "Build", "children": []}}]},
-  {"key": "c-deploy", "span": 2, "children": [{"key": "c-deploy-card", "section": {"card": true, "title": "Deploy", "children": []}}]}]}}
-```
 
 ```go
 cards := ui.NewGrid("cards",
@@ -109,13 +91,6 @@ cards.Grid.MinWidth = 200 // 0: 240
 
 ## divider and spacer
 
-```json
-{"key": "rule", "divider": {}}
-{"key": "rule-checks", "divider": {"label": "Checks"}}
-{"key": "gap", "spacer": {"size": 24}}
-{"key": "push", "spacer": {"flex": true}}
-```
-
 ```go
 ui.NewDivider("rule", "")              // a hairline
 ui.NewDivider("rule-checks", "Checks") // hairlines either side of a centred small-caps label
@@ -136,12 +111,6 @@ ui.NewFlexSpacer("push")
 
 ## group
 
-```json
-{"key": "line", "group": {"align": "between", "items": [
-  {"key": "line-text", "text": {"content": "3 of 4 checks passed"}},
-  {"key": "line-bar", "actions": {"buttons": [{"key": "rerun", "label": "Re-run", "action": {"event": "rerun"}}]}}]}}
-```
-
 ```go
 line := ui.NewGroup("line", ui.AlignBetween, summaryText, ui.NewActions("line-bar", rerun))
 line.Group.NoWrap = true // the default wraps
@@ -159,10 +128,6 @@ line.Group.NoWrap = true // the default wraps
 
 ## container
 
-```json
-{"key": "page", "container": {"width": "narrow", "children": [{"key": "intro", "markdown": {"source": "…"}}]}}
-```
-
 ```go
 page := ui.NewContainer("page", ui.ContainerNarrow, introNode, formNode) // ui.ContainerWide, ui.ContainerFull
 ```
@@ -174,14 +139,6 @@ reading width and a wide one is the page's main column. It draws nothing and spa
 nodes like the list around it. It is a container for the depth limit; fill looks past it.
 
 ## masterDetail
-
-```json
-{"key": "runs", "masterDetail": {"selected": "run-5", "listWidth": 280,
-  "list": {"rows": [{"key": "run-6", "title": "Build #6", "glyph": {"status": "running"}},
-                    {"key": "run-5", "title": "Build #5", "glyph": {"status": "failed"}}]},
-  "emptyDetail": {"glyph": {"icon": "list"}, "title": "No run chosen"},
-  "detail": [{"key": "run-facts", "pairs": {"items": []}}]}}
-```
 
 ```go
 md := ui.NewMasterDetail("runs", ui.List{Rows: rows}, selected, detailNodes...) // selected: "" or a row key
@@ -227,12 +184,6 @@ md.MasterDetail.EmptyDetail = &ui.Empty{Title: "No run chosen"}
 
 ## tabs (a node's own)
 
-```json
-{"key": "run-tabs", "tabs": {"active": "run-tab-log",
-  "items": [{"key": "run-tab-overview", "label": "Overview"}, {"key": "run-tab-log", "label": "Log", "badge": {"label": "1 error", "tone": "error"}}],
-  "children": [{"key": "run-log-pane", "pane": {"height": 240, "children": [{"key": "run-log", "log": {"text": "…"}}]}}]}}
-```
-
 ```go
 tabs := ui.NewTabsNode("run-tabs", ui.NewTabs(active, ui.NewTab("run-tab-overview", "Overview"), ui.NewTab("run-tab-log", "Log")), children...)
 ```
@@ -258,19 +209,6 @@ tabs := ui.NewTabsNode("run-tabs", ui.NewTabs(active, ui.NewTab("run-tab-overvie
   read together or compared. Prefer the view's own tabs for whole pages.
 
 ## toolbar and footer
-
-```json
-{"header": {"title": "Runs"},
- "toolbar": [
-   {"key": "search", "form": {"fields": [{"key": "search-q", "name": "q", "label": "Filter runs", "input": {"placeholder": "Filter runs"}}],
-     "submit": {"key": "search-go", "label": "Filter", "icon": "search", "iconOnly": true, "action": {"event": "filter"}}}},
-   {"key": "status", "chips": {"chips": [{"key": "st-all", "label": "All", "selected": true, "action": {"event": "status", "data": "all"}},
-     {"key": "st-failed", "label": "Failed", "status": "failed", "action": {"event": "status", "data": "failed"}}]}}],
- "nodes": [],
- "footer": [
-   {"key": "count", "text": {"content": "2 of 6 runs", "size": "sm"}},
-   {"key": "bar", "actions": {"align": "end", "buttons": [{"key": "rerun", "label": "Run again", "style": "attention", "action": {"event": "rerun"}}]}}]}
-```
 
 ```go
 submit := ui.EventButton("search-go", "Filter", "filter").WithIcon("search").AsIconOnly()
@@ -340,8 +278,7 @@ grows to match.
 - Columns, grid items, group items and the toolbar's and footer's nodes count as
   elements toward the view's 400.
 - Thread and terminal nodes inside panes and columns are live streams like any others: the
-  app keeps at most 2 live at once across plugin views (`primitives.md`, thread and
-  terminal), so a layout with three threads shows the third paused with Attach. The app's
+  app keeps at most 2 live at once across plugin views (`owned.md`), so a layout with three threads shows the third paused with Attach. The app's
   other streams (a terminal in the bottom panel, a second panel) can leave fewer live: a
   node then says it is waiting for a connection, and Attach is not offered meanwhile.
 
