@@ -53,7 +53,7 @@ Temp is writable by anything on the machine, so a check on a path says nothing a
 open gets. Flipping `/tmp/foo/x.txt` between a file and a link served `daemon.token` within about
 30 requests. So in a temp folder the open comes first and the checks are on the open file.
 
-- `ReadFile`: a `real` under home is opened as it is (nobody else can swap a home file), and a
+- `ReadFile`: a `real` under home is opened with no link allowed on the way, and a
   `real` in temp through a Root at the deepest temp folder holding it. The open file's stat
   decides what it is. This is why the File tab can still read a `/tmp` link into home.
 - The route, temp grant (`preview/open.go`): a grant is a name in a temp folder, not a resolved
@@ -63,10 +63,17 @@ open gets. Flipping `/tmp/foo/x.txt` between a file and a link served `daemon.to
   with no new grant, which binding an inode would not. Files open through a Root on that folder.
 - A one-file grant takes the file at its name: `Lstat` after the open must be the same file.
 - The Floor speaks of paths, so before it is asked the real path must lead to the open file
-  (`realOf`). That keeps a config home below a tree guarded. An atomic rewrite landing between
-  the open and that check is a 404 for one request.
-- The route, home grant: checks then opens, as before, and the real file must be under home
-  unless the grant is in temp. A bridged `~/proj/index.html` cannot load `build/app.js` through
+  (`realOf`). That keeps a config home below a tree guarded, with one known gap: the Floor reads
+  markers by path after the open, so a second user who can write in that tree can race it. The
+  home must be one the Floor does not know, at least two levels below the tree. The review served
+  a file 66 times in 43,560 requests that way. Closing it means walking markers on held
+  descriptors, which was judged too much code for a dev daemon's scratch home inside someone
+  else's temp tree. A process running as the user needs no race: it can read the file anyway.
+  An atomic rewrite landing between the open and that check is a 404 for that request.
+- The route, home grant: checks then opens with `O_NOFOLLOW_ANY` (`fsx.NoFollowAny`), and the
+  real file must be under home unless the grant is in temp. `ReadFile`'s home branch opens the
+  same way. Home is not safe from swaps: `~/Public/Drop Box` is writable by other users, so a
+  link swapped in after the check must fail the open. A bridged `~/proj/index.html` cannot load `build/app.js` through
   `~/proj/build -> /tmp/foo`, and `~/site/l.html -> /tmp/a.html -> ~/real.html` serves only while
   it leads home, so repointing `/tmp/a.html` gives a 404, not temp's bytes at a home URL.
   `PreviewFile` refuses such a link up front rather than hand out a URL that 404s.
@@ -74,7 +81,11 @@ open gets. Flipping `/tmp/foo/x.txt` between a file and a link served `daemon.to
   `OpenTree` makes its Root from the walked descriptor (`/dev/fd/<n>`). `Root.OpenFile` takes
   `O_NONBLOCK` and opens folders on the way with `O_DIRECTORY`; `os.ReadDir` does too.
 - A hard link in temp to a home file the Floor does not guard is served: nothing tells it from a
-  file. Linking needs the way into home, which macOS's default home permissions close to others.
+  file. Home is 0750 group `staff` on a default Mac, so another `staff` user may be able to make
+  one. It is left in because refusing `links > 1` would break hard-linked temp builds, and only
+  a second user on the machine can use it.
+- The marker walk stops below a temp folder: `touch /tmp/daemon.token` must not guard all of
+  `/tmp`. A home that is a temp folder itself is only guarded when the Floor knows it.
 
 ## Gotchas
 

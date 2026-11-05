@@ -16,7 +16,9 @@ const openFlags = os.O_RDONLY | syscall.O_NONBLOCK
 
 // open opens the regular file rel names under e and says where it really is, or fails with
 // ErrNotExist or a read error, each a 404. A temp grant goes by what it opened (openTemp). A
-// home grant may check first and open after: nobody else can swap a file under home.
+// home grant checks first and opens after, with no link allowed on the way: real has none, so
+// a link swapped in since the check fails the open. Other users can write in parts of home
+// (~/Public/Drop Box), so a swap there is possible.
 func open(floor Floor, e entry, rel string) (*os.File, string, error) {
 	if floor.inTemp(e.dir) {
 		return openTemp(floor, e, rel)
@@ -25,7 +27,7 @@ func open(floor Floor, e entry, rel string) (*os.File, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	f, err := os.OpenFile(real, openFlags, 0)
+	f, err := os.OpenFile(real, openFlags|fsx.NoFollowAny, 0)
 	if err != nil {
 		return nil, "", err
 	}
@@ -71,7 +73,8 @@ func resolve(floor Floor, dir, rel string) (string, error) {
 //   - A one-file grant serves the file at its name and nothing a link there leads to.
 //   - The file must be regular once open.
 //   - The Floor speaks of paths, so the file's real path must lead to the open file before the
-//     Floor is asked. A config home below the tree stays guarded that way.
+//     Floor is asked. A config home below the tree stays guarded that way, short of a second
+//     user racing the Floor's reads in that tree (docs/notes/read-temp-files.md).
 //
 // Anything refused is ErrNotExist: it may be a stranger's doing, so it is not worth a log line.
 func openTemp(floor Floor, e entry, rel string) (*os.File, string, error) {

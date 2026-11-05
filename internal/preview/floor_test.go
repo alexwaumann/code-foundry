@@ -363,3 +363,25 @@ func TestFloorTempDirInHome(t *testing.T) {
 		t.Errorf("%s stopped being a tree with its own .tmp as TMPDIR", proj)
 	}
 }
+
+// A marker anyone can drop in a temp folder itself guards nothing there; one in a folder below
+// it still guards that folder.
+func TestFloorTempRootMarker(t *testing.T) {
+	f, at := tempFloor(t)
+	marker := homeMarkers[0]
+	write(t, at("private/tmp/foo/page.html"), "<p>page</p>")
+	write(t, at("private/tmp/"+marker), "")
+	write(t, at("private/tmp/cfg/"+marker), "t")
+	write(t, at("private/tmp/cfg/db.sqlite"), "secret")
+	for _, p := range []string{"private/tmp/foo/page.html", "tmp/foo/page.html"} {
+		if f.Guarded(at(p)) {
+			t.Errorf("Guarded(%s) = true, want false", p)
+		}
+	}
+	if !f.ScopeOK(at("private/tmp/foo")) {
+		t.Error("ScopeOK(foo) = false: a marker in the temp folder closed its trees")
+	}
+	if !f.Guarded(at("private/tmp/cfg/db.sqlite")) {
+		t.Error("Guarded(cfg/db.sqlite) = false, want true")
+	}
+}

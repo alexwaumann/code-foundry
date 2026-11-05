@@ -68,13 +68,13 @@ func (r ReadRoots) outsideHome(p, real string) bool {
 }
 
 // open opens the file at real (symlinks resolved, under the roots) without blocking on a FIFO.
-// A home file is opened as it is: nobody else can swap one. What real names in a temp folder
-// may have been swapped for a link since it was resolved, so it is opened through a Root at
-// that folder, which no link leaves.
+// real has no links, so a home file is opened with none allowed on the way: other users can
+// write in parts of home (~/Public/Drop Box). What real names in a temp folder may have been
+// swapped for a link too, and is opened through a Root at that folder, which no link leaves.
 func (r ReadRoots) open(real string) (*os.File, error) {
 	const flags = os.O_RDONLY | syscall.O_NONBLOCK
 	if Within(r.Home, real) {
-		return os.OpenFile(real, flags, 0)
+		return os.OpenFile(real, flags|NoFollowAny, 0)
 	}
 	top := r.TempRoot(real)
 	root, err := os.OpenRoot(top)

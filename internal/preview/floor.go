@@ -3,6 +3,7 @@ package preview
 import (
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
@@ -79,6 +80,11 @@ func (f Floor) reaches(p string) bool { return f.roots().Allows(p) }
 
 // inTemp reports whether p is under a temp folder.
 func (f Floor) inTemp(p string) bool { return f.roots().InTemp(p) }
+
+// isTempRoot reports whether d is a temp folder, in any spelling.
+func (f Floor) isTempRoot(d string) bool {
+	return slices.ContainsFunc(f.temps, func(t string) bool { return fsx.Within(d, t) })
+}
 
 // checkouts are a config home's trees of the user's own work, the ones a write may reach.
 func checkouts(h paths.Paths) []string { return []string{h.Worktrees(), h.Projects()} }
@@ -160,9 +166,10 @@ func (f Floor) inHomeByName(p string, open func(paths.Paths) []string) bool {
 			return true
 		}
 	}
-	// Homes nobody named: p itself or an ancestor holding a marker, up to home or the
-	// temp folder.
-	for d := p; f.reaches(d); d = filepath.Dir(d) {
+	// Homes nobody named: p itself or an ancestor holding a marker, up to home or just below
+	// the temp folder. A marker in the temp folder itself says nothing, as anyone can put one
+	// there, and it would guard every file in it.
+	for d := p; f.reaches(d) && !f.isTempRoot(d); d = filepath.Dir(d) {
 		if isHome(d) && inHome(d, p, open) {
 			return true
 		}
