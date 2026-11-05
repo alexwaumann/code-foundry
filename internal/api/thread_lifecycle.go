@@ -37,6 +37,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		ModelDefaulted: m.GetModelDefaulted(), EffortDefaulted: m.GetEffortDefaulted(),
 		SystemPromptAppend: m.GetSystemPromptAppend(),
 		ProjectIDs:         m.GetProjectIds(), Like: m.GetLikeThreadId(), NewBranch: m.GetNewBranch(), CheckoutMode: m.GetCheckoutMode(),
+		BackgroundSetup: m.GetBackgroundSetup(), DraftJSON: m.GetDraftJson(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef(), Branch: nw.GetBranch(), BaseFromOrigin: optionalBool(nw.BaseFromOrigin)}
@@ -48,7 +49,8 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		return nil, threadError(err)
 	}
 	res := &v1.CreateThreadResponse{Thread: threadToProto(s), Reused: reused}
-	if !reused {
+	// A background setup has placed nothing yet: there is nothing to say about it.
+	if !reused && !o.BackgroundSetup {
 		res.Hints = h.store.CheckoutHints(s)
 		res.MadeWorktree, res.ExistingWorktree, res.SharedWith = report.MadeWorktree, report.ExistingWorktree, report.SharedWith
 		res.WorktreeModeDropped, res.MadeBranch = report.DroppedWorktreeMode, report.MadeBranch
@@ -311,6 +313,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		Pinned:              s.Pinned,
 		EffortPending:       s.EffortPending,
 		CheckoutPaths:       checkoutPathsToProto(s),
+		Setup:               setupToProto(s.Setup),
 	}
 	if !s.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(s.CreatedAt)

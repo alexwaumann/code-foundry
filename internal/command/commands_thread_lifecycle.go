@@ -168,6 +168,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "prompt", Type: String, FileOrStdin: true, Description: "The first message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 				{Name: "composer-prompt", Type: String, Description: "The GUI's text of prompt with its tag tokens, for display (the GUI sets it)"},
+				backgroundSetupArg, draftJSONArg,
 				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (no placement or worktree flags with it)"},
 				{Name: "created-by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
 					Description: "Id of the thread whose agent creates this one, noted at the top of the new thread (default: the thread this command runs in, $CODE_FOUNDRY_THREAD; pass an empty value to opt out)"},
@@ -198,6 +199,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					ProjectIds: projects, LikeThreadId: a.String("like"), NewBranch: a.Bool("new-branch"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
 					Notify: a.Bool("notify"), RequestId: a.String("request-id"),
+					BackgroundSetup: a.Bool("background-setup"), DraftJson: a.String("draft-json"),
 					// A model or effort from the settings' default, not chosen: a resident's
 					// worker defaults may replace it (docs/notes/ember-2-store.md).
 					ModelDefaulted:  a.String("model") != "" && !a.Given("model"),

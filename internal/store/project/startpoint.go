@@ -84,6 +84,74 @@ func looksLikeSHA(s string) bool {
 	return true
 }
 
+// basePlan is how a typed (or default) base resolves in one repository, before anything
+// is fetched: what it names and which remote branch it follows.
+type basePlan struct {
+	typed, name string
+	kind        baseKind
+	remotes     []string
+}
+
+// planBase classifies opts' base (opts.BaseFromOrigin only).
+func (g *Git) planBase(ctx context.Context, m *projectMeta, opts CreateWorktreeOptions) basePlan {
+	remotes, err := g.remoteNames(ctx, m)
+	if err != nil {
+		g.log.Warn("fetch before worktree: listing remotes failed", "project", m.ID, "base", opts.BaseRef, "err", err)
+	}
+	p := basePlan{typed: opts.BaseRef, name: cmp.Or(m.DefaultBranch, "main"), kind: baseBranch, remotes: remotes}
+	if p.typed != "" {
+		p.name = p.typed
+		p.kind = classifyBase(p.typed, remotes, func(ref string) bool { return g.refExists(ctx, m.Path, ref) })
+	}
+	return p
+}
+
+// remoteBranch is the remote branch p follows, the one a fetch refreshes; "" when it
+// follows none (a tag, a sha, an expression, a repository without origin).
+func (p basePlan) remoteBranch() (remote, branch string) {
+	switch {
+	case p.kind == baseRemote:
+		return splitRemoteRef(p.remotes, p.typed)
+	case p.kind == baseBranch && slices.Contains(p.remotes, "origin"):
+		return "origin", p.name
+	}
+	return "", ""
+}
+
+// fetchPlanned fetches the remote branch p follows, if any. A failure is not an error:
+// the existing ref is used, and opts.Progress is told so.
+func (g *Git) fetchPlanned(ctx context.Context, m *projectMeta, p basePlan, opts CreateWorktreeOptions) {
+	remote, branch := p.remoteBranch()
+	if remote == "" {
+		return
+	}
+	g.fetchReported(ctx, m, remote, branch, opts, func(err error) {
+		if p.kind == baseBranch && missingRemoteRef(err) {
+			g.log.Debug("origin has no such branch; using the local one", "project", m.ID, "branch", branch)
+			return
+		}
+		g.log.Warn("fetch before worktree failed; using the existing ref", "project", m.ID, "ref", remote+"/"+branch, "err", err)
+	})
+}
+
+// FetchBase runs the fetch CreateWorktree's opts.Fetch would run for a new branch from
+// opts.BaseRef, on its own: the fetch does not depend on the branch's name, so a caller
+// still waiting for the name runs it meanwhile and then calls CreateWorktree without
+// Fetch, which resolves the same start point from the refs fetched here. Nothing is
+// fetched with opts.BaseFromOrigin off. Failures are told through opts.Progress, never
+// returned: as in CreateWorktree, a stale start point is better than no worktree.
+func (g *Git) FetchBase(ctx context.Context, opts CreateWorktreeOptions) {
+	st := g.project(opts.ProjectID)
+	if st == nil || !opts.BaseFromOrigin {
+		return
+	}
+	m := st.meta.Load()
+	if requireGit(m) != nil {
+		return
+	}
+	g.fetchPlanned(ctx, m, g.planBase(ctx, m, opts), opts)
+}
+
 // startPoint is the ref a new branch starts from for opts (see
 // CreateWorktreeOptions.BaseFromOrigin), fetched first when opts.Fetch says so.
 func (g *Git) startPoint(ctx context.Context, m *projectMeta, opts CreateWorktreeOptions) string {
@@ -100,38 +168,16 @@ func (g *Git) startPoint(ctx context.Context, m *projectMeta, opts CreateWorktre
 		}
 		return def
 	}
-	remotes, err := g.remoteNames(ctx, m)
-	if err != nil {
-		g.log.Warn("fetch before worktree: listing remotes failed", "project", m.ID, "base", typed, "err", err)
-	}
-	name, kind := def, baseBranch
-	if typed != "" {
-		name = typed
-		kind = classifyBase(typed, remotes, func(ref string) bool { return g.refExists(ctx, m.Path, ref) })
-	}
-	switch kind {
-	case baseRemote:
-		if opts.Fetch {
-			remote, branch := splitRemoteRef(remotes, typed)
-			if err := g.fetchRemoteBranch(ctx, m, remote, branch); err != nil {
-				g.log.Warn("fetch before worktree failed; using the existing ref", "project", m.ID, "ref", typed, "err", err)
-			}
-		}
-		return typed
-	case baseAsTyped:
-		return typed
-	}
-	if !slices.Contains(remotes, "origin") {
-		return name
-	}
+	p := g.planBase(ctx, m, opts)
 	if opts.Fetch {
-		if err := g.fetchRemoteBranch(ctx, m, "origin", name); err != nil {
-			if missingRemoteRef(err) {
-				g.log.Debug("origin has no such branch; using the local one", "project", m.ID, "branch", name)
-			} else {
-				g.log.Warn("fetch before worktree failed; using the existing ref", "project", m.ID, "ref", "origin/"+name, "err", err)
-			}
-		}
+		g.fetchPlanned(ctx, m, p, opts)
+	}
+	if p.kind != baseBranch {
+		return typed
+	}
+	name := p.name
+	if !slices.Contains(p.remotes, "origin") {
+		return name
 	}
 	if !g.refExists(ctx, m.Path, "refs/remotes/origin/"+name) {
 		return name

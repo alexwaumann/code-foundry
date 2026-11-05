@@ -45,6 +45,9 @@ func (m *Manager) Reseed(ctx context.Context, id string, o ReseedOptions) (t Thr
 	if err != nil {
 		return Thread{}, false, err
 	}
+	if err := m.refuseSetup(id, "reseeded"); err != nil {
+		return Thread{}, false, err
+	}
 	for {
 		live, _, err := m.liveOrStopped(ctx, id)
 		if err != nil {

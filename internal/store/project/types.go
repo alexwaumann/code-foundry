@@ -225,6 +225,44 @@ type CreateWorktreeOptions struct {
 	// first. The fetch is bounded; on failure it is logged and the existing (possibly
 	// stale) ref is used. Ignored when Branch already exists locally.
 	Fetch bool
+	// Progress, when set, is told what CreateWorktree (or FetchBase) does as it does it,
+	// on the caller's goroutine. It must not block.
+	Progress func(WorktreeEvent)
+}
+
+// report tells o.Progress about ev, if anyone listens.
+func (o CreateWorktreeOptions) report(ev WorktreeEvent) {
+	if o.Progress != nil {
+		o.Progress(ev)
+	}
+}
+
+// WorktreeEventKind says what a WorktreeEvent tells.
+type WorktreeEventKind int
+
+// Worktree events.
+const (
+	// WorktreeFetchStarted: the fetch of a start point began.
+	WorktreeFetchStarted WorktreeEventKind = iota + 1
+	// WorktreeFetchEnded: it ended; Err says how.
+	WorktreeFetchEnded
+	// WorktreeAdding: git worktree add is about to run.
+	WorktreeAdding
+)
+
+// WorktreeEvent is one step of CreateWorktree or FetchBase
+// (CreateWorktreeOptions.Progress).
+type WorktreeEvent struct {
+	Kind WorktreeEventKind
+	// Remote and Ref are what is fetched: "origin", "origin/main".
+	Remote, Ref string
+	// Err is why the fetch failed; the existing ref is used, so it fails nothing else.
+	Err error
+	// Missing: the remote has no such branch, so there was nothing to fetch.
+	Missing bool
+	// RefAt, with Err, is the commit time of the tip of Ref as it is on disk: how old
+	// the start point used instead is. Zero when there is no such ref.
+	RefAt time.Time
 }
 
 // Refs lists the refs a new branch can start from (Store.ListRefs).

@@ -29,6 +29,7 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 			{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto", Description: "As thread new's"},
 			{Name: "prompt", Type: String, FileOrStdin: true, Description: "The first message (@file, -: stdin)"},
 			{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
+			backgroundSetupArg, draftJSONArg,
 			{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 			{Name: "name", Type: String, Description: "Thread name"},
 			createdFocusArg,
@@ -43,6 +44,7 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 				// As thread.new: a model or effort from the settings' default, not chosen.
 				ModelDefaulted:  a.String("model") != "" && !a.Given("model"),
 				EffortDefaulted: a.String("effort") != "" && !a.Given("effort"),
+				BackgroundSetup: a.Bool("background-setup"), DraftJson: a.String("draft-json"),
 			}
 			res, err := b.Create(ctx, connect.NewRequest(req))
 			if err != nil {

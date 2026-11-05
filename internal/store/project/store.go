@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -651,7 +652,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	case remote && opts.BaseRef == "":
 		// git's DWIM: create <branch> tracking origin/<branch>.
 		if opts.Fetch {
-			g.fetchStartPoint(ctx, m, "origin/"+opts.Branch)
+			g.fetchStartPoint(ctx, m, "origin/"+opts.Branch, opts)
 		}
 		args = []string{"worktree", "add", path, opts.Branch}
 	default:
@@ -675,6 +676,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		}
 		args = []string{"worktree", "add", track, "-b", opts.Branch, path, base}
 	}
+	opts.report(WorktreeEvent{Kind: WorktreeAdding})
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {
 		return Worktree{}, fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
 	}
@@ -778,7 +780,7 @@ func refspecWrites(spec, ref string) bool {
 // remote's current tip. Anything else (a local branch, a sha, a tag) is left alone.
 // The fetch is bounded by startFetchTimeout. A failure is logged and ignored: the
 // worktree is then created from the existing, possibly stale, ref.
-func (g *Git) fetchStartPoint(ctx context.Context, m *projectMeta, ref string) {
+func (g *Git) fetchStartPoint(ctx context.Context, m *projectMeta, ref string, opts CreateWorktreeOptions) {
 	remotes, err := g.remoteNames(ctx, m)
 	if err != nil {
 		g.log.Warn("fetch before worktree: listing remotes failed", "project", m.ID, "ref", ref, "err", err)
@@ -788,9 +790,41 @@ func (g *Git) fetchStartPoint(ctx context.Context, m *projectMeta, ref string) {
 	if remote == "" {
 		return
 	}
-	if err := g.fetchRemoteBranch(ctx, m, remote, branch); err != nil {
+	g.fetchReported(ctx, m, remote, branch, opts, func(err error) {
 		g.log.Warn("fetch before worktree failed; using the existing ref", "project", m.ID, "ref", ref, "err", err)
+	})
+}
+
+// fetchReported is fetchRemoteBranch told through opts.Progress: started, then ended with
+// what the caller shows. failed is called with a failure, which goes no further: the
+// existing ref is used. A remote without the branch is told as Missing, not as a failure
+// (the local branch is used, and nothing is stale).
+func (g *Git) fetchReported(ctx context.Context, m *projectMeta, remote, branch string, opts CreateWorktreeOptions, failed func(error)) {
+	ref := remote + "/" + branch
+	opts.report(WorktreeEvent{Kind: WorktreeFetchStarted, Remote: remote, Ref: ref})
+	end := WorktreeEvent{Kind: WorktreeFetchEnded, Remote: remote, Ref: ref}
+	if err := g.fetchRemoteBranch(ctx, m, remote, branch); err != nil {
+		failed(err)
+		if missingRemoteRef(err) {
+			end.Missing = true
+		} else {
+			end.Err, end.RefAt = err, g.refTime(ctx, m, "refs/remotes/"+ref)
+		}
 	}
+	opts.report(end)
+}
+
+// refTime is the commit time of ref's tip; zero when there is no such ref.
+func (g *Git) refTime(ctx context.Context, m *projectMeta, ref string) time.Time {
+	out, err := g.runner.Run(ctx, m.Path, "log", "-1", "--format=%ct", ref, "--")
+	if err != nil {
+		return time.Time{}
+	}
+	sec, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+	if err != nil {
+		return time.Time{}
+	}
+	return time.Unix(sec, 0)
 }
 
 // remoteNames lists the project's configured remotes.

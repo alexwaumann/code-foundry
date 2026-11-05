@@ -52,6 +52,18 @@ func (e *GitError) Error() string {
 
 func (e *GitError) Unwrap() error { return e.Err }
 
+// GitText is what git itself said in err (its stderr, trimmed), for showing a user; err's
+// message when git said nothing or err is not git's.
+func GitText(err error) string {
+	var ge *GitError
+	if errors.As(err, &ge) {
+		if msg := strings.TrimSpace(ge.Stderr); msg != "" {
+			return msg
+		}
+	}
+	return err.Error()
+}
+
 // ExecRunner runs the git binary.
 type ExecRunner struct {
 	// Git is the binary; "git" (from PATH) when empty.

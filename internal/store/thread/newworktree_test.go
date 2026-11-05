@@ -201,8 +201,7 @@ func TestCreateNewWorktree(t *testing.T) {
 				wantBase = ""
 			}
 			got := rr.created()
-			if len(got) != 1 || got[0].Branch != branch || got[0].ProjectID != "r1" || !got[0].Fetch ||
-				got[0].BaseRef != wantBase {
+			if len(got) != 1 || got[0].Branch != branch || got[0].ProjectID != "r1" || got[0].BaseRef != wantBase {
 				t.Fatalf("CreateWorktree calls = %+v, want branch %s base %q", got, branch, wantBase)
 			}
 			wantPath := rr.WorktreeRoot + "/_local/repo/" + strings.ReplaceAll(branch, "/", "-")

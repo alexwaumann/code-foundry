@@ -45,6 +45,76 @@ enum ThreadState {
   THREAD_STATE_DISCONNECTED = 4;
 }
 
+// ThreadSetupPhase is where a thread's setup stands (ThreadSetup.phase).
+enum ThreadSetupPhase {
+  THREAD_SETUP_PHASE_UNSPECIFIED = 0;
+  THREAD_SETUP_PHASE_RUNNING = 1;
+  // Claude's process started. It may still fail its handshake: that is the thread's own
+  // error, not the setup's.
+  THREAD_SETUP_PHASE_DONE = 2;
+  // A step failed, or the daemon restarted during setup; ThreadSetup.error says why.
+  THREAD_SETUP_PHASE_FAILED = 3;
+  // The user stopped it.
+  THREAD_SETUP_PHASE_CANCELLED = 4;
+}
+
+// ThreadSetupStepKind is what a setup step does.
+enum ThreadSetupStepKind {
+  THREAD_SETUP_STEP_KIND_UNSPECIFIED = 0;
+  // Name the new branch (the namer, bounded). One per thread.
+  THREAD_SETUP_STEP_KIND_NAME = 1;
+  // Fetch one project's start point.
+  THREAD_SETUP_STEP_KIND_FETCH = 2;
+  // Make one project's worktree.
+  THREAD_SETUP_STEP_KIND_WORKTREE = 3;
+  // Start Claude. One per thread, always the last.
+  THREAD_SETUP_STEP_KIND_START = 4;
+}
+
+// ThreadSetupStepStatus is how a setup step stands.
+enum ThreadSetupStepStatus {
+  THREAD_SETUP_STEP_STATUS_UNSPECIFIED = 0;
+  THREAD_SETUP_STEP_STATUS_PENDING = 1;
+  THREAD_SETUP_STEP_STATUS_RUNNING = 2;
+  THREAD_SETUP_STEP_STATUS_DONE = 3;
+  // It failed, and setup goes on without it (a fetch: the existing ref is used).
+  THREAD_SETUP_STEP_STATUS_WARNING = 4;
+  THREAD_SETUP_STEP_STATUS_FAILED = 5;
+}
+
+// ThreadSetupStep is one step of ThreadSetup. A step that turns out to have nothing to do
+// (a fetch of a tag, a worktree that exists) leaves the list.
+message ThreadSetupStep {
+  ThreadSetupStepKind kind = 1;
+  // The project a fetch or worktree step is for; empty for name and start.
+  string project_id = 2;
+  string project_name = 3;
+  // fetch: what is fetched ("origin/main"). worktree: its start point, once made.
+  string ref = 4;
+  // name and worktree: the branch, once named.
+  string branch = 5;
+  ThreadSetupStepStatus status = 6;
+  google.protobuf.Timestamp started_at = 7;
+  google.protobuf.Timestamp ended_at = 8;
+  // With FAILED, and with a fetch's WARNING: git's own text.
+  string error = 9;
+  // With WARNING: what went wrong in a line ("Could not reach origin").
+  string warning = 10;
+  // With a fetch's WARNING: the commit time of ref's tip as it is on disk, which the
+  // branch starts from instead; unset when there is no such ref.
+  google.protobuf.Timestamp ref_at = 11;
+}
+
+// ThreadSetup is Thread.setup. Every step is listed, pending, from the start.
+message ThreadSetup {
+  ThreadSetupPhase phase = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Timestamp ended_at = 3;
+  repeated ThreadSetupStep steps = 4;
+  // With FAILED: why, in full (every failed step's error, or the restart's).
+  string error = 5;
+}
+
 // ThreadStatus is what Claude is doing, derived by observing output and the transcript.
 enum ThreadStatus {
   THREAD_STATUS_UNSPECIFIED = 0;
@@ -397,6 +467,13 @@ message Thread {
   // Snooze with neither until nor save, Reconnect, Pin (pinned), Send and Archive
   // (archived) clear it. Persisted. See docs/notes/save-for-later-1-daemon.md.
   google.protobuf.Timestamp saved_at = 76;
+  // What Create is doing or did to set the thread up (internal/store/thread/setup.go):
+  // the steps between the user's message and Claude starting. Set on every thread Create
+  // made, kept after a success, and absent on a fork, a resident thread and rows older
+  // than it. While phase is RUNNING the thread is STARTING and BUSY with no process and,
+  // in worktree mode, no worktree_path yet. FAILED leaves it DISCONNECTED and ERROR
+  // ("setup failed"), with no process.
+  ThreadSetup setup = 77;
 }
 
 // ThreadMove is a Move under way (Thread.pending_move).
@@ -668,6 +745,17 @@ message CreateThreadRequest {
   // Run every member in its own checkout even when the copied thread is in worktree mode
   // (thread new --new-worktree=false). Not with new_worktree or new_branch.
   bool checkout_mode = 28;
+  // Return as soon as the thread exists, its message in the timeline, and do the slow
+  // part (naming, fetches, worktrees, starting Claude) in the background: Thread.setup
+  // follows it, and a failure is the thread's (setup FAILED, status ERROR), not this
+  // call's. Refusals that need no slow work still fail the call, with no thread made.
+  // The reply's hints and made_*, existing_worktree, shared_with and
+  // worktree_mode_dropped are empty: they are not known yet. Without it the call waits
+  // for the same work and a failure leaves no thread behind.
+  bool background_setup = 29;
+  // The composer's draft, opaque to the daemon and kept with the setup until it ends, so
+  // a failed setup can hand it back. At most 1 MiB. Set by the GUI.
+  string draft_json = 30;
 }
 
 message NewWorktree {

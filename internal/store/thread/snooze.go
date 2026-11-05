@@ -83,6 +83,9 @@ func (m *Manager) putAway(ctx context.Context, id string, set func(*Thread)) (Th
 	if err := m.refuseResident(id, "snoozed"); err != nil {
 		return Thread{}, err
 	}
+	if err := m.refuseSettingUp(id, "snoozed"); err != nil {
+		return Thread{}, err
+	}
 	if err := m.Close(ctx, id); err != nil {
 		return Thread{}, err
 	}

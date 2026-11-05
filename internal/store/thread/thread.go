@@ -365,6 +365,11 @@ type Thread struct {
 	// ReseedPending: a Reseed waits for the running turn and background work to end
 	// before Claude stops (reseed.go). Never set on a stopped thread. Not persisted.
 	ReseedPending bool
+	// Setup is what Create did or does to set the thread up (setup.go): the steps, and
+	// until it ended well what it made and what it needs to run again. nil on a fork, a
+	// resident thread and rows from before it. Persisted (threads.setup). Copy on write:
+	// replaced, never written through.
+	Setup *Setup
 }
 
 // APIRetry is one api_retry frame of a thread's stream (stream.go): Claude retries a
@@ -533,6 +538,13 @@ type CreateOptions struct {
 	// model that is not the user's words (theme.ask's), on every spawn. At most 64 KiB, no
 	// NUL.
 	SystemPromptAppend string
+	// BackgroundSetup makes Create return from its fast stage (setup.go): the slow part
+	// runs after it, tracked by the Manager and not bound to ctx, and a failure stays on
+	// the thread. Report stays untouched: nothing is placed yet.
+	BackgroundSetup bool
+	// DraftJSON is the composer's draft, opaque here and kept with the setup until it
+	// ends (Setup.Request), so a failed setup can hand it back. At most MaxDraftJSON.
+	DraftJSON string
 	// ResumeSession, with NoProject, is a Claude session id the thread continues instead
 	// of starting a new conversation: claude --resume <id> --fork-session, so the thread
 	// has its own transcript and the session's stays as it was (agent search's Promote,

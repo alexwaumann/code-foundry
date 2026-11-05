@@ -3,6 +3,7 @@ package thread
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -186,7 +187,7 @@ func TestSendRecreatesOnLastHead(t *testing.T) {
 			if wantBranch != b {
 				want.Path = s.WorktreePath // feat/y's default path is elsewhere
 			}
-			if all[creates] != want {
+			if !reflect.DeepEqual(all[creates], want) {
 				t.Errorf("recreated with %+v, want %+v", all[creates], want)
 			}
 			if fetched := slices.Contains(re.refs.fetched, "feat/y"); fetched != tt.wantFetchY {
@@ -271,7 +272,7 @@ func TestStartRemakesMemberOnLastHead(t *testing.T) {
 				if tt.wantMade == tt.last {
 					want.Path = wt
 				}
-				if len(made) != 1 || made[0] != want {
+				if len(made) != 1 || !reflect.DeepEqual(made[0], want) {
 					t.Errorf("CreateWorktree calls %+v, want %+v", made, want)
 				}
 			}

@@ -80,8 +80,8 @@ func startProjectActivity(ctx context.Context, log *slog.Logger, threads func() 
 					continue
 				}
 				th, ok := threads().Thread(ev.Thread())
-				if !ok || th.ProjectID == "" {
-					continue // gone, or a thread without a project
+				if !ok || th.ProjectID == "" || th.WorktreePath == "" {
+					continue // gone, a thread without a project, or one not placed yet
 				}
 				if now {
 					projects.TouchNow(th.WorktreePath)

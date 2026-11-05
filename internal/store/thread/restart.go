@@ -19,6 +19,9 @@ const RestartNote = "Restarted Claude"
 
 // Restart implements Store.
 func (m *Manager) Restart(ctx context.Context, id string) (Thread, bool, error) {
+	if t, ok := m.Snapshot().Thread(id); ok && t.SettingUp() {
+		return t, false, nil // Claude is not running yet
+	}
 	live, s, err := m.liveOrStopped(ctx, id)
 	if err != nil {
 		return Thread{}, false, err
