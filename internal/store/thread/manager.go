@@ -34,6 +34,8 @@ type ProjectSource interface {
 	RemoveWorktree(ctx context.Context, opts project.RemoveWorktreeOptions) error
 	// AbandonWorktree removes what an add that never finished left behind.
 	AbandonWorktree(ctx context.Context, opts project.AbandonWorktreeOptions) error
+	// Refresh reads a project's worktrees now, rather than at the next event.
+	Refresh(ctx context.Context, id string) error
 	DefaultWorktreePath(projectID, branch string) string
 }
 

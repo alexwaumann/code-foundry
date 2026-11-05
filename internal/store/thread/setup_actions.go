@@ -237,6 +237,7 @@ func (m *Manager) replan(j *setupJob, t *setupTracker) error {
 	if s.WorktreePath != "" {
 		m.update(j.id, true, func(r *record) { r.s.unplace() })
 	}
+	m.refreshProjects(j.ctx, s)
 	name, err := cleanName(j.o.Name, true)
 	if err != nil {
 		return err
@@ -257,6 +258,19 @@ func (m *Manager) replan(j *setupJob, t *setupTracker) error {
 		t.lost(gone)
 	}
 	return nil
+}
+
+// refreshProjects reads s's projects again: whoever tries a setup again has often just
+// fixed what stopped it, and the snapshot may not have seen that yet.
+func (m *Manager) refreshProjects(ctx context.Context, s Thread) {
+	if m.opts.Projects == nil {
+		return
+	}
+	for _, id := range s.Projects() {
+		if err := m.opts.Projects.Refresh(ctx, id); err != nil && !errors.Is(err, project.ErrNotFound) {
+			m.log.Warn("refresh a project for a retried setup", "thread", s.ID, "project", id, "err", err)
+		}
+	}
 }
 
 // placedOf is the placement that landed on s.

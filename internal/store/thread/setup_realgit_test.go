@@ -309,6 +309,28 @@ func TestCleanupOfARealWorktree(t *testing.T) {
 	}
 }
 
+// The user fixes what stopped the setup, and tries again at once: the retry looks at the
+// repository, not at what the project store last saw of it.
+func TestRetrySeesWhatTheUserJustFixed(t *testing.T) {
+	e, r := newRealGit(t)
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: r.id, InitialPrompt: "do x", NewWorktree: &NewWorktree{Branch: "main"}, BackgroundSetup: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = e.waitFor(s.ID, "the setup to fail", func(s Thread) bool { return s.Setup.Phase == SetupFailed })
+	if !strings.Contains(s.Setup.Error, "main checkout") {
+		t.Fatalf("error %q", s.Setup.Error)
+	}
+	r.git("switch", "-q", "-c", "elsewhere")
+	if _, err := e.m.RetrySetup(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	done := e.waitFor(s.ID, "the retry to end", func(s Thread) bool { return s.Setup.Phase != SetupRunning })
+	if done.Setup.Phase != SetupDone || done.Branch != "main" {
+		t.Errorf("setup %+v", done.Setup)
+	}
+}
+
 // A setup that made a local branch of origin's goes back to not having it: it was this
 // setup's, while origin's stays.
 func TestCleanupTakesALocalBranchOfOrigins(t *testing.T) {
