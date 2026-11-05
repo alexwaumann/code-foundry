@@ -4,6 +4,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNow } from "@/lib/clock";
 import { sentTime } from "@/lib/format";
+import { pointerMoved } from "@/lib/pointerMotion";
 import { hitRanges, oneLine, PROMPT_SCOPES, relativeAge, SCOPE_LABELS } from "@/lib/promptHistory";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
@@ -196,8 +197,8 @@ export function PromptHistoryCard({ picker, above = false }: { picker: PromptPic
                 data-testid="prompt-history-item"
                 data-selected={on || undefined}
                 className={cn("mx-1 flex h-7 cursor-pointer items-center gap-3 rounded-md px-2", on && "bg-cf-control-hover")}
-                onMouseMove={() => {
-                  select(i);
+                onPointerMove={() => {
+                  if (pointerMoved()) select(i);
                 }}
                 onClick={() => {
                   pick(i);

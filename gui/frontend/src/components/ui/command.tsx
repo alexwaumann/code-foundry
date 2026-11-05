@@ -1,9 +1,10 @@
 import * as React from "react"
-import { Command as CommandPrimitive } from "cmdk"
+import { Command as CommandPrimitive, useCommandState } from "cmdk"
 import { SearchIcon } from "lucide-react"
+import { pointerMoved } from "@/lib/pointerMotion"
 import { cn } from "@/lib/utils"
 
-function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
+function Command({ className, onPointerMoveCapture, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
       data-slot="command"
@@ -11,6 +12,12 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
         "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
         className
       )}
+      // cmdk selects the row under any pointermove. Only a real one reaches the rows, or
+      // typing with the mouse at rest selects whatever the new layout put under it.
+      onPointerMoveCapture={(e) => {
+        if (!pointerMoved()) e.stopPropagation()
+        onPointerMoveCapture?.(e)
+      }}
       {...props}
     />
   )
@@ -38,9 +45,31 @@ function CommandInput({
   )
 }
 
-function CommandList({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.List>) {
+function scrollToTop(list: HTMLElement) {
+  list.scrollTop = 0
+  for (const inner of list.querySelectorAll("[data-command-scroll]")) inner.scrollTop = 0
+}
+
+/**
+ * A new search starts at the top of the list. cmdk selects the first row, but scrolls in
+ * the same pass, before that selection has rendered: to the old row, wherever the new list
+ * put it. So this is a passive effect, after cmdk's layout effect (still before the paint:
+ * cmdk's store updates synchronously). A picker that scrolls an element inside the list
+ * marks it with data-command-scroll.
+ */
+function CommandList({ className, ref, ...props }: React.ComponentProps<typeof CommandPrimitive.List>) {
+  const listRef = React.useRef<HTMLDivElement>(null)
+  React.useImperativeHandle(ref, () => listRef.current as HTMLDivElement)
+  const search: string = useCommandState((s) => s.search)
+  const shown = React.useRef(search)
+  React.useEffect(() => {
+    if (shown.current === search) return
+    shown.current = search
+    if (listRef.current) scrollToTop(listRef.current)
+  }, [search])
   return (
     <CommandPrimitive.List
+      ref={listRef}
       data-slot="command-list"
       className={cn("max-h-[min(420px,60vh/var(--cf-zoom))] scroll-py-1 overflow-x-hidden overflow-y-auto", className)}
       {...props}

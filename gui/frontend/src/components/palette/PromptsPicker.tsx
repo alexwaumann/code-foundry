@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { PromptScopeView, SentPromptView } from "@/api/thread";
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Hint, PromptRowBody, ScopeToggle } from "@/components/compose/PromptHistoryCard";
 import { listStatusText, usePromptList } from "@/components/compose/usePromptHistory";
 import { nextScope, pickerAction } from "@/lib/promptHistory";
+import { useFirstRowSelection } from "@/lib/useFirstRowSelection";
 import { copyPrompt, insertFromPalette, paletteSource, revealPrompt } from "@/stores/promptHistory";
 
 function promptKey(p: SentPromptView): string {
@@ -26,14 +27,11 @@ export function PromptsPicker({ close }: { close: () => void }) {
   const [query, setQuery] = useState("");
   const filter = query.trim();
   const list = usePromptList({ open: true, openSeq: 1, scope, threadId, source, query: filter });
-  const rootRef = useRef<HTMLDivElement>(null);
   const status = listStatusText(list, filter);
+  const keys = useMemo(() => list.prompts.map(promptKey), [list.prompts]);
+  const [selected, setSelected] = useFirstRowSelection(keys);
 
-  /** The row cmdk highlights (it does not report automatic highlights, so read the DOM). */
-  const highlighted = (): SentPromptView | undefined => {
-    const key = rootRef.current?.querySelector('[cmdk-item][data-selected="true"]')?.getAttribute("data-value");
-    return list.prompts.find((p) => promptKey(p) === key);
-  };
+  const highlighted = (): SentPromptView | undefined => list.prompts.find((p) => promptKey(p) === selected);
   const pick = (p: SentPromptView) => {
     close();
     insertFromPalette(p);
@@ -45,9 +43,10 @@ export function PromptsPicker({ close }: { close: () => void }) {
 
   return (
     <Command
-      ref={rootRef}
       loop
       shouldFilter={false}
+      value={selected}
+      onValueChange={setSelected}
       data-testid="palette"
       data-mode="prompts"
       onKeyDown={(e) => {

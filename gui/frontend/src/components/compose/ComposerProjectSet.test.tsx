@@ -86,9 +86,13 @@ async function settle(): Promise<void> {
 /** The model, effort and permission a draft sends without a pick (the registry's defaults here; the mock's settings in e2e). */
 const DEFAULTS = { model: "claude-opus-4-8[1m]", effort: "high", permission: "auto" };
 
+/** Where hoverTip last put the pointer: a Command ignores a pointer that did not move. */
+let pointerX = 0;
+
 /** The Tip on an element, opened the way a pointer does (after the provider's 500 ms). */
 async function hoverTip(el: Element): Promise<string | null> {
-  fireEvent.pointerMove(el, { pointerType: "mouse" });
+  pointerX += 1;
+  fireEvent.pointerMove(el, { pointerType: "mouse", clientX: pointerX });
   await act(async () => {
     await new Promise((r) => setTimeout(r, 550));
   });

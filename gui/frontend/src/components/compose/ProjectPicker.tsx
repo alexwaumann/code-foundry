@@ -92,7 +92,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
       />
       {/* Not the scroll region itself: that is the rows' div, so Add a project stays put below it. */}
       <CommandList className="max-h-none overflow-visible">
-        <div className="max-h-[min(420px,60vh/var(--cf-zoom))] scroll-py-1 overflow-x-hidden overflow-y-auto" data-testid="picker-rows">
+        <div className="max-h-[min(420px,60vh/var(--cf-zoom))] scroll-py-1 overflow-x-hidden overflow-y-auto" data-testid="picker-rows" data-command-scroll>
           <CommandEmpty>{!loaded ? "Loading projects…" : "No matching projects."}</CommandEmpty>
           {visible.length > 0 && <div className="p-1">{visible.map(rowFor)}</div>}
         </div>

@@ -3,6 +3,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Kbd } from "@/components/ui/kbd";
 import { statusColor } from "@/components/changes/files";
 import { changeStatuses, emptyGroups, MAX_WORDS, parseFinderQuery, searchRows, type FinderGroup, type FinderRow, type Run } from "@/lib/fileFinder";
+import { useFirstRowSelection } from "@/lib/useFirstRowSelection";
 import { cn } from "@/lib/utils";
 import { openFoundFile, tagFoundFile } from "@/stores/fileFinder";
 import { keyOf } from "@/stores/panel";
@@ -123,17 +124,8 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
   }, [searching, parsed.tooMany, found, changes, recent, checkouts, ctx]);
   const rows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
 
-  // The highlighted row: the first of each new list, else the one the keys or pointer moved to.
-  // cmdk picks the first row when the input changes, before a search answers: the answer's
-  // first row takes over then, and whenever the highlighted row leaves the list.
-  const [selected, setSelected] = useState("");
-  const firstKey = rows[0]?.key ?? "";
-  const shownFirst = useRef(firstKey);
-  useEffect(() => {
-    const moved = shownFirst.current !== firstKey;
-    shownFirst.current = firstKey;
-    setSelected((cur) => (moved || !rows.some((r) => r.key === cur) ? firstKey : cur));
-  }, [rows, firstKey]);
+  const rowKeys = useMemo(() => rows.map((r) => r.key), [rows]);
+  const [selected, setSelected] = useFirstRowSelection(rowKeys);
 
   const open = (r: FinderRow) => {
     openFoundFile(threadId, r, parsed.line);
