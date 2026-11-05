@@ -55,7 +55,7 @@ two siblings (`command.SharedChords` is the one allowed exception to unique chor
 - **It searches again only after 200 ms of quiet.** A build log never gives it that, so
   `TerminalFind` forces a search when the count is a second old, or ten searches' time.
 - **`highlightLimit` cuts from the top of the buffer**, so past it the newest matches are the
-  unhighlighted ones. 20,000 (VS Code's number) keeps that to one or two letter queries in a
+  unhighlighted ones. 20,000 keeps that to one or two letter queries in a
   full scrollback. Measured in WebKit on 10,000 lines: 65 ms for 5,000 matches, 260 ms for
   20,000. The count then says `20000+`, or `4 of 20000+`. A flood at full scrollback with
   20,000 matches parsed about 3,000 lines in 1 to 2 s, because each marker hears each trim.
