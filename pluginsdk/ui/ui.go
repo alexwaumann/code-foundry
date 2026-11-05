@@ -6,8 +6,8 @@
 // divider, spacer and the inline group; the view's pinned toolbar and footer; inline
 // spans with times and durations), builders, and
 // Validate, which checks a view against the host's rules and limits before it leaves
-// the plugin. The code-foundry-plugin skill's reference/primitives.md shows every node
-// as JSON and Go.
+// the plugin. The code-foundry-plugin skill's reference/primitives.md is the guide, with
+// an index of every node.
 //
 // The view travels as JSON. Field names are lowerCamel; enums are short lowercase
 // strings ("error", "running"); an Inline whose only content is plain text encodes as a

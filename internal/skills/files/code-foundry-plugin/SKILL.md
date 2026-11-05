@@ -1,122 +1,88 @@
 ---
 name: code-foundry-plugin
-description: "Build, debug and publish a Code Foundry plugin: a Go executable using pluginsdk with a plugin.json manifest that adds commands, side-panel surfaces, thread flags, event subscriptions, session environment or its own Claude threads and terminals to Code Foundry. Use when asked to build, create, write, fix, test or release a plugin for Code Foundry, to edit a plugin.json, to use pluginsdk, pluginsdk/ui or plugintest, to debug a plugin with code-foundry plugin dev, logs, surface or act, or to add a plugin to a Code Foundry plugin registry."
+description: "Build, debug and publish a Code Foundry plugin: a Go executable with a plugin.json manifest that adds commands, side-panel surfaces, thread flags, event subscriptions, session environment or its own Claude threads and terminals. Use for anything touching a plugin, plugin.json, pluginsdk, pluginsdk/ui or plugintest, for the code-foundry plugin dev, logs, surface or act commands, or for a plugin registry."
 ---
 
 # Building a Code Foundry plugin
 
 {{cf.provenance}}
 
-A plugin is an executable the Code Foundry daemon starts and talks to over its stdin and
-stdout (newline-delimited JSON-RPC 2.0). Its `plugin.json` declares everything up front:
-**commands** (`code-foundry plugin <name> <command>`, also in the app's command palette),
-**surfaces** (side-panel tabs the app draws from a JSON view model the plugin sends; no
-HTML), **wake sources** agents subscribe to instead of polling, and **permissions** the
-user consents to (host commands, events, flags, env, secrets, threads, terminals). Write
-plugins in Go with the SDK `github.com/alexwaumann/code-foundry/pluginsdk` (standard library only;
-`/ui` builds views, `/plugintest` a fake host for tests). This Code Foundry is {{cf.version}}.
+A plugin is an executable the daemon starts and talks to over stdin and stdout
+(newline-delimited JSON-RPC 2.0). Its `plugin.json` declares everything up front: commands,
+surfaces (side-panel tabs drawn from a JSON view model; no HTML), wake sources, and the
+permissions the user consents to. Write it in Go with `github.com/alexwaumann/code-foundry/pluginsdk`
+(`/ui` builds views, `/plugintest` is a fake host). This Code Foundry is {{cf.version}}.
+
+## Read only what the task needs
+
+Files are split into `##` sections: `grep -n "^## " <file>`, then read the one you need.
+
+| To | Read (in `reference/`) |
+|---|---|
+| Declare commands, surfaces, permissions, `when` clauses, icons | `manifest.md` |
+| Draw a view: model, value types, limits, acts, design rules, which node to use | `primitives.md` |
+| Use a display node (list, chips, log, notice, section…) | `nodes.md` |
+| Take input (fields, drafts, secrets in forms) | `forms.md` |
+| Lay out: columns, pane, grid, group, master-detail; a toolbar or footer (search, filters) | `ui-layout.md` |
+| Call the host: `h.Log`, `h.DataDir`, Invoke, flags, context facts, session env, secrets, toasts | `host-api.md` |
+| React to daemon events | `events.md` |
+| Let agents wait on the plugin instead of polling | `wakes.md` |
+| Run its own Claude threads or terminals | `owned.md` |
+| Debug the wire: lifecycle, process, errors, timeouts, crashes | `protocol.md` |
+| Write tests, drive it against the daemon | `testing.md` |
+| Release, runners, the registry | `publishing.md` |
+| Look up a CLI flag, or a host command it may run | `cli.md`, `host-commands.md` |
+
+`example/` is the plugin to copy. `go doc github.com/alexwaumann/code-foundry/pluginsdk`
+(`/ui`, `/plugintest`) has every type. For a working use of any component, `code-foundry
+plugin install alexwaumann/code-foundry-plugin-showcase` and read its `tab_*.go`; larger
+plugins: `alexwaumann/code-foundry-plugin-gh-actions`, `-test-watcher`.
 
 ## The loop
 
-1. **Scaffold** from the example (a command, a surface, tests, Makefile, CI and release
-   workflows, README template) in a folder under the home directory (`plugin dev` refuses
-   others; ask where the user keeps code) named after its repository (a clone: copy into it):
+1. **Scaffold** under the home directory (`plugin dev` refuses others; ask where the user
+   keeps code), in a folder named after the repository:
    ```
    mkdir -p <dir>/code-foundry-plugin-<name> && cd <dir>/code-foundry-plugin-<name>
    cp -R {{cf.example}}/. .
    ```
-   Replace `minimal` and `Minimal` with the plugin's name everywhere (`grep -rni minimal .`),
-   kebab case starting with a letter (`gh-actions`); fill in the README. Ask the user which
-   GitHub Actions runner to use: hosted `ubuntu-24.04` or a self-hosted/org label (set it as
-   `runs-on` in both workflows). Not known: `rm -rf .github`, and tell them the by-hand
-   commands for CI and releases (`reference/publishing.md`, "Runners").
-2. **Manifest**: edit `plugin.json` (`reference/manifest.md`): commands and their args,
-   surfaces with a scope and a `when` clause, and the fewest permissions that work.
-3. **Module** (Go 1.24 or newer; keep the `go` line `go mod init` writes, CI installs it):
+   Replace `minimal` and `Minimal` with the plugin's kebab-case name (`grep -rni minimal .`)
+   and fill in the README. Ask which GitHub Actions runner to use (`publishing.md`, "Runners").
+2. **Manifest**: edit `plugin.json`, with the fewest permissions that work.
+3. **Module** (Go 1.24 or newer; keep the `go` line `go mod init` writes):
    ```
    go mod init github.com/<owner>/code-foundry-plugin-<name>
    go get github.com/alexwaumann/code-foundry/pluginsdk@{{cf.sdkPin}}
    go mod tidy
    ```
    The pin is this build's SDK (first fetch: up to a minute; not on GitHub: `@main`).
-   `go doc github.com/alexwaumann/code-foundry/pluginsdk` (`/ui`, `/plugintest`) has every type.
-4. **Serve**: in `main.go`, `pluginsdk.Serve(pluginsdk.Plugin{...})` with a handler for
-   every manifest command (`Commands`, by name) and surface (`Surfaces`, by id), plus
-   `Init`, `OnEvent` and `Shutdown` as needed (`reference/protocol.md`, `host-api.md`,
-   `primitives.md`). Build with `make build`, not `go build ./...`.
-5. **Run it**: `make build && code-foundry plugin dev "$PWD" --follow=false` links the
-   folder and enables it. The first time (and when permissions grow) it prints the consent
-   text and exits 2: tell the user what the plugin may do, re-run with `--yes` once they
-   agree. `code-foundry plugin list` must say `running (dev)` (NOTE: manifest problems).
-6. **Read its log**: `code-foundry plugin logs <name> --lines 50` (its stderr, `h.Log()`,
-   and the host's lines: starts, exits, refused calls, rejected views). Never `--follow`
-   from your Bash tool: it does not return.
-7. **Drive it without the GUI** (`reference/testing.md`, "Against the daemon"):
-   `code-foundry plugin <name> <command> [args] --thread <id>` runs a command; `plugin
-   surface <name> <surface> --thread <id> [--settle 2s]` prints the view and its elements
-   (`--settle` waits out "Loading"); `plugin act <name> <surface> <event> [--key k]
-   [--values '{...}']` clicks (an event or a command button) and prints the view after.
-   After every rebuild or `plugin.json` edit: `make build && code-foundry plugin restart
-   <name>` (nothing watches the folder).
-8. **Test** with plugintest: `go test ./...` (`reference/testing.md`). Test every command,
-   every act, and that every view passes `ui.View.Validate`.
-9. **Release**: push (`ci.yml` runs `make check`), bump `version` in `plugin.json` and
-   `main.go` (a test checks they agree), tag `v<version>`, push the tag; `release.yml` runs
-   `make release`. No workflows: run both by hand (`reference/publishing.md`).
-10. **Registry**: `make registry-entry` writes `dist/<name>.json`. Only a registry the user
-    configured lists it, never a default: `code-foundry settings get plugins.registries`
-    (comma-separated). One: a pull request to it; several: ask which; none: stop and tell
-    the user what is left (`reference/publishing.md`, "Which registry").
+4. **Serve**: in `main.go`, `pluginsdk.Serve(pluginsdk.Plugin{...})` with a handler for every
+   manifest command (`Commands`, by name) and surface (`Surfaces`, by id), plus `Init`,
+   `OnEvent` and `Shutdown` as needed.
+5. **Run**: `make build && code-foundry plugin dev "$PWD" --follow=false` (use `make build`,
+   not `go build ./...`). The first time, and when permissions grow, it prints the consent
+   text and exits 2: tell the user what the plugin may do and re-run with `--yes` once they
+   agree. `code-foundry plugin list` must say `running (dev)`.
+6. **Check**: `code-foundry plugin logs <name> --lines 50` shows its stderr, `h.Log()` and
+   refused calls or views (never `--follow` from your Bash tool: it does not return). Drive
+   it with `plugin <name> <command>`, `plugin surface` and `plugin act` (`testing.md`,
+   "Against the daemon"). Nothing watches the folder: after each edit,
+   `make build && code-foundry plugin restart <name>`.
+7. **Test**: `go test ./...` with plugintest: every command, every act, and every view
+   through `ui.View.Validate`.
+8. **Publish** (`publishing.md`): only after asking the user, since it goes out under their
+   name. List it only in a registry they configured, never a default.
 
-Ask the user before steps 9 and 10: they publish under the user's name. Larger examples:
-`alexwaumann/code-foundry-plugin-gh-actions` and `alexwaumann/code-foundry-plugin-test-watcher`.
-**Showcase.** `alexwaumann/code-foundry-plugin-showcase` is the living gallery of every
-component, a tab per family with its Go in `tab_*.go`: `code-foundry plugin install
-alexwaumann/code-foundry-plugin-showcase` and read the matching file.
+## Rules Validate does not catch
 
-## Design rules for surfaces
-
-- The panel is 400 px wide and may be 280 px: short labels (pills of one or two words),
-  no tables, no side-by-side layouts. Rows, pairs and chips wrap or truncate; titles get
-  one line and the header sub-line two, then are cut for good: guidance is a `text` node.
-  At most two `thread` or `terminal` nodes in a view (each is a live stream).
-- **No filled buttons.** The one thing that needs the user next is `attention` (amber
-  outline); everything else is the default `muted`, `outline` for a little weight, or
-  `link`. The `primary` style does not exist; the host refuses it.
-- Colour means status: `attention` (amber) needs the user, `error` (red) failed, `ok`
-  (emerald) only in pills and glyphs. Choose a status or tone, never a colour (no identity colour).
-- **Actions as commands first.** Whatever a user can do is a manifest command (palette,
-  CLI, agents); the view's button runs it (`ui.CommandButton`). Events (`ui.EventButton`)
-  are for what only makes sense in the view: tabs, form submits, selecting a row.
-- Remote or side-effecting runs (cancel or rerun CI, deploy, delete what the user cannot
-  get back, sign out) are commands with `confirm` text: the host asks. Local work that is
-  cheap to redo (stop or rerun a local test run, hide a row) needs no confirm; give a
-  stop button the `destructive` style anyway. Icons: `reference/manifest.md`.
-- **Flags**: until-seen for one-off events; sticky for conditions the plugin clears, with a
-  visible way out, never re-raised after a user's clear (`reference/host-api.md`).
-- **Secrets** never appear in a view, a log line, a command arg or argv: a form's secret
-  input with `store` puts one in the Keychain, `h.Secrets().Get` reads it, views show `hasValue`.
-- Nothing is revealed on hover; tooltips exist only on icon-only buttons. Let the host
-  tick times (`ui.At`, `ui.For` spans), not re-send views each second; stream output
-  into a log node with `h.AppendLog`; mark last-known data `stale` when the backend is down.
-
-## Good to know
-
-- The plugin runs in its package folder with a minimal environment (PATH, HOME, …);
-  `h.DataDir()` is its state folder. Run the user's own tools (`go test`, `npm test`)
-  through their login shell (`$SHELL -lc "<cmd>"`), as project actions do. stdout is
-  the protocol: the SDK sends a stray `fmt.Println` to the log instead.
-- Requests run concurrently (guard state with a mutex); notifications in order on one
-  goroutine (`OnEvent` returns quickly); none of them before `Init` has returned.
-- **Wake sources** (`manifest.md` "Wakes", `host-api.md` "FireWake"): arm in `OnWakeSubscribed`
-  (replayed with `Rearm` after each start, then `OnWakeArmed`); fire with `h.FireWake`; end
-  messages, notices, timeline text (never a flag reason: 80 chars) with `h.WakeHint(source, args)`.
-
-## References (next to this file)
-
-- `reference/manifest.md`: every `plugin.json` field, permissions, scopes, `when` clauses; `reference/protocol.md`: methods both ways, errors, lifecycle, timeouts, crashes.
-- `reference/primitives.md`: every view node and value type, limits; `reference/ui-layout.md`: columns, panes, grids, inline, containers, master-detail, node tabs, toolbar, footer.
-- `reference/host-api.md`: Invoke, flags, context facts, session env, events, secrets, toasts.
-- `reference/testing.md`: plugintest patterns, driving the plugin in the daemon; `reference/publishing.md`: runners, releases (workflow or by hand), the registry entry.
-- `reference/cli.md`: the `plugin` commands' help; `reference/host-commands.md`: what it may run.
-- `example/`: the minimal plugin to copy.
+- **Commands first.** Whatever a user can do is a manifest command (palette, CLI, agents)
+  that a button runs. Events are for what only makes sense in the view: tabs, form submits,
+  selecting a row.
+- **Confirm** remote or side-effecting commands (cancel CI, deploy, delete, sign out) with
+  `confirm` text. Local work that is cheap to redo needs none.
+- **Secrets** never go in a view, log line, command arg or argv: a form's secret input with
+  `store` keeps one, `h.Secrets().Get` reads it.
+- **Handlers**: requests run concurrently, so guard state with a mutex; notifications run in
+  order on one goroutine, so `OnEvent` returns quickly; none run before `Init` has returned.
+- **Tools**: the plugin's environment is minimal, so run the user's own tools through
+  `$SHELL -lc "<cmd>"`. stdout is the protocol; `h.DataDir()` is its state folder.

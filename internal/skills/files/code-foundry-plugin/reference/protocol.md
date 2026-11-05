@@ -113,7 +113,7 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `terminal/read` | request | `{terminalId, maxBytes, scrollback}` → `{text, truncated, lines}`: its screen as plain text, with `scrollback` the scrollback and the screen (capability `terminal.scrollback`); no trailing newline, `lines` counted (screen reads too since pluginsdk v0.2.1) | `ReadTerminal`, `ReadTerminalWith` | `terminals` |
 | `wake/fire` | request | `{source, match, title, payload}` → `{delivered}` | `FireWake` | a manifest `wakes` entry |
 
-What each does and its limits: `reference/host-api.md`. A method this host does not
+What each does and its limits: `host-api.md`, `events.md`, `wakes.md`, `owned.md`. A method this host does not
 serve answers -32601.
 
 ## Errors

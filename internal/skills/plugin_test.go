@@ -22,6 +22,8 @@ var pluginSkillFiles = []string{
 	"code-foundry-plugin/SKILL.md",
 	"code-foundry-plugin/reference/manifest.md", "code-foundry-plugin/reference/protocol.md",
 	"code-foundry-plugin/reference/primitives.md", "code-foundry-plugin/reference/ui-layout.md", "code-foundry-plugin/reference/host-api.md",
+	"code-foundry-plugin/reference/nodes.md", "code-foundry-plugin/reference/forms.md", "code-foundry-plugin/reference/events.md",
+	"code-foundry-plugin/reference/wakes.md", "code-foundry-plugin/reference/owned.md",
 	"code-foundry-plugin/reference/testing.md", "code-foundry-plugin/reference/publishing.md",
 	"code-foundry-plugin/reference/cli.md", "code-foundry-plugin/reference/host-commands.md",
 	"code-foundry-plugin/example/plugin.json", "code-foundry-plugin/example/main.go",
@@ -77,11 +79,11 @@ func TestRenderPluginSkill(t *testing.T) {
 			t.Errorf("manifest.md lacks %q", want)
 		}
 	}
-	hostAPI := string(files[skills.Plugin+"/reference/host-api.md"])
+	events := string(files[skills.Plugin+"/reference/events.md"])
 	for _, want := range []string{"| `threads` | `thread-list` | `threadList` | `snapshot`, `updated`, `removedId`", "| `thread` | `thread` | `thread` | `pending`, `pendingSnapshot` |", "`pullRequestDetailUpdated`, `pullRequestChanged`",
 		"| `gh.pullRequestChanged` |"} {
-		if !strings.Contains(hostAPI, want) {
-			t.Errorf("host-api.md lacks %q", want)
+		if !strings.Contains(events, want) {
+			t.Errorf("events.md lacks %q", want)
 		}
 	}
 	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Elements in a view (nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs) | 400 |") {

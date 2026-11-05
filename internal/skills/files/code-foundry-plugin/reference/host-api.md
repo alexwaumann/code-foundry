@@ -178,116 +178,6 @@ for _, issue := range res.Issues { h.Log().Warn("environment", "issue", issue) }
 - A new thread waits up to 2 s for a plugin with this permission that is still starting,
   so push early in Init.
 
-## Subscribe and OnEvent: the daemon's events (permission `events`)
-
-```go
-pluginsdk.Plugin{
-	Init: func(ctx context.Context, h *pluginsdk.Host) error {
-		_, err := h.Subscribe(ctx, "threads", "gh")
-		return err
-	},
-	OnEvent: func(ctx context.Context, h *pluginsdk.Host, ev pluginsdk.Event) {
-		var e struct {
-			ThreadList *struct {
-				Updated *struct{ ID, Name, Branch, Status string } `json:"updated"`
-			} `json:"threadList"`
-		}
-		if json.Unmarshal(ev.Event, &e) == nil && e.ThreadList != nil && e.ThreadList.Updated != nil { … }
-	},
-}
-```
-
-- Sources (each must be in `permissions.events`): `threads` (the thread list: every
-  thread's state), `thread` (threads' pending questions and permissions), `project`
-  (projects and worktrees), `workspace`, `gh` (GitHub polling: pull requests, checks),
-  `gitops` (git operations per worktree), `settings`, `update`, `action` (project
-  actions and their runs), `plugin`.
-- `ev.Event` is the event as JSON, exactly what `code-foundry events --json --source
-  <source>` prints for the same source: one object keyed by the source with one change
-  inside, plus `seq` and `epoch` (enums are their full names, `THREAD_STATUS_IDLE`):
-  ```json
-  {"threadList":{"updated":{"id":"s-1f2e3d4c5b6a","name":"Fix the login redirect","status":"THREAD_STATUS_IDLE", …}},"seq":"42","epoch":"c85aff6ef6fc"}
-  {"threadList":{"removedId":"s-1e06a2c44e99"},"seq":"43","epoch":"c85aff6ef6fc"}
-  {"gitops":{"finished":{…}},"seq":"44","epoch":"c85aff6ef6fc"}
-  ```
-  `updated` carries the whole object after the change, `removedId` (or `removedName`)
-  the id of what went. The table below lists every change. See real payloads before
-  decoding them: capture a few seconds of `events` (it streams until killed; macOS has
-  no `timeout`) while producing the events:
-  ```
-  code-foundry events --json --source thread-list > /tmp/events.json & pid=$!; sleep 5; kill $pid
-  ```
-  `code-foundry thread get <id> --json` shows a thread's fields. Decode only what you
-  need.
-- Each source starts with its snapshot (`ev.Snapshot` true), then live events in order.
-  Most snapshots are one object replacing everything
-  (`{"threadList":{"snapshot":{"threads":[…]}}}`; `thread`: `pendingSnapshot`); `gh`'s
-  are ordinary events (`viewerUpdated`, `polled`, `dashboardUpdated`,
-  `repoActivityUpdated`), `update`'s its `status`. Events may reach OnEvent before
-  Subscribe returns.
-- OnEvent runs on the notification goroutine: keep it short (hand work to a goroutine).
-  A plugin that falls behind loses the oldest events (the host keeps 2,048 or 8 MiB) and
-  then gets that source's snapshot again: a snapshot after the first means events were
-  lost, so replace or rescan what you know.
-- Subscriptions end with the process: subscribe in Init. At most 16 at once;
-  `h.Unsubscribe(ctx, id)` ends one.
-
-Every source and the changes it sends (this build):
-
-{{cf.eventVariants}}
-
-**The payloads.** protojson: lowerCamel fields, enums by full name, and empty lists,
-`false`, `0` and `""` left out (an empty snapshot is `{"threadList":{"snapshot":{}}}`,
-with no `threads`). The useful fields:
-
-| Change | Fields |
-|---|---|
-| `threadList.snapshot` | `threads`: a list of threads |
-| `threadList.updated` (a thread) | `id`, `projectId`, `workspaceId`, `worktreePath` (its cwd), `branch`, `name`, `state` (`THREAD_STATE_CONNECTED`, …), `status` (`THREAD_STATUS_BUSY`, `_IDLE`, `_NEEDS_ATTENTION`, `_ERROR`), `statusReason`, `lastActivityAt`, `linkedPullRequests` (`[{slug, number, url}]`), `archivedAt` |
-| `threadList.removedId` | the removed thread's id (a string). Archiving is not removal: it arrives as `updated` with `archivedAt` set |
-| `project.snapshot` | `projects`: each with `id`, `name`, `path`, `githubSlug`, `defaultBranch`, `git`, `worktrees` |
-| `project.worktreeUpdated` (a worktree) | `projectId`, `path`, `branch`, `head`, `isMain`, `detached`, `status`: `{modified, staged, untracked, conflicted, dirty, ahead, behind, upstream, baseRef, baseAhead, baseBehind, operation, error, refreshedAt}` |
-| `project.worktreeRemoved` | `{projectId, path}` |
-| `project.worktreeFilesChanged` | `{projectId, path, files: [{path, op}], truncated}`: `path` is the worktree root, each file's `path` worktree-relative; `op` is `FILE_OP_CREATED`, `_MODIFIED`, `_REMOVED` or `_RENAMED` |
-| `project.projectUpdated` / `projectRemovedId` | a whole project (with its worktrees) / an id |
-| `gh.branchPullRequestsUpdated` | `{repoSlug, headRef, fetchedAt}`: a watched branch's pull requests changed |
-| `gh.pullRequestDetailUpdated` | `{repoSlug, number}`: re-read with `pr.checks` |
-| `gh.pullRequestChanged` | one pull request that changed, one event per pull request per poll (coalesced): `repoSlug`, `number`, `url`, `headRef`, `pullRequest` (the summary after the change: `title`, `author`, `state`, `headSha`, `draft`, `reviewDecision`, `checks` `{state, total, passed, failed, pending, skipped}`, `commentCount`, `reviewCount`, `reviewRequests`, …) and `changes`: a list of `{kind, …}` with the old and new values of that kind. Kinds (`PULL_REQUEST_CHANGE_KIND_` + ): `APPEARED` (new in the viewer's scope; not sent for what was there before a restart or a newly watched branch), `MERGED` / `CLOSED` / `REOPENED` (`oldState`, `newState`), `HEAD_PUSHED` (`oldHeadSha`, `newHeadSha`), `CHECKS` (`oldChecks`, `newChecks`: rollups; `newChecks.state` `CHECK_ROLLUP_STATE_SUCCESS` or `_FAILURE` after `_PENDING` means the run finished), `REVIEW_DECISION` (`oldReviewDecision`, `newReviewDecision`), `REVIEWS` and `COMMENTS` (the count rose: `oldCount`, `newCount`), `REVIEW_REQUESTED` (`requested`: new logins and `org/team` slugs; `viewerRequested`), `DRAFT` (`oldDraft`, `newDraft`), `TITLE` (`oldTitle`, `newTitle`). Counts only, never comment or review text: fetch those with `gh`. No `CHECKS` for a rerun ending with the rollup it had (failure 1/1 → 1/1) or a run that starts and ends between two polls: follow a run you reran yourself. Just after a push, a `when` on `pr.checks.*` can read "not known yet" for seconds the first time it is asked with no GUI: retry |
-| `gitops.queued` / `started` / `finished` | a git operation on a worktree (fetch, pull, push, …) |
-
-**Per-file events.** `project.worktreeFilesChanged` lists the files that changed in a
-worktree, so a plugin that reacts to edits (a test watcher) needs no polling:
-
-- **One per worktree per second at most.** Edits are collected from the first one for
-  1 s, then sent as one event; a burst (a build, a checkout, an untar) arrives as one
-  event per second while it lasts.
-- **`files`** is sorted by path, each path at most once per event, with what is there
-  when the second ends: `created` (new), `modified` (was there before), `removed` (gone,
-  also the old side of a rename), `renamed` (moved onto this path). Paths use forward
-  slashes, relative to `path` (the worktree root). A directory ends in `/` and appears
-  only when removed or renamed: `rm -rf sub` lists `sub/` and every file under it; one
-  moved in or out lists only itself (rescan it). An atomic save (`sed -i`, editors: a
-  temp file renamed onto the file) is one entry: a never-listed path created and gone
-  within the second is left out. Treat `created`, `modified` and `renamed` alike when
-  all you need is "this file changed".
-- **`truncated: true`**: more changed than listed (the list stops at 500, by path).
-  Still a change: a watcher can just re-run; one that needs the list runs `git status`.
-- **Left out:** gitignored paths (git's own rules, so a tracked file always counts),
-  anything under a `.git` directory, and paths inside a submodule. A second in which
-  only ignored files changed (build output, `node_modules`) sends nothing, so re-running
-  on every event cannot loop on your own outputs.
-- **Live worktrees only:** ones with a thread that is not archived or snoozed. An idle
-  worktree sends no file lists (its `worktreeUpdated` status summaries still come).
-- It is never in a snapshot. The `project` snapshot at startup is not a resync; a later
-  one means events were lost: rescan what you watch once.
-
-Keep using `project.worktreeUpdated` for head, branch, checkout and status-count changes:
-a commit sends no files event (only `.git` changes), its new head comes as
-`worktreeUpdated`; a `git checkout` changes files, but `worktreeUpdated` says what
-happened.
-`worktreeDetailUpdated` is sent only for worktrees whose detail someone asked for in the
-last 10 minutes (the app's worktree panel), so a plugin cannot rely on it.
-
 ## Secrets (permission `secrets`)
 
 ```go
@@ -313,7 +203,7 @@ list, err := h.Secrets().List(ctx) // names and set times, never values
 - This is isolation between well-behaved plugins, not a sandbox: a plugin runs as the
   user, and the items trust `/usr/bin/security`, so any of the user's processes can read
   them.
-- The usual way in is a form secret input with `store` (`reference/primitives.md`): the
+- The usual way in is a form secret input with `store` (`forms.md`): the
   user types it, the host stores it, the plugin only reads it. A plugin that needs a
   secret it does not have shows a notice with a form, not an error.
 - The user sees and deletes them with `code-foundry plugin secrets list|delete <name>`
@@ -328,60 +218,6 @@ when an update asks for more the host stops it until the user consents again, an
 start hands over what was granted (`h.Granted()`). Test it with plugintest's
 `h.DeleteSecret(key)`.
 
-## FireWake: wake sources agents subscribe to
-
-A manifest wake source (`manifest.md`, "Wakes") lets an agent's thread wait for an event
-instead of polling. The host keeps the subscriptions; the plugin watches for each one's
-event and fires:
-
-```go
-pluginsdk.Plugin{
-	// Sent when a thread subscribes, and again for every live subscription after each
-	// start with s.Rearm set (the plugin re-arms here). Key state by s.Subscription; a
-	// repeat is the same one.
-	OnWakeSubscribed: func(ctx context.Context, h *pluginsdk.Host, s pluginsdk.WakeSubscription) {
-		w.arm(s.Subscription, s.Source, s.Args["pr"]) // s.Context: the subscriber's thread, project
-	},
-	// Unsubscribed, a one-shot that fired, its thread archived: stop watching.
-	OnWakeUnsubscribed: func(ctx context.Context, h *pluginsdk.Host, u pluginsdk.WakeUnsubscribed) {
-		w.disarm(u.Subscription)
-	},
-	// Once per start, after the replay (count of them, 0 too): a subscription the plugin
-	// saved in its data dir that was not replayed ended while it was down; drop it.
-	OnWakeArmed: func(ctx context.Context, h *pluginsdk.Host, count int) {
-		w.dropNotRearmed()
-	},
-}
-
-// When the event happens: every subscription to the source whose args all equal the
-// match's values is woken (fewer args match more broadly). It returns how many threads.
-n, err := h.FireWake(ctx, "checks-done", map[string]string{"pr": "octo/app#12", "conclusion": "failure"},
-	"3 of 12 checks failed", map[string]any{"failed": []string{"lint", "e2e"}})
-```
-
-- **Match**: name only the source's args. A subscription without an arg (an optional one
-  the agent left out) matches any value of it. Fire once per distinct value set: one fire
-  for `pr=octo/app#12` reaches every thread waiting on that pull request.
-- The thread gets `[code-foundry wake] <display name>: <source> — <title>` and a JSON
-  block `{kind: "plugin", subscription_id, plugin, source, args, title, payload,
-  fired_at}`. Title: one line, at most 200 characters; payload: any JSON, at most 8 KiB
-  (send ids and counts, not logs). At most 20 fires a second.
-- A one-shot subscription (the default) goes after the first fire that reaches it (the
-  plugin then gets `wake/unsubscribed`); `--repeat` stays. Each thread gets at most 60
-  wakes an hour, whatever their source.
-- Disabling, uninstalling or replacing the plugin, or an update that drops a source, ends
-  its subscriptions with a last wake `… — source gone (<reason>)` (payload null).
-- **Ordering.** Every wake notification, like everything else the host sends, reaches
-  the plugin after `Init` has returned, in order: a re-arm finds what Init loaded. Keep
-  only in-memory state, or save it in the data dir and let `OnWakeArmed` prune it; a timer
-  to forget a subscription is not needed.
-- **Advertise the source.** End every message, notice or timeline text the plugin sends
-  about an event with `h.WakeHint(source, args)` (or `pluginsdk.WakeHint(plugin, source,
-  args)`): the exact `code-foundry thread subscribe --plugin … --arg …` line, so an agent
-  that reads "checks failed" waits for the next run instead of polling it. Never a flag
-  reason: it is one line of at most 80 characters and the line does not fit; the
-  failure's message or the panel's notice carries it.
-
 ## Toasts
 
 `h.Toast(pluginsdk.ToastInfo, "Rerun started")` shows a short message in the app's
@@ -393,72 +229,8 @@ stay with the panel, render a `notice` node. Up to 200 characters, at most one a
 (more are dropped). A command's `Message` is toasted anyway when it runs from the GUI: do
 not toast it twice.
 
-## Views
+## Elsewhere
 
-`h.UpdateView(instance, view)`, `h.AppendLog(instance, key, text)`,
-`h.AppendLogLines(instance, key, lines...)`: `reference/primitives.md`.
+`h.UpdateView`, `h.AppendLog`, `h.AppendLogLines`: `primitives.md`. `h.Subscribe`: `events.md`.
+`h.FireWake`: `wakes.md`. `h.CreateThread`, `h.CreateTerminal`: `owned.md`.
 
-## Threads and terminals of its own (permissions `threads`, `terminals`)
-
-```go
-// A skill for the thread: Claude Code loads <add-dir>/.claude/skills/<skill>/SKILL.md.
-skillDir := filepath.Join(h.DataDir(), "claude")
-_ = os.MkdirAll(filepath.Join(skillDir, ".claude", "skills", "deploy-helper"), 0o755)
-_ = os.WriteFile(filepath.Join(skillDir, ".claude", "skills", "deploy-helper", "SKILL.md"), skillMD, 0o644)
-id, err := h.CreateThread(ctx, pluginsdk.ThreadCreateParams{Title: "Deploy helper",
-	AddDirs: []string{skillDir}, Env: map[string]string{"DEPLOYBOT_URL": url}})
-err = h.SendThread(ctx, id, "Summarize the last failed deploy in one line.")
-term, err := h.CreateTerminal(ctx, pluginsdk.TerminalCreateParams{Argv: []string{"make", "test"}, Title: "tests"})
-```
-
-`CreateThread` makes a Claude thread the plugin owns: hidden from the sidebar, `thread
-list`, attention counts and the dock (`code-foundry plugin threads <name>` lists them),
-shown by a `thread` node. `Cwd` defaults to the plugin's data dir (with `ProjectID`, the
-project's main worktree; a `cwd` must be under home); `Env` and `AddDirs` follow the
-session environment's rules, but a bad one refuses the call, and they replace the
-plugin's own session environment for this thread; `Model` and `Effort` default to the
-user's settings (`Model` a model id, `Effort` `low` … `max`: the values `code-foundry help
-thread.new` lists for `--model` and `--effort`); `PermissionMode` is `supervised`,
-`accept-edits` or `auto` (`--permission`'s values; default Claude's own, which asks);
-`Prompt` is an optional first message.
-An `AddDirs` entry (here or in `SetEnvironment`) is a directory Claude Code may read and
-loads skills from: a skill is `<dir>/.claude/skills/<skill>/SKILL.md` (with `name` and
-`description` front matter), as above; `<dir>` itself is passed. It runs like any thread: a
-message starts its Claude, which stops at cache expiry, and it costs what it costs (the
-Usage page counts it). `SendThread` and `ArchiveThread` reach only the plugin's own
-threads (-32004 otherwise; an archived thread's node still renders,
-so drop it from the view); `Threads` lists them. To write to the
-user's thread, `Invoke` `thread.send` with the id from `act.Context`. `CreateTerminal`
-starts a terminal the plugin owns (cwd the data dir unless given, under home; env checked
-like a thread's; `$SHELL -lc` for the user's tools), shown by a `terminal` node and, on
-request, in the bottom panel; `CloseTerminal` and `Terminals` as for threads, and an exited
-terminal stays until closed. At most 32 live threads and 16 terminals. Disabling the
-plugin archives its threads (enabling it again finds them with `Threads`; a send
-unarchives one) and closes its terminals. Uninstalling it (with or without `--purge`), or
-another source taking its name with `--force`, removes its threads for good, as `thread
-remove` does (Claude stops first; the user is told how many), and closes its terminals.
-Terminals end with the daemon, threads do not (find them again with `Threads` in Init).
-plugintest keeps both
-in memory (`CreatedThreads`, `ThreadSends`, `PluginTerminals`, `ExitTerminal`,
-`SetTerminalText`).
-
-A terminal's output is readable: `h.ReadTerminal(ctx, id, maxBytes)` returns the text on
-its screen, plain (no escape sequences), one line per row with trailing spaces trimmed:
-the rows the terminal shows (24 by default, more when a viewer made it taller), not the
-scrollback above them, and at most `maxBytes` of it (0: 64 KiB, at most 256 KiB; its end,
-from a line start, with `Truncated`). Blank rows below the text are dropped and no read
-ends with a newline; `Lines` counts the text's lines (a host before pluginsdk v0.2.1
-sets it with the scrollback only, and its screen text may end with a newline). When its process exits the plugin gets
-`terminal/exited` `{terminalId, exitCode}` (`Plugin.OnTerminalExit`; 128+n when signal n
-killed it), once; read the screen then rather than polling `Terminals`. For a run whose
-whole output matters, read it with the scrollback:
-`h.ReadTerminalWith(ctx, id, pluginsdk.ReadTerminalOptions{Scrollback: true})` returns
-everything the terminal kept, the scrollback then the screen, oldest line first, plain
-like the screen but with a soft-wrapped line as one line, and `Lines`, how many lines
-that is; at most `MaxBytes` (0 and at most: 1 MiB), its end from a line start with
-`Truncated` when longer. A terminal keeps its last 10,000 rows (the user's *Scrollback
-lines* setting, 1,000 to 100,000; a full-screen program on the alternate screen has none),
-so there is no need to `tee` or `script(1)` the run into a file; do that only for output
-beyond those bounds. Check `h.HasCapability("terminal.scrollback")` first: an older
-Code Foundry ignores `Scrollback` and answers the screen. plugintest answers it with
-`SetTerminalScrollback` and records every read (`TerminalReads`).
