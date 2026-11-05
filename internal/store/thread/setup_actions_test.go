@@ -622,14 +622,47 @@ func TestCancelRacesTheLanding(t *testing.T) {
 		case errors.Is(err, ErrFailedPrecondition):
 			late++
 			now, _ := e.m.Get(e.ctx(), s.ID)
-			if now.Setup.Phase != SetupDone || now.WorktreePath == "" {
-				t.Fatalf("round %d: too late, but %+v", i, now.Setup)
+			if now.Setup.Phase != SetupDone || now.WorktreePath == "" || !strings.Contains(err.Error(), "too late") {
+				t.Fatalf("round %d: %v, but %+v", i, err, now.Setup)
 			}
 		default:
 			t.Fatalf("round %d: %v", i, err)
 		}
 	}
 	t.Logf("%d cancelled, %d too late", cancelled, late)
+}
+
+// A cancel asked for just before spawn's commit wins it: the process it started goes, and
+// so does what was made. The race above rarely lands there, so this one puts it there.
+func TestCancelBeatsTheCommit(t *testing.T) {
+	e, rr := newWorktreeEnv(t, nil)
+	s, release := inSetup(t, e, rr, CreateOptions{InitialPrompt: "do x"})
+	e.m.mu.Lock()
+	j := e.m.recs[s.ID].setup
+	j.cancelAsked = true // its ctx goes on: nothing stops the setup before the commit
+	e.m.mu.Unlock()
+	release()
+	select {
+	case <-j.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the setup did not end")
+	}
+	got, err := e.m.Get(e.ctx(), s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Setup.Phase != SetupCancelled || got.State != StateDisconnected || got.WorktreePath != "" || got.Setup.Made != nil {
+		t.Errorf("after the commit: %+v, setup %+v", got, got.Setup)
+	}
+	if n := worktreeCount(rr, "r1"); n != 1 {
+		t.Errorf("r1 has %d worktrees", n)
+	}
+	if got.PendingFirst == nil {
+		t.Error("the first message went: a retry has nothing to send")
+	}
+	if len(e.sentTexts()) != 0 {
+		t.Errorf("Claude got %q", e.sentTexts())
+	}
 }
 
 func TestDiscardGivesBackTheDraft(t *testing.T) {
