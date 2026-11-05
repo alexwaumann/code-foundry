@@ -384,3 +384,26 @@ func TestHasClipboardRace(t *testing.T) {
 		})
 	}
 }
+
+func TestClipboardReason(t *testing.T) {
+	slack := frontApp{PID: 7, Name: "Slack"}
+	chrome := frontApp{PID: 8, Name: "Chrome"}
+	tests := []struct {
+		name string
+		f    pasteFacts
+		want string
+	}{
+		{"it pastes", pasteFacts{Pressed: slack, Front: slack, Trusted: true}, ""},
+		{"nothing in front", pasteFacts{Front: slack, Trusted: true}, "no app in front at the press"},
+		{"moved on", pasteFacts{Pressed: slack, Front: chrome, Trusted: true}, "the app in front changed from Slack to Chrome"},
+		{"secure input", pasteFacts{Pressed: slack, Front: slack, Secure: true, Trusted: true}, "secure input is on"},
+		{"no grant", pasteFacts{Pressed: slack, Front: slack}, "Accessibility is not granted"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := clipboardReason(tt.f); got != tt.want {
+				t.Errorf("%q, want %q", got, tt.want)
+			}
+		})
+	}
+}

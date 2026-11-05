@@ -46,3 +46,12 @@ Music paused on the phone. A two-device headset may switch to the Mac for its mi
 any sound the Mac plays. AVAudioEngine also binds the default input before `cfMicPin` moves it,
 and may use the output side. If that is the cause, moving capture to an input-only AUHAL unit
 would leave the headset alone. The start tone is the other candidate.
+
+## The GUI keeps a log now
+
+A launch from Finder or the Dock sends stderr to `/dev/null`, so the host's `dictation:` lines and
+a Go crash's goroutine dump were lost, and a report needed a run from a terminal. `keepStderr`
+points the descriptor at `<home>/logs/gui.log` unless a terminal is reading it, which catches the
+runtime's crash output too. It appends, and starts again past 5 MB. The paste's lines now say why
+the text stayed on the clipboard, how long the caret read took, and each paste step. They name
+apps and never the text.

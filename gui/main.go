@@ -46,6 +46,9 @@ func main() {
 		log.Error("resolve config home", "err", err)
 		os.Exit(1)
 	}
+	// Launched from Finder or the Dock, stderr goes nowhere: slog's lines and a Go crash's
+	// goroutine dump were lost, and both are what a report needs (guilog.go).
+	keepStderr(p.GUILog(), log)
 	// Before anything spawns the daemon: give it the user's PATH (Finder launches get
 	// launchd's minimal one) and point it and its threads at the CLI installed next to this executable.
 	adoptLoginShellPath(log)
