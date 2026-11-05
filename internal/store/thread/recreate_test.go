@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -187,7 +188,7 @@ func TestSendRecreatesRemovedWorktree(t *testing.T) {
 				t.Fatalf("CreateWorktree calls %+v", all)
 			}
 			want := project.CreateWorktreeOptions{ProjectID: "r1", Branch: b, BaseRef: tt.wantBase, Fetch: true, BaseFromOrigin: true}
-			if all[creates] != want {
+			if !reflect.DeepEqual(all[creates], want) {
 				t.Errorf("recreated with %+v, want %+v", all[creates], want)
 			}
 			if fetched := slices.Contains(re.refs.fetched, b); fetched != tt.wantFetch {

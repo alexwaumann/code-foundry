@@ -127,6 +127,9 @@ func (m *Manager) RemoveProject(ctx context.Context, id, ref string) (Thread, er
 // and one that runs in its workspace's folder (leaving the workspace would leave it
 // without a cwd).
 func CheckMembersChange(s Thread) error {
+	if err := setupRefusal(s, "given other projects"); err != nil {
+		return err
+	}
 	if !s.ArchivedAt.IsZero() {
 		return fmt.Errorf("%w: thread %s is archived; unarchive it first", ErrFailedPrecondition, s.ID)
 	}
@@ -161,7 +164,7 @@ func (m *Manager) placeMember(ctx context.Context, s Thread, r project.Project) 
 	if !s.worktreeMode() || !r.Git {
 		return mainCheckout(r), nil, nil
 	}
-	made, err := m.makeWorktrees(ctx, []project.Project{r}, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin())
+	made, err := m.makeWorktrees(ctx, []project.Project{r}, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin(), nil, nil)
 	if err != nil {
 		return "", nil, err
 	}

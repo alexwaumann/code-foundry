@@ -34,6 +34,15 @@ func TestThreadStatusWordWaiting(t *testing.T) {
 	}
 }
 
+// A wait on a thread whose setup failed says why it never started.
+func TestWaitStatusFailedSetup(t *testing.T) {
+	s := &v1.Thread{State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_ERROR, StatusReason: "setup failed",
+		Setup: &v1.ThreadSetup{Phase: v1.ThreadSetupPhase_THREAD_SETUP_PHASE_FAILED, Error: "create worktree cf/x in web: fatal: no room"}}
+	if got, want := waitStatus(s), "error (setup failed), disconnected: create worktree cf/x in web: fatal: no room"; got != want {
+		t.Errorf("waitStatus = %q; want %q", got, want)
+	}
+}
+
 // A thread whose Claude has not reported a status yet is starting, not "unknown".
 func TestNoStatusWord(t *testing.T) {
 	starting := &v1.Thread{State: v1.ThreadState_THREAD_STATE_STARTING}

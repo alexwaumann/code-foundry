@@ -31,6 +31,9 @@ func (m *Manager) SetWorkspace(_ context.Context, id, ref string) (Thread, error
 	if err != nil {
 		return Thread{}, err
 	}
+	if err := setupRefusal(rec.s, "given another workspace"); err != nil {
+		return Thread{}, err // its placement is still to land, and would overwrite this
+	}
 	if err := CheckWorkspaceChange(rec.s, wsID); err != nil {
 		return Thread{}, fmt.Errorf("thread %s: %w", id, err)
 	}

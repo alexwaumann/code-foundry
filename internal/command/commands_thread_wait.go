@@ -264,7 +264,7 @@ func waitLine(s *v1.Thread) string {
 }
 
 // waitStatus is a thread's status and reason, "needs attention (finished)", followed by
-// ", disconnected" when no Claude process runs.
+// ", disconnected" when no Claude process runs, and why its setup failed when it did.
 func waitStatus(s *v1.Thread) string {
 	st := strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "THREAD_STATUS_")), "_", " ")
 	if s.GetStatus() == v1.ThreadStatus_THREAD_STATUS_UNSPECIFIED {
@@ -277,6 +277,9 @@ func waitStatus(s *v1.Thread) string {
 	}
 	if s.GetState() == v1.ThreadState_THREAD_STATE_DISCONNECTED {
 		st += ", disconnected"
+	}
+	if s.GetSetup().GetPhase() == v1.ThreadSetupPhase_THREAD_SETUP_PHASE_FAILED {
+		st += ": " + s.GetSetup().GetError() // why it never started
 	}
 	return st
 }

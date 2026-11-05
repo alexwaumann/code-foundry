@@ -45,6 +45,10 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if err != nil {
 		return Item{}, err
 	}
+	// Claude has no place to run yet, and nothing would deliver it (setup.go).
+	if err := m.refuseSetup(id, "sent to"); err != nil {
+		return Item{}, err
+	}
 	// A conversation Claude Code deleted cannot continue (transcriptmissing.go);
 	// startStopped checks again for one that is not flagged yet.
 	if err := m.refuseTranscriptMissing(id); err != nil {
@@ -170,6 +174,9 @@ func (d Decision) word() string {
 // no-op. With by (another thread asked for it), a turn it stopped leaves a resume note
 // (resumenote.go).
 func (m *Manager) Interrupt(ctx context.Context, id, by string) error {
+	if t, ok := m.Snapshot().Thread(id); ok && t.SettingUp() {
+		return nil // no turn yet: it must not wait for the setup and stop the first one
+	}
 	r, s, err := m.liveOrStopped(ctx, id)
 	if err != nil || r == nil {
 		return err
@@ -190,6 +197,10 @@ func (m *Manager) Interrupt(ctx context.Context, id, by string) error {
 // the row (persisted) for a thread that is not running, which the next spawn reads
 // (claudeCommand).
 func (m *Manager) setLive(ctx context.Context, id, what string, apply func(context.Context, *claudestream.Conn) error, row func(*Thread)) (Thread, error) {
+	// Refused, not queued: spawn may be reading the row, and the setting would be lost.
+	if err := m.refuseSettingUp(id, "given a "+what); err != nil {
+		return Thread{}, err
+	}
 	for {
 		r, _, err := m.liveOrStopped(ctx, id)
 		if err != nil {

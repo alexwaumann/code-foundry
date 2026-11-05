@@ -653,8 +653,7 @@ func cloneItem(it Item) Item {
 // thread returns the thread's item log, loading it from the database the
 // first time.
 func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
-	// m.mu before (never inside) m.tmu: Remove takes them the other way round. The
-	// record, not the snapshot: Create's spawn gets here before the first publish.
+	// m.mu before (never inside) m.tmu: Remove takes them the other way round.
 	m.mu.Lock()
 	rec, err := m.record(id)
 	if err != nil {

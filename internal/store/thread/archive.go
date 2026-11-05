@@ -192,6 +192,10 @@ func archivedStatus(s *Thread, now time.Time) bool {
 // began (interrupted) read already, and its wakes forgotten (unwatchForArchive).
 func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted bool) (_ Thread, _ bool, err error) {
 	defer func() { m.endArchiving(id, err != nil) }() // after m.mu's unlock below
+	// A setup under way ends first, either way: then there is a process to close, or none.
+	if err := m.waitSetup(ctx, id); err != nil {
+		return Thread{}, false, err
+	}
 	if err := m.Close(ctx, id); err != nil {
 		return Thread{}, false, err
 	}

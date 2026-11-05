@@ -99,6 +99,9 @@ func (s Thread) withMove(j *moveJob) Thread {
 // not supported), an archived one, the resident thread, one whose transcript is gone,
 // and one already moving. Pure; the fake (threadtest) uses it too.
 func CheckMove(s Thread) error {
+	if err := setupRefusal(s, "moved"); err != nil {
+		return err
+	}
 	switch {
 	case len(s.Projects()) > 0 || s.WorkspaceID != "":
 		return fmt.Errorf("%w: thread %s already has a project; only a thread without one can be moved", ErrFailedPrecondition, s.ID)

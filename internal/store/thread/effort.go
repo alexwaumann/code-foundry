@@ -40,6 +40,9 @@ func (m *Manager) SetEffort(ctx context.Context, id, effort string) (Thread, err
 	if !slices.Contains(Efforts, effort) {
 		return Thread{}, fmt.Errorf("%w: effort %q (want one of %s)", ErrInvalidArgument, effort, strings.Join(Efforts, ", "))
 	}
+	if err := m.refuseSettingUp(id, "given an effort change"); err != nil {
+		return Thread{}, err // as setLive's
+	}
 	var r *runner
 	for {
 		live, _, err := m.liveOrStopped(ctx, id)

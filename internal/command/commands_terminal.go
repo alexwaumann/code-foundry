@@ -335,6 +335,10 @@ func shellOwner(ctx context.Context, projects ProjectBackend, threads ThreadBack
 			return owner{}, err
 		}
 		s := res.Msg.GetThread()
+		if cwd == "" && s.GetWorktreePath() == "" {
+			// Its worktree is still being made, or its setup failed before it was.
+			return owner{}, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("thread %s has no checkout yet", s.GetId()))
+		}
 		return owner{thread: s.GetId(), project: s.GetProjectId(), worktree: s.GetWorktreePath(), cwd: cmp.Or(cwd, s.GetWorktreePath())}, nil
 	}
 	path, start := c.ActiveWorktreePath, cmp.Or(cwd, c.ActiveWorktreePath)

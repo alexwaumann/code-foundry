@@ -28,6 +28,9 @@ import (
 type ProjectSource interface {
 	Snapshot() *project.Snapshot
 	CreateWorktree(ctx context.Context, opts project.CreateWorktreeOptions) (project.Worktree, error)
+	// FetchBase fetches a new branch's base ahead of CreateWorktree, while the branch
+	// still has no name.
+	FetchBase(ctx context.Context, opts project.CreateWorktreeOptions)
 	RemoveWorktree(ctx context.Context, opts project.RemoveWorktreeOptions) error
 	DefaultWorktreePath(projectID, branch string) string
 }
@@ -404,6 +407,8 @@ type record struct {
 	// lateMoveName is the title a move's naming gave after SlugTimeout while the move
 	// was still queued: applied when it lands (move.go, applyLateMoveName).
 	lateMoveName string
+	// setup is the thread's setup stage while one runs (setup_run.go).
+	setup *setupJob
 }
 
 var _ Store = (*Manager)(nil)
@@ -446,6 +451,15 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	transcripts := &transcriptIndex{paths: opts.Paths} // transcriptmissing.go
 	for _, s := range rows {
 		s.unwaitLoaded() // nothing is waited on at startup (waiting.go)
+		if s.SettingUp() {
+			// It lost its setup with the daemon: what it made is on the row (setup.go).
+			opts.Log.Warn("thread setup lost: the daemon stopped during it", "thread", s.ID)
+			lost = append(lost, s.ID)
+			s.failSetup(opts.Now(), SetupRestarted)
+			if err := saveThread(ctx, opts.DB, s); err != nil {
+				return nil, err
+			}
+		}
 		if s.State != StateDisconnected {
 			lost = append(lost, s.ID)
 			s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonRestarts
@@ -642,10 +656,14 @@ func (m *Manager) record(id string) (*record, error) {
 	return rec, nil
 }
 
-// Create spawns claude in a worktree. The thread is returned STARTING. With
-// NewWorktree it first creates the worktree (synchronously: on failure nothing is
-// persisted); see newWorktree. With NoProject it runs in Options.Home and has no
-// owner.
+// Create spawns claude in a worktree, in two stages (setup.go). The fast stage refuses
+// what needs no slow work, with nothing made, then publishes the thread with its
+// provisional name and its first message in the timeline. The setup stage names the
+// branch, makes the worktrees and spawns (setup_run.go). Create waits for it and returns
+// the thread STARTING; a failure removes the thread and what was made, and is the error.
+// With BackgroundSetup it returns from the fast stage and the thread follows in
+// Thread.Setup; a failure stays on the thread. With NoProject it runs in Options.Home and
+// has no owner.
 func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err := validateModelEffort(o.Model, o.Effort); err != nil {
 		return Thread{}, err
@@ -709,10 +727,6 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		Owner: owner, SpawnEnv: slices.Clone(o.Env), SpawnAddDirs: slices.Clone(o.AddDirs), Epoch: 1,
 		SystemPromptAppend: appendPrompt.prompt,
 	}
-	namingTried := name != ""
-	var late <-chan namingResult
-	var made []madeWorktree // the worktrees placement made, for the hook
-	var report CreateReport
 	if o.Cwd != "" && !o.NoProject {
 		return Thread{}, fmt.Errorf("%w: cwd is for a thread without a project (a project's thread runs in its worktree)", ErrInvalidArgument)
 	}
@@ -731,117 +745,103 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		len(o.ProjectIDs) > 0 || o.Like != "" || o.NewBranch || o.CheckoutMode) {
 		return Thread{}, fmt.Errorf("%w: no_project excludes a project, projects, worktree, new worktree, like and workspace", ErrInvalidArgument)
 	}
+	if len(o.DraftJSON) > MaxDraftJSON {
+		return Thread{}, fmt.Errorf("%w: the draft has more than %d bytes", ErrInvalidArgument, MaxDraftJSON)
+	}
+	var p placedThread
+	var w *worktreePlan
 	switch {
 	case o.NoProject:
 		// No owner: ProjectID and WorkspaceID stay empty and claude starts in the home
 		// directory (or Cwd inside it), trusted like any cwd (spawn).
-		if s.WorktreePath, err = m.noProjectCwd(o.Cwd); err != nil {
+		if p.path, err = m.noProjectCwd(o.Cwd); err != nil {
 			return Thread{}, err
 		}
 	default:
-		p, err := m.placeThread(ctx, id, name, creatorID, o)
-		if err != nil {
+		if p, w, err = m.planThread(id, name, creatorID, o); err != nil {
 			return Thread{}, err
 		}
-		s.ProjectID, s.ProjectIDs, s.WorktreePath, s.WorkspaceID = p.projectID, p.projectIDs, p.path, p.workspaceID
-		s.CheckoutPaths = p.checkouts
-		s.BaseRef, s.CreatedWorktree, s.Branch = p.baseRef, p.createdWorktree, p.branch
-		if p.name != "" {
-			s.Name, s.AutoNamed = p.name, true
-		}
-		namingTried = namingTried || p.namerCalled
-		late, made = p.late, p.made
-		report = CreateReport{MadeWorktree: p.madePrimary, MadeBranch: p.madeBranch, ExistingWorktree: p.reusedPrimary, DroppedWorktreeMode: p.droppedWorktreeMode}
 	}
-	s.ProjectIDs = CleanProjectIDs(s.ProjectID, s.ProjectIDs)
-	if s.ProjectID != "" {
-		s = s.withCheckout(s.ProjectID, s.WorktreePath) // the primary's is the cwd
+	shown := p
+	if w != nil {
+		// Its cwd comes with its worktrees, even a workspace's folder that exists now: a
+		// path here would read as a landed placement, and each member as its main checkout.
+		shown.path = ""
 	}
+	s = shown.apply(s)
 	if s.Name == "" {
 		// Until the namer answers (provisional.go); namingTried stays false so it runs.
 		s.nameProvisionally(o.ComposerPrompt, o.InitialPrompt)
 	}
-	// The worktrees exist now: point file references at them (see filerefs.go).
-	prompt, dropped := rewriteFileRefs(prompt, m.fileRefRoots(s))
-	if len(dropped) > 0 {
-		m.log.Warn("file references outside the thread's projects; passing their relative paths",
-			"thread", id, "project", s.ProjectID, "workspace", s.WorkspaceID, "refs", dropped)
-	}
-	// Thread references: where Claude can read the other thread (see threadrefs.go).
-	prompt = m.rewriteThreadRefsLogged(id, prompt, o.ComposerPrompt)
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now
+	s.setStatus(StatusBusy, ReasonSettingUp, now)
+	s.Setup = &Setup{Phase: SetupRunning, StartedAt: now, Steps: m.setupSteps(w), Request: setupRequestOf(o)}
+	if prompt != "" {
+		// The prompt goes in as the first user message; the item keeps it as typed. It is on
+		// the row until Claude has it, so a daemon stop before the handshake keeps it for
+		// the next start (firstprompt.go). Its references are rewritten once the worktrees
+		// exist (landPlacement).
+		s.PendingFirst = pendingFirstOf(&outgoing{text: strings.TrimSpace(o.InitialPrompt),
+			composer: strings.TrimSpace(o.ComposerPrompt), attachments: attachments, prompt: prompt, by: creatorID})
+	}
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
 		return Thread{}, ErrClosed
 	}
-	rec := &record{s: s, namingTried: namingTried}
-	if prompt != "" {
-		// The prompt goes in as the first user message; the item keeps it as typed. It is
-		// on the row until Claude has it, so a daemon stop before the handshake keeps it
-		// for the next start (firstprompt.go); spawn's commit writes it with the row.
-		rec.s.PendingFirst = pendingFirstOf(&outgoing{text: strings.TrimSpace(o.InitialPrompt),
-			composer: strings.TrimSpace(o.ComposerPrompt), attachments: attachments, prompt: prompt, by: creatorID})
-	}
+	rec := &record{s: s, namingTried: name != ""}
+	rec.reserve()
 	m.recs[id] = rec
+	m.commitLocked(rec, true)
 	m.mu.Unlock()
-	drop := func() {
-		m.mu.Lock()
-		delete(m.recs, id)
-		m.tmu.Lock()
-		delete(m.threads, id) // the thread's log, loaded by spawnStream
-		m.tmu.Unlock()
-		m.mu.Unlock()
-	}
-	var note *Item
-	if creatorID != "" {
-		// Before spawn, so the note precedes the first message (written once Claude
-		// answers its handshake); its row once spawn wrote the thread's, like a fork's
-		// copy (fork.go).
-		// The text keeps the name at creation (the CLI's and a removed creator's
-		// fallback); NoteCreatedBy lets the GUI show the creator's current name.
-		it, err := m.startNote(ctx, id, Item{ID: createdByNoteID, Text: createdByNoteText(creatorName, brief), NoteCreatedBy: creatorID})
-		if err != nil {
-			drop()
-			return Thread{}, err
-		}
-		note = &it
+	if err := m.openTimeline(ctx, s, creatorName, brief); err != nil {
+		m.discardCreate(id)
+		return Thread{}, err
 	}
 	l := launch{newID: cid}
 	if o.ResumeSession != "" {
 		l = launch{resume: o.ResumeSession, fork: true, newID: cid, freshPrompt: true}
 	}
-	if err := m.spawn(ctx, id, l); err != nil {
-		drop()
-		m.rollback(ctx, made)
+	j := &setupJob{id: id, creatorID: creatorID, o: o, p: p, w: w, prompt: prompt, l: l}
+	if err := m.beginSetup(ctx, j); err != nil {
+		m.discardCreate(id)
 		return Thread{}, err
 	}
-	if note != nil {
-		m.saveItem(id, *note)
-		m.log.Info("thread created by another thread", "thread", id, "created_by", creatorID)
-	}
-	if late != nil {
-		m.applyLateName(id, late)
-	}
-	if m.opts.WorktreeCreated != nil {
-		// Every worktree placement made runs its project's on-worktree-create actions.
-		for _, w := range made {
-			m.opts.WorktreeCreated(id, w.projectID, w.path)
-		}
-	}
-	if o.Notify {
-		m.notifyCreator(ctx, creatorID, id)
-	}
-	if o.Report != nil {
-		if report.ExistingWorktree {
-			if other, ok := m.otherHolder(id, s.WorktreePath); ok {
-				report.SharedWith = holderLabel(other)
-			}
-		}
-		*o.Report = report
+	if o.BackgroundSetup {
+		go func() { _ = m.finishSetup(j) }()
+	} else if err := m.finishSetup(j); err != nil {
+		return Thread{}, err
 	}
 	return m.Get(ctx, id)
+}
+
+// openTimeline writes a new thread's first items: its creator's note, then the user's
+// message, which goes out under this id once Claude answers (firstprompt.go).
+func (m *Manager) openTimeline(ctx context.Context, s Thread, creatorName, brief string) error {
+	if s.CreatedBy != "" {
+		// The text keeps the name at creation (the CLI's and a removed creator's
+		// fallback); NoteCreatedBy lets the GUI show the creator's current name.
+		note, err := m.startNote(ctx, s.ID, Item{ID: createdByNoteID, Text: createdByNoteText(creatorName, brief), NoteCreatedBy: s.CreatedBy})
+		if err != nil {
+			return err
+		}
+		m.saveItem(s.ID, note)
+		m.log.Info("thread created by another thread", "thread", s.ID, "created_by", s.CreatedBy)
+	}
+	if s.PendingFirst == nil {
+		return nil
+	}
+	log, err := m.thread(ctx, s.ID)
+	if err != nil {
+		return fmt.Errorf("thread: create %s: %w", s.ID, err)
+	}
+	first := s.PendingFirst.outgoing()
+	if _, err := recordUser(itemWriter{log: log, save: func(it Item) { m.saveItem(s.ID, it) }}, first); err != nil {
+		return err
+	}
+	m.setPendingFirstItem(s.ID, first.itemID)
+	return nil
 }
 
 // Fork starts a new thread that continues id's conversation under a new Claude
@@ -865,6 +865,9 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		return Thread{}, ErrClosed
 	}
 	if err := m.refuseResident(id, "forked"); err != nil {
+		return Thread{}, err
+	}
+	if err := setupRefusal(parent, "forked"); err != nil {
 		return Thread{}, err
 	}
 	if parent.ClaudeSessionID == "" {
@@ -1025,6 +1028,9 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	}
 	rec.run = r
 	rec.release()
+	if rec.s.SettingUp() {
+		rec.s.Setup = rec.s.Setup.done(now) // with the process, in one commit (setup.go)
+	}
 	rec.spawnedWith(extras)
 	if mem.fresh {
 		rec.s.MemoryHash = mem.hash // its system prompt has the memory as it is now
@@ -1043,8 +1049,8 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	m.wg.Add(1)
 	m.mu.Unlock()
 	if len(first) > 0 && first[0].itemID == "" {
-		// A new thread's prompt goes into the timeline now, before the handshake (the
-		// row is written, so the item can be): a start that fails leaves the message,
+		// A row's first message with no item yet (Create writes its own at once) goes into
+		// the timeline now, before the handshake: a start that fails leaves the message,
 		// then why, for the user to copy or send again. sendMessage delivers it under
 		// this id. Before run starts, so nothing else writes the log yet. The row's
 		// pending first message keeps the id, so a later start does not write it again
@@ -1223,6 +1229,9 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 			_ = m.setRemoving(id, false) // gone meanwhile: nothing to clear
 		}
 	}()
+	if err := m.stopSetup(ctx, id); err != nil { // its goroutine must not outlive the record
+		return err
+	}
 	if err := m.Close(ctx, id); err != nil { // before the cascade: it creates no more
 		return err
 	}
@@ -1288,6 +1297,9 @@ func (m *Manager) removeCascadeTargets(id string, skip map[string]bool) []Thread
 // removed are shown in the sidebar from then on (Thread.InSidebar). A start meanwhile
 // fails it.
 func (m *Manager) removeOne(ctx context.Context, id string) error {
+	if err := m.stopSetup(ctx, id); err != nil {
+		return err
+	}
 	if err := m.Close(ctx, id); err != nil {
 		return err
 	}

@@ -156,6 +156,9 @@ func ListedCheckouts(t Thread, snap *project.Snapshot) []Checkout {
 }
 
 func checkoutsOf(t Thread, snap *project.Snapshot, pathFor func(projectID, branch string) string, exists func(string) bool, files bool) []Checkout {
+	if t.unplaced() {
+		return nil // nothing is made yet: resolving its members would name someone else's
+	}
 	ids := t.Projects()
 	out := make([]Checkout, 0, len(ids))
 	for _, id := range ids {

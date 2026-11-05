@@ -390,7 +390,7 @@ func threadPlace(snap *thread.Snapshot, id string, checkouts func(thread.Thread)
 		return action.ThreadPlace{}, false
 	}
 	t, ok := snap.Thread(id)
-	if !ok {
+	if !ok || t.WorktreePath == "" { // no cwd: its setup has not placed it
 		return action.ThreadPlace{}, false
 	}
 	p := action.ThreadPlace{ProjectID: t.ProjectID, Worktree: t.WorktreePath, Checkouts: map[string]string{}}

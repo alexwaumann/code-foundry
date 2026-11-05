@@ -429,7 +429,7 @@ func (m *Manager) fillPending() []string {
 	defer m.mu.Unlock()
 	var ids []string
 	for id, rec := range m.recs {
-		if rec.s.CheckoutPaths == nil && len(rec.s.Projects()) > 0 {
+		if rec.s.CheckoutPaths == nil && len(rec.s.Projects()) > 0 && !rec.s.unplaced() {
 			ids = append(ids, id)
 		}
 	}

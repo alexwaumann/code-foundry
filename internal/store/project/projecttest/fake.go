@@ -57,6 +57,13 @@ type Fake struct {
 	Err error
 	// Calls records method calls, e.g. "Register /x", "Refresh r1".
 	Calls []string
+	// Fetches records every fetch of a base, FetchBase's and a CreateWorktree's with
+	// Fetch and BaseFromOrigin, in call order. OnFetch, when set, runs in each: it may
+	// block (a slow remote), and an error is that fetch's failure; FetchRefAt is then
+	// the age told of the ref on disk.
+	Fetches    []project.CreateWorktreeOptions
+	OnFetch    func(context.Context, project.CreateWorktreeOptions) error
+	FetchRefAt time.Time
 	// Creates records every CreateWorktree's options, in call order.
 	Creates []project.CreateWorktreeOptions
 }
@@ -198,7 +205,16 @@ func (f *Fake) Unregister(_ context.Context, id string) error {
 }
 
 // CreateWorktree implements project.Store.
-func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions) (project.Worktree, error) {
+func (f *Fake) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptions) (project.Worktree, error) {
+	if o.Fetch && o.BaseFromOrigin {
+		f.fetch(ctx, o)
+	}
+	if err := ctx.Err(); err != nil {
+		return project.Worktree{}, err // as git, which never starts on a dead context
+	}
+	if o.Progress != nil {
+		o.Progress(project.WorktreeEvent{Kind: project.WorktreeAdding})
+	}
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "CreateWorktree "+o.ProjectID+" "+o.Branch)
 	f.Creates = append(f.Creates, o)
@@ -236,6 +252,36 @@ func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions
 	}
 	f.Put(r)
 	return w, nil
+}
+
+// FetchBase records the call and runs OnFetch, as a fetch of the base's origin branch.
+// With o.BaseFromOrigin off it fetches nothing, as the real store does.
+func (f *Fake) FetchBase(ctx context.Context, o project.CreateWorktreeOptions) {
+	if o.BaseFromOrigin {
+		f.fetch(ctx, o)
+	}
+}
+
+// fetch is one fetch of o's base, told through o.Progress.
+func (f *Fake) fetch(ctx context.Context, o project.CreateWorktreeOptions) {
+	ref := "origin/" + strings.TrimPrefix(cmp.Or(o.BaseRef, "main"), "origin/")
+	f.mu.Lock()
+	f.Fetches = append(f.Fetches, o)
+	hook := f.OnFetch
+	f.mu.Unlock()
+	report := func(ev project.WorktreeEvent) {
+		if o.Progress != nil {
+			o.Progress(ev)
+		}
+	}
+	report(project.WorktreeEvent{Kind: project.WorktreeFetchStarted, Remote: "origin", Ref: ref})
+	end := project.WorktreeEvent{Kind: project.WorktreeFetchEnded, Remote: "origin", Ref: ref}
+	if hook != nil {
+		if end.Err = hook(ctx, o); end.Err != nil {
+			end.RefAt = f.FetchRefAt
+		}
+	}
+	report(end)
 }
 
 // DefaultWorktreePath is where CreateWorktree puts project id's worktree for branch

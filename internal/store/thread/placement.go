@@ -286,16 +286,58 @@ type madeWorktree struct {
 	worktree   project.Worktree
 }
 
-// placeThread decides and carries out a new thread's placement (decidePlacement) for
-// Create: it resolves the options' project refs, finds the thread to copy (o.Like, else
-// the creator), and in worktree mode names the branch (one namer wait, as a new
-// worktree's) and makes every git member's worktree in parallel. A failure removes what
-// it made and names the project.
+// placeThread decides and carries out a new thread's placement at once (planThread, then
+// placeWorktrees), for a Move. A failure removes what it made and names the project.
 func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o CreateOptions) (placedThread, error) {
+	p, w, err := m.planThread(id, name, creatorID, o)
+	if err != nil || w == nil {
+		return p, err
+	}
+	return m.placeWorktrees(ctx, p, w, nil)
+}
+
+// worktreePlan is a worktree-mode placement decided and not carried out yet: the project
+// checks passed, nothing slow done.
+type worktreePlan struct {
+	id, name string
+	o        CreateOptions
+	pl       placement
+	// bases are the members' own bases; base is the one for the others, checked.
+	bases  map[string]string
+	base   string
+	shared map[string]string
+	git    []project.Project
+	nw     NewWorktree
+	// bc is how a new branch is chosen; zero without one.
+	bc         branchChoice
+	fromOrigin bool
+}
+
+// todo are the git members whose worktree the placement makes: every one that does not
+// share the copied thread's.
+func (w *worktreePlan) todo() []project.Project {
+	var out []project.Project
+	for _, r := range w.git {
+		if w.shared[r.ID] == "" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// baseOf is project id's base for a new branch.
+func (w *worktreePlan) baseOf(id string) string { return cmp.Or(w.bases[id], w.base) }
+
+// planThread decides a new thread's placement (decidePlacement) without doing anything
+// slow: it resolves the options' project refs, finds the thread to copy (o.Like, else the
+// creator) and checks what can be checked. Every refusal that needs neither the namer nor
+// git is here. A placement with no worktree to make is complete; otherwise p has the set,
+// the primary and the workspace, and w what placeWorktrees still has to do.
+func (m *Manager) planThread(id, name, creatorID string, o CreateOptions) (placedThread, *worktreePlan, error) {
 	var p placedThread
 	req, bases, err := m.placeRequest(o)
 	if err != nil {
-		return p, err
+		return p, nil, err
 	}
 	var src *Thread
 	explicit := strings.TrimSpace(o.Like) != ""
@@ -303,7 +345,10 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 	case explicit:
 		t, ok := m.Snapshot().Thread(strings.TrimSpace(o.Like))
 		if !ok {
-			return p, fmt.Errorf("%w: like: thread %s not found", ErrInvalidArgument, o.Like)
+			return p, nil, fmt.Errorf("%w: like: thread %s not found", ErrInvalidArgument, o.Like)
+		}
+		if t.unplaced() {
+			return p, nil, setupRefusal(t, "copied")
 		}
 		src = &t
 	case creatorID != "":
@@ -313,7 +358,7 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 	}
 	// A like without a project gets decidePlacement's "has no project to branch".
 	if o.NewBranch && req.workspaceID == "" && (src == nil || (!explicit && len(src.Projects()) == 0)) {
-		return p, fmt.Errorf("%w: new branch needs like (or a creating thread with a project) to branch from", ErrInvalidArgument)
+		return p, nil, fmt.Errorf("%w: new branch needs like (or a creating thread with a project) to branch from", ErrInvalidArgument)
 	}
 	var srcCheckouts []Checkout
 	if src != nil {
@@ -321,7 +366,7 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 	}
 	pl, err := decidePlacement(src, explicit, req, srcCheckouts)
 	if err != nil {
-		return p, err
+		return p, nil, err
 	}
 	var shared map[string]string
 	if src != nil && pl.from == src.ID {
@@ -334,7 +379,7 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 	if pl.noProject {
 		p.noProject = true
 		p.path, err = m.noProjectCwd(pl.primaryPath)
-		return p, err
+		return p, nil, err
 	}
 	p.projectIDs, p.projectID, p.workspaceID = pl.projectIDs, pl.primary, pl.workspaceID
 	p.droppedWorktreeMode = pl.droppedWorktreeMode
@@ -342,25 +387,26 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 		// The workspace's folder: its root, else its managed dir (made by workspaceDir).
 		w, err := m.workspaceDir(pl.workspaceID)
 		if err != nil {
-			return p, err
+			return p, nil, err
 		}
 		p.path = w.Dir()
 		if !pl.worktreeMode {
 			p.checkouts = m.ownCheckouts(pl.projectIDs, "", "", shared)
-			return p, nil
+			return p, nil, nil
 		}
 	}
 	if !pl.worktreeMode {
 		p.path = cmp.Or(pl.primaryPath, shared[pl.primary])
 		if p.path == "" {
 			if _, p.path, err = m.resolveWorktree(pl.primary, ""); err != nil {
-				return p, err
+				return p, nil, err
 			}
 		}
 		p.checkouts = m.ownCheckouts(pl.projectIDs, pl.primary, p.path, shared)
-		return p, nil
+		return p, nil, nil
 	}
-	return m.placeWorktrees(ctx, id, name, o, pl, bases, shared, p)
+	w, err := m.planWorktrees(id, name, o, pl, bases, shared)
+	return p, w, err
 }
 
 // sharedCheckouts are the checkouts a thread placed like src shares with it: when it
@@ -501,12 +547,11 @@ func (m *Manager) placeRequest(o CreateOptions) (placeRequest, map[string]string
 	return req, bases, nil
 }
 
-// placeWorktrees carries out a worktree-mode placement: the branch (named for a new
-// one), then every git member's worktree, made in parallel where missing; a member in
-// shared keeps the copied thread's worktree, whatever it has checked out now.
-func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateOptions, pl placement, bases map[string]string, shared map[string]string, p placedThread) (placedThread, error) {
+// planWorktrees checks a worktree-mode placement's projects and base, and what it asks of
+// the branch, before anything is made.
+func (m *Manager) planWorktrees(id, name string, o CreateOptions, pl placement, bases, shared map[string]string) (*worktreePlan, error) {
 	if m.opts.Projects == nil {
-		return p, fmt.Errorf("%w: creating a worktree needs the project store", ErrFailedPrecondition)
+		return nil, fmt.Errorf("%w: creating a worktree needs the project store", ErrFailedPrecondition)
 	}
 	snap := m.opts.Projects.Snapshot()
 	var git []project.Project
@@ -514,7 +559,7 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 	for _, pid := range pl.projectIDs {
 		r, err := m.projectByRef(snap, pid)
 		if err != nil {
-			return p, err
+			return nil, err
 		}
 		if r.Git {
 			git = append(git, r)
@@ -523,11 +568,11 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 		}
 	}
 	if len(git) == 0 && plain == nil {
-		return p, fmt.Errorf("%w: new worktrees need a project with git; the thread has none", ErrFailedPrecondition)
+		return nil, fmt.Errorf("%w: new worktrees need a project with git; the thread has none", ErrFailedPrecondition)
 	}
 	if len(git) == 0 {
 		// Before the namer: a project without git runs threads in its one checkout.
-		return p, noGitForWorktree(*plain)
+		return nil, noGitForWorktree(*plain)
 	}
 	var nw NewWorktree
 	if o.NewWorktree != nil {
@@ -535,54 +580,71 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 	}
 	base := strings.TrimSpace(nw.BaseRef)
 	if err := validateRef(base); err != nil {
-		return p, err
+		return nil, err
 	}
-	branch, fresh := pl.branch, false
+	w := &worktreePlan{id: id, name: name, o: o, pl: pl, bases: bases, base: base, shared: shared, git: git, nw: nw,
+		fromOrigin: m.fromOrigin(nw.BaseFromOrigin)}
 	if pl.newBranch {
-		bc, err := m.newBranchChoice(nw.Branch)
-		if err != nil {
-			return p, err
+		var err error
+		if w.bc, err = m.newBranchChoice(nw.Branch); err != nil {
+			return nil, err
 		}
+	}
+	return w, nil
+}
+
+// placeWorktrees carries out a worktree-mode placement: the branch (named for a new one,
+// while the bases are fetched), then every git member's worktree, made in parallel where
+// missing; a member in shared keeps the copied thread's worktree, whatever it has checked
+// out now. t, when set, follows it step by step, and a failure keeps what was made when it
+// says so.
+func (m *Manager) placeWorktrees(ctx context.Context, p placedThread, w *worktreePlan, t *setupTracker) (placedThread, error) {
+	pl, git, base, bases := w.pl, w.git, w.base, w.bases
+	branch, fresh := pl.branch, false
+	todo := w.todo()
+	var pf *prefetches
+	if pl.newBranch {
 		paths := make([]string, len(git))
 		for i, r := range git {
 			paths[i] = r.Path
 		}
-		bc = m.existingBranchChoice(ctx, paths, bc, nw.Branch)
+		bc := m.existingBranchChoice(ctx, paths, w.bc, w.nw.Branch)
+		// The namer and the fetches run side by side: a new branch's base does not depend
+		// on the branch's name (docs/notes/instant-threads-1-daemon.md).
+		pf = m.startPrefetches(ctx, w, bc, paths, todo, t)
+		defer pf.wait() // whatever happens next: nothing outlives the placement
+		t.begin(SetupStepName, "")
 		var sl slugWait
-		if o.naming != nil {
-			sl, err = o.naming(ctx, bc)
+		var err error
+		if w.o.naming != nil {
+			sl, err = w.o.naming(ctx, bc)
 		} else {
-			sl, err = m.waitNaming(ctx, id, name, o.InitialPrompt, bc)
+			sl, err = m.waitNaming(ctx, w.id, w.name, w.o.InitialPrompt, bc)
 		}
 		if err != nil {
 			return p, err
 		}
 		p.name, p.namerCalled, p.late = sl.name, sl.namerCalled, sl.late
+		t.titled(sl.name, sl.namerCalled)
 		var existing bool
 		var release func()
-		branch, existing, release = m.pickBranch(ctx, paths, bc, sl.branch, id)
+		branch, existing, release = m.pickBranch(ctx, paths, bc, sl.branch, w.id)
 		defer release() // the worktrees are made (or rolled back) by then
+		t.named(branch)
 		if existing && (base != "" || len(bases) > 0) {
-			m.log.Info("branch exists; checking it out and ignoring the base", "thread", id, "branch", branch, "base", base)
+			m.log.Info("branch exists; checking it out and ignoring the base", "thread", w.id, "branch", branch, "base", base)
 			base, bases = "", nil
 		}
 		fresh = !existing
 	}
-	fromOrigin := m.fromOrigin(nw.BaseFromOrigin)
-	var todo []project.Project
-	for _, r := range git {
-		if shared[r.ID] == "" {
-			todo = append(todo, r)
-		}
-	}
-	made, err := m.makeWorktrees(ctx, todo, branch, func(pid string) string { return cmp.Or(bases[pid], base) }, fresh, fromOrigin)
+	made, err := m.makeWorktrees(ctx, todo, branch, func(pid string) string { return cmp.Or(bases[pid], base) }, fresh, w.fromOrigin, pf, t)
 	if err != nil {
 		return p, err
 	}
 	p.made, p.branch, p.createdWorktree = made, branch, true
 	// The plain folders are their folders (or the copied thread's); each git member's
 	// worktree is the one made, shared or reused.
-	p.checkouts = m.ownCheckouts(pl.projectIDs, "", "", shared)
+	p.checkouts = m.ownCheckouts(pl.projectIDs, "", "", w.shared)
 	for _, r := range git {
 		var wt project.Worktree
 		var start string
@@ -591,9 +653,9 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 		case i >= 0:
 			wt, start = made[i].worktree, made[i].startPoint
 			wt.Path = made[i].path
-		case shared[r.ID] != "":
-			wt, _ = m.opts.Projects.Snapshot().Worktree(r.ID, shared[r.ID])
-			wt.Path = shared[r.ID]
+		case w.shared[r.ID] != "":
+			wt, _ = m.opts.Projects.Snapshot().Worktree(r.ID, w.shared[r.ID])
+			wt.Path = w.shared[r.ID]
 		default:
 			wt, _ = m.memberWorktree(r, branch)
 		}
@@ -612,13 +674,59 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 	}
 	if p.path == "" { // the primary is a plain folder: it runs there
 		if _, p.path, err = m.resolveWorktree(pl.primary, ""); err != nil {
-			m.rollback(ctx, made)
+			if !t.keepMade() {
+				m.rollback(ctx, made)
+			}
 			return p, err
 		}
 	}
-	m.log.Info("worktrees ready for thread", "thread", id, "projects", pl.projectIDs, "branch", branch,
+	m.log.Info("worktrees ready for thread", "thread", w.id, "projects", pl.projectIDs, "branch", branch,
 		"made", len(made), "cwd", p.path, "base", p.baseRef)
 	return p, nil
+}
+
+// prefetches are the fetches a placement runs ahead of its worktrees, by project id: the
+// channel closes when that project's ended. nil: none.
+type prefetches struct{ done map[string]chan struct{} }
+
+// startPrefetches starts fetching each of todo's bases for a new branch, unless that
+// branch is known to exist (its base is ignored, and CreateWorktree fetches what it
+// checks out) or nothing is fetched at all (BaseFromOrigin off).
+func (m *Manager) startPrefetches(ctx context.Context, w *worktreePlan, bc branchChoice, paths []string, todo []project.Project, t *setupTracker) *prefetches {
+	if !w.fromOrigin || (bc.verbatim != "" && m.branchExists(ctx, paths, bc.verbatim)) {
+		return nil
+	}
+	pf := &prefetches{done: make(map[string]chan struct{}, len(todo))}
+	for _, r := range todo {
+		done := make(chan struct{})
+		pf.done[r.ID] = done
+		go func() {
+			defer close(done)
+			m.opts.Projects.FetchBase(ctx, project.CreateWorktreeOptions{ProjectID: r.ID, BaseRef: w.baseOf(r.ID),
+				BaseFromOrigin: w.fromOrigin, Fetch: true, Progress: t.progress(r.ID)})
+			t.fetched(r.ID)
+		}()
+	}
+	return pf
+}
+
+// await waits for project id's fetch and reports whether it had one.
+func (pf *prefetches) await(id string) bool {
+	if pf == nil || pf.done[id] == nil {
+		return false
+	}
+	<-pf.done[id]
+	return true
+}
+
+// wait waits for every fetch.
+func (pf *prefetches) wait() {
+	if pf == nil {
+		return
+	}
+	for id := range pf.done {
+		pf.await(id)
+	}
 }
 
 // memberWorktree is r's existing worktree for branch when it is on disk: the one at the
@@ -683,9 +791,10 @@ func (m *Manager) defaultPathTaken(r project.Project, branch string, onDisk bool
 }
 
 // makeWorktrees makes the worktree for branch in each of projects that has none, in
-// parallel, and returns what it made. base gives a member's base for a new branch. One
-// failure removes what the others made and is the error, naming the project.
-func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project, branch string, base func(string) string, fresh, fromOrigin bool) ([]madeWorktree, error) {
+// parallel, and returns what it made. base gives a member's base for a new branch; pf the
+// fetches run ahead of it. One failure removes what the others made, unless t keeps it,
+// and is the error, naming the project.
+func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project, branch string, base func(string) string, fresh, fromOrigin bool, pf *prefetches, t *setupTracker) ([]madeWorktree, error) {
 	var (
 		wg   sync.WaitGroup
 		mu   sync.Mutex
@@ -700,6 +809,7 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 	// check and the Create refuse with the same message before anything is made.
 	for _, r := range projects {
 		if _, _, err := m.worktreeFor(r, branch, true); err != nil {
+			t.worktreeFailed(r.ID, err)
 			errs = append(errs, err)
 		}
 	}
@@ -710,7 +820,15 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			mw, ok, err := m.makeWorktree(ctx, r, branch, base(r.ID), fresh, fromOrigin)
+			mw, ok, err := m.makeWorktree(ctx, r, branch, base(r.ID), fresh, fromOrigin, pf.await(r.ID), t)
+			switch {
+			case err != nil:
+				t.worktreeFailed(r.ID, err)
+			case ok:
+				t.made(mw)
+			default:
+				t.nothingToMake(r.ID)
+			}
 			mu.Lock()
 			defer mu.Unlock()
 			switch {
@@ -724,7 +842,9 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 	wg.Wait()
 	slices.SortFunc(made, func(a, b madeWorktree) int { return strings.Compare(a.projectID, b.projectID) })
 	if len(errs) > 0 {
-		m.rollback(ctx, made)
+		if !t.keepMade() {
+			m.rollback(ctx, made)
+		}
 		return nil, errors.Join(errs...)
 	}
 	return made, nil
@@ -737,8 +857,9 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 // second finds the first's: under the lock a fresh branch that exists now (another
 // Create with the same --branch made it meanwhile) is no longer new, and its worktree is
 // shared. The project's main checkout is never the thread's worktree (branchWorktree);
-// makeWorktrees refuses a branch checked out there (mainCheckoutBusy).
-func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, base string, fresh, fromOrigin bool) (madeWorktree, bool, error) {
+// makeWorktrees refuses a branch checked out there (mainCheckoutBusy). prefetched: r's
+// base was fetched already, so a new branch does not fetch it again.
+func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, base string, fresh, fromOrigin, prefetched bool, t *setupTracker) (madeWorktree, bool, error) {
 	unlock := m.lockWorktree(r.ID, branch)
 	defer unlock()
 	if fresh && m.opts.RefExists(ctx, r.Path, "refs/heads/"+branch) {
@@ -755,7 +876,7 @@ func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, b
 	if err := m.defaultPathTaken(cur, branch, true); err != nil {
 		return madeWorktree{}, false, err
 	}
-	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: branch, Fetch: true, BaseFromOrigin: fromOrigin}
+	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: branch, Fetch: !(fresh && prefetched), BaseFromOrigin: fromOrigin, Progress: t.progress(r.ID)}
 	newBranch := fresh
 	if !fresh {
 		local, remote := m.findBranch(ctx, r.Path, branch)
@@ -866,7 +987,7 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 			found[r.ID] = path
 		}
 		if len(rest) > 0 {
-			onBranch, err := m.makeWorktrees(ctx, rest, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin())
+			onBranch, err := m.makeWorktrees(ctx, rest, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin(), nil, nil)
 			if err != nil {
 				m.rollback(ctx, made)
 				return nil, nil, err

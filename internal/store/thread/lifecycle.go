@@ -152,6 +152,10 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	case rec.run != nil || rec.reserved != nil || rec.s.State != StateDisconnected:
 		m.mu.Unlock()
 		return Item{}, errNotStopped
+	case rec.s.setupUnfinished():
+		err := setupRefusal(rec.s, "started")
+		m.mu.Unlock()
+		return Item{}, err // its checkouts may not exist, and nothing says what it was to run
 	case o.move != nil && !rec.s.ArchivedAt.IsZero():
 		m.mu.Unlock()
 		return Item{}, errArchivedWhileMoving // archived during the move's naming: it never starts

@@ -44,6 +44,9 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, er
 	if err != nil {
 		return Thread{}, err
 	}
+	if err := setupRefusal(cur, "moved to another checkout"); err != nil {
+		return Thread{}, err
+	}
 	if len(cur.Projects()) == 0 {
 		return Thread{}, fmt.Errorf("%w: thread %s has no project to run in", ErrFailedPrecondition, id)
 	}

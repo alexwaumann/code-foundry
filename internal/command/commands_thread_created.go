@@ -47,3 +47,12 @@ func callerPlacement(ctx context.Context, b ThreadBackend, c Context, req *v1.Cr
 	req.LikeThreadId = c.CallerThreadID
 	return true, nil
 }
+
+// backgroundSetupArg and draftJSONArg are the GUI composer's: a thread it opens at once,
+// and the draft a failed setup hands back (docs/notes/instant-threads-1-daemon.md). Not
+// for an agent: a caller of the CLI wants to know the thread started.
+var (
+	backgroundSetupArg = ArgSpec{Name: "background-setup", Type: Bool,
+		Description: "Return as soon as the thread exists and set it up in the background; a failure shows in the thread (the GUI sets it)"}
+	draftJSONArg = ArgSpec{Name: "draft-json", Type: String, Description: "The composer's draft, kept until setup ends (the GUI sets it)"}
+)
