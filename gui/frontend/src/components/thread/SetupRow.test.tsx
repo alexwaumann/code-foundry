@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { setupRowPhase, SETUP_FOLD_KEY } from "@/lib/threadSetup";
 import { useThreadStore } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
-import { KeepRowContext, ThreadContext } from "./context";
+import { FoldInPlaceContext, ThreadContext } from "./context";
 import { TimelineRowView } from "./rows";
 
 const NOW = Date.UTC(2026, 10, 5, 10, 0, 0);
@@ -22,14 +22,14 @@ function seed(s: ThreadSetupView): void {
   useThreadsStore.setState({ byId: { s: { id: "s", setup: s } as ThreadView }, order: ["s"] });
 }
 
-function View({ keep }: { keep?: (key: string) => void }) {
+function View({ foldInPlace }: { foldInPlace?: (el: HTMLElement, change: () => void) => void }) {
   const folds = useThreadStore((st) => st.folds.s);
   return (
     <TooltipProvider>
       <ThreadContext.Provider value={{ threadId: "s", cwd: "" }}>
-        <KeepRowContext.Provider value={keep ?? (() => undefined)}>
+        <FoldInPlaceContext.Provider value={foldInPlace ?? ((_el, change) => { change(); })}>
           <TimelineRowView row={{ type: "setup", key: SETUP_FOLD_KEY, folded: folds?.[SETUP_FOLD_KEY] ?? true }} />
-        </KeepRowContext.Provider>
+        </FoldInPlaceContext.Provider>
       </ThreadContext.Provider>
     </TooltipProvider>
   );
@@ -166,14 +166,21 @@ describe("SetupRow", () => {
 
   it("done: folded to one line; a click opens the steps, keeping the line where it is, and closes them", () => {
     seed(done);
-    const keep = vi.fn<(key: string) => void>();
-    render(<View keep={keep} />);
+    const held: HTMLElement[] = [];
+    render(
+      <View
+        foldInPlace={(el, change) => {
+          held.push(el);
+          change();
+        }}
+      />,
+    );
     const fold = screen.getByTestId("thread-setup-fold");
     expect(fold.textContent).toBe("Set up in 6.8s");
     expect(fold.getAttribute("aria-expanded")).toBe("false");
     expect(lines()).toEqual([]);
     fireEvent.click(fold);
-    expect(keep).toHaveBeenCalledWith(SETUP_FOLD_KEY);
+    expect(held[0]?.contains(fold)).toBe(true);
     expect(screen.getByTestId("thread-setup-fold").getAttribute("aria-expanded")).toBe("true");
     expect(lines()).toEqual(["done: Named the branch cf/x1.2s", "done: Created the worktree4.6s", "done: Started Claude1.0s"]);
     fireEvent.click(screen.getByTestId("thread-setup-fold"));

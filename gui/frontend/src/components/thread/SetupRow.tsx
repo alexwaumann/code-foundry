@@ -1,4 +1,4 @@
-import { memo, useContext, useEffect, useState } from "react";
+import { memo, useContext, useEffect, useRef, useState } from "react";
 import { Ban, Check, ChevronRight, Circle, CircleX, LoaderCircle, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { ThreadSetupStepStatusView, ThreadSetupView } from "@/api/threads";
 import { Tip } from "@/components/ui/tooltip";
@@ -6,7 +6,7 @@ import { setupLabelText, setupLineTime, setupRevealAt, setupView, SETUP_FOLD_KEY
 import type { TimelineRow } from "@/lib/threadTimeline";
 import { setTurnFolded } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
-import { KeepRowContext, useThreadCtx } from "./context";
+import { FoldInPlaceContext, useThreadCtx } from "./context";
 
 const STATUS_ICONS: Readonly<Record<ThreadSetupStepStatusView, { icon: LucideIcon; className?: string }>> = {
   pending: { icon: Circle },
@@ -85,12 +85,15 @@ function StepLines({ lines, now }: { lines: readonly SetupLine[]; now: number })
  * the rules are lib/threadSetup). Running: a live line in the turn header's style and a row
  * per step, once a step has taken long enough to be worth one. Failed: the rows as they
  * ended, git's text under the one that failed. Cancelled: one quiet line. Done: a fold line
- * in the finished turn header's style, which keeps its place on screen as it opens
- * (KeepRowContext). Nothing when there is nothing to tell, so the row takes no height.
+ * in the finished turn header's style. Its steps open inside this row, not as rows below it
+ * like a turn's work, so it keeps its place with FoldInPlaceContext, not KeepRowContext, whose
+ * pass runs before the row has its new height. Nothing when there is nothing to tell, so the
+ * row takes no height.
  */
 export const SetupRow = memo(function SetupRow({ row }: { row: Extract<TimelineRow, { type: "setup" }> }) {
   const { threadId } = useThreadCtx();
-  const keep = useContext(KeepRowContext);
+  const foldInPlace = useContext(FoldInPlaceContext);
+  const foldRef = useRef<HTMLDivElement>(null);
   const setup = useThreadsStore((s) => s.byId[threadId]?.setup ?? null);
   const now = useSetupNow(setup);
   const view = setupView(setup, now);
@@ -99,7 +102,7 @@ export const SetupRow = memo(function SetupRow({ row }: { row: Extract<TimelineR
       return null;
     case "live":
       return (
-        <div data-testid="thread-setup" data-phase="running">
+        <div className="pt-1" data-testid="thread-setup" data-phase="running">
           <div className="thead" data-testid="thread-setup-live" data-live>
             <span className="line text-caption">
               <span className="ico">
@@ -119,13 +122,13 @@ export const SetupRow = memo(function SetupRow({ row }: { row: Extract<TimelineR
       );
     case "failed":
       return (
-        <div data-testid="thread-setup" data-phase="failed">
+        <div className="pt-1" data-testid="thread-setup" data-phase="failed">
           <StepLines lines={view.lines} now={now} />
         </div>
       );
     case "cancelled":
       return (
-        <div data-testid="thread-setup" data-phase="cancelled">
+        <div className="pt-1" data-testid="thread-setup" data-phase="cancelled">
           <div className="row">
             <span className="ico">
               <Ban aria-hidden />
@@ -136,8 +139,8 @@ export const SetupRow = memo(function SetupRow({ row }: { row: Extract<TimelineR
       );
     case "done":
       return (
-        <div data-testid="thread-setup" data-phase="done" data-folded={row.folded || undefined}>
-          <div className="thead">
+        <div className="pt-1" data-testid="thread-setup" data-phase="done" data-folded={row.folded || undefined}>
+          <div className="thead" ref={foldRef}>
             <button
               type="button"
               className="fold text-caption"
@@ -145,8 +148,11 @@ export const SetupRow = memo(function SetupRow({ row }: { row: Extract<TimelineR
               aria-label={row.folded ? "Show the setup's steps" : "Hide the setup's steps"}
               data-testid="thread-setup-fold"
               onClick={() => {
-                keep(row.key);
-                setTurnFolded(threadId, SETUP_FOLD_KEY, !row.folded);
+                const change = () => {
+                  setTurnFolded(threadId, SETUP_FOLD_KEY, !row.folded);
+                };
+                if (foldRef.current) foldInPlace(foldRef.current, change);
+                else change();
               }}
             >
               <span className="ico">
