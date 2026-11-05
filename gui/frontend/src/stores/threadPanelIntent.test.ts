@@ -13,6 +13,8 @@ const { showThreadView } = await import("./threadPanelIntent");
 const { useThreadsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
 const { useViewsStore } = await import("./views");
+const { fileEditKey, noteEditor } = await import("./fileEdit");
+const { fileTab } = await import("@/surfaces/fileTarget");
 
 const WEB_MAIN = "/src/web";
 const WEB_FEAT = "/wt/web/cf-feat";
@@ -158,6 +160,48 @@ describe("a ShowView scoped to a thread", () => {
       showItem("panel.file", { path: `${WEB_FEAT}/welcome.html`, project: "web", base: WEB_FEAT, page: "1", title: "Welcome" });
       expect(active("thread:b")).toMatchObject({ kind: "files", title: "Welcome", params: { path: `${WEB_FEAT}/welcome.html`, page: "1", title: "Welcome" } });
       untouched();
+    });
+
+    describe("a thread's request to edit a file (--edit)", () => {
+      const ENV = `${WEB_FEAT}/.env`;
+      const ask = { path: ENV, project: "web", base: WEB_FEAT, edit: "1", thread: "b" };
+      const params = () => getPanel("thread:b").groups[0]?.tabs[0]?.params;
+
+      it("opens the tab editing, with who asked and what they said, and takes no focus", () => {
+        const before = document.activeElement;
+        showItem("panel.file", { ...ask, note: "Put the key on line 2", line: "2" });
+        expect(params()).toMatchObject({ edit: "1", asker: "b", note: "Put the key on line 2", line: "2" });
+        expect(useUiStore.getState().selection).toEqual(inA);
+        expect(useUiStore.getState().panelFocusSeq).toBe(0);
+        expect(useUiStore.getState().promptFocusSeq).toBe(0);
+        expect(document.activeElement).toBe(before);
+      });
+
+      it("a missing file is a tab to make it", () => {
+        showItem("panel.file", { ...ask, create: "1" });
+        expect(params()).toMatchObject({ edit: "1", create: "1" });
+      });
+
+      it("a plain open has none of it", () => {
+        showItem("panel.file", { path: ENV, project: "web", base: WEB_FEAT });
+        expect(params()).toEqual({ path: ENV, project: "web", base: WEB_FEAT });
+      });
+
+      it("with --focus the editor takes the keyboard at the end of the line, once it is there", () => {
+        showItem("panel.file", { ...ask, line: "2", focus: "1" });
+        const key = fileEditKey("thread:b", fileTab({ project: "web", base: WEB_FEAT, path: ENV }).id);
+        const focus = vi.fn();
+        noteEditor(key, { focus, caret: () => null });
+        expect(focus).toHaveBeenCalledTimes(1);
+      });
+
+      it("without it the editor takes nothing", () => {
+        showItem("panel.file", { ...ask, line: "2" });
+        const key = fileEditKey("thread:b", fileTab({ project: "web", base: WEB_FEAT, path: ENV }).id);
+        const focus = vi.fn();
+        noteEditor(key, { focus, caret: () => null });
+        expect(focus).not.toHaveBeenCalled();
+      });
     });
 
     it("panel.file again moves the open tab to the new line", () => {

@@ -702,7 +702,169 @@ describe("file.save", () => {
   });
 });
 
+describe("Save File from the palette", () => {
+  const OTHER = fileEditKey(PANEL, "files:y");
+  const other = () => useFileEditStore.getState().sessions[OTHER];
+  const palette = { open: false, query: "", commandName: null, page: "commands", returnTo: "content" } as const;
+
+  /** a.txt with the caret, b.txt in the focused group: both dirty, a split panel. */
+  async function split(): Promise<HTMLElement> {
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" }, palette });
+    await editing("a=22\n");
+    usePanelStore.setState({
+      byKey: { [PANEL]: { open: true, focused: 1, groups: [{ tabs: [tab], activeTabId: TAB }, { tabs: [{ ...tab, id: "files:y" }], activeTabId: "files:y" }] } },
+    });
+    await startEdit(OTHER, { panelKey: PANEL, tabId: "files:y", base: "/w" }, view({ path: "/w/b.txt" }));
+    lib.drafts.set(other()?.stateKey ?? "", "b\n");
+    noteDraft(OTHER, "b\n");
+    noteEditor(OTHER, { focus: vi.fn(), caret: () => null });
+    const wrap = document.createElement("div");
+    wrap.setAttribute("data-code-editor", edit()?.stateKey ?? "");
+    const host = document.createElement("div");
+    host.tabIndex = -1;
+    wrap.append(host);
+    document.body.append(wrap);
+    host.focus();
+    return wrap;
+  }
+
+  /** The palette opens: its input takes the keyboard, a moment after the store says so. */
+  function openPalette(): HTMLElement {
+    useUiStore.getState().openPalette();
+    const input = document.createElement("input");
+    document.body.append(input);
+    input.focus();
+    return input;
+  }
+
+  afterEach(() => {
+    useUiStore.setState({ palette });
+  });
+
+  it("saves the editor that had the keyboard, not the focused group's tab", async () => {
+    const wrap = await split();
+    const input = openPalette();
+    api.write.mockResolvedValue(written());
+    expect(canSaveFile()).toBe(true);
+    presentFileSave();
+    wrap.remove();
+    input.remove();
+    expect(api.write).toHaveBeenCalledTimes(1);
+    expect(api.write.mock.lastCall?.[1]).toBe("/w/.env");
+    await vi.waitFor(() => {
+      expect(edit()?.dirty).toBe(false);
+    });
+    expect(other()?.dirty).toBe(true);
+  });
+
+  it("is listed by that editor too: a tab it does not have says nothing", async () => {
+    const wrap = await split();
+    const input = openPalette();
+    noteEditor(KEY, { focus: vi.fn(), caret: () => null });
+    // That editor's tab closed while the palette was up: nothing is left of what it meant.
+    useFileEditStore.setState((s) => {
+      const { [KEY]: _gone, ...rest } = s.sessions;
+      return { sessions: rest };
+    });
+    usePanelStore.setState({ byKey: { [PANEL]: { open: false, groups: [{ tabs: [tab], activeTabId: TAB }] } } });
+    expect(canSaveFile()).toBe(false);
+    wrap.remove();
+    input.remove();
+  });
+
+  it("gives the keyboard back to that editor once the palette has gone", async () => {
+    const wrap = await split();
+    const editor = { focus: vi.fn(), caret: () => null };
+    noteEditor(KEY, editor);
+    const input = openPalette();
+    api.write.mockResolvedValue(written());
+    presentFileSave();
+    useUiStore.getState().closePalette();
+    await vi.waitFor(() => {
+      expect(editor.focus).toHaveBeenCalledTimes(1);
+    });
+    wrap.remove();
+    input.remove();
+  });
+
+  it("with no editor holding the keyboard it is the focused group's rule, and nothing moves the keyboard", async () => {
+    const wrap = await split();
+    wrap.remove();
+    const editor = { focus: vi.fn(), caret: () => null };
+    noteEditor(OTHER, editor);
+    const input = openPalette();
+    api.write.mockResolvedValue(written({ path: "/w/b.txt" }));
+    presentFileSave();
+    input.remove();
+    expect(api.write.mock.lastCall?.[1]).toBe("/w/b.txt");
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(editor.focus).not.toHaveBeenCalled();
+  });
+});
+
 describe("the keyboard", () => {
+  /** The editor's DOM with the keyboard in its shadow root's find field. */
+  function inFind(): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.setAttribute("data-code-editor", edit()?.stateKey ?? "");
+    const host = document.createElement("div");
+    const root = host.attachShadow({ mode: "open" });
+    const panel = document.createElement("div");
+    panel.setAttribute("data-search-panel", "");
+    const input = document.createElement("input");
+    panel.append(input);
+    root.append(panel);
+    wrap.append(host);
+    document.body.append(wrap);
+    input.focus();
+    return wrap;
+  }
+
+  it("a clean re-read leaves the find field and the document alone while the field has it", async () => {
+    await editing();
+    const before = edit();
+    const wrap = inFind();
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
+    expect(edit()).toBe(before);
+    wrap.remove();
+  });
+
+  it("the document follows the file once the field lets go", async () => {
+    await editing();
+    const wrap = inFind();
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
+    wrap.remove();
+    await vi.waitFor(() => {
+      expect(edit()).toMatchObject({ seed: "theirs", revision: 1 });
+    });
+  });
+
+  it("a read held by the find field never lands over a save that came after it", async () => {
+    await editing();
+    const wrap = inFind();
+    const held = view({ modifiedAtMs: 101, text: "theirs" });
+    noteRead(held, editClock());
+    observeRead(KEY, held);
+    wrap.remove();
+    noteDraft(KEY, "mine\n");
+    lib.drafts.set(edit()?.stateKey ?? "", "mine\n");
+    api.write.mockResolvedValue(written());
+    await saveFile(KEY);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(edit()).toMatchObject({ revision: 0, conflict: null });
+  });
+
+  it("a replace in the find field made the document dirty: the held read is the conflict it is", async () => {
+    await editing();
+    const wrap = inFind();
+    observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
+    wrap.remove();
+    noteDraft(KEY, "replaced\n");
+    await vi.waitFor(() => {
+      expect(edit()).toMatchObject({ dirty: true, conflict: "changed", revision: 0 });
+    });
+  });
+
   it("a clean re-read keeps it, and the caret, in the new editor", async () => {
     await editing();
     const wrap = document.createElement("div");

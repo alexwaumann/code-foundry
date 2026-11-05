@@ -103,7 +103,7 @@ var renderingsAfter = []Rendering{
 		"The save prints the app's contrast check of the file (failing pairs, stale pins) while the app is open; theme check <id> prints it again."},
 	{"edits", "Edit, MultiEdit, Write and NotebookEdit calls show as diffs in the timeline."},
 	{"file tab", "Opened by a path chip the user clicks, or by view.panel.file (view.panel.diff for a changed file's diff). " +
-		"It renders markdown, images, PDFs and HTML, and highlights other text files."},
+		"It renders markdown, images, PDFs and HTML, and highlights other text files; the user can edit a text file there, and view.panel.file --edit asks them to."},
 	{"not rendered", "Math (LaTeX) and mermaid or other diagrams show as text or code; data: URI images and raw " +
 		"HTML blocks do not render."},
 }

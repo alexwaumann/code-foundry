@@ -127,7 +127,7 @@ function isMissingService(err: unknown): boolean {
 }
 
 /** Lists threads without failing the resync: a daemon without ThreadService still works. */
-async function reconcileThreads(signal: AbortSignal): Promise<void> {
+export async function reconcileThreads(signal: AbortSignal): Promise<void> {
   try {
     const list = await listThreads(daemon, signal);
     useThreadsStore.setState((s) => ({ ...replaceThreads(s, list), loaded: true, availability: "available", error: null, epoch: s.epoch + 1 }));

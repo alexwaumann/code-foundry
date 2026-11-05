@@ -240,31 +240,41 @@ function adopt(key: string, was: FileEdit, view: FileReadView, creating = false)
 }
 
 // A read a find field kept off the screen: a new document would close the field under the
-// user's fingers and leave the keyboard nowhere. It lands when the document has the keyboard.
+// user's fingers and leave the keyboard nowhere. It lands when the field lets go. Nothing
+// says so: the library's field closes without a focus event anyone outside it can hear, and
+// the keyboard goes to the body. So it is looked for, only while a read is held.
 const heldReads = new Map<string, FileReadView>();
+const HELD_READ_CHECK_MS = 200;
+let heldReadCheck: ReturnType<typeof setInterval> | undefined;
+
+function holdRead(key: string, view: FileReadView): void {
+  heldReads.set(key, view);
+  heldReadCheck ??= setInterval(landHeldReads, HELD_READ_CHECK_MS);
+}
+
+function landHeldReads(): void {
+  if (heldReads.size > 0 && findHasKeyboard()) return;
+  clearInterval(heldReadCheck);
+  heldReadCheck = undefined;
+  const held = [...heldReads];
+  heldReads.clear();
+  for (const [key, view] of held) observeRead(key, view);
+}
 
 /**
  * A clean document follows the file. The new editor keeps the keyboard and the caret, if the
- * old one had them. With the keyboard in its find field, the document waits instead: the
- * field stays, and what the user types stays in it.
+ * old one had them. With the keyboard in its find field, the document waits for the field
+ * instead: it stays, and what the user types stays in it.
  */
 function follow(key: string, was: FileEdit, view: FileReadView): void {
   if (editorWithFocus() === key) {
     if (findHasKeyboard()) {
-      heldReads.set(key, view);
+      holdRead(key, view);
       return;
     }
     nextFocus.set(key, editors.get(key)?.caret() ?? null);
   }
   adopt(key, was, view);
-}
-
-/** The document took the keyboard: a read the find field held lands now, with what is known by then. */
-export function editorFocused(key: string): void {
-  const view = heldReads.get(key);
-  if (!view) return;
-  heldReads.delete(key);
-  observeRead(key, view);
 }
 
 /**

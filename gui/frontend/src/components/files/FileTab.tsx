@@ -11,7 +11,7 @@ import { useNow } from "@/lib/clock";
 import { dirPart, extOf, fileName, relativeTo, resolvePath } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
 import { setPreviewMode, useCodeViewStore, type PreviewMode } from "@/stores/codeView";
-import { discardDraft, editClock, editorDetached, editorFocused, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
+import { discardDraft, editClock, editorDetached, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
 import { canTell, dismissAsk, saveAndTell } from "@/stores/fileRequest";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
@@ -172,9 +172,6 @@ export function FileTab({ target }: { target: FileTarget }) {
   const onReady = useCallback((editor: EditorHandle) => {
     noteEditor(editKey, editor);
   }, [editKey]);
-  const onFocus = useCallback(() => {
-    editorFocused(editKey);
-  }, [editKey]);
   // Buttons that go disabled or away under the pointer would drop the keyboard on the body.
   const backToEditor = () => {
     focusEditor(editKey);
@@ -188,7 +185,7 @@ export function FileTab({ target }: { target: FileTarget }) {
   const revision = session?.revision ?? 0;
   // The line a thread pointed at stays marked until the user changes something.
   const mark = ask !== undefined && !dirty;
-  const edit = useMemo<CodeFileEdit>(() => ({ active: stateKey !== undefined, stateKey, revision, onChange: onDraft, onOpening, onDetached, onReady, onFocus, mark }), [stateKey, revision, onDraft, onOpening, onDetached, onReady, onFocus, mark]);
+  const edit = useMemo<CodeFileEdit>(() => ({ active: stateKey !== undefined, stateKey, revision, onChange: onDraft, onOpening, onDetached, onReady, mark }), [stateKey, revision, onDraft, onOpening, onDetached, onReady, mark]);
 
   const meta = !file || creating ? null : file.notFound || file.isDir ? null : file.pdf ? (
     pdfMeta(file.size, file.truncated ? null : pages)

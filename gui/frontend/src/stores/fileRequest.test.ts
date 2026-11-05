@@ -185,11 +185,11 @@ describe("Save and tell", () => {
 
   it("a newer request that came during the write stands", async () => {
     await asked(SECRET);
-    let done = (_: FileWriteView) => undefined as void;
-    api.write.mockReturnValue(new Promise<FileWriteView>((r) => (done = r)));
+    const out = Promise.withResolvers<FileWriteView>();
+    api.write.mockReturnValue(out.promise);
     const told = saveAndTell(KEY);
     openFileInPanel(PANEL, { ...target, ask: { thread: "s-1", note: "And line 3" } });
-    done(written());
+    out.resolve(written());
     await told;
     expect(tab().params.note).toBe("And line 3");
   });

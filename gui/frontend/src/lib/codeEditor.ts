@@ -28,10 +28,7 @@ export interface EditorHandle {
   caret: () => EditorPlace | null;
 }
 
-/** What an EditorHandle is made from. */
-export type EditorSource = Pick<CodeEditor, "focus" | "getViewState">;
-
-export function editorHandle(editor: EditorSource): EditorHandle {
+export function editorHandle(editor: Pick<CodeEditor, "focus" | "getViewState">): EditorHandle {
   return {
     focus: (at) => {
       editor.focus(at && { lineNumber: at.line + 1, character: at.character });
