@@ -59,6 +59,9 @@ type outgoing struct {
 	// first: the thread's pending first message (Thread.PendingFirst), cleared on the row
 	// once it went out (firstprompt.go).
 	first bool
+	// setupQueued: a message sent during the setup (Setup.Queued), taken off the row once
+	// it went out.
+	setupQueued bool
 }
 
 // streamState is the runner's process half. Every field is touched only by
@@ -474,14 +477,19 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 			r.m.setPendingFirstItem(r.id, f.itemID) // the next start must not write it again
 		}
 	}
-	id, err := newUUID()
-	if err != nil {
-		return Item{}, err
+	var it Item
+	if o.itemID != "" {
+		it, _ = st.log.get(o.itemID) // written during the setup (sendToSetup)
+	} else {
+		id, err := newUUID()
+		if err != nil {
+			return Item{}, err
+		}
+		o.itemID = id
+		u := userItem(id, o)
+		u.Queued = true
+		it = st.proj.w.add(u)
 	}
-	o.itemID = id
-	u := userItem(id, o)
-	u.Queued = true
-	it := st.proj.w.add(u)
 	st.queued = append(st.queued, o)
 	st.sd.waiting = true
 	r.checkStatus()
@@ -489,6 +497,12 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 		r.publishStatus() // as send does (waiting.go)
 	}
 	return it, nil
+}
+
+// addQueued puts messages behind the ones the runner has, before it runs.
+func (st *streamState) addQueued(msgs []*outgoing) {
+	st.queued = append(st.queued, msgs...)
+	st.sd.waiting = true
 }
 
 func (r *runner) onStreamEvent(ev claudestream.Event) {
@@ -654,6 +668,9 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	}
 	if o.first {
 		r.m.clearPendingFirst(r.id)
+	}
+	if o.setupQueued {
+		r.m.clearSetupQueued(r.id, id)
 	}
 	if seed != "" {
 		r.seed = ""
@@ -1153,6 +1170,7 @@ func (r *runner) maybeExited() {
 		// Only a daemon stop keeps an undelivered first message (firstprompt.go): a start
 		// that failed, or a close while starting, ends it as before.
 		s.PendingFirst = nil
+		s.dropSetupQueued()
 	})
 }
 

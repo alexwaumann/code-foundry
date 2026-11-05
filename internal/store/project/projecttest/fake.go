@@ -213,7 +213,7 @@ func (f *Fake) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptio
 		return project.Worktree{}, err // as git, which never starts on a dead context
 	}
 	if o.Progress != nil {
-		o.Progress(project.WorktreeEvent{Kind: project.WorktreeAdding})
+		o.Progress(project.WorktreeEvent{Kind: project.WorktreeAdding, Path: f.DefaultWorktreePath(o.ProjectID, o.Branch), Branch: o.Branch})
 	}
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "CreateWorktree "+o.ProjectID+" "+o.Branch)
@@ -333,10 +333,38 @@ func (f *Fake) RemoveWorktree(_ context.Context, o project.RemoveWorktreeOptions
 	r.Worktrees = slices.Delete(slices.Clone(r.Worktrees), i, i+1)
 	f.projects[r.ID] = r
 	f.rebuild()
+	if o.DeleteMadeBranch != "" {
+		f.Calls = append(f.Calls, "DeleteMadeBranch "+o.ProjectID+" "+o.DeleteMadeBranch)
+	}
+	makeDirs := f.MakeDirs
 	f.mu.Unlock()
+	if makeDirs {
+		if err := os.RemoveAll(o.Path); err != nil {
+			return err
+		}
+	}
 	f.publish(project.WorktreeRemoved{ProjectID: r.ID, Path: o.Path})
 	f.publish(project.ProjectUpdated{Project: r})
 	return nil
+}
+
+// AbandonWorktree implements project.Store: it records the call and takes the worktree
+// out of the listing, if it got there.
+func (f *Fake) AbandonWorktree(_ context.Context, o project.AbandonWorktreeOptions) error {
+	f.mu.Lock()
+	f.Calls = append(f.Calls, "AbandonWorktree "+o.ProjectID+" "+o.Path+" "+o.Branch)
+	r, ok := f.projects[o.ProjectID]
+	if !ok {
+		f.mu.Unlock()
+		return fmt.Errorf("%w: project %q", project.ErrNotFound, o.ProjectID)
+	}
+	if i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return w.Path == o.Path }); i >= 0 {
+		r.Worktrees = slices.Delete(slices.Clone(r.Worktrees), i, i+1)
+		f.projects[r.ID] = r
+		f.rebuild()
+	}
+	f.mu.Unlock()
+	return os.RemoveAll(o.Path)
 }
 
 // Refresh implements project.Store.

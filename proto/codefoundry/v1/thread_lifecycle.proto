@@ -114,6 +114,9 @@ message ThreadSetup {
   repeated ThreadSetupStep steps = 4;
   // With FAILED: why, in full (every failed step's error, or the restart's).
   string error = 5;
+  // Create's caller did not wait for it. Only such a setup takes messages and can be
+  // cancelled: the other is its caller's, whose call fails and removes the thread.
+  bool background = 6;
 }
 
 // ThreadStatus is what Claude is doing, derived by observing output and the transcript.
@@ -813,6 +816,49 @@ message ReadAttachmentResponse {
   // Sniffed from the content: image/png, image/jpeg, image/gif, image/webp or
   // application/pdf.
   string mime_type = 2;
+}
+
+message RetryThreadSetupRequest {
+  string id = 1;
+}
+
+message RetryThreadSetupResponse {
+  Thread thread = 1;
+}
+
+message CancelThreadSetupRequest {
+  string id = 1;
+}
+
+message CancelThreadSetupResponse {
+  Thread thread = 1;
+  // Worktrees the setup made that stayed for the work in them; a thread sharing one is not
+  // counted.
+  repeated string kept_worktrees = 2;
+}
+
+message DiscardThreadSetupRequest {
+  string id = 1;
+}
+
+// A message of a setup that never reached Claude. Its attachments stay on disk.
+message ThreadSetupMessage {
+  string text = 1;
+  string composer_text = 2;
+  repeated string attachments = 3;
+}
+
+message DiscardThreadSetupResponse {
+  // CreateThreadRequest.draft_json, as it came.
+  string draft_json = 1;
+  // Why the setup failed; empty after a cancel.
+  string error = 2;
+  // The first message; unset for a thread created without one.
+  ThreadSetupMessage first = 3;
+  // The messages sent behind it, in order.
+  repeated ThreadSetupMessage queued = 4;
+  // As CancelThreadSetupResponse.kept_worktrees.
+  repeated string kept_worktrees = 5;
 }
 
 message CreateThreadResponse {

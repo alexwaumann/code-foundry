@@ -246,7 +246,8 @@ const (
 	WorktreeFetchStarted WorktreeEventKind = iota + 1
 	// WorktreeFetchEnded: it ended; Err says how.
 	WorktreeFetchEnded
-	// WorktreeAdding: git worktree add is about to run.
+	// WorktreeAdding: git worktree add is about to run, at Path on Branch. What
+	// AbandonWorktree takes, should it never end.
 	WorktreeAdding
 )
 
@@ -263,6 +264,9 @@ type WorktreeEvent struct {
 	// RefAt, with Err, is the commit time of the tip of Ref as it is on disk: how old
 	// the start point used instead is. Zero when there is no such ref.
 	RefAt time.Time
+	// Path, Branch and Head go with WorktreeAdding. Head is where the add starts the
+	// branch when it makes it; "" when the branch exists.
+	Path, Branch, Head string
 }
 
 // Refs lists the refs a new branch can start from (Store.ListRefs).
@@ -303,6 +307,18 @@ type RemoveWorktreeOptions struct {
 	// without Force a held worktree is refused before git runs (fuzz finding git 6).
 	// Nil: nothing holds it.
 	Hold func(w Worktree) string
+	// DeleteMadeBranch names a branch to delete once the worktree is gone, only while
+	// its tip is where the worktree was made (Worktree.CreatedHead): a branch made for it
+	// that nobody has committed to. Otherwise it stays, and that is no error.
+	DeleteMadeBranch string
+}
+
+// AbandonWorktreeOptions is Store.AbandonWorktree's: what a WorktreeAdding event said.
+type AbandonWorktreeOptions struct {
+	ProjectID string
+	Path      string
+	// Branch is deleted while its tip is still Head; a Head of "" leaves it.
+	Branch, Head string
 }
 
 // Store is the project store. The daemon's implementation is *Git; a fake lives in
@@ -326,6 +342,10 @@ type Store interface {
 	// ErrFailedPrecondition for a project without git.
 	CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (Worktree, error)
 	RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) error
+	// AbandonWorktree removes what a `git worktree add` that never finished left behind
+	// (worktree_abandon.go). Only for a path a WorktreeAdding event named: it was free
+	// when the add began.
+	AbandonWorktree(ctx context.Context, opts AbandonWorktreeOptions) error
 	// DeleteBranch deletes a branch no worktree has checked out (branch_delete.go).
 	DeleteBranch(ctx context.Context, opts DeleteBranchOptions) (DeleteBranchResult, error)
 	// ListRefs lists the project's local branches and remote-tracking refs, read from git

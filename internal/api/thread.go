@@ -149,6 +149,17 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 			if ev.Thread() != id || threadSeq(ev) <= seen {
 				continue
 			}
+			if _, reset := ev.(thread.ItemsReset); reset {
+				// An item left the log, which only a snapshot can tell.
+				if snap, err = h.store.Items(ctx, id); err != nil {
+					return threadError(err)
+				}
+				seen = snap.Seq
+				if err := send(wakes.snapshot(snap)); err != nil {
+					return err
+				}
+				continue
+			}
 			if msg := threadEventToProto(ev); msg != nil {
 				if err := send(msg); err != nil {
 					return err
@@ -252,6 +263,8 @@ func threadSeq(ev thread.ThreadEvent) uint64 {
 	case thread.SlashCommandsChanged:
 		return e.Seq
 	case thread.AgentsChanged:
+		return e.Seq
+	case thread.ItemsReset:
 		return e.Seq
 	}
 	return 0

@@ -57,6 +57,14 @@ func (p *PendingFirst) outgoing() *outgoing {
 	return o
 }
 
+// queuedOutgoing is p as a message sent during the setup (Setup.Queued); setupQueued marks
+// it, so sendMessage takes it off the row once it went out.
+func (p *PendingFirst) queuedOutgoing() *outgoing {
+	o := p.outgoing()
+	o.first, o.setupQueued = false, true
+	return o
+}
+
 // pendingFirstJSON is the pending_first column: "" for none.
 func pendingFirstJSON(p *PendingFirst) string {
 	if p == nil {
@@ -109,11 +117,17 @@ func (m *Manager) clearPendingFirst(id string) {
 }
 
 // firstMessages are the messages a spawn delivers once Claude answers its handshake:
-// the thread's pending first message, then the one that started it (startStopped's).
+// the thread's pending first message, those sent during its setup, then the one that
+// started it (startStopped's).
 func firstMessages(s Thread, started *outgoing) []*outgoing {
 	var out []*outgoing
 	if s.PendingFirst != nil {
 		out = append(out, s.PendingFirst.outgoing())
+	}
+	if s.Setup != nil {
+		for i := range s.Setup.Queued {
+			out = append(out, s.Setup.Queued[i].queuedOutgoing())
+		}
 	}
 	if started != nil {
 		out = append(out, started)

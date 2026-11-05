@@ -13,7 +13,7 @@ import (
 // The setup stage of Create (setup.go): the same work whether the caller waits for it or
 // not. A caller that waits gets today's contract: a failure removes what was made and the
 // thread, and is the call's error. One that does not (CreateOptions.BackgroundSetup) gets
-// the thread at once; a failure stays on it, with what it made.
+// the thread at once; a failure stays on it, with what it made, for setup_actions.go.
 
 // setupJob is one Create's setup stage.
 type setupJob struct {
@@ -35,8 +35,14 @@ type setupJob struct {
 	stopWatch func() bool
 	// done closes when the setup stage has ended, its tail included.
 	done chan struct{}
-	// made are the worktrees of a placement that landed, for a caller's rollback.
-	made []madeWorktree
+	// retry: it runs again (setup_actions.go), so its placement is decided first;
+	// fromStart: after a cancel, with nothing of the run before left.
+	retry, fromStart bool
+	// cancelAsked: CancelSetup asked for it to stop; settled: the stage ended and it is
+	// too late to. Both under m.mu, so one of them is first.
+	cancelAsked, settled bool
+	// kept are the worktrees a cancel left because they have work in them.
+	kept []string
 }
 
 // beginSetup registers the setup stage on the thread, tracked by Shutdown. The caller's
@@ -45,9 +51,6 @@ func (m *Manager) beginSetup(ctx context.Context, j *setupJob) error {
 	if j.o.BackgroundSetup {
 		ctx = context.WithoutCancel(ctx)
 	}
-	j.ctx, j.cancel = context.WithCancel(ctx)
-	j.stopWatch = context.AfterFunc(m.ctx, j.cancel)
-	j.done = make(chan struct{})
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(j.id)
@@ -55,13 +58,19 @@ func (m *Manager) beginSetup(ctx context.Context, j *setupJob) error {
 		err = ErrClosed
 	}
 	if err != nil {
-		j.stopWatch()
-		j.cancel()
 		return err
 	}
+	m.registerSetupLocked(ctx, rec, j)
+	return nil
+}
+
+// registerSetupLocked makes j rec's setup stage. Callers hold m.mu.
+func (m *Manager) registerSetupLocked(ctx context.Context, rec *record, j *setupJob) {
+	j.ctx, j.cancel = context.WithCancel(ctx)
+	j.stopWatch = context.AfterFunc(m.ctx, j.cancel)
+	j.done = make(chan struct{})
 	rec.setup = j
 	m.wg.Add(1)
-	return nil
 }
 
 // finishSetup runs a registered setup stage to its end and settles a failure.
@@ -78,6 +87,10 @@ func (m *Manager) finishSetup(j *setupJob) error {
 		}
 		return nil
 	}
+	if m.settleSetup(j) {
+		m.endCancelled(j)
+		return err
+	}
 	stopping := m.ctx.Err() != nil || errors.Is(err, ErrClosed)
 	if !j.o.BackgroundSetup {
 		return m.failWaitedSetup(j, err, stopping)
@@ -90,16 +103,22 @@ func (m *Manager) finishSetup(j *setupJob) error {
 	}
 	m.log.Warn("thread setup failed", "thread", j.id, "err", err)
 	m.failSetup(j.id, err)
-	if s, ok := m.Snapshot().Thread(j.id); ok && s.Removing {
-		m.rollback(j.ctx, madeOf(s.Setup)) // going with the thread: nothing else knows them
-	}
 	return err
+}
+
+// settleSetup ends the race with a cancel: from here on it is too late to ask for one. It
+// reports whether one was asked for in time.
+func (m *Manager) settleSetup(j *setupJob) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	j.settled = true
+	return j.cancelAsked
 }
 
 // failWaitedSetup settles a failure of a setup its caller waits for: what it made goes,
 // and so does the thread, as if the Create had never made it (unless a Remove has it).
 func (m *Manager) failWaitedSetup(j *setupJob, err error, stopping bool) error {
-	m.rollback(j.ctx, j.made)
+	m.cleanSetup(j.ctx, j.id)
 	if s, ok := m.Snapshot().Thread(j.id); ok && s.Removing {
 		m.failSetup(j.id, err)
 		return fmt.Errorf("%w: thread %s was removed during its setup", ErrFailedPrecondition, j.id)
@@ -133,17 +152,24 @@ func (m *Manager) releaseSetup(id string) {
 // here, and the thread settles with the reason.
 func (m *Manager) failSetup(id string, err error) {
 	why := setupWhy(id, err)
-	if log, lerr := m.thread(context.Background(), id); lerr == nil {
-		closeOpenTurn(itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}, m.opts.Now())
-	} else {
-		m.log.Warn("close the turn of a failed setup", "thread", id, "err", lerr)
-	}
+	m.closeSetupTurn(id)
 	now := m.opts.Now()
 	m.update(id, true, func(r *record) {
 		r.release()
 		r.first = nil
 		r.s.failSetup(now, why)
 	})
+}
+
+// closeSetupTurn ends the turn of thread id's message: it never ran, and this is what a
+// wait counts as a reaction.
+func (m *Manager) closeSetupTurn(id string) {
+	log, err := m.thread(context.Background(), id)
+	if err != nil {
+		m.log.Warn("close the turn of a setup that did not finish", "thread", id, "err", err)
+		return
+	}
+	closeOpenTurn(itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}, m.opts.Now())
 }
 
 // madeOf is what a setup recorded as made, as a rollback takes it.
@@ -153,7 +179,8 @@ func madeOf(s *Setup) []madeWorktree {
 	}
 	out := make([]madeWorktree, len(s.Made))
 	for i, w := range s.Made {
-		out[i] = madeWorktree{projectID: w.ProjectID, path: w.Path, branch: w.Branch, newBranch: w.NewBranch, startPoint: w.StartPoint}
+		out[i] = madeWorktree{projectID: w.ProjectID, path: w.Path, branch: w.Branch, newBranch: w.NewBranch,
+			ownBranch: w.OwnBranch || w.NewBranch, startPoint: w.StartPoint}
 	}
 	return out
 }
@@ -187,14 +214,18 @@ func (m *Manager) discardCreate(id string) {
 // on the row, the prompt rewritten for it, Claude, then what follows a start.
 func (m *Manager) runSetup(j *setupJob) (CreateReport, error) {
 	var report CreateReport
-	t := &setupTracker{m: m, id: j.id, keep: j.o.BackgroundSetup}
+	t := &setupTracker{m: m, id: j.id}
+	if j.retry {
+		if err := m.replan(j, t); err != nil {
+			return report, err
+		}
+	}
 	p := j.p
 	if j.w != nil {
 		var err error
 		if p, err = m.placeWorktrees(j.ctx, p, j.w, t); err != nil {
 			return report, err
 		}
-		j.made = p.made
 	}
 	report = CreateReport{MadeWorktree: p.madePrimary, MadeBranch: p.madeBranch, ExistingWorktree: p.reusedPrimary, DroppedWorktreeMode: p.droppedWorktreeMode}
 	if s, ok := m.Snapshot().Thread(j.id); ok && s.Removing {

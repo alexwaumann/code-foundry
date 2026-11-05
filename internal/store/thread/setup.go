@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,7 +24,9 @@ import (
 // starting thread does. It has no process and, in worktree mode, no checkouts (unplaced).
 // spawn's commit ends it: the process, the reservation and the phase change together. A
 // failure leaves the thread DISCONNECTED and ERROR ReasonSetupFailed, which settles a
-// wait; it cannot start again by itself, since nothing says its checkouts exist.
+// wait; it cannot start again by itself, since nothing says its checkouts exist. A cancel
+// leaves it DISCONNECTED and IDLE ReasonSetupCancelled: the user did that, so it wants
+// nothing of them. setup_actions.go is the way out of either.
 
 // ReasonSettingUp is the StatusReason, with StatusBusy, of a thread whose setup runs.
 const ReasonSettingUp = "setting up"
@@ -31,6 +34,10 @@ const ReasonSettingUp = "setting up"
 // ReasonSetupFailed is the StatusReason, with StatusError, and the DisconnectReason of a
 // thread whose setup failed; Setup.Error and LastError say why.
 const ReasonSetupFailed = "setup failed"
+
+// ReasonSetupCancelled is the StatusReason, with StatusIdle, and the DisconnectReason of a
+// thread whose setup the user cancelled.
+const ReasonSetupCancelled = "setup cancelled"
 
 // SetupRestarted is Setup.Error of a thread the daemon lost during its setup.
 const SetupRestarted = "Code Foundry restarted during setup"
@@ -101,11 +108,24 @@ type SetupStep struct {
 
 // SetupWorktree is a worktree a setup made, with what it takes to remove it again.
 type SetupWorktree struct {
-	ProjectID  string `json:"project_id"`
-	Path       string `json:"path"`
-	Branch     string `json:"branch"`
-	NewBranch  bool   `json:"new_branch,omitempty"`
+	ProjectID string `json:"project_id"`
+	Path      string `json:"path"`
+	Branch    string `json:"branch"`
+	NewBranch bool   `json:"new_branch,omitempty"`
+	// OwnBranch: the local branch did not exist. NewBranch says the same of the remote
+	// too; a local branch made from origin's is the setup's as well.
+	OwnBranch  bool   `json:"own_branch,omitempty"`
 	StartPoint string `json:"start_point,omitempty"`
+}
+
+// SetupAdd is a `git worktree add` running now: what project.AbandonWorktree takes,
+// should the daemon die during it, when nothing is there to clean up after it. Head is
+// where the add starts the branch it makes; "" when the branch exists.
+type SetupAdd struct {
+	ProjectID string `json:"project_id"`
+	Path      string `json:"path"`
+	Branch    string `json:"branch,omitempty"`
+	Head      string `json:"head,omitempty"`
 }
 
 // SetupRequest is what a setup needs to run again that is not on the row: CreateOptions'
@@ -149,16 +169,27 @@ type Setup struct {
 	Steps     []SetupStep `json:"steps"`
 	// Error is why it failed, in full.
 	Error string `json:"error,omitempty"`
-	// Made are the worktrees it made so far, and Request what it needs to run again. Not
-	// on the API; dropped with a success.
+	// Background: the caller of Create did not wait for it. One that waits hears of a
+	// failure itself, so nothing of it may stay behind.
+	Background bool `json:"background,omitempty"`
+	// Made are the worktrees it made so far, Adding the adds that have not ended, Held the worktrees of others it is about to work in (no checkout says so before the
+	// placement lands), and Request what it needs to run again. Not on the API; dropped
+	// with a success.
 	Made    []SetupWorktree `json:"made,omitempty"`
+	Adding  []SetupAdd      `json:"adding,omitempty"`
+	Held    []string        `json:"held,omitempty"`
 	Request *SetupRequest   `json:"request,omitempty"`
+	// Queued are the messages sent during the setup, in order, each until Claude has it:
+	// like PendingFirst it outlives a success, and goes at the next start after a daemon
+	// death. Prompt is as built, its references rewritten by the spawn that delivers it.
+	Queued []PendingFirst `json:"queued,omitempty"`
 }
 
 // edit is s changed by fn, s untouched.
 func (s *Setup) edit(fn func(*Setup)) *Setup {
 	c := *s
-	c.Steps, c.Made = slices.Clone(s.Steps), slices.Clone(s.Made)
+	c.Steps, c.Made, c.Adding = slices.Clone(s.Steps), slices.Clone(s.Made), slices.Clone(s.Adding)
+	c.Held, c.Queued = slices.Clone(s.Held), slices.Clone(s.Queued)
 	fn(&c)
 	return &c
 }
@@ -190,6 +221,11 @@ func (st *SetupStep) end(status SetupStepStatus, now time.Time) {
 	st.Status, st.EndedAt = status, now
 }
 
+// reset makes st pending again, keeping what says what it is for.
+func (st *SetupStep) reset() {
+	*st = SetupStep{Kind: st.Kind, ProjectID: st.ProjectID, ProjectName: st.ProjectName, Ref: st.Ref, Branch: st.Branch, Status: SetupStepPending}
+}
+
 // drop removes the steps match says have nothing to do.
 func (s *Setup) drop(match func(SetupStep) bool) {
 	s.Steps = slices.DeleteFunc(s.Steps, match)
@@ -199,7 +235,34 @@ func (s *Setup) drop(match func(SetupStep) bool) {
 func (s *Setup) done(now time.Time) *Setup {
 	return s.edit(func(c *Setup) {
 		c.step(SetupStepStart, "").end(SetupStepDone, now)
-		c.Phase, c.EndedAt, c.Made, c.Request = SetupDone, now, nil, nil
+		c.Phase, c.EndedAt, c.Made, c.Adding, c.Held, c.Request = SetupDone, now, nil, nil, nil, nil
+	})
+}
+
+// cancelled is s stopped by the user, what it made gone: what was under way never happened.
+func (s *Setup) cancelled(now time.Time) *Setup {
+	return s.edit(func(c *Setup) {
+		c.Phase, c.EndedAt, c.Error = SetupCancelled, now, ""
+		c.Made, c.Adding, c.Held = nil, nil, nil
+		for i := range c.Steps {
+			if st := &c.Steps[i]; st.Status == SetupStepRunning || st.Status == SetupStepFailed {
+				st.reset()
+			}
+		}
+	})
+}
+
+// retried is s running again from now. After a failure the steps that ended well stay,
+// so it goes on at the one that failed. After a cancel nothing is left of them.
+func (s *Setup) retried(now time.Time) *Setup {
+	fromStart := s.Phase == SetupCancelled
+	return s.edit(func(c *Setup) {
+		c.Phase, c.StartedAt, c.EndedAt, c.Error, c.Background = SetupRunning, now, time.Time{}, "", true
+		for i := range c.Steps {
+			if st := &c.Steps[i]; fromStart || st.Status == SetupStepFailed || st.Status == SetupStepRunning {
+				st.reset()
+			}
+		}
 	})
 }
 
@@ -260,6 +323,12 @@ func (t Thread) setupUnfinished() bool { return t.Setup != nil && t.Setup.Phase 
 // made, or a setup that failed never got that far. A cwd says the placement landed.
 func (t Thread) unplaced() bool { return t.setupUnfinished() && t.WorktreePath == "" }
 
+// setupStopped reports whether t's setup failed or was cancelled: the two it can be tried
+// again from.
+func (t Thread) setupStopped() bool {
+	return t.Setup != nil && (t.Setup.Phase == SetupFailed || t.Setup.Phase == SetupCancelled)
+}
+
 // failSetup ends t's setup with why: no process, an error that sorts with the threads
 // that want the user, and a settled wait.
 func (t *Thread) failSetup(now time.Time, why string) {
@@ -268,11 +337,25 @@ func (t *Thread) failSetup(now time.Time, why string) {
 	t.Setup = t.Setup.failed(now, why)
 }
 
+// cancelSetup ends t's setup at the user's word: no process, a quiet status and a settled
+// wait.
+func (t *Thread) cancelSetup(now time.Time) {
+	t.State, t.DisconnectReason, t.LastError = StateDisconnected, ReasonSetupCancelled, ""
+	t.setStatus(StatusIdle, ReasonSetupCancelled, now)
+	t.Setup = t.Setup.cancelled(now)
+}
+
+// unplace forgets a placement whose worktrees went with its setup: it is planned again.
+func (t *Thread) unplace() {
+	t.WorktreePath, t.CheckoutPaths, t.Branch, t.BaseRef, t.CreatedWorktree = "", nil, "", "", false
+}
+
 // setupWhy is err as a setup tells it: without the thread's own prefix and the error
 // classes, which mean something to a caller, not to someone reading the timeline.
 func setupWhy(id string, err error) string {
 	why := strings.TrimPrefix(err.Error(), "thread "+id+": ")
-	return strings.ReplaceAll(why, ErrFailedPrecondition.Error()+": ", "")
+	why = strings.ReplaceAll(why, ErrFailedPrecondition.Error()+": ", "")
+	return strings.ReplaceAll(why, ErrInvalidArgument.Error()+": ", "")
 }
 
 // setupRefusal is the refusal of doing ("sent to", "forked") to a thread that needs
@@ -282,7 +365,8 @@ func setupRefusal(t Thread, doing string) error {
 	case t.SettingUp():
 		return fmt.Errorf("%w: thread %s is still being set up; it cannot be %s yet", ErrFailedPrecondition, t.ID, doing)
 	case t.setupUnfinished():
-		return fmt.Errorf("%w: thread %s did not finish its setup, so it cannot be %s: %s", ErrFailedPrecondition, t.ID, doing, t.Setup.Error)
+		return fmt.Errorf("%w: thread %s did not finish its setup, so it cannot be %s: %s; try its setup again first",
+			ErrFailedPrecondition, t.ID, doing, cmp.Or(t.Setup.Error, "it was cancelled"))
 	}
 	return nil
 }
@@ -310,12 +394,11 @@ func (m *Manager) refuseSettingUp(id, doing string) error {
 type setupTracker struct {
 	m  *Manager
 	id string
-	// keep: what the setup made stays when it fails (a background setup: the thread does).
-	keep bool
 }
 
-// keepMade reports whether a failure leaves the worktrees made so far.
-func (t *setupTracker) keepMade() bool { return t != nil && t.keep }
+// keepMade reports whether a failure leaves the worktrees made so far: a setup has them on
+// its record, and whoever ends it takes them from there.
+func (t *setupTracker) keepMade() bool { return t != nil }
 
 // edit changes the setup, persisted.
 func (t *setupTracker) edit(fn func(s *Setup, now time.Time)) {
@@ -390,6 +473,7 @@ func (t *setupTracker) progress(projectID string) func(project.WorktreeEvent) {
 				st.end(SetupStepWarning, now)
 			case project.WorktreeAdding:
 				s.step(SetupStepWorktree, projectID).begin(now)
+				s.Adding = append(s.Adding, SetupAdd{ProjectID: projectID, Path: ev.Path, Branch: ev.Branch, Head: ev.Head})
 			}
 		})
 	}
@@ -424,16 +508,24 @@ func (t *setupTracker) made(w madeWorktree) {
 			st.Ref, st.Branch = w.startPoint, w.branch
 			st.end(SetupStepDone, now)
 		}
-		s.Made = append(s.Made, SetupWorktree{ProjectID: w.projectID, Path: w.path, Branch: w.branch, NewBranch: w.newBranch, StartPoint: w.startPoint})
+		s.Made = append(s.Made, SetupWorktree{ProjectID: w.projectID, Path: w.path, Branch: w.branch, NewBranch: w.newBranch, OwnBranch: w.ownBranch, StartPoint: w.startPoint})
+		s.Adding = slices.DeleteFunc(s.Adding, func(a SetupAdd) bool { return a.ProjectID == w.projectID })
 	})
 }
 
-// worktreeFailed fails project id's worktree step with git's text.
+// holds records that the setup is about to work in a worktree it did not make.
+func (t *setupTracker) holds(path string) {
+	t.edit(func(s *Setup, _ time.Time) { s.Held = append(s.Held, path) })
+}
+
+// worktreeFailed fails project id's worktree step with git's text. Its add is over: git
+// or the project store cleaned up after it.
 func (t *setupTracker) worktreeFailed(projectID string, err error) {
 	t.edit(func(s *Setup, now time.Time) {
 		if st := s.step(SetupStepWorktree, projectID); st != nil {
 			st.Error = setupWhy(t.id, errors.New(project.GitText(err)))
 			st.end(SetupStepFailed, now)
 		}
+		s.Adding = slices.DeleteFunc(s.Adding, func(a SetupAdd) bool { return a.ProjectID == projectID })
 	})
 }

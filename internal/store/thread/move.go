@@ -570,7 +570,7 @@ func (m *Manager) failMove(ctx context.Context, id string, job *moveJob, err err
 	m.log.Warn("thread move failed; it stays without a project", "thread", id, "to", job.place, "err", err)
 	ctx = context.WithoutCancel(ctx) // the caller may have stopped waiting; the cleanup still runs
 	m.stopMoveStart(id, job)
-	m.rollback(ctx, job.placed.made)
+	m.rollback(ctx, id, job.placed.made)
 	m.releaseMove(id)
 	m.update(id, false, func(rec *record) { rec.s.LastError = "move to " + job.place + ": " + err.Error() })
 	if !noted {

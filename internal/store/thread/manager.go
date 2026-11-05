@@ -32,6 +32,8 @@ type ProjectSource interface {
 	// still has no name.
 	FetchBase(ctx context.Context, opts project.CreateWorktreeOptions)
 	RemoveWorktree(ctx context.Context, opts project.RemoveWorktreeOptions) error
+	// AbandonWorktree removes what an add that never finished left behind.
+	AbandonWorktree(ctx context.Context, opts project.AbandonWorktreeOptions) error
 	DefaultWorktreePath(projectID, branch string) string
 }
 
@@ -446,11 +448,21 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	m.servers = newServerWatch(m, opts.ServerProbe)
-	var lost []string
+	var lost, unmade []string
 	reported := map[string]bool{}
 	transcripts := &transcriptIndex{paths: opts.Paths} // transcriptmissing.go
 	for _, s := range rows {
 		s.unwaitLoaded() // nothing is waited on at startup (waiting.go)
+		if s.SettingUp() && !s.Setup.Background {
+			// The Create waiting for it died too: its caller got a connection error and
+			// knows of no such thread. The row stays until what it made is gone (setup_run.go).
+			opts.Log.Warn("thread lost with the create that waited for it: discarding it", "thread", s.ID)
+			s.failSetup(opts.Now(), SetupRestarted)
+			s.Removing = true
+			unmade = append(unmade, s.ID)
+			m.recs[s.ID] = &record{s: s}
+			continue
+		}
 		if s.SettingUp() {
 			// It lost its setup with the daemon: what it made is on the row (setup.go).
 			opts.Log.Warn("thread setup lost: the daemon stopped during it", "thread", s.ID)
@@ -516,6 +528,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 			m.log.Warn("close the open turn of a thread the daemon lost", "thread", id, "err", err)
 		}
 	}
+	m.startDiscardingUnmade(unmade)
 	// Rows from before threads.branch get theirs from the project store (recreate.go).
 	m.startBackfill()
 	// Threads from before the search index get their documents (search_index.go).
@@ -776,7 +789,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now
 	s.setStatus(StatusBusy, ReasonSettingUp, now)
-	s.Setup = &Setup{Phase: SetupRunning, StartedAt: now, Steps: m.setupSteps(w), Request: setupRequestOf(o)}
+	s.Setup = &Setup{Phase: SetupRunning, StartedAt: now, Steps: m.setupSteps(w), Request: setupRequestOf(o), Background: o.BackgroundSetup, Held: w.sharedPaths()}
 	if prompt != "" {
 		// The prompt goes in as the first user message; the item keeps it as typed. It is on
 		// the row until Claude has it, so a daemon stop before the handshake keeps it for
@@ -988,6 +1001,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	first := firstMessages(s, rec.first)
 	rec.first = nil
 	m.mu.Unlock()
+	m.rewriteQueued(s, first)
 	// Every other member's checkout is an --add-dir, and claude refuses a missing one.
 	if err := m.requireCheckouts(s); err != nil {
 		return err
@@ -1026,11 +1040,19 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 		r.abandon()
 		return ErrClosed
 	}
+	if rec.setup != nil && rec.setup.cancelAsked {
+		// A cancel came first: this commit is the line between its two answers (CancelSetup).
+		m.mu.Unlock()
+		r.abandon()
+		return errSetupCancelled
+	}
 	rec.run = r
 	rec.release()
 	if rec.s.SettingUp() {
 		rec.s.Setup = rec.s.Setup.done(now) // with the process, in one commit (setup.go)
 	}
+	late := lateMessages(rec.s, first) // sent since the read above; nothing else has them
+	first = append(first, late...)
 	rec.spawnedWith(extras)
 	if mem.fresh {
 		rec.s.MemoryHash = mem.hash // its system prompt has the memory as it is now
@@ -1045,9 +1067,15 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	}
 	rec.s.DisconnectReason, rec.s.ExitCode = "", 0
 	rec.s.LastActivityAt = now
+	placed := rec.s
 	m.commitLocked(rec, true)
 	m.wg.Add(1)
 	m.mu.Unlock()
+	if len(late) > 0 {
+		// Before run starts, which owns the state from then on.
+		m.rewriteQueued(placed, late)
+		r.st.addQueued(late)
+	}
 	if len(first) > 0 && first[0].itemID == "" {
 		// A row's first message with no item yet (Create writes its own at once) goes into
 		// the timeline now, before the handshake: a start that fails leaves the message,
@@ -1300,6 +1328,7 @@ func (m *Manager) removeOne(ctx context.Context, id string) error {
 	if err := m.stopSetup(ctx, id); err != nil {
 		return err
 	}
+	m.cleanSetup(ctx, id) // nothing else knows what a setup that never finished made
 	if err := m.Close(ctx, id); err != nil {
 		return err
 	}

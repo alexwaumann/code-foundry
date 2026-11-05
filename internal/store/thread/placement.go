@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -279,8 +280,9 @@ type madeWorktree struct {
 	projectID, projectName, path string
 	// branch is the branch it was made on.
 	branch string
-	// newBranch: the branch did not exist; a rollback deletes it too.
-	newBranch bool
+	// newBranch: the branch did not exist here or on origin (what a summary tells).
+	// ownBranch: it did not exist here; a rollback deletes it too.
+	newBranch, ownBranch bool
 	// startPoint is project.Worktree.StartPoint.
 	startPoint string
 	worktree   project.Worktree
@@ -311,6 +313,8 @@ type worktreePlan struct {
 	// bc is how a new branch is chosen; zero without one.
 	bc         branchChoice
 	fromOrigin bool
+	// resume is what an earlier run of the setup left (setup_actions.go); nil: none.
+	resume *setupResume
 }
 
 // todo are the git members whose worktree the placement makes: every one that does not
@@ -323,6 +327,14 @@ func (w *worktreePlan) todo() []project.Project {
 		}
 	}
 	return out
+}
+
+// sharedPaths are the worktrees of the copied thread the placement works in.
+func (w *worktreePlan) sharedPaths() []string {
+	if w == nil {
+		return nil
+	}
+	return slices.Sorted(maps.Values(w.shared))
 }
 
 // baseOf is project id's base for a new branch.
@@ -601,9 +613,13 @@ func (m *Manager) planWorktrees(id, name string, o CreateOptions, pl placement, 
 func (m *Manager) placeWorktrees(ctx context.Context, p placedThread, w *worktreePlan, t *setupTracker) (placedThread, error) {
 	pl, git, base, bases := w.pl, w.git, w.base, w.bases
 	branch, fresh := pl.branch, false
-	todo := w.todo()
+	todo := w.resume.left(w.todo())
 	var pf *prefetches
-	if pl.newBranch {
+	if w.resume.named() {
+		// It stays what it was. Whether it is new now depends on each project: made in
+		// one, not yet in another (makeWorktree looks).
+		branch, fresh, p.namerCalled = w.resume.branch, pl.newBranch, true
+	} else if pl.newBranch {
 		paths := make([]string, len(git))
 		for i, r := range git {
 			paths[i] = r.Path
@@ -611,7 +627,7 @@ func (m *Manager) placeWorktrees(ctx context.Context, p placedThread, w *worktre
 		bc := m.existingBranchChoice(ctx, paths, w.bc, w.nw.Branch)
 		// The namer and the fetches run side by side: a new branch's base does not depend
 		// on the branch's name (docs/notes/instant-threads-1-daemon.md).
-		pf = m.startPrefetches(ctx, w, bc, paths, todo, t)
+		pf = m.startPrefetches(ctx, w, bc, paths, w.resume.unfetched(todo), t)
 		defer pf.wait() // whatever happens next: nothing outlives the placement
 		t.begin(SetupStepName, "")
 		var sl slugWait
@@ -637,10 +653,11 @@ func (m *Manager) placeWorktrees(ctx context.Context, p placedThread, w *worktre
 		}
 		fresh = !existing
 	}
-	made, err := m.makeWorktrees(ctx, todo, branch, func(pid string) string { return cmp.Or(bases[pid], base) }, fresh, w.fromOrigin, pf, t)
+	made, err := m.makeWorktrees(ctx, w.id, todo, branch, func(pid string) string { return cmp.Or(bases[pid], base) }, fresh, w.fromOrigin, pf, w.resume.fetchedIn, t)
 	if err != nil {
 		return p, err
 	}
+	made = w.resume.withMade(made)
 	p.made, p.branch, p.createdWorktree = made, branch, true
 	// The plain folders are their folders (or the copied thread's); each git member's
 	// worktree is the one made, shared or reused.
@@ -675,7 +692,7 @@ func (m *Manager) placeWorktrees(ctx context.Context, p placedThread, w *worktre
 	if p.path == "" { // the primary is a plain folder: it runs there
 		if _, p.path, err = m.resolveWorktree(pl.primary, ""); err != nil {
 			if !t.keepMade() {
-				m.rollback(ctx, made)
+				m.rollback(ctx, w.id, made)
 			}
 			return p, err
 		}
@@ -790,11 +807,12 @@ func (m *Manager) defaultPathTaken(r project.Project, branch string, onDisk bool
 	return nil
 }
 
-// makeWorktrees makes the worktree for branch in each of projects that has none, in
-// parallel, and returns what it made. base gives a member's base for a new branch; pf the
-// fetches run ahead of it. One failure removes what the others made, unless t keeps it,
-// and is the error, naming the project.
-func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project, branch string, base func(string) string, fresh, fromOrigin bool, pf *prefetches, t *setupTracker) ([]madeWorktree, error) {
+// makeWorktrees makes thread id's worktree for branch in each of projects that has none,
+// in parallel, and returns what it made. base gives a member's base for a new branch; pf the
+// fetches run ahead of it, and fetched (nil: none) the members a run before this one
+// fetched. One failure removes what the others made, unless t keeps it, and is the error,
+// naming the project.
+func (m *Manager) makeWorktrees(ctx context.Context, id string, projects []project.Project, branch string, base func(string) string, fresh, fromOrigin bool, pf *prefetches, fetched func(string) bool, t *setupTracker) ([]madeWorktree, error) {
 	var (
 		wg   sync.WaitGroup
 		mu   sync.Mutex
@@ -820,7 +838,8 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			mw, ok, err := m.makeWorktree(ctx, r, branch, base(r.ID), fresh, fromOrigin, pf.await(r.ID), t)
+			ran := pf.await(r.ID)
+			mw, ok, err := m.makeWorktree(ctx, r, branch, base(r.ID), fresh, fromOrigin, ran, fetched != nil && fetched(r.ID), t)
 			switch {
 			case err != nil:
 				t.worktreeFailed(r.ID, err)
@@ -843,7 +862,7 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 	slices.SortFunc(made, func(a, b madeWorktree) int { return strings.Compare(a.projectID, b.projectID) })
 	if len(errs) > 0 {
 		if !t.keepMade() {
-			m.rollback(ctx, made)
+			m.rollback(ctx, id, made)
 		}
 		return nil, errors.Join(errs...)
 	}
@@ -858,15 +877,18 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 // Create with the same --branch made it meanwhile) is no longer new, and its worktree is
 // shared. The project's main checkout is never the thread's worktree (branchWorktree);
 // makeWorktrees refuses a branch checked out there (mainCheckoutBusy). prefetched: r's
-// base was fetched already, so a new branch does not fetch it again.
-func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, base string, fresh, fromOrigin, prefetched bool, t *setupTracker) (madeWorktree, bool, error) {
+// base was fetched already, so a new branch does not fetch it again; fetched: a run before
+// this one did, so nothing is. A worktree that exists is noted on t, under the same lock
+// a cleanup takes: it is about to be someone else's too.
+func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, base string, fresh, fromOrigin, prefetched, fetched bool, t *setupTracker) (madeWorktree, bool, error) {
 	unlock := m.lockWorktree(r.ID, branch)
 	defer unlock()
 	if fresh && m.opts.RefExists(ctx, r.Path, "refs/heads/"+branch) {
 		m.log.Info("new branch was made meanwhile by another create; sharing it", "project", r.ID, "branch", branch)
 		fresh = false
 	}
-	if _, ok := m.memberWorktree(r, branch); ok && !fresh {
+	if wt, ok := m.memberWorktree(r, branch); ok && !fresh {
+		t.holds(wt.Path)
 		return madeWorktree{}, false, nil // a new branch has no worktree yet
 	}
 	cur := r
@@ -876,11 +898,11 @@ func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, b
 	if err := m.defaultPathTaken(cur, branch, true); err != nil {
 		return madeWorktree{}, false, err
 	}
-	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: branch, Fetch: !(fresh && prefetched), BaseFromOrigin: fromOrigin, Progress: t.progress(r.ID)}
-	newBranch := fresh
+	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: branch, Fetch: !(fresh && prefetched) && !fetched, BaseFromOrigin: fromOrigin, Progress: t.progress(r.ID)}
+	newBranch, ownBranch := fresh, fresh
 	if !fresh {
 		local, remote := m.findBranch(ctx, r.Path, branch)
-		newBranch = !local && !remote
+		newBranch, ownBranch = !local && !remote, !local
 	}
 	if newBranch {
 		opts.BaseRef = base
@@ -895,20 +917,72 @@ func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, b
 		}
 	}
 	m.log.Info("member worktree made", "project", r.ID, "branch", branch, "path", wt.Path, "new_branch", newBranch, "start_point", wt.StartPoint)
-	return madeWorktree{projectID: r.ID, projectName: r.Name, path: filepath.Clean(wt.Path), branch: branch, newBranch: newBranch, startPoint: wt.StartPoint, worktree: wt}, true, nil
+	return madeWorktree{projectID: r.ID, projectName: r.Name, path: filepath.Clean(wt.Path), branch: branch, newBranch: newBranch, ownBranch: ownBranch, startPoint: wt.StartPoint, worktree: wt}, true, nil
 }
 
-// rollback removes worktrees a failed Create made, with the branches it made for them.
-// It runs even when ctx is cancelled.
-func (m *Manager) rollback(ctx context.Context, made []madeWorktree) {
+// rollback removes worktrees that thread id made and no longer needs, with the branches
+// it made for them, and returns the paths it left: only what was made, only what nobody
+// else has, and never work. Another thread may share a worktree (its branch, memberWorktree),
+// so one a thread holds stays. No force: git keeps a worktree with changes or untracked
+// files in it, whoever left them, and a branch stays once it has moved past where it was
+// made (RemoveWorktreeOptions.DeleteMadeBranch). It runs even when ctx is cancelled.
+func (m *Manager) rollback(ctx context.Context, id string, made []madeWorktree) []string {
 	ctx = context.WithoutCancel(ctx)
+	var kept []string
 	for _, w := range made {
-		if err := m.opts.Projects.RemoveWorktree(ctx, project.RemoveWorktreeOptions{
-			ProjectID: w.projectID, Path: w.path, Force: true, DeleteBranch: w.newBranch,
-		}); err != nil {
-			m.log.Warn("remove a worktree a failed create made", "project", w.projectID, "path", w.path, "err", err)
+		if m.rollbackOne(ctx, id, w) {
+			kept = append(kept, w.path)
 		}
 	}
+	return kept
+}
+
+// rollbackOne is rollback for w, under the lock that makes or shares it; true when it
+// stays.
+func (m *Manager) rollbackOne(ctx context.Context, id string, w madeWorktree) bool {
+	unlock := m.lockWorktree(w.projectID, w.branch)
+	defer unlock()
+	if who, held := m.heldElsewhere(id, w.path); held {
+		m.log.Info("worktree kept: another thread has it", "thread", id, "project", w.projectID, "path", w.path, "holder", who)
+		return false // it is that thread's now, not something left behind
+	}
+	o := project.RemoveWorktreeOptions{ProjectID: w.projectID, Path: w.path}
+	if w.ownBranch && !m.branchHeld(id, w.projectID, w.branch) {
+		o.DeleteMadeBranch = w.branch
+	}
+	err := m.opts.Projects.RemoveWorktree(ctx, o)
+	var dirty *project.UncommittedError
+	switch {
+	case err == nil, errors.Is(err, project.ErrNotFound):
+		return false
+	case errors.As(err, &dirty):
+		m.log.Info("worktree kept: it has work in it", "thread", id, "project", w.projectID, "path", w.path)
+	default:
+		m.log.Warn("remove a worktree a failed create made", "thread", id, "project", w.projectID, "path", w.path, "err", err)
+	}
+	return true
+}
+
+// heldElsewhere reports the thread other than id that works in path, or is about to: a
+// checkout on its row, or one a running setup noted before its placement lands.
+func (m *Manager) heldElsewhere(id, path string) (string, bool) {
+	if t, ok := m.otherHolder(id, path); ok {
+		return holderLabel(t), true
+	}
+	for _, t := range m.Snapshot().Threads {
+		if t.ID != id && t.SettingUp() && slices.ContainsFunc(t.Setup.Held, func(p string) bool { return samePath(p, path) }) {
+			return holderLabel(t), true
+		}
+	}
+	return "", false
+}
+
+// branchHeld reports whether a thread other than id, archived ones included (they come
+// back on it), is on branch in project pid.
+func (m *Manager) branchHeld(id, pid, branch string) bool {
+	return slices.ContainsFunc(m.Snapshot().Threads, func(t Thread) bool {
+		return t.ID != id && !t.Removing && t.Branch == branch && slices.Contains(t.Projects(), pid)
+	})
 }
 
 // lockWorktree serializes making (project, branch)'s worktree within the store.
@@ -974,7 +1048,7 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 			mw, path, ok, err := m.remakeOnHead(ctx, s, r, was)
 			switch {
 			case err != nil:
-				m.rollback(ctx, made)
+				m.rollback(ctx, s.ID, made)
 				return nil, nil, projectError("recreate worktree "+s.LastHeads[r.ID]+" in "+r.Name, err)
 			case !ok:
 				rest = append(rest, r)
@@ -987,9 +1061,9 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 			found[r.ID] = path
 		}
 		if len(rest) > 0 {
-			onBranch, err := m.makeWorktrees(ctx, rest, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin(), nil, nil)
+			onBranch, err := m.makeWorktrees(ctx, s.ID, rest, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin(), nil, nil, nil)
 			if err != nil {
-				m.rollback(ctx, made)
+				m.rollback(ctx, s.ID, made)
 				return nil, nil, err
 			}
 			made = append(made, onBranch...)
