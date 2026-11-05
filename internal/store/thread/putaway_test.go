@@ -248,7 +248,11 @@ func TestPutAwaySelfInterruptedTurnDrops(t *testing.T) {
 	}
 	e, s := midTurnAt(t, path, nil)
 	e.putAwaySelf(s, PutAway{Kind: PutAwayArchive})
-	conn, err := e.m.recs[s.ID].run.st.connection()
+	live, _, _, _, err := e.m.lifecycle(s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := live.st.connection()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,6 +380,20 @@ func TestPutAwaySelfSecondReplaces(t *testing.T) {
 	got := e.waitFor(s.ID, "snoozed", func(s Thread) bool { return s.Snoozed() })
 	if !got.ArchivedAt.IsZero() {
 		t.Errorf("archived too: %+v", got)
+	}
+}
+
+// The user putting the thread away differently, now, wins: the turn is cut off and what
+// was pending goes with the process.
+func TestPutAwaySelfOverruledByTheUser(t *testing.T) {
+	e, s := midTurnAt(t, fixturePath("write-allow"), nil)
+	e.putAwaySelf(s, PutAway{Kind: PutAwaySnooze, Until: time.Now().Add(time.Hour)})
+	got, err := e.m.Archive(e.ctx(), s.ID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ArchivedAt.IsZero() || got.Snoozed() || got.Status != StatusIdle || got.StatusReason != ReasonArchived || e.pendingPutAway(s.ID) != nil {
+		t.Errorf("end state %v %q, archived %v, snoozed %v, pending %+v", got.Status, got.StatusReason, got.ArchivedAt, got.Snoozed(), e.pendingPutAway(s.ID))
 	}
 }
 
