@@ -89,6 +89,7 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 	if err := send(wakes.snapshot(snap)); err != nil {
 		return err
 	}
+	beat.Flush()
 	seen := snap.Seq
 	var dropped, goneDropped uint64
 	for {
@@ -142,6 +143,7 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 				if err := send(wakes.snapshot(snap)); err != nil {
 					return err
 				}
+				beat.Flush()
 				continue
 			}
 			if ev.Thread() != id || threadSeq(ev) <= seen {
