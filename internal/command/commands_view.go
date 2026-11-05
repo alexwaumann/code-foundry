@@ -148,7 +148,8 @@ func (d ViewDeps) showPageWith(uctx Context, a Args, name string, params map[str
 //   - composer.history (commands_view_composer.go), the Previous prompts picker, and
 //     composer.stage (commands_composer_stage.go), text in a thread's composer;
 //   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
-//   - file.find (commands_view_file_find.go), the file finder over the thread on screen.
+//   - file.find (commands_view_file_find.go), the file finder over the thread on screen,
+//     and file.save (commands_view_file_save.go), which saves the focused File tab's edit.
 //
 // Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, d ViewDeps) error {
@@ -289,6 +290,6 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:         show(ViewThreadNext),
 		},
 	}
-	cmds = append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand(), d.searchOpenCommand())
+	cmds = append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
 	return r.RegisterAll(append(cmds, d.threadFindCommands()...)...)
 }
