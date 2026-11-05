@@ -5,7 +5,7 @@ import { ReadFileResponseSchema, WriteFileResponseSchema } from "@/gen/codefound
 import { DiffScope, FileVersionSchema, GetWorktreeFileDiffResponseSchema } from "@/gen/codefoundry/v1/project_pb";
 import { toFileDiffView } from "./fileDiff";
 import type { DaemonConnection } from "./endpoint";
-import { canEdit, isImageMime, readFile, READ_MAX_BYTES, toFileReadView, writeFile, type FileReadView } from "./files";
+import { blankFile, canEdit, isImageMime, readFile, READ_MAX_BYTES, toFileReadView, writeFile, type FileReadView } from "./files";
 
 const enc = new TextEncoder();
 
@@ -141,15 +141,22 @@ describe("writeFile", () => {
   it("sends the text as UTF-8 with the version it replaces, and takes the new one", async () => {
     const { asked, conn } = connected(() => Promise.resolve(create(WriteFileResponseSchema, { resolvedPath: "/x/.env", size: 9n, modifiedAt: 1_700_000_000_500n })));
     const r = await writeFile("/x", ".env", "é=1\r\n", version, {}, conn);
-    expect(asked).toEqual([{ baseDir: "/x", path: ".env", contents: enc.encode("é=1\r\n"), modifiedAt: 1_700_000_000_000n, size: 5n, force: false }]);
+    expect(asked).toEqual([{ baseDir: "/x", path: ".env", contents: enc.encode("é=1\r\n"), modifiedAt: 1_700_000_000_000n, size: 5n, force: false, create: false }]);
     expect(r).toEqual({ path: "/x/.env", size: 9, modifiedAtMs: 1_700_000_000_500, conflict: false, notFound: false });
   });
 
   it("force goes through; a conflict is an answer", async () => {
     const { asked, conn } = connected(() => Promise.resolve(create(WriteFileResponseSchema, { resolvedPath: "/x/a", conflict: true, notFound: true })));
     const r = await writeFile("/x", "a", "b", { size: 0, modifiedAtMs: null }, { force: true }, conn);
-    expect(asked).toEqual([{ baseDir: "/x", path: "a", contents: enc.encode("b"), modifiedAt: 0n, size: 0n, force: true }]);
+    expect(asked).toEqual([{ baseDir: "/x", path: "a", contents: enc.encode("b"), modifiedAt: 0n, size: 0n, force: true, create: false }]);
     expect([r.conflict, r.notFound, r.modifiedAtMs]).toEqual([true, true, null]);
+  });
+
+  it("create goes through, and a blank file is a document the tab can edit", async () => {
+    const { asked, conn } = connected(() => Promise.resolve(create(WriteFileResponseSchema, { resolvedPath: "/x/a" })));
+    await writeFile("/x", "a", "b", blankFile("/x/a"), { create: true }, conn);
+    expect(asked).toEqual([{ baseDir: "/x", path: "a", contents: enc.encode("b"), modifiedAt: 0n, size: 0n, force: false, create: true }]);
+    expect(canEdit(blankFile("/x/a"))).toBe(true);
   });
 
   it("a refusal stays an error with its message", async () => {
