@@ -23,6 +23,8 @@ export interface XtermRendererOptions {
   onRendererChange?: (kind: RendererKind) => void;
   /** Opens a clicked link; defaults to window.open. */
   openLink?: (uri: string) => void;
+  /** How many matches the find highlights and counts; defaults to FIND_LIMIT. */
+  findLimit?: number;
 }
 
 const encoder = new TextEncoder();
@@ -71,7 +73,7 @@ export class XtermRenderer implements TerminalRenderer {
     );
     this.search = new TerminalFind(this.term, (color) => {
       this.applyTheme(terminalTheme(), color);
-    });
+    }, opts.findLimit);
     // The palette is the document's CSS variables (theme.ts); follow them when the scheme
     // (or, later, the theme) on <html> changes.
     const stopTheme = watchTerminalTheme((theme) => {

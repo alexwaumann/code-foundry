@@ -1,5 +1,7 @@
 import type { ITheme } from "@xterm/xterm";
-import { contrast, flatten, over } from "@/themes/color";
+import { themes } from "@/themes";
+import { contrast, flatten, over, parseHex, toHex } from "@/themes/color";
+import { resolveSlots, type ThemeFile } from "@/themes/slots";
 
 /**
  * xterm ITheme keys and the CSS variables on <html> they come from (the active theme's
@@ -72,7 +74,7 @@ const TEXT_CONTRAST_KEPT = 0.8;
  * a muted theme is well before a solid fill, and every other match stays at most half of it.
  */
 export function findColors(surface: string, warning: string, foreground: string): FindColors {
-  const under = flatten(surface, "#000000");
+  const under = toHex(parseHex(surface).rgb);
   const border = flatten(warning, under);
   const text = flatten(foreground, under);
   const floor = Math.min(TEXT_CONTRAST, contrast(text, under) * TEXT_CONTRAST_KEPT);
@@ -81,17 +83,16 @@ export function findColors(surface: string, warning: string, foreground: string)
   return { match: over(border, Math.min(MATCH_TINT, strength / 2), under), active: over(border, strength, under), border };
 }
 
-/** Under jsdom, and for a variable that is not a hex colour, which no theme slot is not. */
-const FALLBACK_FIND_COLORS = findColors("#0d1117", "#e3b341", "#e6edf3");
+const fromSlots = (read: (name: string) => string | undefined) => findColors(read("--cf-surface") ?? "", read("--cf-warning") ?? "", read("--terminal-fg") ?? "");
 
-/** The find's colours for the active theme. */
+/** The find's colours for the active theme; with no theme on the document (jsdom), the catalog's first. */
 export function terminalFindColors(root: Element = document.documentElement): FindColors {
   const style = getComputedStyle(root);
-  const read = (name: string) => style.getPropertyValue(name).trim();
   try {
-    return findColors(read("--cf-surface"), read("--cf-warning"), read("--terminal-fg"));
+    return fromSlots((name) => style.getPropertyValue(name).trim());
   } catch {
-    return FALLBACK_FIND_COLORS;
+    const slots = resolveSlots(themes[0] as ThemeFile);
+    return fromSlots((name) => slots[name]);
   }
 }
 

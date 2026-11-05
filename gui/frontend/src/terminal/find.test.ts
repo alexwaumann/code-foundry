@@ -1,15 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FindResults } from "./renderer";
 import { terminalCountLabel } from "./results";
-import { FIND_LIMIT } from "./find";
 import { XtermRenderer } from "./xterm";
 
 // xterm's open() watches the display's pixel ratio.
 window.matchMedia = (() => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined, addListener: () => undefined, removeListener: () => undefined })) as unknown as typeof window.matchMedia;
 
 /** The real xterm and addon: what they count, not what they paint (e2e/terminal-find.spec.ts). */
-function setup() {
-  const r = new XtermRenderer({ fontSize: 12, isGlobalChord: () => false });
+function setup(findLimit?: number) {
+  const r = new XtermRenderer({ fontSize: 12, isGlobalChord: () => false, findLimit });
   // Selecting needs xterm opened; its renderer is not what these tests are about.
   const el = document.createElement("div");
   document.body.append(el);
@@ -173,8 +172,12 @@ describe("the renderer's find", () => {
   });
 
   it("marks the count at the limit", async () => {
-    await t.write("x ".repeat(FIND_LIMIT + 10));
+    t.r.dispose();
+    t = setup(50);
+    await t.write("x ".repeat(60));
     t.r.find("x");
-    expect(t.last()).toMatchObject({ total: FIND_LIMIT, capped: true });
+    expect(t.last()).toMatchObject({ total: 50, capped: true });
+    t.r.find("xx");
+    expect(t.last()).toMatchObject({ total: 0, capped: false });
   });
 });

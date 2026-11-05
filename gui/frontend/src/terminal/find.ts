@@ -36,8 +36,8 @@ interface AddonInternals {
  * (`onSelectionColor`), or the current match would look like a selection, not a match.
  */
 export class TerminalFind {
-  private readonly addon = new SearchAddon({ highlightLimit: FIND_LIMIT });
-  private readonly internals = this.addon as unknown as AddonInternals;
+  private readonly addon: SearchAddon;
+  private readonly internals: AddonInternals;
   private readonly listeners = new Set<(r: FindResults) => void>();
   private readonly subs: IDisposable[];
   private query = "";
@@ -48,12 +48,15 @@ export class TerminalFind {
   constructor(
     private readonly term: Terminal,
     private readonly onSelectionColor: (color: string | null) => void,
+    limit = FIND_LIMIT,
   ) {
+    this.addon = new SearchAddon({ highlightLimit: limit });
+    this.internals = this.addon;
     term.loadAddon(this.addon);
     this.subs = [
       this.addon.onDidChangeResults(({ resultIndex, resultCount }) => {
         this.searchedAt = Date.now();
-        this.publish({ index: resultIndex, total: resultCount, capped: resultCount >= FIND_LIMIT });
+        this.publish({ index: resultIndex, total: resultCount, capped: resultCount >= limit });
       }),
       term.onWriteParsed(() => {
         if (this.query !== "" && Date.now() - this.searchedAt >= this.staleMs) this.searchAgain();

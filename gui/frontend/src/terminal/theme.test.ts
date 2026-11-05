@@ -62,7 +62,7 @@ describe("findColors", () => {
   });
 
   it("flattens a translucent colour onto the surface", () => {
-    expect(findColors("#000000", "#ffffff80", "#ffffff").border).toBe("#808080");
+    expect(findColors("#000", "#ffffff80", "#fff").border).toBe("#808080");
   });
 
   it("falls back for what is not a hex colour (jsdom has no theme)", () => {
