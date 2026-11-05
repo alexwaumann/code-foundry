@@ -107,6 +107,41 @@ func TestFilesystemWriteFileReach(t *testing.T) {
 	}
 }
 
+// view.panel.file --edit asks the same reach as WriteFile, with the real config home rule.
+func TestFilesystemCheckEdit(t *testing.T) {
+	tests := []struct {
+		name, path string
+		code       connect.Code // 0: editable
+	}{
+		{name: "the daemon's token", path: "~/.code-foundry/daemon.token", code: connect.CodeInvalidArgument},
+		{name: "a new file in the config home", path: "~/.code-foundry/notes.md", code: connect.CodeInvalidArgument},
+		{name: "a symlink into the config home", path: "~/src/app/token", code: connect.CodeInvalidArgument},
+		{name: "a checkout in the config home", path: "~/.code-foundry/projects/app/main.go"},
+		{name: "aws credentials", path: "~/.aws/credentials"},
+		{name: "a new file", path: "~/src/app/.env"},
+		{name: "no directory", path: "~/src/nope/.env", code: connect.CodeInvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root, _ := writeHome(t)
+			h := NewFilesystem(root, projecttest.New(nil), testGrants(root))
+			got, err := h.CheckEdit(context.Background(), "", tt.path)
+			if tt.code != 0 {
+				if connect.CodeOf(err) != tt.code {
+					t.Fatalf("err = %v, want %v", err, tt.code)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := filepath.Join(root, tt.path[2:]); got != want {
+				t.Errorf("got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 // A create is held to the same rule as an edit.
 func TestFilesystemWriteFileCreate(t *testing.T) {
 	root, c := writeHome(t)

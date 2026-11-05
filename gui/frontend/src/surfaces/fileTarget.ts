@@ -28,10 +28,28 @@ export interface FileTarget {
   page?: { title: string };
   /** The tab opens with its editor on, when the file is one it can edit. */
   edit?: boolean;
+  /** A thread asked the user to edit this file (view.panel.file --edit); gone once saved or dismissed. With `edit`. */
+  ask?: FileAsk;
 }
 
+/** Who asked for a file to be edited, and what they said. The note is model text: plain text only. */
+export interface FileAsk {
+  /** This request, from every other: one for the same note is still a new one. */
+  id: string;
+  thread: string;
+  note: string;
+  /**
+   * The version (versionStamp, api/files.ts) a write of ours left on disk since this request.
+   * The thread can be told it was saved only while that is still the version on disk.
+   */
+  saved?: string;
+}
+
+/** The params a File tab's request lives in: dropping them finishes it, for good. */
+export const ASK_PARAMS = ["edit", "askId", "asker", "note", "askSaved"] as const;
+
 /**
- * A File tab: params { project, base, path, line?, page?, title?, edit? } with the path made
+ * A File tab: params { project, base, path, line?, page?, title?, edit?, askId?, asker?, note?, askSaved? } with the path made
  * absolute against base when it can be, keyed by that path alone, titled with the page's
  * title or the file's name.
  */
@@ -44,6 +62,12 @@ export function fileTab(t: FileTarget): Tab {
     if (t.page.title) params.title = t.page.title;
   }
   if (t.edit) params.edit = "1";
+  if (t.ask) {
+    params.askId = t.ask.id;
+    params.asker = t.ask.thread;
+    if (t.ask.note) params.note = t.ask.note;
+    if (t.ask.saved) params.askSaved = t.ask.saved;
+  }
   return { id: tabId(FILE_KIND, { path }), kind: FILE_KIND, title: t.page?.title || fileName(path) || path, params };
 }
 
@@ -59,6 +83,7 @@ export function fileOfTab(tab: Pick<Tab, "params">): FileTarget | null {
     ...(Number.isInteger(line) && line > 0 ? { line } : {}),
     ...(tab.params.page === "1" ? { page: { title: tab.params.title ?? "" } } : {}),
     ...(tab.params.edit === "1" ? { edit: true } : {}),
+    ...(tab.params.asker ? { ask: { id: tab.params.askId ?? "", thread: tab.params.asker, note: tab.params.note ?? "", ...(tab.params.askSaved ? { saved: tab.params.askSaved } : {}) } } : {}),
   };
 }
 

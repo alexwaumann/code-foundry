@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectView, WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
 
@@ -13,6 +13,9 @@ const { showThreadView } = await import("./threadPanelIntent");
 const { useThreadsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
 const { useViewsStore } = await import("./views");
+const { fileEditKey, noteEditor, startEdit, useFileEditStore } = await import("./fileEdit");
+const { blankFile } = await import("@/api/files");
+const { fileTab } = await import("@/surfaces/fileTarget");
 
 const WEB_MAIN = "/src/web";
 const WEB_FEAT = "/wt/web/cf-feat";
@@ -158,6 +161,110 @@ describe("a ShowView scoped to a thread", () => {
       showItem("panel.file", { path: `${WEB_FEAT}/welcome.html`, project: "web", base: WEB_FEAT, page: "1", title: "Welcome" });
       expect(active("thread:b")).toMatchObject({ kind: "files", title: "Welcome", params: { path: `${WEB_FEAT}/welcome.html`, page: "1", title: "Welcome" } });
       untouched();
+    });
+
+    describe("a thread's request to edit a file (--edit)", () => {
+      const ENV = `${WEB_FEAT}/.env`;
+      const ask = { path: ENV, project: "web", base: WEB_FEAT, edit: "1", thread: "b" };
+      const params = () => getPanel("thread:b").groups[0]?.tabs[0]?.params;
+
+      it("opens the tab editing, with who asked and what they said, and takes no focus", () => {
+        const before = document.activeElement;
+        showItem("panel.file", { ...ask, note: "Put the key on line 2", line: "2" });
+        expect(params()).toMatchObject({ edit: "1", asker: "b", note: "Put the key on line 2", line: "2" });
+        expect(useUiStore.getState().selection).toEqual(inA);
+        expect(useUiStore.getState().panelFocusSeq).toBe(0);
+        expect(useUiStore.getState().promptFocusSeq).toBe(0);
+        expect(document.activeElement).toBe(before);
+      });
+
+      it("two requests are two, the same note or not", () => {
+        showItem("panel.file", { ...ask, note: "Same" });
+        const first = params()?.askId;
+        showItem("panel.file", { ...ask, note: "Same" });
+        expect(first).toBeTruthy();
+        expect(params()?.askId).not.toBe(first);
+      });
+
+      it("a plain open has none of it", () => {
+        showItem("panel.file", { path: ENV, project: "web", base: WEB_FEAT });
+        expect(params()).toEqual({ path: ENV, project: "web", base: WEB_FEAT });
+      });
+
+      it("with --focus the editor takes the keyboard at the end of the line, once it is there", () => {
+        showItem("panel.file", { ...ask, line: "2", focus: "1" });
+        const key = fileEditKey("thread:b", fileTab({ project: "web", base: WEB_FEAT, path: ENV }).id);
+        const focus = vi.fn();
+        noteEditor(key, { focus, caret: () => null });
+        expect(focus).toHaveBeenCalledTimes(1);
+      });
+
+      // Its own file: an editor noted for one tab stays noted, and would answer in place of this one.
+      it("without it the editor takes nothing", () => {
+        const path = `${WEB_FEAT}/no-focus.env`;
+        showItem("panel.file", { ...ask, path, line: "2" });
+        const key = fileEditKey("thread:b", fileTab({ project: "web", base: WEB_FEAT, path }).id);
+        const focus = vi.fn();
+        noteEditor(key, { focus, caret: () => null });
+        expect(focus).not.toHaveBeenCalled();
+      });
+
+      describe("with the user typing in an editor of that group", () => {
+        const A = `${WEB_FEAT}/a.env`;
+        const a = fileTab({ project: "web", base: WEB_FEAT, path: A });
+        const b = fileTab({ project: "web", base: WEB_FEAT, path: ENV });
+        const aKey = fileEditKey("thread:b", a.id);
+        let wrap: HTMLElement;
+
+        beforeEach(async () => {
+          usePanelStore.setState({ byKey: { "thread:b": { open: true, groups: [{ tabs: [a], activeTabId: a.id }] } } });
+          await startEdit(aKey, { panelKey: "thread:b", tabId: a.id, base: WEB_FEAT }, { ...blankFile(A), text: "x\n" });
+          wrap = document.createElement("div");
+          wrap.setAttribute("data-code-editor", useFileEditStore.getState().sessions[aKey]?.stateKey ?? "");
+          const host = document.createElement("div");
+          host.tabIndex = -1;
+          wrap.append(host);
+          document.body.append(wrap);
+          host.focus();
+        });
+        afterEach(() => {
+          wrap.remove();
+          useFileEditStore.setState({ sessions: {} });
+        });
+
+        it("a request joins the strip behind it", () => {
+          showItem("panel.file", ask);
+          const g = getPanel("thread:b").groups[0];
+          expect(g?.activeTabId).toBe(a.id);
+          expect(g?.tabs.map((t) => t.id)).toEqual([a.id, b.id]);
+          expect(g?.tabs[1]?.params).toMatchObject({ asker: "b", edit: "1" });
+        });
+
+        it("a repeat request updates its tab there", () => {
+          showItem("panel.file", ask);
+          showItem("panel.file", { ...ask, note: "Second" });
+          const g = getPanel("thread:b").groups[0];
+          expect(g?.activeTabId).toBe(a.id);
+          expect(g?.tabs[1]?.params.note).toBe("Second");
+        });
+
+        it("--focus goes to it: the user asked to be taken there", () => {
+          showItem("panel.file", { ...ask, focus: "1" });
+          expect(getPanel("thread:b").groups[0]?.activeTabId).toBe(b.id);
+        });
+
+        it("a plain open behaves as it always has", () => {
+          showItem("panel.file", { path: ENV, project: "web", base: WEB_FEAT });
+          expect(getPanel("thread:b").groups[0]?.activeTabId).toBe(b.id);
+        });
+
+        it("in the other group it opens as usual: that group's screen is not the user's", () => {
+          usePanelStore.setState({ byKey: { "thread:b": { open: true, focused: 1, groups: [{ tabs: [a], activeTabId: a.id }, { tabs: [], activeTabId: null }] } } });
+          showItem("panel.file", ask);
+          expect(getPanel("thread:b").groups[1]?.activeTabId).toBe(b.id);
+          expect(getPanel("thread:b").groups[0]?.activeTabId).toBe(a.id);
+        });
+      });
     });
 
     it("panel.file again moves the open tab to the new line", () => {

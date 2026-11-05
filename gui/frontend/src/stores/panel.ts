@@ -289,6 +289,34 @@ export function retitleTab(e: PanelEntry, id: string, title: string): PanelEntry
   return withGroup(e, g, { ...grp, tabs: grp.tabs.map((t) => (t.id === id ? { ...t, title } : t)) });
 }
 
+/** A tab's params changed, wherever it is; an unknown id or the same params change nothing. */
+function withParams(e: PanelEntry, id: string, change: (params: Tab["params"]) => Tab["params"]): PanelEntry {
+  const g = groupOf(e, id);
+  if (g === null) return e;
+  const grp = groupAt(e, g);
+  const old = grp.tabs.find((t) => t.id === id);
+  if (!old) return e;
+  const params = change(old.params);
+  return sameParams(old.params, params) ? e : withGroup(e, g, { ...grp, tabs: grp.tabs.map((t) => (t.id === id ? { ...t, params } : t)) });
+}
+
+/** Takes `names` out of a tab's params. */
+export function dropParams(e: PanelEntry, id: string, names: readonly string[]): PanelEntry {
+  return withParams(e, id, (params) => Object.fromEntries(Object.entries(params).filter(([k]) => !names.includes(k))));
+}
+
+/**
+ * openTab for a tab that must not take its group's screen, where the user is typing: it joins
+ * the strip behind the active tab, or takes the new params where it is, and nothing else moves.
+ */
+export function openTabBehind(e: PanelEntry, tab: Tab): PanelEntry {
+  const g = groupOf(e, tab.id);
+  if (g !== null) return withParams(e, tab.id, () => tab.params);
+  const at = focusedGroup(e);
+  const grp = groupAt(e, at);
+  return withGroup(e, at, { ...grp, tabs: [...grp.tabs, tab] });
+}
+
 /** Makes an existing tab active in its group (ending picking there), and focuses that group; an unknown id changes nothing. */
 export function activateTab(e: PanelEntry, id: string): PanelEntry {
   const g = groupOf(e, id);
@@ -662,10 +690,10 @@ export function getPanel(target: PanelTarget = "current"): PanelEntry {
  * tab goes to `group` (a group's "+" or surface list), by default the focused group (the
  * last one the user interacted with); a tab already open in either group is activated
  * where it is (openTab). Returns false when there is no panel to open (nothing selected).
- * It does not request focus.
+ * It does not request focus. `behind`: openTabBehind.
  */
-export function openSurface(target: PanelTarget, tab: Tab, opts: { group?: GroupIndex } = {}): boolean {
-  return update(target, (e) => openTab(e, tab, opts.group)) !== null;
+export function openSurface(target: PanelTarget, tab: Tab, opts: { group?: GroupIndex; behind?: boolean } = {}): boolean {
+  return update(target, (e) => (opts.behind ? openTabBehind(e, tab) : openTab(e, tab, opts.group))) !== null;
 }
 
 /**
@@ -691,6 +719,16 @@ export function closePanelTab(target: PanelTarget, id: string, opts: { keepOpen?
 /** Sets a tab's title in its strip (retitleTab). */
 export function retitlePanelTab(target: PanelTarget, id: string, title: string): void {
   update(target, (e) => retitleTab(e, id, title));
+}
+
+/** Takes `names` out of a tab's params (dropParams). */
+export function dropPanelTabParams(target: PanelTarget, id: string, names: readonly string[]): void {
+  update(target, (e) => dropParams(e, id, names));
+}
+
+/** Sets one of a tab's params. */
+export function setPanelTabParam(target: PanelTarget, id: string, name: string, value: string): void {
+  update(target, (e) => withParams(e, id, (params) => ({ ...params, [name]: value })));
 }
 
 /** Activates a tab in its group, which takes focus (activateTab). */

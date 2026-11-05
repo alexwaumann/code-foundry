@@ -40,6 +40,7 @@ type panelDeps struct {
 	windows  int
 	viewed   map[string]bool
 	files    *commandtest.Files
+	edits    command.FileEditChecker
 	diffs    *commandtest.FileDiffs
 	projects *commandtest.Project
 	prs      *commandtest.PullRequestChecks
@@ -61,6 +62,9 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 	}
 	if d.files != nil {
 		deps.Files = d.files
+	}
+	if d.edits != nil {
+		deps.FileEdits = d.edits
 	}
 	if d.diffs != nil {
 		deps.FileDiffs = d.diffs

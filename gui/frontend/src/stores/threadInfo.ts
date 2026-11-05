@@ -137,15 +137,26 @@ export function releasePending(key: string): void {
  * failed-prompt notice as a composer send does. The draft is left alone; a failure toasts.
  */
 export async function sendThreadPrompt(threadId: string, text: string): Promise<boolean> {
+  try {
+    return await deliverThreadPrompt(threadId, text);
+  } catch (err) {
+    toast.error("Send failed", { description: sendErrorMessage(err) });
+    return false;
+  }
+}
+
+/** sendThreadPrompt for a caller that says a failure itself: it throws one, and false is the user declining a confirmation. */
+export async function deliverThreadPrompt(threadId: string, text: string): Promise<boolean> {
   const release = holdFailedNotice(threadId);
   try {
     const res = await invokeConfirmed(THREAD_COMMANDS.send, { id: threadId, text }, threadContext(threadId));
+    // A removed thread answers with its report and a failing exit code, not an error.
+    if (res?.exitCode) throw new Error(res.message.split("\n")[0]);
     if (!res) release();
     return res !== null;
   } catch (err) {
     release();
-    toast.error("Send failed", { description: sendErrorMessage(err) });
-    return false;
+    throw err;
   } finally {
     void refreshCommands();
   }

@@ -336,7 +336,9 @@ var panelActions = []string{ViewPanelToggle, ViewPanelExpand, ViewPanelNewTab, V
 // panelItems is how the item verbs (commands_view_items.go) and replies open one file or
 // pull request.
 const panelItems = "view.panel.file (--path, --line), view.panel.diff (--path, --scope) and view.panel.pr (--number) open one item " +
-	"(view.panel.page (--path, --title) an .html page as your own, with its bridge and no card) and refuse one that does not exist or has nothing to show. A file path written in a reply (prose or inline code) also renders as " +
+	"(view.panel.page (--path, --title) an .html page as your own, with its bridge and no card) and refuse one that does not exist or has nothing to show. " +
+	"view.panel.file --edit (--line, --note) asks the user to edit the file, a new one included, for a secret or a file you cannot read: end your turn, a message says when it is saved. " +
+	"A file path written in a reply (prose or inline code) also renders as " +
 	"a chip the user clicks to open it in the File tab; .html files render there interactively (scripts on)."
 
 // inlinePage is how a thread shows an HTML page in its own conversation (view.inline,

@@ -4,7 +4,8 @@
  * closed, and the bottom panel is closed (the daemon removed the thread's shells, so its
  * tabs went on their own). A File tab with unsaved edits stays, and its panel opens, so the
  * user finds it on coming back: this can happen from another window or the CLI, with no one
- * to ask. Removing a thread drops its drafts, since nothing can reach them after. Reacting to the threads store rather than wrapping
+ * to ask. Removing a thread drops its drafts, since nothing can reach them after; a thread
+ * list that failed reports no removal, though it empties the store. Reacting to the threads store rather than wrapping
  * archiveThread / snoozeThread makes every archive and snooze behave the same. Only a
  * transition counts (not archived or snoozed to so, on a thread this window already
  * knew), so panels opened later on an archived or snoozed thread are left alone, a
@@ -85,7 +86,7 @@ export function startArchiveCleanup(): () => void {
     for (const id of putAway) resetThreadPanels(id);
     for (const id of newlyRemoved(prev, s)) {
       putAway.add(id);
-      dropPanelDrafts(keyOf({ kind: "thread", id }) ?? "");
+      if (s.availability !== "unavailable") dropPanelDrafts(keyOf({ kind: "thread", id }) ?? "");
     }
     const ui = useUiStore.getState();
     if (putAwaySelected(ui.selection, putAway)) ui.select(HOME);

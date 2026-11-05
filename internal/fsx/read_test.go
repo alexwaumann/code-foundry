@@ -139,7 +139,7 @@ func TestReadFile(t *testing.T) {
 			if !tt.want.NotFound && got.ModifiedAt.IsZero() {
 				t.Error("modified at is zero")
 			}
-			got.Contents, got.ModifiedAt = nil, tt.want.ModifiedAt
+			got.Contents, got.ModifiedAt, got.RealPath, got.Mode = nil, tt.want.ModifiedAt, "", 0
 			if tt.want.IsDir {
 				got.Size = 0 // a directory's size is whatever the filesystem says
 			}
@@ -172,5 +172,34 @@ func TestDetectMIME(t *testing.T) {
 	}
 	if !LooksBinary([]byte("ab\x00")) || LooksBinary([]byte(strings.Repeat("a", BinarySniff)+"\x00")) {
 		t.Error("LooksBinary checks only the first BinarySniff bytes for NUL")
+	}
+}
+
+// RealPath and Mode are the file a write lands on, through whatever symlinks led there.
+func TestReadFileRealPath(t *testing.T) {
+	h := newWriteHome(t)
+	real := h.file(h.at("proj/drop.txt"), "x", 0o644)
+	link := h.link(real, h.at("proj/.env"))
+	got, err := ReadFile(h.root, "", link, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Path != link || got.RealPath != real || got.Mode != 0o644 {
+		t.Errorf("got %s real %s mode %o", got.Path, got.RealPath, got.Mode)
+	}
+	dir := h.link(h.at("proj"), h.at("linked"))
+	got, err = ReadFile(h.root, "", dir+"/new.env", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.NotFound || got.RealPath != h.at("proj/new.env") || got.Mode != 0 {
+		t.Errorf("missing: got %+v", got)
+	}
+	got, err = ReadFile(h.root, "", h.at("nope/new.env"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.NotFound || got.RealPath != "" {
+		t.Errorf("no directory: got %+v", got)
 	}
 }

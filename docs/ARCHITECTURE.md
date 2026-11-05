@@ -401,7 +401,10 @@ Services (v1):
   that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).
   The File tab's editor calls it directly; a draft lives only in the window's memory and only
   the window saves it: `file.save` refuses every caller that reaches the daemon
-  (`docs/notes/file-edit-2-gui.md`).
+  (`docs/notes/file-edit-2-gui.md`). `view.panel.file --edit` asks the user to edit a file: the
+  verb refuses what the tab could not edit, nothing from inside the file reaches its answer, and
+  the tab's Save and tell thread sends one ordinary message after the write
+  (`docs/notes/file-edit-3-agent.md`).
 * `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, Watch. Per-project
   actions (name unique per project ignoring case, command, icon, in terminal or in the
   background, run on worktree create, position; SQLite, cascading with the project) and

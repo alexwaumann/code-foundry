@@ -137,6 +137,7 @@
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
  *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
  *   POST /__mock/fs/remove?path=…                 (the file goes)
+ *   POST /__mock/fs/link?path=…&real=…            (ReadFile says a link leads from the path to real)
  *   POST /__mock/fs/refuse?code=…&message=…       (the next WriteFile fails: code as in failed_precondition)
  *   GET  /__mock/fs/text?path=…                   ({ text }: a file's contents, null when absent)
  *   GET  /__mock/fs/calls                         ("read <path>", "write <path> [force]", "diff <worktree> <file> <working|branch>")
@@ -472,7 +473,7 @@ function routes(router: ConnectRouter): void {
     },
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
     searchFiles: (req) => searchFilesSlow(world.projects, req),
-    readFile: (req) => mockFiles.readFile(req.baseDir, req.path, req.maxBytes),
+    readFile: (req) => mockFiles.readWithLink(req.baseDir, req.path, req.maxBytes),
     writeFile: (req) => mockFiles.writeFile(req),
     previewFile: (req) => mockFiles.previewFile(req.baseDir, req.path),
   });
@@ -1819,6 +1820,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/fs/remove":
       mockFiles.remove(q.get("path") ?? "");
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/fs/link":
+      mockFiles.links.set(q.get("path") ?? "", q.get("real") ?? "");
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/fs/refuse":

@@ -1,7 +1,8 @@
 import { createElement } from "react";
 import { FileText } from "lucide-react";
 import { FileTab } from "@/components/files/FileTab";
-import { confirmCloseFile, fileEditKey, useFileDirty } from "@/stores/fileEdit";
+import { fileEditKey, useFileDirty } from "@/stores/fileEdit";
+import { confirmCloseFile } from "@/stores/fileRequest";
 import { lastTabOf } from "@/stores/filePanel";
 import { usePanelStore } from "@/stores/panel";
 import { FILE_KIND, fileOfTab } from "./fileTarget";
@@ -26,6 +27,7 @@ export const filesSurface: SurfaceSpec = {
   watches: [...NO_PROJECT_WATCHES, usePanelStore],
   beforeClose: confirmCloseFile,
   useUnsaved: (panelKey, tab) => useFileDirty(fileEditKey(panelKey, tab.id)),
+  waiting: (tab) => (fileOfTab(tab)?.ask ? "A thread asked you to edit this file" : null),
   render: (tab) => {
     const target = fileOfTab(tab);
     return target ? createElement(FileTab, { target }) : null;

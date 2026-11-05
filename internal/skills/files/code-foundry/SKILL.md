@@ -1,6 +1,6 @@
 ---
 name: code-foundry
-description: "Start here for anything about Code Foundry, the app this thread runs in. Use when the user asks what you can do, what's running, their work, this worktree's changes or PRs, version, model, effort, usage, cost, settings, plugins; asks to see or make a file, diff, page, HTML, chart or theme, a mockup or recolour the app; states a preference to remember; wants a skill, a PR or a reminder; or before acting in the app."
+description: "Start here for anything about Code Foundry, the app this thread runs in. Use when asked what you can do, what's running, their work, this worktree's changes or PRs, version, model, effort, usage, cost, settings, plugins; to see or make a file, diff, page, HTML, chart or theme, a mockup or a recolour; a preference to remember; a skill, PR, reminder, a secret or a file you cannot read; or before acting in the app."
 user-invocable: false
 ---
 
@@ -30,6 +30,7 @@ Never tell the user skill or command names: say what you will do, not which comm
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
 | About this thread: what changed, its branch, checkouts, subagents, child threads, MCP servers, linked PRs | What changed is the branch's commits since its base (`baseRef` in `thread get --json`, else origin's default branch) plus uncommitted work, not uncommitted work alone; `code-foundry thread checkouts`; `thread agents`; `thread list --created-by $CODE_FOUNDRY_THREAD` (`thread get` names your creator); `thread mcp` (your session's start list goes stale); linked PRs are `thread get --json`'s `linkedPullRequests` (absent: none); `thread pr link <url>` links one by hand |
 | To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`, `view.panel.mcp`: your own side panel. Add `--focus` only when the user asks to be taken there |
+| A secret value, or a change to a file you cannot read (`.env`, `~/.aws/credentials`) | Never ask for it in chat or read the file: `view.panel.file <path> --edit --line N --note "<what goes where>"`, then end your turn. Told it is saved, continue without reading its values. If refused, tell the user why |
 | A page, chart, form, board, dashboard, mockup of a product, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown; `--panel` also opens it beside the thread) and can read and change the app |
 | What's running or going on, their work | "running" here means this app's threads, actions and terminals, never the Mac's processes (no `ps`, no killing): `code-foundry thread list`, `action runs`, `terminal list`; a board of it: the code-foundry-pages skill |
 | The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
@@ -50,8 +51,7 @@ with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised
 `--cf-text`, `--cf-text-muted`, `--cf-accent`, `--cf-border` and the status fills
 `--cf-success`, `--cf-warning`, `--cf-error` (their text `-text`, tint `-surface`), or the
 type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
-`/cf/bridge.js` lets it call the app and sizes its card: load it in every page.
-`view.inline` warns about what a page misses. More: code-foundry-pages.
+`/cf/bridge.js` lets it call the app and sizes its card: load it in every page. More: code-foundry-pages.
 
 ## Scopes
 

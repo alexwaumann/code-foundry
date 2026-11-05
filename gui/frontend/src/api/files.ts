@@ -11,6 +11,10 @@ import { orOutdatedDaemon } from "./errors";
 export interface FileReadView {
   /** Absolute, cleaned path as asked for (before following symlinks). */
   path: string;
+  /** Where a write lands, symlinks followed: of a missing file, where it would be; "" when not known. */
+  realPath: string;
+  /** The real file's permission bits; 0 for a missing file. */
+  mode: number;
   /** Size of the whole file in bytes (a directory's own size for a folder). */
   size: number;
   /** Only part came back: the first MiB of a text file, the first READ_MAX_BYTES of any other. */
@@ -60,6 +64,11 @@ function decodeText(bytes: Uint8Array): { text: string; lossless: boolean } {
   }
 }
 
+/** What a tab edits where no file is yet: an empty text document at `path`, nothing on disk behind it. */
+export function blankFile(path: string, realPath = ""): FileReadView {
+  return { path, realPath, mode: 0, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, text: "", lossless: true, image: null, pdf: null };
+}
+
 /** Whether a MIME type is an image the webview can show (`image/svg+xml` included). */
 export function isImageMime(mime: string): boolean {
   return mime.startsWith("image/");
@@ -82,6 +91,8 @@ export function toFileReadView(r: ReadFileResponse): FileReadView {
   const decoded = !r.binary && !r.notFound && !r.isDir ? decodeText(r.contents) : null;
   return {
     path: r.resolvedPath,
+    realPath: r.realPath,
+    mode: r.mode,
     size: Number(r.size),
     truncated: r.truncated,
     binary: r.binary,
@@ -116,6 +127,11 @@ export interface FileVersion {
   modifiedAtMs: number | null;
 }
 
+/** One version of a file as a string, for telling it from another. */
+export function versionStamp(v: FileVersion): string {
+  return `${String(v.size)}:${String(v.modifiedAtMs)}`;
+}
+
 /** FilesystemService.WriteFile's answer. A conflict wrote nothing. */
 export interface FileWriteView extends FileVersion {
   /** Absolute, cleaned path as asked for (before following symlinks). */
@@ -128,17 +144,18 @@ export interface FileWriteView extends FileVersion {
 
 /**
  * Replaces a file's contents with `text`, as UTF-8, if it is still `version` (`force`
- * writes whatever is there, and makes a file that went). `path` as for readFile. A conflict
+ * writes whatever is there, and makes a file that went; `create` makes a file where none
+ * is, at 0600, and never replaces one that appeared). `path` as for readFile. A conflict
  * is an answer, not an error. A refusal is an error with a message fit to show:
  * FailedPrecondition (read-only, locked, an unwritable folder), ResourceExhausted (disk
  * full), PermissionDenied (macOS privacy), InvalidArgument (over 1 MiB, a config home
  * file). A daemon older than the RPC fails with OutdatedDaemonError.
  */
-export async function writeFile(baseDir: string, path: string, text: string, version: FileVersion, opts: { force?: boolean } = {}, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileWriteView> {
+export async function writeFile(baseDir: string, path: string, text: string, version: FileVersion, opts: { force?: boolean; create?: boolean } = {}, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileWriteView> {
   const c = await conn.client(FilesystemService);
   try {
     const r = await c.writeFile(
-      { baseDir, path, contents: encoder.encode(text), modifiedAt: BigInt(version.modifiedAtMs ?? 0), size: BigInt(version.size), force: opts.force ?? false },
+      { baseDir, path, contents: encoder.encode(text), modifiedAt: BigInt(version.modifiedAtMs ?? 0), size: BigInt(version.size), force: opts.force ?? false, create: opts.create ?? false },
       { signal },
     );
     return { path: r.resolvedPath, size: Number(r.size), modifiedAtMs: r.modifiedAt > 0n ? Number(r.modifiedAt) : null, conflict: r.conflict, notFound: r.notFound };

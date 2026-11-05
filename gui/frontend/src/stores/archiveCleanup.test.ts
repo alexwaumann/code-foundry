@@ -1,8 +1,10 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileReadView } from "@/api/files";
 import type { ThreadView } from "@/api/threads";
 import { newlyArchived, newlyRemoved, newlySnoozed, putAwaySelected, startArchiveCleanup } from "./archiveCleanup";
 import { useBottomStore } from "./bottomPanel";
+import { reconcileThreads } from "./events";
 import { fileEditKey, noteDraft, startEdit, useFileEditStore } from "./fileEdit";
 import { allTabs, emptyEntry, makeTab, usePanelStore } from "./panel";
 import { applyThreadListEvent, emptyThreads, replaceThreads, useThreadsStore } from "./threads";
@@ -17,6 +19,9 @@ vi.mock("@/lib/codeEditor", () => ({
     dropped.push(k);
   },
 }));
+
+const listThreads = vi.hoisted(() => vi.fn());
+vi.mock("@/api/threads", async (orig) => ({ ...(await orig<typeof import("@/api/threads")>()), listThreads }));
 
 const thread = (id: string, archivedAtMs: number | null = null, snoozedUntilMs: number | null = null) =>
   ({ id, createdAtMs: 1, archivedAtMs, snoozedUntilMs, linkedPullRequests: [], usage: [], agentRuns: [] }) as unknown as ThreadView;
@@ -142,7 +147,7 @@ describe("startArchiveCleanup", () => {
   describe("a File tab with unsaved edits", () => {
     const file = { ...makeTab("files", "File"), id: "files:env", title: ".env" };
     const key = fileEditKey("thread:a", file.id);
-    const view: FileReadView = { path: "/w/.env", size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null };
+    const view: FileReadView = { path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null };
     const session = () => useFileEditStore.getState().sessions[key];
 
     beforeEach(async () => {
@@ -185,6 +190,49 @@ describe("startArchiveCleanup", () => {
       expect(dropped).toContain(stateKey);
       // Its panel entry stays, as it did: only the draft had to go.
       expect(allTabs(usePanelStore.getState().byKey["thread:a"] ?? emptyEntry).map((t) => t.id)).toContain(file.id);
+    });
+  });
+
+  describe("a thread list that failed", () => {
+    const file = makeTab("files", ".env");
+    const key = fileEditKey("thread:a", file.id);
+    const fails = (err: Error) => {
+      listThreads.mockRejectedValue(err);
+      return reconcileThreads(new AbortController().signal);
+    };
+
+    beforeEach(async () => {
+      useThreadsStore.setState({ availability: "available" });
+      usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [file], activeTabId: file.id }] } } });
+      await startEdit(key, { panelKey: "thread:a", tabId: file.id, base: "/w" }, { path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null } satisfies FileReadView);
+      noteDraft(key, "SECRET=draft\n");
+    });
+    afterEach(() => {
+      useFileEditStore.setState({ sessions: {} });
+    });
+
+    it.each<[string, Error]>([
+      ["NotFound", new ConnectError("no such service", Code.NotFound)],
+      ["Unimplemented", new ConnectError("no such rpc", Code.Unimplemented)],
+      ["a 404", new ConnectError("HTTP 404", Code.Unknown)],
+    ])("%s: every thread looks gone, and no draft goes", async (_name, err) => {
+      await fails(err);
+      expect(useThreadsStore.getState().order).toEqual([]);
+      expect(useFileEditStore.getState().sessions[key]?.dirty).toBe(true);
+    });
+
+    it("the list coming back finds the draft where it was", async () => {
+      await fails(new ConnectError("no such rpc", Code.Unimplemented));
+      listThreads.mockResolvedValue([thread("a"), thread("b")]);
+      await reconcileThreads(new AbortController().signal);
+      expect(useThreadsStore.getState().availability).toBe("available");
+      expect(useFileEditStore.getState().sessions[key]?.dirty).toBe(true);
+    });
+
+    it("a list that answers without the thread is its removal", async () => {
+      listThreads.mockResolvedValue([thread("b")]);
+      await reconcileThreads(new AbortController().signal);
+      expect(useFileEditStore.getState().sessions[key]).toBeUndefined();
     });
   });
 

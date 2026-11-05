@@ -266,6 +266,11 @@ message ReadFileResponse {
   bool not_found = 8;
   // resolved_path is a directory; only size and modified_at are set.
   bool is_dir = 9;
+  // Where the file really is, symlinks followed; with not_found, where it would be, when
+  // its directory exists. A write lands here.
+  string real_path = 10;
+  // The real file's permission bits (0644); 0 with not_found.
+  uint32 mode = 11;
 }
 
 message WriteFileRequest {

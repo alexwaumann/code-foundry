@@ -286,6 +286,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		},
 		Gh:                ghAPI,
 		Files:             filesystemAPI,
+		FileEdits:         filesystemAPI,
 		FileDiffs:         projectAPI,
 		Settings:          settingsAPI,
 		Update:            updateAPI,

@@ -8,9 +8,10 @@
  *
  *   POST /__mock/fs/write?path=…&text=…   (a file's new contents on disk; reset restores the fixtures)
  *   POST /__mock/fs/remove?path=…         (the file goes)
+ *   POST /__mock/fs/link?path=…&real=…    (ReadFile says a link leads from the path to real; reset forgets it)
  *   POST /__mock/fs/refuse?code=…&message=…   (the next WriteFile fails with that Connect code name)
  *   GET  /__mock/fs/text?path=…           ({ text }: a file's contents on disk, null when absent)
- *   GET  /__mock/fs/calls                 ("read <path>", "write <path> [force]", "diff <worktree> <file> <scope>")
+ *   GET  /__mock/fs/calls                 ("read <path>", "write <path> [force] [create]", "diff <worktree> <file> <scope>")
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
@@ -309,6 +310,7 @@ export class MockFiles {
   constructor(private readonly detailOf: (path: string) => DetailFiles | undefined) {}
 
   reset(): void {
+    this.links.clear();
     this.disk = fixtures();
     this.refusal = null;
     this.calls.length = 0;
@@ -317,6 +319,16 @@ export class MockFiles {
   /** The file goes, as `rm` would. */
   remove(path: string): void {
     this.disk.delete(path);
+  }
+
+  /** Where a path's link leads, for ReadFile's real_path; POST /__mock/fs/link. */
+  readonly links = new Map<string, string>();
+
+  /** ReadFile's answer with where its file really is: a link if one was set, and 0644 behind one. */
+  readWithLink(baseDir: string, path: string, maxBytes: bigint): ReadInit {
+    const r = this.readFile(baseDir, path, maxBytes);
+    const real = this.links.get(r.resolvedPath ?? "");
+    return real === undefined ? r : { ...r, realPath: real, mode: 0o644 };
   }
 
   /** The next WriteFile fails with this code ("failed_precondition") and message. */
@@ -426,16 +438,18 @@ export class MockFiles {
     };
   }
 
-  /** internal/fsx Writer: a changed or vanished file is a conflict, nothing written; force writes whatever is there. */
+  /** internal/fsx Writer: a changed or vanished file is a conflict, nothing written; force writes whatever is there; create takes a place where nothing is. */
   writeFile(req: WriteFileRequest): WriteInit {
     const abs = req.path.startsWith("/") ? normalize(req.path) : normalize(`${req.baseDir}/${req.path}`);
-    this.calls.push(`write ${abs}${req.force ? " force" : ""}`);
+    this.calls.push(`write ${abs}${req.force ? " force" : ""}${req.create ? " create" : ""}`);
     const refusal = this.refusal;
     this.refusal = null;
     if (refusal) throw refusal;
     const e = this.onDisk(abs);
     if (e?.dir) throw new ConnectError(`${abs} is a directory`, Code.InvalidArgument);
-    if (!req.force) {
+    if (req.create) {
+      if (e) return { resolvedPath: abs, modifiedAt: BigInt(e.modifiedAt ?? FIXTURE_MTIME), size: BigInt(e.size ?? e.data.length), conflict: true };
+    } else if (!req.force) {
       if (!e) return { resolvedPath: abs, conflict: true, notFound: true };
       const modifiedAt = BigInt(e.modifiedAt ?? FIXTURE_MTIME);
       const size = BigInt(e.size ?? e.data.length);

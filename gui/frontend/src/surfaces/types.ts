@@ -64,6 +64,8 @@ export interface SurfaceSpec {
   beforeClose?: (panelKey: string, tab: Tab) => true | Promise<boolean>;
   /** A hook: the tab holds unsaved work, which its strip marks. */
   useUnsaved?: (panelKey: string, tab: Tab) => boolean;
+  /** What waits on a tab that is not showing, which its strip marks: its name for a screen reader, null for nothing. */
+  waiting?: (tab: Tab) => string | null;
   /** The tab body. Mounted under key={tab.id}, so each tab gets fresh component state. */
   render: (tab: Tab) => ReactNode;
   /** The tab the empty state and the hotkey open; null when there is nothing to open. */

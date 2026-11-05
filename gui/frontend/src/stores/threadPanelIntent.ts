@@ -13,9 +13,14 @@
  * not the screen.
  *
  * The item actions (panel.file, panel.diff, panel.pr) open what their params name; the
- * daemon checked it exists first (internal/command/commands_view_items.go).
+ * daemon checked it exists first (internal/command/commands_view_items.go). The one thing
+ * here that may take the keyboard is a request to edit a file with --focus: the daemon
+ * sends focus=1 only then, and only because the user asked to be taken there. Without it, a
+ * request that would replace the editor the user is typing in joins the strip behind it.
  */
 import type { DiffScopeView } from "@/api/fileDiff";
+import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
+import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
 import { openDiffInPanel, openFileInPanel } from "./filePanel";
 import { openMcpSurface } from "./mcpPanel";
 import { expandPanel, getPanel, isSplit, keyOf, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
@@ -48,6 +53,14 @@ function item(open: (key: string, params: Params) => boolean): ThreadPanelAction
   };
 }
 
+let asks = 0;
+
+/** A new request's id, kept in its tab across a reload. */
+function nextAskId(): string {
+  asks += 1;
+  return `${Date.now().toString(36)}-${String(asks)}`;
+}
+
 /** A positive whole number from a param, else undefined. */
 function positive(v: string | undefined): number | undefined {
   const n = Number(v);
@@ -75,17 +88,24 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
   },
   "panel.mcp": surface(openMcpSurface),
   // view.panel.file: params path (absolute), line, project and base; view.panel.page adds
-  // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts).
+  // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts); --edit adds
+  // edit=1 and thread (who asked), with note and focus when they apply.
   "panel.file": item((key, p) => {
     if (!p.path) return false;
     const line = positive(p.line);
-    return openFileInPanel(key, {
+    const file: FileTarget = {
       project: p.project ?? "",
       base: p.base ?? "",
       path: p.path,
       ...(line === undefined ? {} : { line }),
       ...(p.page === "1" ? { page: { title: p.title ?? "" } } : {}),
-    });
+      ...(p.edit === "1" ? { edit: true, ask: { id: nextAskId(), thread: p.thread ?? "", note: p.note ?? "" } } : {}),
+    };
+    const tabId = fileTab(file).id;
+    const behind = p.edit === "1" && p.focus !== "1" && editorHasKeyboard(key, tabId);
+    if (!openFileInPanel(key, file, { behind })) return false;
+    if (p.focus === "1") focusEditorLine(fileEditKey(key, tabId), line);
+    return true;
   }),
   // view.panel.diff: params project, worktree, path (worktree-relative) and scope.
   "panel.diff": item((key, p) => {
