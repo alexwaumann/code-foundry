@@ -16,7 +16,7 @@ vi.mock("sonner", async (orig) => {
 const { daemon, invocationsOf, refuse, resetDaemon } = await import("@/test/daemonFakes");
 const { getDraft, updateDraft, useComposeStore } = await import("./compose");
 const { useProjectsStore } = await import("./projects");
-const { cancelSetup, editSetup, retrySetup, setupDraftJson } = await import("./setupActions");
+const { cancelSetup, editSetup, noteSentFrom, retrySetup, setupDraftJson } = await import("./setupActions");
 const { threadDraftKey } = await import("./threadActions");
 const { useThreadsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
@@ -113,6 +113,18 @@ describe("Edit", () => {
     await edit;
     expect(getDraft("repo-a").phase).toBe("idle");
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "removed", id: ID }));
+  });
+
+  it("waits in the composer it was sent from, not the thread's primary's", async () => {
+    useThreadsStore.setState({ byId: { [ID]: thread({ projectId: "repo-b", projectIds: ["repo-a", "repo-b"] }) }, order: [ID] });
+    noteSentFrom(ID, { kind: "project", projectId: "repo-a" });
+    let answer = (): void => undefined;
+    daemon.handlers.set("thread.setup.discard", () => new Promise((resolve) => { answer = () => { resolve({ message: "", resultJson: JSON.stringify({ first: { text: "go" } }) }); }; }));
+    const edit = editSetup(ID);
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-a" });
+    answer();
+    await edit;
+    expect(getDraft("repo-a").text).toBe("go");
   });
 
   it("a cancel leaves no error", async () => {

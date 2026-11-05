@@ -46,6 +46,18 @@ export function setupDraftJson(target: ComposeTarget, d: Draft): string {
   });
 }
 
+/**
+ * The composer each thread was sent from in this window, by thread: Edit waits in the right
+ * one before the daemon has given the snapshot back, so a set whose primary is not the
+ * target, or a like draft, does not pass through another composer on the way.
+ */
+const sentFrom = new Map<string, ComposeTarget>();
+
+/** sendDraft's note of where a thread came from. */
+export function noteSentFrom(threadId: string, target: ComposeTarget): void {
+  sentFrom.set(threadId, target);
+}
+
 /** thread.setup.retry (the note's Try again). The daemon's refusal is the composer's error line. */
 export async function retrySetup(threadId: string): Promise<boolean> {
   const key = threadDraftKey(threadId);
@@ -220,7 +232,7 @@ export async function editSetup(threadId: string): Promise<boolean> {
   if (!t) return false;
   const threadKey = threadDraftKey(threadId);
   const ctx = threadContext(threadId);
-  const own = targetOfThread(t);
+  const own = sentFrom.get(threadId) ?? targetOfThread(t);
   const waitIn = targetExists(own, threadId) ? own : nearestTarget(t.projectIds);
   const waitKey = draftKey(waitIn);
   if (getDraft(waitKey).phase !== "idle") {
@@ -248,6 +260,7 @@ export async function editSetup(threadId: string): Promise<boolean> {
     updateDraft(threadKey, { error: failure.message || "Could not undo the send." });
     return false;
   }
+  sentFrom.delete(threadId);
   const gone = parseDiscardedSetup(res.resultJson);
   const snap = parseSetupDraft(gone.draftJson);
   const notes: string[] = [];

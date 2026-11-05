@@ -684,6 +684,8 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   with force, and the project store undoes a `git worktree add` it killed. The GUI shows a
   setup as one timeline row under the first message and in the sidebar's status
   (`lib/threadSetup.ts`, `components/thread/SetupRow.tsx`, `docs/notes/instant-threads-3-gui.md`).
+  The new-thread composer's send runs it in the background; the composer's Cancel, Try again and
+  Edit are `stores/setupActions.ts` (`docs/notes/instant-threads-4-composer.md`).
 * Auto-naming via an independent `claude -p` call producing a short natural title
   ("Fix the login redirect") and, for a new worktree or workspace, its branch in the same
   call, in the `projects.branch_naming` mode: `semantic` (default, `<type>/<slug>`, the
