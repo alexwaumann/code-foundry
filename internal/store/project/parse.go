@@ -182,7 +182,9 @@ type listedWorktree struct {
 	Detached bool
 	Bare     bool
 	Locked   bool
-	Prunable bool
+	// LockReason is why it is locked: "initializing" while an add checks it out.
+	LockReason string
+	Prunable   bool
 }
 
 // parseWorktreeList parses `git worktree list --porcelain -z`: attributes are
@@ -221,7 +223,7 @@ func parseWorktreeList(out []byte) ([]listedWorktree, error) {
 		case "bare":
 			cur.Bare = true
 		case "locked":
-			cur.Locked = true
+			cur.Locked, cur.LockReason = true, val
 		case "prunable":
 			cur.Prunable = true
 		}

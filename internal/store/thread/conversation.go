@@ -39,14 +39,14 @@ func (r *runner) call(ctx context.Context, cmd threadCmd) (Item, error) {
 // told in the timeline, not by an error, unless its transcript is gone
 // (ErrTranscriptMissing: nothing is written). A message to a starting thread waits for the
 // handshake behind the first prompt (queue); one to a closing thread waits for the exit,
-// then starts it. A sent message unarchives and unsnoozes the thread.
+// then starts it; one to a thread in setup goes on its row (sendToSetup). A sent message
+// unarchives and unsnoozes the thread.
 func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error) {
 	log, err := m.thread(ctx, id)
 	if err != nil {
 		return Item{}, err
 	}
-	// Claude has no place to run yet, and nothing would deliver it (setup.go).
-	if err := m.refuseSetup(id, "sent to"); err != nil {
+	if err := m.refuseToSetup(id, msg); err != nil {
 		return Item{}, err
 	}
 	// A conversation Claude Code deleted cannot continue (transcriptmissing.go);
@@ -75,6 +75,24 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if err != nil {
 		return Item{}, err
 	}
+	var written string // its item, when a setup took it and then let it through
+	if s.setupUnfinished() {
+		// No process to send it to, and maybe no worktrees yet (setup_actions.go).
+		o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
+			by: strings.TrimSpace(msg.ByThreadID)}
+		m.nameFromFirstMessage(id, log, o)
+		it, handled, err := m.sendToSetup(ctx, id, log, o)
+		if handled || err != nil {
+			if err == nil {
+				m.backToList(id)
+			}
+			return it, err
+		}
+		written = o.itemID
+		if s, err = m.Get(ctx, id); err != nil {
+			return Item{}, err
+		}
+	}
 	prompt, dropped := rewriteFileRefs(prompt, m.fileRefRoots(s))
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths", "thread", id, "refs", dropped)
@@ -87,7 +105,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 		prompt = note + "\n\n" + prompt
 	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
-		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), note: note, resume: resume}
+		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), note: note, resume: resume, itemID: written}
 	m.nameFromFirstMessage(id, log, o)
 	for {
 		live, closing, reserved, _, err := m.lifecycle(id)

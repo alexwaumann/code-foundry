@@ -670,6 +670,13 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   thread and what was made, and is the call's error) or passes `background_setup` (a failure
   stays on the thread, `setup failed`). While it runs the thread is STARTING with a
   reservation and busy "setting up"; in worktree mode it has no cwd and no checkouts.
+  A background setup has its ways out (`setup_actions.go`,
+  `docs/notes/instant-threads-2-actions.md`): `thread.setup.retry` goes on at the step that
+  failed, `thread.setup.cancel` stops it and removes what it made (idle `setup cancelled`),
+  `thread.setup.discard` undoes the send and gives back the draft. A message sent during it
+  queues on the row behind the first prompt; one sent after it failed tries it again. All
+  cleanup goes through `rollback`: only what was made, nothing another thread holds, never
+  with force, and the project store undoes a `git worktree add` it killed.
 * Auto-naming via an independent `claude -p` call producing a short natural title
   ("Fix the login redirect") and, for a new worktree or workspace, its branch in the same
   call, in the `projects.branch_naming` mode: `semantic` (default, `<type>/<slug>`, the

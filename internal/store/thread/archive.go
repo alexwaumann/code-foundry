@@ -72,6 +72,9 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 	if err != nil {
 		return Thread{}, err
 	}
+	if s.ID == "" {
+		return Thread{}, m.notFound(id) // its create failed: there never was such a thread
+	}
 	cascade() // created below it while the others were archived
 	if changed || cascaded > 0 {
 		m.log.Info("archived thread", "thread", id, "cascaded", cascaded, "cascade_failed", len(failed))
@@ -195,6 +198,9 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 	// A setup under way ends first, either way: then there is a process to close, or none.
 	if err := m.waitSetup(ctx, id); err != nil {
 		return Thread{}, false, err
+	}
+	if _, ok := m.Snapshot().Thread(id); !ok && m.createFailed(id) {
+		return Thread{}, false, nil // nothing to archive, and no failure of the archive's
 	}
 	if err := m.Close(ctx, id); err != nil {
 		return Thread{}, false, err

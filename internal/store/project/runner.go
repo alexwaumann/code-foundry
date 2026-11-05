@@ -114,6 +114,17 @@ func gitEnv(base []string) []string {
 	)
 }
 
+// killGroup kills process group pgid. A group that is gone is os.ErrProcessDone, which
+// tells exec.Cmd the process ended by itself. So is EPERM: macOS answers that for a group
+// of zombies, and a group git started is the daemon's own to signal.
+func killGroup(pgid int) error {
+	err := syscall.Kill(-pgid, syscall.SIGKILL)
+	if errors.Is(err, syscall.ESRCH) || errors.Is(err, syscall.EPERM) {
+		return os.ErrProcessDone
+	}
+	return err
+}
+
 // Run implements Runner.
 func (r ExecRunner) Run(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	return r.RunInput(ctx, dir, nil, args...)
@@ -144,7 +155,10 @@ func (r ExecRunner) RunInput(ctx context.Context, dir string, stdin []byte, args
 	// /dev/tty to prompt for a password or host key, even when the daemon runs in a
 	// terminal with --dev.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	// Children such as ssh can outlive a killed git and hold the pipes open.
+	// A cancelled git goes with what it started (ssh, a remote helper, a filter): Setsid
+	// made it the leader of its own group, and they would outlive it otherwise.
+	cmd.Cancel = func() error { return killGroup(cmd.Process.Pid) }
+	// Children that left the group can still hold the pipes open.
 	cmd.WaitDelay = 2 * time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

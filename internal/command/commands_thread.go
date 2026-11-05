@@ -36,6 +36,9 @@ type ThreadBackend interface {
 	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
 	RegenerateName(context.Context, *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
+	RetrySetup(context.Context, *connect.Request[v1.RetryThreadSetupRequest]) (*connect.Response[v1.RetryThreadSetupResponse], error)
+	CancelSetup(context.Context, *connect.Request[v1.CancelThreadSetupRequest]) (*connect.Response[v1.CancelThreadSetupResponse], error)
+	DiscardSetup(context.Context, *connect.Request[v1.DiscardThreadSetupRequest]) (*connect.Response[v1.DiscardThreadSetupResponse], error)
 	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
 	Move(context.Context, *connect.Request[v1.MoveThreadRequest]) (*connect.Response[v1.MoveThreadResponse], error)
 	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
@@ -126,7 +129,8 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			NoPalette: true,
 			Title:     "Send to Thread",
 			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
-				"A thread whose Claude is not running starts with it.",
+				"A thread whose Claude is not running starts with it. During a setup it waits behind the first prompt; " +
+				"after a failed or cancelled setup it tries the setup again.",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,

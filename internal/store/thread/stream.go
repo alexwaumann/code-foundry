@@ -59,6 +59,9 @@ type outgoing struct {
 	// first: the thread's pending first message (Thread.PendingFirst), cleared on the row
 	// once it went out (firstprompt.go).
 	first bool
+	// setupQueued: a message sent during the setup (Setup.Queued), taken off the row once
+	// it went out.
+	setupQueued bool
 }
 
 // streamState is the runner's process half. Every field is touched only by
@@ -179,8 +182,7 @@ func (r *runner) pid() int { return r.st.proc.Pid() }
 // spawnStream starts a thread's claude and prepares its runner (spawn starts run). msgs
 // go out once Claude answers its handshake, in order; the items of all but the first are
 // in the timeline already.
-func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv, env []string, msgs []*outgoing) error {
-	s := rec.s
+func (m *Manager) spawnStream(ctx context.Context, s Thread, r *runner, argv, env []string, msgs []*outgoing) error {
 	log, err := m.thread(ctx, s.ID)
 	if err != nil {
 		return err
@@ -230,9 +232,13 @@ func (m *Manager) saveItem(id string, it Item) {
 
 // closeUnfinished completes items a run left open: streaming text stays as it is,
 // running tool calls become errors, pending requests are cancelled, queued messages
-// stay where they are (Claude never read them).
+// stay where they are (Claude never read them) and stop being queued, unless the row still
+// has them for the next process (Setup.Queued): those are still on their way.
 func closeUnfinished(w itemWriter, why string) {
 	for _, it := range w.log.unfinished() {
+		if it.Queued && w.log.queuedHeld(it.ID) {
+			continue
+		}
 		w.change(it.ID, func(x *Item) {
 			x.Streaming, x.Queued = false, false
 			if x.Tool != nil && x.Tool.Status == ToolRunning {
@@ -474,14 +480,19 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 			r.m.setPendingFirstItem(r.id, f.itemID) // the next start must not write it again
 		}
 	}
-	id, err := newUUID()
-	if err != nil {
-		return Item{}, err
+	var it Item
+	if o.itemID != "" {
+		it, _ = st.log.get(o.itemID) // written during the setup (sendToSetup)
+	} else {
+		id, err := newUUID()
+		if err != nil {
+			return Item{}, err
+		}
+		o.itemID = id
+		u := userItem(id, o)
+		u.Queued = true
+		it = st.proj.w.add(u)
 	}
-	o.itemID = id
-	u := userItem(id, o)
-	u.Queued = true
-	it := st.proj.w.add(u)
 	st.queued = append(st.queued, o)
 	st.sd.waiting = true
 	r.checkStatus()
@@ -489,6 +500,12 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 		r.publishStatus() // as send does (waiting.go)
 	}
 	return it, nil
+}
+
+// addQueued puts messages behind the ones the runner has, before it runs.
+func (st *streamState) addQueued(msgs []*outgoing) {
+	st.queued = append(st.queued, msgs...)
+	st.sd.waiting = true
 }
 
 func (r *runner) onStreamEvent(ev claudestream.Event) {
@@ -654,6 +671,10 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	}
 	if o.first {
 		r.m.clearPendingFirst(r.id)
+	}
+	if o.setupQueued {
+		st.log.releaseQueued(id)
+		r.m.clearSetupQueued(r.id, id)
 	}
 	if seed != "" {
 		r.seed = ""
@@ -1133,6 +1154,7 @@ func (r *runner) maybeExited() {
 		}
 	}
 	st.sd.pending = nil
+	st.log.releaseQueued() // the row lets go of them below (finish)
 	closeUnfinished(st.proj.w, "the thread's process ended")
 	// A turn still open had no result: a close or archive while busy, a crash.
 	st.proj.cutTurn(r.m.opts.Now())
@@ -1153,6 +1175,7 @@ func (r *runner) maybeExited() {
 		// Only a daemon stop keeps an undelivered first message (firstprompt.go): a start
 		// that failed, or a close while starting, ends it as before.
 		s.PendingFirst = nil
+		s.dropSetupQueued()
 	})
 }
 

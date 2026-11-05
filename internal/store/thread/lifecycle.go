@@ -326,8 +326,12 @@ func itemSuffix() string {
 }
 
 // recordUser writes o's user item into the timeline under a new id, which o keeps:
-// sendMessage then delivers it without a second item.
+// sendMessage then delivers it without a second item. One written already stays.
 func recordUser(w itemWriter, o *outgoing) (Item, error) {
+	if o.itemID != "" {
+		it, _ := w.log.get(o.itemID) // written during the setup (sendToSetup)
+		return it, nil
+	}
 	id, err := newUUID()
 	if err != nil {
 		return Item{}, err

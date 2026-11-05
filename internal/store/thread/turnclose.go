@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"slices"
 	"strings"
 	"time"
 )
@@ -112,6 +113,18 @@ func closeOpenTurnWith(w itemWriter, end time.Time, fill func(*TurnEnd)) (Item, 
 		fill(t)
 	}
 	return w.add(Item{ID: synthTurnPrefix + start.ID, Kind: KindTurnEnd, Turn: t}), true
+}
+
+// lastSynthTurn is the id of the log's last top-level turn end when the daemon wrote it.
+func (t *threadLog) lastSynthTurn() (string, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for _, it := range slices.Backward(t.items) {
+		if it.Kind == KindTurnEnd && it.ParentToolUseID == "" {
+			return it.ID, isSynthTurn(it.Turn)
+		}
+	}
+	return "", false
 }
 
 // closeLostRun completes what a run the daemon lost (it died with the process running)

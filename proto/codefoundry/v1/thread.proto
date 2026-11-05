@@ -58,6 +58,18 @@ service ThreadService {
   // removed; with its creator gone it is shown in the sidebar (Thread.created_by's
   // rule).
   rpc Remove(RemoveThreadRequest) returns (RemoveThreadResponse) {}
+  // RetrySetup runs a failed or cancelled setup again, in the background. After a failure it
+  // goes on at the step that failed: what is done stays done, the branch keeps its name.
+  // After a cancel it starts over. FAILED_PRECONDITION for any other thread.
+  rpc RetrySetup(RetryThreadSetupRequest) returns (RetryThreadSetupResponse) {}
+  // CancelSetup stops a running background setup, waits for it to end and removes what it
+  // made; the thread is then DISCONNECTED, IDLE "setup cancelled", phase CANCELLED. Once
+  // the setup passed its spawn it is too late: FAILED_PRECONDITION, and Interrupt applies.
+  rpc CancelSetup(CancelThreadSetupRequest) returns (CancelThreadSetupResponse) {}
+  // DiscardSetup undoes the send of a thread whose setup failed or was cancelled: what the
+  // setup made goes, the thread is forgotten with no tombstone, and the reply is what the
+  // composer needs back. FAILED_PRECONDITION for any other thread.
+  rpc DiscardSetup(DiscardThreadSetupRequest) returns (DiscardThreadSetupResponse) {}
   // RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
   // becomes the primary. A live thread gets set_cwd once it is idle
   // (pending_worktree_path shows the queued target until then) and the row's

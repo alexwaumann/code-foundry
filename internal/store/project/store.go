@@ -646,6 +646,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	remote := g.refExists(ctx, m.Path, "refs/remotes/origin/"+opts.Branch)
 	var args []string
 	base := "" // the start point of a new branch
+	adding := WorktreeEvent{Kind: WorktreeAdding, Path: path, Branch: opts.Branch}
 	switch {
 	case local:
 		args = []string{"worktree", "add", path, opts.Branch}
@@ -655,6 +656,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 			g.fetchStartPoint(ctx, m, "origin/"+opts.Branch, opts)
 		}
 		args = []string{"worktree", "add", path, opts.Branch}
+		adding.Head = g.revParse(ctx, m.Path, "refs/remotes/origin/"+opts.Branch)
 	default:
 		if err := g.ensureBorn(ctx, m, opts.BaseRef); err != nil {
 			return Worktree{}, err
@@ -675,9 +677,19 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 			track = "--track"
 		}
 		args = []string{"worktree", "add", track, "-b", opts.Branch, path, base}
+		adding.Head = g.revParse(ctx, m.Path, base)
 	}
-	opts.report(WorktreeEvent{Kind: WorktreeAdding})
+	opts.report(adding)
+	// Killed, git cannot clean up after itself. Nobody has seen this worktree yet.
+	undo := func() {
+		if ctx.Err() != nil {
+			if err := g.undoAdd(context.WithoutCancel(ctx), m, AbandonWorktreeOptions{Path: path, Branch: adding.Branch, Head: adding.Head}); err != nil {
+				g.log.Warn("a killed worktree add left something behind", "project", m.ID, "path", path, "err", err)
+			}
+		}
+	}
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {
+		undo()
 		return Worktree{}, fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
 	}
 	if real, err := filepath.EvalSymlinks(path); err == nil {
@@ -686,6 +698,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	g.log.Info("worktree created", "project", m.ID, "path", path, "branch", opts.Branch, "base", base)
 	g.recordMade(ctx, m.ID, path) // before the refresh, so its snapshot has it Managed
 	if err := g.refresh(ctx, m.ID); err != nil {
+		undo()
 		return Worktree{}, err
 	}
 	wt, ok := g.Snapshot().Worktree(m.ID, path)
@@ -965,6 +978,9 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	var branchErr error
 	if opts.DeleteBranch && wt.Branch != "" {
 		branchErr = g.deleteRemovedBranch(ctx, m, wt.Branch, opts.Force)
+	}
+	if opts.DeleteMadeBranch != "" {
+		g.deleteUntouchedBranch(ctx, m, opts.DeleteMadeBranch, wt.CreatedHead)
 	}
 	if err := g.sched.wait(ctx, jobKey{kind: jobReconcile, projectID: m.ID}); err != nil {
 		return errors.Join(branchErr, err)

@@ -734,6 +734,17 @@ type Store interface {
 	// ReadAttachment returns a staged attachment's content and MIME type (a thread's
 	// user message shows its images and PDFs). ErrNotFound once reaped.
 	ReadAttachment(ctx context.Context, path string) ([]byte, string, error)
+	// RetrySetup runs a failed or cancelled setup again, in the background: from the step
+	// that failed, or from the start after a cancel (setup_actions.go).
+	// ErrFailedPrecondition otherwise.
+	RetrySetup(ctx context.Context, id string) (Thread, error)
+	// CancelSetup stops a running background setup, waits for it to end and removes what
+	// it made; it returns the thread and the worktrees that stayed for the work in them.
+	// ErrFailedPrecondition otherwise, also when it came too late.
+	CancelSetup(ctx context.Context, id string) (Thread, []string, error)
+	// DiscardSetup undoes a send whose setup failed or was cancelled: what it made goes,
+	// and so does the thread, with no tombstone. ErrFailedPrecondition otherwise.
+	DiscardSetup(ctx context.Context, id string) (SetupDraft, error)
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
 	// List returns the threads o selects, the most recently active first (filter.go).

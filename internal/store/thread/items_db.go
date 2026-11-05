@@ -91,6 +91,14 @@ func writeItem(ctx context.Context, db execer, threadID string, it Item) error {
 	return nil
 }
 
+// deleteItem deletes one item's row (threadLog.dropItem).
+func deleteItem(ctx context.Context, db execer, threadID, itemID string) error {
+	if _, err := db.ExecContext(ctx, `DELETE FROM thread_items WHERE thread_id = ? AND item_id = ?`, threadID, itemID); err != nil {
+		return fmt.Errorf("thread: delete item %s of %s: %w", itemID, threadID, err)
+	}
+	return nil
+}
+
 // querier is a *sql.DB or a *sql.Tx.
 type querier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)

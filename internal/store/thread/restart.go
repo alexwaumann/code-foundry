@@ -21,6 +21,10 @@ const RestartNote = "Restarted Claude"
 func (m *Manager) Restart(ctx context.Context, id string) (Thread, bool, error) {
 	if t, ok := m.Snapshot().Thread(id); ok && t.SettingUp() {
 		return t, false, nil // Claude is not running yet
+	} else if ok {
+		if err := setupRefusal(t, "restarted"); err != nil {
+			return t, false, err // nothing says what it was to run: a retry does
+		}
 	}
 	live, s, err := m.liveOrStopped(ctx, id)
 	if err != nil {

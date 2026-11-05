@@ -24,15 +24,18 @@ type Fake struct {
 	// Now is the clock used for CreatedAt.
 	Now func() time.Time
 	// Err, when set, is returned by every mutating method.
-	Err     error
-	mu      sync.Mutex
-	next    int
-	staged  int
-	byID    map[string]thread.Thread
-	snap    *thread.Snapshot
-	calls   []string
-	retired []thread.UsageBucket
-	items   map[string]*thread.ItemsSnapshot
+	Err error
+	// KeptWorktrees is what CancelSetup answers, and SetupDraft what DiscardSetup does.
+	KeptWorktrees []string
+	SetupDraft    thread.SetupDraft
+	mu            sync.Mutex
+	next          int
+	staged        int
+	byID          map[string]thread.Thread
+	snap          *thread.Snapshot
+	calls         []string
+	retired       []thread.UsageBucket
+	items         map[string]*thread.ItemsSnapshot
 	// Watchers counts WatchItems calls whose ctx has not ended, by thread.
 	watchers map[string]int
 	mcpErrs  map[string]string
@@ -829,6 +832,42 @@ func (f *Fake) Respond(_ context.Context, id, requestID string, d thread.Decisio
 		bus.Publish(f.bus, ev)
 	}
 	return it, nil
+}
+
+// RetrySetup records "RetrySetup <id>" and returns the thread.
+func (f *Fake) RetrySetup(_ context.Context, id string) (thread.Thread, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.record("RetrySetup " + id); err != nil {
+		return thread.Thread{}, err
+	}
+	return f.get(id)
+}
+
+// CancelSetup records "CancelSetup <id>" and returns the thread, with KeptWorktrees.
+func (f *Fake) CancelSetup(_ context.Context, id string) (thread.Thread, []string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.record("CancelSetup " + id); err != nil {
+		return thread.Thread{}, nil, err
+	}
+	s, err := f.get(id)
+	return s, f.KeptWorktrees, err
+}
+
+// DiscardSetup records "DiscardSetup <id>", forgets the thread and returns SetupDraft.
+func (f *Fake) DiscardSetup(_ context.Context, id string) (thread.SetupDraft, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.record("DiscardSetup " + id); err != nil {
+		return thread.SetupDraft{}, err
+	}
+	if _, err := f.get(id); err != nil {
+		return thread.SetupDraft{}, err
+	}
+	delete(f.byID, id)
+	f.rebuild()
+	return f.SetupDraft, nil
 }
 
 // Interrupt records "Interrupt <id>", with " by <by>" when another thread asked.

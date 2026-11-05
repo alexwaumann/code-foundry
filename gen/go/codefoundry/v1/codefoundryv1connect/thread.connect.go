@@ -54,6 +54,15 @@ const (
 	ThreadServiceReconnectProcedure = "/codefoundry.v1.ThreadService/Reconnect"
 	// ThreadServiceRemoveProcedure is the fully-qualified name of the ThreadService's Remove RPC.
 	ThreadServiceRemoveProcedure = "/codefoundry.v1.ThreadService/Remove"
+	// ThreadServiceRetrySetupProcedure is the fully-qualified name of the ThreadService's RetrySetup
+	// RPC.
+	ThreadServiceRetrySetupProcedure = "/codefoundry.v1.ThreadService/RetrySetup"
+	// ThreadServiceCancelSetupProcedure is the fully-qualified name of the ThreadService's CancelSetup
+	// RPC.
+	ThreadServiceCancelSetupProcedure = "/codefoundry.v1.ThreadService/CancelSetup"
+	// ThreadServiceDiscardSetupProcedure is the fully-qualified name of the ThreadService's
+	// DiscardSetup RPC.
+	ThreadServiceDiscardSetupProcedure = "/codefoundry.v1.ThreadService/DiscardSetup"
 	// ThreadServiceRunInProcedure is the fully-qualified name of the ThreadService's RunIn RPC.
 	ThreadServiceRunInProcedure = "/codefoundry.v1.ThreadService/RunIn"
 	// ThreadServiceAddProjectProcedure is the fully-qualified name of the ThreadService's AddProject
@@ -208,6 +217,18 @@ type ThreadServiceClient interface {
 	// removed; with its creator gone it is shown in the sidebar (Thread.created_by's
 	// rule).
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
+	// RetrySetup runs a failed or cancelled setup again, in the background. After a failure it
+	// goes on at the step that failed: what is done stays done, the branch keeps its name.
+	// After a cancel it starts over. FAILED_PRECONDITION for any other thread.
+	RetrySetup(context.Context, *connect.Request[v1.RetryThreadSetupRequest]) (*connect.Response[v1.RetryThreadSetupResponse], error)
+	// CancelSetup stops a running background setup, waits for it to end and removes what it
+	// made; the thread is then DISCONNECTED, IDLE "setup cancelled", phase CANCELLED. Once
+	// the setup passed its spawn it is too late: FAILED_PRECONDITION, and Interrupt applies.
+	CancelSetup(context.Context, *connect.Request[v1.CancelThreadSetupRequest]) (*connect.Response[v1.CancelThreadSetupResponse], error)
+	// DiscardSetup undoes the send of a thread whose setup failed or was cancelled: what the
+	// setup made goes, the thread is forgotten with no tombstone, and the reply is what the
+	// composer needs back. FAILED_PRECONDITION for any other thread.
+	DiscardSetup(context.Context, *connect.Request[v1.DiscardThreadSetupRequest]) (*connect.Response[v1.DiscardThreadSetupResponse], error)
 	// RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
 	// becomes the primary. A live thread gets set_cwd once it is idle
 	// (pending_worktree_path shows the queued target until then) and the row's
@@ -556,6 +577,24 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Remove")),
 			connect.WithClientOptions(opts...),
 		),
+		retrySetup: connect.NewClient[v1.RetryThreadSetupRequest, v1.RetryThreadSetupResponse](
+			httpClient,
+			baseURL+ThreadServiceRetrySetupProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("RetrySetup")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelSetup: connect.NewClient[v1.CancelThreadSetupRequest, v1.CancelThreadSetupResponse](
+			httpClient,
+			baseURL+ThreadServiceCancelSetupProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("CancelSetup")),
+			connect.WithClientOptions(opts...),
+		),
+		discardSetup: connect.NewClient[v1.DiscardThreadSetupRequest, v1.DiscardThreadSetupResponse](
+			httpClient,
+			baseURL+ThreadServiceDiscardSetupProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("DiscardSetup")),
+			connect.WithClientOptions(opts...),
+		),
 		runIn: connect.NewClient[v1.RunInThreadRequest, v1.RunInThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceRunInProcedure,
@@ -841,6 +880,9 @@ type threadServiceClient struct {
 	close             *connect.Client[v1.CloseThreadRequest, v1.CloseThreadResponse]
 	reconnect         *connect.Client[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse]
 	remove            *connect.Client[v1.RemoveThreadRequest, v1.RemoveThreadResponse]
+	retrySetup        *connect.Client[v1.RetryThreadSetupRequest, v1.RetryThreadSetupResponse]
+	cancelSetup       *connect.Client[v1.CancelThreadSetupRequest, v1.CancelThreadSetupResponse]
+	discardSetup      *connect.Client[v1.DiscardThreadSetupRequest, v1.DiscardThreadSetupResponse]
 	runIn             *connect.Client[v1.RunInThreadRequest, v1.RunInThreadResponse]
 	addProject        *connect.Client[v1.AddThreadProjectRequest, v1.AddThreadProjectResponse]
 	move              *connect.Client[v1.MoveThreadRequest, v1.MoveThreadResponse]
@@ -936,6 +978,21 @@ func (c *threadServiceClient) Reconnect(ctx context.Context, req *connect.Reques
 // Remove calls codefoundry.v1.ThreadService.Remove.
 func (c *threadServiceClient) Remove(ctx context.Context, req *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
 	return c.remove.CallUnary(ctx, req)
+}
+
+// RetrySetup calls codefoundry.v1.ThreadService.RetrySetup.
+func (c *threadServiceClient) RetrySetup(ctx context.Context, req *connect.Request[v1.RetryThreadSetupRequest]) (*connect.Response[v1.RetryThreadSetupResponse], error) {
+	return c.retrySetup.CallUnary(ctx, req)
+}
+
+// CancelSetup calls codefoundry.v1.ThreadService.CancelSetup.
+func (c *threadServiceClient) CancelSetup(ctx context.Context, req *connect.Request[v1.CancelThreadSetupRequest]) (*connect.Response[v1.CancelThreadSetupResponse], error) {
+	return c.cancelSetup.CallUnary(ctx, req)
+}
+
+// DiscardSetup calls codefoundry.v1.ThreadService.DiscardSetup.
+func (c *threadServiceClient) DiscardSetup(ctx context.Context, req *connect.Request[v1.DiscardThreadSetupRequest]) (*connect.Response[v1.DiscardThreadSetupResponse], error) {
+	return c.discardSetup.CallUnary(ctx, req)
 }
 
 // RunIn calls codefoundry.v1.ThreadService.RunIn.
@@ -1205,6 +1262,18 @@ type ThreadServiceHandler interface {
 	// removed; with its creator gone it is shown in the sidebar (Thread.created_by's
 	// rule).
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
+	// RetrySetup runs a failed or cancelled setup again, in the background. After a failure it
+	// goes on at the step that failed: what is done stays done, the branch keeps its name.
+	// After a cancel it starts over. FAILED_PRECONDITION for any other thread.
+	RetrySetup(context.Context, *connect.Request[v1.RetryThreadSetupRequest]) (*connect.Response[v1.RetryThreadSetupResponse], error)
+	// CancelSetup stops a running background setup, waits for it to end and removes what it
+	// made; the thread is then DISCONNECTED, IDLE "setup cancelled", phase CANCELLED. Once
+	// the setup passed its spawn it is too late: FAILED_PRECONDITION, and Interrupt applies.
+	CancelSetup(context.Context, *connect.Request[v1.CancelThreadSetupRequest]) (*connect.Response[v1.CancelThreadSetupResponse], error)
+	// DiscardSetup undoes the send of a thread whose setup failed or was cancelled: what the
+	// setup made goes, the thread is forgotten with no tombstone, and the reply is what the
+	// composer needs back. FAILED_PRECONDITION for any other thread.
+	DiscardSetup(context.Context, *connect.Request[v1.DiscardThreadSetupRequest]) (*connect.Response[v1.DiscardThreadSetupResponse], error)
 	// RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
 	// becomes the primary. A live thread gets set_cwd once it is idle
 	// (pending_worktree_path shows the queued target until then) and the row's
@@ -1549,6 +1618,24 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Remove")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceRetrySetupHandler := connect.NewUnaryHandler(
+		ThreadServiceRetrySetupProcedure,
+		svc.RetrySetup,
+		connect.WithSchema(threadServiceMethods.ByName("RetrySetup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceCancelSetupHandler := connect.NewUnaryHandler(
+		ThreadServiceCancelSetupProcedure,
+		svc.CancelSetup,
+		connect.WithSchema(threadServiceMethods.ByName("CancelSetup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceDiscardSetupHandler := connect.NewUnaryHandler(
+		ThreadServiceDiscardSetupProcedure,
+		svc.DiscardSetup,
+		connect.WithSchema(threadServiceMethods.ByName("DiscardSetup")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceRunInHandler := connect.NewUnaryHandler(
 		ThreadServiceRunInProcedure,
 		svc.RunIn,
@@ -1841,6 +1928,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceReconnectHandler.ServeHTTP(w, r)
 		case ThreadServiceRemoveProcedure:
 			threadServiceRemoveHandler.ServeHTTP(w, r)
+		case ThreadServiceRetrySetupProcedure:
+			threadServiceRetrySetupHandler.ServeHTTP(w, r)
+		case ThreadServiceCancelSetupProcedure:
+			threadServiceCancelSetupHandler.ServeHTTP(w, r)
+		case ThreadServiceDiscardSetupProcedure:
+			threadServiceDiscardSetupHandler.ServeHTTP(w, r)
 		case ThreadServiceRunInProcedure:
 			threadServiceRunInHandler.ServeHTTP(w, r)
 		case ThreadServiceAddProjectProcedure:
@@ -1978,6 +2071,18 @@ func (UnimplementedThreadServiceHandler) Reconnect(context.Context, *connect.Req
 
 func (UnimplementedThreadServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Remove is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) RetrySetup(context.Context, *connect.Request[v1.RetryThreadSetupRequest]) (*connect.Response[v1.RetryThreadSetupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.RetrySetup is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) CancelSetup(context.Context, *connect.Request[v1.CancelThreadSetupRequest]) (*connect.Response[v1.CancelThreadSetupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.CancelSetup is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) DiscardSetup(context.Context, *connect.Request[v1.DiscardThreadSetupRequest]) (*connect.Response[v1.DiscardThreadSetupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.DiscardSetup is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {

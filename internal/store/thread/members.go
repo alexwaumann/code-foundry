@@ -58,7 +58,7 @@ func (m *Manager) AddProject(ctx context.Context, id, ref string) (Thread, error
 	})
 	if err != nil {
 		if made != nil {
-			m.rollback(ctx, []madeWorktree{*made})
+			m.rollback(ctx, id, []madeWorktree{*made})
 		}
 		return Thread{}, err
 	}
@@ -164,7 +164,7 @@ func (m *Manager) placeMember(ctx context.Context, s Thread, r project.Project) 
 	if !s.worktreeMode() || !r.Git {
 		return mainCheckout(r), nil, nil
 	}
-	made, err := m.makeWorktrees(ctx, []project.Project{r}, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin(), nil, nil)
+	made, err := m.makeWorktrees(ctx, s.ID, []project.Project{r}, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin(), nil, nil, nil)
 	if err != nil {
 		return "", nil, err
 	}
