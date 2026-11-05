@@ -9,6 +9,7 @@
  * (place) shows no icon or word, only the time since the last activity, muted.
  */
 import {
+  Ban,
   BellRing,
   CircleAlert,
   CircleCheck,
@@ -68,6 +69,9 @@ export const statusRegistry: Readonly<Record<StatusLineKind, StatusEntry>> = {
   transcriptDeleted: { icon: CircleAlert, word: "Error", tone: "error", timeMode: "none" },
   finished: { icon: CircleCheck, word: "Done", tone: "success", timeMode: "none" },
   working: { icon: CircleDashed, word: "Working", tone: "info", timeMode: "status" },
+  settingUp: { icon: CircleDashed, word: "Setting up", tone: "info", timeMode: "status" },
+  setupFailed: { icon: CircleAlert, word: "Setup failed", tone: "error", timeMode: "none" },
+  setupCancelled: { icon: Ban, word: "Cancelled", tone: "muted", timeMode: "none" },
   waiting: { icon: CircleDashed, word: "Waiting", tone: "muted", timeMode: "status" },
   place: { icon: null, word: "", tone: "muted", timeMode: "activity" },
 };
@@ -97,6 +101,7 @@ export type StatusDetailThread = Pick<ThreadView, "status" | "statusReason"> & {
  * - snoozeEnded: "snooze ended"; error: the error note (statusNote)
  * - interrupted / crashed: "resend to continue"; transcriptDeleted: "transcript deleted"
  * - working: the current tool (busyTool), "compacting" while Claude compacts, else ""
+ * - settingUp: the step it is on ("Fetching origin/main"); setupFailed: why ("Could not create the worktree")
  * - waiting: "": line 3 shows the branch, and the row's badge counts the subagents and
  *   child threads still live (lib/liveCount); the hover card says what it waits on (TipWaiting)
  * - finished, place: ""
@@ -123,6 +128,10 @@ export function statusDetail(line: StatusLine, thread: StatusDetailThread | unde
     case "working":
       if (!thread) return "";
       return thread.statusReason === "compacting" ? "compacting" : (thread.busyTool ?? "");
+    case "settingUp":
+    case "setupFailed":
+      return line.detail;
+    case "setupCancelled":
     case "waiting":
     case "finished":
     case "place":

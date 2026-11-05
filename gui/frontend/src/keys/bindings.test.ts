@@ -53,6 +53,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     workspaceId: "",
     pendingWorktreePath: "",
     pendingMove: null,
+    setup: null,
     pinned: false,
     archivedAtMs: null,
     snoozedUntilMs: null,

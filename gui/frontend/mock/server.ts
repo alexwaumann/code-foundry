@@ -39,6 +39,11 @@
  *     since the running process started: Thread.plugin_env_stale; an empty change clears it)
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
  *     Thread.transcript_missing; stopped and held; thread.send and thread.fork refuse it)
+ *   POST /__mock/thread/setup?id=s-1&state=running|fresh|warn|multi|failed|cancelled|done|done-warn|start-only[&queued=1]
+ *     (Thread.setup: the thread stands where that script of mock/setup.ts leaves it, with no cwd
+ *     until it is placed and held, and its timeline is its first message and, for a setup that did
+ *     not finish, the synthetic turn end. Scripting another state moves it on, keeping the message,
+ *     and watchers get a new snapshot, as for a retry. queued: a message sent during the setup waits there)
  *   POST /__mock/transcript-deleted              (the thread s-transcript-deleted, "Fix sidebar flake":
  *     one exchange, its transcript deleted; MOCK_SCENARIO=transcript-deleted seeds it; World.addTranscriptDeleted)
  *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
@@ -1139,6 +1144,9 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
       case "transcript":
         world.setTranscriptMissing(id, q.get("missing") !== "false");
         break;
+      case "setup":
+        world.scriptSetup(id, q.get("state") ?? "running", q.get("queued") === "1");
+        break;
       case "flag": {
         const level = flagLevels[q.get("level") ?? "attention"];
         if (level === undefined) throw new CommandError("invalid", "level must be attention, error or none");
@@ -1208,7 +1216,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript|move-fail|move-delay)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript|setup|move-fail|move-delay)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;

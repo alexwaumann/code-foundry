@@ -1154,3 +1154,50 @@ describe("SidebarRow: a thread whose transcript Claude Code deleted", () => {
     expect(screen.getByTestId("row-detail").textContent).toBe("transcript deleted");
   });
 });
+
+describe("a thread's setup", () => {
+  const step = (kind: "worktree" | "fetch", status: "running" | "failed" | "pending", ref = "") => ({ kind, projectId: "cf", projectName: "code-foundry", ref, branch: "", status, startedAtMs: null, endedAtMs: null, error: "", warning: "", refAtMs: null });
+  const setup = (phase: "running" | "failed" | "cancelled", steps: ReturnType<typeof step>[] = []) => ({ phase, startedAtMs: NOW, endedAtMs: null, steps, error: "", background: true });
+
+  it("running: Setting up in Working's place, the step on line 3 instead of a branch", () => {
+    // The clock held at NOW, as for Working's time: under load the file takes long enough to reach this that the time moved on.
+    vi.useFakeTimers({ now: NOW });
+    try {
+      const body = renderRow({ worktreePath: "", state: "starting", status: "busy", statusReason: "setting up", statusChangedAtMs: NOW - 12_000, setup: setup("running", [step("fetch", "running", "origin/main"), step("worktree", "pending")]) });
+      expect(body.dataset.statusLine).toBe("settingUp");
+      expect(body.dataset.threadBadge).toBe("busy");
+      expect(screen.getByTestId("row-status-word").textContent).toBe("Setting up");
+      expect(screen.getByTestId("row-status").className).toContain("text-cf-info-text");
+      expect(screen.getByTestId("row-time").textContent).toBe("12s");
+      expect(screen.getByTestId("row-detail").textContent).toBe("Fetching origin/main");
+      expect(screen.queryByTestId("row-branch")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("running: no Snooze on the row, which the daemon would refuse", () => {
+    renderRow({ worktreePath: "", state: "starting", status: "busy", statusReason: "setting up", setup: setup("running", [step("worktree", "running")]) });
+    expect(screen.queryByTestId("row-snooze")).toBeNull();
+    expect(screen.getByTestId("row-archive")).toBeTruthy();
+  });
+
+  it("failed: Setup failed in the error colour, the reason on line 3, truncated", () => {
+    renderRow({ worktreePath: "", state: "disconnected", status: "error", statusReason: "setup failed", setup: setup("failed", [step("worktree", "failed")]) });
+    expect(screen.getByTestId("row-status-word").textContent).toBe("Setup failed");
+    expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
+    expect(screen.queryByTestId("row-time")).toBeNull();
+    const detail = screen.getByTestId("row-detail");
+    expect(detail.textContent).toBe("Could not create the worktree");
+    expect(detail.className).toContain("truncate");
+    expect(screen.getByTestId("row-snooze")).toBeTruthy();
+  });
+
+  it("cancelled: Cancelled, muted, nothing on line 3", () => {
+    renderRow({ worktreePath: "", state: "disconnected", status: "idle", statusReason: "setup cancelled", setup: setup("cancelled") });
+    expect(screen.getByTestId("row-status-word").textContent).toBe("Cancelled");
+    expect(screen.getByTestId("row-status").className).toContain("text-cf-sidebar-muted-foreground");
+    expect(screen.queryByTestId("row-detail")).toBeNull();
+    expect(screen.queryByTestId("row-branch")).toBeNull();
+  });
+});

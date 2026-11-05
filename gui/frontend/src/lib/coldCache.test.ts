@@ -26,6 +26,8 @@ describe("coldCacheNote", () => {
     ["a finished turn not seen yet is idle enough", { status: "attention" }, NOTE],
     ["unknown status while connected", { status: "unknown" }, NOTE],
     ["before the expiry", { nowMs: EXPIRES - 1 }, null],
+    // Claude never ran: no result, so no cache to have gone cold.
+    ["a setup that failed", { state: "disconnected", status: "error", contextTokens: 0, cacheExpiresAtMs: null, contextRereadUsd: 0 }, null],
     // Whether Claude runs does not matter; after the idle stop every stopped thread is past expiry.
     ["stopped at its prompt", { state: "disconnected" }, NOTE],
     ["stopped with a finished turn", { state: "disconnected", status: "attention" }, NOTE],

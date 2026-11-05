@@ -805,6 +805,23 @@ html[data-thread-width="full"] {
   color: transparent;
   animation: cf-shimmer 2s linear infinite;
 }
+/* ---------- a thread's setup (SetupRow): its checklist under the first message, in the
+   work log's rows. A step that has not run is dim; git's text sits under a failed line,
+   lined up with the labels. */
+.cf-thread .setup-line[data-status="pending"] {
+  opacity: 0.5;
+}
+.cf-thread .setup-line .setup-project {
+  margin-right: 8px;
+}
+.cf-thread .setup-error {
+  margin: 2px 0 6px 30px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in oklab, var(--t-red) 22%, var(--cf-border));
+  background: color-mix(in oklab, var(--t-red) 8%, transparent);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* The last row of a turn before the next one (Timeline's data-turn-end) carries the
    space between turns. */
 .cf-thread [data-turn-end] {

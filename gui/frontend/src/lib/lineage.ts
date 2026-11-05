@@ -118,6 +118,7 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
   if (isSnoozed(t)) return "snoozed";
   switch (statusLine(t).kind) {
     case "working":
+    case "settingUp":
     case "waiting": // on its own child threads or background work: its team works (lib/waiting)
       return "working";
     case "input":
@@ -133,7 +134,9 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
     case "crashed":
     case "flagError":
     case "transcriptDeleted":
+    case "setupFailed":
       return "error";
+    case "setupCancelled":
     case "place":
       return "idle";
   }

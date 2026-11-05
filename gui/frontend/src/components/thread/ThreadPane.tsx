@@ -15,6 +15,7 @@ import { useShownRun } from "@/stores/subagentView";
 import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
 import { cardFits } from "@/lib/threadInfo";
+import { setupRowPhase } from "@/lib/threadSetup";
 import { useWidth } from "@/lib/useWidth";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { CiteLayer } from "./cite/CiteLayer";
@@ -85,6 +86,8 @@ function WatchedThread({ threadId }: { threadId: string }) {
 
 function ThreadBody({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
+  // A thread made with no prompt still has its setup's row to show.
+  const setupRow = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup) !== "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
   const [dockRef, dockHeight] = useElementHeight();
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -141,7 +144,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
               )}
               {!loaded && <p className="absolute top-10 right-(--ti-inset) left-0 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
               {/* Nothing to show (a thread made without a prompt; a fork starts with its parent's items). */}
-              {loaded && empty && !working && (
+              {loaded && empty && !working && !setupRow && (
                 <p className="absolute top-10 right-(--ti-inset) left-0 px-10 text-center text-body text-cf-text-muted" data-testid="thread-empty">
                   No messages yet.
                 </p>

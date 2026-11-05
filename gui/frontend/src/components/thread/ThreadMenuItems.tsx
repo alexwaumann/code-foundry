@@ -5,6 +5,7 @@ import { beginRename } from "@/keys/bindings";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
 import { isSnoozed } from "@/lib/snooze";
 import { canNewLike, canRunElsewhere, worktreeBranch } from "@/lib/threadRow";
+import { isUnplaced, setupUnfinished } from "@/lib/threadSetup";
 import { runCommand, useCommandsStore } from "@/stores/commands";
 import { composeLike } from "@/stores/compose";
 import { openMovePicker } from "@/stores/movePicker";
@@ -110,8 +111,12 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   // Plugin flags hold the thread in the attention group until a plugin or the user clears them.
   const flags = useThreadsStore((s) => s.byId[id]?.flags.length ?? 0);
   // The palette's and the daemon's rules (lib/threadRow): somewhere else to run; a project or workspace to copy.
-  const runIn = useThreadsStore((s) => canRunElsewhere(s.byId[id]));
-  const newLike = useThreadsStore((s) => canNewLike(s.byId[id])) && !noProject;
+  // A setup that did not finish takes neither: the daemon refuses Run in and Snooze as above, and New thread on this branch while there is no branch.
+  const unfinished = useThreadsStore((s) => setupUnfinished(s.byId[id]?.setup));
+  const unplaced = useThreadsStore((s) => isUnplaced(s.byId[id]));
+  const settingUp = useThreadsStore((s) => s.byId[id]?.setup?.phase === "running");
+  const runIn = useThreadsStore((s) => canRunElsewhere(s.byId[id])) && !unfinished;
+  const newLike = useThreadsStore((s) => canNewLike(s.byId[id])) && !noProject && !unplaced;
   const canSave = useCanSaveAsWorkspace(id) && !noProject;
   const restartListed = useCommandsStore((s) => s.commands.some((c) => c.name === "thread.restart"));
   const clearListed = useCommandsStore((s) => s.commands.some((c) => c.name === "thread.flag.clear"));
@@ -161,21 +166,23 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
       >
         {pinned ? "Unpin" : "Pin"}
       </kit.Item>
-      <kit.Sub>
-        <kit.SubTrigger data-testid="menu-snooze">
-          Snooze
-        </kit.SubTrigger>
-        <kit.SubContent data-testid="menu-snooze-presets">
-          <SnoozePresetItems
-            id={id}
-            Item={kit.Item}
-            Separator={kit.Separator}
-            onPreset={() => {
-              markInPlace(kit, id);
-            }}
-          />
-        </kit.SubContent>
-      </kit.Sub>
+      {!settingUp && (
+        <kit.Sub>
+          <kit.SubTrigger data-testid="menu-snooze">
+            Snooze
+          </kit.SubTrigger>
+          <kit.SubContent data-testid="menu-snooze-presets">
+            <SnoozePresetItems
+              id={id}
+              Item={kit.Item}
+              Separator={kit.Separator}
+              onPreset={() => {
+                markInPlace(kit, id);
+              }}
+            />
+          </kit.SubContent>
+        </kit.Sub>
+      )}
       {snoozed && (
         <kit.Item
           data-testid="menu-unsnooze"

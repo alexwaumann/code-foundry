@@ -11,6 +11,7 @@ import type { UiContextView } from "@/api/command";
 import { isNotFound } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import { terminalIdFromResult, type TerminalView } from "@/api/terminal";
+import { isUnplaced } from "@/lib/threadSetup";
 import {
   activate,
   activeTabOf,
@@ -48,6 +49,7 @@ import { getUiContext, projectsShellPlace, worktreeContext } from "./context";
 import { expandPanel, getPanel } from "./panel";
 import { hidePluginTerminalTab } from "./pluginTerminals";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
+import { useThreadsStore } from "./threads";
 import { isProjectsView, PROJECTS_INDEX, useUiStore } from "./ui";
 import { bottomCanShow, toggleBottomCommand, useViewsStore, visibleBottomKey } from "./views";
 
@@ -56,11 +58,12 @@ import { bottomCanShow, toggleBottomCommand, useViewsStore, visibleBottomKey } f
  * (it carries the thread, which owns the new shell). The Projects page's panel: its active
  * tab's worktree (the page itself carries none), so "+" opens another shell beside the
  * active one. Null when there is nothing to own a new shell (the Projects page with no
- * tabs, or a key that is neither).
+ * tabs, a key that is neither, or a thread with no checkout yet: terminal.new refuses one
+ * during its setup, and its panel says why).
  */
 export function paneContext(key: string): UiContextView | null {
   const thread = threadOfKey(key);
-  if (thread !== null) return getUiContext({ kind: "thread", id: thread });
+  if (thread !== null) return isUnplaced(useThreadsStore.getState().byId[thread]) ? null : getUiContext({ kind: "thread", id: thread });
   if (key !== PROJECTS_KEY) return null;
   const active = getBottomActiveId(key);
   const place = projectsShellPlace(active === null ? undefined : useTerminalsStore.getState().byId[active]);
@@ -287,6 +290,19 @@ export function toggleBottomFromHere(): boolean {
  */
 export function markTerminalNewFromHere(): void {
   markPendingFocus(bottomKeyOf(useUiStore.getState().selection));
+}
+
+/**
+ * terminal.new from here for a thread with no checkout yet: the daemon would refuse it, so
+ * its panel opens on the empty state, which says when a terminal can start. False for
+ * any other selection: terminal.new runs as usual.
+ */
+export function showBottomIfUnplaced(): boolean {
+  const key = bottomKeyOf(useUiStore.getState().selection);
+  const thread = key === null ? null : threadOfKey(key);
+  if (key === null || thread === null || !isUnplaced(useThreadsStore.getState().byId[thread])) return false;
+  if (!getBottom(key).open) toggleBottomCommand();
+  return true;
 }
 
 /**

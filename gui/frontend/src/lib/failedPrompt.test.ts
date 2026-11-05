@@ -198,3 +198,28 @@ describe("appendToDraft", () => {
     expect(appendToDraft(draft, added)).toBe(want);
   });
 });
+
+describe("failedPrompt on a setup that did not finish", () => {
+  const prompt = user();
+  const end = turnEnd({ subtype: "process_ended", interrupted: true });
+  const items = [prompt, end];
+  const input: FailedPromptInput = {
+    order: items.map((i) => i.id),
+    byId: Object.fromEntries(items.map((i) => [i.id, i])),
+    state: "disconnected",
+    status: "error",
+    statusReason: "setup failed",
+    statusChangedAtMs: T0 + 100_000_000,
+    pending: 0,
+    transcriptMissing: false,
+  };
+
+  it("would read the status as a failed send, were it not for the setup", () => {
+    expect(failedPrompt(input)).not.toBeNull();
+  });
+
+  it("says nothing: the setup's own rows are the failure's display", () => {
+    expect(failedPrompt({ ...input, setupUnfinished: true })).toBeNull();
+    expect(failedPrompt({ ...input, status: "idle", statusReason: "setup cancelled", setupUnfinished: true })).toBeNull();
+  });
+});

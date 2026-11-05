@@ -6,18 +6,20 @@
 import type { ThreadMoveView, ThreadView } from "@/api/threads";
 import type { WorktreeChoice } from "./compose";
 import { isNoProject, type ProjectLookup } from "./threadRow";
+import { setupUnfinished } from "./threadSetup";
 
 /**
  * Whether the move picker is offered for a thread: one without a project (lib/threadRow
  * isNoProject) that thread.move would take: not archived, not resident (Ember), not
- * moving already, its transcript not deleted (the daemon refuses: nothing to resume).
+ * moving already, its transcript not deleted (the daemon refuses: nothing to resume), its
+ * setup finished (the daemon refuses: it has not started).
  * The crumb, the menus and the palette's thread.move.open share it.
  */
 export function canMove(
-  t: Pick<ThreadView, "projectId" | "workspaceId" | "worktreePath" | "archivedAtMs" | "resident" | "pendingMove" | "transcriptMissing"> | undefined,
+  t: (Pick<ThreadView, "projectId" | "workspaceId" | "worktreePath" | "archivedAtMs" | "resident" | "pendingMove" | "transcriptMissing"> & Partial<Pick<ThreadView, "setup">>) | undefined,
   projects: ProjectLookup,
 ): boolean {
-  if (!t || t.archivedAtMs !== null || (t.resident ?? "") !== "" || t.pendingMove !== null || t.transcriptMissing) return false;
+  if (!t || t.archivedAtMs !== null || (t.resident ?? "") !== "" || t.pendingMove !== null || t.transcriptMissing || setupUnfinished(t.setup)) return false;
   return isNoProject(t, projects);
 }
 

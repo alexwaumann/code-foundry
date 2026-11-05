@@ -11,6 +11,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { tildify } from "@/lib/path";
 import { isActionLabels } from "@/lib/termlabel";
+import { isUnplaced } from "@/lib/threadSetup";
 import { cn } from "@/lib/utils";
 import { closeBottomTerminal, newBottomTerminal, paneContext } from "@/stores/bottomActions";
 import {
@@ -30,6 +31,7 @@ import {
   useBottomTabIds,
   useCurrentBottomKey,
 } from "@/stores/bottomPanel";
+import { useThreadsStore } from "@/stores/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { usePanelExpanded } from "@/stores/panel";
 import { useTerminalsStore } from "@/stores/terminals";
@@ -159,9 +161,11 @@ function useNewTerminalCommand(): { title: string; chord: string | null } {
  * its active tab's worktree). Re-read whenever the terminals or this panel's state change.
  */
 function useCanStartTerminal(panelKey: string): boolean {
-  // Re-renders when the remembered tab changes; the selector below re-runs on every
-  // terminals change and every render, reading the rest (paneContext) as it is now.
+  // Re-renders when the remembered tab changes or the thread gets its checkout; the
+  // selector below re-runs on every terminals change and every render, reading the rest
+  // (paneContext) as it is now.
   useBottomStore((s) => s.byKey[panelKey]?.activeTerminalId);
+  useThreadsStore((s) => isUnplaced(s.byId[threadOfKey(panelKey) ?? ""]));
   return useTerminalsStore(() => paneContext(panelKey) !== null);
 }
 
@@ -223,11 +227,13 @@ function TabStrip({ panelKey, ids, activeId }: { panelKey: string; ids: readonly
  * No terminals: a button for terminal.new with its chord, like the side panel's surface
  * list. A fallback since cmd+j starts a shell in an empty panel and the last tab's exit
  * hides it: it shows when terminal.new failed, or on the Projects page, which has no
- * worktree to own a shell until it has a tab, so it points at the page's rows instead.
+ * worktree to own a shell until it has a tab, so it points at the page's rows instead. A
+ * thread with no checkout yet (its setup) has nowhere to start one until it has.
  */
 function EmptyState({ panelKey }: { panelKey: string }) {
   const { title, chord } = useNewTerminalCommand();
   const canStart = useCanStartTerminal(panelKey);
+  const thread = threadOfKey(panelKey) !== null;
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6" data-testid="bottom-empty">
       <div className="w-full max-w-64">
@@ -248,7 +254,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
             </li>
           </ul>
         ) : (
-          <p className="text-center text-caption">Start one with New terminal on a project or worktree row.</p>
+          <p className="text-center text-caption">{thread ? "A terminal can start here once the worktree is ready." : "Start one with New terminal on a project or worktree row."}</p>
         )}
       </div>
     </div>

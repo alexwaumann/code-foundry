@@ -39,6 +39,7 @@ export function useCanMove(id: string | null): boolean {
             archivedAtMs: x.archivedAtMs,
             resident: x.resident ?? "",
             moving: x.pendingMove !== null,
+            setup: x.setup,
             transcriptMissing: x.transcriptMissing === true,
           }
         : null;

@@ -75,6 +75,8 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
   switch (statusLine({ ...th, statusChangedAtMs: null }).kind) {
     case "working":
       return { text: "Working", tone: "sky" };
+    case "settingUp":
+      return { text: "Setting up", tone: "sky" };
     case "waiting":
       // A lead waiting on its children; a bare "waiting" names none (workerBusy).
       return waitingCount(th) > 0 ? { text: "Working", tone: "sky" } : { text: "Idle", tone: "muted" };
@@ -93,6 +95,10 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
       return { text: "Error", tone: "red" };
     case "transcriptDeleted":
       return { text: "Transcript deleted", tone: "red" };
+    case "setupFailed":
+      return { text: "Setup failed", tone: "red" };
+    case "setupCancelled":
+      return { text: "Cancelled", tone: "muted" };
     case "place":
       return { text: "Idle", tone: "muted" };
   }

@@ -5,6 +5,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { failedPrompt } from "@/lib/failedPrompt";
+import { setupUnfinished as unfinished } from "@/lib/threadSetup";
 import { useThreadStore } from "./thread";
 import { useThreadsStore } from "./threads";
 
@@ -41,12 +42,13 @@ export function useFailedPrompt(threadId: string, pending: number): { itemId: st
   const statusReason = useThreadsStore((s) => s.byId[threadId]?.statusReason ?? "");
   const statusChangedAtMs = useThreadsStore((s) => s.byId[threadId]?.statusChangedAtMs ?? null);
   const transcriptMissing = useThreadsStore((s) => s.byId[threadId]?.transcriptMissing === true);
+  const setupUnfinished = useThreadsStore((s) => unfinished(s.byId[threadId]?.setup));
   const hold = useHolds((s) => s.holds[threadId] ?? -1);
   return useThreadStore(
     useShallow((s) => {
       const log = s.logs[threadId];
       if (!log) return null;
-      const f = failedPrompt({ order: log.order, byId: log.byId, state, status, statusReason, statusChangedAtMs, pending, transcriptMissing });
+      const f = failedPrompt({ order: log.order, byId: log.byId, state, status, statusReason, statusChangedAtMs, pending, transcriptMissing, setupUnfinished });
       return f && f.ordinal > hold ? { itemId: f.itemId, line: f.line } : null;
     }),
   );

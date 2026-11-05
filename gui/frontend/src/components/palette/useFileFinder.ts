@@ -7,6 +7,7 @@ import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { mainCheckout } from "@/lib/collisionHints";
 import type { CheckoutChanges, FinderCheckout } from "@/lib/fileFinder";
 import { normalizePath } from "@/lib/filePath";
+import { isUnplaced } from "@/lib/threadSetup";
 import { FILE_KIND } from "@/surfaces/fileTarget";
 import { usePanelStore } from "@/stores/panel";
 import { useProjectsStore } from "@/stores/projects";
@@ -26,10 +27,12 @@ const SEP = "\u0001";
  * the thread's order (useThreadCheckouts); a project the thread has no recorded checkout
  * in is read from its main worktree. A workspace thread's members only, never the
  * workspace's folder (it is no project). Also each project's name and whether it has git
- * (only a git checkout has changes to list).
+ * (only a git checkout has changes to list). A thread with no checkout yet searches its
+ * projects' own, whose changes are not the thread's: it lists none.
  */
 export function useFinderCheckouts(threadId: string): { checkouts: FinderCheckout[]; names: Record<string, string>; git: ReadonlySet<string> } {
   const { projectIds, paths } = useThreadCheckouts(threadId);
+  const unplaced = useThreadsStore((s) => isUnplaced(s.byId[threadId]));
   const facts = useProjectsStore(
     useShallow((s) =>
       projectIds.map((id) => {
@@ -46,11 +49,11 @@ export function useFinderCheckouts(threadId: string): { checkouts: FinderCheckou
     for (const f of facts) {
       const [projectId = "", path = "", name = "", isGit = ""] = f.split(SEP);
       names[projectId] = name;
-      if (isGit) git.add(projectId);
+      if (isGit && !unplaced) git.add(projectId);
       if (path) checkouts.push({ projectId, path });
     }
     return { checkouts, names, git };
-  }, [facts]);
+  }, [facts, unplaced]);
 }
 
 /** "Go to file in <name>…": the thread's workspace's name, else its primary project's. */

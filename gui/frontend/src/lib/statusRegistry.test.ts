@@ -115,3 +115,26 @@ describe("statusBadge / statusDetail / statusTimeAt", () => {
     expect(statusTimeAt(line, { statusChangedAtMs: null, lastActivityAtMs: 5 })).toBeNull();
   });
 });
+
+describe("a thread's setup on the row", () => {
+  const line = (kind: StatusLineKind, detail = "") => ({ kind, detail, at: null });
+  const thread = { status: "busy", statusReason: "setting up" } as const;
+
+  it.each<[StatusLineKind, string, RowTone, TimeMode]>([
+    ["settingUp", "Setting up", "info", "status"],
+    ["setupFailed", "Setup failed", "error", "none"],
+    ["setupCancelled", "Cancelled", "muted", "none"],
+  ])("%s", (kind, word, tone, timeMode) => {
+    expect(statusRegistry[kind]).toMatchObject({ word, tone, timeMode });
+  });
+
+  it("puts the step, or why it failed, on line 3, and nothing for a cancel", () => {
+    expect(statusDetail(line("settingUp", "Fetching origin/main"), thread)).toBe("Fetching origin/main");
+    expect(statusDetail(line("setupFailed", "Could not create the worktree"), thread)).toBe("Could not create the worktree");
+    expect(statusDetail(line("setupCancelled"), thread)).toBe("");
+  });
+
+  it("counts Setting up from when the status changed, as Working does", () => {
+    expect(statusTimeAt(line("settingUp"), { statusChangedAtMs: 7 })).toBe(7);
+  });
+});
