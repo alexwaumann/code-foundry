@@ -435,7 +435,7 @@ describe("editing", () => {
     expect(screen.queryByTestId("file-conflict")).toBeNull();
     files.set(ENV, text({ text: "theirs\n", size: 7, modifiedAtMs: 150 }));
     await refresh();
-    expect(screen.getByTestId("file-conflict").textContent).toContain("Changed on disk");
+    expect((await screen.findByTestId("file-conflict")).textContent).toContain("Changed on disk");
     expect(screen.getByTestId("code-file").textContent).toBe("A=1\n");
     expect(screen.getByTestId("file-reload")).toBeTruthy();
     expect(screen.getByTestId("file-overwrite")).toBeTruthy();
@@ -448,7 +448,7 @@ describe("editing", () => {
     type("A=2\n");
     files.delete(ENV);
     await refresh();
-    expect(screen.getByTestId("file-conflict").textContent).toContain("Deleted on disk");
+    expect((await screen.findByTestId("file-conflict")).textContent).toContain("Deleted on disk");
     expect(screen.queryByTestId("file-reload")).toBeNull();
     expect(screen.getByTestId<HTMLButtonElement>("file-discard").disabled).toBe(false);
     expect(screen.queryByTestId("file-not-found")).toBeNull();
@@ -467,7 +467,7 @@ describe("editing", () => {
     await editing();
     files.delete(ENV);
     await refresh();
-    expect(screen.getByTestId("file-conflict").textContent).toContain("Deleted on disk");
+    expect((await screen.findByTestId("file-conflict")).textContent).toContain("Deleted on disk");
     expect(screen.getByTestId("draft")).toBeTruthy();
     fireEvent.click(screen.getByTestId("file-discard"));
     expect(await screen.findByTestId("file-not-found")).toBeTruthy();
@@ -485,7 +485,7 @@ describe("editing", () => {
     type("mine too\n");
     files.delete(short);
     await refresh();
-    expect(screen.getByTestId("file-conflict").textContent).toContain("Deleted on disk");
+    expect((await screen.findByTestId("file-conflict")).textContent).toContain("Deleted on disk");
     expect(screen.getByTestId("file-tab").getAttribute("data-path")).toBe(short);
     expect(listed.calls).toEqual([]);
     expect(reads).not.toContain(other);
