@@ -48,6 +48,58 @@ export function formValues(form: FormNodeData, drafts: Readonly<Record<string, F
   return out;
 }
 
+/** How long typing pauses before a live input sends its change event, in ms. */
+export const LIVE_CHANGE_MS = 300;
+
+/** A live input's change events: see liveSender. */
+export interface LiveSender {
+  /** The text changed: send it once typing pauses. */
+  push: (value: string) => void;
+  /** Send what is waiting now (focus left, Enter). */
+  flush: () => void;
+  /** Forget what is waiting (the field went). */
+  cancel: () => void;
+}
+
+/**
+ * Sends a live input's text as it is typed: after a pause, one at a time, so a plugin never
+ * answers an older filter after a newer one, and the latest text always goes last. The same
+ * text twice running goes once.
+ */
+export function liveSender(send: (value: string) => Promise<unknown>, delay = LIVE_CHANGE_MS): LiveSender {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let waiting: string | undefined;
+  let last: string | undefined;
+  let sending = false;
+  const fire = () => {
+    clearTimeout(timer);
+    timer = undefined;
+    if (sending || waiting === undefined) return;
+    const value = waiting;
+    waiting = undefined;
+    if (value === last) return;
+    last = value;
+    sending = true;
+    void send(value).finally(() => {
+      sending = false;
+      if (timer === undefined) fire();
+    });
+  };
+  return {
+    push: (value) => {
+      waiting = value;
+      clearTimeout(timer);
+      timer = setTimeout(fire, delay);
+    },
+    flush: fire,
+    cancel: () => {
+      clearTimeout(timer);
+      timer = undefined;
+      waiting = undefined;
+    },
+  };
+}
+
 /** A value as a command argument or a change event's value: lists comma-joined. */
 export function valueString(v: FieldValue): string {
   return Array.isArray(v) ? v.join(",") : String(v);

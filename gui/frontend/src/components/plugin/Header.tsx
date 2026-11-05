@@ -15,9 +15,11 @@ export function SurfaceHeader({ header, fallbackTitle, icon, note }: { header: V
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="plugin-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
         <PluginIcon name={header?.icon || icon} fallback="puzzle" className="size-4 shrink-0 text-cf-text-muted" />
-        <span className="min-w-0 truncate" data-testid="plugin-title">
-          {header?.title || fallbackTitle}
-        </span>
+        <Tip label={header?.title || fallbackTitle} whenTruncated>
+          <span className="min-w-0 truncate" data-testid="plugin-title">
+            {header?.title || fallbackTitle}
+          </span>
+        </Tip>
         {(header?.trailing !== undefined || header?.pill) && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-1">
             <InlineView value={header.trailing} className="text-caption tabular-nums" />
@@ -29,7 +31,9 @@ export function SurfaceHeader({ header, fallbackTitle, icon, note }: { header: V
         <div className="flex min-h-6 min-w-0 items-center gap-1.5 text-caption" data-testid="plugin-subline">
           {header?.sublineIcon && <PluginIcon name={header.sublineIcon} className="size-3.5 shrink-0" />}
           {note ? (
-            <span className="min-w-0 truncate">{note}</span>
+            <Tip label={note} whenTruncated>
+              <span className="min-w-0 truncate">{note}</span>
+            </Tip>
           ) : (
             inlineSpans(header?.subline).length > 0 && (
               <Tip label={inlineText(header?.subline)} whenTruncated>

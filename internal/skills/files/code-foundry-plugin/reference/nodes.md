@@ -67,7 +67,7 @@ ui.NewChips("stages",
 ```
 
 Stages or steps in a wrapping strip; labels up to 32 characters (keep them short: at
-280 px a line holds one or two chips).
+280 px a line holds one or two chips). A cut label shows whole on hover unless `hint` is set.
 
 ## log
 

@@ -1,4 +1,5 @@
 import { Progress } from "@/components/ui/progress";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { InlineView } from "../parts";
 import type { NodeProps } from "../registry";
@@ -11,7 +12,9 @@ export function ProgressNode({ data }: NodeProps<"progress">) {
     <div className="flex min-w-0 flex-col gap-1.5" data-testid="plugin-progress" data-value={value ?? undefined}>
       {(data.label || data.meta !== undefined) && (
         <div className="flex min-w-0 items-center gap-2 text-caption-sm">
-          <span className={cn("min-w-0 flex-1 truncate", failed ? "text-cf-error-text" : "text-cf-text")}>{data.label}</span>
+          <Tip label={data.label} whenTruncated>
+            <span className={cn("min-w-0 flex-1 truncate", failed ? "text-cf-error-text" : "text-cf-text")}>{data.label}</span>
+          </Tip>
           <InlineView value={data.meta} className="shrink-0 tabular-nums" />
         </div>
       )}

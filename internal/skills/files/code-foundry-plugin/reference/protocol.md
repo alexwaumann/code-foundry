@@ -141,7 +141,8 @@ code; `pluginsdk.ErrClosed` means the host went away (Serve is ending).
 `initialize` lists what the host supports, so a plugin can work with older and newer
 hosts: `invoke`, `invoke.ask`, `secrets`, `log`, `surfaces`, `view.v1`, `view.append`,
 `view.node.<kind>` for each node kind it renders, `view.tabs`, `view.fieldset`,
-`view.optionsSource`, `view.duration`, `context`, `events`, `flags`, `sessionEnv`,
+`view.optionsSource`, `view.duration`, `view.hint`, `view.input.multiline`,
+`view.input.number`, `view.input.live`, `context`, `events`, `flags`, `sessionEnv`,
 `threads`, `terminals`, `act.context`, `wakes`. Check `h.HasCapability("view.node.thread")` before
 relying on something newer than protocol 1's first release.
 

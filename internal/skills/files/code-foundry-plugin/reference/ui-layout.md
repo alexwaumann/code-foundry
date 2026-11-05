@@ -295,7 +295,7 @@ grows to match.
 - **A status line**: `group(between)[ text, actions ]` instead of a text and an actions
   bar on two lines.
 - **Actions at the bottom of a box**: `pane(fill)[ list, spacer(flex), actions ]`.
-- **Search and filter a list**: `toolbar[ form(input q, submit icon-only), chips(status) ]`
+- **Search and filter a list**: `toolbar[ form(input q live, or with a submit icon-only), chips(status) ]`
   over the list in the body, the count in the `footer`.
 - **A page's reading column**: `container(narrow)[ markdown, form ]`; the panel shows it
   full width.

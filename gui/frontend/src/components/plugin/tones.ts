@@ -64,3 +64,15 @@ export const statusIcon: Record<Status, { icon: LucideIcon; className: string }>
 export function statusTone(s: Status | undefined): Tone {
   return s === "failed" ? "error" : s === "attention" ? "attention" : "";
 }
+
+/** A status in words: what a dot's colour means, which nothing on screen says. */
+export const statusWord: Readonly<Record<Status, string>> = {
+  "": "",
+  ok: "OK",
+  failed: "Failed",
+  attention: "Needs attention",
+  running: "Running",
+  pending: "Pending",
+  skipped: "Skipped",
+  off: "Off",
+};

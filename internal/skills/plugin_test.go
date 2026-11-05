@@ -74,7 +74,7 @@ func TestRenderPluginSkill(t *testing.T) {
 	}
 	manifest := string(files[skills.Plugin+"/reference/manifest.md"])
 	for _, want := range []string{"`pr.checks.provider`", "`thread.hasPr`", "`threads`, `thread`", "`surface`, `act`", "`context-thread`",
-		"`activity`, `ban`", "`workflow`, `wrench`"} {
+		"`activity`, `alarm-clock`", "`workflow`, `wrench`"} {
 		if !strings.Contains(manifest, want) {
 			t.Errorf("manifest.md lacks %q", want)
 		}

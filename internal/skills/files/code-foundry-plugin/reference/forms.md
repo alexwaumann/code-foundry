@@ -24,7 +24,12 @@ The one way values travel to the plugin. A field has a `key`, a `name` (its key 
 submitted values, or the command arg it fills), a label, a `description`, an `error` (the
 plugin's validation message), `required`, `disabled`, and exactly one control:
 
-- `input`: one-line text; `kind: "secret"` masks it. `value` (never for a secret),
+- `input`: one-line text; `kind: "secret"` masks it, `kind: "multiline"`
+  (`ui.MultilineField(key, name, label, rows)`; `rows` 2..12, default 4) is a box where
+  Enter adds a line and cmd+Enter submits (not in a toolbar or footer), `kind: "number"`
+  (`ui.NumberField`) takes a number that still arrives as a string, so parse it. Check
+  `h.HasCapability("view.input.multiline")` (`view.input.number`) first: an older host
+  refuses the kind. `value` (never for a secret),
   `placeholder`, `maxLength`, `pattern` (a regular expression, at most 256 characters,
   no quantified group holding a quantifier such as `(a+)+` or `(-[a-z]+)*`: the GUI's
   JavaScript could take exponential time on it) with `patternMessage`, `mono`.
@@ -43,7 +48,10 @@ plugin's validation message), `required`, `disabled`, and exactly one control:
 A field with `change: {"event": "…"}` sends a `change` act when the user commits an edit
 (a text field on leaving it, a select or toggle on each pick; never per keystroke):
 `act.Field` its name, `act.Value` the new value, for dependent fields; never for a
-secret. The **submit** button sends a `submit` act with every field's value in
+secret. `live: true` (`.WithChange("filter").AsLive()`, capability `view.input.live`; without
+it the host sends the event on blur) sends it as the user types instead, once they pause
+for 300 ms, for a filter that follows the text: one at a time, the latest last, so render
+only from the `change` act and do no slow work in it. The **submit** button sends a `submit` act with every field's value in
 `act.Values` by name: strings, booleans for toggles, string lists for multiple selects.
 It may run a command instead (the fields fill its args by name) unless the form has a
 secret field. `secondary` buttons act like any button. `error` shows under the form.

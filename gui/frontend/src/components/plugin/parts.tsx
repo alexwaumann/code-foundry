@@ -16,7 +16,7 @@ import { useRunAction } from "./actions";
 import { useFormCtx, useViewCtx } from "./context";
 import { formatFixedDuration, formatTime } from "./format";
 import { PLUGIN_ICONS } from "./icons";
-import { statusDot, statusIcon, toneText, tonePill } from "./tones";
+import { statusDot, statusIcon, statusWord, toneText, tonePill } from "./tones";
 
 /** An allowlisted lucide icon by kebab name (a circle for any other name; `fallback` when there is none). */
 export function PluginIcon({ name, fallback = "circle", className, label }: { name: string | undefined; fallback?: string; className?: string; label?: string }) {
@@ -36,7 +36,7 @@ function SpanView({ span }: { span: Span }) {
   if (span.url) {
     const url = span.url;
     return (
-      <Tip label={url}>
+      <Tip label={span.hint ?? url}>
         <a
           href={url}
           className={cn("text-link", cls)}
@@ -47,6 +47,13 @@ function SpanView({ span }: { span: Span }) {
         >
           {body}
         </a>
+      </Tip>
+    );
+  }
+  if (span.hint) {
+    return (
+      <Tip label={span.hint}>
+        <span className={cls}>{body}</span>
       </Tip>
     );
   }
@@ -81,16 +88,33 @@ export function InlineLine({ value, className }: { value: Inline | undefined; cl
 /** A small tinted label (MCP's pill); never shrinks. */
 export function PillView({ pill, className }: { pill: PillValue | undefined; className?: string }) {
   if (!pill?.label) return null;
-  return (
+  const el = (
     <span className={cn("shrink-0 rounded-full px-1.5 text-caption-sm font-medium whitespace-nowrap", tonePill[pill.tone ?? ""], className)} data-testid="plugin-pill" data-tone={pill.tone || undefined}>
       {pill.label}
     </span>
   );
+  return pill.hint ? <Tip label={pill.hint}>{el}</Tip> : el;
 }
 
-/** A status (dot or icon style) or an allowlisted icon with a tone. */
-export function GlyphView({ glyph, style = "dot", className }: { glyph: GlyphValue | undefined; style?: "dot" | "icon"; className?: string }) {
+
+/**
+ * A status (dot or icon style) or an allowlisted icon with a tone. Its tooltip is its hint,
+ * else the status in words, which `named` leaves out when the words are already on screen
+ * (a row's pill, an empty state's title).
+ */
+export function GlyphView({ glyph, style = "dot", className, named = false }: { glyph: GlyphValue | undefined; style?: "dot" | "icon"; className?: string; named?: boolean }) {
   if (!glyph) return null;
+  const tip = glyph.hint || (named ? "" : statusWord[glyph.status ?? ""]);
+  const el = <GlyphMark glyph={glyph} style={style} className={className} />;
+  if (!tip) return el;
+  return (
+    <Tip label={tip}>
+      <span className="inline-flex shrink-0 items-center justify-center">{el}</span>
+    </Tip>
+  );
+}
+
+function GlyphMark({ glyph, style, className }: { glyph: GlyphValue; style: "dot" | "icon"; className: string | undefined }) {
   if (glyph.icon) {
     const tone = glyph.tone ?? "";
     return <PluginIcon name={glyph.icon} className={cn("size-3.5 shrink-0", tone === "ok" ? "text-cf-success-text" : tone ? toneText[tone] : "text-cf-text-muted", className)} />;
@@ -125,7 +149,8 @@ const buttonStyle: Record<NonNullable<ViewButton["style"]>, string> = {
  * one thing that needs the user next), destructive (red only on hover; the command's
  * confirm dialog carries the weight) or link. Pending from the click until the plugin
  * answers (or the command returns), `busy` while the plugin says so. An icon-only button
- * gets its label as a tooltip (the only one: the label is otherwise hidden).
+ * gets its label as a tooltip (the label is otherwise hidden), then the plugin's hint;
+ * any other button shows the hint, or its label when that is cut.
  */
 export function PluginButton({ button, values, onClick, submit }: { button: ViewButton; values?: () => Readonly<Record<string, string | boolean | string[]>>; onClick?: () => void; submit?: boolean }) {
   const { watchKey, inert } = useViewCtx();
@@ -160,7 +185,7 @@ export function PluginButton({ button, values, onClick, submit }: { button: View
     </Button>
   );
   // A label wider than the panel truncates; the tooltip then shows it whole.
-  if (!button.iconOnly) {
+  if (!button.iconOnly && !button.hint) {
     return (
       <Tip label={button.label} whenTruncated>
         {el}
@@ -169,8 +194,8 @@ export function PluginButton({ button, values, onClick, submit }: { button: View
   }
   // The span carries the tooltip while the button is disabled (no pointer events).
   return (
-    <Tip label={button.label}>
-      <span className="inline-flex shrink-0">{el}</span>
+    <Tip label={button.iconOnly ? [button.label, button.hint].filter(Boolean).join("\n") : button.hint}>
+      <span className={cn("inline-flex", button.iconOnly ? "shrink-0" : "max-w-full min-w-0")}>{el}</span>
     </Tip>
   );
 }

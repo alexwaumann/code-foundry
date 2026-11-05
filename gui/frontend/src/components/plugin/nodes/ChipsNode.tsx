@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent } from "react";
 import type { Chip } from "@/api/plugin";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useRunAction } from "../actions";
 import { useViewCtx } from "../context";
@@ -15,29 +16,31 @@ function ChipView({ chip, focusable }: { chip: Chip; focusable: boolean }) {
   const tone = statusTone(chip.status);
   const clickable = chip.action !== undefined && !inert;
   return (
-    <button
-      type="button"
-      tabIndex={focusable ? 0 : -1}
-      aria-disabled={!clickable || undefined}
-      aria-pressed={chip.selected ?? false}
-      className={cn(
-        "flex h-6 min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
-        tone === "error" ? "border-cf-error/35 text-cf-error-text" : tone === "attention" ? "border-cf-warning/35 text-cf-warning-text" : "border-cf-border",
-        clickable && "hover:bg-cf-control-hover dark:hover:bg-cf-control-hover/50",
-        chip.selected && "bg-cf-control-hover dark:bg-cf-control-hover/50",
-      )}
-      data-testid="plugin-chip"
-      data-key={chip.key}
-      data-status={chip.status || undefined}
-      data-selected={chip.selected || undefined}
-      onClick={() => {
-        if (clickable) run(chip.key, chip.action);
-      }}
-    >
-      {glyph && <glyph.icon className={cn("size-3.5 shrink-0", glyph.className)} aria-hidden />}
-      <span className="truncate">{chip.label}</span>
-      {chip.meta !== undefined && <InlineView value={chip.meta} className="shrink-0 text-caption-sm tabular-nums" />}
-    </button>
+    <Tip label={chip.hint || chip.label} whenTruncated={!chip.hint}>
+      <button
+        type="button"
+        tabIndex={focusable ? 0 : -1}
+        aria-disabled={!clickable || undefined}
+        aria-pressed={chip.selected ?? false}
+        className={cn(
+          "flex h-6 min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
+          tone === "error" ? "border-cf-error/35 text-cf-error-text" : tone === "attention" ? "border-cf-warning/35 text-cf-warning-text" : "border-cf-border",
+          clickable && "hover:bg-cf-control-hover dark:hover:bg-cf-control-hover/50",
+          chip.selected && "bg-cf-control-hover dark:bg-cf-control-hover/50",
+        )}
+        data-testid="plugin-chip"
+        data-key={chip.key}
+        data-status={chip.status || undefined}
+        data-selected={chip.selected || undefined}
+        onClick={() => {
+          if (clickable) run(chip.key, chip.action);
+        }}
+      >
+        {glyph && <glyph.icon className={cn("size-3.5 shrink-0", glyph.className)} aria-hidden />}
+        <span className="truncate">{chip.label}</span>
+        {chip.meta !== undefined && <InlineView value={chip.meta} className="shrink-0 text-caption-sm tabular-nums" />}
+      </button>
+    </Tip>
   );
 }
 

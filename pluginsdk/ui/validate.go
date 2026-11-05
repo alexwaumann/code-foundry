@@ -203,6 +203,7 @@ func (c *checker) pill(path string, p *Pill) {
 	c.required(path+".label", p.Label)
 	c.str(path+".label", p.Label, MaxLabel)
 	c.tone(path+".tone", p.Tone)
+	c.str(path+".hint", p.Hint, MaxLabel)
 }
 
 func (c *checker) glyph(path string, g *Glyph) {
@@ -218,6 +219,7 @@ func (c *checker) glyph(path string, g *Glyph) {
 	c.status(path+".status", g.Status)
 	c.icon(path+".icon", g.Icon)
 	c.tone(path+".tone", g.Tone)
+	c.str(path+".hint", g.Hint, MaxLabel)
 }
 
 func (c *checker) inline(path string, in *Inline, max int) {
@@ -252,6 +254,7 @@ func (c *checker) inline(path string, in *Inline, max int) {
 		}
 		n += utf8.RuneCountInString(s.Text)
 		c.tone(sp+".tone", s.Tone)
+		c.str(sp+".hint", s.Hint, MaxLabel)
 		if s.URL != "" {
 			c.url(sp+".url", s.URL)
 		}
@@ -331,6 +334,7 @@ func (c *checker) button(path string, b *Button) {
 	c.key(path, b.Key)
 	c.required(path+".label", b.Label)
 	c.str(path+".label", b.Label, MaxLabel)
+	c.str(path+".hint", b.Hint, MaxLabel)
 	c.icon(path+".icon", b.Icon)
 	if b.IconOnly && b.Icon == "" {
 		c.bad(path+".icon", "an icon-only button needs an icon")
@@ -392,8 +396,9 @@ func (c *checker) height(path string, h Height) {
 var StripKinds = []string{"text", "chips", "actions", "progress", "form", "divider", "spacer", "group"}
 
 // strip checks a toolbar or footer: at most MaxStripNodes nodes, each a top-level node of
-// one of StripKinds; a form's fields are inputs, toggles or dropdown selects (no
-// fieldsets, no list-style selects: the strip is one row); a divider has no label.
+// one of StripKinds; a form's fields are one-line inputs, toggles or dropdown selects (no
+// fieldsets, multi-line inputs or list-style selects: the strip is one row); a divider has
+// no label.
 func (c *checker) strip(path string, nodes []Node) {
 	if len(nodes) > MaxStripNodes {
 		c.bad(path, "%d nodes, at most %d", len(nodes), MaxStripNodes)
@@ -418,6 +423,8 @@ func (c *checker) strip(path string, nodes []Node) {
 				c.bad(fp, "a form in the %s has no fieldsets (inputs, selects and toggles in a row)", path)
 			case f.Select != nil && f.Select.Style == SelectList:
 				c.bad(fp+".select.style", "a select in the %s is a dropdown, not a list", path)
+			case f.Input != nil && f.Input.Kind == InputMultiline:
+				c.bad(fp+".input.kind", "an input in the %s is one line, not multiline", path)
 			}
 		}
 	}
@@ -480,6 +487,7 @@ func (c *checker) node(path string, n Node, outer []string) {
 			c.str(p+".label", ch.Label, MaxChipLabel)
 			c.status(p+".status", ch.Status)
 			c.inline(p+".meta", ch.Meta, MaxLabel)
+			c.str(p+".hint", ch.Hint, MaxLabel)
 			c.action(p+".action", ch.Action)
 		}
 	case n.Log != nil:
@@ -845,8 +853,18 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 	case f.Input != nil:
 		in := f.Input
 		p := path + ".input"
-		if !slices.Contains([]InputKind{"", InputText, InputSecret}, in.Kind) {
+		if !slices.Contains([]InputKind{"", InputText, InputSecret, InputMultiline, InputNumber}, in.Kind) {
 			c.bad(p+".kind", "unknown kind %q", in.Kind)
+		}
+		if in.Kind == InputMultiline {
+			if in.Rows != 0 && (in.Rows < MinInputRows || in.Rows > MaxInputRows) {
+				c.bad(p+".rows", "%d, want %d to %d", in.Rows, MinInputRows, MaxInputRows)
+			}
+		} else if in.Rows != 0 {
+			c.bad(p+".rows", "rows are for multiline inputs")
+		}
+		if in.Live && (f.Change == nil || f.Change.Event == "") {
+			c.bad(p+".live", "a live input needs a change event")
 		}
 		if in.MaxLength < 0 {
 			c.bad(p+".maxLength", "negative")
