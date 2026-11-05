@@ -153,7 +153,7 @@ func TestParseWorktreeList(t *testing.T) {
 				"worktree /gone\x00HEAD 11\x00branch refs/heads/y\x00prunable gitdir file points to non-existent location\x00\x00",
 			want: []listedWorktree{
 				{Path: "/r.git", Bare: true},
-				{Path: "/a b", Head: "00", Branch: "x", Locked: true},
+				{Path: "/a b", Head: "00", Branch: "x", Locked: true, LockReason: "on usb"},
 				{Path: "/gone", Head: "11", Branch: "y", Prunable: true},
 			},
 		},
