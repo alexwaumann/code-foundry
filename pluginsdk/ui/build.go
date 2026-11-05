@@ -29,6 +29,9 @@ func (s Span) AsStrong() Span { s.Strong = true; return s }
 // Link returns s as a link to url (http or https).
 func (s Span) Link(url string) Span { s.URL = url; return s }
 
+// WithHint returns s with a tooltip: what is not on screen, such as an exact value.
+func (s Span) WithHint(hint string) Span { s.Hint = hint; return s }
+
 // NewPill returns a pill.
 func NewPill(label string, tone Tone) *Pill { return &Pill{Label: label, Tone: tone} }
 
@@ -91,6 +94,9 @@ func (b Button) WithData(data string) Button {
 
 // AsIconOnly returns b drawn as its icon (the label becomes its tooltip).
 func (b Button) AsIconOnly() Button { b.IconOnly = true; return b }
+
+// WithHint returns b with a tooltip: what is not on screen, such as why it is disabled.
+func (b Button) WithHint(hint string) Button { b.Hint = hint; return b }
 
 // NewView returns a view.
 func NewView(header *Header, nodes ...Node) View { return View{Header: header, Nodes: nodes} }
@@ -171,6 +177,16 @@ func NewForm(key string, submit *Button, fields ...Field) Node {
 // TextField returns a text input field.
 func TextField(key, name, label string) Field {
 	return Field{Key: key, Name: name, Label: label, Input: &Input{}}
+}
+
+// MultilineField returns a multi-line text field, rows text rows tall (0: the default).
+func MultilineField(key, name, label string, rows int) Field {
+	return Field{Key: key, Name: name, Label: label, Input: &Input{Kind: InputMultiline, Rows: rows}}
+}
+
+// NumberField returns a number field; its value still travels as a string.
+func NumberField(key, name, label string) Field {
+	return Field{Key: key, Name: name, Label: label, Input: &Input{Kind: InputNumber}}
 }
 
 // SecretField returns a secret input field; store, when set, has the host keep the

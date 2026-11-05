@@ -84,7 +84,9 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
       data-live={attached || undefined}
     >
       <div className="flex min-w-0 items-center gap-1.5 border-b border-cf-border py-1 pr-1 pl-2.5">
-        <span className="min-w-0 flex-1 truncate text-caption font-medium">{data.title || "Terminal"}</span>
+        <Tip label={data.title} whenTruncated>
+          <span className="min-w-0 flex-1 truncate text-caption font-medium">{data.title || "Terminal"}</span>
+        </Tip>
         <span className="flex shrink-0 items-center gap-0.5">
           {data.actions?.map((b) => (
             <PluginButton key={b.key} button={narrow && b.icon ? { ...b, iconOnly: true } : b} />

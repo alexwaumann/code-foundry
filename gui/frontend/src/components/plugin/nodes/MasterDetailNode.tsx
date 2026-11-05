@@ -4,6 +4,7 @@ import { nodeScope, type Row } from "@/api/plugin";
 import { VirtualStack, type Reveal } from "@/components/pr/VirtualStack";
 import { VirtualScrollRoot } from "@/components/pr/virtualRoot";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { chooseElement, chooserKeyOf, closeDetail, openDetail, useChoice, useDetailOpen } from "@/stores/pluginSurfaces";
 import { useRunAction } from "../actions";
@@ -188,7 +189,9 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
         <>
           <Button variant="ghost" size="xs" className="-ml-2 max-w-full min-w-0 self-start text-cf-text-muted hover:text-cf-text" onClick={back} tabIndex={0} data-testid="plugin-md-back" aria-label={`Back to the list from ${detailLabel ?? ""}`}>
             <ChevronLeft aria-hidden />
-            <span className="truncate">{shownRow?.title}</span>
+            <Tip label={shownRow?.title} whenTruncated>
+              <span className="truncate">{shownRow?.title}</span>
+            </Tip>
           </Button>
           <div className="flex min-w-0 flex-col" role="region" aria-label={detailLabel ?? "Detail"} data-testid="plugin-md-detail">
             {detail}

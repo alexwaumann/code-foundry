@@ -35,8 +35,10 @@ err := h.UpdateView(open.Instance, v)
 - Give a stop button the `destructive` style, also when its command needs no confirm.
 - **Flags**: until-seen for one-off events; sticky for conditions the plugin clears, with a
   visible way out, never re-raised after a user's clear (`host-api.md`).
-- The host draws tooltips: an icon-only button's label, a link's URL, text it cut. A plugin
-  sets none, so what the user must read goes on screen.
+- **Tooltips.** The host draws an icon-only button's label, a link's URL, text it cut and a
+  status in words. `hint` adds one, only for what is not on screen (why a button is
+  disabled, an exact value): never a repeat of the label, and nothing the user must read to
+  act goes in one.
 - Let the host tick times (`ui.At`, `ui.For` spans) rather than re-sending views each second;
   stream output into a log node with `h.AppendLog`; mark last-known data `stale` when the
   backend is down.
@@ -111,13 +113,16 @@ the problem (`nodes[2].list.rows[0].title: required`; the first 50 problems are 
 | tone | `""` (neutral), `"muted"`, `"attention"`, `"error"`, `"ok"` | `ui.ToneNeutral`, `ToneMuted`, `ToneAttention`, `ToneError`, `ToneOK` | amber = needs the user, red = failed; `ok` (emerald) only in pills and status glyphs, elsewhere neutral |
 | status | `"ok"`, `"failed"`, `"attention"`, `"running"` (spinner), `"pending"` (queued), `"skipped"`, `"off"` (aborted, disabled) | `ui.StatusOK`, … | rows, chips, glyphs; the host picks the dot or icon |
 | inline | `"plain text"` or `{"spans": [...]}` | `ui.Plain("…")`, `ui.Spans(...)` | text that may mix tones, links, times |
-| span | `{"text", "tone", "mono", "strong", "url"}`, `{"time": {"at", "style"}}` or `{"duration": {"ms"}}` | `ui.T("x").WithTone(ui.ToneError).AsMono().AsStrong().Link(url)`, `ui.At(t, ui.TimeElapsed)`, `ui.For(d)` | one of text, time, duration; `url` http(s) only, opened by the host |
+| span | `{"text", "tone", "mono", "strong", "url", "hint"}`, `{"time": {"at", "style"}}` or `{"duration": {"ms"}}` | `ui.T("x").WithTone(ui.ToneError).AsMono().AsStrong().Link(url).WithHint("…")`, `ui.At(t, ui.TimeElapsed)`, `ui.For(d)` | one of text, time, duration; `url` http(s) only, opened by the host |
 | time | `{"at": "2026-10-18T09:00:00Z", "style": "relative"}` | `ui.At(t, ui.TimeRelative)` | `relative` ("12s ago", "in 3 days"; default), `elapsed` ("4m 12s", counting up), `countdown` ("9:41", then "expired"); the host ticks it |
 | duration | `{"ms": 100000}` | `ui.For(100*time.Second)` | a fixed length, formatted like `elapsed` ("1m 40s") |
-| pill | `{"label": "failed", "tone": "error"}` | `ui.NewPill("failed", ui.ToneError)` | one or two words |
-| glyph | `{"status": "running"}` or `{"icon": "package", "tone": "muted"}` | `ui.StatusGlyph(s)`, `ui.IconGlyph(name, tone)` | a status or a lucide icon, not both |
+| pill | `{"label": "failed", "tone": "error", "hint"}` | `ui.NewPill("failed", ui.ToneError)` | one or two words |
+| glyph | `{"status": "running"}` or `{"icon": "package", "tone": "muted"}`, either with `"hint"` | `ui.StatusGlyph(s)`, `ui.IconGlyph(name, tone)` | a status or a lucide icon, not both |
 | action | exactly one of `{"event": "rerun", "data": "job-7"}`, `{"command": {"name", "args"}}`, `{"openUrl": "https://…"}`, `{"copy": "text"}` | `ui.EventAction(event, data)`, `ui.CommandAction(name, args)`, `ui.URLAction(url)`, `ui.CopyAction(text)` | below |
-| button | `{"key", "label", "icon", "style", "action", "disabled", "busy", "iconOnly"}` | `ui.EventButton(key, label, event)`, `ui.CommandButton(key, label, command, args)`, `ui.URLButton(key, label, url)`, `ui.CopyButton(key, label, text)`, then `.WithStyle(…)`, `.WithIcon("refresh-cw")`, `.AsIconOnly()`, `.WithData(id)` (an event's data) | `label` always (the tooltip of an icon-only button); styles `muted` (default), `outline`, `attention`, `destructive`, `link`; `busy` shows a spinner for work that outlives the click |
+| button | `{"key", "label", "icon", "style", "action", "disabled", "busy", "iconOnly", "hint"}` | `ui.EventButton(key, label, event)`, `ui.CommandButton(key, label, command, args)`, `ui.URLButton(key, label, url)`, `ui.CopyButton(key, label, text)`, then `.WithStyle(…)`, `.WithIcon("refresh-cw")`, `.AsIconOnly()`, `.WithData(id)` (an event's data), `.WithHint("Tests are still running")` | `label` always (the tooltip of an icon-only button); styles `muted` (default), `outline`, `attention`, `destructive`, `link`; `busy` shows a spinner for work that outlives the click; `hint` also shows on a disabled button, and under an icon-only button's label |
+
+`hint` is at most 200 characters, and chips take one too. An older host ignores it: check
+`h.HasCapability("view.hint")` only if the view reads wrongly without it.
 
 **Actions.** An `event` reaches the plugin as a `surface/act` (`act.Action` is the event
 name, `act.Data` its data, at most 1 KB). A `command` runs a command with the panel's

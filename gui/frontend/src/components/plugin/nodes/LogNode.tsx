@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { logLines } from "../log";
 import { CopyIconButton } from "../parts";
@@ -38,7 +39,9 @@ export function LogNode({ data }: NodeProps<"log">) {
     <div className="flex min-h-0 min-w-0 flex-col gap-1" data-testid="plugin-log">
       {(data.title || lines.length > 0) && (
         <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-caption-sm">{data.title}</span>
+          <Tip label={data.title} whenTruncated>
+            <span className="min-w-0 flex-1 truncate text-caption-sm">{data.title}</span>
+          </Tip>
           {lines.length > 0 && <CopyIconButton text={text} label="Copy log" />}
         </div>
       )}

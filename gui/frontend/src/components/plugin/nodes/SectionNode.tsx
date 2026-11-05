@@ -1,9 +1,10 @@
 import { ChevronRight } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { draftKeyOf, setCollapsed, useCollapsed } from "@/stores/pluginSurfaces";
 import { useViewCtx } from "../context";
 import { NodeList } from "../NodeList";
-import { ButtonBar, InlineView, PillView } from "../parts";
+import { ButtonBar, InlineLine, PillView } from "../parts";
 import type { NodeProps } from "../registry";
 import { toneBorder } from "../tones";
 
@@ -24,8 +25,12 @@ export function SectionNode({ node, data }: NodeProps<"section">) {
   const label = (
     <>
       {collapsible && <ChevronRight className={cn("size-3.5 shrink-0 text-cf-text-muted transition-transform", !collapsed && "rotate-90")} aria-hidden />}
-      {data.title && <span className={titleClass}>{data.title}</span>}
-      {data.meta !== undefined && <InlineView value={data.meta} className="min-w-0 truncate text-caption-sm" />}
+      {data.title && (
+        <Tip label={data.title} whenTruncated>
+          <span className={titleClass}>{data.title}</span>
+        </Tip>
+      )}
+      <InlineLine value={data.meta} className="text-caption-sm" />
     </>
   );
   return (

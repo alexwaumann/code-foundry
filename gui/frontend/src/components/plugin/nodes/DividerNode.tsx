@@ -1,4 +1,5 @@
 import { Separator } from "@/components/ui/separator";
+import { Tip } from "@/components/ui/tooltip";
 import type { NodeProps } from "../registry";
 import { useInStrip } from "../strip";
 
@@ -16,9 +17,11 @@ export function DividerNode({ node, data }: NodeProps<"divider">) {
   return (
     <div className="flex min-w-0 items-center gap-2" data-testid="plugin-divider" data-key={node.key} data-label={label}>
       <Separator className="min-w-4 flex-1" />
-      <span className="min-w-0 truncate text-overline" data-testid="plugin-divider-label">
-        {label}
-      </span>
+      <Tip label={label} whenTruncated>
+        <span className="min-w-0 truncate text-overline" data-testid="plugin-divider-label">
+          {label}
+        </span>
+      </Tip>
       <Separator className="min-w-4 flex-1" />
     </div>
   );

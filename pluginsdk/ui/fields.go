@@ -68,6 +68,17 @@ func (f Field) WithPattern(pattern, message string) Field {
 	return f
 }
 
+// AsLive returns f sending its change event as the user types, once they pause (a text or
+// number input with a change event): a filter that follows the text.
+func (f Field) AsLive() Field {
+	if f.Input != nil {
+		in := *f.Input
+		in.Live = true
+		f.Input = &in
+	}
+	return f
+}
+
 // WithStore returns a secret input that the host stores on submit under key in the
 // plugin's secrets (permission secrets): the submit carries {key, stored: true}.
 func (f Field) WithStore(key string) Field {

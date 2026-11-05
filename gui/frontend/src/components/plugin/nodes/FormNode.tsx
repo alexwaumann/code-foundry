@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent, type KeyboardEvent, type ReactNode } from "react";
 import type { Field, FieldValue, FormNodeData, SelectOption } from "@/api/plugin";
 import { ChevronDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,16 +8,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { actOnElement, clearDrafts, draftKeyOf, revertDraft, runCommandElement, setDraft, usePending, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { FormContext, useFormCtx, useViewCtx } from "../context";
-import { fieldValue, formValues, isSecret, pluginValue, validateField, validateForm, valueString } from "../form";
+import { fieldValue, formValues, isSecret, liveSender, pluginValue, validateField, validateForm, valueString, type LiveSender } from "../form";
 import { useSourceOptions } from "../options";
 import { InlineView, PluginButton } from "../parts";
 import type { NodeProps } from "../registry";
 import { useInStrip } from "../strip";
 
 const NO_DRAFTS: Readonly<Record<string, FieldValue>> = {};
+
+/** A multi-line input's rows when the plugin names none (pluginsdk/ui DefaultInputRows). */
+const DEFAULT_INPUT_ROWS = 4;
 
 interface FieldApi {
   drafts: Readonly<Record<string, FieldValue>>;
@@ -26,6 +31,8 @@ interface FieldApi {
   change: (f: Field, v: FieldValue, commit: boolean) => void;
   /** Focus left a field: check it, and send a text field's change event. */
   blur: (f: Field) => void;
+  /** Send a live input's change event with this text. */
+  live: (f: Field, v: string) => Promise<unknown>;
   submit: () => void;
 }
 
@@ -48,38 +55,61 @@ function InputControl({ f, api, id, invalid }: { f: Field; api: FieldApi; id: st
   const name = f.name ?? f.key;
   const draft = api.drafts[name];
   const value = typeof draft === "string" ? draft : secret ? "" : (input.value ?? "");
-  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+  const multiline = input.kind === "multiline";
+  const isLive = (input.live ?? false) && f.change?.event !== undefined;
+  // The sender outlives renders; what it calls is this render's.
+  const sendLive = useRef((v: string) => api.live(f, v));
+  useEffect(() => {
+    sendLive.current = (v) => api.live(f, v);
+  });
+  const live = useRef<LiveSender | null>(null);
+  useEffect(() => {
+    const sender = liveSender((v) => sendLive.current(v));
+    live.current = sender;
+    return sender.cancel;
+  }, []);
+  const onKey = (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (!multiline || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
+      if (isLive) live.current?.flush();
       api.submit();
     } else if (e.key === "Escape" && draft !== undefined) {
       e.preventDefault();
       e.stopPropagation();
       revertDraft(draftKey, name);
+      if (isLive) live.current?.push(input.value ?? "");
     }
   };
+  const shared = {
+    id,
+    value,
+    placeholder: secret && input.hasValue ? "Saved · type to replace" : input.placeholder,
+    disabled: f.disabled || locked,
+    "aria-invalid": invalid || undefined,
+    "aria-required": f.required || undefined,
+    spellCheck: false,
+    "data-testid": "plugin-input",
+    "data-name": name,
+    onChange: (e: { target: { value: string } }) => {
+      api.change(f, e.target.value, false);
+      if (isLive) live.current?.push(e.target.value);
+    },
+    onBlur: () => {
+      api.blur(f);
+      if (isLive) live.current?.flush();
+    },
+    onKeyDown: onKey,
+  };
+  if (multiline) {
+    return <Textarea {...shared} rows={input.rows || DEFAULT_INPUT_ROWS} maxLength={input.maxLength || undefined} className={cn("min-h-0 resize-y px-2 py-1 text-body-sm", input.mono && "font-mono")} />;
+  }
   return (
     <Input
-      id={id}
-      type={secret ? "password" : "text"}
-      value={value}
-      placeholder={secret && input.hasValue ? "Saved · type to replace" : input.placeholder}
+      {...shared}
+      type={secret ? "password" : input.kind === "number" ? "number" : "text"}
       maxLength={input.maxLength || undefined}
-      disabled={f.disabled || locked}
-      aria-invalid={invalid || undefined}
-      aria-required={f.required || undefined}
       autoComplete={secret ? "new-password" : "off"}
-      spellCheck={false}
       className={cn("h-7 text-body-sm", input.mono && "font-mono")}
-      data-testid="plugin-input"
-      data-name={name}
-      onChange={(e) => {
-        api.change(f, e.target.value, false);
-      }}
-      onBlur={() => {
-        api.blur(f);
-      }}
-      onKeyDown={onKey}
     />
   );
 }
@@ -89,7 +119,9 @@ function optionLabel(o: SelectOption, list: boolean, control: ReactNode) {
     <span className="flex min-w-0 flex-col">
       <span className="flex items-center gap-2 text-body-sm">
         {control}
-        <span className={cn("min-w-0 truncate", o.disabled && "opacity-50")}>{o.label}</span>
+        <Tip label={o.label} whenTruncated>
+          <span className={cn("min-w-0 truncate", o.disabled && "opacity-50")}>{o.label}</span>
+        </Tip>
       </span>
       {list && o.description !== undefined && (
         <span className="pl-6 text-caption-sm">
@@ -219,7 +251,9 @@ function MultiDropdown({ f, api, id, invalid, options, disabled }: { f: Field; a
           data-name={f.name}
           data-style="multi-dropdown"
         >
-          <span className="min-w-0 truncate">{labels.length === 0 ? f.select?.placeholder || "Choose…" : summary}</span>
+          <Tip label={labels.length === 0 ? undefined : summary} whenTruncated>
+            <span className="min-w-0 truncate">{labels.length === 0 ? f.select?.placeholder || "Choose…" : summary}</span>
+          </Tip>
           <span className="flex shrink-0 items-center gap-1.5">
             {labels.length > 1 && <span className="text-caption-sm tabular-nums">{labels.length}</span>}
             <ChevronDown className="size-4 text-cf-text-muted opacity-50" aria-hidden />
@@ -329,7 +363,9 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
  * shows the plugin's value. Required fields carry a muted asterisk from the start. The host checks
  * required, max length and pattern on blur and on submit; the plugin's own errors come back
  * in its next view. From submit until the plugin answers (and while `busy`) the whole
- * form is disabled and the submit spins. Enter in a text field submits; Escape reverts it.
+ * form is disabled and the submit spins. Enter in a text field submits (cmd+Enter in a
+ * multi-line one, where Enter adds a line); Escape reverts it. A live input sends its change
+ * event as the user types, through form.ts's liveSender, instead of on blur.
  * In a toolbar or footer (strip.ts) the same form lays its fields and buttons out in one
  * row that wraps: inputs and selects without visible labels or descriptions, toggles with
  * their label beside the switch.
@@ -390,9 +426,13 @@ export function FormNode({ node, data }: NodeProps<"form">) {
         return err ? { ...rest, [name]: err } : rest;
       });
       const draft = drafts[name];
-      if (f.change?.event && !isSecret(f) && draft !== undefined && draft !== pluginValue(f)) {
+      if (f.change?.event && !isSecret(f) && !f.input?.live && draft !== undefined && draft !== pluginValue(f)) {
         void actOnElement(watchKey, f.key, { value: valueString(draft), values: formValues(data, drafts, false) });
       }
+    },
+    live: (f, v) => {
+      const now = { ...usePluginSurfacesStore.getState().drafts[draftKey], [f.name ?? ""]: v };
+      return actOnElement(watchKey, f.key, { value: v, values: formValues(data, now, false) });
     },
     submit: () => void send(data),
   };

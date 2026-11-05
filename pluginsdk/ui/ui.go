@@ -93,8 +93,10 @@ const (
 type InputKind string
 
 const (
-	InputText   InputKind = "text" // the default
-	InputSecret InputKind = "secret"
+	InputText      InputKind = "text" // the default
+	InputSecret    InputKind = "secret"
+	InputMultiline InputKind = "multiline" // Enter adds a line, cmd+Enter submits; not in a toolbar or footer
+	InputNumber    InputKind = "number"    // the value still travels as a string
 )
 
 // SelectStyle is how a select renders.
@@ -180,11 +182,13 @@ type Tab struct {
 	Badge *Pill  `json:"badge,omitempty"`
 }
 
-// Glyph is a status or an allowlisted lucide icon.
+// Glyph is a status or an allowlisted lucide icon. A status glyph's tooltip is the status
+// in words unless Hint says more.
 type Glyph struct {
 	Status Status `json:"status,omitempty"`
 	Icon   string `json:"icon,omitempty"`
 	Tone   Tone   `json:"tone,omitempty"` // icon only
+	Hint   string `json:"hint,omitempty"` // tooltip; see Button.Hint
 }
 
 // Inline is text that may mix tones, links and ticking times. With only Text set it
@@ -232,6 +236,8 @@ type Span struct {
 	Strong   bool      `json:"strong,omitempty"`
 	// URL makes the span a link the host opens (http and https only).
 	URL string `json:"url,omitempty"`
+	// Hint is the span's tooltip (a link's, in place of its URL); see Button.Hint.
+	Hint string `json:"hint,omitempty"`
 }
 
 // Time is a moment the host formats and ticks on its own clock.
@@ -250,6 +256,7 @@ type Duration struct {
 type Pill struct {
 	Label string `json:"label"`
 	Tone  Tone   `json:"tone,omitempty"`
+	Hint  string `json:"hint,omitempty"` // tooltip; see Button.Hint
 }
 
 // Command names a command and its args.
@@ -280,6 +287,10 @@ type Button struct {
 	Disabled bool        `json:"disabled,omitempty"`
 	Busy     bool        `json:"busy,omitempty"` // plugin-owned pending
 	IconOnly bool        `json:"iconOnly,omitempty"`
+	// Hint is a tooltip with what is not on screen (why a button is disabled), at most
+	// MaxLabel characters. Never one that repeats the label; an icon-only button shows it
+	// under its label.
+	Hint string `json:"hint,omitempty"`
 }
 
 // Node is one body element: a key unique in the view and exactly one kind.
@@ -410,6 +421,7 @@ type Chip struct {
 	Meta     *Inline `json:"meta,omitempty"`
 	Selected bool    `json:"selected,omitempty"`
 	Action   *Action `json:"action,omitempty"`
+	Hint     string  `json:"hint,omitempty"` // tooltip; see Button.Hint
 }
 
 // Log is a monospace tail. Text (or Lines, each with its own tone) is replaced by a
@@ -503,7 +515,7 @@ type Field struct {
 	Fieldset    *Fieldset `json:"fieldset,omitempty"`
 }
 
-// Input is a one-line text or secret input.
+// Input is a text input: one line, secret, multi-line or a number.
 type Input struct {
 	Kind           InputKind `json:"kind,omitempty"`
 	Value          string    `json:"value,omitempty"` // never for a secret
@@ -517,7 +529,21 @@ type Input struct {
 	// Store (secret): on submit the host writes the value into the plugin's secret
 	// namespace under this key and the submit carries {key, stored: true} instead.
 	Store string `json:"store,omitempty"`
+	// Rows (multiline) is the height in text rows (MinInputRows..MaxInputRows, 0 =
+	// DefaultInputRows).
+	Rows int `json:"rows,omitempty"`
+	// Live sends the field's change event as the user types, once they pause, for a filter
+	// that follows the text. It needs a change event. The host sends one at a time, the
+	// latest text last.
+	Live bool `json:"live,omitempty"`
 }
+
+// A multi-line input's rows.
+const (
+	DefaultInputRows = 4
+	MinInputRows     = 2
+	MaxInputRows     = 12
+)
 
 // Select picks one or more options.
 type Select struct {

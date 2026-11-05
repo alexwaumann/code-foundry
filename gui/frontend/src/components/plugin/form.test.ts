@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Field, FormNodeData } from "@/api/plugin";
 import { demoView } from "@/test/pluginFixtures";
-import { flatFields, formValues, validateField, validateForm, valueString } from "./form";
+import { flatFields, formValues, liveSender, validateField, validateForm, valueString } from "./form";
 
 const form = demoView("form").nodes.find((n) => n.form)?.form as FormNodeData;
 
@@ -44,5 +44,80 @@ describe("validation", () => {
   it("checks the whole form", () => {
     expect(validateForm(form, undefined)).toEqual({ name: "Required" });
     expect(validateForm(form, { name: "Ada" })).toEqual({});
+  });
+});
+
+describe("liveSender", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A send that stays open until `finish` is called. */
+  function held() {
+    const sent: string[] = [];
+    const open: (() => void)[] = [];
+    const send = (v: string) => {
+      sent.push(v);
+      return new Promise<void>((resolve) => open.push(resolve));
+    };
+    return { sent, send, finish: () => open.shift()?.() };
+  }
+
+  it("waits for a pause and sends only the latest text", () => {
+    vi.useFakeTimers();
+    const { sent, send } = held();
+    const live = liveSender(send, 300);
+    live.push("a");
+    vi.advanceTimersByTime(200);
+    live.push("ab");
+    vi.advanceTimersByTime(299);
+    expect(sent).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(sent).toEqual(["ab"]);
+  });
+
+  it("sends one at a time, the latest last", async () => {
+    vi.useFakeTimers();
+    const { sent, send, finish } = held();
+    const live = liveSender(send, 300);
+    live.push("a");
+    vi.advanceTimersByTime(300);
+    live.push("ab");
+    vi.advanceTimersByTime(300);
+    live.push("abc");
+    vi.advanceTimersByTime(300);
+    expect(sent).toEqual(["a"]);
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sent).toEqual(["a", "abc"]);
+  });
+
+  it("sends the same text twice running once, and a change back again", async () => {
+    vi.useFakeTimers();
+    const sent: string[] = [];
+    const live = liveSender((v) => {
+      sent.push(v);
+      return Promise.resolve();
+    }, 300);
+    for (const v of ["a", "a", "", "a"]) {
+      live.push(v);
+      await vi.advanceTimersByTimeAsync(300);
+    }
+    expect(sent).toEqual(["a", "", "a"]);
+  });
+
+  it("flushes at once and cancels what waits", () => {
+    vi.useFakeTimers();
+    const { sent, send } = held();
+    const live = liveSender(send, 300);
+    live.push("a");
+    live.flush();
+    expect(sent).toEqual(["a"]);
+    const other = held();
+    const gone = liveSender(other.send, 300);
+    gone.push("b");
+    gone.cancel();
+    vi.advanceTimersByTime(1000);
+    expect(other.sent).toEqual([]);
   });
 });

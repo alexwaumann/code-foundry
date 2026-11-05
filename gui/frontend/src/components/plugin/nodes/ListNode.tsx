@@ -51,7 +51,7 @@ export function RowView({ row, glyphStyle, dense, onActivate, selected: shown }:
     >
       {row.glyph && (
         <span className={cn("flex shrink-0 items-center justify-center", dense ? "size-3.5" : "h-5 w-3.5")}>
-          <GlyphView glyph={row.glyph} style={glyphStyle} />
+          <GlyphView glyph={row.glyph} style={glyphStyle} named={row.pill !== undefined} />
         </span>
       )}
       <div className="flex min-w-0 flex-1 flex-col">

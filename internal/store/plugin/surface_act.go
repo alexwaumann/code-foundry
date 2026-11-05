@@ -39,6 +39,7 @@ var surfaceCapabilities = []string{
 	"view.node.log", "view.node.actions", "view.node.progress", "view.node.notice", "view.node.empty",
 	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.node.container",
 	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
+	"view.hint", "view.input.multiline", "view.input.number", "view.input.live",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.

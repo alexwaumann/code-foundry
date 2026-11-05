@@ -64,6 +64,8 @@ export interface Span {
   strong?: boolean;
   /** An http(s) link the host opens. */
   url?: string;
+  /** A tooltip (a link's, in place of its URL). */
+  hint?: string;
 }
 
 /** Text that may mix tones, links and times: a bare string when it is plain text. */
@@ -72,6 +74,8 @@ export type Inline = string | { text?: string; spans?: Span[] };
 export interface Pill {
   label: string;
   tone?: Tone;
+  /** A tooltip. */
+  hint?: string;
 }
 
 export interface Glyph {
@@ -79,6 +83,8 @@ export interface Glyph {
   /** A kebab lucide name (the host's allowlist; others draw a circle). */
   icon?: string;
   tone?: Tone;
+  /** A tooltip; a status without one shows the status in words. */
+  hint?: string;
 }
 
 export interface CommandRef {
@@ -107,6 +113,8 @@ export interface ViewButton {
   /** Plugin-owned pending. */
   busy?: boolean;
   iconOnly?: boolean;
+  /** A tooltip with what is not on screen; an icon-only button shows it under its label. */
+  hint?: string;
 }
 
 export interface ViewHeader {
@@ -180,6 +188,8 @@ export interface Chip {
   meta?: Inline;
   selected?: boolean;
   action?: ViewAction;
+  /** A tooltip. */
+  hint?: string;
 }
 
 export interface ChipsData {
@@ -244,7 +254,7 @@ export interface SectionData {
 }
 
 export interface InputControl {
-  kind?: "text" | "secret";
+  kind?: "text" | "secret" | "multiline" | "number";
   value?: string;
   placeholder?: string;
   maxLength?: number;
@@ -253,6 +263,10 @@ export interface InputControl {
   mono?: boolean;
   hasValue?: boolean;
   store?: string;
+  /** A multi-line input's height in text rows. */
+  rows?: number;
+  /** Send the change event as the user types, once they pause. */
+  live?: boolean;
 }
 
 export interface SelectOption {

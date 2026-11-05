@@ -135,6 +135,7 @@ func viewLimits() string {
 		{"Select options", n(ui.MaxOptions)},
 		{"Buttons in a header / row / notice / section / empty state / terminal / actions bar", n(ui.MaxHeaderButtons, ui.MaxRowButtons, ui.MaxNoticeButtons, ui.MaxSectionButton, ui.MaxEmptyButtons, ui.MaxTerminalButtons, ui.MaxBarButtons)},
 		{"An input's pattern (characters)", n(ui.MaxPattern)},
+		{"A multi-line input's rows: least / most", n(ui.MinInputRows, ui.MaxInputRows)},
 		{"A command action's args: count / names and values together (bytes) / one value (bytes)", n(ui.MaxCommandArgs, ui.MaxCommandArgsBytes, ui.MaxCommandArgValue)},
 		{"An action's form values as the host gets them (bytes, encoded)", n(ui.MaxActValues)},
 	}
