@@ -69,7 +69,31 @@ func TestPrivacyMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := privacyMessage(root, tt.path, tt.real, tt.app); got != tt.want {
+			if got := privacyMessage(root, tt.path, tt.real, reading, tt.app); got != tt.want {
+				t.Errorf("got  %s\nwant %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPrivacyMessageWriting(t *testing.T) {
+	const root = "/Users/me"
+	app := tcc.App{Name: "iTerm", Path: "/Applications/iTerm.app/Contents/MacOS/iTerm2", Bundled: true}
+	tests := []struct {
+		name, path, want string
+	}{
+		{
+			name: "a folder with a toggle", path: "/Users/me/Documents/a.md",
+			want: `macOS's privacy protection blocked writing /Users/me/Documents/a.md: "iTerm" has no access to your Documents folder. Allow it in System Settings → Privacy & Security → Files and Folders (or Full Disk Access), then run Restart Daemon from the command palette.`,
+		},
+		{
+			name: "a file only Full Disk Access opens", path: "/Users/me/.Trash/old.txt",
+			want: `macOS's privacy protection blocked writing /Users/me/.Trash/old.txt: "iTerm" needs Full Disk Access to write it. Allow it in System Settings → Privacy & Security → Full Disk Access, then run Restart Daemon from the command palette.`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := privacyMessage(root, tt.path, tt.path, writing, app); got != tt.want {
 				t.Errorf("got  %s\nwant %s", got, tt.want)
 			}
 		})
@@ -93,7 +117,7 @@ func TestNotPermittedError(t *testing.T) {
 	if isPrivacyDenial(&fs.PathError{Op: "open", Path: "/x", Err: syscall.EACCES}) {
 		t.Fatal("EACCES (file modes) is a privacy denial")
 	}
-	err := notPermitted("/Users/me", open.Path, open.Path, open)
+	err := notPermitted("/Users/me", open.Path, open.Path, reading, open)
 	if !errors.Is(err, ErrNotPermitted) || !errors.Is(err, fs.ErrPermission) || errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("notPermitted's error matches ErrNotPermitted %t, fs.ErrPermission %t, ErrInvalidArgument %t",
 			errors.Is(err, ErrNotPermitted), errors.Is(err, fs.ErrPermission), errors.Is(err, ErrInvalidArgument))

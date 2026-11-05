@@ -153,7 +153,7 @@ internal/
   guide/                   the agent guide and the skills' references, rendered from commands and settings
   skills/                  the Claude Code skills written for every thread at daemon start
                            (orchestrate, help, plugin), and Ember's own (ember)
-  fsx/                     the home-directory boundary and directory completion
+  fsx/                     the home-directory boundary, directory completion, file reads and writes
 pluginsdk/                 the plugin SDK, its own module (stdlib only, Go 1.24): manifest, protocol,
                            Serve, Host, ui (view model), plugintest (§10)
 plugins/                   example plugins, built by `make plugins`: hello (every protocol method),
@@ -396,6 +396,9 @@ Services (v1):
   a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
   completion (`docs/notes/composer-tags-1-daemon.md`; the GUI's tags and `/` card:
   `docs/notes/composer-tags-3-skills.md`; the `@` card: `docs/notes/composer-tags-4-files.md`).
+  ReadFile and WriteFile serve the file viewer: WriteFile replaces a file atomically
+  anywhere under home except the config home outside its checkouts, and answers a file
+  that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).
 * `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, Watch. Per-project
   actions (name unique per project ignoring case, command, icon, in terminal or in the
   background, run on worktree create, position; SQLite, cascading with the project) and

@@ -10,9 +10,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/tcc"
 )
 
-// ErrNotPermitted matches ReadFile's error for a file macOS's privacy protection (TCC)
-// would not let the daemon open: EPERM from open(2), which plain file modes never give
-// (they give EACCES). See docs/notes/tcc-read-errors.md.
+// ErrNotPermitted matches ReadFile's and Writer.Write's error for a file macOS's privacy
+// protection (TCC) would not let the daemon open: EPERM from open(2), which plain file
+// modes never give (they give EACCES). See docs/notes/tcc-read-errors.md.
 var ErrNotPermitted = errors.New("not permitted")
 
 // notPermittedError says which app macOS checked and where to allow it.
@@ -28,28 +28,36 @@ func (e *notPermittedError) Is(target error) bool { return target == ErrNotPermi
 // isPrivacyDenial reports whether err from opening a file is macOS refusing it.
 func isPrivacyDenial(err error) bool { return errors.Is(err, syscall.EPERM) }
 
-// notPermitted is ReadFile's error for path (as asked) whose file real (symlinks
-// resolved, under root) macOS would not open, naming the app it checked.
-func notPermitted(root, path, real string, err error) error {
-	return &notPermittedError{msg: privacyMessage(root, path, real, tcc.Responsible()), err: err}
+// fileAccess is what macOS refused, as privacyMessage words it.
+type fileAccess struct{ gerund, verb string }
+
+var (
+	reading = fileAccess{"reading", "read"}
+	writing = fileAccess{"writing", "write"}
+)
+
+// notPermitted is the error for path (as asked) whose file real (symlinks resolved,
+// under root) macOS would not open for access, naming the app it checked.
+func notPermitted(root, path, real string, access fileAccess, err error) error {
+	return &notPermittedError{msg: privacyMessage(root, path, real, access, tcc.Responsible()), err: err}
 }
 
 // restartDaemon is the last step of every fix: quitting the app leaves the daemon
 // running, and it is the process that was refused.
 const restartDaemon = "run Restart Daemon from the command palette"
 
-// privacyMessage explains a privacy denial of path (real once resolved, under root) to
+// privacyMessage explains a denial of access to path (real once resolved, under root) to
 // app, the process macOS checked. A bundled app has its toggles in Files and Folders. A
 // bare executable, ours included, goes through Full Disk Access, and an entry made by
 // another build does nothing until it is removed and added again.
-func privacyMessage(root, path, real string, app tcc.App) string {
+func privacyMessage(root, path, real string, access fileAccess, app tcc.App) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "macOS's privacy protection blocked reading %s: ", path)
+	fmt.Fprintf(&b, "macOS's privacy protection blocked %s %s: ", access.gerund, path)
 	what := protectedArea(root, real)
 	if what != "" {
 		fmt.Fprintf(&b, "%q has no access to %s. ", app.Name, what)
 	} else {
-		fmt.Fprintf(&b, "%q needs Full Disk Access to read it. ", app.Name)
+		fmt.Fprintf(&b, "%q needs Full Disk Access to %s it. ", app.Name, access.verb)
 	}
 	switch {
 	case !app.Bundled:

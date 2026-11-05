@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/filesystem.proto.
  */
 export const file_codefoundry_v1_filesystem: GenFile = /*@__PURE__*/
-  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKCAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJECg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMitwEKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgiNAoSUHJldmlld0ZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkiRgoTUHJldmlld0ZpbGVSZXNwb25zZRILCgN1cmwYASABKAkSDQoFc2NvcGUYAiABKAkSEwoLc2luZ2xlX2ZpbGUYAyABKAgqWAoKU2tpbGxTY29wZRIbChdTS0lMTF9TQ09QRV9VTlNQRUNJRklFRBAAEhQKEFNLSUxMX1NDT1BFX1VTRVIQARIXChNTS0lMTF9TQ09QRV9QUk9KRUNUEAIy1QMKEUZpbGVzeXN0ZW1TZXJ2aWNlEmQKD0xpc3REaXJlY3RvcmllcxImLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXNwb25zZSIAElUKCkxpc3RTa2lsbHMSIS5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXNwb25zZSIAElgKC1NlYXJjaEZpbGVzEiIuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXNwb25zZSIAEk8KCFJlYWRGaWxlEh8uY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXNwb25zZSIAElgKC1ByZXZpZXdGaWxlEiIuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXNwb25zZSIAQscBChJjb20uY29kZWZvdW5kcnkudjFCD0ZpbGVzeXN0ZW1Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
+  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKCAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJECg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMitwEKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgihgEKEFdyaXRlRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIQCghjb250ZW50cxgDIAEoDBITCgttb2RpZmllZF9hdBgEIAEoAxIMCgRzaXplGAUgASgDEg0KBWZvcmNlGAYgASgIEg4KBmNyZWF0ZRgHIAEoCCJyChFXcml0ZUZpbGVSZXNwb25zZRITCgttb2RpZmllZF9hdBgBIAEoAxIMCgRzaXplGAIgASgDEhUKDXJlc29sdmVkX3BhdGgYAyABKAkSEAoIY29uZmxpY3QYBCABKAgSEQoJbm90X2ZvdW5kGAUgASgIIjQKElByZXZpZXdGaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJIkYKE1ByZXZpZXdGaWxlUmVzcG9uc2USCwoDdXJsGAEgASgJEg0KBXNjb3BlGAIgASgJEhMKC3NpbmdsZV9maWxlGAMgASgIKlgKClNraWxsU2NvcGUSGwoXU0tJTExfU0NPUEVfVU5TUEVDSUZJRUQQABIUChBTS0lMTF9TQ09QRV9VU0VSEAESFwoTU0tJTExfU0NPUEVfUFJPSkVDVBACMqkEChFGaWxlc3lzdGVtU2VydmljZRJkCg9MaXN0RGlyZWN0b3JpZXMSJi5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVzcG9uc2UiABJVCgpMaXN0U2tpbGxzEiEuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1JlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVzcG9uc2UiABJYCgtTZWFyY2hGaWxlcxIiLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEZpbGVzUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEZpbGVzUmVzcG9uc2UiABJPCghSZWFkRmlsZRIfLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVxdWVzdBogLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVzcG9uc2UiABJSCglXcml0ZUZpbGUSIC5jb2RlZm91bmRyeS52MS5Xcml0ZUZpbGVSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuV3JpdGVGaWxlUmVzcG9uc2UiABJYCgtQcmV2aWV3RmlsZRIiLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVzcG9uc2UiAELHAQoSY29tLmNvZGVmb3VuZHJ5LnYxQg9GaWxlc3lzdGVtUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message codefoundry.v1.ListDirectoriesRequest
@@ -507,6 +507,117 @@ export const ReadFileResponseSchema: GenMessage<ReadFileResponse> = /*@__PURE__*
   messageDesc(file_codefoundry_v1_filesystem, 12);
 
 /**
+ * @generated from message codefoundry.v1.WriteFileRequest
+ */
+export type WriteFileRequest = Message<"codefoundry.v1.WriteFileRequest"> & {
+  /**
+   * Absolute directory a relative path is resolved against. Ignored for an absolute
+   * path.
+   *
+   * @generated from field: string base_dir = 1;
+   */
+  baseDir: string;
+
+  /**
+   * Absolute, "~/"-prefixed, or relative to base_dir.
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * The file's new contents, at most 1 MiB. Never logged.
+   *
+   * @generated from field: bytes contents = 3;
+   */
+  contents: Uint8Array;
+
+  /**
+   * What the read saw: ReadFileResponse.modified_at, unix milliseconds. Ignored with
+   * force or create.
+   *
+   * @generated from field: int64 modified_at = 4;
+   */
+  modifiedAt: bigint;
+
+  /**
+   * What the read saw: ReadFileResponse.size. Ignored with force or create.
+   *
+   * @generated from field: int64 size = 5;
+   */
+  size: bigint;
+
+  /**
+   * Write whatever is there now (the viewer's Overwrite), even if the file is gone.
+   *
+   * @generated from field: bool force = 6;
+   */
+  force: boolean;
+
+  /**
+   * Create a file that does not exist. Not with force.
+   *
+   * @generated from field: bool create = 7;
+   */
+  create: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.WriteFileRequest.
+ * Use `create(WriteFileRequestSchema)` to create a new message.
+ */
+export const WriteFileRequestSchema: GenMessage<WriteFileRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 13);
+
+/**
+ * @generated from message codefoundry.v1.WriteFileResponse
+ */
+export type WriteFileResponse = Message<"codefoundry.v1.WriteFileResponse"> & {
+  /**
+   * Modification time, unix milliseconds: of the file as written, so a later edit's
+   * baseline matches, or of the file found there on a conflict. Zero with not_found.
+   *
+   * @generated from field: int64 modified_at = 1;
+   */
+  modifiedAt: bigint;
+
+  /**
+   * Size in bytes: as modified_at. Zero with not_found.
+   *
+   * @generated from field: int64 size = 2;
+   */
+  size: bigint;
+
+  /**
+   * Absolute, cleaned path as asked for (before following symlinks).
+   *
+   * @generated from field: string resolved_path = 3;
+   */
+  resolvedPath: string;
+
+  /**
+   * Nothing was written: the file is not what the request expected.
+   *
+   * @generated from field: bool conflict = 4;
+   */
+  conflict: boolean;
+
+  /**
+   * With conflict: no file is at resolved_path (a symlink that leads nowhere counts).
+   *
+   * @generated from field: bool not_found = 5;
+   */
+  notFound: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.WriteFileResponse.
+ * Use `create(WriteFileResponseSchema)` to create a new message.
+ */
+export const WriteFileResponseSchema: GenMessage<WriteFileResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 14);
+
+/**
  * @generated from message codefoundry.v1.PreviewFileRequest
  */
 export type PreviewFileRequest = Message<"codefoundry.v1.PreviewFileRequest"> & {
@@ -531,7 +642,7 @@ export type PreviewFileRequest = Message<"codefoundry.v1.PreviewFileRequest"> & 
  * Use `create(PreviewFileRequestSchema)` to create a new message.
  */
 export const PreviewFileRequestSchema: GenMessage<PreviewFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 13);
+  messageDesc(file_codefoundry_v1_filesystem, 15);
 
 /**
  * @generated from message codefoundry.v1.PreviewFileResponse
@@ -568,7 +679,7 @@ export type PreviewFileResponse = Message<"codefoundry.v1.PreviewFileResponse"> 
  * Use `create(PreviewFileResponseSchema)` to create a new message.
  */
 export const PreviewFileResponseSchema: GenMessage<PreviewFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 14);
+  messageDesc(file_codefoundry_v1_filesystem, 16);
 
 /**
  * @generated from enum codefoundry.v1.SkillScope
@@ -695,6 +806,33 @@ export const FilesystemService: GenService<{
     methodKind: "unary";
     input: typeof ReadFileRequestSchema;
     output: typeof ReadFileResponseSchema;
+  },
+  /**
+   * WriteFile replaces one file for the file viewer, or creates it. path is as for
+   * ReadFile, and symlinks are written through: the file they lead to is replaced, never
+   * the link, and it must be under the home directory too.
+   *
+   * Editing: modified_at and size say what the read saw. A file that differs from them,
+   * or that is gone, is conflict, not an error, and nothing is written; force skips the
+   * check, and writes a file that is gone anew (mode 0600). Creating: create makes a file
+   * that does not exist, mode 0600, in a directory that does; anything already at path is
+   * conflict. Neither flag on a missing file is conflict with not_found.
+   *
+   * The write is atomic (a temp file beside the target, then a rename) and keeps the
+   * existing file's mode. It replaces the file: another hard link keeps the old contents,
+   * and extended attributes are not carried over. InvalidArgument: a path outside the
+   * home directory, or relative without an absolute base_dir; a directory or anything
+   * else that is not a regular file; contents over 1 MiB; create with force; create or
+   * force in a directory that does not exist; force on a symlink that leads nowhere; a
+   * path in the config home outside its checkouts (its worktrees and projects).
+   * PermissionDenied: macOS's privacy protection refused the write.
+   *
+   * @generated from rpc codefoundry.v1.FilesystemService.WriteFile
+   */
+  writeFile: {
+    methodKind: "unary";
+    input: typeof WriteFileRequestSchema;
+    output: typeof WriteFileResponseSchema;
   },
   /**
    * PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback

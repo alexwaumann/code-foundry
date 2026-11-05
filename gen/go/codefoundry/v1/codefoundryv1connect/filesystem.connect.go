@@ -45,6 +45,9 @@ const (
 	// FilesystemServiceReadFileProcedure is the fully-qualified name of the FilesystemService's
 	// ReadFile RPC.
 	FilesystemServiceReadFileProcedure = "/codefoundry.v1.FilesystemService/ReadFile"
+	// FilesystemServiceWriteFileProcedure is the fully-qualified name of the FilesystemService's
+	// WriteFile RPC.
+	FilesystemServiceWriteFileProcedure = "/codefoundry.v1.FilesystemService/WriteFile"
 	// FilesystemServicePreviewFileProcedure is the fully-qualified name of the FilesystemService's
 	// PreviewFile RPC.
 	FilesystemServicePreviewFileProcedure = "/codefoundry.v1.FilesystemService/PreviewFile"
@@ -108,6 +111,25 @@ type FilesystemServiceClient interface {
 	// errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
 	// capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
+	// WriteFile replaces one file for the file viewer, or creates it. path is as for
+	// ReadFile, and symlinks are written through: the file they lead to is replaced, never
+	// the link, and it must be under the home directory too.
+	//
+	// Editing: modified_at and size say what the read saw. A file that differs from them,
+	// or that is gone, is conflict, not an error, and nothing is written; force skips the
+	// check, and writes a file that is gone anew (mode 0600). Creating: create makes a file
+	// that does not exist, mode 0600, in a directory that does; anything already at path is
+	// conflict. Neither flag on a missing file is conflict with not_found.
+	//
+	// The write is atomic (a temp file beside the target, then a rename) and keeps the
+	// existing file's mode. It replaces the file: another hard link keeps the old contents,
+	// and extended attributes are not carried over. InvalidArgument: a path outside the
+	// home directory, or relative without an absolute base_dir; a directory or anything
+	// else that is not a regular file; contents over 1 MiB; create with force; create or
+	// force in a directory that does not exist; force on a symlink that leads nowhere; a
+	// path in the config home outside its checkouts (its worktrees and projects).
+	// PermissionDenied: macOS's privacy protection refused the write.
+	WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error)
 	// PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
 	// listener that serves the file, and everything else under its scope, without the
 	// bearer token: the scope is the registered checkout holding the file, else its
@@ -159,6 +181,12 @@ func NewFilesystemServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(filesystemServiceMethods.ByName("ReadFile")),
 			connect.WithClientOptions(opts...),
 		),
+		writeFile: connect.NewClient[v1.WriteFileRequest, v1.WriteFileResponse](
+			httpClient,
+			baseURL+FilesystemServiceWriteFileProcedure,
+			connect.WithSchema(filesystemServiceMethods.ByName("WriteFile")),
+			connect.WithClientOptions(opts...),
+		),
 		previewFile: connect.NewClient[v1.PreviewFileRequest, v1.PreviewFileResponse](
 			httpClient,
 			baseURL+FilesystemServicePreviewFileProcedure,
@@ -174,6 +202,7 @@ type filesystemServiceClient struct {
 	listSkills      *connect.Client[v1.ListSkillsRequest, v1.ListSkillsResponse]
 	searchFiles     *connect.Client[v1.SearchFilesRequest, v1.SearchFilesResponse]
 	readFile        *connect.Client[v1.ReadFileRequest, v1.ReadFileResponse]
+	writeFile       *connect.Client[v1.WriteFileRequest, v1.WriteFileResponse]
 	previewFile     *connect.Client[v1.PreviewFileRequest, v1.PreviewFileResponse]
 }
 
@@ -195,6 +224,11 @@ func (c *filesystemServiceClient) SearchFiles(ctx context.Context, req *connect.
 // ReadFile calls codefoundry.v1.FilesystemService.ReadFile.
 func (c *filesystemServiceClient) ReadFile(ctx context.Context, req *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
 	return c.readFile.CallUnary(ctx, req)
+}
+
+// WriteFile calls codefoundry.v1.FilesystemService.WriteFile.
+func (c *filesystemServiceClient) WriteFile(ctx context.Context, req *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error) {
+	return c.writeFile.CallUnary(ctx, req)
 }
 
 // PreviewFile calls codefoundry.v1.FilesystemService.PreviewFile.
@@ -260,6 +294,25 @@ type FilesystemServiceHandler interface {
 	// errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
 	// capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
+	// WriteFile replaces one file for the file viewer, or creates it. path is as for
+	// ReadFile, and symlinks are written through: the file they lead to is replaced, never
+	// the link, and it must be under the home directory too.
+	//
+	// Editing: modified_at and size say what the read saw. A file that differs from them,
+	// or that is gone, is conflict, not an error, and nothing is written; force skips the
+	// check, and writes a file that is gone anew (mode 0600). Creating: create makes a file
+	// that does not exist, mode 0600, in a directory that does; anything already at path is
+	// conflict. Neither flag on a missing file is conflict with not_found.
+	//
+	// The write is atomic (a temp file beside the target, then a rename) and keeps the
+	// existing file's mode. It replaces the file: another hard link keeps the old contents,
+	// and extended attributes are not carried over. InvalidArgument: a path outside the
+	// home directory, or relative without an absolute base_dir; a directory or anything
+	// else that is not a regular file; contents over 1 MiB; create with force; create or
+	// force in a directory that does not exist; force on a symlink that leads nowhere; a
+	// path in the config home outside its checkouts (its worktrees and projects).
+	// PermissionDenied: macOS's privacy protection refused the write.
+	WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error)
 	// PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
 	// listener that serves the file, and everything else under its scope, without the
 	// bearer token: the scope is the registered checkout holding the file, else its
@@ -307,6 +360,12 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 		connect.WithSchema(filesystemServiceMethods.ByName("ReadFile")),
 		connect.WithHandlerOptions(opts...),
 	)
+	filesystemServiceWriteFileHandler := connect.NewUnaryHandler(
+		FilesystemServiceWriteFileProcedure,
+		svc.WriteFile,
+		connect.WithSchema(filesystemServiceMethods.ByName("WriteFile")),
+		connect.WithHandlerOptions(opts...),
+	)
 	filesystemServicePreviewFileHandler := connect.NewUnaryHandler(
 		FilesystemServicePreviewFileProcedure,
 		svc.PreviewFile,
@@ -323,6 +382,8 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 			filesystemServiceSearchFilesHandler.ServeHTTP(w, r)
 		case FilesystemServiceReadFileProcedure:
 			filesystemServiceReadFileHandler.ServeHTTP(w, r)
+		case FilesystemServiceWriteFileProcedure:
+			filesystemServiceWriteFileHandler.ServeHTTP(w, r)
 		case FilesystemServicePreviewFileProcedure:
 			filesystemServicePreviewFileHandler.ServeHTTP(w, r)
 		default:
@@ -348,6 +409,10 @@ func (UnimplementedFilesystemServiceHandler) SearchFiles(context.Context, *conne
 
 func (UnimplementedFilesystemServiceHandler) ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.ReadFile is not implemented"))
+}
+
+func (UnimplementedFilesystemServiceHandler) WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.WriteFile is not implemented"))
 }
 
 func (UnimplementedFilesystemServiceHandler) PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {

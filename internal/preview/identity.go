@@ -32,6 +32,17 @@ type guard struct {
 // are stat'd on every call, since ~/.claude.json is replaced on every write and a home or
 // ~/.aws may appear at any time.
 func (f Floor) guards() []guard {
+	out := f.homeGuards(readable)
+	for _, c := range f.creds {
+		if fi, err := os.Stat(c); err == nil {
+			out = append(out, guard{fi: fi, path: c})
+		}
+	}
+	return out
+}
+
+// homeGuards stats the known config homes, each with its open trees.
+func (f Floor) homeGuards(open func(paths.Paths) []string) []guard {
 	var out []guard
 	for _, h := range f.homes {
 		fi, err := os.Stat(h)
@@ -39,19 +50,13 @@ func (f Floor) guards() []guard {
 			continue
 		}
 		g := guard{fi: fi, path: h}
-		hp := paths.New(h)
-		for _, o := range []string{hp.Worktrees(), hp.Projects(), hp.Pages()} {
+		for _, o := range open(paths.New(h)) {
 			g.openName = append(g.openName, filepath.Base(o))
 			if ofi, err := os.Stat(o); err == nil {
 				g.open = append(g.open, ofi)
 			}
 		}
 		out = append(out, g)
-	}
-	for _, c := range f.creds {
-		if fi, err := os.Stat(c); err == nil {
-			out = append(out, guard{fi: fi, path: c})
-		}
 	}
 	return out
 }
@@ -89,6 +94,16 @@ func (f Floor) guardedByIdentity(p string) bool {
 		return false
 	}
 	real := realPath(p)
+	if below(gs, real) {
+		return true
+	}
+	fi, err := os.Stat(real)
+	return err == nil && fi.Mode().IsRegular() && links(fi) > 1 && f.hardLinkToGuarded(gs, fi)
+}
+
+// below reports whether real (symlinks resolved) is one of gs or lies below one, each
+// ancestor stat'd and compared.
+func below(gs []guard, real string) bool {
 	var child fs.FileInfo
 	childName := ""
 	for d := real; ; d = filepath.Dir(d) {
@@ -102,11 +117,9 @@ func (f Floor) guardedByIdentity(p string) bool {
 		}
 		child, childName = fi, filepath.Base(d)
 		if d == filepath.Dir(d) {
-			break
+			return false
 		}
 	}
-	fi, err := os.Stat(real)
-	return err == nil && fi.Mode().IsRegular() && links(fi) > 1 && f.hardLinkToGuarded(gs, fi)
 }
 
 // links is fi's hard link count; 1 when the platform does not say.
