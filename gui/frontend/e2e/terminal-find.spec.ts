@@ -274,6 +274,8 @@ test.describe("screenshots", () => {
       await page.keyboard.type("resize");
       for (let i = 0; i < 5; i++) await page.keyboard.press("Shift+Enter");
       await expect(count(page)).toHaveText("4 of 9");
+      // The count is synchronous; the WebGL selection is drawn frames later.
+      await page.waitForTimeout(600);
       await page.screenshot({ path: `${String(shots)}/after-${scheme}.png` });
     });
   }
