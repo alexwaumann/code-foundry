@@ -2,12 +2,14 @@ import { cleanup, render, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { useCollisions } from "@/components/compose/useCollisions";
+import { McpSurface } from "@/components/mcp/McpSurface";
 import { useFinderCheckouts } from "@/components/palette/useFileFinder";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { canMove } from "@/lib/move";
 import { fileSources } from "@/lib/completion";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
+import { useUiStore } from "@/stores/ui";
 import { useThreadCheckouts } from "./useThreadCheckouts";
 import { WaitingStrip } from "./WaitingStrip";
 
@@ -61,6 +63,17 @@ describe("a thread with no checkout yet", () => {
     const home = thread({ projectId: "", projectIds: [], worktreePath: "/Users/dev" });
     expect(canMove(home, useProjectsStore.getState())).toBe(false);
     expect(canMove({ ...home, setup: null }, useProjectsStore.getState())).toBe(true);
+  });
+
+  it("says when MCP servers will show, with no Refresh the daemon would refuse", () => {
+    useUiStore.setState({ selection: { kind: "thread", id: "s" } });
+    const { getByTestId, queryByTestId } = render(
+      <TooltipProvider>
+        <McpSurface />
+      </TooltipProvider>,
+    );
+    expect(getByTestId("mcp-unstarted").textContent).toBe("MCP servers show here once Claude has started.");
+    expect(queryByTestId("mcp-refresh")).toBeNull();
   });
 
   it("shows nothing in the waiting strip, failed or running", () => {

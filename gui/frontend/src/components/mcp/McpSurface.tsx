@@ -24,6 +24,7 @@ import {
   type McpBucket,
   type ToolHint,
 } from "@/lib/mcp";
+import { setupUnfinished } from "@/lib/threadSetup";
 import { cn } from "@/lib/utils";
 import { ensureMcpStatus, reconnectMcp, refreshMcp, useMcpBucketCounts, useMcpBucketNames, useMcpHeader, useMcpReconnecting, useMcpRefreshing, useMcpServer, useMcpServerNames, useMcpSettling, useMcpStale, useMcpStatus } from "@/stores/mcp";
 import { setMcpTab, useMcpTab } from "@/stores/mcpTabs";
@@ -332,7 +333,7 @@ function EmptyTab({ threadId, bucket }: { threadId: string; bucket: McpBucket })
  * 10 min old) the header turns amber, the pills go muted and dashed, and Refresh is the
  * primary button. Refresh and Reconnect work whether or not
  * Claude runs for the thread (the daemon starts it for them); its last status outlives
- * the process.
+ * the process. A thread whose setup did not finish has neither, and no Refresh.
  */
 export function McpSurface() {
   const threadId = useThreadId();
@@ -340,6 +341,8 @@ export function McpSurface() {
   // Internal only: a running Claude answers the status ask below, so the empty state says
   // a check is on its way; a stopped one has nothing new to say until a refresh.
   const asking = useThreadsStore((s) => claudeRunning(s.byId[threadId]?.state));
+  // A thread whose setup did not finish has had no Claude to report any, and the daemon refuses to start one for a refresh.
+  const unstarted = useThreadsStore((s) => setupUnfinished(s.byId[threadId]?.setup));
   const refreshing = useMcpRefreshing(threadId);
   const stale = useMcpStale(threadId);
   const status = useMcpStatus(threadId);
@@ -348,10 +351,11 @@ export function McpSurface() {
   const bucket = useMcpTab(panelKey);
   const missing = status === null;
   useEffect(() => {
-    if (known && missing) ensureMcpStatus(threadId);
-  }, [threadId, known, missing]);
+    if (known && missing && !unstarted) ensureMcpStatus(threadId);
+  }, [threadId, known, missing, unstarted]);
 
   if (!known) return <Message testId="mcp-missing">Select a thread to see its MCP servers.</Message>;
+  if (unstarted) return <Message testId="mcp-unstarted">MCP servers show here once Claude has started.</Message>;
   return (
     // @container: tightens the padding when the panel is narrow (down to 280px).
     <div className="@container flex min-w-0 flex-col" data-testid="mcp-surface" data-thread={threadId}>

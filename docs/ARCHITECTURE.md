@@ -679,7 +679,9 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `thread.setup.discard` undoes the send and gives back the draft. A message sent during it
   queues on the row behind the first prompt; one sent after it failed tries it again. All
   cleanup goes through `rollback`: only what was made, nothing another thread holds, never
-  with force, and the project store undoes a `git worktree add` it killed.
+  with force, and the project store undoes a `git worktree add` it killed. The GUI shows a
+  setup as one timeline row under the first message and in the sidebar's status
+  (`lib/threadSetup.ts`, `components/thread/SetupRow.tsx`, `docs/notes/instant-threads-3-gui.md`).
 * Auto-naming via an independent `claude -p` call producing a short natural title
   ("Fix the login redirect") and, for a new worktree or workspace, its branch in the same
   call, in the `projects.branch_naming` mode: `semantic` (default, `<type>/<slug>`, the
