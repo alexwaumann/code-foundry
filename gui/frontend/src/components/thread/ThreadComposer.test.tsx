@@ -55,6 +55,80 @@ describe("the follow-up prompt", () => {
   });
 });
 
+describe("the Compact chip", () => {
+  const chip = () => screen.queryByTestId("thread-compact");
+  const atPrompt = { state: "connected", status: "idle", statusReason: "at prompt", contextTokens: 412_000 } as const;
+
+  it("comes last in the left row, past the threshold, with no chevron", () => {
+    put({ ...atPrompt, contextTokens: 400_000 });
+    render(<ThreadComposer threadId="s-r1" pending={[]} busy={false} />);
+    expect(chip()).toBeNull();
+    act(() => {
+      put(atPrompt);
+    });
+    expect(chip()?.textContent).toBe("Compact · 412K");
+    expect(chip()?.previousElementSibling?.getAttribute("data-testid")).toBe("thread-permission-mode");
+    expect(chip()?.querySelectorAll("svg")).toHaveLength(1);
+  });
+
+  it("a double click compacts once; it goes while Claude compacts and stays gone once the context came down", async () => {
+    put(atPrompt);
+    render(<ThreadComposer threadId="s-r1" pending={[]} busy={false} />);
+    const c = chip() as HTMLElement;
+    fireEvent.click(c, { detail: 1 });
+    fireEvent.click(c, { detail: 2 });
+    await waitFor(() => {
+      expect(invocationsOf("thread.compact").map((i) => i.args)).toEqual([{ id: "s-r1" }]);
+    });
+    expect(invocationsOf("thread.send")).toEqual([]);
+    act(() => {
+      put({ status: "busy", statusReason: "compacting" });
+    });
+    expect(chip()).toBeNull();
+    act(() => {
+      put({ ...atPrompt, contextTokens: 34_000 });
+    });
+    expect(chip()).toBeNull();
+  });
+
+  it("a second press while the first is on its way sends nothing; once it came back it can be pressed again", async () => {
+    let answer: (v: { message: string; resultJson: string }) => void = () => undefined;
+    daemon.handlers.set("thread.compact", () => new Promise((resolve) => (answer = resolve)));
+    put(atPrompt);
+    render(<ThreadComposer threadId="s-r1" pending={[]} busy={false} />);
+    fireEvent.click(chip() as HTMLElement, { detail: 1 });
+    fireEvent.click(chip() as HTMLElement, { detail: 1 });
+    await waitFor(() => {
+      expect(invocationsOf("thread.compact")).toHaveLength(1);
+    });
+    await act(async () => {
+      answer({ message: "", resultJson: "" });
+      await Promise.resolve();
+    });
+    fireEvent.click(chip() as HTMLElement, { detail: 1 });
+    await waitFor(() => {
+      expect(invocationsOf("thread.compact")).toHaveLength(2);
+    });
+    answer({ message: "", resultJson: "" });
+  });
+
+  it("not while a message is on its way, and not in a composer of Ember's thread", () => {
+    put(atPrompt);
+    updateDraft(KEY, { phase: "starting" });
+    const { rerender } = render(<ThreadComposer threadId="s-r1" pending={[]} busy={false} />);
+    expect(chip()).toBeNull();
+    act(() => {
+      updateDraft(KEY, { phase: "idle" });
+    });
+    expect(chip()).not.toBeNull();
+    act(() => {
+      put({ resident: "ember" });
+    });
+    rerender(<ThreadComposer threadId="s-r1" pending={[]} busy={false} />);
+    expect(chip()).toBeNull();
+  });
+});
+
 describe("the effort picker", () => {
   async function pick(label: string): Promise<void> {
     fireEvent.click(screen.getByTestId("thread-effort"));

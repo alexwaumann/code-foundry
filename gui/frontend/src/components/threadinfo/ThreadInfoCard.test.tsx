@@ -188,6 +188,30 @@ describe("ThreadInfoCard: one project", () => {
     expect(oneLine(screen.getByTestId("ti-mcp").querySelector(":scope > span:nth-of-type(2)"))).toBe("2 servers connected");
   });
 
+  it("Compact: under Context past the threshold with Claude at its prompt; a double click compacts once; gone while it compacts and after", async () => {
+    const id = seedSingle();
+    const idle = { state: "connected", status: "idle", statusReason: "at prompt" } as const;
+    updateThread(id, { ...idle, contextTokens: 400_000 });
+    await renderCard(id);
+    expect(screen.queryByTestId("ti-compact")).toBeNull();
+
+    updateThread(id, { contextTokens: 412_000 });
+    const row = screen.getByTestId("ti-compact");
+    expect(row.textContent).toBe("Compact412K of context");
+    expect([...screen.getByTestId("ti-context-group").children].map((r) => r.getAttribute("data-testid"))).toEqual(["ti-context", "ti-compact", "ti-usage"]);
+
+    fireEvent.click(row, { detail: 1 });
+    fireEvent.click(row, { detail: 2 });
+    await waitFor(() => {
+      expect(invocationsOf("thread.compact").map((i) => i.args)).toEqual([{ id }]);
+    });
+
+    updateThread(id, { status: "busy", statusReason: "compacting" });
+    expect(screen.queryByTestId("ti-compact")).toBeNull();
+    updateThread(id, { ...idle, contextTokens: 34_000 });
+    expect(screen.queryByTestId("ti-compact")).toBeNull();
+  });
+
   it("context and usage: the warm cache, the window's tokens, the cost by model, the fold's kinds, total, savings and requests", async () => {
     const id = seedSingle();
     await renderCard(id);

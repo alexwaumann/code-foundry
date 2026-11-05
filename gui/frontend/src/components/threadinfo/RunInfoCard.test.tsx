@@ -143,6 +143,15 @@ describe("a subagent's card", () => {
     none("ti-lineage-row", "ti-previous");
   });
 
+  it("no Compact row: the thread's context past the threshold is the thread's card's to offer", () => {
+    updateThread(threadId, { state: "connected", status: "idle", statusReason: "at prompt", contextTokens: 412_000 });
+    const { unmount } = render(<ThreadInfoContent threadId={threadId} />);
+    expect(screen.getByTestId("ti-compact")).toBeTruthy();
+    unmount();
+    card();
+    expect(screen.queryByTestId("ti-compact")).toBeNull();
+  });
+
   it("Context is the run's tokens against the window, with no cache words", () => {
     updateThread(threadId, { cacheExpiresAtMs: NOW + 30 * 60_000 });
     card();

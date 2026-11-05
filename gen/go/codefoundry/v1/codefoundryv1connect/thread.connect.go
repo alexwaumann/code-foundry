@@ -133,6 +133,8 @@ const (
 	ThreadServiceWatchThreadProcedure = "/codefoundry.v1.ThreadService/WatchThread"
 	// ThreadServiceSendProcedure is the fully-qualified name of the ThreadService's Send RPC.
 	ThreadServiceSendProcedure = "/codefoundry.v1.ThreadService/Send"
+	// ThreadServiceCompactProcedure is the fully-qualified name of the ThreadService's Compact RPC.
+	ThreadServiceCompactProcedure = "/codefoundry.v1.ThreadService/Compact"
 	// ThreadServiceRespondProcedure is the fully-qualified name of the ThreadService's Respond RPC.
 	ThreadServiceRespondProcedure = "/codefoundry.v1.ThreadService/Respond"
 	// ThreadServiceInterruptProcedure is the fully-qualified name of the ThreadService's Interrupt RPC.
@@ -401,6 +403,10 @@ type ThreadServiceClient interface {
 	// the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
 	// error's message is a sentence pointing at the app's control, shown as it is.
 	Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error)
+	// Compact sends /compact to the thread: Claude replaces the conversation with its
+	// summary. A stopped thread starts with it. FAILED_PRECONDITION while the thread works,
+	// compacts, starts or restarts, waits for an answer, or has no conversation yet.
+	Compact(context.Context, *connect.Request[v1.CompactThreadRequest]) (*connect.Response[v1.CompactThreadResponse], error)
 	// Respond answers a pending permission request or question. A thread that is not
 	// running has none (FAILED_PRECONDITION).
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
@@ -763,6 +769,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Send")),
 			connect.WithClientOptions(opts...),
 		),
+		compact: connect.NewClient[v1.CompactThreadRequest, v1.CompactThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceCompactProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Compact")),
+			connect.WithClientOptions(opts...),
+		),
 		respond: connect.NewClient[v1.RespondThreadRequest, v1.RespondThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceRespondProcedure,
@@ -911,6 +923,7 @@ type threadServiceClient struct {
 	search            *connect.Client[v1.SearchThreadsRequest, v1.SearchThreadsResponse]
 	watchThread       *connect.Client[v1.WatchThreadRequest, v1.ThreadEvent]
 	send              *connect.Client[v1.SendThreadMessageRequest, v1.SendThreadMessageResponse]
+	compact           *connect.Client[v1.CompactThreadRequest, v1.CompactThreadResponse]
 	respond           *connect.Client[v1.RespondThreadRequest, v1.RespondThreadResponse]
 	interrupt         *connect.Client[v1.InterruptThreadRequest, v1.InterruptThreadResponse]
 	setModel          *connect.Client[v1.SetThreadModelRequest, v1.SetThreadModelResponse]
@@ -1133,6 +1146,11 @@ func (c *threadServiceClient) WatchThread(ctx context.Context, req *connect.Requ
 // Send calls codefoundry.v1.ThreadService.Send.
 func (c *threadServiceClient) Send(ctx context.Context, req *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error) {
 	return c.send.CallUnary(ctx, req)
+}
+
+// Compact calls codefoundry.v1.ThreadService.Compact.
+func (c *threadServiceClient) Compact(ctx context.Context, req *connect.Request[v1.CompactThreadRequest]) (*connect.Response[v1.CompactThreadResponse], error) {
+	return c.compact.CallUnary(ctx, req)
 }
 
 // Respond calls codefoundry.v1.ThreadService.Respond.
@@ -1446,6 +1464,10 @@ type ThreadServiceHandler interface {
 	// the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
 	// error's message is a sentence pointing at the app's control, shown as it is.
 	Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error)
+	// Compact sends /compact to the thread: Claude replaces the conversation with its
+	// summary. A stopped thread starts with it. FAILED_PRECONDITION while the thread works,
+	// compacts, starts or restarts, waits for an answer, or has no conversation yet.
+	Compact(context.Context, *connect.Request[v1.CompactThreadRequest]) (*connect.Response[v1.CompactThreadResponse], error)
 	// Respond answers a pending permission request or question. A thread that is not
 	// running has none (FAILED_PRECONDITION).
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
@@ -1804,6 +1826,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Send")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceCompactHandler := connect.NewUnaryHandler(
+		ThreadServiceCompactProcedure,
+		svc.Compact,
+		connect.WithSchema(threadServiceMethods.ByName("Compact")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceRespondHandler := connect.NewUnaryHandler(
 		ThreadServiceRespondProcedure,
 		svc.Respond,
@@ -1990,6 +2018,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceWatchThreadHandler.ServeHTTP(w, r)
 		case ThreadServiceSendProcedure:
 			threadServiceSendHandler.ServeHTTP(w, r)
+		case ThreadServiceCompactProcedure:
+			threadServiceCompactHandler.ServeHTTP(w, r)
 		case ThreadServiceRespondProcedure:
 			threadServiceRespondHandler.ServeHTTP(w, r)
 		case ThreadServiceInterruptProcedure:
@@ -2195,6 +2225,10 @@ func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *connect.R
 
 func (UnimplementedThreadServiceHandler) Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Send is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Compact(context.Context, *connect.Request[v1.CompactThreadRequest]) (*connect.Response[v1.CompactThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Compact is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error) {

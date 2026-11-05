@@ -870,6 +870,19 @@ func (f *Fake) DiscardSetup(_ context.Context, id string) (thread.SetupDraft, er
 	return f.SetupDraft, nil
 }
 
+// Compact records "Compact <id>" and sends /compact as the thread itself, like the
+// Manager; the refusals are the Manager's (compact_test.go), injected here with record's
+// errors.
+func (f *Fake) Compact(ctx context.Context, id string) (thread.Item, error) {
+	f.mu.Lock()
+	err := f.record("Compact " + id)
+	f.mu.Unlock()
+	if err != nil {
+		return thread.Item{}, err
+	}
+	return f.Send(ctx, id, thread.Message{Text: "/compact", ByThreadID: id})
+}
+
 // Interrupt records "Interrupt <id>", with " by <by>" when another thread asked.
 func (f *Fake) Interrupt(_ context.Context, id, by string) error {
 	f.mu.Lock()

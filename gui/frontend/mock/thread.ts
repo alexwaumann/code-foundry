@@ -111,6 +111,12 @@ export interface ThreadWorld {
   modelOf(id: string): string;
   /** A turn ended: the thread's context totals move to now (mock/context.ts). */
   recordResult(id: string, model: string): void;
+  /** The thread's context size after its last turn. */
+  contextTokensOf(id: string): number;
+  /** Claude is starting for the thread (STARTING). */
+  isStarting(id: string): boolean;
+  /** A compaction ended: the context is `tokens`. */
+  recordCompaction(id: string, tokens: number): void;
   /** The thread's subagent runs changed: its thread's running counts follow (mock/agents.ts). */
   agentsChanged(id: string): void;
   /** One of the user's themes as a theme card's file (mock/userThemes.ts), for the scripted theme state. */
@@ -148,6 +154,9 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * item and the daemon's process_ended turn end; mock/world.ts stops the thread with status
  * error "did not start").
  */
+/** How long a compaction takes. */
+const COMPACT_MS = 600;
+
 export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "waiting" | "servers" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "html-repeat" | "theme" | "bridge" | "pagelib";
 export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "waiting", "servers", "stopped", "crashed", "html", "html-idle", "html-scroll", "long", "html-repeat", "theme", "bridge", "pagelib"];
 
@@ -304,6 +313,8 @@ export class MockThreadLogs {
   calls: string[] = [];
   /** Bumped by reset(): a scripted reply still sleeping from before stops. */
   private generation = 0;
+  /** Threads whose /compact is running. */
+  private readonly compacting = new Set<string>();
   /**
    * POST /__mock/thread/fail-respond: the next thread.respond fails (the prompt must come
    * back); with ?withdrawn=1 Claude withdrew the request first (NotFound, like the daemon).
@@ -1499,6 +1510,56 @@ export class MockThreadLogs {
     return msg;
   }
 
+  /**
+   * thread.compact, like the daemon's Manager.Compact (internal/store/thread/compact.go):
+   * refused unless Claude is at its prompt; a stopped thread starts with it.
+   */
+  compact(id: string): ItemInit {
+    this.world.refuseTranscriptMissing(id);
+    const hold = this.compactHold(id);
+    if (hold) throw new CommandError("unavailable", `failed precondition: thread ${id} ${hold}`);
+    const msg = this.append(id, this.item(id, { case: "userMessage", value: { text: "/compact" } }));
+    if (this.world.isConnected(id)) this.runCompact(id);
+    else {
+      const gen = this.generation;
+      this.world.start(id, () => {
+        if (gen === this.generation) this.runCompact(id);
+      });
+    }
+    return msg;
+  }
+
+  /** What the daemon says after "thread <id>" when it refuses a compaction; "" when it would not. */
+  private compactHold(id: string): string {
+    const l = this.log(id);
+    const later = "; compact it once Claude is back at its prompt";
+    if (!l.items.some((x) => x.payload?.case === "userMessage")) return "has no conversation to compact yet";
+    if (this.world.isStarting(id)) return `is starting${later}`;
+    if (l.pending.length > 0) return `is waiting for an answer${later}`;
+    if (this.world.statusOf(id) !== ThreadStatus.BUSY) return "";
+    return `${this.compacting.has(id) ? "is already compacting" : "is in the middle of a turn"}${later}`;
+  }
+
+  /** The compaction's stream: busy "compacting", then its row, Claude's "Compacted" and a turn with no request. */
+  private runCompact(id: string): void {
+    const l = this.log(id);
+    this.compacting.add(id);
+    this.world.setStatus(id, ThreadStatus.BUSY, "compacting");
+    const gen = this.generation;
+    void (async () => {
+      await sleep(COMPACT_MS);
+      this.compacting.delete(id);
+      if (gen !== this.generation) return;
+      const pre = this.world.contextTokensOf(id);
+      const post = Math.round(pre / 12);
+      this.append(id, this.item(id, { case: "compaction", value: { trigger: "manual", preTokens: BigInt(pre), postTokens: BigInt(post), summary: "The conversation so far, in short." } }));
+      this.append(id, this.item(id, { case: "commandOutput", value: { text: "<local-command-stdout>Compacted </local-command-stdout>" } }));
+      this.append(id, this.item(id, { case: "turnEnd", value: { subtype: "success", durationMs: BigInt(COMPACT_MS), numTurns: 0 } }));
+      this.world.recordCompaction(id, post);
+      this.world.setStatus(id, l.watchers > 0 ? ThreadStatus.IDLE : ThreadStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
+    })();
+  }
+
   /** The scripted reply to a message: thinking, a streamed answer, the turn's end. */
   private reply(id: string): void {
     this.world.setStatus(id, ThreadStatus.BUSY, "working");
@@ -1564,6 +1625,15 @@ export class MockThreadLogs {
           this.send(a.id ?? "", a.text ?? "", atts, a["composer-text"] ?? "");
           // The daemon's message is for the CLI (commands_thread.go sendNext); the GUI must not toast it as is.
           return `sent to thread ${a.id ?? ""}; wait with: code-foundry thread wait ${a.id ?? ""}`;
+        },
+      },
+      {
+        cmd: { name: "thread.compact", title: "Compact Thread", category: "Thread", description: "Have Claude replace a thread's conversation with its summary", keybindings: [], args: [id] },
+        when,
+        run: (_ctx, a) => {
+          this.compact(a.id ?? "");
+          this.calls.push(`compact ${a.id ?? ""}`);
+          return `compacting thread ${a.id ?? ""}`;
         },
       },
       {

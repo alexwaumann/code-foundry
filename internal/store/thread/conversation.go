@@ -100,12 +100,16 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	prompt = m.rewriteThreadRefsLogged(id, prompt, msg.ComposerText)
 	// After a stop that was not the user's, the message starts with what happened
 	// (resumenote.go); cleared once it went out.
-	note, resume := m.resumeNote(id)
+	var note string
+	var resume ResumeNote
+	if !msg.compact { // it stays for the next message (compact.go)
+		note, resume = m.resumeNote(id)
+	}
 	if note != "" {
 		prompt = note + "\n\n" + prompt
 	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
-		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), note: note, resume: resume, itemID: written}
+		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), note: note, resume: resume, itemID: written, compact: msg.compact}
 	m.nameFromFirstMessage(id, log, o)
 	for {
 		live, closing, reserved, _, err := m.lifecycle(id)

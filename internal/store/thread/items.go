@@ -298,6 +298,8 @@ type Message struct {
 	// ByThreadID is the thread that sends it (the CLI's $CODE_FOUNDRY_THREAD), kept on the
 	// item as SentBy; "" for the user.
 	ByThreadID string
+	// compact: Compact's /compact (compact.go).
+	compact bool
 }
 
 // MessageOrigin is who sent a user message.

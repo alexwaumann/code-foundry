@@ -44,6 +44,7 @@ import { useUiStore } from "@/stores/ui";
 import { registerCiteTarget } from "@/stores/cite";
 import { cancelSetup } from "@/stores/setupActions";
 import { ColdCacheNote } from "./ColdCacheNote";
+import { CompactChip } from "./CompactChip";
 import { FailedPromptNote } from "./FailedPromptNote";
 import { RetryNote } from "./RetryNote";
 import { SetupNote } from "./SetupNote";
@@ -454,6 +455,7 @@ export function ThreadComposer({
             contentClassName="w-60"
             data-testid="thread-permission-mode"
           />
+          <CompactChip threadId={threadId} />
           <div className="ml-auto flex items-center gap-0.5">
             <DictationMic dictation={dictation} disabled={inputOff} />
             {/* The span carries the tooltip while the button is disabled (no pointer events). */}

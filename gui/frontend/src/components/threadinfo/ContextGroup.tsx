@@ -1,13 +1,16 @@
 import { useMemo, useRef, useState } from "react";
+import { FoldVertical } from "lucide-react";
 import type { UsageBucketView } from "@/api/threads";
 import { Tip } from "@/components/ui/tooltip";
 import { useNowSelect } from "@/lib/clock";
+import { compactOffer } from "@/lib/compact";
 import { canonicalModelName } from "@/lib/models";
 import { cacheMinutesLeft, cacheSuffix, cardUsd, contextPercent, foldUsd, USD_SHOWN } from "@/lib/threadInfo";
 import { fmtShare, fmtTok, totalUsage, usageByModel } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { useModelChoices } from "@/stores/settings";
 import { useThreadStore } from "@/stores/thread";
+import { compactThread } from "@/stores/threadActions";
 import { sameUsage, useThreadsStore } from "@/stores/threads";
 import { Group, HOVER_CARD, Row } from "./Row";
 
@@ -76,6 +79,24 @@ function ContextRowView({ tokens, window, minutes, reread }: { tokens: number; w
         </span>
       </Row>
     </Tip>
+  );
+}
+
+/** Compact: thread.compact, offered under the rule of lib/compact; the composer's chip offers the same. */
+function CompactRow({ threadId }: { threadId: string }) {
+  const tokens = useThreadsStore((s) => compactOffer(s.byId[threadId]));
+  if (tokens === null) return null;
+  return (
+    <Row
+      icon={<FoldVertical />}
+      onActivate={() => {
+        void compactThread(threadId);
+      }}
+      meta={<span className="text-cf-text-muted">{fmtTok(tokens)} of context</span>}
+      testId="ti-compact"
+    >
+      Compact
+    </Row>
   );
 }
 
@@ -174,11 +195,12 @@ function UsageRowView({ usage }: { usage: readonly UsageBucketView[] }) {
   );
 }
 
-/** The last group: Context and Usage, always there. */
+/** The last group: Context and Usage, always there, and Compact between them once the context is large. */
 export function ContextGroup({ threadId }: { threadId: string }) {
   return (
     <Group testId="ti-context-group">
       <ContextRow threadId={threadId} />
+      <CompactRow threadId={threadId} />
       <UsageRow threadId={threadId} />
     </Group>
   );

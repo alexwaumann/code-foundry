@@ -243,6 +243,10 @@ service ThreadService {
   // the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
   // error's message is a sentence pointing at the app's control, shown as it is.
   rpc Send(SendThreadMessageRequest) returns (SendThreadMessageResponse) {}
+  // Compact sends /compact to the thread: Claude replaces the conversation with its
+  // summary. A stopped thread starts with it. FAILED_PRECONDITION while the thread works,
+  // compacts, starts or restarts, waits for an answer, or has no conversation yet.
+  rpc Compact(CompactThreadRequest) returns (CompactThreadResponse) {}
   // Respond answers a pending permission request or question. A thread that is not
   // running has none (FAILED_PRECONDITION).
   rpc Respond(RespondThreadRequest) returns (RespondThreadResponse) {}
@@ -927,6 +931,15 @@ message SendThreadMessageRequest {
 
 message SendThreadMessageResponse {
   // The user_message item.
+  ThreadItem item = 1;
+}
+
+message CompactThreadRequest {
+  string thread_id = 1;
+}
+
+message CompactThreadResponse {
+  // The user_message item of the /compact.
   ThreadItem item = 1;
 }
 

@@ -44,7 +44,7 @@ import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { MockDictation } from "./dictation";
 import { MockSearches } from "./agentSearch";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
-import { contextFields, recordResult, type MockContext } from "./context";
+import { contextFields, recordCompaction, recordResult, type MockContext } from "./context";
 import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
 import { panelItemCommands } from "./panelItemVerbs";
 import { createHints, type SetThread } from "./projectSets";
@@ -809,6 +809,13 @@ export class World {
       recordResult: (id, model) => {
         const s = this.thread(id);
         recordResult(s, model);
+        this.publishThread(s);
+      },
+      contextTokensOf: (id) => this.thread(id).contextTokens,
+      isStarting: (id) => this.thread(id).state === ThreadState.STARTING,
+      recordCompaction: (id, tokens) => {
+        const s = this.thread(id);
+        recordCompaction(s, tokens);
         this.publishThread(s);
       },
       themeCard: (id) => this.themes.cardOf(id),
@@ -2704,10 +2711,10 @@ export class World {
     return Number(this.settings.values()["threads.cache_ttl_seconds"] || 3600);
   }
 
-  /** POST /__mock/thread/cache: the thread's last result `agoSeconds` ago (optionally with `tokens`, answered by `model`). */
-  ageThreadCache(id: string, agoSeconds: number, tokens?: number, model?: string): void {
+  /** POST /__mock/thread/cache: the thread's last result `agoSeconds` ago (undefined: when it was, else now), optionally with `tokens`, answered by `model`. */
+  ageThreadCache(id: string, agoSeconds: number | undefined, tokens?: number, model?: string): void {
     const s = this.thread(id);
-    s.lastResultAt = new Date(Date.now() - agoSeconds * 1000);
+    s.lastResultAt = agoSeconds === undefined ? (s.lastResultAt ?? new Date()) : new Date(Date.now() - agoSeconds * 1000);
     if (tokens !== undefined) s.contextTokens = tokens;
     if (model !== undefined) s.contextModel = model;
     this.publishThread(s);
