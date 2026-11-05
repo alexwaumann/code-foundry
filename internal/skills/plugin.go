@@ -49,7 +49,7 @@ func placeholders(src Sources) map[string]string {
 		"eventSources":  codeList(pluginsdk.EventSources),
 		"limits":        viewLimits(),
 		"eventVariants": eventVariants(),
-		"icons":         codeList(ui.Icons),
+		"iconNames":     strings.Join(ui.Icons, " "),
 		"bridgeAPI":     bridgeAPI(),
 		"bridgeErrors":  codeList(bridge.ErrorCodes),
 	}

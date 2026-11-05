@@ -25,9 +25,7 @@ next, and tables, charts and images wait on the `html` node decision.
 
 ## Decisions
 
-- Icons: every icon the app uses (189), not all of lucide. The skill prints the list into
-  `manifest.md`, and all of lucide would add about 20 KB to it. Names are lucide's canonical
-  ones: `Loader2` is `loader-circle`, `FileJson` is `file-braces`.
+- Icons: superseded by `plugin-all-icons.md`.
 - A chip with a `hint` shows the hint, not its cut label: one tooltip per element.
 
 ## Gotchas

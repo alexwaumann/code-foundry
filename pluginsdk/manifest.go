@@ -147,7 +147,7 @@ const (
 type SurfaceSpec struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
-	// Icon is a lucide icon name from the host's allowlist (unknown names fall back).
+	// Icon is a lucide icon name (unknown names fall back).
 	Icon      string   `json:"icon,omitempty"`
 	Scope     string   `json:"scope,omitempty"`     // default ScopeThread
 	Placement []string `json:"placement,omitempty"` // default [PlacementPanel]

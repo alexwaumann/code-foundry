@@ -2,6 +2,7 @@
  * The shared pieces of plugin views: inline content (text runs with tones, links and
  * ticking times), pills, status glyphs and buttons (PRIMITIVES.md §A, shared value types).
  */
+import { createElement } from "react";
 import { Check, Circle, Copy, ExternalLink, LoaderCircle } from "lucide-react";
 import type { Glyph as GlyphValue, Inline, Pill as PillValue, Span, ViewButton } from "@/api/plugin";
 import { inlineSpans, inlineText } from "@/api/plugin";
@@ -15,13 +16,12 @@ import { openElementUrl } from "@/stores/pluginSurfaces";
 import { useRunAction } from "./actions";
 import { useFormCtx, useViewCtx } from "./context";
 import { formatFixedDuration, formatTime } from "./format";
-import { PLUGIN_ICONS } from "./icons";
+import { iconByName } from "./icons";
 import { statusDot, statusIcon, statusWord, toneText, tonePill } from "./tones";
 
-/** An allowlisted lucide icon by kebab name (a circle for any other name; `fallback` when there is none). */
+/** A lucide icon by kebab name (a circle for any other name; `fallback` when there is none). */
 export function PluginIcon({ name, fallback = "circle", className, label }: { name: string | undefined; fallback?: string; className?: string; label?: string }) {
-  const Icon = (name ? PLUGIN_ICONS[name] : undefined) ?? PLUGIN_ICONS[name ? "circle" : fallback] ?? Circle;
-  return <Icon className={className} aria-hidden={label ? undefined : true} aria-label={label} />;
+  return createElement(iconByName(name || fallback) ?? Circle, { className, "aria-hidden": label ? undefined : true, "aria-label": label });
 }
 
 /** A time span: its own component on the shared 1 s clock, so only it re-renders. */
@@ -98,7 +98,7 @@ export function PillView({ pill, className }: { pill: PillValue | undefined; cla
 
 
 /**
- * A status (dot or icon style) or an allowlisted icon with a tone. Its tooltip is its hint,
+ * A status (dot or icon style) or an icon with a tone. Its tooltip is its hint,
  * else the status in words, which `named` leaves out when the words are already on screen
  * (a row's pill, an empty state's title).
  */

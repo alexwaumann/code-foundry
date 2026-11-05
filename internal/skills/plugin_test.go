@@ -8,13 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/skills"
-	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
 // pluginSkillFiles are the code-foundry-plugin skill's files.
@@ -23,7 +21,7 @@ var pluginSkillFiles = []string{
 	"code-foundry-plugin/reference/manifest.md", "code-foundry-plugin/reference/protocol.md",
 	"code-foundry-plugin/reference/primitives.md", "code-foundry-plugin/reference/ui-layout.md", "code-foundry-plugin/reference/host-api.md",
 	"code-foundry-plugin/reference/nodes.md", "code-foundry-plugin/reference/forms.md", "code-foundry-plugin/reference/events.md",
-	"code-foundry-plugin/reference/wakes.md", "code-foundry-plugin/reference/owned.md",
+	"code-foundry-plugin/reference/wakes.md", "code-foundry-plugin/reference/owned.md", "code-foundry-plugin/reference/icons.md",
 	"code-foundry-plugin/reference/testing.md", "code-foundry-plugin/reference/publishing.md",
 	"code-foundry-plugin/reference/cli.md", "code-foundry-plugin/reference/host-commands.md",
 	"code-foundry-plugin/example/plugin.json", "code-foundry-plugin/example/main.go",
@@ -73,11 +71,13 @@ func TestRenderPluginSkill(t *testing.T) {
 		}
 	}
 	manifest := string(files[skills.Plugin+"/reference/manifest.md"])
-	for _, want := range []string{"`pr.checks.provider`", "`thread.hasPr`", "`threads`, `thread`", "`surface`, `act`", "`context-thread`",
-		"`activity`, `alarm-clock`", "`workflow`, `wrench`"} {
+	for _, want := range []string{"`pr.checks.provider`", "`thread.hasPr`", "`threads`, `thread`", "`surface`, `act`", "`context-thread`"} {
 		if !strings.Contains(manifest, want) {
 			t.Errorf("manifest.md lacks %q", want)
 		}
+	}
+	if icons := string(files[skills.Plugin+"/reference/icons.md"]); !strings.Contains(icons, " activity ") || !strings.Contains(icons, " trash-2 ") {
+		t.Errorf("icons.md lacks the icon names: %.300s", icons)
 	}
 	events := string(files[skills.Plugin+"/reference/events.md"])
 	for _, want := range []string{"| `threads` | `thread-list` | `threadList` | `snapshot`, `updated`, `removedId`", "| `thread` | `thread` | `thread` | `pending`, `pendingSnapshot` |", "`pullRequestDetailUpdated`, `pullRequestChanged`",
@@ -208,31 +208,6 @@ func TestSDKPin(t *testing.T) {
 				t.Errorf("SKILL.md does not pin %q", tt.want)
 			}
 		})
-	}
-}
-
-// The skill lists the icons the GUI draws (ui.Icons); once the GUI's allowlist is in
-// this tree the two must agree.
-func TestIconsMatchTheGUI(t *testing.T) {
-	src, err := os.ReadFile("../../gui/frontend/src/components/plugin/icons.ts")
-	if os.IsNotExist(err) {
-		t.Skip("no plugin icon allowlist in the GUI yet")
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	body := string(src)
-	start := strings.Index(body, "PLUGIN_ICONS")
-	end := strings.Index(body[max(start, 0):], "\n};")
-	if start < 0 || end < 0 {
-		t.Fatal("icons.ts has no PLUGIN_ICONS map")
-	}
-	var gui []string
-	for _, m := range regexp.MustCompile(`(?m)^\s+"?([a-z0-9-]+)"?:`).FindAllStringSubmatch(body[start:start+end], -1) {
-		gui = append(gui, m[1])
-	}
-	if !slices.Equal(gui, ui.Icons) {
-		t.Errorf("the GUI draws %v, pluginsdk/ui.Icons says %v", gui, ui.Icons)
 	}
 }
 

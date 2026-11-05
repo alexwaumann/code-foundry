@@ -80,7 +80,7 @@ export interface Pill {
 
 export interface Glyph {
   status?: Status;
-  /** A kebab lucide name (the host's allowlist; others draw a circle). */
+  /** A kebab lucide name (others draw a circle). */
   icon?: string;
   tone?: Tone;
   /** A tooltip; a status without one shows the status in words. */

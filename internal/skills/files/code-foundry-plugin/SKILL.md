@@ -19,7 +19,8 @@ Files are split into `##` sections: `grep -n "^## " <file>`, then read the one y
 
 | To | Read (in `reference/`) |
 |---|---|
-| Declare commands, surfaces, permissions, `when` clauses, icons | `manifest.md` |
+| Declare commands, surfaces, permissions, `when` clauses | `manifest.md` |
+| Find an icon name (search it, do not read it) | `icons.md` |
 | Draw a view: model, value types, limits, acts, design rules, which node to use | `primitives.md` |
 | Use a display node (list, chips, log, notice, section…) | `nodes.md` |
 | Take input (fields, drafts, secrets in forms) | `forms.md` |
