@@ -48,7 +48,7 @@ func (w *Writer) Editable(baseDir, path string) (string, error) {
 	case t.info.Mode()&0o200 == 0:
 		return "", refused(ErrNotWritable, fmt.Sprintf("%s is read-only", p), nil)
 	}
-	f, err := ReadFile(w.Root, baseDir, path, 0)
+	f, err := ReadFile(ReadRoots{Home: w.Root}, baseDir, path, 0)
 	if err != nil {
 		return "", err
 	}

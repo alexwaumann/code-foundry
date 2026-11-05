@@ -19,7 +19,7 @@ vi.mock("@/api/files", async (orig) => ({
   writeFile: api.write,
   readFile: (_base: string, path: string) => {
     const f = disk.get(path) ?? { notFound: true };
-    return Promise.resolve({ path, realPath: path, mode: 0o600, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, text: null, lossless: false, image: null, pdf: null, ...f });
+    return Promise.resolve({ path, realPath: path, mode: 0o600, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, outsideHome: false, text: null, lossless: false, image: null, pdf: null, ...f });
   },
 }));
 vi.mock("@/api/filesystem", async (orig) => ({

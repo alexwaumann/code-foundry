@@ -36,6 +36,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/preview"
@@ -206,13 +207,15 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	actionAPI := api.NewAction(st.action, events)
 	dictationAPI := api.NewDictation(st.dictation, events)
 	searchAPI := api.NewSearch(st.search, events)
-	grants := preview.NewGrants(preview.NewFloor(st.home, p))
+	// The file viewer also reads the temp folders, where agents write; nothing else does.
+	tempRoots := fsx.TempRoots(st.home)
+	grants := preview.NewGrants(preview.NewFloor(st.home, p).WithTemp(tempRoots))
 	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css),
 	// and its contrast reports on the user's themes (theme save, theme check).
 	liveTheme, themeReports := theme.NewLive(), theme.NewReports()
 	// Terminals answer color queries from the theme; dark until the GUI publishes one.
 	st.terminal.SetColors(ctx, terminalColors(theme.DefaultFrame(theme.SchemeDark)))
-	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithPagesOrigin(pagesOrigin(pagesPort))
+	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesOrigin(pagesOrigin(pagesPort))
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
 	// Plugins start once every command is registered (below), so a starting plugin's

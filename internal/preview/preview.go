@@ -2,11 +2,13 @@
 // daemon's bearer token (an <iframe src> carries no headers), so the GUI asks
 // FilesystemService.PreviewFile for a grant: an unguessable id bound to one directory
 // tree (the registered checkout holding the file, else its directory) or, when that
-// directory is too broad for the Floor (home itself, an ancestor of the config home), to
-// the one file. The grant goes in the URL and is the credential for
+// directory is too broad for the Floor (home itself, a temp folder, an ancestor of the
+// config home), to the one file. The grant goes in the URL and is the credential for
 // GET /preview/<grant>/<path> on the loopback listener, mounted outside the bearer check.
-// A grant reads only its tree, never above it, outside the home directory or inside a
-// guarded folder (symlinks resolved), and lasts until the daemon stops.
+// A grant reads only its tree, never above it, outside the home directory and the temp
+// folders or inside a guarded folder (symlinks resolved), and lasts until the daemon stops.
+// A grant in a temp folder reads only its own tree, and what is in a temp folder only such a
+// grant reads: anyone can plant a link there, or swap a file for one mid-read (open.go).
 //
 // The route is served on the daemon's pages listener, not the API's
 // (docs/notes/bridge-1-daemon.md). Its CSP sandbox keeps scripts and forms on and allows
@@ -78,7 +80,7 @@ func (g *Grants) Grant(dir string) (string, error) {
 // GrantFile returns the id that serves file (absolute, cleaned) and nothing else, for a
 // file whose directory may not be a tree; ErrGuarded when the file itself is guarded.
 func (g *Grants) GrantFile(file string) (string, error) {
-	if g.floor.Guarded(file) || !fsx.Within(g.floor.Home(), file) {
+	if g.floor.Guarded(file) || !g.floor.reaches(file) {
 		return "", fmt.Errorf("%w: %s", ErrGuarded, file)
 	}
 	return g.mint(entry{dir: filepath.Dir(file), file: file})
@@ -146,10 +148,10 @@ func escapeSegment(s string) string {
 }
 
 // Handler serves GET /preview/<grant>/<path> from the grant's directory (only its file,
-// for a one-file grant). A file whose symlinks lead outside the home directory or into a
-// guarded folder (the Floor: the config home's token and database, ~/.ssh, compared by
-// file identity, so a folded spelling or a hard link is no way around it), or a path
-// above the grant's directory, is 404 like a missing one. A directory serves its
+// for a one-file grant). A file whose symlinks lead out of home for a home grant, out of the
+// tree for a temp grant (open) or into a guarded folder (the Floor: the config home's token and
+// database, ~/.ssh, compared by file identity, so a folded spelling or a hard link is no way
+// around it), or a path above the grant's directory, is 404 like a missing one. A directory serves its
 // index.html. Responses are never cached (the thread edits these files), carry no
 // referrer, so the grant does not leak to the sites a page loads from, and allow any
 // origin: a page reads its own files with fetch(), and a frame that is not same-origin
@@ -178,7 +180,7 @@ func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		p, err := resolve(g.floor, e.dir, rel)
+		f, p, err := open(g.floor, e, rel)
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				log.Warn("preview read failed", "path", rel, "err", err)
@@ -186,51 +188,20 @@ func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+		defer func() { _ = f.Close() }()
 		var tag []byte
 		if paint != nil && r.URL.Query().Get(ThemedParam) == "1" {
 			tag = paintTag(paint())
 		}
-		serve(w, r, p, tag)
+		serve(w, r, f, p, tag)
 	})
 }
 
-// resolve maps a request path to the regular file it names under dir, or ErrNotExist.
-func resolve(floor Floor, dir, rel string) (string, error) {
-	clean := path.Clean("/" + rel)
-	p := filepath.Join(dir, filepath.FromSlash(clean))
-	if !fsx.Within(dir, p) {
-		return "", fs.ErrNotExist
-	}
-	real, err := filepath.EvalSymlinks(p)
-	if err != nil {
-		return "", err
-	}
-	if !fsx.Within(floor.Home(), real) || floor.Guarded(real) {
-		return "", fs.ErrNotExist
-	}
-	fi, err := os.Stat(real)
-	if err != nil {
-		return "", err
-	}
-	if fi.IsDir() {
-		return resolve(floor, dir, path.Join(clean, "index.html"))
-	}
-	if !fi.Mode().IsRegular() {
-		return "", fs.ErrNotExist
-	}
-	return real, nil
-}
-
-// serve writes the file at p; an HTML document gets tag (paint.go) when tag is not nil.
-func serve(w http.ResponseWriter, r *http.Request, p string, tag []byte) {
-	f, err := os.Open(p)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer func() { _ = f.Close() }()
+// serve writes the open file f, whose real path is p; an HTML document gets tag (paint.go)
+// when tag is not nil.
+func serve(w http.ResponseWriter, r *http.Request, f *os.File, p string, tag []byte) {
 	fi, err := f.Stat()
-	if err != nil {
+	if err != nil || !fi.Mode().IsRegular() {
 		http.NotFound(w, r)
 		return
 	}

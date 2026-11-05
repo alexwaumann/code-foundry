@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/filesystem.proto.
  */
 export const file_codefoundry_v1_filesystem: GenFile = /*@__PURE__*/
-  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKCAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJECg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMi2AEKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgSEQoJcmVhbF9wYXRoGAogASgJEgwKBG1vZGUYCyABKA0ihgEKEFdyaXRlRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIQCghjb250ZW50cxgDIAEoDBITCgttb2RpZmllZF9hdBgEIAEoAxIMCgRzaXplGAUgASgDEg0KBWZvcmNlGAYgASgIEg4KBmNyZWF0ZRgHIAEoCCJyChFXcml0ZUZpbGVSZXNwb25zZRITCgttb2RpZmllZF9hdBgBIAEoAxIMCgRzaXplGAIgASgDEhUKDXJlc29sdmVkX3BhdGgYAyABKAkSEAoIY29uZmxpY3QYBCABKAgSEQoJbm90X2ZvdW5kGAUgASgIIjQKElByZXZpZXdGaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJIkYKE1ByZXZpZXdGaWxlUmVzcG9uc2USCwoDdXJsGAEgASgJEg0KBXNjb3BlGAIgASgJEhMKC3NpbmdsZV9maWxlGAMgASgIKlgKClNraWxsU2NvcGUSGwoXU0tJTExfU0NPUEVfVU5TUEVDSUZJRUQQABIUChBTS0lMTF9TQ09QRV9VU0VSEAESFwoTU0tJTExfU0NPUEVfUFJPSkVDVBACMqkEChFGaWxlc3lzdGVtU2VydmljZRJkCg9MaXN0RGlyZWN0b3JpZXMSJi5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVzcG9uc2UiABJVCgpMaXN0U2tpbGxzEiEuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1JlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVzcG9uc2UiABJYCgtTZWFyY2hGaWxlcxIiLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEZpbGVzUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEZpbGVzUmVzcG9uc2UiABJPCghSZWFkRmlsZRIfLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVxdWVzdBogLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVzcG9uc2UiABJSCglXcml0ZUZpbGUSIC5jb2RlZm91bmRyeS52MS5Xcml0ZUZpbGVSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuV3JpdGVGaWxlUmVzcG9uc2UiABJYCgtQcmV2aWV3RmlsZRIiLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVzcG9uc2UiAELHAQoSY29tLmNvZGVmb3VuZHJ5LnYxQg9GaWxlc3lzdGVtUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
+  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKCAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJECg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMi7gEKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgSEQoJcmVhbF9wYXRoGAogASgJEgwKBG1vZGUYCyABKA0SFAoMb3V0c2lkZV9ob21lGAwgASgIIoYBChBXcml0ZUZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkSEAoIY29udGVudHMYAyABKAwSEwoLbW9kaWZpZWRfYXQYBCABKAMSDAoEc2l6ZRgFIAEoAxINCgVmb3JjZRgGIAEoCBIOCgZjcmVhdGUYByABKAgicgoRV3JpdGVGaWxlUmVzcG9uc2USEwoLbW9kaWZpZWRfYXQYASABKAMSDAoEc2l6ZRgCIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAMgASgJEhAKCGNvbmZsaWN0GAQgASgIEhEKCW5vdF9mb3VuZBgFIAEoCCI0ChJQcmV2aWV3RmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCSJGChNQcmV2aWV3RmlsZVJlc3BvbnNlEgsKA3VybBgBIAEoCRINCgVzY29wZRgCIAEoCRITCgtzaW5nbGVfZmlsZRgDIAEoCCpYCgpTa2lsbFNjb3BlEhsKF1NLSUxMX1NDT1BFX1VOU1BFQ0lGSUVEEAASFAoQU0tJTExfU0NPUEVfVVNFUhABEhcKE1NLSUxMX1NDT1BFX1BST0pFQ1QQAjKpBAoRRmlsZXN5c3RlbVNlcnZpY2USZAoPTGlzdERpcmVjdG9yaWVzEiYuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1Jlc3BvbnNlIgASVQoKTGlzdFNraWxscxIhLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1Jlc3BvbnNlIgASWAoLU2VhcmNoRmlsZXMSIi5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1Jlc3BvbnNlIgASTwoIUmVhZEZpbGUSHy5jb2RlZm91bmRyeS52MS5SZWFkRmlsZVJlcXVlc3QaIC5jb2RlZm91bmRyeS52MS5SZWFkRmlsZVJlc3BvbnNlIgASUgoJV3JpdGVGaWxlEiAuY29kZWZvdW5kcnkudjEuV3JpdGVGaWxlUmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLldyaXRlRmlsZVJlc3BvbnNlIgASWAoLUHJldmlld0ZpbGUSIi5jb2RlZm91bmRyeS52MS5QcmV2aWV3RmlsZVJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5QcmV2aWV3RmlsZVJlc3BvbnNlIgBCxwEKEmNvbS5jb2RlZm91bmRyeS52MUIPRmlsZXN5c3RlbVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
 
 /**
  * @generated from message codefoundry.v1.ListDirectoriesRequest
@@ -512,6 +512,16 @@ export type ReadFileResponse = Message<"codefoundry.v1.ReadFileResponse"> & {
    * @generated from field: uint32 mode = 11;
    */
   mode: number;
+
+  /**
+   * The file is outside the home directory, or was reached through a temp folder, so what
+   * the path leads to can change. The File tab offers no editing and no page gets the
+   * bridge. WriteFile goes by the real file alone: it refuses one outside home, and takes a
+   * link in a temp folder that leads into home.
+   *
+   * @generated from field: bool outside_home = 12;
+   */
+  outsideHome: boolean;
 };
 
 /**
@@ -811,10 +821,12 @@ export const FilesystemService: GenService<{
    * ReadFile reads one file for the file viewer. path is absolute, or relative to
    * base_dir (a thread's worktree, or the home directory); "~/" is the home
    * directory. Symlinks are followed, and the file they lead to must be under the
-   * home directory too: InvalidArgument otherwise (also for a relative path without
-   * an absolute base_dir). A missing path is not_found and a directory is_dir, not
-   * errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
-   * capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
+   * home directory or a temp folder (/tmp, $TMPDIR), where agents write, and so must a
+   * path that does not exist: InvalidArgument otherwise (also for a relative path without
+   * an absolute base_dir). A temp folder is only for reading: see outside_home. A missing
+   * path is not_found and a directory is_dir, not errors. Contents are at most max_bytes
+   * (zero means 1 MiB): a text file is always capped at 1 MiB, any other file (images,
+   * PDFs) at 32 MiB.
    *
    * @generated from rpc codefoundry.v1.FilesystemService.ReadFile
    */
@@ -866,13 +878,13 @@ export const FilesystemService: GenService<{
    * directory. A sandboxed frame loads the page from there so its scripts run and its
    * relative links, stylesheets, scripts and images resolve. The grant is an
    * unguessable id in the URL, scoped to that directory tree and never reaching above
-   * it, outside the home directory or into a protected folder (symlinks resolved); it
-   * lasts until the daemon stops. A scope is never home itself, the config home or an
-   * ancestor of it, or a credentials folder: a file whose directory is one of those gets
-   * a grant for the file alone (single_file). path is as for ReadFile: InvalidArgument
-   * when it is outside the home directory, relative without an absolute base_dir, not a
-   * regular file, or in a protected folder (the config home outside its checkouts,
-   * ~/.ssh, ~/Library and other credential folders).
+   * it, outside the home directory and the temp folders or into a protected folder
+   * (symlinks resolved); it lasts until the daemon stops. A scope is never home itself, a
+   * temp folder, the config home or an ancestor of it, or a credentials folder: a file
+   * whose directory is one of those gets a grant for the file alone (single_file). path is
+   * as for ReadFile: InvalidArgument when ReadFile refuses it, when it is not a regular
+   * file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
+   * ~/Library and other credential folders).
    *
    * @generated from rpc codefoundry.v1.FilesystemService.PreviewFile
    */

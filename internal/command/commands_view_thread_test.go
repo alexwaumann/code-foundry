@@ -65,6 +65,9 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 	}
 	if d.edits != nil {
 		deps.FileEdits = d.edits
+		if d.files == nil { // --edit also reads where the path leads
+			deps.Files = &commandtest.Files{}
+		}
 	}
 	if d.diffs != nil {
 		deps.FileDiffs = d.diffs
@@ -307,7 +310,7 @@ func TestWindowActionsSayWhereTheyWent(t *testing.T) {
 	}
 }
 
-// view.panel.file: the file must exist under home (ReadFile decides); the ShowView names
+// view.panel.file: the file must exist where ReadFile reads (it decides); the ShowView names
 // it absolute with the thread's checkout and project.
 func TestPanelFile(t *testing.T) {
 	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
@@ -323,6 +326,9 @@ func TestPanelFile(t *testing.T) {
 			wantParams: map[string]string{"path": "/wt/main.go", "project": "r1", "base": "/wt"}},
 		{name: "with a line", args: map[string]string{"path": "/wt/main.go", "line": "12"}, files: &commandtest.Files{Files: []string{"/wt/main.go"}},
 			wantParams: map[string]string{"path": "/wt/main.go", "project": "r1", "base": "/wt", "line": "12"}},
+		{name: "a file in a temp folder", args: map[string]string{"path": "/tmp/report.html"},
+			files:      &commandtest.Files{Files: []string{"/tmp/report.html"}, OutsideHome: []string{"/tmp/report.html"}},
+			wantParams: map[string]string{"path": "/tmp/report.html", "project": "r1", "base": "/wt"}},
 		{name: "missing", args: map[string]string{"path": "/wt/nope.go"}, files: &commandtest.Files{}, code: connect.CodeNotFound},
 		{name: "a directory", args: map[string]string{"path": "/wt/docs"}, files: &commandtest.Files{Dirs: []string{"/wt/docs"}}, argErr: "path"},
 		{name: "line 0", args: map[string]string{"path": "/wt/main.go", "line": "0"}, files: &commandtest.Files{Files: []string{"/wt/main.go"}}, argErr: "line"},

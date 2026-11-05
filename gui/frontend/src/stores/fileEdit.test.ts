@@ -42,7 +42,7 @@ vi.mock("@/api/files", async (orig) => ({
   readFile: api.read,
 }));
 
-const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
+const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, outsideHome: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
 const gone = () => view({ notFound: true, text: null, lossless: false, size: 0, modifiedAtMs: null });
 const written = (over: Partial<FileWriteView> = {}): FileWriteView => ({ path: "/w/.env", size: 5, modifiedAtMs: 200, conflict: false, notFound: false, ...over });
 

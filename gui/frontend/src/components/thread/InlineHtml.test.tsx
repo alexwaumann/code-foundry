@@ -14,7 +14,7 @@ const HELLO = "<!doctype html>\n<h1 id=hello>Hello</h1>\n<button id=wave>Wave</b
 vi.mock("@/api/files", async (orig) => {
   const read = (path: string): FileReadView => {
     const there = path.endsWith("hello.html");
-    return { path: `${CF}/${path}`, size: there ? HELLO.length : 0, truncated: false, binary: false, mime: there ? "text/html" : "", modifiedAtMs: null, notFound: !there, isDir: false, text: there ? HELLO : null } as FileReadView;
+    return { path: `${CF}/${path}`, size: there ? HELLO.length : 0, truncated: false, binary: false, mime: there ? "text/html" : "", modifiedAtMs: null, notFound: !there, isDir: false, outsideHome: false, text: there ? HELLO : null } as FileReadView;
   };
   return {
     ...(await orig<typeof import("@/api/files")>()),

@@ -25,6 +25,7 @@ describe("toFileReadView", () => {
       modifiedAtMs: 1_700_000_000_000,
       notFound: false,
       isDir: false,
+      outsideHome: false,
       text: "# Héllo\n",
       lossless: true,
       image: null,
@@ -108,7 +109,7 @@ describe("lossless", () => {
 });
 
 describe("canEdit", () => {
-  const text: FileReadView = { path: "/x/a.ts", realPath: "/x/a.ts", mode: 0o644, size: 2, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, text: "a\n", lossless: true, image: null, pdf: null };
+  const text: FileReadView = { path: "/x/a.ts", realPath: "/x/a.ts", mode: 0o644, size: 2, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 1, notFound: false, isDir: false, outsideHome: false, text: "a\n", lossless: true, image: null, pdf: null };
   it.each<[string, Partial<FileReadView>, boolean]>([
     ["whole text", {}, true],
     ["empty text", { text: "", size: 0 }, true],
@@ -119,8 +120,12 @@ describe("canEdit", () => {
     ["invalid UTF-8 or a BOM", { lossless: false }, false],
     ["an SVG, shown as a picture", { image: new Uint8Array([1]) }, false],
     ["a PDF", { pdf: new Uint8Array([1]) }, false],
+    ["outside home, as a temp folder's file is", { outsideHome: true }, false],
   ])("%s", (_name, over, want) => {
     expect(canEdit({ ...text, ...over })).toBe(want);
+  });
+  it("takes a temp folder's file from the read", () => {
+    expect(canEdit(toFileReadView(create(ReadFileResponseSchema, { contents: enc.encode("a\n"), size: 2n, mimeType: "text/plain", outsideHome: true })))).toBe(false);
   });
   it("no read yet", () => {
     expect(canEdit(null)).toBe(false);

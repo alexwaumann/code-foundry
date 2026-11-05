@@ -25,6 +25,8 @@ export interface FileReadView {
   modifiedAtMs: number | null;
   notFound: boolean;
   isDir: boolean;
+  /** The file is in a temp folder, or otherwise outside home: it can be read and not saved. */
+  outsideHome: boolean;
   /** The decoded contents of a text file; null for binary, folders and missing files. */
   text: string | null;
   /**
@@ -66,7 +68,7 @@ function decodeText(bytes: Uint8Array): { text: string; lossless: boolean } {
 
 /** What a tab edits where no file is yet: an empty text document at `path`, nothing on disk behind it. */
 export function blankFile(path: string, realPath = ""): FileReadView {
-  return { path, realPath, mode: 0, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, text: "", lossless: true, image: null, pdf: null };
+  return { path, realPath, mode: 0, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, outsideHome: false, text: "", lossless: true, image: null, pdf: null };
 }
 
 /** Whether a MIME type is an image the webview can show (`image/svg+xml` included). */
@@ -78,10 +80,11 @@ export function isImageMime(mime: string): boolean {
  * Whether the File tab offers to edit a read: whole text whose bytes survive the round
  * trip. A truncated read would save without the rest of the file, and the daemon does not
  * know a read was truncated; a file with invalid UTF-8 or a BOM would lose those bytes.
- * Images (an SVG is text) show as pictures, so there is no code to edit.
+ * Images (an SVG is text) show as pictures, so there is no code to edit. A file outside home
+ * (a temp folder's) is only for reading: the daemon would refuse the save.
  */
 export function canEdit(file: FileReadView | null): boolean {
-  return file !== null && file.text !== null && file.lossless && !file.truncated && !file.binary && !file.notFound && !file.isDir && file.image === null && file.pdf === null;
+  return file !== null && file.text !== null && file.lossless && !file.truncated && !file.binary && !file.notFound && !file.isDir && !file.outsideHome && file.image === null && file.pdf === null;
 }
 
 export function toFileReadView(r: ReadFileResponse): FileReadView {
@@ -100,6 +103,7 @@ export function toFileReadView(r: ReadFileResponse): FileReadView {
     modifiedAtMs: r.modifiedAt > 0n ? Number(r.modifiedAt) : null,
     notFound: r.notFound,
     isDir: r.isDir,
+    outsideHome: r.outsideHome,
     text: decoded?.text ?? null,
     lossless: decoded?.lossless ?? false,
     image: image && present ? r.contents : null,

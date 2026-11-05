@@ -401,6 +401,8 @@ Services (v1):
   ReadFile and WriteFile serve the file viewer: WriteFile replaces a file atomically
   anywhere under home except the config home outside its checkouts, and answers a file
   that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).
+  ReadFile and PreviewFile also read the temp folders (`/tmp`, `$TMPDIR`), where agents write; only
+  they do, so a temp file has no editing and no bridge (`docs/notes/read-temp-files.md`).
   The File tab's editor calls it directly; a draft lives only in the window's memory and only
   the window saves it: `file.save` refuses every caller that reaches the daemon
   (`docs/notes/file-edit-2-gui.md`). `view.panel.file --edit` asks the user to edit a file: the

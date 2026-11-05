@@ -879,7 +879,12 @@ type ReadFileResponse struct {
 	// its directory exists. A write lands here.
 	RealPath string `protobuf:"bytes,10,opt,name=real_path,json=realPath,proto3" json:"real_path,omitempty"`
 	// The real file's permission bits (0644); 0 with not_found.
-	Mode          uint32 `protobuf:"varint,11,opt,name=mode,proto3" json:"mode,omitempty"`
+	Mode uint32 `protobuf:"varint,11,opt,name=mode,proto3" json:"mode,omitempty"`
+	// The file is outside the home directory, or was reached through a temp folder, so what
+	// the path leads to can change. The File tab offers no editing and no page gets the
+	// bridge. WriteFile goes by the real file alone: it refuses one outside home, and takes a
+	// link in a temp folder that leads into home.
+	OutsideHome   bool `protobuf:"varint,12,opt,name=outside_home,json=outsideHome,proto3" json:"outside_home,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -989,6 +994,13 @@ func (x *ReadFileResponse) GetMode() uint32 {
 		return x.Mode
 	}
 	return 0
+}
+
+func (x *ReadFileResponse) GetOutsideHome() bool {
+	if x != nil {
+		return x.OutsideHome
+	}
+	return false
 }
 
 type WriteFileRequest struct {
@@ -1361,7 +1373,7 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\x0fReadFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1b\n" +
-	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes\"\xc0\x02\n" +
+	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes\"\xe3\x02\n" +
 	"\x10ReadFileResponse\x12\x1a\n" +
 	"\bcontents\x18\x01 \x01(\fR\bcontents\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1c\n" +
@@ -1375,7 +1387,8 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\x06is_dir\x18\t \x01(\bR\x05isDir\x12\x1b\n" +
 	"\treal_path\x18\n" +
 	" \x01(\tR\brealPath\x12\x12\n" +
-	"\x04mode\x18\v \x01(\rR\x04mode\"\xc0\x01\n" +
+	"\x04mode\x18\v \x01(\rR\x04mode\x12!\n" +
+	"\foutside_home\x18\f \x01(\bR\voutsideHome\"\xc0\x01\n" +
 	"\x10WriteFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1a\n" +

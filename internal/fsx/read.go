@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -31,6 +33,58 @@ func LooksBinary(b []byte) bool {
 	return bytes.IndexByte(b[:min(len(b), BinarySniff)], 0) >= 0
 }
 
+// ReadRoots are the trees ReadFile reads. Only reads reach Temp: everything else in the
+// app, writes included, stays under home.
+type ReadRoots struct {
+	// Home is the resolved home directory (ResolveRoot): what "~" expands to, and what
+	// the privacy messages name.
+	Home string
+	// Temp are the temp folders, in every form a path may spell them (TempRoots).
+	Temp []string
+}
+
+// Allows reports whether p (absolute, cleaned) is under one of the roots.
+func (r ReadRoots) Allows(p string) bool { return Within(r.Home, p) || r.InTemp(p) }
+
+// InTemp reports whether p (absolute, cleaned) is under a temp folder.
+func (r ReadRoots) InTemp(p string) bool {
+	return slices.ContainsFunc(r.Temp, func(t string) bool { return Within(t, p) })
+}
+
+// TempRoot is the deepest temp folder holding p (TMPDIR may be below /tmp); "" when none does.
+func (r ReadRoots) TempRoot(p string) string {
+	top := ""
+	for _, t := range r.Temp {
+		if len(t) > len(top) && Within(t, p) {
+			top = t
+		}
+	}
+	return top
+}
+
+// outsideHome is FileContents.OutsideHome for the path p and the real file it leads to.
+func (r ReadRoots) outsideHome(p, real string) bool {
+	return !Within(r.Home, real) || (r.InTemp(p) && !Within(r.Home, p))
+}
+
+// open opens the file at real (symlinks resolved, under the roots) without blocking on a FIFO.
+// real has no links, so a home file is opened with none allowed on the way: other users can
+// write in parts of home (~/Public/Drop Box). What real names in a temp folder may have been
+// swapped for a link too, and is opened through a Root at that folder, which no link leaves.
+func (r ReadRoots) open(real string) (*os.File, error) {
+	const flags = os.O_RDONLY | syscall.O_NONBLOCK
+	if Within(r.Home, real) {
+		return os.OpenFile(real, flags|NoFollowAny, 0)
+	}
+	top := r.TempRoot(real)
+	root, err := os.OpenRoot(top)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }()
+	return root.OpenFile(below(top, real), flags, 0)
+}
+
 // FileContents is ReadFile's result.
 type FileContents struct {
 	// Path is the absolute, cleaned path asked for (symlinks not followed).
@@ -39,43 +93,52 @@ type FileContents struct {
 	// its directory.
 	RealPath string
 	// Mode is the real file's permission bits.
-	Mode       fs.FileMode
-	NotFound   bool
-	IsDir      bool
-	Contents   []byte
-	Size       int64
-	Truncated  bool
-	Binary     bool
-	MIMEType   string
-	ModifiedAt time.Time
+	Mode fs.FileMode
+	// OutsideHome: the file is only here by way of ReadRoots.Temp, as it lies in a temp
+	// folder or was reached through one, so what the path leads to can change. The File tab
+	// reads it and offers no editing, and no page gets the bridge from it.
+	OutsideHome bool
+	NotFound    bool
+	IsDir       bool
+	Contents    []byte
+	Size        int64
+	Truncated   bool
+	Binary      bool
+	MIMEType    string
+	ModifiedAt  time.Time
 }
 
 // ReadFile reads at most maxBytes of the file at path. Zero means MaxReadBytes; a text
 // file (a text MIME type and no NUL in the first BinarySniff bytes) is capped at
 // MaxReadBytes and any other file at MaxBinaryReadBytes. path is absolute, "~" or
-// "~/..." (under root), or relative to baseDir, which must then be absolute. The path, and the file its symlinks lead to, must be under
-// root (a resolved root, see ResolveRoot); otherwise, and for a path that is not a
-// regular file or directory, the error wraps ErrInvalidArgument. A file macOS's privacy
+// "~/..." (under roots.Home), or relative to baseDir, which must then be absolute. The file
+// its symlinks lead to must be under roots, and a path that does not exist must be too;
+// otherwise, and for a path that is not a regular file or directory, the error wraps
+// ErrInvalidArgument. A file macOS's privacy
 // protection keeps closed is an ErrNotPermitted error that says where to allow it. A
 // missing file is NotFound and a directory IsDir, not errors.
-func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) {
+//
+// The check and the read are not one step, and anything can write to a temp folder, so the
+// open is what counts (ReadRoots.open) and what it opened decides what the file is. It never
+// blocks: it takes no context, and a FIFO swapped in would otherwise hold it for good.
+func ReadFile(roots ReadRoots, baseDir, path string, maxBytes int64) (FileContents, error) {
 	if maxBytes < 0 {
 		return FileContents{}, fmt.Errorf("%w: max_bytes %d is negative", ErrInvalidArgument, maxBytes)
 	}
 	if maxBytes == 0 {
 		maxBytes = MaxReadBytes
 	}
-	p, err := ResolveReadPath(root, baseDir, path)
+	p, err := ResolveReadPath(roots.Home, baseDir, path)
 	if err != nil {
 		return FileContents{}, err
 	}
 	out := FileContents{Path: p}
 	real, err := filepath.EvalSymlinks(p)
 	if errors.Is(err, fs.ErrNotExist) {
-		if !Within(root, p) {
-			return FileContents{}, fmt.Errorf("%w: %s is outside your home directory", ErrInvalidArgument, path)
+		if !roots.Allows(p) {
+			return FileContents{}, outsideRoots(path)
 		}
-		out.NotFound = true
+		out.NotFound, out.OutsideHome = true, roots.outsideHome(p, p)
 		if dir, err := filepath.EvalSymlinks(filepath.Dir(p)); err == nil {
 			out.RealPath = filepath.Join(dir, filepath.Base(p))
 		}
@@ -84,33 +147,36 @@ func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) 
 	if err != nil {
 		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
 	}
-	if !Within(root, real) {
-		return FileContents{}, fmt.Errorf("%w: %s is outside your home directory", ErrInvalidArgument, path)
+	if !roots.Allows(real) {
+		return FileContents{}, outsideRoots(path)
 	}
+	out.OutsideHome = roots.outsideHome(p, real)
+	out.RealPath = real
 	fi, err := os.Stat(real)
 	if err != nil {
 		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
 	}
-	out.RealPath, out.Mode = real, fi.Mode().Perm()
-	out.Size, out.ModifiedAt = fi.Size(), fi.ModTime()
-	switch {
-	case fi.IsDir():
-		out.IsDir = true
-		return out, nil
-	case !fi.Mode().IsRegular(): // a FIFO would block the read; a device is never a document
-		return FileContents{}, fmt.Errorf("%w: %s is not a regular file", ErrInvalidArgument, path)
+	// Asked first because a folder macOS keeps closed can be stat'd but not opened.
+	if err := out.describe(fi, path); err != nil || out.IsDir {
+		return out, err
 	}
-	f, err := os.Open(real)
+	f, err := roots.open(real)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) { // removed since the stat
-			return FileContents{Path: p, NotFound: true}, nil
+			return FileContents{Path: p, NotFound: true, OutsideHome: out.OutsideHome}, nil
 		}
 		if isPrivacyDenial(err) { // TCC lets a stat through and refuses the open
-			return FileContents{}, notPermitted(root, p, real, reading, err)
+			return FileContents{}, notPermitted(roots.Home, p, real, reading, err)
 		}
 		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
 	}
 	defer func() { _ = f.Close() }()
+	if fi, err = f.Stat(); err != nil {
+		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
+	}
+	if err := out.describe(fi, path); err != nil || out.IsDir {
+		return out, err
+	}
 	// The type, and so the cap, comes from the name and a head of the file, read before
 	// the rest so a large text file is not read only to be cut.
 	head := make([]byte, BinarySniff)
@@ -140,6 +206,21 @@ func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) 
 	out.Contents = b
 	out.Truncated = int64(len(b)) < out.Size
 	return out, nil
+}
+
+// describe fills in what fi says of the file at path, and refuses anything but a regular file
+// or a directory: a FIFO has no end to read to, and a device is never a document.
+func (c *FileContents) describe(fi fs.FileInfo, path string) error {
+	c.Mode, c.Size, c.ModifiedAt, c.IsDir = fi.Mode().Perm(), fi.Size(), fi.ModTime(), fi.IsDir()
+	if !c.IsDir && !fi.Mode().IsRegular() {
+		return fmt.Errorf("%w: %s is not a regular file", ErrInvalidArgument, path)
+	}
+	return nil
+}
+
+// outsideRoots is ReadFile's refusal of path.
+func outsideRoots(path string) error {
+	return fmt.Errorf("%w: %s is outside your home directory and the temp folders", ErrInvalidArgument, path)
 }
 
 // ResolveReadPath makes path absolute and clean, as ReadFile does (see its doc).

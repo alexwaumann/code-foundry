@@ -62,7 +62,7 @@ func (h *writeHome) link(target, link string) string {
 // saw is a request for the file at p as a read sees it now, for an absolute path.
 func (h *writeHome) saw(p string) WriteRequest {
 	h.t.Helper()
-	f, err := ReadFile(h.root, "", p, 0)
+	f, err := ReadFile(ReadRoots{Home: h.root}, "", p, 0)
 	if err != nil {
 		h.t.Fatal(err)
 	}

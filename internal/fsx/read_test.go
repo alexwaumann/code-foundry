@@ -123,7 +123,7 @@ func TestReadFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadFile(root, tt.baseDir, tt.path, tt.max)
+			got, err := ReadFile(ReadRoots{Home: root}, tt.baseDir, tt.path, tt.max)
 			if tt.invalid {
 				if !errors.Is(err, ErrInvalidArgument) {
 					t.Fatalf("err = %v, want ErrInvalidArgument", err)
@@ -180,7 +180,7 @@ func TestReadFileRealPath(t *testing.T) {
 	h := newWriteHome(t)
 	real := h.file(h.at("proj/drop.txt"), "x", 0o644)
 	link := h.link(real, h.at("proj/.env"))
-	got, err := ReadFile(h.root, "", link, 0)
+	got, err := ReadFile(ReadRoots{Home: h.root}, "", link, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,18 +188,99 @@ func TestReadFileRealPath(t *testing.T) {
 		t.Errorf("got %s real %s mode %o", got.Path, got.RealPath, got.Mode)
 	}
 	dir := h.link(h.at("proj"), h.at("linked"))
-	got, err = ReadFile(h.root, "", dir+"/new.env", 0)
+	got, err = ReadFile(ReadRoots{Home: h.root}, "", dir+"/new.env", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !got.NotFound || got.RealPath != h.at("proj/new.env") || got.Mode != 0 {
 		t.Errorf("missing: got %+v", got)
 	}
-	got, err = ReadFile(h.root, "", h.at("nope/new.env"), 0)
+	got, err = ReadFile(ReadRoots{Home: h.root}, "", h.at("nope/new.env"), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !got.NotFound || got.RealPath != "" {
 		t.Errorf("no directory: got %+v", got)
+	}
+}
+
+// The temp folders are read as home is, by the spelling and the resolved path alike, and a
+// file there says so; a link from them to anywhere else stays refused.
+func TestReadFileTemp(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := func(p string) string { return filepath.Join(base, p) }
+	file := func(p string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(at(p)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(at(p), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	link := func(target, p string) {
+		t.Helper()
+		if err := os.Symlink(at(target), at(p)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, f := range []string{"home/notes.txt", "private/tmp/report.txt", "private/tmp/dir/deep.txt", "outside/secret"} {
+		file(f)
+	}
+	link("private/tmp", "tmp") // /tmp is /private/tmp
+	link("outside/secret", "private/tmp/out.txt")
+	link("outside", "private/tmp/outdir")
+	link("outside/gone", "private/tmp/dead.txt")
+	link("home/notes.txt", "private/tmp/to-home.txt")
+	link("private/tmp/report.txt", "home/to-temp.txt")
+	roots := ReadRoots{Home: at("home"), Temp: []string{at("tmp"), at("private/tmp")}}
+
+	tests := []struct {
+		name        string
+		roots       ReadRoots
+		path        string
+		wantReal    string
+		notFound    bool
+		isDir       bool
+		outsideHome bool
+		refused     bool
+	}{
+		{name: "as spelled", roots: roots, path: at("tmp/report.txt"), wantReal: at("private/tmp/report.txt"), outsideHome: true},
+		{name: "resolved", roots: roots, path: at("private/tmp/report.txt"), wantReal: at("private/tmp/report.txt"), outsideHome: true},
+		{name: "in a folder", roots: roots, path: at("tmp/dir/deep.txt"), wantReal: at("private/tmp/dir/deep.txt"), outsideHome: true},
+		{name: "a folder", roots: roots, path: at("tmp/dir"), wantReal: at("private/tmp/dir"), isDir: true, outsideHome: true},
+		{name: "missing, as spelled", roots: roots, path: at("tmp/nope.txt"), wantReal: at("private/tmp/nope.txt"), notFound: true, outsideHome: true},
+		{name: "missing, resolved", roots: roots, path: at("private/tmp/nope.txt"), wantReal: at("private/tmp/nope.txt"), notFound: true, outsideHome: true},
+		{name: "a dead link leading out", roots: roots, path: at("tmp/dead.txt"), wantReal: at("private/tmp/dead.txt"), notFound: true, outsideHome: true},
+		{name: "a link leading out", roots: roots, path: at("tmp/out.txt"), refused: true},
+		{name: "a linked folder leading out", roots: roots, path: at("tmp/outdir/secret"), refused: true},
+		{name: "a link into home, reached through temp", roots: roots, path: at("tmp/to-home.txt"), wantReal: at("home/notes.txt"), outsideHome: true},
+		{name: "a link from home into temp", roots: roots, path: at("home/to-temp.txt"), wantReal: at("private/tmp/report.txt"), outsideHome: true},
+		{name: "home", roots: roots, path: at("home/notes.txt"), wantReal: at("home/notes.txt")},
+		{name: "elsewhere", roots: roots, path: at("outside/secret"), refused: true},
+		{name: "missing elsewhere", roots: roots, path: at("outside/nope"), refused: true},
+		{name: "a system file", roots: roots, path: "/etc/hosts", refused: true},
+		{name: "home alone reads no temp", roots: ReadRoots{Home: at("home")}, path: at("tmp/report.txt"), refused: true},
+		{name: "home alone: missing", roots: ReadRoots{Home: at("home")}, path: at("tmp/nope.txt"), refused: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ReadFile(tt.roots, "", tt.path, 0)
+			if tt.refused {
+				if !errors.Is(err, ErrInvalidArgument) || !strings.Contains(err.Error(), "outside your home directory and the temp folders") {
+					t.Fatalf("err = %v, want the refusal", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.RealPath != tt.wantReal || got.NotFound != tt.notFound || got.IsDir != tt.isDir || got.OutsideHome != tt.outsideHome {
+				t.Errorf("got real %q notFound %t isDir %t outsideHome %t", got.RealPath, got.NotFound, got.IsDir, got.OutsideHome)
+			}
+		})
 	}
 }

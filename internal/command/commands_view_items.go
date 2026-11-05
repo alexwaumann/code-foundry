@@ -37,7 +37,7 @@ const (
 )
 
 // FileReader reads a file the way the File tab does (FilesystemService.ReadFile): under
-// the home directory only, relative paths against a base directory.
+// the home directory or a temp folder only, relative paths against a base directory.
 type FileReader interface {
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 }
@@ -101,10 +101,10 @@ func (d ViewDeps) itemCommands() []Command {
 				"A missing file starts empty and is made on save, in a directory that must exist. Refused for what the tab cannot edit: tell the user.",
 			Category:     "View",
 			NoKeybinding: true,
-			// Any thread: a thread without a project reads files under home.
+			// Any thread: a thread without a project reads files under home and in the temp folders.
 			When: hasThread,
 			Args: []ArgSpec{
-				{Name: "path", Type: Path, Required: true, Positional: true, Description: "File to show: absolute, ~/…, or relative to the current directory; under the home directory"},
+				{Name: "path", Type: Path, Required: true, Positional: true, Description: "File to show: absolute, ~/…, or relative to the current directory; under the home directory or in a temp folder (/tmp, $TMPDIR; not with --edit)"},
 				{Name: "line", Type: Int, Description: "1-based line to scroll to and mark"},
 				{Name: "edit", Type: Bool, Description: "Ask the user to edit the file: the tab opens editing, with a band naming this thread and Save and tell thread, whose message says only that it was saved"},
 				{Name: "note", Type: String, Description: fmt.Sprintf("With --edit: what to put where, shown as one plain paragraph in the band, quoted as yours; at most %d characters", maxEditNote)},
@@ -201,6 +201,15 @@ func (d ViewDeps) editCheck(ctx context.Context, t *v1.Thread, a Args, asker str
 		}
 		return nil, err
 	}
+	// Write takes a link in a temp folder that leads into home, but the tab shows such a file
+	// read-only (canEdit): anything could repoint the link while the user typed.
+	res, err := d.Files.ReadFile(ctx, connect.NewRequest(&v1.ReadFileRequest{BaseDir: base, Path: a.Path("path"), MaxBytes: 1}))
+	if err != nil {
+		return nil, err
+	}
+	if res.Msg.GetOutsideHome() {
+		return nil, InvalidArg("path", "%s is reached through a temp folder, so the tab cannot edit it: pass the path it leads to", path)
+	}
 	params := map[string]string{"path": path, "project": t.GetProjectId(), "base": base, "edit": "1", "thread": asker}
 	if line > 0 {
 		params["line"] = strconv.Itoa(line)
@@ -258,31 +267,37 @@ func fileLine(a Args) (int, error) {
 }
 
 // fileCheck is view.panel.file's check: the file exists (and is not a directory) where
-// the File tab would read it, under the home directory (ReadFile refuses anything else,
-// symlinks followed). The path is absolute: the CLI resolves a relative one against its
-// own directory, a thread's worktree when the model runs it.
+// the File tab would read it, under the home directory or in a temp folder (ReadFile
+// refuses anything else, symlinks followed). The path is absolute: the CLI resolves a
+// relative one against its own directory, a thread's worktree when the model runs it.
 func (d ViewDeps) fileCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	params, _, err := d.readCheck(ctx, t, a)
+	return params, err
+}
+
+// readCheck is fileCheck, with whether the file is outside home (ReadFileResponse.outside_home).
+func (d ViewDeps) readCheck(ctx context.Context, t *v1.Thread, a Args) (params map[string]string, outsideHome bool, err error) {
 	line, err := fileLine(a)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	base := t.GetWorktreePath()
 	res, err := d.Files.ReadFile(ctx, connect.NewRequest(&v1.ReadFileRequest{BaseDir: base, Path: a.Path("path"), MaxBytes: 1}))
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	path := res.Msg.GetResolvedPath()
 	switch {
 	case res.Msg.GetNotFound():
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no file at %s", path))
+		return nil, false, connect.NewError(connect.CodeNotFound, fmt.Errorf("no file at %s", path))
 	case res.Msg.GetIsDir():
-		return nil, InvalidArg("path", "%s is a directory, not a file", path)
+		return nil, false, InvalidArg("path", "%s is a directory, not a file", path)
 	}
-	params := map[string]string{"path": path, "project": t.GetProjectId(), "base": base}
+	params = map[string]string{"path": path, "project": t.GetProjectId(), "base": base}
 	if line > 0 {
 		params["line"] = strconv.Itoa(line)
 	}
-	return params, nil
+	return params, res.Msg.GetOutsideHome(), nil
 }
 
 // diffCheck is view.panel.diff's check: the thread runs in a project worktree, the path
