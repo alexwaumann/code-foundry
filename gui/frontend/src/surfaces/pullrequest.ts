@@ -3,11 +3,11 @@ import { GitPullRequest } from "lucide-react";
 import { PullRequestSurface } from "@/components/pr/PullRequestSurface";
 import { COPY_LINK_CHORD } from "@/components/pr/keys";
 import { branchKey, branchPullRequestsResource } from "@/stores/gh";
-import { copyPullRequestLink } from "@/stores/prPanel";
+import { copyPullRequestLink, panelPullRequestTab } from "@/stores/prPanel";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
-import { PULL_REQUEST_KIND, prRefOfTab, pullRequestTab, selectionBranch, selectionPullRequest, type PrRef } from "./pullrequestTarget";
+import { PULL_REQUEST_KIND, prRefOfTab, selectionBranch, selectionPullRequest, type PrRef } from "./pullrequestTarget";
 import { noProjectNow } from "./noProject";
 import type { SurfaceSpec } from "./types";
 
@@ -70,6 +70,6 @@ export const pullRequestSurface: SurfaceSpec = {
   },
   openDefault: (ctx) => {
     const ref = currentPullRequest(ctx.selection);
-    return ref ? pullRequestTab(ref) : null;
+    return ref ? panelPullRequestTab(ref, ctx.panelKey) : null;
   },
 };

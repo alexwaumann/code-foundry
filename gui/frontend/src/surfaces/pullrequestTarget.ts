@@ -6,7 +6,7 @@
  */
 import type { BranchPullRequestsView, PullRequestView } from "@/api/gh";
 import { deriveContext } from "@/stores/context";
-import { makeTab, type Tab } from "@/stores/panel";
+import { makeTab, pullRequestTabId, type Tab } from "@/stores/panel";
 import { findWorktree, type ProjectsData } from "@/stores/projects";
 import type { ResourceEntry } from "@/stores/resource";
 import type { ThreadsData } from "@/stores/threads";
@@ -20,9 +20,10 @@ export interface PrRef {
   number: number;
 }
 
-/** The tab for a pull request: params { slug, number }, title "#<number>". */
+/** The tab for a pull request: params { slug, number }, title "#<number>", one id however the slug is spelled. */
 export function pullRequestTab(ref: PrRef): Tab {
-  return makeTab(PULL_REQUEST_KIND, `#${String(ref.number)}`, { slug: ref.slug, number: String(ref.number) });
+  const number = String(ref.number);
+  return { ...makeTab(PULL_REQUEST_KIND, `#${number}`, { slug: ref.slug, number }), id: pullRequestTabId(ref.slug, number) };
 }
 
 /** The pull request a tab names, or null when its params are not one. */

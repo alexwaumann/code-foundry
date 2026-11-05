@@ -8,7 +8,7 @@ import { useMemo } from "react";
 import { usePanelKey } from "@/components/panel/panelKeyContext";
 import { parsePullRequestUrl } from "@/lib/prUrl";
 import { getPanel, type PanelTarget } from "@/stores/panel";
-import { PULL_REQUEST_KIND, prRefOfTab, type PrRef } from "@/surfaces/pullrequestTarget";
+import { pullRequestTab } from "@/surfaces/pullrequestTarget";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import type { MarkdownExtras } from "./Markdown";
 
@@ -21,28 +21,13 @@ export function openPullRequestLink(target: PanelTarget): (url: string) => boole
   return (url) => {
     const parsed = parsePullRequestUrl(url);
     if (parsed === null) return false;
-    const { ref, showing } = inPanel(target, parsed);
+    const { slug, number, anchored } = parsed;
+    const { id } = pullRequestTab({ slug, number });
     // A link into the page of the pull request already showing (a comment, a diff line)
     // would land on the same tab and lose its anchor: the browser opens it there.
-    if (showing && parsed.anchored) return false;
-    return openPullRequestInPanel(ref, target);
+    if (anchored && getPanel(target).groups.some((g) => g.activeTabId === id)) return false;
+    return openPullRequestInPanel({ slug, number }, target);
   };
-}
-
-/**
- * The pull request as the target's panel already holds it, if it does: GitHub slugs are
- * case-insensitive but tab ids are not, so `Octo/Hello#1` reuses the `octo/hello#1` tab
- * instead of opening a second one. `showing`: that tab is a group's active tab.
- */
-function inPanel(target: PanelTarget, link: { slug: string; number: number }): { ref: PrRef; showing: boolean } {
-  const slug = link.slug.toLowerCase();
-  for (const g of getPanel(target).groups) {
-    for (const t of g.tabs) {
-      const r = t.kind === PULL_REQUEST_KIND ? prRefOfTab(t) : null;
-      if (r && r.number === link.number && r.slug.toLowerCase() === slug) return { ref: r, showing: g.activeTabId === t.id };
-    }
-  }
-  return { ref: { slug: link.slug, number: link.number }, showing: false };
 }
 
 /** For a thread's messages: the selection's panel. */

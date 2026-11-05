@@ -13,6 +13,7 @@ import {
   migratePanelV1,
   migratePanelV2,
   migratePanelV3,
+  migratePanelV4,
   movePanelTab,
   moveTab,
   openSurface,
@@ -131,13 +132,59 @@ describe("migratePanelV2", () => {
     expect(migratePanelV2({ a: legacy(true, [files], files.id), b: legacy(false, [], null) })).toEqual({ a: entry(true, [files], files.id), b: emptyEntry });
   });
 
-  it("rehydrates a version 2 store through it and saves it as version 4", async () => {
+  it("rehydrates a version 2 store through it and saves it as version 5", async () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 2, state: { byKey: { "thread:s-1": { ...legacy(true, [files, diff], null, files.id), width: 500 } } } }));
     await usePanelStore.persist.rehydrate();
     expect(getPanel("thread:s-1")).toEqual({ ...picking([files, diff], files.id), width: 500 });
-    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 4, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 5, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
+  });
+});
+
+describe("migratePanelV4 (docs/notes/pr-tab-slug-case.md)", () => {
+  /** A pull request tab as a version 4 build stored it: the id keeps the slug's case. */
+  const stored = (slug: string, number = 1) => makeTab("pullrequest", `#${String(number)}`, { slug, number: String(number) });
+  const mixed = stored("Alex/Repo");
+  const lower = stored("alex/repo");
+  const other = stored("alex/repo", 2);
+  const files = makeTab("files", "Files", { path: "Alex/Repo" });
+  const id = lower.id;
+  const shown = { ...mixed, id };
+
+  it.each<[string, PanelEntry, PanelEntry]>([
+    ["a mixed-case tab takes the lower-case id and keeps its slug", entry(true, [mixed, files], mixed.id), entry(true, [shown, files], id)],
+    ["a lower-case tab and any other kind stay as they are", entry(true, [lower, files], files.id), entry(true, [lower, files], files.id)],
+    ["two tabs of one pull request are the first, active if the second was", entry(true, [mixed, other, lower], lower.id), entry(true, [shown, other], id)],
+    [
+      "picking goes back to the tab that stayed",
+      { open: true, groups: [{ tabs: [mixed, lower], activeTabId: null, pickFrom: lower.id }] },
+      { open: true, groups: [{ tabs: [shown], activeTabId: null, pickFrom: id }] },
+    ],
+    [
+      "a copy in the other group goes, and that group shows its first tab",
+      { open: true, groups: [{ tabs: [mixed], activeTabId: mixed.id }, { tabs: [other, lower], activeTabId: lower.id }], focused: 1, ratio: 0.4 },
+      { open: true, groups: [{ tabs: [shown], activeTabId: id }, { tabs: [other], activeTabId: other.id }], focused: 1, ratio: 0.4 },
+    ],
+    [
+      "a group left empty by that is one group again",
+      { open: true, groups: [{ tabs: [mixed], activeTabId: mixed.id }, { tabs: [lower], activeTabId: lower.id }], focused: 1, ratio: 0.4 },
+      { open: true, groups: [{ tabs: [shown], activeTabId: id }] },
+    ],
+    [
+      "a split already picking in an empty group stays split",
+      { open: true, groups: [{ tabs: [mixed], activeTabId: mixed.id }, { tabs: [], activeTabId: null }], focused: 1 },
+      { open: true, groups: [{ tabs: [shown], activeTabId: id }, { tabs: [], activeTabId: null }], focused: 1 },
+    ],
+  ])("%s", (_name, before, want) => {
+    expect(migratePanelV4({ k: before })).toEqual({ k: want });
+  });
+
+  it("rehydrates a version 4 store through it and saves it as version 5", async () => {
+    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 4, state: { byKey: { "thread:s-1": entry(true, [mixed, lower], lower.id) } } }));
+    await usePanelStore.persist.rehydrate();
+    expect(usePanelStore.getState().byKey["thread:s-1"]).toEqual(entry(true, [shown], id));
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 5 });
   });
 });
 
@@ -173,12 +220,12 @@ describe("migratePanelV3 (docs/notes/thread-header-crumb.md)", () => {
     expect(migratePanelV3({ k: before })).toEqual({ k: want });
   });
 
-  it("rehydrates a version 3 store through it and saves it as version 4", async () => {
+  it("rehydrates a version 3 store through it and saves it as version 5", async () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 3, state: { byKey: { "thread:s-1": entry(true, [usage, wt], usage.id), "view:projects": entry(true, [wt], wt.id) } } }));
     await usePanelStore.persist.rehydrate();
     expect(getPanel("thread:s-1")).toEqual(entry(true, [changes], changes.id));
     expect(getPanel("view:projects")).toEqual(entry(true, [changes], changes.id));
-    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 4 });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 5 });
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
   });

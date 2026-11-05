@@ -47,10 +47,10 @@ describe("openPullRequestLink", () => {
     expect(openPullRequestLink("current")(PR)).toBe(false);
   });
 
-  it("reuses the panel's tab for the same pull request in another letter case", () => {
+  it("knows the pull request showing in another letter case", () => {
     seedPanel("thread:t1", [{ slug: "octo/hello", number: 42 }], 0);
-    expect(openPullRequestLink("thread:t1")("https://github.com/Octo/Hello/pull/42")).toBe(true);
-    expect(openPullRequestInPanel).toHaveBeenCalledWith(REF, "thread:t1");
+    expect(openPullRequestLink("thread:t1")("https://github.com/Octo/Hello/pull/42/files#discussion_r7")).toBe(false);
+    expect(openPullRequestInPanel).not.toHaveBeenCalled();
   });
 
   it("sends a link into the page of the pull request already showing to the browser", () => {

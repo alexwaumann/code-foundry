@@ -15,7 +15,7 @@ import { copyText } from "@/lib/clipboard";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
 import { runCommand, runCommandForResult } from "./commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
-import { allTabs, openSurface, usePanelStore, type PanelState, type PanelTarget } from "./panel";
+import { allTabs, getPanel, openSurface, usePanelStore, type PanelState, type PanelTarget, type Tab } from "./panel";
 import { createResource, type Resource } from "./resource";
 
 export type PrInnerTab = "overview" | "activity" | "code";
@@ -121,7 +121,13 @@ export const reviewerCandidatesResource = createResource(
  * stores/threadPanelIntent.ts). Returns false with nothing selected.
  */
 export function openPullRequestInPanel(ref: PrRef, target: PanelTarget = "current"): boolean {
-  return openSurface(target, pullRequestTab(ref));
+  return openSurface(target, panelPullRequestTab(ref, target));
+}
+
+/** The tab to open for a pull request: the one the panel holds, so it keeps the slug it shows, else a new one. */
+export function panelPullRequestTab(ref: PrRef, target: PanelTarget): Tab {
+  const tab = pullRequestTab(ref);
+  return allTabs(getPanel(target)).find((t) => t.id === tab.id) ?? tab;
 }
 
 export const prArgs = (ref: PrRef): Record<string, string> => ({ "repo-slug": ref.slug, number: String(ref.number) });
@@ -248,7 +254,7 @@ export async function revertPullRequest(ref: PrRef, panel: PanelTarget): Promise
     action: { label: "Open on GitHub", onClick: () => void openUrl(url) },
   });
   const next = { slug: ref.slug, number: made.number };
-  openSurface(panel, pullRequestTab(next));
+  openPullRequestInPanel(next, panel);
   return next;
 }
 
