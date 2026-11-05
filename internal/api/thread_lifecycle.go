@@ -49,9 +49,12 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		return nil, threadError(err)
 	}
 	res := &v1.CreateThreadResponse{Thread: threadToProto(s), Reused: reused}
-	// A background setup has placed nothing yet: there is nothing to say about it.
-	if !reused && !o.BackgroundSetup {
+	// A background setup that makes worktrees has placed nothing yet, so there is nothing to
+	// say about it; one that runs in a checkout has its place already.
+	if !reused && (!o.BackgroundSetup || s.WorktreePath != "") {
 		res.Hints = h.store.CheckoutHints(s)
+	}
+	if !reused && !o.BackgroundSetup {
 		res.MadeWorktree, res.ExistingWorktree, res.SharedWith = report.MadeWorktree, report.ExistingWorktree, report.SharedWith
 		res.WorktreeModeDropped, res.MadeBranch = report.DroppedWorktreeMode, report.MadeBranch
 	}

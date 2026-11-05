@@ -16,7 +16,7 @@ vi.mock("sonner", async (orig) => {
 const { daemon, invocationsOf, refuse, resetDaemon } = await import("@/test/daemonFakes");
 const { getDraft, updateDraft, useComposeStore } = await import("./compose");
 const { useProjectsStore } = await import("./projects");
-const { cancelSetup, editSetup, noteSentFrom, retrySetup, setupDraftJson } = await import("./setupActions");
+const { CANCEL_TOO_LATE, cancelSetup, EDIT_TOO_LATE, editSetup, noteSentFrom, plainDraftText, retrySetup, setupDraftJson } = await import("./setupActions");
 const { threadDraftKey } = await import("./threadActions");
 const { useThreadsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
@@ -229,8 +229,16 @@ describe("Edit", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: ID });
     expect(useThreadsStore.getState().order).toEqual([ID]);
     expect(useThreadsStore.getState().byId[ID]?.setup?.phase).toBe("failed");
-    expect(getDraft(threadDraftKey(ID)).error).toContain("only a failed or cancelled setup can be discarded");
+    expect(getDraft(threadDraftKey(ID)).error).toBe(EDIT_TOO_LATE);
     expect(useComposeStore.getState().drafts["repo-a"]).toBeUndefined();
+  });
+
+  it("refused for another reason: the daemon's word on the error line", async () => {
+    daemon.handlers.set("thread.setup.discard", () => {
+      throw refuse("the database is locked", Code.Internal);
+    });
+    expect(await editSetup(ID)).toBe(false);
+    expect(getDraft(threadDraftKey(ID)).error).toContain("the database is locked");
   });
 
   it("does not take over a composer that is sending", async () => {
@@ -279,12 +287,12 @@ describe("Cancel", () => {
     expect(getDraft(threadDraftKey(ID)).notice).toBe("/w/a, /w/b stayed: they have work in them");
   });
 
-  it("too late is the daemon's word, without alarm", async () => {
+  it("too late says so without alarm, and without the daemon's thread id", async () => {
     daemon.handlers.set("thread.setup.cancel", () => {
       throw refuse("it was too late to cancel it, and Claude is starting", Code.FailedPrecondition);
     });
     expect(await cancelSetup(ID)).toBe(false);
-    expect(toastInfo.mock.calls[0]?.[0]).toContain("too late to cancel");
+    expect(toastInfo.mock.calls[0]?.[0]).toBe(CANCEL_TOO_LATE);
   });
 });
 
@@ -301,5 +309,17 @@ describe("setupDraftJson", () => {
       base: "origin/dev",
       attachments: [{ id: "a1", path: "/att/1", name: "shot.png", kind: "image", pages: null }],
     });
+  });
+});
+
+describe("plainDraftText", () => {
+  const sent = (text: string, composerText = "") => ({ text, composerText, attachments: [] });
+  it.each([
+    ["the snapshot's text first, the queue and what was typed after it", "", { ...snapshot(), text: "first" }, sent("x"), [sent("second")], { text: "third" }, "first\n\nsecond\n\nthird"],
+    ["no snapshot: the first message, as composed", "", null, sent("raw", "composed"), [], null, "composed"],
+    ["after what the draft held", "kept", null, sent("raw"), [], null, "kept\n\nraw"],
+    ["nothing at all", "kept", null, null, [], { text: "  " }, "kept"],
+  ])("%s", (_name, draft, snap, first, queued, typed, want) => {
+    expect(plainDraftText(draft, snap, { first, queued }, typed)).toBe(want);
   });
 });

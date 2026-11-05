@@ -6,7 +6,6 @@
  * rules of what comes back are here; the snapshot's format is lib/setupDraft.
  */
 import { toast } from "sonner";
-import { errorMessage } from "@/api/stream";
 import { isFailedPrecondition } from "@/api/errors";
 import type { ThreadView } from "@/api/threads";
 import { newCitationId } from "@/lib/citation";
@@ -73,11 +72,17 @@ export async function retrySetup(threadId: string): Promise<boolean> {
   return res !== null;
 }
 
+/** Cancel lost the race with the setup's end: the composer shows what is true now. */
+export const CANCEL_TOO_LATE = "Too late to cancel: this setup has just ended.";
+
+/** Edit lost the race with a Try again, or the setup finished. */
+export const EDIT_TOO_LATE = "This setup is running again, so there is no send to undo.";
+
 /**
  * thread.setup.cancel (Interrupt's place while a setup runs). What it left for the work in
  * it goes on the notice line. Too late, because Claude is starting or the setup failed just
  * then, is no failure: the daemon's word on it, without alarm, and the composer shows what
- * is true now.
+ * is true now. The daemon's refusal names the thread by id, which is no use here.
  */
 export async function cancelSetup(threadId: string): Promise<boolean> {
   const res = await runCommandForResult(SETUP_COMMANDS.cancel, { id: threadId }, {
@@ -85,7 +90,7 @@ export async function cancelSetup(threadId: string): Promise<boolean> {
     quiet: true,
     expected: (err) => {
       if (!isFailedPrecondition(err)) return false;
-      toast.info(errorMessage(err));
+      toast.info(CANCEL_TOO_LATE);
       return true;
     },
   });
@@ -220,6 +225,13 @@ async function fillDraft(to: ComposeTarget, snap: SetupDraft | null, sameTarget:
   updateDraft(key, { ...options, text, attachments, citations, phase: "idle", error: gone.error || null, notice: notes.length > 0 ? notes.join(" · ") : null });
 }
 
+/** Everything a discarded thread held as text, after what the draft has: the last resort when its draft cannot be rebuilt. */
+export function plainDraftText(draft: string, snap: SetupDraft | null, gone: Pick<DiscardedSetup, "first" | "queued">, typed: Pick<Draft, "text"> | null): string {
+  const sentText = (m: { text: string; composerText: string }) => m.composerText || m.text;
+  const parts = [snap?.text ?? (gone.first ? sentText(gone.first) : ""), ...gone.queued.map(sentText), typed?.text ?? ""];
+  return parts.reduce((text, p) => (p.trim() ? appendToDraft(text, p) : text), draft);
+}
+
 /**
  * The note's Edit: undoes the send. The composer shows first and the row leaves at once, so
  * the thread going is never seen from inside it (no stream ending on a thread that is gone,
@@ -243,11 +255,14 @@ export async function editSetup(threadId: string): Promise<boolean> {
   updateDraft(waitKey, { phase: "starting", error: null, notice: null });
   showComposer(waitIn);
   const restore = hideThread(threadId);
-  const failure = { message: "" };
+  const failure = { message: "", tooLate: false };
   const res = await runCommandForResult(SETUP_COMMANDS.discard, { id: threadId }, {
     ctx,
     quiet: true,
-    expected: () => true,
+    expected: (err) => {
+      failure.tooLate = isFailedPrecondition(err);
+      return true;
+    },
     onError: (m) => {
       failure.message = m;
     },
@@ -257,7 +272,7 @@ export async function editSetup(threadId: string): Promise<boolean> {
     updateDraft(waitKey, { phase: "idle" });
     if (isDraftEmpty(getDraft(waitKey))) takeDraft(waitKey);
     useUiStore.getState().select({ kind: "thread", id: threadId }, { focusPrompt: true });
-    updateDraft(threadKey, { error: failure.message || "Could not undo the send." });
+    updateDraft(threadKey, { error: failure.tooLate ? EDIT_TOO_LATE : failure.message || "Could not undo the send." });
     return false;
   }
   sentFrom.delete(threadId);
@@ -279,7 +294,13 @@ export async function editSetup(threadId: string): Promise<boolean> {
   }
   // What was typed in the thread's composer moves with it.
   const typed = takeDraft(threadKey);
-  await fillDraft(to, snap, snap !== null && to === snap.target, gone, notes, typed);
+  try {
+    await fillDraft(to, snap, snap !== null && to === snap.target, gone, notes, typed);
+  } catch {
+    // The thread has gone, so this is the only copy left: the words at least stay.
+    const cur = getDraft(toKey);
+    updateDraft(toKey, { text: plainDraftText(cur.text, snap, gone, typed), phase: "idle", error: gone.error || null, notice: "Only the text came back: attach anything else again" });
+  }
   // Only if the user is still here: they may have moved on while it was gone.
   const ui = useUiStore.getState();
   if (ui.selection.kind === "compose") {
