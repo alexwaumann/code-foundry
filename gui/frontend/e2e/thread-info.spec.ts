@@ -782,3 +782,29 @@ for (const scheme of ["dark", "light"] as const) {
     });
   });
 }
+
+/** SHOTS=<dir>: an archived thread's card after its worktree went, and a pull request opened from it, WebKit, 1280x800 at 2x, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test.describe(`archived thread card screenshots (${scheme})`, () => {
+    test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
+    test("the pull requests of a thread whose worktree was cleaned up", async ({ page }, info) => {
+      const shots = process.env.SHOTS;
+      test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      const { id } = (await mockPost("thread-info?scenario=archived")) as { id: string };
+      await openApp(page);
+      await page.getByTestId("archived-header").click();
+      await row(page, `s:${id}`).click();
+      await toggle(page).click();
+      const prs = card(page).getByTestId("ti-pr");
+      await expect(prs).toHaveCount(2);
+      await expect(card(page).getByTestId("ti-branch")).toHaveCount(0);
+      await page.mouse.move(640, 700);
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(shots)}/archived-card-${scheme}.png` });
+      await prs.first().click();
+      await expect(page.getByTestId("pr-inner-bar")).toBeVisible();
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(shots)}/archived-card-pr-${scheme}.png` });
+    });
+  });
+}

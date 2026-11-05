@@ -1,12 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Toaster, toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { card } from "@/test/cardFakes";
 import { invocationsOf, resetDaemon } from "@/test/daemonFakes";
-import { texts } from "@/test/projectsWorld";
+import { HOME, pullRequest, texts } from "@/test/projectsWorld";
 import { activePanelTab, bucket, mcpServer, resetCard, seedChild, seedNoGit, seedServers, seedSingle, seedWs9, setLog, TREE, updateThread } from "@/test/threadInfoWorld";
 import { tooltipText } from "@/test/tooltip";
+import type { DashboardView } from "@/api/gh";
 import type { McpServerView } from "@/api/mcp";
 import { useActionDialogStore } from "@/stores/actionDialog";
+import { DASHBOARD_KEY, dashboardResource } from "@/stores/gh";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { ThreadInfoContent } from "./ThreadInfoCard";
@@ -25,6 +29,19 @@ vi.mock("@/lib/clipboard", () => ({ copyText: () => Promise.resolve() }));
  * stepping aside at 1280px, menus under their rows, hover colours, the wheel) stays in
  * e2e/thread-info.spec.ts.
  */
+
+const SLUG = "alexwaumann/code-foundry";
+const linkTo = (number: number) => ({ slug: SLUG, number, url: `https://github.com/${SLUG}/pull/${String(number)}`, linkedAt: 0 });
+
+/** The project's worktree at `path` gone, as an archive's cleanup leaves it. */
+function removeWorktree(projectId: string, path: string): void {
+  act(() => {
+    useProjectsStore.setState((s) => {
+      const p = s.byId[projectId];
+      return p ? { byId: { ...s.byId, [projectId]: { ...p, worktrees: p.worktrees.filter((w) => w.path !== path) } } } : s;
+    });
+  });
+}
 
 const byTest = (root: ParentNode, id: string, attrs = ""): HTMLElement | null => root.querySelector<HTMLElement>(`[data-testid="${id}"]${attrs}`);
 const cardEl = () => screen.getByTestId("thread-info-card");
@@ -327,6 +344,72 @@ describe("ThreadInfoCard: other scenarios", () => {
     expect(screen.getByTestId("ti-lineage-label").nextElementSibling).toBe(parent);
     fireEvent.click(parent);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-ti-1" });
+  });
+
+  describe("pull requests without a checkout", () => {
+    /** s-ti-1 as an archive leaves it: stopped, its worktree cleaned up, its links kept. */
+    function seedArchivedCleaned(): string {
+      const id = seedSingle();
+      updateThread(id, { state: "disconnected", archivedAtMs: Date.now() });
+      removeWorktree("repo-cf", TREE);
+      return id;
+    }
+
+    it("an archived thread whose worktree was cleaned up: the pull requests, and no row that needs the checkout", async () => {
+      await renderCard(seedArchivedCleaned());
+      await waitFor(() => {
+        expect(screen.getAllByTestId("ti-pr").map((r) => r.dataset.number)).toEqual(["78", "63"]);
+      });
+      expect(screen.queryByTestId("ti-branch")).toBeNull();
+      expect(screen.queryByTestId("ti-git")).toBeNull();
+      expect(screen.queryByTestId("ti-changes")).toBeNull();
+    });
+
+    it("a folder without git keeps a child's pull request", async () => {
+      const id = seedNoGit();
+      updateThread(id, { linkedPullRequests: [linkTo(78)] });
+      card.prDetails.set(`${SLUG}#78`, pullRequest({ repoSlug: SLUG, number: 78, title: "Include the head SHA" }));
+      await renderCard(id);
+      await waitFor(() => {
+        expect(screen.getByTestId("ti-pr-title").textContent).toBe("Include the head SHA");
+      });
+      expect(screen.queryByTestId("ti-branch")).toBeNull();
+    });
+
+    it("a thread with no project keeps a child's pull request, named by its repository", async () => {
+      const id = seedNoGit();
+      updateThread(id, { projectId: "", projectIds: [], worktreePath: HOME, linkedPullRequests: [linkTo(78)] });
+      card.prDetails.set(`${SLUG}#78`, pullRequest({ repoSlug: SLUG, number: 78, title: "Include the head SHA" }));
+      await renderCard(id);
+      await waitFor(() => {
+        expect(screen.getByTestId("ti-pr-project").textContent).toBe(SLUG);
+      });
+      expect(screen.queryByTestId("ti-branch")).toBeNull();
+    });
+
+    it("only closed pull requests: no group, so no empty divider", async () => {
+      const id = seedArchivedCleaned();
+      card.prDetails.set(`${SLUG}#78`, pullRequest({ repoSlug: SLUG, number: 78, state: "closed" }));
+      card.prDetails.set(`${SLUG}#63`, pullRequest({ repoSlug: SLUG, number: 63, state: "closed" }));
+      await renderCard(id);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      expect(screen.queryByTestId("ti-git-group")).toBeNull();
+    });
+
+    it("a detail that cannot be read: the row comes from the dashboard, as the sidebar's does", async () => {
+      const id = seedArchivedCleaned();
+      card.prDetails.delete(`${SLUG}#78`);
+      dashboardResource.set(DASHBOARD_KEY, {
+        data: { authored: [pullRequest({ repoSlug: SLUG, number: 78, title: "From the dashboard" })], reviewRequested: [], reviewed: [], recentlyMerged: [] } as unknown as DashboardView,
+      });
+      await renderCard(id);
+      await waitFor(() => {
+        expect(screen.getAllByTestId("ti-pr").map((r) => r.dataset.number)).toEqual(["78", "63"]);
+      });
+      expect(screen.getAllByTestId("ti-pr-title")[0]?.textContent).toBe("From the dashboard");
+    });
   });
 
   it("a folder without git: no git group", async () => {

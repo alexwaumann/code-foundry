@@ -13,7 +13,7 @@ import type { PullRequestView } from "@/api/gh";
 import type { McpServerView } from "@/api/mcp";
 import type { BackgroundShellView, ThreadView, UsageBucketView } from "@/api/threads";
 import { useActionsStore } from "@/stores/actions";
-import { pullRequestDetailResource } from "@/stores/gh";
+import { dashboardResource, pullRequestDetailResource } from "@/stores/gh";
 import { activeTab, getPanel, usePanelStore } from "@/stores/panel";
 import { placementResource } from "@/stores/placementChecks";
 import { useProjectsStore } from "@/stores/projects";
@@ -135,6 +135,7 @@ export function resetCard(): void {
   card.editors = [];
   card.refusals.clear();
   pullRequestDetailResource.store.setState({ entries: {} });
+  dashboardResource.store.setState({ entries: {} });
   actionPicksResource.store.setState({ entries: {} });
   editorAppsResource.store.setState({ entries: {} });
   placementResource.store.setState({ entries: {} });

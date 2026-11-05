@@ -17,10 +17,10 @@ import {
   Upload,
   WandSparkles,
 } from "lucide-react";
-import type { PullRequestView } from "@/api/gh";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { fileTotals } from "@/components/changes/files";
+import { useLinkedPrViews } from "@/components/sidebar/useLinkedPrs";
 import {
   commits,
   files,
@@ -221,8 +221,8 @@ function PrRowView({ row }: { row: PrRow }) {
   );
 }
 
-/** The thread's linked pull requests (lib/threadInfo prRows), each detail watched while the card shows. */
-function PrRows({ threadId }: { threadId: string }) {
+/** The thread's linked pull requests as rows (lib/threadInfo prRows): each detail watched while the card shows, the freshest read of each used. */
+function usePrRows(threadId: string): PrRow[] {
   const { cwdProjectId, members } = useMembers(threadId);
   const links = useThreadsStore(useShallow((s) => (s.byId[threadId]?.linkedPullRequests ?? []).map((l) => [l.slug, String(l.number), l.url].join(SEP))));
   const keys = useMemo(
@@ -234,9 +234,9 @@ function PrRows({ threadId }: { threadId: string }) {
     [links],
   );
   useWatchKeys(pullRequestDetailResource.watch, keys);
-  const details = pullRequestDetailResource.store(useShallow((s) => keys.map((k): PullRequestView | null => s.entries[k]?.data?.pullRequest ?? null)));
+  const views = useLinkedPrViews(keys);
   const projectKey = useProjectsStore(useShallow((s) => members.map((id) => [id, s.byId[id]?.name ?? id, s.byId[id]?.githubSlug ?? ""].join(SEP))));
-  const rows = useMemo(() => {
+  return useMemo(() => {
     const projects = new Map<string, { id: string; name: string }>();
     for (const p of projectKey) {
       const [id = "", name = "", slug = ""] = p.split(SEP);
@@ -244,17 +244,10 @@ function PrRows({ threadId }: { threadId: string }) {
     }
     const inputs: PrInput[] = links.map((l, i) => {
       const [slug = "", n = "0", url = ""] = l.split(SEP);
-      return { slug, number: Number(n), url, pr: details[i] ?? null };
+      return { slug, number: Number(n), url, pr: views[i] ?? null };
     });
     return prRows(inputs, projects, members, cwdProjectId);
-  }, [links, details, projectKey, members, cwdProjectId]);
-  return (
-    <>
-      {rows.map((r) => (
-        <PrRowView key={`${r.slug}#${String(r.number)}`} row={r} />
-      ))}
-    </>
-  );
+  }, [links, views, projectKey, members, cwdProjectId]);
 }
 
 /**
@@ -486,16 +479,24 @@ function ChangesSubRow({ d }: { d: MemberChanges }) {
   );
 }
 
-/** The git group: absent when the cwd's project has no git. */
+/**
+ * The git group. The branch, git state and Changes rows need the cwd's checkout; the pull
+ * requests do not: they are the thread's own links, and outlive the worktree an archive
+ * cleans up. Absent with neither.
+ */
 export function GitGroup({ threadId }: { threadId: string }) {
   const { git, wt } = useCwdCheckout(threadId);
-  if (!git || !wt) return null;
+  const prs = usePrRows(threadId);
+  const checkout = git && wt !== undefined;
+  if (!checkout && prs.length === 0) return null;
   return (
     <Group testId="ti-git-group">
-      <BranchRow threadId={threadId} />
-      <PrRows threadId={threadId} />
-      <GitStateRowView threadId={threadId} />
-      <ChangesRow threadId={threadId} />
+      {checkout && <BranchRow threadId={threadId} />}
+      {prs.map((r) => (
+        <PrRowView key={`${r.slug}#${String(r.number)}`} row={r} />
+      ))}
+      {checkout && <GitStateRowView threadId={threadId} />}
+      {checkout && <ChangesRow threadId={threadId} />}
     </Group>
   );
 }
