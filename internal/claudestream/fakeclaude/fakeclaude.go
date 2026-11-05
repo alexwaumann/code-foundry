@@ -60,6 +60,11 @@
 // message; turn n (2, 3, …) replays once the file <dir>/turn-<n> exists, and pauses
 // before its first system/init line until <dir>/turn-<n>.init exists. Both waits end
 // when stdin closes (the rest of the turn is then dropped, as a killed claude would).
+//
+// A turn on the way out: with CF_FAKE_CLAUDE_CLOSE_TURN (a duration) the next turn replays
+// that long after stdin closes, as real Claude does while a background agent it waits for
+// ends (it outlives stdin by up to the daemon's CloseTimeout), before any
+// CF_FAKE_CLAUDE_EXIT_DELAY.
 package fakeclaude
 
 import (
@@ -413,6 +418,10 @@ func Run(fixture string) int {
 	}
 	mu.Unlock()
 	replay.Wait()
+	if d, err := time.ParseDuration(os.Getenv("CF_FAKE_CLAUDE_CLOSE_TURN")); err == nil && next < len(turns) {
+		time.Sleep(d)
+		play(turns[next], "")
+	}
 	if d, err := time.ParseDuration(os.Getenv("CF_FAKE_CLAUDE_EXIT_DELAY")); err == nil {
 		time.Sleep(d)
 	}

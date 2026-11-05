@@ -235,9 +235,18 @@ func TestPutAwaySelfInterrupted(t *testing.T) {
 }
 
 // A turn interrupted by something the daemon's Interrupt did not see (the budget stop)
-// has the same end.
+// has the same end, by the result's terminal reason alone: is_error is off here, so the
+// failed-turn rule cannot be what drops it.
 func TestPutAwaySelfInterruptedTurnDrops(t *testing.T) {
-	e, s := midTurnAt(t, fixturePath("interrupt-pending"), nil)
+	data, err := os.ReadFile(fixturePath("interrupt-pending"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "interrupted.jsonl")
+	if err := os.WriteFile(path, []byte(strings.ReplaceAll(string(data), `"is_error":true`, `"is_error":false`)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e, s := midTurnAt(t, path, nil)
 	e.putAwaySelf(s, PutAway{Kind: PutAwayArchive})
 	conn, err := e.m.recs[s.ID].run.st.connection()
 	if err != nil {
@@ -390,6 +399,50 @@ func TestPutAwaySelfWaitsForQueuedTurn(t *testing.T) {
 	e.waitFor(s.ID, "archived", func(s Thread) bool { return !s.ArchivedAt.IsZero() })
 }
 
+// Claude can outlive the close by up to CloseTimeout while a background agent runs, and
+// when that ends it takes a turn. That turn is not the user's to see: the thread was put
+// away, and its status stays what the close began with.
+func TestPutAwaySelfTurnOnTheWayOut(t *testing.T) {
+	second, err := os.ReadFile(fixturePath("text-table"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := resultFixture(t, func(l string) string { return l })
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(append([]byte("\n"), second...)); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	e, s := midTurnAt(t, path, []string{"CF_FAKE_CLAUDE_CLOSE_TURN=20ms", "CF_FAKE_CLAUDE_EXIT_DELAY=400ms"},
+		func(o *Options) { o.Attended = func() bool { return false } })
+	sub := bus.Subscribe[Event](e.bus, 1024)
+	defer sub.Close()
+	e.putAwaySelf(s, PutAway{Kind: PutAwayArchive})
+	e.allow(s)
+	got := e.waitFor(s.ID, "archived", func(s Thread) bool { return !s.ArchivedAt.IsZero() })
+	if got.Status != StatusIdle || got.StatusReason != "at prompt" {
+		t.Errorf("status %v %q, want idle at prompt", got.Status, got.StatusReason)
+	}
+	if n := countTurnEnds(e.items(s.ID).Items); n != 2 {
+		t.Fatalf("%d turn ends, want the one on the way out too", n)
+	}
+	for drained := false; !drained; {
+		select {
+		case ev := <-sub.C():
+			if u, ok := ev.(Updated); ok && u.Thread.ID == s.ID && u.Thread.StatusReason == "finished" {
+				t.Errorf("published %v %q on the way out", u.Thread.Status, u.Thread.StatusReason)
+			}
+		default:
+			drained = true
+		}
+	}
+}
+
 // A thread not mid-turn is put away at once, as any caller's would be.
 func TestPutAwaySelfNotMidTurn(t *testing.T) {
 	for _, f := range putAwayForms {
@@ -435,22 +488,28 @@ func TestPutAwaySelfRefusals(t *testing.T) {
 // The turn's end archives like any archive: a child its creator watches wakes no one,
 // though the turn ended by itself rather than by the close. A plain turn end does wake it,
 // so the count means something. The subscription is to idle, or the prompt that holds the
-// turn open would be a wake of its own.
+// turn open would be a wake of its own. A hidden thread below it holds the archive up in
+// its cascade, past the debounce that publishes idle: the wakes must be gone before that.
 func TestPutAwaySelfArchiveWakesNoOne(t *testing.T) {
 	tests := []struct {
 		name      string
 		putAway   bool
+		below     bool
 		wantWakes int
 	}{
 		{name: "archiving itself", putAway: true, wantWakes: 0},
+		{name: "archiving itself, a slow thread below it", putAway: true, below: true, wantWakes: 0},
 		{name: "a plain turn end", wantWakes: 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := newFixtureEnvAt(t, fixturePath("write-allow"), nil, func(o *Options) { o.WakeBatch = -1 })
+			e := newFixtureEnvAt(t, fixturePath("write-allow"), []string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms"}, func(o *Options) { o.WakeBatch = -1 })
 			parent := e.stopped("Lead")
 			kid := e.create(CreateOptions{Name: "Worker", InitialPrompt: "write", CreatedBy: parent.ID})
 			s := e.asking(kid.ID)
+			if tt.below {
+				e.asking(e.create(CreateOptions{Name: "Helper", InitialPrompt: "write", CreatedBy: kid.ID}).ID)
+			}
 			if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: kid.ID, Condition: CondIdle, Repeat: true}); err != nil {
 				t.Fatal(err)
 			}
