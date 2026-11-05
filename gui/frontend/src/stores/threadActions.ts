@@ -41,6 +41,7 @@ export const THREAD_COMMANDS = {
   snooze: "thread.snooze",
   runIn: "thread.run-in",
   send: "thread.send",
+  compact: "thread.compact",
   interrupt: "thread.interrupt",
   setModel: "thread.set-model",
   setMode: "thread.set-mode",
@@ -248,6 +249,23 @@ export async function editThreadMessage(threadId: string, m: SentMessage): Promi
  */
 export async function interruptThread(threadId: string): Promise<boolean> {
   return (await runCommandForResult(THREAD_COMMANDS.interrupt, { id: threadId }, { ctx: threadContext(threadId), quiet: true })) !== null;
+}
+
+/** Threads whose thread.compact is on its way: the chip and the card's row share this, so a second press sends nothing. */
+const compacting = new Set<string>();
+
+/**
+ * Compacts a thread (thread.compact; docs/notes/compact-button.md): the timeline shows it, so
+ * only a failure toasts.
+ */
+export async function compactThread(threadId: string): Promise<boolean> {
+  if (compacting.has(threadId)) return false;
+  compacting.add(threadId);
+  try {
+    return (await runCommandForResult(THREAD_COMMANDS.compact, { id: threadId }, { ctx: threadContext(threadId), quiet: true })) !== null;
+  } finally {
+    compacting.delete(threadId);
+  }
 }
 
 /**

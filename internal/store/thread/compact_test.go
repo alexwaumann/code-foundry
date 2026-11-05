@@ -10,7 +10,9 @@ import (
 )
 
 func TestCompactHold(t *testing.T) {
-	sd := func(busy, compacting bool) *streamStatus { return &streamStatus{started: true, busy: busy, compacting: compacting} }
+	sd := func(busy, compacting bool) *streamStatus {
+		return &streamStatus{started: true, busy: busy, compacting: compacting}
+	}
 	tests := []struct {
 		name string
 		st   streamState

@@ -5,7 +5,8 @@
  * cache expiry and the re-read cost, computed when sent like the daemon's.
  *
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]
- *        moves the thread's last result <seconds> into the past (ago > the TTL: expired)
+ *        moves the thread's last result <seconds> into the past (ago > the TTL: expired);
+ *        with tokens and no ago, sets the context and leaves the result's time
  */
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 
@@ -37,6 +38,12 @@ export function contextFields(c: MockContext, ttlSeconds: number) {
     cacheExpiresAt: timestampFromDate(new Date(c.lastResultAt.getTime() + ttlSeconds * 1000)),
     contextRereadUsd: (c.contextTokens * rate) / 1e6,
   };
+}
+
+/** A compaction ended: the context is its summary. */
+export function recordCompaction(c: MockContext, tokens: number): void {
+  c.contextTokens = tokens;
+  c.lastResultAt = new Date();
 }
 
 /** A turn ended: the context grew by what it added. */

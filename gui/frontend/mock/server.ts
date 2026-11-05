@@ -55,7 +55,7 @@
  *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true][&save=true]   (thread.snooze as the CLI's
  *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
  *   POST /__mock/thread/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
- *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; mock/context.ts)
+ *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; only tokens: its context, the result's time kept; mock/context.ts)
  *   POST /__mock/thread?state=permission|question|streaming|idle   (the scripted thread s-r1:
  *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
@@ -1502,7 +1502,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/thread/cache":
       try {
-        world.ageThreadCache(q.get("id") ?? "s-r1", Number(q.get("ago") ?? "3660"), q.has("tokens") ? Number(q.get("tokens")) : undefined, q.get("model") ?? undefined);
+        world.ageThreadCache(q.get("id") ?? "s-r1", q.has("ago") || !q.has("tokens") ? Number(q.get("ago") ?? "3660") : undefined, q.has("tokens") ? Number(q.get("tokens")) : undefined, q.get("model") ?? undefined);
         json(res, 200, { ok: true });
       } catch (err) {
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
