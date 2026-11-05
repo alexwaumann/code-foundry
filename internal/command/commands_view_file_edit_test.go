@@ -155,7 +155,14 @@ func TestPanelFileEditThreads(t *testing.T) {
 	if _, err := reg.Invoke(context.Background(), caller, "view.panel.file", map[string]string{"path": path, "edit": "true", "focus": "true", "thread": "s-aaaaaaaaaaa1"}); err != nil {
 		t.Fatal(err)
 	}
-	intents := emit.Intents()
+	res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.file", map[string]string{"path": path, "edit": "true"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Message, "end your turn") {
+		t.Errorf("message = %q, want what to do next", res.Message)
+	}
+	intents := emit.Intents()[:2]
 	if len(intents) != 2 {
 		t.Fatalf("intents = %v, want the focus and the show", intents)
 	}

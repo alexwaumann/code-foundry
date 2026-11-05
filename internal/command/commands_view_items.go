@@ -158,7 +158,7 @@ func (d ViewDeps) runPanelFile(ctx context.Context, uctx Context, a Args) (Resul
 	if uctx.ActiveView == "" && uctx.CallerThreadID != "" {
 		asker = uctx.CallerThreadID
 	}
-	return showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	res, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
 		switch {
 		case a.Bool("edit"):
 			return d.editCheck(ctx, t, a, asker)
@@ -167,7 +167,14 @@ func (d ViewDeps) runPanelFile(ctx context.Context, uctx Context, a Args) (Resul
 		}
 		return d.fileCheck(ctx, t, a)
 	})
+	if out, ok := res.JSON.(PanelResult); ok && err == nil && a.Bool("edit") && out.Windows > 0 && res.Message != "" {
+		res.Message += editNext
+	}
+	return res, err
 }
+
+// editNext follows --edit's message: what the model does now.
+const editNext = "; the user is asked to edit it: end your turn, a message says when it is saved"
 
 // editCheck is view.panel.file --edit's check: the tab could edit and save the file, or
 // make it (docs/notes/file-edit-3-agent.md). A file the agent may not read comes through
