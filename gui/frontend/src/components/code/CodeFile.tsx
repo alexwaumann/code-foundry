@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { EditProvider, File, type EditorFactory, type FileEditChangeHandler, type FileOptions, type SelectedLineRange } from "@pierre/diffs/react";
-import { createCodeEditor, editorHandle, type CodeEditor, type EditorHandle } from "@/lib/codeEditor";
+import { createCodeEditor, editorHandle, type EditorHandle, type EditorSource } from "@/lib/codeEditor";
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { useCodeViewStore } from "@/stores/codeView";
@@ -27,6 +27,10 @@ export interface CodeFileEdit {
   onDetached: (stateKey: string) => void;
   /** The editor is ready, after attaching to a file. */
   onReady: (editor: EditorHandle) => void;
+  /** The document took the keyboard. */
+  onFocus: () => void;
+  /** While editing, a marked line stays marked (a thread pointed at it); otherwise the only selection is the caret's. */
+  mark: boolean;
 }
 
 // How many mounted views hold each draft key. Mounts come and go in one commit (StrictMode's
@@ -86,7 +90,7 @@ export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbe
 
 /** The File tab's view of a file: the library's File under its editor context. */
 function EditableFile({ file, options, selectedLines, edit }: { file: { name: string; contents: string }; options: FileOptions<undefined, undefined>; selectedLines: SelectedLineRange | null | undefined; edit: CodeFileEdit }) {
-  const { active, stateKey, revision, onChange, onOpening, onDetached, onReady } = edit;
+  const { active, stateKey, revision, onChange, onOpening, onDetached, onReady, onFocus, mark } = edit;
   const onEditChange = useMemo<FileEditChangeHandler<undefined, undefined>>(
     () => (event) => {
       onChange(event.editor.getText());
@@ -95,11 +99,12 @@ function EditableFile({ file, options, selectedLines, edit }: { file: { name: st
   );
   const editorOptions = useMemo(
     () => ({
-      onAttach: (editor: CodeEditor) => {
+      onAttach: (editor: EditorSource) => {
         onReady(editorHandle(editor));
       },
+      onFocus,
     }),
-    [onReady],
+    [onReady, onFocus],
   );
   const createEditor = useCallback<EditorFactory<undefined, undefined>>(
     (type, options, key) => {
@@ -121,8 +126,7 @@ function EditableFile({ file, options, selectedLines, edit }: { file: { name: st
   }, [active, stateKey, onDetached]);
   return (
     <EditProvider createEditor={createEditor}>
-      {/* While editing, the only selection is the caret's. */}
-      <File key={revision} file={file} options={options} selectedLines={active ? null : selectedLines} edit={active} editStateKey={stateKey} editorOptions={editorOptions} onEditChange={onEditChange} />
+      <File key={revision} file={file} options={options} selectedLines={active && !mark ? null : selectedLines} edit={active} editStateKey={stateKey} editorOptions={editorOptions} onEditChange={onEditChange} />
     </EditProvider>
   );
 }

@@ -1,0 +1,362 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { FileReadView, FileWriteView } from "@/api/files";
+import type { ThreadView } from "@/api/threads";
+import { fileTab } from "@/surfaces/fileTarget";
+import { answerAlternate, answerConfirm, useConfirmStore } from "./confirm";
+import { fileEditKey, noteDraft, noteEditor, observeRead, saveFile, startEdit, useFileEditStore } from "./fileEdit";
+import { openFileInPanel } from "./filePanel";
+import { canTell, confirmCloseFile, dismissAsk, presentFileSave, saveAndTell, savedMessage } from "./fileRequest";
+import { allTabs, getPanel, keyOf, usePanelStore, type Tab } from "./panel";
+import { useThreadsStore } from "./threads";
+import { useUiStore } from "./ui";
+
+// The library's memory: a draft per key.
+const lib = vi.hoisted(() => ({ drafts: new Map<string, string>() }));
+vi.mock("@/lib/codeEditor", () => ({
+  loadCodeEditor: () => Promise.resolve(),
+  draftText: (k: string) => lib.drafts.get(k) ?? null,
+  forgetDraft: (k: string) => {
+    lib.drafts.delete(k);
+  },
+}));
+
+// What happened, in order: the two calls this store is about.
+const calls = vi.hoisted(() => [] as string[]);
+const api = vi.hoisted(() => ({ write: vi.fn(), read: vi.fn(), send: vi.fn() }));
+vi.mock("@/api/files", async (orig) => ({
+  ...(await orig<typeof import("@/api/files")>()),
+  writeFile: (...args: unknown[]) => {
+    calls.push("write");
+    return api.write(...args) as Promise<FileWriteView>;
+  },
+  readFile: api.read,
+}));
+vi.mock("./commands", async (orig) => ({
+  ...(await orig<typeof import("./commands")>()),
+  invokeConfirmed: (name: string, args: Record<string, string>) => {
+    calls.push(`send ${name}`);
+    return api.send(args) as Promise<unknown>;
+  },
+  refreshCommands: () => Promise.resolve(),
+}));
+
+const SECRET = "API_KEY=sk-live-4242\n";
+const ENV = "/w/.env";
+const PANEL = "thread:s-1";
+const ASK = { thread: "s-1", note: "Put the key on line 2" };
+const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: ENV, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, text: "a=1\n", lossless: true, image: null, pdf: null, ...over });
+const missing = () => view({ notFound: true, text: null, lossless: false, size: 0, modifiedAtMs: null });
+const written = (over: Partial<FileWriteView> = {}): FileWriteView => ({ path: ENV, size: SECRET.length, modifiedAtMs: 200, conflict: false, notFound: false, ...over });
+
+const target = { project: "repo", base: "/w", path: ENV, edit: true, ask: ASK };
+const tabId = fileTab(target).id;
+const KEY = fileEditKey(PANEL, tabId);
+const edit = () => useFileEditStore.getState().sessions[KEY];
+const tab = (): Tab => {
+  const t = allTabs(getPanel(PANEL)).find((x) => x.id === tabId);
+  if (!t) throw new Error("no tab");
+  return t;
+};
+
+/** A thread's request open on `read`, the editor on screen, the document `text` if given. */
+async function asked(text: string | null = null, read = view(), over: Partial<typeof target> & { create?: boolean } = {}): Promise<void> {
+  openFileInPanel(PANEL, { ...target, ...over });
+  await startEdit(KEY, { panelKey: PANEL, tabId, base: "/w" }, read, { create: over.create === true });
+  const s = edit();
+  if (!s) throw new Error("no session");
+  lib.drafts.set(s.stateKey, text ?? s.seed);
+  noteEditor(KEY, { focus: vi.fn(), caret: () => null });
+  if (text !== null) noteDraft(KEY, text);
+}
+
+const sentArgs = (): unknown[] => api.send.mock.calls.map((c) => c[0] as unknown);
+
+beforeEach(() => {
+  calls.length = 0;
+  lib.drafts.clear();
+  api.write.mockReset();
+  api.read.mockReset();
+  api.send.mockReset();
+  api.send.mockResolvedValue({ ok: true });
+  useFileEditStore.setState({ sessions: {} });
+  usePanelStore.setState({ byKey: {} });
+  useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Set up billing", projectId: "repo", worktreePath: "/w", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: [], agentRuns: [] } as unknown as ThreadView }, order: ["s-1"] });
+  useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+});
+
+describe("Save and tell", () => {
+  it("writes, then sends one ordinary message, and the request is over", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    await expect(saveAndTell(KEY)).resolves.toBe("saved");
+    expect(calls).toEqual(["write", "send thread.send"]);
+    expect(sentArgs()).toEqual([{ id: "s-1", text: "I saved .env." }]);
+    expect(tab().params.asker).toBeUndefined();
+    expect(tab().params.note).toBeUndefined();
+    expect(tab().params.edit).toBeUndefined();
+    expect(edit()?.dirty).toBe(false);
+  });
+
+  it("the message holds nothing from the file: no contents, no size, no line text", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    await saveAndTell(KEY);
+    const sent = JSON.stringify(sentArgs());
+    for (const leak of ["API_KEY", "sk-live", "4242", String(SECRET.length)]) expect(sent).not.toContain(leak);
+  });
+
+  it.each([
+    ["a project's file by its path in the checkout", "/w/config/.env", "repo", "/w", "I saved config/.env."],
+    ["a file outside the checkout under home", "/Users/me/.aws/credentials", "repo", "/w", "I saved ~/.aws/credentials."],
+    ["a thread without a project", "/Users/me/.aws/credentials", "", "/Users/me", "I saved ~/.aws/credentials."],
+  ])("names %s", (_name, path, project, base, want) => {
+    expect(savedMessage(path, project, base)).toBe(want);
+  });
+
+  it("a conflict sends nothing, and the request stands", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written({ conflict: true }));
+    await expect(saveAndTell(KEY)).resolves.toBe("conflict");
+    expect(calls).toEqual(["write"]);
+    expect(tab().params.asker).toBe("s-1");
+    expect(edit()?.conflict).toBe("changed");
+  });
+
+  it("a failed write sends nothing, and the request stands", async () => {
+    await asked(SECRET);
+    api.write.mockRejectedValue(new Error("read-only"));
+    await expect(saveAndTell(KEY)).resolves.toBe("failed");
+    expect(calls).toEqual(["write"]);
+    expect(tab().params.asker).toBe("s-1");
+    expect(edit()?.failure).toContain("Could not save");
+  });
+
+  it("a send that fails leaves the save standing and says so", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    api.send.mockRejectedValue(new Error("thread s-1 not found"));
+    await expect(saveAndTell(KEY)).resolves.toBe("untold");
+    expect(edit()).toMatchObject({ dirty: false, failure: expect.stringContaining("Saved, but Set up billing was not told") as string });
+    expect(edit()?.failure).toContain("not found");
+    expect(tab().params.asker).toBeUndefined();
+  });
+
+  it("a thread that is gone is said too, by what is left of it", async () => {
+    await asked(SECRET);
+    useThreadsStore.setState({ byId: {}, order: [] });
+    api.write.mockResolvedValue(written());
+    api.send.mockRejectedValue(new Error("no such thread"));
+    await expect(saveAndTell(KEY)).resolves.toBe("untold");
+    expect(edit()?.failure).toContain("Saved, but the thread was not told");
+  });
+
+  it("twice in a row writes and sends once", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    await Promise.all([saveAndTell(KEY), saveAndTell(KEY)]);
+    await saveAndTell(KEY);
+    expect(calls).toEqual(["write", "send thread.send"]);
+  });
+
+  it("after row two's Save only tells: the file is what the user wants", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    await saveFile(KEY);
+    expect(calls).toEqual(["write"]);
+    expect(tab().params.asker).toBe("s-1");
+    await saveAndTell(KEY);
+    expect(calls).toEqual(["write", "send thread.send"]);
+  });
+
+  it.each([
+    ["while a write is out", { busy: true }],
+    ["with a conflict up", { conflict: "changed" as const }],
+    ["with nothing to make yet", { creating: true, dirty: false }],
+  ])("cannot run %s", async (_name, over) => {
+    await asked();
+    const s = edit();
+    if (!s) throw new Error("no session");
+    expect(canTell(s)).toBe(true);
+    expect(canTell({ ...s, ...over })).toBe(false);
+    useFileEditStore.setState({ sessions: { [KEY]: { ...s, ...over } } });
+    await expect(saveAndTell(KEY)).resolves.toBe("skipped");
+    expect(calls).toEqual([]);
+  });
+
+  it("a newer request that came during the write stands", async () => {
+    await asked(SECRET);
+    let done = (_: FileWriteView) => undefined as void;
+    api.write.mockReturnValue(new Promise<FileWriteView>((r) => (done = r)));
+    const told = saveAndTell(KEY);
+    openFileInPanel(PANEL, { ...target, ask: { thread: "s-1", note: "And line 3" } });
+    done(written());
+    await told;
+    expect(tab().params.note).toBe("And line 3");
+  });
+});
+
+describe("Dismiss", () => {
+  it("ends the request, sends nothing, and editing goes on", async () => {
+    await asked("typed\n");
+    dismissAsk(KEY);
+    expect(tab().params.asker).toBeUndefined();
+    expect(edit()?.dirty).toBe(true);
+    expect(calls).toEqual([]);
+    api.write.mockResolvedValue(written());
+    await saveAndTell(KEY);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("a request's life", () => {
+  it("nothing of a finished request is left for a reload to find", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    await saveAndTell(KEY);
+    const stored = JSON.stringify(usePanelStore.getState().byKey);
+    expect(stored).not.toContain(ASK.note);
+    expect(stored).not.toContain('"asker"');
+  });
+
+  it("a repeat request shows the new note and leaves the draft alone", async () => {
+    await asked("half typed\n");
+    const before = edit();
+    openFileInPanel(PANEL, { ...target, ask: { thread: "s-1", note: "Line 3 too" }, line: 3 });
+    expect(tab().params.note).toBe("Line 3 too");
+    expect(tab().params.line).toBe("3");
+    expect(edit()).toBe(before);
+    expect(getPanel(PANEL).groups[0]?.activeTabId).toBe(tabId);
+  });
+
+  it("opening the file another way keeps the request", async () => {
+    await asked();
+    openFileInPanel(PANEL, { project: "repo", base: "/w", path: ENV, line: 7 });
+    expect(tab().params).toMatchObject({ asker: "s-1", note: ASK.note, edit: "1", line: "7" });
+  });
+
+  it("the tab's close asks to save and tell, and that closes it having told", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    const closing = confirmCloseFile(PANEL, tab());
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending?.confirmLabel).toBe("Save and tell thread");
+    });
+    answerConfirm(true);
+    await expect(closing).resolves.toBe(true);
+    expect(calls).toEqual(["write", "send thread.send"]);
+  });
+
+  it("the close dialog's Discard sends nothing", async () => {
+    await asked(SECRET);
+    const closing = confirmCloseFile(PANEL, tab());
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).not.toBeNull();
+    });
+    answerAlternate();
+    await expect(closing).resolves.toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  it("a told-nobody close keeps the tab, to say so", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    api.send.mockRejectedValue(new Error("gone"));
+    const closing = confirmCloseFile(PANEL, tab());
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).not.toBeNull();
+    });
+    answerConfirm(true);
+    await expect(closing).resolves.toBe(false);
+  });
+});
+
+describe("cmd+S", () => {
+  it("is Save and tell while the request stands, a plain save after", async () => {
+    usePanelStore.setState({ byKey: {} });
+    await asked("one\n");
+    expect(keyOf(useUiStore.getState().selection)).toBe(PANEL);
+    api.write.mockResolvedValue(written());
+    presentFileSave();
+    await vi.waitFor(() => {
+      expect(calls).toEqual(["write", "send thread.send"]);
+    });
+    calls.length = 0;
+    const s = edit();
+    if (s) lib.drafts.set(s.stateKey, "two\n");
+    noteDraft(KEY, "two\n");
+    presentFileSave();
+    await vi.waitFor(() => {
+      expect(calls).toEqual(["write"]);
+    });
+  });
+});
+
+describe("a new file", () => {
+  const fresh = (text: string | null = null) => asked(text, missing(), { create: true });
+
+  it("is an empty document marked as such", async () => {
+    await fresh();
+    expect(edit()).toMatchObject({ creating: true, seed: "", dirty: false, view: { text: "", notFound: false } });
+  });
+
+  it("nothing typed can be neither saved nor told, and writes nothing", async () => {
+    await fresh();
+    await expect(saveAndTell(KEY)).resolves.toBe("skipped");
+    await expect(saveFile(KEY)).resolves.toBe("skipped");
+    expect(confirmCloseFile(PANEL, tab())).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  it("saves with create, then tells, and is an ordinary file after", async () => {
+    await fresh(SECRET);
+    api.write.mockResolvedValue(written());
+    await saveAndTell(KEY);
+    expect(calls).toEqual(["write", "send thread.send"]);
+    expect(api.write).toHaveBeenCalledWith("/w", ENV, SECRET, expect.anything(), { create: true });
+    expect(edit()).toMatchObject({ creating: false, dirty: false });
+    expect(tab().params.create).toBeUndefined();
+  });
+
+  it("a file that appeared is a conflict: nothing replaced, nothing sent", async () => {
+    await fresh(SECRET);
+    api.write.mockResolvedValue(written({ conflict: true }));
+    await expect(saveAndTell(KEY)).resolves.toBe("conflict");
+    expect(calls).toEqual(["write"]);
+    expect(edit()).toMatchObject({ conflict: "changed", creating: true, dirty: true });
+  });
+
+  it("Overwrite after that goes with force, not create", async () => {
+    await fresh(SECRET);
+    api.write.mockResolvedValue(written({ conflict: true }));
+    await saveFile(KEY);
+    api.write.mockResolvedValue(written());
+    await saveFile(KEY, { force: true });
+    expect(api.write).toHaveBeenLastCalledWith("/w", ENV, SECRET, expect.anything(), { force: true });
+    expect(edit()).toMatchObject({ creating: false, conflict: null });
+  });
+
+  it("a read finding nothing is what it expects", async () => {
+    await fresh("typed\n");
+    observeRead(KEY, missing());
+    expect(edit()).toMatchObject({ conflict: null, dirty: true, creating: true });
+  });
+
+  it("a read finding a file raises the conflict over a draft", async () => {
+    await fresh("typed\n");
+    observeRead(KEY, view());
+    expect(edit()).toMatchObject({ conflict: "changed", dirty: true, creating: true });
+  });
+
+  it("a clean document follows a file that appeared, as an ordinary session", async () => {
+    await fresh();
+    observeRead(KEY, view());
+    expect(edit()).toMatchObject({ creating: false, seed: "a=1\n", conflict: null });
+  });
+
+  it("the conflict goes if the file does", async () => {
+    await fresh("typed\n");
+    observeRead(KEY, view());
+    observeRead(KEY, missing());
+    expect(edit()).toMatchObject({ conflict: null, creating: true });
+  });
+});

@@ -13,12 +13,11 @@
  * and raises a conflict instead; a clean one starts over on the new version.
  */
 import { create } from "zustand";
-import { canEdit, readFile, writeFile, type FileReadView } from "@/api/files";
+import { blankFile, canEdit, readFile, writeFile, type FileReadView } from "@/api/files";
 import { errorMessage } from "@/api/stream";
 import { draftText, forgetDraft, loadCodeEditor, type EditorHandle, type EditorPlace } from "@/lib/codeEditor";
-import { fileName } from "@/lib/filePath";
-import { requestChoice } from "./confirm";
-import { activatePanelTab, activeTab, allTabs, getPanel, keyOf, usePanelStore, type PanelEntry, type Tab } from "./panel";
+import { deepActiveElement } from "@/lib/keyTarget";
+import { activeTab, allTabs, getPanel, keyOf, usePanelStore, type PanelEntry, type Tab } from "./panel";
 import { useUiStore } from "./ui";
 
 /** What is wrong with the draft's baseline: the file was changed, or is gone. */
@@ -31,6 +30,8 @@ export interface FileEdit {
   base: string;
   /** The resolved path it started on, for good: every read and write of the session is of this file. */
   path: string;
+  /** No file is there yet: the document is empty to start with, and a save makes the file, never replacing one that appeared. */
+  creating: boolean;
   /** The version being edited, its text the baseline of `dirty`. Null when a clean session left the screen: the tab's next read starts it again. */
   view: FileReadView | null;
   /** What the editor's document started from. It stays put after a save: a new `file` prop would reset the document. */
@@ -74,6 +75,11 @@ function session(key: string): FileEdit | undefined {
   return useFileEditStore.getState().sessions[key];
 }
 
+/** The tab's session right now, outside a render. */
+export function fileEditOf(key: string): FileEdit | undefined {
+  return session(key);
+}
+
 function patch(key: string, change: Partial<FileEdit>): void {
   useFileEditStore.setState((s) => {
     const was = s.sessions[key];
@@ -91,7 +97,15 @@ function nextStateKey(): string {
 
 // The editors on screen, and where the keyboard goes when a tab's next one attaches.
 const editors = new Map<string, EditorHandle>();
-const nextFocus = new Map<string, EditorPlace | null>();
+const nextFocus = new Map<string, EditorPlace | { lineEnd: number } | null>();
+
+/** The end of a zero-based line of the tab's document; of its last line past the end. */
+function lineEnd(key: string, line: number): EditorPlace {
+  const s = session(key);
+  const lines = ((s && draftText(s.stateKey)) ?? s?.seed ?? "").split("\n");
+  const at = Math.min(line, lines.length - 1);
+  return { line: at, character: (lines[at] ?? "").replace(/\r$/, "").length };
+}
 
 /** The tab's editor is on screen. It takes the keyboard if it was asked to. */
 export function noteEditor(key: string, editor: EditorHandle): void {
@@ -99,7 +113,7 @@ export function noteEditor(key: string, editor: EditorHandle): void {
   const at = nextFocus.get(key);
   if (at === undefined) return;
   nextFocus.delete(key);
-  editor.focus(at ?? undefined);
+  editor.focus(at === null ? undefined : "lineEnd" in at ? lineEnd(key, at.lineEnd) : at);
 }
 
 /** Puts the keyboard back in the tab's editor, if it is on screen. */
@@ -112,6 +126,13 @@ export function focusNextEditor(key: string): void {
   nextFocus.set(key, null);
 }
 
+/** The tab's editor takes the keyboard at the end of a 1-based line, now or when it is on screen (a thread's --focus). */
+export function focusEditorLine(key: string, line: number | undefined): void {
+  const editor = editors.get(key);
+  if (editor) editor.focus(line === undefined ? undefined : lineEnd(key, line - 1));
+  else nextFocus.set(key, line === undefined ? null : { lineEnd: line - 1 });
+}
+
 /** The session whose editor has the keyboard (its find field too); null when none does. */
 function editorWithFocus(): string | null {
   const stateKey = document.activeElement?.closest("[data-code-editor]")?.getAttribute("data-code-editor");
@@ -120,12 +141,40 @@ function editorWithFocus(): string | null {
   return found ? found[0] : null;
 }
 
+/** The keyboard is in an editor's find field, not its document. */
+function findHasKeyboard(): boolean {
+  return deepActiveElement()?.closest("[data-search-panel]") != null;
+}
+
+// The palette's input has the keyboard while it is open, so cmd+S's rule cannot see the
+// editor that had it: that is kept here from the moment the palette opens, before it mounts.
+let paletteEditor: string | null = null;
+
+useUiStore.subscribe((s, prev) => {
+  if (s.palette.open && !prev.palette.open) paletteEditor = editorWithFocus();
+});
+
+/** The session whose editor the user was in: the palette's, while it covers the window. */
+function editorInUse(): string | null {
+  if (!useUiStore.getState().palette.open) return editorWithFocus();
+  return paletteEditor !== null && session(paletteEditor) ? paletteEditor : null;
+}
+
+/** The palette is closing on a command that was for this editor: the keyboard goes back in, which the palette's focus return cannot do through a shadow root. */
+export function returnFromPalette(key: string): void {
+  if (!useUiStore.getState().palette.open || paletteEditor !== key) return;
+  requestAnimationFrame(() => {
+    focusEditor(key);
+  });
+}
+
 /** Ends a session and drops its draft (an editor still on screen drops it in editorDetached). */
 function end(key: string): void {
   const was = session(key);
   if (!was) return;
   editors.delete(key);
   nextFocus.delete(key);
+  heldReads.delete(key);
   useFileEditStore.setState((s) => {
     const { [key]: _gone, ...rest } = s.sessions;
     return { sessions: rest };
@@ -183,30 +232,55 @@ function sameVersion(a: FileReadView, b: FileReadView): boolean {
   return a.size === b.size && a.modifiedAtMs === b.modifiedAtMs;
 }
 
-/** The session starts over on `view`: a new document, nothing to save, nothing wrong. */
-function adopt(key: string, was: FileEdit, view: FileReadView): void {
+/** The session starts over on `view`: a new document, nothing to save, nothing wrong. `creating`: still no file behind it. */
+function adopt(key: string, was: FileEdit, view: FileReadView, creating = false): void {
   clock += 1;
   forgetDraft(was.stateKey);
-  patch(key, { view, seed: view.text ?? "", stateKey: nextStateKey(), revision: was.revision + 1, dirty: false, conflict: null, failure: null, busy: false, readsFrom: clock });
+  patch(key, { creating, view, seed: view.text ?? "", stateKey: nextStateKey(), revision: was.revision + 1, dirty: false, conflict: null, failure: null, busy: false, readsFrom: clock });
 }
 
-/** A clean document follows the file. The new editor keeps the keyboard and the caret, if the old one had them. */
+// A read a find field kept off the screen: a new document would close the field under the
+// user's fingers and leave the keyboard nowhere. It lands when the document has the keyboard.
+const heldReads = new Map<string, FileReadView>();
+
+/**
+ * A clean document follows the file. The new editor keeps the keyboard and the caret, if the
+ * old one had them. With the keyboard in its find field, the document waits instead: the
+ * field stays, and what the user types stays in it.
+ */
 function follow(key: string, was: FileEdit, view: FileReadView): void {
-  if (editorWithFocus() === key) nextFocus.set(key, editors.get(key)?.caret() ?? null);
+  if (editorWithFocus() === key) {
+    if (findHasKeyboard()) {
+      heldReads.set(key, view);
+      return;
+    }
+    nextFocus.set(key, editors.get(key)?.caret() ?? null);
+  }
   adopt(key, was, view);
+}
+
+/** The document took the keyboard: a read the find field held lands now, with what is known by then. */
+export function editorFocused(key: string): void {
+  const view = heldReads.get(key);
+  if (!view) return;
+  heldReads.delete(key);
+  observeRead(key, view);
 }
 
 /**
  * Turns the editor on for a tab. Loads it first, so the tab flips once it can. A session
- * already there stays: a second click must not reset a draft.
+ * already there stays: a second click must not reset a draft. `create`: a read that found
+ * nothing starts an empty document, which a save makes into the file.
  */
-export async function startEdit(key: string, target: { panelKey: string; tabId: string; base: string }, view: FileReadView): Promise<void> {
+export async function startEdit(key: string, target: { panelKey: string; tabId: string; base: string }, read: FileReadView, opts: { create?: boolean } = {}): Promise<void> {
   await loadCodeEditor();
+  const creating = opts.create === true && read.notFound;
+  const view = creating ? blankFile(read.path) : read;
   if (session(key) || !canEdit(view)) return;
   useFileEditStore.setState((s) => ({
     sessions: {
       ...s.sessions,
-      [key]: { ...target, path: view.path, view, seed: view.text ?? "", stateKey: nextStateKey(), revision: 0, dirty: false, conflict: null, failure: null, busy: false, readsFrom: clock },
+      [key]: { ...target, path: view.path, creating, view, seed: view.text ?? "", stateKey: nextStateKey(), revision: 0, dirty: false, conflict: null, failure: null, busy: false, readsFrom: clock },
     },
   }));
 }
@@ -230,11 +304,16 @@ export function noteDraft(key: string, text: string): void {
  * document: at most it raises the conflict band. A file that went says so, clean or dirty.
  * A clean document follows the file, and leaves edit mode if the file is no longer one it can
  * edit. A read of any other file is no news about this one (one that left before the session).
+ * A document with no file behind it expects to find nothing; a file that appeared is a
+ * conflict like any other, and a clean one follows it.
  */
 export function observeRead(key: string, view: FileReadView): void {
   const s = session(key);
   if (!s || s.busy || view.path !== s.path || (readStarts.get(view) ?? Infinity) < s.readsFrom) return;
-  if (!s.view) {
+  if (s.creating && view.notFound) {
+    if (!s.view) adopt(key, s, blankFile(s.path), true);
+    else if (s.conflict !== null) patch(key, { conflict: null });
+  } else if (!s.view) {
     if (canEdit(view)) adopt(key, s, view);
     else end(key);
   } else if (view.notFound) {
@@ -245,6 +324,11 @@ export function observeRead(key: string, view: FileReadView): void {
     if (s.conflict !== "changed") patch(key, { conflict: "changed" });
   } else if (canEdit(view)) follow(key, s, view);
   else end(key);
+}
+
+/** Says what went wrong in the tab, as a sentence, in the band a failed save uses. */
+export function noteEditFailure(key: string, failure: string): void {
+  patch(key, { failure });
 }
 
 export type SaveOutcome = "saved" | "conflict" | "failed" | "skipped";
@@ -267,6 +351,8 @@ export async function saveFile(key: string, opts: { force?: boolean } = {}): Pro
     return "failed";
   }
   const { view } = s;
+  // Overwrite wins over whatever appeared; anything else must not replace it.
+  const how = s.creating && opts.force !== true ? { create: true } : opts;
   clock += 1;
   patch(key, { busy: true, failure: null, readsFrom: clock });
   // The answer is about this document: the session may have let it go meanwhile (a clean tab left the screen).
@@ -275,7 +361,7 @@ export async function saveFile(key: string, opts: { force?: boolean } = {}): Pro
     return now?.stateKey === s.stateKey ? now : null;
   };
   try {
-    const r = await writeFile(s.base, s.path, text, view, opts);
+    const r = await writeFile(s.base, s.path, text, view, how);
     clock += 1;
     const now = current();
     if (!now) {
@@ -288,7 +374,7 @@ export async function saveFile(key: string, opts: { force?: boolean } = {}): Pro
     }
     const saved = { ...view, text, size: r.size, modifiedAtMs: r.modifiedAtMs, notFound: false };
     // Edits typed while the write ran are still unsaved.
-    patch(key, { view: saved, dirty: draftText(now.stateKey) !== text, conflict: null, busy: false, readsFrom: clock });
+    patch(key, { creating: false, view: saved, dirty: draftText(now.stateKey) !== text, conflict: null, busy: false, readsFrom: clock });
     return "saved";
   } catch (err) {
     patch(key, current() ? { busy: false, failure: `Could not save: ${errorMessage(err)}` } : { busy: false });
@@ -319,9 +405,9 @@ async function readBack(key: string, giveUp: (s: FileEdit, fresh: FileReadView) 
 
 /** Reload: the document goes to what is on disk. If there is nothing to take, the draft stays and the tab says why. */
 export function reloadDraft(key: string): Promise<void> {
-  return readBack(key, (_, fresh) => {
+  return readBack(key, (now, fresh) => {
     nextFocus.delete(key);
-    if (fresh.notFound) patch(key, { busy: false, conflict: "deleted" });
+    if (fresh.notFound) patch(key, { busy: false, conflict: now.creating ? null : "deleted" });
     else patch(key, { busy: false, failure: "Could not reload: the file on disk is no longer text this tab can edit." });
     focusEditor(key);
   });
@@ -336,7 +422,7 @@ export async function discardDraft(key: string): Promise<void> {
     await readBack(key, () => {
       end(key);
     });
-  } else if (s.dirty) adopt(key, s, s.view);
+  } else if (s.dirty) adopt(key, s, s.view, s.creating);
 }
 
 /**
@@ -364,41 +450,8 @@ export function editorDetached(key: string, stateKey: string): void {
 export function editorOpening(key: string, stateKey: string): void {
   const s = session(key);
   if (s?.stateKey !== stateKey || !s.dirty || !s.view || draftText(stateKey) !== null) return;
-  adopt(key, s, s.view);
+  adopt(key, s, s.view, s.creating);
   patch(key, { failure: DRAFT_LOST });
-}
-
-/**
- * Asked before a File tab closes (SurfaceSpec.beforeClose): a dirty one asks Save, Discard
- * or Keep editing. A save that does not go through keeps the tab, on screen, showing why.
- */
-export function confirmCloseFile(panelKey: string, tab: Tab): true | Promise<boolean> {
-  const key = fileEditKey(panelKey, tab.id);
-  const s = session(key);
-  if (!s?.dirty) return true;
-  return askClose(key, panelKey, tab, fileName(s.view?.path ?? "") || tab.title);
-}
-
-async function askClose(key: string, panelKey: string, tab: Tab, name: string): Promise<boolean> {
-  const answer = await requestChoice({
-    title: `Save changes to ${name}?`,
-    message: "Unsaved edits are lost if you discard them.",
-    confirmLabel: "Save",
-    alternateLabel: "Discard",
-    cancelLabel: "Keep editing",
-    centered: true,
-  });
-  if (answer === "cancel") {
-    // After the dialog hands focus back, which it cannot do into a shadow root.
-    requestAnimationFrame(() => {
-      focusEditor(key);
-    });
-    return false;
-  }
-  if (answer === "alternate") return true;
-  if ((await saveFile(key)) === "saved") return true;
-  activatePanelTab(panelKey, tab.id);
-  return false;
 }
 
 /**
@@ -406,8 +459,8 @@ async function askClose(key: string, panelKey: string, tab: Tab, name: string): 
  * without it, so the focused group's tab may be another file. Otherwise the focused group's
  * active tab, if it is really on screen: a draft the user cannot see is not saved.
  */
-function focusedEdit(): string | null {
-  const focused = editorWithFocus();
+export function focusedEdit(): string | null {
+  const focused = editorInUse();
   if (focused !== null) return focused;
   const panelKey = keyOf(useUiStore.getState().selection);
   if (panelKey === null) return null;
@@ -420,11 +473,4 @@ function focusedEdit(): string | null {
 /** Whether file.save would do anything here: the palette lists it only then. */
 export function canSaveFile(): boolean {
   return focusedEdit() !== null;
-}
-
-/** file.save in this window. With nothing to save, nothing happens; the command is still handled. */
-export function presentFileSave(): boolean {
-  const key = focusedEdit();
-  if (key !== null) void saveFile(key);
-  return true;
 }

@@ -13,9 +13,13 @@
  * not the screen.
  *
  * The item actions (panel.file, panel.diff, panel.pr) open what their params name; the
- * daemon checked it exists first (internal/command/commands_view_items.go).
+ * daemon checked it exists first (internal/command/commands_view_items.go). The one thing
+ * here that may take the keyboard is a request to edit a file with --focus: the daemon
+ * sends focus=1 only then, and only because the user asked to be taken there.
  */
 import type { DiffScopeView } from "@/api/fileDiff";
+import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
+import { fileEditKey, focusEditorLine } from "./fileEdit";
 import { openDiffInPanel, openFileInPanel } from "./filePanel";
 import { openMcpSurface } from "./mcpPanel";
 import { expandPanel, getPanel, isSplit, keyOf, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
@@ -75,17 +79,23 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
   },
   "panel.mcp": surface(openMcpSurface),
   // view.panel.file: params path (absolute), line, project and base; view.panel.page adds
-  // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts).
+  // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts); --edit adds
+  // edit=1 and thread (who asked), with note, create and focus when they apply.
   "panel.file": item((key, p) => {
     if (!p.path) return false;
     const line = positive(p.line);
-    return openFileInPanel(key, {
+    const file: FileTarget = {
       project: p.project ?? "",
       base: p.base ?? "",
       path: p.path,
       ...(line === undefined ? {} : { line }),
       ...(p.page === "1" ? { page: { title: p.title ?? "" } } : {}),
-    });
+      ...(p.edit === "1" ? { edit: true, ask: { thread: p.thread ?? "", note: p.note ?? "" } } : {}),
+      ...(p.create === "1" ? { create: true } : {}),
+    };
+    if (!openFileInPanel(key, file)) return false;
+    if (p.focus === "1") focusEditorLine(fileEditKey(key, fileTab(file).id), line);
+    return true;
   }),
   // view.panel.diff: params project, worktree, path (worktree-relative) and scope.
   "panel.diff": item((key, p) => {

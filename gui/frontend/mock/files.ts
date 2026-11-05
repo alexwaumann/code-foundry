@@ -10,7 +10,7 @@
  *   POST /__mock/fs/remove?path=…         (the file goes)
  *   POST /__mock/fs/refuse?code=…&message=…   (the next WriteFile fails with that Connect code name)
  *   GET  /__mock/fs/text?path=…           ({ text }: a file's contents on disk, null when absent)
- *   GET  /__mock/fs/calls                 ("read <path>", "write <path> [force]", "diff <worktree> <file> <scope>")
+ *   GET  /__mock/fs/calls                 ("read <path>", "write <path> [force] [create]", "diff <worktree> <file> <scope>")
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
@@ -426,16 +426,18 @@ export class MockFiles {
     };
   }
 
-  /** internal/fsx Writer: a changed or vanished file is a conflict, nothing written; force writes whatever is there. */
+  /** internal/fsx Writer: a changed or vanished file is a conflict, nothing written; force writes whatever is there; create takes a place where nothing is. */
   writeFile(req: WriteFileRequest): WriteInit {
     const abs = req.path.startsWith("/") ? normalize(req.path) : normalize(`${req.baseDir}/${req.path}`);
-    this.calls.push(`write ${abs}${req.force ? " force" : ""}`);
+    this.calls.push(`write ${abs}${req.force ? " force" : ""}${req.create ? " create" : ""}`);
     const refusal = this.refusal;
     this.refusal = null;
     if (refusal) throw refusal;
     const e = this.onDisk(abs);
     if (e?.dir) throw new ConnectError(`${abs} is a directory`, Code.InvalidArgument);
-    if (!req.force) {
+    if (req.create) {
+      if (e) return { resolvedPath: abs, modifiedAt: BigInt(e.modifiedAt ?? FIXTURE_MTIME), size: BigInt(e.size ?? e.data.length), conflict: true };
+    } else if (!req.force) {
       if (!e) return { resolvedPath: abs, conflict: true, notFound: true };
       const modifiedAt = BigInt(e.modifiedAt ?? FIXTURE_MTIME);
       const size = BigInt(e.size ?? e.data.length);

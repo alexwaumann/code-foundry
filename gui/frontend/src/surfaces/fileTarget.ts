@@ -28,10 +28,23 @@ export interface FileTarget {
   page?: { title: string };
   /** The tab opens with its editor on, when the file is one it can edit. */
   edit?: boolean;
+  /** With `edit`: no file is there, so the tab edits an empty document and a save makes the file. */
+  create?: boolean;
+  /** A thread asked the user to edit this file (view.panel.file --edit); gone once saved or dismissed. */
+  ask?: FileAsk;
 }
 
+/** Who asked for a file to be edited, and what they said. The note is model text: plain text only. */
+export interface FileAsk {
+  thread: string;
+  note: string;
+}
+
+/** The params a File tab's request lives in: dropping them finishes it, for good. */
+export const ASK_PARAMS = ["edit", "create", "asker", "note"] as const;
+
 /**
- * A File tab: params { project, base, path, line?, page?, title?, edit? } with the path made
+ * A File tab: params { project, base, path, line?, page?, title?, edit?, create?, asker?, note? } with the path made
  * absolute against base when it can be, keyed by that path alone, titled with the page's
  * title or the file's name.
  */
@@ -44,6 +57,11 @@ export function fileTab(t: FileTarget): Tab {
     if (t.page.title) params.title = t.page.title;
   }
   if (t.edit) params.edit = "1";
+  if (t.create) params.create = "1";
+  if (t.ask) {
+    params.asker = t.ask.thread;
+    if (t.ask.note) params.note = t.ask.note;
+  }
   return { id: tabId(FILE_KIND, { path }), kind: FILE_KIND, title: t.page?.title || fileName(path) || path, params };
 }
 
@@ -59,6 +77,8 @@ export function fileOfTab(tab: Pick<Tab, "params">): FileTarget | null {
     ...(Number.isInteger(line) && line > 0 ? { line } : {}),
     ...(tab.params.page === "1" ? { page: { title: tab.params.title ?? "" } } : {}),
     ...(tab.params.edit === "1" ? { edit: true } : {}),
+    ...(tab.params.create === "1" ? { create: true } : {}),
+    ...(tab.params.asker ? { ask: { thread: tab.params.asker, note: tab.params.note ?? "" } } : {}),
   };
 }
 

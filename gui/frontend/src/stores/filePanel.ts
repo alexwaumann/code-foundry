@@ -3,23 +3,25 @@
  * state only: no daemon command. The Changes tab's rows open a Diff tab; the Diff tab's
  * Open file opens a File tab; path chips open File tabs through openFileInPanel too.
  */
-import { diffTab, fileTab, type DiffTarget, type FileTarget } from "@/surfaces/fileTarget";
+import { diffTab, fileOfTab, fileTab, type DiffTarget, type FileTarget } from "@/surfaces/fileTarget";
 import { allTabs, getPanel, openSurface, usePanelStore, type PanelTarget, type Tab } from "./panel";
 
 /**
  * Opens (or activates) a file's tab in a panel ("current": the window's selection) and
  * shows the panel; an open tab of the same file moves to the new line. A tab that is its
  * thread's page (view.panel.page) stays one when the file opens again another way (a
- * path chip), so its bridge keeps working. False with no panel.
+ * path chip), so its bridge keeps working, and a thread's open request to edit it stays
+ * until it is saved or dismissed; a new request replaces it. False with no panel.
  */
 export function openFileInPanel(target: PanelTarget, file: FileTarget): boolean {
-  let page = file.page;
-  if (!page) {
-    const tab = fileTab(file);
-    const old = allTabs(getPanel(target)).find((t) => t.id === tab.id);
-    if (old?.params.page === "1") page = { title: old.params.title ?? "" };
-  }
-  return openSurface(target, fileTab(page ? { ...file, page } : file));
+  const id = fileTab(file).id;
+  const old = allTabs(getPanel(target)).find((t) => t.id === id);
+  const was = old ? fileOfTab(old) : null;
+  const keeps = {
+    ...(was?.page && !file.page ? { page: was.page } : {}),
+    ...(was?.ask && !file.ask ? { ask: was.ask, edit: true, ...(was.create ? { create: true } : {}) } : {}),
+  };
+  return openSurface(target, fileTab({ ...file, ...keeps }));
 }
 
 /** Opens (or activates) a changed file's Diff tab in a panel; an open one takes the new scope. */

@@ -4,7 +4,6 @@ import type { FileReadView, FileWriteView } from "@/api/files";
 import { answerAlternate, answerConfirm, useConfirmStore } from "./confirm";
 import {
   canSaveFile,
-  confirmCloseFile,
   discardDraft,
   dropPanelDrafts,
   editClock,
@@ -15,7 +14,6 @@ import {
   noteEditor,
   noteRead,
   observeRead,
-  presentFileSave,
   reloadDraft,
   saveFile,
   startEdit,
@@ -23,6 +21,7 @@ import {
   unsavedTabs,
   useFileEditStore,
 } from "./fileEdit";
+import { confirmCloseFile, presentFileSave } from "./fileRequest";
 import { closePanelTab, openSurface, usePanelStore, type Tab } from "./panel";
 import { useUiStore } from "./ui";
 

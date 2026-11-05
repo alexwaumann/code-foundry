@@ -5,7 +5,8 @@
  * app's selection, or --thread), a ShowView with the item in its params, and --focus an
  * explicit FocusThread first. The mock checks only what it knows: the thread, a path in
  * its worktree for a diff, and a GitHub repository for a pull request. It does not read
- * files or diffs.
+ * files or diffs, and of view.panel.file --edit's refusals only --note without --edit, which
+ * are Go's to test; a path `exists` does not know is a new file.
  */
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { CommandError } from "./errors";
@@ -28,6 +29,13 @@ type Command = {
 };
 
 const lead = "in a thread's side panel (from a thread: its own; in the app: the selected one): ";
+
+let exists: (path: string) => boolean = () => true;
+
+/** What says whether a file is on the mock's disk (mock/server.ts owns it). */
+export function setFileExists(fn: (path: string) => boolean): void {
+  exists = fn;
+}
 
 /** The four item verbs over `lookup`, emitting through `emit`. */
 export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, emit: (i: UiIntentInit) => number): Command[] {
@@ -53,15 +61,22 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
         args: [
           { name: "path", type: ArgType.PATH, required: true, description: "File to show: absolute, ~/…, or relative to the current directory; under the home directory" },
           { name: "line", type: ArgType.INT, required: false, description: "1-based line to scroll to and mark" },
+          { name: "edit", type: ArgType.BOOL, required: false, description: "Ask the user to edit the file" },
+          { name: "note", type: ArgType.STRING, required: false, description: "With --edit: what to put where" },
           ...panelThreadArgs,
         ],
       },
       when,
       run: (ctx, args) =>
-        show(ctx, args, "panel.file", (t) => {
+        show(ctx, args, "panel.file", (t, id) => {
           const path = args.path ?? "";
           if (!path.startsWith("/")) throw new CommandError("invalid", `want an absolute path, got "${path}"`);
-          return { path, project: t.projectId, base: t.worktreePath, ...(args.line ? { line: args.line } : {}) };
+          if (args.note && args.edit !== "true") throw new CommandError("invalid", "only with --edit");
+          const asked =
+            args.edit === "true"
+              ? { edit: "1", thread: id, ...(args.note ? { note: args.note } : {}), ...(exists(path) ? {} : { create: "1" }), ...(args.focus === "true" ? { focus: "1" } : {}) }
+              : {};
+          return { path, project: t.projectId, base: t.worktreePath, ...(args.line ? { line: args.line } : {}), ...asked };
         }),
     },
     {

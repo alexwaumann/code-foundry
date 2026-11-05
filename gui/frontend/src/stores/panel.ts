@@ -289,6 +289,17 @@ export function retitleTab(e: PanelEntry, id: string, title: string): PanelEntry
   return withGroup(e, g, { ...grp, tabs: grp.tabs.map((t) => (t.id === id ? { ...t, title } : t)) });
 }
 
+/** Takes `names` out of a tab's params, wherever it is; an unknown id or nothing to drop changes nothing. */
+export function dropParams(e: PanelEntry, id: string, names: readonly string[]): PanelEntry {
+  const g = groupOf(e, id);
+  if (g === null) return e;
+  const grp = groupAt(e, g);
+  const old = grp.tabs.find((t) => t.id === id);
+  if (!old || !names.some((n) => n in old.params)) return e;
+  const params = Object.fromEntries(Object.entries(old.params).filter(([k]) => !names.includes(k)));
+  return withGroup(e, g, { ...grp, tabs: grp.tabs.map((t) => (t.id === id ? { ...t, params } : t)) });
+}
+
 /** Makes an existing tab active in its group (ending picking there), and focuses that group; an unknown id changes nothing. */
 export function activateTab(e: PanelEntry, id: string): PanelEntry {
   const g = groupOf(e, id);
@@ -691,6 +702,11 @@ export function closePanelTab(target: PanelTarget, id: string, opts: { keepOpen?
 /** Sets a tab's title in its strip (retitleTab). */
 export function retitlePanelTab(target: PanelTarget, id: string, title: string): void {
   update(target, (e) => retitleTab(e, id, title));
+}
+
+/** Takes `names` out of a tab's params (dropParams). */
+export function dropPanelTabParams(target: PanelTarget, id: string, names: readonly string[]): void {
+  update(target, (e) => dropParams(e, id, names));
 }
 
 /** Activates a tab in its group, which takes focus (activateTab). */

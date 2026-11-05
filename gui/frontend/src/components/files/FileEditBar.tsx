@@ -5,23 +5,28 @@ import { cn } from "@/lib/utils";
 import { useCommandsStore } from "@/stores/commands";
 import type { EditConflict } from "@/stores/fileEdit";
 
-/** Row two's state of an editing tab: "Unsaved" with an amber dot, or plain "Editing". */
-export function EditStatus({ dirty }: { dirty: boolean }) {
+/** Row two's state of an editing tab: "Unsaved" with an amber dot, or plain "Editing"; "New file" while no file is behind the document. */
+export function EditStatus({ dirty, creating }: { dirty: boolean; creating: boolean }) {
   return (
     <span className="flex shrink-0 items-center gap-1.5 text-caption-sm" data-testid="file-edit-status">
       {dirty && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-cf-warning" />}
-      {dirty ? "Unsaved" : "Editing"}
+      {creating ? "New file" : dirty ? "Unsaved" : "Editing"}
     </span>
   );
+}
+
+/** file.save's chord on a button, wherever the user put it. */
+export function SaveChord() {
+  const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "file.save")?.keybindings[0]);
+  return chord ? <span className="font-normal opacity-70">{formatChord(chord)}</span> : null;
 }
 
 /**
  * Row two's Discard and Save, both off while there is nothing to discard or save or a write
  * or reload is out. A file that went can be discarded clean too: there is nothing else
- * to do with the tab. The chord shown is file.save's, wherever the user put it.
+ * to do with the tab. Save shows the chord unless a thread's request has it (`chord` off).
  */
-export function EditButtons({ dirty, gone, busy, onDiscard, onSave }: { dirty: boolean; gone: boolean; busy: boolean; onDiscard: () => void; onSave: () => void }) {
-  const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "file.save")?.keybindings[0]);
+export function EditButtons({ dirty, gone, busy, chord, onDiscard, onSave }: { dirty: boolean; gone: boolean; busy: boolean; chord: boolean; onDiscard: () => void; onSave: () => void }) {
   return (
     <span className="flex shrink-0 items-center gap-1">
       <Button variant="ghost" size="xs" disabled={!(dirty || gone) || busy} onClick={onDiscard} data-testid="file-discard">
@@ -29,7 +34,7 @@ export function EditButtons({ dirty, gone, busy, onDiscard, onSave }: { dirty: b
       </Button>
       <Button size="xs" disabled={!dirty || busy} onClick={onSave} data-testid="file-save">
         Save
-        {chord && <span className="font-normal opacity-70">{formatChord(chord)}</span>}
+        {chord && <SaveChord />}
       </Button>
     </span>
   );

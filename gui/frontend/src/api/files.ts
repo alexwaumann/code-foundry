@@ -60,6 +60,11 @@ function decodeText(bytes: Uint8Array): { text: string; lossless: boolean } {
   }
 }
 
+/** What a tab edits where no file is yet: an empty text document at `path`, nothing on disk behind it. */
+export function blankFile(path: string): FileReadView {
+  return { path, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, text: "", lossless: true, image: null, pdf: null };
+}
+
 /** Whether a MIME type is an image the webview can show (`image/svg+xml` included). */
 export function isImageMime(mime: string): boolean {
   return mime.startsWith("image/");
@@ -128,17 +133,18 @@ export interface FileWriteView extends FileVersion {
 
 /**
  * Replaces a file's contents with `text`, as UTF-8, if it is still `version` (`force`
- * writes whatever is there, and makes a file that went). `path` as for readFile. A conflict
+ * writes whatever is there, and makes a file that went; `create` makes a file where none
+ * is, at 0600, and never replaces one that appeared). `path` as for readFile. A conflict
  * is an answer, not an error. A refusal is an error with a message fit to show:
  * FailedPrecondition (read-only, locked, an unwritable folder), ResourceExhausted (disk
  * full), PermissionDenied (macOS privacy), InvalidArgument (over 1 MiB, a config home
  * file). A daemon older than the RPC fails with OutdatedDaemonError.
  */
-export async function writeFile(baseDir: string, path: string, text: string, version: FileVersion, opts: { force?: boolean } = {}, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileWriteView> {
+export async function writeFile(baseDir: string, path: string, text: string, version: FileVersion, opts: { force?: boolean; create?: boolean } = {}, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileWriteView> {
   const c = await conn.client(FilesystemService);
   try {
     const r = await c.writeFile(
-      { baseDir, path, contents: encoder.encode(text), modifiedAt: BigInt(version.modifiedAtMs ?? 0), size: BigInt(version.size), force: opts.force ?? false },
+      { baseDir, path, contents: encoder.encode(text), modifiedAt: BigInt(version.modifiedAtMs ?? 0), size: BigInt(version.size), force: opts.force ?? false, create: opts.create ?? false },
       { signal },
     );
     return { path: r.resolvedPath, size: Number(r.size), modifiedAtMs: r.modifiedAt > 0n ? Number(r.modifiedAt) : null, conflict: r.conflict, notFound: r.notFound };
