@@ -62,7 +62,7 @@ export interface ThreadState {
   watches: Readonly<Record<string, ThreadWatchState>>;
   /**
    * Threads whose open Watch has delivered a snapshot: their log is current. A log kept from
-   * an earlier visit (KEPT_LOGS) shows at once but may be behind until then.
+   * an earlier visit (KEPT_LOG_BUDGET) shows at once but may be behind until then.
    */
   synced: Readonly<Record<string, true>>;
   /** Turns the user folded (true) or unfolded (false), by thread and turn key; absent: the default. */
@@ -317,18 +317,68 @@ export function useThreadSynced(threadId: string): boolean {
 export const WATCH_BATCH_MS = 16;
 
 /**
- * Logs kept for threads no longer watched, most recent first: switching back shows them at
- * once (the Watch's snapshot then replaces them). Older ones are dropped, so memory stays
- * bounded however many threads are opened (a log holds every item, tool output included).
+ * How much text (in characters, about a byte each) the logs may hold together: an open
+ * thread's counts, and logs of threads no longer watched fill the rest, most recent first.
+ * Older ones are dropped, so memory stays bounded by what the logs hold, not by how many
+ * there are (a thread can hold 50 KB or 50 MB; a Read's result holds a whole file). A kept
+ * log only shows at once while the Watch fetches: its snapshot then replaces it, so nothing
+ * here ever decides what is current (docs/notes/kept-logs-budget.md).
  */
-export const KEPT_LOGS = 4;
+export const KEPT_LOG_BUDGET = 64 * 1024 * 1024;
 let recentlyWatched: string[] = [];
+
+/** The characters of text in a value (an item's fields, a request's). */
+function textSize(v: unknown): number {
+  if (typeof v === "string") return v.length;
+  if (typeof v !== "object" || v === null) return 0;
+  return Object.values(v).reduce<number>((n, x) => n + textSize(x), 0);
+}
+
+/** A log no one updates keeps its identity, so each kept one is sized once. */
+const logSizes = new WeakMap<ThreadLog, number>();
+
+function logSize(log: ThreadLog): number {
+  let n = logSizes.get(log);
+  if (n === undefined) {
+    n = textSize(log.byId);
+    logSizes.set(log, n);
+  }
+  return n;
+}
+
+/**
+ * The threads of `recent` (most recent first) whose logs fall outside the budget: those
+ * past the point it runs out, except open ones, and the most recent closed one, which stays
+ * however large it is (going back to the thread just left is the commonest switch).
+ */
+export function logsOverBudget(recent: readonly string[], size: (id: string) => number, open: (id: string) => boolean, budget = KEPT_LOG_BUDGET): string[] {
+  let used = 0;
+  let closed = 0;
+  return recent.filter((id) => {
+    used += size(id);
+    if (open(id)) return false;
+    closed++;
+    return closed > 1 && used > budget;
+  });
+}
+
+/** Drops the logs outside the budget, and the ids of threads with no log. */
+function trimKeptLogs(): void {
+  const { logs } = useThreadStore.getState();
+  recentlyWatched = recentlyWatched.filter((id) => id in logs || openWatches.has(id));
+  const size = (id: string) => {
+    const log = logs[id];
+    return log ? logSize(log) : 0;
+  };
+  const drop = new Set(logsOverBudget(recentlyWatched, size, (id) => openWatches.has(id)));
+  if (drop.size === 0) return;
+  recentlyWatched = recentlyWatched.filter((id) => !drop.has(id));
+  pruneThreadLogs((id) => !drop.has(id));
+}
 
 function keepRecent(threadId: string): void {
   recentlyWatched = [threadId, ...recentlyWatched.filter((id) => id !== threadId)];
-  const drop = new Set(recentlyWatched.slice(KEPT_LOGS).filter((id) => !openWatches.has(id)));
-  recentlyWatched = recentlyWatched.filter((id) => !drop.has(id));
-  if (drop.size > 0) pruneThreadLogs((id) => !drop.has(id));
+  trimKeptLogs();
 }
 
 /** The open Watches by thread: how many views hold each (and how many of them are core), and how to end it. */
@@ -415,6 +465,8 @@ function openThreadWatch(threadId: string, priority: () => StreamPriority): () =
       const { [threadId]: _was, ...synced } = s.synced;
       return { watches, synced };
     });
+    // Its log is final now: this is where a thread that grew counts.
+    trimKeptLogs();
   };
 }
 
@@ -692,16 +744,25 @@ export function useSlashCommands(threadId: string): readonly SlashCommandView[] 
   return useThreadStore((s) => s.logs[threadId]?.commands ?? NO_COMMANDS);
 }
 
-/** The thread's pending requests: the Watch's when it has the thread, else the EventService's. */
+/**
+ * The thread's pending requests: the Watch's once it has synced, else the EventService's.
+ * A log kept from an earlier visit stopped following them when its Watch closed.
+ */
+function pendingOf(s: ThreadState, threadId: string): readonly ThreadPendingView[] {
+  const log = s.logs[threadId];
+  return (log && threadId in s.synced ? log.pending : s.pending[threadId]?.pending) ?? NO_PENDING;
+}
+
+/** The thread's pending requests (pendingOf). */
 export function useThreadPending(threadId: string): readonly ThreadPendingView[] {
-  return useThreadStore((s) => s.logs[threadId]?.pending ?? s.pending[threadId]?.pending ?? NO_PENDING);
+  return useThreadStore((s) => pendingOf(s, threadId));
 }
 
 /** The thread's pending requests without the ones being answered (their prompts left already). */
 export function useOpenRequests(threadId: string): readonly ThreadPendingView[] {
   return useThreadStore(
     useShallow((s) => {
-      const all = s.logs[threadId]?.pending ?? s.pending[threadId]?.pending ?? NO_PENDING;
+      const all = pendingOf(s, threadId);
       const answering = s.answering[threadId];
       return answering ? all.filter((p) => !answering[p.requestId]) : all;
     }),

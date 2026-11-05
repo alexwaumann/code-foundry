@@ -175,6 +175,7 @@ function world(state: "permission" | "question" | "multi" | "parallel" | "subage
 function publish(w: World): void {
   useThreadStore.setState((s) => ({
     logs: { ...s.logs, "s-r1": { seq: w.items.length, byId: Object.fromEntries(w.items.map((it) => [it.id, it])), order: w.items.map((it) => it.id), pending: w.pending, mcp: null, commands: [], agents: [] } },
+    synced: { ...s.synced, "s-r1": true },
   }));
 }
 
@@ -232,7 +233,7 @@ afterEach(() => {
   });
   cleanup();
   vi.restoreAllMocks();
-  useThreadStore.setState({ logs: {}, answering: {} });
+  useThreadStore.setState({ logs: {}, synced: {}, answering: {} });
 });
 
 const prompt = () => screen.getByTestId("thread-permission");
