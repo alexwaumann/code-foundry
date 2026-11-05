@@ -810,7 +810,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   after 5 s without other messages (`api.HeartbeatInterval`, mirrored by
   `api/stream.ts` `HEARTBEAT_MS`). WKWebView can hold a stream's last bytes after the
   window was hidden, minimized or covered until more bytes arrive; the heartbeat releases
-  them. `runStream` reconnects an attempt that heartbeated and then went silent for three
+  them. It also holds the end of a large message in a visible window, so `WatchThread`
+  sends two more heartbeats 10 ms and 100 ms after a snapshot, or a thread could take 5 s
+  to open (`docs/notes/thread-open-stall.md`). `runStream` reconnects an attempt that heartbeated and then went silent for three
   intervals, and the thread Watch (`resyncOnVisible`) reopens for a fresh snapshot when
   the page becomes visible again (`docs/notes/thread-render-stall.md`).
 * A thread's content pane is `components/thread`: a virtualized
