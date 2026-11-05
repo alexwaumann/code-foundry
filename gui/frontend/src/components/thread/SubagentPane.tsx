@@ -24,7 +24,7 @@ import { ThreadMarkdown } from "./Code";
 import { KeepRowContext, ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
 import { PaneOverlay } from "./InlineHtml";
-import { LiveTurnHead, TurnHead, WorkNodeView } from "./rows";
+import { TurnHead, WorkNodeView } from "./rows";
 import { SubagentComposer } from "./SubagentComposer";
 import { CRUMB_LINK, ThreadCrumb } from "./ThreadParts";
 import { TimelineList } from "./Timeline";
@@ -85,7 +85,7 @@ function RunTitle({ threadId, runId }: { threadId: string; runId: string }) {
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1" data-testid="thread-title-bar">
       <ThreadCrumb id={threadId} run={crumb} />
-      <span className="flex h-6 min-w-12 shrink-[100] items-center gap-1.5 px-1.5 text-label font-medium text-cf-text" data-testid="subagent-title">
+      <span className="flex h-6 min-w-12 shrink items-center gap-1.5 px-1.5 text-label font-medium text-cf-text" data-testid="subagent-title">
         <Bot className="size-3.5 shrink-0 text-cf-info-text" aria-hidden />
         <Tip label={name} whenTruncated>
           <span className="min-w-0 truncate" data-testid="subagent-name">
@@ -155,9 +155,9 @@ function HeadRow({ threadId, run, folded, foldable }: { threadId: string; run: A
   const running = run.status === "running";
   const now = useNow(running ? 1000 : 60_000);
   const parts = headerParts(run, model, now);
-  if (running) return <LiveTurnHead parts={parts} status={run.status} />;
   return (
     <TurnHead
+      live={running}
       parts={parts}
       red={run.status === "failed"}
       folded={folded}
@@ -184,9 +184,9 @@ function ReportRow({ run }: { run: AgentRunView }) {
 /** Why a failed run failed, in its own words. */
 function ErrorRow({ run }: { run: AgentRunView }) {
   return (
-    <p className="selectable text-body break-words whitespace-pre-wrap text-cf-error-text" role="alert" data-testid="subagent-error">
+    <div className="a-md selectable break-words whitespace-pre-wrap text-cf-error-text" role="alert" data-testid="subagent-error">
       {run.error}
-    </p>
+    </div>
   );
 }
 

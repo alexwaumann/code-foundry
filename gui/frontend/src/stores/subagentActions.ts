@@ -1,8 +1,8 @@
 /**
  * The read-only subagent view's commands (internal/command/commands_agents_view.go), as
  * this window starts them: thread.agent.open from the entry points (the Agent rows' Open,
- * the strip's run names, the thread info card's agent rows), thread.agent.up from the view's back
- * buttons. Escape reaches thread.agent.up through the registry's keybinding.
+ * the strip's run names, the thread info card's agent rows), thread.agent.up from the view's way
+ * back. Escape reaches thread.agent.up through the registry's keybinding.
  */
 import { isStartable, startCommandNamed } from "@/keys/bindings";
 import { runCommand, useCommandsStore } from "./commands";

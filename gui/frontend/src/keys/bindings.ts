@@ -25,7 +25,7 @@ import { cancelSetup } from "@/stores/setupActions";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { getViewing, leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
-import { toggleThreadInfo } from "@/stores/threadInfoOverlay";
+import { toggleThreadInfo, useCardRoom } from "@/stores/threadInfoOverlay";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -511,6 +511,8 @@ const quietCommands: ReadonlySet<string> = new Set(["terminal.new", "thread.inte
  */
 export function chordFires(chord: string, target: Element | null): boolean {
   if (/^(cmd|ctrl|alt)\+/.test(chord)) return true;
+  // The floating card takes Escape first (ThreadInfoOverlay): it closes, and a subagent's view stays.
+  if (chord === "escape" && useCardRoom.getState().overlayFor !== null) return false;
   return Boolean(target?.closest('[data-region="content"]')) && !target?.closest("[data-keys-local]");
 }
 

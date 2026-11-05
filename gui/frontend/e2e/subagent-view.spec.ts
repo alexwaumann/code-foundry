@@ -2,13 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
 
 /**
- * The read-only subagent view (docs/notes/subagent-view.md) over the mock's scripted thread
+ * The subagent view, drawn as a thread (docs/notes/subagent-as-thread.md), over the mock's scripted thread
  * s-r1 "Agents panel" in its "agents" state (mock/agents.ts): the done foreground Explore
  * a0 (its work and report), the running background "PR 1" a1 (a work log with a nested
  * Agent call a1b, a running test and a streaming reply), the running "PR 2" a2 and the
  * failed a3 (a short log and its error, with its "Agent failed" note). The view opens from
  * the Agent rows' Open, the notes' Open, the strip's names, the thread info card's agent rows and the
- * CLI (thread.agent.open); Escape, the back buttons, the crumb and the CLI
+ * CLI (thread.agent.open); Escape, the composer's Back, the crumb and the CLI
  * (thread.agent.up) go back up.
  */
 
@@ -90,18 +90,68 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-// The run's view (header, crumb, Read-only, live status, lineage, prompt, its own rows, the
-// nested run not openable, footer, plate, no composer or strip): unit-tested in
-// src/components/thread/SubagentPane.test.tsx and agentOpen.test.tsx. Left here: the parent's
-// Agent row's hover-only Open, through thread.agent.open to the view.
+// The run's view (header, crumb, lineage, prompt, turn header and fold, its own rows, the nested
+// run not openable, the composer card's words and chips, what is left out of it and its card):
+// unit-tested in src/components/thread/SubagentPane.test.tsx, RunInfoCard.test.tsx and
+// agentOpen.test.tsx. Left here: the parent's Agent row's hover-only Open, through
+// thread.agent.open to the view, and what needs a browser's layout and keyboard below.
 test("Open › on a running Agent row (shown on hover) opens the run read-only", async ({ page }) => {
   await openThread(page);
   await unfoldTurn(page);
   await openFromRow(page, "PR 1: daemon task frames");
   await expectViewing(page, "a1", "PR 1: daemon task frames");
   expect((await invocations()).filter((i) => i.name === "thread.agent.open").map((i) => i.args)).toEqual([{ id: "s-r1", run: "a1" }]);
-  await expect(page.getByTestId("subagent-readonly")).toHaveText("Read-only");
+  await expect(page.getByTestId("subagent-composer")).toBeVisible();
   await expect(page.getByTestId("thread-composer")).toHaveCount(0);
+});
+
+test("nothing jumps between a thread and its subagent: the composer card and the card keep their place", async ({ page }) => {
+  await openThread(page);
+  await page.getByTestId("thread-info-toggle").click();
+  await expect(page.getByTestId("thread-info")).toBeVisible();
+  await unfoldTurn(page);
+  const composer = await page.getByTestId("thread-composer").boundingBox();
+  const card = await page.getByTestId("thread-info-card").boundingBox();
+  await openFromRow(page, "PR 1: daemon task frames");
+  await expect(page.getByTestId("thread-info-card")).toHaveAttribute("data-read-only", "");
+  expect(await page.getByTestId("subagent-composer").boundingBox()).toEqual(composer);
+  expect((await page.getByTestId("thread-info-card").boundingBox())?.x).toBe(card?.x);
+  // The same toggle and state: off here is off on the thread.
+  await page.getByTestId("thread-info-toggle").click();
+  await expect(page.getByTestId("thread-info")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expectParent(page);
+  await expect(page.getByTestId("thread-info")).toHaveCount(0);
+});
+
+test("a finished run's chevron keeps its place on screen as its work opens", async ({ page }) => {
+  await openThread(page);
+  await unfoldTurn(page);
+  await openFromRow(page, "Find the header chip pattern");
+  const header = page.getByTestId("thread-turn-header");
+  await expect(header).toHaveAttribute("data-folded", "true");
+  const before = await header.boundingBox();
+  await header.locator("button.fold").click();
+  await expect(header).not.toHaveAttribute("data-folded", "true");
+  await expect(page.getByTestId("thread-group")).toBeVisible();
+  expect((await header.boundingBox())?.y).toBe(before?.y);
+});
+
+test("on a narrow pane the toggle floats the card, and Escape closes it before it goes up", async ({ page }) => {
+  await page.setViewportSize({ width: 980, height: 800 });
+  await openThread(page);
+  await unfoldTurn(page);
+  await openFromRow(page, "PR 1: daemon task frames");
+  await expect(page.getByTestId("thread-info")).toHaveCount(0);
+  await page.getByTestId("thread-info-toggle").click();
+  const overlay = page.getByTestId("thread-info-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay.getByTestId("thread-info-card")).toHaveAttribute("data-read-only", "");
+  await page.keyboard.press("Escape");
+  await expect(overlay).toHaveCount(0);
+  await expect(view(page)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expectParent(page);
 });
 
 test("Escape goes back to the parent, the thread still selected, its one Watch kept and no reload", async ({ page }) => {
@@ -145,7 +195,7 @@ test("Escape goes back to the parent, the thread still selected, its one Watch k
   expect(watches()).toBe(before);
 });
 
-// The back buttons and the crumb going up: unit-tested in src/components/thread/SubagentPane.test.tsx
+// The composer's Back, the crumb and the note's name going up: unit-tested in src/components/thread/SubagentPane.test.tsx
 
 // A strip name opening its run (agentOpen.test.tsx), the card's agent rows opening theirs, the
 // finished under Previous agents (src/components/threadinfo/LineageAgents.test.tsx), and the done
@@ -154,7 +204,7 @@ test("Escape goes back to the parent, the thread still selected, its one Watch k
 // The run ending while viewed (done in place, its report, no handback row): unit-tested in
 // src/components/thread/SubagentPane.test.tsx and src/lib/subagentView.test.ts.
 
-// The failed run's view (its Bash rows, the error, the plate) and another run failing while
+// The failed run's view (its Bash rows, the error, the composer's words) and another run failing while
 // viewed: unit-tested in src/components/thread/SubagentPane.test.tsx. Left here: the note's Open,
 // shown on hover only.
 test("the failed run's note has an Open on hover that opens the run", async ({ page }) => {
@@ -165,7 +215,7 @@ test("the failed run's note has an Open on hover that opens the run", async ({ p
   await note.hover();
   await open.click();
   await expectViewing(page, "a3", "Screenshot the panel in Wails");
-  await expect(page.getByTestId("subagent-status")).toHaveAttribute("data-status", "failed");
+  await expect(page.getByTestId("thread-turn-header")).toHaveAttribute("data-status", "failed");
 });
 
 // Selecting another thread drops the view: unit-tested in src/stores/subagentView.test.ts

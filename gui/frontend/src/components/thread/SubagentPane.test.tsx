@@ -35,6 +35,7 @@ const { historyComposer, presentPromptHistory } = await import("@/stores/history
 const { threadDraftKey } = await import("@/lib/threadDraft");
 const { useCommandsStore } = await import("@/stores/commands");
 const { getViewing, showAgentRun, useSubagentViewStore } = await import("@/stores/subagentView");
+const { useCardRoom } = await import("@/stores/threadInfoOverlay");
 const { useThreadStore } = await import("@/stores/thread");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
@@ -282,6 +283,25 @@ describe("SubagentPane", () => {
       unmount();
     }
     expect(useUiStore.getState().promptFocusSeq).toBe(3);
+  });
+
+  it("Escape closes the floating card first, and only then goes up", () => {
+    const stop = installKeybindings(window);
+    try {
+      show();
+      act(() => {
+        useCardRoom.setState({ room: false, overlayFor: "s1" });
+      });
+      fireEvent.keyDown(tid("subagent-pane"), { key: "Escape", code: "Escape" });
+      expect(getViewing()).not.toBeNull();
+      act(() => {
+        useCardRoom.setState({ room: true, overlayFor: null });
+      });
+      fireEvent.keyDown(tid("subagent-pane"), { key: "Escape", code: "Escape" });
+      expect(getViewing()).toBeNull();
+    } finally {
+      stop();
+    }
   });
 
   it("the crumb takes no move: a no-project thread's place is plain text here", () => {
