@@ -3,7 +3,7 @@ import { Toaster, toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { card } from "@/test/cardFakes";
 import { invocationsOf, resetDaemon } from "@/test/daemonFakes";
-import { pullRequest, texts } from "@/test/projectsWorld";
+import { HOME, pullRequest, texts } from "@/test/projectsWorld";
 import { activePanelTab, bucket, mcpServer, resetCard, seedChild, seedNoGit, seedServers, seedSingle, seedWs9, setLog, TREE, updateThread } from "@/test/threadInfoWorld";
 import { tooltipText } from "@/test/tooltip";
 import type { DashboardView } from "@/api/gh";
@@ -372,6 +372,17 @@ describe("ThreadInfoCard: other scenarios", () => {
       await renderCard(id);
       await waitFor(() => {
         expect(screen.getByTestId("ti-pr-title").textContent).toBe("Include the head SHA");
+      });
+      expect(screen.queryByTestId("ti-branch")).toBeNull();
+    });
+
+    it("a thread with no project keeps a child's pull request, named by its repository", async () => {
+      const id = seedNoGit();
+      updateThread(id, { projectId: "", projectIds: [], worktreePath: HOME, linkedPullRequests: [linkTo(78)] });
+      card.prDetails.set(`${SLUG}#78`, pullRequest({ repoSlug: SLUG, number: 78, title: "Include the head SHA" }));
+      await renderCard(id);
+      await waitFor(() => {
+        expect(screen.getByTestId("ti-pr-project").textContent).toBe(SLUG);
       });
       expect(screen.queryByTestId("ti-branch")).toBeNull();
     });
