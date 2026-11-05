@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FileReadView, FileWriteView } from "@/api/files";
+import { versionStamp, type FileReadView, type FileWriteView } from "@/api/files";
 import type { ThreadView } from "@/api/threads";
 import { fileTab } from "@/surfaces/fileTarget";
 import { answerAlternate, answerConfirm, useConfirmStore } from "./confirm";
-import { fileEditKey, noteDraft, noteEditor, observeRead, saveFile, startEdit, useFileEditStore } from "./fileEdit";
+import { discardDraft, editorDetached, fileEditKey, noteDraft, noteEditor, observeRead, reloadDraft, saveFile, startEdit, useFileEditStore } from "./fileEdit";
 import { openFileInPanel } from "./filePanel";
 import { canTell, confirmCloseFile, dismissAsk, fileFacts, presentFileSave, saveAndTell, savedMessage } from "./fileRequest";
 import { allTabs, getPanel, keyOf, usePanelStore, type Tab } from "./panel";
@@ -141,6 +141,17 @@ describe("Save and tell", () => {
     expect(tab().params.asker).toBeUndefined();
   });
 
+  it("a removed thread's name reaches the band cleaned and cut", async () => {
+    await asked(SECRET);
+    api.write.mockResolvedValue(written());
+    api.send.mockResolvedValue({ message: `thread Sess\u202eion${"x".repeat(400)} (s-1) was removed\nno report`, resultJson: "", exitCode: 1 });
+    await saveAndTell(KEY);
+    const failure = edit()?.failure ?? "";
+    expect(failure).toContain("thread Session");
+    expect(failure).not.toContain("\u202e");
+    expect(failure.length).toBeLessThan(280);
+  });
+
   it("a thread that is gone is said too, by what is left of it", async () => {
     await asked(SECRET);
     useThreadsStore.setState({ byId: {}, order: [] });
@@ -183,7 +194,83 @@ describe("Save and tell", () => {
     expect(tab().params.askSaved).toBeUndefined();
     api.write.mockResolvedValue(written());
     await saveFile(KEY, { force: true });
-    expect(tab().params.askSaved).toBe("1");
+    expect(tab().params.askSaved).toBe(`${String(SECRET.length)}:200`);
+    await expect(saveAndTell(KEY)).resolves.toBe("saved");
+  });
+
+  describe("'saved' means what is on disk is our write, since this request", () => {
+    const told = () => calls.filter((c) => c.startsWith("send"));
+
+    /** Row two's Save landed, and the request stands. */
+    async function savedByRowTwo(): Promise<void> {
+      await asked(SECRET);
+      api.write.mockResolvedValue(written());
+      await saveFile(KEY);
+      expect(tab().params.askSaved).toBeTruthy();
+      calls.length = 0;
+    }
+
+    it("saved, the file deleted, a reload: New file has nothing to tell", async () => {
+      await savedByRowTwo();
+      useFileEditStore.setState({ sessions: {} });
+      await startEdit(KEY, { panelKey: PANEL, tabId, base: "/w" }, missing(), { create: true });
+      const s = edit();
+      expect(s?.creating).toBe(true);
+      if (s) lib.drafts.set(s.stateKey, "");
+      noteEditor(KEY, { focus: vi.fn(), caret: () => null });
+      presentFileSave();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(calls).toEqual([]);
+    });
+
+    it("even a stamp that matched a blank document tells nothing", async () => {
+      await asked(null, missing());
+      const s = edit();
+      if (!s?.view) throw new Error("no view");
+      expect(canTell(s, { ...ASK, saved: versionStamp(s.view) })).toBe(false);
+    });
+
+    it("saved, more typed, an outside write, Reload: the disk holds theirs", async () => {
+      await savedByRowTwo();
+      const s = edit();
+      if (s) lib.drafts.set(s.stateKey, "more\n");
+      noteDraft(KEY, "more\n");
+      observeRead(KEY, view({ text: "THEIRS=1\n", size: 9, modifiedAtMs: 300 }));
+      expect(edit()?.conflict).toBe("changed");
+      api.read.mockResolvedValue(view({ text: "THEIRS=1\n", size: 9, modifiedAtMs: 300 }));
+      await reloadDraft(KEY);
+      expect(edit()).toMatchObject({ dirty: false, conflict: null });
+      await expect(saveAndTell(KEY)).resolves.toBe("skipped");
+      expect(told()).toEqual([]);
+    });
+
+    it("saved, an outside write a clean document follows, cmd+S: nothing to tell", async () => {
+      await savedByRowTwo();
+      observeRead(KEY, view({ text: "THEIRS=1\n", size: 9, modifiedAtMs: 300 }));
+      expect(edit()?.seed).toBe("THEIRS=1\n");
+      presentFileSave();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(told()).toEqual([]);
+    });
+
+    it("saved, the tab left and came back to the same version: it can still tell", async () => {
+      await savedByRowTwo();
+      const before = edit();
+      if (before) editorDetached(KEY, before.stateKey);
+      expect(edit()?.view).toBeNull();
+      observeRead(KEY, view({ text: SECRET, size: SECRET.length, modifiedAtMs: 200 }));
+      await expect(saveAndTell(KEY)).resolves.toBe("saved");
+      expect(told()).toHaveLength(1);
+    });
+
+    it("saved, more typed, Discard: the disk is still our write", async () => {
+      await savedByRowTwo();
+      const s = edit();
+      if (s) lib.drafts.set(s.stateKey, "more\n");
+      noteDraft(KEY, "more\n");
+      await discardDraft(KEY);
+      await expect(saveAndTell(KEY)).resolves.toBe("saved");
+    });
   });
 
   it("a write that failed did not land: nothing to tell", async () => {

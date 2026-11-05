@@ -27,6 +27,7 @@ export const filesSurface: SurfaceSpec = {
   watches: [...NO_PROJECT_WATCHES, usePanelStore],
   beforeClose: confirmCloseFile,
   useUnsaved: (panelKey, tab) => useFileDirty(fileEditKey(panelKey, tab.id)),
+  waiting: (tab) => (fileOfTab(tab)?.ask ? "A thread asked you to edit this file" : null),
   render: (tab) => {
     const target = fileOfTab(tab);
     return target ? createElement(FileTab, { target }) : null;

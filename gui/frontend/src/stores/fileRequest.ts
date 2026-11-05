@@ -13,14 +13,14 @@
  * true: with no write since the request and nothing to write, there is nothing to tell, and
  * cmd+S does nothing, as anywhere.
  */
-import type { FileReadView } from "@/api/files";
+import { versionStamp } from "@/api/files";
 import { errorMessage } from "@/api/stream";
 import { fileName, relativeTo } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
-import { plainName } from "@/lib/plainText";
+import { plainLine, plainName, plainPath } from "@/lib/plainText";
 import { ASK_PARAMS, fileOfTab, type FileAsk } from "@/surfaces/fileTarget";
 import { requestChoice } from "./confirm";
-import { fileEditKey, fileEditOf, focusEditor, focusedEdit, noteEditFailure, returnFromPalette, saveFile, type FileEdit, type SaveOutcome } from "./fileEdit";
+import { fileEditKey, fileEditOf, focusEditor, focusedEdit, noteEditFailure, returnFromPalette, saveFile, type FileEdit, type FileWhere, type SaveOutcome } from "./fileEdit";
 import { activatePanelTab, allTabs, dropPanelTabParams, getPanel, type Tab } from "./panel";
 import { deliverThreadPrompt } from "./threadInfo";
 import { useThreadsStore } from "./threads";
@@ -36,11 +36,14 @@ function askOf(s: FileEdit | undefined): FileAsk | null {
 }
 
 /**
- * Whether Save and tell can run now: something to write, or a write that landed since the
- * request (row two's Save, Overwrite), which only needs telling. A conflict is settled first.
+ * Whether Save and tell can run now: something to write, or what is on disk being a write of
+ * ours since the request (row two's Save, Overwrite), which only needs telling. The version
+ * is compared, so a document that started over on anyone else's, a file that went and one
+ * that came back all count for nothing. A conflict is settled first.
  */
 export function canTell(s: FileEdit, ask: FileAsk): boolean {
-  return s.view !== null && !s.busy && s.conflict === null && (s.dirty || ask.saved === true);
+  if (s.view === null || s.busy || s.conflict !== null) return false;
+  return s.dirty || (!s.creating && ask.saved === versionStamp(s.view));
 }
 
 /** What the thread is told: the path as the user sees it, nothing from the file, and not to go and read it. */
@@ -56,11 +59,15 @@ export function askerLabel(name: string | undefined, unnamed = "A thread"): stri
 
 /**
  * What the user should know about where this file really is, as facts: where a save lands
- * when a link leads elsewhere, and who else can read it. Neither is a refusal.
+ * when a link leads elsewhere, and who else can read it. Neither is a refusal. A link's target
+ * is anyone's text: it is cleaned and cut like a note, and said to be if cleaning changed it.
  */
-export function fileFacts(file: FileReadView): string[] {
+export function fileFacts(file: FileWhere): string[] {
   const facts: string[] = [];
-  if (file.realPath && file.realPath !== file.path) facts.push(`This path is a link: the file is really ${tildify(file.realPath)}.`);
+  if (file.realPath && file.realPath !== file.path) {
+    const real = tildify(file.realPath);
+    facts.push(`This path is a link: the file is really ${plainPath(real)}${plainLine(real) === real ? "" : " (its name has characters not shown here)"}.`);
+  }
   const group = (file.mode & 0o040) !== 0;
   const others = (file.mode & 0o004) !== 0;
   if (group || others) facts.push(`${group && others ? "Group and others" : group ? "Group" : "Others"} can read this file (${file.mode.toString(8).padStart(4, "0")}).`);
@@ -86,9 +93,12 @@ export async function saveAndTell(key: string): Promise<TellOutcome> {
   finish(s, ask);
   const why = await tell(ask.thread, savedMessage(s.path, project, s.base));
   if (why === null) return "saved";
-  noteEditFailure(key, `Saved, but ${askerLabel(useThreadsStore.getState().byId[ask.thread]?.name, "the thread")} was not told: ${why}`);
+  noteEditFailure(key, `Saved, but ${askerLabel(useThreadsStore.getState().byId[ask.thread]?.name, "the thread")} was not told: ${plainName(why, MAX_WHY)}`);
   return "untold";
 }
+
+/** The most of a failure the band says: a removed thread's answer holds its name. */
+const MAX_WHY = 200;
 
 /** Sends the message: null when it went, else why not. */
 async function tell(thread: string, text: string): Promise<string | null> {

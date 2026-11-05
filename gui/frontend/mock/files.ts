@@ -8,6 +8,7 @@
  *
  *   POST /__mock/fs/write?path=…&text=…   (a file's new contents on disk; reset restores the fixtures)
  *   POST /__mock/fs/remove?path=…         (the file goes)
+ *   POST /__mock/fs/link?path=…&real=…    (ReadFile says a link leads from the path to real; reset forgets it)
  *   POST /__mock/fs/refuse?code=…&message=…   (the next WriteFile fails with that Connect code name)
  *   GET  /__mock/fs/text?path=…           ({ text }: a file's contents on disk, null when absent)
  *   GET  /__mock/fs/calls                 ("read <path>", "write <path> [force] [create]", "diff <worktree> <file> <scope>")
@@ -309,6 +310,7 @@ export class MockFiles {
   constructor(private readonly detailOf: (path: string) => DetailFiles | undefined) {}
 
   reset(): void {
+    this.links.clear();
     this.disk = fixtures();
     this.refusal = null;
     this.calls.length = 0;
@@ -317,6 +319,16 @@ export class MockFiles {
   /** The file goes, as `rm` would. */
   remove(path: string): void {
     this.disk.delete(path);
+  }
+
+  /** Where a path's link leads, for ReadFile's real_path; POST /__mock/fs/link. */
+  readonly links = new Map<string, string>();
+
+  /** ReadFile's answer with where its file really is: a link if one was set, and 0644 behind one. */
+  readWithLink(baseDir: string, path: string, maxBytes: bigint): ReadInit {
+    const r = this.readFile(baseDir, path, maxBytes);
+    const real = this.links.get(r.resolvedPath ?? "");
+    return real === undefined ? r : { ...r, realPath: real, mode: 0o644 };
   }
 
   /** The next WriteFile fails with this code ("failed_precondition") and message. */

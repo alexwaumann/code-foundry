@@ -127,6 +127,11 @@ export interface FileVersion {
   modifiedAtMs: number | null;
 }
 
+/** One version of a file as a string, for telling it from another. */
+export function versionStamp(v: FileVersion): string {
+  return `${String(v.size)}:${String(v.modifiedAtMs)}`;
+}
+
 /** FilesystemService.WriteFile's answer. A conflict wrote nothing. */
 export interface FileWriteView extends FileVersion {
   /** Absolute, cleaned path as asked for (before following symlinks). */

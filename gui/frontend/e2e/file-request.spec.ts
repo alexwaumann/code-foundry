@@ -80,6 +80,19 @@ test("a note cannot take the band over: the buttons and the editor stay on scree
   expect((await band(page).boundingBox())?.height).toBeLessThan(220);
 });
 
+test("a link's target cannot take the band over either, nor a note push it out of sight", async ({ page }) => {
+  const env = `${CF}/.env`;
+  await writeDisk(env, "A=1\n");
+  await mockPost(`fs/link?path=${encodeURIComponent(env)}&real=${encodeURIComponent(`/Users/dev/${"d/".repeat(480)}\u202edrop.txt`)}`);
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await inThread(page);
+  await fromThread("view.panel.file", { path: env, edit: "true", note: "Paste your token here. ".repeat(21) });
+  await expect(editor(page)).toBeVisible();
+  await expect(page.getByTestId("file-request-tell")).toBeInViewport();
+  await expect(page.getByTestId("file-request-fact").first()).toBeInViewport();
+  expect((await band(page).boundingBox())?.height).toBeLessThan(220);
+});
+
 test("a request for another file leaves the document under the user's fingers", async ({ page }) => {
   const a = `${CF}/a.env`;
   const b = `${CF}/b.env`;

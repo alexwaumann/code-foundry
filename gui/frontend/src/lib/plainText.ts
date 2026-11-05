@@ -12,6 +12,13 @@ export function plainLine(s: string): string {
     .trim();
 }
 
+/** plainLine, with its middle cut out past `max` characters: the end of a path is what tells it. */
+export function plainPath(s: string, max = 72): string {
+  const chars = Array.from(plainLine(s));
+  const head = 16;
+  return chars.length > max ? `${chars.slice(0, head).join("")}…${chars.slice(head + 1 - max).join("")}` : chars.join("");
+}
+
 /** plainLine, cut to `max` characters. */
 export function plainName(s: string, max = 48): string {
   const chars = Array.from(plainLine(s));

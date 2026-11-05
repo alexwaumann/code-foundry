@@ -38,8 +38,11 @@ export interface FileAsk {
   id: string;
   thread: string;
   note: string;
-  /** A write landed since this request: only then can the thread be told it was saved. */
-  saved?: boolean;
+  /**
+   * The version (versionStamp, api/files.ts) a write of ours left on disk since this request.
+   * The thread can be told it was saved only while that is still the version on disk.
+   */
+  saved?: string;
 }
 
 /** The params a File tab's request lives in: dropping them finishes it, for good. */
@@ -63,7 +66,7 @@ export function fileTab(t: FileTarget): Tab {
     params.askId = t.ask.id;
     params.asker = t.ask.thread;
     if (t.ask.note) params.note = t.ask.note;
-    if (t.ask.saved) params.askSaved = "1";
+    if (t.ask.saved) params.askSaved = t.ask.saved;
   }
   return { id: tabId(FILE_KIND, { path }), kind: FILE_KIND, title: t.page?.title || fileName(path) || path, params };
 }
@@ -80,7 +83,7 @@ export function fileOfTab(tab: Pick<Tab, "params">): FileTarget | null {
     ...(Number.isInteger(line) && line > 0 ? { line } : {}),
     ...(tab.params.page === "1" ? { page: { title: tab.params.title ?? "" } } : {}),
     ...(tab.params.edit === "1" ? { edit: true } : {}),
-    ...(tab.params.asker ? { ask: { id: tab.params.askId ?? "", thread: tab.params.asker, note: tab.params.note ?? "", ...(tab.params.askSaved === "1" ? { saved: true } : {}) } } : {}),
+    ...(tab.params.asker ? { ask: { id: tab.params.askId ?? "", thread: tab.params.asker, note: tab.params.note ?? "", ...(tab.params.askSaved ? { saved: tab.params.askSaved } : {}) } } : {}),
   };
 }
 

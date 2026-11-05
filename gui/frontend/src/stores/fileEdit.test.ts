@@ -802,6 +802,27 @@ describe("Save File from the palette", () => {
   });
 });
 
+describe("where the file is", () => {
+  it("every read refreshes it, and neither the baseline nor a conflict moves", async () => {
+    await editing("mine\n", view({ mode: 0o600, realPath: "/w/.env" }));
+    const before = edit()?.view;
+    observeRead(KEY, view({ text: "a=1\n", mode: 0o644, realPath: "/w/other" }));
+    expect(edit()?.where).toEqual({ path: "/w/.env", mode: 0o644, realPath: "/w/other" });
+    expect(edit()?.view).toBe(before);
+    observeRead(KEY, view({ size: 9, modifiedAtMs: 300, mode: 0o600, realPath: "/w/.env" }));
+    expect(edit()).toMatchObject({ conflict: "changed", where: { mode: 0o600 } });
+    expect(edit()?.view).toBe(before);
+  });
+
+  it("a read of the session's own view is no news, and a file that went keeps what was known", async () => {
+    await editing(null, view({ mode: 0o644, realPath: "/w/other" }));
+    const s = edit();
+    if (!s?.view) throw new Error("no view");
+    observeRead(KEY, { ...gone(), realPath: "", mode: 0 });
+    expect(edit()?.where.mode).toBe(0o644);
+  });
+});
+
 describe("the keyboard", () => {
   /** The editor's DOM with the keyboard in its shadow root's find field. */
   function inFind(): HTMLElement {

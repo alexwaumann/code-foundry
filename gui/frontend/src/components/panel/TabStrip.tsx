@@ -55,6 +55,7 @@ function TabButton({
 }) {
   const surface = surfaceOf(tab.kind);
   const Icon = surface?.icon;
+  const waiting = active ? null : (surface?.waiting?.(tab) ?? null);
   const data = useMemo(() => ({ kind: "tab", group }), [group]);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id, data });
   return (
@@ -96,6 +97,7 @@ function TabButton({
         {Icon && <Icon className="size-3.5 shrink-0" aria-hidden />}
         <span className="truncate">{tab.title}</span>
         {surface?.useUnsaved && <UnsavedDot useUnsaved={surface.useUnsaved} panelKey={panelKey} tab={tab} />}
+        {waiting && <span role="img" aria-label={waiting} className="size-1.5 shrink-0 rounded-full bg-cf-accent" data-testid="tab-waiting" />}
       </button>
       <Tip label="Close tab">
         <button

@@ -440,6 +440,33 @@ describe("appearance.panel_keep_open", () => {
 
 // From e2e/panel.spec.ts: closing tabs, the strip's keyboard and the + (what is left there is
 // computed CSS, native button keys and real focus).
+describe("a tab a thread is waiting on", () => {
+  const tab = fileTab({ project: "", base: "/w", path: "/w/.env", edit: true, ask: { id: "a1", thread: "s-1", note: "" } });
+  const other = fileTab({ project: "", base: "/w", path: "/w/other.env" });
+
+  beforeEach(() => {
+    vi.spyOn(filesSurface, "render").mockReturnValue(null);
+  });
+
+  it("is marked in the strip while it is not showing, and not once it is", () => {
+    openSurface(KEY, other);
+    openSurface(KEY, tab, { behind: true });
+    render(<SidePanel />);
+    expect(screen.getByTestId("tab-waiting").getAttribute("aria-label")).toBe("A thread asked you to edit this file");
+    act(() => {
+      activatePanelTab(KEY, tab.id);
+    });
+    expect(screen.queryByTestId("tab-waiting")).toBeNull();
+  });
+
+  it("a tab no one is waiting on has no mark", () => {
+    openSurface(KEY, other);
+    openSurface(KEY, fileTab({ project: "", base: "/w", path: "/w/third.env" }));
+    render(<SidePanel />);
+    expect(screen.queryByTestId("tab-waiting")).toBeNull();
+  });
+});
+
 describe("a tab with unsaved edits", () => {
   const tab = fileTab({ project: "", base: "/w", path: "/w/.env" });
   const editKey = fileEditKey(KEY, tab.id);

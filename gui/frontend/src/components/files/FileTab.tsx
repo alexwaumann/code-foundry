@@ -251,11 +251,11 @@ export function FileTab({ target }: { target: FileTarget }) {
           />
         )}
       </FileHeader>
-      {ask && editing && file && (
+      {ask && editing && (
         <FileRequestBand
           ask={ask}
           canTell={canTell(session, ask)}
-          facts={fileFacts(file)}
+          facts={fileFacts(session.where)}
           onTell={() => {
             void saveAndTell(editKey).then(backToEditor);
           }}

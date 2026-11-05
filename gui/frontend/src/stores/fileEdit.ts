@@ -13,7 +13,7 @@
  * and raises a conflict instead; a clean one starts over on the new version.
  */
 import { create } from "zustand";
-import { blankFile, canEdit, readFile, writeFile, type FileReadView } from "@/api/files";
+import { blankFile, canEdit, readFile, versionStamp, writeFile, type FileReadView } from "@/api/files";
 import { errorMessage } from "@/api/stream";
 import { draftText, forgetDraft, loadCodeEditor, type EditorHandle, type EditorPlace } from "@/lib/codeEditor";
 import { deepActiveElement } from "@/lib/keyTarget";
@@ -23,6 +23,9 @@ import { useUiStore } from "./ui";
 /** What is wrong with the draft's baseline: the file was changed, or is gone. */
 export type EditConflict = "changed" | "deleted";
 
+/** Where a file really is and who can read it. */
+export type FileWhere = Pick<FileReadView, "path" | "realPath" | "mode">;
+
 export interface FileEdit {
   panelKey: string;
   tabId: string;
@@ -30,6 +33,8 @@ export interface FileEdit {
   base: string;
   /** The resolved path it started on, for good: every read and write of the session is of this file. */
   path: string;
+  /** What the latest read says of the file's place, kept apart from `view`: a chmod or a new link moves neither size nor time, and the baseline must not move. */
+  where: FileWhere;
   /** No file is there yet: the document is empty to start with, and a save makes the file, never replacing one that appeared. */
   creating: boolean;
   /** The version being edited, its text the baseline of `dirty`. Null when a clean session left the screen: the tab's next read starts it again. */
@@ -237,6 +242,10 @@ export function noteRead(view: FileReadView, started: number): void {
   readStarts.set(view, started);
 }
 
+function whereOf(view: FileReadView): FileWhere {
+  return { path: view.path, realPath: view.realPath, mode: view.mode };
+}
+
 function sameVersion(a: FileReadView, b: FileReadView): boolean {
   return a.size === b.size && a.modifiedAtMs === b.modifiedAtMs;
 }
@@ -245,7 +254,7 @@ function sameVersion(a: FileReadView, b: FileReadView): boolean {
 function adopt(key: string, was: FileEdit, view: FileReadView, creating = false): void {
   clock += 1;
   forgetDraft(was.stateKey);
-  patch(key, { creating, view, seed: view.text ?? "", stateKey: nextStateKey(), revision: was.revision + 1, dirty: false, conflict: null, failure: null, busy: false, readsFrom: clock });
+  patch(key, { creating, where: view === was.view ? was.where : whereOf(view), view, seed: view.text ?? "", stateKey: nextStateKey(), revision: was.revision + 1, dirty: false, conflict: null, failure: null, busy: false, readsFrom: clock });
 }
 
 // A read a find field kept off the screen: a new document would close the field under the
@@ -299,7 +308,7 @@ export async function startEdit(key: string, target: { panelKey: string; tabId: 
   useFileEditStore.setState((s) => ({
     sessions: {
       ...s.sessions,
-      [key]: { ...target, path: view.path, creating, view, seed: view.text ?? "", stateKey: nextStateKey(), revision: 0, dirty: false, conflict: null, failure: null, busy: false, readsFrom: clock },
+      [key]: { ...target, path: view.path, where: whereOf(view), creating, view, seed: view.text ?? "", stateKey: nextStateKey(), revision: 0, dirty: false, conflict: null, failure: null, busy: false, readsFrom: clock },
     },
   }));
 }
@@ -329,6 +338,7 @@ export function noteDraft(key: string, text: string): void {
 export function observeRead(key: string, view: FileReadView): void {
   const s = session(key);
   if (!s || s.busy || view.path !== s.path || (readStarts.get(view) ?? Infinity) < s.readsFrom) return;
+  if (view !== s.view && (!view.notFound || s.creating) && (view.realPath !== s.where.realPath || view.mode !== s.where.mode)) patch(key, { where: whereOf(view) });
   if (s.creating && view.notFound) {
     if (!s.view) adopt(key, s, blankFile(s.path, view.realPath), true);
     else if (s.conflict !== null) patch(key, { conflict: null });
@@ -388,7 +398,7 @@ export async function saveFile(key: string, opts: { force?: boolean } = {}): Pro
   try {
     const r = await writeFile(s.base, s.path, text, view, how);
     clock += 1;
-    if (!r.conflict && ask !== undefined && askIdOf(s) === ask) setPanelTabParam(s.panelKey, s.tabId, "askSaved", "1");
+    if (!r.conflict && ask !== undefined && askIdOf(s) === ask) setPanelTabParam(s.panelKey, s.tabId, "askSaved", versionStamp(r));
     const now = current();
     if (!now) {
       patch(key, { busy: false, readsFrom: clock });

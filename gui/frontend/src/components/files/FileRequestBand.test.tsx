@@ -197,6 +197,28 @@ describe("the band", () => {
     expect(screen.queryAllByTestId("file-request-fact").map((p) => p.textContent)).toEqual(want);
   });
 
+  it("a link's target is shown cleaned, cut, and said to be unusual; the facts lead the note", async () => {
+    disk.set(ENV, { ...text, realPath: `/Users/me/${"d/".repeat(480)}\u202edrop.txt`, mode: 0o600 });
+    asked({ ask: ask({ note: "The note" }) });
+    await screen.findByTestId("draft");
+    const [fact] = screen.getAllByTestId("file-request-fact");
+    expect(fact?.textContent).toContain("/drop.txt (its name has characters not shown here).");
+    expect(fact?.textContent).toContain("…");
+    expect(fact?.textContent).not.toContain("\u202e");
+    expect(fact?.textContent.length).toBeLessThan(160);
+    const box = screen.getByTestId("file-request-details");
+    expect(box.contains(screen.getByTestId("file-request-note"))).toBe(true);
+    expect(box.firstElementChild).toBe(fact);
+    expect(box.contains(screen.getByTestId("file-request-tell"))).toBe(false);
+  });
+
+  it("a plain link is said plainly", async () => {
+    disk.set(ENV, { ...text, realPath: "/Users/me/Public/drop.txt" });
+    asked();
+    await screen.findByTestId("draft");
+    expect(screen.getByTestId("file-request-fact").textContent).toBe("This path is a link: the file is really ~/Public/drop.txt.");
+  });
+
   it("the facts go with the band", async () => {
     disk.set(ENV, { ...text, mode: 0o644 });
     asked();
@@ -222,6 +244,21 @@ describe("the band", () => {
     render(<PanelTab />);
     await screen.findByTestId("draft");
     expect(band()).toBeNull();
+  });
+
+  it("a chmod or a re-link shows on the next read, the draft untouched", async () => {
+    disk.set(ENV, { ...text, mode: 0o600 });
+    asked();
+    await screen.findByTestId("draft");
+    type("half typed\n");
+    expect(screen.queryAllByTestId("file-request-fact")).toEqual([]);
+    disk.set(ENV, { ...text, mode: 0o644, realPath: "/Users/me/Public/drop.txt" });
+    fireEvent.click(screen.getByTestId("file-refresh"));
+    await waitFor(() => {
+      expect(screen.getAllByTestId("file-request-fact")).toHaveLength(2);
+    });
+    expect(screen.getByTestId("file-edit-status").textContent).toBe("Unsaved");
+    expect(screen.queryByTestId("file-conflict")).toBeNull();
   });
 
   it("Save and tell writes, tells, and goes", async () => {
@@ -303,7 +340,7 @@ describe("a repeat request", () => {
   });
 
   it("forgets that a write landed for the one before: this one has none", async () => {
-    asked({ ask: ask({ saved: true }) });
+    asked({ ask: ask({ saved: "4:100" }) });
     await screen.findByTestId("draft");
     expect(tell().disabled).toBe(false);
     act(() => {
