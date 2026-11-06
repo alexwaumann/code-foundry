@@ -654,6 +654,20 @@ func TestPageThatStoppedHitsTheWriteDeadline(t *testing.T) {
 	}
 }
 
+// A client must not send a count unless the head says so: a daemon from before them reads one
+// as a close.
+func TestHeadAdvertisesCounts(t *testing.T) {
+	ctx := testContext(t)
+	r := newRig(t, wstunnel.Options{}, hold(make(chan struct{})))
+	head, err := r.call(ctx).ReadHead(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !head.Counts {
+		t.Errorf("head = %+v", head)
+	}
+}
+
 // Counts keep a stream going past its window for as long as they come.
 func TestCountsReopenTheWindow(t *testing.T) {
 	ctx := testContext(t)
@@ -821,6 +835,59 @@ func TestCloseReason(t *testing.T) {
 				t.Fatal(err)
 			}
 			tt.leave(ctx, t, c)
+			if err := r.tunnel.Drain(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if want := `reason="` + tt.want + `"`; !strings.Contains(r.logs.String(), want) {
+				t.Errorf("want %s in: %s", want, r.logs.String())
+			}
+		})
+	}
+}
+
+// A handler waiting for room in the window writes nothing, so what ends it says who left. The
+// write deadline is far off in every case: only the page really stopping reads as a timeout.
+func TestCloseReasonWaitingForCounts(t *testing.T) {
+	tests := []struct {
+		name  string
+		leave func(context.Context, *testing.T, *rig, *wstunneltest.Client)
+		want  string
+	}{
+		{"a connection dropped with no close", func(_ context.Context, t *testing.T, _ *rig, c *wstunneltest.Client) {
+			if err := c.Conn.CloseNow(); err != nil {
+				t.Fatal(err)
+			}
+		}, "client gone"},
+		{"a close", func(_ context.Context, _ *testing.T, _ *rig, c *wstunneltest.Client) {
+			go func() { _ = c.Conn.Close(websocket.StatusNormalClosure, "") }()
+		}, "client closed"},
+		{"a count that is not one", func(ctx context.Context, t *testing.T, _ *rig, c *wstunneltest.Client) {
+			if err := c.Conn.Write(ctx, websocket.MessageText, []byte("nope")); err != nil {
+				t.Fatal(err)
+			}
+		}, "client closed"},
+		{"a shutdown with the page stopped", func(_ context.Context, _ *testing.T, r *rig, _ *wstunneltest.Client) {
+			r.shutdown()
+		}, "write timeout"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testContext(t)
+			done := make(chan error, 1)
+			r := newRig(t, wstunnel.Options{Window: 1 << 20, WriteTimeout: time.Minute, FinalTimeout: 50 * time.Millisecond}, flood(done))
+			c := r.call(ctx)
+			if _, err := c.ReadHead(ctx); err != nil {
+				t.Fatal(err)
+			}
+			for taken := 0; taken < 1<<20; {
+				_, b, err := c.Conn.Read(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				taken += len(b)
+			}
+			time.Sleep(50 * time.Millisecond) // into the wait for room
+			tt.leave(ctx, t, r, c)
 			if err := r.tunnel.Drain(ctx); err != nil {
 				t.Fatal(err)
 			}

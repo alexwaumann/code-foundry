@@ -142,8 +142,8 @@ grep '"path":"/codefoundry.v1.EventService/Watch"' "$L" | grep '"method":"POST"'
 | --- | --- |
 | `served` | The handler returned first: a terminal that exited, a daemon shutting down. |
 | `client closed` | The client sent a close, or data that is not a count: a tab switch, a resync, the watchdog, a quit, `AttachController` dropping a stream. The end of stream then fails to write; that failure is not news. |
-| `client gone` | The connection died with no close frame, or a write failed. A crashed page, or a close that a full-speed write reached first (1 in 39 under `yes`). |
-| `write timeout` | The client took nothing for 30 s: a window that never reopened, or a write that never finished. |
+| `client gone` | The connection died with no close frame, or a write failed. A crashed page, a dropped connection while the handler waited for a count, or a close that a full-speed write reached first (1 in 39 under `yes`). |
+| `write timeout` | The client was connected and took nothing for 30 s: a window that never reopened, or a write that never finished. A daemon shutting down cuts that wait to a second. |
 | `no request` | The opening frames never came. A view that left at once logs this too. |
 
 A killed daemon logs no `tunnel closed` at all.

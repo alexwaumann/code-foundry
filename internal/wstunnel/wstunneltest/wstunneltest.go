@@ -120,6 +120,7 @@ func (c *Client) Send(ctx context.Context, headers map[string]string, body []byt
 type Head struct {
 	Status  int               `json:"status"`
 	Headers map[string]string `json:"headers"`
+	Counts  bool              `json:"counts"`
 }
 
 // ReadHead reads the response head, which must be the next message.

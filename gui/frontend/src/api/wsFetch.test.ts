@@ -26,8 +26,8 @@ class FakeSocket {
   close() {
     this.closeCalls++;
   }
-  head(status = 200, headers: Record<string, string> = { "content-type": "application/connect+proto" }) {
-    this.onmessage?.({ data: JSON.stringify({ status, headers }) });
+  head(status = 200, headers: Record<string, string> = { "content-type": "application/connect+proto" }, counts = true) {
+    this.onmessage?.({ data: JSON.stringify({ status, headers, ...(counts ? { counts } : {}) }) });
   }
   frame(...bytes: number[]) {
     this.onmessage?.({ data: new Uint8Array(bytes).buffer });
@@ -262,6 +262,18 @@ describe("the counts the daemon's flow control reads", () => {
     ctl.abort();
     ws.bytes(4 * MIB);
     expect(ws.counts).toEqual([]);
+  });
+
+  it("never go to a daemon whose head does not ask, which would read one as the client closing", async () => {
+    const { res, ws } = open();
+    ws.onopen?.();
+    ws.head(200, { "content-type": "application/connect+proto" }, false);
+    const reader = (await res).body?.getReader();
+    ws.bytes(4 * MIB);
+    ws.bytes(4 * MIB);
+    ws.bytes(4 * MIB);
+    expect(ws.counts).toEqual([]);
+    expect((await reader?.read())?.value?.byteLength).toBe(4 * MIB);
   });
 });
 

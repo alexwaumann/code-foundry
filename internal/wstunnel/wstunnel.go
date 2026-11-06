@@ -6,14 +6,16 @@
 //
 //	client: text    {"headers":{"Authorization":"Bearer ...","Content-Type":"application/connect+proto"}}
 //	client: binary  the request body, as it would be POSTed
-//	daemon: text    {"status":200,"headers":{...}}
+//	daemon: text    {"status":200,"headers":{...},"counts":true}
 //	daemon: binary  one message per Flush of the handler: Connect's envelopes, unchanged
 //	client: text    "1048576": the body bytes it has taken so far, sent as it goes
 //	daemon: close   1000 once the handler has returned, 1013 if a write failed first
 //
 // Those counts are the flow control: a browser takes everything off the socket whether or not
 // its page is running, so nothing else tells the daemon that a client has stopped reading
-// (docs/notes/ws-transport.md). At most Options.Window bytes go uncounted.
+// (docs/notes/ws-transport.md). At most Options.Window bytes go uncounted. The head's "counts"
+// is what lets a client send them: a daemon from before them, which an update leaves running,
+// reads any text past the request as the client's close.
 //
 // The tunnel owns no RPC: it replays the call as a POST through Options.Next, so a new
 // stream needs nothing here, and the bearer check, its scopes and Connect's framing and
@@ -319,11 +321,18 @@ func (e *clientEnd) note(err error) {
 // handler's end of stream is then written to a closed socket, and that failed write is not
 // news. Past that a write that ran out of time is a stuck client, and any other failed write,
 // or a read that died, is a client that left with no close (docs/notes/ws-transport.md).
+//
+// A write's deadline is a timeout even with a dead read, since it closes the socket and so ends
+// the read too. A cancelled one depends on why: the read dying cancels the handler and so ends
+// the wait, which is the client going, and with the read alive it is a shutdown cutting off a
+// client that was not taking anything.
 func closeReason(end int32, writeErr error) string {
 	switch {
 	case end == clientClosed:
 		return "client closed"
-	case errors.Is(writeErr, context.DeadlineExceeded), errors.Is(writeErr, context.Canceled):
+	case errors.Is(writeErr, context.DeadlineExceeded):
+		return "write timeout"
+	case errors.Is(writeErr, context.Canceled) && end != clientDropped:
 		return "write timeout"
 	case writeErr != nil, end == clientDropped:
 		return "client gone"
@@ -510,7 +519,8 @@ func (w *response) Flush() {
 		head, err := json.Marshal(struct {
 			Status  int               `json:"status"`
 			Headers map[string]string `json:"headers"`
-		}{w.status, headers})
+			Counts  bool              `json:"counts"`
+		}{w.status, headers, true})
 		if err != nil {
 			w.fail(err)
 			return

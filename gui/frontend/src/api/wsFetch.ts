@@ -23,7 +23,9 @@ const SOCKET_CLOSED = 3;
  * How often to tell the daemon how much has arrived: its flow control (internal/wstunnel) lets
  * 8 MiB go uncounted, so this must stay below that or a stream would stop for good. A browser
  * empties the socket whether or not the page runs, so these counts are all that stops a daemon
- * filling a page that has stopped (docs/notes/ws-transport.md).
+ * filling a page that has stopped (docs/notes/ws-transport.md). Sent only to a daemon whose head
+ * asks for them: one from before them, which an update leaves running until `daemon restart`,
+ * reads a count as the client closing.
  */
 const ACK_BYTES = 2 << 20;
 
@@ -85,9 +87,10 @@ export const wsFetch: typeof fetch = (input, init) =>
     let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
     // The caller has its answer: the promise rejected, or the body ended, failed or was cancelled.
     let finished = false;
-    // Body bytes arrived, and how many of them the daemon has been told of.
+    // Body bytes arrived, how many of them the daemon has been told of, and whether it wants to be.
     let received = 0;
     let told = 0;
+    let counts = false;
 
     const finish = () => {
       finished = true;
@@ -106,7 +109,8 @@ export const wsFetch: typeof fetch = (input, init) =>
     signal?.addEventListener("abort", onAbort, { once: true });
 
     const onHead = (text: string) => {
-      const head = JSON.parse(text) as { status: number; headers: Record<string, string> };
+      const head = JSON.parse(text) as { status: number; headers: Record<string, string>; counts?: boolean };
+      counts = head.counts === true;
       const stream = new ReadableStream<Uint8Array>(
         {
           start: (c) => {
@@ -132,7 +136,7 @@ export const wsFetch: typeof fetch = (input, init) =>
       }
       c.enqueue(new Uint8Array(data));
       received += data.byteLength;
-      if (received - told >= ACK_BYTES) {
+      if (counts && received - told >= ACK_BYTES) {
         told = received;
         ws.send(String(received));
       }

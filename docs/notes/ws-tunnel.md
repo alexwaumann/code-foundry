@@ -57,8 +57,15 @@ the bus's drop rules work as designed.
 - Only body messages count, heartbeats included. The head does not.
 - A count must be a number, not go backwards and not pass what was sent. Anything else is data
   past the request, which `readUntilGone` still treats as the client's close.
-- No opt-in: the GUI and the daemon are always the same version, and a client that never counts
-  only stalls past 8 MiB, then reconnects.
+- The daemon advertises it: every head carries `"counts":true`, and `wsFetch` sends counts only after
+  seeing that. The GUI and the daemon are not always the same version: an update leaves a running
+  daemon on its old version until `daemon restart` (`scripts/install.sh`). A daemon from before
+  counts reads the first one as the client closing, and a new GUI on one reconnected constantly, 19
+  Attach sockets in a few seconds, each resending the snapshot. Without the field a stream runs with
+  no flow control, as it did on that daemon before.
+- The other way round, a page from before counts on a new daemon never sends one, so a stream that
+  passes 8 MiB in its life stalls, ends in `write timeout` and reconnects. Such a page tunnels only
+  `WatchBoard`, which takes months of heartbeats to get there.
 
 ## Check-then-use
 
