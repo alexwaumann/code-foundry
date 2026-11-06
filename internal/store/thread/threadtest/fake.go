@@ -25,6 +25,8 @@ type Fake struct {
 	Now func() time.Time
 	// Err, when set, is returned by every mutating method.
 	Err error
+	// SubscribeWarnings are Subscribe's warnings.
+	SubscribeWarnings []string
 	// KeptWorktrees is what CancelSetup answers, and SetupDraft what DiscardSetup does.
 	KeptWorktrees []string
 	SetupDraft    thread.SetupDraft

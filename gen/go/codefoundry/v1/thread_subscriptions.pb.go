@@ -561,7 +561,11 @@ type SubscribeThreadResponse struct {
 	Fired bool `protobuf:"varint,2,opt,name=fired,proto3" json:"fired,omitempty"`
 	// The same subscription (subscriber, target, condition) existed: it is returned, with
 	// repeat updated, and nothing fired.
-	Existed       bool `protobuf:"varint,3,opt,name=existed,proto3" json:"existed,omitempty"`
+	Existed bool `protobuf:"varint,3,opt,name=existed,proto3" json:"existed,omitempty"`
+	// Why this subscription may not fire, one line each: a pull request whose state could
+	// not be checked, a closed one, a stopped thread, a plugin that is not running. A wake
+	// that cannot fire is refused (FAILED_PRECONDITION) instead.
+	Warnings      []string `protobuf:"bytes,4,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -615,6 +619,13 @@ func (x *SubscribeThreadResponse) GetExisted() bool {
 		return x.Existed
 	}
 	return false
+}
+
+func (x *SubscribeThreadResponse) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
 }
 
 type UnsubscribeThreadRequest struct {
@@ -946,11 +957,12 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\rafter_ordinal\x18\x10 \x01(\x03R\fafterOrdinal\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x91\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xad\x01\n" +
 	"\x17SubscribeThreadResponse\x12F\n" +
 	"\fsubscription\x18\x01 \x01(\v2\".codefoundry.v1.ThreadSubscriptionR\fsubscription\x12\x14\n" +
 	"\x05fired\x18\x02 \x01(\bR\x05fired\x12\x18\n" +
-	"\aexisted\x18\x03 \x01(\bR\aexisted\"\xbb\x02\n" +
+	"\aexisted\x18\x03 \x01(\bR\aexisted\x12\x1a\n" +
+	"\bwarnings\x18\x04 \x03(\tR\bwarnings\"\xbb\x02\n" +
 	"\x18UnsubscribeThreadRequest\x12'\n" +
 	"\x0fsubscription_id\x18\x01 \x01(\tR\x0esubscriptionId\x120\n" +
 	"\x14subscriber_thread_id\x18\x02 \x01(\tR\x12subscriberThreadId\x12(\n" +

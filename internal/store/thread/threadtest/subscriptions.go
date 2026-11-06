@@ -104,7 +104,7 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 		f.subs = append(f.subs, sub)
 		bus.Publish(f.bus, thread.SubscriptionsChanged{SubscriberID: sub.SubscriberID})
 	}
-	return thread.SubscribeResult{Subscription: sub, Fired: fired}, nil
+	return thread.SubscribeResult{Subscription: sub, Fired: fired, Warnings: f.SubscribeWarnings}, nil
 }
 
 // Unsubscribe records "Unsubscribe <id>" or "Unsubscribe <subscriber> <target>"

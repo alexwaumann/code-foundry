@@ -237,8 +237,9 @@ review decision and the changes (counts only, never comment text). On a failure,
 the failing job (`gh pr checks 87 --repo acme/web`), fix and push: the same `--repeat`
 subscription wakes you when the new head's checks finish. Subscribing anew right after a
 push can wake you at once with the old head's result (the poll has not seen the push
-yet): compare `head_sha` with what you pushed. A merged pull request ends every
-subscription to it. Subscribe a child's thread instead with `--id <child>`.
+yet): compare `head_sha` with what you pushed. A merge ends every subscription to the
+pull request and a close every one but `changed`, each with a last wake; subscribe again
+if it reopens. Subscribe a child's thread instead with `--id <child>`.
 `code-foundry thread subscriptions` lists what you wait for; `thread unsubscribe --pr
 acme/web#87` stops.
 

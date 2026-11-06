@@ -12,19 +12,19 @@ import (
 
 // Wake subscriptions to pull requests (docs/notes/gh-events-3-pr-wake.md). The target
 // is "owner/name#123" (lower-case slug; ParsePullRequestTarget also takes a pull
-// request URL). The thread store does not know the GitHub store: the daemon looks pull
-// requests up in its cache for it (Options.PullRequest), tells it every change a poll
-// saw (Manager.PullRequestChanged, from the GitHub store's PullRequestChanged), and
-// keeps the watched pull requests in the poll (Options.WatchPullRequests). A poll
-// coalesces a pull request's changes into one event, so a subscription fires at most
-// once per poll, with every change that matched. Latency is the GitHub poll interval.
+// request URL). The thread store does not know the GitHub store: the daemon asks GitHub
+// for it at subscribe time (Options.LookupPullRequest), tells it every change a poll saw
+// (Manager.PullRequestChanged, from the GitHub store's PullRequestChanged), and keeps the
+// watched pull requests in the poll (Options.WatchPullRequests). A poll coalesces a pull
+// request's changes into one event, so a subscription fires at most once per poll, with
+// every change that matched. Latency is the GitHub poll interval.
 
 // TargetPullRequest is a pull request target ("owner/name#123").
 const TargetPullRequest TargetKind = "pull_request"
 
 // Pull request conditions. Each fires on a change a poll saw (edge-triggered); the
-// checks conditions and merged/closed also fire at subscribe time when the cached pull
-// request already meets them.
+// checks conditions and merged/closed also fire at subscribe time when the pull request
+// already meets them.
 const (
 	// CondChecksDone: every check on the head completed, whatever the result (the
 	// rollup has checks and none pending).
@@ -172,8 +172,8 @@ func checksMeet(c Condition, r PRChecks) bool {
 	return false
 }
 
-// prAlreadyMet reports whether a cached pull request meets c at subscribe time: only
-// the checks conditions and merged/closed have a state to meet.
+// prAlreadyMet reports whether pull request p, as GitHub just told it, meets c: only the
+// checks conditions and merged/closed have a state to meet.
 func prAlreadyMet(c Condition, p PullRequestInfo) bool {
 	switch c {
 	case CondMerged:
@@ -245,8 +245,9 @@ func matchPullRequest(c Condition, e PullRequestEvent) []PullRequestChange {
 
 // PullRequestChanged fires the subscriptions to e's pull request that its changes
 // meet. The daemon calls it for every PullRequestChanged of the GitHub store. A one-shot
-// goes once it fired, so do merged and closed; every subscription to a merged pull
-// request goes (nothing more will happen to it).
+// goes once it fired, so do merged and closed. One the event leaves unable to fire
+// (prCannotFire) gets a last wake saying so and goes too. A last wake the limit drops is
+// tried again (retryFinalWakesLocked), and the subscription stays until one gets through.
 func (m *Manager) PullRequestChanged(e PullRequestEvent) {
 	target := e.PullRequest.Target()
 	m.mu.Lock()
@@ -266,26 +267,58 @@ func (m *Manager) PullRequestChanged(e PullRequestEvent) {
 	slices.SortFunc(hit, func(a, b *subRec) int {
 		return cmp.Or(a.s.CreatedAt.Compare(b.s.CreatedAt), strings.Compare(a.s.ID, b.s.ID))
 	})
-	merged := e.PullRequest.State == "merged" || e.has(PRChangeMerged)
 	var gone []string
 	for _, r := range hit {
-		matched := matchPullRequest(r.s.Condition, e)
-		fired := len(matched) > 0 &&
-			m.fireLocked(r, func(s Subscription, at time.Time) Message { return prWake(s, e.PullRequest, matched, at) })
+		r.final = nil // this event says what is true now: a reopening calls it off
+		c, p := r.s.Condition, e.PullRequest
+		matched := matchPullRequest(c, e)
+		met := prTerminal(c) && prAlreadyMet(c, p)
+		cannot := prCannotFire(c, p)
+		var build func(Subscription, time.Time) Message
 		switch {
-		case merged:
-			gone = append(gone, r.s.ID)
-		case fired && (!r.s.Repeat || prTerminal(r.s.Condition)):
+		case len(matched) > 0 || met:
+			build = func(s Subscription, at time.Time) Message { return prWake(s, p, matched, at) }
+		case cannot:
+			build = func(s Subscription, at time.Time) Message { return prEndedWake(s, p, e.Changes, at) }
+		default:
+			continue
+		}
+		last := met || cannot
+		switch fired := m.fireLocked(r, build); {
+		case fired && (last || !r.s.Repeat):
 			gone = append(gone, r.s.ID)
 		case fired:
 			s.firedLocked(r)
+		case last:
+			r.final, r.retryAt = build, m.opts.Now().Add(timerRetry)
 		}
 	}
 	if len(gone) > 0 {
 		s.removeLocked(gone)
-		if merged {
-			m.log.Info("wake subscriptions to a merged pull request done", "pull_request", target, "subscriptions", gone)
+		if e.PullRequest.State != "open" {
+			m.log.Info("wake subscriptions to a pull request ended", "pull_request", target, "state", e.PullRequest.State, "subscriptions", gone)
 		}
+	}
+}
+
+// retryFinalWakesLocked tries again the last wakes the limit dropped, on the timers' tick.
+// A subscription goes with the wake that got through, so a retry is one wake. Callers
+// hold m.mu and m.subs.mu.
+func (m *Manager) retryFinalWakesLocked(now time.Time) {
+	s := m.subs
+	var gone []string
+	for _, r := range s.byID {
+		if r.final == nil || now.Before(r.retryAt) {
+			continue
+		}
+		if m.fireLocked(r, r.final) {
+			gone = append(gone, r.s.ID)
+			continue
+		}
+		r.retryAt = now.Add(timerRetry)
+	}
+	if len(gone) > 0 {
+		s.removeLocked(gone)
 	}
 }
 

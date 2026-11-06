@@ -269,7 +269,8 @@ func threadSubscribe(b ThreadBackend) Command {
 		Title:     "Subscribe Thread to Wakes",
 		Description: "Wake a thread with a message when another thread settles, " +
 			"an action run finishes, a pull request's checks finish, a plugin wake fires (plugin wakes), or at a time or every interval (at, every). " +
-			"Fires on each change into the condition, and at once when already met; once by default, every time with repeat.",
+			"Fires on each change into the condition, and at once when already met; once by default, every time with repeat. " +
+			"Refuses a wake that cannot fire; warns when it may not.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
@@ -356,7 +357,7 @@ func threadSubscribe(b ThreadBackend) Command {
 			case res.Msg.GetFired():
 				msg += "; woke it at once: the target already met the condition"
 			}
-			return Result{Message: msg, JSON: res.Msg}, nil
+			return Result{Message: msg, JSON: res.Msg, Warnings: res.Msg.GetWarnings()}, nil
 		},
 	}
 }

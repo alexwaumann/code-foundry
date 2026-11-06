@@ -96,7 +96,7 @@ func (h *Thread) Subscribe(ctx context.Context, req *connect.Request[v1.Subscrib
 		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.SubscribeThreadResponse{
-		Subscription: subscriptionToProto(res.Subscription), Fired: res.Fired, Existed: res.Existed,
+		Subscription: subscriptionToProto(res.Subscription), Fired: res.Fired, Existed: res.Existed, Warnings: res.Warnings,
 	}), nil
 }
 

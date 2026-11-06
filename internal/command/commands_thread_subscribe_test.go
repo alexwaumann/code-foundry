@@ -19,6 +19,30 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
+// The store's warnings reach the result: the CLI prints them, --json carries them, and
+// every other caller of the command gets them with the response.
+func TestThreadSubscribeWarnings(t *testing.T) {
+	const warning = "pull request acme/web#7 has not been polled yet"
+	reg := command.NewRegistry()
+	b := &commandtest.Thread{SubscribeWarnings: []string{warning}}
+	if err := command.RegisterThread(reg, b); err != nil {
+		t.Fatal(err)
+	}
+	if err := command.RegisterThreadLifecycle(reg, b, &commandtest.Emitter{Delivered: 1, OpenWindows: 1}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-me"}, "thread.subscribe", map[string]string{"pr": "acme/web#7"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(res.Warnings, []string{warning}) {
+		t.Errorf("warnings = %q", res.Warnings)
+	}
+	if got, err := res.EncodeJSON(); err != nil || !strings.Contains(got, warning) {
+		t.Errorf("JSON = %s, %v", got, err)
+	}
+}
+
 func TestThreadSubscriptionCommands(t *testing.T) {
 	const (
 		settled   = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED

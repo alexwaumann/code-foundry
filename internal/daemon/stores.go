@@ -296,6 +296,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// Wake subscriptions to pull requests read the GitHub store's cache and keep
 		// their pull requests in its poll (wake_pr.go).
 		PullRequest:       pullRequestForWake(s.gh),
+		LookupPullRequest: lookupPullRequestForWake(s.gh),
 		WatchPullRequests: watchPullRequestsForWake(log.With("store", "gh"), s.gh),
 		// An archived thread's worktree-mode worktrees nobody else has go (cleanup_archived.go).
 		Archived: s.archived.archived,

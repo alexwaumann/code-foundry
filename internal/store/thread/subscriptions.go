@@ -242,6 +242,9 @@ type SubscribeResult struct {
 	// Existed: the same subscriber, target and condition was subscribed already; it is
 	// returned (Repeat updated, and Note when one was given) and nothing fired.
 	Existed bool
+	// Warnings say why a subscription that was kept may not fire, one line each for the
+	// agent that asked (subscriptions_cannot_fire.go). What cannot fire is refused instead.
+	Warnings []string
 }
 
 // UnsubscribeOptions configures Store.Unsubscribe: an ID, or a SubscriberID and exactly
@@ -318,6 +321,10 @@ type subRec struct {
 	// the stored note; in memory. Each goes on the first wake whose target handled the
 	// message it is about (extraNote.through).
 	extra []extraNote
+	// final is a pull request subscription's last wake, which the wake limit dropped: it
+	// is tried again every retryAt, and the subscription goes with the one that gets
+	// through (retryFinalWakesLocked). In memory.
+	final func(Subscription, time.Time) Message
 }
 
 // extraNote is a note for one wake only: the first wake whose target's HandledThrough
@@ -544,24 +551,26 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 	var run ActionRun
 	var pr *PullRequestInfo
 	var args map[string]string
+	var warning string
 	switch kind {
 	case TargetActionRun:
 		if run, err = m.actionRun(ctx, target); err != nil {
 			return SubscribeResult{}, err
 		}
 	case TargetPullRequest:
-		if m.opts.PullRequest == nil {
+		if m.opts.LookupPullRequest == nil {
 			return SubscribeResult{}, fmt.Errorf("%w: pull requests are not available", ErrFailedPrecondition)
 		}
-		if p, ok := m.opts.PullRequest(ctx, target); ok {
-			if p.State == "merged" && cond != CondMerged {
-				return SubscribeResult{}, fmt.Errorf("%w: pull request %s is merged; nothing more will happen to it", ErrFailedPrecondition, target)
-			}
-			pr = &p
+		if pr, warning, err = m.checkPullRequest(ctx, target, cond); err != nil {
+			return SubscribeResult{}, err
 		}
 	case TargetPlugin:
 		if args, err = m.resolvePluginTarget(ctx, subscriber, target, o.Args); err != nil {
 			return SubscribeResult{}, err
+		}
+		if pw := m.subs.pluginWakes(); pw != nil {
+			_, status := pw.Describe(target)
+			warning = pluginWarning(target, status)
 		}
 	}
 	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
@@ -582,6 +591,9 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 	}, run, pr, sendGate{before: o.BeforeSend, after: o.AfterOrdinal})
 	if err == nil {
 		m.rewait(subscriber) // it may wait on the target now (waiting.go)
+		if warning != "" && !res.Fired {
+			res.Warnings = append(res.Warnings, warning)
+		}
 	}
 	if err != nil || kind != TargetActionRun || res.Fired || res.Existed {
 		return res, err
@@ -608,8 +620,8 @@ func (m *Manager) actionRun(ctx context.Context, id string) (ActionRun, error) {
 
 // subscribe validates sub against the threads and the other subscriptions and keeps
 // it, under m.mu and the subscriptions' lock: it fires at once when its target already
-// meets the condition (a run: already finished, given as run; a pull request: as the
-// GitHub store's cache has it, pr, nil when unknown there). A thread target's send gate
+// meets the condition (a run: already finished, given as run; a pull request: as GitHub
+// just answered, pr, nil when it could not be asked). A thread target's send gate
 // is g (SubscribeOptions.BeforeSend, AfterOrdinal; subRec.meets); with it, an existing
 // same subscription is left as it is, or armed (armLocked).
 func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo, g sendGate) (SubscribeResult, error) {
@@ -639,7 +651,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 		case !trec.s.ArchivedAt.IsZero() && !g.before:
 			// Before a send (BeforeSend) an archived target is fine: the send unarchives it.
 			// Should it stay archived (the send fails), the arming is refused.
-			return SubscribeResult{}, fmt.Errorf("%w: thread %s is archived", ErrFailedPrecondition, sub.TargetID)
+			return SubscribeResult{}, fmt.Errorf("%w: thread %s is archived, so it will not change; unarchive it first", ErrFailedPrecondition, sub.TargetID)
 		}
 		for _, r := range s.byID {
 			if r.s.SubscriberID == sub.TargetID && r.s.TargetKind == TargetThread && r.s.TargetID == sub.SubscriberID {
@@ -687,7 +699,10 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	case TargetPullRequest:
 		if pr != nil && prAlreadyMet(sub.Condition, *pr) {
 			p := *pr
-			fired = m.fireLocked(r, func(s Subscription, at time.Time) Message { return prWake(s, p, nil, at) })
+			build := func(s Subscription, at time.Time) Message { return prWake(s, p, nil, at) }
+			if fired = m.fireLocked(r, build); !fired && prTerminal(sub.Condition) {
+				r.final, r.retryAt = build, m.opts.Now().Add(timerRetry)
+			}
 		}
 	}
 	if fired && (!r.s.Repeat || prTerminal(r.s.Condition)) {
@@ -704,7 +719,11 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	s.changedLocked(sub.SubscriberID)
 	m.log.Info("wake subscription added", "subscription", sub.ID, "subscriber", sub.SubscriberID, "target_kind", sub.TargetKind,
 		"target", sub.TargetID, "condition", sub.Condition, "repeat", sub.Repeat, "fired", fired)
-	return SubscribeResult{Subscription: r.s, Fired: fired}, nil
+	res := SubscribeResult{Subscription: r.s, Fired: fired}
+	if w := threadWarning(sub.Condition, target); sub.TargetKind == TargetThread && !fired && g == (sendGate{}) && w != "" {
+		res.Warnings = []string{w}
+	}
+	return res, nil
 }
 
 // armLocked is a Subscribe with AfterOrdinal ordinal (and note) finding r, the same
