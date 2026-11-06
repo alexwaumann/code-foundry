@@ -242,6 +242,72 @@ test("merged pull request menu (screenshot)", async ({ page }) => {
   await shot(page, "chunk3-menu");
 });
 
+/** SHOTS=<dir>: each action while it runs, dark and light. The states themselves: PullRequestSurface.test.tsx ("busy feedback"). */
+for (const scheme of ["dark", "light"] as const) {
+  test(`Ready for review busy (screenshot, ${scheme})`, async ({ page }) => {
+    test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
+    await page.emulateMedia({ colorScheme: scheme });
+    await shotViewport(page);
+    await openPrPage(page);
+
+    await openPr(page, 145);
+    const ready = page.getByTestId("pr-ready-for-review");
+    await expect(ready).toHaveText("Ready for review");
+    await mockPost("gh/pr-detail-delay?ms=30000");
+    await ready.click();
+    await expect(ready).toHaveText("Marking ready…");
+    await page.mouse.move(5, 5);
+    await shot(page, `busy-ready-${scheme}`);
+  });
+
+  test(`Convert to draft busy (screenshot, ${scheme})`, async ({ page }) => {
+    test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
+    await page.emulateMedia({ colorScheme: scheme });
+    await shotViewport(page);
+    await openPrPage(page);
+
+    await openPr(page, 142);
+    await expect(page.getByTestId("pr-menu-button")).toBeVisible();
+    await mockPost("gh/pr-detail-delay?ms=30000");
+    await page.getByTestId("pr-menu-button").click();
+    await page.getByTestId("pr-menu-draft").click();
+    await expect(page.getByTestId("pr-menu-draft")).toContainText("Converting to draft…");
+    await shot(page, `busy-draft-${scheme}`);
+  });
+
+  test(`Cancel auto-merge busy (screenshot, ${scheme})`, async ({ page }) => {
+    test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
+    await page.emulateMedia({ colorScheme: scheme });
+    await shotViewport(page);
+    await openPrPage(page);
+
+    await openPr(page, 164);
+    const cancel = page.getByTestId("pr-cancel-auto-merge");
+    await expect(cancel).toHaveText("Cancel auto-merge");
+    await mockPost("gh/pr-detail-delay?ms=30000");
+    await cancel.click();
+    await expect(cancel).toHaveText("Cancelling…");
+    await page.mouse.move(5, 5);
+    await shot(page, `busy-cancel-${scheme}`);
+  });
+
+  test(`Revert busy (screenshot, ${scheme})`, async ({ page }) => {
+    test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
+    await page.emulateMedia({ colorScheme: scheme });
+    await shotViewport(page);
+    await openPrPage(page);
+
+    await openPr(page, 138);
+    await mockPost("gh/pr-delay?ms=30000");
+    const revert = page.getByTestId("pr-revert");
+    await revert.click();
+    await page.getByTestId("confirm-ok").click();
+    await expect(revert).toHaveText("Reverting…");
+    await page.mouse.move(5, 5);
+    await shot(page, `busy-revert-${scheme}`);
+  });
+}
+
 test("panel state is per selection; a thread or worktree on a PR branch enables the surface", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 142).click();
