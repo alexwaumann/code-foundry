@@ -9,6 +9,7 @@ import { useScrollbackLines, useTerminalFontFamily } from "@/stores/settings";
 import { noteTerminalKeyboard, registerTerminalFindHost, setTerminalFindResults, useTerminalFindQuery } from "@/stores/terminalFind";
 import { useUiStore } from "@/stores/ui";
 import { AttachController, type AttachState } from "@/terminal/attach";
+import { TerminalInput } from "@/terminal/input";
 import { XtermRenderer, type RendererKind } from "@/terminal/xterm";
 import { TerminalFindBar } from "./TerminalFindBar";
 
@@ -36,6 +37,9 @@ export interface TerminalHostHandle {
  * Dev-only: VITE_SIMULATE_WEBGL_LOSS_MS=<ms> loses the WebGL context that long after mount,
  * to exercise the DOM fallback inside the real WKWebView (`wails3 dev`).
  */
+/** One for the app: keys still queued when a host remounts stay ahead of what the next one sends. */
+const terminalInput = new TerminalInput((id, data) => writeTerminal(id, data));
+
 function simulateWebglLoss(host: HTMLElement): () => void {
   const ms = Number((import.meta.env as { VITE_SIMULATE_WEBGL_LOSS_MS?: string }).VITE_SIMULATE_WEBGL_LOSS_MS);
   if (!import.meta.env.DEV || !ms) return () => undefined;
@@ -153,7 +157,7 @@ export function TerminalHost({
       renderer,
       {
         attach: (id, signal) => attachTerminal(id, signal),
-        write: (id, data) => writeTerminal(id, data),
+        input: terminalInput,
         resize: (id, cols, rows) => resizeTerminal(id, cols, rows),
         onStreamError: invalidateOnTransportError,
         priority: priority.current,
