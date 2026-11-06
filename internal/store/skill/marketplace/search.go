@@ -24,13 +24,15 @@ type Query struct {
 	Kind Kind
 	// Limit caps Result.Entries: DefaultLimit when 0 or less, at most MaxLimit.
 	Limit int
+	// Offset skips that many matches: the next page. 0 or less skips none.
+	Offset int
 }
 
 // Result is a page of matches.
 type Result struct {
-	// Entries are the first Limit matches, best first.
+	// Entries are Limit matches after Offset, best first.
 	Entries []Entry
-	// Total is how many entries matched before the limit.
+	// Total is how many entries matched, before the offset and the limit.
 	Total int
 }
 
@@ -63,7 +65,8 @@ func Search(entries []Entry, q Query) Result {
 		return cmp.Or(cmp.Compare(a.rank, b.rank), compareEntries(a.e, b.e), cmp.Compare(a.e.Registry, b.e.Registry))
 	})
 	out := Result{Total: len(hits)}
-	for _, h := range hits[:min(limit, len(hits))] {
+	start := min(max(q.Offset, 0), len(hits))
+	for _, h := range hits[start:min(start+limit, len(hits))] {
 		out.Entries = append(out.Entries, h.e)
 	}
 	return out

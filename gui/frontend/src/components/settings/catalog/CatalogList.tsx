@@ -4,7 +4,7 @@ import { VirtualStack } from "@/components/pr/VirtualStack";
 import { cn } from "@/lib/utils";
 import { countWords } from "./model";
 
-/** A group's header: its name, how many, a note ("showing the first 200"), and what acts on the group at the right. */
+/** A group's header: its name, how many, a note ("Searching…"), and what acts on the group at the right. */
 export function GroupHeader({
   id,
   label,

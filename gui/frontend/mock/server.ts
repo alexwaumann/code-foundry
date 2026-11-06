@@ -208,6 +208,7 @@
  *   POST /__mock/action/ports?run=r-…&ports=5173,24678   (or terminal=t-…: that running run listens
  *                                                 on these ports now, as the probe reports; empty
  *                                                 closes them; a run's end clears them)
+ *   POST /__mock/skills?many=1240   (that many more skills in the marketplace)
  *   POST /__mock/skills?fail=skill.install&error=…   (that skill.* command fails with the message until
  *        cleared with an empty error); registries=none|default (Claude Code without the marketplace);
  *        listError=… (the marketplace list failed); pluginsError=…; epoch=1 (a read, like the hourly

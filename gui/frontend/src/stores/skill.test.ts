@@ -8,6 +8,7 @@ import {
   disableSkill,
   dismissSkillFailure,
   installSkill,
+  loadMoreSkills,
   onSkillEpoch,
   openSkillMarketplace,
   refreshSkillMarketplaces,
@@ -110,7 +111,7 @@ describe("search", () => {
   it("aborts the request in flight for an older query", async () => {
     const signals: AbortSignal[] = [];
     install({
-      search: (_q, _limit, signal) => {
+      search: (_q, _limit, _offset, signal) => {
         if (signal) signals.push(signal);
         return Promise.resolve(searchView([]));
       },
@@ -136,6 +137,96 @@ describe("search", () => {
     install({ search: (_q, limit) => (limits.push(limit), Promise.resolve(searchView([]))) });
     await searchSkills("");
     expect(limits).toEqual([200]);
+  });
+});
+
+describe("paging", () => {
+  const names = (n: number) => Array.from({ length: n }, (_, i) => `s${String(i)}`);
+  const shown = () => useSkillMarketplaceStore.getState().search?.entries.map((e) => e.name) ?? [];
+  let epoch: number;
+  let asked: [number, number][];
+  /** A marketplace of `n` hits, a page at a time as the daemon gives them. */
+  const catalogue = (n: number) => {
+    epoch = 1;
+    asked = [];
+    install({
+      search: (_q, limit, offset) => {
+        asked.push([limit, offset]);
+        return Promise.resolve({ ...searchView(names(n).slice(offset, offset + limit), epoch), total: n });
+      },
+    });
+  };
+
+  it("adds the next page after what is loaded, in order, and stops at the end", async () => {
+    catalogue(450);
+    await searchSkills("");
+    await loadMoreSkills();
+    await loadMoreSkills();
+    await loadMoreSkills();
+    expect(asked).toEqual([[200, 0], [200, 200], [200, 400]]);
+    expect(shown()).toEqual(names(450));
+  });
+
+  it("asks once while a page is on its way", async () => {
+    catalogue(450);
+    await searchSkills("");
+    await Promise.all([loadMoreSkills(), loadMoreSkills()]);
+    expect(asked).toEqual([[200, 0], [200, 200]]);
+  });
+
+  it("a new search drops a page that arrives late", async () => {
+    const page = deferred<SkillSearchView>();
+    install({ search: (q, _l, offset) => (offset > 0 ? page.promise : Promise.resolve({ ...searchView(q.text ? ["new"] : names(200)), total: q.text ? 1 : 450 })) });
+    await searchSkills("");
+    const more = loadMoreSkills();
+    await searchSkills("new");
+    page.resolve({ ...searchView(["late"]), total: 450 });
+    await more;
+    expect(shown()).toEqual(["new"]);
+    expect(useSkillMarketplaceStore.getState().loadingMore).toBe(false);
+  });
+
+  it("a page of a newer read reads the list again rather than skip or repeat hits", async () => {
+    catalogue(450);
+    await searchSkills("");
+    epoch = 2;
+    await loadMoreSkills();
+    await flush();
+    expect(asked).toEqual([[200, 0], [200, 200], [400, 0]]);
+    expect(shown()).toEqual(names(400));
+  });
+
+  it("a read of the same query keeps every page loaded, in pages the daemon gives", async () => {
+    catalogue(1000);
+    await searchSkills("");
+    for (let i = 0; i < 3; i++) await loadMoreSkills();
+    expect(shown()).toHaveLength(800);
+    asked = [];
+    await searchSkills("");
+    expect(asked).toEqual([[500, 0], [300, 500]]);
+    expect(shown()).toEqual(names(800));
+  });
+
+  it("another query starts from the first page", async () => {
+    catalogue(450);
+    await searchSkills("");
+    await loadMoreSkills();
+    asked = [];
+    await searchSkills("x");
+    expect(asked).toEqual([[200, 0]]);
+  });
+
+  it("a failed page keeps what is loaded and says why, until the next try", async () => {
+    let down = true;
+    install({ search: (_q, limit, offset) => (offset > 0 && down ? Promise.reject(new Error("daemon down")) : Promise.resolve({ ...searchView(names(450).slice(offset, offset + limit)), total: 450 })) });
+    await searchSkills("");
+    await loadMoreSkills();
+    expect(shown()).toHaveLength(200);
+    expect(useSkillMarketplaceStore.getState().loadMoreError).toBe("daemon down");
+    down = false;
+    await loadMoreSkills();
+    expect(shown()).toHaveLength(400);
+    expect(useSkillMarketplaceStore.getState().loadMoreError).toBe("");
   });
 });
 

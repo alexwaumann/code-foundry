@@ -202,7 +202,7 @@ const tierProto = (t: Tier) => (t === "enterprise" ? SkillTier.ENTERPRISE : Skil
 const tierRank = (t: Tier) => (t === "enterprise" ? 0 : 1);
 
 /** The daemon's marketplace.Search (internal/store/skill/marketplace/search.go). */
-export function searchEntries(entries: readonly Entry[], q: { text: string; tier: Tier | ""; kind: Kind | ""; limit: number }): { hits: Entry[]; total: number } {
+export function searchEntries(entries: readonly Entry[], q: { text: string; tier: Tier | ""; kind: Kind | ""; limit: number; offset?: number }): { hits: Entry[]; total: number } {
   const limit = Math.min(q.limit > 0 ? q.limit : 50, 500);
   const text = q.text.toLowerCase().split(/\s+/).filter(Boolean).join(" ");
   const words = text.split(" ").filter(Boolean);
@@ -221,7 +221,8 @@ export function searchEntries(entries: readonly Entry[], q: { text: string; tier
     .map((e) => ({ e, r: rank(e.name) }))
     .sort((a, b) => cmp(a.r, b.r) || cmp(a.e.name.toLowerCase(), b.e.name.toLowerCase()) || cmp(tierRank(a.e.tier), tierRank(b.e.tier)) || cmp(a.e.kind, b.e.kind) || cmp(a.e.path, b.e.path))
     .map((h) => h.e);
-  return { hits: hits.slice(0, limit), total: hits.length };
+  const start = Math.max(q.offset ?? 0, 0);
+  return { hits: hits.slice(start, start + limit), total: hits.length };
 }
 
 export interface SkillDeps {
@@ -340,7 +341,7 @@ export class MockSkills {
     if (req.refresh) refreshError = this.refreshNow();
     const tier = req.tier === SkillTier.ENTERPRISE ? "enterprise" : req.tier === SkillTier.COMMUNITY ? "community" : "";
     const kind = req.kind === SkillKind.PLUGIN ? "plugin" : req.kind === SkillKind.SKILL ? "skill" : "";
-    const { hits, total } = searchEntries(this.catalogue(), { text: req.query, tier, kind, limit: req.limit });
+    const { hits, total } = searchEntries(this.catalogue(), { text: req.query, tier, kind, limit: req.limit, offset: req.offset });
     return { entries: hits.map((e) => this.entryMsg(e)), total, refreshError, epoch: BigInt(this.epoch) };
   }
 
@@ -499,16 +500,17 @@ export class MockSkills {
           { name: "tier", type: ArgType.ENUM, required: false, description: "Only this tier", enumValues: ["enterprise", "community"] },
           { name: "kind", type: ArgType.ENUM, required: false, description: "Only plugins or only skills", enumValues: ["plugin", "skill"] },
           { name: "limit", type: ArgType.INT, required: false, description: "At most this many (up to 500)", defaultValue: "50" },
+          { name: "offset", type: ArgType.INT, required: false, description: "Skip this many matches: the next page", defaultValue: "0" },
           { name: "refresh", type: ArgType.BOOL, required: false, description: "Update the marketplaces first" },
         ]),
         when: always,
         run: (_c, a) => {
-          this.record("skill.browse", a, ["query", "tier", "kind", "limit", "refresh"]);
+          this.record("skill.browse", a, ["query", "tier", "kind", "limit", "offset", "refresh"]);
           if (a.refresh === "true") this.refreshNow();
           if (this.noRegistries) return `Claude Code has no plugin marketplace; add your organisation's with: claude plugin marketplace add <owner>/<repo> (for example the ${SKILL_MARKETPLACE} repository)`;
-          const { hits, total } = searchEntries(this.catalogue(), { text: a.query ?? "", tier: (a.tier ?? "") as Tier | "", kind: (a.kind ?? "") as Kind | "", limit: Number(a.limit ?? 50) });
+          const { hits, total } = searchEntries(this.catalogue(), { text: a.query ?? "", tier: (a.tier ?? "") as Tier | "", kind: (a.kind ?? "") as Kind | "", limit: Number(a.limit ?? 50), offset: Number(a.offset ?? 0) });
           const lines = hits.map((e) => `${e.name}  ${e.kind}  ${e.tier}  ${e.version}`);
-          if (total > hits.length) lines.push(`${String(hits.length)} of ${String(total)} shown (--limit shows more)`);
+          if (total > hits.length) lines.push(`${String(hits.length)} of ${String(total)} shown (--limit or --offset shows more)`);
           return Promise.resolve({ message: lines.join("\n") || "nothing matches", resultJson: JSON.stringify({ total, entries: hits.map((e) => ({ kind: e.kind, name: e.name })) }) });
         },
       },
@@ -668,6 +670,13 @@ export class MockSkills {
 
   /** POST /__mock/skills: the failure and registry controls (see the file comment). */
   control(q: URLSearchParams): Record<string, unknown> {
+    const many = Number(q.get("many") ?? 0);
+    if (many > 0) {
+      // A marketplace too long for one page.
+      const from = this.entries.length;
+      for (let i = 1; i <= many; i++) this.entries.push(skill("community", "generated", `generated-${String(from + i).padStart(4, "0")}`, "Mock", "2026-10-01", "A generated skill for a long list.", ["generated"]));
+      this.bump();
+    }
     const fail = q.get("fail");
     if (fail) {
       const msg = q.get("error") ?? "";

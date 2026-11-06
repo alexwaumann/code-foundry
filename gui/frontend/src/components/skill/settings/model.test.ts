@@ -19,7 +19,6 @@ import {
   rowKeys,
   rowMain,
   searchedIds,
-  shownWords,
   skillGroup,
   skillMenu,
   sourceWords,
@@ -70,11 +69,6 @@ describe("skill settings model", () => {
     expect(sourceWords(r)).toBe(want);
   });
 
-  it("shownWords says only when the list is cut", () => {
-    expect(shownWords(42, 42)).toBe("");
-    expect(shownWords(1234, 200)).toBe("showing the first 200");
-    expect(shownWords(12_345, 1200)).toBe("showing the first 1,200");
-  });
 
   it("registryLine counts and dates a marketplace", () => {
     expect(registryLine({ plugins: 1, skills: 39, readAtMs: now - 5 * 60_000 }, now)).toBe("1 plugin · 39 skills · read 5 min ago");

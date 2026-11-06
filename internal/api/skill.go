@@ -55,7 +55,7 @@ func (h *Skill) Search(ctx context.Context, req *connect.Request[v1.SearchSkills
 	}
 	snap := h.store.Snapshot()
 	res := h.store.Search(marketplace.Query{
-		Text: m.GetQuery(), Tier: skillTiers.from(m.GetTier()), Kind: skillKinds.from(m.GetKind()), Limit: int(m.GetLimit()),
+		Text: m.GetQuery(), Tier: skillTiers.from(m.GetTier()), Kind: skillKinds.from(m.GetKind()), Limit: int(m.GetLimit()), Offset: int(m.GetOffset()),
 	})
 	out.Total, out.Epoch = int32(res.Total), snap.Epoch
 	for _, e := range res.Entries {

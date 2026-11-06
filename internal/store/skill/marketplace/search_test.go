@@ -46,6 +46,9 @@ func TestSearch(t *testing.T) {
 		{"words across fields", Query{Text: "sql   poets"}, []string{"s:haiku"}, 1},
 		{"no match", Query{Text: "nothing"}, nil, 0},
 		{"limit keeps the total", Query{Text: "sql", Limit: 2}, []string{"p:sql", "s:sql"}, 6},
+		{"offset is the next page", Query{Text: "sql", Limit: 1, Offset: 1}, []string{"s:sql"}, 6},
+		{"offset past the end", Query{Text: "sql", Offset: 6}, nil, 6},
+		{"negative offset", Query{Text: "sql", Limit: 1, Offset: -1}, []string{"p:sql"}, 6},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

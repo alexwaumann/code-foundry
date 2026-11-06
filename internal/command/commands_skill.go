@@ -83,6 +83,7 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 				{Name: "tier", Type: Enum, Enum: []string{string(marketplace.TierEnterprise), string(marketplace.TierCommunity)}, Description: "Only this tier"},
 				{Name: "kind", Type: Enum, Enum: []string{string(marketplace.KindPlugin), string(marketplace.KindSkill)}, Description: "Only plugins or only skills"},
 				{Name: "limit", Type: Int, Default: "50", Description: "At most this many (up to 500)"},
+				{Name: "offset", Type: Int, Default: "0", Description: "Skip this many matches: the next page"},
 				{Name: "refresh", Type: Bool, Description: "Update the marketplaces first (claude plugin marketplace update; network)"},
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -91,7 +92,7 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 					refreshErr = d.Skills.Refresh(ctx)
 				}
 				res := d.Skills.Search(marketplace.Query{
-					Text: a.String("query"), Tier: marketplace.Tier(a.String("tier")), Kind: kindOf(a), Limit: a.Int("limit"),
+					Text: a.String("query"), Tier: marketplace.Tier(a.String("tier")), Kind: kindOf(a), Limit: a.Int("limit"), Offset: a.Int("offset"),
 				})
 				out := browseView(d.Skills.Snapshot(), res)
 				if refreshErr != nil {
@@ -490,7 +491,7 @@ func formatSkillBrowse(v SkillBrowseView) string {
 		sb.Reset()
 		sb.WriteString(strings.Join(lines, "\n"))
 		if v.Total > len(v.Entries) {
-			fmt.Fprintf(&sb, "%d of %d shown (--limit shows more)\n", len(v.Entries), v.Total)
+			fmt.Fprintf(&sb, "%d of %d shown (--limit or --offset shows more)\n", len(v.Entries), v.Total)
 		}
 	}
 	if v.RefreshError != "" {

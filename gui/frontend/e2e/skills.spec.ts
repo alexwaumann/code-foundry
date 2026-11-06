@@ -61,6 +61,24 @@ test("Escape closes the Registries dialog and leaves Settings open; right-click 
   expect(Math.abs((at?.x ?? 0) - ((box?.x ?? 0) + 200))).toBeLessThan(8);
 });
 
+test("Browse all reads the next pages as the list scrolls to its end", async ({ page }) => {
+  await mockPost("skills?many=500");
+  await openSkills(page);
+  await page.getByTestId("skill-browse-all").click();
+  await expect(page.getByTestId("skill-catalog-rows")).toHaveAttribute("data-virtual", "true");
+  const box = await page.getByTestId("skill-catalog-rows").boundingBox();
+  await page.mouse.move((box?.x ?? 0) + 200, 400);
+  // The marketplace's last name, on the third page: only scrolling gets there.
+  const last = page.locator('[data-testid="skill-entry"][data-name="vendor-risk"]');
+  await expect
+    .poll(async () => {
+      await page.mouse.wheel(0, 6000);
+      return last.count();
+    }, { timeout: 20_000 })
+    .toBe(1);
+  await expect(page.getByTestId("skill-more")).toHaveCount(0);
+});
+
 /** SHOTS=<dir>: the PR's screenshots, WebKit, 1280x800, dark and light: default, search, Browse all, Update all. */
 for (const scheme of ["dark", "light"] as const) {
   test.describe(`screenshots (${scheme})`, () => {
