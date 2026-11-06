@@ -505,6 +505,7 @@ function routes(router: ConnectRouter): void {
     submitPullRequestReview: (req) => prDetailCall(() => world.gh.prDetails.submitReview(req.repoSlug, req.number, req.event, req.body)),
     addPullRequestComment: (req) => prDetailCall(() => world.gh.prDetails.postComment(req.repoSlug, req.number, req.body)),
     setPullRequestDraft: (req) => prDetailCall(() => world.gh.prDetails.setDraft(req.repoSlug, req.number, req.draft)),
+    setPullRequestCheckbox: (req) => prDetailCall(() => world.gh.prDetails.setCheckbox(req.repoSlug, req.number, req.index, req.text, req.checked)),
     setPullRequestAutoMerge: (req) =>
       prDetailCall(() => world.gh.prDetails.setAutoMerge(req.repoSlug, req.number, req.enabled, req.enabled ? req.method : 0, req.enabled ? req.expectedHeadSha : "")),
     getPullRequestDiff: (req) => world.gh.prDiffs.diff(req.repoSlug, req.number, req.refresh),

@@ -12,6 +12,7 @@ import { listReviewerCandidates, parseMergeResult, parseRefreshResult, parseReve
 import { mergeArgs } from "@/components/pr/merge";
 import type { Verdict } from "@/components/pr/review";
 import { copyText } from "@/lib/clipboard";
+import type { TaskItem } from "@/lib/taskItems";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
 import { runCommand, runCommandForResult } from "./commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
@@ -64,11 +65,13 @@ interface PrPanelState {
   changing: Readonly<Record<string, PrChange>>;
   /** pullRequestKey → a pr.revert in flight (from its confirmation on). */
   reverting: Readonly<Record<string, boolean>>;
+  /** taskCheckKey → the state a pr.checkbox in flight asks for (until the detail shows it). */
+  taskChecks: Readonly<Record<string, boolean>>;
   /** Lower-case repository slug → the merge method last chosen there (the split button's default). */
   mergeMethods: Readonly<Record<string, MergeMethodView>>;
 }
 
-export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, mergeMethods: {} }));
+export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, taskChecks: {}, mergeMethods: {} }));
 
 export const prTabKey = (panelKey: string, tabId: string): string => `${panelKey}\u0000${tabId}`;
 
@@ -372,6 +375,36 @@ export function usePullRequestChange(ref: PrRef): PrChange | null {
 /** The draft row's Ready for review (pr.ready) and the menu's Convert to draft (pr.draft). */
 export function setPullRequestDraft(ref: PrRef, draft: boolean): Promise<boolean> {
   return changePullRequest(ref, draft ? "draft" : "ready", draft ? "pr.draft" : "pr.ready", prArgs(ref));
+}
+
+/** A task box of a pull request's description: its pullRequestKey and its index. */
+export const taskCheckKey = (ref: PrRef, index: number): string => `${pullRequestKey(ref.slug, ref.number)}\u0000${String(index)}`;
+
+/**
+ * A click on a description's task box (components/pr/TaskBox): pr.checkbox. The box shows
+ * `checked` at once and until the detail is read again, so it never flips back on the way;
+ * a failure frees it at once and the toast says why. It says nothing on success: the box is
+ * the answer. A second click while one runs sends nothing. Other boxes do not wait: the
+ * daemon runs them one at a time, each on the last one's result.
+ */
+export async function setTaskChecked(ref: PrRef, item: TaskItem, checked: boolean): Promise<boolean> {
+  const key = pullRequestKey(ref.slug, ref.number);
+  const box = taskCheckKey(ref, item.index);
+  if (usePrPanelStore.getState().taskChecks[box] !== undefined) return false;
+  usePrPanelStore.setState((s) => ({ taskChecks: { ...s.taskChecks, [box]: checked } }));
+  let ok = false;
+  try {
+    const args = { ...prArgs(ref), index: String(item.index), checked: String(checked), text: item.text };
+    ok = (await runCommandForResult("pr.checkbox", args, { quiet: true })) !== null;
+    return ok;
+  } finally {
+    pullRequestDetailResource.invalidate(key);
+    if (ok) await settled(pullRequestDetailResource, (k) => k === key);
+    usePrPanelStore.setState((s) => {
+      const { [box]: _done, ...rest } = s.taskChecks;
+      return { taskChecks: rest };
+    });
+  }
 }
 
 /** pr.auto-merge's args: on with a method and the head shown (refused if it moved), or --off. */

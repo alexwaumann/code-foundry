@@ -10,6 +10,7 @@ import type { PluggableList } from "unified";
 import { rehypeAnswerRefs, rehypeInert } from "./answerMarkdown";
 import { INLINE_HTML_TAGS, rehypeInlineHtml } from "./inlineHtml";
 import { rehypePathChips } from "./pathChips";
+import { TASK_PROP, TASK_TEXT_PROP, rehypeTaskItems, remarkTaskItems } from "./taskItems";
 
 /** What markdown and GFM produce themselves. */
 const markdownTags = [
@@ -34,7 +35,12 @@ const markdownSchema: SanitizeSchema = {
 const inlineSchema: SanitizeSchema = { ...markdownSchema, tagNames: [...new Set([...markdownTags, ...INLINE_HTML_TAGS])] };
 
 export const remarkPlugins: PluggableList = [remarkGfm];
+/** With boxes people can tick (MarkdownExtras.task, lib/taskItems). */
+export const remarkTaskPlugins: PluggableList = [remarkGfm, remarkTaskItems];
 const rehypePlugins: PluggableList = [rehypeRaw, [rehypeSanitize, markdownSchema]];
+/** rehypePlugins with lib/taskItems' numbers on the real boxes: put there before rehype-raw makes raw HTML into elements, kept by the sanitizer. */
+const taskSchema: SanitizeSchema = { ...markdownSchema, attributes: { ...markdownSchema.attributes, input: [...(markdownSchema.attributes?.input ?? []), TASK_PROP, TASK_TEXT_PROP] } };
+const rehypePluginsTasks: PluggableList = [rehypeTaskItems, rehypeRaw, [rehypeSanitize, taskSchema]];
 /**
  * Without raw HTML: HTML in the source shows as text, except matched pairs of a few inline
  * tags (small, mark, sub, sup, kbd, ins, s, del, u) and br, which render
@@ -51,9 +57,9 @@ export function rehypePluginsInertFor(opts: { citations: boolean }): PluggableLi
   return opts.citations ? [...rehypePluginsInert, rehypeAnswerRefs] : rehypePluginsInert;
 }
 
-/** The rehype plugins for a surface: raw HTML or not, then the prose path pass when it draws path chips. */
-export function rehypePluginsFor(opts: { html: boolean; pathChips: boolean }): PluggableList {
-  const base = opts.html ? rehypePlugins : rehypePluginsNoHtml;
+/** The rehype plugins for a surface: raw HTML or not (with numbered task boxes, for a GitHub body), then the prose path pass when it draws path chips. */
+export function rehypePluginsFor(opts: { html: boolean; pathChips: boolean; tasks?: boolean }): PluggableList {
+  const base = !opts.html ? rehypePluginsNoHtml : opts.tasks ? rehypePluginsTasks : rehypePlugins;
   return opts.pathChips ? [...base, rehypePathChips] : base;
 }
 

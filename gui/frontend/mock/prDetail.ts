@@ -47,6 +47,8 @@
  * moves. Approving or requesting changes on the viewer's own pull request is refused
  * with GitHub's message, as the daemon relays it (FAILED_PRECONDITION).
  *
+ * Task boxes (pr.checkbox; SetPullRequestCheckbox): see setCheckbox.
+ *
  * Draft and auto-merge (pr.ready, pr.draft, pr.auto-merge; SetPullRequestDraft and
  * SetPullRequestAutoMerge), with the daemon's refusals (FAILED_PRECONDITION; no write
  * access is PERMISSION_DENIED): not open, already so, a draft with auto-merge, a method
@@ -79,12 +81,14 @@ import {
   AddPullRequestCommentResponseSchema,
   SubmitPullRequestReviewResponseSchema,
   SetPullRequestAutoMergeResponseSchema,
+  SetPullRequestCheckboxResponseSchema,
   SetPullRequestDraftResponseSchema,
   MergeStateStatus,
   Mergeable,
   type ReviewerCandidateSchema,
 } from "../src/gen/codefoundry/v1/gh_pb";
 import { matchesReviewerSearch, reviewerSearchTokens } from "../src/components/pr/reviewerSearch";
+import { setTaskLine, taskMessage } from "./taskBody";
 import type { PrInit } from "./github";
 import type { InvokeOut } from "./gitops";
 
@@ -1033,6 +1037,28 @@ export class PrDetailWorld {
       })),
       {
         cmd: {
+          name: "pr.checkbox", noPalette: true,
+          title: "Set Pull Request Task",
+          category: "Pull Request",
+          description: "Tick or untick one task-list item of a pull request's description, as on GitHub. Refused if the item moved or changed since it was read.",
+          keybindings: [],
+          args: [
+            slugArg,
+            numberArg,
+            { name: "index", type: ArgType.INT, required: true, description: "Which task-list item, counted from 0 in the order they are written (nested ones too)" },
+            { name: "checked", type: ArgType.BOOL, required: true, description: "Tick it (--checked=false: untick it)" },
+            { name: "text", type: ArgType.STRING, required: false, description: "The item's text as shown: its source line after the box. Refused unless it still reads the same" },
+          ],
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const r = prDetailCall(() => this.setCheckbox(slug, n, Number(args.index), args.text ?? "", args.checked === "true"));
+          return out(r.message, toJson(SetPullRequestCheckboxResponseSchema, create(SetPullRequestCheckboxResponseSchema, r)));
+        },
+      },
+      {
+        cmd: {
           name: "pr.auto-merge", noPalette: true,
           title: "Auto-merge Pull Request",
           category: "Pull Request",
@@ -1205,6 +1231,27 @@ export class PrDetailWorld {
     this.touch(d, timestampFromDate(new Date()));
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
     return { draft, message: draft ? `Converted #${String(number)} to a draft` : `Marked #${String(number)} ready for review` };
+  }
+
+  /**
+   * Ticks or unticks a task of the description (SetPullRequestCheckbox, pr.checkbox), in any
+   * state, refused like the daemon: the item gone or reading differently, no write access
+   * (#140). POST /__mock/gh/pr-fail?command=pr.checkbox refuses the next one as edited on
+   * GitHub. A change edits the fixture's body and is announced.
+   */
+  setCheckbox(slug: string, number: number, index: number, text: string, checked: boolean): { changed: boolean; message: string } {
+    this.h.count("SetPullRequestCheckbox");
+    const d = this.detailOf(slug, number);
+    if (!d.pullRequest) throw new PrDetailError("not_found", `Could not resolve to a PullRequest with the number of ${String(number)}.`);
+    const refuse = (why: string) => new PrDetailError("failed_precondition", `failed precondition: pull request #${String(number)} ${why}; look again and retry`);
+    if (this.failNext.delete("pr.checkbox")) throw refuse(`has a different task ${String(index + 1)} in its description now ("edited on GitHub", was "${text}")`);
+    if (!d.viewerCanUpdate) throw new PrDetailError("permission_denied", "permission denied on github: Resource not accessible by integration");
+    const r = setTaskLine(d.body ?? "", index, text, checked);
+    if ("refusal" in r) throw refuse(r.refusal);
+    d.body = r.body;
+    this.touch(d, timestampFromDate(new Date()));
+    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+    return { changed: r.changed, message: taskMessage(number, index, checked) };
   }
 
   /**

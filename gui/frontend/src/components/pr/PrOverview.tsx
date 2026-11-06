@@ -10,8 +10,9 @@ import { openUrl } from "@/stores/gh";
 import { sectionOpenByDefault, toggleOrder, toggleSection, usePrPanelStore, type PrSection } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
-import { Markdown } from "./Markdown";
+import { Markdown, type MarkdownExtras } from "./Markdown";
 import { usePanelMarkdownExtras } from "./prLinks";
+import { TaskBox } from "./TaskBox";
 import { ago, commentCount, conversation, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
 import { ReviewerPicker } from "./ReviewerPicker";
 import { toneText } from "./tones";
@@ -105,8 +106,15 @@ function Label({ l }: { l: PullRequestLabelView }) {
  * fade and a centred Show all, which shows it whole in place (Show less folds it again).
  * Kept per panel tab.
  */
-function Description({ d, tabKey }: { d: PullRequestDetailView; tabKey: string }) {
-  const extras = usePanelMarkdownExtras();
+function Description({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
+  const panelExtras = usePanelMarkdownExtras();
+  const { slug, number } = prRef;
+  // Only here, and only for someone who can edit it, whatever state the pull request is in
+  // (GitHub lets them tick a merged one's boxes). Comments and threads stay read-only.
+  const extras = useMemo<MarkdownExtras>(
+    () => (d.viewerCanUpdate ? { ...panelExtras, task: (item) => <TaskBox prRef={{ slug, number }} item={item} /> } : panelExtras),
+    [panelExtras, d.viewerCanUpdate, slug, number],
+  );
   const full = useSectionOpen(tabKey, "fullDescription");
   const [ref, taller] = useTallerThan(FOLD_PX);
   const folded = taller && !full;
@@ -319,7 +327,7 @@ export function PrOverview({ d, prRef, tabKey }: { d: PullRequestDetailView; prR
         </div>
       )}
       <Section tabKey={tabKey} section="description" title="Description" testId="pr-description">
-        <Description d={d} tabKey={tabKey} />
+        <Description d={d} prRef={prRef} tabKey={tabKey} />
       </Section>
       <Section tabKey={tabKey} section="comments" title="Comments" count={commentCount(d)} extra={<OrderToggle tabKey={tabKey} which="commentOrder" />} testId="pr-comments">
         <Conversation items={items} />
