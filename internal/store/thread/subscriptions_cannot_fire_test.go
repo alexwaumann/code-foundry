@@ -150,25 +150,24 @@ func TestSubscribeLookupFails(t *testing.T) {
 func TestSubscribeLookupTimesOut(t *testing.T) {
 	prs := newFakePRs()
 	asked := make(chan time.Time, 1)
+	timeUp := make(chan struct{}) // the question lasts until the store answered
 	prs.lookup = func(ctx context.Context, _ string) (PullRequestInfo, error) {
 		deadline, _ := ctx.Deadline()
 		asked <- deadline
-		<-ctx.Done()
-		return PullRequestInfo{}, ctx.Err()
+		<-timeUp
+		return PullRequestInfo{}, context.DeadlineExceeded
 	}
 	e := newEnv(t, prs.opts)
 	parent := e.stopped("parent")
 	other := e.stopped("other")
 	start := time.Now()
-	ctx, cancel := context.WithCancel(e.ctx()) // the question lasts until the store answered
-	defer cancel()
 	type result struct {
 		res SubscribeResult
 		err error
 	}
 	done := make(chan result, 1)
 	go func() {
-		res, err := e.m.Subscribe(ctx, SubscribeOptions{SubscriberID: parent.ID, TargetPullRequest: "acme/web#7"})
+		res, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetPullRequest: "acme/web#7"})
 		done <- result{res, err}
 	}()
 	if d := <-asked; d.IsZero() || d.After(start.Add(prLookupTimeout+time.Second)) {
@@ -191,7 +190,7 @@ func TestSubscribeLookupTimesOut(t *testing.T) {
 	case <-time.After(prLookupTimeout / 2):
 		t.Fatal("the store waits for the question: a lock is held")
 	}
-	cancel()
+	close(timeUp)
 	r := <-done
 	if r.err != nil || r.res.Fired || len(r.res.Warnings) != 1 {
 		t.Fatalf("= %+v, %v", r.res, r.err)
@@ -587,4 +586,45 @@ func (f *statusPluginWakes) Describe(target string) (string, string) {
 		status = f.status
 	}
 	return name, status
+}
+
+// A caller that gave up while the lookup ran would never see a subscription made for it.
+func TestCanceledCallerGetsNoSubscription(t *testing.T) {
+	prs := newFakePRs()
+	prs.lookup = func(ctx context.Context, _ string) (PullRequestInfo, error) {
+		<-ctx.Done()
+		return PullRequestInfo{}, ctx.Err()
+	}
+	e := newEnv(t, prs.opts)
+	parent := e.stopped("parent")
+	ctx, cancel := context.WithCancel(e.ctx())
+	go func() { time.Sleep(10 * time.Millisecond); cancel() }()
+	if _, err := e.m.Subscribe(ctx, SubscribeOptions{SubscriberID: parent.ID, TargetPullRequest: "acme/web#7"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Subscribe = %v, want context.Canceled", err)
+	}
+	if subs, err := e.m.Subscriptions(e.ctx(), parent.ID); err != nil || len(subs) != 0 {
+		t.Errorf("subscriptions = %v, %v, want none", subs, err)
+	}
+}
+
+// Subscribing again after an unchecked one, as its warning invites: the fresh answer fires it.
+func TestSubscribingAgainFiresWhatTheAnswerMeets(t *testing.T) {
+	prs := newFakePRs() // no answer: subscribed unchecked
+	e := newEnv(t, prs.opts)
+	parent := e.stopped("parent")
+	o := SubscribeOptions{SubscriberID: parent.ID, TargetPullRequest: "acme/web#7", Condition: CondMerged}
+	if _, err := e.m.Subscribe(e.ctx(), o); err != nil {
+		t.Fatal(err)
+	}
+	prs.set(PullRequestInfo{Slug: "acme/web", Number: 7, State: "merged"})
+	res, err := e.m.Subscribe(e.ctx(), o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Fired {
+		t.Errorf("Subscribe = %+v, want fired", res)
+	}
+	if subs, err := e.m.Subscriptions(e.ctx(), parent.ID); err != nil || len(subs) != 0 {
+		t.Errorf("subscriptions = %v, %v, want none", subs, err)
+	}
 }

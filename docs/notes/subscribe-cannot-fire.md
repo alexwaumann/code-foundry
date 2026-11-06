@@ -68,6 +68,10 @@ disabled plugin) and already-met wakes are as they were.
 
 ## After that: only change events
 
+`resolveFingerprints` keeps a known copy when a detail fetch fails, and used to keep its state too,
+so a reopened pull request could be reported closed. It takes state and head from the fingerprint now,
+because everything here trusts the state on an event.
+
 `PullRequestChanged` reads the state off the event, which is the poll's fresh copy:
 
 * A subscription the event meets fires as before. `merged` and `closed` go even with
@@ -111,6 +115,18 @@ All existing limits but the last three, none fixed here:
 * New here: a close between the lookup and the first poll of the branch can go unreported,
   since a list's first poll only records. Subscribing brings that poll forward, so the
   window is seconds.
+
+- The lookup can be fresher than the poll, so the next poll can repeat what it saw. `--until
+  checks_done --repeat` subscribed just after checks finish fires at once, then again when the
+  poll reports pending to success: two identical wakes for one result. A one-shot `changed` on a
+  pull request closed less than a poll ago is kept with its warning, then spent by the poll's late
+  `closed`, so a later reopening is not heard. Keeping the lookup's answer on the record and
+  ignoring a first event that only repeats it would close both; not done, as neither loses work.
+- Subscribing again after a failed lookup: a condition the new answer meets fires then. A
+  condition it says cannot fire is refused and the old subscription stays armed, which still hears
+  a reopening.
+- One wake per subscription: three subscriptions on a merged pull request are three wakes and
+  three of the 60 an hour. One message per event per subscriber would be a good follow-up.
 
 ## End to end
 

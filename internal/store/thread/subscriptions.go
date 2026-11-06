@@ -670,6 +670,15 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 			case g.after > 0:
 				return m.armLocked(r, target, g.after, sub.Note), nil
 			}
+			// Subscribing again, as a warning about an unchecked one invites: this answer is
+			// fresh, so a condition it meets fires now rather than never.
+			if pr != nil && sub.TargetKind == TargetPullRequest && prAlreadyMet(r.s.Condition, *pr) && (!r.s.Repeat || prTerminal(r.s.Condition)) {
+				p := *pr
+				if m.fireLocked(r, func(s Subscription, at time.Time) Message { return prWake(s, p, nil, at) }) {
+					s.removeLocked([]string{r.s.ID})
+					return SubscribeResult{Subscription: r.s, Fired: true}, nil
+				}
+			}
 			if r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note) {
 				r.s.Repeat = sub.Repeat
 				r.s.Note = cmp.Or(sub.Note, r.s.Note)

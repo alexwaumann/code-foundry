@@ -19,12 +19,15 @@ const prLookupTimeout = 5 * time.Second
 
 // checkPullRequest asks GitHub about target for a subscription with condition c, off the
 // locks. It returns the pull request and a warning, or the refusal. A failed question
-// refuses nothing: the subscription stays, nil and warned about.
-func (m *Manager) checkPullRequest(ctx context.Context, target string, c Condition) (*PullRequestInfo, string, error) {
-	ctx, cancel := context.WithTimeout(ctx, prLookupTimeout)
+// refuses nothing: the subscription stays, nil and warned about. A caller that gave up gets
+// its error: it would never see a subscription made for it.
+func (m *Manager) checkPullRequest(caller context.Context, target string, c Condition) (*PullRequestInfo, string, error) {
+	ctx, cancel := context.WithTimeout(caller, prLookupTimeout)
 	defer cancel()
 	p, err := m.opts.LookupPullRequest(ctx, target)
 	switch {
+	case caller.Err() != nil:
+		return nil, "", caller.Err()
 	case errors.Is(err, ErrNotFound):
 		return nil, "", fmt.Errorf("%w: pull request %s does not exist, or this GitHub login cannot see it; check the owner, name and number",
 			ErrFailedPrecondition, target)
