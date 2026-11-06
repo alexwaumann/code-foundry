@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -234,14 +235,18 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 	if err != nil {
 		// A deadline or an oversized message has only sent the close frame: the socket is
 		// still open, and hangUp ends it.
-		go readUntilGone(read, c, func() {})
+		go readUntilGone(read, c, func(error) {})
 		t.hangUp(c, conn, websocket.StatusPolicyViolation, "bad request", stopRead)
 		return "no request"
 	}
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	go readUntilGone(read, c, cancel)
+	var end clientEnd
+	go readUntilGone(read, c, func(err error) {
+		end.note(err)
+		cancel()
+	})
 
 	header.Set("Origin", origin)
 	req := (&http.Request{
@@ -263,24 +268,55 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 	t.opts.Next.ServeHTTP(w, req)
 	cancel()
 	w.Flush()
+	// Before hangUp: the answer to the daemon's own close frame is a close frame too.
+	reason := closeReason(end.Load(), w.err)
 	t.hangUp(c, conn, websocket.StatusNormalClosure, "", stopRead)
+	return reason
+}
+
+// clientEnd is what the read side saw of the client while the handler ran. The first
+// sighting stands: the read that fails after a write has closed the socket says nothing.
+type clientEnd struct{ atomic.Int32 }
+
+const (
+	clientThere   = iota
+	clientClosed  // it sent a close frame, or data, which counts as one
+	clientDropped // the connection died with no close frame
+)
+
+// note records how a read ended; nil is data past the request.
+func (e *clientEnd) note(err error) {
+	end := int32(clientClosed)
+	if err != nil && websocket.CloseStatus(err) == -1 {
+		end = clientDropped
+	}
+	e.CompareAndSwap(clientThere, end)
+}
+
+// closeReason says how a tunnel ended, for the log. A client's close comes first: the
+// handler's end of stream is then written to a closed socket, and that failed write is not
+// news. Past that a write that ran out of time is a stuck client, and any other failed write,
+// or a read that died, is a client that left with no close (docs/notes/ws-transport.md).
+func closeReason(end int32, writeErr error) string {
 	switch {
-	case errors.Is(w.err, context.DeadlineExceeded), errors.Is(w.err, context.Canceled):
+	case end == clientClosed:
+		return "client closed"
+	case errors.Is(writeErr, context.DeadlineExceeded), errors.Is(writeErr, context.Canceled):
 		return "write timeout"
-	case w.err != nil:
+	case writeErr != nil, end == clientDropped:
 		return "client gone"
 	}
 	return "served"
 }
 
-// readUntilGone reads the socket until it is closed, calling gone on anything it reads:
-// past the head and the body, any data counts as the client's close. This is CloseRead
-// without its data path, which waits on itself before it cancels (docs/notes/ws-tunnel.md).
-// A reader must run for ping, pong and close frames to be seen at all.
-func readUntilGone(ctx context.Context, c *websocket.Conn, gone func()) {
+// readUntilGone reads the socket until it is closed, calling gone on anything it reads, with
+// the read's error: past the head and the body, any data counts as the client's close. This
+// is CloseRead without its data path, which waits on itself before it cancels
+// (docs/notes/ws-tunnel.md). A reader must run for ping, pong and close frames to be seen at all.
+func readUntilGone(ctx context.Context, c *websocket.Conn, gone func(error)) {
 	for {
 		_, _, err := c.Read(ctx)
-		gone()
+		gone(err)
 		if err != nil {
 			return
 		}
