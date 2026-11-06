@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DictationService } from "@/gen/codefoundry/v1/dictation_pb";
 import { EmberService } from "@/gen/codefoundry/v1/ember_pb";
 import { EventService } from "@/gen/codefoundry/v1/events_pb";
 import { HealthService } from "@/gen/codefoundry/v1/health_pb";
 import { PluginService } from "@/gen/codefoundry/v1/plugin_pb";
+import { ProjectService } from "@/gen/codefoundry/v1/project_pb";
+import { SearchService } from "@/gen/codefoundry/v1/search_pb";
 import { TerminalService } from "@/gen/codefoundry/v1/terminal_pb";
 import { ThreadService } from "@/gen/codefoundry/v1/thread_pb";
 import { DaemonConnection, jsonRequested } from "./endpoint";
@@ -77,17 +80,18 @@ describe("which transport a call takes", () => {
     ["ThreadService/WatchThread", async (conn) => (await conn.client(ThreadService)).watchThread({})[Symbol.asyncIterator]().next()],
     ["TerminalService/Attach", async (conn) => (await conn.client(TerminalService)).attach({})[Symbol.asyncIterator]().next()],
     ["PluginService/WatchSurface", async (conn) => (await conn.client(PluginService)).watchSurface({})[Symbol.asyncIterator]().next()],
+    ["EventService/Watch", async (conn) => (await conn.client(EventService)).watch({})[Symbol.asyncIterator]().next()],
+    ["DictationService/Watch", async (conn) => (await conn.client(DictationService)).watch({})[Symbol.asyncIterator]().next()],
+    ["DictationService/Session", async (conn) => (await conn.client(DictationService)).session({})[Symbol.asyncIterator]().next()],
+    ["SearchService/Watch", async (conn) => (await conn.client(SearchService)).watch({})[Symbol.asyncIterator]().next()],
+    ["SearchService/WatchRecent", async (conn) => (await conn.client(SearchService)).watchRecent({})[Symbol.asyncIterator]().next()],
+    ["ProjectService/Clone", async (conn) => (await conn.client(ProjectService)).clone({})[Symbol.asyncIterator]().next()],
   ])("is the socket for %s", async (procedure, call) => {
     const got = await reached(call);
     expect(got).toEqual({ socket: [`ws://127.0.0.1:1/stream/codefoundry.v1.${procedure}`], fetch: [] });
   });
 
-  it("is fetch for a stream not on the list", async () => {
-    const got = await reached(async (conn) => (await conn.client(EventService)).watch({})[Symbol.asyncIterator]().next());
-    expect(got).toEqual({ socket: [], fetch: ["http://127.0.0.1:1/codefoundry.v1.EventService/Watch"] });
-  });
-
-  it("is fetch for a unary call of a service with a listed stream", async () => {
+  it("is fetch for a unary call of a service with a stream", async () => {
     const got = await reached(async (conn) => (await conn.client(EmberService)).getStatus({}));
     expect(got).toEqual({ socket: [], fetch: ["http://127.0.0.1:1/codefoundry.v1.EmberService/GetStatus"] });
   });

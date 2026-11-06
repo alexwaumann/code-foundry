@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UpdateStateView, UpdateStatusView } from "@/api/update";
 import type { CutOff } from "./thread";
-import { busyHeading, compareVersions, cutOffLabel, displayVersion, failureHeadline, olderStable, updateBadge, updateView, versionMismatch, type Restarting, type ThreadActivity, type UpdateVariant } from "./update";
+import { busyHeading, compareVersions, cutOffLabel, displayVersion, failureHeadline, olderStable, predatesTunnel, TUNNEL_SINCE, updateBadge, updateView, versionMismatch, type Restarting, type ThreadActivity, type UpdateVariant } from "./update";
 
 describe("displayVersion", () => {
   it.each([
@@ -449,5 +449,58 @@ describe("failureHeadline", () => {
     ["gh: HTTP 403: API rate limit exceeded", "Installer failed"],
   ])("%s", (reason, want) => {
     expect(failureHeadline(reason)).toBe(want);
+  });
+});
+
+describe("predatesTunnel", () => {
+  it.each([
+    ["v0.21.5", true],
+    ["v0.21.6-tip.1", true],
+    [TUNNEL_SINCE, false],
+    ["v0.21.6-tip.28", false],
+    ["v0.21.6", false],
+    ["v0.22.0", false],
+    ["dev", false],
+    ["mock", false],
+    ["", false],
+  ])("%s: %s", (version, want) => {
+    expect(predatesTunnel(version)).toBe(want);
+  });
+});
+
+describe("a daemon from before the tunnel", () => {
+  const gui = "v0.22.0";
+  // Its updater has its own view of things, and none of it is about this window.
+  const states = ["idle", "available", "downloading", "failed", "downloaded", "installed", "restartRequired"] as const;
+
+  it.each(states)("asks for a restart in state %s", (state) => {
+    const st = status(state, { currentVersion: "v0.21.5", targetVersion: "v0.21.6" });
+    const v = updateView(st, gui, { busy: 0 }, null, true);
+    expect(v.variant).toBe("partlyApplied");
+    expect(v.primary).toBe("Restart Now");
+    expect(v.body).toBe("The app is on v0.22.0 but the daemon is still on v0.21.5; nothing updates live until you restart.");
+    expect(updateBadge(st, gui, true)).toEqual({ kind: "installed", label: "v0.22.0 installed", cta: "Restart to apply" });
+  });
+
+  it("asks even when the daemon's updates are off", () => {
+    expect(updateView(status("idle", { enabled: false, currentVersion: "v0.21.5" }), gui, { busy: 0 }, null, true).variant).toBe("partlyApplied");
+  });
+
+  it("lists what a restart cuts off, and lets it wait", () => {
+    const v = updateView(status("idle", { currentVersion: "v0.21.5" }), gui, { busy: 2 }, null, true);
+    expect(v.showBusy).toBe(true);
+    expect(v.later).toBe("Wait, I’ll restart later");
+  });
+
+  it("shows the restart once it has run", () => {
+    expect(updateView(status("idle", { currentVersion: "v0.21.5" }), gui, { busy: 0 }, { install: "" }, true).variant).toBe("restarting");
+  });
+
+  it("says the same to a dev window", () => {
+    expect(updateView(status("idle", { currentVersion: "v0.21.5" }), "dev", { busy: 0 }, null, true).body).toContain("The app is on dev but the daemon is still on v0.21.5");
+  });
+
+  it("is nothing outside Wails", () => {
+    expect(updateBadge(status("idle", { currentVersion: "v0.21.5" }), null, true)).toBeNull();
   });
 });

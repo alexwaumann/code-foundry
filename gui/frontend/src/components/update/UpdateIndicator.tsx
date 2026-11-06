@@ -19,7 +19,8 @@ const tone: Record<UpdateBadgeKind, { className: string; icon: LucideIcon }> = {
 export function UpdateIndicator() {
   const status = useUpdateStore((s) => s.status);
   const guiVersion = useUpdateStore((s) => s.guiVersion);
-  const badge = useMemo(() => updateBadge(status, guiVersion), [status, guiVersion]);
+  const oldDaemon = useUpdateStore((s) => s.oldDaemon);
+  const badge = useMemo(() => updateBadge(status, guiVersion, oldDaemon), [status, guiVersion, oldDaemon]);
   if (!badge) return null;
   const { className, icon: Icon } = tone[badge.kind];
   return (

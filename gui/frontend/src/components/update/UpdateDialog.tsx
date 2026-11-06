@@ -228,8 +228,9 @@ export function UpdateDialog() {
   const st = useUpdateStore((s) => s.status);
   const guiVersion = useUpdateStore((s) => s.guiVersion);
   const restarting = useUpdateStore((s) => s.restarting);
+  const oldDaemon = useUpdateStore((s) => s.oldDaemon);
   const busy = useCutOffThreadIds().length;
-  const v = useMemo(() => (st ? updateView(st, guiVersion, { busy }, restarting) : null), [st, guiVersion, busy, restarting]);
+  const v = useMemo(() => (st ? updateView(st, guiVersion, { busy }, restarting, oldDaemon) : null), [st, guiVersion, busy, restarting, oldDaemon]);
   return (
     <Dialog
       open={open}

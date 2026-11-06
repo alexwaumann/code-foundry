@@ -1,6 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it, vi } from "vitest";
-import { backoffDelay, errorMessage, isUnreachable, runStream, sendErrorMessage, type StreamStatus } from "./stream";
+import { backoffDelay, errorMessage, HEARTBEAT, isUnreachable, runStream, sendErrorMessage, type StreamStatus } from "./stream";
 
 /** A controllable server stream: push events, end, or fail it from the test. */
 function fakeStream<T>() {
@@ -153,6 +153,52 @@ describe("runStream", () => {
     await tick();
     await tick();
     expect(statuses.length).toBe(before);
+  });
+});
+
+describe("backoff with onConnect", () => {
+  it("grows while the calls pass and the stream never brings a message", async () => {
+    const delays: number[] = [];
+    let opens = 0;
+    const stop = runStream({
+      // eslint-disable-next-line require-yield
+      open: async function* () {
+        opens++;
+        await Promise.resolve(); // onConnect's calls get there first
+        await Promise.resolve();
+        throw new TypeError("a WebSocket stream closed with 1006");
+      },
+      onConnect: () => Promise.resolve(),
+      onEvent: () => undefined,
+      // A macrotask: a sleep that resolves at once would never let the test's own timers run.
+      sleep: (ms) => {
+        delays.push(ms);
+        return new Promise((resolve) => setTimeout(resolve, 0));
+      },
+    });
+    await vi.waitFor(() => {
+      expect(opens).toBeGreaterThan(4);
+    });
+    stop();
+    // Jitter is 20% either way: the third wait is past anything the first can be.
+    expect(delays[2]).toBeGreaterThan((delays[0] ?? 0) * 2);
+  });
+
+  it("calls onMessage for heartbeats too", async () => {
+    const onMessage = vi.fn();
+    const stop = runStream<string>({
+      open: async function* () {
+        yield HEARTBEAT;
+        yield "event";
+        await new Promise(() => undefined);
+      },
+      onEvent: () => undefined,
+      onMessage,
+    });
+    await vi.waitFor(() => {
+      expect(onMessage).toHaveBeenCalledTimes(2);
+    });
+    stop();
   });
 });
 

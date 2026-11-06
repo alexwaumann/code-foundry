@@ -4,7 +4,7 @@ import { daemon, invalidateOnTransportError } from "@/api/endpoint";
 import { reportClientState, watchEvents, type EventView } from "@/api/events";
 import { listProjects } from "@/api/project";
 import { listThreads } from "@/api/threads";
-import { errorMessage, isAbort, onPageStateChange, runStream, type StreamStatus } from "@/api/stream";
+import { errorMessage, HEARTBEAT_MS, isAbort, onPageStateChange, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
 import { applyActionEvent, useActionsStore } from "./actions";
 import { onActionRunFinished } from "./actionActions";
@@ -30,9 +30,18 @@ interface EventsState {
   /** Status of the one EventService.Watch stream that feeds every slice. */
   stream: StreamStatus;
   streamError: string | null;
+  /**
+   * No attempt has brought a message for SILENT_MS. `stream` cannot say so: onConnect's calls
+   * open it, and they work on a daemon whose sockets something is stopping
+   * (docs/notes/ws-transport.md).
+   */
+  silent: boolean;
 }
 
-export const useEventsStore = create<EventsState>()(() => ({ stream: "connecting", streamError: null }));
+export const useEventsStore = create<EventsState>()(() => ({ stream: "connecting", streamError: null, silent: false }));
+
+/** Longer than a daemon restart takes, so a restart never shows as silence. */
+export const SILENT_MS = 4 * HEARTBEAT_MS;
 
 type Handlers = { [S in EventView["source"]]: (event: Extract<EventView, { source: S }>["event"]) => void };
 
@@ -150,6 +159,9 @@ export async function reconcileThreads(signal: AbortSignal): Promise<void> {
  * while the service is unavailable.
  */
 export function startEventSync(threadRetryMs = 10_000): () => void {
+  // Counted in ticks, not by the clock: a Mac waking from sleep is not a silent stream.
+  let delivered = false;
+  let quietTicks = 0;
   const stop = runStream<EventView>({
     open: (signal) => watchEvents(signal),
     slot: { label: "events", priority: "core" },
@@ -167,10 +179,20 @@ export function startEventSync(threadRetryMs = 10_000): () => void {
     },
     onEvent: dispatchEvent,
     onStatus: (stream, err) => {
+      if (stream === "connecting" || stream === "retrying") delivered = false;
       useEventsStore.setState({ stream, streamError: err ?? null });
+    },
+    onMessage: () => {
+      delivered = true;
+      quietTicks = 0;
+      if (useEventsStore.getState().silent) useEventsStore.setState({ silent: false });
     },
     onError: invalidateOnTransportError,
   });
+  const silence = setInterval(() => {
+    quietTicks = delivered ? 0 : quietTicks + 1;
+    if (quietTicks * HEARTBEAT_MS >= SILENT_MS && !useEventsStore.getState().silent) useEventsStore.setState({ silent: true });
+  }, HEARTBEAT_MS);
   // The daemon polls GitHub less while no GUI window is visible, and counts an open
   // thread as seen only while a window is visible and focused.
   const unwatchPageState = onPageStateChange(() => void reportClientState());
@@ -182,6 +204,7 @@ export function startEventSync(threadRetryMs = 10_000): () => void {
   return () => {
     unwatchPageState();
     clearInterval(retry);
+    clearInterval(silence);
     stop();
   };
 }

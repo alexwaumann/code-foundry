@@ -10,8 +10,12 @@ vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/
 const relaunchApp = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/api/app", async (orig) => ({ ...(await orig<typeof import("@/api/app")>()), relaunchApp }));
 
+const getUpdateStatus = vi.hoisted(() => vi.fn());
+vi.mock("@/api/update", async (orig) => ({ ...(await orig<typeof import("@/api/update")>()), getUpdateStatus }));
+
 const { useCommandsStore } = await import("./commands");
-const { applyUpdateEvent, runUpdateAction, useUpdateStore } = await import("./update");
+const { useHealthStore } = await import("./health");
+const { applyUpdateEvent, runUpdateAction, startUpdateSync, useUpdateStore } = await import("./update");
 const { presentCommand } = await import("@/keys/bindings");
 
 function cmd(name: string): CommandView {
@@ -136,5 +140,70 @@ describe("applyUpdateEvent", () => {
     expect(listCommands).toHaveBeenCalledTimes(2);
     applyUpdateEvent({ kind: "status", status: st("downloaded", "v0.3.0") });
     expect(listCommands).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("a daemon from before the tunnel", () => {
+  const seen = (version: string) => {
+    useHealthStore.setState({ status: "ok", health: { pid: 1, version, uptimeSeconds: 1 }, error: null });
+  };
+  const old = { state: "available", currentVersion: "v0.21.5" } as UpdateStatusView;
+  let stop: () => void;
+
+  beforeEach(() => {
+    useUpdateStore.setState({ status: null, dialogOpen: false, oldDaemon: false });
+    useHealthStore.setState({ status: "connecting", health: null, error: null });
+    getUpdateStatus.mockResolvedValue(old);
+    stop = startUpdateSync();
+  });
+  afterEach(() => {
+    stop();
+  });
+
+  it("asks for the status by a call, since no event will bring it, and opens the dialog", async () => {
+    seen("v0.21.5");
+    await vi.waitFor(() => {
+      expect(useUpdateStore.getState().dialogOpen).toBe(true);
+    });
+    expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: true, status: old });
+  });
+
+  it("opens the dialog once, so Later stays closed through the next pings", async () => {
+    seen("v0.21.5");
+    await vi.waitFor(() => {
+      expect(useUpdateStore.getState().dialogOpen).toBe(true);
+    });
+    useUpdateStore.setState({ dialogOpen: false });
+    seen("v0.21.5");
+    await Promise.resolve();
+    expect(useUpdateStore.getState().dialogOpen).toBe(false);
+    expect(getUpdateStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again on the next ping after a failed call", async () => {
+    getUpdateStatus.mockRejectedValueOnce(new Error("no"));
+    seen("v0.21.5");
+    await vi.waitFor(() => {
+      expect(getUpdateStatus).toHaveBeenCalledTimes(1);
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    seen("v0.21.5");
+    await vi.waitFor(() => {
+      expect(useUpdateStore.getState().dialogOpen).toBe(true);
+    });
+  });
+
+  it.each(["v0.21.6-tip.2", "v0.22.0", "dev", "mock"])("leaves %s alone", async (version) => {
+    seen(version);
+    await Promise.resolve();
+    expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
+    expect(getUpdateStatus).not.toHaveBeenCalled();
+  });
+
+  it("clears once a restart brings a daemon this window can follow", () => {
+    seen("v0.21.5");
+    seen("v0.22.0");
+    expect(useUpdateStore.getState().oldDaemon).toBe(false);
   });
 });
