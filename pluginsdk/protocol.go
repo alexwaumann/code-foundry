@@ -643,8 +643,8 @@ type TerminalReadParams struct {
 // Truncated: only its last MaxBytes, from a line start. Lines is how many lines Text
 // has (0 for none; a host before pluginsdk v0.2.1 sets it with Scrollback only).
 //
-// With Scrollback, Text is the scrollback the terminal kept (its last 10,000 rows by
-// default, the scrollback lines setting) and the screen below it, oldest line first, a
+// With Scrollback, Text is the scrollback the terminal kept (its last 30,000 rows by
+// default, the scrollback rows setting) and the screen below it, oldest line first, a
 // soft-wrapped line as one line.
 type TerminalReadResult struct {
 	Text      string `json:"text"`

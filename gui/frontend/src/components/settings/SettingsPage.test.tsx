@@ -60,7 +60,7 @@ const fields: SettingFieldView[] = [
   f("threads.cache_ttl_seconds", "Prompt cache lifetime", "int", "general", "lifecycle", { defaultValue: "3600", unit: "s", min: 60, max: 86400 }),
   f("appearance.font_family", "Terminal font", "string", "appearance", "terminal", { defaultValue: "" }),
   f("appearance.font_size", "Terminal font size", "int", "appearance", "terminal", { defaultValue: "13", unit: "pt", min: 9, max: 28 }),
-  f("threads.scrollback_lines", "Scrollback", "int", "appearance", "terminal", { defaultValue: "10000", min: 100, max: 100000, restartRequired: true }),
+  f("threads.scrollback_lines", "Scrollback", "int", "appearance", "terminal", { defaultValue: "30000", min: 100, max: 100000, restartRequired: true }),
   f("appearance.backdrop", "Backdrop", "enum", "appearance", "window", { enumValues: ["forest", "none", "custom"], defaultValue: "forest" }),
   f("appearance.backdrop_file", "Backdrop file", "string", "appearance", "window"),
   f("notifications.sound", "Alert sound", "bool", "notifications", "alerts", { defaultValue: "false" }),

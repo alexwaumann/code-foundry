@@ -85,8 +85,8 @@ whole output matters, read it with the scrollback:
 everything the terminal kept, the scrollback then the screen, oldest line first, plain
 like the screen but with a soft-wrapped line as one line, and `Lines`, how many lines
 that is; at most `MaxBytes` (0 and at most: 1 MiB), its end from a line start with
-`Truncated` when longer. A terminal keeps its last 10,000 rows (the user's *Scrollback
-lines* setting, 1,000 to 100,000; a full-screen program on the alternate screen has none),
+`Truncated` when longer. A terminal keeps its last 30,000 rows (the user's *Scrollback
+rows* setting, 1,000 to 100,000; a full-screen program on the alternate screen has none),
 so there is no need to `tee` or `script(1)` the run into a file; do that only for output
 beyond those bounds. Check `h.HasCapability("terminal.scrollback")` first: an older
 Code Foundry ignores `Scrollback` and answers the screen. plugintest answers it with

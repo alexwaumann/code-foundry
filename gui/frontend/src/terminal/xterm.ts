@@ -58,7 +58,7 @@ export class XtermRenderer implements TerminalRenderer {
       fontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
       fontSize: opts.fontSize,
       theme: terminalTheme(),
-      scrollback: 10_000,
+      scrollback: 30_000,
       allowProposedApi: true,
       macOptionIsMeta: false,
       macOptionClickForcesSelection: true,
@@ -317,9 +317,9 @@ export class XtermRenderer implements TerminalRenderer {
     this.fit();
   }
 
-  /** threads.scrollback_lines. */
-  setScrollback(lines: number): void {
-    this.term.options.scrollback = lines;
+  /** threads.scrollback_lines (rows, despite the key). */
+  setScrollback(rows: number): void {
+    this.term.options.scrollback = rows;
   }
 
   /** Visible buffer as text, for tests and debugging. */
