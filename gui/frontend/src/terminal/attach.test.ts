@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AttachEventView } from "@/api/terminal";
 import { AttachController, MAX_BEHIND_BYTES, type AttachState } from "./attach";
 import type { Disposable, TermSize, TerminalRenderer } from "./renderer";
+import { XtermRenderer } from "./xterm";
 
 /** Records calls; fit() moves the grid to `container` and fires onResize like xterm. */
 class FakeRenderer implements TerminalRenderer {
@@ -367,5 +368,72 @@ describe("AttachController", () => {
     r.type("x");
     await flush();
     expect(writes).toEqual([]);
+  });
+});
+
+/** xterm's own write buffer: its reset() leaves it alone, and it throws past 50 MB. */
+describe("AttachController on a real xterm", () => {
+  const screen = (r: XtermRenderer) => {
+    const buf = r.term.buffer.active;
+    return Array.from({ length: buf.length }, (_, i) => buf.getLine(i)?.translateToString(true) ?? "").filter(Boolean);
+  };
+  const parsed = (r: XtermRenderer) =>
+    new Promise<void>((resolve) => {
+      r.term.write("", resolve);
+    });
+
+  function attached() {
+    const r = new XtermRenderer({ fontSize: 12, isGlobalChord: () => false });
+    const s = streams();
+    const ctl = new AttachController(r, { attach: s.attach, write: () => Promise.resolve(), resize: () => Promise.resolve() }, () => undefined);
+    return { r, s, ctl };
+  }
+
+  it("comes back from a flood with the snapshot's screen and no output before it", async () => {
+    const { r, s, ctl } = attached();
+    ctl.attach("t");
+    await flush();
+    s.push("t", { kind: "snapshot", data: enc("start\r\n"), cols: 80, rows: 24, altScreen: false });
+    await flush();
+    // In one task, as a page that was stopped delivers it: 64 MiB is past xterm's limit.
+    const chunk = enc("y\r\n".repeat(1 << 18));
+    for (let i = 0; i < 64 && s.aborted.length === 0; i++) {
+      s.push("t", { kind: "output", data: chunk });
+      await flush();
+    }
+    expect(s.aborted).toEqual(["t"]);
+
+    await vi.waitFor(() => {
+      expect(s.opened).toEqual(["t", "t"]);
+    });
+    s.push("t", { kind: "snapshot", data: enc("fresh\r\n"), cols: 80, rows: 24, altScreen: false });
+    s.push("t", { kind: "output", data: enc("after\r\n") });
+    await flush();
+    await vi.waitFor(async () => {
+      await parsed(r);
+      expect(screen(r)).toEqual(["fresh", "after"]);
+    });
+    expect(ctl.current.phase).toBe("live");
+    ctl.dispose();
+    r.dispose();
+  });
+
+  it("shows only the snapshot after a reconnect with output still unparsed", async () => {
+    const { r, s, ctl } = attached();
+    ctl.attach("t");
+    await flush();
+    s.push("t", { kind: "snapshot", data: enc(""), cols: 80, rows: 24, altScreen: false });
+    await flush();
+    await parsed(r); // past the snapshot, or "old" would wait behind it
+    s.push("t", { kind: "output", data: enc("old\r\n") });
+    s.push("t", { kind: "snapshot", data: enc("snap\r\n"), cols: 80, rows: 24, altScreen: false });
+    // Both in this task: xterm parses on a timer, so "old" is still in its buffer.
+    for (let i = 0; i < 4; i++) await flush();
+    await vi.waitFor(async () => {
+      await parsed(r);
+      expect(screen(r)).toEqual(["snap"]);
+    });
+    ctl.dispose();
+    r.dispose();
   });
 });
