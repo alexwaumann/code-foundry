@@ -88,6 +88,11 @@ What this showed:
   26 MB/s arrive and xterm parses about 9 MB/s, so its buffer reaches its 50 MB limit and `write`
   throws. A throw from a `parsed` callback, from replaying held output, ends xterm's parse loop for
   good. Every later snapshot's write then threw, a reconnect loop at 4/s that outlived `yes`.
+- **A big snapshot wedged it the same way, with no flood.** xterm runs a write's callback before it
+  subtracts that write from `_pendingData`, so held output replayed from a snapshot's callback still
+  counted the whole snapshot. Past 50 MB that threw inside the parse loop, and `unparsed` never came
+  back to 0, so the next snapshot never applied. 13,000 rows of per-cell truecolor at 198 columns
+  (53-58 MB) with output every 10 ms wedged 6 of 6, and every 250 ms 5 of 5. A 31 MB snapshot did not.
 - **`term.reset()` leaves xterm's write buffer alone.** So a snapshot written over a backlog met a
   screen that was not fresh, which `internal/store/terminal/snapshot.go` requires. A tab switch had
   the same hole.
@@ -97,6 +102,49 @@ second of parsing) it drops the stream, lets xterm finish, and opens a new one, 
 about one reconnect every 1.5 s with nothing open between them, and Ctrl-C shows within a second.
 Nothing is lost: the snapshot has the screen and scrollback. Input keeps working through this, so the
 phase stays `live`. A snapshot always waits for xterm to finish before `reset()`.
+
+### After xterm's parse loop
+
+`XtermRenderer.write` runs `parsed` as a microtask, so nothing the controller does can reach xterm's
+loop or its count. That is not a race. `WriteBuffer._innerWrite` calls the callback, adds to its
+offset and subtracts the size in straight-line code, and a microtask runs only once the JS stack is
+empty. Every route to that code is synchronous from there:
+
+| Route | When | Where the microtask runs |
+| --- | --- | --- |
+| The timer | Output, normally | After `_innerWrite` returns |
+| `_innerWrite` inside `write()` | The first write after user input | After the caller of `write()` returns |
+| A `.then` continuation | A parser handler returned a promise | After that continuation's `_innerWrite` returns; the callback is never reached on the pass that returns the promise |
+
+`writeSync` is a fourth, deprecated and not on the public API. `xterm.test.ts` writes 50,000,001 bytes
+through each of the three and writes again from `parsed`, which xterm refuses unless the count is
+right. A microtask also runs after any later chunks xterm parsed in the same pass, so `parsed` cannot
+be used to order anything against output after it. Nothing is: a snapshot is alone in the buffer, and
+`held` keeps the rest back.
+
+If xterm refuses a write anyway, nothing of it is in xterm and its callback will never come, so
+`AttachController.write` gives back what it counted and re-attaches, 1 s after xterm is done (a
+reconnect that met the same refusal at once would cost the daemon a snapshot each time). The rest
+of a replay goes with it, and the phase stays what it was until the new snapshot. Nothing in the code
+reaches that today: output is capped at 8 MiB behind, and a snapshot waits for an empty buffer. What
+is left is a throw from xterm's parser itself or one of our handlers, outside any write. That
+ends the loop with no callback, and neither a re-attach nor this code recovers it; nothing is known
+to do that.
+
+### Around a re-attach
+
+- **Input.** Each queued key carries its terminal, so a tab switch neither drops it nor moves it.
+  `detach` used to clear the queue, which lost whatever waited behind a Write in flight, and a key
+  typed in the next terminal during that Write waited for another key. A failed Write drops only its
+  own terminal's keys, since later ones would land with a hole before them.
+- **`Resized`.** `resize()` applies at once and xterm parses later, so a `Resized` overtook the output
+  before it, and that output, written for the old size, drew at the new one. It now waits for xterm,
+  holding what follows, in a replay too. A real xterm showed the wrong screen on the alternate screen.
+- **The host's `fit()`.** It can land between a snapshot's `write` and xterm's timer, one frame in
+  a drag, and the snapshot then draws at the wrong size. A grid that moved in that gap re-attaches.
+- **An alternate-screen program that ignores `SIGWINCH`.** xterm and libghostty keep different cells
+  across a resize, so such a screen differs from a fresh snapshot with no re-attach at all (4 of 4
+  rounds). Programs repaint on `SIGWINCH`, and those screens matched exactly.
 
 ## Terminals on the socket
 
@@ -241,5 +289,31 @@ For PR 3, on a built app with a scratch home unless noted, with the same tempora
   `request` event shows one and a count of them would have passed at 0. Stream counts through
   `/__mock/streams` held with no other change.
 
-Not verified: inline preemption on a real plugin node (e2e covers it over the mock tunnel), and a day
-of use. That is milestone 2.
+After review, on a scratch home, with the real daemon, tunnel and xterm in WebKit unless noted:
+
+- 53-58 MB snapshots: 6 of 6 rounds live with output every 10 ms, 4 of 4 every 250 ms, `unparsed` and
+  `behind` 0, no page error.
+- A new GUI on a daemon from before counts: one Attach socket through 12 MB of output, no counts
+  sent, screen correct. On this daemon: one socket, 4 counts.
+- Typing: 900 keys through a `yes`-style flood, a tab switch every 90 keys and a killed Attach socket
+  every 37. A program recording its stdin had each terminal's keys, whole and in order. Then again
+  with each Write delayed 30 ms and a switch every 47 keys. Before the fix, 12 keys of 900 were lost,
+  and 500 of 600 with the delay.
+- An alternate-screen program under a flood, resized 24 times with Attach sockets killed: 9-12
+  snapshots a round, and the grid and cursor equal a fresh attach in a new xterm, 3 of 3. The same
+  with slow output, 3 of 3. This run also passes on the code before the `Resized` fix, because the
+  program repaints: `attach.test.ts` on a real xterm is what fails without that fix.
+- A real turn in a thread with its Watch socket closed every 1-2 s: 24 closes, 40 items, and the
+  store equal to `ListItems` in seq, order and text.
+- `TestWatchThreadAcrossTunnelReconnects` does the same in Go under `-race`, with about 80 reconnects
+  over 3,000 events, and fails with seq gaps if `WatchThread` subscribes after its snapshot.
+- `live-bottom` (2 tests) and `live-stall` with real Claude Code passed.
+- The `hello` plugin on a real daemon: `WatchSurface` and the inline Attach of its Shell tab both
+  came back from a killed socket with the same view, and acts landed after it. With five slots open,
+  a bottom panel shell took `WatchBoard`'s slot, which is the inline holder, and the board came
+  back when the shell exited. The terminal node stayed live throughout.
+
+e2e does not exercise flow control: the mock takes counts and ignores them. `wstunnel_test.go` covers
+the window, the deadline and the head; `wsFetch.test.ts` covers when counts are sent.
+
+Not verified: a day of use. That is milestone 2.

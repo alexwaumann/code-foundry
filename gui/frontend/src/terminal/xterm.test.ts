@@ -197,6 +197,18 @@ describe("XtermRenderer keyup", () => {
 });
 
 describe("XtermRenderer hideCursor", () => {
+  it("does not throw behind writes over xterm's 50 MB limit: the exit must still show", async () => {
+    const r = renderer();
+    const parsed = new Promise<void>((resolve) => {
+      r.write(new Uint8Array(51_000_000), resolve);
+    });
+    expect(() => {
+      r.hideCursor();
+    }).not.toThrow();
+    await parsed;
+    r.dispose();
+  });
+
   const hidden = (r: XtermRenderer) => (r.term as unknown as { _core: { coreService: { isCursorHidden: boolean } } })._core.coreService.isCursorHidden;
 
   it("hides the cursor after the output written before it, even one that showed it", async () => {
