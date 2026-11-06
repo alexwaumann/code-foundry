@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ActionView } from "@/api/actions";
-import { actionCommandOf, actionTabStatus, addArgs, commandEcho, draftOf, draftProblem, editArgs, formatRunClock, formatRunDuration, NEW_ACTION_DRAFT, refusalText } from "./actions";
+import { actionCommandOf, actionTabStatus, addArgs, commandEcho, draftOf, draftProblem, editArgs, formatRunClock, formatRunDuration, NEW_ACTION_DRAFT } from "./actions";
 
 const action: ActionView = { id: "a-1", projectId: "repo-cf", name: "Test", command: "go test ./...", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 1 };
 
@@ -104,14 +104,3 @@ describe("drafts", () => {
   });
 });
 
-describe("refusalText", () => {
-  it.each([
-    ["failed precondition", 'failed precondition: this project already has an action named "Test"', 'this project already has an action named "Test"'],
-    ["invalid argument", "invalid argument: an action needs a name", "an action needs a name"],
-    ["not found", 'not found: action "a-1"', 'action "a-1"'],
-    ["no sentinel", 'no action "x" in this project', 'no action "x" in this project'],
-    ["only at the start", "the name: failed precondition: x", "the name: failed precondition: x"],
-  ])("%s", (_name, message, want) => {
-    expect(refusalText(message)).toBe(want);
-  });
-});
