@@ -9,6 +9,9 @@
 # Dependencies
 node_modules/
 
+# scripts/guide-eval
+__pycache__/
+
 # zig, ghostty source, and libghostty-vt build output (see `make ghostty-vt`)
 
 # macOS
