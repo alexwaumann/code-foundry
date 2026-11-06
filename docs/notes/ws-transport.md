@@ -332,10 +332,17 @@ shows `no live updates` in the status row.
 `runStream` and `isUnreachable` did not change for a socket, but two things did show up:
 
 - **`stream` says open on a dead socket.** `onConnect`'s calls open it, and those work when only sockets
-  fail. A socket that hangs would read as open for good. `silent` counts instead: 20 s with no attempt
-  bringing a message. It counts ticks, not the clock, so a Mac waking from sleep is not silence.
-- **The backoff reset on `onConnect`.** With the calls passing and the socket failing, a List could beat
-  the failure, so the stream retried every 250 ms with three List calls each. The reset now needs a message.
+  fail. A socket that hangs would read as open for good. `silent` counts instead: 20 s of answered pings with
+  no attempt bringing a message. It counts ticks, not the clock, so a Mac waking from sleep is not
+  silence, and only while the ping answers, so a daemon back from an outage is not silence while Events
+  sits out its backoff (up to about 12 s).
+- **A stopped daemon answers nothing and refuses nothing.** After SIGSTOP the socket still accepts, so
+  `ping` hung, the dot stayed green and the row blamed this Mac. `ping` now gives up after 5 s, and the
+  daemon reads as unreachable.
+- **The backoff reset.** With the calls passing and the socket failing, a List could beat the failure,
+  so the stream retried every 250 ms with three List calls each. Resetting on a message alone was the
+  same bug the other way round: a snapshot followed by a failed resync. The reset needs both a message
+  and a passed `onConnect`, in either order.
 
 ### Clone
 

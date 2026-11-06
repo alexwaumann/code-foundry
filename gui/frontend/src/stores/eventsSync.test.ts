@@ -11,6 +11,7 @@ vi.mock("./settings", async (orig) => ({ ...(await orig<typeof import("./setting
 
 const { HEARTBEAT } = await import("@/api/stream");
 const { onDaemonEvent, SILENT_MS, startEventSync, useEventsStore } = await import("./events");
+const { useHealthStore } = await import("./health");
 
 /** Runs until a message would come, which it never does. */
 const hangs: Gen = (signal) =>
@@ -44,6 +45,7 @@ let stop: () => void;
 beforeEach(() => {
   vi.useFakeTimers();
   useEventsStore.setState({ stream: "connecting", streamError: null, silent: false });
+  useHealthStore.setState({ status: "ok" });
 });
 afterEach(() => {
   stop();
@@ -67,6 +69,32 @@ describe("silent", () => {
     watch.open = delivers;
     stop = startEventSync();
     await vi.advanceTimersByTimeAsync(SILENT_MS * 3);
+    expect(useEventsStore.getState().silent).toBe(false);
+  });
+
+  it.each(["connecting", "error"] as const)("does not count while the daemon's status is %s, so its return starts from nothing", async (status) => {
+    useHealthStore.setState({ status });
+    watch.open = refused;
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(SILENT_MS * 2);
+    expect(useEventsStore.getState().silent).toBe(false);
+    useHealthStore.setState({ status: "ok" });
+    await vi.advanceTimersByTimeAsync(SILENT_MS - HEARTBEAT_MS);
+    expect(useEventsStore.getState().silent).toBe(false);
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+    expect(useEventsStore.getState().silent).toBe(true);
+  });
+
+  it("clears when the daemon goes down, and does not come back with it", async () => {
+    watch.open = refused;
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(SILENT_MS);
+    expect(useEventsStore.getState().silent).toBe(true);
+    useHealthStore.setState({ status: "error" });
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+    expect(useEventsStore.getState().silent).toBe(false);
+    useHealthStore.setState({ status: "ok" });
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
     expect(useEventsStore.getState().silent).toBe(false);
   });
 

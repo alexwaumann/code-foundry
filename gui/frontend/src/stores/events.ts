@@ -11,6 +11,7 @@ import { onActionRunFinished } from "./actionActions";
 import { closeEmptyPanels, onNewTerminal, onRemovedTerminal, revealArrived } from "./bottomActions";
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
+import { useHealthStore } from "./health";
 import { applyIntent } from "./intents";
 import { applyMemoryEvent } from "./memory";
 import { applySearchActivity } from "./searchActivity";
@@ -40,7 +41,7 @@ interface EventsState {
 
 export const useEventsStore = create<EventsState>()(() => ({ stream: "connecting", streamError: null, silent: false }));
 
-/** Longer than a daemon restart takes, so a restart never shows as silence. */
+/** Of answered pings: longer than the backoff's longest wait, so a daemon back from any outage never shows as silence. */
 export const SILENT_MS = 4 * HEARTBEAT_MS;
 
 type Handlers = { [S in EventView["source"]]: (event: Extract<EventView, { source: S }>["event"]) => void };
@@ -190,8 +191,11 @@ export function startEventSync(threadRetryMs = 10_000): () => void {
     onError: invalidateOnTransportError,
   });
   const silence = setInterval(() => {
-    quietTicks = delivered ? 0 : quietTicks + 1;
-    if (quietTicks * HEARTBEAT_MS >= SILENT_MS && !useEventsStore.getState().silent) useEventsStore.setState({ silent: true });
+    // Silence is a daemon that answers and streams nothing; a down daemon is the red dot.
+    const answers = useHealthStore.getState().status === "ok";
+    quietTicks = delivered || !answers ? 0 : quietTicks + 1;
+    const silent = quietTicks * HEARTBEAT_MS >= SILENT_MS;
+    if (silent !== useEventsStore.getState().silent) useEventsStore.setState({ silent });
   }, HEARTBEAT_MS);
   // The daemon polls GitHub less while no GUI window is visible, and counts an open
   // thread as seen only while a window is visible and focused.

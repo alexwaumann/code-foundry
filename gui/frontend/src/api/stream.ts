@@ -295,10 +295,19 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         }
         let buffering = h.onConnect !== undefined;
         const buffer: T[] = [];
+        // The attempt counts as working once the stream brought a message and any resync
+        // passed: either alone can pass while the other keeps failing.
+        let heard = false;
+        let resynced = h.onConnect === undefined;
+        const proven = () => {
+          if (heard && resynced) attempt = 0;
+        };
         const connected = h.onConnect?.(ctl.signal).then(() => {
           buffering = false;
           for (const ev of buffer.splice(0)) h.onEvent(ev);
           status("open");
+          resynced = true;
+          proven();
         });
         // A failed resync fails the whole attempt.
         connected?.catch((err: unknown) => {
@@ -310,8 +319,8 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         for await (const ev of h.open(ctl.signal)) {
           // A stopped or resynced attempt's late events must not reach the client.
           if (ctl.signal.aborted) break;
-          // The stream itself, not onConnect: its calls can pass while every socket fails.
-          attempt = 0;
+          heard = true;
+          proven();
           h.onMessage?.();
           if (first) {
             first = false;

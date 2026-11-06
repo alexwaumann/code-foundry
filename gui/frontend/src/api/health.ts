@@ -17,10 +17,13 @@ export function toHealthView(res: PingResponse): HealthView {
   };
 }
 
+/** Past this a daemon that accepts connections and never answers reads as down: a stopped process still accepts them. */
+export const PING_TIMEOUT_MS = 5_000;
+
 export async function ping(conn: DaemonConnection = daemon): Promise<HealthView> {
   try {
     const client = await conn.client(HealthService);
-    return toHealthView(await client.ping({}));
+    return toHealthView(await client.ping({}, { timeoutMs: PING_TIMEOUT_MS }));
   } catch (err) {
     conn.invalidate();
     throw err;
