@@ -135,13 +135,13 @@ func TestUpdateFixesKeptValue(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _, path := openTest(t, "[appearance]\nfont_size = 30000\n")
+			s, _, path := openTest(t, "[appearance]\nfont_size = 12345\n")
 			snap, err := s.Update(context.Background(), map[string]string{KeyFontSize: tt.value})
 			if err != nil {
 				t.Fatal(err)
 			}
 			data, _ := os.ReadFile(path)
-			if !strings.Contains(string(data), tt.want) || strings.Contains(string(data), "30000") || len(snap.Issues) != 0 {
+			if !strings.Contains(string(data), tt.want) || strings.Contains(string(data), "12345") || len(snap.Issues) != 0 {
 				t.Fatalf("issues %v, file:\n%s", snap.Issues, data)
 			}
 		})
