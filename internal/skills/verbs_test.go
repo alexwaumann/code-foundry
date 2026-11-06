@@ -372,7 +372,8 @@ func TestSkillFilesResolve(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The files hold about 200: far fewer means the patterns stopped matching.
+	t.Logf("read %d calls", calls)
+	// Far fewer than the files hold means the patterns stopped matching.
 	if calls < 150 {
 		t.Errorf("read %d calls in the skill files; the patterns no longer match", calls)
 	}
