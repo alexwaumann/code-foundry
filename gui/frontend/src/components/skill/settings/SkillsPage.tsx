@@ -12,6 +12,7 @@ import { PageHead } from "@/components/settings/PageHead";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
 import { useNow } from "@/lib/clock";
 import {
+  loadMoreSkills,
   openSkillMarketplace,
   refreshSkillMarketplaces,
   searchSkills,
@@ -35,7 +36,6 @@ import {
   registriesSummary,
   rowKeys,
   searchedIds,
-  shownWords,
   tierLabel,
   toggleChip,
   updatableRows,
@@ -53,7 +53,7 @@ type Tier = (typeof TIERS)[number];
 type Kind = (typeof KINDS)[number];
 
 /** One line of the card: a group's header, an installed row, a marketplace hit, or a line of words. */
-type Item = { kind: "group"; id: string; count: number } | { kind: "row"; key: string } | { kind: "market" } | { kind: "hit"; key: string } | { kind: "line"; id: "none" | "market-none" | "loading" | "installed-none" };
+type Item = { kind: "group"; id: string; count: number } | { kind: "row"; key: string } | { kind: "market" } | { kind: "hit"; key: string } | { kind: "more"; shown: number } | { kind: "line"; id: "none" | "market-none" | "loading" | "installed-none" };
 
 function itemKey(it: Item): string {
   switch (it.kind) {
@@ -65,9 +65,37 @@ function itemKey(it: Item): string {
       return "#market";
     case "hit":
       return `hit:${it.key}`;
+    case "more":
+      return `more:${String(it.shown)}`;
     case "line":
       return `line:${it.id}`;
   }
+}
+
+/**
+ * The list's last line while more hits are to come. It mounts when it scrolls near the
+ * view (the list is virtualised) and asks for the next page; a page's arrival keys a new
+ * one, so reaching the end again asks again.
+ */
+function MoreLine({ first }: { first: boolean }) {
+  const error = useSkillMarketplaceStore((s) => s.loadMoreError);
+  useEffect(() => {
+    void loadMoreSkills();
+  }, []);
+  return (
+    <CatalogLine first={first} testId="skill-more">
+      {error ? (
+        <>
+          <span className="text-cf-error-text">The next results did not load: {error}</span>{" "}
+          <button type="button" className="text-link hover:underline" onClick={() => void loadMoreSkills()} data-testid="skill-more-retry">
+            Try again
+          </button>
+        </>
+      ) : (
+        "Loading more…"
+      )}
+    </CatalogLine>
+  );
 }
 
 /** The search box and the chips: typing waits SEARCH_DEBOUNCE_MS, a chip searches at once with the text typed so far (taking over a wait). */
@@ -224,13 +252,14 @@ export function SkillsPage({ page, section }: { schema: SettingsSchemaView; page
     // Nothing anywhere is one line, unless a chip the header holds is what narrowed it.
     if (!browse && out.length === 0 && hits.length === 0 && !waiting && !searchBusy && !tierOn) return [{ kind: "line", id: "none" }];
     // Every hit is an installed row above and no chip wants the header: there is no marketplace group to show.
-    if (!browse && hits.length === 0 && shown > 0 && !waiting && !tierOn) return out;
+    if (!browse && hits.length === 0 && shown > 0 && shown >= total && !waiting && !tierOn) return out;
     out.push({ kind: "market" });
     for (const key of hits) out.push({ kind: "hit", key });
+    if (shown < total && !waiting) out.push({ kind: "more", shown });
     // Hits all shown as installed rows above do match: only no hit at all is "nothing".
     if (shown === 0 && !waiting && !searchBusy) out.push({ kind: "line", id: "market-none" });
     return out;
-  }, [installed, hits, shown, showMarket, browse, waiting, searchBusy, tierOn, loaded]);
+  }, [installed, hits, shown, total, showMarket, browse, waiting, searchBusy, tierOn, loaded]);
 
   const toggle = useCallback((key: string) => {
     setOpen((o) => {
@@ -276,7 +305,7 @@ export function SkillsPage({ page, section }: { schema: SettingsSchemaView; page
         );
       case "market":
         return (
-          <GroupHeader id="market" label="In your marketplace" count={waiting ? null : marketTotal} note={waiting ? "Searching…" : shownWords(marketTotal, hits.length)} busy={searchBusy} first={first}>
+          <GroupHeader id="market" label="In your marketplace" count={waiting ? null : marketTotal} note={waiting ? "Searching…" : undefined} busy={searchBusy} first={first}>
             {TIERS.map((t) => (
               <Chip
                 key={t}
@@ -316,6 +345,8 @@ export function SkillsPage({ page, section }: { schema: SettingsSchemaView; page
             }}
           />
         );
+      case "more":
+        return <MoreLine first={first} />;
       case "line":
         switch (it.id) {
           case "loading":

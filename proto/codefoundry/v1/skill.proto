@@ -97,11 +97,13 @@ message SearchSkillsRequest {
   // Update the marketplaces first (`claude plugin marketplace update`; network). The
   // Settings page uses skill.refresh instead.
   bool refresh = 5;
+  // Skip this many matches: the next page. Ranks are stable within an epoch.
+  int32 offset = 6;
 }
 
 message SearchSkillsResponse {
   repeated SkillEntry entries = 1;
-  // How many matched before the limit.
+  // How many matched, before the offset and the limit.
   int32 total = 2;
   // Why refresh failed; the search ran over the last good read.
   string refresh_error = 3;

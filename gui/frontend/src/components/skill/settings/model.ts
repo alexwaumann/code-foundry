@@ -70,11 +70,6 @@ export function installedWords(e: Pick<SkillEntryView, "state">): string {
   return e.state === "disabled" ? "Installed, disabled" : "Installed";
 }
 
-/** What the marketplace group's count leaves out: "showing the first 200" when the daemon stopped short of every match. */
-export function shownWords(total: number, shown: number): string {
-  return shown < total ? `showing the first ${countWords(shown)}` : "";
-}
-
 /** A marketplace's line: "3 plugins · 39 skills · read 5 min ago". */
 export function registryLine(r: Pick<SkillRegistryView, "plugins" | "skills" | "readAtMs">, now: number): string {
   return [`${String(r.plugins)} ${r.plugins === 1 ? "plugin" : "plugins"}`, skillCount(r.skills), readWords(r.readAtMs, now)].join(" · ");

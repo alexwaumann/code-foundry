@@ -99,6 +99,7 @@ func TestSkillSearch(t *testing.T) {
 		{name: "by matches", req: &v1.SearchSkillsRequest{Query: "guild"}, wantTotal: 1, wantNames: []string{"pr-review"}},
 		{name: "community tier", req: &v1.SearchSkillsRequest{Tier: v1.SkillTier_SKILL_TIER_COMMUNITY}, wantTotal: 2, wantNames: []string{"haiku-writer", "lint-kit"}},
 		{name: "skills, limited", req: &v1.SearchSkillsRequest{Kind: v1.SkillKind_SKILL_KIND_SKILL, Limit: 1}, wantTotal: 3, wantNames: []string{"haiku-writer"}},
+		{name: "skills, past the end", req: &v1.SearchSkillsRequest{Kind: v1.SkillKind_SKILL_KIND_SKILL, Offset: 3}, wantTotal: 3},
 		{name: "enterprise plugins", req: &v1.SearchSkillsRequest{Tier: v1.SkillTier_SKILL_TIER_ENTERPRISE, Kind: v1.SkillKind_SKILL_KIND_PLUGIN}, wantTotal: 1,
 			wantNames: []string{"enterprise-data"}},
 		{name: "nothing", req: &v1.SearchSkillsRequest{Query: "zzz"}},

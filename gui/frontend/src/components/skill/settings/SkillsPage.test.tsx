@@ -528,14 +528,6 @@ describe("searching", () => {
     expect(countOf("market")).toBe("2");
   });
 
-  it("the header keeps the truth about a cut list", () => {
-    show();
-    type("sql");
-    answered("sql", [entry({ name: "a" }), entry({ name: "b" })], 40);
-    expect(countOf("market")).toBe("40");
-    expect(within(groupOf("market")).getByTestId("catalog-group-note").textContent).toBe("showing the first 2");
-  });
-
   it("Enterprise and Community sit in the marketplace's header and search at once", () => {
     show();
     type("sql");
@@ -607,6 +599,28 @@ describe("Browse all", () => {
   const browse = () => {
     fireEvent.click(screen.getByTestId("skill-browse-all"));
   };
+
+  it("counts every match, and its last line asks for the next page until none is left", () => {
+    show();
+    browse();
+    const hits = useSkillMarketplaceStore.getState().search?.entries ?? [];
+    answered("", hits, 1240);
+    expect(screen.getByTestId("skill-more").textContent).toBe("Loading more…");
+    expect(document.body.textContent).not.toContain("showing the first");
+    answered("", hits);
+    expect(screen.queryByTestId("skill-more")).toBeNull();
+  });
+
+  it("says why the next page failed and offers another try", () => {
+    show();
+    browse();
+    answered("", useSkillMarketplaceStore.getState().search?.entries ?? [], 1240);
+    act(() => {
+      useSkillMarketplaceStore.setState({ loadMoreError: "daemon gone" });
+    });
+    expect(screen.getByTestId("skill-more").textContent).toContain("The next results did not load: daemon gone");
+    expect(screen.getByTestId("skill-more-retry").textContent).toBe("Try again");
+  });
 
   it("is the marketplace alone, with no query, pressed and counted", () => {
     show();

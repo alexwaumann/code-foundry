@@ -423,7 +423,9 @@ type SearchSkillsRequest struct {
 	Limit int32 `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	// Update the marketplaces first (`claude plugin marketplace update`; network). The
 	// Settings page uses skill.refresh instead.
-	Refresh       bool `protobuf:"varint,5,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	Refresh bool `protobuf:"varint,5,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	// Skip this many matches: the next page. Ranks are stable within an epoch.
+	Offset        int32 `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -493,10 +495,17 @@ func (x *SearchSkillsRequest) GetRefresh() bool {
 	return false
 }
 
+func (x *SearchSkillsRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
 type SearchSkillsResponse struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Entries []*SkillEntry          `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
-	// How many matched before the limit.
+	// How many matched, before the offset and the limit.
 	Total int32 `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
 	// Why refresh failed; the search ran over the last good read.
 	RefreshError string `protobuf:"bytes,3,opt,name=refresh_error,json=refreshError,proto3" json:"refresh_error,omitempty"`
@@ -1293,13 +1302,14 @@ const file_codefoundry_v1_skill_proto_rawDesc = "" +
 	"\fsetup_script\x18\r \x01(\tR\vsetupScript\x125\n" +
 	"\x05state\x18\x0e \x01(\x0e2\x1f.codefoundry.v1.SkillEntryStateR\x05state\x12+\n" +
 	"\x11installed_version\x18\x0f \x01(\tR\x10installedVersion\x12%\n" +
-	"\x0eupdate_version\x18\x10 \x01(\tR\rupdateVersion\"\xb9\x01\n" +
+	"\x0eupdate_version\x18\x10 \x01(\tR\rupdateVersion\"\xd1\x01\n" +
 	"\x13SearchSkillsRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12-\n" +
 	"\x04tier\x18\x02 \x01(\x0e2\x19.codefoundry.v1.SkillTierR\x04tier\x12-\n" +
 	"\x04kind\x18\x03 \x01(\x0e2\x19.codefoundry.v1.SkillKindR\x04kind\x12\x14\n" +
 	"\x05limit\x18\x04 \x01(\x05R\x05limit\x12\x18\n" +
-	"\arefresh\x18\x05 \x01(\bR\arefresh\"\x9d\x01\n" +
+	"\arefresh\x18\x05 \x01(\bR\arefresh\x12\x16\n" +
+	"\x06offset\x18\x06 \x01(\x05R\x06offset\"\x9d\x01\n" +
 	"\x14SearchSkillsResponse\x124\n" +
 	"\aentries\x18\x01 \x03(\v2\x1a.codefoundry.v1.SkillEntryR\aentries\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12#\n" +

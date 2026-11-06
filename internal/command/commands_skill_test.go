@@ -74,7 +74,7 @@ func TestSkillCommands(t *testing.T) {
 				"enterprise-data  plugin (2 skills)  enterprise  1.4.0     -          Data Platform  Query the data warehouse and its catalog.\n" +
 				"marketplace ai-marketplace (acme/ai-marketplace): 4 plugin(s), 3 skill(s), read"},
 		{name: "browse filtered and limited", cmd: "skill.browse", args: map[string]string{"kind": "skill", "tier": "enterprise", "limit": "1"},
-			wantMsg: "1 of 2 shown (--limit shows more)"},
+			wantMsg: "1 of 2 shown (--limit or --offset shows more)"},
 		{name: "browse a bad tier", cmd: "skill.browse", args: map[string]string{"tier": "gold"}, wantErr: command.ErrInvalidArgs},
 		{name: "install a skill", cmd: "skill.install", args: map[string]string{"name": "pr-review"},
 			wantMsg: "installed skill pr-review 20260305 from ai-marketplace (" + filepath.Join(f.skillsDir, "pr-review") + ")\n" +

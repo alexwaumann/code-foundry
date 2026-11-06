@@ -159,7 +159,7 @@ export const EMPTY_SKILL_QUERY: SkillQuery = { text: "", tier: "", kind: "" };
 /** One page of hits, best first. */
 export interface SkillSearchView {
   entries: SkillEntryView[];
-  /** How many matched before the limit ("200 of 1,234"). */
+  /** How many matched, before the offset and the limit. */
   total: number;
   /** Why the refresh asked for failed (the search ran over the last read). */
   refreshError: string;
@@ -171,10 +171,10 @@ export function toSkillSearch(r: SearchSkillsResponse): SkillSearchView {
   return { entries: r.entries.map(toSkillEntry), total: r.total, refreshError: r.refreshError, epoch: Number(r.epoch) };
 }
 
-/** SkillService.Search: at most `limit` hits (the daemon caps it at 500). */
-export async function searchSkills(q: SkillQuery, limit: number, signal?: AbortSignal, conn: DaemonConnection = daemon): Promise<SkillSearchView> {
+/** SkillService.Search: at most `limit` hits after `offset` (the daemon caps a page at 500). */
+export async function searchSkills(q: SkillQuery, limit: number, offset: number, signal?: AbortSignal, conn: DaemonConnection = daemon): Promise<SkillSearchView> {
   const c = await conn.client(SkillService);
-  return toSkillSearch(await c.search({ query: q.text, tier: toTierProto(q.tier), kind: toKindProto(q.kind), limit }, { signal }));
+  return toSkillSearch(await c.search({ query: q.text, tier: toTierProto(q.tier), kind: toKindProto(q.kind), limit, offset }, { signal }));
 }
 
 // ---------------------------------------------------------------------------------------

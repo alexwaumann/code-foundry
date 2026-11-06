@@ -52,8 +52,10 @@ export interface SkillItemRef {
   registry: string;
 }
 
-/** How many hits a search asks for (the list is virtualised; the daemon caps it at 500). */
+/** How many hits a page of a search asks for (the list is virtualised). */
 export const SKILL_SEARCH_LIMIT = 200;
+/** The most hits the daemon gives in one page. */
+const SKILL_PAGE_MAX = 500;
 
 /** skill.setup's refusal with no thread or project in the context (the button's tooltip). */
 export const NO_SETUP_OWNER = "select a thread or project first";
@@ -63,6 +65,10 @@ export interface SkillMarketplaceState {
   query: SkillQuery;
   /** The answer to `query`; null before the first one. A newer query's answer replaces it, an older one is dropped. */
   search: SkillSearchView | null;
+  /** The next page is on its way. */
+  loadingMore: boolean;
+  /** Why the next page did not come. */
+  loadMoreError: string;
   /** The words `search` answers: "" while it is still the whole marketplace, so a first search is not shown those hits as its own. */
   searchedText: string;
   searching: boolean;
@@ -85,6 +91,8 @@ export interface SkillMarketplaceState {
 const initial: SkillMarketplaceState = {
   query: EMPTY_SKILL_QUERY,
   search: null,
+  loadingMore: false,
+  loadMoreError: "",
   searchedText: "",
   searching: false,
   searchError: "",
@@ -102,7 +110,7 @@ export const useSkillMarketplaceStore = create<SkillMarketplaceState>()(() => in
 
 /** What the store calls out to; tests replace it (setSkillMarketplaceDeps). */
 export interface SkillMarketplaceDeps {
-  search: (q: SkillQuery, limit: number, signal?: AbortSignal) => Promise<SkillSearchView>;
+  search: (q: SkillQuery, limit: number, offset: number, signal?: AbortSignal) => Promise<SkillSearchView>;
   installed: (signal?: AbortSignal) => Promise<InstalledListView>;
   registries: (signal?: AbortSignal) => Promise<SkillRegistriesView>;
   run: (name: string, args: Record<string, string>, opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void }) => Promise<InvokeResultView | null>;
@@ -114,7 +122,7 @@ export interface SkillMarketplaceDeps {
 }
 
 const defaultDeps: SkillMarketplaceDeps = {
-  search: (q, limit, signal) => apiSearchSkills(q, limit, signal),
+  search: (q, limit, offset, signal) => apiSearchSkills(q, limit, offset, signal),
   installed: (signal) => listInstalledSkills(signal),
   registries: (signal) => listSkillRegistries(signal),
   run: (name, args, opts) => runCommandForResult(name, args, opts),
@@ -137,6 +145,7 @@ export function resetSkillMarketplace(): void {
   searchAbort?.abort();
   searchAbort = null;
   searchSeq++;
+  answered = null;
   openCount = 0;
   useSkillMarketplaceStore.setState(initial, true);
 }
@@ -145,6 +154,8 @@ export function resetSkillMarketplace(): void {
 // Reads
 
 let searchSeq = 0;
+/** The query `search` answers: a read of the same one keeps every page loaded. */
+let answered: SkillQuery | null = null;
 let searchAbort: AbortController | null = null;
 
 /**
@@ -158,20 +169,61 @@ export async function searchSkills(text: string, tier: SkillTierView = "", kind:
   return runSearch();
 }
 
-async function runSearch(): Promise<void> {
+/** The first `want` hits, a page at a time; short of that if the marketplace was read again meanwhile. */
+async function readHits(q: SkillQuery, want: number, signal: AbortSignal): Promise<SkillSearchView> {
+  let read = await deps.search(q, Math.min(want, SKILL_PAGE_MAX), 0, signal);
+  while (read.entries.length < Math.min(want, read.total)) {
+    const page = await deps.search(q, Math.min(want - read.entries.length, SKILL_PAGE_MAX), read.entries.length, signal);
+    if (page.entries.length === 0 || page.epoch !== read.epoch) break;
+    read = { ...page, entries: [...read.entries, ...page.entries] };
+  }
+  return read;
+}
+
+async function runSearch(want = SKILL_SEARCH_LIMIT): Promise<void> {
   const seq = ++searchSeq;
   searchAbort?.abort();
   const abort = new AbortController();
   searchAbort = abort;
-  const q = useSkillMarketplaceStore.getState().query;
+  const { query: q, search: held } = useSkillMarketplaceStore.getState();
+  // A read again of the same query keeps what is loaded: the list stays under the scroll.
+  const again = answered !== null && answered.text === q.text && answered.tier === q.tier && answered.kind === q.kind;
   useSkillMarketplaceStore.setState({ searching: true });
   try {
-    const search = await deps.search(q, SKILL_SEARCH_LIMIT, abort.signal);
-    if (seq === searchSeq) useSkillMarketplaceStore.setState({ search, searchedText: q.text, searching: false, searchError: "" });
+    const search = await readHits(q, Math.max(want, again ? (held?.entries.length ?? 0) : 0), abort.signal);
+    if (seq === searchSeq) {
+      answered = q;
+      useSkillMarketplaceStore.setState({ search, searchedText: q.text, searching: false, searchError: "" });
+    }
   } catch (err) {
     if (seq === searchSeq && !isAbort(err)) useSkillMarketplaceStore.setState({ searching: false, searchError: errorMessage(err) });
   } finally {
     if (searchAbort === abort) searchAbort = null;
+  }
+}
+
+/**
+ * The next page of the search on show, after what is loaded (the list's last line asks
+ * when it scrolls into view). A page from another read of the marketplace would skip or
+ * repeat hits, so that reads the list again instead.
+ */
+export async function loadMoreSkills(): Promise<void> {
+  const { search: held, query: q, searching, loadingMore } = useSkillMarketplaceStore.getState();
+  if (!held || searching || loadingMore || held.entries.length >= held.total) return;
+  const seq = searchSeq;
+  const abort = new AbortController();
+  searchAbort = abort;
+  useSkillMarketplaceStore.setState({ loadingMore: true, loadMoreError: "" });
+  try {
+    const page = await deps.search(q, SKILL_SEARCH_LIMIT, held.entries.length, abort.signal);
+    if (seq !== searchSeq) return;
+    if (page.epoch !== held.epoch) void runSearch(held.entries.length + SKILL_SEARCH_LIMIT);
+    else useSkillMarketplaceStore.setState({ search: { ...page, entries: [...held.entries, ...page.entries] } });
+  } catch (err) {
+    if (seq === searchSeq && !isAbort(err)) useSkillMarketplaceStore.setState({ loadMoreError: errorMessage(err) });
+  } finally {
+    if (searchAbort === abort) searchAbort = null;
+    useSkillMarketplaceStore.setState({ loadingMore: false });
   }
 }
 
