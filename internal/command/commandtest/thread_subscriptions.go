@@ -15,8 +15,8 @@ import (
 // Subscribe echoes the request as subscription "sub-1" (condition unspecified becomes
 // settled for a thread, finished for a run, checks_done for a pull request, which is
 // kept as given, fired for a plugin, whose args it keeps, and a timer, "at:<UTC>" or
-// "every:<interval>"), with its note and Fired and Existed as set; SubscribeErr and
-// SubscribeErrAfter refuse it.
+// "every:<interval>"), with its note and Fired, Existed and SubscribeWarnings as set;
+// SubscribeErr and SubscribeErrAfter refuse it.
 func (s *Thread) Subscribe(_ context.Context, r *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (s *Thread) Subscribe(_ context.Context, r *connect.Request[v1.SubscribeThr
 	if s.Fired {
 		sub.FiredCount = 1
 	}
-	return connect.NewResponse(&v1.SubscribeThreadResponse{Subscription: sub, Fired: s.Fired, Existed: s.Existed}), nil
+	return connect.NewResponse(&v1.SubscribeThreadResponse{Subscription: sub, Fired: s.Fired, Existed: s.Existed, Warnings: s.SubscribeWarnings}), nil
 }
 
 // Unsubscribe removes the matching Subscriptions (by id, or subscriber and target) and

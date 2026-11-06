@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"slices"
@@ -95,6 +96,27 @@ func TestPullRequestForWake(t *testing.T) {
 		if _, ok := get(context.Background(), target); ok {
 			t.Errorf("%s was found", target)
 		}
+	}
+}
+
+func TestLookupPullRequestForWake(t *testing.T) {
+	g := ghtest.New(nil)
+	g.SetPullRequest("acme/web", gh.PullRequestDetail{PullRequest: gh.PullRequest{Number: 7, Title: "Retry", State: gh.PullRequestClosed}})
+	look := lookupPullRequestForWake(g)
+	p, err := look(context.Background(), "acme/web#7")
+	if err != nil || p.State != "closed" || p.Title != "Retry" || p.Target() != "acme/web#7" {
+		t.Errorf("acme/web#7 = %+v, %v", p, err)
+	}
+	// GitHub's "not found" is the thread store's; nothing else is.
+	if _, err := look(context.Background(), "acme/web#8"); !errors.Is(err, thread.ErrNotFound) {
+		t.Errorf("acme/web#8 = %v", err)
+	}
+	g.SetError(gh.ErrRateLimited)
+	if _, err := look(context.Background(), "acme/web#7"); err == nil || errors.Is(err, thread.ErrNotFound) {
+		t.Errorf("rate limited = %v", err)
+	}
+	if _, err := look(context.Background(), "acme/web"); err == nil || errors.Is(err, thread.ErrNotFound) {
+		t.Errorf("bad target = %v", err)
 	}
 }
 

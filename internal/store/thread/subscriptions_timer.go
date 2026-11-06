@@ -148,6 +148,7 @@ func (m *Manager) fireTimers() {
 		}
 		d.r.retryAt = now.Add(timerRetry) // dropped (the wake limit) or the daemon stops
 	}
+	m.retryFinalWakesLocked(now)
 }
 
 // fireTimersLoop runs fireTimers on every tick until Shutdown cancels m.ctx.

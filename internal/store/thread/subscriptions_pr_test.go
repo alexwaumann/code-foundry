@@ -271,6 +271,9 @@ type fakePRs struct {
 	mu      sync.Mutex
 	prs     map[string]PullRequestInfo
 	watched [][]string
+	// lookup is GitHub's answer when set. Without it GitHub answers from prs, and the
+	// question fails for a pull request prs does not hold.
+	lookup func(ctx context.Context, target string) (PullRequestInfo, error)
 }
 
 func newFakePRs(prs ...PullRequestInfo) *fakePRs {
@@ -287,6 +290,19 @@ func (f *fakePRs) opts(o *Options) {
 		defer f.mu.Unlock()
 		p, ok := f.prs[target]
 		return p, ok
+	}
+	o.LookupPullRequest = func(ctx context.Context, target string) (PullRequestInfo, error) {
+		f.mu.Lock()
+		look := f.lookup
+		p, ok := f.prs[target]
+		f.mu.Unlock()
+		switch {
+		case look != nil:
+			return look(ctx, target)
+		case !ok:
+			return PullRequestInfo{}, errors.New("no answer")
+		}
+		return p, nil
 	}
 	o.WatchPullRequests = func(targets []string) {
 		f.mu.Lock()
@@ -383,7 +399,7 @@ func TestPullRequestSubscriptions(t *testing.T) {
 	other.PullRequest.Number = 8
 	e.m.PullRequestChanged(other)
 
-	// Fire at once from the cache: checks_passed once (not kept), checks_done repeat (kept).
+	// Fire at once on GitHub's answer: checks_passed once (not kept), checks_done repeat (kept).
 	prs.set(PullRequestInfo{Slug: "acme/web", Number: 7, Title: "Retry", State: "open", Checks: passed4})
 	if res := sub(SubscribeOptions{TargetPullRequest: target, Condition: CondChecksPassed}); !res.Fired {
 		t.Errorf("checks_passed at once = %+v", res)
@@ -401,13 +417,15 @@ func TestPullRequestSubscriptions(t *testing.T) {
 	}
 	e.waitItems(parent.ID, "the at-once wakes", func(items []Item) bool { return len(wakes(items)) == 5 })
 
-	// Merged: merged fires even with repeat, and every subscription to it goes.
+	// Merged: merged fires even with repeat, and every subscription to it goes, the
+	// others told that they ended.
 	ev = prEvent(passed4, PullRequestChange{Kind: PRChangeMerged, OldState: "open", NewState: "merged"})
 	ev.PullRequest.State = "merged"
 	e.m.PullRequestChanged(ev)
-	items = e.waitItems(parent.ID, "the merged wake", func(items []Item) bool { return len(wakes(items)) == 6 })
-	if got := wakeTitles(items)[5]; got != "Pull request acme/web#7: merged." {
-		t.Errorf("merged wake %q", got)
+	items = e.waitItems(parent.ID, "the merged wakes", func(items []Item) bool { return len(wakes(items)) == 9 })
+	if got := wakeTitles(items)[5:]; !slices.Contains(got, "Pull request acme/web#7: merged.") ||
+		!slices.Contains(got, "Pull request acme/web#7: merged, so review can no longer fire and the subscription ended.") {
+		t.Errorf("merged wakes %q", got)
 	}
 	if subs, _ := e.m.Subscriptions(e.ctx(), parent.ID); len(subs) != 0 {
 		t.Errorf("left after the merge: %+v", subs)
@@ -415,7 +433,7 @@ func TestPullRequestSubscriptions(t *testing.T) {
 	if w, _ := prs.lastWatched(); len(w) != 0 {
 		t.Errorf("still watched after the merge: %v", w)
 	}
-	// Merged in the cache: merged fires at once and is not kept; anything else is refused.
+	// Merged on GitHub: merged fires at once and is not kept; anything else is refused.
 	prs.set(PullRequestInfo{Slug: "acme/web", Number: 7, State: "merged"})
 	if res := sub(SubscribeOptions{TargetPullRequest: target, Condition: CondMerged, Repeat: true}); !res.Fired {
 		t.Errorf("merged at once = %+v", res)
@@ -437,23 +455,23 @@ func TestPullRequestSubscriptionsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	comment, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetPullRequest: target, Condition: CondComment})
+	changed, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetPullRequest: target, Condition: CondChanged, Repeat: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ev := prEvent(passed4, PullRequestChange{Kind: PRChangeClosed, OldState: "open", NewState: "closed"})
 	ev.PullRequest.State = "closed"
 	e.m.PullRequestChanged(ev)
-	e.waitItems(parent.ID, "the closed wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+	e.waitItems(parent.ID, "the closed wakes", func(items []Item) bool { return len(wakes(items)) == 2 })
 	if _, kept := e.subscription(closed.Subscription.ID); kept {
 		t.Error("closed stayed with repeat")
 	}
-	if _, kept := e.subscription(comment.Subscription.ID); !kept {
-		t.Error("comment went with the close (it may reopen)")
+	if _, kept := e.subscription(changed.Subscription.ID); !kept {
+		t.Error("changed went with the close (it may reopen)")
 	}
 	// Unsubscribe by the pull request (a URL), then nothing is watched.
 	gone, err := e.m.Unsubscribe(e.ctx(), UnsubscribeOptions{SubscriberID: parent.ID, TargetPullRequest: "https://github.com/acme/web/pull/7"})
-	if err != nil || len(gone) != 1 || gone[0].ID != comment.Subscription.ID {
+	if err != nil || len(gone) != 1 || gone[0].ID != changed.Subscription.ID {
 		t.Errorf("Unsubscribe = %+v, %v", gone, err)
 	}
 	if w, _ := prs.lastWatched(); len(w) != 0 {

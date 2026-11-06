@@ -357,8 +357,8 @@ func (p *pollPlan) section(name string) searchSection {
 }
 
 // resolveFingerprints maps fingerprints to pull requests: fetched details first, then
-// the known copy (with the fingerprint's checks when it carried them), else a
-// placeholder.
+// the known copy (with the fingerprint's state and head, and its checks when it carried
+// them), else a placeholder.
 func resolveFingerprints(list []prFingerprint, fetched, known map[string]PullRequest) []PullRequest {
 	out := make([]PullRequest, 0, len(list))
 	for _, f := range list {
@@ -371,6 +371,9 @@ func resolveFingerprints(list []prFingerprint, fetched, known map[string]PullReq
 			out = append(out, f.placeholder())
 			continue
 		}
+		// A failed detail fetch must not report an old state as current: wake subscriptions
+		// act on this copy, so a reopened pull request would read as still closed.
+		k.State, k.HeadSHA = f.State, f.HeadSHA
 		if f.HasChecks {
 			k.Checks = f.Checks
 		}

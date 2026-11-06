@@ -2,6 +2,7 @@ package ghtest
 
 import (
 	"cmp"
+	"context"
 	"maps"
 	"slices"
 	"strings"
@@ -33,6 +34,12 @@ func (s *Store) Watched() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return slices.Clone(s.watched)
+}
+
+// LookupPullRequest answers as PullRequest does: the detail set with SetPullRequest.
+func (s *Store) LookupPullRequest(ctx context.Context, slug string, number int) (gh.PullRequest, error) {
+	d, err := s.PullRequest(ctx, slug, number)
+	return d.PullRequest, err
 }
 
 // CachedPullRequest finds a pull request in the dashboard lists, the branches set with

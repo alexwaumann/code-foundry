@@ -110,6 +110,16 @@ func TestUserMessageOrigin(t *testing.T) {
 	}
 }
 
+func TestSubscribeWarnings(t *testing.T) {
+	fake, c := newThreadServer(t)
+	fake.Put(thread.Thread{ID: "s-p", State: thread.StateConnected})
+	fake.SubscribeWarnings = []string{"not polled yet"}
+	res, err := c.Subscribe(context.Background(), connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetPullRequest: "acme/web#7"}))
+	if err != nil || !slices.Equal(res.Msg.GetWarnings(), fake.SubscribeWarnings) {
+		t.Errorf("Subscribe = %v, %v", res, err)
+	}
+}
+
 func TestThreadSubscriptionsPullRequest(t *testing.T) {
 	fake, c := newThreadServer(t)
 	ctx := context.Background()

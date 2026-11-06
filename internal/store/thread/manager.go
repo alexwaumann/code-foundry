@@ -156,11 +156,16 @@ type Options struct {
 	// (subscriptions.go); nil refuses them. The daemon reads the action store; it also
 	// calls Manager.ActionRunFinished for every run that ends.
 	ActionRun func(ctx context.Context, id string) (ActionRun, bool)
-	// PullRequest looks up a pull request ("owner/name#123") for wake subscriptions to
-	// pull requests (subscriptions_pr.go), from the GitHub store's cache only; false when
-	// it is not there. nil refuses them. The daemon also calls
-	// Manager.PullRequestChanged for every change the GitHub poll sees.
+	// PullRequest looks up a pull request ("owner/name#123") from the GitHub store's cache
+	// only, for listings (subscriptions_pr.go); false when it is not there. The copy may be
+	// old: it decides no wake. The daemon also calls Manager.PullRequestChanged for every
+	// change the GitHub poll sees.
 	PullRequest func(ctx context.Context, target string) (PullRequestInfo, bool)
+	// LookupPullRequest asks GitHub for a pull request now, for Subscribe; an error
+	// wrapping ErrNotFound means GitHub answered that it does not exist, any other that
+	// the question failed. Subscribe bounds it and holds no lock. nil refuses wake
+	// subscriptions to pull requests.
+	LookupPullRequest func(ctx context.Context, target string) (PullRequestInfo, error)
 	// WatchPullRequests is told the pull requests the subscriptions watch (sorted
 	// "owner/name#123") whenever that set changes, from New on, so the GitHub poll keeps
 	// them in scope. Called under the store's locks: it must not call back into it.

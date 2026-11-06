@@ -174,6 +174,10 @@ message SubscribeThreadResponse {
   // The same subscription (subscriber, target, condition) existed: it is returned, with
   // repeat updated, and nothing fired.
   bool existed = 3;
+  // Why this subscription may not fire, one line each: a pull request whose state could
+  // not be checked, a closed one, a stopped thread, a plugin that is not running. A wake
+  // that cannot fire is refused (FAILED_PRECONDITION) instead.
+  repeated string warnings = 4;
 }
 
 message UnsubscribeThreadRequest {

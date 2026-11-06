@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -14,14 +16,15 @@ import (
 
 // Wake subscriptions to pull requests (docs/notes/gh-events-3-pr-wake.md): the thread
 // store does not know the GitHub store, so the daemon looks pull requests up in its
-// cache (thread.Options.PullRequest), keeps the subscribed ones in the poll
-// (thread.Options.WatchPullRequests) and hands it every PullRequestChanged
-// (startWakePullRequests).
+// cache (thread.Options.PullRequest) and on GitHub (thread.Options.LookupPullRequest),
+// keeps the subscribed ones in the poll (thread.Options.WatchPullRequests) and hands it
+// every PullRequestChanged (startWakePullRequests).
 
 // prCache is the part of the GitHub store wake subscriptions read and steer.
 // *gh.Store implements it.
 type prCache interface {
 	CachedPullRequest(slug string, number int) (gh.PullRequest, bool)
+	LookupPullRequest(ctx context.Context, slug string, number int) (gh.PullRequest, error)
 	WatchPullRequests(refs []gh.PullRequestRef) error
 }
 
@@ -54,6 +57,27 @@ func pullRequestForWake(prs prCache) func(ctx context.Context, target string) (t
 		info := prInfo(p)
 		info.Slug, info.Number = r.Slug, r.Number
 		return info, true
+	}
+}
+
+// lookupPullRequestForWake is thread.Options.LookupPullRequest: GitHub's answer now, with
+// its "not found" as thread.ErrNotFound.
+func lookupPullRequestForWake(prs prCache) func(ctx context.Context, target string) (thread.PullRequestInfo, error) {
+	return func(ctx context.Context, target string) (thread.PullRequestInfo, error) {
+		r, ok := prRef(target)
+		if !ok {
+			return thread.PullRequestInfo{}, fmt.Errorf("pull request target %q", target)
+		}
+		p, err := prs.LookupPullRequest(ctx, r.Slug, r.Number)
+		if errors.Is(err, gh.ErrNotFound) {
+			return thread.PullRequestInfo{}, fmt.Errorf("%w: %w", thread.ErrNotFound, err)
+		}
+		if err != nil {
+			return thread.PullRequestInfo{}, err
+		}
+		info := prInfo(p)
+		info.Slug, info.Number = r.Slug, r.Number
+		return info, nil
 	}
 }
 

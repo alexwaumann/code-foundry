@@ -153,23 +153,32 @@ func (s *Store) setWatch(r PullRequestRef, fn func(*prWatch)) {
 }
 
 // cachedByRef indexes the cached lists (dashboards and branches) by pull request, the
-// first non-placeholder copy winning. A renamed repository's pull requests are under
-// the slug the store knows it by (Snapshot.LocalRepo).
+// copy GitHub updated last winning: a branch list stays in memory after its watch ends,
+// and goes stale beside a dashboard that is still polled. A renamed repository's pull
+// requests are under the slug the store knows it by (Snapshot.LocalRepo).
 func (s *Store) cachedByRef() map[PullRequestRef]PullRequest {
 	out := map[PullRequestRef]PullRequest{}
 	snap := s.Snapshot()
-	for _, p := range knownPullRequests(snap.Dashboard, &s.branches) {
+	eachKnownPullRequest(snap.Dashboard, &s.branches, func(p PullRequest) {
 		p.Repo = snap.LocalRepo(p.Repo)
 		r := PullRequestRef{strings.ToLower(p.Repo), p.Number}
 		if r.Slug == "" || r.Number <= 0 {
-			continue
+			return
 		}
-		if have, ok := out[r]; ok && !have.Partial {
-			continue
+		if have, ok := out[r]; !ok || newerCopy(p, have) {
+			out[r] = p
 		}
-		out[r] = p
-	}
+	})
 	return out
+}
+
+// newerCopy reports whether p should replace have: it was updated later, or as late
+// and is no less complete (a placeholder has no title or counts).
+func newerCopy(p, have PullRequest) bool {
+	if !p.UpdatedAt.Equal(have.UpdatedAt) {
+		return p.UpdatedAt.After(have.UpdatedAt)
+	}
+	return !p.Partial || have.Partial
 }
 
 // CachedPullRequest returns a pull request as the poll last saw it (the dashboards
@@ -182,6 +191,24 @@ func (s *Store) CachedPullRequest(slug string, number int) (PullRequest, bool) {
 	}
 	p, ok := s.cachedByRef()[PullRequestRef{key, number}]
 	return p, ok
+}
+
+// LookupPullRequest asks GitHub for a pull request now, past every cache, for a decision
+// a stale copy must not make. An error wrapping ErrNotFound means GitHub answered without
+// it; an answer that holds it beside a nested failure counts as found.
+func (s *Store) LookupPullRequest(ctx context.Context, slug string, number int) (PullRequest, error) {
+	key, err := NormalizeSlug(slug)
+	if err != nil {
+		return PullRequest{}, err
+	}
+	if number <= 0 {
+		return PullRequest{}, fmt.Errorf("%w: pull request number %d", ErrInvalidArgument, number)
+	}
+	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number, read: true})
+	if p := res.detail.PullRequest; p.Number > 0 {
+		return p, nil
+	}
+	return PullRequest{}, res.err
 }
 
 // CachedPullRequests returns every pull request the cached lists hold (the dashboards

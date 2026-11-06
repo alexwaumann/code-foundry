@@ -26,6 +26,9 @@ type wakePRPayload struct {
 	FiredAt        string         `json:"fired_at"`
 	PullRequest    wakePR         `json:"pull_request"`
 	Changes        []wakePRChange `json:"changes"`
+	// Ended: the pull request closed or merged, so this subscription can no longer fire
+	// and is gone (prEndedWake).
+	Ended bool `json:"ended,omitempty"`
 }
 
 type wakePR struct {
@@ -113,6 +116,11 @@ func wakePRChangeOf(c PullRequestChange) wakePRChange {
 // prWake is the wake message of sub about pull request p, fired at for changes (none
 // when it fired at subscribe time).
 func prWake(sub Subscription, p PullRequestInfo, changes []PullRequestChange, at time.Time) Message {
+	return wakeMessage(prWakeTitle(sub.Condition, p, changes), prPayload(sub, p, changes, at))
+}
+
+// prPayload is the JSON of a wake of sub about p.
+func prPayload(sub Subscription, p PullRequestInfo, changes []PullRequestChange, at time.Time) wakePRPayload {
 	pr := wakePR{
 		Slug: p.Slug, Number: p.Number, URL: p.URL, Title: p.Title, State: p.State, HeadSHA: p.HeadSHA, HeadRef: p.HeadRef,
 		Draft: p.Draft, ReviewDecision: p.ReviewDecision, Checks: wakeChecksOf(p.Checks), Reviews: p.Reviews,
@@ -127,7 +135,7 @@ func prWake(sub Subscription, p PullRequestInfo, changes []PullRequestChange, at
 	for _, c := range changes {
 		payload.Changes = append(payload.Changes, wakePRChangeOf(c))
 	}
-	return wakeMessage(prWakeTitle(sub.Condition, p, changes), payload)
+	return payload
 }
 
 // prWakeTitle is a pull request wake's header without its prefix:
