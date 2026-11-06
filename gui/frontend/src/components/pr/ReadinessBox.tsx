@@ -12,6 +12,7 @@ import {
   GitMergeConflict,
   GitPullRequestClosed,
   GitPullRequestDraft,
+  Loader2,
   LoaderCircle,
   Lock,
   MessageSquare,
@@ -28,7 +29,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useViewerLogin } from "@/stores/gh";
-import { revertPullRequest, setAutoMerge, setPullRequestDraft, toggleSection, usePrPanelStore } from "@/stores/prPanel";
+import { revertPullRequest, setAutoMerge, setPullRequestDraft, toggleSection, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { AutoMergeButton } from "./AutoMergeButton";
 import { Avatar } from "./Avatar";
@@ -132,15 +133,36 @@ function Line({ line, now }: { line: SubLine; now: number }) {
   }
 }
 
+/**
+ * A button whose change runs on GitHub: a spinner and `busyLabel` while `running`. `inert`
+ * (this change or another of the pull request's) dims it and a press sends nothing; it stays
+ * focusable.
+ */
+function ChangeButton({ label, busyLabel, running, inert, onRun, testId, className }: { label: string; busyLabel: string; running: boolean; inert: boolean; onRun: () => void; testId: string; className?: string }) {
+  return (
+    <Button
+      variant="outline"
+      size="xs"
+      className={cn("aria-disabled:pointer-events-none aria-disabled:opacity-70", className)}
+      data-testid={testId}
+      aria-disabled={inert || undefined}
+      aria-busy={running || undefined}
+      onClick={() => {
+        if (!inert) onRun();
+      }}
+    >
+      {running && <Loader2 className="animate-spin" aria-hidden data-testid={`${testId}-busy`} />}
+      {running ? busyLabel : label}
+    </Button>
+  );
+}
+
 function ActionButton({ action, prRef, panelKey }: { action: RowAction; prRef: PrRef; panelKey: string }) {
-  const busy = usePrPanelStore((s) => s.changing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
+  const change = usePullRequestChange(prRef);
+  const reverting = usePrPanelStore((s) => s.reverting[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   switch (action.kind) {
     case "ready":
-      return (
-        <Button variant="outline" size="xs" data-testid="pr-ready-for-review" aria-disabled={busy || undefined} onClick={() => !busy && void setPullRequestDraft(prRef, false)}>
-          Ready for review
-        </Button>
-      );
+      return <ChangeButton label="Ready for review" busyLabel="Marking ready…" running={change === "ready"} inert={change !== null} onRun={() => void setPullRequestDraft(prRef, false)} testId="pr-ready-for-review" />;
     case "approve-workflow":
       return (
         <Button variant="outline" size="xs" data-testid="pr-approve-workflow" onClick={() => void openUrl(action.url)}>
@@ -149,11 +171,7 @@ function ActionButton({ action, prRef, panelKey }: { action: RowAction; prRef: P
         </Button>
       );
     case "revert":
-      return (
-        <Button variant="outline" size="xs" data-testid="pr-revert" onClick={() => void revertPullRequest(prRef, panelKey)}>
-          Revert
-        </Button>
-      );
+      return <ChangeButton label="Revert" busyLabel="Reverting…" running={reverting} inert={reverting} onRun={() => void revertPullRequest(prRef, panelKey)} testId="pr-revert" />;
   }
 }
 
@@ -223,12 +241,8 @@ function Row({ row, d, prRef, panelKey, tabKey, now, viewer, routing }: { row: R
 }
 
 function CancelAutoMerge({ prRef }: { prRef: PrRef }) {
-  const busy = usePrPanelStore((s) => s.changing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
-  return (
-    <Button variant="outline" size="xs" className="h-7 px-2" data-testid="pr-cancel-auto-merge" aria-disabled={busy || undefined} onClick={() => !busy && void setAutoMerge(prRef, null, "")}>
-      Cancel auto-merge
-    </Button>
-  );
+  const change = usePullRequestChange(prRef);
+  return <ChangeButton label="Cancel auto-merge" busyLabel="Cancelling…" running={change === "cancel-auto-merge"} inert={change !== null} onRun={() => void setAutoMerge(prRef, null, "")} testId="pr-cancel-auto-merge" className="h-7 px-2 has-[>svg]:px-2" />;
 }
 
 /** The rows, with the task buttons' routing read once for all of them (useTaskRouting). */

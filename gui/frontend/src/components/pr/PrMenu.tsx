@@ -8,7 +8,7 @@ import { formatChord } from "@/keys/chord";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useFreshness, useViewerLogin } from "@/stores/gh";
-import { copyPullRequestLink, linkPullRequestToThread, refreshPullRequest, revertPullRequest, setPullRequestDraft, usePrPanelStore } from "@/stores/prPanel";
+import { copyPullRequestLink, linkPullRequestToThread, refreshPullRequest, revertPullRequest, setPullRequestDraft, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
 import { startingKey, startPrThread, usePrThreadsStore, type PrThreadKind } from "@/stores/prThreads";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -67,15 +67,20 @@ function useLinkableThread(ref: PrRef): string | null {
 /**
  * The header's ⋯ menu, in T3 Code's order. Every action is a registry command or a store
  * action. Ask a question opens the surface's composer (onAsk), or focuses it again when it
- * is open; Explain and Fix findings start their thread at once, keeping the menu
- * open with a spinner until it has started. A running item is aria-disabled (it stays
- * focusable; a second select sends nothing) wherever the pull request is shown.
+ * is open; Explain, Fix findings and Convert to draft run at once, keeping the menu
+ * open with a spinner until they are done. Revert changes asks first, so the menu shuts
+ * for the confirm dialog and the ⋯ button spins while it runs (as it does for a Convert to
+ * draft whose menu was closed). A running item is aria-disabled (it stays focusable; a
+ * second select sends nothing) wherever the pull request is shown.
  */
 export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detail: PullRequestDetailView; panelKey: string; onAsk: () => void }) {
   const viewer = useViewerLogin();
   const busy = usePrPanelStore((s) => s.refreshing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   const explaining = useStarting(prRef, "explain");
   const fixing = useStarting(prRef, "fix");
+  const change = usePullRequestChange(prRef);
+  const drafting = change === "draft";
+  const reverting = usePrPanelStore((s) => s.reverting[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   const [open, setOpen] = useState(false);
   // Ask hands focus to the composer, so the menu must not take it back to its button.
   const keepFocus = useRef(false);
@@ -123,7 +128,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
             data-testid="pr-menu-button"
             className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover"
           >
-            <Ellipsis className="size-4" aria-hidden />
+            {drafting || reverting ? <Loader2 className="size-4 animate-spin" aria-hidden data-testid="pr-menu-button-busy" /> : <Ellipsis className="size-4" aria-hidden />}
           </button>
         </DropdownMenuTrigger>
       </Tip>
@@ -198,8 +203,19 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         </DropdownMenuItem>
         {(canDraft || linkThread !== null) && <DropdownMenuSeparator />}
         {canDraft && (
-          <DropdownMenuItem data-testid="pr-menu-draft" onSelect={() => void setPullRequestDraft(prRef, true)}>
-            <Item title="Convert to draft" hint="Reviewers are not asked again until it is marked ready." />
+          <DropdownMenuItem
+            data-testid="pr-menu-draft"
+            aria-busy={drafting || undefined}
+            aria-disabled={change !== null || undefined}
+            onSelect={(e) => {
+              // Stay open with a spinner until the detail shows the draft.
+              e.preventDefault();
+              void setPullRequestDraft(prRef, true).then((ok) => {
+                if (ok) setOpen(false);
+              });
+            }}
+          >
+            <Item busy={drafting} title="Convert to draft" hint={drafting ? "Converting to draft…" : "Reviewers are not asked again until it is marked ready."} />
           </DropdownMenuItem>
         )}
         {linkThread !== null && (
@@ -219,8 +235,8 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         {canRevert && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem data-testid="pr-menu-revert" onSelect={() => void revertPullRequest(prRef, panelKey)}>
-              <Item title="Revert changes" hint={`Opens a pull request that reverses #${String(prRef.number)}.`} />
+            <DropdownMenuItem data-testid="pr-menu-revert" aria-busy={reverting || undefined} aria-disabled={reverting || undefined} onSelect={() => void revertPullRequest(prRef, panelKey)}>
+              <Item busy={reverting} title="Revert changes" hint={reverting ? "Reverting…" : `Opens a pull request that reverses #${String(prRef.number)}.`} />
             </DropdownMenuItem>
           </>
         )}

@@ -938,8 +938,9 @@ export class PrDetailWorld {
           confirm: (_ctx: UiContext | undefined, args: Record<string, string>) => `This opens a new pull request that reverses the changes merged by #${args.number ?? ""}.`,
         },
         when: always,
-        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+        run: async (_ctx: UiContext | undefined, args: Record<string, string>) => {
           const [slug, n] = target(args);
+          if (this.threadDelayMs > 0) await new Promise((r) => setTimeout(r, this.threadDelayMs));
           const r = prDetailCall(() => this.revert(slug, n));
           return out(`Opened #${String(r.number)} to revert #${String(n)}: ${r.url}`, r);
         },

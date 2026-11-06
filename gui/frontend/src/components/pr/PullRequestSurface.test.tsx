@@ -14,7 +14,7 @@ const { seedWorld, CF } = await import("@/test/projectsWorld");
 const { tooltipText } = await import("@/test/tooltip");
 const { runCommandForResult } = await import("@/stores/commands");
 const { closePanelTab, usePanelStore } = await import("@/stores/panel");
-const { mergePullRequest } = await import("@/stores/prPanel");
+const { mergePullRequest, usePrPanelStore } = await import("@/stores/prPanel");
 const { useUiStore } = await import("@/stores/ui");
 const { applyGhEvent } = await import("@/stores/gh");
 const { UPDATING_AFTER_MS } = await import("./PullRequestSurface");
@@ -1168,6 +1168,175 @@ describe("draft and links", () => {
     ]);
     openMenu();
     expect(queryTestId("pr-menu-link")).toBeNull();
+  });
+});
+
+describe("busy feedback", () => {
+  const busyMark = (id: string) => queryTestId(`${id}-busy`);
+
+  it("Ready for review: a spinner and Marking ready… until it answers; a press meanwhile sends nothing", async () => {
+    renderPrPanel();
+    await openPr(145);
+    expect(byTestId("pr-ready-for-review").textContent).toBe("Ready for review");
+    expect(busyMark("pr-ready-for-review")).toBeNull();
+    expect(byTestId("pr-ready-for-review").getAttribute("aria-disabled")).toBeNull();
+    const release = world.hold("pr.ready");
+    fireEvent.click(byTestId("pr-ready-for-review"));
+    await settle();
+    const button = byTestId("pr-ready-for-review");
+    expect(button.textContent).toBe("Marking ready…");
+    expect(busyMark("pr-ready-for-review")).toBeTruthy();
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(button);
+    await settle();
+    expect(invocationsOf("pr.ready")).toHaveLength(1);
+    release();
+    await vi.waitFor(() => {
+      expect(byTestId("pr-state").textContent).toBe("Open");
+    });
+    expect(queryTestId("pr-ready-for-review")).toBeNull();
+  });
+
+  it("Ready for review that fails goes back to its label", async () => {
+    renderPrPanel();
+    await openPr(145);
+    world.failNext.add("pr.ready");
+    fireEvent.click(byTestId("pr-ready-for-review"));
+    await settle(3);
+    expect(byTestId("pr-ready-for-review").textContent).toBe("Ready for review");
+    expect(busyMark("pr-ready-for-review")).toBeNull();
+    expect(byTestId("pr-ready-for-review").getAttribute("aria-disabled")).toBeNull();
+  });
+
+  it("Convert to draft: the menu stays open with a spinner and Converting to draft… until it answers, then shuts", async () => {
+    renderPrPanel();
+    await openPr(142);
+    const release = world.hold("pr.draft");
+    openMenu();
+    expect(byTestId("pr-menu-draft").textContent).toContain("Reviewers are not asked again");
+    await pick(byTestId("pr-menu-draft"));
+    const item = byTestId("pr-menu-draft");
+    expect(item.textContent).toContain("Converting to draft…");
+    expect(within(item).getByTestId("pr-menu-busy")).toBeTruthy();
+    expect(item.getAttribute("aria-busy")).toBe("true");
+    expect(item.getAttribute("aria-disabled")).toBe("true");
+    await pick(item);
+    expect(invocationsOf("pr.draft")).toHaveLength(1);
+    release();
+    await vi.waitFor(() => {
+      expect(byTestId("pr-state").textContent).toBe("Draft");
+    });
+    await vi.waitFor(() => {
+      expect(queryTestId("pr-menu")).toBeNull();
+    });
+    expect(queryTestId("pr-menu-button-busy")).toBeNull();
+  });
+
+  it("Convert to draft that fails stays in the open menu, idle again", async () => {
+    renderPrPanel();
+    await openPr(142);
+    world.failNext.add("pr.draft");
+    openMenu();
+    await pick(byTestId("pr-menu-draft"));
+    await settle(3);
+    const item = byTestId("pr-menu-draft");
+    expect(item.textContent).toContain("Reviewers are not asked again");
+    expect(item.getAttribute("aria-busy")).toBeNull();
+    expect(within(item).queryByTestId("pr-menu-busy")).toBeNull();
+  });
+
+  it("Convert to draft with its menu closed: the ⋯ button spins", async () => {
+    renderPrPanel();
+    await openPr(142);
+    expect(queryTestId("pr-menu-button-busy")).toBeNull();
+    const release = world.hold("pr.draft");
+    openMenu();
+    await pick(byTestId("pr-menu-draft"));
+    fireEvent.keyDown(byTestId("pr-menu"), { key: "Escape" });
+    await settle();
+    expect(queryTestId("pr-menu")).toBeNull();
+    expect(byTestId("pr-menu-button-busy")).toBeTruthy();
+    release();
+    await vi.waitFor(() => {
+      expect(queryTestId("pr-menu-button-busy")).toBeNull();
+    });
+  });
+
+  it("Cancel auto-merge: a spinner and Cancelling… until it answers", async () => {
+    renderPrPanel();
+    await openPr(164);
+    const release = world.hold("pr.auto-merge");
+    fireEvent.click(byTestId("pr-cancel-auto-merge"));
+    await settle();
+    const button = byTestId("pr-cancel-auto-merge");
+    expect(button.textContent).toBe("Cancelling…");
+    expect(busyMark("pr-cancel-auto-merge")).toBeTruthy();
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(button);
+    await settle();
+    expect(invocationsOf("pr.auto-merge")).toHaveLength(1);
+    release();
+    await vi.waitFor(() => {
+      expect(queryTestId("pr-cancel-auto-merge")).toBeNull();
+    });
+  });
+
+  it("another change running: Cancel auto-merge waits, dimmed, without claiming to cancel", async () => {
+    renderPrPanel();
+    await openPr(164);
+    const release = world.hold("pr.draft");
+    openMenu();
+    await pick(byTestId("pr-menu-draft"));
+    const button = byTestId("pr-cancel-auto-merge");
+    expect(button.textContent).toBe("Cancel auto-merge");
+    expect(busyMark("pr-cancel-auto-merge")).toBeNull();
+    expect(button.getAttribute("aria-busy")).toBeNull();
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    release();
+    await settle(3);
+  });
+
+  it("Revert: the box's button, the ⋯ button and the menu item all show it until it answers; a second press opens no second revert", async () => {
+    renderPrPanel();
+    await openPr(138);
+    const release = world.hold("pr.revert");
+    fireEvent.click(byTestId("pr-revert"));
+    await settle();
+    fireEvent.click(byTestId("confirm-ok"));
+    await settle(3);
+    const button = byTestId("pr-revert");
+    expect(button.textContent).toBe("Reverting…");
+    expect(busyMark("pr-revert")).toBeTruthy();
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(byTestId("pr-menu-button-busy")).toBeTruthy();
+    openMenu();
+    const item = byTestId("pr-menu-revert");
+    expect(item.textContent).toContain("Reverting…");
+    expect(within(item).getByTestId("pr-menu-busy")).toBeTruthy();
+    expect(item.getAttribute("aria-busy")).toBe("true");
+    await pick(item);
+    fireEvent.click(byTestId("pr-revert"));
+    await settle();
+    expect(queryTestId("confirm-dialog")).toBeNull();
+    expect(invocationsOf("pr.revert").filter((i) => i.confirmed)).toHaveLength(1);
+    release();
+    await vi.waitFor(() => {
+      expect(prTabs()).toEqual(["#138", "#151"]);
+    });
+    expect(usePrPanelStore.getState().reverting).toEqual({});
+  });
+
+  it("a declined revert goes back to Revert", async () => {
+    renderPrPanel();
+    await openPr(138);
+    fireEvent.click(byTestId("pr-revert"));
+    await settle();
+    fireEvent.click(byTestId("confirm-cancel"));
+    await settle(3);
+    expect(byTestId("pr-revert").textContent).toBe("Revert");
+    expect(busyMark("pr-revert")).toBeNull();
+    expect(queryTestId("pr-menu-button-busy")).toBeNull();
   });
 });
 

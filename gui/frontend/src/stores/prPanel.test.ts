@@ -32,7 +32,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, reviewing: {}, changing: {}, mergeMethods: {} });
+  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, reviewing: {}, changing: {}, reverting: {}, mergeMethods: {} });
   usePanelStore.setState({ byKey: {} });
 });
 
