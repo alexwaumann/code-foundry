@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AttachEventView } from "@/api/terminal";
-import { AttachController, type AttachState } from "./attach";
+import { AttachController, MAX_BEHIND_BYTES, type AttachState } from "./attach";
 import type { Disposable, TermSize, TerminalRenderer } from "./renderer";
 
 /** Records calls; fit() moves the grid to `container` and fires onResize like xterm. */
@@ -171,12 +171,124 @@ describe("AttachController", () => {
     s.push("t1", { kind: "snapshot", data: enc("new"), cols: 100, rows: 30, altScreen: false });
     s.push("t1", { kind: "output", data: enc("fresh") });
     for (let i = 0; i < 4; i++) await flush();
-    const [first, second] = r.deferParse;
-    first?.();
+    // The newer snapshot waits for the older one, then meets a reset screen.
+    expect(r.calls).not.toContain("write:new");
+    r.deferParse.shift()?.();
+    expect(r.calls.slice(-3)).toEqual(["reset", "resize:100x30", "write:new"]);
     expect(r.calls).not.toContain("write:fresh");
-    second?.();
+    r.deferParse.shift()?.();
     expect(r.calls).not.toContain("write:stale");
     expect(r.calls.at(-1)).toBe("write:fresh");
+  });
+
+  describe("output that outruns xterm", () => {
+    const big = (n = MAX_BEHIND_BYTES / 2) => ({ kind: "output" as const, data: new Uint8Array(n) });
+    /** Attached and live, with xterm's parsing left to the test. */
+    async function live() {
+      ctl.attach("t1");
+      await flush();
+      s.push("t1", { kind: "snapshot", data: enc("start"), cols: 100, rows: 30, altScreen: false });
+      await flush();
+      r.deferParse = [];
+      r.calls = [];
+    }
+    const parseAll = () => {
+      while (r.deferParse?.length) r.deferParse.shift()?.();
+    };
+
+    it("drops the stream at the limit, waits for xterm, and only then opens a new one", async () => {
+      await live();
+      s.push("t1", big());
+      s.push("t1", big());
+      await flush();
+      expect(s.aborted).toEqual([]);
+      s.push("t1", big(1));
+      await flush();
+      expect(s.aborted).toEqual(["t1"]);
+      expect(r.calls.filter((c) => c.startsWith("write:"))).toHaveLength(2);
+      // Input still goes, so the program can be stopped: no "Reconnecting…".
+      expect(ctl.current.phase).toBe("live");
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(s.opened).toEqual(["t1"]);
+
+      parseAll();
+      await flush();
+      expect(s.opened).toEqual(["t1", "t1"]);
+      s.push("t1", { kind: "snapshot", data: enc("now"), cols: 100, rows: 30, altScreen: false });
+      await flush();
+      expect(r.calls.slice(-3)).toEqual(["reset", "resize:100x30", "write:now"]);
+    });
+
+    it("never drops a stream xterm keeps up with, however much it sends", async () => {
+      await live();
+      for (let i = 0; i < 6; i++) {
+        s.push("t1", big());
+        await flush();
+        parseAll();
+      }
+      expect(s.aborted).toEqual([]);
+      expect(s.opened).toEqual(["t1"]);
+    });
+
+    it("counts output held behind a snapshot, not the snapshot", async () => {
+      await live();
+      s.push("t1", { kind: "snapshot", data: new Uint8Array(MAX_BEHIND_BYTES * 2), cols: 100, rows: 30, altScreen: false });
+      s.push("t1", big(1));
+      await flush();
+      expect(s.aborted).toEqual([]);
+      s.push("t1", big());
+      s.push("t1", big());
+      await flush();
+      expect(s.aborted).toEqual(["t1"]);
+    });
+
+    it("gives a held snapshot's output back to the limit when a newer snapshot drops it", async () => {
+      await live();
+      s.push("t1", { kind: "snapshot", data: enc("a"), cols: 100, rows: 30, altScreen: false });
+      s.push("t1", big());
+      s.push("t1", big(MAX_BEHIND_BYTES / 2 - 1));
+      s.push("t1", { kind: "snapshot", data: enc("b"), cols: 100, rows: 30, altScreen: false });
+      s.push("t1", big());
+      await flush();
+      expect(s.aborted).toEqual([]);
+    });
+
+    it("holds a reconnect's snapshot until xterm has parsed the old output, so it meets a reset screen", async () => {
+      await live();
+      s.push("t1", { kind: "output", data: enc("old") });
+      s.push("t1", { kind: "snapshot", data: enc("snap"), cols: 100, rows: 30, altScreen: false });
+      s.push("t1", { kind: "output", data: enc("after") });
+      for (let i = 0; i < 4; i++) await flush();
+      expect(r.calls).toEqual(["write:old"]);
+      parseAll();
+      expect(r.calls).toEqual(["write:old", "reset", "resize:100x30", "write:snap", "write:after"]);
+    });
+
+    it("does the same across a tab switch, whose new terminal must not meet the old one's output", async () => {
+      await live();
+      s.push("t1", { kind: "output", data: enc("old") });
+      await flush();
+      ctl.attach("t2");
+      await flush();
+      r.calls = [];
+      s.push("t2", { kind: "snapshot", data: enc("other"), cols: 100, rows: 30, altScreen: false });
+      await flush();
+      expect(r.calls).toEqual([]);
+      parseAll();
+      expect(r.calls).toEqual(["reset", "resize:100x30", "write:other"]);
+    });
+
+    it("opens nothing for a terminal that was detached while xterm caught up", async () => {
+      await live();
+      s.push("t1", big());
+      s.push("t1", big());
+      s.push("t1", big());
+      await flush();
+      ctl.detach();
+      parseAll();
+      await flush();
+      expect(s.opened).toEqual(["t1"]);
+    });
   });
 
   it("writes output, applies Resized without echoing a Resize, and shows exit", async () => {

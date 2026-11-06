@@ -22,6 +22,14 @@ export interface AttachDeps {
   priority?: StreamPriority;
 }
 
+/**
+ * The most output this side may hold unparsed, xterm's buffer and what waits for a snapshot
+ * together. Past it the stream is dropped for a fresh snapshot, which costs nothing: the daemon
+ * has the whole screen and its scrollback. About a second of xterm's parsing (9 MB/s under
+ * `yes`), so Ctrl-C shows soon, and far below the 50 MB where xterm's write throws.
+ */
+export const MAX_BEHIND_BYTES = 8 << 20;
+
 function concat(chunks: readonly Uint8Array[]): Uint8Array {
   if (chunks.length === 1 && chunks[0]) return chunks[0];
   const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
@@ -37,9 +45,11 @@ function concat(chunks: readonly Uint8Array[]): Uint8Array {
  * Owns the attach lifecycle for one renderer. At most one terminal is attached at a
  * time: attach(id) aborts the previous stream before opening the next.
  *
- *   Snapshot -> reset(), size to the snapshot, write(data); once xterm has parsed it,
- *               fit (which may Resize) and apply what arrived meanwhile
- *   Output   -> write (held while a snapshot is being parsed)
+ *   Snapshot -> once xterm has parsed all it was given: reset(), size to the snapshot,
+ *               write(data); once xterm has parsed that, fit (which may Resize) and apply
+ *               what arrived meanwhile
+ *   Output   -> write (held while a snapshot waits or is being parsed). A stream that outruns
+ *               xterm by MAX_BEHIND_BYTES is dropped; a new one opens once xterm has caught up
  *   Resized  -> resize (no Resize RPC back)
  *   Exited   -> phase "exited"; no reconnect after the stream ends
  *
@@ -63,6 +73,16 @@ export class AttachController {
    */
   private held: AttachEventView[] | null = null;
   private snapshots = 0;
+  /**
+   * Bytes xterm was given and has not parsed. These outlive a detach: reset() does not empty
+   * xterm's buffer, so what is in it would land on a reset screen, and a snapshot must meet a
+   * freshly reset one (internal/store/terminal/snapshot.go).
+   */
+  private unparsed = 0;
+  /** Output accepted and not yet parsed: the unparsed part of it and the part in `held`. */
+  private behind = 0;
+  /** Runs once xterm has parsed everything (null: nothing waits). */
+  private afterParsed: (() => void) | null = null;
 
   constructor(
     private readonly renderer: TerminalRenderer,
@@ -95,6 +115,10 @@ export class AttachController {
     const gen = ++this.generation;
     this.renderer.reset();
     this.setState({ terminalId: id, phase: "connecting", exitCode: null, error: null });
+    this.open(id, gen);
+  }
+
+  private open(id: string, gen: number): void {
     this.stopStream = runStream<AttachEventView>({
       open: (signal) => this.deps.attach(id, signal),
       slot: { label: `terminal:${id}`, priority: this.deps.priority ?? "core" },
@@ -119,31 +143,50 @@ export class AttachController {
     this.stopStream = null;
     clearTimeout(this.resizeTimer);
     this.pending = [];
-    this.held = null;
+    this.dropHeld();
+    this.afterParsed = null;
     this.snapshots++;
     if (this.state.terminalId !== null) this.setState({ terminalId: null, phase: "idle", exitCode: null, error: null });
   }
 
   private handle(ev: AttachEventView): void {
-    if (this.held && ev.kind !== "snapshot") {
-      this.held.push(ev);
+    if (ev.kind === "snapshot") {
+      this.snapshot(ev);
       return;
     }
-    switch (ev.kind) {
-      case "snapshot": {
-        // A new snapshot (a reconnect) replaces whatever the previous one was holding.
-        const seq = ++this.snapshots;
-        this.held = [];
-        this.renderer.reset();
-        if (ev.cols > 0 && ev.rows > 0) this.renderer.resize(ev.cols, ev.rows);
-        this.renderer.write(ev.data, () => {
-          if (seq !== this.snapshots) return;
-          this.snapshotParsed(ev.cols, ev.rows);
-        });
-        break;
+    if (ev.kind === "output") {
+      if (this.behind + ev.data.length > MAX_BEHIND_BYTES) {
+        this.fallBehind();
+        return;
       }
+      this.behind += ev.data.length;
+    }
+    if (this.held) this.held.push(ev);
+    else this.apply(ev);
+  }
+
+  /** A new snapshot (a reconnect) replaces whatever the previous one was holding. */
+  private snapshot(ev: Extract<AttachEventView, { kind: "snapshot" }>): void {
+    const seq = ++this.snapshots;
+    this.dropHeld();
+    this.held = [];
+    this.whenParsed(() => {
+      this.renderer.reset();
+      if (ev.cols > 0 && ev.rows > 0) this.renderer.resize(ev.cols, ev.rows);
+      this.write(ev.data, () => {
+        if (seq !== this.snapshots) return;
+        this.snapshotParsed(ev.cols, ev.rows);
+      });
+    });
+  }
+
+  /** What the stream had for an up to date terminal: it applies now, in order. */
+  private apply(ev: Exclude<AttachEventView, { kind: "snapshot" }>): void {
+    switch (ev.kind) {
       case "output":
-        this.renderer.write(ev.data);
+        this.write(ev.data, () => {
+          this.behind -= ev.data.length;
+        });
         if (this.state.phase === "reconnecting" || this.state.phase === "connecting") this.setState({ phase: "live", error: null });
         break;
       case "resized":
@@ -157,6 +200,49 @@ export class AttachController {
     }
   }
 
+  /** Runs in xterm's parse loop through `parsed`, where a throw would end the loop for good. */
+  private write(data: Uint8Array, parsed: () => void): void {
+    this.unparsed += data.length;
+    this.renderer.write(data, () => {
+      this.unparsed -= data.length;
+      parsed();
+      if (this.unparsed > 0) return;
+      const next = this.afterParsed;
+      this.afterParsed = null;
+      next?.();
+    });
+  }
+
+  /** Now if xterm has nothing left to parse, else then. A later call replaces an earlier one. */
+  private whenParsed(fn: () => void): void {
+    if (this.unparsed > 0) this.afterParsed = fn;
+    else fn();
+  }
+
+  private dropHeld(): void {
+    for (const ev of this.held ?? []) if (ev.kind === "output") this.behind -= ev.data.length;
+    this.held = null;
+  }
+
+  /**
+   * Output outran xterm: stop taking it, let xterm finish what it has, and open a new stream,
+   * whose snapshot has everything dropped here. Waiting for xterm keeps a flood to a reconnect
+   * every second or so, with nothing open between them. Input keeps working, so the phase
+   * stays: this is not a lost connection.
+   */
+  private fallBehind(): void {
+    const id = this.state.terminalId;
+    if (!id) return;
+    const gen = this.generation;
+    this.stopStream?.();
+    this.stopStream = null;
+    this.dropHeld();
+    this.snapshots++;
+    this.whenParsed(() => {
+      if (gen === this.generation) this.open(id, gen);
+    });
+  }
+
   /** The snapshot is on the grid: fit it to the container, then apply what arrived meanwhile. */
   private snapshotParsed(snapCols: number, snapRows: number): void {
     const held = this.held ?? [];
@@ -166,7 +252,7 @@ export class AttachController {
     const { cols, rows } = this.renderer.size;
     if (cols !== snapCols || rows !== snapRows) this.scheduleResize(cols, rows, 0);
     if (this.state.phase !== "exited") this.setState({ phase: "live", error: null });
-    for (const ev of held) this.handle(ev);
+    for (const ev of held) if (ev.kind !== "snapshot") this.apply(ev);
   }
 
   private input(data: Uint8Array): void {
