@@ -43,16 +43,7 @@ func TestSystemPrompt(t *testing.T) {
 			t.Errorf("ThreadPrompt does not route %q: %q", want, ThreadPrompt)
 		}
 	}
-	// It is paid on every request of every thread (about 260 tokens over the
-	// orchestration-only line, measured with claude -p; the thread new clause added 12
-	// more, thread-new-base-origin; how to write a path so its chip opens, 124 bytes,
-	// model-paths): grow it only by cutting. The page clause naming the pages skill, its
-	// folder and "not the repo unless asked", 92 bytes, moved the cap from 1550: without it
-	// page prompts in a project thread wrote unthemed pages into the repo (1 of 15 routed;
-	// 14 of 20 with it: page-library-fixes-b).
-	if n := len(ThreadPrompt); n > 1641 {
-		t.Errorf("ThreadPrompt has %d bytes; keep it under 1641", n)
-	}
+	// Its size budget, 1,641 bytes, is in the skills' table (internal/skills/budget_test.go).
 	for _, sway := range []string{"In place", "Fresh copy", "prefer", "unless the user"} {
 		if strings.Contains(placementClause(t), sway) {
 			t.Errorf("the thread new clause recommends a placement (%q): %q", sway, placementClause(t))
