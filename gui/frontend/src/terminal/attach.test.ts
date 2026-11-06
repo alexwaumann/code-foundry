@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AttachEventView } from "@/api/terminal";
 import { AttachController, MAX_BEHIND_BYTES, REFUSED_RETRY_MS, type AttachState } from "./attach";
+import { TerminalInput } from "./input";
 import type { Disposable, TermSize, TerminalRenderer } from "./renderer";
 import { XtermRenderer } from "./xterm";
 
@@ -108,7 +109,10 @@ describe("AttachController", () => {
   let resizes: [string, number, number][];
   let states: AttachState[];
   let ctl: AttachController;
-  let releaseWrite: (() => void) | null;
+  /** What each Write in flight is waiting for, oldest first. */
+  let inFlight: (() => void)[];
+  let input: TerminalInput;
+  const releaseWrite = () => inFlight.shift()?.();
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -117,15 +121,16 @@ describe("AttachController", () => {
     writes = [];
     resizes = [];
     states = [];
-    releaseWrite = null;
+    inFlight = [];
+    input = new TerminalInput((id, data) => {
+      writes.push([id, new TextDecoder().decode(data)]);
+      return new Promise<void>((res) => inFlight.push(res));
+    });
     ctl = new AttachController(
       r,
       {
         attach: s.attach,
-        write: (id, data) => {
-          writes.push([id, new TextDecoder().decode(data)]);
-          return new Promise<void>((res) => (releaseWrite = res));
-        },
+        input,
         resize: (id, cols, rows) => {
           resizes.push([id, cols, rows]);
           return Promise.resolve();
@@ -456,7 +461,7 @@ describe("AttachController", () => {
     r.type("c");
     await flush();
     expect(writes).toEqual([["t1", "a"]]);
-    releaseWrite?.();
+    releaseWrite();
     await flush();
     expect(writes).toEqual([
       ["t1", "a"],
@@ -469,19 +474,17 @@ describe("AttachController", () => {
     const snap = { kind: "snapshot" as const, data: enc("s"), cols: 100, rows: 30, altScreen: false };
     /** Lets the write in flight return, and what it started. */
     const returnWrite = async () => {
-      releaseWrite?.();
+      releaseWrite();
       await flush();
     };
 
-    it("sends what was typed in the next terminal while the last one's write was out", async () => {
+    it("sends what is typed in the next terminal without waiting for the last one's write", async () => {
       ctl.attach("t1");
       await flush();
       r.type("a");
       ctl.attach("t2");
       await flush();
       r.type("b");
-      expect(decoded()).toEqual(["t1:a"]);
-      await returnWrite();
       expect(decoded()).toEqual(["t1:a", "t2:b"]);
     });
 
@@ -493,10 +496,10 @@ describe("AttachController", () => {
         r,
         {
           attach: s.attach,
-          write: (id, data) => {
+          input: new TerminalInput((id, data) => {
             seen.push([id, new TextDecoder().decode(data)]);
             return id === "t1" ? new Promise<void>((_, reject) => (failWrite = reject)) : Promise.resolve();
-          },
+          }),
           resize: () => Promise.resolve(),
         },
         () => undefined,
@@ -524,7 +527,7 @@ describe("AttachController", () => {
       r.type("b");
       await returnWrite();
       await returnWrite();
-      expect(decoded()).toEqual(["t1:a", "t1:queued", "t2:b"]);
+      expect(decoded()).toEqual(["t1:a", "t2:b", "t1:queued"]);
     });
 
     it("keeps each terminal's keys in order through a switch there and back", async () => {
@@ -538,8 +541,8 @@ describe("AttachController", () => {
       ctl.attach("t1");
       await flush();
       r.type("c");
-      for (let i = 0; i < 4; i++) await returnWrite();
-      expect(decoded()).toEqual(["t1:a", "t1:b", "t2:x", "t1:c"]);
+      for (let i = 0; i < 3; i++) await returnWrite();
+      expect(decoded()).toEqual(["t1:a", "t2:x", "t1:bc"]);
     });
 
     it("drops the rest of a terminal's keys when a write fails, and only its", async () => {
@@ -549,11 +552,11 @@ describe("AttachController", () => {
         r,
         {
           attach: s.attach,
-          write: (id, data) => {
+          input: new TerminalInput((id, data) => {
             const text = new TextDecoder().decode(data);
             seen.push([id, text]);
             return text === "a" ? new Promise<void>((_, reject) => (fail = reject)) : Promise.resolve();
-          },
+          }),
           resize: () => Promise.resolve(),
         },
         () => undefined,
@@ -568,6 +571,45 @@ describe("AttachController", () => {
       fail(new Error("gone"));
       await flush();
       expect(seen).toEqual([["t1", "a"], ["t2", "b"]]);
+      c.dispose();
+    });
+
+    it("keeps a terminal's keys in order through a remount: a new controller queues behind the old one's", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.type("a");
+      r.type("b");
+      ctl.dispose();
+      const next = new FakeRenderer();
+      const c = new AttachController(next, { attach: s.attach, input, resize: () => Promise.resolve() }, () => undefined);
+      c.attach("t1");
+      await flush();
+      next.type("c");
+      await returnWrite();
+      await returnWrite();
+      expect(decoded()).toEqual(["t1:a", "t1:bc"]);
+      c.dispose();
+    });
+
+    it("shows a failed write in the controller on that terminal, not the disposed one before it", async () => {
+      let fail: (err: Error) => void = () => undefined;
+      const shared = new TerminalInput(() => new Promise<void>((_, reject) => (fail = reject)));
+      const oldErrors: unknown[] = [];
+      const old = new AttachController(r, { attach: s.attach, input: shared, resize: () => Promise.resolve(), onStreamError: (e) => oldErrors.push(e) }, () => undefined);
+      old.attach("t1");
+      await flush();
+      r.type("a");
+      old.dispose();
+      const next = new FakeRenderer();
+      const c = new AttachController(next, { attach: s.attach, input: shared, resize: () => Promise.resolve() }, () => undefined);
+      c.attach("t1");
+      await flush();
+      next.type("b");
+      fail(new Error("gone"));
+      await flush();
+      expect(oldErrors).toHaveLength(1);
+      expect(old.current.error).toBeNull();
+      expect(c.current.error).toBe("write failed: gone");
       c.dispose();
     });
 
@@ -734,7 +776,7 @@ describe("AttachController on a real xterm", () => {
   function attached() {
     const r = new XtermRenderer({ fontSize: 12, isGlobalChord: () => false });
     const s = streams();
-    const ctl = new AttachController(r, { attach: s.attach, write: () => Promise.resolve(), resize: () => Promise.resolve() }, () => undefined);
+    const ctl = new AttachController(r, { attach: s.attach, input: new TerminalInput(() => Promise.resolve()), resize: () => Promise.resolve() }, () => undefined);
     return { r, s, ctl };
   }
 

@@ -128,15 +128,17 @@ reconnect that met the same refusal at once would cost the daemon a snapshot eac
 of a replay goes with it, and the phase stays what it was until the new snapshot. Nothing in the code
 reaches that today: output is capped at 8 MiB behind, and a snapshot waits for an empty buffer. What
 is left is a throw from xterm's parser itself or one of our handlers, outside any write. That
-ends the loop with no callback, and neither a re-attach nor this code recovers it; nothing is known
-to do that.
+ends the loop with no callback, and neither a re-attach nor this code recovers it. The known trigger
+was REP: one line with a huge count made xterm's allocation throw. `XtermRenderer` now caps it
+(`docs/notes/terminal-rep-cap.md`), and no other trigger is known.
 
 ### Around a re-attach
 
-- **Input.** Each queued key carries its terminal, so a tab switch neither drops it nor moves it.
-  `detach` used to clear the queue, which lost whatever waited behind a Write in flight, and a key
-  typed in the next terminal during that Write waited for another key. A failed Write drops only its
-  own terminal's keys, since later ones would land with a hole before them.
+- **Input.** Each terminal has its own queue (`TerminalInput`, one for the app), so a tab switch or a
+  remount neither drops a key nor moves it. `detach` used to clear the queue, which lost whatever
+  waited behind a Write in flight, and a key typed in the next terminal during that Write waited for
+  another key. A failed Write drops only its own terminal's keys, since later ones would land with a
+  hole before them.
 - **`Resized`.** `resize()` applies at once and xterm parses later, so a `Resized` overtook the output
   before it, and that output, written for the old size, drew at the new one. It now waits for xterm,
   holding what follows, in a replay too. A real xterm showed the wrong screen on the alternate screen.
