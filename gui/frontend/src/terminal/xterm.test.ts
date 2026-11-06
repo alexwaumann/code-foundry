@@ -47,6 +47,38 @@ describe("XtermRenderer shift+enter", () => {
   });
 });
 
+describe("XtermRenderer cursor across reset", () => {
+  /** Whether the cursor is hidden once everything queued has been parsed. */
+  async function hidden(r: XtermRenderer): Promise<boolean> {
+    await write(r, "");
+    return (r.term as unknown as { _core: { coreService: { isCursorHidden: boolean } } })._core.coreService.isCursorHidden;
+  }
+
+  it.each([
+    { name: "a program hid it", before: async (r: XtermRenderer) => write(r, "\x1b[?25l"), snapshot: "plain", want: false },
+    { name: "an exited terminal's hide already parsed", before: async (r: XtermRenderer) => { r.hideCursor(); await write(r, ""); }, snapshot: "plain", want: false },
+    { name: "an exited terminal's hide still queued", before: (r: XtermRenderer) => { r.hideCursor(); }, snapshot: "plain", want: false },
+    { name: "a program's hide still queued", before: (r: XtermRenderer) => { r.term.write("\x1b[?25l"); }, snapshot: "plain", want: false },
+    { name: "the next snapshot's program hid it", before: (r: XtermRenderer) => { r.hideCursor(); }, snapshot: "\x1b[?25lfull screen", want: true },
+  ])("$name: hidden is $want", async ({ before, snapshot, want }) => {
+    const r = renderer();
+    await before(r);
+    r.reset();
+    r.write(new TextEncoder().encode(snapshot));
+    expect(await hidden(r)).toBe(want);
+    r.dispose();
+  });
+
+  it("stays hidden for an exited terminal attached again: its exit follows the snapshot", async () => {
+    const r = renderer();
+    r.reset();
+    r.write(new TextEncoder().encode("done"));
+    r.hideCursor();
+    expect(await hidden(r)).toBe(true);
+    r.dispose();
+  });
+});
+
 describe("XtermRenderer keyboard modes", () => {
   it("tracks kitty flags and modifyOtherKeys from the output stream", async () => {
     const r = renderer();
