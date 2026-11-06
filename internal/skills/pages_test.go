@@ -14,7 +14,8 @@ import (
 // pagesSkillFiles are the code-foundry-pages skill's files.
 var pagesSkillFiles = []string{"code-foundry-pages/SKILL.md", "code-foundry-pages/reference/examples.md",
 	"code-foundry-pages/reference/sources.md", "code-foundry-pages/reference/verbs.md", "code-foundry-pages/reference/react.md",
-	"code-foundry-pages/reference/components.md", "code-foundry-pages/reference/welcome.md",
+	"code-foundry-pages/reference/components.md", "code-foundry-pages/reference/errors-and-limits.md",
+	"code-foundry-pages/reference/welcome.md",
 	"code-foundry-pages/reference/welcome.html"}
 
 // cfRun is a cf.run call in a skill file with a literal verb and an args object:
@@ -112,9 +113,10 @@ func TestRenderPagesSkill(t *testing.T) {
 			t.Errorf("SKILL.md lacks bridge.js's header line %q", line)
 		}
 	}
+	errors := string(files[skills.Pages+"/reference/errors-and-limits.md"])
 	for _, code := range bridge.ErrorCodes {
-		if !strings.Contains(body, "`"+code+"`") || !strings.Contains(body, "  - `"+code+"`: ") {
-			t.Errorf("SKILL.md does not say what to do on %s", code)
+		if !strings.Contains(errors, "`"+code+"`") || !strings.Contains(errors, "  - `"+code+"`: ") {
+			t.Errorf("errors-and-limits.md does not say what to do on %s", code)
 		}
 	}
 	for _, s := range bridge.Sources {

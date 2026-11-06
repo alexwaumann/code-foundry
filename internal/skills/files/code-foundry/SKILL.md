@@ -14,52 +14,39 @@ thread. The `code-foundry` CLI drives it (most buttons are commands too) and cha
 
 ## The one rule
 
-The user can ask you for anything about or in the app; if you can do it with the CLI,
-offer it and do it. A question ("how do I…?") gets the answer and the offer; run a change
-once the user says yes (code-foundry-help, "Explain first, then offer"). Skills never run
-commands themselves: you run `code-foundry …` with your Bash tool. Talk about the app as the
-user sees it: pages, buttons, the side panel, Settings labels.
-Never tell the user skill or command names: say what you will do, not which command.
+If the CLI can do it, offer it and do it. A question ("how do I…?") gets the answer and the offer;
+run a change once the user says yes (code-foundry-help). Talk about the app as the user sees it:
+pages, buttons, the side panel, Settings labels; never skill or command names.
 
 ## Which skill or command
 
 | The user wants | Read (your Skill tool, or the SKILL.md `--group skills` lists) or run |
 |---|---|
 | How to do something, a setting or keybinding | the code-foundry-help skill |
-| A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences"); one for a set of projects or one repo, or a skill for them: `reference/scopes.md` |
-| What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
-| About this thread: what changed, its branch, checkouts, subagents, child threads, MCP servers, linked PRs | What changed is the branch's commits since its base (`baseRef` in `thread get --json`, else origin's default branch) plus uncommitted work, not uncommitted work alone; `code-foundry thread checkouts`; `thread agents`; `thread list --created-by $CODE_FOUNDRY_THREAD` (`thread get` names your creator); `thread mcp` (your session's start list goes stale); linked PRs are `thread get --json`'s `linkedPullRequests` (absent: none); `thread pr link <url>` links one by hand |
-| To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`, `view.panel.mcp`: your own side panel. Add `--focus` only when the user asks to be taken there |
-| A secret value, or a change to a file you cannot read (`.env`, `~/.aws/credentials`) | Never ask for it in chat or read the file: `view.panel.file <path> --edit --line N --note "<what goes where>"`, then end your turn. Told it is saved, continue without reading its values. If refused, tell the user why |
-| A page, chart, form, board, dashboard, mockup of a product, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown; `--panel` also opens it beside the thread) and can read and change the app |
-| What's running or going on, their work | "running" here means this app's threads, actions and terminals, never the Mac's processes (no `ps`, no killing): `code-foundry thread list`, `action runs`, `terminal list`; a board of it: the code-foundry-pages skill |
-| The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | `reference/making-a-theme.md` (next to this file), before you change anything |
-| To be told or reminded later, or something done on a schedule ("tell me when #4 passes", "every hour…", "keep an eye on…") | `code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`, `--at 2h`, `--thread <id> --until attention`, `--note`): the app wakes you, even stopped; never Claude Code's cron or a background `--watch`, which die when the app stops this idle thread |
+| A standing preference ("always open PRs as drafts") | `code-foundry memory add <text>`; for a set of projects, one repo, or a skill for them: `reference/scopes.md` |
+| What it cost, token usage | `code-foundry usage.show` (`--all` for every thread) |
+| A thread's model, effort or permission mode | `thread get --json` reads them; `thread.set-model '<id>'` (ids: its `--help`), `thread.set-effort <level>`, `thread.set-mode <mode>` change them. The app replaces /model, /effort, /fast, /mcp, /rename and /clear: the composer's pickers, the MCP panel, Rename Thread, a new thread |
+| What changed in this thread | The branch's commits since its base (`baseRef` in `thread get --json`, else origin's default branch) plus uncommitted work, not uncommitted work alone |
+| This thread's checkouts, subagents, child threads, MCP servers, linked PRs | `thread checkouts`; `thread agents`; `thread list --created-by $CODE_FOUNDRY_THREAD`; `thread mcp` (your session's start list goes stale); `thread get --json`'s `linkedPullRequests`, `thread pr link <url>` adds one |
+| To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`, `view.panel.mcp`: your own side panel; `--focus` only when asked to be taken there |
+| A secret value, or a change to a file you cannot read (`.env`, `~/.aws/credentials`) | Never ask for it in chat or read the file: `view.panel.file <path> --edit --line N --note "<what goes where>"` (a missing file is made on save), then end your turn. Told it is saved, continue without reading its values |
+| A page, chart, form, board, dashboard, mockup, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES` (never the repository) with `/cf/theme.css`, and `/cf/bridge.js`, which sizes its card; shown with `code-foundry view.inline <path>`, not markdown |
+| What's running or going on, their work | This app's threads, actions and terminals, never the Mac's processes: `code-foundry thread list`, `action runs`, `terminal list`; a board of it: the code-foundry-pages skill |
+| The app's colours: a theme, "sidebar quieter", "less contrast", the accent | `reference/making-a-theme.md`, before you change anything |
+| To be told or reminded later, or something on a schedule ("tell me when #4 passes", "every hour…") | `code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`, `--at 2h`, `--thread <id> --until attention`, `--note`): the app wakes you, even stopped; never Claude Code's cron or a background `--watch`, which die when the app stops this idle thread |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
-| Something said, decided or done in an earlier thread ("where did we…", "the thread that fixed…") | `code-foundry thread search <words>` (`--include children` for threads other threads made), then `thread read --id <thread> --since <#N-3>`; never grep ~/.claude |
+| Something said or done in an earlier thread | `code-foundry thread search <words>` (`--include children` for threads other threads made), then `thread read --id <thread> --since <#N-3>` |
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
 | To build, debug or publish a plugin | the code-foundry-plugin skill |
-| To know what exists here, or find a verb | `reference/commands.md` (next to this file) lists every verb; `code-foundry daemon.capabilities`, then `--group <name>` (build, commands, pages, panel, rendering, skills, plugins, settings, memory, presence; `--json`): it reads the running app |
-| A first run ("I just installed", "welcome tutorial", no projects yet) | the code-foundry-pages skill's reference/welcome.md: open the page the app placed in the side panel, then its two-line reply |
-| How something works inside the app | its source at the ref in the line under this title, as the help skill's "Reading the source" says |
-
-## Showing things
-
-Write a page in `$CODE_FOUNDRY_PAGES` (your thread's own folder), never in the repository
-or the home folder. It links `<link rel="stylesheet" href="/cf/theme.css">` and paints only
-with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised`,
-`--cf-text`, `--cf-text-muted`, `--cf-accent`, `--cf-border` and the status fills
-`--cf-success`, `--cf-warning`, `--cf-error` (their text `-text`, tint `-surface`), or the
-type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
-`/cf/bridge.js` lets it call the app and sizes its card: load it in every page. More: code-foundry-pages.
+| To find a verb, or know what exists here | `reference/commands.md` lists every verb; `code-foundry daemon.capabilities`, then `--group <name>` (build, commands, pages, panel, rendering, skills, plugins, settings, memory, presence; `--json`) reads the running app |
+| A first run ("I just installed", "welcome tutorial", no projects yet) | the code-foundry-pages skill's reference/welcome.md |
+| How something works inside the app | the code-foundry-help skill's `reference/reading-the-source.md` |
 
 ## Good to know
 
-- A **project** is a folder on the Mac; a **thread** is one conversation with an agent in
-  it. The composer's "Work in" places the user's own threads: In place (the project
-  folder) or Fresh copy (a worktree and branch), default `threads.default_worktree`.
-  Threads you create with `thread new` are yours to place: in place or `--new-worktree`.
-- The app replaces /model, /effort, /fast, /mcp, /rename and /clear: the composer's
-  Model, Effort and Permissions pickers, the MCP panel, Rename Thread, a new thread.
+- A **project** is a folder on the Mac; a **thread** is one conversation with an agent in it. The
+  composer's "Work in" places the user's own threads: Project folder or Fresh copy (a worktree and
+  branch), default `threads.default_worktree`. Yours from `thread new`: the project folder or
+  `--new-worktree`.
 - `$CODE_FOUNDRY_THREAD` is your thread's id. Thread commands without `--id` act on it.
 - Commands that ask first exit 2 without `--yes`: add it once the user agreed to that act.

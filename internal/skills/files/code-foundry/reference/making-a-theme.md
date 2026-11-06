@@ -10,4 +10,4 @@ pin `overrides` only where a rule is wrong ({{cf.themesRef}}). Body text keeps 7
 4.5:1: for less contrast move `surface` and `canvas` toward the text, never the text. Fix every
 pair the save's `contrast:` lists before you reply. A theme this thread did not make needs
 `--replace`, once the user asked to change it. A light theme while the app is dark changes nothing
-on screen: say so, offer `theme set-scheme light`, never switch unasked. Reply in a sentence or two.
+on screen: say so, offer `theme set-scheme light`, never switch unasked.

@@ -29,6 +29,7 @@ const (
 	themeRef   = skills.Entry + "/reference/making-a-theme.md"
 	scopesRef  = skills.Entry + "/reference/scopes.md"
 	helpFile   = skills.Help + "/SKILL.md"
+	sourceRef  = skills.Help + "/reference/reading-the-source.md"
 	orchFile   = skills.Orchestrate + "/SKILL.md"
 	wakesFile  = skills.Orchestrate + "/reference/wakes.md"
 	leadsFile  = skills.Orchestrate + "/reference/leads.md"
@@ -101,6 +102,8 @@ var rules = []rule{
 	{note: "control-6-memory-fixes", file: helpFile, says: []string{"after a restart", "remove the old entry"}},
 	// The source at the build's own revision, and the dev build's caveat.
 	{note: "control-2-skill-provenance", file: helpFile, says: []string{"reading the source", "dev build", `docs/architecture\.md`}},
+	{note: "control-2-skill-provenance", file: helpFile, says: []string{`reference/reading-the-source\.md`}},
+	{note: "control-2-skill-provenance", file: sourceRef, says: []string{"never answer that from memory", `daemon\.version --json`, "dev build", `docs/architecture\.md`}},
 	// Round 3: rules read late or not at all from a reference earned their inline place.
 	{note: "orch-skill-v4", file: orchFile, says: []string{`git merge-tree --write-tree`, `git diff origin/<default> --stat`, "--descendants-of", "project branch delete"}},
 	{note: "orch-skill-v4", file: wakesFile, says: []string{"without --wait", "report_stale"}},

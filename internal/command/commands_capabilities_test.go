@@ -205,7 +205,7 @@ func TestCapabilitiesGroups(t *testing.T) {
 	}{
 		{group: "build",
 			has: []string{"build: Code Foundry v0.21.3\n", "commit: 844a109c01234567890abcdef0123456789abcde\n", "go: go1.26.10\n",
-				"source: https://github.com/alexwaumann/code-foundry/tree/v0.21.3\n", "\"Reading the source\""},
+				"source: https://github.com/alexwaumann/code-foundry/tree/v0.21.3\n", "reference/reading-the-source.md"},
 			hasNot: []string{"dev build"},
 			json:   map[string]any{"version": "v0.21.3", "source_ref": "v0.21.3", "source_url": "https://github.com/alexwaumann/code-foundry/tree/v0.21.3"}},
 		{group: "commands",
