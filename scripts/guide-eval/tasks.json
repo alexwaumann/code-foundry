@@ -36,5 +36,9 @@
  {"id":"s1-scopes","verb":"^thread\\.checkouts\\b","avoid":"^memory\\.add\\b","workspace":true,
   "prompt":"In this workspace every repo has to run its tests with -race. Make that stick for all of them, not just this one, and tell me when it takes effect."},
  {"id":"ember","skill":"code-foundry-ember","verb":"^ember\\.task\\.start\\b","ember":true,"last":true,"heavy":true,
-  "prompt":"Add a --version flag to the greet CLI that prints 0.1.0. Push the branch, no PR."}
+  "prompt":"Add a --version flag to the greet CLI that prints 0.1.0. Push the branch, no PR."},
+ {"id":"t10-overlap","skill":"code-foundry-orchestrate","verb":"^thread\\.new\\b","heavy":true,"home":true,"checkout":"project",
+  "prompt":"Add four subcommands to this CLI: shout (upper-cases the greeting), whisper (lower-cases it), reverse (reverses it) and twice (prints it two times). Do them in parallel, one branch each and no PRs; the origin is a local bare repo. Each needs a test, and the usage line, the README's command list and the changelog must end up listing all four. I will merge the branches myself, in any order. Push everything, then tell me when it is pushed and whether it all fits together."},
+ {"id":"ember-overlap","skill":"code-foundry-ember","verb":"^ember\\.task\\.start\\b","ember":true,"heavy":true,"home":true,
+  "prompt":"Add four subcommands to this CLI: shout (upper-cases the greeting), whisper (lower-cases it), reverse (reverses it) and twice (prints it two times). Do them in parallel, one branch each and no PRs; the origin is a local bare repo. Each needs a test, and the usage line, the README's command list and the changelog must end up listing all four. I will merge the branches myself, in any order. Push everything, then tell me when it is pushed and whether it all fits together."}
 ]
