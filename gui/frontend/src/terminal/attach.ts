@@ -56,7 +56,8 @@ function concat(chunks: readonly Uint8Array[]): Uint8Array {
  *               what arrived meanwhile
  *   Output   -> write (held while a snapshot waits or is being parsed). A stream that outruns
  *               xterm by MAX_BEHIND_BYTES is dropped; a new one opens once xterm has caught up
- *   Resized  -> resize (no Resize RPC back)
+ *   Resized  -> resize (no Resize RPC back), once xterm has parsed the output before it: resize()
+ *               applies at once, and that output was written for the old size
  *   Exited   -> phase "exited"; no reconnect after the stream ends
  *
  * Input is sent through an ordered queue (one Write in flight, later bytes coalesced),
@@ -72,10 +73,10 @@ export class AttachController {
   private resizeTimer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
   /**
-   * Events that arrived while a snapshot was still being parsed (null: none is). xterm
-   * parses a large write over later frames while resize() applies at once, so output or
-   * a resize applied before the snapshot lands would draw at the wrong size and the
-   * replay would interleave with live output.
+   * Events waiting for xterm (null: none are): behind a snapshot still being parsed, or a
+   * Resized with output ahead of it. xterm parses a large write over later frames while
+   * resize() applies at once, so output or a resize applied too early would draw at the
+   * wrong size and the replay would interleave with live output.
    */
   private held: AttachEventView[] | null = null;
   private snapshots = 0;
@@ -168,7 +169,10 @@ export class AttachController {
       this.behind += ev.data.length;
     }
     if (this.held) this.held.push(ev);
-    else this.apply(ev);
+    else if (ev.kind === "resized" && this.unparsed > 0) {
+      this.held = [ev];
+      this.replay();
+    } else this.apply(ev);
   }
 
   /** A new snapshot (a reconnect) replaces whatever the previous one was holding. */
@@ -179,9 +183,12 @@ export class AttachController {
     this.whenParsed(() => {
       this.renderer.reset();
       if (ev.cols > 0 && ev.rows > 0) this.renderer.resize(ev.cols, ev.rows);
+      const { cols, rows } = this.renderer.size;
       this.write(ev.data, () => {
         if (seq !== this.snapshots) return;
-        this.snapshotParsed(ev.cols, ev.rows);
+        // The host's fit() got in before xterm's parse, so this drew at the wrong size.
+        if (this.renderer.size.cols !== cols || this.renderer.size.rows !== rows) this.fallBehind();
+        else this.snapshotParsed(ev.cols, ev.rows);
       });
     });
   }
@@ -271,10 +278,24 @@ export class AttachController {
     const { cols, rows } = this.renderer.size;
     if (cols !== snapCols || rows !== snapRows) this.scheduleResize(cols, rows, 0);
     if (this.state.phase !== "exited") this.setState({ phase: "live", error: null });
-    // One at a time out of `held`, so that a refused write's dropHeld takes the rest with it.
-    while (this.held?.length) {
-      const ev = this.held.shift();
-      if (ev && ev.kind !== "snapshot") this.apply(ev);
+    this.replay();
+  }
+
+  /**
+   * Applies what is held, in order, stopping for xterm before each Resized. One at a time out of
+   * `held`, so that a refused write's dropHeld takes the rest with it.
+   */
+  private replay(): void {
+    while (this.held?.[0]) {
+      const ev = this.held[0];
+      if (ev.kind === "resized" && this.unparsed > 0) {
+        this.whenParsed(() => {
+          this.replay();
+        });
+        return;
+      }
+      this.held.shift();
+      if (ev.kind !== "snapshot") this.apply(ev);
     }
     this.held = null;
   }
@@ -296,6 +317,8 @@ export class AttachController {
           await this.deps.write(id, chunk);
         } catch (err) {
           this.deps.onStreamError?.(err);
+          // A terminal left meanwhile: `pending` and the state are the next one's now.
+          if (this.state.terminalId !== id) continue;
           this.setState({ error: `write failed: ${errorMessage(err)}` });
           this.pending = [];
         }
@@ -303,6 +326,9 @@ export class AttachController {
     } finally {
       this.flushing = false;
     }
+    // Typed in the next terminal while that last write was out: its flush found this one running.
+    const next = this.state.terminalId;
+    if (next !== null && next !== id && this.pending.length > 0) void this.flush(next);
   }
 
   private scheduleResize(cols: number, rows: number, delay = this.resizeDebounceMs): void {

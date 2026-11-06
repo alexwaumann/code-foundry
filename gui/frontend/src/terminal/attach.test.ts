@@ -165,8 +165,11 @@ describe("AttachController", () => {
     expect(r.calls).toEqual(["reset", "reset", "resize:80x10", "write:replay"]);
     expect(ctl.current.phase).toBe("connecting");
     r.deferParse.shift()?.();
-    expect(r.calls).toEqual(["reset", "reset", "resize:80x10", "write:replay", "fit:100x30", "write:live1", "resize:90x12", "write:live2"]);
+    expect(r.calls.slice(4)).toEqual(["fit:100x30", "write:live1"]);
     expect(ctl.current.phase).toBe("live");
+    // The Resized waits for the output before it, which was written for the old size.
+    r.deferParse.shift()?.();
+    expect(r.calls.slice(4)).toEqual(["fit:100x30", "write:live1", "resize:90x12", "write:live2"]);
   });
 
   it("drops what a snapshot held when a newer snapshot replaces it", async () => {
@@ -461,6 +464,189 @@ describe("AttachController", () => {
     ]);
   });
 
+  describe("typed input around a re-attach", () => {
+    const decoded = () => writes.map(([id, text]) => `${id}:${text}`);
+    const snap = { kind: "snapshot" as const, data: enc("s"), cols: 100, rows: 30, altScreen: false };
+    /** Lets the write in flight return, and what it started. */
+    const returnWrite = async () => {
+      releaseWrite?.();
+      await flush();
+    };
+
+    it("sends what was typed in the next terminal while the last one's write was out", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.type("a");
+      ctl.attach("t2");
+      await flush();
+      r.type("b");
+      expect(decoded()).toEqual(["t1:a"]);
+      await returnWrite();
+      expect(decoded()).toEqual(["t1:a", "t2:b"]);
+    });
+
+    it("leaves the next terminal's input and state alone when the last one's write fails", async () => {
+      const failed = new Error("gone");
+      let failWrite: (err: Error) => void = () => undefined;
+      const seen: [string, string][] = [];
+      const c = new AttachController(
+        r,
+        {
+          attach: s.attach,
+          write: (id, data) => {
+            seen.push([id, new TextDecoder().decode(data)]);
+            return id === "t1" ? new Promise<void>((_, reject) => (failWrite = reject)) : Promise.resolve();
+          },
+          resize: () => Promise.resolve(),
+        },
+        () => undefined,
+      );
+      c.attach("t1");
+      await flush();
+      r.type("a");
+      c.attach("t2");
+      await flush();
+      r.type("b");
+      failWrite(failed);
+      await flush();
+      expect(seen).toEqual([["t1", "a"], ["t2", "b"]]);
+      expect(c.current.error).toBeNull();
+      c.dispose();
+    });
+
+    it("drops what was queued for a terminal left behind, and never sends it to the next", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.type("a");
+      r.type("queued");
+      ctl.attach("t2");
+      await flush();
+      await returnWrite();
+      expect(decoded()).toEqual(["t1:a"]);
+    });
+
+    it("sends each keystroke once through a stream dropped for falling behind, and in order", async () => {
+      ctl.attach("t1");
+      await flush();
+      s.push("t1", snap);
+      await flush();
+      r.deferParse = [];
+      s.push("t1", { kind: "output", data: new Uint8Array(MAX_BEHIND_BYTES) });
+      await flush();
+      r.type("a");
+      s.push("t1", { kind: "output", data: enc("x") }); // over the limit: the stream goes
+      await flush();
+      expect(s.aborted).toEqual(["t1"]);
+      r.type("b");
+      await returnWrite();
+      r.type("c");
+      while (r.deferParse.length) r.deferParse.shift()?.();
+      await flush();
+      expect(s.opened).toEqual(["t1", "t1"]);
+      r.type("d");
+      await returnWrite();
+      s.push("t1", snap);
+      await flush();
+      r.type("e");
+      await returnWrite();
+      await returnWrite();
+      expect(decoded().map((d) => d.slice(3)).join("")).toBe("abcde");
+      expect(decoded().every((d) => d.startsWith("t1:"))).toBe(true);
+    });
+
+    it("sends what is typed while a snapshot waits or is parsed, through the terminal it belongs to", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.deferParse = [];
+      r.type("a");
+      s.push("t1", snap);
+      await flush();
+      r.type("b");
+      await returnWrite();
+      expect(decoded()).toEqual(["t1:a", "t1:b"]);
+    });
+  });
+
+  describe("a resize around a re-attach", () => {
+    const snap = (cols: number, rows: number, text = "s") => ({ kind: "snapshot" as const, data: enc(text), cols, rows, altScreen: false });
+    const parseAll = () => {
+      while (r.deferParse?.length) r.deferParse.shift()?.();
+    };
+    /** Every event pushed so far delivered: each takes several ticks of the generator. */
+    const delivered = async () => {
+      for (let i = 0; i < 4; i++) await flush();
+    };
+    async function live() {
+      r.container = { cols: 100, rows: 30 };
+      ctl.attach("t1");
+      await flush();
+      s.push("t1", snap(100, 30));
+      await flush();
+      r.calls = [];
+    }
+
+    it("keeps a Resized behind the output before it, and the output after behind it", async () => {
+      await live();
+      r.deferParse = [];
+      s.push("t1", { kind: "output", data: enc("old") });
+      s.push("t1", { kind: "resized", cols: 90, rows: 20 });
+      s.push("t1", { kind: "output", data: enc("new") });
+      await delivered();
+      expect(r.calls).toEqual(["write:old"]);
+      parseAll();
+      expect(r.calls).toEqual(["write:old", "resize:90x20", "write:new"]);
+    });
+
+    it("keeps that order through a snapshot's replay", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.container = { cols: 100, rows: 30 };
+      r.deferParse = [];
+      s.push("t1", snap(100, 30));
+      s.push("t1", { kind: "output", data: enc("old") });
+      s.push("t1", { kind: "resized", cols: 90, rows: 20 });
+      s.push("t1", { kind: "output", data: enc("new") });
+      await delivered();
+      r.calls = [];
+      r.deferParse.shift()?.();
+      expect(r.calls).toEqual(["write:old"]);
+      parseAll();
+      expect(r.calls).toEqual(["write:old", "resize:90x20", "write:new"]);
+    });
+
+    it("lets a newer snapshot replace a Resized that waits for xterm", async () => {
+      await live();
+      r.deferParse = [];
+      s.push("t1", { kind: "output", data: enc("old") });
+      s.push("t1", { kind: "resized", cols: 90, rows: 20 });
+      s.push("t1", snap(100, 30, "fresh"));
+      await delivered();
+      parseAll();
+      expect(r.calls).toEqual(["write:old", "reset", "resize:100x30", "write:fresh"]);
+    });
+
+    it("attaches again when the grid moved under a snapshot still waiting to parse, which drew at the wrong size", async () => {
+      await live();
+      r.deferParse = [];
+      s.push("t1", snap(100, 30, "fresh"));
+      await flush();
+      r.size = { cols: 70, rows: 30 }; // the host's fit(), on a frame before xterm's timer
+      parseAll();
+      await flush();
+      expect(s.aborted).toEqual(["t1"]);
+      expect(s.opened).toEqual(["t1", "t1"]);
+    });
+
+    it("does not loop on a grid that cannot take the snapshot's size", async () => {
+      await live();
+      r.resize = () => undefined; // xterm's minimum, or a size it clamps
+      s.push("t1", snap(1, 1));
+      await flush();
+      expect(s.aborted).toEqual([]);
+      expect(ctl.current.phase).toBe("live");
+    });
+  });
+
   it("debounces viewport resizes into one Resize", async () => {
     ctl.attach("t1");
     await flush();
@@ -608,6 +794,103 @@ describe("AttachController on a real xterm", () => {
       ctl.dispose();
       r.dispose();
     }, 20_000);
+  });
+
+  describe("the screen after a re-attach", () => {
+    /** Every row of the active buffer, blanks included, and the cursor. */
+    const grid = (r: XtermRenderer) => {
+      const buf = r.term.buffer.active;
+      const rows = Array.from({ length: r.term.rows }, (_, i) => buf.getLine(buf.baseY + i)?.translateToString(true) ?? "");
+      return { type: buf.type, rows, x: buf.cursorX, y: buf.cursorY };
+    };
+    /** What xterm shows for the same bytes and sizes with no stream, no backlog and no controller. */
+    async function direct(steps: (string | [number, number])[]) {
+      const r = new XtermRenderer({ fontSize: 12, isGlobalChord: () => false });
+      for (const step of steps) {
+        if (typeof step === "string") await new Promise<void>((resolve) => { r.write(enc(step), resolve); });
+        else r.resize(step[0], step[1]);
+      }
+      const want = grid(r);
+      r.dispose();
+      return want;
+    }
+    const ALT = "\x1b[?1049h\x1b[2J\x1b[H";
+
+    it("draws what a snapshot held at the size it was written for, through a resize, in the alternate screen", async () => {
+      const { r, s, ctl } = attached();
+      ctl.attach("t");
+      await flush();
+      const steps = [`${ALT}top\x1b[3;70Hedge`, [60, 24], "\x1b[2;50Hmoved"] as (string | [number, number])[];
+      r.resize(80, 24);
+      s.push("t", { kind: "snapshot", data: enc(ALT), cols: 80, rows: 24, altScreen: true });
+      s.push("t", { kind: "output", data: enc("top\x1b[3;70Hedge") });
+      s.push("t", { kind: "resized", cols: 60, rows: 24 });
+      s.push("t", { kind: "output", data: enc("\x1b[2;50Hmoved") });
+      await flush();
+      await vi.waitFor(async () => {
+        await flush();
+        await parsed(r);
+        expect(r.term.cols).toBe(60);
+        expect(grid(r)).toEqual(await direct([[80, 24], ...steps]));
+      });
+      ctl.dispose();
+      r.dispose();
+    });
+
+    it("leaves the alternate screen, and what is under it, as the snapshot says after a flood's reconnect", async () => {
+      const { r, s, ctl } = attached();
+      ctl.attach("t");
+      await flush();
+      const under = "shell$ vim\r\n";
+      const snapshot = `${under}\x1b[?1049h\x1b[2J\x1b[Hscreen one`;
+      s.push("t", { kind: "snapshot", data: enc(snapshot), cols: 80, rows: 24, altScreen: true });
+      await flush();
+      await parsed(r);
+      s.push("t", { kind: "output", data: new Uint8Array(MAX_BEHIND_BYTES + 1) });
+      await flush();
+      expect(s.aborted).toEqual(["t"]);
+      await vi.waitFor(() => {
+        expect(s.opened).toHaveLength(2);
+      });
+      s.push("t", { kind: "snapshot", data: enc(`${under}\x1b[?1049h\x1b[2J\x1b[Hscreen two`), cols: 80, rows: 24, altScreen: true });
+      await flush();
+      await vi.waitFor(async () => {
+        await flush();
+        await parsed(r);
+        expect(grid(r).rows[0]).toBe("screen two");
+      });
+      expect(r.term.buffer.active.type).toBe("alternate");
+      expect(r.keyboardModes).toBeDefined();
+      s.push("t", { kind: "output", data: enc("\x1b[?1049l") });
+      await flush();
+      await vi.waitFor(async () => {
+        await flush();
+        await parsed(r);
+        expect(r.term.buffer.active.type).toBe("normal");
+      });
+      expect(screen(r)).toEqual(["shell$ vim"]);
+      ctl.dispose();
+      r.dispose();
+    });
+
+    it("comes out of a program's alternate screen when the snapshot shows it gone", async () => {
+      const { r, s, ctl } = attached();
+      ctl.attach("t");
+      await flush();
+      s.push("t", { kind: "snapshot", data: enc("prompt\r\n\x1b[?1049h\x1b[Hfull screen"), cols: 80, rows: 24, altScreen: true });
+      await flush();
+      await parsed(r);
+      s.push("t", { kind: "snapshot", data: enc("prompt\r\ndone\r\n"), cols: 80, rows: 24, altScreen: false });
+      await flush();
+      await vi.waitFor(async () => {
+        await flush();
+        await parsed(r);
+        expect(r.term.buffer.active.type).toBe("normal");
+        expect(screen(r)).toEqual(["prompt", "done"]);
+      });
+      ctl.dispose();
+      r.dispose();
+    });
   });
 
   it("shows only the snapshot after a reconnect with output still unparsed", async () => {
