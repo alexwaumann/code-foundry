@@ -112,7 +112,7 @@ describe("XtermRenderer write callback", () => {
         try {
           r.write(new TextEncoder().encode("next"), resolve);
         } catch (err) {
-          reject(err);
+          reject(new Error("xterm refused the write", { cause: err }));
         }
       });
     });
