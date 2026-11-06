@@ -102,6 +102,66 @@ describe("XtermRenderer cursor across reset", () => {
   });
 });
 
+describe("XtermRenderer write callback", () => {
+  // Past xterm's 50 MB limit while it is pending, and NUL, which is cheap to parse.
+  const huge = () => new Uint8Array(50_000_001);
+  /** Writes from `parsed`, as AttachController does: xterm refuses, and throws, if it still counts `data`. */
+  function writeOnFromParsed(r: XtermRenderer, data: Uint8Array): Promise<void> {
+    return new Promise((resolve, reject) => {
+      r.write(data, () => {
+        try {
+          r.write(new TextEncoder().encode("next"), resolve);
+        } catch (err) {
+          reject(new Error("xterm refused the write", { cause: err }));
+        }
+      });
+    });
+  }
+  const line = (r: XtermRenderer) => r.term.buffer.active.getLine(0)?.translateToString(true);
+
+  it("may write when xterm parsed the data on its timer", async () => {
+    const r = renderer();
+    await writeOnFromParsed(r, huge());
+    expect(line(r)).toBe("next");
+    r.dispose();
+  });
+
+  it("may write when xterm parsed the data inside write(), as it does after user input", async () => {
+    const r = renderer();
+    r.term.input("x");
+    await writeOnFromParsed(r, huge());
+    expect(line(r)).toBe("next");
+    r.dispose();
+  });
+
+  it("may write when xterm resumed the data after an async parser handler", async () => {
+    const r = renderer();
+    r.term.parser.registerOscHandler(7777, () => Promise.resolve(true));
+    const osc = new TextEncoder().encode("\x1b]7777;x\x07");
+    const data = huge();
+    data.set(osc);
+    await writeOnFromParsed(r, data);
+    expect(line(r)).toBe("next");
+    r.dispose();
+  });
+
+  it("runs after the data, however many writes share xterm's pass", async () => {
+    const r = renderer();
+    const seen: (string | undefined)[] = [];
+    const done = new Promise<void>((resolve) => {
+      r.write(new TextEncoder().encode("a"), () => seen.push(line(r)));
+      r.write(new TextEncoder().encode("b"), () => {
+        seen.push(line(r));
+        resolve();
+      });
+    });
+    await done;
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toBe("ab");
+    r.dispose();
+  });
+});
+
 describe("XtermRenderer keyboard modes", () => {
   it("tracks kitty flags and modifyOtherKeys from the output stream", async () => {
     const r = renderer();
@@ -137,6 +197,18 @@ describe("XtermRenderer keyup", () => {
 });
 
 describe("XtermRenderer hideCursor", () => {
+  it("does not throw behind writes over xterm's 50 MB limit: the exit must still show", async () => {
+    const r = renderer();
+    const parsed = new Promise<void>((resolve) => {
+      r.write(new Uint8Array(51_000_000), resolve);
+    });
+    expect(() => {
+      r.hideCursor();
+    }).not.toThrow();
+    await parsed;
+    r.dispose();
+  });
+
   const hidden = (r: XtermRenderer) => (r.term as unknown as { _core: { coreService: { isCursorHidden: boolean } } })._core.coreService.isCursorHidden;
 
   it("hides the cursor after the output written before it, even one that showed it", async () => {

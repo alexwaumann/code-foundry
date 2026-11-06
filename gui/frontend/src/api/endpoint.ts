@@ -53,7 +53,12 @@ function binaryWire(): boolean {
  * The streams on the WebSocket tunnel (docs/notes/ws-transport.md); everything else uses fetch.
  * Temporary: later PRs add to it, and the last one removes it once every long-lived stream is on.
  */
-const TUNNELLED_STREAMS: ReadonlySet<string> = new Set(["EmberService/WatchBoard"]);
+const TUNNELLED_STREAMS: ReadonlySet<string> = new Set([
+  "EmberService/WatchBoard",
+  "ThreadService/WatchThread",
+  "TerminalService/Attach",
+  "PluginService/WatchSurface",
+]);
 
 /** Unary calls over fetch, and each stream over the tunnel or fetch by its procedure. */
 function daemonTransport(ep: DaemonEndpoint): Transport {

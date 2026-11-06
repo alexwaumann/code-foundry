@@ -617,6 +617,155 @@ func TestStuckClientHitsTheWriteDeadline(t *testing.T) {
 	}
 }
 
+// A browser takes everything off the socket whether or not its page runs, so a client that
+// reads but counts nothing is the stuck page: it gets the window, then the write deadline.
+func TestPageThatStoppedHitsTheWriteDeadline(t *testing.T) {
+	ctx := testContext(t)
+	done := make(chan error, 1)
+	r := newRig(t, wstunnel.Options{Window: 3 << 20, WriteTimeout: 200 * time.Millisecond, FinalTimeout: 100 * time.Millisecond}, flood(done))
+	c := r.call(ctx)
+	if _, err := c.ReadHead(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var taken int
+	for {
+		f, err := c.ReadFrame(ctx)
+		if err != nil {
+			// Not 1000: the end of stream never went, and the client must retry as it does
+			// for a dead socket, not report a truncated stream.
+			if code := websocket.CloseStatus(err); code != websocket.StatusTryAgainLater {
+				t.Errorf("close = %v", code)
+			}
+			break
+		}
+		taken += len(f.Payload)
+	}
+	if taken > 4<<20 { // the window, and the message that went into its last room
+		t.Errorf("%d bytes went out on a window of 3 MiB", taken)
+	}
+	if err := <-done; err == nil {
+		t.Error("the handler's Send did not fail")
+	}
+	if err := r.tunnel.Drain(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(r.logs.String(), `reason="write timeout"`) {
+		t.Errorf("logs: %s", r.logs.String())
+	}
+}
+
+// A client must not send a count unless the head says so: a daemon from before them reads one
+// as a close.
+func TestHeadAdvertisesCounts(t *testing.T) {
+	ctx := testContext(t)
+	r := newRig(t, wstunnel.Options{}, hold(make(chan struct{})))
+	head, err := r.call(ctx).ReadHead(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !head.Counts {
+		t.Errorf("head = %+v", head)
+	}
+}
+
+// Counts keep a stream going past its window for as long as they come.
+func TestCountsReopenTheWindow(t *testing.T) {
+	ctx := testContext(t)
+	r := newRig(t, wstunnel.Options{Window: 1 << 20, WriteTimeout: 2 * time.Second}, func(_ context.Context, s *connect.ServerStream[v1.AttachEvent]) error {
+		for range 20 {
+			if err := s.Send(wstunneltest.Output(make([]byte, 1<<20))); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	c := r.call(ctx)
+	if _, err := c.ReadHead(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var taken int64
+	for range 20 {
+		_, b, err := c.Conn.Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		taken += int64(len(b))
+		if err := c.Ack(ctx, taken); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := c.ReadFrame(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !f.End() {
+		t.Errorf("flags = %d, want the end of stream", f.Flags)
+	}
+	if code := c.ReadClose(ctx); code != websocket.StatusNormalClosure {
+		t.Errorf("close = %v", code)
+	}
+}
+
+// A count that is no count is data past the request, which ends the tunnel: the bytes sent
+// are the daemon's own, so no client may claim more.
+func TestBadCountsCloseTheTunnel(t *testing.T) {
+	for _, count := range []string{"not a number", "-1", "99999999", "1.5", ""} {
+		t.Run(count, func(t *testing.T) {
+			ctx := testContext(t)
+			ended := make(chan struct{})
+			r := newRig(t, wstunnel.Options{}, hold(ended))
+			c := r.call(ctx)
+			if _, err := c.ReadHead(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Conn.Write(ctx, websocket.MessageText, []byte(count)); err != nil {
+				t.Fatal(err)
+			}
+			waitDone(t, ended, 3*time.Second, "handler")
+		})
+	}
+}
+
+// A good count leaves the stream alone.
+func TestCountDoesNotEndTheStream(t *testing.T) {
+	ctx := testContext(t)
+	ended := make(chan struct{})
+	r := newRig(t, wstunnel.Options{}, hold(ended))
+	c := r.call(ctx)
+	if _, err := c.ReadHead(ctx); err != nil {
+		t.Fatal(err)
+	}
+	f, err := c.ReadFrame(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Ack(ctx, int64(len(f.Payload)+5)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ended:
+		t.Fatal("a count ended the handler")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// PluginService.WatchSurface flushes its headers with an empty Send before its first update,
+// which may wait on the plugin: the head must go out alone.
+func TestHeadersFlushBeforeTheFirstMessage(t *testing.T) {
+	ctx := testContext(t)
+	r := newRig(t, wstunnel.Options{}, func(ctx context.Context, s *connect.ServerStream[v1.AttachEvent]) error {
+		if err := s.Send(nil); err != nil {
+			return err
+		}
+		<-ctx.Done()
+		return nil
+	})
+	c := r.call(ctx)
+	if h, err := c.ReadHead(ctx); err != nil || h.Status != http.StatusOK {
+		t.Fatalf("head = %+v, %v", h, err)
+	}
+}
+
 // At shutdown a stuck client gets FinalTimeout, not the rest of the write deadline.
 func TestStuckClientDoesNotHoldShutdown(t *testing.T) {
 	ctx := testContext(t)
@@ -648,6 +797,173 @@ func TestClientThatNeverAnswersTheClose(t *testing.T) {
 	}
 }
 
+// A client that leaves on purpose reads as that whatever the close says, even though the end
+// of stream then fails to write; one that loses the connection does not.
+func TestCloseReason(t *testing.T) {
+	tests := []struct {
+		name  string
+		leave func(context.Context, *testing.T, *wstunneltest.Client)
+		want  string
+	}{
+		{"a close, as a resync sends", func(_ context.Context, t *testing.T, c *wstunneltest.Client) {
+			if err := c.Conn.Close(websocket.StatusNormalClosure, ""); err != nil {
+				t.Fatal(err)
+			}
+		}, "client closed"},
+		{"a page going away", func(_ context.Context, t *testing.T, c *wstunneltest.Client) {
+			if err := c.Conn.Close(websocket.StatusGoingAway, ""); err != nil {
+				t.Fatal(err)
+			}
+		}, "client closed"},
+		{"data past the request", func(ctx context.Context, t *testing.T, c *wstunneltest.Client) {
+			if err := c.Conn.Write(ctx, websocket.MessageBinary, []byte("more")); err != nil {
+				t.Fatal(err)
+			}
+		}, "client closed"},
+		{"a connection dropped with no close", func(_ context.Context, t *testing.T, c *wstunneltest.Client) {
+			if err := c.Conn.CloseNow(); err != nil {
+				t.Fatal(err)
+			}
+		}, "client gone"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testContext(t)
+			r := newRig(t, wstunnel.Options{FinalTimeout: 100 * time.Millisecond}, hold(make(chan struct{})))
+			c := r.call(ctx)
+			if _, err := c.ReadHead(ctx); err != nil {
+				t.Fatal(err)
+			}
+			tt.leave(ctx, t, c)
+			if err := r.tunnel.Drain(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if want := `reason="` + tt.want + `"`; !strings.Contains(r.logs.String(), want) {
+				t.Errorf("want %s in: %s", want, r.logs.String())
+			}
+		})
+	}
+}
+
+// A handler waiting for room in the window writes nothing, so what ends it says who left. The
+// write deadline is far off in every case: only the page really stopping reads as a timeout.
+func TestCloseReasonWaitingForCounts(t *testing.T) {
+	tests := []struct {
+		name  string
+		leave func(context.Context, *testing.T, *rig, *wstunneltest.Client)
+		want  string
+	}{
+		{"a connection dropped with no close", func(_ context.Context, t *testing.T, _ *rig, c *wstunneltest.Client) {
+			if err := c.Conn.CloseNow(); err != nil {
+				t.Fatal(err)
+			}
+		}, "client gone"},
+		{"a close", func(_ context.Context, _ *testing.T, _ *rig, c *wstunneltest.Client) {
+			go func() { _ = c.Conn.Close(websocket.StatusNormalClosure, "") }()
+		}, "client closed"},
+		{"a count that is not one", func(ctx context.Context, t *testing.T, _ *rig, c *wstunneltest.Client) {
+			if err := c.Conn.Write(ctx, websocket.MessageText, []byte("nope")); err != nil {
+				t.Fatal(err)
+			}
+		}, "client closed"},
+		{"a shutdown with the page stopped", func(_ context.Context, _ *testing.T, r *rig, _ *wstunneltest.Client) {
+			r.shutdown()
+		}, "write timeout"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testContext(t)
+			done := make(chan error, 1)
+			r := newRig(t, wstunnel.Options{Window: 1 << 20, WriteTimeout: time.Minute, FinalTimeout: 50 * time.Millisecond}, flood(done))
+			c := r.call(ctx)
+			if _, err := c.ReadHead(ctx); err != nil {
+				t.Fatal(err)
+			}
+			for taken := 0; taken < 1<<20; {
+				_, b, err := c.Conn.Read(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				taken += len(b)
+			}
+			time.Sleep(50 * time.Millisecond) // into the wait for room
+			tt.leave(ctx, t, r, c)
+			if err := r.tunnel.Drain(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if want := `reason="` + tt.want + `"`; !strings.Contains(r.logs.String(), want) {
+				t.Errorf("want %s in: %s", want, r.logs.String())
+			}
+		})
+	}
+}
+
+// A real write failure: the connection resets under a handler that is writing, with no close
+// frame to read. It must not pass for a client's close or for a stuck client.
+func TestResetUnderAWriteIsClientGone(t *testing.T) {
+	ctx := testContext(t)
+	done := make(chan error, 1)
+	r := newRig(t, wstunnel.Options{FinalTimeout: 100 * time.Millisecond}, flood(done))
+	var raw net.Conn
+	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		c, err := (&net.Dialer{}).DialContext(ctx, network, addr)
+		raw = c
+		return c, err
+	}
+	httpClient := &http.Client{Transport: &http.Transport{DialContext: dial}}
+	c, _, err := wstunneltest.Dial{URL: r.url(wstunneltest.Stream), Origins: []string{origin}, HTTPClient: httpClient}.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Send(ctx, wstunneltest.Headers(token), requestBody(t)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.ReadHead(ctx); err != nil { // the handler is writing
+		t.Fatal(err)
+	}
+	if err := raw.(*net.TCPConn).SetLinger(0); err != nil {
+		t.Fatal(err)
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("the handler's write did not fail")
+		}
+	case <-ctx.Done():
+		t.Fatal("handler still pinned")
+	}
+	if err := r.tunnel.Drain(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(r.logs.String(), `reason="client gone"`) {
+		t.Errorf("logs: %s", r.logs.String())
+	}
+}
+
+// The daemon ending the stream is served, though the client answers its close frame.
+func TestAnswerToTheDaemonsCloseIsServed(t *testing.T) {
+	ctx := testContext(t)
+	r := newRig(t, wstunnel.Options{}, func(_ context.Context, s *connect.ServerStream[v1.AttachEvent]) error {
+		return s.Send(wstunneltest.Output([]byte("bye")))
+	})
+	c := r.call(ctx)
+	if _, err := c.ReadHead(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if code := c.ReadClose(ctx); code != websocket.StatusNormalClosure { // reading answers the close
+		t.Fatalf("close = %v", code)
+	}
+	if err := r.tunnel.Drain(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(r.logs.String(), `reason=served`) {
+		t.Errorf("logs: %s", r.logs.String())
+	}
+}
+
 // drainNow is Drain with a short leash.
 func (r *rig) drainNow(ctx context.Context) error {
 	short, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
@@ -671,7 +987,7 @@ func TestLogsOpenAndClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	logs := r.logs.String()
-	for _, want := range []string{"tunnel open", "tunnel closed", "procedure=" + wstunneltest.Stream, "origin=" + origin, "level=INFO", `reason="client gone"`} {
+	for _, want := range []string{"tunnel open", "tunnel closed", "procedure=" + wstunneltest.Stream, "origin=" + origin, "level=INFO", `reason="client closed"`} {
 		if !strings.Contains(logs, want) {
 			t.Errorf("logs lack %q: %s", want, logs)
 		}

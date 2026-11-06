@@ -24,7 +24,8 @@ function replay(ws: WebSocket, port: number, path: string, headers: Record<strin
   };
   call.on("error", drop);
   call.on("response", (res) => {
-    ws.send(JSON.stringify({ status: res.statusCode, headers: flatHeaders(res.headers) }));
+    // Counts are welcome and then ignored: nothing here has a window (ws.once took the opening two).
+    ws.send(JSON.stringify({ status: res.statusCode, headers: flatHeaders(res.headers), counts: true }));
     res.on("data", (chunk: Buffer) => {
       ws.send(chunk);
     });

@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EmberService } from "@/gen/codefoundry/v1/ember_pb";
 import { EventService } from "@/gen/codefoundry/v1/events_pb";
 import { HealthService } from "@/gen/codefoundry/v1/health_pb";
+import { PluginService } from "@/gen/codefoundry/v1/plugin_pb";
+import { TerminalService } from "@/gen/codefoundry/v1/terminal_pb";
+import { ThreadService } from "@/gen/codefoundry/v1/thread_pb";
 import { DaemonConnection, jsonRequested } from "./endpoint";
 
 describe("jsonRequested", () => {
@@ -69,9 +72,14 @@ describe("which transport a call takes", () => {
     return { socket, fetch: fetchStub.mock.calls.map(([url]) => url as string) };
   }
 
-  it("is the socket for EmberService/WatchBoard", async () => {
-    const got = await reached(async (conn) => (await conn.client(EmberService)).watchBoard({})[Symbol.asyncIterator]().next());
-    expect(got).toEqual({ socket: ["ws://127.0.0.1:1/stream/codefoundry.v1.EmberService/WatchBoard"], fetch: [] });
+  it.each<[string, (conn: DaemonConnection) => Promise<unknown>]>([
+    ["EmberService/WatchBoard", async (conn) => (await conn.client(EmberService)).watchBoard({})[Symbol.asyncIterator]().next()],
+    ["ThreadService/WatchThread", async (conn) => (await conn.client(ThreadService)).watchThread({})[Symbol.asyncIterator]().next()],
+    ["TerminalService/Attach", async (conn) => (await conn.client(TerminalService)).attach({})[Symbol.asyncIterator]().next()],
+    ["PluginService/WatchSurface", async (conn) => (await conn.client(PluginService)).watchSurface({})[Symbol.asyncIterator]().next()],
+  ])("is the socket for %s", async (procedure, call) => {
+    const got = await reached(call);
+    expect(got).toEqual({ socket: [`ws://127.0.0.1:1/stream/codefoundry.v1.${procedure}`], fetch: [] });
   });
 
   it("is fetch for a stream not on the list", async () => {
@@ -82,5 +90,10 @@ describe("which transport a call takes", () => {
   it("is fetch for a unary call of a service with a listed stream", async () => {
     const got = await reached(async (conn) => (await conn.client(EmberService)).getStatus({}));
     expect(got).toEqual({ socket: [], fetch: ["http://127.0.0.1:1/codefoundry.v1.EmberService/GetStatus"] });
+  });
+
+  it("is fetch for a terminal's input, which never waits on a stream", async () => {
+    const got = await reached(async (conn) => (await conn.client(TerminalService)).write({ id: "t", data: new Uint8Array([1]) }));
+    expect(got).toEqual({ socket: [], fetch: ["http://127.0.0.1:1/codefoundry.v1.TerminalService/Write"] });
   });
 });

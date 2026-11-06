@@ -664,6 +664,18 @@ func (f *Fake) PutItems(id string, items ...thread.Item) {
 	}
 }
 
+// AppendText grows the log's last item, as a streaming message does.
+func (f *Fake) AppendText(id, text string) {
+	f.mu.Lock()
+	snap := f.items[id]
+	snap.Seq++
+	last := &snap.Items[len(snap.Items)-1]
+	last.Text += text
+	ev := thread.ItemDelta{ThreadID: id, Seq: snap.Seq, ItemID: last.ID, Ordinal: last.Ordinal, Field: thread.DeltaText, Text: text}
+	f.mu.Unlock()
+	bus.Publish[thread.ThreadEvent](f.bus, ev)
+}
+
 func pending(items []thread.Item) []thread.PendingRequest {
 	var out []thread.PendingRequest
 	for _, it := range items {

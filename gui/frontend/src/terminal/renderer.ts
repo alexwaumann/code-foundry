@@ -24,7 +24,8 @@ export interface TerminalRenderer {
   mount(el: HTMLElement): void;
   /**
    * Feeds program output. Parsing may happen later (xterm parses in chunks on later
-   * frames); `parsed` runs once this data has been applied to the grid.
+   * frames); `parsed` runs once this data has been applied to the grid, outside the parser, so
+   * it may write. Throws, with nothing of `data` taken, when the renderer holds too much.
    */
   write(data: Uint8Array, parsed?: () => void): void;
   /** Full reset (RIS) plus cleared scrollback, cursor showing; used before a snapshot. */

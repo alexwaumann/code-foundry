@@ -19,11 +19,13 @@ async function setVisibility(page: Page, state: "hidden" | "visible"): Promise<v
   }, state);
 }
 
-/** Counts ThreadService.WatchThread requests and records whether the chip ever showed. */
+const WATCH = /\/stream\/codefoundry\.v1\.ThreadService\/WatchThread$/;
+
+/** Counts ThreadService.WatchThread sockets and records whether the chip ever showed. */
 async function track(page: Page): Promise<{ watches: () => number }> {
   let watches = 0;
-  page.on("request", (req) => {
-    if (req.url().endsWith("/codefoundry.v1.ThreadService/WatchThread")) watches++;
+  page.on("websocket", (ws) => {
+    if (WATCH.test(ws.url())) watches++;
   });
   await page.addInitScript(() => {
     const w = window as unknown as { __chipSeen: boolean };
@@ -61,6 +63,12 @@ test("showing the window again reopens the visible thread's Watch, without the r
 });
 
 test("a Watch that cannot reconnect shows the chip over the log until it is back", async ({ page }) => {
+  // Routed from the start: a Watch reaches the mock until `refuse`, then its socket dies.
+  let refuse = false;
+  await page.routeWebSocket(WATCH, (ws) => {
+    if (refuse) void ws.close({ code: 1011 });
+    else ws.connectToServer();
+  });
   await mockPost("thread?state=idle");
   await openApp(page);
   await row(page, "s:s-r1").click();
@@ -69,7 +77,7 @@ test("a Watch that cannot reconnect shows the chip over the log until it is back
   await expect(chip).toHaveCount(0);
 
   // The daemon is unreachable for the Watch; a resync drops the open one.
-  await page.route("**/codefoundry.v1.ThreadService/WatchThread", (r) => r.abort());
+  refuse = true;
   await setVisibility(page, "hidden");
   await setVisibility(page, "visible");
   await expect(chip).toBeVisible();
@@ -77,7 +85,7 @@ test("a Watch that cannot reconnect shows the chip over the log until it is back
   // The log stays on screen under it.
   await expect(timeline(page)).toBeVisible();
 
-  await page.unroute("**/codefoundry.v1.ThreadService/WatchThread");
+  refuse = false;
   await expect(chip).toBeHidden({ timeout: 10_000 });
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
 });

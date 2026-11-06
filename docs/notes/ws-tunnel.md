@@ -43,6 +43,30 @@ connect-web then reports `Unauthenticated` or `PermissionDenied` from the status
 - A refused Origin logs at Info: it is what the managed Mac milestone needs to see, and a browser
   can only send its real origin.
 
+## Flow control
+
+Added with the heavy streams (`docs/notes/ws-transport.md` has the measurements). A browser empties
+the socket whether or not its page runs, so a write never blocks and `WriteTimeout` alone cannot
+see a stopped page. The client sends a running total of body bytes as text, every 2 MiB, and
+`response.send` waits for room when `Window` (8 MiB) has gone uncounted. That wait is on the
+write's own clock, so a page that stops ends in `write timeout` after 30 s. The handler's `Send`
+blocks meanwhile, as it would on a full TCP socket, so the terminal store's subscriber buffer and
+the bus's drop rules work as designed.
+
+- A message goes whole once there is room: a 104 MB snapshot must not need 104 MB of window.
+- Only body messages count, heartbeats included. The head does not.
+- A count must be a number, not go backwards and not pass what was sent. Anything else is data
+  past the request, which `readUntilGone` still treats as the client's close.
+- The daemon advertises it: every head carries `"counts":true`, and `wsFetch` sends counts only after
+  seeing that. The GUI and the daemon are not always the same version: an update leaves a running
+  daemon on its old version until `daemon restart` (`scripts/install.sh`). A daemon from before
+  counts reads the first one as the client closing, and a new GUI on one reconnected constantly, 19
+  Attach sockets in a few seconds, each resending the snapshot. Without the field a stream runs with
+  no flow control, as it did on that daemon before.
+- The other way round, a page from before counts on a new daemon never sends one, so a stream that
+  passes 8 MiB in its life stalls, ends in `write timeout` and reconnects. Such a page tunnels only
+  `WatchBoard`, which takes months of heartbeats to get there.
+
 ## Check-then-use
 
 Each value is validated once and that same value is used:

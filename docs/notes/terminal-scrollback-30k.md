@@ -30,8 +30,13 @@ title and description say rows now.
 ## Snapshot size and replay
 
 xterm's 50 MB limit is on what is pending when a write arrives, not on the size of a write. One
-large snapshot goes through; a write made while more than 50 MB is unparsed throws. Output during a
-replay is held by `AttachController`, so what is exposed is a tab switch during the replay.
+large snapshot goes through; a write made while more than 50 MB is unparsed throws. A write stays
+pending until its callback has returned, so replaying held output from the snapshot's own callback
+threw as well, inside xterm's parse loop, which ended that loop for good: any snapshot past 50 MB
+with output behind it, or one just under it with enough held. Two things are exposed to the limit
+and neither can freeze a terminal now. `parsed` runs after the loop (`XtermRenderer.write`), and a
+tab switch during a replay refuses only the cursor write that `reset()` guards. If a write is ever
+refused, `AttachController` attaches again (`docs/notes/ws-transport.md`).
 
 Measured through the real daemon in WebKit (`make drive DAEMON=dev`), at 198 columns on a loaded
 machine:

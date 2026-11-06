@@ -186,7 +186,7 @@ Transport:
 |---|---|---|
 | CLI, Wails host | Unix socket `$CONFIG/daemon.sock` | filesystem permissions (0600) |
 | Frontend | `http://127.0.0.1:<random port>` | bearer token from `$CONFIG/daemon.token` (0600) |
-| Frontend streams on the tunnel (`EmberService.WatchBoard` only; `TUNNELLED_STREAMS` in `api/endpoint.ts`, the others stay on fetch) | `ws://127.0.0.1:<same port>/stream/<procedure>`, one WebSocket per stream through `api/wsFetch.ts`, never on the Unix socket or the pages listener (`internal/wstunnel`, `docs/notes/ws-tunnel.md`, `docs/notes/ws-transport.md`) | `allowedOrigin` before the upgrade, then the same bearer token in the first frame |
+| Frontend streams on the tunnel (`EmberService.WatchBoard`, `ThreadService.WatchThread`, `TerminalService.Attach`, `PluginService.WatchSurface`; `TUNNELLED_STREAMS` in `api/endpoint.ts`, the others stay on fetch) | `ws://127.0.0.1:<same port>/stream/<procedure>`, one WebSocket per stream through `api/wsFetch.ts`, never on the Unix socket or the pages listener (`internal/wstunnel`, `docs/notes/ws-tunnel.md`, `docs/notes/ws-transport.md`) | `allowedOrigin` before the upgrade, then the same bearer token in the first frame; the client counts what it has taken and the daemon stops 8 MiB ahead |
 | CLI inside a thread | `CODE_FOUNDRY_ENDPOINT` (the loopback listener) | `CODE_FOUNDRY_TOKEN`; both set in every thread's Claude env, never auto-starts a daemon |
 | CLI inside Agent search's hidden run | `CODE_FOUNDRY_ENDPOINT` | `CODE_FOUNDRY_TOKEN` is a token scoped to that search (`internal/capability`): `thread.search`, `thread.read` and its own `search.report` only, revoked when the run ends (`docs/notes/search-5-agent-daemon.md`) |
 
