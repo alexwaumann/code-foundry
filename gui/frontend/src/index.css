@@ -482,6 +482,11 @@
   top: 0.3em;
   margin: 0;
 }
+/* A box people can tick (components/pr/TaskBox) is larger than the native one, with a hover
+   ring: a wider gutter keeps both off the text. */
+.cf-markdown li.task-list-item:has(> .cf-task-box, > p > .cf-task-box) {
+  padding-left: 1.75em;
+}
 /* A task-list box is native and read-only (GFM renders it disabled), tinted with the info
    token: sky-600 in light as before, sky-400 in dark (WebKit dims a disabled box either way).
    The shadcn Checkbox was tried: disabled it goes grey at 50% and its empty box all but

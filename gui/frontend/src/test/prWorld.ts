@@ -30,6 +30,7 @@ import type {
   StatsView,
 } from "@/api/gh";
 import { matchesReviewerSearch, reviewerSearchTokens } from "@/components/pr/reviewerSearch";
+import { setTaskLine, taskMessage } from "../../mock/taskBody";
 import { daemon, needsConfirm, type Invocation } from "./daemonFakes";
 
 export const SLUG = "alexwaumann/code-foundry";
@@ -430,6 +431,7 @@ const titles: Record<string, string> = {
   "pr.ready": "Mark Pull Request Ready for Review",
   "pr.draft": "Convert Pull Request to Draft",
   "pr.auto-merge": "Auto-merge Pull Request",
+  "pr.checkbox": "Set Pull Request Task",
   "thread.pr.link": "Link Pull Request to Thread",
   "pr.task": "Hand Pull Request Task to Thread",
 };
@@ -738,6 +740,18 @@ export class PrWorld {
         return { message: draft ? `Converted #${String(n)} to a draft` : `Marked #${String(n)} ready for review`, resultJson: "" };
       });
     }
+    h.set("pr.checkbox", (inv) => {
+      const [slug, n, d] = this.target(inv);
+      const index = Number(inv.args.index);
+      const text = inv.args.text ?? "";
+      const checked = inv.args.checked === "true";
+      if (this.failNext.delete("pr.checkbox")) throw this.refuse(`pull request #${String(n)} has a different task ${String(index + 1)} in its description now ("edited on GitHub", was "${text}"); look again and retry`);
+      if (!d.viewerCanUpdate) throw new ConnectError("Resource not accessible by integration", Code.PermissionDenied);
+      const r = setTaskLine(d.body, index, text, checked);
+      if ("refusal" in r) throw this.refuse(`pull request #${String(n)} ${r.refusal}; look again and retry`);
+      this.details.set(key(slug, n), { ...d, body: r.body, fetchedAtMs: Date.now() });
+      return { message: taskMessage(n, index, checked), resultJson: "" };
+    });
     h.set("pr.auto-merge", async (inv) => {
       const off = inv.args.off === "true";
       if (off) await this.gate("pr.auto-merge");

@@ -111,7 +111,7 @@ describe("Overview", () => {
 
     // The description renders markdown: a heading and a task list.
     expect(within(byTestId("pr-description")).getByRole("heading", { name: "Test plan" })).toBeTruthy();
-    expect(byTestId("pr-description").querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
+    expect(within(byTestId("pr-description")).getAllByRole("checkbox")).toHaveLength(2);
 
     // The checks row unfolds every check, failed first, with its tone.
     expect(queryTestId("pr-check")).toBeNull();

@@ -2,9 +2,10 @@ import { memo, useMemo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { Tip } from "@/components/ui/tooltip";
 import { REF_PROP, REF_TIGHT_PROP } from "@/lib/answerMarkdown";
-import { rehypePluginsFor, rehypePluginsInertFor, remarkPlugins } from "@/lib/markdownPlugins";
+import { rehypePluginsFor, rehypePluginsInertFor, remarkPlugins, remarkTaskPlugins } from "@/lib/markdownPlugins";
 import { CHIP_PROP, isRelativeHref, matchPath, type PathMatch } from "@/lib/pathChips";
 import { fitScrollbar } from "@/lib/scrollbarFit";
+import { taskItemOf, type TaskItem } from "@/lib/taskItems";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
@@ -97,6 +98,12 @@ export interface MarkdownExtras {
    */
   openLink?: (url: string) => boolean;
   /**
+   * A task-list box (lib/taskItems) to draw in place of the disabled <input>, for a body
+   * people can edit (a pull request's description). A box in raw HTML is not one and stays
+   * as it is. Needs raw HTML on (GitHub bodies). Without it, every box is read-only.
+   */
+  task?: (item: TaskItem) => ReactNode;
+  /**
    * Text that must do nothing (an agent search's answer, which derives from old thread
    * content): a link is its text, an image its alt text, raw HTML shows as typed. Nothing
    * loads or navigates, whatever else `extras` says.
@@ -110,7 +117,7 @@ export interface MarkdownExtras {
 }
 
 function withExtras(extras: MarkdownExtras): Components {
-  const { code, image, table, pathChip, link, openLink, citation } = extras;
+  const { code, image, table, pathChip, link, openLink, task, citation } = extras;
   return {
     ...baseComponents,
     ...((link || openLink) && {
@@ -138,6 +145,12 @@ function withExtras(extras: MarkdownExtras): Components {
       img: ({ src, alt }) => (typeof src !== "string" ? null : /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : image(src, alt ?? "")),
     }),
     ...(table && { table: ({ children }) => <>{table(children)}</> }),
+    ...(task && {
+      input: ({ node, ...props }) => {
+        const item = taskItemOf(node);
+        return item ? <>{task(item)}</> : <input {...props} />;
+      },
+    }),
     ...(pathChip && {
       code: ({ className, children }) => {
         // Inline code only: a fenced block's text has a language class or ends in a newline
@@ -163,7 +176,7 @@ function withExtras(extras: MarkdownExtras): Components {
 /** The rehype plugins for a set of extras (lib/markdownPlugins): inert, else raw HTML or not, then the prose path pass. */
 function rehypeFor(extras: MarkdownExtras | undefined) {
   if (extras?.inert) return rehypePluginsInertFor({ citations: extras.citation !== undefined });
-  return rehypePluginsFor({ html: extras?.html !== false, pathChips: extras?.pathChip !== undefined });
+  return rehypePluginsFor({ html: extras?.html !== false, pathChips: extras?.pathChip !== undefined, tasks: extras?.task !== undefined });
 }
 
 /**
@@ -190,7 +203,7 @@ export const MarkdownContent = memo(function MarkdownContent({ children, extras 
   const components = useMemo(() => (extras ? withExtras(extras) : baseComponents), [extras]);
   const rehype = useMemo(() => rehypeFor(extras), [extras]);
   return (
-    <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehype} components={components}>
+    <ReactMarkdown remarkPlugins={extras?.task ? remarkTaskPlugins : remarkPlugins} rehypePlugins={rehype} components={components}>
       {children}
     </ReactMarkdown>
   );

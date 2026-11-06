@@ -17,13 +17,15 @@ export default defineConfig({
     // the page bridge script's test the daemon's script (src/lib/cfBridgeScript.test.ts), and
     // the bridge sources test the pages skill's field list (src/api/bridgeSourcesDoc.test.ts),
     // and the markdown text test the rendered text fixture agent search's daemon side checks
-    // too (src/lib/markdownText.test.tsx).
+    // too (src/lib/markdownText.test.tsx), and the task items test the cases the daemon's
+    // parser checks (src/lib/taskItems.test.tsx).
     fs: {
       allow: [
         searchForWorkspaceRoot(process.cwd()),
         path.resolve(import.meta.dirname, "../../docs"),
         path.resolve(import.meta.dirname, "../../internal/store/plugin/testdata/hello-demo"),
         path.resolve(import.meta.dirname, "../../internal/store/thread/testdata"),
+        path.resolve(import.meta.dirname, "../../internal/store/gh/testdata"),
         path.resolve(import.meta.dirname, "../../internal/bridge"),
         path.resolve(import.meta.dirname, "../../internal/skills/files"),
         path.resolve(import.meta.dirname, "../../pluginsdk/ui"),
