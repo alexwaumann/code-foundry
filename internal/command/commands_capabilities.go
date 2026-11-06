@@ -208,7 +208,7 @@ func capBuild(_ context.Context, env capEnv) (capDetail, error) {
 	if caveat = strings.TrimSpace(caveat); caveat != "" {
 		fmt.Fprintf(&b, "%s\n", caveat)
 	}
-	b.WriteString("Read the source at that ref for how something works inside (the code-foundry-help skill's \"Reading the source\").")
+	b.WriteString("Read the source at that ref for how something works inside (the code-foundry-help skill's reference/reading-the-source.md).")
 	sum := v.Version + ", source " + src.URL
 	return capDetail{Summary: sum, Text: b.String(), JSON: js}, nil
 }

@@ -5,7 +5,7 @@ the built-in skills, and how many guidance tokens that takes. Any PR that change
 `ThreadPrompt`, a skill or the guide runs it before and after. The baseline is in
 `docs/notes/guide-eval-baseline.md`.
 
-It spends real money, so it is not part of `make check`: 18 tasks, 3 runs, is about $16 on
+It spends real money, so it is not part of `make check`: 19 tasks, 3 runs, is about $16 on
 Opus 5.5 and $6 on Sonnet 5.5. Run the scorer's tests with
 `python3 scripts/guide-eval/score_test.py`.
 
@@ -54,12 +54,15 @@ run the before build too.
   Skill tool or by reading its `SKILL.md`. Tasks with no `skill` are not counted.
 - **Correct verb**: the task's `verb` regex matched a CLI call by that thread, `--help` aside.
   t1 has no verb to run, so its `answer` regex on the reply also counts.
+  `avoid` undoes it: `s1` also fails if the thread reached for `memory add`.
 - **Guidance tokens**: always loaded (`ThreadPrompt` as spawned, plus each shipped skill's
   name and description) plus what the run loaded: `SKILL.md` bodies, reference reads, and
   `help`, `guide` and `daemon.capabilities` output, over the thread's whole tree. Bytes
   divided by 2.7, the audit's measured rate (2.3 to 3.0 by file), so the numbers are
   estimates that compare well, not exact tokens. A Bash call that mixes guidance with other
-  work counts its whole output.
+  work counts its whole output. Bash sets an output over 30,000 characters aside and returns a
+  preview: that counts as the preview plus what the run reads back from the file. Reports
+  scored before this rule need `score.py report` again before a comparison.
 - **Wrong turns**: failed CLI calls (the CLI's own error line, so a failure of something else
   in the same command does not count, and `exit=$?` tricks do), `--help` hops, and Monitor or
   Cron fetches. `p8`'s `pr.create` failure is expected: the origin is not on GitHub.
@@ -79,7 +82,8 @@ Each round gets its own scratch home, daemon, project and local bare origin unde
    thread's whole tree has been quiet for 30 seconds.
 3. `t2` and `ember` run last: `t2`'s app memory reaches every thread started after it.
 
-`p7` asks for the other model, so the switch is real on either side. Ember is one thread per
+`s1` runs in a workspace made for it (`workspace` in `tasks.json`), so `thread checkouts` has a folder
+to name. `p7` asks for the other model, so the switch is real on either side. Ember is one thread per
 home, one more reason for a home per round.
 
 ## Safety
