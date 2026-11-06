@@ -65,6 +65,79 @@ half a second with `unparsed` 0 and phase `live`: the cluster and `A` reproducti
 the same count, and `e` with 300,000 marks and a count of 4096. `Z\033[9b` printed ten `Z`, and a new
 tab reached `live`.
 
+## Other counts
+
+REP was one of a class. `CSI Ps S`, `T`, `L`, `M`, `I` and `Z` run xterm's loop once per count: they
+hang and recover, about nine minutes each for the line four and 25 s for tabs at 2^31 - 1. One line
+of output should not do that, so `terminal/counts.ts` closes the class.
+
+**The audit.** Reading `InputHandler.ts` was checked by running it: every CSI identifier on a stock
+xterm (63 finals, 5 prefixes, 17 intermediates, 6 param shapes, about 32,000 sequences), at 1,000,000
+and then at 2^31 - 1. Only those six scale with the count, in every param shape.
+
+| Sequences | Why they do not matter |
+| --- | --- |
+| `@`, `P`, `X`, `SP @`, `SP A`, `' }`, `' ~` | `insertCells` and friends stop at the row's end |
+| `A`-`H`, `` ` ``, `a`, `d`, `e`, `f`, `r` | Arithmetic, then clamped to the grid |
+| `g`, `J`, `K`, `m`, `h`, `l`, `t` | Bounded by the grid, the param list or a fixed stack |
+| Rectangle operations | xterm 6.0.0 does not register them |
+| `< u` (ours, `keyboard.ts`) | Over the stack's length it resets, so the loop is bounded |
+
+**Two parts, because neither is enough alone.** Past the grid a count changes nothing more: every
+line of the region is blank, and the cursor is at the last stop. So a clamp is exact, but a handler
+cannot do it. It gets a copy of the params, and `term.write` from inside one lands behind the rest of
+the chunk, which would blank text printed after the sequence.
+
+- `clampCounts` rewrites the count on the bytes before `term.write`, and returns the same array when
+  there is nothing to rewrite. `ESC` ends an OSC or DCS string, so `ESC [` is a CSI wherever it
+  appears and the scan cannot touch a payload.
+- `swallowCountsPastGrid` is a parser handler that swallows any count past the grid that got through.
+  This is what guarantees no freeze. Holding bytes back to rejoin a split sequence would have closed
+  the first row below too, at the price of state to clear on every reset. Not worth it for this.
+
+| Form | What happens | Against the daemon |
+| --- | --- | --- |
+| `S`, `T`, `L`, `M` past the rows; `I`, `Z` past the columns | Clamped | Same |
+| More than one param, or a sub parameter | Swallowed | Same: Ghostty ignores both |
+| Split across two writes, a C0 inside it, or the C1 form | Swallowed | Differs until the next snapshot |
+| A resize between the write and the parse | Clamped to the old size, or swallowed | Differs until the next snapshot |
+
+A count up to the grid never changes. The split row covers any count past the grid, so `\033[999M`
+cut by a chunk boundary is dropped too. That is the accepted cost: the other choice was swallowing
+only past 4096, and that leaves a flood of those forms at about 7 s per 64 KiB (scaled, not run).
+
+**Against Ghostty**, read at the pinned commit:
+
+| | libghostty (the snapshot) | xterm (the live view) |
+| --- | --- | --- |
+| Count | `u16`, saturating | Up to 2^31 - 1, clamped here |
+| `L`, `M` | `@min(count, rem)`, cursor to the left margin | Same result |
+| `S` | Clamped to the region; lines go to scrollback at the top of the screen | Same screen; lines are dropped, at any count |
+| `I`, `Z` | Stops once the cursor stops moving | Same result |
+| Count 0 | No-op | 1, at any size of grid |
+| More than one param | Ignored | Uses the first below the cap |
+
+The scrollback, count 0 and small multi-param rows are older differences this does not touch.
+
+**Measured in WebKit**, main thread blocked per 64 KiB of nothing but the sequence:
+
+| Sequence | 24 x 80 | 60 x 200 |
+| --- | --- | --- |
+| `S` at the rows, the worst case | 68 ms | 403 ms |
+| `S` at 2^31 - 1 | 27 ms | 159 ms |
+| `I` at the columns | 19 ms | 32 ms |
+
+All under REP's 616 ms. The scan costs 1.7 ms per MiB of escape-heavy output, and nothing measurable
+on plain text.
+
+**Checked live.** `make drive DAEMON=dev` on a scratch home, one terminal per case, the bytes arriving
+over the live stream at 138 x 13. All six at 2^31 - 1, a normal `3S`, `3M` and `2I`, and `2147483647;5S`:
+longest main-thread gap 21 ms, `unparsed` 0, phase `live`, and the text and cursor equal to what a
+remount built from the daemon's snapshot. A split `S` drained the same way and differed as the table
+says, until the remount put it right. A live check has to fill the screen after the GUI's resize: a
+terminal starts at 80 x 24, and the two emulators place the cursor differently across that resize,
+which looks like a mismatch at every count.
+
 ## Key order across a remount
 
 The input queue belonged to the controller, and cmd+j remounts the host, so keys queued in the old
@@ -93,8 +166,3 @@ hidden pages throttle xterm's timer. The controller would need a renderer factor
 fixed renderer, new `onData` and `onResize` subscriptions, and its counters reset, and the host would
 have to re-mount into the element and restore WebGL, font and find state. The snapshot brings back
 the screen, so nothing is lost. Worth building if a second trigger appears.
-
-**Other uncapped counts.** These loop `count` times and do not allocate, so they hang and then
-recover, with no wedge. Measured at 1,000,000 and scaled to 2^31 - 1, they freeze the page for about
-nine minutes each: `CSI Ps S`, `T`, `L` and `M`. `CSI Ps I` is about 25 s. Not fixed here. A swallow
-like this one would do, capped at the grid's rows.
