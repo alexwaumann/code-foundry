@@ -55,10 +55,10 @@ var skillBudgets = []struct {
 	description int
 	body        int
 }{
-	{skills.Entry, 420, 6_800},
-	{skills.Help, 400, 7_900},
+	{skills.Entry, 420, 5_500},
+	{skills.Help, 400, 5_500},
 	{skills.Orchestrate, 540, 9_700},
-	{skills.Pages, 400, 10_600},
+	{skills.Pages, 400, 8_700},
 	{skills.Plugin, 420, 5_500},
 	{skills.Ember, 260, 13_900},
 }

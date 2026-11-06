@@ -20,7 +20,7 @@ pages, buttons, the side panel, Settings labels; never skill or command names.
 
 ## Which skill or command
 
-| The user wants | Read (your Skill tool, or the SKILL.md `--group skills` lists) or run |
+| The user wants | Read (your Skill tool, or the SKILL.md `--group skills` lists; `reference/` is next to this file) or run |
 |---|---|
 | How to do something, a setting or keybinding | the code-foundry-help skill |
 | A standing preference ("always open PRs as drafts") | `code-foundry memory add <text>`; for a set of projects, one repo, or a skill for them: `reference/scopes.md` |

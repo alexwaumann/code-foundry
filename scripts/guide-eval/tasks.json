@@ -33,6 +33,8 @@
   "prompt":"Switch this thread to {other_model}."},
  {"id":"p8-pr","verb":"^pr\\.create\\b","allow_fail":"not on GitHub",
   "prompt":"Add a line to the README saying the tool needs Go 1.24, commit it, and open a pull request."},
+ {"id":"s1-scopes","verb":"^thread\\.checkouts\\b","avoid":"^memory\\.add\\b","workspace":true,
+  "prompt":"In this workspace every repo has to run its tests with -race. Make that stick for all of them, not just this one, and tell me when it takes effect."},
  {"id":"ember","skill":"code-foundry-ember","verb":"^ember\\.task\\.start\\b","ember":true,"last":true,"heavy":true,
   "prompt":"Add a --version flag to the greet CLI that prints 0.1.0. Push the branch, no PR."}
 ]

@@ -182,8 +182,9 @@ class Home:
                 raise RuntimeError(f"settings set {key}: {r.stderr or r.stdout}")
         self.project = self.cf_json("project", "add", "--path", str(self.repo))["id"]
 
-    def new_thread(self, name, prompt, model, effort):
-        t = self.cf_json("thread", "new", "--project", self.project, "--new-worktree", "--created-by=", "--focus=false",
+    def new_thread(self, name, prompt, model, effort, workspace=""):
+        place = ["--workspace", workspace] if workspace else ["--project", self.project]
+        t = self.cf_json("thread", "new", *place, "--new-worktree", "--created-by=", "--focus=false",
                          "--model", model, "--effort", effort, "--name", name, "--budget", THREAD_BUDGET,
                          "--prompt", prompt, timeout=180)
         return t["id"]
@@ -250,7 +251,9 @@ def run_task(h, task, rnd, args, out, stop):
             if r.returncode != 0:
                 raise RuntimeError(f"thread send: {r.stderr or r.stdout}")
         else:
-            root = h.new_thread(task["id"], prompt, MODELS[args.model], args.effort)
+            # Only this task's thread gets a workspace: made here, it changes no other run.
+            workspace = h.cf_json("workspace", "new", task["id"], "--projects", h.project)["id"] if task.get("workspace") else ""
+            root = h.new_thread(task["id"], prompt, MODELS[args.model], args.effort, workspace)
         rec["root"] = root
         rec["settled"], rec["wait"] = wait_quiet(h, root, args.task_timeout, stop)
         ts = h.threads()

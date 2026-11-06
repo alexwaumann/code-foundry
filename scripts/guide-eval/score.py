@@ -134,6 +134,8 @@ def score_run(task, root_items, other_items, files):
     verb_ok = any(re.search(verb, c) for c in root["cli"] if not is_help(c)) if verb else True
     if not verb_ok and task.get("answer"):
         verb_ok = re.search(task["answer"], root["text"]) is not None
+    if task.get("avoid") and any(re.search(task["avoid"], c) for c in root["cli"] if not is_help(c)):
+        verb_ok = False  # the right verb beside the wrong store is still the wrong store
     want = task.get("skill")
     wrong = sum(len(s["failed"]) + s["help"] + s["fetches"] for s in every)
     return dict(task=task["id"], skill_ok=(want in root["skills"]) if want else None, verb_ok=verb_ok, skills=root["skills"],

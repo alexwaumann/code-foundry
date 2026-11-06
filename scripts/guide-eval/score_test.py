@@ -88,6 +88,13 @@ class Run(unittest.TestCase):
         self.assertTrue(score.score_run(task, [said], [], FILES)["verb_ok"])
         self.assertFalse(score.score_run(task, [{"assistantText": {"text": "No idea."}}], [], FILES)["verb_ok"])
 
+    def test_avoid_undoes_a_right_verb(self):
+        task = {"id": "s1", "verb": r"^thread\.checkouts\b", "avoid": r"^memory\.add\b"}
+        right = bash("code-foundry thread checkouts")
+        self.assertTrue(score.score_run(task, [right], [], FILES)["verb_ok"])
+        self.assertFalse(score.score_run(task, [right, bash("code-foundry memory add x")], [], FILES)["verb_ok"])
+        self.assertTrue(score.score_run(task, [right, bash("code-foundry memory add --help", "usage")], [], FILES)["verb_ok"])
+
     def test_guidance_and_skill_by_reading(self):
         items = [
             tool("Read", {"file_path": "/h/claude/.claude/skills/code-foundry/SKILL.md"}, "x" * 100),
