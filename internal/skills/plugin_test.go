@@ -31,12 +31,6 @@ var pluginSkillFiles = []string{
 	"code-foundry-plugin/example/README.md",
 }
 
-// maxPluginFile bounds every file of the plugin skill: an agent reads a reference whole
-// (the Read tool's default window is 2,000 lines, and long files cost context). The
-// provenance line under each title (control-2-skill-provenance) is not counted: it is
-// the same in every file and its length depends on the build.
-const maxPluginFile = 32 << 10
-
 func TestRenderPluginSkill(t *testing.T) {
 	src := realSources(t)
 	// An installed plugin's own commands are neither verbs nor host commands.
@@ -46,84 +40,45 @@ func TestRenderPluginSkill(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range pluginSkillFiles {
-		b := files[p]
-		size := len(b) - bytes.Count(b, []byte(src.Provenance()+"\n\n"))*len(src.Provenance()+"\n\n")
-		switch {
+		switch b := files[p]; {
 		case len(b) == 0:
 			t.Errorf("%s is missing or empty", p)
-		case size > maxPluginFile:
-			t.Errorf("%s has %d bytes without the provenance line; keep it under %d", p, size, maxPluginFile)
 		case bytes.Contains(b, []byte("{{cf.")):
 			t.Errorf("%s has an unfilled placeholder", p)
 		}
 	}
 
-	// The filled values: the SDK pin, the example's installed path, the host facts, the
-	// SDK's names and limits.
+	// The filled values: the SDK pin, the example's installed path, the host's version, and
+	// what is rendered from the host's own lists. The limits table has its own test
+	// (TestViewLimitsNameEveryLimit); nothing here freezes its numbers or a file's prose.
 	body := string(files[skills.Plugin+"/SKILL.md"])
-	for _, want := range []string{
-		"go get github.com/alexwaumann/code-foundry/pluginsdk@0123456789abcdef0123456789abcdef01234567\n",
-		"cp -R /Users/ada/.code-foundry/claude/.claude/skills/code-foundry-plugin/example/. .\n",
-		"This Code Foundry is v9.9.9.",
-	} {
+	for _, want := range []string{"pluginsdk@" + src.Commit, "/Users/ada/.code-foundry/claude/.claude/skills/code-foundry-plugin/example/", src.Version} {
 		if !strings.Contains(body, want) {
 			t.Errorf("SKILL.md lacks %q", want)
 		}
 	}
 	manifest := string(files[skills.Plugin+"/reference/manifest.md"])
-	for _, want := range []string{"`pr.checks.provider`", "`thread.hasPr`", "`threads`, `thread`", "`surface`, `act`", "`context-thread`"} {
-		if !strings.Contains(manifest, want) {
-			t.Errorf("manifest.md lacks %q", want)
+	for _, fact := range src.Facts {
+		if !strings.Contains(manifest, "`"+fact+"`") {
+			t.Errorf("manifest.md lacks the host fact %s", fact)
 		}
 	}
 	if icons := string(files[skills.Plugin+"/reference/icons.md"]); !strings.Contains(icons, " activity ") || !strings.Contains(icons, " trash-2 ") {
 		t.Errorf("icons.md lacks the icon names: %.300s", icons)
 	}
 	events := string(files[skills.Plugin+"/reference/events.md"])
-	for _, want := range []string{"| `threads` | `thread-list` | `threadList` | `snapshot`, `updated`, `removedId`", "| `thread` | `thread` | `thread` | `pending`, `pendingSnapshot` |", "`pullRequestDetailUpdated`, `pullRequestChanged`",
-		"| `gh.pullRequestChanged` |"} {
+	for _, want := range []string{"`thread-list`", "`pullRequestChanged`"} {
 		if !strings.Contains(events, want) {
 			t.Errorf("events.md lacks %q", want)
 		}
-	}
-	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Elements in a view (nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs) | 400 |") {
-		t.Error("primitives.md lacks the limits table")
-	}
-	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Containers (section, columns, pane, grid, container, masterDetail, tabs) a node sits inside | 4 |") ||
-		!strings.Contains(prim, "| Nodes in the toolbar / in the footer | 6 / 6 |") || !strings.Contains(prim, "| A container's widest: narrow / wide (px) | 680 / 1080 |") {
-		t.Error("primitives.md lacks the container depth, the strips' or the container's limits")
-	}
-	if layout := string(files[skills.Plugin+"/reference/ui-layout.md"]); !strings.Contains(layout, "2 columns need 492 px") || !strings.Contains(layout, "view.node.columns") ||
-		!strings.Contains(layout, "`view.toolbar`, `view.footer`") || !strings.Contains(layout, "**Up to 6 nodes each**") || !strings.Contains(layout, "`narrow` is at most 680 px, `wide` at most 1080 px") {
-		t.Error("ui-layout.md lacks the side by side rule, the capabilities, the strips' cap or the container's widths")
-	}
-	if layout := string(files[skills.Plugin+"/reference/ui-layout.md"]); !strings.Contains(layout, "floor((width + 12) / (minWidth + 12))") || !strings.Contains(layout, "view.node.group") ||
-		!strings.Contains(layout, "text, chips, actions and progress") {
-		t.Error("ui-layout.md lacks the grid formula, the group capability or its kinds")
-	}
-	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Grid: items / least and most minWidth (px) / columns / an item's span | 24 / 160 / 480 / 6 / 2 |") ||
-		!strings.Contains(prim, "| Items in a group | 8 |") || !strings.Contains(prim, "| Spacer size: least / most (px) | 4 / 64 |") {
-		t.Error("primitives.md lacks the grid, group or spacer limits")
-	}
-	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Master-detail list width: least / default / most; the detail's least beside it (px) | 200 / 280 / 400; 320 |") ||
-		!strings.Contains(prim, "| Tabs in a tabs node: least / most | 2 / 8 |") {
-		t.Error("primitives.md lacks the master-detail or tabs node limits")
-	}
-	if layout := string(files[skills.Plugin+"/reference/ui-layout.md"]); !strings.Contains(layout, "view.node.masterDetail") || !strings.Contains(layout, "view.node.tabs") ||
-		!strings.Contains(layout, "612 px") || !strings.Contains(layout, `"kind": "select"`) || !strings.Contains(layout, `"node": "run-tabs"`) {
-		t.Error("ui-layout.md lacks the master-detail and tabs node capabilities, breakpoint or act shapes")
 	}
 
 	// cli.md: every plugin verb's help and the debugging helpers, the common flags once,
 	// and no installed plugin's commands.
 	cli := string(files[skills.Plugin+"/reference/cli.md"])
-	for _, want := range []string{
-		"### plugin.dev\n\n```\nplugin.dev - Develop Plugin\n", "code-foundry plugin dev <path> [flags]",
-		"### plugin.act\n", "  --values string", "### plugin.secrets.delete\n", "### thread.flags\n", "### pr.checks\n",
-		"Rendered by Code Foundry v9.9.9 (commit ", "code-foundry events --json --source",
-	} {
-		if !strings.Contains(cli, want) {
-			t.Errorf("cli.md lacks %q", want)
+	for _, verb := range []string{"plugin.dev", "plugin.act", "plugin.secrets.delete", "thread.flags", "pr.checks"} {
+		if !strings.Contains(cli, "### "+verb+"\n") {
+			t.Errorf("cli.md lacks %s", verb)
 		}
 	}
 	if strings.Index(cli, "### plugin.dev") > strings.Index(cli, "### plugin.list") {
@@ -138,7 +93,7 @@ func TestRenderPluginSkill(t *testing.T) {
 
 	// host-commands.md: the registry without the plugin namespace.
 	host := string(files[skills.Plugin+"/reference/host-commands.md"])
-	for _, want := range []string{"- `thread.send [--id] <text>`", "- `pr.checks", "## Thread\n", "permissions.commands"} {
+	for _, want := range []string{"- `thread.send", "- `pr.checks", "## Thread\n"} {
 		if !strings.Contains(host, want) {
 			t.Errorf("host-commands.md lacks %q", want)
 		}

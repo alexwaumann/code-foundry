@@ -1,6 +1,7 @@
 package skills_test
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
@@ -35,6 +36,7 @@ var notFlags = []string{
 	"no-verify",  // git's, in "never --no-verify"
 	"until-seen", // an example of a plugin's own flag name (reference/manifest.md)
 	"card",       // a CSS variable (reference/react.md)
+	"flag",       // the guide's word for any flag ("every other arg is a `--flag`")
 }
 
 // notFlagPrefixes are CSS custom properties.
@@ -349,7 +351,8 @@ func (s surface) checkFile(name, text string) (problems []string, calls int) {
 }
 
 func TestSkillFilesResolve(t *testing.T) {
-	s := liveSurface(t, realSources(t))
+	src := realSources(t)
+	s := liveSurface(t, src)
 	calls := 0
 	err := filepath.WalkDir("files", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -372,6 +375,13 @@ func TestSkillFilesResolve(t *testing.T) {
 	// The files hold about 200: far fewer means the patterns stopped matching.
 	if calls < 150 {
 		t.Errorf("read %d calls in the skill files; the patterns no longer match", calls)
+	}
+	// The guide's Conventions are hand-written too.
+	var buf bytes.Buffer
+	guide.Write(&buf, src.Commands, "s-7754a478e649")
+	problems, _ := s.checkFile("guide.md", buf.String())
+	for _, pr := range problems {
+		t.Errorf("the guide: %s", pr)
 	}
 }
 

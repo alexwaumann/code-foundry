@@ -2,6 +2,7 @@ package skills_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"os"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/guide"
 	"github.com/alexwaumann/code-foundry/internal/skills"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
@@ -79,6 +81,10 @@ func frontmatter(t *testing.T, name string, b []byte) map[string]string {
 // settings may forbid; a skill must never use it.
 var dynamicCommand = regexp.MustCompile("!`")
 
+// referenceName is `reference/<file>.md`, with the other skill that owns it before it and
+// the section after it, if any.
+var referenceName = regexp.MustCompile("(?:(code-foundry[a-z-]*) skill's\\s+)?`(reference/[a-z-]+\\.md)`(?: §([0-9a-z]+))?")
+
 func TestRender(t *testing.T) {
 	src := realSources(t)
 	files, err := skills.Render(src)
@@ -118,39 +124,12 @@ func TestRender(t *testing.T) {
 		t.Errorf("provenance of a release = %q, want %q", src.Provenance(), want)
 	}
 
-	// Frontmatter: names, short descriptions, invocation. Each cap includes the two
-	// lines of the provenance line under the title (control-2-skill-provenance).
-	for _, tt := range []struct {
-		skill, userInvocable string
-		maxDesc, maxLines    int
-	}{
-		// Model only: not in the slash menu. Names the user's words for parallel work, and
-		// its loop rules are the ones the orchestration experiment tested (orch-skill-v2, v3).
-		// Wake and lead rules live in reference files (orch-skill-split); new material
-		// goes behind a pointer too, so the cap stays below the old 160. Round 3 of the
-		// orchestration experiments (orch-round-3) put nine lines of rules back inline
-		// (shared checkout, conflict-free prompts, quiet wake turns, leads, re-reports):
-		// the references were read late or not at all, so those rules earn their place.
-		{skills.Orchestrate, "false", 600, 138},
-		// The entry skill (control-4-capabilities): what the app is, the one rule and the
-		// routing table; what exists is daemon.capabilities, not a list in the file. 80, up
-		// from 70, for "Making a theme" (theme-model-flow): the theme flow has no other skill.
-		// 83 for the three lines the theme fuzz showed models missing (theme-fuzz-daemon): the
-		// verbs, the contrast floors and how to lower contrast, --replace and the scheme.
-		// 84 for the first-run row (welcome-page): it routes to the pages skill's welcome.md.
-		// 85, and a description up to 420, for the thread row (orch-removed-panels-check):
-		// with the Usage, Worktree, Agents, Threads and Linked PRs tabs gone, asking is the
-		// path, and models read uncommitted work as all that changed and found no PR verb.
-		// 86 for the earlier-thread row (search-3-index): thread.search over the app's index,
-		// not a grep of Claude's transcripts.
-		{skills.Entry, "false", 420, 86},
-		// Its routing and the app's description moved to the entry skill (control-4);
-		// the cap came down from 120 with them. 109 for the workspaces answer path
-		// (workspaces-v2-5-skills): what a workspace is, its card, where its files go.
-		// 121 for the welcome tutorial (welcome-page): a first run's thread reads this skill
-		// first, so how to show the page and the exact reply are here, not behind a pointer.
-		{skills.Help, "", 400, 121},   // both: no invocation keys
-		{skills.Plugin, "", 600, 122}, // both; names the words that should trigger it
+	// Frontmatter: names and invocation. What each may cost is in budget_test.go.
+	for _, tt := range []struct{ skill, userInvocable string }{
+		{skills.Orchestrate, "false"}, // model only: not in the slash menu
+		{skills.Entry, "false"},
+		{skills.Help, ""}, // both: no invocation keys
+		{skills.Plugin, ""},
 	} {
 		p := tt.skill + "/SKILL.md"
 		fm := frontmatter(t, p, files[p])
@@ -158,8 +137,8 @@ func TestRender(t *testing.T) {
 			t.Errorf("%s: name %q", p, fm["name"])
 		}
 		desc := strings.Trim(fm["description"], `"`)
-		if desc == "" || len(desc) >= tt.maxDesc || strings.Contains(desc, `"`) {
-			t.Errorf("%s: description of %d characters (want 1..%d, no inner quotes)", p, len(desc), tt.maxDesc-1)
+		if desc == "" || strings.Contains(desc, `"`) {
+			t.Errorf("%s: description %q (want one, with no inner quotes)", p, desc)
 		}
 		if fm["user-invocable"] != tt.userInvocable {
 			t.Errorf("%s: user-invocable %q, want %q", p, fm["user-invocable"], tt.userInvocable)
@@ -167,34 +146,24 @@ func TestRender(t *testing.T) {
 		if _, ok := fm["disable-model-invocation"]; ok {
 			t.Errorf("%s: disable-model-invocation is set", p)
 		}
-		if n := bytes.Count(files[p], []byte("\n")); n > tt.maxLines {
-			t.Errorf("%s has %d lines; keep it under %d", p, n, tt.maxLines)
-		}
 	}
 
-	// Each command reference lists its categories, and only those.
+	// Each command reference lists its categories, and only those, with every command the
+	// guide lists in them.
 	for _, tt := range []struct {
-		path      string
-		cats      []string
-		notCats   []string
-		detailed  string // an arg line only the detailed Thread category has
-		mentioned []string
+		path     string
+		cats     []string
+		notCats  []string
+		detailed string // an arg line only the detailed category has
 	}{
 		{
 			path: skills.Orchestrate + "/reference/commands.md", cats: []string{"Thread", "Action", "Workspace", "Project"},
 			notCats: []string{"Settings", "Pull Request", "View"}, detailed: "  - `--request-id string`",
-			mentioned: []string{"`thread.new`", "`thread.wait <id>`", "`thread.reports`", "`action.run <action>`",
-				"`project.worktree.cleanup <project> <path> --yes`", "`workspace.new <name>`"},
 		},
 		{
-			path: skills.Help + "/reference/commands.md", cats: []string{"Project", "Settings", "Thread", "Pull Request", "Action", "View"},
-			notCats: []string{"Workspace", "Terminal"},
 			// Settings in full, Thread one line each.
-			detailed: "  - `<value>`",
-			// memory.* for "Remembering preferences", View for "Showing things in the app".
-			mentioned: []string{"`settings.set <key> <value>`", "`pr.create`", "`project.add <path>`", "`thread.new`",
-				"`memory.show`", "`memory.add <text>`", "`memory.remove <entry>`", "`memory.clear --yes`",
-				"`view.panel.file <path>`", "`view.panel.mcp`", "`ui.presence`", "`ui.notify`"},
+			path: skills.Help + "/reference/commands.md", cats: []string{"Project", "Settings", "Thread", "Pull Request", "Action", "View"},
+			notCats: []string{"Workspace", "Terminal"}, detailed: "  - `<value>`",
 		},
 	} {
 		got := string(files[tt.path])
@@ -211,145 +180,23 @@ func TestRender(t *testing.T) {
 		if !strings.Contains(got, tt.detailed) {
 			t.Errorf("%s lacks %q", tt.path, tt.detailed)
 		}
-		for _, m := range tt.mentioned {
-			if !strings.Contains(got, "- "+m+" ") {
-				t.Errorf("%s lacks %s", tt.path, m)
+		for _, c := range src.Commands {
+			if slices.Contains(tt.cats, c.GetCategory()) && !guide.LeftOut(c) && !strings.Contains(got, "- `"+c.GetName()) {
+				t.Errorf("%s lacks %s", tt.path, c.GetName())
 			}
 		}
 	}
 	if help := string(files[skills.Help+"/reference/commands.md"]); strings.Contains(help, "  - `--request-id") {
 		t.Error("the help skill lists thread.new's args; it has the one-line form")
 	}
-	// The help skill saves standing preferences to the app memory, a setting first
-	// (docs/notes/control-3-app-memory.md); its description names them so it fires.
-	helpSkill := string(files[skills.Help+"/SKILL.md"])
-	for _, want := range []string{"standing preference about the app or how you work in it", "\n## Remembering preferences\n",
-		"Check `reference/settings.md` first", "`code-foundry memory add \"<preference>\"`", "not your own memory files",
-		// The scope rule (control-8-memory-scope): facts about the user, a project or its code
-		// are Claude's own memory; "what do you remember" answers from both.
-		"nor a fact about the user, a project or its\ncode", "facts go in your own memory files", "plus your own memory files, each\nlabelled",
-		// The memory verbs' own wording (control-6-memory-fixes).
-		"\"Remembered: …\". New threads follow it;\n   threads already open get it on their next message after a restart",
-		"remove the old entry first", "`code-foundry memory show`",
-		// Workspaces v2 (workspaces-v2-5-skills): the scope beside the app memory, and the
-		// answer path for what a workspace is and where its instructions and skills go.
-		"What holds across a\nworkspace's projects goes in its `CLAUDE.md`", "\n## Workspaces\n",
-		"The Projects page has a page per workspace", "Save as workspace", "`code-foundry workspace new <name>",
-		"Its folder (`code-foundry workspace list`) holds `CLAUDE.md` and\n`.claude/skills/<name>/SKILL.md`"} {
-		if !strings.Contains(helpSkill, want) {
-			t.Errorf("help SKILL.md lacks %q", want)
-		}
-	}
-	// It fires when the user asks to see something and before showing something in the
-	// side panel: a "show me" opens it in the thread's own panel without a presence
-	// check, ui.presence only decides what to mention, no ui.notify, page verbs only
-	// when asked (control-7-skill-routing). It offers actions in the user's words.
-	for _, want := range []string{"asks to see something, or before you show something in the app's side panel", "\n## Showing things in the app\n",
-		"open it in your own thread's side panel", "A \"show me\" is asking", "Add `--focus` only when they ask to be taken there",
-		"`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <number>`", "Do not `ui.notify`",
-		"`code-foundry ui.presence --json` is only for deciding whether to mention", "refused from a thread no window shows",
-		"`code-foundry daemon.capabilities --group panel`", "unless a saved preference says not to",
-		"\n## Explain first, then offer\n", "Run it only after the user says yes", "\"Want me to make Fresh copy the\n   default?\"",
-		"Show the command only if they ask for it", "by its Settings page label", "the code-foundry skill"} {
-		if !strings.Contains(helpSkill, want) {
-			t.Errorf("help SKILL.md lacks %q", want)
-		}
-	}
-	// Pages the model writes link the frame stylesheet and may follow the theme live
-	// (theme-css-route); the entry skill says the first half. Status text is the tone's
-	// -text slot, the tone itself a fill (theme-slots-3); the help skill points at the
-	// theme notes for every slot.
-	if entry := string(files[skills.Entry+"/SKILL.md"]); !strings.Contains(entry, "the status fills") || !strings.Contains(entry, "(their text `-text`, tint `-surface`)") {
-		t.Error("entry SKILL.md does not name the status fills and their -text")
-	}
-	if !strings.Contains(helpSkill, "every slot and what it paints: reference/themes.md") {
-		t.Error("help SKILL.md does not point at reference/themes.md")
-	}
-	for _, want := range []string{"`<link rel=\"stylesheet\" href=\"/cf/theme.css\">`", "`--cf-*` variables", "type-role classes", "`{type: \"cf:theme\", id, scheme, vars}`"} {
-		if !strings.Contains(helpSkill, want) {
-			t.Errorf("help SKILL.md lacks %q", want)
-		}
-		if entry := string(files[skills.Entry+"/SKILL.md"]); !strings.Contains(entry, want) && !strings.Contains(want, "cf:theme") {
-			t.Errorf("entry SKILL.md lacks %q", want)
-		}
-	}
-	// A page shows inline in the conversation (inline-html): both skills name the verb,
-	// --panel and that /cf/bridge.js sizes the card (never a hand-posted cf:resize:
-	// page-library-fixes-b).
-	for _, want := range []string{"`code-foundry view.inline <path>`", "`--panel` also opens it", "/cf/bridge.js", "sizes its card"} {
-		if !strings.Contains(helpSkill, want) {
-			t.Errorf("help SKILL.md lacks %q", want)
-		}
-		if entry := string(files[skills.Entry+"/SKILL.md"]); !strings.Contains(entry, want) {
-			t.Errorf("entry SKILL.md lacks %q", want)
-		}
-	}
-	for _, gone := range []string{"`viewed` is true", "check presence", "started from now on"} {
-		if strings.Contains(helpSkill, gone) {
-			t.Errorf("help SKILL.md still has %q", gone)
-		}
-	}
 
-	// The entry skill routes to every other skill and to daemon.capabilities, carries
-	// the one rule, and says that the model, not the skill, runs commands. The rules
-	// that moved out of the help skill (the --id default, project and thread) are here.
+	// The entry skill routes: to every other skill, and to every capabilities group.
 	entry := string(files[skills.Entry+"/SKILL.md"])
-	for _, want := range []string{"the code-foundry-help skill", "the code-foundry-orchestrate skill", "the code-foundry-plugin skill",
-		"`code-foundry daemon.capabilities`, then `--group <name>`", "\"Reading the source\"", "the line under this title",
-		"if you can do it with the CLI,\noffer it and do it", "Skills never run\ncommands themselves: you run `code-foundry …` with your Bash tool",
-		"Thread commands without `--id` act on it", "A **project** is a folder on the Mac", "\"Work in\"", "`--yes`",
-		// The routing testers' threads missed (control-7-skill-routing).
-		"Never tell the user skill or command names: say what you will do, not which command",
-		"`code-foundry memory add <text>`", "`code-foundry usage.show`", "`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`",
-		"`.html` file", "`code-foundry pr.create`, `code-foundry project.github.publish`", "Add `--focus` only when the user asks",
-		// The removed side panel tabs' questions (orch-removed-panels-check): what changed
-		// counts the branch's commits, children and linked PRs have their reads.
-		"| About this thread: what changed", "the branch's commits since its base", "not uncommitted work alone",
-		"`thread list --created-by $CODE_FOUNDRY_THREAD`", "`thread mcp` (your session's start list goes stale)",
-		"`thread get --json`'s `linkedPullRequests` (absent: none)",
-		"default `threads.default_worktree`", "The app replaces /model, /effort",
-		// The setting is the composer's; where thread new puts a thread is the model's call
-		// (thread-new-base-origin).
-		"Threads you create with `thread new` are yours to place: in place or `--new-worktree`",
-		// The theme fuzz (theme-fuzz-daemon): a theme request in any thread, every verb, the
-		// reference by its installed path, the floors, --replace and the scheme.
-		"The app's colours, in any thread", "never\nedit the themes folder",
-		"`theme list|show|save|check|edit|duplicate|delete|restore|set-dark|`\n`set-light|set-scheme|ask`",
-		"(/Users/ada/.code-foundry/claude/.claude/skills/code-foundry-help/reference/themes.md)",
-		"Body text keeps 7:1, status text\n4.5:1: for less contrast move `surface` and `canvas` toward the text, never the text",
-		"Fix every\npair the save's `contrast:` lists before you reply", "needs\n`--replace`, once the user asked",
-		"offer `theme set-scheme light`, never switch unasked",
-		// Reminders and schedules are wakes, never the session's cron (bridge-fix-c-daemon).
-		"To be told or reminded later, or something done on a schedule", "`code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`",
-		"never Claude Code's cron or a background `--watch`",
-		// "show me what's running" listed the Mac's processes in testing (bridge-fix-wording).
-		"| What's running or going on, their work |", "\"running\" here means this app's threads, actions and terminals, never the Mac's processes",
-		"a to-do to tick off",
-		// Scopes (workspaces-v2-5-skills): app memory, the workspace's folder from thread
-		// checkouts, a repo's own CLAUDE.md; a member's CLAUDE.md before editing there; how
-		// a workspace skill is laid out; new files load at the next start.
-		"\n## Scopes\n", "one for a set of projects or one repo, or a skill for them: \"Scopes\" below",
-		"How you act in the app everywhere is app memory (`memory add`)", "the folder after `WORKSPACE` in `code-foundry thread\ncheckouts`",
-		"`CLAUDE.md` (else `AGENTS.md`; a new file is `CLAUDE.md`)", "`.claude/skills/<name>/SKILL.md` (frontmatter `name`, `description`)",
-		"One repo's is its own `CLAUDE.md`", "Only your primary checkout's `CLAUDE.md` loads",
-		"before you edit there", "at its next start"} {
-		if !strings.Contains(entry, want) {
-			t.Errorf("entry SKILL.md lacks %q", want)
+	for _, s := range []string{skills.Help, skills.Orchestrate, skills.Plugin, skills.Pages} {
+		if !strings.Contains(entry, s) {
+			t.Errorf("entry SKILL.md does not route to %s", s)
 		}
 	}
-	// The removed tabs' panel verbs (thread-header-crumb) are not offered: a model ran
-	// view.panel.usage from this line and got an unknown command.
-	if strings.Contains(entry, "`usage`, `worktree`, `threads`") {
-		t.Error("entry SKILL.md still names the removed usage, worktree and threads panels")
-	}
-	// Its description names the words of the prompts that loaded no skill.
-	entryDesc := frontmatter(t, skills.Entry+"/SKILL.md", files[skills.Entry+"/SKILL.md"])["description"]
-	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree's changes or PRs", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR", "reminder", "what's running", "their work"} {
-		if !strings.Contains(entryDesc, w) {
-			t.Errorf("entry SKILL.md's description lacks %q", w)
-		}
-	}
-	// Every group the index names is a real group.
 	for _, g := range command.CapabilityGroups() {
 		if !strings.Contains(entry, g) {
 			t.Errorf("entry SKILL.md does not name the capabilities group %s", g)
@@ -361,15 +208,6 @@ func TestRender(t *testing.T) {
 	for _, f := range src.Settings {
 		if n := strings.Count(set, "- `"+f.GetKey()+"` "); n != 1 {
 			t.Errorf("settings.md lists %s %d times", f.GetKey(), n)
-		}
-	}
-	for _, want := range []string{
-		"## Threads (`[threads]`)", "- `threads.default_model` **",
-		"Type: enum, one of `claude-opus-5-5[1m]` (", "Default: `",
-		"- `keybindings.thread.new` New Thread: `cmd+n`",
-	} {
-		if !strings.Contains(set, want) {
-			t.Errorf("settings.md lacks %q", want)
 		}
 	}
 
@@ -394,81 +232,28 @@ func TestRender(t *testing.T) {
 		t.Error("reference/themes.md is not docs/THEMES.md with the provenance line under its title")
 	}
 
-	// The orchestrate skill keeps its line cap by pointing at reference files: worked
-	// sections of patterns.md (orch-skill-v3), and the wake and lead rules
-	// (orch-skill-split). Each file has its sections and the file that sends the reader
-	// there (SKILL.md, or wakes.md for the supervised and budget sections) names each.
-	for _, tt := range []struct{ file, want, from, pointer string }{
-		{"reference/patterns.md", "\n## 5. A supervised child\n", "reference/wakes.md", "`reference/patterns.md` §5"},
-		{"reference/patterns.md", "\n## 6. Budget stops\n", "reference/wakes.md", "`reference/patterns.md` §6"},
-		{"reference/patterns.md", "\n## 7. Discarding a child's work\n", "SKILL.md", "`reference/patterns.md` §7"},
-		{"reference/wakes.md", "\n## Pending prompts and questions\n", "SKILL.md", "`reference/wakes.md`"},
-		{"reference/wakes.md", "`report_stale: true`", "SKILL.md", "`reference/wakes.md`"},
-		{"reference/wakes.md", "\n## A batch of wakes\n", "SKILL.md", "`reference/wakes.md`"},
-		{"reference/wakes.md", "\n## After the app restarts\n", "SKILL.md", "`reference/wakes.md`"},
-		{"reference/wakes.md", "WITHOUT `--wait`", "SKILL.md", "`reference/wakes.md`"},
-		{"reference/wakes.md", "\n## Plugin wake sources\n", "SKILL.md", "`reference/wakes.md`"},
-		{"reference/patterns.md", "\n## 8. Checking a batch before the roll-up\n", "SKILL.md", "`reference/patterns.md` §8"},
-		{"reference/patterns.md", "\n## 0. The child's prompt\n", "SKILL.md", "`reference/patterns.md` §0"},
-		{"reference/patterns.md", "\n## 2c. A change across several projects\n", "SKILL.md", "`reference/patterns.md` §2c"},
-		{"reference/patterns.md", "`--projects` with only the projects its task touches", "SKILL.md", "`reference/patterns.md` §2c"},
-		{"reference/wakes.md", "\n## Interrupted\n", "SKILL.md", "`reference/wakes.md`"},
-		{"reference/leads.md", "# Leads (children that orchestrate)\n", "SKILL.md", "`reference/leads.md`"},
-		{"reference/sidebar.md", "\n## Hidden while you exist\n", "SKILL.md", "`reference/sidebar.md`"},
-		{"reference/sidebar.md", "\n## When the user should take the work\n", "SKILL.md", "`reference/sidebar.md`"},
-		{"reference/sidebar.md", "`thread fork\n--id <child>`", "SKILL.md", "`reference/sidebar.md`"},
-		{"reference/sidebar.md", "\n## Archiving takes hidden threads along\n", "SKILL.md", "`reference/sidebar.md`"},
-		{"reference/leads.md", "Before a lead ends a turn while its workers still run, it posts `code-foundry thread\n  report progress",
-			"SKILL.md", "`reference/leads.md`"},
-	} {
-		if got := string(files[skills.Orchestrate+"/"+tt.file]); !strings.Contains(got, tt.want) {
-			t.Errorf("%s lacks %q", tt.file, tt.want)
-		}
-		if !strings.Contains(string(files[skills.Orchestrate+"/"+tt.from]), tt.pointer) {
-			t.Errorf("the orchestrate %s does not point at %s", tt.from, tt.pointer)
-		}
-	}
-
-	// Workspaces v2 (workspaces-v2-5-skills): a child inherits its creator's projects,
-	// workspace, mode and checkouts (thread-checkouts: whatever they have checked out);
-	// --projects narrows a worker, one worker per checkout, archiving removes clean
-	// worktrees. Nothing says a new worktree is in one project.
-	// Compared with the line breaks folded to spaces: the paragraph is reflowed as it grows.
-	orch := strings.Join(strings.Fields(string(files[skills.Orchestrate+"/SKILL.md"])), " ")
-	patterns := strings.Join(strings.Fields(string(files[skills.Orchestrate+"/reference/patterns.md"])), " ")
-	for _, want := range []string{"A child inherits your projects (`code-foundry thread checkouts`), workspace, mode and checkouts",
-		"without `--new-worktree` (or `--new-branch`) it works in your worktrees, whatever they have checked out", "one worker per checkout",
-		"`--projects` keeps it to the projects its task touches", "thread new --projects <project id> --new-worktree",
-		"removes clean worktrees no other thread uses, never a branch"} {
-		if !strings.Contains(orch, want) {
-			t.Errorf("orchestrate SKILL.md lacks %q", want)
-		}
-	}
-	for _, gone := range []string{"It keeps the worktree and branch", "terminal or workspace on", "terminal or workspace still uses"} {
-		if strings.Contains(orch, gone) || strings.Contains(patterns, gone) {
-			t.Errorf("the orchestrate skill still says %q", gone)
-		}
-	}
-
-	// The help skill sends internals questions to the source at the provenance line's
-	// ref, starting from the architecture doc, and names the line's dev-build caveat.
-	help := string(files[skills.Help+"/SKILL.md"])
-	for _, want := range []string{"\n## Reading the source\n", "never answer that from memory", "https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>",
-		"gh api 'repos/<owner>/<repo>/contents/<path>?ref=<ref>'", "`docs/ARCHITECTURE.md`", "Cite the file paths", "If the line says `dev build`"} {
-		if !strings.Contains(help, want) {
-			t.Errorf("the help SKILL.md lacks %q", want)
-		}
-	}
+	// The help skill's source reading goes by the provenance line, whose dev build caveat
+	// it names (a rule in rules_test.go).
 	if dev := (skills.Sources{Version: "dev", Commit: "0123456789abcdef0123456789abcdef01234567"}).Provenance(); !strings.Contains(dev, "(dev build") {
 		t.Errorf("a dev build's provenance line %q does not say `dev build`, which the help skill looks for", dev)
 	}
 
-	// The skills reference their files by the paths they are installed at.
-	for _, skill := range []string{skills.Entry, skills.Orchestrate, skills.Help, skills.Plugin} {
-		body := string(files[skill+"/SKILL.md"])
-		for _, ref := range regexp.MustCompile("`(reference/[a-z-]+\\.md)`").FindAllStringSubmatch(body, -1) {
-			if _, ok := files[skill+"/"+ref[1]]; !ok {
-				t.Errorf("%s names %s, which it does not have", skill, ref[1])
+	// The skills reference their files by the paths they are installed at, and a section by
+	// its number.
+	for _, skill := range []string{skills.Entry, skills.Orchestrate, skills.Help, skills.Plugin, skills.Pages} {
+		for p, b := range files {
+			if !strings.HasPrefix(p, skill+"/") || !strings.HasSuffix(p, ".md") {
+				continue
+			}
+			for _, ref := range referenceName.FindAllStringSubmatch(string(b), -1) {
+				owner := cmp.Or(ref[1], skill)
+				target, ok := files[owner+"/"+ref[2]]
+				if !ok {
+					t.Errorf("%s names %s, which %s does not have", p, ref[2], owner)
+				}
+				if ref[3] != "" && !bytes.Contains(target, []byte("\n## "+ref[3]+". ")) {
+					t.Errorf("%s points at %s §%s, which has no such section", p, ref[2], ref[3])
+				}
 			}
 		}
 	}
@@ -537,39 +322,6 @@ func TestEmberSkill(t *testing.T) {
 	fm := frontmatter(t, p, ember[p])
 	if fm["name"] != skills.Ember || fm["user-invocable"] != "false" {
 		t.Errorf("frontmatter = %v", fm)
-	}
-	// Round 2 of the Ember battle test (ember-fixes-2-skill) added the worker checklist,
-	// the combination check, cancel, merge, restart and budget recipes: each one was a
-	// discovery call or a wrong claim without its line. Pay for new lines by cutting.
-	if n := bytes.Count(ember[p], []byte("\n")); n >= 205 {
-		t.Errorf("%s has %d lines; keep it under 205", p, n)
-	}
-	for _, w := range []string{"ember task add", "ember task start", "--notify", "--labels ember,<task id>", "Never pass `--model`", "cf-task://", "reference/leads.md",
-		"--budget", "ember remember", "ember board", "Skill tool", "never progress", "thread send --id <worker>", "thread respond --id <worker>",
-		"thread subscribe --at", "git -C <worktree> log origin/<branch>", "--branch <branch>",
-		"--prompt - <<'EOF'", "never in double quotes", "merge-tree --write-tree", `"no text`, "ember task cancel", "thread unsubscribe",
-		"project branch delete", "pr merge", "at most 1000 characters", "no new errors against the base", "report `blocked`, not `done`",
-		// ember-research-tasks: Ember reads to split and assign; a question about code is a
-		// research task in the project's checkout that reports findings and closes without a branch.
-		"never answer it yourself", "per piece. Anything past a handful of reads", "is a research task", "## Research",
-		"--new-worktree=false --prompt - <<'EOF'`: the project's checkout", "touches nothing", `"findings": [...]`,
-		`done <task id> "<finding>"` + "` (no `--branch`)", "a parent or research task",
-		// ember-rules-reply: only a turn's last text shows; edits only for an explicit ask.
-		"in your turn's last text (only it shows", "in your last text (it alone shows)", "piece the user tells you to do yourself"} {
-		if !bytes.Contains(ember[p], []byte(w)) {
-			t.Errorf("%s lacks %q", p, w)
-		}
-	}
-	// Gone with ember task start: the two-command dance and its $(...) footgun. Gone in
-	// round 2: a prompt in double quotes (its backticks ran in Ember's shell) and "every
-	// caveat in the summary" (over the report cap).
-	// Gone with ember-research-tasks: "Understand it" and its unbounded reads (a file whole
-	// before saying what a project has or lacks), which let Ember run research itself.
-	for _, w := range []string{"Two separate commands", "ember task update <task id> --thread", `--prompt "`, "every caveat",
-		"**Understand it.**", "before you say what a project has or lacks", "You never edit files"} {
-		if bytes.Contains(ember[p], []byte(w)) {
-			t.Errorf("%s still has %q", p, w)
-		}
 	}
 	if dynamicCommand.Match(ember[p]) {
 		t.Errorf("%s runs a shell command when it loads", p)

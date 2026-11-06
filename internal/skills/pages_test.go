@@ -1,7 +1,6 @@
 package skills_test
 
 import (
-	"bytes"
 	"regexp"
 	"slices"
 	"strings"
@@ -60,9 +59,21 @@ func callArgs(src string) int {
 // argKey is one key of such an args object: a bare name or a quoted one.
 var argKey = regexp.MustCompile(`(?:^|,)\s*(?:"([a-z-]+)"|([a-z][a-zA-Z]*))\s*:`)
 
-// The pages skill (bridge-3-skill): what a page is for, the bridge as the script serves
-// it, the gesture rule, every error code and event source, the own-thread id, storage and
-// the limits; its examples call real verbs with real args.
+// bridgeHeaderLine is the line of bridge.js's header comment starting with prefix.
+func bridgeHeaderLine(t *testing.T, prefix string) string {
+	t.Helper()
+	for _, line := range strings.Split(string(bridge.Script()), "\n") {
+		if rest, ok := strings.CutPrefix(line, " *   "); ok && strings.HasPrefix(rest, prefix) {
+			return rest
+		}
+	}
+	t.Fatalf("bridge.js's header has no line for %s", prefix)
+	return ""
+}
+
+// The pages skill (bridge-3-skill): the bridge as the script serves it, every error code
+// and event source, and examples that call real verbs with real args. Its rules are in
+// rules_test.go.
 func TestRenderPagesSkill(t *testing.T) {
 	src := realSources(t)
 	files, err := skills.Render(src)
@@ -90,35 +101,15 @@ func TestRenderPagesSkill(t *testing.T) {
 	if _, ok := fm["user-invocable"]; ok {
 		t.Errorf("user-invocable is set")
 	}
-	desc := strings.Trim(fm["description"], `"`)
-	if len(desc) >= 400 || strings.Contains(desc, `"`) {
-		t.Errorf("description of %d characters (want under 400, no inner quotes)", len(desc))
-	}
-	// "what's running", "my work", "tick off" and "to-do" loaded no skill in testing
-	// (bridge-fix-wording); "never the processes" keeps "what's running" off ps.
-	for _, w := range []string{"page", "dashboard", "form", "chart", "tool", "checklist", "board", "tracker", "UI", "/cf/bridge.js",
-		"to-do", "tick off", "what's running", "what's going on", "their work", "not the Mac's processes"} {
-		if !strings.Contains(desc, w) {
-			t.Errorf("description lacks %q", w)
-		}
-	}
-	// The examples are in reference/examples.md.
-	if n := bytes.Count(files[p], []byte("\n")); n > 160 {
-		t.Errorf("%s has %d lines; keep it under 160", p, n)
-	}
-	for _, f := range pagesSkillFiles {
-		if n := len(files[f]); n > 16<<10 {
-			t.Errorf("%s has %d bytes; keep it under %d", f, n, 16<<10)
-		}
+	if desc := strings.Trim(fm["description"], `"`); desc == "" || strings.Contains(desc, `"`) {
+		t.Errorf("description %q (want one, with no inner quotes)", desc)
 	}
 
-	// The API block is bridge.js's header, verbatim.
-	for _, line := range []string{"cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}",
-		"cf.on(source, fn) / cf.off    live data, fn(value, source): now, then on change; on returns an unsubscribe",
-		"cf.storage(prefix?)           the thread's page storage, kept across app restarts",
-		"cf.fetch(url, init?)          Promise of {status, ok, headers, text(), json()}; the app makes it: no CORS"} {
-		if !strings.Contains(body, "\n"+line+"\n") || !bytes.Contains(bridge.Script(), []byte(line)) {
-			t.Errorf("SKILL.md lacks the header line %q", line)
+	// The API block is bridge.js's header, verbatim, for what a page calls.
+	for _, api := range []string{"cf.run(", "cf.on(", "cf.storage(", "cf.fetch("} {
+		line := bridgeHeaderLine(t, api)
+		if !strings.Contains(body, "\n"+line+"\n") {
+			t.Errorf("SKILL.md lacks bridge.js's header line %q", line)
 		}
 	}
 	for _, code := range bridge.ErrorCodes {
@@ -129,48 +120,6 @@ func TestRenderPagesSkill(t *testing.T) {
 	for _, s := range bridge.Sources {
 		if !strings.Contains(body, "`"+s+"`") {
 			t.Errorf("SKILL.md does not describe the source %s", s)
-		}
-	}
-	for _, want := range []string{
-		// Page, wake, plugin or reply; a wake for reminders and schedules, never the
-		// session's cron (bridge-fix-c-daemon).
-		"## Page, wake, plugin or reply", "the code-foundry-plugin skill", "It runs only while it is on screen",
-		"`code-foundry thread subscribe --pr owner/name#4 --until checks_passed`", "`--every 1h`", "--until attention --repeat",
-		"Never Claude Code's own cron or a `--watch`\n  loop",
-		// The two shapes and the field reference.
-		"Two shapes, never mixed", "THREAD_STATUS_IDLE", "`…AtMs`", "`reference/sources.md`",
-		// The skeleton.
-		`<link rel="stylesheet" href="/cf/theme.css">`, `<script src="/cf/bridge.js"></script>`, "await cf.ready", "`--cf-*` variables",
-		"no build step", "`--json`",
-		// The two shapes (page-library): plain HTML for something small, React with @cf/ui
-		// for state, dialogs, tabs or tables, the exact tags and imports; a mockup brings its
-		// own look.
-		"## Plain HTML or React", "**Plain HTML** only for something tiny and static", "**React with `@cf/ui`** for the rest: a board, a list with actions, a dashboard",
-		`<link rel="stylesheet" href="/cf/ui.css">`, `<script src="/cf/jsx.js"></script>`, `<script type="text/tsx">`,
-		`import { createRoot } from "react-dom/client";`, `from "@cf/ui";`, `from "@cf/icons";`, "`reference/components.md`, read it and `reference/react.md` first",
-		"A **mockup of another product**", "leave out both\nstylesheets", "`/cf/tailwind.js`", "keep `/cf/bridge.js`, it sizes the card",
-		"`react.md`", "`components.md`", "`verbs.md`",
-		// The gesture rule, confirmations, own thread.
-		"runs only from a click or key press in the page", "counts for 5 seconds", "`await Promise.all(items.map(", "on `change`, not `input`",
-		"Never pass `yes` or `force`", "its own dialog opens over the page", "`id: cf.thread.id`", "`\"created-by\": \"\"`",
-		"update that row from the result at once", "a wrong or missing arg",
-		// Live data and state.
-		"never polling", "Never `setInterval`", "`cf.storage(", "survives reloads and\n  app restarts", "Every page of this thread shares it",
-		"`localStorage` is cleared when the app quits", "another thread starts empty", "only while Ember is open", "show its message",
-		// onError and cf.off; rows that do not move under the pointer (bridge-fix-wording).
-		"`onError(e)` gets a refusal: show `e.message` in the page", "`cf.off(source)`", "**Rows stay put**", "acts on its row's id",
-		// Wording from testing: the folder, limits, the verbs table, declines, results.
-		"read nothing in\nother threads' folders or the app's home", "never try values on the user's real settings to find a limit",
-		"not an error. Button back, at most a muted", "never print `text`",
-		"`request-id` per row: a second click then resolves with the same thread, a success",
-		// Limits.
-		"**On screen only.**", "SSO and OAuth redirects", "to paste an API token into a password field", "send it in a header\n  with `cf.fetch`",
-		"Plain `fetch` only for an API known to allow any origin", "CORS never blocks it",
-		"**Data a source lacks**", "A plugin cannot feed a page",
-		"in `reference/`:\n`examples.md`", "`code-foundry view.inline <path>", "once per file", "never\nrun view.inline for that file again",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("SKILL.md lacks %q", want)
 		}
 	}
 	// Reads it calls read-only are read-only.
@@ -220,9 +169,6 @@ func TestRenderPagesSkill(t *testing.T) {
 	}
 	// In reference/verbs.md (page-library: moved out of SKILL.md for the React skeleton).
 	verbsRef := string(files[skills.Pages+"/reference/verbs.md"])
-	if !strings.Contains(verbsRef, "A starter list: every verb the CLI runs works") {
-		t.Error("reference/verbs.md lacks its starter-list line")
-	}
 	_, table, _ := strings.Cut(verbsRef, "| Verb | Args |\n")
 	rows := 0
 	for _, line := range strings.Split(table, "\n") {
@@ -263,26 +209,7 @@ func TestRenderPagesSkill(t *testing.T) {
 			t.Errorf("reference/sources.md has no section for %s", s)
 		}
 	}
-	for _, want := range []string{"THREAD_STATUS_IDLE", "AtMs", "`new Date(ms)`", "code unavailable",
-		// cf.fetch (bridge-fetch): the shape, the errors, the destinations.
-		"## External APIs: cf.fetch and tokens", "resolves for every status", "`json()` throws", "Private networks",
-		"localhost, 127.0.0.1", "1 MiB", "8 MiB", "120 s at most", "no Origin"} {
-		if !strings.Contains(ref, want) {
-			t.Errorf("reference/sources.md lacks %q", want)
-		}
-	}
 
-	ex := string(files[skills.Pages+"/reference/examples.md"])
-	for _, want := range []string{`cf.on("gh"`, `cf.run("pr.merge"`, `"head-sha": pr.headSha`, `cf.run("thread.new"`, "Promise.allSettled",
-		`type="password"`, `cf.storage("linear")`, "await cf.ready", `cf.fetch("https://api.linear.app/graphql"`, "res.json()",
-		`id="refresh"`, "res.status === 401"} {
-		if !strings.Contains(ex, want) {
-			t.Errorf("examples.md lacks %q", want)
-		}
-	}
-	if strings.Contains(ex, "setInterval") || strings.Contains(ex, "cf:resize") {
-		t.Error("examples.md polls or sizes the card by hand")
-	}
 	// Every cf.on in the skeleton and the examples passes an onError: a refusal shown
 	// only in the console left a board empty in testing.
 	ons := 0
@@ -297,11 +224,6 @@ func TestRenderPagesSkill(t *testing.T) {
 	}
 	if ons < 2 {
 		t.Errorf("found %d cf.on calls in the skeleton and examples; the pattern no longer matches", ons)
-	}
-	for _, want := range []string{`"request-id": `, `json?.name`, `"not merged"`, `"muted"`, "localeCompare"} {
-		if !strings.Contains(ex, want) {
-			t.Errorf("examples.md lacks %q", want)
-		}
 	}
 
 	// reference/components.md names every @cf/ui export, as built (internal/pagelib's
@@ -322,18 +244,8 @@ func TestRenderPagesSkill(t *testing.T) {
 		}
 	}
 	react := string(files[skills.Pages+"/reference/react.md"])
-	for _, want := range []string{
-		// What a page loads and the import map, from pagelib.
-		pagelib.JSXPath, pagelib.UICSSPath, pagelib.TailwindPath, "/cf/theme.css", "/cf/bridge.js",
-		// How the loader runs a page; the bridge in React; overlays in the card.
-		"`text/jsx` and `text/babel` work too", "types stripped", "in document order", "write the app as one script",
-		"red box at the top of the page", "No charting or other library", "`var(--cf-chart-1)`", "An arbitrary value",
-		"return what `cf.on` returns", "no Dialog that asks before merging or archiving", "`<TooltipProvider>`", "`<Toaster />`",
-		"`min-h-112`", "`/cf/theme.css?scheme=light`", `<html style="font-size: 18px">`, `cf.run("thread.archive", { id: t.id })`, `e.code === "declined"`, "t.id !== cf.thread.id", "localeCompare",
-		// The mockup: no theme, its own palette, the runtime's @theme, the bridge for sizing.
-		"## A mockup of another product", "Leave out `/cf/theme.css` and `/cf/ui.css`", "`color-scheme`", `<style type="text/tailwindcss">`,
-		"No `@import` in it", "say in the reply that it is a mockup",
-	} {
+	// What a page loads and the import map, from pagelib.
+	for _, want := range []string{pagelib.JSXPath, pagelib.UICSSPath, pagelib.TailwindPath, "/cf/theme.css", "/cf/bridge.js"} {
 		if !strings.Contains(react, want) {
 			t.Errorf("reference/react.md lacks %q", want)
 		}
