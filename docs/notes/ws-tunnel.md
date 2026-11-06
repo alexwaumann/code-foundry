@@ -53,7 +53,7 @@ write's own clock, so a page that stops ends in `write timeout` after 30 s. The 
 blocks meanwhile, as it would on a full TCP socket, so the terminal store's subscriber buffer and
 the bus's drop rules work as designed.
 
-- A message goes whole once there is room: a 49 MB snapshot must not need 49 MB of window.
+- A message goes whole once there is room: a 104 MB snapshot must not need 104 MB of window.
 - Only body messages count, heartbeats included. The head does not.
 - A count must be a number, not go backwards and not pass what was sent. Anything else is data
   past the request, which `readUntilGone` still treats as the client's close.

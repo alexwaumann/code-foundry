@@ -29,8 +29,8 @@ const ACK_BYTES = 2 << 20;
 
 /**
  * The most the body may hold unread. Counts go out as bytes arrive, so a reader that stops is
- * bounded here and not by the daemon. The largest snapshot seen is 49 MB and may sit here whole
- * while the reader is busy; a live reader keeps this at 0 (measured under `yes`).
+ * bounded here and not by the daemon. A live reader keeps this at 0 (measured under `yes`), and
+ * a snapshot past it still arrives: thread snapshots reach 49 MB and terminal ones 104 MB.
  */
 export const MAX_QUEUED_BYTES = 64 << 20;
 

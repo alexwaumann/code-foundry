@@ -74,9 +74,10 @@ What this showed:
 
 - **A cap in `wsFetch` cannot do the job alone.** A live reader takes each message in the task it
   arrives in, so the queue measured 0 at any rate. A blocked main thread runs no JS, so nothing can
-  check a cap while memory grows at about 73 MB/s. The cap is in (`MAX_QUEUED_BYTES`, 64 MiB, above
-  the largest snapshot seen, 49 MB), for a reader that stalls with the main thread running. Nothing
-  does that today. It checks before it enqueues, so one message larger than the cap is delivered.
+  check a cap while memory grows at about 73 MB/s. The cap is in (`MAX_QUEUED_BYTES`, 64 MiB), for
+  a reader that stalls with the main thread running. Nothing does that today. It checks before it
+  enqueues, so a message larger than the cap is delivered: thread snapshots reach 49 MB, and terminal
+  ones 104 MB (`docs/notes/terminal-scrollback-30k.md`).
 - **So the tunnel has flow control** (`docs/notes/ws-tunnel.md`): a running count every 2 MiB and
   an 8 MiB window. A stopped page now holds 8 MiB per stream, the write deadline fires for the first
   time, and the terminal store's slow-subscriber drop works as designed.

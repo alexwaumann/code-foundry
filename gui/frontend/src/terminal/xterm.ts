@@ -231,8 +231,8 @@ export class XtermRenderer implements TerminalRenderer {
       this.term.write("\x1b[?25h");
     } catch {
       // Behind 50 MB of unparsed writes (a huge snapshot, then a tab switch) xterm refuses
-      // any write. reset() runs in a React effect and must not throw; the snapshot's own
-      // write fails the same way, and the stream's retry resets again once that has drained.
+      // any write. reset() runs in a React effect and must not throw; the next snapshot waits
+      // for xterm to finish and resets again (terminal/attach.ts).
     }
     this.keyboardModes.reset();
   }
