@@ -299,7 +299,7 @@ describe("startThreadWatch", () => {
 
   describe("across reconnects", () => {
     const delta = (seq: number, itemId: string, t: string): ThreadEventView => ({ kind: "delta", threadId: "s", seq, itemId, ordinal: 1, field: "text", text: t });
-    const appended = (seq: number, item: ThreadItemView): ThreadEventView => ({ kind: "appended", threadId: "s", seq, item }) as ThreadEventView;
+    const appended = (seq: number, item: ThreadItemView): ThreadEventView => ({ kind: "appended", threadId: "s", seq, item });
     const log = () => {
       const l = useThreadStore.getState().logs.s;
       return l?.order.map((id) => (l.byId[id] as { text: string }).text);
