@@ -1,10 +1,13 @@
 package gh
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"slices"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 )
@@ -163,4 +166,180 @@ func toFloat(v any) float64 {
 		return f
 	}
 	return -1
+}
+
+// watchedWorld is a store polling o/r with someone else's pull request #9 on branch
+// feature-x, in no dashboard, its lookup answered like the rest of the fake.
+func watchedWorld(t *testing.T) (*fakeGitHub, *fakeRunner, *Store, time.Time) {
+	t.Helper()
+	g, t0 := changeDrivenWorld()
+	theirs := fakePR("PR_x", "o/r", 9, t0)
+	theirs.Author, theirs.HeadRef = "someone", "feature-x"
+	g.addPR(theirs)
+	g.setBranch("o/r", "feature-x", "PR_x")
+	f := &fakeRunner{}
+	f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+		if op != "PullRequest" {
+			return g.respond(op, doc, vars)
+		}
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		for _, p := range g.prs {
+			if p.Repo == vars["owner"].(string)+"/"+vars["name"].(string) && float64(p.Number) == toFloat(vars["number"]) {
+				pr := prJSON(p)
+				pr["checks"] = rollupOrNil(p.Checks)
+				return json.Marshal(map[string]any{"repository": map[string]any{"pullRequest": pr}})
+			}
+		}
+		return nil, ErrNotFound
+	})
+	s := startStore(t, testOptions(openTestDB(t), f, bus.New()))
+	if err := s.Track("o/r"); err != nil {
+		t.Fatal(err)
+	}
+	return g, f, s, t0
+}
+
+// A branch list outlives its watch. The viewer's own pull request reopens, and the cache
+// answers with the dashboard's newer copy; someone else's has only the stale one until
+// watching again brings a poll of its branch.
+func TestCachedPullRequestAfterTheWatchEnded(t *testing.T) {
+	g, f, s, t0 := watchedWorld(t)
+	g.setBranch("o/r", "branch-1", "PR_a")
+	both := []PullRequestRef{{"o/r", 1}, {"o/r", 9}}
+	if err := s.WatchPullRequests(both); err != nil {
+		t.Fatal(err)
+	}
+	pollOnce(t, s, f)
+	pollOnce(t, s, f)
+	setState := func(state PullRequestState, at time.Time) {
+		for _, id := range []string{"PR_a", "PR_x"} {
+			g.edit(id, func(p *PullRequest) { p.State, p.UpdatedAt = state, at })
+		}
+	}
+	setState(PullRequestClosed, t0.Add(time.Second))
+	g.mu.Lock()
+	g.sections[sectionAuthored] = slices.DeleteFunc(g.sections[sectionAuthored], func(id string) bool { return id == "PR_a" })
+	g.mu.Unlock()
+	pollOnce(t, s, f)
+	if p, ok := s.CachedPullRequest("o/r", 1); !ok || p.State != PullRequestClosed {
+		t.Fatalf("after the close: %q, %v", p.State, ok)
+	}
+
+	if err := s.WatchPullRequests(nil); err != nil {
+		t.Fatal(err)
+	}
+	setState(PullRequestOpen, t0.Add(2*time.Second))
+	g.mu.Lock()
+	g.sections[sectionAuthored] = append(g.sections[sectionAuthored], "PR_a")
+	g.mu.Unlock()
+	pollOnce(t, s, f)
+	if p, _ := s.CachedPullRequest("o/r", 1); p.State != PullRequestOpen {
+		t.Errorf("own pull request: %q, the dashboard says open", p.State)
+	}
+	if p, _ := s.CachedPullRequest("o/r", 9); p.State != PullRequestClosed {
+		t.Fatalf("their pull request: %q, nothing polled it", p.State)
+	}
+
+	if err := s.WatchPullRequests(both); err != nil {
+		t.Fatal(err)
+	}
+	pollOnce(t, s, f)
+	if p, _ := s.CachedPullRequest("o/r", 9); p.State != PullRequestOpen {
+		t.Errorf("their pull request after the poll: %q", p.State)
+	}
+}
+
+func TestNewerCopy(t *testing.T) {
+	t0 := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	later := t0.Add(time.Second)
+	for _, tt := range []struct {
+		name    string
+		p, have PullRequest
+		want    bool
+	}{
+		{"updated later", PullRequest{UpdatedAt: later}, PullRequest{UpdatedAt: t0}, true},
+		{"updated earlier", PullRequest{UpdatedAt: t0}, PullRequest{UpdatedAt: later}, false},
+		{"a placeholder, later", PullRequest{UpdatedAt: later, Partial: true}, PullRequest{UpdatedAt: t0}, true},
+		{"a placeholder, as late", PullRequest{UpdatedAt: t0, Partial: true}, PullRequest{UpdatedAt: t0}, false},
+		{"over a placeholder, as late", PullRequest{UpdatedAt: t0}, PullRequest{UpdatedAt: t0, Partial: true}, true},
+		{"as late, as complete", PullRequest{UpdatedAt: t0}, PullRequest{UpdatedAt: t0}, true},
+	} {
+		if got := newerCopy(tt.p, tt.have); got != tt.want {
+			t.Errorf("%s: %v", tt.name, got)
+		}
+	}
+}
+
+// LookupPullRequest asks GitHub whatever the caches hold: only an answer without the pull
+// request is "not found", and an answer with it counts beside a nested failure.
+func TestLookupPullRequest(t *testing.T) {
+	answer := func(pr any) json.RawMessage {
+		d, err := json.Marshal(map[string]any{"repository": map[string]any{"pullRequest": pr}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	p := fakePR("PR_x", "o/r", 9, time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC))
+	p.State = PullRequestClosed
+	real := prJSON(&p)
+	real["checks"] = nil
+	nested := func(kind string) *PartialError {
+		return &PartialError{Errors: []graphQLError{{Type: kind, Message: "x", Path: []any{"repository", "pullRequest", "reviewRequests"}}}}
+	}
+	for _, tt := range []struct {
+		name    string
+		data    json.RawMessage
+		err     error
+		want    PullRequestState
+		wantErr error
+	}{
+		{name: "found", data: answer(real), want: PullRequestClosed},
+		{name: "not found", err: ErrNotFound, wantErr: ErrNotFound},
+		{name: "null pull request beside NOT_FOUND", data: answer(nil), wantErr: ErrNotFound,
+			err: &PartialError{Errors: []graphQLError{{Type: "NOT_FOUND", Message: "x", Path: []any{"repository", "pullRequest"}}}}},
+		{name: "nested NOT_FOUND beside the pull request", data: answer(real), err: nested("NOT_FOUND"), want: PullRequestClosed},
+		{name: "nested FORBIDDEN beside the pull request", data: answer(real), err: nested("FORBIDDEN"), want: PullRequestClosed},
+		{name: "forbidden", err: ErrPermissionDenied, wantErr: ErrPermissionDenied},
+		{name: "partial forbidden", err: &PartialError{Errors: []graphQLError{{Type: "FORBIDDEN", Message: "SAML"}}}, wantErr: ErrPermissionDenied},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			g, _ := changeDrivenWorld()
+			f := &fakeRunner{}
+			var asked atomic.Int32
+			f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+				if op == "PullRequest" {
+					asked.Add(1)
+					return tt.data, tt.err
+				}
+				return g.respond(op, doc, vars)
+			})
+			s := startStore(t, testOptions(openTestDB(t), f, bus.New()))
+			got, err := s.LookupPullRequest(context.Background(), "o/r", 9)
+			if !errors.Is(err, tt.wantErr) || got.State != tt.want {
+				t.Fatalf("= %q, %v; want %q, %v", got.State, err, tt.want, tt.wantErr)
+			}
+			if tt.wantErr != nil {
+				return
+			}
+			// The detail just saved is young enough for PullRequest; this one still asks.
+			if _, err := s.LookupPullRequest(context.Background(), "o/r", 9); err != nil {
+				t.Fatal(err)
+			}
+			if n := asked.Load(); n != 2 {
+				t.Errorf("asked GitHub %d times, want 2", n)
+			}
+		})
+	}
+}
+
+func TestLookupPullRequestRefuses(t *testing.T) {
+	s := startStore(t, testOptions(openTestDB(t), &fakeRunner{}, bus.New()))
+	if _, err := s.LookupPullRequest(context.Background(), "nope", 1); err == nil {
+		t.Error("a bad slug was asked about")
+	}
+	if _, err := s.LookupPullRequest(context.Background(), "o/r", 0); !errors.Is(err, ErrInvalidArgument) {
+		t.Errorf("number 0: %v", err)
+	}
 }

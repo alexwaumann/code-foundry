@@ -647,10 +647,17 @@ func canonicalSlug(slug string, rr repoResult) *string {
 // state to drift.
 func knownPullRequests(d Dashboard, b *branchStates) map[string]PullRequest {
 	out := map[string]PullRequest{}
+	eachKnownPullRequest(d, b, func(p PullRequest) { out[p.ID] = p })
+	return out
+}
+
+// eachKnownPullRequest calls fn on every copy d and the branch lists hold, the branch
+// lists last, under their lock.
+func eachKnownPullRequest(d Dashboard, b *branchStates, fn func(PullRequest)) {
 	addAll := func(prs []PullRequest) {
 		for _, p := range prs {
 			if p.ID != "" {
-				out[p.ID] = p
+				fn(p)
 			}
 		}
 	}
@@ -659,11 +666,10 @@ func knownPullRequests(d Dashboard, b *branchStates) map[string]PullRequest {
 	addAll(d.ReviewRequested)
 	addAll(d.Authored)
 	b.mu.Lock()
+	defer b.mu.Unlock()
 	for _, st := range b.m {
 		addAll(st.PullRequests)
 	}
-	b.mu.Unlock()
-	return out
 }
 
 // needsDetail reports whether a pull request must be (re)fetched: it is new or only a
@@ -1111,6 +1117,12 @@ func (s *Store) fetchPullRequest(ctx context.Context, slug string, number int) (
 			vars["after"] = after
 		}
 		data, err := s.call(ctx, queryPullRequest, vars)
+		if isPartial(err) {
+			// A failure still, beside what came back: a nested "not found" with the pull
+			// request in the answer does not mean the pull request is gone.
+			p, _, _, _ := decodePullRequest(data)
+			return PullRequestDetail{PullRequest: p}, err
+		}
 		if err != nil {
 			return PullRequestDetail{}, err
 		}
