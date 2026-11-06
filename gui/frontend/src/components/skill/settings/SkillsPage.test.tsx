@@ -566,6 +566,14 @@ describe("searching", () => {
     expect(screen.getByTestId("skill-results-none").textContent).toBe("Nothing in your marketplace matches “kubectl”.");
   });
 
+  it("hits that are all installed rows above are no marketplace group, and no “nothing”", () => {
+    show();
+    type("sql");
+    answered("sql", [entry({ name: "sql-helper", state: "disabled" })]);
+    expect(groups()).toEqual(["installed"]);
+    expect(screen.queryByTestId("skill-results-none")).toBeNull();
+  });
+
   it("the search's failure is in words; Installed still answers", () => {
     seed({ searchError: "daemon gone" });
     show();

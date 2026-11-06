@@ -13,7 +13,6 @@ import {
   marketKeys,
   marketplaceCount,
   matchesInstalled,
-  readWords,
   refreshHint,
   registriesSummary,
   registryLine,
@@ -51,16 +50,6 @@ describe("skill settings model", () => {
     [800 * DAY, "2 years ago"],
   ])("ageWords(%d ms ago) is %s", (ago, want) => {
     expect(ageWords(now - ago, now)).toBe(want);
-  });
-
-  it.each([
-    [null, "not read yet"],
-    [now - 10_000, "read just now"],
-    [now - 5 * 60_000, "read 5 min ago"],
-    [now - 3 * 3_600_000, "read 3 h ago"],
-    [now - 2 * DAY, "read 2 d ago"],
-  ])("readWords(%s) is %s", (at, want) => {
-    expect(readWords(at, now)).toBe(want);
   });
 
   it.each([

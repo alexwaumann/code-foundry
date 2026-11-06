@@ -95,6 +95,33 @@ function seedEntries(): Entry[] {
       permissions: { commands: ["thread.send"], events: ["project", "threads"], threadStatus: true, sessionEnv: false, secrets: false },
       registry: FIXTURE_REGISTRY,
     },
+    {
+      name: "linear-triage",
+      displayName: "Linear Triage",
+      version: "0.3.0",
+      description: "Files a Linear issue from a failing thread, with the failure and the branch.",
+      repo: "alexwaumann/code-foundry-plugin-linear-triage",
+      permissions: { commands: ["thread.send"], events: ["threads"], threadStatus: false, sessionEnv: false, secrets: true },
+      registry: FIXTURE_REGISTRY,
+    },
+    {
+      name: "linear-board",
+      displayName: "Linear Board",
+      version: "0.1.2",
+      description: "Shows your Linear cycle in the side panel.",
+      repo: "alexwaumann/code-foundry-plugin-linear-board",
+      permissions: { commands: [], events: [], threadStatus: false, sessionEnv: false, secrets: true },
+      registry: FIXTURE_REGISTRY,
+    },
+    {
+      name: "deps-radar",
+      displayName: "Deps Radar",
+      version: "1.1.0",
+      description: "Flags a branch that adds a dependency with a known advisory.",
+      repo: "alexwaumann/code-foundry-plugin-deps-radar",
+      permissions: { commands: [], events: ["project"], threadStatus: true, sessionEnv: false, secrets: false },
+      registry: FIXTURE_REGISTRY,
+    },
   ];
 }
 

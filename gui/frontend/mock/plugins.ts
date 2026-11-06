@@ -755,6 +755,34 @@ function seedPlugins(): MockPlugin[] {
       surfaces: [],
       install: { kind: "registry", source: "https://github.com/alexwaumann/code-foundry-plugins" },
     },
+    // A longer list for Settings → Plugins: no commands or surfaces, so nothing else sees them.
+    ...[
+      ["linear-sync", "Linear Sync", "1.2.0", "Mirrors a thread's linked issues and posts when a pull request merges."],
+      ["sentry-feed", "Sentry Feed", "0.4.2", "Shows new issues for the thread's project in the side panel."],
+      ["disk-watch", "Disk Watch", "0.2.1", "Warns before a worktree fills the disk."],
+      ["pager-bridge", "Pager Bridge", "2.0.3", "Opens a thread when an incident pages you and links it back."],
+      ["flag-audit", "Flag Audit", "0.7.0", "Lists feature flags a branch touches and who owns them."],
+      ["doc-preview", "Doc Preview", "1.0.4", "Renders the docs a branch changes and keeps them beside the diff."],
+    ].map(([name = "", displayName = "", version = "", description = ""], i): MockPlugin => ({
+      name,
+      displayName,
+      version,
+      description,
+      state: PluginState.RUNNING,
+      enabled: true,
+      dev: false,
+      needsConsent: false,
+      granted: true,
+      disabledReason: "",
+      lastError: "",
+      restarts: 0,
+      pid: 48400 + i,
+      startedAt: started,
+      permissions: { commands: [], events: [], threadStatus: false, sessionEnv: false, secrets: false },
+      commands: [],
+      surfaces: [],
+      install: { kind: "registry", source: "https://plugins.acme.dev/index.json" },
+    })),
   ];
 }
 
@@ -1197,6 +1225,11 @@ export class MockPlugins {
           this.changed(p);
           return `enabled ${p.name} ${p.version} (starting)`;
         },
+      },
+      {
+        cmd: { name: "plugin.reload", noPalette: true, title: "Reload Plugins", category: "Plugin", description: "Rescan ~/.code-foundry/plugins for added, changed and removed plugins.", keybindings: [], args: [] },
+        when: () => true,
+        run: () => "rescanned the plugins directory",
       },
       {
         cmd: { name: "plugin.disable", noPalette: true, title: "Disable Plugin", category: "Plugin", description: "Stop a plugin and remove its commands.", keybindings: [], args: [nameArg] },

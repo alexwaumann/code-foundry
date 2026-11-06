@@ -1,21 +1,9 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, KeyRound, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/lib/clock";
 import { formatAgo } from "@/lib/thread";
 import { deletePluginSecret, loadPluginSecrets, usePluginSecrets } from "@/stores/pluginSecrets";
-
-/** The Secrets toggle among a row's actions. */
-export function SecretsToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
-  const Chevron = open ? ChevronDown : ChevronRight;
-  return (
-    <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" aria-expanded={open} onClick={onToggle} data-testid="plugin-secrets-toggle">
-      <KeyRound aria-hidden />
-      Secrets
-      <Chevron aria-hidden />
-    </Button>
-  );
-}
 
 /**
  * A plugin's secrets in the Keychain: each name and when it was set, never a value, with a

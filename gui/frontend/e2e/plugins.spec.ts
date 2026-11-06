@@ -33,8 +33,8 @@ test.beforeEach(async () => {
 // src/components/plugin/PluginSurface.test.tsx, registry.test.tsx, renderer.test.tsx, form.test.ts.
 // The hello plugin's own answers (its next views, "Saved: …", Pin) are the mock plugin's.
 
-// Settings → Plugins' rows, pills, pid, env names, last error, logs, the consent's title and
-// permissions, Cancel and Enable: src/components/plugin/settings/PluginsPage.test.tsx and
+// Settings → Plugins' rows, groups, menus, pid, env names, last error, logs, the consent's title
+// and permissions, Cancel and Enable: src/components/plugin/settings/PluginsPage.test.tsx and
 // src/components/plugin/ConsentDialog.test.tsx. Here the flow across routes once it is enabled.
 test("Settings → Plugins: a plugin's surface opened from its row closes Settings and shows live in the panel", async ({ page }) => {
   await openApp(page);
@@ -42,10 +42,11 @@ test("Settings → Plugins: a plugin's surface opened from its row closes Settin
   await page.keyboard.press("Meta+,");
   await page.getByTestId("settings-nav-plugins").click();
   const acme = page.getByTestId("plugin-row-settings").and(page.locator('[data-plugin="acme-data"]'));
-  await acme.getByTestId("plugin-enable").click();
+  await acme.getByTestId("plugin-switch").click();
   await page.getByTestId("consent-dialog").getByTestId("consent-enable").click();
-  await expect(acme.locator('[data-testid="plugin-pill"]')).toHaveText("Running");
-  await acme.locator('[data-testid="plugin-open-surface"][data-surface="plugin.acme-data.access"]').click();
+  await expect(acme.getByTestId("plugin-switch")).toBeChecked();
+  await acme.getByTestId("plugin-row-menu").click();
+  await page.getByTestId("plugin-menu-surface-access").click();
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.acme-data.access");
   await expect(surface(page).getByTestId("plugin-title")).toHaveText("Data access");

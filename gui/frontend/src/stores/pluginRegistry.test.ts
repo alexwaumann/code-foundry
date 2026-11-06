@@ -6,7 +6,7 @@ const m = vi.hoisted(() => ({ browse: vi.fn(), runCommand: vi.fn(), runCommandFo
 vi.mock("@/api/plugin", async (orig) => ({ ...(await orig<typeof import("@/api/plugin")>()), browsePlugins: m.browse }));
 vi.mock("./commands", () => ({ runCommand: m.runCommand, runCommandForResult: m.runCommandForResult }));
 
-const { applyInstallProgress, dismissInstallFailure, failedProgress, installPlugin, onInstallProgress, onRegistryEpoch, uninstallPlugin, usePluginRegistryStore } = await import("./pluginRegistry");
+const { applyInstallProgress, dismissInstallFailure, failedProgress, installPlugin, onInstallProgress, onRegistryEpoch, uninstallPlugin, usePluginRegistryStore, dismissPluginFailure, runPluginAction, updatePlugin } = await import("./pluginRegistry");
 
 beforeEach(() => {
   for (const f of Object.values(m)) f.mockReset();
@@ -109,12 +109,12 @@ describe("uninstallPlugin", () => {
 
   it("runs plugin.uninstall with the purge choice and answers its daemon confirm itself: no second dialog", async () => {
     let answered: boolean | undefined;
-    m.runCommand.mockImplementation(async () => {
+    m.runCommandForResult.mockImplementation(async () => {
       answered = await ask("true");
-      return true;
+      return { message: "", resultJson: "" };
     });
     await uninstallPlugin("test-watcher", true);
-    expect(m.runCommand).toHaveBeenCalledWith("plugin.uninstall", { name: "test-watcher", purge: "true" });
+    expect(m.runCommandForResult).toHaveBeenCalledWith("plugin.uninstall", { name: "test-watcher", purge: "true" }, expect.anything());
     expect(answered).toBe(true);
     expect(useConfirmStore.getState().pending).toBeNull();
   });
@@ -150,5 +150,66 @@ describe("the daemon's plugin events", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("a row's actions", () => {
+  const fails = (message: string) => (_n: string, _a: unknown, opts: { onError?: (m: string) => void }) => {
+    opts.onError?.(message);
+    return Promise.resolve(null);
+  };
+
+  beforeEach(() => {
+    usePluginRegistryStore.setState({ busy: {}, failures: {} });
+    m.runCommandForResult.mockReset().mockResolvedValue({ message: "", resultJson: "" });
+  });
+
+  it.each([
+    ["enable", { name: "hello" }],
+    ["disable", { name: "hello" }],
+    ["restart", { name: "hello" }],
+    ["reload", {}],
+  ] as const)("%s is busy while it runs, then not", async (action, args) => {
+    let during: string | undefined;
+    m.runCommandForResult.mockImplementation(() => {
+      during = usePluginRegistryStore.getState().busy.hello;
+      return Promise.resolve({ message: "", resultJson: "" });
+    });
+    expect(await runPluginAction("hello", action)).toBe(true);
+    expect(during).toBe(action);
+    expect(m.runCommandForResult).toHaveBeenCalledWith(`plugin.${action}`, args, expect.anything());
+    expect(usePluginRegistryStore.getState().busy.hello).toBeUndefined();
+  });
+
+  it("a failure stays under the row until the next try or a dismiss", async () => {
+    m.runCommandForResult.mockImplementationOnce(fails("it would not start"));
+    expect(await runPluginAction("hello", "restart")).toBe(false);
+    expect(usePluginRegistryStore.getState().failures.hello).toEqual({ action: "restart", message: "it would not start" });
+    await runPluginAction("hello", "restart");
+    expect(usePluginRegistryStore.getState().failures.hello).toBeUndefined();
+    m.runCommandForResult.mockImplementationOnce(fails("again"));
+    await runPluginAction("hello", "restart");
+    dismissPluginFailure("hello");
+    expect(usePluginRegistryStore.getState().failures.hello).toBeUndefined();
+  });
+
+  it("a declined consent is no failure", async () => {
+    m.runCommandForResult.mockResolvedValue(null);
+    expect(await runPluginAction("hello", "enable")).toBe(false);
+    expect(usePluginRegistryStore.getState().failures.hello).toBeUndefined();
+  });
+
+  it("a row already busy is left alone", async () => {
+    usePluginRegistryStore.setState({ busy: { hello: "update" } });
+    expect(await runPluginAction("hello", "disable")).toBe(false);
+    expect(m.runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("updatePlugin says how it went, keeps a failure and can stay quiet", async () => {
+    expect(await updatePlugin("hello", { quiet: true })).toBe(true);
+    expect(m.runCommandForResult).toHaveBeenCalledWith("plugin.update", { name: "hello" }, expect.objectContaining({ quiet: true }));
+    m.runCommandForResult.mockImplementationOnce(fails("offline"));
+    expect(await updatePlugin("hello")).toBe(false);
+    expect(usePluginRegistryStore.getState().failures.hello).toEqual({ action: "update", message: "offline" });
   });
 });

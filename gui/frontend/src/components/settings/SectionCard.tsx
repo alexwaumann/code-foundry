@@ -71,8 +71,11 @@ function AdvancedFold({ schema, fields }: { schema: SettingsSchemaView; fields: 
   );
 }
 
-/** A page's section: its rows (single fields, side-by-side pairs), any link row registered for it, and any Advanced fields. */
-export function SettingsSection({ schema, pageId, section }: { schema: SettingsSchemaView; pageId: string; section: SectionFields }) {
+/**
+ * A page's section: its rows (single fields, side-by-side pairs), any link row registered for
+ * it, and any Advanced fields. `bare` leaves its heading off, for a dialog whose title says it.
+ */
+export function SettingsSection({ schema, pageId, section, bare = false }: { schema: SettingsSchemaView; pageId: string; section: SectionFields; bare?: boolean }) {
   const hidden = useHiddenFields(section.fields);
   const id = `${pageId}/${section.section.id}`;
   const shown = section.fields.filter((f) => !hidden.has(f.key));
@@ -82,8 +85,8 @@ export function SettingsSection({ schema, pageId, section }: { schema: SettingsS
   return (
     <SectionCard
       id={section.section.id}
-      heading={section.section.title}
-      description={section.section.description}
+      heading={bare ? "" : section.section.title}
+      description={bare ? "" : section.section.description}
       after={advanced.length > 0 ? <AdvancedFold schema={schema} fields={advanced} /> : undefined}
     >
       {rows.map((row, i) => {
