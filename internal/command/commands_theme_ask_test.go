@@ -61,7 +61,7 @@ func TestThemeAsk(t *testing.T) {
 		{name: "from the Themes page", uctx: gui, args: map[string]string{"description": "warm dark, teal accent"}, message: "warm dark, teal accent",
 			want: []string{"The user asked for a colour theme on Code Foundry's Themes page (Ask the model); their first message in this thread describes it. " +
 				"The current dark theme is Ocean Dusk (ocean-dusk) and the light theme is GitHub Light (github-light). ",
-				"save it with `code-foundry theme save --file <path> --apply`", "(the code-foundry skill: Making a theme)."},
+				"save it with `code-foundry theme save --file <path> --apply`", "(the code-foundry skill's reference/making-a-theme.md)."},
 			mode: v1.PermissionMode_PERMISSION_MODE_AUTO},
 		{name: "from the CLI, a model and supervised", args: map[string]string{"description": "sepia", "model": command.ThreadModels[0], "permission": "supervised"}, message: "sepia",
 			want: []string{"The user wants a colour theme for Code Foundry; their first message"},

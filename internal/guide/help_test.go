@@ -19,14 +19,20 @@ func TestWriteHelp(t *testing.T) {
 		},
 		Keybindings: []string{"cmd+k"},
 	}
+	guiArgs := &v1.Command{Name: "thread.send", Title: "Send", Args: []*v1.ArgSpec{
+		{Name: "name", Description: "A name"},
+		{Name: "composer-text", Description: "The composer's text (the GUI sets it)"},
+		{Name: "attachments", Description: "Paths from StageAttachment"},
+		{Name: "by", Description: "Who sends it (the CLI sets it from $CODE_FOUNDRY_THREAD)"},
+	}}
 	for _, tt := range []struct {
 		name      string
-		common    bool
+		style     HelpStyle
 		cmd       *v1.Command
 		want, not []string
 	}{
 		{
-			name: "full", common: true, cmd: cmd,
+			name: "full", cmd: cmd,
 			want: []string{
 				"plugin.secrets.delete - Delete Plugin Secret\n\nDelete one of a plugin's secrets.\n",
 				"  code-foundry plugin.secrets.delete <name> [<key>] [flags]\n  code-foundry plugin secrets delete <name> [<key>] [flags]\n",
@@ -35,7 +41,7 @@ func TestWriteHelp(t *testing.T) {
 			not: []string{"Asks for confirmation"},
 		},
 		{
-			name: "without the common flags", cmd: cmd,
+			name: "without the common flags", style: HelpReference, cmd: cmd,
 			want: []string{"Flags:", "Asks for confirmation: --yes confirms"},
 			not:  []string{"Common flags:", "--context-thread"},
 		},
@@ -52,13 +58,34 @@ func TestWriteHelp(t *testing.T) {
 				"  --until idle|error  "},
 		},
 		{
-			name: "no args, no confirmation", cmd: &v1.Command{Name: "plugin.list", Title: "List Plugins"},
+			name: "no args, no confirmation", style: HelpReference, cmd: &v1.Command{Name: "plugin.list", Title: "List Plugins"},
 			want: []string{"  code-foundry plugin list [flags]\n"},
 			not:  []string{"Flags:", "Asks for confirmation", "\n\n\n"},
 		},
+		{
+			// Everywhere but in a thread, a flag someone else sets is still listed.
+			name: "the GUI's flags, outside a thread", cmd: guiArgs,
+			want: []string{"--composer-text", "--attachments", "--by", "Common flags:\n", "  --context-worktree path"},
+		},
+		{
+			name: "the GUI's flags, in a thread", style: HelpThread, cmd: guiArgs,
+			want: []string{"  --name string", "Common flags: --json, --context-<thread|project|worktree|workspace|terminal>\n"},
+			not:  []string{"--composer-text", "--attachments", "--by", "--yes", "Common flags:\n", "  --context-worktree path"},
+		},
+		{
+			name: "confirmation, in a thread", style: HelpThread, cmd: cmd,
+			want: []string{"  --lines n ", "Common flags: --json, --yes (it asks first), --context-<"},
+			not:  []string{"Asks for confirmation"},
+		},
+		{
+			// All its flags are set for it, so no empty heading.
+			name: "only hidden flags, in a thread", style: HelpThread,
+			cmd: &v1.Command{Name: "composer.x", Title: "X", Args: guiArgs.GetArgs()[1:]},
+			not: []string{"Flags:\n"},
+		},
 	} {
 		var buf bytes.Buffer
-		WriteHelp(&buf, tt.cmd, tt.common)
+		WriteHelp(&buf, tt.cmd, tt.style)
 		got := buf.String()
 		for _, w := range tt.want {
 			if !strings.Contains(got, w) {

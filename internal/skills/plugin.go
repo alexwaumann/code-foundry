@@ -190,7 +190,7 @@ func exampleDir(skillsDir string) string {
 }
 
 // themesReference is where the help skill's reference/themes.md (docs/THEMES.md) is
-// installed, for the entry skill's "Making a theme": a thread that has the path reads it
+// installed, for the entry skill's reference/making-a-theme.md: a thread that has the path reads it
 // instead of searching the disk for it (theme-fuzz-daemon, model 9).
 func themesReference(skillsDir string) string {
 	if skillsDir == "" {

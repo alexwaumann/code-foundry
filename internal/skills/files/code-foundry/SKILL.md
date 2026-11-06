@@ -26,14 +26,14 @@ Never tell the user skill or command names: say what you will do, not which comm
 | The user wants | Read (your Skill tool, or the SKILL.md `--group skills` lists) or run |
 |---|---|
 | How to do something, a setting or keybinding | the code-foundry-help skill |
-| A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences"); one for a set of projects or one repo, or a skill for them: "Scopes" below |
+| A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences"); one for a set of projects or one repo, or a skill for them: `reference/scopes.md` |
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
 | About this thread: what changed, its branch, checkouts, subagents, child threads, MCP servers, linked PRs | What changed is the branch's commits since its base (`baseRef` in `thread get --json`, else origin's default branch) plus uncommitted work, not uncommitted work alone; `code-foundry thread checkouts`; `thread agents`; `thread list --created-by $CODE_FOUNDRY_THREAD` (`thread get` names your creator); `thread mcp` (your session's start list goes stale); linked PRs are `thread get --json`'s `linkedPullRequests` (absent: none); `thread pr link <url>` links one by hand |
 | To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`, `view.panel.mcp`: your own side panel. Add `--focus` only when the user asks to be taken there |
 | A secret value, or a change to a file you cannot read (`.env`, `~/.aws/credentials`) | Never ask for it in chat or read the file: `view.panel.file <path> --edit --line N --note "<what goes where>"`, then end your turn. Told it is saved, continue without reading its values. If refused, tell the user why |
 | A page, chart, form, board, dashboard, mockup of a product, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown; `--panel` also opens it beside the thread) and can read and change the app |
 | What's running or going on, their work | "running" here means this app's threads, actions and terminals, never the Mac's processes (no `ps`, no killing): `code-foundry thread list`, `action runs`, `terminal list`; a board of it: the code-foundry-pages skill |
-| The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
+| The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | `reference/making-a-theme.md` (next to this file), before you change anything |
 | To be told or reminded later, or something done on a schedule ("tell me when #4 passes", "every hour…", "keep an eye on…") | `code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`, `--at 2h`, `--thread <id> --until attention`, `--note`): the app wakes you, even stopped; never Claude Code's cron or a background `--watch`, which die when the app stops this idle thread |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
 | Something said, decided or done in an earlier thread ("where did we…", "the thread that fixed…") | `code-foundry thread search <words>` (`--include children` for threads other threads made), then `thread read --id <thread> --since <#N-3>`; never grep ~/.claude |
@@ -52,27 +52,6 @@ with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised
 `--cf-success`, `--cf-warning`, `--cf-error` (their text `-text`, tint `-surface`), or the
 type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
 `/cf/bridge.js` lets it call the app and sizes its card: load it in every page. More: code-foundry-pages.
-
-## Scopes
-
-How you act in the app everywhere is app memory (`memory add`). What spans a set of projects (a
-product's repos) is the workspace's, in the folder after `WORKSPACE` in `code-foundry thread
-checkouts`: instructions in `CLAUDE.md` (else `AGENTS.md`; a new file is `CLAUDE.md`), skills in
-`.claude/skills/<name>/SKILL.md` (frontmatter `name`, `description`), written with your file tools.
-One repo's is its own `CLAUDE.md`. Only your primary checkout's `CLAUDE.md` loads: read another
-checkout's (INSTRUCTIONS column) before you edit there. A running thread loads them at its next start.
-
-## Making a theme
-
-Every colour change is `code-foundry theme save --file <path> --apply` (a card with Undo); never
-edit the themes folder. Verbs: `theme list|show|save|check|edit|duplicate|delete|restore|set-dark|`
-`set-light|set-scheme|ask`. Copy the closest (`theme show <id>`) into `$CODE_FOUNDRY_PAGES` with a
-new `id`, `name` and `from` (the theme copied; `pair` only for your own). Change base colours first;
-pin `overrides` only where a rule is wrong ({{cf.themesRef}}). Body text keeps 7:1, status text
-4.5:1: for less contrast move `surface` and `canvas` toward the text, never the text. Fix every
-pair the save's `contrast:` lists before you reply. A theme this thread did not make needs
-`--replace`, once the user asked to change it. A light theme while the app is dark changes nothing
-on screen: say so, offer `theme set-scheme light`, never switch unasked. Reply in a sentence or two.
 
 ## Good to know
 

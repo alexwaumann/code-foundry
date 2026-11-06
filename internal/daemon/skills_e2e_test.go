@@ -57,7 +57,7 @@ func TestDaemonInstallsSkills(t *testing.T) {
 	}
 	skills := filepath.Join(p.Claude(), ".claude", "skills")
 	for _, f := range []string{
-		"code-foundry-orchestrate/SKILL.md", "code-foundry-orchestrate/reference/commands.md",
+		"code-foundry-orchestrate/SKILL.md", "code-foundry/reference/commands.md",
 		"code-foundry-help/SKILL.md", "code-foundry-help/reference/settings.md",
 		"code-foundry-plugin/SKILL.md", "code-foundry-plugin/reference/cli.md", "code-foundry-plugin/example/main.go",
 	} {
@@ -77,16 +77,9 @@ func TestDaemonInstallsSkills(t *testing.T) {
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Errorf("the old skill is still there: %v", err)
 	}
-	// thread.new's model and effort defaults come from the settings at start; the files
-	// leave the value out (it would go stale) and keep the setting's name.
-	b, _ := os.ReadFile(filepath.Join(skills, "code-foundry-orchestrate/reference/commands.md"))
-	model := ""
-	for line := range strings.Lines(string(b)) {
-		if strings.HasPrefix(line, "  - `--model ") && model == "" {
-			model = line
-		}
-	}
-	if !strings.Contains(model, "(default: settings threads.default_model)") || strings.Contains(model, "(default \"") {
-		t.Errorf("thread.new's --model line: %q", model)
+	// The file lists what the running daemon registered.
+	b, _ := os.ReadFile(filepath.Join(skills, "code-foundry/reference/commands.md"))
+	if !strings.Contains(string(b), "- `thread.new` ") {
+		t.Errorf("the command index lacks thread.new:\n%s", b)
 	}
 }

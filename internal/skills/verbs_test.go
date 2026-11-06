@@ -377,9 +377,12 @@ func TestSkillFilesResolve(t *testing.T) {
 	if calls < 150 {
 		t.Errorf("read %d calls in the skill files; the patterns no longer match", calls)
 	}
-	// The guide's Conventions are hand-written too.
+	// The guide's Conventions are hand-written too, and the thread topic's.
 	var buf bytes.Buffer
 	guide.Write(&buf, src.Commands, "s-7754a478e649")
+	if err := guide.WriteTopic(&buf, src.Commands, "thread"); err != nil {
+		t.Fatal(err)
+	}
 	problems, _ := s.checkFile("guide.md", buf.String())
 	for _, pr := range problems {
 		t.Errorf("the guide: %s", pr)

@@ -26,6 +26,8 @@ type rule struct {
 
 const (
 	entryFile  = skills.Entry + "/SKILL.md"
+	themeRef   = skills.Entry + "/reference/making-a-theme.md"
+	scopesRef  = skills.Entry + "/reference/scopes.md"
 	helpFile   = skills.Help + "/SKILL.md"
 	orchFile   = skills.Orchestrate + "/SKILL.md"
 	wakesFile  = skills.Orchestrate + "/reference/wakes.md"
@@ -80,14 +82,16 @@ var rules = []rule{
 	// Overlays and tooltips that broke in a card, arbitrary classes that did nothing.
 	{note: "page-library-fixes-a", file: reactRef, says: []string{"<tooltipprovider>", "<toaster />", "min-h-112", `theme\.css\?scheme=light`}},
 	// The theme fuzz: models missed the verbs, the floors, --replace and the scheme.
-	{note: "theme-fuzz-daemon", file: entryFile, says: []string{
+	{note: "theme-fuzz-daemon", file: themeRef, says: []string{
 		`body.{0,20}7:1`, `status.{0,20}4\.5:1`, `surface.{0,60}toward the text`, "contrast:", "--replace", "theme set-scheme",
 		"never edit the themes folder", "theme list", `code-foundry-help/reference/themes\.md`}},
 	// The removed tabs' questions: what changed is the branch, not the uncommitted work.
 	{note: "orch-removed-panels-check", file: entryFile, description: true, says: []string{"worktree's changes or prs"}},
 	{note: "orch-removed-panels-check", file: entryFile, says: []string{"commits since its base", "thread mcp", "linkedpullrequests", `thread list --created-by`}},
 	// "Remember for this workspace" went to the app memory, then to the primary repo.
-	{note: "workspaces-v2-5-skills", file: entryFile, says: []string{"memory add", "thread checkouts", "primary checkout", `\.claude/skills/<name>/skill\.md`}},
+	{note: "workspaces-v2-5-skills", file: scopesRef, says: []string{"memory add", "thread checkouts", "primary checkout", `\.claude/skills/<name>/skill\.md`}},
+	{note: "theme-fuzz-daemon", file: entryFile, says: []string{`reference/making-a-theme\.md`}},
+	{note: "workspaces-v2-5-skills", file: entryFile, says: []string{`reference/scopes\.md`}},
 	{note: "workspaces-v2-5-skills", file: helpFile, says: []string{"workspace new", "workspace list", `\.claude/skills/<name>/skill\.md`}},
 	{note: "workspaces-v2-5-skills", file: orchFile, says: []string{"thread checkouts", "--new-worktree", "--new-branch", "one worker per checkout", "--projects", "never a branch"}},
 	// The store goes by what is remembered, not by the verb.
