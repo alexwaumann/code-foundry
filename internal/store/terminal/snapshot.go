@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	ghostty "go.mitchellh.com/libghostty"
@@ -40,6 +41,19 @@ import (
 // continuation is the unfinished escape sequence or UTF-8 prefix at the end of the stream
 // so far; without it, the first live Output chunk after the snapshot could start in the
 // middle of a sequence the replaying emulator never saw the beginning of.
+//
+// Everything is streamed. Formatter.Format and Terminal.Snapshot build their result in a
+// C buffer grown by realloc, and macOS's malloc keeps large freed blocks in the process
+// footprint until the kernel takes them back, which it does lazily: three such passes per
+// attach piled up about three times the snapshot on every attach, to 1.8 GiB on a 36 GiB
+// Mac, with nothing allocated (docs/notes/terminal-attach-memory.md).
+
+// snapshotSlack is what a snapshot can add to the wrapped pass that sizes it: the palette
+// (~8 KiB), padding, the suffix, the title, and the parser continuation.
+const snapshotSlack = continuationMaxBytes + 64<<10
+
+// errFormatterUnstable is a second formatter pass that disagrees with the first.
+var errFormatterUnstable = errors.New("vt formatter output is not stable across passes")
 
 // buildSnapshot serializes t. Call only on t's owning goroutine.
 func buildSnapshot(t *ghostty.Terminal) ([]byte, error) {
@@ -96,11 +110,11 @@ func buildSnapshot(t *ghostty.Terminal) ([]byte, error) {
 // writePrimaryUnderAlt emits the primary screen (with scrollback) of a terminal that is
 // currently on the alternate screen, ending with the cursor where the primary cursor is.
 func writePrimaryUnderAlt(out *bytes.Buffer, t *ghostty.Terminal) error {
-	raw, err := t.Snapshot()
-	if err != nil {
+	var raw bytes.Buffer
+	if _, err := t.SnapshotWriteTo(&raw); err != nil {
 		return fmt.Errorf("encode vt snapshot: %w", err)
 	}
-	dec, err := ghostty.NewSnapshotDecoderBytes(raw)
+	dec, err := ghostty.NewSnapshotDecoderBytes(raw.Bytes())
 	if err != nil {
 		return fmt.Errorf("new snapshot decoder: %w", err)
 	}
@@ -124,53 +138,92 @@ func writePrimaryUnderAlt(out *bytes.Buffer, t *ghostty.Terminal) error {
 // Content is emitted unwrapped, so soft-wrapped lines stay soft-wrapped in the replaying
 // emulator (and reflow there on resize). Wrapping happens only at the right margin, so an
 // emulator of the same width re-wraps them onto exactly the original rows. The row count
-// used for padding comes from a separate wrapped pass, where every row ends in CRLF.
+// used for padding comes from a separate wrapped pass, where every row ends in CRLF. That
+// pass is only measured, the prefix pass goes straight into out, and of the full pass only
+// what follows the prefix pass is kept, so out holds the one copy of the content.
 func writeScreen(out *bytes.Buffer, t *ghostty.Terminal, prefix, suffix []ghostty.FormatterOption) error {
 	vt := ghostty.WithFormatterFormat(ghostty.FormatterFormatVT)
 	unwrap := ghostty.WithFormatterUnwrap(true)
-	rowsPass, err := format(t, vt)
-	if err != nil {
+	var rows rowCounter
+	if err := formatTo(&rows, t, vt); err != nil {
 		return err
 	}
-	head, err := format(t, append([]ghostty.FormatterOption{vt, unwrap}, prefix...)...)
-	if err != nil {
+	out.Grow(rows.size + snapshotSlack)
+	start := out.Len()
+	if err := formatTo(out, t, append([]ghostty.FormatterOption{vt, unwrap}, prefix...)...); err != nil {
 		return err
 	}
-	full, err := format(t, append(append([]ghostty.FormatterOption{vt, unwrap}, prefix...), suffix...)...)
-	if err != nil {
+	tail := tailWriter{head: out.Bytes()[start:]}
+	if err := formatTo(&tail, t, append(append([]ghostty.FormatterOption{vt, unwrap}, prefix...), suffix...)...); err != nil {
 		return err
 	}
-	if !bytes.HasPrefix(full, head) {
-		return errors.New("vt formatter output is not stable across passes")
+	if len(tail.head) > 0 {
+		return errFormatterUnstable
 	}
 	total, err := t.TotalRows()
 	if err != nil {
 		return fmt.Errorf("total rows: %w", err)
 	}
-	out.Write(head)
-	out.WriteString(strings.Repeat("\r\n", padRows(rowsPass, total)))
-	out.Write(full[len(head):])
+	out.WriteString(strings.Repeat("\r\n", padRows(rows.crlfs, total)))
+	out.Write(tail.rest)
 	return nil
 }
 
-func format(t *ghostty.Terminal, opts ...ghostty.FormatterOption) ([]byte, error) {
+// formatTo streams a formatter pass into w.
+func formatTo(w io.Writer, t *ghostty.Terminal, opts ...ghostty.FormatterOption) error {
 	f, err := ghostty.NewFormatter(t, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("new formatter: %w", err)
+		return fmt.Errorf("new formatter: %w", err)
 	}
 	defer f.Close()
-	b, err := f.Format()
-	if err != nil {
-		return nil, fmt.Errorf("format: %w", err)
+	if _, err := f.WriteTo(w); err != nil {
+		return fmt.Errorf("format: %w", err)
 	}
-	return b, nil
+	return nil
+}
+
+// rowCounter measures a formatter pass without keeping it.
+type rowCounter struct {
+	crlfs int
+	size  int
+	cr    bool // the last write ended in CR
+}
+
+func (c *rowCounter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if c.cr && p[0] == '\n' {
+		c.crlfs++
+	}
+	c.crlfs += bytes.Count(p, []byte("\r\n"))
+	c.cr = p[len(p)-1] == '\r'
+	c.size += len(p)
+	return len(p), nil
+}
+
+// tailWriter checks that a formatter pass starts with head and keeps what follows it.
+// head shrinks to what is still unmatched.
+type tailWriter struct {
+	head []byte
+	rest []byte
+}
+
+func (w *tailWriter) Write(p []byte) (int, error) {
+	n := min(len(w.head), len(p))
+	if !bytes.Equal(w.head[:n], p[:n]) {
+		return 0, errFormatterUnstable
+	}
+	w.head = w.head[n:]
+	w.rest = append(w.rest, p[n:]...)
+	return len(p), nil
 }
 
 // padRows returns how many CRLFs to append to content so that it spans totalRows lines.
-// rows is a wrapped (non-unwrapped), extras-free VT pass: the formatter ends every row,
-// soft-wrapped or not, with CRLF, so the content spans count(CRLF)+1 rows.
-func padRows(content []byte, totalRows uint) int {
-	lines := uint(bytes.Count(content, []byte("\r\n"))) + 1
+// crlfs is counted in a wrapped (non-unwrapped), extras-free VT pass: the formatter ends
+// every row, soft-wrapped or not, with CRLF, so the content spans crlfs+1 rows.
+func padRows(crlfs int, totalRows uint) int {
+	lines := uint(crlfs) + 1
 	if lines >= totalRows {
 		return 0
 	}

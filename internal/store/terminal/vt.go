@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"fmt"
+	"strings"
 
 	ghostty "go.mitchellh.com/libghostty"
 )
@@ -123,7 +124,8 @@ func formatActivePlain(t *ghostty.Terminal, cols, rows uint16) (string, error) {
 // that is the alternate screen alone, which has no scrollback. Call only on t's owning
 // goroutine.
 func formatScrollbackPlain(t *ghostty.Terminal) (string, error) {
-	b, err := format(t,
+	var b strings.Builder
+	err := formatTo(&b, t,
 		ghostty.WithFormatterFormat(ghostty.FormatterFormatPlain),
 		ghostty.WithFormatterUnwrap(true),
 		ghostty.WithFormatterTrim(true),
@@ -131,5 +133,5 @@ func formatScrollbackPlain(t *ghostty.Terminal) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("scrollback text: %w", err)
 	}
-	return string(b), nil
+	return b.String(), nil
 }

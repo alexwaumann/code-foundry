@@ -1,7 +1,10 @@
 package terminal
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -32,6 +35,12 @@ var checkedModes = map[string]ghostty.Mode{
 	"focusEvent":      ghostty.ModeFocusEvent,
 	"keypadKeys":      ghostty.ModeKeypadKeys,
 	"altScreen(1047)": ghostty.ModeAltScreen,
+}
+
+func format(term *ghostty.Terminal, opts ...ghostty.FormatterOption) ([]byte, error) {
+	var b bytes.Buffer
+	err := formatTo(&b, term, opts...)
+	return b.Bytes(), err
 }
 
 func readState(t *testing.T, term *ghostty.Terminal) vtState {
@@ -274,9 +283,85 @@ func TestPadRows(t *testing.T) {
 		{"\x1b[?2004h\x1b[Ha", 5, 4},
 	}
 	for _, tt := range tests {
-		if got := padRows([]byte(tt.content), tt.total); got != tt.want {
-			t.Errorf("padRows(%q, %d) = %d, want %d", tt.content, tt.total, got, tt.want)
+		// However the pass arrives: a CRLF can straddle two writes.
+		for cut := range len(tt.content) + 1 {
+			var rows rowCounter
+			_, _ = rows.Write([]byte(tt.content[:cut]))
+			_, _ = rows.Write([]byte(tt.content[cut:]))
+			if got := padRows(rows.crlfs, tt.total); got != tt.want {
+				t.Errorf("padRows of %q cut at %d, total %d = %d, want %d", tt.content, cut, tt.total, got, tt.want)
+			}
+			if rows.size != len(tt.content) {
+				t.Errorf("size of %q cut at %d = %d", tt.content, cut, rows.size)
+			}
 		}
+	}
+}
+
+// A pass must start with what the prefix pass wrote; only what follows is kept.
+func TestTailWriter(t *testing.T) {
+	tests := []struct {
+		name   string
+		head   string
+		writes []string
+		rest   string
+		left   int
+		err    bool
+	}{
+		{name: "no suffix", head: "abc", writes: []string{"abc"}},
+		{name: "suffix", head: "abc", writes: []string{"abcde"}, rest: "de"},
+		{name: "head across writes", head: "abc", writes: []string{"a", "bcd", "e"}, rest: "de"},
+		{name: "empty head", writes: []string{"de"}, rest: "de"},
+		{name: "pass too short", head: "abc", writes: []string{"ab"}, left: 1},
+		{name: "pass differs", head: "abc", writes: []string{"axc"}, left: 3, err: true},
+		{name: "differs in a later write", head: "abc", writes: []string{"a", "xc"}, rest: "", left: 2, err: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := tailWriter{head: []byte(tt.head)}
+			var err error
+			for _, p := range tt.writes {
+				if _, err = w.Write([]byte(p)); err != nil {
+					break
+				}
+			}
+			if errors.Is(err, errFormatterUnstable) != tt.err {
+				t.Errorf("err = %v, want unstable: %v", err, tt.err)
+			}
+			if string(w.rest) != tt.rest || len(w.head) != tt.left {
+				t.Errorf("rest = %q, head left = %d; want %q, %d", w.rest, len(w.head), tt.rest, tt.left)
+			}
+		})
+	}
+}
+
+// Passes stream into one buffer, so a snapshot costs Go one snapshot. Formatter.Format,
+// whose freed C buffers macOS's malloc keeps in the footprint (see snapshot.go), copies
+// every pass into Go, so going back to it allocates at least three.
+func TestSnapshotAllocatesOneCopy(t *testing.T) {
+	term, err := newVT(120, 40, scrollbackLimits{lines: 10_000, bytes: 64 << 20}, vtHooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer term.Close()
+	line := []byte(strings.Repeat("\x1b[32mok\x1b[0m \x1b[1;34mlog\x1b[0m ", 16) + "\r\n")
+	for range 8_000 {
+		term.VTWrite(line)
+	}
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	snap, err := buildSnapshot(term)
+	runtime.ReadMemStats(&after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap) < 1<<20 {
+		t.Fatalf("snapshot is %d bytes: too small to tell", len(snap))
+	}
+	// One copy, two under -race, where bytes.Buffer.Grow's temporary is not optimized away.
+	// Formatter.Format's passes take four.
+	if got := after.TotalAlloc - before.TotalAlloc; got > uint64(len(snap))*5/2 {
+		t.Errorf("building a %d byte snapshot allocated %d bytes", len(snap), got)
 	}
 }
 
