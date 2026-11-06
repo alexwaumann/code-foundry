@@ -981,6 +981,25 @@ describe("AttachController on a real xterm", () => {
     });
   });
 
+  it.each(["S", "T", "L", "M", "I", "Z", "2;S"])("drains a count of 2^31 - 1 on CSI %s and goes on", async (seq) => {
+    const { r, s, ctl } = attached();
+    ctl.attach("t");
+    await flush();
+    s.push("t", { kind: "snapshot", data: enc(""), cols: 80, rows: 24, altScreen: false });
+    await flush();
+    await parsed(r);
+    s.push("t", { kind: "output", data: enc(`\x1b[2147483647${seq}\x1b[1;1Hafter`) });
+    await vi.waitFor(async () => {
+      await parsed(r);
+      expect(screen(r)).toEqual(["after"]);
+    });
+    await vi.waitFor(() => {
+      expect((ctl as unknown as { unparsed: number }).unparsed).toBe(0);
+    });
+    ctl.dispose();
+    r.dispose();
+  });
+
   it("shows only the snapshot after a reconnect with output still unparsed", async () => {
     const { r, s, ctl } = attached();
     ctl.attach("t");

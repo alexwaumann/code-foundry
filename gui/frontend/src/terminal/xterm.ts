@@ -6,6 +6,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { chordFromEvent } from "@/keys/chord";
 import { copyText } from "@/lib/clipboard";
+import { clampCounts, swallowCountsPastGrid } from "./counts";
 import { TerminalFind } from "./find";
 import type { Disposable, FindResults, TermSize, TerminalRenderer } from "./renderer";
 import { DEFAULT_TERMINAL_FONT_FAMILY, onBundledFontLoaded } from "./fonts";
@@ -95,7 +96,7 @@ export class XtermRenderer implements TerminalRenderer {
     this.term.attachCustomKeyEventHandler((e) => this.keyHandler(e));
     this.trackKeyboardModes();
     this.capRepeats();
-    this.disposables.push(...swallowDaemonAnsweredQueries(this.term));
+    this.disposables.push(...swallowCountsPastGrid(this.term), ...swallowDaemonAnsweredQueries(this.term));
   }
 
   /** The palette, with the find's current match as the selection's colour while there is one (terminal/find.ts). */
@@ -251,7 +252,7 @@ export class XtermRenderer implements TerminalRenderer {
     // counts as pending, so a write from there can pass its 50 MB limit with nothing queued, and
     // a throw there ends the loop for good. That loop is synchronous on every path through its
     // write buffer, so no microtask can run until it has returned and the count is right.
-    this.term.write(data, parsed && (() => { queueMicrotask(parsed); }));
+    this.term.write(clampCounts(data, this.term), parsed && (() => { queueMicrotask(parsed); }));
   }
 
   reset(): void {
