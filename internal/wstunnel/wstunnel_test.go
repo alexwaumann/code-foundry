@@ -631,7 +631,12 @@ func TestPageThatStoppedHitsTheWriteDeadline(t *testing.T) {
 	for {
 		f, err := c.ReadFrame(ctx)
 		if err != nil {
-			break // the deadline closed the socket
+			// Not 1000: the end of stream never went, and the client must retry as it does
+			// for a dead socket, not report a truncated stream.
+			if code := websocket.CloseStatus(err); code != websocket.StatusTryAgainLater {
+				t.Errorf("close = %v", code)
+			}
+			break
 		}
 		taken += len(f.Payload)
 	}

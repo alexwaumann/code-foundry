@@ -9,7 +9,7 @@
 //	daemon: text    {"status":200,"headers":{...}}
 //	daemon: binary  one message per Flush of the handler: Connect's envelopes, unchanged
 //	client: text    "1048576": the body bytes it has taken so far, sent as it goes
-//	daemon: close   1000 once the handler has returned
+//	daemon: close   1000 once the handler has returned, 1013 if a write failed first
 //
 // Those counts are the flow control: a browser takes everything off the socket whether or not
 // its page is running, so nothing else tells the daemon that a client has stopped reading
@@ -287,7 +287,12 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 	w.Flush()
 	// Before hangUp: the answer to the daemon's own close frame is a close frame too.
 	reason := closeReason(end.Load(), w.err)
-	t.hangUp(c, conn, websocket.StatusNormalClosure, "", stopRead)
+	// A 1000 says the end of stream is in the body, and after a failed write it is not.
+	code := websocket.StatusNormalClosure
+	if w.err != nil {
+		code = websocket.StatusTryAgainLater
+	}
+	t.hangUp(c, conn, code, "", stopRead)
 	return reason
 }
 
