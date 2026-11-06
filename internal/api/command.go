@@ -174,5 +174,6 @@ func commandToProto(c command.Listed) *v1.Command {
 		RequiresConfirmation: c.Confirm != "",
 		ReadOnly:             c.ReadOnly,
 		NoPalette:            c.NoPalette,
+		NoIndex:              c.NoIndex,
 	}
 }

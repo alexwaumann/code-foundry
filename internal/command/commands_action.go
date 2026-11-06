@@ -372,6 +372,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:      "action.last",
+			NoIndex:   true,
 			NoPalette: true,
 			ReadOnly:  true,
 			Title:     "Action to Run Again",

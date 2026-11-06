@@ -26,6 +26,7 @@ var placementModes = []string{"worktree", "checkout"}
 func threadPlacementCheck(b PlacementBackend) Command {
 	return Command{
 		Name:      "thread.placement.check",
+		NoIndex:   true,
 		NoPalette: true,
 		ReadOnly:  true,
 		Title:     "Check Thread Placement",

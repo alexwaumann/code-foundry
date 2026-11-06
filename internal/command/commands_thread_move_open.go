@@ -23,6 +23,7 @@ func canOpenMove(c Context) bool {
 func threadMoveOpen(e Emitter, idArg ArgSpec) Command {
 	return Command{
 		Name:         "thread.move.open",
+		NoIndex:      true,
 		Title:        "Move Thread to a Project or Workspace…",
 		Description:  "Open the move picker for a thread without a project: pick a project or workspace, where it works there, then Move (thread.move).",
 		Category:     "Thread",

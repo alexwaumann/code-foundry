@@ -17,7 +17,7 @@ Read these (next to this file) with your Read tool instead of answering from mem
   topic here first and use its words for buttons, pages and shortcuts.
 - `reference/settings.md`: every setting: key, title (the Settings page's label), what it does,
   allowed values, default, and whether it needs a daemon restart.
-- `reference/commands.md`: the commands, also in the palette (⌘K); `code-foundry help <command>`.
+- {{cf.commandsRef}}: every command, also in the palette (⌘K); `code-foundry help <command>`.
 
 None covers it: read the source (below); still unanswered, say so rather than guess.
 

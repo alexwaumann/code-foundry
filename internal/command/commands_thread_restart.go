@@ -44,8 +44,9 @@ func threadRestartConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 func threadRestartCmd(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
-		Name:  "thread.restart",
-		Title: "Restart Claude",
+		Name:    "thread.restart",
+		NoIndex: true,
+		Title:   "Restart Claude",
 		Description: "Restart a thread's Claude process with the same conversation, so it picks up what changed outside it, " +
 			"such as a plugin's environment. A running turn is interrupted; background agents and shells stop. " +
 			"A thread whose Claude is not running is left as it is: its next message starts Claude afresh.",

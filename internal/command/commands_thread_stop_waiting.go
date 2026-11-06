@@ -67,8 +67,9 @@ func threadStopWaitingCmd(b ThreadBackend, idArg ArgSpec) Command {
 		return res.Msg.GetThread().GetBackgroundShells()
 	}
 	return Command{
-		Name:  "thread.stop-waiting",
-		Title: "Stop Waiting",
+		Name:    "thread.stop-waiting",
+		NoIndex: true,
+		Title:   "Stop Waiting",
 		Description: "Remove everything that would wake a thread and stop its background shells. Child threads keep working " +
 			"and subagents run to their end.",
 		Category:     "Thread",

@@ -315,6 +315,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "thread.regenerate-name",
+			NoIndex:     true,
 			Title:       "Regenerate Thread Name",
 			Description: "Name the thread again from its most recent turns.",
 			Category:    "Thread",

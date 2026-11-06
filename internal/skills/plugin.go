@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -42,6 +43,7 @@ func placeholders(src Sources) map[string]string {
 		"sdkPin":        SDKPin(src.Commit, src.SDKTag),
 		"example":       exampleDir(src.SkillsDir),
 		"themesRef":     themesReference(src.SkillsDir),
+		"commandsRef":   commandsIndexPath(src.SkillsDir),
 		"welcomePage":   welcomePage(src.PagesDir),
 		"facts":         codeList(src.Facts),
 		"reservedNames": codeList(pluginsdk.ReservedNames),
@@ -197,6 +199,14 @@ func themesReference(skillsDir string) string {
 	return filepath.Join(skillsDir, Help, "reference", "themes.md")
 }
 
+// commandsIndexPath is where the command index is, for the skills other than its own.
+func commandsIndexPath(skillsDir string) string {
+	if skillsDir == "" {
+		return "the code-foundry skill's reference/commands.md"
+	}
+	return filepath.Join(skillsDir, Entry, "reference", "commands.md")
+}
+
 // welcomePage is where PlaceWelcome puts the first-run page, for the help skill and
 // welcome.md.
 func welcomePage(pagesDir string) string {
@@ -304,7 +314,7 @@ string in `+"`view.viewJson`"+` (decode it twice, or use the text output).
 		fmt.Fprintf(w, "\n## %s\n", group.title)
 		for _, c := range group.cmds {
 			fmt.Fprintf(w, "\n### %s\n\n```\n", c.GetName())
-			guide.WriteHelp(w, c, false)
+			guide.WriteHelp(w, c, guide.HelpReference)
 			fmt.Fprint(w, "```\n")
 		}
 	}
@@ -330,15 +340,5 @@ own views.
 			cats[c.GetCategory()] = true
 		}
 	}
-	var list []guide.Category
-	for _, c := range slices.Sorted(func(yield func(string) bool) {
-		for c := range cats {
-			if !yield(c) {
-				return
-			}
-		}
-	}) {
-		list = append(list, guide.Category{Name: c})
-	}
-	guide.WriteCategories(w, cmds, list)
+	guide.WriteCategories(w, cmds, slices.Sorted(maps.Keys(cats)))
 }

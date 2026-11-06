@@ -3,6 +3,7 @@ package guide
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -10,10 +11,24 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
+// HelpStyle is who WriteHelp is for.
+type HelpStyle int
+
+const (
+	// HelpFull is the CLI's text: every flag, then the flags every command takes.
+	HelpFull HelpStyle = iota
+	// HelpReference leaves the flags every command takes out: a reference listing many
+	// commands states those once (WriteCommonFlags).
+	HelpReference
+	// HelpThread is the CLI's text inside a thread, where a model reads it and pays for each
+	// byte: no flag only the GUI or the CLI sets, and the common flags on one line. Those
+	// flags still work.
+	HelpThread
+)
+
 // WriteHelp writes a command's `code-foundry help <command>` text: name and title, the
-// description, both usage forms, its flags, and the flags every command takes (with
-// common; a reference listing many commands states those once, WriteCommonFlags).
-func WriteHelp(w io.Writer, cmd *v1.Command, common bool) {
+// description, both usage forms, its flags, and the flags every command takes.
+func WriteHelp(w io.Writer, cmd *v1.Command, style HelpStyle) {
 	name := cmd.GetName()
 	fmt.Fprintf(w, "%s - %s\n", name, cmd.GetTitle())
 	if d := cmd.GetDescription(); d != "" {
@@ -24,9 +39,13 @@ func WriteHelp(w io.Writer, cmd *v1.Command, common bool) {
 		name, pos, strings.ReplaceAll(name, ".", " "), pos)
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if len(cmd.GetArgs()) > 0 {
+	args := cmd.GetArgs()
+	if style == HelpThread {
+		args = slices.DeleteFunc(slices.Clone(args), setForYouArg)
+	}
+	if len(args) > 0 {
 		fmt.Fprintln(tw, "\nFlags:")
-		for _, a := range cmd.GetArgs() {
+		for _, a := range args {
 			flag, detail := helpFlag(a), ArgDetail(a)
 			if ph := ArgPlaceholder(a); len(ph) > maxHelpPlaceholder {
 				// A long enum (every model) would push every description far right.
@@ -36,10 +55,13 @@ func WriteHelp(w io.Writer, cmd *v1.Command, common bool) {
 			fmt.Fprintf(tw, "  %s\t%s\n", flag, detail)
 		}
 	}
-	if common {
+	switch {
+	case style == HelpFull:
 		fmt.Fprintln(tw, "\nCommon flags:")
 		writeCommonFlags(tw, cmd.GetRequiresConfirmation())
-	} else if cmd.GetRequiresConfirmation() {
+	case style == HelpThread:
+		fmt.Fprintf(tw, "\n%s\n", threadCommonFlags(cmd.GetRequiresConfirmation()))
+	case cmd.GetRequiresConfirmation():
 		fmt.Fprintln(tw, "\nAsks for confirmation: --yes confirms (required without a terminal).")
 	}
 	_ = tw.Flush()
@@ -68,6 +90,14 @@ func WriteCommonFlags(w io.Writer) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	writeCommonFlags(tw, false)
 	_ = tw.Flush()
+}
+
+// threadCommonFlags is HelpThread's line for the flags every command takes.
+func threadCommonFlags(confirm bool) string {
+	if confirm {
+		return "Common flags: --json, --yes (it asks first), --context-<thread|project|worktree|workspace|terminal>"
+	}
+	return "Common flags: --json, --context-<thread|project|worktree|workspace|terminal>"
 }
 
 func writeCommonFlags(tw io.Writer, confirm bool) {

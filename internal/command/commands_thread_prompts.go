@@ -34,6 +34,7 @@ const promptTextWidth = 100
 func threadPrompts(b PromptsBackend) Command {
 	return Command{
 		Name:      "thread.prompts",
+		NoIndex:   true,
 		NoPalette: true,
 		ReadOnly:  true,
 		Title:     "List Sent Prompts",

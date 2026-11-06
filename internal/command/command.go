@@ -46,6 +46,12 @@ type Command struct {
 	// name, a repo slug and PR number) where a page offers the action on the right row.
 	// The CLI, pages and chords still have it (palette_test.go keeps the list).
 	NoPalette bool
+	// NoIndex marks a command the agents' command index leaves out (the skills' and
+	// `code-foundry guide`'s list, internal/guide): one a control of the GUI runs, or the
+	// user's own, that a model has no use for or has a better verb for. Unset, a new verb
+	// is listed; nothing else needs editing. The CLI, --help and daemon.capabilities still
+	// have it (index_test.go keeps the list).
+	NoIndex bool
 	// ReadOnly marks a command that only reads: it creates, changes, sends, runs, opens
 	// or writes nothing, and moves no window (view.* and ui.* are not read-only). A page's
 	// bridge runs a read-only verb freely and any other only from a user gesture in the
