@@ -37,7 +37,7 @@ const pageIcons: Readonly<Partial<Record<string, LucideIcon | ComponentType<{ cl
 };
 
 /** Pages drawn by a component of their own, by id; the rest are section cards of fields. */
-const customPages: Readonly<Partial<Record<string, (p: { schema: SettingsSchemaView; page: SettingPageView }) => React.JSX.Element>>> = {
+const customPages: Readonly<Partial<Record<string, (p: { schema: SettingsSchemaView; page: SettingPageView; section?: string | null }) => React.JSX.Element>>> = {
   keybindings: KeybindingsPage,
   ...Object.fromEntries(guiPages.map((g) => [g.page.id, g.component])),
 };
@@ -254,7 +254,7 @@ export function SettingsPage() {
             {schemaError && <p className="text-body text-cf-error-text">Cannot load the settings schema: {schemaError}</p>}
             {!schema && !schemaError && <p className="text-body text-cf-text-muted">Loading…</p>}
             {schema && result && <SearchResults query={query.trim()} words={words} result={result} sections={guiHits?.hits} onOpenSection={openSection} back={page?.title ?? "the page"} />}
-            {schema && !result && page && Page && <Page key={page.id} schema={schema} page={page} />}
+            {schema && !result && page && Page && <Page key={page.id} schema={schema} page={page} section={toSection} />}
           </div>
         </div>
       </div>

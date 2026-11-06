@@ -1,5 +1,5 @@
 import { useRef, useState, type ComponentType, type ReactNode } from "react";
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,8 @@ export type OverflowItem =
       testId: string;
       /** Shown at the item's right, e.g. how many things it acts on. */
       badge?: number;
+      /** A second, quieter line under the label: what the item stands on ("Read 5 min ago"), or why it is disabled. */
+      hint?: string;
       disabled?: boolean;
     }
   | "separator";
@@ -42,7 +44,16 @@ export function MenuItems({ items, parts: { Item, Separator }, onPick }: { items
           onPick(it.onSelect);
         }}
       >
-        {it.label}
+        {it.hint ? (
+          <span className="flex min-w-0 flex-col">
+            <span>{it.label}</span>
+            <span className="text-caption-sm" data-testid={`${it.testId}-hint`}>
+              {it.hint}
+            </span>
+          </span>
+        ) : (
+          it.label
+        )}
         {it.badge !== undefined && (
           <span className="ml-auto pl-4 text-caption tabular-nums" data-testid={`${it.testId}-count`}>
             {it.badge}
@@ -98,6 +109,9 @@ export function OverflowMenu<P extends RowMenuPart = never>({
   parts,
   testId,
   size = "sm",
+  tabbable = false,
+  busy = false,
+  triggerClassName,
 }: {
   label: string;
   items: readonly RowMenuEntry<P>[];
@@ -105,6 +119,11 @@ export function OverflowMenu<P extends RowMenuPart = never>({
   testId: string;
   /** "md": a page title block's (28px, a 16px glyph); "sm": a row's. */
   size?: "sm" | "md";
+  /** In the tab order: for a page with no list cursor to reach the row's actions (Settings), where the palette has no twin of every item. */
+  tabbable?: boolean;
+  /** Something the menu started is running: the trigger spins. */
+  busy?: boolean;
+  triggerClassName?: string;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const picked = useRef<(() => void) | null>(null);
@@ -124,12 +143,14 @@ export function OverflowMenu<P extends RowMenuPart = never>({
           <button
             ref={triggerRef}
             type="button"
-            tabIndex={-1}
+            tabIndex={tabbable ? 0 : -1}
             aria-label={label}
             data-testid={testId}
             className={cn(
               "flex shrink-0 items-center justify-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text",
               size === "md" ? "size-7 [&_svg]:size-4" : "size-6 [&_svg]:size-3.5",
+              tabbable && "outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
+              triggerClassName,
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -138,7 +159,7 @@ export function OverflowMenu<P extends RowMenuPart = never>({
               e.stopPropagation();
             }}
           >
-            <Ellipsis />
+            {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Ellipsis />}
           </button>
         </DropdownMenuTrigger>
       </Tip>

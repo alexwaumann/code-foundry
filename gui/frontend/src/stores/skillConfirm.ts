@@ -1,13 +1,15 @@
 /**
- * The Skills page's confirms (docs/notes/skills-4-gui.md). skill.disable, skill.uninstall
- * and skill.remove confirm in the daemon (Confirm, --yes on the CLI). From Settings → Skills
- * the user has answered already, in the page's dialog with the restart warning: that call
- * is not asked twice. From the palette it gets the generic confirm with the daemon's words.
- * The plugin page does the same for plugin.uninstall (stores/pluginRegistry.ts).
+ * The Skills page's confirms (docs/notes/skills-page-redesign.md). skill.disable,
+ * skill.uninstall and skill.remove confirm in the daemon (Confirm, --yes on the CLI). From
+ * Settings → Skills that call is not asked twice: Uninstall and Remove have asked in the
+ * page's dialog with the restart warning, and a switch flips at once with the warning in a
+ * toast (setSkillEnabled). From the palette they get the generic confirm with the daemon's
+ * words. The plugin page does the same for plugin.uninstall (stores/pluginRegistry.ts).
  */
-import { skillCommandName } from "@/api/skill";
+import { toast } from "sonner";
+import { skillCommandName, skillItemKey } from "@/api/skill";
 import { registerConfirmPresenter, requestConfirm, type ConfirmRequest } from "./confirm";
-import { disableSkill, removeLocalSkill, uninstallSkill, type SkillItemRef } from "./skill";
+import { disableSkill, enableSkill, removeLocalSkill, RESTART_WARNING, uninstallSkill, type SkillItemRef } from "./skill";
 
 /** The actions that confirm. */
 export type ConfirmedSkillAction = "disable" | "uninstall" | "remove";
@@ -24,7 +26,7 @@ function nameArg(action: ConfirmedSkillAction, item: SkillItemRef): string {
 }
 
 const run: Record<ConfirmedSkillAction, (item: SkillItemRef) => Promise<boolean>> = {
-  disable: disableSkill,
+  disable: (item) => disableSkill(item, { quiet: true }),
   uninstall: uninstallSkill,
   remove: removeLocalSkill,
 };
@@ -38,6 +40,14 @@ export async function runConfirmedSkill(action: ConfirmedSkillAction, item: Skil
   } finally {
     preconfirmed.delete(k);
   }
+}
+
+/** A row's switch: enabling runs at once; disabling too, with no confirm, and the restart warning follows in a toast. */
+export async function setSkillEnabled(item: SkillItemRef, on: boolean): Promise<boolean> {
+  if (on) return enableSkill(item);
+  const done = await runConfirmedSkill("disable", item);
+  if (done) toast(`Disabled ${item.name}`, { id: `skill-disabled:${skillItemKey(item.kind, item.name, item.registry)}`, description: RESTART_WARNING });
+  return done;
 }
 
 for (const action of ["disable", "uninstall", "remove"] as const) {

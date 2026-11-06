@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { diffOfChange, lastTabOf, openDiffInPanel, openFileInPanel } from "./filePanel";
+import { diffOfChange, lastTabOf, openDiffInPanel, openFileInPanel, openLooseFile } from "./filePanel";
 import { usePanelStore } from "./panel";
-import { useUiStore } from "./ui";
+import { HOME, useUiStore } from "./ui";
 
 /** Diff tabs as a Changes row opens them (docs/notes/file-viewer-3-tabs.md). */
 
@@ -57,5 +57,40 @@ describe("openDiffInPanel", () => {
     openFileInPanel("current", { project: "repo-cf", base: W, path: "README.md" });
     expect(lastTabOf("diff", KEY)?.title).toBe("README.md");
     expect(lastTabOf("files", KEY)?.params.path).toBe(`${W}/README.md`);
+  });
+});
+
+describe("openLooseFile", () => {
+  const DIR = "/Users/dev/.claude/skills/pr-review";
+  const shown = (key: string) => {
+    const e = usePanelStore.getState().byKey[key];
+    const g = e?.groups[0];
+    return { open: e?.open, expanded: e?.expanded, tab: g?.tabs.find((t) => t.id === g.activeTabId)?.params };
+  };
+
+  it.each([
+    ["a thread", { kind: "thread", id: "s-1" }, "thread:s-1"],
+    ["the home composer", HOME, "compose:home:"],
+    ["a project's composer", { kind: "compose", projectId: "p-1" }, "compose:p-1"],
+    ["the Pull Requests page", { kind: "view", name: "pullrequests" }, "view:pullrequests"],
+    ["a project's page", { kind: "view", name: "projects", projectId: "p-1" }, "view:projects:project:p-1"],
+  ] as const)("opens in %s's panel, as nobody's file", (_name, selection, key) => {
+    useUiStore.setState({ selection, windowWidth: 1600 });
+    expect(openLooseFile(DIR, "SKILL.md")).toBe(true);
+    expect(shown(key)).toMatchObject({ open: true, tab: { project: "", base: DIR, path: `${DIR}/SKILL.md` } });
+    expect(shown(key).expanded).toBeUndefined();
+  });
+
+  it("with nothing that has a panel selected, the home composer takes it", () => {
+    useUiStore.setState({ selection: { kind: "none" }, windowWidth: 1600 });
+    expect(openLooseFile(DIR, "SKILL.md")).toBe(true);
+    expect(useUiStore.getState().selection).toEqual(HOME);
+    expect(shown("compose:home:")).toMatchObject({ open: true, tab: { path: `${DIR}/SKILL.md` } });
+  });
+
+  it("a window too narrow for a panel beside the content gets it expanded, so it shows", () => {
+    useUiStore.setState({ selection: { kind: "thread", id: "s-1" }, windowWidth: 700 });
+    expect(openLooseFile(DIR, "SKILL.md")).toBe(true);
+    expect(shown(KEY)).toMatchObject({ open: true, expanded: true });
   });
 });
