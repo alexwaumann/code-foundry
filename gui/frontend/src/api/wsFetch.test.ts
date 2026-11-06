@@ -3,7 +3,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EmberService } from "@/gen/codefoundry/v1/ember_pb";
 import { isUnreachable } from "./stream";
-import { OPEN_SOCKETS_WARNING, openSocketCount, wsFetch } from "./wsFetch";
+import { MAX_QUEUED_BYTES, OPEN_SOCKETS_WARNING, openSocketCount, wsFetch } from "./wsFetch";
 
 /** What a browser's WebSocket does, driven by the test. */
 class FakeSocket {
@@ -31,6 +31,14 @@ class FakeSocket {
   }
   frame(...bytes: number[]) {
     this.onmessage?.({ data: new Uint8Array(bytes).buffer });
+  }
+  /** A binary message of `n` bytes. */
+  bytes(n: number) {
+    this.onmessage?.({ data: new ArrayBuffer(n) });
+  }
+  /** The byte counts it has told the daemon, in order. */
+  get counts(): string[] {
+    return this.sent.slice(2).filter((m) => typeof m === "string");
   }
   /** The close event, which fires once. */
   closed(code: number) {
@@ -187,6 +195,76 @@ describe("the body", () => {
   });
 });
 
+describe("the reader falling behind", () => {
+  const MIB = 1 << 20;
+  const unread = async () => {
+    const { res, ws } = open();
+    ws.onopen?.();
+    ws.head();
+    const body = (await res).body;
+    if (!body) throw new Error("no body");
+    return { ws, body };
+  };
+
+  it("fails the body with a TypeError past the cap and closes, so the stream reconnects", async () => {
+    const { ws, body } = await unread();
+    for (let i = 0; i < MAX_QUEUED_BYTES / (16 * MIB); i++) ws.bytes(16 * MIB);
+    expect(ws.closeCalls).toBe(0);
+    ws.bytes(1);
+    expect(ws.closeCalls).toBe(1);
+    await expect(body.getReader().read()).rejects.toBeInstanceOf(TypeError);
+  });
+
+  it("delivers one message larger than the cap: a big snapshot must not retry forever", async () => {
+    const { ws, body } = await unread();
+    ws.bytes(MAX_QUEUED_BYTES + 1);
+    expect(ws.closeCalls).toBe(0);
+    expect((await body.getReader().read()).value).toHaveLength(MAX_QUEUED_BYTES + 1);
+  });
+
+  it("never trips for a reader that keeps up, however much arrives", async () => {
+    const { ws, body } = await unread();
+    const reader = body.getReader();
+    for (let i = 0; i < (2 * MAX_QUEUED_BYTES) / (16 * MIB); i++) {
+      const read = reader.read();
+      ws.bytes(16 * MIB);
+      expect((await read).value).toHaveLength(16 * MIB);
+    }
+    expect(ws.closeCalls).toBe(0);
+  });
+});
+
+describe("the counts the daemon's flow control reads", () => {
+  const MIB = 1 << 20;
+
+  it("go out as a running total, once per step, and not on small streams", async () => {
+    const { ws } = await opened();
+    ws.onopen?.();
+    ws.bytes(MIB);
+    expect(ws.counts).toEqual([]);
+    ws.bytes(MIB);
+    ws.bytes(MIB);
+    ws.bytes(3 * MIB);
+    expect(ws.counts).toEqual([String(2 * MIB), String(6 * MIB)]);
+  });
+
+  it("do not wait for the reader, which the cap bounds on its own", async () => {
+    const { ws } = await opened();
+    ws.onopen?.();
+    ws.bytes(4 * MIB);
+    expect(ws.counts).toEqual([String(4 * MIB)]);
+  });
+
+  it("stop with the stream", async () => {
+    const ctl = new AbortController();
+    const { ws } = await opened({ signal: ctl.signal });
+    ws.onopen?.();
+    ctl.abort();
+    ws.bytes(4 * MIB);
+    expect(ws.counts).toEqual([]);
+  });
+});
+
 describe("a failure before the head", () => {
   it.each([1006, 1008, 1000])("rejects with a TypeError on a close of %i", async (code) => {
     const { res, ws } = open();
@@ -294,6 +372,21 @@ describe("through connect-web", () => {
       ws.closed(1006);
     });
     expect(isUnreachable(err)).toBe(true);
+  });
+
+  it("sees a reader past the cap as the daemon being unreachable, so runStream reconnects", async () => {
+    const it = client().watchBoard({})[Symbol.asyncIterator]();
+    const first = it.next();
+    await vi.waitFor(() => {
+      expect(FakeSocket.all).toHaveLength(1);
+    });
+    const ws = FakeSocket.all[0] as FakeSocket;
+    ws.onopen?.();
+    ws.head();
+    // Nothing reads between these: they are one task, as a page that was stopped delivers them.
+    ws.bytes(MAX_QUEUED_BYTES);
+    ws.bytes(1);
+    await expect(first).rejects.toSatisfy(isUnreachable);
   });
 
   it("maps the daemon's 401 head to Unauthenticated", async () => {

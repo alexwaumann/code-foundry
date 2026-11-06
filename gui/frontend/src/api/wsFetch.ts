@@ -19,6 +19,21 @@ const CLOSE_NORMAL = 1000;
 /** WebSocket.CLOSED, which a test's fake socket need not define. */
 const SOCKET_CLOSED = 3;
 
+/**
+ * How often to tell the daemon how much has arrived: its flow control (internal/wstunnel) lets
+ * 8 MiB go uncounted, so this must stay below that or a stream would stop for good. A browser
+ * empties the socket whether or not the page runs, so these counts are all that stops a daemon
+ * filling a page that has stopped (docs/notes/ws-transport.md).
+ */
+const ACK_BYTES = 2 << 20;
+
+/**
+ * The most the body may hold unread. Counts go out as bytes arrive, so a reader that stops is
+ * bounded here and not by the daemon. The largest snapshot seen is 49 MB and may sit here whole
+ * while the reader is busy; a live reader keeps this at 0 (measured under `yes`).
+ */
+export const MAX_QUEUED_BYTES = 64 << 20;
+
 /** Past this many open sockets something is leaking one: nothing here caps them. */
 export const OPEN_SOCKETS_WARNING = 150;
 
@@ -70,6 +85,9 @@ export const wsFetch: typeof fetch = (input, init) =>
     let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
     // The caller has its answer: the promise rejected, or the body ended, failed or was cancelled.
     let finished = false;
+    // Body bytes arrived, and how many of them the daemon has been told of.
+    let received = 0;
+    let told = 0;
 
     const finish = () => {
       finished = true;
@@ -89,16 +107,35 @@ export const wsFetch: typeof fetch = (input, init) =>
 
     const onHead = (text: string) => {
       const head = JSON.parse(text) as { status: number; headers: Record<string, string> };
-      const stream = new ReadableStream<Uint8Array>({
-        start: (c) => {
-          controller = c;
+      const stream = new ReadableStream<Uint8Array>(
+        {
+          start: (c) => {
+            controller = c;
+          },
+          cancel: () => {
+            finish();
+            ws.close();
+          },
         },
-        cancel: () => {
-          finish();
-          ws.close();
-        },
-      });
+        // In bytes, so desiredSize is the room left. A read already waiting takes a chunk
+        // straight from enqueue, and desiredSize only falls for what stays queued.
+        { highWaterMark: MAX_QUEUED_BYTES, size: (chunk) => chunk.byteLength },
+      );
       resolve(new Response(stream, { status: head.status, headers: head.headers }));
+    };
+
+    const onBody = (c: ReadableStreamDefaultController<Uint8Array>, data: ArrayBuffer) => {
+      // Past the cap before this message, so one larger than the cap can still be read.
+      if ((c.desiredSize ?? 0) <= 0) {
+        fail(new TypeError("a WebSocket stream's reader fell too far behind"));
+        return;
+      }
+      c.enqueue(new Uint8Array(data));
+      received += data.byteLength;
+      if (received - told >= ACK_BYTES) {
+        told = received;
+        ws.send(String(received));
+      }
     };
 
     ws.onopen = () => {
@@ -112,7 +149,7 @@ export const wsFetch: typeof fetch = (input, init) =>
     ws.onmessage = (e: MessageEvent<string | ArrayBuffer>) => {
       if (finished) return;
       if (typeof e.data !== "string") {
-        if (controller) controller.enqueue(new Uint8Array(e.data));
+        if (controller) onBody(controller, e.data);
         else fail(new TypeError("a WebSocket stream sent its body before its head"));
         return;
       }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -156,6 +157,14 @@ func (c *Client) ReadFrame(ctx context.Context) (Frame, error) {
 		return Frame{}, fmt.Errorf("read frame: not one envelope (%d bytes)", len(b))
 	}
 	return Frame{Flags: b[0], Payload: b[5:]}, nil
+}
+
+// Ack tells the daemon how many body bytes the client has taken so far.
+func (c *Client) Ack(ctx context.Context, n int64) error {
+	if err := c.Conn.Write(ctx, websocket.MessageText, []byte(strconv.FormatInt(n, 10))); err != nil {
+		return fmt.Errorf("send count: %w", err)
+	}
+	return nil
 }
 
 // ReadClose reads until the daemon closes and returns the close code, -1 when the socket

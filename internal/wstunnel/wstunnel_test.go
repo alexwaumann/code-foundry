@@ -617,6 +617,136 @@ func TestStuckClientHitsTheWriteDeadline(t *testing.T) {
 	}
 }
 
+// A browser takes everything off the socket whether or not its page runs, so a client that
+// reads but counts nothing is the stuck page: it gets the window, then the write deadline.
+func TestPageThatStoppedHitsTheWriteDeadline(t *testing.T) {
+	ctx := testContext(t)
+	done := make(chan error, 1)
+	r := newRig(t, wstunnel.Options{Window: 3 << 20, WriteTimeout: 200 * time.Millisecond, FinalTimeout: 100 * time.Millisecond}, flood(done))
+	c := r.call(ctx)
+	if _, err := c.ReadHead(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var taken int
+	for {
+		f, err := c.ReadFrame(ctx)
+		if err != nil {
+			break // the deadline closed the socket
+		}
+		taken += len(f.Payload)
+	}
+	if taken > 4<<20 { // the window, and the message that went into its last room
+		t.Errorf("%d bytes went out on a window of 3 MiB", taken)
+	}
+	if err := <-done; err == nil {
+		t.Error("the handler's Send did not fail")
+	}
+	if err := r.tunnel.Drain(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(r.logs.String(), `reason="write timeout"`) {
+		t.Errorf("logs: %s", r.logs.String())
+	}
+}
+
+// Counts keep a stream going past its window for as long as they come.
+func TestCountsReopenTheWindow(t *testing.T) {
+	ctx := testContext(t)
+	r := newRig(t, wstunnel.Options{Window: 1 << 20, WriteTimeout: 2 * time.Second}, func(_ context.Context, s *connect.ServerStream[v1.AttachEvent]) error {
+		for range 20 {
+			if err := s.Send(wstunneltest.Output(make([]byte, 1<<20))); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	c := r.call(ctx)
+	if _, err := c.ReadHead(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var taken int64
+	for range 20 {
+		_, b, err := c.Conn.Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		taken += int64(len(b))
+		if err := c.Ack(ctx, taken); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := c.ReadFrame(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !f.End() {
+		t.Errorf("flags = %d, want the end of stream", f.Flags)
+	}
+	if code := c.ReadClose(ctx); code != websocket.StatusNormalClosure {
+		t.Errorf("close = %v", code)
+	}
+}
+
+// A count that is no count is data past the request, which ends the tunnel: the bytes sent
+// are the daemon's own, so no client may claim more.
+func TestBadCountsCloseTheTunnel(t *testing.T) {
+	for _, count := range []string{"not a number", "-1", "99999999", "1.5", ""} {
+		t.Run(count, func(t *testing.T) {
+			ctx := testContext(t)
+			ended := make(chan struct{})
+			r := newRig(t, wstunnel.Options{}, hold(ended))
+			c := r.call(ctx)
+			if _, err := c.ReadHead(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Conn.Write(ctx, websocket.MessageText, []byte(count)); err != nil {
+				t.Fatal(err)
+			}
+			waitDone(t, ended, 3*time.Second, "handler")
+		})
+	}
+}
+
+// A good count leaves the stream alone.
+func TestCountDoesNotEndTheStream(t *testing.T) {
+	ctx := testContext(t)
+	ended := make(chan struct{})
+	r := newRig(t, wstunnel.Options{}, hold(ended))
+	c := r.call(ctx)
+	if _, err := c.ReadHead(ctx); err != nil {
+		t.Fatal(err)
+	}
+	f, err := c.ReadFrame(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Ack(ctx, int64(len(f.Payload)+5)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ended:
+		t.Fatal("a count ended the handler")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// PluginService.WatchSurface flushes its headers with an empty Send before its first update,
+// which may wait on the plugin: the head must go out alone.
+func TestHeadersFlushBeforeTheFirstMessage(t *testing.T) {
+	ctx := testContext(t)
+	r := newRig(t, wstunnel.Options{}, func(ctx context.Context, s *connect.ServerStream[v1.AttachEvent]) error {
+		if err := s.Send(nil); err != nil {
+			return err
+		}
+		<-ctx.Done()
+		return nil
+	})
+	c := r.call(ctx)
+	if h, err := c.ReadHead(ctx); err != nil || h.Status != http.StatusOK {
+		t.Fatalf("head = %+v, %v", h, err)
+	}
+}
+
 // At shutdown a stuck client gets FinalTimeout, not the rest of the write deadline.
 func TestStuckClientDoesNotHoldShutdown(t *testing.T) {
 	ctx := testContext(t)

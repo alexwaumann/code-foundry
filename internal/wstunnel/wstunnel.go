@@ -8,7 +8,12 @@
 //	client: binary  the request body, as it would be POSTed
 //	daemon: text    {"status":200,"headers":{...}}
 //	daemon: binary  one message per Flush of the handler: Connect's envelopes, unchanged
+//	client: text    "1048576": the body bytes it has taken so far, sent as it goes
 //	daemon: close   1000 once the handler has returned
+//
+// Those counts are the flow control: a browser takes everything off the socket whether or not
+// its page is running, so nothing else tells the daemon that a client has stopped reading
+// (docs/notes/ws-transport.md). At most Options.Window bytes go uncounted.
 //
 // The tunnel owns no RPC: it replays the call as a POST through Options.Next, so a new
 // stream needs nothing here, and the bearer check, its scopes and Connect's framing and
@@ -27,6 +32,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,6 +52,10 @@ const (
 	// bigBuffer is the most a response keeps between messages: a thread's snapshot can be
 	// tens of megabytes, and the stream it opens may then stay idle for hours.
 	bigBuffer = 1 << 20
+
+	// defaultWindow is 0.1 s of a terminal at full speed, and about what a stopped page may
+	// hold per stream. The client's step must stay smaller (ACK_BYTES in api/wsFetch.ts).
+	defaultWindow = 8 << 20
 
 	defaultFirstFrameTimeout = 5 * time.Second
 	defaultWriteTimeout      = 30 * time.Second
@@ -73,12 +83,15 @@ type Options struct {
 
 	// FirstFrameTimeout bounds the wait for the head and the body. Zero: 5 s.
 	FirstFrameTimeout time.Duration
-	// WriteTimeout bounds each message, so a client that stopped reading cannot pin a
-	// handler. Zero: 30 s.
+	// WriteTimeout bounds each message, the wait for room in the window included, so a
+	// client that stopped reading cannot pin a handler. Zero: 30 s.
 	WriteTimeout time.Duration
 	// FinalTimeout bounds the last flush, the close handshake, and any write still blocked
 	// once the handler's context has ended. Zero: 1 s.
 	FinalTimeout time.Duration
+	// Window is how many body bytes may be out with no count from the client. A message
+	// goes whole once there is room, so one may pass it. Zero: 8 MiB.
+	Window int64
 }
 
 // Tunnel is the http.Handler behind Prefix.
@@ -100,6 +113,9 @@ func New(opts Options) *Tunnel {
 	}
 	if opts.FinalTimeout == 0 {
 		opts.FinalTimeout = defaultFinalTimeout
+	}
+	if opts.Window == 0 {
+		opts.Window = defaultWindow
 	}
 	return &Tunnel{opts: opts}
 }
@@ -235,7 +251,7 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 	if err != nil {
 		// A deadline or an oversized message has only sent the close frame: the socket is
 		// still open, and hangUp ends it.
-		go readUntilGone(read, c, func(error) {})
+		go readUntilGone(read, c, func([]byte) bool { return false }, func(error) {})
 		t.hangUp(c, conn, websocket.StatusPolicyViolation, "bad request", stopRead)
 		return "no request"
 	}
@@ -243,7 +259,8 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	var end clientEnd
-	go readUntilGone(read, c, func(err error) {
+	room := newWindow(t.opts.Window)
+	go readUntilGone(read, c, room.ack, func(err error) {
 		end.note(err)
 		cancel()
 	})
@@ -264,7 +281,7 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 		Host:          r.Host,
 		RemoteAddr:    r.RemoteAddr,
 	}).WithContext(ctx)
-	w := &response{conn: c, header: http.Header{}, ctx: ctx, abort: cancel, writeTimeout: t.opts.WriteTimeout, finalTimeout: t.opts.FinalTimeout}
+	w := &response{conn: c, header: http.Header{}, ctx: ctx, abort: cancel, room: room, writeTimeout: t.opts.WriteTimeout, finalTimeout: t.opts.FinalTimeout}
 	t.opts.Next.ServeHTTP(w, req)
 	cancel()
 	w.Flush()
@@ -309,16 +326,70 @@ func closeReason(end int32, writeErr error) string {
 	return "served"
 }
 
-// readUntilGone reads the socket until it is closed, calling gone on anything it reads, with
-// the read's error: past the head and the body, any data counts as the client's close. This
-// is CloseRead without its data path, which waits on itself before it cancels
-// (docs/notes/ws-tunnel.md). A reader must run for ping, pong and close frames to be seen at all.
-func readUntilGone(ctx context.Context, c *websocket.Conn, gone func(error)) {
+// readUntilGone reads the socket until it is closed, giving text messages to ack and calling
+// gone, with the read's error, on anything else: past the head and the body, any data that is
+// not a count counts as the client's close. This is CloseRead without its data path, which
+// waits on itself before it cancels (docs/notes/ws-tunnel.md). A reader must run for ping, pong
+// and close frames to be seen at all.
+func readUntilGone(ctx context.Context, c *websocket.Conn, ack func([]byte) bool, gone func(error)) {
 	for {
-		_, _, err := c.Read(ctx)
+		typ, b, err := c.Read(ctx)
+		if err == nil && typ == websocket.MessageText && ack(b) {
+			continue
+		}
 		gone(err)
 		if err != nil {
 			return
+		}
+	}
+}
+
+// window is the flow control: the body bytes sent, those the client has counted, and what
+// wakes a sender waiting for room.
+type window struct {
+	size int64
+
+	mu    sync.Mutex
+	sent  int64
+	acked int64
+	moved chan struct{} // closed and replaced by each count
+}
+
+func newWindow(size int64) *window { return &window{size: size, moved: make(chan struct{})} }
+
+// ack takes a client's count; false for anything that is not one: not a number, or a number
+// that goes backwards or past what was sent.
+func (w *window) ack(b []byte) bool {
+	n, err := strconv.ParseInt(string(b), 10, 64)
+	if err != nil {
+		return false
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if n < w.acked || n > w.sent {
+		return false
+	}
+	w.acked = n
+	close(w.moved)
+	w.moved = make(chan struct{})
+	return true
+}
+
+// reserve waits until n more bytes may go, or for ctx, and counts them as sent.
+func (w *window) reserve(ctx context.Context, n int) error {
+	for {
+		w.mu.Lock()
+		if w.sent-w.acked < w.size {
+			w.sent += int64(n)
+			w.mu.Unlock()
+			return nil
+		}
+		moved := w.moved
+		w.mu.Unlock()
+		select {
+		case <-moved:
+		case <-ctx.Done():
+			return fmt.Errorf("wait for the client's count: %w", ctx.Err())
 		}
 	}
 }
@@ -398,6 +469,7 @@ type response struct {
 
 	ctx          context.Context // the handler's
 	abort        context.CancelFunc
+	room         *window
 	writeTimeout time.Duration
 	finalTimeout time.Duration
 }
@@ -452,7 +524,9 @@ func (w *response) Flush() {
 // send writes one message, on a context of its own: Write closes the socket when its
 // context ends, and the end of the stream is written after the handler's has. A write gets
 // writeTimeout, or finalTimeout from the moment the handler's context is done, so a stuck
-// client cannot hold shutdown for the rest of the deadline.
+// client cannot hold shutdown for the rest of the deadline. A body message waits for room in
+// the window on the same clock, which is what a page that stopped reading runs into: its
+// browser keeps the socket empty, so the write itself would never block.
 func (w *response) send(typ websocket.MessageType, b []byte) {
 	if w.err != nil {
 		return
@@ -461,6 +535,12 @@ func (w *response) send(typ websocket.MessageType, b []byte) {
 	defer cancel()
 	stop := context.AfterFunc(w.ctx, func() { time.AfterFunc(w.finalTimeout, cancel) })
 	defer stop()
+	if typ == websocket.MessageBinary {
+		if err := w.room.reserve(ctx, len(b)); err != nil {
+			w.fail(err)
+			return
+		}
+	}
 	if err := w.conn.Write(ctx, typ, b); err != nil {
 		w.fail(err)
 	}
