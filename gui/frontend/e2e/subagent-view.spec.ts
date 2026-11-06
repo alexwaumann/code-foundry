@@ -18,13 +18,13 @@ const threadPane = (page: Page) => page.getByTestId("thread-pane");
 const agentCall = (page: Page, name: string) => threadPane(page).locator('[data-tool="Agent"]').filter({ hasText: name }).first();
 
 /**
- * Counts the GUI's ThreadService.WatchThread calls (Connect-Web's fetch): entering a run and
- * going back must keep the one stream (ThreadPane's WatchedThread).
+ * Counts the GUI's ThreadService.WatchThread sockets: entering a run and going back must keep
+ * the one stream (ThreadPane's WatchedThread).
  */
 function countWatches(page: Page): () => number {
   let n = 0;
-  page.on("request", (r) => {
-    if (r.url().includes("ThreadService/WatchThread")) n++;
+  page.on("websocket", (ws) => {
+    if (ws.url().includes("ThreadService/WatchThread")) n++;
   });
   return () => n;
 }

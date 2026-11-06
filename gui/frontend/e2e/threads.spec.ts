@@ -185,6 +185,15 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   });
   page.on("requestfinished", done);
   page.on("requestfailed", done);
+  // The streams on the tunnel are sockets, which no request event shows.
+  page.on("websocket", (ws) => {
+    const n = /codefoundry\.v1\.(\w+\/\w+)$/.exec(ws.url())?.[1] ?? "";
+    started.set(n, (started.get(n) ?? 0) + 1);
+    open.set(n, (open.get(n) ?? 0) + 1);
+    ws.on("close", () => {
+      open.set(n, (open.get(n) ?? 1) - 1);
+    });
+  });
 
   await openApp(page);
   // Exercise every source: threads, threads (switching watches the other one), intents, projects.
