@@ -190,6 +190,9 @@ describe("transport failures", () => {
     ["a bare HTTP 503", new ConnectError("HTTP 503", Code.Unavailable), true, "Code Foundry's daemon is not reachable."],
     ["the daemon's own Unavailable", new ConnectError("the daemon is stopping", Code.Unavailable), false, "the daemon is stopping"],
     ["an application error", new ConnectError("no such thread", Code.NotFound), false, "no such thread"],
+    ["a store's refusal", new ConnectError("failed precondition: pull request #9 is merged", Code.FailedPrecondition), false, "pull request #9 is merged"],
+    ["a store's bad input", new ConnectError("invalid argument: name is required", Code.InvalidArgument), false, "name is required"],
+    ["the words inside a message", new ConnectError("gh said failed precondition: no", Code.Unknown), false, "gh said failed precondition: no"],
     ["a plain error", new Error("boom"), false, "boom"],
   ])("%s", (_, err, unreachable, message) => {
     expect(isUnreachable(err)).toBe(unreachable);

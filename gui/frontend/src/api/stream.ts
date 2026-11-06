@@ -63,9 +63,12 @@ export function isUnreachable(err: unknown): boolean {
   return err.code === Code.Unavailable && (err.rawMessage === "" || /^HTTP \d+$/.test(err.rawMessage));
 }
 
+/** A store's sentinel repeats the error code in words; the CLI drops it too (cmd/code-foundry invokeFailed). */
+const SENTINEL_PREFIX = /^(?:failed precondition|invalid argument|not found): /;
+
 export function errorMessage(err: unknown): string {
   if (isUnreachable(err)) return `${DAEMON_UNREACHABLE}.`;
-  if (err instanceof ConnectError) return err.rawMessage || Code[err.code];
+  if (err instanceof ConnectError) return err.rawMessage.replace(SENTINEL_PREFIX, "") || Code[err.code];
   return err instanceof Error ? err.message : String(err);
 }
 

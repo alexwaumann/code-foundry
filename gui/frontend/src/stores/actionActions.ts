@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { runFromResult, type ActionRunFinishedView } from "@/api/actions";
 import { invokeCommand, type UiContextView } from "@/api/command";
 import { errorMessage } from "@/api/stream";
-import { addArgs, editArgs, refusalText, type ActionDraft } from "@/lib/actions";
+import { addArgs, editArgs, type ActionDraft } from "@/lib/actions";
 import { ACTION_LABEL, PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { useActionsStore } from "./actions";
 import { openActionRunOutput } from "./actionDialog";
@@ -134,7 +134,7 @@ export async function saveAction(target: { projectId: string; actionId?: string 
     ctx: projectContext(target.projectId),
     quiet: true,
     onError: (m) => {
-      failed.message = refusalText(m);
+      failed.message = m;
     },
     expected: () => true,
   });
@@ -148,7 +148,7 @@ export async function deleteAction(actionId: string, projectId: string): Promise
     ctx: projectContext(projectId),
     quiet: true,
     onError: (m) => {
-      failed.message = refusalText(m);
+      failed.message = m;
     },
     expected: () => true,
   });
