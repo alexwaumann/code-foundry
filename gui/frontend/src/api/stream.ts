@@ -182,6 +182,8 @@ export interface StreamHandlers<T> {
   shouldReconnectOnEnd?: () => boolean;
   /** Called when the attempt fails; e.g. invalidate the cached endpoint. */
   onError?: (err: unknown) => void;
+  /** Called for each message of a live attempt, heartbeats included. */
+  onMessage?: () => void;
   backoff?: Backoff;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   /**
@@ -293,11 +295,19 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         }
         let buffering = h.onConnect !== undefined;
         const buffer: T[] = [];
+        // The attempt counts as working once the stream brought a message and any resync
+        // passed: either alone can pass while the other keeps failing.
+        let heard = false;
+        let resynced = h.onConnect === undefined;
+        const proven = () => {
+          if (heard && resynced) attempt = 0;
+        };
         const connected = h.onConnect?.(ctl.signal).then(() => {
           buffering = false;
           for (const ev of buffer.splice(0)) h.onEvent(ev);
           status("open");
-          attempt = 0;
+          resynced = true;
+          proven();
         });
         // A failed resync fails the whole attempt.
         connected?.catch((err: unknown) => {
@@ -309,6 +319,9 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         for await (const ev of h.open(ctl.signal)) {
           // A stopped or resynced attempt's late events must not reach the client.
           if (ctl.signal.aborted) break;
+          heard = true;
+          proven();
+          h.onMessage?.();
           if (first) {
             first = false;
             status("open");
@@ -319,7 +332,6 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
             continue;
           }
           feed();
-          if (!connected) attempt = 0;
           if (buffering) buffer.push(ev);
           else h.onEvent(ev);
         }

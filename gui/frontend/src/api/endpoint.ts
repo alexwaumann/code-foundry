@@ -50,17 +50,10 @@ function binaryWire(): boolean {
 }
 
 /**
- * The streams on the WebSocket tunnel (docs/notes/ws-transport.md); everything else uses fetch.
- * Temporary: later PRs add to it, and the last one removes it once every long-lived stream is on.
+ * Unary calls over fetch and every stream over the tunnel (docs/notes/ws-transport.md): a fetch
+ * stream would hold one of WebKit's six connections per origin. There is no fallback to fetch, so
+ * a daemon from before the tunnel has to be restarted: stores/update.ts says so.
  */
-const TUNNELLED_STREAMS: ReadonlySet<string> = new Set([
-  "EmberService/WatchBoard",
-  "ThreadService/WatchThread",
-  "TerminalService/Attach",
-  "PluginService/WatchSurface",
-]);
-
-/** Unary calls over fetch, and each stream over the tunnel or fetch by its procedure. */
 function daemonTransport(ep: DaemonEndpoint): Transport {
   const auth: Interceptor = (next) => (req) => {
     req.header.set("Authorization", `Bearer ${ep.token}`);
@@ -69,11 +62,7 @@ function daemonTransport(ep: DaemonEndpoint): Transport {
   const options = { baseUrl: ep.baseUrl, interceptors: [auth], useBinaryFormat: binaryWire() };
   const http = createConnectTransport(options);
   const tunnel = createConnectTransport({ ...options, fetch: wsFetch });
-  return {
-    unary: (method, signal, timeoutMs, header, input, contextValues) => http.unary(method, signal, timeoutMs, header, input, contextValues),
-    stream: (method, signal, timeoutMs, header, input, contextValues) =>
-      (TUNNELLED_STREAMS.has(`${method.parent.name}/${method.name}`) ? tunnel : http).stream(method, signal, timeoutMs, header, input, contextValues),
-  };
+  return { unary: http.unary.bind(http), stream: tunnel.stream.bind(tunnel) };
 }
 
 function defaultResolver(): EndpointResolver {

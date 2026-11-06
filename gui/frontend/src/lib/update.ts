@@ -49,6 +49,18 @@ export function displayVersion(v: string): string {
   return m ? `${m[1] ?? ""} (tip ${m[2] ?? ""})` : v;
 }
 
+/**
+ * The first release whose daemon has the WebSocket tunnel. Every GUI stream needs it and none
+ * falls back to fetch, so a window on anything older (an update leaves a running daemon on its
+ * old version until it restarts) gets no events at all.
+ */
+export const TUNNEL_SINCE = "v0.21.6-tip.2";
+
+/** Whether a daemon of this version has no tunnel. A "dev" daemon has one. */
+export function predatesTunnel(daemon: string): boolean {
+  return compareVersions(daemon, TUNNEL_SINCE) === -1;
+}
+
 /** The window and the daemon run different versions (see versionMismatch). */
 export interface Mismatch {
   /** The window's version. */
@@ -87,6 +99,14 @@ export function versionMismatch(status: UpdateStatusView, guiVersion: string | n
   }
 }
 
+/**
+ * The mismatch on a daemon from before the tunnel, in any state: its updater knows nothing of
+ * the install, and may well be offering it. Null unless `oldDaemon`, or outside Wails.
+ */
+function strandedOn(status: UpdateStatusView, guiVersion: string | null, oldDaemon: boolean): Mismatch | null {
+  return oldDaemon && guiVersion !== null ? { app: guiVersion, daemon: status.currentVersion, version: guiVersion } : null;
+}
+
 export type UpdateBadgeKind = "available" | "downloading" | "downloaded" | "failed" | "installed";
 
 export interface UpdateBadge {
@@ -102,9 +122,11 @@ export interface UpdateBadge {
  * Restart to apply", and installed, restart-required and partly applied (the install on
  * disk is newer than what runs) "vX installed · Restart to apply".
  */
-export function updateBadge(status: UpdateStatusView | null, guiVersion: string | null): UpdateBadge | null {
+export function updateBadge(status: UpdateStatusView | null, guiVersion: string | null, oldDaemon = false): UpdateBadge | null {
   if (!status) return null;
   const target = displayVersion(status.targetVersion);
+  const stranded = strandedOn(status, guiVersion, oldDaemon);
+  if (stranded) return { kind: "installed", label: `${displayVersion(stranded.version)} installed`, cta: "Restart to apply" };
   switch (status.state) {
     case "available":
       return { kind: "available", label: `${target} available`, cta: "Download" };
@@ -234,9 +256,10 @@ function readyBusyRest(busy: number, install: boolean): string {
 
 /**
  * Picks the update dialog's variant and copy from the daemon's updater status, the
- * window's own version, the busy thread count, and whether Restart Now already ran.
+ * window's own version, the busy thread count, whether Restart Now already ran, and whether
+ * the daemon is one this window cannot follow (predatesTunnel).
  */
-export function updateView(status: UpdateStatusView, guiVersion: string | null, t: ThreadActivity, restarting: Restarting | null = null): UpdateView {
+export function updateView(status: UpdateStatusView, guiVersion: string | null, t: ThreadActivity, restarting: Restarting | null = null, oldDaemon = false): UpdateView {
   // Copy shows versions through displayVersion; `version` and `mismatch` keep the tags.
   const target = displayVersion(status.targetVersion);
   const current = displayVersion(status.currentVersion);
@@ -254,20 +277,21 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
     }
     return { ...base, variant: "restarting", title: "Restarting…", body: "Code Foundry will reopen in a moment.", later: null };
   }
-  if (!status.enabled) {
+  const stranded = strandedOn(status, guiVersion, oldDaemon);
+  if (!status.enabled && !stranded) {
     return { ...base, variant: "disabled", version: status.currentVersion, title: "Updates are off for this build", body: sentence(status.disabledReason), later: null, close: true };
   }
-  const m = versionMismatch(status, guiVersion);
+  const m = stranded ?? versionMismatch(status, guiVersion);
   if (m) {
     const app = displayVersion(m.app);
     const daemon = displayVersion(m.daemon);
-    const where = compareVersions(m.app, m.daemon) === 1 ? `The app is on ${app} but the daemon is still on ${daemon}` : `The daemon is on ${daemon} but the app is still on ${app}`;
+    const where = compareVersions(m.app, m.daemon) === -1 ? `The daemon is on ${daemon} but the app is still on ${app}` : `The app is on ${app} but the daemon is still on ${daemon}`;
     return {
       ...base,
       variant: "partlyApplied",
       version: m.version,
       title: `Code Foundry ${displayVersion(m.version)} is partly applied`,
-      body: `${where}; some things won’t work until you restart.${t.busy > 0 ? ` ${cutOff(t.busy)}` : ""}`,
+      body: `${where}; ${stranded ? "nothing updates live" : "some things won’t work"} until you restart.${t.busy > 0 ? ` ${cutOff(t.busy)}` : ""}`,
       primary: "Restart Now",
       later: laterFor(t),
       showBusy: t.busy > 0,

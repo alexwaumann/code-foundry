@@ -1,5 +1,6 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { UpdateState, type UpdateEvent, type UpdateStatus } from "@/gen/codefoundry/v1/update_pb";
+import { UpdateService, UpdateState, type UpdateEvent, type UpdateStatus } from "@/gen/codefoundry/v1/update_pb";
+import { daemon, type DaemonConnection } from "./endpoint";
 
 export type UpdateStateView = "idle" | "available" | "downloading" | "downloaded" | "installed" | "restartRequired" | "failed";
 
@@ -58,6 +59,13 @@ export function toUpdateStatusView(s: UpdateStatus): UpdateStatusView {
     progress: s.progress,
     failureReason: s.failureReason,
   };
+}
+
+/** The updater's status by a plain call, for a daemon whose events cannot reach this window. */
+export async function getUpdateStatus(conn: DaemonConnection = daemon): Promise<UpdateStatusView | null> {
+  const c = await conn.client(UpdateService);
+  const { status } = await c.get({});
+  return status ? toUpdateStatusView(status) : null;
 }
 
 export function toUpdateEventView(e: UpdateEvent): UpdateEventView | null {

@@ -4,10 +4,11 @@ import { toast } from "sonner";
 import { appInfo, onCheckForUpdatesMenu, relaunchApp } from "@/api/app";
 import { invokeCommand, isUnknownCommand } from "@/api/command";
 import { errorMessage } from "@/api/stream";
-import type { UpdateEventView, UpdateStatusView } from "@/api/update";
-import type { Restarting } from "@/lib/update";
+import { getUpdateStatus, type UpdateEventView, type UpdateStatusView } from "@/api/update";
+import { predatesTunnel, type Restarting } from "@/lib/update";
 import { invokeConfirmed, refreshCommands, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
+import { useHealthStore } from "./health";
 import { restartCutsOff } from "@/lib/thread";
 import { useThreadsStore } from "./threads";
 
@@ -18,6 +19,8 @@ interface UpdateSlice {
   status: UpdateStatusView | null;
   /** The window shell's own version; null outside Wails. */
   guiVersion: string | null;
+  /** The daemon predates the tunnel, so nothing streams to this window (lib/update.ts predatesTunnel). */
+  oldDaemon: boolean;
   dialogOpen: boolean;
   /** An action the dialog started and is waiting on. */
   pending: UpdateAction | null;
@@ -32,6 +35,7 @@ interface UpdateSlice {
 export const useUpdateStore = create<UpdateSlice>()(() => ({
   status: null,
   guiVersion: null,
+  oldDaemon: false,
   dialogOpen: false,
   pending: null,
   restarting: null,
@@ -140,14 +144,47 @@ export async function runUpdateAction(action: UpdateAction): Promise<boolean> {
   }
 }
 
-/** Loads the GUI's own version and wires the app menu's "Check for Updates…". */
+/**
+ * Opens the dialog on a daemon from before the tunnel. Its status can only come from events,
+ * which need the tunnel, so without this call a window updated by `install.sh` would sit on a
+ * running old daemon with nothing live, no chip and no dialog. The dialog's Restart Now is
+ * app.restart, a plain call, and the host follows it over the Unix socket. Restarting by itself
+ * would cut off working threads, so it asks.
+ */
+function watchForOldDaemon(): () => void {
+  let seen = "";
+  return useHealthStore.subscribe((s) => {
+    const version = s.health?.version ?? "";
+    if (version === seen) return;
+    seen = version;
+    const oldDaemon = predatesTunnel(version);
+    // A restart from a terminal has settled it: the dialog that asked for one has nothing to say.
+    if (useUpdateStore.getState().oldDaemon && !oldDaemon) closeUpdateDialog();
+    useUpdateStore.setState({ oldDaemon });
+    if (!oldDaemon) return;
+    getUpdateStatus()
+      .then((status) => {
+        useUpdateStore.setState({ status, dialogOpen: true });
+      })
+      .catch(() => {
+        seen = ""; // The next ping asks again.
+      });
+  });
+}
+
+/** Loads the GUI's own version, wires the app menu's "Check for Updates…" and watches for a daemon this window cannot follow. */
 export function startUpdateSync(): () => void {
+  const unwatch = watchForOldDaemon();
   appInfo()
     .then((info) => {
       useUpdateStore.setState({ guiVersion: info?.version ?? null });
     })
     .catch(() => undefined);
-  return onCheckForUpdatesMenu(() => {
+  const unmenu = onCheckForUpdatesMenu(() => {
     openUpdateDialog({ check: true });
   });
+  return () => {
+    unwatch();
+    unmenu();
+  };
 }
