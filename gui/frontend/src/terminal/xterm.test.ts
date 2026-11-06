@@ -54,15 +54,23 @@ describe("XtermRenderer cursor across reset", () => {
     return (r.term as unknown as { _core: { coreService: { isCursorHidden: boolean } } })._core.coreService.isCursorHidden;
   }
 
+  const byProgram = (r: XtermRenderer) => {
+    r.term.write("\x1b[?25l");
+  };
+  const byExit = (r: XtermRenderer) => {
+    r.hideCursor();
+  };
+
   it.each([
-    { name: "a program hid it", before: async (r: XtermRenderer) => write(r, "\x1b[?25l"), snapshot: "plain", want: false },
-    { name: "an exited terminal's hide already parsed", before: async (r: XtermRenderer) => { r.hideCursor(); await write(r, ""); }, snapshot: "plain", want: false },
-    { name: "an exited terminal's hide still queued", before: (r: XtermRenderer) => { r.hideCursor(); }, snapshot: "plain", want: false },
-    { name: "a program's hide still queued", before: (r: XtermRenderer) => { r.term.write("\x1b[?25l"); }, snapshot: "plain", want: false },
-    { name: "the next snapshot's program hid it", before: (r: XtermRenderer) => { r.hideCursor(); }, snapshot: "\x1b[?25lfull screen", want: true },
-  ])("$name: hidden is $want", async ({ before, snapshot, want }) => {
+    { name: "a program hid it", hide: byProgram, parsed: true, snapshot: "plain", want: false },
+    { name: "an exited terminal's hide already parsed", hide: byExit, parsed: true, snapshot: "plain", want: false },
+    { name: "an exited terminal's hide still queued", hide: byExit, parsed: false, snapshot: "plain", want: false },
+    { name: "a program's hide still queued", hide: byProgram, parsed: false, snapshot: "plain", want: false },
+    { name: "the next snapshot's program hid it", hide: byExit, parsed: false, snapshot: "\x1b[?25lfull screen", want: true },
+  ])("$name: hidden is $want", async ({ hide, parsed, snapshot, want }) => {
     const r = renderer();
-    await before(r);
+    hide(r);
+    if (parsed) await write(r, "");
     r.reset();
     r.write(new TextEncoder().encode(snapshot));
     expect(await hidden(r)).toBe(want);
