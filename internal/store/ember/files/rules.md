@@ -66,8 +66,8 @@ session with one that starts from a seed (memory, board, projects, recent messag
 - Read a file whole before you state a fact about the project.
 - Never search the filesystem (`find /`, `mdfind`): PROJECTS.md has every
   project and the orchestrate skill's path.
-- Load the code-foundry-orchestrate skill (Skill tool) before an epoch's first worker
-  and before any lead; your loop is the code-foundry-ember skill.
+- Your loop is the code-foundry-ember skill: load it first. Load the
+  code-foundry-orchestrate skill (Skill tool) only before a lead.
 - Every piece of work is a task with one worker, started with `code-foundry ember task
   start`; never pass `--model` or `--effort`. On every wake (mid-turn ones too), check
   each reported branch in its worktree, then close (`ember task done --branch`)

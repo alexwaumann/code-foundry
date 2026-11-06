@@ -106,8 +106,11 @@ var rules = []rule{
 	{note: "control-2-skill-provenance", file: sourceRef, says: []string{"never answer that from memory", `daemon\.version --json`, "dev build", `docs/architecture\.md`}},
 	// Round 3: rules read late or not at all from a reference earned their inline place.
 	{note: "orch-skill-v4", file: orchFile, says: []string{`git merge-tree --write-tree`, `git diff origin/<default> --stat`, "--descendants-of", "project branch delete"}},
+	{note: "orch-skill-v4", file: orchFile, says: []string{"distinct anchor", `git add -a`, "after any later message", "one line", "from the child's report"}},
 	{note: "orch-skill-v4", file: wakesFile, says: []string{"without --wait", "report_stale"}},
 	{note: "orch-skill-v4", file: leadsFile, says: []string{"thread report progress"}},
+	// Ember stopped loading the orchestrate skill each epoch: what it took from there lives here.
+	{note: "orch-skill-v4", file: emberFile, says: []string{"distinct anchor", "only as many spots", `git add -a`, `git diff origin/<default> --stat`, "after any later message", "one line", "take it from its report", "report_stale"}},
 	// Prompts in double quotes ran their backticks in Ember's shell; the worker checklist.
 	{note: "ember-fixes-2-skill", file: emberFile, says: []string{
 		"--prompt - <<'eof'", "never in double quotes", "--budget", `merge-tree --write-tree`, `"no text`, "ember task cancel", "thread unsubscribe",

@@ -358,7 +358,7 @@ func RenderSkills(dir string) string {
 	if dir == "" {
 		return ""
 	}
-	return "\n## Skills\n\nThe code-foundry-orchestrate skill (the thread protocol) is in `" + dir + "`: " +
+	return "\n## Skills\n\nThe code-foundry-orchestrate skill, for leads, is in `" + dir + "`: " +
 		"SKILL.md, and `reference/leads.md` for leads (`" + filepath.Join(dir, "reference", "leads.md") + "`). " +
 		"Read them by these paths; never search the disk for them.\n"
 }
