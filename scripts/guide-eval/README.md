@@ -5,8 +5,9 @@ the built-in skills, and how many guidance tokens that takes. Any PR that change
 `ThreadPrompt`, a skill or the guide runs it before and after. The baseline is in
 `docs/notes/guide-eval-baseline.md`.
 
-It spends real money, so it is not part of `make check`. A full side (18 tasks, 3 runs) is
-in the note. Run the scorer's tests with `python3 scripts/guide-eval/score_test.py`.
+It spends real money, so it is not part of `make check`: 18 tasks, 3 runs, is about $16 on
+Opus 5.5 and $6 on Sonnet 5.5. Run the scorer's tests with
+`python3 scripts/guide-eval/score_test.py`.
 
 ## Run
 
@@ -21,8 +22,8 @@ make guide-eval-compare BEFORE=<dir> AFTER=<dir>
 - `BIN` is the build under test; the skills and guide are embedded in it.
 - `TASKS=t1-setting,p4-show-file` runs a subset. A subset cannot pass the gate against a full
   report.
-- `MAX_COST` (USD, default 15) stops launching runs once spent. The runs in flight finish,
-  and each thread also has a $4 budget the daemon enforces.
+- `MAX_COST` (USD, default 18, just above a full Opus side) stops launching runs once spent.
+  The runs in flight finish, and each thread also has a $4 budget the daemon enforces.
 - `eval.py --heavy-runs N` runs the heavy tasks fewer times; `--first-round N --out <dir>`
   adds rounds to an existing report.
 - Results go to `~/.cache/code-foundry/guide-eval/<label>-<model>-<effort>-<time>/`: raw
@@ -40,8 +41,12 @@ make guide-eval-compare BEFORE=<dir> AFTER=<dir>
   invalid run, on the same model, effort and Claude Code version.
 
 Totals decide, so a one-run swing on a noisy task does not block a PR, but the comparison
-lists every per-task drop: read them. A trim that only changes `ThreadPrompt` or a
-description also shows in `always loaded`, which has no run noise.
+lists every per-task drop: read them. The token mean is noisy too (the note has the size), so
+a small fall proves little alone: a real trim also shows in `always loaded` or in the size of
+the files it touched, which have no run noise.
+
+The committed baseline ran the heavy tasks once, so it is a reference, not a side of the gate:
+run the before build too.
 
 ## Metrics
 
@@ -102,3 +107,9 @@ home, one more reason for a home per round.
 - Your own `~/.claude` applies (user skills, hooks, MCP servers), like for a real user. Reports
   compare only when they come from the same machine and setup.
 - A run is a first turn on a fresh thread. It says nothing about a long thread's routing.
+- `t4` and `p2` read real pull requests. `octocat/Hello-World#4` is closed with no checks, so
+  declining to subscribe is a fair answer that scores as a miss. Should `cli/cli#14957` merge,
+  `p2` changes meaning too: pick another open PR, on both sides of a comparison.
+- Claude Code adds each scratch folder to `projects` in `~/.claude.json`, about two entries a
+  run. The harness leaves them: other sessions write that file at the same time. They are
+  harmless and name folders that no longer exist.
