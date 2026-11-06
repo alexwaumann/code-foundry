@@ -53,6 +53,12 @@ func main() {
 	// launchd's minimal one) and point it and its threads at the CLI installed next to this executable.
 	adoptLoginShellPath(log)
 	exportDaemonBinary(log)
+	// Before any window exists: a home that is not the default one must never open the
+	// default home's web storage (webstorage.go).
+	if err := isolateWebStorage(p, log); err != nil {
+		log.Error("web storage of this home", "err", err)
+		os.Exit(1)
+	}
 
 	daemonService := NewDaemonService(p, log)
 	appService := NewAppService(log, p.WindowBackground())

@@ -77,6 +77,11 @@ func Resolve() (Paths, error) {
 		}
 		return New(abs), nil
 	}
+	return Default()
+}
+
+// Default returns Paths for the default home, whatever $CODE_FOUNDRY_HOME says.
+func Default() (Paths, error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return Paths{}, fmt.Errorf("resolve user home: %w", err)
