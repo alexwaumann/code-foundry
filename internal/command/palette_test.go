@@ -31,7 +31,7 @@ var noPalette = []string{
 	"memory.show", "plugin.act", "plugin.browse", "plugin.dev", "plugin.disable", "plugin.enable",
 	"plugin.env", "plugin.install", "plugin.list", "plugin.logs", "plugin.restart",
 	"plugin.secrets.delete", "plugin.secrets.list", "plugin.surface", "plugin.terminals",
-	"plugin.threads", "plugin.uninstall", "plugin.wakes", "pr.ask", "pr.auto-merge", "pr.checks", "pr.comment", "pr.draft",
+	"plugin.threads", "plugin.uninstall", "plugin.wakes", "pr.ask", "pr.auto-merge", "pr.checkbox", "pr.checks", "pr.comment", "pr.draft",
 	"pr.explain", "pr.fix.findings", "pr.merge", "pr.ready", "pr.refresh", "pr.revert", "pr.review",
 	"pr.review.request", "pr.task", "project.branch.delete", "project.list", "settings.get", "settings.path",
 	"search.agent", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.report",

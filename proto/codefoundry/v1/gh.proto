@@ -110,6 +110,16 @@ service GhService {
   // refuses (a pull request it could merge now is in "clean status": merge it instead).
   // The detail is invalidated and pull_request_detail_updated is sent.
   rpc SetPullRequestAutoMerge(SetPullRequestAutoMergeRequest) returns (SetPullRequestAutoMergeResponse) {}
+  // SetPullRequestCheckbox ticks or unticks one task-list item of a pull request's
+  // description, any state the viewer may edit it in, merged and closed included
+  // (updatePullRequest). The description is read fresh from GitHub first, and only that
+  // box changes, so an edit made since it was shown is kept: FAILED_PRECONDITION when
+  // the item is gone or reads differently (the detail is invalidated, so the client
+  // shows the new text). Calls for one pull request run one at a time. A box already in
+  // the requested state sends no mutation (changed false). GitHub's refusals keep their
+  // kind (no permission is PERMISSION_DENIED) or are FAILED_PRECONDITION with its
+  // message. The detail is invalidated and pull_request_detail_updated is sent.
+  rpc SetPullRequestCheckbox(SetPullRequestCheckboxRequest) returns (SetPullRequestCheckboxResponse) {}
   // GetPullRequestDiff returns a pull request's unified diff as GitHub renders it
   // (REST pulls/{n} with Accept: application/vnd.github.v3.diff; the base side is the
   // merge base, and a cross-repository pull request works the same). Cached in memory
@@ -915,6 +925,26 @@ message SetPullRequestDraftResponse {
   // Whether GitHub reports the pull request a draft afterwards.
   bool draft = 1;
   // What happened, for people ("Marked #12 ready for review").
+  string message = 2;
+}
+
+message SetPullRequestCheckboxRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  // Which task-list item, counted from 0 in source order: a list item that starts with
+  // a checkbox, at any depth, outside footnotes. "[ ]" in code or raw HTML is not one.
+  int32 index = 3;
+  // The item's text as shown: its first source line after the box, without the spaces
+  // around it. Refused unless GitHub's copy still reads the same.
+  string text = 4;
+  // true ticks the box; false unticks it.
+  bool checked = 5;
+}
+
+message SetPullRequestCheckboxResponse {
+  // Whether the description changed; false: the box was already so.
+  bool changed = 1;
+  // What happened, for people ("Checked task 2 on #12").
   string message = 2;
 }
 

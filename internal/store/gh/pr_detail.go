@@ -165,8 +165,9 @@ type fullCache struct {
 	mu sync.Mutex
 	m  map[fullKey]*fullEntry
 	// reverts and merges answer repeats of a recent revert or merge (pr_actions.go,
-	// pr_merge.go); mergeLocks runs one merge of a pull request at a time. reviews and
-	// comments answer an identical review or comment sent again soon (pr_review.go).
+	// pr_merge.go); mergeLocks runs one merge, state change or description edit of a pull
+	// request at a time. reviews and comments answer an identical review or comment sent
+	// again soon (pr_review.go).
 	reverts    writeMemos[fullKey, RevertResult]
 	merges     writeMemos[fullKey, mergeMemo]
 	mergeLocks keyLocks

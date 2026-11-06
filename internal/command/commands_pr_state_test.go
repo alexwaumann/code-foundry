@@ -112,3 +112,74 @@ func TestPullRequestStateCommands(t *testing.T) {
 		})
 	}
 }
+
+// pr.checkbox: the request it sends and the daemon's refusals passed through.
+func TestPullRequestCheckboxCommand(t *testing.T) {
+	args := func(kv ...string) map[string]string {
+		m := map[string]string{"repo-slug": "o/r", "number": "142"}
+		for i := 0; i+1 < len(kv); i += 2 {
+			m[kv[i]] = kv[i+1]
+		}
+		return m
+	}
+	tests := []struct {
+		name     string
+		args     map[string]string
+		backend  func(*commandtest.Gh)
+		wantReq  proto.Message
+		wantMsg  string
+		wantErr  error
+		wantCode connect.Code
+	}{
+		{name: "ticks", args: args("index", "0", "text", "a `b`", "checked", "true"),
+			wantReq: &v1.SetPullRequestCheckboxRequest{RepoSlug: "o/r", Number: 142, Text: "a `b`", Checked: true}, wantMsg: "Changed task 1 on #142"},
+		{name: "unticks", args: args("index", "3", "text", "c", "checked", "false"),
+			wantReq: &v1.SetPullRequestCheckboxRequest{RepoSlug: "o/r", Number: 142, Index: 3, Text: "c"}, wantMsg: "Changed task 4 on #142"},
+		{name: "an item with no text on its line", args: args("index", "1", "text", "", "checked", "true"),
+			wantReq: &v1.SetPullRequestCheckboxRequest{RepoSlug: "o/r", Number: 142, Index: 1, Checked: true}, wantMsg: "Changed task 2 on #142"},
+		{name: "the item moved passes through", args: args("index", "0", "text", "c", "checked", "true"),
+			backend: func(g *commandtest.Gh) {
+				g.Err = connect.NewError(connect.CodeFailedPrecondition, errors.New("pull request #142 has a different task 1"))
+			},
+			wantReq: &v1.SetPullRequestCheckboxRequest{RepoSlug: "o/r", Number: 142, Text: "c", Checked: true}, wantCode: connect.CodeFailedPrecondition},
+		{name: "no permission passes through", args: args("index", "0", "text", "c", "checked", "true"),
+			backend: func(g *commandtest.Gh) {
+				g.Err = connect.NewError(connect.CodePermissionDenied, errors.New("Resource not accessible by integration"))
+			},
+			wantReq: &v1.SetPullRequestCheckboxRequest{RepoSlug: "o/r", Number: 142, Text: "c", Checked: true}, wantCode: connect.CodePermissionDenied},
+		{name: "index is required", args: args("checked", "true"), wantErr: command.ErrInvalidArgs},
+		{name: "checked is required", args: args("index", "0"), wantErr: command.ErrInvalidArgs},
+		{name: "a negative index", args: args("index", "-1", "checked", "true"), wantErr: command.ErrInvalidArgs},
+		{name: "an index over int32", args: args("index", "4294967296", "checked", "true"), wantErr: command.ErrInvalidArgs},
+		{name: "bad number", args: map[string]string{"repo-slug": "o/r", "number": "0", "index": "0", "checked": "true"}, wantErr: command.ErrInvalidArgs},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, be := newPullRequestRegistry(t)
+			if tt.backend != nil {
+				tt.backend(be)
+			}
+			res, err := reg.Invoke(context.Background(), command.Context{}, "pr.checkbox", tt.args)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("err = %v, want %v", err, tt.wantErr)
+				}
+				if len(be.Requests()) != 0 {
+					t.Errorf("requests = %v, want none", be.Requests())
+				}
+				return
+			}
+			if tt.wantCode != 0 {
+				if connect.CodeOf(err) != tt.wantCode {
+					t.Errorf("err = %v, want %v", err, tt.wantCode)
+				}
+			} else if err != nil || res.Message != tt.wantMsg {
+				t.Errorf("result = %+v, %v; want %q", res, err, tt.wantMsg)
+			}
+			reqs := be.Requests()
+			if len(reqs) != 1 || !proto.Equal(reqs[0], tt.wantReq) {
+				t.Errorf("requests = %v, want %v", reqs, tt.wantReq)
+			}
+		})
+	}
+}
