@@ -61,14 +61,15 @@ function concat(chunks: readonly Uint8Array[]): Uint8Array {
  *   Exited   -> phase "exited"; no reconnect after the stream ends
  *
  * Input is sent through an ordered queue (one Write in flight, later bytes coalesced),
- * so keystrokes never reorder across concurrent requests. Viewport resizes are
- * debounced into one Resize RPC.
+ * so keystrokes never reorder across concurrent requests, and a tab switch neither drops
+ * them nor moves them. Viewport resizes are debounced into one Resize RPC.
  */
 export class AttachController {
   private stopStream: (() => void) | null = null;
   private state: AttachState = { terminalId: null, phase: "idle", exitCode: null, error: null };
   private readonly subs: Disposable[];
-  private pending: Uint8Array[] = [];
+  /** Input not yet written, each with the terminal it was typed in: it goes there, whatever is attached by then. */
+  private pending: { id: string; data: Uint8Array }[] = [];
   private flushing = false;
   private resizeTimer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
@@ -149,7 +150,6 @@ export class AttachController {
     this.stopStream?.();
     this.stopStream = null;
     clearTimeout(this.resizeTimer);
-    this.pending = [];
     this.dropHeld();
     this.afterParsed = null;
     this.snapshots++;
@@ -303,32 +303,31 @@ export class AttachController {
   private input(data: Uint8Array): void {
     const id = this.state.terminalId;
     if (!id || this.state.phase === "exited" || this.state.phase === "idle") return;
-    this.pending.push(data);
-    void this.flush(id);
+    this.pending.push({ id, data });
+    void this.flush();
   }
 
-  private async flush(id: string): Promise<void> {
+  private async flush(): Promise<void> {
     if (this.flushing) return;
     this.flushing = true;
     try {
-      while (this.pending.length > 0 && this.state.terminalId === id) {
-        const chunk = concat(this.pending.splice(0));
+      for (let first = this.pending[0]; first; first = this.pending[0]) {
+        const { id } = first;
+        let keys = 1;
+        while (this.pending[keys]?.id === id) keys++;
+        const chunk = concat(this.pending.splice(0, keys).map((p) => p.data));
         try {
           await this.deps.write(id, chunk);
         } catch (err) {
           this.deps.onStreamError?.(err);
-          // A terminal left meanwhile: `pending` and the state are the next one's now.
-          if (this.state.terminalId !== id) continue;
-          this.setState({ error: `write failed: ${errorMessage(err)}` });
-          this.pending = [];
+          // Later keys would land with a hole before them.
+          this.pending = this.pending.filter((p) => p.id !== id);
+          if (this.state.terminalId === id) this.setState({ error: `write failed: ${errorMessage(err)}` });
         }
       }
     } finally {
       this.flushing = false;
     }
-    // Typed in the next terminal while that last write was out: its flush found this one running.
-    const next = this.state.terminalId;
-    if (next !== null && next !== id && this.pending.length > 0) void this.flush(next);
   }
 
   private scheduleResize(cols: number, rows: number, delay = this.resizeDebounceMs): void {

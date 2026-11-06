@@ -514,15 +514,61 @@ describe("AttachController", () => {
       c.dispose();
     });
 
-    it("drops what was queued for a terminal left behind, and never sends it to the next", async () => {
+    it("sends what was queued to the terminal it was typed in, not the one attached by then", async () => {
       ctl.attach("t1");
       await flush();
       r.type("a");
       r.type("queued");
       ctl.attach("t2");
       await flush();
+      r.type("b");
       await returnWrite();
-      expect(decoded()).toEqual(["t1:a"]);
+      await returnWrite();
+      expect(decoded()).toEqual(["t1:a", "t1:queued", "t2:b"]);
+    });
+
+    it("keeps each terminal's keys in order through a switch there and back", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.type("a");
+      r.type("b");
+      ctl.attach("t2");
+      await flush();
+      r.type("x");
+      ctl.attach("t1");
+      await flush();
+      r.type("c");
+      for (let i = 0; i < 4; i++) await returnWrite();
+      expect(decoded()).toEqual(["t1:a", "t1:b", "t2:x", "t1:c"]);
+    });
+
+    it("drops the rest of a terminal's keys when a write fails, and only its", async () => {
+      let fail: (err: Error) => void = () => undefined;
+      const seen: [string, string][] = [];
+      const c = new AttachController(
+        r,
+        {
+          attach: s.attach,
+          write: (id, data) => {
+            const text = new TextDecoder().decode(data);
+            seen.push([id, text]);
+            return text === "a" ? new Promise<void>((_, reject) => (fail = reject)) : Promise.resolve();
+          },
+          resize: () => Promise.resolve(),
+        },
+        () => undefined,
+      );
+      c.attach("t1");
+      await flush();
+      r.type("a");
+      r.type("hole before it");
+      c.attach("t2");
+      await flush();
+      r.type("b");
+      fail(new Error("gone"));
+      await flush();
+      expect(seen).toEqual([["t1", "a"], ["t2", "b"]]);
+      c.dispose();
     });
 
     it("sends each keystroke once through a stream dropped for falling behind, and in order", async () => {
