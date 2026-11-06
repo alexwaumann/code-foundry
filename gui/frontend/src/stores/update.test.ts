@@ -201,9 +201,12 @@ describe("a daemon from before the tunnel", () => {
     expect(getUpdateStatus).not.toHaveBeenCalled();
   });
 
-  it("clears once a restart brings a daemon this window can follow", () => {
+  it("clears, and closes its dialog, once a restart brings a daemon this window can follow", async () => {
     seen("v0.21.5");
+    await vi.waitFor(() => {
+      expect(useUpdateStore.getState().dialogOpen).toBe(true);
+    });
     seen("v0.22.0");
-    expect(useUpdateStore.getState().oldDaemon).toBe(false);
+    expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
   });
 });

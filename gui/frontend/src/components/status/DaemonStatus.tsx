@@ -4,6 +4,7 @@ import { displayVersion } from "@/lib/update";
 import { cn } from "@/lib/utils";
 import { useEventsStore } from "@/stores/events";
 import { useHealthStore } from "@/stores/health";
+import { useUpdateStore } from "@/stores/update";
 
 const dot = {
   connecting: "bg-cf-warning",
@@ -13,6 +14,9 @@ const dot = {
 
 /** Why the row says "no live updates": calls reach the daemon and its streams do not. */
 const SILENT_DETAIL = "the daemon answers but its streams do not open; something on this Mac may be blocking ws://127.0.0.1";
+
+/** The same on a daemon from before the tunnel, where the update chip beside it has the answer. */
+const OLD_DAEMON_DETAIL = "this daemon is older than the app's streams; restart to finish the update";
 
 /** "events" while the shared events stream is not open (connecting or reconnecting). */
 function useDegradedStreams(): string {
@@ -33,8 +37,9 @@ export function DaemonStatus() {
   const error = useHealthStore((s) => s.error);
   const degraded = useDegradedStreams();
   const silent = useEventsStore((s) => s.silent) && status === "ok";
+  const oldDaemon = useUpdateStore((s) => s.oldDaemon);
   const label = status === "ok" ? "daemon" : status === "error" ? "daemon unreachable" : "connecting";
-  const details = [label, pid !== undefined && `pid ${String(pid)}`, uptime !== undefined && `up ${formatUptime(uptime)}`, status === "error" && error, silent && SILENT_DETAIL]
+  const details = [label, pid !== undefined && `pid ${String(pid)}`, uptime !== undefined && `up ${formatUptime(uptime)}`, status === "error" && error, silent && (oldDaemon ? OLD_DAEMON_DETAIL : SILENT_DETAIL)]
     .filter(Boolean)
     .join(" · ");
 

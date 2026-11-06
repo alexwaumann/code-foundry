@@ -158,6 +158,8 @@ function watchForOldDaemon(): () => void {
     if (version === seen) return;
     seen = version;
     const oldDaemon = predatesTunnel(version);
+    // A restart from a terminal has settled it: the dialog that asked for one has nothing to say.
+    if (useUpdateStore.getState().oldDaemon && !oldDaemon) closeUpdateDialog();
     useUpdateStore.setState({ oldDaemon });
     if (!oldDaemon) return;
     getUpdateStatus()
