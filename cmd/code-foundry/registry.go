@@ -64,6 +64,19 @@ func (cl *cli) env(key string) string {
 // threadEnv is --context-thread's default: $CODE_FOUNDRY_THREAD.
 func (cl *cli) threadEnv() string { return cl.env(paths.EnvThread) }
 
+// inThread reports whether a thread's Claude process runs this CLI: only there does the
+// daemon set both the thread id and the endpoint. A thread's action runs have the id alone
+// and may be a person's terminal; plugins and search runs have the endpoint alone.
+func (cl *cli) inThread() bool { return cl.threadEnv() != "" && cl.env(paths.EnvEndpoint) != "" }
+
+// helpStyle is the help a model pays for inside a thread, the whole text anywhere else.
+func (cl *cli) helpStyle() guide.HelpStyle {
+	if cl.inThread() {
+		return guide.HelpThread
+	}
+	return guide.HelpFull
+}
+
 func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {
 	wt, err := cl.absPath(cf.worktree)
 	if err != nil {
@@ -243,7 +256,7 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	words, err := cl.parseWithPositionals(fs, rest)
 	if errors.Is(err, errHelp) {
 		// Asked for (-h), so stdout: `thread new -h | less` reads it.
-		guide.WriteHelp(cl.stdout, cmd, true)
+		guide.WriteHelp(cl.stdout, cmd, cl.helpStyle())
 		return nil
 	}
 	if err != nil {
@@ -513,6 +526,6 @@ func (cl *cli) commandHelp(ctx context.Context, words []string) error {
 		fmt.Fprintf(cl.stderr, "code-foundry help: unexpected arguments %v\n", rest)
 		return errUsage
 	}
-	guide.WriteHelp(cl.stdout, cmd, true)
+	guide.WriteHelp(cl.stdout, cmd, cl.helpStyle())
 	return nil
 }

@@ -15,10 +15,9 @@ import (
 // is generated from CommandService.List (the palette's source) at every run, so it
 // never drifts from the commands; internal/guide renders it. See docs/notes/agents-5-cli.md.
 //
-// `code-foundry guide` is the intro, the conventions and the thread commands, and names
-// the other categories' topics; `code-foundry guide <topic>` prints one
-// (docs/notes/hidden-children-1-daemon.md: the whole guide outgrew what an agent's Bash
-// tool reads at once).
+// `code-foundry guide` is the intro, the conventions and the command index; `code-foundry
+// guide <topic>` prints one category in full, thread among them
+// (docs/notes/guide-command-index.md).
 func runGuide(ctx context.Context, cl *cli, args []string) error {
 	fs := cl.newFlagSet("guide")
 	if err := fs.Parse(args); err != nil {

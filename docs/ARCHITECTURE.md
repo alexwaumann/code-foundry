@@ -595,7 +595,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   embedded, references rendered from the registry and the settings schema through
   `internal/guide`, `docs/GETTING-STARTED.md` embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
   `--add-dir`, before the attachments dir, a workspace's managed dir, the other members' checkouts and grants
-  (`docs/notes/agent-skills.md`). The entry skill's Scopes say where a standing rule goes:
+  (`docs/notes/agent-skills.md`). The entry skill's `reference/scopes.md` says where a standing rule goes:
   the app memory (every project), the workspace's folder that `thread checkouts` prints
   (`CLAUDE.md`, `.claude/skills/<name>/SKILL.md`: a set of projects; `ThreadPrompt` says
   so too) or a repo's own `CLAUDE.md`, and that a member's `CLAUDE.md` is read before
@@ -793,9 +793,12 @@ idempotent (`thread_requests`); `thread.read` pages items; `thread.send --wait` 
 `thread.wait --after` wait for the turn after a message, and a plain `thread.wait` for
 the turn after the thread's latest message (`docs/notes/send-ordinal-wait-after.md`). `code-foundry guide` (a local
 verb, like `--help`) prints a Markdown guide for agents generated from `CommandService.List`
-(`internal/guide`, which also renders the skills' command references): the conventions and
-the Thread commands, and a topic per other category that `code-foundry guide <topic>`
-prints (`docs/notes/hidden-children-1-daemon.md`).
+(`internal/guide`, which also renders the entry skill's `reference/commands.md`): the
+conventions and the command index (verb and title per category; a registered verb is listed
+unless `Command.NoIndex` marks it), and a topic per category that `code-foundry guide <topic>`
+prints in full, `thread` with its own conventions (`docs/notes/guide-command-index.md`).
+Inside a thread's Claude process `help` leaves out flags only the GUI or the CLI sets and
+puts the common flags on one line; everywhere else it prints the whole text.
 
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md; `pr.review`, `pr.comment`;

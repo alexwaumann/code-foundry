@@ -17,7 +17,7 @@ Read these (next to this file) with your Read tool instead of answering from mem
   topic here first and use its words for buttons, pages and shortcuts.
 - `reference/settings.md`: every setting: key, title (the Settings page's label), what it does,
   allowed values, default, and whether it needs a daemon restart.
-- `reference/commands.md`: the commands, also in the palette (⌘K); `code-foundry help <command>`.
+- {{cf.commandsRef}}: every command, also in the palette (⌘K); `code-foundry help <command>`.
 
 None covers it: read the source (below); still unanswered, say so rather than guess.
 
@@ -79,7 +79,7 @@ A workspace is a saved set of projects (a product's repos) with a folder for the
 skills that span them. The Projects page has a page per workspace (projects, threads, instructions
 file, skills); Save as workspace in a thread's title menu makes one (`code-foundry workspace new <name>
 --projects a,b`). Its folder (`code-foundry workspace list`) holds `CLAUDE.md` and
-`.claude/skills/<name>/SKILL.md`: offer to write them (the code-foundry skill's "Scopes"). Adding
+`.claude/skills/<name>/SKILL.md`: offer to write them (the code-foundry skill's `reference/scopes.md`). Adding
 or removing a thread's project (card's project menu, `thread project add|remove`) leaves its workspace.
 
 ## The welcome tutorial

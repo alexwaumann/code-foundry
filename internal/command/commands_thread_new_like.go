@@ -17,6 +17,7 @@ import (
 func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 	return Command{
 		Name:         "thread.new-like",
+		NoIndex:      true,
 		Title:        "New thread on this branch",
 		Description:  "Start a new thread with this thread's projects, branch, primary, workspace and mode (thread new --like).",
 		Category:     "Thread",

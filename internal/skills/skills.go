@@ -93,12 +93,7 @@ type reference struct {
 // references are the rendered files, beside the static ones. A new reference is a new
 // entry here.
 var references = []reference{
-	{Orchestrate + "/reference/commands.md", commandsReference(
-		"Commands for orchestrating threads",
-		[]guide.Category{{Name: "Thread", Detailed: true}, {Name: "Action"}, {Name: "Workspace"}, {Name: "Project"}})},
-	{Help + "/reference/commands.md", commandsReference(
-		"Commands for projects, settings, threads, pull requests, actions and the app's views",
-		[]guide.Category{{Name: "Project"}, {Name: "Settings", Detailed: true}, {Name: "Thread"}, {Name: "Pull Request"}, {Name: "Action"}, {Name: "View"}})},
+	{Entry + "/reference/commands.md", commandIndex},
 	{Help + "/reference/settings.md", settingsReference},
 	{Help + "/reference/getting-started.md", func(w io.Writer, src Sources) {
 		_, _ = w.Write(underTitle(docs.GettingStarted, src.Provenance()))
@@ -245,22 +240,11 @@ func underTitle(b []byte, line string) []byte {
 	return append(out, rest...)
 }
 
-// commandsReference renders cats of src.Commands in the CLI guide's format.
-func commandsReference(title string, cats []guide.Category) func(io.Writer, Sources) {
-	return func(w io.Writer, src Sources) {
-		header(w, title, "commands", src)
-		fmt.Fprint(w, `
-How to read it:
-
-- Run a command by its dotted name or with spaces: `+"`code-foundry thread.new ...` = `code-foundry thread new ...`"+`.
-  `+"`<arg>`"+` is positional; every other arg is a `+"`--flag`"+`.
-- `+"`[--id]`"+`: the thread the command acts on, by default your own (`+"`$CODE_FOUNDRY_THREAD`"+`). Ids take a unique
-  suffix of 4+ characters.
-- `+"`--yes`"+`: the command may ask for confirmation, and without it then exits 2 and does nothing.
-- Every command takes `+"`--json`"+`. `+"`code-foundry help <command>`"+` prints every flag of one command.
-`)
-		guide.WriteCategories(w, src.Commands, cats)
-	}
+// commandIndex renders the one list of verbs every skill points at.
+func commandIndex(w io.Writer, src Sources) {
+	header(w, "Commands", "commands", src)
+	fmt.Fprintln(w)
+	guide.WriteIndex(w, src.Commands)
 }
 
 // settingsReference renders every setting of src.

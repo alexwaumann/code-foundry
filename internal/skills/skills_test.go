@@ -96,12 +96,13 @@ func TestRender(t *testing.T) {
 		paths = append(paths, p)
 	}
 	want := []string{
-		"code-foundry/SKILL.md",
-		"code-foundry-orchestrate/SKILL.md", "code-foundry-orchestrate/reference/commands.md",
+		"code-foundry/SKILL.md", "code-foundry/reference/commands.md",
+		"code-foundry/reference/making-a-theme.md", "code-foundry/reference/scopes.md",
+		"code-foundry-orchestrate/SKILL.md",
 		"code-foundry-orchestrate/reference/patterns.md", "code-foundry-orchestrate/reference/wakes.md",
 		"code-foundry-orchestrate/reference/leads.md", "code-foundry-orchestrate/reference/sidebar.md",
 		"code-foundry-help/SKILL.md", "code-foundry-help/reference/getting-started.md",
-		"code-foundry-help/reference/settings.md", "code-foundry-help/reference/commands.md",
+		"code-foundry-help/reference/settings.md",
 		"code-foundry-help/reference/themes.md",
 	}
 	want = append(want, pluginSkillFiles...)
@@ -148,46 +149,17 @@ func TestRender(t *testing.T) {
 		}
 	}
 
-	// Each command reference lists its categories, and only those, with every command the
-	// guide lists in them.
-	for _, tt := range []struct {
-		path     string
-		cats     []string
-		notCats  []string
-		detailed string // an arg line only the detailed category has
-	}{
-		{
-			path: skills.Orchestrate + "/reference/commands.md", cats: []string{"Thread", "Action", "Workspace", "Project"},
-			notCats: []string{"Settings", "Pull Request", "View"}, detailed: "  - `--request-id string`",
-		},
-		{
-			// Settings in full, Thread one line each.
-			path: skills.Help + "/reference/commands.md", cats: []string{"Project", "Settings", "Thread", "Pull Request", "Action", "View"},
-			notCats: []string{"Workspace", "Terminal"}, detailed: "  - `<value>`",
-		},
-	} {
-		got := string(files[tt.path])
-		for _, c := range tt.cats {
-			if !strings.Contains(got, "\n## "+c+"\n") {
-				t.Errorf("%s lacks category %s", tt.path, c)
-			}
-		}
-		for _, c := range tt.notCats {
-			if strings.Contains(got, "\n## "+c+"\n") {
-				t.Errorf("%s has category %s", tt.path, c)
-			}
-		}
-		if !strings.Contains(got, tt.detailed) {
-			t.Errorf("%s lacks %q", tt.path, tt.detailed)
-		}
-		for _, c := range src.Commands {
-			if slices.Contains(tt.cats, c.GetCategory()) && !guide.LeftOut(c) && !strings.Contains(got, "- `"+c.GetName()) {
-				t.Errorf("%s lacks %s", tt.path, c.GetName())
-			}
+	// One command index, in the entry skill, and the other skills name where it is.
+	index := string(files[skills.Entry+"/reference/commands.md"])
+	for _, c := range src.Commands {
+		if n := strings.Count(index, "- `"+c.GetName()+"` "); n != b2i(!guide.LeftOut(c)) {
+			t.Errorf("the index lists %s %d times; left out: %t", c.GetName(), n, guide.LeftOut(c))
 		}
 	}
-	if help := string(files[skills.Help+"/reference/commands.md"]); strings.Contains(help, "  - `--request-id") {
-		t.Error("the help skill lists thread.new's args; it has the one-line form")
+	for _, s := range []string{skills.Help, skills.Orchestrate} {
+		if !bytes.Contains(files[s+"/SKILL.md"], []byte("reference/commands.md")) {
+			t.Errorf("%s does not say where the command index is", s)
+		}
 	}
 
 	// The entry skill routes: to every other skill, and to every capabilities group.
@@ -356,4 +328,12 @@ func TestShipped(t *testing.T) {
 			t.Errorf("Shipped lists %s, which Render does not ship", s.Name)
 		}
 	}
+}
+
+// b2i is 1 for true.
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

@@ -100,6 +100,12 @@ class Run(unittest.TestCase):
         self.assertTrue(r["skill_ok"])
         self.assertEqual((r["guidance_bytes"], r["guide"], r["caps"], len(r["reads"])), (200, 1, 1, 2))
 
+    def test_index_reads_past_a_long_path(self):
+        long = "cd /Users/x/.cf-guide-eval-1234abcd/r1/home/claude/.claude/skills/code-foundry && grep -n model reference/commands.md"
+        self.assertEqual(score.score_thread([bash(long, "45:- `thread.set-model` Set Thread Model")], {}, FILES)["index"], 1)
+        read = tool("Read", {"file_path": "/h/.claude/skills/code-foundry/reference/commands.md"}, "x")
+        self.assertEqual(score.score_thread([read], {}, FILES)["index"], 1)
+
     def test_routing_is_the_root_threads_cost_is_the_trees(self):
         child = [tool("Skill", {"skill": "code-foundry"}), bash("code-foundry thread subscribe --at 2h"), turn(0.5)]
         r = score.score_run(self.task, [turn(0.25)], [child], FILES)

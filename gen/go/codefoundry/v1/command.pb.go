@@ -359,7 +359,10 @@ type Command struct {
 	// The GUI palette does not list it: a query whose only output is a text toast, a verb
 	// for the model or the CLI to drive the app, or one whose required arg is an opaque id
 	// the palette can only take as typed text. The CLI, pages and chords still have it.
-	NoPalette     bool `protobuf:"varint,10,opt,name=no_palette,json=noPalette,proto3" json:"no_palette,omitempty"`
+	NoPalette bool `protobuf:"varint,10,opt,name=no_palette,json=noPalette,proto3" json:"no_palette,omitempty"`
+	// The agents' command index leaves it out: a control of the GUI or the user's own, with
+	// no use to a model. The CLI, --help and daemon.capabilities still have it.
+	NoIndex       bool `protobuf:"varint,11,opt,name=no_index,json=noIndex,proto3" json:"no_index,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -460,6 +463,13 @@ func (x *Command) GetReadOnly() bool {
 func (x *Command) GetNoPalette() bool {
 	if x != nil {
 		return x.NoPalette
+	}
+	return false
+}
+
+func (x *Command) GetNoIndex() bool {
+	if x != nil {
+		return x.NoIndex
 	}
 	return false
 }
@@ -899,7 +909,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"repeatable\x12\x0e\n" +
 	"\x02id\x18\f \x01(\bR\x02id\x12#\n" +
 	"\rcontext_bound\x18\r \x01(\bR\fcontextBound\x12\x12\n" +
-	"\x04rest\x18\x0e \x01(\bR\x04rest\"\xcf\x02\n" +
+	"\x04rest\x18\x0e \x01(\bR\x04rest\"\xea\x02\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -912,7 +922,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\tread_only\x18\t \x01(\bR\breadOnly\x12\x1d\n" +
 	"\n" +
 	"no_palette\x18\n" +
-	" \x01(\bR\tnoPalette\"{\n" +
+	" \x01(\bR\tnoPalette\x12\x19\n" +
+	"\bno_index\x18\v \x01(\bR\anoIndex\"{\n" +
 	"\x13ListCommandsRequest\x123\n" +
 	"\acontext\x18\x01 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\x12/\n" +
 	"\x13include_unavailable\x18\x02 \x01(\bR\x12includeUnavailable\"K\n" +

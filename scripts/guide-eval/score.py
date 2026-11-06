@@ -66,13 +66,17 @@ def tool_calls(items):
         yield v.get("name"), inp, v.get("output") or "", bool(v.get("isError")) or "ERROR" in str(v.get("status"))
 
 
+# The command index, read whole or grepped for a verb.
+INDEX = "reference/commands.md"
+
+
 def skill_size(files, name):
     return files.get(f"{name.split(':')[-1]}/SKILL.md", 0)
 
 
 def score_thread(items, task, files):
     """One thread's counts. `task` gives allow_fail, `files` the shipped sizes."""
-    s = dict(skills=[], reads=[], cli=[], failed=[], help=0, guide=0, caps=0, fetches=0, guidance_bytes=0, cost=0.0, turns=0, text="")
+    s = dict(skills=[], reads=[], cli=[], failed=[], help=0, guide=0, caps=0, fetches=0, index=0, guidance_bytes=0, cost=0.0, turns=0, text="")
     allow = task.get("allow_fail")
     for it in items:
         if "turnEnd" in it:
@@ -90,6 +94,7 @@ def score_thread(items, task, files):
             if SKILLS_DIR in path:
                 rel = path.split(SKILLS_DIR)[1]
                 s["reads"].append(rel)
+                s["index"] += rel.endswith(INDEX)
                 s["guidance_bytes"] += len(out.encode())
                 if rel.endswith("/SKILL.md"):
                     s["skills"].append(rel.split("/")[0])
@@ -106,6 +111,7 @@ def score_thread(items, task, files):
             skill_files = SKILLS_DIR in cmd
             if skill_files:
                 s["reads"].append("sh: " + cmd[:90].replace("\n", " "))
+                s["index"] += INDEX in cmd  # from the command: `reads` keeps only its start
             if helps or guides or caps or skill_files:
                 s["guidance_bytes"] += len(out.encode())
             if found and CLI_ERROR.search(out) and not (allow and re.search(allow, out)):
@@ -133,7 +139,7 @@ def score_run(task, root_items, other_items, files):
     return dict(task=task["id"], skill_ok=(want in root["skills"]) if want else None, verb_ok=verb_ok, skills=root["skills"],
                 reads=[r for s in every for r in s["reads"]], cli=root["cli"], failed=[f for s in every for f in s["failed"]],
                 help=sum(s["help"] for s in every), fetches=sum(s["fetches"] for s in every),
-                guide=sum(s["guide"] for s in every), caps=sum(s["caps"] for s in every),
+                guide=sum(s["guide"] for s in every), caps=sum(s["caps"] for s in every), index=sum(s["index"] for s in every),
                 wrong_turns=wrong, guidance_bytes=sum(s["guidance_bytes"] for s in every),
                 cost=round(sum(s["cost"] for s in every), 4), turns=sum(s["turns"] for s in every), threads=len(every))
 
@@ -177,7 +183,6 @@ def write_report(out, tasks=None):
 
 def totals(rows):
     skill = [r for r in rows if r["skill_ok"] is not None]
-    reads = [x for r in rows for x in r["reads"]]
     return dict(runs=len(rows), invalid=sum(not r["valid"] for r in rows),
                 skill_hits=sum(bool(r["skill_ok"]) for r in skill), skill_total=len(skill),
                 verb_hits=sum(r["verb_ok"] for r in rows), verb_total=len(rows),
@@ -186,7 +191,7 @@ def totals(rows):
                 wrong_turns=sum(r["wrong_turns"] for r in rows), failed_cli=sum(len(r["failed"]) for r in rows),
                 help_hops=sum(r["help"] for r in rows), fetches=sum(r["fetches"] for r in rows),
                 guide_calls=sum(r["guide"] for r in rows), capabilities_calls=sum(r["caps"] for r in rows),
-                commands_md_reads=sum("reference/commands.md" in x for x in reads),
+                commands_md_reads=sum(r["index"] for r in rows),
                 cost=round(sum(r["cost"] for r in rows), 2))
 
 

@@ -33,6 +33,9 @@ const (
 	// agent then greps it instead of reading it (seen in the e2e). This is that limit with a
 	// margin, not a target: no run of the guide eval called `guide` at all.
 	wholeOutput = "Bash sets output over 30,000 characters aside, and the agent then greps it"
+	// The guide is the intro, the conventions and the command index, and only the index
+	// grows by itself: about 40 bytes a verb, so this is room for twenty.
+	shortGuide = "the guide's detail belongs in a topic; a verb's in its --help"
 	// A reference is read when a skill points at it and an agent reads it whole; past this
 	// it should be two files. It is the plugin skill's old file limit, now for every skill.
 	wholeRead = "an agent reads a reference whole; split it instead"
@@ -52,7 +55,7 @@ var skillBudgets = []struct {
 	description int
 	body        int
 }{
-	{skills.Entry, 420, 8_300},
+	{skills.Entry, 420, 6_800},
 	{skills.Help, 400, 7_900},
 	{skills.Orchestrate, 540, 9_700},
 	{skills.Pages, 400, 10_600},
@@ -65,7 +68,8 @@ const (
 	// prompts in a project thread wrote unthemed pages into the repo, 1 of 15 routed against
 	// 14 of 20 with them (page-library-fixes-b). Anything new has to pay with a cut.
 	threadPromptBudget = 1_641
-	guideBudget        = 29_000
+	guideBudget        = 11_000
+	topicBudget        = 29_000
 	referenceBudget    = 32 << 10
 )
 
@@ -110,13 +114,13 @@ func TestBudgets(t *testing.T) {
 
 	var buf bytes.Buffer
 	guide.Write(&buf, src.Commands, "s-7754a478e649")
-	check(budget{"the guide", guideBudget, wholeOutput}, buf.Len())
+	check(budget{"the guide", guideBudget, shortGuide}, buf.Len())
 	for _, tp := range guide.Topics(src.Commands) {
 		buf.Reset()
 		if err := guide.WriteTopic(&buf, src.Commands, tp.Name); err != nil {
 			t.Fatal(err)
 		}
-		check(budget{"guide topic " + tp.Name, guideBudget, wholeOutput}, buf.Len())
+		check(budget{"guide topic " + tp.Name, topicBudget, wholeOutput}, buf.Len())
 	}
 
 	for p, b := range files {

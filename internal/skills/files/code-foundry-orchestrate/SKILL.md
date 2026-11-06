@@ -129,8 +129,7 @@ To discard a child's work: `reference/patterns.md` §7.
 
 ## More
 
-- `reference/commands.md` (next to this file): every thread, action, workspace and project
-  command with its flags; read it (or `code-foundry help <command>`) before a new flag.
+- {{cf.commandsRef}}: every command. `code-foundry help <command>` before a new flag.
 - `reference/patterns.md`: §0 the child's prompt; examples (a wait, fanning out, a sibling's
   branch, several projects, review, CI); §5 supervised; §6 budget; §7 discarding; §8 batch check.
 - `reference/wakes.md`: reading a wake and its turn. `reference/leads.md`: leads.

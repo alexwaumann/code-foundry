@@ -48,7 +48,7 @@ func ThemeAskContext(onPage bool, dark, light theme.Theme, pair *theme.File, pai
 	}
 	ctx := fmt.Sprintf("%s; their first message in this thread describes it. The current dark theme is %s (%s) and the light theme is %s (%s). "+
 		"Make the theme they describe, save it with `code-foundry theme save --file <path> --apply`, and keep refining it in this thread "+
-		"(the code-foundry skill: Making a theme).", where, dark.Name, dark.ID, light.Name, light.ID)
+		"(the code-foundry skill's reference/making-a-theme.md).", where, dark.Name, dark.ID, light.Name, light.ID)
 	if pair != nil {
 		ctx += " " + ThemePairAsk(*pair, pairID)
 	}

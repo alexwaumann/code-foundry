@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -123,4 +125,56 @@ func TestCLIThreadDefaultAndExitCode(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Help is trimmed only where a model reads it: a thread's Claude process, which alone has
+// both variables. A thread's action run has the id alone, plugins and search runs the
+// endpoint alone, and a plain terminal neither.
+func TestHelpInAThread(t *testing.T) {
+	path, h := codefoundryv1connect.NewCommandServiceHandler(&helpCommands{cmd: &v1.Command{
+		Name: "thread.send", Title: "Send", Category: "Thread", Available: true, Args: []*v1.ArgSpec{
+			{Name: "composer-text", Type: v1.ArgType_ARG_TYPE_STRING, Description: "Composer text (the GUI sets it)"},
+		}}})
+	mux := http.NewServeMux()
+	mux.Handle(path, h)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := &client.Client{Command: codefoundryv1connect.NewCommandServiceClient(srv.Client(), srv.URL)}
+	for _, tt := range []struct {
+		name    string
+		env     map[string]string
+		trimmed bool
+	}{
+		{"a thread's Claude process", map[string]string{paths.EnvThread: "s-1", paths.EnvEndpoint: "http://127.0.0.1:1"}, true},
+		{"a thread's action run", map[string]string{paths.EnvThread: "s-1"}, false},
+		{"a plugin or a search run", map[string]string{paths.EnvEndpoint: "http://127.0.0.1:1"}, false},
+		{"a plain terminal", map[string]string{}, false},
+		{"no environment at all", nil, false},
+	} {
+		for _, args := range [][]string{{"help", "thread", "send"}, {"thread", "send", "-h"}, {"thread.send", "--help"}} {
+			var stdout bytes.Buffer
+			cl := &cli{stdout: &stdout, stderr: io.Discard, getwd: func() (string, error) { return "/work", nil },
+				connect: func(context.Context) (*client.Client, error) { return c, nil }}
+			if tt.env != nil {
+				cl.getenv = func(k string) string { return tt.env[k] }
+			}
+			if err := cl.dispatch(context.Background(), args); err != nil {
+				t.Fatalf("%s: %v: %v", tt.name, args, err)
+			}
+			out := stdout.String()
+			if got := !strings.Contains(out, "--composer-text") && !strings.Contains(out, "--context-worktree path"); got != tt.trimmed {
+				t.Errorf("%s: %v trimmed %t, want %t:\n%s", tt.name, args, got, tt.trimmed, out)
+			}
+		}
+	}
+}
+
+// helpCommands serves one command, for help to read.
+type helpCommands struct {
+	codefoundryv1connect.UnimplementedCommandServiceHandler
+	cmd *v1.Command
+}
+
+func (f *helpCommands) List(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error) {
+	return connect.NewResponse(&v1.ListCommandsResponse{Commands: []*v1.Command{f.cmd}}), nil
 }

@@ -245,6 +245,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		},
 		Command{
 			Name:         "worktree.editors",
+			NoIndex:      true,
 			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Editor Apps",
