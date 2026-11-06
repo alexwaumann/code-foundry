@@ -26,6 +26,9 @@ export type SortOrder = "newest" | "oldest";
  */
 export type PrSection = "description" | "fullDescription" | "checks" | "comments" | "files";
 
+/** Which change of the pull request is running (`changing`): each button spins only for its own. */
+export type PrChange = "ready" | "draft" | "auto-merge" | "cancel-auto-merge";
+
 export interface PrTabState {
   inner: PrInnerTab;
   commentOrder: SortOrder;
@@ -57,13 +60,15 @@ interface PrPanelState {
   merging: Readonly<Record<string, boolean>>;
   /** pullRequestKey → a pr.review in flight (until the detail shows it). */
   reviewing: Readonly<Record<string, boolean>>;
-  /** pullRequestKey → a pr.ready, pr.draft or pr.auto-merge in flight (until the detail shows it). */
-  changing: Readonly<Record<string, boolean>>;
+  /** pullRequestKey → the pr.ready, pr.draft or pr.auto-merge in flight (until the detail shows it). */
+  changing: Readonly<Record<string, PrChange>>;
+  /** pullRequestKey → a pr.revert in flight (from its confirmation on). */
+  reverting: Readonly<Record<string, boolean>>;
   /** Lower-case repository slug → the merge method last chosen there (the split button's default). */
   mergeMethods: Readonly<Record<string, MergeMethodView>>;
 }
 
-export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, mergeMethods: {} }));
+export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, mergeMethods: {} }));
 
 export const prTabKey = (panelKey: string, tabId: string): string => `${panelKey}\u0000${tabId}`;
 
@@ -237,25 +242,36 @@ export async function setReviewRequest(ref: PrRef, login: string, kind: "user" |
 /**
  * Menu → Revert changes: pr.revert (the daemon asks for confirmation; the confirm dialog
  * handles it). On success, toasts the new pull request and opens it as another tab of
- * the same panel. Returns the new pull request, or null.
+ * the same panel. Returns the new pull request, or null; a second call while one runs
+ * sends nothing, so it cannot open a second revert.
  */
 export async function revertPullRequest(ref: PrRef, panel: PanelTarget): Promise<PrRef | null> {
-  const res = await runCommandForResult("pr.revert", prArgs(ref), { quiet: true });
-  if (!res) return null;
-  const made = parseRevertResult(res.resultJson);
-  pullRequestDetailResource.invalidate(pullRequestKey(ref.slug, ref.number));
-  if (!made) {
-    if (res.message) toast.success(res.message);
-    return null;
+  const key = pullRequestKey(ref.slug, ref.number);
+  if (usePrPanelStore.getState().reverting[key]) return null;
+  usePrPanelStore.setState((s) => ({ reverting: { ...s.reverting, [key]: true } }));
+  try {
+    const res = await runCommandForResult("pr.revert", prArgs(ref), { quiet: true });
+    if (!res) return null;
+    const made = parseRevertResult(res.resultJson);
+    pullRequestDetailResource.invalidate(key);
+    if (!made) {
+      if (res.message) toast.success(res.message);
+      return null;
+    }
+    const url = made.url || pullRequestUrl({ slug: ref.slug, number: made.number });
+    toast.success(`Opened #${String(made.number)} to revert #${String(ref.number)}`, {
+      description: url,
+      action: { label: "Open on GitHub", onClick: () => void openUrl(url) },
+    });
+    const next = { slug: ref.slug, number: made.number };
+    openPullRequestInPanel(next, panel);
+    return next;
+  } finally {
+    usePrPanelStore.setState((s) => {
+      const { [key]: _done, ...rest } = s.reverting;
+      return { reverting: rest };
+    });
   }
-  const url = made.url || pullRequestUrl({ slug: ref.slug, number: made.number });
-  toast.success(`Opened #${String(made.number)} to revert #${String(ref.number)}`, {
-    description: url,
-    action: { label: "Open on GitHub", onClick: () => void openUrl(url) },
-  });
-  const next = { slug: ref.slug, number: made.number };
-  openPullRequestInPanel(next, panel);
-  return next;
 }
 
 /**
@@ -330,10 +346,10 @@ export function rememberMergeMethod(slug: string, method: MergeMethodView): void
  * shows the new state when its button comes back; a failure frees it at once. A second
  * call while one runs sends nothing.
  */
-async function changePullRequest(ref: PrRef, command: string, args: Record<string, string>): Promise<boolean> {
+async function changePullRequest(ref: PrRef, change: PrChange, command: string, args: Record<string, string>): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().changing[key]) return false;
-  usePrPanelStore.setState((s) => ({ changing: { ...s.changing, [key]: true } }));
+  usePrPanelStore.setState((s) => ({ changing: { ...s.changing, [key]: change } }));
   let ok = false;
   try {
     ok = await runCommand(command, args);
@@ -348,9 +364,14 @@ async function changePullRequest(ref: PrRef, command: string, args: Record<strin
   }
 }
 
+/** The change running on ref (null: none). Any of them makes the others wait. */
+export function usePullRequestChange(ref: PrRef): PrChange | null {
+  return usePrPanelStore((s) => s.changing[pullRequestKey(ref.slug, ref.number)] ?? null);
+}
+
 /** The draft row's Ready for review (pr.ready) and the menu's Convert to draft (pr.draft). */
 export function setPullRequestDraft(ref: PrRef, draft: boolean): Promise<boolean> {
-  return changePullRequest(ref, draft ? "pr.draft" : "pr.ready", prArgs(ref));
+  return changePullRequest(ref, draft ? "draft" : "ready", draft ? "pr.draft" : "pr.ready", prArgs(ref));
 }
 
 /** pr.auto-merge's args: on with a method and the head shown (refused if it moved), or --off. */
@@ -365,7 +386,7 @@ export function autoMergeArgs(ref: PrRef, method: MergeMethodView | null, headSh
  * repository's default only once auto-merge is on (not when declined or refused).
  */
 export async function setAutoMerge(ref: PrRef, method: MergeMethodView | null, headSha: string): Promise<boolean> {
-  const ok = await changePullRequest(ref, "pr.auto-merge", autoMergeArgs(ref, method, headSha));
+  const ok = await changePullRequest(ref, method === null ? "cancel-auto-merge" : "auto-merge", "pr.auto-merge", autoMergeArgs(ref, method, headSha));
   if (ok && method !== null) rememberMergeMethod(ref.slug, method);
   return ok;
 }

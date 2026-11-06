@@ -27,7 +27,7 @@ export interface TerminalRenderer {
    * frames); `parsed` runs once this data has been applied to the grid.
    */
   write(data: Uint8Array, parsed?: () => void): void;
-  /** Full reset (RIS) plus cleared scrollback; used before a snapshot. */
+  /** Full reset (RIS) plus cleared scrollback, cursor showing; used before a snapshot. */
   reset(): void;
   /**
    * Hides the cursor (DECTCEM off, as a program would), after any output already written.

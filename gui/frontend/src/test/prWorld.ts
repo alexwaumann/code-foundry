@@ -637,9 +637,10 @@ export class PrWorld {
       this.details.set(key(slug, n), { ...d, reviewers: reviewers.filter((r) => r.requested || r.state !== "") });
       return { message: requested ? `Requested a review from ${login} on #${String(n)}` : `Withdrew the review request for ${login} on #${String(n)}`, resultJson: "" };
     });
-    h.set("pr.revert", (inv) => {
+    h.set("pr.revert", async (inv) => {
       const [slug, n, d] = this.target(inv);
       if (!inv.confirmed) throw needsConfirm({ command: "pr.revert", title: titles["pr.revert"], message: `This opens a new pull request that reverses the changes merged by #${String(n)}.` });
+      await this.gate("pr.revert");
       const done = this.reverts.get(key(slug, n));
       const made = done ?? this.nextNumber++;
       if (done === undefined) {
@@ -726,7 +727,9 @@ export class PrWorld {
       return { message: `Started thread ${id} for PR #${String(n)}`, resultJson: JSON.stringify({ threadId: id, sent: false }) };
     });
     for (const name of ["pr.ready", "pr.draft"]) {
-      h.set(name, (inv) => {
+      h.set(name, async (inv) => {
+        await this.gate(name);
+        if (this.failNext.delete(name)) throw this.refuse("GitHub said no");
         const [slug, n, d] = this.target(inv);
         const draft = name === "pr.draft";
         if (d.pullRequest.state !== "open") throw this.refuse(`pull request #${String(n)} is ${d.pullRequest.state}, not open`);
@@ -735,9 +738,10 @@ export class PrWorld {
         return { message: draft ? `Converted #${String(n)} to a draft` : `Marked #${String(n)} ready for review`, resultJson: "" };
       });
     }
-    h.set("pr.auto-merge", (inv) => {
-      const [slug, n, d] = this.target(inv);
+    h.set("pr.auto-merge", async (inv) => {
       const off = inv.args.off === "true";
+      if (off) await this.gate("pr.auto-merge");
+      const [slug, n, d] = this.target(inv);
       const method = inv.args.method as PullRequestDetailView["autoMergeMethod"];
       if (!off && !inv.confirmed) throw needsConfirm({ command: "pr.auto-merge", title: titles["pr.auto-merge"], message: `Turn on auto-merge for #${String(n)} with ${methodWords[method ?? ""] ?? ""}?` });
       if (off && !d.autoMergeEnabled) throw this.refuse(`pull request #${String(n)} does not have auto-merge on`);

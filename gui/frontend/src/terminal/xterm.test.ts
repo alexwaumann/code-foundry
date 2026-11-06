@@ -47,6 +47,61 @@ describe("XtermRenderer shift+enter", () => {
   });
 });
 
+describe("XtermRenderer cursor across reset", () => {
+  /** Whether the cursor is hidden once everything queued has been parsed. */
+  async function hidden(r: XtermRenderer): Promise<boolean> {
+    await write(r, "");
+    return (r.term as unknown as { _core: { coreService: { isCursorHidden: boolean } } })._core.coreService.isCursorHidden;
+  }
+
+  const byProgram = (r: XtermRenderer) => {
+    r.term.write("\x1b[?25l");
+  };
+  const byExit = (r: XtermRenderer) => {
+    r.hideCursor();
+  };
+
+  it.each([
+    { name: "a program hid it", hide: byProgram, parsed: true, snapshot: "plain", want: false },
+    { name: "an exited terminal's hide already parsed", hide: byExit, parsed: true, snapshot: "plain", want: false },
+    { name: "an exited terminal's hide still queued", hide: byExit, parsed: false, snapshot: "plain", want: false },
+    { name: "a program's hide still queued", hide: byProgram, parsed: false, snapshot: "plain", want: false },
+    { name: "the next snapshot's program hid it", hide: byExit, parsed: false, snapshot: "\x1b[?25lfull screen", want: true },
+  ])("$name: hidden is $want", async ({ hide, parsed, snapshot, want }) => {
+    const r = renderer();
+    hide(r);
+    if (parsed) await write(r, "");
+    r.reset();
+    r.write(new TextEncoder().encode(snapshot));
+    expect(await hidden(r)).toBe(want);
+    r.dispose();
+  });
+
+  it("does not throw behind writes over xterm's 50 MB limit, and shows the cursor on the next reset", async () => {
+    const r = renderer();
+    r.hideCursor();
+    const parsed = new Promise<void>((resolve) => {
+      r.write(new Uint8Array(51_000_000), resolve);
+    });
+    expect(() => {
+      r.reset();
+    }).not.toThrow();
+    await parsed;
+    r.reset();
+    expect(await hidden(r)).toBe(false);
+    r.dispose();
+  });
+
+  it("stays hidden for an exited terminal attached again: its exit follows the snapshot", async () => {
+    const r = renderer();
+    r.reset();
+    r.write(new TextEncoder().encode("done"));
+    r.hideCursor();
+    expect(await hidden(r)).toBe(true);
+    r.dispose();
+  });
+});
+
 describe("XtermRenderer keyboard modes", () => {
   it("tracks kitty flags and modifyOtherKeys from the output stream", async () => {
     const r = renderer();

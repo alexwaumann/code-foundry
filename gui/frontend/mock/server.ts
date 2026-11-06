@@ -175,7 +175,7 @@
  *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
  *        also pr.ask, pr.explain, pr.fix.findings, pr.task (the fork refusal), pr.merge
  *        as a moved head, and pr.review as unconfirmed)
- *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.task, pr.merge, pr.review take 800ms)
+ *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.task, pr.merge, pr.revert, pr.review take 800ms)
  *   POST /__mock/gh/pr-detail-delay?ms=1500  (GetPullRequestDetail takes 1500ms, as with nothing cached; 0: at once)
  *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
  *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,

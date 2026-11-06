@@ -2,8 +2,7 @@ import { Zap } from "lucide-react";
 import { useMemo } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { pullRequestKey } from "@/stores/gh";
-import { setAutoMerge, usePrPanelStore } from "@/stores/prPanel";
+import { setAutoMerge, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { autoMergeHint, defaultMergeMethod, MERGE_METHOD_LABELS, mergeAvailability } from "./merge";
 import { SplitButton } from "./SplitButton";
@@ -16,7 +15,7 @@ import { SplitButton } from "./SplitButton";
  */
 export function AutoMergeButton({ prRef, detail }: { prRef: PrRef; detail: PullRequestDetailView }) {
   const methods = useMemo(() => mergeAvailability(detail).methods, [detail]);
-  const busy = usePrPanelStore((s) => s.changing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
+  const busy = usePullRequestChange(prRef) !== null;
   const last = usePrPanelStore((s) => s.mergeMethods[prRef.slug.toLowerCase()]);
   const method = defaultMergeMethod(methods, last);
   const head = detail.pullRequest.headSha;
