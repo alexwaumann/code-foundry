@@ -30,6 +30,12 @@ export interface AttachDeps {
  */
 export const MAX_BEHIND_BYTES = 8 << 20;
 
+/**
+ * How long to wait before attaching again after xterm refused a write with nothing of ours left
+ * to parse. The reconnect would meet the same refusal, and each costs the daemon a snapshot.
+ */
+export const REFUSED_RETRY_MS = 1000;
+
 function concat(chunks: readonly Uint8Array[]): Uint8Array {
   if (chunks.length === 1 && chunks[0]) return chunks[0];
   const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
@@ -200,17 +206,28 @@ export class AttachController {
     }
   }
 
-  /** Runs in xterm's parse loop through `parsed`, where a throw would end the loop for good. */
-  private write(data: Uint8Array, parsed: () => void): void {
+  /**
+   * `done` runs once xterm has finished with data: parsed it, or refused it. A refusal is its
+   * limit, which leaves its buffer running, and the write's own callback will never come: what
+   * was refused is gone, so the stream goes too and a new snapshot brings it back.
+   */
+  private write(data: Uint8Array, done: () => void): void {
     this.unparsed += data.length;
-    this.renderer.write(data, () => {
+    try {
+      this.renderer.write(data, () => {
+        this.unparsed -= data.length;
+        done();
+        if (this.unparsed > 0) return;
+        const next = this.afterParsed;
+        this.afterParsed = null;
+        next?.();
+      });
+    } catch (err) {
+      console.warn("xterm refused a write", err);
       this.unparsed -= data.length;
-      parsed();
-      if (this.unparsed > 0) return;
-      const next = this.afterParsed;
-      this.afterParsed = null;
-      next?.();
-    });
+      this.fallBehind(REFUSED_RETRY_MS);
+      done();
+    }
   }
 
   /** Now if xterm has nothing left to parse, else then. A later call replaces an earlier one. */
@@ -228,9 +245,9 @@ export class AttachController {
    * Output outran xterm: stop taking it, let xterm finish what it has, and open a new stream,
    * whose snapshot has everything dropped here. Waiting for xterm keeps a flood to a reconnect
    * every second or so, with nothing open between them. Input keeps working, so the phase
-   * stays: this is not a lost connection.
+   * stays: this is not a lost connection. `delayMs` is a further wait once xterm is done.
    */
-  private fallBehind(): void {
+  private fallBehind(delayMs = 0): void {
     const id = this.state.terminalId;
     if (!id) return;
     const gen = this.generation;
@@ -238,21 +255,28 @@ export class AttachController {
     this.stopStream = null;
     this.dropHeld();
     this.snapshots++;
-    this.whenParsed(() => {
+    const reopen = () => {
       if (gen === this.generation) this.open(id, gen);
+    };
+    this.whenParsed(() => {
+      if (delayMs > 0) setTimeout(reopen, delayMs);
+      else reopen();
     });
   }
 
   /** The snapshot is on the grid: fit it to the container, then apply what arrived meanwhile. */
   private snapshotParsed(snapCols: number, snapRows: number): void {
-    const held = this.held ?? [];
-    this.held = null;
     // The container decides the size; tell the daemon if it differs from the PTY's.
     this.renderer.fit();
     const { cols, rows } = this.renderer.size;
     if (cols !== snapCols || rows !== snapRows) this.scheduleResize(cols, rows, 0);
     if (this.state.phase !== "exited") this.setState({ phase: "live", error: null });
-    for (const ev of held) if (ev.kind !== "snapshot") this.apply(ev);
+    // One at a time out of `held`, so that a refused write's dropHeld takes the rest with it.
+    while (this.held?.length) {
+      const ev = this.held.shift();
+      if (ev && ev.kind !== "snapshot") this.apply(ev);
+    }
+    this.held = null;
   }
 
   private input(data: Uint8Array): void {

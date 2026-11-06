@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AttachEventView } from "@/api/terminal";
-import { AttachController, MAX_BEHIND_BYTES, type AttachState } from "./attach";
+import { AttachController, MAX_BEHIND_BYTES, REFUSED_RETRY_MS, type AttachState } from "./attach";
 import type { Disposable, TermSize, TerminalRenderer } from "./renderer";
 import { XtermRenderer } from "./xterm";
 
@@ -14,7 +14,13 @@ class FakeRenderer implements TerminalRenderer {
   mount(): void {}
   /** When set, a write's `parsed` callback waits here until the test calls it (xterm's async parse). */
   deferParse: (() => void)[] | null = null;
+  /** How many writes throw, as xterm's does past its limit. */
+  refuse = 0;
   write(data: Uint8Array, parsed?: () => void): void {
+    if (this.refuse > 0) {
+      this.refuse--;
+      throw new Error("write data discarded");
+    }
     this.calls.push(`write:${new TextDecoder().decode(data)}`);
     if (!parsed) return;
     if (this.deferParse) this.deferParse.push(parsed);
@@ -292,6 +298,117 @@ describe("AttachController", () => {
     });
   });
 
+  describe("a write xterm refuses", () => {
+    const snap = (text: string) => ({ kind: "snapshot" as const, data: enc(text), cols: 100, rows: 30, altScreen: false });
+    beforeEach(() => {
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("re-attaches when it was the snapshot's, and the next snapshot goes live", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.refuse = 1;
+      s.push("t1", snap("lost"));
+      await flush();
+      expect(s.aborted).toEqual(["t1"]);
+      expect(ctl.current.phase).toBe("connecting");
+
+      await vi.advanceTimersByTimeAsync(REFUSED_RETRY_MS);
+      await flush();
+      expect(s.opened).toEqual(["t1", "t1"]);
+      s.push("t1", snap("back"));
+      await flush();
+      expect(r.calls.at(-1)).toBe("write:back");
+      expect(ctl.current.phase).toBe("live");
+    });
+
+    it("re-attaches when it was output, and takes that output off the limit", async () => {
+      ctl.attach("t1");
+      await flush();
+      s.push("t1", snap("start"));
+      await flush();
+      r.refuse = 1;
+      s.push("t1", { kind: "output", data: new Uint8Array(MAX_BEHIND_BYTES) });
+      await flush();
+      expect(s.aborted).toEqual(["t1"]);
+      await vi.advanceTimersByTimeAsync(REFUSED_RETRY_MS);
+      s.push("t1", snap("back"));
+      s.push("t1", { kind: "output", data: new Uint8Array(MAX_BEHIND_BYTES) });
+      await flush();
+      expect(s.aborted).toEqual(["t1"]);
+    });
+
+    it("waits for what xterm still has before it attaches again", async () => {
+      ctl.attach("t1");
+      await flush();
+      s.push("t1", snap("start"));
+      await flush();
+      r.deferParse = [];
+      s.push("t1", { kind: "output", data: enc("old") });
+      await flush();
+      r.refuse = 1;
+      s.push("t1", { kind: "output", data: enc("lost") });
+      await flush();
+      await vi.advanceTimersByTimeAsync(REFUSED_RETRY_MS * 3);
+      expect(s.opened).toEqual(["t1"]);
+
+      while (r.deferParse.length) r.deferParse.shift()?.();
+      await vi.advanceTimersByTimeAsync(REFUSED_RETRY_MS);
+      expect(s.opened).toEqual(["t1", "t1"]);
+    });
+
+    it("drops the rest of a replay, and leaves its output off the limit", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.deferParse = [];
+      s.push("t1", snap("start"));
+      s.push("t1", { kind: "output", data: enc("first") });
+      s.push("t1", { kind: "output", data: new Uint8Array(MAX_BEHIND_BYTES - 5) });
+      await flush();
+      r.refuse = 1;
+      r.deferParse.shift()?.();
+      expect(s.aborted).toEqual(["t1"]);
+      expect(r.calls.filter((c) => c.startsWith("write:"))).toEqual(["write:start"]);
+
+      await vi.advanceTimersByTimeAsync(REFUSED_RETRY_MS);
+      r.deferParse = null;
+      s.push("t1", snap("back"));
+      s.push("t1", { kind: "output", data: new Uint8Array(MAX_BEHIND_BYTES) });
+      await flush();
+      expect(s.aborted).toEqual(["t1"]);
+      expect(ctl.current.phase).toBe("live");
+    });
+
+    it("tries again at its own pace while xterm keeps refusing", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.refuse = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < 3; i++) {
+        s.push("t1", snap("lost"));
+        await flush();
+        await vi.advanceTimersByTimeAsync(REFUSED_RETRY_MS - 1);
+        expect(s.opened).toHaveLength(i + 1);
+        await vi.advanceTimersByTimeAsync(1);
+        await flush();
+        expect(s.opened).toHaveLength(i + 2);
+      }
+    });
+
+    it("opens nothing for a terminal that was detached during the wait", async () => {
+      ctl.attach("t1");
+      await flush();
+      r.refuse = 1;
+      s.push("t1", snap("lost"));
+      await flush();
+      ctl.detach();
+      await vi.advanceTimersByTimeAsync(REFUSED_RETRY_MS);
+      expect(s.opened).toEqual(["t1"]);
+    });
+  });
+
   it("writes output, applies Resized without echoing a Resize, and shows exit", async () => {
     ctl.attach("t1");
     await flush();
@@ -416,6 +533,81 @@ describe("AttachController on a real xterm", () => {
     expect(ctl.current.phase).toBe("live");
     ctl.dispose();
     r.dispose();
+  });
+
+  // xterm refuses a write made while it counts more than 50 MB as pending, and it counts a write
+  // until its callback has returned. NUL is cheap to parse, and every case is past the limit.
+  describe("a snapshot near xterm's limit", () => {
+    const snapshotOf = (size: number, tail: string) => {
+      const data = new Uint8Array(size);
+      data.set(enc(tail), size - tail.length);
+      return { kind: "snapshot" as const, data, cols: 80, rows: 24, altScreen: false };
+    };
+
+    it.each([
+      { name: "past it, with output held", size: 60_000_000, chunks: 1 },
+      { name: "under it until the replay passes it", size: 49_000_000, chunks: 32 },
+    ])("replays what it held when $name", async ({ size, chunks }) => {
+      const { r, s, ctl } = attached();
+      ctl.attach("t");
+      await flush();
+      s.push("t", snapshotOf(size, "snap\r\n"));
+      const chunk = new Uint8Array(64 << 10);
+      chunk.set(enc("held\r\n"));
+      for (let i = 0; i < chunks; i++) s.push("t", { kind: "output", data: chunk });
+      await flush();
+      await vi.waitFor(() => {
+        expect(ctl.current.phase).toBe("live");
+      }, 10_000);
+      s.push("t", { kind: "output", data: enc("later\r\n") });
+      await vi.waitFor(async () => {
+        await flush();
+        await parsed(r);
+        expect(screen(r)).toContain("later");
+      });
+      expect(s.aborted).toEqual([]);
+      ctl.dispose();
+      r.dispose();
+    }, 20_000);
+
+    it("writes a newer snapshot over one past it", async () => {
+      const { r, s, ctl } = attached();
+      ctl.attach("t");
+      await flush();
+      s.push("t", snapshotOf(60_000_000, "first\r\n"));
+      await flush();
+      s.push("t", snapshotOf(60_000_000, "second\r\n"));
+      await flush();
+      await vi.waitFor(() => {
+        expect(ctl.current.phase).toBe("live");
+      }, 10_000);
+      await parsed(r);
+      expect(screen(r)).toEqual(["second"]);
+      expect(s.aborted).toEqual([]);
+      ctl.dispose();
+      r.dispose();
+    }, 20_000);
+
+    it("comes back when a reconnect follows one past it", async () => {
+      const { r, s, ctl } = attached();
+      ctl.attach("t");
+      await flush();
+      s.push("t", snapshotOf(60_000_000, "first\r\n"));
+      s.push("t", { kind: "output", data: enc("held\r\n") });
+      await flush();
+      await vi.waitFor(() => {
+        expect(ctl.current.phase).toBe("live");
+      }, 10_000);
+      s.push("t", { kind: "snapshot", data: enc("fresh\r\n"), cols: 80, rows: 24, altScreen: false });
+      await flush();
+      await vi.waitFor(async () => {
+        await flush();
+        await parsed(r);
+        expect(screen(r)).toEqual(["fresh"]);
+      });
+      ctl.dispose();
+      r.dispose();
+    }, 20_000);
   });
 
   it("shows only the snapshot after a reconnect with output still unparsed", async () => {

@@ -216,7 +216,11 @@ export class XtermRenderer implements TerminalRenderer {
   }
 
   write(data: Uint8Array, parsed?: () => void): void {
-    this.term.write(data, parsed);
+    // xterm calls back from inside its parse loop, before it takes this write off what it
+    // counts as pending, so a write from there can pass its 50 MB limit with nothing queued, and
+    // a throw there ends the loop for good. That loop is synchronous on every path through its
+    // write buffer, so no microtask can run until it has returned and the count is right.
+    this.term.write(data, parsed && (() => { queueMicrotask(parsed); }));
   }
 
   reset(): void {
@@ -239,7 +243,11 @@ export class XtermRenderer implements TerminalRenderer {
 
   hideCursor(): void {
     // Queued behind earlier writes, like program output, so a snapshot cannot show it again.
-    this.term.write("\x1b[?25l");
+    try {
+      this.term.write("\x1b[?25l");
+    } catch {
+      // Refused, as in reset(): a cursor left showing must not stop the exit being shown.
+    }
   }
 
   resize(cols: number, rows: number): void {
