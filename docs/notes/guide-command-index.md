@@ -87,14 +87,16 @@ registry; later commits touch only docs and the scorer.
 | `t7` | 13,225 | 14,648 | Plugin skill reads, unrelated to this PR: noise |
 | `p6` | 9,402 | 10,780 | Pages reads; before's low run was 5,984: noise |
 
-Help hops rose by 5. By task: `t9` +2, `t6` +1, `t7` +1, `t8` +1, `p7` +1, `p6` -1, `p5` -1, others
-level. `t9`'s are new and unexplained: its row did not change. They cost about 270 tokens on that
-task, and it can only be read as 3 runs against 3.
+Help hops rose by 5. By task: `t9` +2, `t6` +1, `t7` +1, `t8` +1, `p7` +1, `p8` +1, `p6` -1, `p5` -1,
+others level. `t9`'s are new and unexplained: its row did not change. Those two runs cost 723 and
+815 tokens more than the third, which also made one `daemon.capabilities` call between them, and it
+can only be read as 3 runs against 3.
 
 ### Reading the runs
 
-Final answers of all 54 after runs against their before runs, and full transcripts of `t4`, `t8`,
-`t9`, `p2`, `p7`. No answer got worse.
+The start of every final answer (300 characters) on both sides, all 18 tasks, and round 1's
+transcripts of `t4`, `t8`, `t9`, `p2`, `p7`, with `t9` round 2. No answer read got worse. `t8` got the
+ends of its answers read too. The rest of a long answer was not read, so this is a sample.
 
 - **`t8`**: all 3 read `making-a-theme.md`, saved with `theme save --apply`, never touched the
   themes folder, and checked 7:1 and 4.5:1 by hand. Each said the app's own check did not run.
