@@ -81,6 +81,12 @@ type Service interface {
 	// AddPullRequestComment posts a comment on a pull request's conversation as the
 	// viewer. Errors as for SubmitPullRequestReview.
 	AddPullRequestComment(ctx context.Context, slug string, number int, body string) (PostedComment, error)
+	// SetPullRequestCheckbox ticks or unticks one task-list item of a pull request's
+	// description, re-reading it from GitHub so a concurrent edit is kept (pr_checkbox.go).
+	// ErrFailedPrecondition when the item is gone or no longer reads as shown, or GitHub
+	// refuses; ErrPermissionDenied when the viewer may not edit it. On any answer from
+	// GitHub the detail is invalidated.
+	SetPullRequestCheckbox(ctx context.Context, slug string, number int, r CheckboxChange) (CheckboxResult, error)
 	// SetPullRequestDraft marks an open draft ready for review (draft false) or converts
 	// an open pull request to a draft (ErrFailedPrecondition when it is not open or
 	// already so; GitHub's refusals relayed) (pr_draft.go).

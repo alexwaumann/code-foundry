@@ -1,0 +1,8 @@
+# A pull request's node id and description, read fresh for SetPullRequestCheckbox: the
+# box to flip is found in this copy, never in the cached detail's.
+query PullRequestBody($owner: String!, $name: String!, $number: Int!) {
+  rateLimit { ...RateLimitFields }
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) { id body }
+  }
+}

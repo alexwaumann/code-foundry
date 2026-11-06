@@ -144,6 +144,17 @@ func (f *Gh) SetPullRequestDraft(_ context.Context, r *connect.Request[v1.SetPul
 	return connect.NewResponse(&v1.SetPullRequestDraftResponse{Draft: r.Msg.GetDraft(), Message: msg}), nil
 }
 
+// SetPullRequestCheckbox implements command.GhBackend: a change and a message for it.
+func (f *Gh) SetPullRequestCheckbox(_ context.Context, r *connect.Request[v1.SetPullRequestCheckboxRequest]) (*connect.Response[v1.SetPullRequestCheckboxResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	return connect.NewResponse(&v1.SetPullRequestCheckboxResponse{
+		Changed: true, Message: "Changed task " + strconv.Itoa(int(r.Msg.GetIndex())+1) + " on #" + strconv.Itoa(int(r.Msg.GetNumber())),
+	}), nil
+}
+
 // SetPullRequestAutoMerge implements command.GhBackend: the requested state and a
 // message for it (AutoMerge, when set, replaces the answer).
 func (f *Gh) SetPullRequestAutoMerge(_ context.Context, r *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error) {

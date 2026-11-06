@@ -1,0 +1,6 @@
+# Replaces a pull request's description (SetPullRequestCheckbox).
+mutation UpdatePullRequestBody($id: ID!, $body: String!) {
+  updatePullRequest(input: { pullRequestId: $id, body: $body }) {
+    pullRequest { id }
+  }
+}

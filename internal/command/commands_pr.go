@@ -13,7 +13,7 @@ import (
 
 // GhBackend is the slice of GhService the pull request detail panel's commands need
 // (pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review, pr.comment, pr.ready,
-// pr.draft, pr.auto-merge), in generated Connect signatures (see
+// pr.draft, pr.auto-merge, pr.checkbox), in generated Connect signatures (see
 // TerminalBackend). Reads the panel shows (GetPullRequestDetail without refresh,
 // ListReviewerCandidates) stay RPCs.
 type GhBackend interface {
@@ -25,6 +25,7 @@ type GhBackend interface {
 	AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error)
 	SetPullRequestDraft(context.Context, *connect.Request[v1.SetPullRequestDraftRequest]) (*connect.Response[v1.SetPullRequestDraftResponse], error)
 	SetPullRequestAutoMerge(context.Context, *connect.Request[v1.SetPullRequestAutoMergeRequest]) (*connect.Response[v1.SetPullRequestAutoMergeResponse], error)
+	SetPullRequestCheckbox(context.Context, *connect.Request[v1.SetPullRequestCheckboxRequest]) (*connect.Response[v1.SetPullRequestCheckboxResponse], error)
 }
 
 var (
@@ -40,7 +41,7 @@ func hasPullRequest(Context) bool { return true }
 
 // RegisterPullRequest registers pr.revert, pr.merge (commands_pr_merge.go),
 // pr.review.request, pr.refresh, pr.review and pr.comment (commands_pr_review.go), and
-// pr.ready, pr.draft and pr.auto-merge (commands_pr_state.go): the pull request detail
+// pr.ready, pr.draft, pr.auto-merge and pr.checkbox (commands_pr_state.go): the pull request detail
 // panel's actions. b nil registers them against
 // UnimplementedGhServiceHandler.
 func RegisterPullRequest(r *Registry, b GhBackend) error {

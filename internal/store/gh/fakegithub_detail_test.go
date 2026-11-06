@@ -21,6 +21,8 @@ type fakeDetail struct {
 	merge fakeMerge
 	// state is the draft and auto-merge state (fakegithub_draft_test.go).
 	state fakeState
+	// bodies is what description reads and writes did (fakegithub_checkbox_test.go).
+	bodies fakeBody
 }
 
 func (g *fakeGitHub) refuseReverts(errType string) {
