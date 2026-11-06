@@ -298,7 +298,7 @@ After review, on a scratch home, with the real daemon, tunnel and xterm in WebKi
 - Typing: 900 keys through a `yes`-style flood, a tab switch every 90 keys and a killed Attach socket
   every 37. A program recording its stdin had each terminal's keys, whole and in order. Then again
   with each Write delayed 30 ms and a switch every 47 keys. Before the fix, 12 keys of 900 were lost,
-  and 500 of 600 with the delay.
+  and 393 of 600 with the delay.
 - An alternate-screen program under a flood, resized 24 times with Attach sockets killed: 9-12
   snapshots a round, and the grid and cursor equal a fresh attach in a new xterm, 3 of 3. The same
   with slow output, 3 of 3. This run also passes on the code before the `Resized` fix, because the
@@ -311,7 +311,7 @@ After review, on a scratch home, with the real daemon, tunnel and xterm in WebKi
 - The `hello` plugin on a real daemon: `WatchSurface` and the inline Attach of its Shell tab both
   came back from a killed socket with the same view, and acts landed after it. With five slots open,
   a bottom panel shell took `WatchBoard`'s slot, which is the inline holder, and the board came
-  back when the shell exited. The terminal node stayed live throughout.
+  back when the shell exited. The terminal node was live at each check.
 
 e2e does not exercise flow control: the mock takes counts and ignores them. `wstunnel_test.go` covers
 the window, the deadline and the head; `wsFetch.test.ts` covers when counts are sent.
