@@ -64,6 +64,7 @@ Three processes, one protocol.
   `docs/notes/dictate-anywhere.md`). One GUI runs per home: a second launch shows the first's
   window and exits (`gui/singleinstance.go`).
   No business logic lives in the Wails host.
+  A home other than the default one gets its own WebKit data store (`gui/webstorage.go`).
 * **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
   the CLI, so threads can orchestrate other threads.

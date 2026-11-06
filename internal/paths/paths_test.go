@@ -7,6 +7,22 @@ import (
 	"testing"
 )
 
+func TestDefaultIgnoresTheOverride(t *testing.T) {
+	t.Setenv(EnvHome, "")
+	want, err := Resolve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(EnvHome, "/tmp/cf-home")
+	got, err := Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Home() != want.Home() {
+		t.Errorf("Default() = %q, want %q", got.Home(), want.Home())
+	}
+}
+
 func TestResolve(t *testing.T) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
