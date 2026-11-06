@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { XtermRenderer } from "./xterm";
+import { MAX_REPEAT_UNITS, XtermRenderer } from "./xterm";
 
 function renderer(): XtermRenderer {
   return new XtermRenderer({ fontSize: 12, isGlobalChord: () => false });
@@ -44,6 +44,63 @@ describe("XtermRenderer shift+enter", () => {
     expect(press(r, { key: "Enter", code: "Enter", ctrlKey: true }).handled).toBe(true);
     expect(press(r, { ...shiftEnter, isComposing: true }).handled).toBe(true);
     r.dispose();
+  });
+});
+
+describe("XtermRenderer REP cap", () => {
+  const mark = "\u0301";
+  // Two cells and two code units, on the Unicode 6 widths of an unmounted renderer too: REP has
+  // to look past the spacer cell to see them.
+  const wide = "\u{2000B}";
+  /** The cursor's row and column once `output` is parsed, on an 80-column grid. */
+  async function cursorAfter(output: string): Promise<[number, number]> {
+    const r = renderer();
+    await write(r, output);
+    const buf = r.term.buffer.active;
+    const at: [number, number] = [buf.baseY + buf.cursorY, buf.cursorX];
+    r.dispose();
+    return at;
+  }
+  /** Where `n` cells of width 1 from the home position leave the cursor. */
+  const cells = (n: number): [number, number] => [Math.floor(n / 80), n % 80];
+
+  it.each([
+    { name: "an ASCII run", output: "A\x1b[3b", want: cells(4) },
+    { name: "no count", output: "A\x1b[b", want: cells(2) },
+    { name: "a zero count", output: "A\x1b[0b", want: cells(2) },
+    { name: "a wide character", output: "你\x1b[2b", want: cells(6) },
+    { name: "a wide surrogate pair", output: `${wide}\x1b[2b`, want: cells(6) },
+    { name: "a cluster, repeated whole", output: `e${mark}\x1b[2b`, want: cells(3) },
+    { name: "the cap exactly", output: `A\x1b[${String(MAX_REPEAT_UNITS)}b`, want: cells(MAX_REPEAT_UNITS + 1) },
+    { name: "the cap in a cluster's code units", output: `e${mark}\x1b[${String(MAX_REPEAT_UNITS / 2)}b`, want: cells(MAX_REPEAT_UNITS / 2 + 1) },
+  ])("repeats $name", async ({ output, want }) => {
+    expect(await cursorAfter(output)).toEqual(want);
+  });
+
+  it.each([
+    { name: "one past the cap", output: `A\x1b[${String(MAX_REPEAT_UNITS + 1)}b`, want: cells(1) },
+    { name: "one past the cap in code units", output: `${wide}\x1b[${String(MAX_REPEAT_UNITS / 2 + 1)}b`, want: cells(2) },
+    { name: "the largest count", output: "A\x1b[2147483647b", want: cells(1) },
+    { name: "the largest count on a wide surrogate pair", output: `${wide}\x1b[2147483647b`, want: cells(2) },
+    { name: "the largest count on a cluster", output: `e${mark.repeat(3)}\x1b[2147483647b`, want: cells(1) },
+    { name: "a sub parameter on the count", output: "A\x1b[2147483647:5b", want: cells(1) },
+    { name: "a cell with too many marks for even one", output: `e${mark.repeat(MAX_REPEAT_UNITS)}\x1b[1b`, want: cells(1) },
+    { name: "a small count on a long cluster", output: `e${mark.repeat(999)}\x1b[5b`, want: cells(1) },
+    { name: "the last column, wrap pending", output: `${"A".repeat(80)}\x1b[2147483647b`, want: [0, 80] as [number, number] },
+  ])("swallows $name", async ({ output, want }) => {
+    expect(await cursorAfter(output)).toEqual(want);
+  });
+
+  it("keeps parsing after a swallowed one, and repeats again", async () => {
+    const r = renderer();
+    await write(r, "e\u0301\u0301\u0301\x1b[2147483647b\r\nB\x1b[2b");
+    expect(r.getText().trim().split("\n").at(-1)).toBe("BBB");
+    r.dispose();
+  });
+
+  it("repeats on the alternate screen and leaves other final-b sequences to xterm", async () => {
+    expect(await cursorAfter("\x1b[?1049hA\x1b[3b")).toEqual(cells(4));
+    expect(await cursorAfter("A\x1b[?2147483647b")).toEqual(cells(1));
   });
 });
 

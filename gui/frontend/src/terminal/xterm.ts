@@ -27,6 +27,17 @@ export interface XtermRendererOptions {
   findLimit?: number;
 }
 
+/**
+ * The most UTF-16 code units one REP (CSI Ps b) may repeat: one row of the widest grid the
+ * daemon allows (maxDimension, internal/store/terminal/manager.go), since a program repeats a
+ * character to fill a row. xterm allocates a Uint32Array of count x the cell's code units with
+ * no limit, and the count alone can reach 2^31 - 1. WebKit throws at 2^33 elements, which ends
+ * xterm's parse loop for good, and below that the page hangs. Counting code units and not just
+ * the count matters because a cell's combining marks have no limit either.
+ * See docs/notes/terminal-rep-cap.md.
+ */
+export const MAX_REPEAT_UNITS = 4096;
+
 const encoder = new TextEncoder();
 
 function binaryStringToBytes(s: string): Uint8Array {
@@ -83,6 +94,7 @@ export class XtermRenderer implements TerminalRenderer {
     this.disposables.push({ dispose: stopTheme }, { dispose: () => { this.search.dispose(); } });
     this.term.attachCustomKeyEventHandler((e) => this.keyHandler(e));
     this.trackKeyboardModes();
+    this.capRepeats();
     this.disposables.push(...swallowDaemonAnsweredQueries(this.term));
   }
 
@@ -115,6 +127,25 @@ export class XtermRenderer implements TerminalRenderer {
         modes.setAlternate(buf.type === "alternate");
       }),
     );
+  }
+
+  /** Swallows a REP over MAX_REPEAT_UNITS; xterm handles the rest. A swallowed one prints nothing. */
+  private capRepeats(): void {
+    this.disposables.push(
+      this.term.parser.registerCsiHandler({ final: "b" }, (params) => {
+        const count = typeof params[0] === "number" ? params[0] : 1;
+        return Math.max(count, 1) * this.repeatedUnits() > MAX_REPEAT_UNITS;
+      }),
+    );
+  }
+
+  /** Code units in the cell REP would repeat: the one behind the cursor, or the wide one before its spacer. */
+  private repeatedUnits(): number {
+    const buf = this.term.buffer.active;
+    const line = buf.getLine(buf.baseY + buf.cursorY);
+    const cell = line?.getCell(buf.cursorX - 1);
+    const chars = cell?.getWidth() === 0 ? line?.getCell(buf.cursorX - 2)?.getChars() : cell?.getChars();
+    return Math.max(chars?.length ?? 1, 1);
   }
 
   /** Returns false for keys xterm must not process. */
