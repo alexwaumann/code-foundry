@@ -131,8 +131,9 @@ The method and the first results are in `docs/notes/guide-orchestrate-ember.md`.
   compare only when they come from the same machine and setup.
 - A run is a first turn on a fresh thread. It says nothing about a long thread's routing.
 - `t4` and `p2` read real pull requests. `octocat/Hello-World#4` is closed with no checks, so
-  declining to subscribe is a fair answer that scores as a miss. Should `cli/cli#14957` merge,
-  `p2` changes meaning too: pick another open PR, on both sides of a comparison.
+  declining to subscribe is a fair answer that scores as a miss. Should `cli/cli#13505` merge,
+  `p2` changes meaning too: pick another open PR, on both sides of a comparison. `#14957`, its
+  first PR, merged between two sides on 2026-11-06, and every run rightly set no reminder.
 - Claude Code adds each scratch folder to `projects` in `~/.claude.json`, about two entries a
   run. The harness leaves them: other sessions write that file at the same time. They are
   harmless and name folders that no longer exist.

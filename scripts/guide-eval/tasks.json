@@ -20,7 +20,7 @@
  {"id":"p1-remind-timer","skill":"code-foundry","verb":"^thread\\.subscribe\\b.*--at\\b",
   "prompt":"Remind me in 2 hours to review the release notes."},
  {"id":"p2-remind-pr","skill":"code-foundry","verb":"^thread\\.subscribe\\b.*--pr\\b",
-  "prompt":"Let me know when PR #14957 in cli/cli gets merged."},
+  "prompt":"Let me know when PR #13505 in cli/cli gets merged."},
  {"id":"p3-watch-cost","skill":"code-foundry","verb":"^thread\\.subscribe\\b.*--every\\b",
   "prompt":"Keep an eye on what this thread costs and tell me every hour."},
  {"id":"p4-show-file","verb":"^view\\.panel\\.file\\b",
