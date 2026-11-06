@@ -1,5 +1,5 @@
 [
- {"id":"t1-setting","skill":"code-foundry-help","verb":"^settings\\.(get|set)\\b","answer":"(?i)default.worktree",
+ {"id":"t1-setting","skill":"code-foundry-help","verb":"^settings\\.(get|set)\\b","answer":"(?i)default.worktree|new threads work in",
   "prompt":"How do I make new threads start in their own worktree by default instead of in the project folder?"},
  {"id":"t2-remember","verb":"^memory\\.add\\b","last":true,
   "prompt":"From now on, always open pull requests as drafts."},
@@ -27,11 +27,11 @@
   "prompt":"Show me README.md."},
  {"id":"p5-earlier","skill":"code-foundry","verb":"^thread\\.search\\b",
   "prompt":"Where did we decide how the --shout flag should behave? I think it was in an earlier thread."},
- {"id":"p6-chart","skill":"code-foundry-pages","verb":"^view\\.inline\\b",
+ {"id":"p6-chart","heavy":true,"skill":"code-foundry-pages","verb":"^view\\.inline\\b",
   "prompt":"Make me a chart of these monthly numbers: Jan 3, Feb 5, Mar 9, Apr 7."},
- {"id":"p7-model","skill":"code-foundry","verb":"^thread\\.set-model\\b",
+ {"id":"p7-model","heavy":true,"skill":"code-foundry","verb":"^thread\\.set-model\\b",
   "prompt":"Switch this thread to {other_model}."},
- {"id":"p8-pr","verb":"^pr\\.create\\b","allow_fail":"^pr\\.create\\b",
+ {"id":"p8-pr","verb":"^pr\\.create\\b","allow_fail":"not on GitHub",
   "prompt":"Add a line to the README saying the tool needs Go 1.24, commit it, and open a pull request."},
  {"id":"ember","skill":"code-foundry-ember","verb":"^ember\\.task\\.start\\b","ember":true,"last":true,"heavy":true,
   "prompt":"Add a --version flag to the greet CLI that prints 0.1.0. Push the branch, no PR."}

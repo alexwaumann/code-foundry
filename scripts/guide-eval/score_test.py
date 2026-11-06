@@ -31,6 +31,9 @@ class Calls(unittest.TestCase):
             ("git -C ~/code-foundry-x log; ls code-foundry-pages", []),
             ("cd code-foundry/ && ls", []),
             ("code-foundry view.inline /tmp/a.html --title x", ["view.inline /tmp/a.html --title x"]),
+            ("cat > README.md <<'E'\nrun code-foundry plugin dev here\nE\ncode-foundry plugin list", ["plugin.list"]),
+            ("code-foundry memory add - <<E\ncode-foundry usage.show\nE", ["memory.add - <<E"]),
+            ("echo 'see `code-foundry plugin dev`'", []),
         ]
         for command, want in cases:
             self.assertEqual(score.calls(command), want, command)
@@ -69,11 +72,15 @@ class Run(unittest.TestCase):
         self.assertEqual((len(r["failed"]), r["fetches"], r["wrong_turns"]), (3, 1, 4))
 
     def test_allowed_failure(self):
-        task = {"id": "p8", "verb": r"^pr\.create\b", "allow_fail": r"^pr\.create\b"}
-        r = score.score_run(task, [bash("code-foundry pr.create --body x", "code-foundry pr.create: not available in this context")], [], FILES)
+        task = {"id": "p8", "verb": r"^pr\.create\b", "allow_fail": "not on GitHub"}
+        items = [bash("code-foundry pr.create --body x", "code-foundry pr.create: not available in this context: repository is not on GitHub")]
+        r = score.score_run(task, items, [], FILES)
         self.assertTrue(r["verb_ok"])
         self.assertIsNone(r["skill_ok"])
         self.assertEqual(r["wrong_turns"], 0)
+        # Any other failure of the same verb is a wrong turn.
+        items.append(bash("code-foundry pr.create --body x", "code-foundry pr.create: missing --worktree"))
+        self.assertEqual(score.score_run(task, items, [], FILES)["wrong_turns"], 1)
 
     def test_answer_stands_in_for_a_verb(self):
         task = {"id": "t1", "verb": r"^settings\.", "answer": "default.worktree"}

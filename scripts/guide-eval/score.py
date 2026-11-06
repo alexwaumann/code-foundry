@@ -21,16 +21,19 @@ FETCH_TOOLS = {"Monitor", "CronCreate", "CronList", "CronDelete", "ScheduleWakeu
 # The CLI's error lines: "code-foundry view.inline: ... outside your home directory",
 # "code-foundry: unknown command ...", and a bad flag's "Run `code-foundry help ...".
 CLI_ERROR = re.compile(r"^(?:code-foundry(?: [\w.-]+)*: |Run `code-foundry help )", re.M)
-CLI_CALL = re.compile(r"(?:^|[\s;|&(\"'`=])(?:\S*/)?(?:code-foundry|\$\{?CODE_FOUNDRY_BIN\}?\"?)[ \t]+([^\n;|&)]*)")
+HEREDOC = re.compile(r"(<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n).*?\n\s*\2\b", re.S)
+CLI_CALL = re.compile(r"(?:^|[\s;|&(\"'=])(?:\S*/)?(?:code-foundry|\$\{?CODE_FOUNDRY_BIN\}?\"?)[ \t]+([^\n;|&)]*)")
 
 
 def calls(command):
     """The code-foundry invocations in a Bash command, each as `dotted.verb --rest`.
 
     `thread subscribe --at 2h` and `thread.subscribe --at 2h` both give the second. Lowercase
-    positionals join the verb too (`thread.search.shout`), which the tasks' `\\b` allows."""
+    positionals join the verb too (`thread.search.shout`), which the tasks' `\\b` allows.
+    A heredoc's body is text (a README, a page), and so is a call in Markdown backticks."""
     found = []
-    for m in CLI_CALL.finditer(re.sub(r"\\\n\s*", " ", command)):
+    command = HEREDOC.sub(r"\1", re.sub(r"\\\n\s*", " ", command))
+    for m in CLI_CALL.finditer(command):
         words = m.group(1).split()
         verb = []
         while words and re.fullmatch(r"[a-z][a-z0-9.-]*", words[0]):
@@ -105,7 +108,7 @@ def score_thread(items, task, files):
                 s["reads"].append("sh: " + cmd[:90].replace("\n", " "))
             if helps or guides or caps or skill_files:
                 s["guidance_bytes"] += len(out.encode())
-            if found and CLI_ERROR.search(out) and not (allow and any(re.search(allow, c) for c in found)):
+            if found and CLI_ERROR.search(out) and not (allow and re.search(allow, out)):
                 s["failed"].append((found[-1][:120] + " => " + out[:160]).replace("\n", " "))
         elif name == "ToolSearch":
             if FETCHES.search(str(inp.get("query"))):
