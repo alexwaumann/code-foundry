@@ -436,6 +436,8 @@ For PR 4, built app, each on its own scratch home, with releases packaged from t
   `DictationService/Watch`, and `DictationService/Session` and a second `Watch` from the overlay's
   own webview. None refused, and no `OPTIONS` for any stream. Search and dictation were opened by a
   temporary hook, not in this PR; the overlay's unary `GetTheme` passed too.
+- 100 switches between two real threads with one streaming a turn: all `client closed`, with one
+  Events socket open throughout. 90 more with both idle, the same.
 - SIGTERM: every stream `served`, and all back within 0.07 s of `daemon started`, 1.2 s after the signal.
   SIGKILL: back within 0.07 s of `daemon started`, no `tunnel closed`. During SIGTERM's drain a stream
   that reconnects logs `no request`, which is harmless: the context has ended, and it retries.
