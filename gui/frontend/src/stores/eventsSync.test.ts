@@ -10,7 +10,7 @@ vi.mock("@/api/terminal", async (orig) => ({ ...(await orig<typeof import("@/api
 vi.mock("./settings", async (orig) => ({ ...(await orig<typeof import("./settings")>()), loadSettingsSchema: () => Promise.resolve() }));
 
 const { HEARTBEAT } = await import("@/api/stream");
-const { SILENT_MS, startEventSync, useEventsStore } = await import("./events");
+const { onDaemonEvent, SILENT_MS, startEventSync, useEventsStore } = await import("./events");
 
 /** Runs until a message would come, which it never does. */
 const hangs: Gen = (signal) =>
@@ -79,5 +79,31 @@ describe("silent", () => {
     live = true;
     await vi.advanceTimersByTimeAsync(10_500); // the backoff's longest wait
     expect(useEventsStore.getState().silent).toBe(false);
+  });
+});
+
+// A page's cf.on is a tap on this stream (stores/bridgeSources.ts): it subscribes once, and a
+// reconnect, on whatever transport, must not need it to subscribe again.
+describe("a tap", () => {
+  it("hears events on both sides of a reconnect", async () => {
+    const intent = (id: string) => ({ source: "skill", event: { epoch: id } });
+    let attempt = 0;
+    watch.open = (signal) =>
+      (async function* () {
+        attempt++;
+        yield intent(`attempt ${String(attempt)}`);
+        if (attempt === 1) throw new TypeError("a WebSocket stream closed with 1006");
+        await new Promise((_, reject) => {
+          signal.addEventListener("abort", () => {
+            reject(new DOMException("aborted", "AbortError"));
+          });
+        });
+      })();
+    const heard: unknown[] = [];
+    const untap = onDaemonEvent((ev) => heard.push((ev.event as unknown as { epoch: string }).epoch));
+    stop = startEventSync();
+    await vi.advanceTimersByTimeAsync(1_000);
+    untap();
+    expect(heard).toEqual(["attempt 1", "attempt 2"]);
   });
 });

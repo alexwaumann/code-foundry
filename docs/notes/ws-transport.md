@@ -2,17 +2,17 @@
 
 `docs/notes/ws-tunnel.md` is the daemon side. PR 2 of six added the client and moved
 `EmberService.WatchBoard`. PR 3 moved the heavy streams: `ThreadService.WatchThread`,
-`TerminalService.Attach` and `PluginService.WatchSurface`. Every other stream and every unary call
-stays on fetch, terminal input included, and the stream slots and the plugin cap stay until PR 5,
-so each of these still claims a slot.
+`TerminalService.Attach` and `PluginService.WatchSurface`. PR 4 moved the rest, `EventService.Watch`
+last, so every GUI stream is on the tunnel and none has a fetch path. Every unary call stays on
+fetch, terminal input included. The stream slots and the plugin cap stay until PR 5, so each stream
+still claims a slot.
 
 ## Shape
 
 - `api/wsFetch.ts` is a `fetch` over one socket. `createConnectTransport({ fetch: wsFetch })`
   keeps connect-web's framing, end-of-stream parsing and error mapping, and the bytes are the
   same for binary and `?json=1`. The token reaches the head through the existing auth interceptor.
-- `api/endpoint.ts` builds a composite transport: `unary` on fetch, `stream` by procedure.
-  `TUNNELLED_STREAMS` is temporary. Later PRs extend it; the last one removes it.
+- `api/endpoint.ts` builds a composite transport: `unary` on fetch, `stream` on the tunnel.
 - `mock/tunnel.ts` takes the two opening messages and replays them as a real request to the
   mock's own port, so all routes, the bearer check and `/__mock/streams` work unchanged. It checks
   no Origin and no procedure: those are daemon rules, tested in Go.
@@ -52,7 +52,8 @@ So the daemon closes with 1013 after a failed write, which arrives as a plain de
 - A browser empties the socket whether or not the page runs, so TCP tells the daemon nothing. The
   client's counts replace it (below).
 - A failed upgrade is only a dead socket. A refused Origin or a missing route looks like a daemon
-  that is down, and the stream retries forever. There is no fallback to fetch.
+  that is down, and the stream retries forever. There is no fallback to fetch. Two things now explain
+  it: a daemon from before the tunnel is told by its version, and anything else by silence (milestone 3).
 - A stream has no CORS preflight, so a tunnelled stream never shows an `OPTIONS` line.
 
 ## A reader that falls behind
@@ -191,8 +192,8 @@ grep '"path":"/codefoundry.v1.EventService/Watch"' "$L" | grep '"method":"POST"'
 | `reason` | Meaning |
 | --- | --- |
 | `served` | The handler returned first: a terminal that exited, a daemon shutting down. |
-| `client closed` | The client sent a close, or data that is not a count: a tab switch, a resync, the watchdog, a quit, `AttachController` dropping a stream. The end of stream then fails to write; that failure is not news. |
-| `client gone` | The connection died with no close frame, or a write failed. A crashed page, a dropped connection while the handler waited for a count, or a close that a full-speed write reached first (1 in 39 under `yes`). |
+| `client closed` | The client sent a close, or data that is not a count: a tab switch, a resync, the watchdog, `AttachController` dropping a stream. The end of stream then fails to write; that failure is not news. |
+| `client gone` | The connection died with no close frame: the app quit, a crashed page, a killed Networking process. `err` says what failed; `EOF` is a page that went away (milestone 3). |
 | `write timeout` | The client was connected and took nothing for 30 s: a window that never reopened, or a write that never finished. A daemon shutting down cuts that wait to a second. |
 | `no request` | The opening frames never came. A view that left at once logs this too. |
 
@@ -219,7 +220,7 @@ time the window goes from hidden to visible, by design, so covering and uncoveri
 `client closed` and `tunnel open` lines. Keep them out of the idle count. `EventService.Watch` has no
 such setting.
 
-To back out: empty `TUNNELLED_STREAMS`. WatchBoard is back on fetch; the tunnel stays unused.
+To back out at the time: empty `TUNNELLED_STREAMS`, which PR 4 removed.
 
 ## Managed Mac milestone 2
 
@@ -249,9 +250,116 @@ What to expect:
    the flood path working.
 6. WebContent's memory in Activity Monitor stays in the hundreds of MB through a noisy build.
 
-To back out one stream, remove its entry from `TUNNELLED_STREAMS` in `api/endpoint.ts`: each is
-independent, and the stream goes back to fetch with no daemon change. `TerminalService/Attach` is the
-first to try. The `AttachController` limit applies on either transport, so it stays.
+To back out at the time: remove the stream's entry from `TUNNELLED_STREAMS`, which PR 4 removed.
+The `AttachController` limit applies on either transport, so it stays.
+
+## Why `client gone` was 30 of 141
+
+Milestone 2 logged 104 `client closed`, 30 `client gone` and 7 `served`, far more `client gone` than
+expected. Nothing here shows a stream dropped under a live page, so the moves went ahead. Reproduced
+on a scratch daemon, in the built app unless noted, with the read's and the write's errors logged:
+
+| What happened | Closes | Logged | Read saw |
+| --- | --- | --- | --- |
+| Tab switch, idle shell and a loop printing the date | 40 | `client closed` | close frame, no status |
+| Tab switch with `yes` | 40 | `client closed` | close frame, no status |
+| Window hidden and shown | 2 (thread, board) | `client closed` | close frame, no status |
+| App quit, by signal and by cmd+q | 1 per open socket | `client gone` | `EOF` |
+| WebContent killed | 1 per open socket | `client gone` | `EOF` |
+| Networking process killed | 1 per open socket | `client gone` | `EOF` |
+| A close frame against a busy writer (Go, 900 rounds) | 15 of 900 | `client gone`, wrongly | not read yet |
+
+So there were two causes:
+
+- **A page that went away.** A quit sends no close frame, so each open socket logs `client gone`. That
+  is true and it is noise: nobody is there to lose a stream. A restart of the app adds up to five.
+- **A real misclassification.** The library shuts the socket inside the read that finds a close frame,
+  before that read returns, so the handler's next write fails and the reason was decided on it. The
+  rate falls with message size: 11 of 300 at 16 bytes, 3 at 4 KiB, 1 at 1 MiB. A stream busy with small
+  messages, as a thread is in a turn, is where this lands. Now a write that failed on its own waits
+  for the read's word, up to `FinalTimeout`. A timeout does not wait: it says nothing about the read.
+
+What this does not settle: how the 30 split, since the field log had no cause. `client gone` lines now
+carry `err`, so milestone 3 can say. A lid sleep was not reproduced, because this machine is shared.
+
+## Managed Mac milestone 3
+
+A day of normal use on a tip with this PR, with an update in it. Keep `advanced.log_level = debug`.
+
+```sh
+L=~/.code-foundry/logs/daemon.log
+grep '"tunnel closed"' "$L" | jq -r '[.procedure, .reason, .err // ""] | @tsv' | sort | uniq -c | sort -rn
+grep '"tunnel refused"' "$L"
+grep -c '"path":"/codefoundry.v1.EventService/Watch"' "$L"
+```
+
+1. `tunnel refused`: none. The last count: `OPTIONS` and `POST` lines only from a window older than this
+   PR, so none once it has relaunched.
+2. `client gone` should now match quits and crashes, with `err` ending in `EOF`. On a live window, a
+   reset or an `EOF` is the result to report, with what the Mac was doing. This is where a lid sleep
+   would show.
+3. Dictating, in a composer and with the hold key: the overlay shows and its levels move.
+4. Clone a large repository from Add Project, and cancel another.
+5. An update through the dialog: the chip, Download, the progress, Install and Restart Now.
+6. If the sidebar's status row ever says `no live updates`, the daemon answers calls and its sockets do
+   not open. That is the result this whole series was watching for. Note what the Mac runs.
+
+To back out, revert this PR: the daemon's routes for fetch streams never went away.
+
+### What a window does on each update path
+
+The daemon still serves every stream over fetch, so a window older than this PR works on any daemon.
+Only the other way round needs care: a window from this PR on a daemon from before #564
+(`TUNNEL_SINCE`, v0.21.6-tip.2) gets no events at all. The update dialog could not explain that, because
+its status comes from events. So the page reads the version from the ping it already sends and
+asks for the status with `UpdateService.Get`, and the dialog opens. Restart Now is `app.restart`, a
+plain call, and the host follows it over the Unix socket, so neither needs a stream. It asks rather
+than restarting on its own, because a restart cuts off working threads. Later keeps the chip and
+shows `no live updates` in the status row.
+
+| Path | Result |
+| --- | --- |
+| In-app Restart Now, from before the tunnel | The old daemon's `app.restart` installs and exits, and the relaunched window starts the new daemon. Run from a real v0.21.5. |
+| Download, then Install and Restart Now, in the new dialog | Chip, dialog and ready state all arrive by events on the socket. The socket ends `served`, and a new one opens 1.7 s later on the new version. |
+| A tip update | The same code with another tag: the run above was v0.21.5 on the tip channel to `-tip.1`. |
+| `code-foundry update`, then `app restart` | Stages `app.new`, then the same restart. |
+| `install.sh` under a daemon from before the tunnel, then reopening | New window, old daemon: the dialog opens on its own. Restart Now, or Later and then the chip. Run against a real v0.21.5. |
+| `install.sh` under a daemon with the tunnel | Events work, so the chip comes from the status as before, and `daemon restart` from a terminal settles it. |
+| `daemon restart` from a terminal on an old daemon | The ping brings the new version, and the dialog closes itself. Unit test only. |
+
+### Failing the way Events always did
+
+`runStream` and `isUnreachable` did not change for a socket, but two things did show up:
+
+- **`stream` says open on a dead socket.** `onConnect`'s calls open it, and those work when only sockets
+  fail. A socket that hangs would read as open for good. `silent` counts instead: 20 s with no attempt
+  bringing a message. It counts ticks, not the clock, so a Mac waking from sleep is not silence.
+- **The backoff reset on `onConnect`.** With the calls passing and the socket failing, a List could beat
+  the failure, so the stream retried every 250 ms with three List calls each. The reset now needs a message.
+
+### Clone
+
+The first stream with no heartbeats, and nothing on the way kills a quiet one: `wsFetch` and connect-web
+have no timer, `runStream` is not involved, the daemon's `ReadHeaderTimeout` ends at the upgrade, and the
+tunnel's write timeout only runs while something is being written. In WKWebView, through a fake `gh`, two
+clones held 3m20s in silence and ended `served`, one of them with no head at all until the end. Aborting
+a third closed its socket: `client closed`, `clone cancelled`, the partial directory gone. A
+slot is still claimed in `addProject.ts` until PR 5.
+
+### The overlay
+
+Its webview is the app's own origin, `wails://localhost`, and it gets its token from
+`GetDaemonEndpoint` like the main window, so it uses `daemon` directly. `ownHostEndpoint` kept its
+streams off the main window's six connections, and streams no longer use them. It was also pointing at
+`localhost` for a daemon that listens on IPv4 only.
+
+`DictationService.Audio` is untouched: the host's, on the Unix socket. `Session` carries only levels,
+phrases and the end to the page.
+
+### The page bridge
+
+`cf.on` is a tap on `dispatchEvent`, above the stream, and subscribes once, so a reconnect does not reach
+it. `eventsSync.test.ts` hears events on both sides of one.
 
 ## Verified
 
@@ -319,3 +427,22 @@ e2e does not exercise flow control: the mock takes counts and ignores them. `wst
 the window, the deadline and the head; `wsFetch.test.ts` covers when counts are sent.
 
 Not verified: a day of use. That is milestone 2.
+
+For PR 4, built app, each on its own scratch home, with releases packaged from this branch and a real
+`v0.21.5` through `CODE_FOUNDRY_RELEASE_DIR`, so the real installer ran. The window's clicks were real:
+
+- All seven kinds of stream on sockets at once from `wails://localhost`: `EventService/Watch`,
+  `TerminalService/Attach`, `EmberService/WatchBoard`, `SearchService/Watch` and `WatchRecent`,
+  `DictationService/Watch`, and `DictationService/Session` and a second `Watch` from the overlay's
+  own webview. None refused, and no `OPTIONS` for any stream. Search and dictation were opened by a
+  temporary hook, not in this PR; the overlay's unary `GetTheme` passed too.
+- SIGTERM: every stream `served`, and all back within 0.07 s of `daemon started`, 1.2 s after the signal.
+  SIGKILL: back within 0.07 s of `daemon started`, no `tunnel closed`. During SIGTERM's drain a stream
+  that reconnects logs `no request`, which is harmless: the context has ended, and it retries.
+- Every path in the table above, except where it says otherwise.
+- `make gui-e2e` now runs Events over the mock's tunnel, with no spec needing a change.
+
+Not verified: a real dictation session, which needs the model and the microphone. Only its stream was
+opened, with an id that does not exist, so no level event crossed a socket. Latency rests on terminal
+echo above, p50 4 ms on either transport. A plugin surface was not reopened: PR 3 covered it, and
+nothing here touches it. A lid sleep, and a window older than this PR on a daemon from it, were not run.

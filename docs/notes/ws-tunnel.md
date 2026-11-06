@@ -67,6 +67,15 @@ the bus's drop rules work as designed.
   passes 8 MiB in its life stalls, ends in `write timeout` and reconnects. Such a page tunnels only
   `WatchBoard`, which takes months of heartbeats to get there.
 
+## Who decides a failed write
+
+A write can fail because of a close frame: the library shuts the socket inside the read that found
+it, before that read returns, so the handler's next write fails first. Decided there, a client's
+plain close logged `client gone`, 15 times in 900 against a busy writer. So a write that failed on its
+own waits up to `FinalTimeout` for the read's word. A write's timeout or cancel skips that: the wait for
+a count leaves the socket open, so nothing would answer. `client gone` lines carry `err`, the read's
+error, else the write's (`docs/notes/ws-transport.md` has what produces them).
+
 ## Check-then-use
 
 Each value is validated once and that same value is used:
