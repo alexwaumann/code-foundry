@@ -125,8 +125,8 @@ Help hops are level in total, but they moved:
   not exist. The row now says a missing file is made on save, and one run still looked.
   Capabilities calls rose 1 to 4, each after "no app window is open", which the eval's no-window
   setup causes. The cut of "If refused, tell the user why" may have added to that. Tokens net -58.
-- **`t8`** is the one task that got worse: 6 of 6 after runs reach for `--group rendering`, about
-  1,100 to 2,400 tokens more. The cause is a guess: the entry no longer names `/cf/theme.css`'s
+- **`t8`** is the one task that got worse: 6 of 6 after runs reach for `--group rendering` (1 of 3
+  before), about 1,100 to 2,400 tokens more. The cause is a guess: the entry no longer names `/cf/theme.css`'s
   variables, so it hunts for the live values. Its answers did not suffer.
 - **`p5`**: 2 new failed calls, `thread search "--shout"`, which needs the term after `--`. Each
   recovered at once.
@@ -156,7 +156,8 @@ all 19 tasks. **Not read**: `t6`, `t7`, `ember`, `p1`, `p2`, `p3` beyond their s
 
 - **Pages**: every page read links theme and bridge, paints with `--cf-*`, catches every call, treats
   `declined` as no error, leaves the page's own thread alone, and uses no `setInterval`,
-  `localStorage` or fixed colour. Each reply says nothing was clicked.
+  `localStorage` or fixed colour. Each board reply says nothing was clicked; each chart reply, that
+  it was not seen rendered in the app.
 - **Theme**: `theme save --apply`, contrast worked out by hand, `--replace` on a second save. One run
   caught two pairs under the floor and fixed them. Each says the app's own check did not run.
 - **Secret**: nobody took a key in chat, each says nothing appeared, and each offers the same two ways
