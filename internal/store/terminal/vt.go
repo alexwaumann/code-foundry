@@ -32,6 +32,23 @@ type scrollbackLimits struct {
 	bytes uint
 }
 
+const (
+	// minScrollbackBytes is the byte cap of any row limit up to ~43,000.
+	minScrollbackBytes = 128 << 20
+	// scrollbackRowBytes is what a coloured row at 250 columns takes uncompressed
+	// (measured 2.8 KiB; a plain one 2.2 KiB, a plain row at 160 columns 1.4 KiB).
+	scrollbackRowBytes = 3 << 10
+)
+
+// scrollbackByteCap is the byte limit for a row limit, high enough that the row limit
+// decides for any ordinary terminal: a fixed cap would undercut the setting's maximum of
+// 100,000 rows, which take 132 MiB at 160 columns. Output colouring every cell by itself
+// takes 8 KiB a row at 160 columns, so the cap still decides for that. It reserves nothing:
+// a terminal only uses what it holds.
+func scrollbackByteCap(rows uint) uint {
+	return max(minScrollbackBytes, rows*scrollbackRowBytes)
+}
+
 // newVT creates a libghostty terminal configured for a PTY-backed program. Call only on
 // the goroutine that will own the terminal.
 func newVT(cols, rows uint16, sb scrollbackLimits, h vtHooks) (*ghostty.Terminal, error) {

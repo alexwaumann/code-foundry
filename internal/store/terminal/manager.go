@@ -24,11 +24,11 @@ import (
 type Options struct {
 	Bus    *bus.Bus     // events are published here; default: a private bus
 	Logger *slog.Logger // default: slog.Default()
-	// MaxScrollbackLines bounds each emulator's scrollback. Default 10,000.
+	// MaxScrollbackLines bounds each emulator's scrollback, in rows: a long line takes
+	// several, more when the terminal is narrow. Default 30,000.
 	MaxScrollbackLines uint
-	// MaxScrollbackBytes is a safety cap on scrollback memory, so that the line limit
-	// is what normally applies. Default 64 MiB (10,000 rows at 250 columns is ~21 MiB
-	// uncompressed).
+	// MaxScrollbackBytes is a safety cap on scrollback memory, so that the row limit
+	// is what normally applies. Default scrollbackByteCap of that limit.
 	MaxScrollbackBytes uint
 	// CompressAfter is how long a terminal must be idle (no output, attach, or
 	// resize) before its scrollback is compressed. Default 2s.
@@ -52,10 +52,10 @@ func (o Options) withDefaults() Options {
 		o.Logger = slog.Default()
 	}
 	if o.MaxScrollbackLines == 0 {
-		o.MaxScrollbackLines = 10_000
+		o.MaxScrollbackLines = 30_000
 	}
 	if o.MaxScrollbackBytes == 0 {
-		o.MaxScrollbackBytes = 64 << 20
+		o.MaxScrollbackBytes = scrollbackByteCap(o.MaxScrollbackLines)
 	}
 	if o.CompressAfter <= 0 {
 		o.CompressAfter = 2 * time.Second

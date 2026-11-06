@@ -255,7 +255,7 @@ const (
 	KeyEmberEpochHours           = "ember.epoch_max_hours"
 	keybindingKeyPrefix          = GroupKeybindings + "."
 	defaultFontFamily            = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
-	defaultScrollback            = 10000
+	defaultScrollback            = 30000
 	defaultCloseGrace            = 10
 	defaultCacheTTL              = 3600
 	defaultGhPollSeconds         = 60
@@ -534,8 +534,8 @@ var staticFields = []Field{
 		bind: func(s *Settings) any { return &s.Appearance.FontSize },
 	},
 	{
-		Key: KeyScrollback, Group: GroupThreads, Page: PageAppearance, Section: "terminal", Type: Int, Title: "Scrollback lines",
-		Description: "Lines of history each terminal keeps.",
+		Key: KeyScrollback, Group: GroupThreads, Page: PageAppearance, Section: "terminal", Type: Int, Title: "Scrollback rows",
+		Description: "Rows of history each terminal keeps. A long line takes several, more when the terminal is narrow.",
 		Default:     strconv.Itoa(defaultScrollback), Min: 1000, Max: 100000, Restart: true,
 		bind: func(s *Settings) any { return &s.Threads.ScrollbackLines },
 	},

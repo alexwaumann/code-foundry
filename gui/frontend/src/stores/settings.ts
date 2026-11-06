@@ -117,10 +117,10 @@ export function useTerminalFontFamily(): string {
   return terminalFontFamily(useSettingValue(KEYS.fontFamily));
 }
 
-/** Terminal scrollback lines (the daemon keeps the same number). */
+/** Terminal scrollback rows (the daemon keeps the same number). */
 export function useScrollbackLines(): number {
   const v = Number(useSettingValue(KEYS.scrollback));
-  return Number.isFinite(v) && v > 0 ? v : 10_000;
+  return Number.isFinite(v) && v > 0 ? v : 30_000;
 }
 
 /** The models the composer offers and threads are named by: the daemon's registry, else the family aliases. */
