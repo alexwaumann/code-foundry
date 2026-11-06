@@ -69,7 +69,8 @@ plugins:
 	done
 
 .PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps bun-version gui-dist-stub pagelib pagelib-check \
-        dev drive gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp package release promote clean fuzz
+        dev drive gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp package release promote clean fuzz \
+        guide-eval guide-eval-compare
 
 all: build
 
@@ -109,6 +110,23 @@ check: go-check frontend-check
 ## one `make check` last passed on. CI then skips its jobs for that pull request.
 attest:
 	@scripts/attest.sh post
+
+## guide-eval: run the agent guide and skill eval on a scratch home and write a scored report
+## (scripts/guide-eval/README.md). It spends real money and is not part of check.
+##   make guide-eval MODEL=opus|sonnet [EFFORT=medium] [RUNS=3] [BIN=path] [LABEL=x] [TASKS=a,b] [MAX_COST=18]
+## guide-eval-compare: compare two reports and apply the merge gate.
+##   make guide-eval-compare BEFORE=<dir> AFTER=<dir>
+MODEL    ?= opus
+EFFORT   ?= medium
+RUNS     ?= 3
+MAX_COST ?= 18
+LABEL    ?= eval
+guide-eval: $(if $(BIN),,build)
+	python3 scripts/guide-eval/eval.py --bin $(or $(BIN),bin/code-foundry) --model $(MODEL) --effort $(EFFORT) \
+		--runs $(RUNS) --max-cost $(MAX_COST) --label $(LABEL) $(if $(TASKS),--tasks $(TASKS))
+
+guide-eval-compare:
+	python3 scripts/guide-eval/score.py compare $(BEFORE) $(AFTER)
 
 # gui/main.go embeds gui/frontend/dist, which only exists after a frontend build. Go
 # vet/staticcheck/test compile the gui package, so give them a placeholder if needed.
