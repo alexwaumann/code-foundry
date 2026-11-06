@@ -105,6 +105,10 @@ phase stays `live`. A snapshot always waits for xterm to finish before `reset()`
   input backlog limit (`ErrInputBacklog`). That is daemon behaviour that this PR does not touch.
 - An exited terminal's stream logs `served` and does not reconnect. A 10.9 MB snapshot crossed as
   one message in WKWebView, so nothing in the path applies a 1 MiB limit.
+- A socket delivers a thread's snapshot on a different beat from fetch, which exposed a stale read in
+  the timeline's `onScroll`: two scrolls before a render left `atBottom` false at the bottom, and the
+  Jump to bottom chip stayed up. It failed 11 of 30 runs of one e2e test on the tunnel, and 0 of 18
+  on fetch. The list was at the bottom in every failure.
 - At five streams, a new Attach takes the slot of an inline holder for a moment, so a board with no
   core view reconnects on each tab switch. That ends with the slots in PR 5.
 

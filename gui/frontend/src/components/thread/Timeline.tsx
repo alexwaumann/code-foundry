@@ -534,7 +534,9 @@ export function TimelineList<R extends ListRow>({
             if (bottom) pin();
             else if (theirs) pinned.current = false;
             else if (pinned.current) toBottom();
-            if (bottom !== atBottom) setAtBottom(bottom);
+            // Always, not when it differs from `atBottom`: two scrolls can land before a render,
+            // and the second would compare with the state the first has already replaced.
+            setAtBottom(bottom);
             captureAnchor();
             noteScroll();
           }}
