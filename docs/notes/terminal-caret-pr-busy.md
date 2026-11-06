@@ -21,6 +21,11 @@ hid its cursor is left for a plain shell.
 
 An ESC is safe behind a chunk that ended inside a sequence: it cancels a CSI and ends an OSC.
 
+The write is caught. xterm throws from `write` while over 50 MB is unparsed, and that is reachable:
+a snapshot of output colouring every cell can pass 50 MB, and a tab switch during its replay calls
+`reset()` from a React effect. Before this change the first write to fail was the next snapshot's,
+in the stream handler, which retries; the catch keeps it that way.
+
 Checked with a dev daemon: a real program that hid its cursor stayed hidden each time its tab was
 shown again, and the plain shell beside it kept its caret. Attaching an already exited terminal
 could not be run there, because the daemon had removed it; that order is covered in vitest only.

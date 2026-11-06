@@ -77,6 +77,21 @@ describe("XtermRenderer cursor across reset", () => {
     r.dispose();
   });
 
+  it("does not throw behind writes over xterm's 50 MB limit, and shows the cursor on the next reset", async () => {
+    const r = renderer();
+    r.hideCursor();
+    const parsed = new Promise<void>((resolve) => {
+      r.write(new Uint8Array(51_000_000), resolve);
+    });
+    expect(() => {
+      r.reset();
+    }).not.toThrow();
+    await parsed;
+    r.reset();
+    expect(await hidden(r)).toBe(false);
+    r.dispose();
+  });
+
   it("stays hidden for an exited terminal attached again: its exit follows the snapshot", async () => {
     const r = renderer();
     r.reset();

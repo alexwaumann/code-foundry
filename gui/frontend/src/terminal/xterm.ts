@@ -227,7 +227,13 @@ export class XtermRenderer implements TerminalRenderer {
     // from the defaults, so a hidden cursor would carry over to the next terminal. A write,
     // not a flag: it has to land after a hide still queued (hideCursor, program output)
     // and before the snapshot, which hides it again if its program did.
-    this.term.write("\x1b[?25h");
+    try {
+      this.term.write("\x1b[?25h");
+    } catch {
+      // Behind 50 MB of unparsed writes (a huge snapshot, then a tab switch) xterm refuses
+      // any write. reset() runs in a React effect and must not throw; the snapshot's own
+      // write fails the same way, and the stream's retry resets again once that has drained.
+    }
     this.keyboardModes.reset();
   }
 
