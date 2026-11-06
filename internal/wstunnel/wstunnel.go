@@ -25,6 +25,7 @@ package wstunnel
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -189,8 +190,12 @@ func (t *Tunnel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log := t.opts.Log.With("procedure", proc, "origin", origin)
 	log.Info("tunnel open")
 	start := time.Now()
-	reason := t.serve(r, c, hj.conn, proc, origin)
-	log.Info("tunnel closed", "reason", reason, "dur", time.Since(start).Round(time.Millisecond).String())
+	reason, cause := t.serve(r, c, hj.conn, proc, origin)
+	attrs := []any{"reason", reason, "dur", time.Since(start).Round(time.Millisecond).String()}
+	if cause != nil {
+		attrs = append(attrs, "err", cause.Error())
+	}
+	log.Info("tunnel closed", attrs...)
 }
 
 // hijackCapture keeps the connection Accept hijacks, the one thing hangUp can always close: the
@@ -236,14 +241,14 @@ func procedure(u *url.URL) (string, bool) {
 	return "/" + name, true
 }
 
-// serve runs one accepted tunnel and says how it ended.
+// serve runs one accepted tunnel and says how it ended, and for "client gone" what failed.
 //
 // The socket must outlive the handler's context, or the end of the stream is lost at
 // shutdown: the daemon cancels requests first. So the context readUntilGone reads under,
 // which closes the socket when it ends, is detached from r's, and so are writes
 // (response.send). The client going cancels the handler; the handler's context ending does
 // not touch the socket.
-func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, origin string) string {
+func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, origin string) (string, error) {
 	read, stopRead := context.WithCancel(context.Background())
 	defer stopRead()
 
@@ -255,12 +260,12 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 		// still open, and hangUp ends it.
 		go readUntilGone(read, c, func([]byte) bool { return false }, func(error) {})
 		t.hangUp(c, conn, websocket.StatusPolicyViolation, "bad request", stopRead)
-		return "no request"
+		return "no request", nil
 	}
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	var end clientEnd
+	end := newClientEnd()
 	room := newWindow(t.opts.Window)
 	go readUntilGone(read, c, room.ack, func(err error) {
 		end.note(err)
@@ -287,6 +292,12 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 	t.opts.Next.ServeHTTP(w, req)
 	cancel()
 	w.Flush()
+	// A write that failed on its own may only be the news arriving early: the read that finds a
+	// client's close frame shuts the socket before it returns, so the next write fails first.
+	// That read is about to report, and what it saw decides. A timeout says nothing about it.
+	if w.err != nil && !errors.Is(w.err, context.DeadlineExceeded) && !errors.Is(w.err, context.Canceled) {
+		end.settle(t.opts.FinalTimeout)
+	}
 	// Before hangUp: the answer to the daemon's own close frame is a close frame too.
 	reason := closeReason(end.Load(), w.err)
 	// A 1000 says the end of stream is in the body, and after a failed write it is not.
@@ -295,12 +306,22 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 		code = websocket.StatusTryAgainLater
 	}
 	t.hangUp(c, conn, code, "", stopRead)
-	return reason
+	if reason != "client gone" {
+		return reason, nil
+	}
+	return reason, cmp.Or(end.cause(), w.err)
 }
 
 // clientEnd is what the read side saw of the client while the handler ran. The first
 // sighting stands: the read that fails after a write has closed the socket says nothing.
-type clientEnd struct{ atomic.Int32 }
+type clientEnd struct {
+	atomic.Int32
+	once sync.Once
+	told chan struct{} // closed at the first sighting
+	why  error         // the read's error; set before the state, so a Load that sees it may read this
+}
+
+func newClientEnd() *clientEnd { return &clientEnd{told: make(chan struct{})} }
 
 const (
 	clientThere   = iota
@@ -314,7 +335,29 @@ func (e *clientEnd) note(err error) {
 	if err != nil && websocket.CloseStatus(err) == -1 {
 		end = clientDropped
 	}
-	e.CompareAndSwap(clientThere, end)
+	e.once.Do(func() {
+		e.why = err
+		e.Store(end)
+		close(e.told)
+	})
+}
+
+// settle waits up to d for the first sighting.
+func (e *clientEnd) settle(d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-e.told:
+	case <-t.C:
+	}
+}
+
+// cause is the read's error, once there has been a sighting.
+func (e *clientEnd) cause() error {
+	if e.Load() == clientThere {
+		return nil
+	}
+	return e.why
 }
 
 // closeReason says how a tunnel ended, for the log. A client's close comes first: the

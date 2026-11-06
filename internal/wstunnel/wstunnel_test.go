@@ -938,8 +938,41 @@ func TestResetUnderAWriteIsClientGone(t *testing.T) {
 	if err := r.tunnel.Drain(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(r.logs.String(), `reason="client gone"`) {
+	if !strings.Contains(r.logs.String(), `reason="client gone"`) || !strings.Contains(r.logs.String(), " err=") {
 		t.Errorf("logs: %s", r.logs.String())
+	}
+}
+
+// A client's close reaching a busy stream: the read that finds the frame shuts the socket before
+// it returns, so the next write fails first, and that failure must not pass for a client that
+// left with no close. It lost about 1 round in 30 before the read's word decided.
+func TestCloseFrameUnderWritesIsClientClosed(t *testing.T) {
+	const rounds = 200
+	for i := range rounds {
+		ctx := testContext(t)
+		r := newRig(t, wstunnel.Options{FinalTimeout: 200 * time.Millisecond}, func(_ context.Context, s *connect.ServerStream[v1.AttachEvent]) error {
+			for {
+				if err := s.Send(wstunneltest.Output([]byte("x"))); err != nil {
+					return err
+				}
+			}
+		})
+		c := r.call(ctx)
+		if _, err := c.ReadHead(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := c.ReadFrame(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// What a browser's close() sends: a frame with no status.
+		_ = c.Conn.Close(websocket.StatusNoStatusRcvd, "")
+		if err := r.tunnel.Drain(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(r.logs.String(), `reason="client closed"`) {
+			t.Fatalf("round %d: %s", i, r.logs.String())
+		}
+		r.srv.Close()
 	}
 }
 
