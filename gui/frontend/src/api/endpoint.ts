@@ -58,6 +58,11 @@ const TUNNELLED_STREAMS: ReadonlySet<string> = new Set([
   "ThreadService/WatchThread",
   "TerminalService/Attach",
   "PluginService/WatchSurface",
+  "DictationService/Watch",
+  "DictationService/Session",
+  "SearchService/Watch",
+  "SearchService/WatchRecent",
+  "ProjectService/Clone",
 ]);
 
 /** Unary calls over fetch, and each stream over the tunnel or fetch by its procedure. */
