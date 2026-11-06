@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -21,35 +22,29 @@ import (
 // TestMain lets the test binary act as `code-foundry daemon`, so the auto-start test can
 // spawn a real, separate daemon process without building cmd/code-foundry.
 func TestMain(m *testing.M) {
-	if len(os.Args) >= 2 && os.Args[1] == "daemon" && os.Getenv("CF_TEST_DAEMON") == "1" {
-		var wait time.Duration
-		if len(os.Args) == 4 && os.Args[2] == FlagWaitLock {
-			wait, _ = time.ParseDuration(os.Args[3])
+	if len(os.Args) >= 2 {
+		parent, err := strconv.Atoi(os.Getenv(envTestDaemon))
+		switch {
+		case os.Args[1] == "daemon" && err == nil:
+			os.Exit(runTestDaemon(parent))
+		case os.Args[1] == argDaemonParent:
+			os.Exit(runDaemonParent(os.Args[2:]))
 		}
-		p, err := paths.Resolve()
-		if err == nil {
-			err = daemon.Run(context.Background(), daemon.Options{Paths: p, Version: version.Info{Version: "test"}, LockWait: wait})
-		}
-		if err != nil {
-			_, _ = os.Stderr.WriteString("code-foundry: " + err.Error() + "\n")
-			if errors.Is(err, daemon.ErrAlreadyRunning) {
-				os.Exit(ExitLockHeld)
-			}
-			os.Exit(1)
-		}
-		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	removeTestHomes()
+	os.Exit(code)
 }
 
 // shortHome returns a temp config home under /tmp: t.TempDir() lives under
 // /var/folders/... which can push daemon.sock past macOS's 104-byte sun_path limit.
 func shortHome(t *testing.T) paths.Paths {
 	t.Helper()
-	dir, err := os.MkdirTemp("/tmp", "cf-")
+	dir, err := os.MkdirTemp(testHomeRoot, testHomePrefix)
 	if err != nil {
 		t.Fatal(err)
 	}
+	testHomes = append(testHomes, dir)
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return paths.New(dir)
 }
@@ -212,7 +207,7 @@ func TestConnectAutoStartsDaemon(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := shortHome(t)
 			tt.setup(t, p)
-			t.Setenv("CF_TEST_DAEMON", "1")
+			spawnsTestDaemon(t)
 
 			ctx := context.Background()
 			c, err := Connect(ctx, p, ConnectOptions{DaemonBinary: os.Args[0], StartTimeout: 10 * time.Second})
