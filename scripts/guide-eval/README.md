@@ -63,6 +63,8 @@ run the before build too.
 - **Wrong turns**: failed CLI calls (the CLI's own error line, so a failure of something else
   in the same command does not count, and `exit=$?` tricks do), `--help` hops, and Monitor or
   Cron fetches. `p8`'s `pr.create` failure is expected: the origin is not on GitHub.
+- **Reads of `reference/commands.md`**: a Read of the index, or a Bash call naming it (models
+  grep it for a verb, which is what it is for).
 - **Cost**: each turn's cost at API rates, over the tree. The daemon's count also has the
   seed threads.
 
