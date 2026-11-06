@@ -31,12 +31,15 @@ import {
   type ThreadLog,
 } from "./thread";
 
-const watched = vi.hoisted(() => ({ events: [] as unknown[], opened: 0 }));
+const watched = vi.hoisted(() => ({ events: [] as unknown[], attempts: [] as unknown[][], opened: 0 }));
 vi.mock("@/api/thread", async (orig) => ({
   ...(await orig<typeof import("@/api/thread")>()),
   watchThread: async function* (_id: string, signal: AbortSignal) {
     watched.opened++;
-    for (const ev of watched.events) yield ev as ThreadEventView;
+    for (const ev of watched.attempts.shift() ?? watched.events) {
+      if (ev === "socket died") throw new TypeError("a WebSocket stream closed with 1006");
+      yield ev as ThreadEventView;
+    }
     await new Promise<void>((resolve) => {
       signal.addEventListener("abort", () => {
         resolve();
@@ -292,6 +295,66 @@ describe("startThreadWatch", () => {
     unsub();
     expect(useThreadStore.getState().watches.s).toBeUndefined();
     expect(watched.opened).toBe(1);
+  });
+
+  describe("across reconnects", () => {
+    const delta = (seq: number, itemId: string, t: string): ThreadEventView => ({ kind: "delta", threadId: "s", seq, itemId, ordinal: 1, field: "text", text: t });
+    const appended = (seq: number, item: ThreadItemView): ThreadEventView => ({ kind: "appended", threadId: "s", seq, item }) as ThreadEventView;
+    const log = () => {
+      const l = useThreadStore.getState().logs.s;
+      return l?.order.map((id) => (l.byId[id] as { text: string }).text);
+    };
+    const settled = () => vi.advanceTimersByTimeAsync(2000);
+
+    it("keeps the log the daemon has when a socket dies with events still in the batch", async () => {
+      watched.attempts = [
+        [snapshot(2, [text("a", 1, "he")]), delta(3, "a", "l"), "socket died"],
+        // Taken after a delta the old socket never delivered, and after one it did.
+        [snapshot(4, [text("a", 1, "hell")]), delta(5, "a", "o"), appended(6, text("b", 2, "next")), "socket died"],
+        // The same seqs again, as a snapshot with what came before them, then what is new.
+        [snapshot(5, [text("a", 1, "hello")]), delta(5, "a", "o"), appended(6, text("b", 2, "next")), delta(7, "b", "!")],
+      ];
+      const stop = startThreadWatch("s");
+      await settled();
+      await settled();
+      expect(watched.opened).toBe(3);
+      expect(log()).toEqual(["hello", "next!"]);
+      stop();
+    });
+
+    it("loses nothing from a batch still waiting when the new snapshot arrives behind it", async () => {
+      watched.attempts = [
+        [snapshot(1, [text("a", 1, "x")]), delta(2, "a", "y"), "socket died"],
+        [snapshot(2, [text("a", 1, "xy")]), appended(3, text("b", 2, "z"))],
+      ];
+      const stop = startThreadWatch("s");
+      await vi.advanceTimersByTimeAsync(WATCH_BATCH_MS - 1); // the first batch is not out yet
+      await settled();
+      expect(log()).toEqual(["xy", "z"]);
+      stop();
+    });
+
+    it("orders by ordinal whatever order the items arrive in", async () => {
+      watched.attempts = [
+        [snapshot(1, [text("c", 3, "third")]), "socket died"],
+        [snapshot(3, [text("a", 1, "first"), text("c", 3, "third")]), appended(4, text("b", 2, "second"))],
+      ];
+      const stop = startThreadWatch("s");
+      await settled();
+      expect(log()).toEqual(["first", "second", "third"]);
+      stop();
+    });
+
+    it("starts over from the snapshot of a daemon that restarted, whose seq is lower", async () => {
+      watched.attempts = [
+        [snapshot(90, [text("a", 1, "old")]), "socket died"],
+        [snapshot(3, [text("a", 1, "kept")]), delta(4, "a", "!")],
+      ];
+      const stop = startThreadWatch("s");
+      await settled();
+      expect(log()).toEqual(["kept!"]);
+      stop();
+    });
   });
 
   it("marks a thread synced once its Watch's snapshot arrives, even one equal to the kept log, and unmarks it when the Watch ends", async () => {
