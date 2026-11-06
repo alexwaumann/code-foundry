@@ -1,26 +1,28 @@
-import { useEffect, useState } from "react";
-import { ArrowUpCircle, FolderPlus, Loader2, Logs, PanelRight, Power, PowerOff, RotateCcw, Trash2 } from "lucide-react";
-import { pluginEnvironments, type PluginEnvironmentView, type PluginView } from "@/api/plugin";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FolderPlus } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
+import { pluginEnvironments, type PluginEnvironmentView } from "@/api/plugin";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
-import { pageSections } from "@/components/settings/model";
+import type { OverflowItem } from "@/components/projects/OverflowMenu";
+import { CatalogCard, CatalogLine, CatalogNotice, GroupHeader } from "@/components/settings/catalog/CatalogList";
+import { CatalogToolbar } from "@/components/settings/catalog/CatalogToolbar";
+import { catalogEntries, readHint, searchPlaceholder } from "@/components/settings/catalog/model";
+import { UpdateAll } from "@/components/settings/catalog/UpdateAll";
+import { queryWords } from "@/components/settings/model";
 import { PageHead } from "@/components/settings/PageHead";
-import { SectionCard, SettingsSection } from "@/components/settings/SectionCard";
 import { Button } from "@/components/ui/button";
-import { Tip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { startCommandNamed } from "@/keys/bindings";
-import { runCommand, useCommandsStore } from "@/stores/commands";
-import { updatePlugin, usePluginRegistryStore } from "@/stores/pluginRegistry";
-import { loadPluginDirs, usePlugin, usePluginNames, usePluginsStore } from "@/stores/plugins";
-import { useProjectsStore } from "@/stores/projects";
+import { useNow } from "@/lib/clock";
+import { loadBrowse, updatePlugin, usePluginRegistryStore } from "@/stores/pluginRegistry";
+import { loadPluginDirs, usePluginNames, usePluginsStore } from "@/stores/plugins";
 import { useUiStore } from "@/stores/ui";
-import { PillView, PluginIcon } from "../parts";
-import { BrowseSection, mainAction } from "./BrowseSection";
+import { forgetUpdated, useUpdateRunStore } from "@/stores/updateRun";
 import { pluginsDirWords } from "./dirs";
 import { LogsDialog } from "./LogsDialog";
-import { SecretsList, SecretsToggle } from "./SecretsSection";
+import { entryNames, GROUP_LABELS, groupedIds, matchingEntries, registriesSummary, searchedIds, updatablePlugins } from "./model";
+import { EntryRow, PluginRow } from "./PluginRows";
+import { RegistriesDialog } from "./RegistriesDialog";
+import { emptyBrowse } from "./registry";
 import { UninstallDialog } from "./UninstallDialog";
-import { keepsSecrets, processLine, scopeWords, statePill } from "./state";
 
 /** Every plugin's contribution to new threads, re-read when a plugin changes. */
 function useEnvironments(): Readonly<Record<string, PluginEnvironmentView>> {
@@ -40,267 +42,291 @@ function useEnvironments(): Readonly<Record<string, PluginEnvironmentView>> {
   return envs;
 }
 
-/**
- * What a plugin adds to new threads: env, PATH, add-dirs, who gets it. New shells get the
- * env and PATH too; a running thread says so in its header until restarted
- * (docs/notes/plugins-env-restart.md).
- */
-function EnvSummary({ env }: { env: PluginEnvironmentView }) {
-  const projects = useProjectsStore((s) => s.byId);
-  const projectName = (id: string) => projects[id]?.name ?? id;
-  const empty = env.env.length === 0 && env.pathPrepend.length === 0 && env.addDirs.length === 0;
-  if (empty && env.issues.length === 0) return null;
-  return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-md border border-cf-border px-3 py-2" data-testid="plugin-env">
-      <p className="text-caption-sm">New threads in {scopeWords(env.projects, env.noProject, projectName)} get:</p>
-      <ul className="flex min-w-0 flex-col gap-0.5 font-mono text-caption-sm text-cf-text">
-        {env.env.map((k) => (
-          <li key={k} className="truncate">
-            {k}
-          </li>
-        ))}
-        {env.pathPrepend.map((p) => (
-          <li key={`path:${p}`} className="truncate">
-            PATH += {p}
-          </li>
-        ))}
-        {env.addDirs.map((d) => (
-          <li key={`dir:${d}`} className="truncate">
-            --add-dir {d}
-          </li>
-        ))}
-      </ul>
-      {env.issues.map((i) => (
-        <p key={i} className="text-caption-sm text-cf-warning-text">
-          {i}
-        </p>
-      ))}
-      <p className="text-caption-sm">New threads get this, and new shells all but the --add-dir folders. A running thread shows “Plugin environment changed” until you restart it.</p>
-    </div>
-  );
+/** One line of the card: a group's header, an installed row, a registry entry, or a line of words. */
+type Item = { kind: "group"; id: string; count: number } | { kind: "row"; key: string } | { kind: "market"; count: number } | { kind: "entry"; name: string } | { kind: "line"; id: "loading" | "none" | "plugins-none" | "market-none" };
+
+function itemKey(it: Item): string {
+  switch (it.kind) {
+    case "group":
+      return `#${it.id}`;
+    case "row":
+      return it.key;
+    case "market":
+      return "#market";
+    case "entry":
+      return `entry:${it.name}`;
+    case "line":
+      return `line:${it.id}`;
+  }
 }
 
-/** "Open <surface>" for each of a plugin's surfaces: its show command, available or not for the current selection. */
-function SurfaceButtons({ p }: { p: PluginView }) {
-  const available = useCommandsStore((s) => s.commands.filter((c) => c.available && c.name.startsWith(`plugin.${p.name}.show.`)).map((c) => c.name).join(","));
-  if (p.surfaces.length === 0 || !p.enabled) return null;
-  const on = new Set(available.split(","));
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-      {p.surfaces.map((s) => {
-        const ok = on.has(s.showCommand);
-        const button = (
-          <Button
-            variant="ghost"
-            size="xs"
-            className="text-cf-text-muted hover:text-cf-text"
-            disabled={!ok}
-            onClick={() => {
-              startCommandNamed(s.showCommand);
-            }}
-            data-testid="plugin-open-surface"
-            data-surface={s.kind}
-          >
-            <PanelRight aria-hidden />
-            Open {s.title}
-          </Button>
-        );
-        return ok ? (
-          <span key={s.id}>{button}</span>
-        ) : (
-          <Tip key={s.id} label="Not available for what is selected">
-            <span className="inline-flex">{button}</span>
-          </Tip>
-        );
-      })}
-    </div>
-  );
+/** A set with one key flipped. */
+function flipped(s: ReadonlySet<string>, key: string): Set<string> {
+  const next = new Set(s);
+  if (!next.delete(key)) next.add(key);
+  return next;
 }
 
-/** One installed plugin: identity, state, the process, problems, its surfaces and what it adds to new threads; the actions. */
-function PluginRow({
-  name,
-  env,
-  className,
-  onLogs,
-  onUninstall,
-}: {
-  name: string;
-  env: PluginEnvironmentView | undefined;
-  className?: string | undefined;
-  onLogs: (name: string) => void;
-  onUninstall: (name: string) => void;
-}) {
-  const p = usePlugin(name);
-  const busy = usePluginRegistryStore((s) => s.busy[name]);
-  const [secretsOpen, setSecretsOpen] = useState(false);
-  if (!p) return null;
-  const secrets = keepsSecrets(p);
-  const pill = statePill(p);
-  const proc = processLine(p);
-  const update = p.updateAvailable && !p.dev;
-  const main = !p.enabled && !update;
+/** The Needs you header's Update all: the rows' own update, quiet (each row says how it went). */
+function UpdateAllPlugins() {
+  const available = usePluginsStore((s) => updatablePlugins(Object.values(s.byName)).length);
   return (
-    <div className={cn("flex min-w-0 flex-col gap-2 px-4 py-3", className)} data-testid="plugin-row-settings" data-plugin={p.name} data-state={p.state}>
-      <div className="flex min-w-0 items-start gap-3">
-        <PluginIcon name={p.surfaces[0]?.icon} fallback="puzzle" className="mt-0.5 size-4 shrink-0 text-cf-text-muted" />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 truncate text-label">{p.displayName}</span>
-            <span className="shrink-0 font-mono text-caption-sm">{p.version}</span>
-            {p.dev && <span className="shrink-0 rounded-sm border border-cf-border px-1 text-caption-sm">dev</span>}
-            <PillView pill={pill} className="ml-auto" />
-          </div>
-          {p.description && <p className="line-clamp-2 text-caption">{p.description}</p>}
-          {proc && (
-            <p className="text-caption-sm tabular-nums" data-testid="plugin-process">
-              {proc}
-            </p>
-          )}
-          {p.disabledReason && <p className="text-caption-sm text-cf-warning-text">{p.disabledReason}</p>}
-          {p.lastError && p.state !== "running" && (
-            <p className="font-mono text-caption-sm break-words text-cf-error-text" data-testid="plugin-last-error">
-              {p.lastError}
-            </p>
-          )}
-          {p.issues.map((i) => (
-            <p key={i} className="text-caption-sm text-cf-warning-text">
-              {i}
-            </p>
-          ))}
-          {p.dev && p.devPath && <p className="truncate font-mono text-caption-sm">{p.devPath}</p>}
-          {!p.dev && p.install && (
-            <p className="truncate font-mono text-caption-sm" data-testid="plugin-installed-from">
-              from {p.install.source.replace(/^https?:\/\/(github\.com\/)?/, "")}
-            </p>
-          )}
-          {update && (
-            <p className="text-caption-sm text-cf-warning-text" data-testid="plugin-update-available">
-              {p.updateVersion} is available.
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-col gap-2 pl-7">
-        <SurfaceButtons p={p} />
-        {env && p.enabled && <EnvSummary env={env} />}
-        {secrets && secretsOpen && <SecretsList name={p.name} />}
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {update && (
-            <Button variant="outline" size="xs" className={mainAction} disabled={busy !== undefined} onClick={() => void updatePlugin(p.name)} data-testid="plugin-update">
-              {busy === "update" ? <Loader2 className="animate-spin" aria-hidden /> : <ArrowUpCircle aria-hidden />}
-              Update to {p.updateVersion}
-            </Button>
-          )}
-          {p.enabled ? (
-            <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void runCommand("plugin.disable", { name: p.name })} data-testid="plugin-disable">
-              <PowerOff aria-hidden />
-              Disable
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="xs"
-              className={cn("bg-transparent dark:bg-transparent", main && "border-cf-warning/40 text-cf-warning-text hover:bg-cf-warning-surface hover:text-cf-warning-text dark:border-cf-warning/40")}
-              onClick={() => void runCommand("plugin.enable", { name: p.name })}
-              data-testid="plugin-enable"
-            >
-              <Power aria-hidden />
-              Enable
-            </Button>
-          )}
-          {p.enabled && (
-            <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void runCommand("plugin.restart", { name: p.name })} data-testid="plugin-restart-settings">
-              <RotateCcw aria-hidden />
-              Restart
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="xs"
-            className="text-cf-text-muted hover:text-cf-text"
-            onClick={() => {
-              onLogs(p.name);
-            }}
-            data-testid="plugin-logs-open"
-          >
-            <Logs aria-hidden />
-            Logs
-          </Button>
-          {secrets && (
-            <SecretsToggle
-              open={secretsOpen}
-              onToggle={() => {
-                setSecretsOpen((o) => !o);
-              }}
-            />
-          )}
-          <Button
-            variant="ghost"
-            size="xs"
-            className="text-cf-text-muted hover:text-cf-text"
-            disabled={busy !== undefined}
-            onClick={() => {
-              onUninstall(p.name);
-            }}
-            data-testid="plugin-uninstall"
-          >
-            {busy === "uninstall" ? <Loader2 className="animate-spin" aria-hidden /> : <Trash2 aria-hidden />}
-            Uninstall
-          </Button>
-        </div>
-      </div>
-    </div>
+    <UpdateAll
+      scope="plugins"
+      available={available}
+      testId="plugin-update-all"
+      steps={() => updatablePlugins(Object.values(usePluginsStore.getState().byName)).map((p) => ({ key: p.name, version: p.updateVersion, run: () => updatePlugin(p.name, { quiet: true }) }))}
+    />
   );
 }
 
 /**
- * Settings → Plugins (DECISIONS.md, "Registry"): the installed plugins, each with its
- * state, process, problems, surfaces (open in the panel) and what it adds to new
- * threads, and enable (with the consent dialog), disable, restart, update, uninstall and
- * logs. "Add a dev plugin" runs plugin.dev from the palette (its folder picker). Browse
- * lists the registries' plugins (BrowseSection); the page's settings (plugins.registries)
- * follow it.
+ * Settings → Plugins (docs/notes/plugins-page-redesign.md), on the catalog layout Settings →
+ * Skills shares. By default the installed plugins, grouped (Needs you, Running, Disabled);
+ * typing adds the registries' entries after the installed rows that match (both filtered
+ * here: the daemon has no plugin search); Browse all is the registries alone. Enable keeps
+ * its consent dialog (plugin.enable's confirm). "Add a dev plugin" runs plugin.dev from the
+ * palette (its folder picker). The registries and the page's settings (plugins.registries)
+ * are in a dialog from the page's ⋯ menu.
  */
 export function PluginsPage({ schema, page }: { schema: SettingsSchemaView; page: SettingPageView }) {
-  const names = usePluginNames();
-  const loaded = usePluginsStore((s) => s.loaded);
-  const envs = useEnvironments();
+  const [text, setText] = useState("");
+  const [browse, setBrowse] = useState(false);
+  const [registries, setRegistries] = useState<{ focusField: boolean } | null>(null);
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const [secrets, setSecrets] = useState<ReadonlySet<string>>(new Set());
   const [logsOf, setLogsOf] = useState<string | null>(null);
   const [uninstallOf, setUninstallOf] = useState<string | null>(null);
+  const envs = useEnvironments();
   const logsTitle = usePluginsStore((s) => (logsOf ? (s.byName[logsOf]?.displayName ?? logsOf) : ""));
   const dir = usePluginsStore((s) => pluginsDirWords(s.dirs));
   useEffect(() => {
     void loadPluginDirs();
+    void loadBrowse();
+    forgetUpdated("plugins");
   }, []);
+
+  const words = useMemo(() => queryWords(text), [text]);
+  const searching = words.length > 0;
+  const names = usePluginNames();
+  const loaded = usePluginsStore((s) => s.loaded);
+  const updated = useUpdateRunStore((s) => s.plugins.updated);
+  const browseRead = usePluginRegistryStore((s) => s.browse !== null);
+  const loading = usePluginRegistryStore((s) => s.loading);
+  const error = usePluginRegistryStore((s) => s.error);
+  const empty = usePluginRegistryStore((s) => emptyBrowse(s.browse, s.error));
+  const failedRegistries = usePluginRegistryStore((s) => s.browse?.registries.filter((r) => r.error).length ?? 0);
+  const count = usePluginRegistryStore((s) => s.browse?.entries.length ?? null);
+  const registriesLine = usePluginRegistryStore((s) => registriesSummary(s.browse?.registries));
+  const now = useNow(60_000);
+  const readLine = usePluginRegistryStore((s) => readHint(s.browse?.registries.map((r) => r.fetchedAtMs) ?? [], now));
+
+  const hits = usePluginRegistryStore(useShallow((s) => (searching ? matchingEntries(s.browse?.entries ?? [], words) : [])));
+  const installed = usePluginsStore(
+    useShallow((s) => {
+      if (browse) return [];
+      const list = names.flatMap((n) => s.byName[n] ?? []);
+      return searching ? searchedIds(list, hits, words) : groupedIds(list, updated);
+    }),
+  );
+  const entries = usePluginRegistryStore(
+    useShallow((s) => {
+      if (!browse && !searching) return [];
+      return entryNames(s.browse?.entries ?? [], words, browse ? new Set() : new Set(installed));
+    }),
+  );
+
+  const showMarket = browse || searching;
+  const items = useMemo<Item[]>(() => {
+    const out: Item[] = catalogEntries(installed);
+    if (!showMarket) {
+      if (out.length === 0) out.push({ kind: "line", id: loaded ? "plugins-none" : "loading" });
+      return out;
+    }
+    if (!browse && entries.length === 0 && browseRead) return out.length === 0 ? [{ kind: "line", id: "none" }] : out;
+    out.push({ kind: "market", count: entries.length });
+    for (const name of entries) out.push({ kind: "entry", name });
+    if (entries.length === 0 && browseRead) out.push({ kind: "line", id: "market-none" });
+    return out;
+  }, [installed, entries, showMarket, browse, browseRead, loaded]);
+
+  const toggle = useCallback((key: string) => {
+    setOpen((o) => flipped(o, key));
+  }, []);
+  const openRegistries = (focusField: boolean) => {
+    setRegistries({ focusField });
+  };
+  const link = (words: string) => (
+    <button
+      type="button"
+      className="text-link hover:underline"
+      onClick={() => {
+        openRegistries(true);
+      }}
+      data-testid="registry-none-link"
+    >
+      {words}
+    </button>
+  );
+
+  const menu: OverflowItem[] = [
+    { label: "Refresh registries", hint: loading ? "Reading the registries…" : readLine, disabled: loading, onSelect: () => void loadBrowse(true), testId: "registry-refresh" },
+    {
+      label: "Registries",
+      hint: registriesLine,
+      onSelect: () => {
+        openRegistries(false);
+      },
+      testId: "registry-open",
+    },
+  ];
+
+  const renderItem = (it: Item, i: number) => {
+    const first = i === 0;
+    switch (it.kind) {
+      case "group":
+        return (
+          <GroupHeader id={it.id} label={GROUP_LABELS[it.id] ?? it.id} count={it.count} first={first}>
+            {it.id === "needs" && <UpdateAllPlugins />}
+          </GroupHeader>
+        );
+      case "market":
+        return <GroupHeader id="market" label="In your registries" count={browseRead ? it.count : null} note={loading && !browseRead ? "Reading the registries…" : ""} busy={loading} first={first} />;
+      case "row":
+        return (
+          <PluginRow
+            name={it.key}
+            env={envs[it.key]}
+            first={first}
+            open={open.has(it.key)}
+            secrets={secrets.has(it.key)}
+            onToggle={() => {
+              toggle(it.key);
+            }}
+            onSecrets={() => {
+              const showing = secrets.has(it.key);
+              setSecrets((s) => flipped(s, it.key));
+              if (!showing) setOpen((o) => new Set(o).add(it.key));
+            }}
+            onLogs={() => {
+              setLogsOf(it.key);
+            }}
+            onUninstall={() => {
+              setUninstallOf(it.key);
+            }}
+          />
+        );
+      case "entry":
+        return (
+          <EntryRow
+            name={it.name}
+            first={first}
+            open={open.has(`entry:${it.name}`)}
+            onToggle={() => {
+              toggle(`entry:${it.name}`);
+            }}
+          />
+        );
+      case "line":
+        switch (it.id) {
+          case "loading":
+            return (
+              <CatalogLine first={first} testId="plugins-loading">
+                Loading…
+              </CatalogLine>
+            );
+          case "plugins-none":
+            return (
+              <CatalogLine first={first} testId="plugins-none">
+                No plugins yet. Add a dev plugin from a folder, or put one in {dir}. A new one stays off until you enable it and allow what it asks for.
+              </CatalogLine>
+            );
+          case "none":
+            return (
+              <CatalogLine first={first} testId="plugin-results-none">
+                Nothing installed or in your registries matches “{text.trim()}”.
+              </CatalogLine>
+            );
+          case "market-none":
+            return searching ? (
+              <CatalogLine first={first} testId="plugin-results-none">
+                Nothing in your registries matches “{text.trim()}”.
+              </CatalogLine>
+            ) : empty === "no-registry" ? (
+              <CatalogLine first={first} testId="registry-none">
+                No registry configured. {link("Add one in Registries")}
+              </CatalogLine>
+            ) : (
+              empty === "none-listed" && (
+                <CatalogLine first={first} testId="registry-empty">
+                  No plugins listed yet.
+                </CatalogLine>
+              )
+            );
+        }
+    }
+  };
+
   return (
     <>
       <PageHead
         page={page}
         aside={
-          <Button variant="outline" size="xs" onClick={() => {
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => {
               useUiStore.getState().openPalette("", "plugin.dev");
-            }} data-testid="plugin-dev">
+            }}
+            data-testid="plugin-dev"
+          >
             <FolderPlus aria-hidden />
             Add a dev plugin
           </Button>
         }
       />
-      <SectionCard id="installed" heading="Installed" description={`Plugins in ${dir}. A new one stays off until you enable it and allow what it asks for.`}>
-        {!loaded ? (
-          <p className="px-4 py-3 text-caption">Loading…</p>
-        ) : names.length === 0 ? (
-          <p className="px-4 py-3 text-caption" data-testid="plugins-none">
-            No plugins yet. Add a dev plugin from a folder, or put one in {dir}.
-          </p>
-        ) : (
-          names.map((n, i) => <PluginRow key={n} name={n} env={envs[n]} className={i > 0 ? "border-t border-cf-border" : undefined} onLogs={setLogsOf} onUninstall={setUninstallOf} />)
-        )}
-      </SectionCard>
-      <BrowseSection />
-      {pageSections(schema, page).map((sf) => (
-        <SettingsSection key={sf.section.id} schema={schema} pageId={page.id} section={sf} />
-      ))}
+      <CatalogToolbar
+        testId="plugin"
+        search={{ value: text, placeholder: searchPlaceholder(browse, count, { place: "your registries", browse: "Search the registries" }), label: "Search plugins", onChange: setText }}
+        browse={{
+          on: browse,
+          count,
+          onToggle: () => {
+            setBrowse((b) => !b);
+          },
+        }}
+        menu={{ label: "Registry options", items: menu, busy: loading }}
+      />
+      <CatalogCard
+        testId="plugin-catalog"
+        notices={
+          <>
+            {error && (
+              <CatalogNotice tone="error" testId="registry-error">
+                {error}
+              </CatalogNotice>
+            )}
+            {failedRegistries > 0 && (
+              <CatalogNotice tone="warning" testId="registry-failed">
+                {failedRegistries === 1 ? "A registry" : `${String(failedRegistries)} registries`} could not be read, so this is the last read. Registries in the page&apos;s ⋯ menu says why.
+              </CatalogNotice>
+            )}
+          </>
+        }
+        items={items}
+        itemKey={itemKey}
+        render={renderItem}
+      />
+      {registries && (
+        <RegistriesDialog
+          schema={schema}
+          page={page}
+          focusField={registries.focusField}
+          onClose={() => {
+            setRegistries(null);
+          }}
+        />
+      )}
       {uninstallOf && (
         <UninstallDialog
           name={uninstallOf}

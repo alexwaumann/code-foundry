@@ -6,7 +6,7 @@
 import type { Tone } from "@/api/plugin";
 import type { InstalledSkillView, SkillEntryView, SkillKindView, SkillRegistryView, SkillTierView } from "@/api/skill";
 import type { OverflowItem } from "@/components/projects/OverflowMenu";
-import { countWords, flatIds, groupId, matchesWords } from "@/components/settings/catalog/model";
+import { countWords, flatIds, groupId, matchesWords, readHint, readWords } from "@/components/settings/catalog/model";
 import { RESTART_WARNING, type SkillAction, type SkillFailure } from "@/stores/skill";
 
 /** A pill: its words and tone (the plugin pills' table, components/plugin/tones.ts). */
@@ -32,17 +32,6 @@ export function ageWords(ms: number, now: number): string {
   if (days < 60) return `${String(Math.floor(days / 7))} weeks ago`;
   if (days < 730) return `${String(Math.floor(days / 30))} months ago`;
   return `${String(Math.floor(days / 365))} years ago`;
-}
-
-/** When a marketplace was read: "read just now", "read 5 min ago", "read 3 h ago", "read 2 d ago"; "not read yet". */
-export function readWords(ms: number | null, now: number): string {
-  if (ms === null) return "not read yet";
-  const mins = Math.round(Math.max(0, now - ms) / 60_000);
-  if (mins < 1) return "read just now";
-  if (mins < 60) return `read ${String(mins)} min ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `read ${String(hours)} h ago`;
-  return `read ${String(Math.round(hours / 24))} d ago`;
 }
 
 /**
@@ -269,9 +258,7 @@ export function marketplaceCount(rs: readonly Pick<SkillRegistryView, "plugins" 
 
 /** Refresh marketplaces' hint: when the marketplaces were last read ("Read 5 min ago"), by the newest read. */
 export function refreshHint(rs: readonly Pick<SkillRegistryView, "readAtMs">[] | undefined, now: number): string {
-  const read = (rs ?? []).map((r) => r.readAtMs).filter((ms) => ms !== null);
-  const words = readWords(read.length > 0 ? Math.max(...read) : null, now);
-  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+  return readHint((rs ?? []).map((r) => r.readAtMs), now);
 }
 
 /** Registries' hint: "ai-marketplace · 3 plugins · 1,237 skills", "2 marketplaces · …", "None configured". */

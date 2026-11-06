@@ -31,5 +31,5 @@ test("a row that shows a plugin's flag opens the thread and the plugin's surface
 // The info card's project row carrying a flag in its colour (and its hover card), and the title menu's Clear flags: src/components/threadinfo/PlaceGroup.test.tsx ("a plugin's flag marks the row…") and src/components/thread/ThreadMenuItems.test.tsx (thread.flag.clear); a flag's row status is SidebarRow.test.tsx's.
 
 // Settings → Plugins' secrets list, a failed install's line and the daemon's plugin folders:
-// unit-tested in src/components/plugin/settings/{PluginsPage,BrowseSection}.test.tsx and
+// unit-tested in src/components/plugin/settings/PluginsPage.test.tsx and
 // src/stores/pluginRegistry.test.ts.

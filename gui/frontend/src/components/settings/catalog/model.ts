@@ -62,3 +62,21 @@ export function updateAllWords(run: Pick<UpdateRun, "running" | "at" | "total">,
   if (run.running) return `Updating ${String(run.at)} of ${String(run.total)}…`;
   return available > 1 ? `Update all ${String(available)}` : null;
 }
+
+/** When something was read: "read just now", "read 5 min ago", "read 3 h ago", "read 2 d ago"; "not read yet". */
+export function readWords(ms: number | null, now: number): string {
+  if (ms === null) return "not read yet";
+  const mins = Math.round(Math.max(0, now - ms) / 60_000);
+  if (mins < 1) return "read just now";
+  if (mins < 60) return `read ${String(mins)} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `read ${String(hours)} h ago`;
+  return `read ${String(Math.round(hours / 24))} d ago`;
+}
+
+/** The page menu's refresh hint: the newest read, as a sentence ("Read 5 min ago", "Not read yet"). */
+export function readHint(times: readonly (number | null)[], now: number): string {
+  const read = times.filter((ms) => ms !== null);
+  const words = readWords(read.length > 0 ? Math.max(...read) : null, now);
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+}

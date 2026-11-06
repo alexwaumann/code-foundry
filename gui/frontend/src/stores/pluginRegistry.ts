@@ -7,12 +7,19 @@
  * update and uninstall (the Settings dialog's purge choice, confirmed there once).
  */
 import { create } from "zustand";
+import type { InvokeResultView } from "@/api/command";
 import { browsePlugins, installOutcome, type BrowseView, type InstallProgressView } from "@/api/plugin";
 import { errorMessage } from "@/api/stream";
 import { requestConfirm, registerConfirmPresenter, type ConfirmRequest } from "./confirm";
 import { runCommand, runCommandForResult } from "./commands";
 
-export type RegistryAction = "install" | "update" | "uninstall";
+export type RegistryAction = "install" | "update" | "uninstall" | "enable" | "disable" | "restart" | "reload";
+
+/** A failed action on a plugin, shown under its row (the daemon's words). */
+export interface PluginFailure {
+  action: RegistryAction;
+  message: string;
+}
 
 export interface PluginRegistryState {
   browse: BrowseView | null;
@@ -25,9 +32,11 @@ export interface PluginRegistryState {
   progress: Readonly<Record<string, InstallProgressView>>;
   /** What the GUI is doing to a plugin right now. */
   busy: Readonly<Record<string, RegistryAction>>;
+  /** The last failed action per plugin, until the next try or a dismiss. An install's failure is its progress entry. */
+  failures: Readonly<Record<string, PluginFailure>>;
 }
 
-export const usePluginRegistryStore = create<PluginRegistryState>()(() => ({ browse: null, loading: false, error: "", epoch: 0, progress: {}, busy: {} }));
+export const usePluginRegistryStore = create<PluginRegistryState>()(() => ({ browse: null, loading: false, error: "", epoch: 0, progress: {}, busy: {}, failures: {} }));
 
 let inflight: Promise<void> | null = null;
 
@@ -131,26 +140,59 @@ export function dismissInstallFailure(name: string): void {
   });
 }
 
-/** Installs the newer version a registry lists (plugin.update <name>). */
-export async function updatePlugin(name: string): Promise<void> {
-  setBusy(name, "update");
+/**
+ * Runs one command for a row: busy while it runs, its failure kept under the row (and
+ * toasted). Null when it failed or the user declined a confirm. A row already busy is left
+ * alone (null). `quiet` skips the success toast (the row says it).
+ */
+async function act(name: string, action: RegistryAction, command: string, args: Record<string, string>, opts: { quiet?: boolean } = {}): Promise<InvokeResultView | null> {
+  if (usePluginRegistryStore.getState().busy[name]) return null;
+  setBusy(name, action);
+  let failure = "";
   try {
-    if (await runCommand("plugin.update", { name })) void loadBrowse();
+    const res = await runCommandForResult(command, args, { ...opts, onError: (m) => (failure = m) });
+    usePluginRegistryStore.setState((s) => ({ failures: applyPluginFailure(s.failures, name, res === null && failure ? { action, message: failure } : null) }));
+    return res;
   } finally {
     setBusy(name, null);
   }
 }
 
+/** The failures after an action on name: a failure replaces the last, success (or a declined confirm) clears it. Pure. */
+export function applyPluginFailure(s: Readonly<Record<string, PluginFailure>>, name: string, failure: PluginFailure | null): Record<string, PluginFailure> {
+  const { [name]: _gone, ...rest } = s;
+  return failure ? { ...rest, [name]: failure } : rest;
+}
+
+/** Takes a failure away from under its row. */
+export function dismissPluginFailure(name: string): void {
+  usePluginRegistryStore.setState((s) => (name in s.failures ? { failures: applyPluginFailure(s.failures, name, null) } : {}));
+}
+
+/**
+ * A row's switch and menu: plugin.enable (whose consent dialog asks first when it must, and
+ * declining reads as no change), plugin.disable, plugin.restart, and plugin.reload (the
+ * plugins folder as a whole, run from a dev plugin's row, which shows it busy).
+ */
+export async function runPluginAction(name: string, action: "enable" | "disable" | "restart" | "reload"): Promise<boolean> {
+  return (await act(name, action, `plugin.${action}`, action === "reload" ? {} : { name })) !== null;
+}
+
+/** Installs the newer version a registry lists (plugin.update <name>). `quiet`: no success toast (an Update all's row says it). */
+export async function updatePlugin(name: string, opts: { quiet?: boolean } = {}): Promise<boolean> {
+  const done = (await act(name, "update", "plugin.update", { name }, opts)) !== null;
+  if (done) void loadBrowse();
+  return done;
+}
+
 /** Uninstalls a plugin the user already confirmed in the Settings dialog (purge as chosen there). */
 export async function uninstallPlugin(name: string, purge: boolean): Promise<void> {
-  setBusy(name, "uninstall");
   const args = { name, purge: purge ? "true" : "false" };
   preconfirmed.add(confirmKey(args));
   try {
-    if (await runCommand("plugin.uninstall", args)) void loadBrowse();
+    if (await act(name, "uninstall", "plugin.uninstall", args)) void loadBrowse();
   } finally {
     preconfirmed.delete(confirmKey(args));
-    setBusy(name, null);
   }
 }
 

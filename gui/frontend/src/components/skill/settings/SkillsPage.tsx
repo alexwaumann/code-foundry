@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { InstalledSkillView, SkillKindView, SkillTierView } from "@/api/skill";
 import type { OverflowItem } from "@/components/projects/OverflowMenu";
 import { CatalogCard, CatalogLine, CatalogNotice, GroupHeader } from "@/components/settings/catalog/CatalogList";
 import { CatalogToolbar } from "@/components/settings/catalog/CatalogToolbar";
 import { Chip } from "@/components/settings/catalog/Chip";
-import { catalogEntries, searchPlaceholder, updateAllWords } from "@/components/settings/catalog/model";
+import { catalogEntries, searchPlaceholder } from "@/components/settings/catalog/model";
+import { UpdateAll } from "@/components/settings/catalog/UpdateAll";
 import { queryWords } from "@/components/settings/model";
 import { PageHead } from "@/components/settings/PageHead";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
-import { Button } from "@/components/ui/button";
 import { useNow } from "@/lib/clock";
 import {
   openSkillMarketplace,
@@ -23,7 +22,7 @@ import {
   useSkillSearchError,
   useSkillSearching,
 } from "@/stores/skill";
-import { forgetUpdated, runUpdates, useUpdateRunStore } from "@/stores/updateRun";
+import { forgetUpdated, useUpdateRunStore } from "@/stores/updateRun";
 import { ConfirmSkillDialog } from "./ConfirmSkillDialog";
 import {
   chipValue,
@@ -118,26 +117,16 @@ function useSkillQueryState() {
   };
 }
 
-/** "Update all N" or "Updating 2 of 3…" in the Needs you header: the row's own update, one row at a time. */
-function UpdateAll() {
-  const running = useUpdateRunStore((s) => s.skills.running);
-  const at = useUpdateRunStore((s) => s.skills.at);
-  const total = useUpdateRunStore((s) => s.skills.total);
+/** The Needs you header's Update all: the rows' own update, quiet (each row says how it went). */
+function UpdateAllSkills() {
   const available = useSkillMarketplaceStore((s) => updatableRows(s.installed?.installed ?? []).length);
-  const words = updateAllWords({ running, at, total }, available);
-  if (!words) return null;
-  const start = () => {
-    const rows = updatableRows(useSkillMarketplaceStore.getState().installed?.installed ?? []);
-    void runUpdates(
-      "skills",
-      rows.map((r) => ({ key: r.key, version: r.update?.version ?? "", run: () => updateSkill(r, { quiet: true }) })),
-    );
-  };
   return (
-    <Button variant="outline" size="xs" className="h-5 bg-transparent dark:bg-transparent" disabled={running} onClick={start} data-testid="skill-update-all">
-      {running && <Loader2 className="animate-spin" aria-hidden />}
-      {words}
-    </Button>
+    <UpdateAll
+      scope="skills"
+      available={available}
+      testId="skill-update-all"
+      steps={() => updatableRows(useSkillMarketplaceStore.getState().installed?.installed ?? []).map((r) => ({ key: r.key, version: r.update?.version ?? "", run: () => updateSkill(r, { quiet: true }) }))}
+    />
   );
 }
 
@@ -234,11 +223,14 @@ export function SkillsPage({ page, section }: { schema: SettingsSchemaView; page
     }
     // Nothing anywhere is one line, unless a chip the header holds is what narrowed it.
     if (!browse && out.length === 0 && hits.length === 0 && !waiting && !searchBusy && !tierOn) return [{ kind: "line", id: "none" }];
+    // Every hit is an installed row above and no chip wants the header: there is no marketplace group to show.
+    if (!browse && hits.length === 0 && shown > 0 && !waiting && !tierOn) return out;
     out.push({ kind: "market" });
     for (const key of hits) out.push({ kind: "hit", key });
-    if (hits.length === 0 && !waiting && !searchBusy) out.push({ kind: "line", id: "market-none" });
+    // Hits all shown as installed rows above do match: only no hit at all is "nothing".
+    if (shown === 0 && !waiting && !searchBusy) out.push({ kind: "line", id: "market-none" });
     return out;
-  }, [installed, hits, showMarket, browse, waiting, searchBusy, tierOn, loaded]);
+  }, [installed, hits, shown, showMarket, browse, waiting, searchBusy, tierOn, loaded]);
 
   const toggle = useCallback((key: string) => {
     setOpen((o) => {
@@ -279,7 +271,7 @@ export function SkillsPage({ page, section }: { schema: SettingsSchemaView; page
       case "group":
         return (
           <GroupHeader id={it.id} label={GROUP_LABELS[it.id] ?? it.id} count={it.count} first={first}>
-            {it.id === "needs" && <UpdateAll />}
+            {it.id === "needs" && <UpdateAllSkills />}
           </GroupHeader>
         );
       case "market":
