@@ -107,6 +107,18 @@ class Run(unittest.TestCase):
         self.assertTrue(r["skill_ok"])
         self.assertEqual((r["guidance_bytes"], r["guide"], r["caps"], len(r["reads"])), (200, 1, 1, 2))
 
+    def test_a_guidance_output_set_aside_counts_what_is_read_back(self):
+        path = "/h/claude/.claude/skills/code-foundry-pages/reference/react.md"
+        kept = "<persisted-output>\nOutput too large (37.7KB). Full output saved to: /t/b1.txt\n\nPreview (first 2KB):\nabc"
+        first = bash("cat " + path, kept)
+        self.assertEqual(score.score_run({"id": "t5"}, [first], [], FILES)["guidance_bytes"], len(kept))
+        back = "x" * 1000
+        for again in (bash("sed -n 1,400p /t/b1.txt", back), tool("Read", {"file_path": "/t/b1.txt"}, back)):
+            self.assertEqual(score.score_run({"id": "t5"}, [first, again], [], FILES)["guidance_bytes"], len(kept) + 1000)
+        # Set aside but not guidance (a settings dump): reading it back is not guidance either.
+        dump = bash("code-foundry settings get --json", kept)
+        self.assertEqual(score.score_run({"id": "t1"}, [dump, bash("sed -n 1,9p /t/b1.txt", back)], [], FILES)["guidance_bytes"], 0)
+
     def test_index_reads_past_a_long_path(self):
         long = "cd /Users/x/.cf-guide-eval-1234abcd/r1/home/claude/.claude/skills/code-foundry && grep -n model reference/commands.md"
         self.assertEqual(score.score_thread([bash(long, "45:- `thread.set-model` Set Thread Model")], {}, FILES)["index"], 1)

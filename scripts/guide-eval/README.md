@@ -60,7 +60,9 @@ run the before build too.
   `help`, `guide` and `daemon.capabilities` output, over the thread's whole tree. Bytes
   divided by 2.7, the audit's measured rate (2.3 to 3.0 by file), so the numbers are
   estimates that compare well, not exact tokens. A Bash call that mixes guidance with other
-  work counts its whole output.
+  work counts its whole output. Bash sets an output over 30,000 characters aside and returns a
+  preview: that counts as the preview plus what the run reads back from the file. Reports
+  scored before this rule need `score.py report` again before a comparison.
 - **Wrong turns**: failed CLI calls (the CLI's own error line, so a failure of something else
   in the same command does not count, and `exit=$?` tricks do), `--help` hops, and Monitor or
   Cron fetches. `p8`'s `pr.create` failure is expected: the origin is not on GitHub.

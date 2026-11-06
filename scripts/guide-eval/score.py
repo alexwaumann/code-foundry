@@ -25,6 +25,13 @@ HEREDOC = re.compile(r"(<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n).*?\n\s*\2\b", re.S)
 CLI_CALL = re.compile(r"(?:^|[\s;|&(\"'=])(?:\S*/)?(?:code-foundry|\$\{?CODE_FOUNDRY_BIN\}?\"?)[ \t]+([^\n;|&)]*)")
 
 
+# Bash sets an output over 30,000 characters aside in a file and returns a preview. What the
+# model takes in is the preview and whatever it reads back from that file, so a read back of a
+# guidance output counts as guidance: t5's references are 37 KB, and scored by the preview alone
+# one read of 29,900 bytes counted 13 times one of 37,700.
+SET_ASIDE = re.compile(r"Full output saved to: (\S+)")
+
+
 def calls(command):
     """The code-foundry invocations in a Bash command, each as `dotted.verb --rest`.
 
@@ -78,6 +85,7 @@ def score_thread(items, task, files):
     """One thread's counts. `task` gives allow_fail, `files` the shipped sizes."""
     s = dict(skills=[], reads=[], cli=[], failed=[], help=0, guide=0, caps=0, fetches=0, index=0, guidance_bytes=0, cost=0.0, turns=0, text="")
     allow = task.get("allow_fail")
+    set_aside = set()
     for it in items:
         if "turnEnd" in it:
             s["turns"] += 1
@@ -91,7 +99,9 @@ def score_thread(items, task, files):
             s["guidance_bytes"] += skill_size(files, skill)
         elif name == "Read":
             path = str(inp.get("file_path"))
-            if SKILLS_DIR in path:
+            if path in set_aside:
+                s["guidance_bytes"] += len(out.encode())
+            elif SKILLS_DIR in path:
                 rel = path.split(SKILLS_DIR)[1]
                 s["reads"].append(rel)
                 s["index"] += rel.endswith(INDEX)
@@ -112,8 +122,11 @@ def score_thread(items, task, files):
             if skill_files:
                 s["reads"].append("sh: " + cmd[:90].replace("\n", " "))
                 s["index"] += INDEX in cmd  # from the command: `reads` keeps only its start
-            if helps or guides or caps or skill_files:
+            read_back = any(f in cmd for f in set_aside)
+            if helps or guides or caps or skill_files or read_back:
                 s["guidance_bytes"] += len(out.encode())
+                if m := SET_ASIDE.search(out[:300]):
+                    set_aside.add(m.group(1))
             if found and CLI_ERROR.search(out) and not (allow and re.search(allow, out)):
                 s["failed"].append((found[-1][:120] + " => " + out[:160]).replace("\n", " "))
         elif name == "ToolSearch":
