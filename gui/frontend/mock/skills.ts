@@ -7,7 +7,8 @@
  *
  * Installed at start: secure-coding (plugin, enabled, up to date), enterprise-data (plugin,
  * 1.3.2 installed: Update to 1.4.0), pr-review (enabled), sql-helper (disabled),
- * jira-sync (needs setup), incident-postmortem (an update), and the local skill my-notes.
+ * jira-sync (needs setup), incident-postmortem and terraform-review (updates), load-test
+ * (missing), the local skill my-notes, and a dozen more up to date for a long list.
  *
  * Controls (POST /__mock/skills?…, mock/server.ts): fail=skill.install&error=… (that
  * command fails with the message until cleared with an empty error), registries=none|default
@@ -142,6 +143,8 @@ interface Inst {
   enabled: boolean;
   /** A skill whose setup script exited 0 (with the script as it is now). */
   setupDone: boolean;
+  /** A skill Code Foundry installed whose directory is gone. */
+  missing?: boolean;
   /** A local skill's description and by (an installed one shows its entry's). */
   description?: string;
   by?: string;
@@ -158,7 +161,26 @@ function seedInstalled(): Map<string, Inst> {
     { kind: "skill", name: "sql-helper", registry: SKILL_MARKETPLACE, version: "20260821", lastUpdated: at("2026-08-21"), enabled: false, setupDone: true },
     { kind: "skill", name: "jira-sync", registry: SKILL_MARKETPLACE, version: "20261011", lastUpdated: at("2026-10-11"), enabled: true, setupDone: false },
     { kind: "skill", name: "incident-postmortem", registry: SKILL_MARKETPLACE, version: "20260904", lastUpdated: at("2026-09-04"), enabled: true, setupDone: true },
+    { kind: "skill", name: "terraform-review", registry: SKILL_MARKETPLACE, version: "20260811", lastUpdated: at("2026-08-11"), enabled: true, setupDone: true },
+    { kind: "skill", name: "load-test", registry: SKILL_MARKETPLACE, version: "20260818", lastUpdated: at("2026-08-18"), enabled: true, setupDone: true, missing: true },
     { kind: "skill", name: "my-notes", registry: "", version: "", lastUpdated: new Date(0), enabled: true, setupDone: true, description: "How I like my notes: short, dated, one idea per line.", by: "" },
+    // A long list, for the page's groups and scroll: up to date and enabled, then two disabled.
+    ...[
+      ["accessibility-audit", "2026-09-27"],
+      ["adr-writer", "2026-06-24"],
+      ["api-design", "2026-07-15"],
+      ["bash-strict", "2026-08-26"],
+      ["dbt-model", "2026-09-03"],
+      ["design-tokens", "2026-10-05"],
+      ["feature-flags", "2026-09-09"],
+      ["git-archaeology", "2026-07-07"],
+      ["golden-path", "2026-10-13"],
+      ["k8s-manifest", "2026-08-30"],
+      ["observability", "2026-08-12"],
+      ["oncall-runbook", "2026-09-25"],
+    ].map(([name = "", date = ""]): Inst => ({ kind: "skill", name, registry: SKILL_MARKETPLACE, version: date.replaceAll("-", ""), lastUpdated: at(date), enabled: true, setupDone: true })),
+    { kind: "skill", name: "cost-review", registry: SKILL_MARKETPLACE, version: "20260721", lastUpdated: at("2026-07-21"), enabled: false, setupDone: true },
+    { kind: "skill", name: "haiku-writer", registry: SKILL_MARKETPLACE, version: "20260502", lastUpdated: at("2026-05-02"), enabled: false, setupDone: true },
   ];
   return new Map(rows.map((r) => [instKey(r.kind, r.name), r]));
 }
@@ -343,7 +365,7 @@ export class MockSkills {
       version: i.version,
       ...(i.registry ? { lastUpdated: timestampFromDate(i.lastUpdated) } : {}),
       enabled: i.enabled,
-      state: i.registry ? InstalledSkillState.INSTALLED : InstalledSkillState.LOCAL,
+      state: i.missing ? InstalledSkillState.MISSING : i.registry ? InstalledSkillState.INSTALLED : InstalledSkillState.LOCAL,
       dir: this.dirOf(i),
       scope: i.kind === "plugin" ? "user" : "",
       skills: e?.skills ?? [],
@@ -536,6 +558,13 @@ export class MockSkills {
           for (const i of targets) {
             this.local(i, "updated");
             const to = this.offer(i);
+            if (i.missing) {
+              await this.step("skill.update");
+              i.missing = false;
+              lines.push(`reinstalled ${this.what(i)}`);
+              changes.push(this.change("update", i));
+              continue;
+            }
             if (!to) {
               lines.push(`${this.what(i)} ${i.version} is up to date`);
               changes.push(this.change("update", i, { unchanged: true }));

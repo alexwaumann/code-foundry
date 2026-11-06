@@ -454,7 +454,7 @@ describe("search", () => {
     expect(within(nav("skills")).getByTestId("settings-nav-count").textContent).toBe("1");
     fireEvent.click(screen.getByTestId("settings-section-hit"));
     expect(body().dataset.page).toBe("skills");
-    expect(document.querySelector('[data-section="registries"]')).not.toBeNull();
+    expect(screen.getByTestId("skill-registries")).toBeTruthy();
   });
 
   it.each(["remembered", "forget", "preferences", "standing"])("“%s” finds Memory › Remembered, which opens the page", (word) => {

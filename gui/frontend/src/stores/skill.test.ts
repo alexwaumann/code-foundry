@@ -7,7 +7,6 @@ import {
   canRunSetup,
   disableSkill,
   dismissSkillFailure,
-  installedActions,
   installSkill,
   onSkillEpoch,
   openSkillMarketplace,
@@ -269,17 +268,6 @@ describe("what a row offers", () => {
     ["update offered", { state: "enabled", updateVersion: "1.3.9" }, "update"],
   ] as const)("browse: %s", (_name, e, want) => {
     expect(browseAction(e)).toBe(want);
-  });
-
-  const offer = { version: "20261020", lastUpdatedMs: null, commitSha: "" };
-  it.each([
-    ["local", { state: "local", enabled: true, update: null, needsSetup: false, kind: "skill" }, ["remove"]],
-    ["missing", { state: "missing", enabled: false, update: offer, needsSetup: false, kind: "skill" }, ["update", "uninstall"]],
-    ["enabled", { state: "installed", enabled: true, update: null, needsSetup: false, kind: "skill" }, ["disable", "uninstall"]],
-    ["disabled with an update", { state: "installed", enabled: false, update: offer, needsSetup: false, kind: "plugin" }, ["enable", "update", "uninstall"]],
-    ["needs setup", { state: "installed", enabled: true, update: null, needsSetup: true, kind: "skill" }, ["disable", "setup", "uninstall"]],
-  ] as const)("installed: %s", (_name, r, want) => {
-    expect(installedActions(r)).toEqual(want);
   });
 
   it.each([

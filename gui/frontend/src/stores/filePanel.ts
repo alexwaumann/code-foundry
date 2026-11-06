@@ -5,8 +5,9 @@
  */
 import { diffTab, fileOfTab, fileTab, type DiffTarget, type FileTarget } from "@/surfaces/fileTarget";
 import { isUnplaced } from "@/lib/threadSetup";
-import { allTabs, getPanel, openSurface, panelThreadId, usePanelStore, type PanelTarget, type Tab } from "./panel";
+import { allTabs, expandPanel, getPanel, keyOf, openSurface, panelThreadId, usePanelStore, type PanelTarget, type Tab } from "./panel";
 import { useThreadsStore } from "./threads";
+import { HOME, PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "./ui";
 
 /**
  * Opens (or activates) a file's tab in a panel ("current": the window's selection) and
@@ -29,6 +30,23 @@ export function openFileInPanel(target: PanelTarget, file: FileTarget, opts: { b
     ...(held ? { heldFor: held } : {}),
   };
   return openSurface(target, fileTab({ ...file, ...keeps }), opts);
+}
+
+/**
+ * Opens a file that belongs to no project (a skill's SKILL.md: `path` in the folder `dir`,
+ * under home) in the side panel of what the window shows, whatever that is: a File tab reads
+ * by path, so any panel can hold it. A selection with no panel of its own (`none`, which
+ * draws the home composer) goes to the home composer, whose panel it is. A window too narrow
+ * to show a panel beside the content gets it expanded, or the tab would open out of sight.
+ * False when no panel took it.
+ */
+export function openLooseFile(dir: string, path: string): boolean {
+  const ui = useUiStore.getState();
+  if (keyOf(ui.selection) === null) ui.select(HOME);
+  if (!openFileInPanel("current", { project: "", base: dir, path })) return false;
+  const now = useUiStore.getState();
+  if (panelMax(now.windowWidth, visibleSidebarWidth(now)) < PANEL_MIN) expandPanel("current", true, { focus: false });
+  return true;
 }
 
 /** Opens (or activates) a changed file's Diff tab in a panel; an open one takes the new scope. */

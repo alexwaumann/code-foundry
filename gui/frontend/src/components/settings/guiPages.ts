@@ -13,7 +13,8 @@ import { SkillsPage } from "@/components/skill/settings/SkillsPage";
 export interface GuiPage {
   page: SettingPageView;
   icon: LucideIcon;
-  component: (p: { schema: SettingsSchemaView; page: SettingPageView }) => React.JSX.Element;
+  /** `section`: the section a settings search hit opened the page at. A page where it is not a place to scroll to (Skills) acts on it. */
+  component: (p: { schema: SettingsSchemaView; page: SettingPageView; section?: string | null }) => React.JSX.Element;
 }
 
 export const guiPages: readonly GuiPage[] = [
@@ -29,7 +30,7 @@ export const guiPages: readonly GuiPage[] = [
       description: "Claude Code plugins and skills from your organisation's marketplace.",
       sections: [
         { id: "installed", title: "Installed", description: "What's installed on this Mac. Enable, disable, update, run setup or uninstall." },
-        { id: "browse", title: "Browse", description: "Search the marketplace and install plugins and skills." },
+        { id: "browse", title: "Browse all", description: "Search the marketplace and install plugins and skills." },
         { id: "registries", title: "Registries", description: "The marketplaces Claude Code knows about, and refreshing them." },
       ],
     },
