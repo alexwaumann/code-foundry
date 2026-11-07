@@ -68,3 +68,81 @@ test("a shell in the bottom panel adds a stream and takes none from a node", asy
   await surface(page).locator('[data-testid="plugin-button"][data-key="click"]').click();
   await expect(page.getByTestId("plugin-header")).toContainText("1 click");
 });
+
+// A wall four columns wide, each a grid of its own: what only a real layout settles. A grid inside
+// columns first measures them stacked, so for a frame every node is 38 px wide and on screen.
+const WALL_ROWS = 6;
+
+function wallView(): Record<string, unknown> {
+  const rows = Array.from({ length: WALL_ROWS }, (_, r) => r);
+  const items = [0, 1, 2, 3].map((c) => ({
+    key: `c${String(c)}`,
+    children: [
+      {
+        key: `g${String(c)}`,
+        grid: {
+          minWidth: 160,
+          items: rows.map((r) => ({
+            key: `i${String(c)}-${String(r)}`,
+            children: [{ key: `n${String(c)}-${String(r)}`, terminal: { terminalId: `t-wall-${String(c * WALL_ROWS + r)}`, title: "Wall", height: 240 } }],
+          })),
+        },
+      },
+    ],
+  }));
+  return { view: { nodes: [{ key: "cols", columns: { items } }] } };
+}
+
+const liveCount = (page: Page) => surface(page).locator('[data-live="true"]').count();
+const attaches = async () => (await openStreams())["TerminalService/Attach"] ?? 0;
+
+test("a wall holds a stream for what is on screen: never more at first, and scrolling swaps them", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await mockPost(`plugin/terminals?count=${String(4 * WALL_ROWS)}`);
+  await openApp(page);
+  await row(page, "s:s-3").click();
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Show Hello Demo");
+  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
+  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await page.getByTestId("panel-expand").click();
+
+  // The most live nodes at any moment, from before the view lands.
+  await page.evaluate(() => {
+    const w = window as unknown as { __peakLive: number };
+    w.__peakLive = 0;
+    new MutationObserver(() => {
+      w.__peakLive = Math.max(w.__peakLive, document.querySelectorAll('[data-live="true"]').length);
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-live"] });
+  });
+  await mockPost(`plugin/demotab?tab=${encodeURIComponent(`view:${JSON.stringify(wallView())}`)}`);
+  const first = surface(page).locator('[data-testid="plugin-terminal"][data-key="n0-0"]');
+  const last = surface(page).locator(`[data-testid="plugin-terminal"][data-key="n3-${String(WALL_ROWS - 1)}"]`);
+  await expect(first).toHaveAttribute("data-live", "true");
+  await expect(surface(page).getByTestId("plugin-terminal")).toHaveCount(4 * WALL_ROWS);
+  await expect(last.getByTestId("plugin-live-hidden")).toBeAttached();
+
+  const atTop = await liveCount(page);
+  expect(atTop).toBeLessThan(4 * WALL_ROWS);
+  await expect.poll(attaches).toBe(atTop);
+  expect(await page.evaluate(() => (window as unknown as { __peakLive: number }).__peakLive)).toBe(atTop);
+
+  // Scrolled away, a node's stream closes; the ones it reaches open.
+  const scroll = surface(page).getByTestId("plugin-scroll");
+  await scroll.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await expect(last).toHaveAttribute("data-live", "true");
+  await expect(first).not.toHaveAttribute("data-live", "true");
+  await expect(first.getByTestId("plugin-live-hidden")).toBeAttached();
+  await expect.poll(async () => (await attaches()) === (await liveCount(page))).toBe(true);
+  expect(await liveCount(page)).toBeLessThan(4 * WALL_ROWS);
+
+  // And back.
+  await scroll.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await expect(first).toHaveAttribute("data-live", "true");
+  await expect(last).not.toHaveAttribute("data-live", "true");
+  await expect.poll(attaches).toBe(atTop);
+});

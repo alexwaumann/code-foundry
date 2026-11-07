@@ -2,10 +2,12 @@ import { lazy, Suspense, useRef, useState } from "react";
 import { Archive } from "lucide-react";
 import { useThreadsStore } from "@/stores/threads";
 import { useNodeHeight } from "../height";
-import { useOnScreen } from "../live";
+import { useViewCtx } from "../context";
+import { useOnScreen, useRepeated } from "../live";
 import type { NodeProps } from "../registry";
 import { LiveHidden } from "./LiveHidden";
 import { OwnedGone } from "./OwnedGone";
+import { ShownAbove } from "./ShownAbove";
 
 // Loaded on first use: the thread view (and its composer) stays out of what every surface imports.
 const InlineThread = lazy(() => import("@/components/thread/InlineThread").then((m) => ({ default: m.InlineThread })));
@@ -19,9 +21,11 @@ export const THREAD_AUTO_PX = 420;
  * without the composer, and read-only with an "Archived" line while the thread is
  * archived. It holds the thread's Watch only while near the screen
  * (components/plugin/live.ts), shared with the content pane when that shows the same
- * thread. A thread the GUI does not know shows a muted empty state.
+ * thread. A later node naming the same thread in the view says "Shown above" and draws no
+ * conversation. A thread the GUI does not know shows a muted empty state.
  */
 export function ThreadNode({ node, data }: NodeProps<"thread">) {
+  const { watchKey } = useViewCtx();
   const ref = useRef<HTMLDivElement>(null);
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   const height = useNodeHeight(ref, data.height, THREAD_AUTO_PX);
@@ -29,7 +33,8 @@ export function ThreadNode({ node, data }: NodeProps<"thread">) {
   const loaded = useThreadsStore((s) => s.loaded);
   const archived = useThreadsStore((s) => (s.byId[data.threadId]?.archivedAtMs ?? null) !== null);
   const onScreen = useOnScreen(el);
-  const attached = known && onScreen;
+  const repeated = useRepeated(watchKey, data.threadId, el);
+  const attached = known && onScreen && !repeated;
   if (!known) {
     return (
       <OwnedGone
@@ -48,13 +53,14 @@ export function ThreadNode({ node, data }: NodeProps<"thread">) {
         setEl(e);
       }}
       className="relative isolate flex min-w-0 flex-col overflow-hidden rounded-lg border border-cf-border bg-cf-surface"
-      style={{ height }}
+      style={repeated ? undefined : { height }}
       data-testid="plugin-thread"
       data-key={node.key}
       data-thread-id={data.threadId}
       data-read-only={readOnly || undefined}
       data-archived={archived || undefined}
       data-live={attached || undefined}
+      data-repeated={repeated || undefined}
     >
       <div className="relative flex min-h-0 flex-1 flex-col">
         {attached && (
@@ -62,7 +68,7 @@ export function ThreadNode({ node, data }: NodeProps<"thread">) {
             <InlineThread threadId={data.threadId} readOnly={readOnly} placeholder={data.placeholder || undefined} />
           </Suspense>
         )}
-        {!attached && <LiveHidden />}
+        {repeated ? <ShownAbove /> : !attached && <LiveHidden />}
       </div>
       {archived && (
         <div className="flex shrink-0 items-center gap-1.5 border-t border-cf-border px-3 py-1.5 text-caption" data-testid="plugin-thread-archived">

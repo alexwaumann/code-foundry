@@ -17,7 +17,8 @@
  * (the plugin goes down or comes back; its open surfaces follow), POST /__mock/plugin/toast?text=…
  * (a view/toast without an instance: a Notify intent), POST /__mock/plugin/invoke?command=…
  * (a host/invoke with confirm "ask": an InvokeCommand intent), POST /__mock/plugin/demotab?tab=…
- * (the demo shows a tab, "stress" included: two threads and a terminal), GET /__mock/plugin/acts.
+ * (the demo shows a tab, "stress" included: two threads and a terminal), POST
+ * /__mock/plugin/terminals?count=N (the plugin owns terminals t-wall-0..), GET /__mock/plugin/acts.
  */
 import { readFileSync } from "node:fs";
 import type { MessageInitShape } from "@bufbuild/protobuf";

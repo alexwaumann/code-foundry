@@ -6,9 +6,11 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Field, ViewNode } from "@/api/plugin";
+import type { TerminalView } from "@/api/terminal";
 import type { ThreadView } from "@/api/threads";
 import { emptyContext } from "@/stores/context";
 import { chooserKeyOf, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
+import { useTerminalsStore } from "@/stores/terminals";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { ViewContext, type ViewCtx } from "./context";
@@ -36,6 +38,67 @@ afterEach(() => {
   usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {}, choices: {} });
   useUiStore.setState({ selection });
   vi.restoreAllMocks();
+});
+
+describe("a terminal named by more than one node", () => {
+  const term = (id: string) => ({ id, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels: {} }) as unknown as TerminalView;
+  const node = (key: string, terminalId: string): ViewNode => ({ key, terminal: { terminalId, title: key } });
+  const live = () => screen.getAllByTestId("plugin-terminal").map((n) => (n.getAttribute("data-live") ? n.getAttribute("data-key") : null));
+
+  function seed(...ids: string[]) {
+    useTerminalsStore.setState({ loaded: true, byId: Object.fromEntries(ids.map((id) => [id, term(id)])), order: ids });
+  }
+
+  afterEach(() => {
+    useTerminalsStore.setState({ loaded: false, byId: {}, order: [] });
+  });
+
+  it("draws it in the first node; a repeat is a plate with no title bar, terminal or stream", () => {
+    seed("t1", "t2");
+    inView(<NodeList nodes={[node("a", "t1"), node("b", "t2"), node("c", "t1"), node("d", "t1")]} />);
+    expect(live()).toEqual(["a", "b", null, null]);
+    expect(screen.getAllByTestId("plugin-repeat").map((p) => p.textContent)).toEqual(["Shown above.", "Shown above."]);
+    expect(screen.getAllByTestId("plugin-terminal-open-bottom")).toHaveLength(2);
+    expect(screen.queryAllByTestId("plugin-live-hidden")).toHaveLength(0);
+  });
+
+  it("leaves distinct terminals alone: sixteen nodes, sixteen live, no plate", () => {
+    const ids = Array.from({ length: 16 }, (_, i) => `t${String(i)}`);
+    seed(...ids);
+    inView(<NodeList nodes={ids.map((id) => node(`n-${id}`, id))} />);
+    expect(live()).toEqual(ids.map((id) => `n-${id}`));
+    expect(screen.queryAllByTestId("plugin-repeat")).toHaveLength(0);
+  });
+
+  it("hands the terminal to the next node when the first goes, and back to an earlier one that comes", () => {
+    seed("t1");
+    const view = (nodes: ViewNode[]) => (
+      <ViewContext.Provider value={ctx}>
+        <NodeList nodes={nodes} />
+      </ViewContext.Provider>
+    );
+    const { rerender } = render(view([node("a", "t1"), node("b", "t1")]));
+    expect(live()).toEqual(["a", null]);
+    rerender(view([node("b", "t1")]));
+    expect(live()).toEqual(["b"]);
+    rerender(view([node("z", "t1"), node("b", "t1")]));
+    expect(live()).toEqual(["z", null]);
+  });
+
+  it("counts per view: two surfaces each keep their own", () => {
+    seed("t1");
+    render(
+      <>
+        <ViewContext.Provider value={ctx}>
+          <NodeList nodes={[node("a", "t1")]} />
+        </ViewContext.Provider>
+        <ViewContext.Provider value={{ ...ctx, watchKey: "w2" }}>
+          <NodeList nodes={[node("b", "t1")]} />
+        </ViewContext.Provider>
+      </>,
+    );
+    expect(live()).toEqual(["a", "b"]);
+  });
 });
 
 describe("forms", () => {
@@ -232,6 +295,25 @@ describe("thread nodes", () => {
     expect(screen.getAllByTestId("plugin-thread").map((n) => n.getAttribute("data-live"))).toEqual(ids.map(() => "true"));
     // A thread's chips are z-10 too: the node's isolate keeps them under the sticky header.
     expect(screen.getAllByTestId("plugin-thread")[0]?.classList.contains("isolate")).toBe(true);
+  });
+
+  it("keeps a repeated thread in its first node: the others draw a plate and no conversation", () => {
+    useThreadsStore.setState({ loaded: true, byId: { a: thread("a"), b: thread("b") }, order: [], owned: ["a", "b"] });
+    inView(
+      <NodeList
+        nodes={[
+          { key: "a1", thread: { threadId: "a", height: 300 } },
+          { key: "b1", thread: { threadId: "b" } },
+          { key: "a2", thread: { threadId: "a", height: 300 } },
+        ]}
+      />,
+    );
+    const nodes = screen.getAllByTestId("plugin-thread");
+    expect(nodes.map((n) => n.getAttribute("data-live"))).toEqual(["true", "true", null]);
+    expect(nodes[2]?.getAttribute("data-repeated")).toBe("true");
+    expect(nodes[2]?.textContent).toBe("Shown above.");
+    expect(nodes[2]?.style.height).toBe("");
+    expect(nodes[0]?.style.height).toBe("300px");
   });
 
   it("stays live while the user is leaving the view tab (its choice in flight): nothing waits for its stream", () => {

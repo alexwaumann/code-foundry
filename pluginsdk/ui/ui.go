@@ -581,7 +581,8 @@ type Fieldset struct {
 // Thread renders a plugin-owned Claude thread (permission threads; Host.CreateThread)
 // with the host's rendered thread view and its composer. A thread that is gone (removed,
 // or not the plugin's) shows a muted empty state; an archived one still renders. Each
-// Thread or Terminal node is a live stream the GUI attaches while it is on screen.
+// Thread or Terminal node is a live stream the GUI attaches while it is on screen. A view
+// draws each thread or terminal once: a later node naming the same id shows "Shown above".
 type Thread struct {
 	ThreadID string `json:"threadId"`
 	// ReadOnly leaves the composer out: the plugin alone sends (Host.SendThread).

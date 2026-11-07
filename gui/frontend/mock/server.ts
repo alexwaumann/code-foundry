@@ -1176,7 +1176,8 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
  * POST /__mock/plugin/registry?error=… (the default registry's Browse error; empty clears it) and/or
  * &installError=… (every install fails with it after its first step; empty clears it),
  * POST /__mock/plugin/dirs?home=… (the home PluginService.List names the plugin directories under),
- * POST /__mock/plugin/demotab?tab=overview|form|log|assistant|shell|stress, GET /__mock/plugin/acts.
+ * POST /__mock/plugin/demotab?tab=overview|form|log|assistant|shell|stress, POST /__mock/plugin/terminals?count=N,
+ * GET /__mock/plugin/acts.
  */
 function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): void {
   try {
@@ -1200,6 +1201,10 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
       }
       case "POST demotab":
         world.plugins.demoTab(q.get("tab") ?? "overview");
+        json(res, 200, { ok: true });
+        return;
+      case "POST terminals":
+        world.addWallTerminals(Number(q.get("count") ?? "0"));
         json(res, 200, { ok: true });
         return;
       case "POST registry":

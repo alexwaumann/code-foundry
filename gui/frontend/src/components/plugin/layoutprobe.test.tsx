@@ -36,7 +36,7 @@ beforeEach(() => {
   resetSurfaceStore();
   useThreadsStore.setState({
     loaded: true,
-    byId: Object.fromEntries(["a", "b", "c"].map((id) => [id, { id, owner: "plugin:fuzz", worktreePath: "/h", state: "disconnected", status: "idle", archivedAtMs: null } as unknown as ThreadView])),
+    byId: Object.fromEntries(["a", "b", "c", "d"].map((id) => [id, { id, owner: "plugin:fuzz", worktreePath: "/h", state: "disconnected", status: "idle", archivedAtMs: null } as unknown as ThreadView])),
     order: [],
   });
 });
@@ -422,7 +422,7 @@ describe("live nodes", () => {
           { key: "t-detail", thread: { threadId: "a", height: 200 } },
           { key: "tb", tabs: { items: [{ key: "ta", label: "A" }, { key: "tbb", label: "B" }], active: tab, children: [{ key: `t-${tab}`, thread: { threadId: tab === "ta" ? "b" : "c", height: 200 } }] } },
         ]),
-        { key: "t-top", thread: { threadId: "c", height: 200 } },
+        { key: "t-top", thread: { threadId: "d", height: 200 } },
       );
     mount(v("ta"));
     expect(liveKeys()).toEqual(["t-top"]);

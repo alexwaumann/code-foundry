@@ -2971,6 +2971,14 @@ export class World {
     }
   }
 
+  /** The hello plugin's extra terminals t-wall-0.. for a view of many terminal nodes (POST /__mock/plugin/terminals?count=N). */
+  addWallTerminals(count: number): void {
+    for (let i = 0; i < count; i++) {
+      const t = this.addTerm({ id: `t-wall-${String(i)}`, argv: ["sh"], cwd: `${HOME}/.code-foundry/plugin-data/hello`, title: "", kind: "clock", labels: { kind: "plugin", plugin: "hello", title: `Wall ${String(i)}` } });
+      this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
+    }
+  }
+
   private addTerm(o: { id: string; argv: string[]; cwd: string; title: string; kind: Kind; labels: Record<string, string>; startedAt?: Date }): MockTerm {
     const t: MockTerm = {
       id: o.id,

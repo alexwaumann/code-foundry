@@ -2,16 +2,18 @@ import { lazy, Suspense, useRef, useState } from "react";
 import { PanelBottom } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { showPluginTerminal, useInVisibleBottom } from "@/stores/pluginTerminals";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { terminalAutoHeight, useNarrowerThan, useNodeHeight } from "../height";
 import { useViewCtx } from "../context";
-import { useOnScreen } from "../live";
+import { useOnScreen, useRepeated } from "../live";
 import { PluginButton } from "../parts";
 import type { NodeProps } from "../registry";
 import { LiveHidden } from "./LiveHidden";
 import { OwnedGone } from "./OwnedGone";
+import { ShownAbove } from "./ShownAbove";
 
 // Loaded on first use: xterm stays out of what every surface imports.
 const TerminalHost = lazy(() => import("@/components/terminal/TerminalHost").then((m) => ({ default: m.TerminalHost })));
@@ -24,11 +26,12 @@ const NARROW_PX = 400;
  * bar with the plugin's buttons and "Open in bottom panel" (icons only on a narrow node),
  * over the terminal view. Its own Attach only while near the screen
  * (components/plugin/live.ts). While the bottom panel on screen shows the terminal, this
- * node says so instead of attaching a second view. A terminal the GUI does not know shows a
- * muted empty state.
+ * node says so instead of attaching a second view, and a later node naming the same terminal
+ * in the view says "Shown above" for the same reason. A terminal the GUI does not know shows
+ * a muted empty state.
  */
 export function TerminalNode({ node, data }: NodeProps<"terminal">) {
-  const { inert } = useViewCtx();
+  const { inert, watchKey } = useViewCtx();
   const ref = useRef<HTMLDivElement>(null);
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [box, setBox] = useState<HTMLDivElement | null>(null);
@@ -40,7 +43,8 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
   const inBottom = useInVisibleBottom(data.terminalId);
   const narrow = useNarrowerThan(box, NARROW_PX);
   const onScreen = useOnScreen(el);
-  const attached = known && onScreen && !inBottom;
+  const repeated = useRepeated(watchKey, data.terminalId, box);
+  const attached = known && onScreen && !inBottom && !repeated;
   if (!known) {
     return (
       <OwnedGone
@@ -77,37 +81,42 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
       data-exited={exited || undefined}
       data-narrow={narrow || undefined}
       data-live={attached || undefined}
+      data-repeated={repeated || undefined}
     >
-      <div className="flex min-w-0 items-center gap-1.5 border-b border-cf-border py-1 pr-1 pl-2.5">
-        <Tip label={data.title} whenTruncated>
-          <span className="min-w-0 flex-1 truncate text-caption font-medium">{data.title || "Terminal"}</span>
-        </Tip>
-        <span className="flex shrink-0 items-center gap-0.5">
-          {data.actions?.map((b) => (
-            <PluginButton key={b.key} button={narrow && b.icon ? { ...b, iconOnly: true } : b} />
-          ))}
-          {/* A disabled button gets no pointer events: the span carries the tooltip. */}
-          {narrow ? (
-            <Tip label="Open in bottom panel">
-              <span className="inline-flex shrink-0">{openBottom}</span>
-            </Tip>
-          ) : (
-            openBottom
-          )}
-        </span>
-      </div>
+      {!repeated && (
+        <div className="flex min-w-0 items-center gap-1.5 border-b border-cf-border py-1 pr-1 pl-2.5">
+          <Tip label={data.title} whenTruncated>
+            <span className="min-w-0 flex-1 truncate text-caption font-medium">{data.title || "Terminal"}</span>
+          </Tip>
+          <span className="flex shrink-0 items-center gap-0.5">
+            {data.actions?.map((b) => (
+              <PluginButton key={b.key} button={narrow && b.icon ? { ...b, iconOnly: true } : b} />
+            ))}
+            {/* A disabled button gets no pointer events: the span carries the tooltip. */}
+            {narrow ? (
+              <Tip label="Open in bottom panel">
+                <span className="inline-flex shrink-0">{openBottom}</span>
+              </Tip>
+            ) : (
+              openBottom
+            )}
+          </span>
+        </div>
+      )}
       <div
         ref={(e) => {
           ref.current = e;
           setEl(e);
         }}
-        className="relative flex min-h-0 flex-col"
-        style={{ height }}
+        className={cn("relative flex min-h-0 flex-col", repeated && "grow")}
+        style={repeated ? undefined : { height }}
       >
         {inBottom ? (
           <p className="m-auto px-4 text-center text-caption" data-testid="plugin-terminal-in-bottom">
             Shown in the bottom panel.
           </p>
+        ) : repeated ? (
+          <ShownAbove />
         ) : attached ? (
           <Suspense fallback={null}>
             <TerminalHost terminalId={data.terminalId} testId="plugin-terminal-host" />
