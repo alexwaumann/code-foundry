@@ -27,6 +27,8 @@ func TestWriteSettings(t *testing.T) {
 		{"int with bounds, unit and restart", &v1.SettingField{Key: "threads.grace", Group: "threads", Title: "Grace",
 			Type: v1.SettingType_SETTING_TYPE_INT, Min: 1, Max: 120, Unit: "s", DefaultValue: "10", RestartRequired: true},
 			"- `threads.grace` **Grace**\n  Type: int, 1 to 120 s. Default: `10`. Applies after a daemon restart.\n"},
+		{"user-only", &v1.SettingField{Key: "threads.path", Group: "threads", Title: "Path", Type: v1.SettingType_SETTING_TYPE_PATH, UserOnly: true},
+			"Default: none (empty). User-only: refused from a thread; the user changes it in Settings.\n"},
 		{"bool", &v1.SettingField{Key: "threads.auto", Group: "threads", Title: "Auto", Type: v1.SettingType_SETTING_TYPE_BOOL, DefaultValue: "true"},
 			"  Type: bool (`true` or `false`). Default: `true`.\n"},
 		{"empty default", &v1.SettingField{Key: "threads.editor", Group: "threads", Title: "Editor", Type: v1.SettingType_SETTING_TYPE_STRING},

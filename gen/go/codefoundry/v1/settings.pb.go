@@ -134,8 +134,11 @@ type SettingField struct {
 	// depends_on's row, only while that field has this value. The search still finds it,
 	// dimmed. Empty for none.
 	DependsOnValue string `protobuf:"bytes,20,opt,name=depends_on_value,json=dependsOnValue,proto3" json:"depends_on_value,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Only the user may change it: the settings.* commands refuse a page, a plugin and a
+	// thread's CLI, whatever they confirm. The Settings page shows nothing for it.
+	UserOnly      bool `protobuf:"varint,21,opt,name=user_only,json=userOnly,proto3" json:"user_only,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SettingField) Reset() {
@@ -306,6 +309,13 @@ func (x *SettingField) GetDependsOnValue() string {
 		return x.DependsOnValue
 	}
 	return ""
+}
+
+func (x *SettingField) GetUserOnly() bool {
+	if x != nil {
+		return x.UserOnly
+	}
+	return false
 }
 
 // SettingGroup is a table of the settings file ([threads], [github], ...).
@@ -1492,7 +1502,7 @@ var File_codefoundry_v1_settings_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\n" +
-	"\x1dcodefoundry/v1/settings.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe6\x04\n" +
+	"\x1dcodefoundry/v1/settings.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x83\x05\n" +
 	"\fSettingField\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -1517,7 +1527,8 @@ const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\x03row\x18\x11 \x01(\tR\x03row\x12+\n" +
 	"\x11enum_descriptions\x18\x12 \x03(\tR\x10enumDescriptions\x12#\n" +
 	"\renum_examples\x18\x13 \x03(\tR\fenumExamples\x12(\n" +
-	"\x10depends_on_value\x18\x14 \x01(\tR\x0edependsOnValue\"V\n" +
+	"\x10depends_on_value\x18\x14 \x01(\tR\x0edependsOnValue\x12\x1b\n" +
+	"\tuser_only\x18\x15 \x01(\bR\buserOnly\"V\n" +
 	"\fSettingGroup\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +

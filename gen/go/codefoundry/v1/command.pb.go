@@ -21,6 +21,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// CallOrigin says what asked for a command when it is not what the context looks like. A
+// page's call has the context of the CLI inside its thread, and a plugin's has whatever the
+// plugin or its panel gave. A setting's user_only and a page's confirmation read it.
+type CallOrigin int32
+
+const (
+	// The GUI's own controls, or a CLI.
+	CallOrigin_CALL_ORIGIN_UNSPECIFIED CallOrigin = 0
+	// A page shown in the app. Only the GUI's bridge host sets it, never the page.
+	CallOrigin_CALL_ORIGIN_PAGE CallOrigin = 1
+	// A plugin: host/invoke, or a command button of its panel.
+	CallOrigin_CALL_ORIGIN_PLUGIN CallOrigin = 2
+)
+
+// Enum value maps for CallOrigin.
+var (
+	CallOrigin_name = map[int32]string{
+		0: "CALL_ORIGIN_UNSPECIFIED",
+		1: "CALL_ORIGIN_PAGE",
+		2: "CALL_ORIGIN_PLUGIN",
+	}
+	CallOrigin_value = map[string]int32{
+		"CALL_ORIGIN_UNSPECIFIED": 0,
+		"CALL_ORIGIN_PAGE":        1,
+		"CALL_ORIGIN_PLUGIN":      2,
+	}
+)
+
+func (x CallOrigin) Enum() *CallOrigin {
+	p := new(CallOrigin)
+	*p = x
+	return p
+}
+
+func (x CallOrigin) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CallOrigin) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_command_proto_enumTypes[0].Descriptor()
+}
+
+func (CallOrigin) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_command_proto_enumTypes[0]
+}
+
+func (x CallOrigin) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CallOrigin.Descriptor instead.
+func (CallOrigin) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_command_proto_rawDescGZIP(), []int{0}
+}
+
 type ArgType int32
 
 const (
@@ -64,11 +119,11 @@ func (x ArgType) String() string {
 }
 
 func (ArgType) Descriptor() protoreflect.EnumDescriptor {
-	return file_codefoundry_v1_command_proto_enumTypes[0].Descriptor()
+	return file_codefoundry_v1_command_proto_enumTypes[1].Descriptor()
 }
 
 func (ArgType) Type() protoreflect.EnumType {
-	return &file_codefoundry_v1_command_proto_enumTypes[0]
+	return &file_codefoundry_v1_command_proto_enumTypes[1]
 }
 
 func (x ArgType) Number() protoreflect.EnumNumber {
@@ -77,7 +132,7 @@ func (x ArgType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ArgType.Descriptor instead.
 func (ArgType) EnumDescriptor() ([]byte, []int) {
-	return file_codefoundry_v1_command_proto_rawDescGZIP(), []int{0}
+	return file_codefoundry_v1_command_proto_rawDescGZIP(), []int{1}
 }
 
 // UiContext describes what the caller is looking at. The daemon never guesses it.
@@ -93,7 +148,8 @@ type UiContext struct {
 	ActiveView string `protobuf:"bytes,5,opt,name=active_view,json=activeView,proto3" json:"active_view,omitempty"`
 	// Workspace that owns what is active: the active thread's workspace, or the workspace
 	// a composer or page is for. Empty for project threads and from the CLI.
-	ActiveWorkspaceId string `protobuf:"bytes,6,opt,name=active_workspace_id,json=activeWorkspaceId,proto3" json:"active_workspace_id,omitempty"`
+	ActiveWorkspaceId string     `protobuf:"bytes,6,opt,name=active_workspace_id,json=activeWorkspaceId,proto3" json:"active_workspace_id,omitempty"`
+	Origin            CallOrigin `protobuf:"varint,8,opt,name=origin,proto3,enum=codefoundry.v1.CallOrigin" json:"origin,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -168,6 +224,13 @@ func (x *UiContext) GetActiveWorkspaceId() string {
 		return x.ActiveWorkspaceId
 	}
 	return ""
+}
+
+func (x *UiContext) GetOrigin() CallOrigin {
+	if x != nil {
+		return x.Origin
+	}
+	return CallOrigin_CALL_ORIGIN_UNSPECIFIED
 }
 
 type ArgSpec struct {
@@ -880,7 +943,7 @@ var File_codefoundry_v1_command_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xb1\x02\n" +
+	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xe5\x02\n" +
 	"\tUiContext\x12,\n" +
 	"\x12active_terminal_id\x18\x01 \x01(\tR\x10activeTerminalId\x12(\n" +
 	"\x10active_thread_id\x18\x02 \x01(\tR\x0eactiveThreadId\x12*\n" +
@@ -888,7 +951,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
 	"activeView\x12.\n" +
-	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceIdJ\x04\b\a\x10\bR\x17active_session_rendered\"\xd4\x03\n" +
+	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceId\x122\n" +
+	"\x06origin\x18\b \x01(\x0e2\x1a.codefoundry.v1.CallOriginR\x06originJ\x04\b\a\x10\bR\x17active_session_rendered\"\xd4\x03\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +
@@ -958,7 +1022,12 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\")\n" +
 	"\rCommandFailed\x12\x18\n" +
-	"\acommand\x18\x01 \x01(\tR\acommand*\x83\x01\n" +
+	"\acommand\x18\x01 \x01(\tR\acommand*W\n" +
+	"\n" +
+	"CallOrigin\x12\x1b\n" +
+	"\x17CALL_ORIGIN_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10CALL_ORIGIN_PAGE\x10\x01\x12\x16\n" +
+	"\x12CALL_ORIGIN_PLUGIN\x10\x02*\x83\x01\n" +
 	"\aArgType\x12\x18\n" +
 	"\x14ARG_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fARG_TYPE_STRING\x10\x01\x12\x11\n" +
@@ -983,42 +1052,44 @@ func file_codefoundry_v1_command_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_command_proto_rawDescData
 }
 
-var file_codefoundry_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_codefoundry_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_codefoundry_v1_command_proto_goTypes = []any{
-	(ArgType)(0),                  // 0: codefoundry.v1.ArgType
-	(*UiContext)(nil),             // 1: codefoundry.v1.UiContext
-	(*ArgSpec)(nil),               // 2: codefoundry.v1.ArgSpec
-	(*Command)(nil),               // 3: codefoundry.v1.Command
-	(*ListCommandsRequest)(nil),   // 4: codefoundry.v1.ListCommandsRequest
-	(*ListCommandsResponse)(nil),  // 5: codefoundry.v1.ListCommandsResponse
-	(*InvokeCommandRequest)(nil),  // 6: codefoundry.v1.InvokeCommandRequest
-	(*InvokeCommandResponse)(nil), // 7: codefoundry.v1.InvokeCommandResponse
-	(*ConfirmationRequired)(nil),  // 8: codefoundry.v1.ConfirmationRequired
-	(*CommandFailed)(nil),         // 9: codefoundry.v1.CommandFailed
-	nil,                           // 10: codefoundry.v1.InvokeCommandRequest.ArgsEntry
-	nil,                           // 11: codefoundry.v1.ConfirmationRequired.ArgsEntry
-	nil,                           // 12: codefoundry.v1.ConfirmationRequired.BindEntry
+	(CallOrigin)(0),               // 0: codefoundry.v1.CallOrigin
+	(ArgType)(0),                  // 1: codefoundry.v1.ArgType
+	(*UiContext)(nil),             // 2: codefoundry.v1.UiContext
+	(*ArgSpec)(nil),               // 3: codefoundry.v1.ArgSpec
+	(*Command)(nil),               // 4: codefoundry.v1.Command
+	(*ListCommandsRequest)(nil),   // 5: codefoundry.v1.ListCommandsRequest
+	(*ListCommandsResponse)(nil),  // 6: codefoundry.v1.ListCommandsResponse
+	(*InvokeCommandRequest)(nil),  // 7: codefoundry.v1.InvokeCommandRequest
+	(*InvokeCommandResponse)(nil), // 8: codefoundry.v1.InvokeCommandResponse
+	(*ConfirmationRequired)(nil),  // 9: codefoundry.v1.ConfirmationRequired
+	(*CommandFailed)(nil),         // 10: codefoundry.v1.CommandFailed
+	nil,                           // 11: codefoundry.v1.InvokeCommandRequest.ArgsEntry
+	nil,                           // 12: codefoundry.v1.ConfirmationRequired.ArgsEntry
+	nil,                           // 13: codefoundry.v1.ConfirmationRequired.BindEntry
 }
 var file_codefoundry_v1_command_proto_depIdxs = []int32{
-	0,  // 0: codefoundry.v1.ArgSpec.type:type_name -> codefoundry.v1.ArgType
-	2,  // 1: codefoundry.v1.Command.args:type_name -> codefoundry.v1.ArgSpec
-	1,  // 2: codefoundry.v1.ListCommandsRequest.context:type_name -> codefoundry.v1.UiContext
-	3,  // 3: codefoundry.v1.ListCommandsResponse.commands:type_name -> codefoundry.v1.Command
-	1,  // 4: codefoundry.v1.InvokeCommandRequest.context:type_name -> codefoundry.v1.UiContext
-	10, // 5: codefoundry.v1.InvokeCommandRequest.args:type_name -> codefoundry.v1.InvokeCommandRequest.ArgsEntry
-	11, // 6: codefoundry.v1.ConfirmationRequired.args:type_name -> codefoundry.v1.ConfirmationRequired.ArgsEntry
-	7,  // 7: codefoundry.v1.ConfirmationRequired.declined:type_name -> codefoundry.v1.InvokeCommandResponse
-	12, // 8: codefoundry.v1.ConfirmationRequired.bind:type_name -> codefoundry.v1.ConfirmationRequired.BindEntry
-	4,  // 9: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
-	6,  // 10: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
-	5,  // 11: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
-	7,  // 12: codefoundry.v1.CommandService.Invoke:output_type -> codefoundry.v1.InvokeCommandResponse
-	11, // [11:13] is the sub-list for method output_type
-	9,  // [9:11] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	0,  // 0: codefoundry.v1.UiContext.origin:type_name -> codefoundry.v1.CallOrigin
+	1,  // 1: codefoundry.v1.ArgSpec.type:type_name -> codefoundry.v1.ArgType
+	3,  // 2: codefoundry.v1.Command.args:type_name -> codefoundry.v1.ArgSpec
+	2,  // 3: codefoundry.v1.ListCommandsRequest.context:type_name -> codefoundry.v1.UiContext
+	4,  // 4: codefoundry.v1.ListCommandsResponse.commands:type_name -> codefoundry.v1.Command
+	2,  // 5: codefoundry.v1.InvokeCommandRequest.context:type_name -> codefoundry.v1.UiContext
+	11, // 6: codefoundry.v1.InvokeCommandRequest.args:type_name -> codefoundry.v1.InvokeCommandRequest.ArgsEntry
+	12, // 7: codefoundry.v1.ConfirmationRequired.args:type_name -> codefoundry.v1.ConfirmationRequired.ArgsEntry
+	8,  // 8: codefoundry.v1.ConfirmationRequired.declined:type_name -> codefoundry.v1.InvokeCommandResponse
+	13, // 9: codefoundry.v1.ConfirmationRequired.bind:type_name -> codefoundry.v1.ConfirmationRequired.BindEntry
+	5,  // 10: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
+	7,  // 11: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
+	6,  // 12: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
+	8,  // 13: codefoundry.v1.CommandService.Invoke:output_type -> codefoundry.v1.InvokeCommandResponse
+	12, // [12:14] is the sub-list for method output_type
+	10, // [10:12] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_command_proto_init() }
@@ -1031,7 +1102,7 @@ func file_codefoundry_v1_command_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_command_proto_rawDesc), len(file_codefoundry_v1_command_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,

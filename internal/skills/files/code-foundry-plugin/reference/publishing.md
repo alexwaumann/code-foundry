@@ -173,12 +173,11 @@ plugins, or says none is configured.)
 - **An index URL** that is no GitHub repository: ask the user which repository builds it.
 - **None**: stop and tell the user plainly: the plugin is released (tag `v<version>`, the
   tarballs, `dist/<name>.json` ready) but listed in no registry. To finish, they name the
-  registry repository to publish to, or add one to Code Foundry (`code-foundry settings
-  set plugins.registries <owner>/<repo-or-URL>`, or Settings → Plugins → Registries) and
+  registry repository to publish to, or add one in Settings → Plugins → Registries and
   say so. Meanwhile it installs straight from the release: `code-foundry plugin install
   <owner>/code-foundry-plugin-<name>`.
 
-Do not change `plugins.registries` unless the user asks: which registries to trust is
+`plugins.registries` is user-only, refused from a thread: which registries to trust is
 their call. A registry repository the user names takes the pull request even when it is
 not configured.
 

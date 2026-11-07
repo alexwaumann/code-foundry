@@ -89,11 +89,13 @@ export const BRIDGE_DEBOUNCE_MS = 50;
 
 /**
  * What a page's call runs in: its thread and nothing else, which is what the CLI inside
- * that thread sends (UiContext.active_view's proto comment; docs/notes/bridge-1-daemon.md).
- * A verb on a worktree or terminal takes it in its args, as from the CLI.
+ * that thread sends (UiContext.active_view's proto comment; docs/notes/bridge-1-daemon.md),
+ * and the origin that tells the two apart (docs/notes/settings-user-only.md). The page
+ * cannot change it: the host builds this. A verb on a worktree or terminal takes it in its
+ * args, as from the CLI.
  */
 export function pageContext(threadId: string): UiContextView {
-  return { ...emptyContext, activeView: "", activeThreadId: threadId };
+  return { ...emptyContext, activeView: "", activeThreadId: threadId, origin: "page" };
 }
 
 /** The codes of a fetch's answer the strip reports: not `unavailable` (no thread, which the page shows itself). */

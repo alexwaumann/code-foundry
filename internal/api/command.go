@@ -125,6 +125,7 @@ func contextFromProto(c *v1.UiContext) command.Context {
 		ActiveWorktreePath: c.GetActiveWorktreePath(),
 		ActiveView:         c.GetActiveView(),
 		ActiveWorkspaceID:  c.GetActiveWorkspaceId(),
+		Origin:             c.GetOrigin(),
 	}
 }
 

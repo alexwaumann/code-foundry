@@ -37,6 +37,7 @@ func UiContextToProto(c Context) *v1.UiContext {
 	return &v1.UiContext{
 		ActiveTerminalId: c.ActiveTerminalID, ActiveThreadId: c.ActiveThreadID, ActiveProjectId: c.ActiveProjectID,
 		ActiveWorktreePath: c.ActiveWorktreePath, ActiveView: c.ActiveView, ActiveWorkspaceId: c.ActiveWorkspaceID,
+		Origin: c.Origin,
 	}
 }
 
@@ -207,7 +208,12 @@ func pluginAct(ctx context.Context, r *Registry, b PluginSurfaceBackend, uctx Co
 				args[k] = argString(v)
 			}
 		}
-		res, err := r.Invoke(ctx, uctx, el.GetAction(), args, Confirmed(ConfirmedIn(ctx)))
+		// The plugin chose this command; a page pressing its button stays a page.
+		pressed := uctx
+		if pressed.Origin == v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED {
+			pressed.Origin = OriginPlugin
+		}
+		res, err := r.Invoke(ctx, pressed, el.GetAction(), args, Confirmed(ConfirmedIn(ctx)))
 		if err != nil {
 			return Result{}, err
 		}

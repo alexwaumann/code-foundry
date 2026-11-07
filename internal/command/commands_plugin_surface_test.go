@@ -256,3 +256,45 @@ func TestPullRequestChecks(t *testing.T) {
 		})
 	}
 }
+
+// A button's command is the plugin's choice, so it runs as the plugin's; pressed from a page
+// it stays the page's, which asks more of it.
+func TestPluginActButtonOrigin(t *testing.T) {
+	b := &commandtest.PluginSurface{Got: &v1.GetSurfaceResponse{
+		State:    &v1.SurfaceState{Instance: "hello/demo/thread:s-1", Phase: v1.SurfacePhase_SURFACE_PHASE_LIVE},
+		View:     &v1.SurfaceView{Instance: "hello/demo/thread:s-1", Version: 4, ViewJson: `{"nodes":[]}`},
+		Elements: []*v1.SurfaceElement{{Key: "go", Kind: "command", Action: "plugin.hello.go", Label: "Go"}},
+	}}
+	reg := command.NewRegistry()
+	if err := command.RegisterPluginSurface(reg, b); err != nil {
+		t.Fatal(err)
+	}
+	var got v1.CallOrigin
+	if err := reg.Register(command.Command{Name: "plugin.hello.go", Title: "Go", Category: "Hello",
+		Run: func(_ context.Context, uctx command.Context, _ command.Args) (command.Result, error) {
+			got = uctx.Origin
+			return command.Result{}, nil
+		}}); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		ctx  command.Context
+		want v1.CallOrigin
+	}{
+		{"the CLI", command.Context{}, command.OriginPlugin},
+		{"the app", command.Context{ActiveView: "thread"}, command.OriginPlugin},
+		{"a page", command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}, command.OriginPage},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true"}
+			if _, err := reg.Invoke(context.Background(), tt.ctx, "plugin.act", args); err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("Origin = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -35,6 +35,7 @@ description: "Answer how-to questions about Code Foundry, the app this thread ru
   shell: `'claude-opus-4-8[1m]'`); a bool `true` or `false`; an int within its bounds; a
   keybinding a chord such as `cmd+shift+n`, or `none` to unbind (`keybindings.thread.new`).
 - Never edit settings or theme files by hand: `settings set`; colours, `theme save` (the code-foundry skill).
+- A user-only setting (`reference/settings.md`) is refused from a thread: tell the user to change it in Settings.
 
 ## Remembering preferences
 

@@ -97,6 +97,10 @@ type Field struct {
 	// Row groups fields of one section into a single row (model and effort); the
 	// first field's description goes under the row.
 	Row string
+	// UserOnly marks a setting that names a program or command the daemon runs, or decides
+	// where code comes from. Only the user may change it: settings.set and settings.reset
+	// refuse a page, a plugin and a thread's CLI (docs/notes/settings-user-only.md).
+	UserOnly bool
 
 	// bind returns a pointer into s (*string, *int, or *bool) for static fields.
 	bind func(s *Settings) any
@@ -470,7 +474,7 @@ var staticFields = []Field{
 	{
 		Key: KeyUpdateChannel, Group: GroupUpdate, Page: PageGeneral, Section: "updates", Type: Enum, Title: "Channel",
 		Description: "Stable gets releases chosen by hand. Tip gets every build of main. Switching never installs an older version.",
-		Enum:        []string{ChannelStable, ChannelTip}, EnumLabels: []string{"Stable", "Tip"}, Default: ChannelStable,
+		Enum:        []string{ChannelStable, ChannelTip}, EnumLabels: []string{"Stable", "Tip"}, Default: ChannelStable, UserOnly: true,
 		bind: func(s *Settings) any { return &s.Update.Channel },
 	},
 	// Appearance › Theme.
@@ -646,8 +650,8 @@ var staticFields = []Field{
 	{
 		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "projects", Type: String, Title: "Editor command",
 		Description: "Command for Open in Editor, e.g. \"code\" or \"open -a Zed\". {path} stands for the worktree path; without it the path is appended. Empty picks an editor automatically.",
-		Placeholder: "auto-detect",
-		bind:        func(s *Settings) any { return &s.GitOps.EditorCommand },
+		Placeholder: "auto-detect", UserOnly: true,
+		bind: func(s *Settings) any { return &s.GitOps.EditorCommand },
 	},
 	// Ember (docs/notes/ember-2-store.md): read by the Ember store (internal/store/ember),
 	// live.
@@ -699,13 +703,13 @@ var staticFields = []Field{
 	{
 		Key: KeyClaudePath, Group: GroupAdvanced, Page: PageAdvanced, Section: "executables", Type: Path, Title: "claude executable",
 		Description: "Path to claude. Empty finds it on PATH.",
-		Placeholder: "claude (from PATH)", Restart: true, check: checkExecutable,
+		Placeholder: "claude (from PATH)", Restart: true, UserOnly: true, check: checkExecutable,
 		bind: func(s *Settings) any { return &s.Advanced.ClaudePath },
 	},
 	{
 		Key: KeyGhPath, Group: GroupAdvanced, Page: PageAdvanced, Section: "executables", Type: Path, Title: "gh executable",
 		Description: "Path to gh. Empty finds it on PATH or where Homebrew installs it.",
-		Placeholder: "gh (from PATH)", Restart: true, check: checkExecutable,
+		Placeholder: "gh (from PATH)", Restart: true, UserOnly: true, check: checkExecutable,
 		bind: func(s *Settings) any { return &s.Advanced.GhPath },
 	},
 	{
@@ -718,7 +722,7 @@ var staticFields = []Field{
 	{
 		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PagePlugins, Section: "registries", Type: String, Title: "Plugin registries",
 		Description: "Where Browse and plugin install look for plugins, in order; the first registry listing a name wins. Each is a GitHub repository URL (private ones work through your gh login) or an https URL of an index.json, separated by commas. Empty means no registry: Browse lists nothing and install needs a release or a folder.",
-		Default:     "", Placeholder: "https://github.com/<owner>/<repo>",
+		Default:     "", Placeholder: "https://github.com/<owner>/<repo>", UserOnly: true,
 		check: checkRegistries,
 		bind:  func(s *Settings) any { return &s.Plugins.Registries },
 	},

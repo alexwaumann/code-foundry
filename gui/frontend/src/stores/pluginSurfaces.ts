@@ -648,7 +648,8 @@ export function useChoice(watchKey: string, chooser: string): string | undefined
 export async function runCommandElement(watchKey: string, key: string, name: string, args: Record<string, string>, ctx: UiContextView): Promise<boolean> {
   setPending(watchKey, key, true);
   try {
-    return (await runCommandForResult(name, args, { ctx })) !== null;
+    // The plugin chose this command: the click is the user's, what it runs is not.
+    return (await runCommandForResult(name, args, { ctx: { ...ctx, origin: "plugin" } })) !== null;
   } finally {
     setPending(watchKey, key, false);
   }

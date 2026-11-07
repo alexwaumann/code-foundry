@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -31,6 +32,7 @@ type env struct {
 	secrets *plugintest.Secrets
 	m       *plugin.Manager
 	sent    chan string
+	origin  atomic.Int32 // the last thread.send's Context.Origin
 }
 
 // newEnv makes a plugins dir with a registry holding thread.send (records) and
@@ -43,7 +45,8 @@ func newEnv(t *testing.T, mod func(*plugin.Options)) *env {
 		command.Command{Name: "thread.send", Title: "Send", Category: "Thread",
 			Args: []command.ArgSpec{{Name: "id", Type: command.String, Context: command.ContextThread, Required: true},
 				{Name: "text", Type: command.String, Required: true}},
-			Run: func(_ context.Context, _ command.Context, a command.Args) (command.Result, error) {
+			Run: func(_ context.Context, uctx command.Context, a command.Args) (command.Result, error) {
+				e.origin.Store(int32(uctx.Origin))
 				e.sent <- a.String("id") + ":" + a.String("text")
 				return command.Result{Message: "sent to " + a.String("id")}, nil
 			}},

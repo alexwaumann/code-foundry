@@ -169,3 +169,26 @@ func TestCommandInvoke(t *testing.T) {
 		})
 	}
 }
+
+// A page's origin reaches the command: it is what tells a page from the CLI in its thread.
+func TestContextOriginCrossesTheAPI(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  *v1.UiContext
+		want v1.CallOrigin
+	}{
+		{"a page", &v1.UiContext{ActiveThreadId: "s-1", Origin: v1.CallOrigin_CALL_ORIGIN_PAGE}, command.OriginPage},
+		{"a plugin's panel", &v1.UiContext{ActiveView: "thread", Origin: v1.CallOrigin_CALL_ORIGIN_PLUGIN}, command.OriginPlugin},
+		{"a thread's CLI", &v1.UiContext{ActiveThreadId: "s-1"}, v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := contextFromProto(tt.ctx).Origin; got != tt.want {
+				t.Errorf("Origin = %v, want %v", got, tt.want)
+			}
+			if got := command.UiContextToProto(contextFromProto(tt.ctx)).GetOrigin(); got != tt.want {
+				t.Errorf("back to proto: %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

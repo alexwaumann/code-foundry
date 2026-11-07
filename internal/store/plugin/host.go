@@ -177,6 +177,7 @@ func (a *actor) hostInvoke(ctx context.Context, params json.RawMessage) (any, er
 	uctx := command.Context{
 		ActiveThreadID: p.Context.ThreadID, ActiveProjectID: p.Context.ProjectID, ActiveWorktreePath: p.Context.WorktreePath,
 		ActiveTerminalID: p.Context.TerminalID, ActiveWorkspaceID: p.Context.WorkspaceID, ActiveView: p.Context.View,
+		Origin: command.OriginPlugin,
 	}
 	res, err := a.m.opts.Commands.Invoke(ctx, uctx, p.Command, p.Args)
 	if err != nil {
