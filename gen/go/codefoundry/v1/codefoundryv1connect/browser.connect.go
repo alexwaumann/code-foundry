@@ -79,12 +79,14 @@ type BrowserServiceClient interface {
 	Answer(context.Context, *connect.Request[v1.AnswerBrowserRequest]) (*connect.Response[v1.AnswerBrowserResponse], error)
 	// Paste puts the user's text in the page as a paste.
 	Paste(context.Context, *connect.Request[v1.PasteBrowserRequest]) (*connect.Response[v1.PasteBrowserResponse], error)
-	// Copy puts what the page last copied to Chrome's own clipboard on the Mac's. Only ever the
-	// user's doing: a page has no way to the Mac's clipboard but this.
+	// Copy puts what the user copied on the Mac's clipboard: what the last cmd+c or cmd+x of this
+	// surface changed, or what a click on the page's own Copy button left. Only ever the user's
+	// doing: a page has no way to the Mac's clipboard but this.
 	Copy(context.Context, *connect.Request[v1.CopyBrowserRequest]) (*connect.Response[v1.CopyBrowserResponse], error)
 	// Reveal shows a finished download in Finder.
 	Reveal(context.Context, *connect.Request[v1.RevealBrowserDownloadRequest]) (*connect.Response[v1.RevealBrowserDownloadResponse], error)
-	// Relaunch starts Chrome again after it died; each shown surface returns to its page.
+	// Relaunch starts Chrome again after it died. Surfaces open blank and say what they were on:
+	// going straight back to the page that ended Chrome would end it again.
 	Relaunch(context.Context, *connect.Request[v1.RelaunchBrowserRequest]) (*connect.Response[v1.RelaunchBrowserResponse], error)
 	// Close closes a surface's page.
 	Close(context.Context, *connect.Request[v1.CloseBrowserRequest]) (*connect.Response[v1.CloseBrowserResponse], error)
@@ -272,12 +274,14 @@ type BrowserServiceHandler interface {
 	Answer(context.Context, *connect.Request[v1.AnswerBrowserRequest]) (*connect.Response[v1.AnswerBrowserResponse], error)
 	// Paste puts the user's text in the page as a paste.
 	Paste(context.Context, *connect.Request[v1.PasteBrowserRequest]) (*connect.Response[v1.PasteBrowserResponse], error)
-	// Copy puts what the page last copied to Chrome's own clipboard on the Mac's. Only ever the
-	// user's doing: a page has no way to the Mac's clipboard but this.
+	// Copy puts what the user copied on the Mac's clipboard: what the last cmd+c or cmd+x of this
+	// surface changed, or what a click on the page's own Copy button left. Only ever the user's
+	// doing: a page has no way to the Mac's clipboard but this.
 	Copy(context.Context, *connect.Request[v1.CopyBrowserRequest]) (*connect.Response[v1.CopyBrowserResponse], error)
 	// Reveal shows a finished download in Finder.
 	Reveal(context.Context, *connect.Request[v1.RevealBrowserDownloadRequest]) (*connect.Response[v1.RevealBrowserDownloadResponse], error)
-	// Relaunch starts Chrome again after it died; each shown surface returns to its page.
+	// Relaunch starts Chrome again after it died. Surfaces open blank and say what they were on:
+	// going straight back to the page that ended Chrome would end it again.
 	Relaunch(context.Context, *connect.Request[v1.RelaunchBrowserRequest]) (*connect.Response[v1.RelaunchBrowserResponse], error)
 	// Close closes a surface's page.
 	Close(context.Context, *connect.Request[v1.CloseBrowserRequest]) (*connect.Response[v1.CloseBrowserResponse], error)

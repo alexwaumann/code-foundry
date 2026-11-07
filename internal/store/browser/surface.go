@@ -26,7 +26,7 @@ const (
 	defaultHeight   = 600
 	deviceScale     = 2
 	frameQuality    = 80
-	maxDownloadList = 5
+	maxDownloadList = 50
 	castTries       = 10
 	castRetry       = 100 * time.Millisecond
 )
@@ -48,6 +48,7 @@ type Dialog struct {
 	Kind, Message string
 	DefaultPrompt string
 	Origin        string
+	Site          string // Origin's registrable domain, which a viewer keeps visible
 }
 
 // FileChooser is a page's file input waiting for files.
@@ -55,9 +56,9 @@ type FileChooser struct {
 	ID       string
 	Multiple bool
 	Origin   string
+	Site     string // Origin's registrable domain, which a viewer keeps visible
 
 	node int64
-	tgt  *target
 }
 
 // SelectOption is one row of a select.
@@ -75,14 +76,14 @@ type Select struct {
 	X, Y, W  float64 // where it sits in the page, CSS pixels
 
 	context int64
-	tgt     *target
 }
 
 // Download is one download of a surface.
 type Download struct {
 	ID, Name string
+	Site     string // who asked for it, as a registrable domain; empty when nothing says
 	Path     string // set once it completed
-	State    string // inProgress, completed or canceled
+	State    string // one of the Download states
 }
 
 // State is what a surface's chrome shows. It holds what the page said, so a viewer treats
@@ -91,11 +92,14 @@ type State struct {
 	Phase   Phase
 	Message string
 
-	URL, Title   string
-	Loading      bool
-	CanGoBack    bool
-	CanGoForward bool
-	Popup        bool
+	URL, Title string
+	// Site is the domain URL is registered under, and Security says what the page came over:
+	// empty, SecurityInsecure or SecurityCert. Both are the daemon's reading, never the page's.
+	Site, Security string
+	Loading        bool
+	CanGoBack      bool
+	CanGoForward   bool
+	Popup          bool
 
 	Dialog      *Dialog
 	FileChooser *FileChooser
@@ -103,10 +107,17 @@ type State struct {
 	// Notice is the last thing the surface must say and has no better place for.
 	Notice    string
 	Downloads []Download
-	// Copied counts the texts the page put on Chrome's own clipboard; ReadClipboard has
-	// the latest.
+	// DownloadsBlocked counts refused downloads that did not fit in Downloads.
+	DownloadsBlocked int
+	// Copied counts the texts a page's own Copy button left; Copy with fromPage has the latest.
 	Copied uint64
 }
+
+// What a page's address says about how it arrived.
+const (
+	SecurityInsecure = "insecure" // no encryption
+	SecurityCert     = "cert"     // a certificate that failed, or an equal failure of the connection
+)
 
 // Frame is one screencast frame.
 type Frame struct {
@@ -198,6 +209,16 @@ type surface struct {
 	state   State
 	frame   *Frame // the last frame, for a viewer that arrives on a still page
 	nextID  uint64
+	// gesture is when the user last clicked or pressed Enter here, and a download spends it.
+	gesture time.Time
+	budget  struct {
+		files int
+		bytes int64
+	}
+	// copyArmed is a cmd+c or cmd+x that went to the page and Copy has not read yet. copied is
+	// what a page's own Copy button left, waiting for the user's click on the strip.
+	copyArmed bool
+	copied    string
 
 	up sync.Mutex
 }
@@ -210,16 +231,40 @@ func (sf *surface) top() *target {
 	return sf.stack[len(sf.stack)-1]
 }
 
+// refresh brings the state up to the target showing. What a page asks belongs to its target: a
+// viewer sees only what the page on screen asks, under that page's address. Needs Store.mu.
+func (sf *surface) refresh() {
+	sf.state.Dialog, sf.state.FileChooser, sf.state.Select = nil, nil, nil
+	t := sf.top()
+	if t == nil {
+		return
+	}
+	// Both are the page's to make as long as it likes: a data: URL can be megabytes.
+	sf.state.URL, sf.state.Title, sf.state.Loading = clip(shownURL(t.url), maxURL), clip(t.title, maxTitle), t.loading
+	sf.state.Site, sf.state.Security = clip(siteOf(t.url), maxLabel), sf.security(t)
+	sf.state.CanGoBack = t.canBack || len(sf.stack) > 1
+	sf.state.CanGoForward = t.canForward
+	sf.state.Popup = len(sf.stack) > 1
+	sf.state.Dialog, sf.state.FileChooser, sf.state.Select = t.dialog, t.chooser, t.sel
+}
+
+// security reads how a page arrived. Only about:blank on the surface's own page is no page at
+// all: in a popup, it is what an opener can write into. Needs Store.mu.
+func (sf *surface) security(t *target) string {
+	switch {
+	case t.badCert:
+		return SecurityCert
+	case t.url == "", t.url == "about:blank" && len(sf.stack) <= 1:
+		return ""
+	case strings.HasPrefix(t.url, "https://"):
+		return ""
+	}
+	return SecurityInsecure
+}
+
 // publish tells every viewer. Needs Store.mu.
 func (sf *surface) publish() {
-	t := sf.top()
-	if t != nil {
-		// Both are the page's to make as long as it likes: a data: URL can be megabytes.
-		sf.state.URL, sf.state.Title, sf.state.Loading = clip(t.url, maxURL), clip(t.title, maxTitle), t.loading
-		sf.state.CanGoBack = t.canBack || len(sf.stack) > 1
-		sf.state.CanGoForward = t.canForward
-		sf.state.Popup = len(sf.stack) > 1
-	}
+	sf.refresh()
 	for v := range sf.viewers {
 		// The rest of State is values or replaced whole; this list is updated in place.
 		st := sf.state
@@ -234,15 +279,31 @@ func (sf *surface) id() string {
 	return fmt.Sprintf("%d", sf.nextID)
 }
 
-// detach forgets the targets of a Chrome that is gone; the address stays to come back to.
-// Needs Store.mu.
-func (sf *surface) detach() {
-	if t := sf.top(); t != nil && t.url != "" && t.url != "about:blank" && sf.pending == "" {
-		sf.pending = t.url
+// detach forgets the targets of a Chrome that is gone. After a stop the address stays to come back
+// to, if the address rule still passes it. After a crash it does not: going back to the page that
+// ended Chrome would end it again, so the surface opens blank and says where it was. Needs Store.mu.
+func (sf *surface) detach(crashed bool) {
+	t := sf.top()
+	if t != nil && t.url != "" && t.url != "about:blank" {
+		if crashed {
+			sf.state.Notice = crashWords(t.url)
+		} else if u, err := CheckURL(t.url); err == nil && sf.pending == "" {
+			sf.pending = u
+		}
 	}
 	sf.stack = nil
 	sf.state.Dialog, sf.state.FileChooser, sf.state.Select = nil, nil, nil
 	sf.state.Loading = false
+	sf.copyArmed = false
+	sf.abandonDownloads()
+}
+
+// crashWords says what the surface did not go back to.
+func crashWords(address string) string {
+	if site := siteOf(address); site != "" {
+		return "Chrome stopped on " + clip(site, maxLabel) + ", so that page was not opened again."
+	}
+	return "Chrome stopped on that page, so it was not opened again."
 }
 
 // end finishes every viewer. Needs Store.mu.
@@ -300,6 +361,7 @@ func (s *Store) Watch(key string, width, height int, address string) (*Viewer, e
 	} else if sf.top() == nil {
 		sf.state.Phase, sf.state.Message = PhaseStarting, ""
 	}
+	sf.refresh()
 	st := sf.state
 	st.Downloads = slices.Clone(st.Downloads)
 	v.offerState(st)
@@ -462,7 +524,10 @@ func (s *Store) adopt(ctx context.Context, in *instance, t *target) error {
 		params any
 	}{
 		{"Page.enable", nil},
+		// Only for the binding below, which does nothing without it (cdp.go).
 		{"Runtime.enable", nil},
+		// What says a certificate failed, on a page the user went on to anyway.
+		{"Security.enable", nil},
 		{"Page.setInterceptFileChooserDialog", map[string]any{"enabled": true}},
 		// A page that thinks it has no focus draws no caret and drops some key handling.
 		{"Emulation.setFocusEmulationEnabled", map[string]any{"enabled": true}},
@@ -608,12 +673,21 @@ func (s *Store) Navigate(ctx context.Context, key, typed string) (string, error)
 		go s.bringUp(sf)
 		return u, nil
 	}
-	in, _, t, err := s.shown(key)
+	in, sf, t, err := s.shown(key)
 	if err != nil {
 		return "", err
 	}
 	s.dismissDialog(ctx, in, t)
+	s.mu.Lock()
+	sf.newPageBudget()
+	s.mu.Unlock()
 	return u, s.goTo(ctx, in, t, u)
+}
+
+// newPageBudget starts a page's download limits over. Only for what the user asks: a page that
+// navigates itself keeps counting. Needs Store.mu.
+func (sf *surface) newPageBudget() {
+	sf.budget.files, sf.budget.bytes = 0, 0
 }
 
 // goTo is the one place Page.navigate is called. u has passed NormalizeURL. It answers once the
@@ -661,8 +735,8 @@ func (s *Store) clearNotice(t *target) {
 // then still be left.
 func (s *Store) dismissDialog(ctx context.Context, in *instance, t *target) {
 	s.mu.Lock()
-	open := t.surface.state.Dialog != nil
-	t.surface.state.Dialog = nil
+	open := t.dialog != nil
+	t.dialog = nil
 	s.mu.Unlock()
 	if open {
 		_ = in.call(ctx, t.session, "Page.handleJavaScriptDialog", map[string]any{"accept": false}, nil)
@@ -689,6 +763,9 @@ func (h historyEntries) canBack() bool {
 // Go moves a surface through its history: -1 is back, 1 forward. Back from a popup's first
 // page closes the popup, which is how the surface returns to what opened it.
 func (s *Store) Go(ctx context.Context, key string, delta int) error {
+	if delta != -1 && delta != 1 {
+		return ErrBadInput
+	}
 	in, sf, t, err := s.shown(key)
 	if err != nil {
 		return err
@@ -713,12 +790,15 @@ func (s *Store) Go(ctx context.Context, key string, delta int) error {
 
 // Reload reloads the page showing.
 func (s *Store) Reload(ctx context.Context, key string) error {
-	in, _, t, err := s.shown(key)
+	in, sf, t, err := s.shown(key)
 	if err != nil {
 		return err
 	}
 	s.dismissDialog(ctx, in, t)
 	s.clearNotice(t)
+	s.mu.Lock()
+	sf.newPageBudget()
+	s.mu.Unlock()
 	return in.call(ctx, t.session, "Page.reload", nil, nil)
 }
 
@@ -754,11 +834,23 @@ func (s *Store) CloseSurface(ctx context.Context, key string) error {
 		s.mu.Unlock()
 		return nil
 	}
+	// Those views are over, and Viewer.Close will not find them to count them out.
+	s.viewers -= len(sf.viewers)
 	sf.end(ErrNoSurface)
 	delete(s.surfaces, key)
+	if s.viewers == 0 && !s.closed {
+		s.startIdleTimer()
+	}
 	in := s.chrome
 	stack := sf.stack
 	sf.stack = nil
+	if in != nil {
+		for guid, d := range in.downloads {
+			if d.sf == sf && !d.allowed {
+				s.cancelDownload(in, guid, d)
+			}
+		}
+	}
 	s.mu.Unlock()
 	if in != nil {
 		for _, t := range stack {
@@ -768,19 +860,19 @@ func (s *Store) CloseSurface(ctx context.Context, key string) error {
 	return nil
 }
 
-// AnswerDialog answers the dialog id.
+// AnswerDialog answers the dialog id of the page on screen, the only one that can have one.
 func (s *Store) AnswerDialog(ctx context.Context, key, id string, accept bool, text string) error {
 	in, sf, t, err := s.shown(key)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	d := sf.state.Dialog
+	d := t.dialog
 	if d == nil || d.ID != id {
 		s.mu.Unlock()
 		return ErrNotPending
 	}
-	sf.state.Dialog = nil
+	t.dialog = nil
 	sf.publish()
 	s.mu.Unlock()
 	return in.call(ctx, t.session, "Page.handleJavaScriptDialog", map[string]any{"accept": accept, "promptText": text}, nil)
@@ -788,17 +880,17 @@ func (s *Store) AnswerDialog(ctx context.Context, key, id string, accept bool, t
 
 // AnswerFile hands a page's file input the files the user picked, none to cancel.
 func (s *Store) AnswerFile(ctx context.Context, key, id string, paths []string) error {
-	in, sf, _, err := s.shown(key)
+	in, sf, t, err := s.shown(key)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	fc := sf.state.FileChooser
+	fc := t.chooser
 	if fc == nil || fc.ID != id {
 		s.mu.Unlock()
 		return ErrNotPending
 	}
-	sf.state.FileChooser = nil
+	t.chooser = nil
 	sf.publish()
 	s.mu.Unlock()
 	if len(paths) == 0 {
@@ -812,28 +904,28 @@ func (s *Store) AnswerFile(ctx context.Context, key, id string, paths []string) 
 			return fmt.Errorf("not a file: %s", filepath.Base(p))
 		}
 	}
-	return in.call(ctx, fc.tgt.session, "DOM.setFileInputFiles", map[string]any{"files": paths, "backendNodeId": fc.node}, nil)
+	return in.call(ctx, t.session, "DOM.setFileInputFiles", map[string]any{"files": paths, "backendNodeId": fc.node}, nil)
 }
 
 // PickSelect answers an opened <select>: an index of its options, or -1 for none.
 func (s *Store) PickSelect(ctx context.Context, key, id string, index int) error {
-	in, sf, _, err := s.shown(key)
+	in, sf, t, err := s.shown(key)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	sel := sf.state.Select
+	sel := t.sel
 	if sel == nil || sel.ID != id {
 		s.mu.Unlock()
 		return ErrNotPending
 	}
-	sf.state.Select = nil
+	t.sel = nil
 	sf.publish()
 	s.mu.Unlock()
 	if index < 0 || index >= len(sel.Options) {
 		return nil
 	}
-	return in.call(ctx, sel.tgt.session, "Runtime.evaluate", map[string]any{
+	return in.call(ctx, t.session, "Runtime.evaluate", map[string]any{
 		"contextId": sel.context, "expression": fmt.Sprintf("%s(%d)", helperPick, index),
 	}, nil)
 }
@@ -876,7 +968,7 @@ func decodeFrame(data string) ([]byte, error) { return base64.StdEncoding.Decode
 
 // originOf is what a viewer is told asked: never the path, which may hold tokens.
 func originOf(raw string) string {
-	u, err := url.Parse(raw)
+	u, err := url.Parse(shownURL(raw))
 	if err != nil || u.Host == "" {
 		return ""
 	}

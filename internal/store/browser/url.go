@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 // maxURL bounds what a surface will navigate to.
@@ -101,4 +103,49 @@ func allowedPage(raw string) bool {
 		return true
 	}
 	return false
+}
+
+// webScheme matches an address whose authority can carry a user name: Chrome writes the scheme
+// in lower case.
+var webScheme = regexp.MustCompile(`^https?://`)
+
+// shownURL is a page's address as a viewer may see it, with any user name and password gone. A
+// page can navigate itself to http://bank.example%2Flogin:x@evil.test/, and the address bar must
+// not lead with words the page chose. Done by hand and not by url.Parse, which refuses some of
+// what Chrome accepts, and what it refuses would then show raw.
+func shownURL(raw string) string {
+	head := webScheme.FindString(raw)
+	if head == "" {
+		return raw
+	}
+	rest := raw[len(head):]
+	end := strings.IndexAny(rest, `/?#\`)
+	if end < 0 {
+		end = len(rest)
+	}
+	if at := strings.LastIndexByte(rest[:end], '@'); at >= 0 {
+		return head + rest[at+1:]
+	}
+	return raw
+}
+
+// siteOf is the domain an address is registered under, which a viewer keeps visible however long
+// the host: "example.co.uk" for https://a.b.example.co.uk/. An IP address or a single-label host
+// has none and is itself; an address with no host has nothing to show.
+func siteOf(raw string) string {
+	u, err := url.Parse(shownURL(raw))
+	if err != nil {
+		return ""
+	}
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	if host == "" {
+		return ""
+	}
+	if net.ParseIP(host) != nil {
+		return host
+	}
+	if site, err := publicsuffix.EffectiveTLDPlusOne(host); err == nil {
+		return site
+	}
+	return host
 }

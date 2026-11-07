@@ -28,12 +28,14 @@ service BrowserService {
   rpc Answer(AnswerBrowserRequest) returns (AnswerBrowserResponse) {}
   // Paste puts the user's text in the page as a paste.
   rpc Paste(PasteBrowserRequest) returns (PasteBrowserResponse) {}
-  // Copy puts what the page last copied to Chrome's own clipboard on the Mac's. Only ever the
-  // user's doing: a page has no way to the Mac's clipboard but this.
+  // Copy puts what the user copied on the Mac's clipboard: what the last cmd+c or cmd+x of this
+  // surface changed, or what a click on the page's own Copy button left. Only ever the user's
+  // doing: a page has no way to the Mac's clipboard but this.
   rpc Copy(CopyBrowserRequest) returns (CopyBrowserResponse) {}
   // Reveal shows a finished download in Finder.
   rpc Reveal(RevealBrowserDownloadRequest) returns (RevealBrowserDownloadResponse) {}
-  // Relaunch starts Chrome again after it died; each shown surface returns to its page.
+  // Relaunch starts Chrome again after it died. Surfaces open blank and say what they were on:
+  // going straight back to the page that ended Chrome would end it again.
   rpc Relaunch(RelaunchBrowserRequest) returns (RelaunchBrowserResponse) {}
   // Close closes a surface's page.
   rpc Close(CloseBrowserRequest) returns (CloseBrowserResponse) {}
@@ -94,6 +96,14 @@ message BrowserState {
   repeated BrowserDownload downloads = 13;
   // Goes up when a click left new text on Chrome's clipboard.
   uint64 copied = 14;
+  // The domain the page's address is registered under, which a client keeps visible however
+  // long the address: "example.co.uk" for a.b.example.co.uk. The host itself when it has none.
+  string site = 15;
+  // Empty for a page with a good certificate or no page at all; "insecure" for one that came
+  // over no encryption; "cert" for one whose certificate failed.
+  string security = 16;
+  // Downloads refused that did not fit in downloads.
+  uint32 downloads_blocked = 17;
 }
 
 message BrowserDialog {
@@ -103,12 +113,16 @@ message BrowserDialog {
   string message = 3;
   string default_prompt = 4;
   string origin = 5;
+  // The origin's registrable domain: see BrowserState.site.
+  string site = 6;
 }
 
 message BrowserFileChooser {
   string id = 1;
   bool multiple = 2;
   string origin = 3;
+  // The origin's registrable domain: see BrowserState.site.
+  string site = 4;
 }
 
 message BrowserSelectOption {
@@ -129,8 +143,11 @@ message BrowserSelect {
 message BrowserDownload {
   string id = 1;
   string name = 2;
-  // inProgress, completed or canceled.
+  // asking (a download nobody clicked for, waiting for the user), inProgress, completed,
+  // canceled or blocked.
   string state = 3;
+  // Who asked for it, as a registrable domain; empty when nothing says.
+  string site = 4;
 }
 
 message NavigateBrowserRequest {
@@ -209,13 +226,15 @@ message ResizeBrowserResponse {}
 
 message AnswerBrowserRequest {
   string surface = 1;
-  // The dialog's, chooser's or select's id.
+  // The dialog's, chooser's, select's or download's id.
   string id = 2;
   oneof answer {
     BrowserDialogAnswer dialog = 3;
     BrowserFilesAnswer files = 4;
     // The option's index, -1 for none.
     sint32 option = 5;
+    // Whether a download in the asking state may land.
+    bool download = 6;
   }
 }
 
@@ -240,10 +259,12 @@ message PasteBrowserResponse {}
 
 message CopyBrowserRequest {
   string surface = 1;
+  // Take what a click on the page's own Copy button left, not what a cmd+c changed.
+  bool page_copy = 2;
 }
 
 message CopyBrowserResponse {
-  // How many characters went; 0 when Chrome's clipboard had no text.
+  // How many characters went; 0 when there was nothing new to take.
   uint32 length = 1;
 }
 

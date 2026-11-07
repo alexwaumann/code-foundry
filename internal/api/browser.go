@@ -25,7 +25,8 @@ type BrowserStore interface {
 	AnswerFile(ctx context.Context, surface, id string, paths []string) error
 	PickSelect(ctx context.Context, surface, id string, index int) error
 	Paste(ctx context.Context, surface, text string) error
-	Copy(ctx context.Context, surface string) (int, error)
+	Copy(ctx context.Context, surface string, fromPage bool) (int, error)
+	AnswerDownload(ctx context.Context, surface, id string, allow bool) error
 	RevealDownload(surface, id string) error
 	Relaunch(ctx context.Context) error
 	CloseSurface(ctx context.Context, surface string) error
@@ -183,6 +184,8 @@ func (h *Browser) Answer(ctx context.Context, req *connect.Request[v1.AnswerBrow
 		err = h.store.AnswerFile(ctx, m.GetSurface(), m.GetId(), a.Files.GetPaths())
 	case *v1.AnswerBrowserRequest_Option:
 		err = h.store.PickSelect(ctx, m.GetSurface(), m.GetId(), int(a.Option))
+	case *v1.AnswerBrowserRequest_Download:
+		err = h.store.AnswerDownload(ctx, m.GetSurface(), m.GetId(), a.Download)
 	default:
 		err = browser.ErrNotPending
 	}
@@ -200,9 +203,9 @@ func (h *Browser) Paste(ctx context.Context, req *connect.Request[v1.PasteBrowse
 	return connect.NewResponse(&v1.PasteBrowserResponse{}), nil
 }
 
-// Copy moves Chrome's clipboard to the Mac's.
+// Copy moves the user's copy to the Mac's clipboard.
 func (h *Browser) Copy(ctx context.Context, req *connect.Request[v1.CopyBrowserRequest]) (*connect.Response[v1.CopyBrowserResponse], error) {
-	n, err := h.store.Copy(ctx, req.Msg.GetSurface())
+	n, err := h.store.Copy(ctx, req.Msg.GetSurface(), req.Msg.GetPageCopy())
 	if err != nil {
 		return nil, browserError(err)
 	}
@@ -244,12 +247,13 @@ func browserStateToProto(s *browser.State) *v1.BrowserState {
 	out := &v1.BrowserState{
 		Phase: browserPhases[s.Phase], Message: s.Message, Url: s.URL, Title: s.Title, Loading: s.Loading,
 		CanGoBack: s.CanGoBack, CanGoForward: s.CanGoForward, Popup: s.Popup, Notice: s.Notice, Copied: s.Copied,
+		Site: s.Site, Security: s.Security, DownloadsBlocked: uint32(s.DownloadsBlocked), //nolint:gosec // a count
 	}
 	if d := s.Dialog; d != nil {
-		out.Dialog = &v1.BrowserDialog{Id: d.ID, Kind: d.Kind, Message: d.Message, DefaultPrompt: d.DefaultPrompt, Origin: d.Origin}
+		out.Dialog = &v1.BrowserDialog{Id: d.ID, Kind: d.Kind, Message: d.Message, DefaultPrompt: d.DefaultPrompt, Origin: d.Origin, Site: d.Site}
 	}
 	if f := s.FileChooser; f != nil {
-		out.FileChooser = &v1.BrowserFileChooser{Id: f.ID, Multiple: f.Multiple, Origin: f.Origin}
+		out.FileChooser = &v1.BrowserFileChooser{Id: f.ID, Multiple: f.Multiple, Origin: f.Origin, Site: f.Site}
 	}
 	if sel := s.Select; sel != nil {
 		p := &v1.BrowserSelect{Id: sel.ID, Selected: int32(sel.Selected), X: sel.X, Y: sel.Y, Width: sel.W} //nolint:gosec // an option's index
@@ -259,7 +263,7 @@ func browserStateToProto(s *browser.State) *v1.BrowserState {
 		out.Select = p
 	}
 	for _, d := range s.Downloads {
-		out.Downloads = append(out.Downloads, &v1.BrowserDownload{Id: d.ID, Name: d.Name, State: d.State})
+		out.Downloads = append(out.Downloads, &v1.BrowserDownload{Id: d.ID, Name: d.Name, State: d.State, Site: d.Site})
 	}
 	return out
 }

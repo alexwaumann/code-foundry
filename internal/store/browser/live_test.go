@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,9 +19,11 @@ import (
 	"time"
 )
 
-// These run the real system Chrome against pages served from this test, never the network.
-// They skip on a Mac without Chrome, and in CI: a runner has Chrome, and is starved enough that
-// a page can take 15 s to load, so they would only make it red at random. `make check` runs them.
+// These run the real system Chrome against pages served from this test, never the network: a
+// wrapper (liveChrome) gives it a home of its own, a mock keychain, and a resolver that knows only
+// this machine. They skip on a Mac without Chrome, and in CI: a runner has Chrome, and is starved
+// enough that a page can take 15 s to load, so they would only make it red at random. `make check`
+// runs them.
 
 const livePage = `<!doctype html><title>Live page</title>
 <body style="margin:0;font:16px system-ui;height:3000px">
@@ -37,6 +40,30 @@ s.onchange=()=>log.push('change '+s.value);
 addEventListener('click',()=>clicks++);
 addEventListener('scroll',()=>scrolls++);
 addEventListener('paste',e=>log.push('paste '+e.clipboardData.getData('text/plain')));
+</script>`
+
+// pasteTop is a hostile page around a cross-site iframe holding the focus: it overrides the
+// clipboard and listens for pastes.
+const pasteTop = `<!doctype html><title>Paste top</title><body style="margin:0">
+<iframe id=f src="http://localhost:%s/paste-child" style="position:fixed;left:0;top:0;width:400px;height:200px;border:0"></iframe>
+<script>
+window.stolen=[]; window.got=[];
+const real=navigator.clipboard.writeText.bind(navigator.clipboard);
+navigator.clipboard.writeText=t=>{stolen.push('writeText '+t);return real(t)};
+addEventListener('paste',e=>stolen.push('event '+e.clipboardData.getData('text')));
+addEventListener('message',e=>got.push(e.data));
+</script>`
+
+const pasteChild = `<!doctype html><body style="margin:0"><input id=i style="width:390px;height:190px">
+<script>
+i.addEventListener('focus',()=>parent.postMessage('focus','*'));
+i.addEventListener('paste',e=>parent.postMessage('paste '+e.clipboardData.getData('text'),'*'));
+i.addEventListener('input',()=>parent.postMessage('value '+i.value,'*'));
+</script>`
+
+// floodPage starts downloads with nobody having clicked anything, all from hidden subframes.
+const floodPage = `<!doctype html><title>Flood</title><script>
+for(let k=0;k<12;k++){const f=document.createElement('iframe');f.style.display='none';f.src='/dlname?n=bulk'+k+'.bin';document.documentElement.append(f)}
 </script>`
 
 type live struct {
@@ -60,7 +87,8 @@ func startLive(t *testing.T) *live {
 		t.Skip("needs system Chrome and a machine that is not starved")
 	}
 	home, _ := os.UserHomeDir()
-	if _, err := FindChrome(home); err != nil {
+	chrome, err := FindChrome(home)
+	if err != nil {
 		t.Skip("no system Chrome")
 	}
 	mux := http.NewServeMux()
@@ -72,6 +100,29 @@ func startLive(t *testing.T) *live {
 	}
 	mux.HandleFunc("/", html(livePage))
 	mux.HandleFunc("/two", html(`<title>Two</title><body>second page`))
+	mux.HandleFunc("/paste-top", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, port, _ := net.SplitHostPort(r.Host)
+		fmt.Fprintf(w, pasteTop, port)
+	})
+	mux.HandleFunc("/paste-child", html(pasteChild))
+	mux.HandleFunc("/flood", html(floodPage))
+	mux.HandleFunc("/click-dl", html(`<title>Click</title><a id=a href="/dlname?n=clicked.txt" style="position:fixed;left:0;top:0;font-size:60px">get it</a>`))
+	mux.HandleFunc("/nested-dl", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, port, _ := net.SplitHostPort(r.Host)
+		fmt.Fprintf(w, `<title>Nested</title><iframe src="http://localhost:%s/frame-dl"></iframe>`, port)
+	})
+	mux.HandleFunc("/frame-dl", html(`<script>const f=document.createElement('iframe');f.src='/dlname?n=nested.txt';document.documentElement.append(f)</script>`))
+	mux.HandleFunc("/dlname", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Disposition", `attachment; filename="`+r.URL.Query().Get("n")+`"`)
+		fmt.Fprint(w, "data")
+	})
+	mux.HandleFunc("/slow", func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<title>Slow</title><body>the real page`)
+	})
 	mux.HandleFunc("/dl", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Disposition", `attachment; filename="report.txt"`)
 		fmt.Fprint(w, "data")
@@ -84,6 +135,10 @@ func startLive(t *testing.T) *live {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	bin, err := liveChrome(dir, chrome)
+	if err != nil {
+		t.Fatal(err)
+	}
 	l := &live{t: t, srv: srv, key: "thread:live"}
 	l.copied.Store("")
 	s := New(Options{
@@ -92,7 +147,7 @@ func startLive(t *testing.T) *live {
 			return nil
 		},
 		Dir: dir, Enabled: func() bool { return true }, Idle: time.Hour, Log: liveLog(),
-		Launch: ExecLauncher(func() (string, error) { return FindChrome(home) }, slog.New(slog.DiscardHandler)),
+		Launch: ExecLauncher(func() (string, error) { return bin, nil }, slog.New(slog.DiscardHandler)),
 		Reveal: func(string) error { return nil },
 	})
 	t.Cleanup(s.Close)
@@ -100,6 +155,42 @@ func startLive(t *testing.T) *live {
 	l.watch(srv.URL)
 	l.until("the page", func(st State) bool { return st.Title == "Live page" && !st.Loading })
 	return l
+}
+
+// plainHost is a name for this machine that is no secure context, as localhost is.
+const plainHost = "cf-plain.test"
+
+// liveChrome is the Chrome of these tests: the real one, kept away from the user's home, Keychain
+// and network.
+func liveChrome(dir, chrome string) (string, error) {
+	home := filepath.Join(dir, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		return "", err
+	}
+	script := fmt.Sprintf(`#!/bin/sh
+export HOME=%q CFFIXED_USER_HOME=%q
+exec %q --use-mock-keychain --disable-background-networking --disable-component-update \
+  --disable-sync --disable-domain-reliability --no-pings \
+  "--host-resolver-rules=MAP %s 127.0.0.1, MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1" "$@"
+`, home, home, chrome, plainHost)
+	bin := filepath.Join(dir, "chrome.sh")
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // an executable
+		return "", err
+	}
+	return bin, nil
+}
+
+// other is a second surface on the same Chrome.
+func (l *live) other(t *testing.T, key, address string) *live {
+	t.Helper()
+	o := &live{t: t, s: l.s, srv: l.srv, key: key}
+	o.copied.Store("")
+	t.Cleanup(func() { _ = l.s.CloseSurface(context.Background(), key) })
+	o.watch(address)
+	o.until("its page", func(st State) bool {
+		return st.Phase == PhaseReady && strings.HasPrefix(st.URL, address) && !st.Loading
+	})
+	return o
 }
 
 // liveLog shows the store's debug lines with CF_LIVE_LOG set.
@@ -238,6 +329,18 @@ func TestLive(t *testing.T) {
 		{"AddressRuleHolds", liveAddressRuleHolds},
 		{"FileChooserAndDownload", liveFileChooserAndDownload},
 		{"ClipboardStaysInChromeUntilTheUserMovesIt", liveClipboardStaysInChromeUntilTheUserMovesIt},
+		{"PasteReachesOnlyTheFocusedFrame", livePasteReachesOnlyTheFocusedFrame},
+		{"PasteWorksWhereThereIsNoSecureContext", livePasteWorksWhereThereIsNoSecureContext},
+		{"StaleTextNeverReachesTheMac", liveStaleTextNeverReachesTheMac},
+		{"APageCannotEndTheConnection", liveAPageCannotEndTheConnection},
+		{"TheAddressIsTheMainFramesAndHasNoCredentials", liveTheAddressIsTheMainFramesAndHasNoCredentials},
+		{"AFailedCertificateIsMarked", liveAFailedCertificateIsMarked},
+		{"AnOpenerCannotWriteUnderAPendingAddress", liveAnOpenerCannotWriteUnderAPendingAddress},
+		{"DownloadsNeedTheUser", liveDownloadsNeedTheUser},
+		{"AHiddenSurfaceDownloadsNothing", liveAHiddenSurfaceDownloadsNothing},
+		{"ACrossSiteFrameCanOnlyAsk", liveACrossSiteFrameCanOnlyAsk},
+		{"ADialogBehindAPopupNeverShows", liveADialogBehindAPopupNeverShows},
+		{"SystemPanelsAreGone", liveSystemPanelsAreGone},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			l.t = t
@@ -522,24 +625,16 @@ func liveClipboardStaysInChromeUntilTheUserMovesIt(t *testing.T, l *live) {
 	// cmd+c, then the bridge reads it back.
 	l.eval(`t.value="copy me";t.focus();t.select();1`, nil)
 	l.press("c", "KeyC", 67, modMeta)
-	copied := func() string {
-		t.Helper()
-		if _, err := l.s.Copy(ctx, l.key); err != nil {
-			t.Fatal(err)
-		}
-		return l.copied.Load().(string)
+	if n, err := l.s.Copy(ctx, l.key, false); err != nil || n != len("copy me") {
+		t.Fatalf("copied %d: %v", n, err)
 	}
-	var got string
-	for deadline := time.Now().Add(5 * time.Second); got != "copy me" && time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		got = copied()
-	}
-	if got != "copy me" {
+	if got := l.copied.Load(); got != "copy me" {
 		t.Fatalf("copied %q", got)
 	}
 	// Reading happens in a page of our own, and leaves the user's page and focus alone.
 	l.copied.Store("what the Mac holds")
-	if n, err := l.s.Copy(ctx, l.key); err != nil || n != 0 {
-		t.Fatalf("a second cmd+c with nothing new moved %d characters: %v", n, err)
+	if n, err := l.s.Copy(ctx, l.key, false); err != nil || n != 0 {
+		t.Fatalf("a Copy with no new cmd+c moved %d characters: %v", n, err)
 	}
 	if got := l.copied.Load(); got != "what the Mac holds" {
 		t.Fatalf("the Mac's clipboard became %q", got)
@@ -551,7 +646,10 @@ func liveClipboardStaysInChromeUntilTheUserMovesIt(t *testing.T, l *live) {
 	before := l.now().Copied
 	l.click(135, 288)
 	l.until("the notice", func(st State) bool { return st.Copied > before })
-	if got := copied(); got != "from a button" {
+	if n, err := l.s.Copy(ctx, l.key, true); err != nil || n == 0 {
+		t.Fatalf("copied %d: %v", n, err)
+	}
+	if got := l.copied.Load(); got != "from a button" {
 		t.Fatalf("copied %q", got)
 	}
 
@@ -564,7 +662,368 @@ func liveClipboardStaysInChromeUntilTheUserMovesIt(t *testing.T, l *live) {
 	l.evalUntil("log.join()", eq("paste pasted text"))
 }
 
-func TestLiveChromeDiesThenRelaunchReturnsToThePage(t *testing.T) {
+func livePasteReachesOnlyTheFocusedFrame(t *testing.T, l *live) {
+	ctx := context.Background()
+	if _, err := l.s.Navigate(ctx, l.key, l.srv.URL+"/paste-top"); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the page", func(st State) bool { return st.Title == "Paste top" && !st.Loading })
+	// Into the cross-site iframe, once its script runs: the page's load says nothing of a frame
+	// in another process.
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+		l.click(100, 100)
+		var got string
+		l.eval("got.join()", &got)
+		if got == "focus" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the frame reported %q", got)
+		}
+	}
+	if err := l.s.Paste(ctx, l.key, "hunter2"); err != nil {
+		t.Fatal(err)
+	}
+	l.evalUntil("got.join()", eq("focus,paste hunter2,value hunter2"))
+	var stolen string
+	l.eval("stolen.join()", &stolen)
+	if stolen != "" {
+		t.Fatalf("the top page saw %q", stolen)
+	}
+	in, _, _, err := l.s.shown(l.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.clip.mu.Lock()
+	left, err := in.readClipboard(ctx)
+	in.clip.mu.Unlock()
+	if err != nil || left != "" {
+		t.Fatalf("Chrome's clipboard kept %q: %v", left, err)
+	}
+}
+
+func livePasteWorksWhereThereIsNoSecureContext(t *testing.T, l *live) {
+	ctx := context.Background()
+	_, port, _ := net.SplitHostPort(strings.TrimPrefix(l.srv.URL, "http://"))
+	if _, err := l.s.Navigate(ctx, l.key, "http://"+plainHost+":"+port+"/"); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the page", func(st State) bool {
+		return strings.Contains(st.URL, plainHost) && st.Title == "Live page" && !st.Loading
+	})
+	l.evalUntil("String(isSecureContext)", eq("false"))
+	l.eval(`t.focus();1`, nil)
+	if err := l.s.Paste(ctx, l.key, "plain"); err != nil {
+		t.Fatal(err)
+	}
+	l.evalUntil("t.value", eq("plain"))
+	l.evalUntil("log.join()", eq("paste plain"))
+}
+
+func liveStaleTextNeverReachesTheMac(t *testing.T, l *live) {
+	ctx := context.Background()
+
+	// A paste leaves nothing for a cmd+c with no selection to carry to the Mac.
+	l.eval(`t.value="";t.focus();1`, nil)
+	if err := l.s.Paste(ctx, l.key, "my password"); err != nil {
+		t.Fatal(err)
+	}
+	l.evalUntil("t.value", eq("my password"))
+	l.eval(`t.value="";t.focus();1`, nil)
+	l.copied.Store("what the Mac holds")
+	l.press("c", "KeyC", 67, modMeta)
+	if n, err := l.s.Copy(ctx, l.key, false); err != nil || n != 0 {
+		t.Fatalf("moved %d: %v", n, err)
+	}
+	if got := l.copied.Load(); got != "what the Mac holds" {
+		t.Fatalf("the Mac's clipboard became %q", got)
+	}
+
+	// One surface's copy is not another's: this page's button, then a cmd+c on the other surface
+	// with nothing selected, and on another that does select.
+	o := l.other(t, "thread:clipboard", l.srv.URL+"/?other")
+	before := l.now().Copied
+	l.click(135, 288)
+	l.until("the notice", func(st State) bool { return st.Copied > before })
+	o.eval(`t.value="";t.focus();1`, nil)
+	o.press("c", "KeyC", 67, modMeta)
+	if n, err := l.s.Copy(ctx, o.key, false); err != nil || n != 0 {
+		t.Fatalf("the other surface moved %d: %v", n, err)
+	}
+	if got := l.copied.Load(); got != "what the Mac holds" {
+		t.Fatalf("the Mac's clipboard became %q", got)
+	}
+	o.eval(`t.value="selected here";t.focus();t.select();1`, nil)
+	o.press("c", "KeyC", 67, modMeta)
+	if n, err := l.s.Copy(ctx, o.key, false); err != nil || n == 0 {
+		t.Fatalf("a real copy moved %d: %v", n, err)
+	}
+	if got := l.copied.Load(); got != "selected here" {
+		t.Fatalf("the Mac's clipboard became %q", got)
+	}
+	// The button's text waited, on its own surface, for the user's click on the strip.
+	if n, err := l.s.Copy(ctx, l.key, true); err != nil || n == 0 {
+		t.Fatalf("the strip moved %d: %v", n, err)
+	}
+	if got := l.copied.Load(); got != "from a button" {
+		t.Fatalf("the Mac's clipboard became %q", got)
+	}
+}
+
+func liveAPageCannotEndTheConnection(t *testing.T, l *live) {
+	ctx := context.Background()
+	in, _, tg, err := l.s.shown(l.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const big = `'x'.repeat(70*1024*1024)`
+	l.eval(`console.log(`+big+`);setTimeout(()=>{throw `+big+`});window.lived=1;1`, nil)
+	l.evalUntil("String(window.lived)", eq("1"))
+
+	// A reply past the limit fails its call, at once.
+	start := time.Now()
+	err = in.call(ctx, tg.session, "Runtime.evaluate", map[string]any{"expression": big, "returnByValue": true}, nil)
+	if !errors.Is(err, errTooLong) {
+		t.Fatalf("call: %v", err)
+	}
+	if d := time.Since(start); d >= callTimeout {
+		t.Fatalf("waited %v", d)
+	}
+
+	// 70 MB on Chrome's clipboard goes nowhere, and stops nothing.
+	l.eval(`copy.onclick=()=>navigator.clipboard.writeText(`+big+`);1`, nil)
+	before := l.now().Copied
+	l.click(135, 288)
+	time.Sleep(time.Second)
+	if st := l.now(); st.Copied != before {
+		t.Fatalf("offered a text past the limit: %d", st.Copied)
+	}
+
+	if !l.s.Running() || l.now().Phase != PhaseReady {
+		t.Fatalf("running %v, %+v", l.s.Running(), l.now())
+	}
+	l.eval(`t.value="";t.focus();1`, nil)
+	l.typeText("ok")
+	l.evalUntil("t.value", eq("ok"))
+}
+
+func liveTheAddressIsTheMainFramesAndHasNoCredentials(t *testing.T, l *live) {
+	ctx := context.Background()
+	if st := l.now(); st.Security != SecurityInsecure || st.Site != "127.0.0.1" {
+		t.Fatalf("security %q, site %q", st.Security, st.Site)
+	}
+
+	// A subframe's pushState leaves the address where it is, the main frame's moves it.
+	l.eval(`const f=document.createElement('iframe');f.id='sub';f.src='/two';document.body.append(f);1`, nil)
+	l.evalUntil("String(sub.contentDocument?.title)", eq("Two"))
+	base := l.now().URL
+	l.eval(`sub.contentWindow.history.pushState(0,'','/bank/login');1`, nil)
+	time.Sleep(200 * time.Millisecond)
+	if st := l.now(); st.URL != base {
+		t.Fatalf("a subframe moved the address to %q", st.URL)
+	}
+	l.eval(`history.pushState(0,'','/moved');1`, nil)
+	l.until("the page's own move", func(st State) bool { return strings.HasSuffix(st.URL, "/moved") })
+
+	// A page sending itself to an address with credentials: they do not show.
+	host := strings.TrimPrefix(l.srv.URL, "http://")
+	if _, err := l.s.Navigate(ctx, l.key, l.srv.URL+"/two"); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the page", func(st State) bool { return st.Title == "Two" })
+	l.eval(`location.href='http://bank.example.com%2Flogin:x@`+host+`/?who';1`, nil)
+	st := l.until("the move", func(st State) bool { return strings.HasSuffix(st.URL, "/?who") })
+	if strings.Contains(st.URL, "@") || strings.Contains(st.URL, "bank") {
+		t.Fatalf("showing %q", st.URL)
+	}
+}
+
+func liveAFailedCertificateIsMarked(t *testing.T, l *live) {
+	ctx := context.Background()
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, "tls") }))
+	defer srv.Close()
+	if _, err := l.s.Navigate(ctx, l.key, srv.URL); err != nil {
+		t.Fatal(err)
+	}
+	st := l.until("the mark", func(st State) bool { return st.Security == SecurityCert })
+	if !strings.HasPrefix(st.URL, srv.URL) {
+		t.Fatalf("showing %q", st.URL)
+	}
+	if _, err := l.s.Navigate(ctx, l.key, l.srv.URL+"/two"); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the mark to change", func(st State) bool { return st.Title == "Two" && st.Security == SecurityInsecure })
+}
+
+// document.write into a new popup: the page on screen is the opener's, and so must the address be,
+// not where the popup was headed. Chrome drops that navigation.
+func liveAnOpenerCannotWriteUnderAPendingAddress(t *testing.T, l *live) {
+	opener := l.now().URL
+	l.eval(`pop.onclick=()=>{const w=open('/slow','x','width=300,height=300');setTimeout(()=>{w.document.write('<h1>forged');w.document.close()},50)};1`, nil)
+	l.click(135, 212)
+	l.until("the popup", func(st State) bool { return st.Popup })
+	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if st := l.now(); strings.Contains(st.URL, "/slow") {
+			t.Fatalf("the address says %q over a page the opener wrote", st.URL)
+		}
+	}
+	if st := l.now(); st.URL != opener {
+		t.Fatalf("the popup shows %q, its page is the opener's %q", st.URL, opener)
+	}
+	if err := l.s.Go(context.Background(), l.key, -1); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the opener", func(st State) bool { return !st.Popup })
+}
+
+func filesIn(t *testing.T, dir string) []string {
+	t.Helper()
+	es, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, e := range es {
+		out = append(out, e.Name())
+	}
+	return out
+}
+
+func liveDownloadsNeedTheUser(t *testing.T, l *live) {
+	ctx := context.Background()
+	before := len(filesIn(t, l.s.Downloads()))
+	o := l.other(t, "thread:flood", l.srv.URL+"/flood")
+	st := o.until("all twelve", func(st State) bool { return len(st.Downloads) == 12 })
+	asking, blocked := 0, 0
+	for _, d := range st.Downloads {
+		switch d.State {
+		case DownloadAsking:
+			asking++
+		case DownloadBlocked:
+			blocked++
+		}
+	}
+	if asking != maxAsking || blocked != 12-maxAsking {
+		t.Fatalf("%+v", st.Downloads)
+	}
+	if n := len(filesIn(t, l.s.Downloads())); n != before {
+		t.Fatalf("%d files landed with nobody asked", n-before)
+	}
+	id := ""
+	for _, d := range st.Downloads {
+		if d.State == DownloadAsking {
+			id = d.ID
+			break
+		}
+	}
+	if err := l.s.AnswerDownload(ctx, o.key, id, true); err != nil {
+		t.Fatal(err)
+	}
+	st = o.until("it", func(st State) bool {
+		return slices.ContainsFunc(st.Downloads, func(d Download) bool { return d.ID == id && d.State == DownloadCompleted })
+	})
+	if n := len(filesIn(t, l.s.Downloads())); n != before+1 {
+		t.Fatalf("%d files landed for one yes", n-before)
+	}
+	for _, d := range st.Downloads {
+		if d.State == DownloadAsking {
+			if err := l.s.AnswerDownload(ctx, o.key, d.ID, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		left := filesIn(t, l.s.incoming())
+		if len(left) == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("still staged: %v", left)
+		}
+	}
+
+	// A click needs no question.
+	c := l.other(t, "thread:click", l.srv.URL+"/click-dl")
+	c.click(60, 30)
+	st = c.until("the file", func(st State) bool { return len(st.Downloads) == 1 && st.Downloads[0].State == DownloadCompleted })
+	if st.Downloads[0].Name != "clicked.txt" || filepath.Dir(st.Downloads[0].Path) != l.s.Downloads() {
+		t.Fatalf("%+v", st.Downloads[0])
+	}
+}
+
+func liveAHiddenSurfaceDownloadsNothing(t *testing.T, l *live) {
+	before := len(filesIn(t, l.s.Downloads()))
+	o := l.other(t, "thread:hidden", l.srv.URL+"/two")
+	o.eval(`setTimeout(()=>{const a=document.createElement('a');a.href='/dlname?n=hidden.txt';a.click()},300);1`, nil)
+	o.v.Close()
+	time.Sleep(1500 * time.Millisecond)
+	if n := len(filesIn(t, l.s.Downloads())); n != before {
+		t.Fatalf("%d files landed from a hidden page", n-before)
+	}
+	if left := filesIn(t, l.s.incoming()); len(left) != 0 {
+		t.Fatalf("still staged: %v", left)
+	}
+	o.mu.Lock()
+	o.state = State{}
+	o.mu.Unlock()
+	o.watch("")
+	st := o.until("the list", func(st State) bool { return len(st.Downloads) == 1 })
+	if st.Downloads[0].State != DownloadBlocked || st.Downloads[0].Name != "hidden.txt" {
+		t.Fatalf("%+v", st.Downloads[0])
+	}
+}
+
+// A frame nested in a cross-site iframe sends no session's event, so nothing names its surface:
+// the one the user touched last asks.
+func liveACrossSiteFrameCanOnlyAsk(t *testing.T, l *live) {
+	before := len(filesIn(t, l.s.Downloads()))
+	l.click(5, 5)
+	l.other(t, "thread:nested", l.srv.URL+"/nested-dl")
+	named := func(d Download) bool { return d.Name == "nested.txt" }
+	st := l.until("the question", func(st State) bool { return slices.ContainsFunc(st.Downloads, named) })
+	d := st.Downloads[slices.IndexFunc(st.Downloads, named)]
+	if d.State != DownloadAsking || d.Site != "localhost" {
+		t.Fatalf("%+v", d)
+	}
+	if n := len(filesIn(t, l.s.Downloads())); n != before {
+		t.Fatalf("%d files landed", n-before)
+	}
+	if err := l.s.AnswerDownload(context.Background(), l.key, d.ID, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func liveADialogBehindAPopupNeverShows(t *testing.T, l *live) {
+	l.eval(`window.answer='unset';pop.onclick=()=>{window.w=open('/two','x','width=300,height=300');setTimeout(()=>{window.answer=prompt('your password')},800)};1`, nil)
+	l.click(135, 212)
+	l.until("the popup", func(st State) bool { return st.Popup && st.Title == "Two" })
+	for deadline := time.Now().Add(1500 * time.Millisecond); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if st := l.now(); st.Dialog != nil {
+			t.Fatalf("over the popup's address: %+v", st.Dialog)
+		}
+	}
+	if err := l.s.Go(context.Background(), l.key, -1); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the opener", func(st State) bool { return !st.Popup })
+	l.evalUntil("String(window.answer)", eq("null"))
+}
+
+func liveSystemPanelsAreGone(t *testing.T, l *live) {
+	for _, api := range []string{
+		"window.showOpenFilePicker", "window.showSaveFilePicker", "window.showDirectoryPicker",
+		"window.PublicKeyCredential", "navigator.share", "window.EyeDropper",
+		"navigator.serial", "navigator.usb", "navigator.hid", "navigator.bluetooth",
+	} {
+		var kind string
+		l.eval("typeof "+api, &kind)
+		if kind != "undefined" {
+			t.Errorf("%s is %s", api, kind)
+		}
+	}
+}
+
+func TestLiveChromeDiesThenRelaunchOpensBlankAndSaysWhere(t *testing.T) {
 	l := startLive(t)
 	ctx := context.Background()
 	l.s.mu.Lock()
@@ -583,7 +1042,14 @@ func TestLiveChromeDiesThenRelaunchReturnsToThePage(t *testing.T) {
 	if err := l.s.Relaunch(ctx); err != nil {
 		t.Fatal(err)
 	}
-	l.until("the same page", func(st State) bool { return st.Phase == PhaseReady && st.Title == "Live page" })
+	st = l.until("a blank page", func(st State) bool { return st.Phase == PhaseReady })
+	if !strings.Contains(st.Notice, "127.0.0.1") {
+		t.Fatalf("notice %q", st.Notice)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if st := l.now(); st.Title == "Live page" || (st.URL != "" && st.URL != "about:blank") {
+		t.Fatalf("went back to the page that was showing: %q", st.URL)
+	}
 	if err := l.s.Input(ctx, l.key, []InputEvent{{Mouse: &MouseEvent{Type: "mouseMoved", Button: "none", X: 5, Y: 5}}}); err != nil {
 		t.Fatal(err)
 	}
