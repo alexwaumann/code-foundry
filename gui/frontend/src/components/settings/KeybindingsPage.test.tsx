@@ -15,6 +15,8 @@ const dictate: SettingFieldView = {
   group: "keybindings",
   enumValues: [],
   enumLabels: [],
+  enumDescriptions: [],
+  enumExamples: [],
   defaultValue: "",
   restartRequired: false,
   min: 0,
@@ -24,6 +26,7 @@ const dictate: SettingFieldView = {
   section: "dictation",
   unit: "",
   dependsOn: "",
+  dependsOnValue: "",
   row: "",
 };
 const page = { id: "keybindings", title: "Keybindings", description: "", sections: [{ id: "dictation", title: "Dictation", description: "" }] };

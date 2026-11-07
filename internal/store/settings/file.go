@@ -248,6 +248,12 @@ func render(values map[string]string, issues []Issue) []byte {
 			if len(f.Enum) > 0 {
 				desc += " One of: " + enumList(f.Enum) + "."
 			}
+			for i, d := range f.EnumDescriptions {
+				desc += " " + f.Enum[i] + ": " + d
+			}
+			if f.DependsOnValue != "" {
+				desc += " Used when " + f.DependsOn + " is " + f.DependsOnValue + "."
+			}
 			if f.Type == Int {
 				desc += fmt.Sprintf(" Range %d to %d%s.", f.Min, f.Max, unitWords[f.Unit])
 			}

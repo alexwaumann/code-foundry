@@ -115,15 +115,27 @@ type SettingField struct {
 	Section string `protobuf:"bytes,14,opt,name=section,proto3" json:"section,omitempty"`
 	// Unit shown as a suffix inside a number input ("s", "pt", "%"); empty for none.
 	Unit string `protobuf:"bytes,15,opt,name=unit,proto3" json:"unit,omitempty"`
-	// Key of a SETTING_TYPE_BOOL field this one depends on: while that field is false,
-	// this one renders indented and dimmed. Empty for none.
+	// Key of the field this one depends on, empty for none. A SETTING_TYPE_BOOL: while it
+	// is false, this one renders indented and dimmed. A SETTING_TYPE_ENUM: see
+	// depends_on_value.
 	DependsOn string `protobuf:"bytes,16,opt,name=depends_on,json=dependsOn,proto3" json:"depends_on,omitempty"`
 	// Fields of a section sharing a non-empty row id render side by side in one row
 	// (model and effort), each under its own title, with the first field's description
 	// under the row.
-	Row           string `protobuf:"bytes,17,opt,name=row,proto3" json:"row,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Row string `protobuf:"bytes,17,opt,name=row,proto3" json:"row,omitempty"`
+	// One sentence per enum value saying what it does, parallel to enum_values; empty when
+	// the options explain themselves. The field's dropdown, its row and the settings search
+	// show them.
+	EnumDescriptions []string `protobuf:"bytes,18,rep,name=enum_descriptions,json=enumDescriptions,proto3" json:"enum_descriptions,omitempty"`
+	// A sample value per enum value ("feat/add-filter"), parallel to enum_values; "" for an
+	// option without one. Empty when enum_descriptions is.
+	EnumExamples []string `protobuf:"bytes,19,rep,name=enum_examples,json=enumExamples,proto3" json:"enum_examples,omitempty"`
+	// The depends_on value this field is used with: the settings page shows it, right under
+	// depends_on's row, only while that field has this value. The search still finds it,
+	// dimmed. Empty for none.
+	DependsOnValue string `protobuf:"bytes,20,opt,name=depends_on_value,json=dependsOnValue,proto3" json:"depends_on_value,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SettingField) Reset() {
@@ -271,6 +283,27 @@ func (x *SettingField) GetDependsOn() string {
 func (x *SettingField) GetRow() string {
 	if x != nil {
 		return x.Row
+	}
+	return ""
+}
+
+func (x *SettingField) GetEnumDescriptions() []string {
+	if x != nil {
+		return x.EnumDescriptions
+	}
+	return nil
+}
+
+func (x *SettingField) GetEnumExamples() []string {
+	if x != nil {
+		return x.EnumExamples
+	}
+	return nil
+}
+
+func (x *SettingField) GetDependsOnValue() string {
+	if x != nil {
+		return x.DependsOnValue
 	}
 	return ""
 }
@@ -1459,7 +1492,7 @@ var File_codefoundry_v1_settings_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\n" +
-	"\x1dcodefoundry/v1/settings.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xea\x03\n" +
+	"\x1dcodefoundry/v1/settings.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe6\x04\n" +
 	"\fSettingField\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -1481,7 +1514,10 @@ const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\x04unit\x18\x0f \x01(\tR\x04unit\x12\x1d\n" +
 	"\n" +
 	"depends_on\x18\x10 \x01(\tR\tdependsOn\x12\x10\n" +
-	"\x03row\x18\x11 \x01(\tR\x03row\"V\n" +
+	"\x03row\x18\x11 \x01(\tR\x03row\x12+\n" +
+	"\x11enum_descriptions\x18\x12 \x03(\tR\x10enumDescriptions\x12#\n" +
+	"\renum_examples\x18\x13 \x03(\tR\fenumExamples\x12(\n" +
+	"\x10depends_on_value\x18\x14 \x01(\tR\x0edependsOnValue\"V\n" +
 	"\fSettingGroup\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +

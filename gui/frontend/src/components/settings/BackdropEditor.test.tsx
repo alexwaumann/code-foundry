@@ -50,6 +50,8 @@ const field: SettingFieldView = {
   group: "appearance",
   type: "enum",
   enumValues: ["forest", "none", "custom"],
+  enumDescriptions: [],
+  enumExamples: [],
   enumLabels: ["Forest", "None", "Custom"],
   defaultValue: "forest",
   restartRequired: false,
@@ -60,6 +62,7 @@ const field: SettingFieldView = {
   section: "window",
   unit: "",
   dependsOn: "",
+  dependsOnValue: "",
   row: "",
 };
 

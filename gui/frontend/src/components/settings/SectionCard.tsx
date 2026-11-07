@@ -2,8 +2,8 @@ import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { SettingFieldView, SettingsSchemaView } from "@/api/settings";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useSettingValue } from "@/stores/settings";
 import { sectionAdvanced } from "./advancedFields";
+import { useFieldUnused } from "./fieldUnused";
 import { useHiddenFields } from "./hiddenFields";
 import { fieldRows, rowBorder, type SectionFields } from "./model";
 import { sectionLinks } from "./sectionLinks";
@@ -33,22 +33,13 @@ export function SectionCard({ id, heading, description, aside, after, children }
 }
 
 /**
- * A field whose row depends on a bool (dependsOn). Right under its parent it is indented
+ * A field whose row depends on another (dependsOn). Right under its parent it is indented
  * with a hairline; in another section it says why it does nothing instead. Either way it
  * dims while the parent is off, and its editor stays usable.
  */
 function FieldRow({ field, parent, underParent, className }: { field: SettingFieldView; parent: SettingFieldView | undefined; underParent: boolean; className?: string }) {
-  const parentValue = useSettingValue(field.dependsOn || "") ?? parent?.defaultValue;
-  const dimmed = field.dependsOn !== "" && parentValue === "false";
-  return (
-    <SettingRow
-      field={field}
-      indent={underParent}
-      dimmed={dimmed}
-      note={!underParent && parent ? `Not used while ${parent.title} is off.` : undefined}
-      className={className}
-    />
-  );
+  const { unused, reason } = useFieldUnused(field, parent);
+  return <SettingRow field={field} indent={underParent} dimmed={unused} note={underParent ? undefined : reason} className={className} />;
 }
 
 /** A section's Advanced fields: quiet text under its card, closed until asked, opening a card of its own. */

@@ -1,7 +1,17 @@
+import type { ComponentProps } from "react";
 import { ChevronRight } from "lucide-react";
+import type { SettingFieldView } from "@/api/settings";
+import { useFieldUnused } from "./fieldUnused";
 import { LinkRow } from "./LinkRow";
 import type { PageSectionHit, SearchResult } from "./model";
 import { SettingRow } from "./SettingRow";
+
+/** A hit's row. One used with a value its parent does not have now dims and says so; it stays editable, ready for that value. */
+function HitRow({ parent, ...row }: ComponentProps<typeof SettingRow> & { parent: SettingFieldView | undefined }) {
+  const { unused, reason } = useFieldUnused(row.field, parent);
+  const off = unused && row.field.dependsOnValue !== "";
+  return <SettingRow {...row} dimmed={off} note={off ? reason : undefined} />;
+}
 
 /**
  * The search with text: one flat card of every match across the pages, each under a
@@ -37,10 +47,11 @@ export function SearchResults({
         <p className="py-8 text-center text-body text-cf-text-muted">No settings match “{query}”.</p>
       ) : (
         <div className="overflow-hidden rounded-lg border border-cf-border">
-          {result.hits.map(({ field, page, section }, i) => (
-            <SettingRow
+          {result.hits.map(({ field, parent, page, section }, i) => (
+            <HitRow
               key={field.key}
               field={field}
+              parent={parent}
               words={words}
               className={i > 0 ? "border-t border-cf-border" : undefined}
               crumb={

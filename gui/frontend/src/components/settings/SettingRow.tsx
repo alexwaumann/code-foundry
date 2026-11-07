@@ -3,9 +3,10 @@ import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SettingFieldView } from "@/api/settings";
 import { Tip } from "@/components/ui/tooltip";
+import { MatchedOptions, PickedOption } from "./EnumOptions";
 import { Highlight } from "./Highlight";
 import { keyDescriptions, keyDescriptionTails, keyEditors, keyTitleChips, tallKeyEditors } from "./keyEditors";
-import { displayValue } from "./model";
+import { displayValue, explainedOptions } from "./model";
 import { useSettingField } from "./useSettingField";
 
 
@@ -95,6 +96,8 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
   const TitleChip = keyTitleChips[field.key];
   const DescriptionTail = keyDescriptionTails[field.key];
   const Description = words ? undefined : keyDescriptions[field.key];
+  // Outside the search, the row says what the picked option does in place of the field's description.
+  const picked = words ? undefined : explainedOptions(field).find((o) => o.value === state.value);
   return (
     <div
       className={cn(
@@ -109,27 +112,30 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
       data-modified={state.modified || undefined}
       data-dimmed={dimmed || undefined}
     >
-      <div className={cn("min-w-0", dimmed && "opacity-45")}>
-        {crumb}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-label">
-            <Highlight text={field.title} words={words} />
-          </span>
-          <RestartChip field={field} restartPending={state.restartPending} />
-          {TitleChip && <TitleChip />}
+      <div className="min-w-0">
+        <div className={cn(dimmed && "opacity-45")}>
+          {crumb}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-label">
+              <Highlight text={field.title} words={words} />
+            </span>
+            <RestartChip field={field} restartPending={state.restartPending} />
+            {TitleChip && <TitleChip />}
+          </div>
+          {field.description && (
+            <p className="mt-0.5 text-caption">
+              {picked ? <PickedOption field={field} option={picked} /> : Description ? <Description fallback={field.description} /> : <Highlight text={field.description} words={words} />}
+              {words && <MatchedOptions field={field} words={words} />}
+              {DescriptionTail && <DescriptionTail field={field} />}
+            </p>
+          )}
+          {words && words.length > 0 && (
+            <p className="mt-0.5 text-caption-sm font-mono text-cf-text-muted/75" data-testid="setting-key">
+              <Highlight text={field.key} words={words} />
+            </p>
+          )}
         </div>
-        {field.description && (
-          <p className="mt-0.5 text-caption">
-            {Description ? <Description fallback={field.description} /> : <Highlight text={field.description} words={words} />}
-            {DescriptionTail && <DescriptionTail />}
-          </p>
-        )}
         {dimmed && note && <p className="mt-0.5 text-caption-sm">{note}</p>}
-        {words && words.length > 0 && (
-          <p className="mt-0.5 text-caption-sm font-mono text-cf-text-muted/75" data-testid="setting-key">
-            <Highlight text={field.key} words={words} />
-          </p>
-        )}
       </div>
       <div className={cn(dimmed && "opacity-45 focus-within:opacity-100 hover:opacity-100")}>
         <EditorCell field={field} state={state} />

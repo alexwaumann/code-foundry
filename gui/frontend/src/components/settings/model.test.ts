@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { SettingFieldView, SettingPageView, SettingsSchemaView } from "@/api/settings";
 import { sectionAdvanced } from "./advancedFields";
-import { bucketKeybindings, fieldRows, highlightParts, isBound, matchField, pageSections, queryWords, searchGuiPages, searchSettings } from "./model";
+import { bucketKeybindings, explainedOptions, fieldRows, highlightParts, isBound, matchedOptions, matchField, pageSections, queryWords, searchGuiPages, searchSettings } from "./model";
 
 const base: Omit<SettingFieldView, "key" | "title" | "type" | "page" | "section"> = {
   description: "",
   group: "g",
   enumValues: [],
   enumLabels: [],
+  enumDescriptions: [],
+  enumExamples: [],
   defaultValue: "",
   restartRequired: false,
   min: 0,
@@ -15,6 +17,7 @@ const base: Omit<SettingFieldView, "key" | "title" | "type" | "page" | "section"
   placeholder: "",
   unit: "",
   dependsOn: "",
+  dependsOnValue: "",
   row: "",
 };
 
@@ -217,10 +220,58 @@ describe("searchGuiPages", () => {
 
   it("finds a field behind a section's Advanced disclosure, unless it is hidden", () => {
     const key = "dictation.spoken_symbols";
-    const field = { key, title: "Spoken symbols", description: "“underscore”", page: "general", section: "dictation" } as SettingFieldView;
+    const field = { key, title: "Spoken symbols", description: "“underscore”", page: "general", section: "dictation", enumDescriptions: [] as string[] } as SettingFieldView;
     const s: SettingsSchemaView = { groups: [], fields: [field], pages: [{ id: "general", title: "General", description: "", sections: [{ id: "dictation", title: "Dictation", description: "" }] }] };
     expect(sectionAdvanced["general/dictation"]?.has(key)).toBe(true);
     expect(searchSettings(s, ["underscore"]).hits.map((h) => h.field.key)).toEqual([key]);
     expect(searchSettings(s, ["underscore"], new Set([key])).hits).toEqual([]);
+  });
+});
+
+describe("explained enum options", () => {
+  const naming = field("projects.branch_naming", "source", "projects", {
+    title: "Branch names",
+    type: "enum",
+    description: "How a new worktree's branch is named.",
+    enumValues: ["semantic", "prefix", "custom"],
+    enumLabels: ["Semantic", "Prefix", "Custom instructions"],
+    enumDescriptions: ["A type like feat.", "Your own word first.", "You tell the model."],
+    enumExamples: ["feat/add-filter", "cf/add-filter", ""],
+  });
+  const plain = field("appearance.theme", "general", "threads", { type: "enum", enumValues: ["dark"], enumLabels: ["GitHub Dark"] });
+
+  it("reads them parallel to the values; a field without sentences has none", () => {
+    expect(explainedOptions(naming)[1]).toEqual({ value: "prefix", label: "Prefix", description: "Your own word first.", example: "cf/add-filter" });
+    expect(explainedOptions(plain)).toEqual([]);
+  });
+
+  it.each([
+    ["an option's name", ["semantic"], true],
+    ["an option's sentence", ["own", "word"], true],
+    ["no option's example: the shown one follows the prefix", ["feat/add"], false],
+    ["the field's title and an option", ["branch", "custom"], true],
+    ["a word nowhere", ["semantic", "zzz"], false],
+  ])("finds the field by %s", (_name, words, want) => {
+    expect(matchField(naming, words)).toBe(want);
+  });
+
+  it("does not search the labels of options that explain nothing", () => {
+    expect(matchField(plain, ["github"])).toBe(false);
+  });
+
+  it.each([
+    ["the option the word names", ["prefix"], ["prefix"]],
+    ["several words of one option", ["custom", "instruction"], ["custom"]],
+    ["only words the field's own text lacks", ["branch", "semantic"], ["semantic"]],
+    ["none when its own text has every word", ["branch", "named"], []],
+  ])("marks %s", (_name, words, want) => {
+    expect(matchedOptions(naming, words).map((o) => o.value)).toEqual(want);
+  });
+
+  it("gives a hit the field it depends on", () => {
+    const prefix = field("projects.branch_prefix", "source", "projects", { dependsOn: naming.key, dependsOnValue: "prefix" });
+    const s: SettingsSchemaView = { groups: [], pages, fields: [naming, prefix] };
+    expect(searchSettings(s, ["projects.branch_prefix"]).hits[0]?.parent).toBe(naming);
+    expect(searchSettings(s, ["projects.branch_naming"]).hits[0]?.parent).toBeUndefined();
   });
 });
