@@ -104,12 +104,12 @@ about one reconnect every 1.5 s with nothing open between them, and Ctrl-C shows
 Nothing is lost: the snapshot has the screen and scrollback. Input keeps working through this, so the
 phase stays `live`. A snapshot always waits for xterm to finish before `reset()`.
 
-That holds only for the page's own drop. The daemon has one too, and it can come first: under a `seq`
-flood, 21 `Attach` tunnels ended `served` and `dropped slow attach subscriber` counted
-exactly 21. So the terminal store's slow-subscriber drop ended them, not `fallBehind`.
-`internal/api/terminal.go` returns `ResourceExhausted` for it, `runStream` retries, and
-`AttachController` goes to `reconnecting`, so "Reconnecting…" flashes until the next snapshot. Nothing
-is lost that way either. The label is left as it is for now.
+That held only for the page's own drop. The daemon has one too, and it can come first: under a `seq`
+flood, 21 `Attach` tunnels ended `served` and `dropped slow attach subscriber` counted exactly 21. So
+the terminal store's slow-subscriber drop ended them, not `fallBehind`. `internal/api/terminal.go`
+returns `ResourceExhausted` for it, which put `AttachController` in `reconnecting`, so "Reconnecting…"
+flashed until the next snapshot. #595 keeps that drop `live` too, apart from about 5% of them that
+reach the page as a dead socket (`docs/notes/terminal-flood-label.md`). Nothing is lost either way.
 
 ### After xterm's parse loop
 
@@ -255,8 +255,8 @@ What to expect:
 5. Live views: threads stream and terminals type with no `Reconnecting…` that lasts. A long `seq 1
    100000000` shows jumps in its numbers rather than every line, and `tunnel open` about every 1.5 s
    while it runs. That is the flood path working. Use `seq`, not `yes`: every line of `yes` looks the
-   same, so a jump cannot be seen. `Reconnecting…` flashes when the daemon's slow-subscriber drop gets
-   there first (the `served` closes above).
+   same, so a jump cannot be seen. A brief `Reconnecting…` is the few drops
+   `docs/notes/terminal-flood-label.md` leaves.
 6. WebContent's memory in Activity Monitor stays in the hundreds of MB through a noisy build.
 
 To back out at the time: remove the stream's entry from `TUNNELLED_STREAMS`, which PR 4 removed.
