@@ -159,5 +159,48 @@ class Gate(unittest.TestCase):
             self.assertIn(why, text, name)
 
 
+def message(text, origin="MESSAGE_ORIGIN_USER"):
+    return {"userMessage": {"text": text, "origin": origin}}
+
+
+def wake(text="[code-foundry wake] x"):
+    return message(text, "MESSAGE_ORIGIN_WAKE")
+
+
+class Wakes(unittest.TestCase):
+    def test_score_wakes(self):
+        items = [
+            message("go"), bash("code-foundry thread read s-1"), turn(1.0),  # the user's turn counts for nothing
+            wake("abcd"), {"assistantText": {"text": "ok"}}, turn(0.5),  # no tool
+            wake(), bash("code-foundry thread read s-1"), bash("git -C /w log --oneline"), turn(0.25),
+            wake(), bash("code-foundry thread send --id s-1 more"), turn(0.25),
+            wake(), bash("code-foundry thread reports --created-by x; git fetch origin"), turn(0.25),
+            message("thanks"), bash("git log"), turn(9.0),
+        ]
+        got = score.score_wakes(items)
+        want = dict(wakes=4, wake_cost=1.25, wake_reads=2, wake_git=2, wake_idle=1, wake_acted=1, wake_chars=2)
+        self.assertEqual({k: got[k] for k in want}, want)
+
+    def test_relay(self):
+        task = {"relay": ["Reconcile", "marigold-47"]}
+        self.assertEqual(score.relay_score(task, "Reconcile only"), (1, 2))
+        self.assertEqual(score.relay_score(task, "Reconcile, marigold-47"), (2, 2))
+        self.assertEqual(score.relay_score({}, "anything"), (0, 0))
+
+    def test_child_reports(self):
+        task = {"id": "w", "verb": None}
+        child = [bash("code-foundry thread report done x"), bash("code-foundry thread reports"), bash("code-foundry thread report --help")]
+        row = score.score_run(task, [], [child], FILES)
+        self.assertEqual(row["child_reports"], 1)
+
+    def test_parent_reads_count_outside_wake_turns(self):
+        # A parent on `thread wait` gets no wake turn: its reads count all the same.
+        task = {"id": "w", "verb": None}
+        root = [message("go"), bash("code-foundry thread wait s-1"), bash("code-foundry thread read s-1"), bash("code-foundry thread get s-1 --help"),
+                bash("git ls-remote origin x"), bash("ls")]
+        row = score.score_run(task, root, [], FILES)
+        self.assertEqual((row["parent_reads"], row["parent_git"], row["wakes"]), (1, 1, 0))
+
+
 if __name__ == "__main__":
     unittest.main()

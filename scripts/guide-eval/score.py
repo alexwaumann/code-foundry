@@ -16,6 +16,8 @@ from pathlib import Path
 BYTES_PER_TOKEN = 2.7  # measured on Opus 5.5 for these files in the audit (2.3 to 3.0)
 MIN_RUNS = 3  # a routing change needs this many runs per task: one run is too noisy
 SKILLS_DIR = "/.claude/skills/"
+WAKE_KEYS = ("wakes", "wake_bytes", "wake_cost", "wake_reads", "wake_git", "wake_idle", "wake_acted", "wake_chars",
+             "relay_hits", "relay_total", "child_reports", "parent_reads", "parent_git")
 FETCHES = re.compile(r"Monitor|Cron|ScheduleWakeup", re.I)
 FETCH_TOOLS = {"Monitor", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup"}
 # The CLI's error lines: "code-foundry view.inline: ... outside your home directory",
@@ -150,13 +152,66 @@ def score_run(task, root_items, other_items, files):
     if task.get("avoid") and any(re.search(task["avoid"], c) for c in root["cli"] if not is_help(c)):
         verb_ok = False  # the right verb beside the wrong store is still the wrong store
     want = task.get("skill")
+    relay_hits, relay_total = relay_score(task, root["text"])
+    root_bash = [inp.get("command", "") for name, inp, _, _ in tool_calls(root_items) if name == "Bash"]
+    parent_reads = sum(bool(WAKE_READ.search(c)) for c in root["cli"] if not is_help(c))
+    parent_git = sum(bool(WAKE_GIT.search(cmd)) for cmd in root_bash)
+    reports = sum(c.startswith("thread.report ") or c == "thread.report" or c.startswith("thread.report.") for s in rest for c in s["cli"] if not is_help(c))
     wrong = sum(len(s["failed"]) + s["help"] + s["fetches"] for s in every)
     return dict(task=task["id"], skill_ok=(want in root["skills"]) if want else None, verb_ok=verb_ok, skills=root["skills"],
                 reads=[r for s in every for r in s["reads"]], cli=root["cli"], failed=[f for s in every for f in s["failed"]],
                 help=sum(s["help"] for s in every), fetches=sum(s["fetches"] for s in every),
                 guide=sum(s["guide"] for s in every), caps=sum(s["caps"] for s in every), index=sum(s["index"] for s in every),
                 wrong_turns=wrong, guidance_bytes=sum(s["guidance_bytes"] for s in every),
-                cost=round(sum(s["cost"] for s in every), 4), turns=sum(s["turns"] for s in every), threads=len(every))
+                cost=round(sum(s["cost"] for s in every), 4), turns=sum(s["turns"] for s in every), threads=len(every),
+                relay_hits=relay_hits, relay_total=relay_total, child_reports=reports, parent_reads=parent_reads, parent_git=parent_git,
+                **score_wakes(root_items))
+
+
+# What a parent does in a wake turn to get what the wake did not tell it.
+WAKE_READ = re.compile(r"^thread\.(read|items|get|reports)\b")
+WAKE_GIT = re.compile(r"\bgit\b[^\n|;&]*\b(log|diff|show|fetch|merge-tree|rev-parse|ls-remote|branch)\b")
+WAKE_ACT = re.compile(r"^(thread\.(new|send|respond|interrupt)|ember\.task\.(start|add))\b")
+
+
+def wake_turns(items):
+    """The root's wake messages, each with the items up to the next message."""
+    turns, cur = [], None
+    for it in items:
+        if "userMessage" in it:
+            cur = [] if it["userMessage"].get("origin") == "MESSAGE_ORIGIN_WAKE" else None
+            if cur is not None:
+                turns.append((it["userMessage"], cur))
+        elif cur is not None:
+            cur.append(it)
+    return turns
+
+
+def score_wakes(items):
+    """What wakes cost the thread that gets them, and what it did with them. A turn that
+    reads a child or checks git shows what the wake left out; one with no tool call and
+    nothing acted on was a turn spent for nothing."""
+    s = dict(wakes=0, wake_bytes=0, wake_cost=0.0, wake_reads=0, wake_git=0, wake_idle=0, wake_acted=0, wake_chars=0)
+    for msg, turn in wake_turns(items):
+        s["wakes"] += 1
+        s["wake_bytes"] += len(msg.get("text", "").encode())
+        s["wake_cost"] += sum(float(i["turnEnd"].get("turnCostUsd") or 0) for i in turn if "turnEnd" in i)
+        s["wake_chars"] += sum(len(i["assistantText"].get("text", "")) for i in turn if "assistantText" in i)
+        tools = list(tool_calls(turn))
+        bash = [inp.get("command", "") for name, inp, _, _ in tools if name == "Bash"]
+        found = [c for cmd in bash for c in calls(cmd)]
+        s["wake_reads"] += any(WAKE_READ.search(c) for c in found)
+        s["wake_git"] += any(WAKE_GIT.search(cmd) for cmd in bash)
+        s["wake_acted"] += any(WAKE_ACT.search(c) for c in found)
+        s["wake_idle"] += not tools
+    return s
+
+
+def relay_score(task, text):
+    """How many of the task's `relay` patterns the final reply has: what a child found that
+    the parent had to pass on. (hits, total); (0, 0) for a task without any."""
+    want = task.get("relay", [])
+    return sum(re.search(p, text) is not None for p in want), len(want)
 
 
 def tokens(n_bytes):
@@ -207,7 +262,14 @@ def totals(rows):
                 help_hops=sum(r["help"] for r in rows), fetches=sum(r["fetches"] for r in rows),
                 guide_calls=sum(r["guide"] for r in rows), capabilities_calls=sum(r["caps"] for r in rows),
                 commands_md_reads=sum(r["index"] for r in rows),
-                cost=round(sum(r["cost"] for r in rows), 2))
+                cost=round(sum(r["cost"] for r in rows), 2), **wake_totals(rows))
+
+
+def wake_totals(rows):
+    """The wake columns over rows. Reports scored before these existed have none."""
+    t = {k: sum(r.get(k, 0) for r in rows) for k in WAKE_KEYS}
+    t["wake_cost"] = round(t["wake_cost"], 2)
+    return t
 
 
 def per_task(rows):
@@ -220,7 +282,7 @@ def per_task(rows):
         res[task] = dict(runs=len(rs), skill=None if rs[0]["skill_ok"] is None else sum(bool(r["skill_ok"]) for r in rs),
                          verb=sum(r["verb_ok"] for r in rs), guidance_mean=round(statistics.mean(g)), guidance_min=min(g), guidance_max=max(g),
                          wrong_turns=sum(r["wrong_turns"] for r in rs), cost=round(sum(r["cost"] for r in rs), 2),
-                         invalid=sum(not r["valid"] for r in rs))
+                         invalid=sum(not r["valid"] for r in rs), **wake_totals(rs))
     return res
 
 
@@ -247,6 +309,14 @@ def render_tasks(rep):
         bad = f" ({s['invalid']} invalid)" if s["invalid"] else ""
         lines.append(f"| {task} | {s['runs']}{bad} | {skill} | {s['verb']}/{s['runs']} | "
                      f"{s['guidance_mean']} ({s['guidance_min']}-{s['guidance_max']}) | {s['wrong_turns']} | ${s['cost']} |")
+    if any(s.get("wakes") or s.get("relay_total") or s.get("child_reports") for s in rep["tasks"].values()):
+        lines += ["", "| task | wakes | KB | wake-turn cost | reads | git | no tool | acted | reply chars | child reports | parent reads | parent git | relay |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        for task, s in rep["tasks"].items():
+            if s.get("wakes") or s.get("relay_total") or s.get("child_reports"):
+                relay = f"{s['relay_hits']}/{s['relay_total']}" if s["relay_total"] else "-"
+                lines.append(f"| {task} | {s['wakes']} | {s['wake_bytes'] / 1000:.1f} | ${s['wake_cost']} | {s['wake_reads']} | {s['wake_git']} | "
+                             f"{s['wake_idle']} | {s['wake_acted']} | {s['wake_chars']} | {s['child_reports']} | {s['parent_reads']} | {s['parent_git']} | {relay} |")
     return "\n".join(lines)
 
 
@@ -262,6 +332,14 @@ def compare(before, after):
         lines.append(f"{name:24} {a[key]:>8} -> {b[key]:>8}  ({delta:+})")
     lines.append(f"{'always loaded':24} {before['always_tokens']:>8} -> {after['always_tokens']:>8}  ({after['always_tokens'] - before['always_tokens']:+})")
     lines.append("")
+    if a.get("wakes") or b.get("wakes") or a.get("relay_total") or b.get("relay_total"):  # not part of the gate: read them with the runs
+        for name, key in (("wakes", "wakes"), ("wake bytes", "wake_bytes"), ("wake-turn cost", "wake_cost"), ("wake turns reading a child", "wake_reads"),
+                          ("wake turns checking git", "wake_git"), ("wake turns with no tool", "wake_idle"), ("wake turns that acted", "wake_acted"),
+                          ("wake-turn reply chars", "wake_chars"), ("child report calls", "child_reports"), ("parent reads, whole run", "parent_reads"),
+                          ("parent git calls, whole run", "parent_git"), ("relayed facts", "relay_hits")):
+            x, y = a.get(key, 0), b.get(key, 0)
+            lines.append(f"{name:28} {x:>8} -> {y:>8}  ({round(y - x, 2):+})")
+        lines.append("")
     for task, x in before["tasks"].items():
         y = after["tasks"].get(task)
         if not y:
