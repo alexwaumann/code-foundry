@@ -119,6 +119,7 @@ describe("surface registry", () => {
       ["pullrequest", "p"],
       ["mcp", undefined],
       ["gallery", undefined],
+      ["browser", "c"],
     ]);
     expect(surfaceOf("diff")?.title).toBe("Diff");
     expect(surfaceByHotkey("P")?.kind).toBe("pullrequest");

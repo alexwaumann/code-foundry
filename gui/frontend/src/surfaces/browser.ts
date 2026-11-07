@@ -15,7 +15,7 @@ export const browserSurface: SurfaceSpec = {
   kind: BROWSER_KIND,
   title: BROWSER_TITLE,
   icon: Globe,
-  hotkey: "w",
+  hotkey: "c",
   available: () => (browserEnabled() ? "enabled" : "hidden"),
   watches: [useSettingsStore],
   beforeClose: (panelKey) => {
