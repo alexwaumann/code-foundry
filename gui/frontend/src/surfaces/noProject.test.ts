@@ -5,7 +5,6 @@ import { emptyThreads, replaceThreads, useThreadsStore } from "@/stores/threads"
 import type { Selection } from "@/stores/ui";
 import { diffSurface } from "./diff";
 import { filesSurface } from "./files";
-import { changesSurface } from "./changes";
 import { mcpSurface } from "./mcp";
 import { selectionHasNoProject } from "./noProject";
 import { pullRequestSurface } from "./pullrequest";
@@ -44,13 +43,13 @@ describe("selectionHasNoProject", () => {
 });
 
 describe("the side panel of a thread without a project", () => {
-  it("lists no files, diff or pull request surface; Changes and MCP are never listed", () => {
+  it("lists no files, diff or pull request surface; MCP is never listed", () => {
     useProjectsStore.setState(projects);
     useThreadsStore.setState(threads);
     const ctx = { selection: { kind: "thread", id: "home" } as Selection, panelKey: "thread:home" };
     const proj = { selection: { kind: "thread", id: "proj" } as Selection, panelKey: "thread:proj" };
-    for (const spec of [filesSurface, diffSurface, pullRequestSurface, changesSurface, mcpSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "hidden"]);
-    for (const spec of [changesSurface, mcpSurface]) expect([spec.kind, spec.available(proj)]).toEqual([spec.kind, "hidden"]);
+    for (const spec of [filesSurface, diffSurface, pullRequestSurface, mcpSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "hidden"]);
+    expect(mcpSurface.available(proj)).toBe("hidden");
     expect(filesSurface.available(proj)).toBe("disabled");
   });
 });

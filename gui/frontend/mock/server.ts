@@ -143,6 +143,7 @@
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
  *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
+ *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
  *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
  *   POST /__mock/fs/remove?path=…                 (the file goes)
  *   POST /__mock/fs/link?path=…&real=…            (ReadFile says a link leads from the path to real)
@@ -166,6 +167,7 @@
  *        GET /__mock/update counts app.restart runs (restarts)
  *   POST /__mock/gh/update | poll | stale | inbox-zero | auth?ok=false | touch?path=…   (GitHub + detail;
  *        inbox-zero empties the review queue, leaving the reviews that wait on their authors)
+ *   POST /__mock/gh/many-prs?count=150        (every list of the Pull Requests page that many long)
  *   POST /__mock/gh/project-merged-capped[?shown=3&total=64]   (the dashboard's project-wide
  *        merged list shows its first `shown` of `total`: "Showing 3 of 64")
  *   POST /__mock/gh/branch-pr?slug=o/r&head=b&number=N&title=…&state=open|draft|merged|closed[&ago=ms][&append=1]
@@ -473,6 +475,8 @@ function routes(router: ConnectRouter): void {
       return { detail };
     },
     getWorktreeFileDiff: (req) => mockFiles.fileDiff(req.path, req.file, req.oldPath, req.scope),
+    compareWorktree: (req) => mockFiles.compare(req.path, req.base, req.head),
+    getWorktreeCompareFile: (req) => mockFiles.compareFile(req.path, req.base, req.head, req.file, req.oldPath),
     watch: (_req, ctx) => tracked("ProjectService/Watch", world.projectEvents.subscribe(ctx.signal)),
   });
 
@@ -1648,6 +1652,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       world.gh.inboxZero();
       json(res, 200, { ok: true });
       break;
+    case "POST /__mock/gh/many-prs":
+      world.gh.manyPrs(Number(q.get("count") ?? "150"));
+      json(res, 200, { ok: true });
+      break;
     case "POST /__mock/gh/project-merged-capped":
       world.gh.capProjectMerged(Number(q.get("shown") ?? "3"), Number(q.get("total") ?? "64"));
       json(res, 200, { ok: true });
@@ -1851,6 +1859,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/files/calls":
       json(res, 200, completionCalls);
+      break;
+    case "POST /__mock/compare/files":
+      mockFiles.extraCompareFiles = Number(q.get("count") ?? "0");
+      mockFiles.firstCompareFiles = Number(q.get("first") ?? "0");
+      json(res, 200, { ok: true });
       break;
     case "POST /__mock/fs/write":
       mockFiles.write(q.get("path") ?? "", q.get("text") ?? "", q.get("touch") === "1");

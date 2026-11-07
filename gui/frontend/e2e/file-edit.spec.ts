@@ -84,7 +84,7 @@ test("with the caret in the editor, its chords are its own and typing fires no s
   await page.keyboard.press("Home");
   await page.keyboard.type("fdwc ");
   await expect(line(page, 1)).toContainText("fdwc import");
-  await expect(tabs(page)).toHaveText(["Changes", "app.ts"]);
+  await expect(tabs(page)).toHaveText([/ vs /, "app.ts"]);
 
   // cmd+F is the editor's find, not the thread's.
   await page.keyboard.press("Meta+f");
@@ -186,7 +186,7 @@ test("contents leave the library: on leaving a saved tab, on Discard, on the pen
   await page.keyboard.press("Meta+s");
   await expect(status(page)).toHaveText("Editing");
   expect(await held(page, saved)).toContain("xSECRET");
-  await thenLeft(() => tabs(page).filter({ hasText: "Changes" }).click(), saved);
+  await thenLeft(() => tabs(page).filter({ hasText: " vs " }).click(), saved);
 
   await tabs(page).filter({ hasText: ".env" }).click();
   await expect(status(page)).toHaveText("Editing");
@@ -293,8 +293,8 @@ test("a draft survives leaving the tab, and a long file edits through the virtua
   await expect(status(page)).toHaveText("Unsaved");
   await expect(page.getByTestId("tab-unsaved")).toBeVisible();
 
-  await tabs(page).filter({ hasText: "Changes" }).click();
-  await expect(page.getByTestId("worktree-changes")).toBeVisible();
+  await tabs(page).filter({ hasText: " vs " }).click();
+  await expect(page.getByTestId("diff-compare-bar")).toBeVisible();
   await expect(page.getByTestId("tab-unsaved")).toBeVisible();
   await tabs(page).filter({ hasText: "long.txt" }).click();
   await expect(status(page)).toHaveText("Unsaved");

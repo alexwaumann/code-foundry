@@ -44,8 +44,8 @@ test("register a plain folder, see No git everywhere, then project git init turn
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-projects.png") });
 
     await page.locator(`[data-nav-key="p:${project.id}"]`).dblclick();
-    await expect(page.getByTestId("changes-nogit")).toContainText("Not a git repository");
-    await expect(page.getByTestId("worktree-changes")).toHaveCount(0);
+    await expect(page.getByTestId("diff-nogit")).toContainText("Not a git repository");
+    await expect(page.getByTestId("diff-compare-bar")).toHaveCount(0);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-overview.png") });
 
     const after = JSON.parse(cli("project", "git", "init", "--project", project.id, "--json")) as { git?: boolean; defaultBranch?: string };
@@ -53,9 +53,9 @@ test("register a plain folder, see No git everywhere, then project git init turn
     const branch = after.defaultBranch ?? "";
     expect(branch).not.toBe("");
 
-    // The open Changes tab follows the project event: the lists, and the row offers Publish (no remote).
-    await expect(page.getByTestId("changes-nogit")).toHaveCount(0);
-    await expect(page.getByTestId("worktree-changes")).toBeVisible();
+    // The open Diff tab follows the project event: the lists, and the row offers Publish (no remote).
+    await expect(page.getByTestId("diff-nogit")).toHaveCount(0);
+    await expect(page.getByTestId("diff-compare-bar")).toBeVisible();
     await expect(card.getByTestId("project-publish")).toBeVisible();
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-after-init.png") });
   } finally {

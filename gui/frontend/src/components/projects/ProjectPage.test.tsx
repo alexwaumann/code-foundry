@@ -208,7 +208,7 @@ describe("a project's page", () => {
     menu = openRowMenu(FEAT);
     expect(menuEntries(menu, true)).toEqual(["Open thread", "New thread here", "New terminal here", "—", "Show changes", "Open pull request #142", "—", "Open in Finder", "Copy path", "Copy branch name", "—", "Remove worktree"]);
     await pick(menu, "checkout-menu-changes");
-    expect(pagePanel()).toEqual({ open: true, kind: "changes", title: "Changes · code-foundry · feat/sidebar", params: { project: "repo-cf", path: FEAT } });
+    expect(pagePanel()).toEqual({ open: true, kind: "diff", title: "Diff · code-foundry", params: { project: "repo-cf", worktree: FEAT } });
 
     await pick(openRowMenu(FIX), "checkout-menu-remove");
     expect((await screen.findByTestId("remove-worktree-title")).textContent).toBe("Remove the worktree on fix/resize?");
@@ -489,7 +489,7 @@ describe("Worktrees without threads", () => {
     expect(leftoverRow(COPY).getAttribute("aria-selected")).toBe("false");
     expect(leftoverRow(COPY).className).toContain("hover:bg-cf-control-hover/50");
     fireEvent.click(inEl(leftover(COPY), "leftover-show-diff") as HTMLElement);
-    expect(pagePanel()).toMatchObject({ open: true, kind: "changes", params: { project: "repo-cf", path: COPY } });
+    expect(pagePanel()).toMatchObject({ open: true, kind: "diff", params: { project: "repo-cf", worktree: COPY } });
     expect(page().getAttribute("data-project")).toBe("repo-cf");
   });
 
@@ -515,7 +515,7 @@ describe("Worktrees without threads", () => {
     });
     await settle();
     await pick(openLeftoverMenu(COPY), "leftover-menu-changes");
-    expect(pagePanel()).toMatchObject({ open: true, kind: "changes", params: { project: "repo-cf", path: COPY } });
+    expect(pagePanel()).toMatchObject({ open: true, kind: "diff", params: { project: "repo-cf", worktree: COPY } });
     await pick(openLeftoverMenu(SPIKE), "leftover-menu-resume");
     const archive = lastInvocation("thread.archive");
     expect(archive?.args).toMatchObject({ archived: "false" });
@@ -554,7 +554,7 @@ describe("Worktrees without threads", () => {
     expect(screen.queryByTestId("remove-worktree-dialog")).toBeNull();
     expect(invocationsOf("project.worktree.remove").map((i) => i.confirmed)).toEqual([false]);
     // ... and opens the worktree's Changes tab in this page's panel; the leftover stays.
-    expect(pagePanel()).toMatchObject({ open: true, kind: "changes", params: { project: "repo-cf", path: COPY } });
+    expect(pagePanel()).toMatchObject({ open: true, kind: "diff", params: { project: "repo-cf", worktree: COPY } });
     expect(leftover(COPY)).not.toBeNull();
 
     // Cancel keeps it.

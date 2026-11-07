@@ -602,6 +602,31 @@ export class GhWorld {
     this.publishGh(this.polledEvent());
   }
 
+  /**
+   * Test control (POST /__mock/gh/many-prs?count=150): every list of the page holds `count`
+   * copies of its first pull request, so each is past RowList's limit. Announced like a poll.
+   */
+  manyPrs(count: number): void {
+    const d = this.dashboard;
+    const at = timestampFromDate(new Date());
+    const many = (prs: PrInit[], from: number): PrInit[] => {
+      const first = prs[0];
+      return first ? Array.from({ length: count }, (_, i) => ({ ...first, number: from + i, title: `Row ${String(i)}` })) : prs;
+    };
+    this.dashboard = {
+      ...d,
+      authored: many(d.authored, 3000),
+      reviewRequested: many(d.reviewRequested, 4000),
+      recentlyMerged: many(d.recentlyMerged, 5000),
+      projectOpen: { ...d.projectOpen, pullRequests: many(d.projectOpen.pullRequests, 6000) },
+      projectMerged: { ...d.projectMerged, pullRequests: many(d.projectMerged.pullRequests, 7000) },
+      fetchedAt: at,
+      projectsFetchedAt: at,
+    };
+    this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: at } } });
+    this.publishGh(this.polledEvent());
+  }
+
   /** A file appeared in a worktree: recompute and announce. */
   touch(path: string): boolean {
     const d = this.details.get(path);

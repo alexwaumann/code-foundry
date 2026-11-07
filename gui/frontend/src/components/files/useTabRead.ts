@@ -83,6 +83,39 @@ export function useDebounced(f: () => void, ms = REFRESH_DEBOUNCE_MS): () => voi
   }, [f, ms]);
 }
 
+/**
+ * `f` at most once per `ms` under a stream of calls, for a read that must not fall behind: the
+ * first call starts the wait and later ones join it, where a debounce would start over and a
+ * stream with gaps under `ms` would never let it run. While `busy` (a read not answered yet) the
+ * wait goes on: running `f` would abort that read, and if every read is slower than `ms` none
+ * would ever answer. The returned function is stable; the pending call is dropped on unmount.
+ */
+export function useThrottled(f: () => void, ms = REFRESH_DEBOUNCE_MS, busy = false): () => void {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const now = useRef({ f, ms, busy });
+  useEffect(() => {
+    now.current = { f, ms, busy };
+  });
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+    },
+    [],
+  );
+  return useCallback(() => {
+    if (timer.current !== undefined) return;
+    const tick = () => {
+      if (now.current.busy) {
+        timer.current = setTimeout(tick, now.current.ms);
+        return;
+      }
+      timer.current = undefined;
+      now.current.f();
+    };
+    timer.current = setTimeout(tick, now.current.ms);
+  }, []);
+}
+
 /** Calls `onVisible` when the window becomes visible again (the app comes back from the background). */
 export function useOnWindowVisible(onVisible: () => void): void {
   const fire = useEffectEvent(onVisible);

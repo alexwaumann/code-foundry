@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadLog } from "@/stores/thread";
-import { editsOf, useDebounced, useTabRead } from "./useTabRead";
+import { editsOf, useDebounced, useTabRead, useThrottled } from "./useTabRead";
 
 function tool(id: string, name: string, input: Record<string, unknown>, status: "running" | "done" | "error" = "done", isError = false): ThreadItemView {
   return { id, ordinal: 0, kind: "tool", toolUseId: id, name, inputJson: JSON.stringify(input), status, output: "", isError, resultJson: "" } as unknown as ThreadItemView;
@@ -65,6 +65,63 @@ describe("useTabRead", () => {
     expect(result.current.data).toBe("ok");
     rerender({ k: "b" });
     expect(result.current).toMatchObject({ data: null, error: null, loading: true });
+  });
+});
+
+describe("useThrottled", () => {
+  const fake = (run: () => void) => {
+    vi.useFakeTimers();
+    try {
+      run();
+    } finally {
+      vi.useRealTimers();
+    }
+  };
+
+  it("runs once per wait however many calls join it, and a call after that starts another", () => {
+    fake(() => {
+      const f = vi.fn();
+      const { result } = renderHook(() => useThrottled(f, 100));
+      for (let t = 0; t < 10; t++) {
+        result.current();
+        vi.advanceTimersByTime(30);
+      }
+      expect(f).toHaveBeenCalledTimes(2);
+      vi.advanceTimersByTime(1000);
+      expect(f).toHaveBeenCalledTimes(3);
+      vi.advanceTimersByTime(1000);
+      expect(f).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  it("waits for a read still out, then runs, so a read slower than the wait is never aborted", () => {
+    fake(() => {
+      const f = vi.fn();
+      const { result, rerender } = renderHook(({ busy }) => useThrottled(f, 100, busy), { initialProps: { busy: true } });
+      result.current();
+      vi.advanceTimersByTime(950);
+      expect(f).not.toHaveBeenCalled();
+      rerender({ busy: false });
+      vi.advanceTimersByTime(100);
+      expect(f).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("a new wait takes the new length; a pending call goes with the view", () => {
+    fake(() => {
+      const f = vi.fn();
+      const { result, rerender, unmount } = renderHook(({ ms }) => useThrottled(f, ms), { initialProps: { ms: 100 } });
+      rerender({ ms: 500 });
+      result.current();
+      vi.advanceTimersByTime(499);
+      expect(f).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(f).toHaveBeenCalledTimes(1);
+      result.current();
+      unmount();
+      vi.advanceTimersByTime(1000);
+      expect(f).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

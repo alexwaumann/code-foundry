@@ -18,7 +18,7 @@
  * sends focus=1 only then, and only because the user asked to be taken there. Without it, a
  * request that would replace the editor the user is typing in joins the strip behind it.
  */
-import type { DiffScopeView } from "@/api/fileDiff";
+import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD } from "@/surfaces/diffTarget";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { galleryTab } from "@/surfaces/galleryTarget";
 import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
@@ -111,8 +111,7 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
   // view.panel.diff: params project, worktree, path (worktree-relative) and scope.
   "panel.diff": item((key, p) => {
     if (!p.project || !p.worktree || !p.path) return false;
-    const scope: DiffScopeView = p.scope === "branch" ? "branch" : "working";
-    return openDiffInPanel(key, { project: p.project, worktree: p.worktree, path: p.path, oldPath: "", scope });
+    return openDiffInPanel(key, { project: p.project, worktree: p.worktree, base: DEFAULT_BASE, head: p.scope === "branch" ? COMMITTED_HEAD : DEFAULT_HEAD, file: p.path, oldPath: "", own: true });
   }),
   // view.panel.pr: params slug and number.
   "panel.pr": item((key, p) => {

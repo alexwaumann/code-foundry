@@ -16,7 +16,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { PreviewFileResponseSchema, ReadFileResponseSchema, WriteFileRequest, WriteFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
-import { DiffScope, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
+import { DiffScope, DiffSourceKind, type CompareWorktreeResponseSchema, type DiffSource, type GetWorktreeCompareFileResponseSchema, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { readFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 import { HOME } from "./filesystem";
@@ -27,6 +27,12 @@ type ReadInit = MessageInitShape<typeof ReadFileResponseSchema>;
 type WriteInit = MessageInitShape<typeof WriteFileResponseSchema>;
 type PreviewInit = MessageInitShape<typeof PreviewFileResponseSchema>;
 type DiffInit = MessageInitShape<typeof GetWorktreeFileDiffResponseSchema>;
+type CompareInit = MessageInitShape<typeof CompareWorktreeResponseSchema>;
+type CompareFileInit = MessageInitShape<typeof GetWorktreeCompareFileResponseSchema>;
+/** One side of a comparison request; unset is that side's default. */
+type CompareSide = DiffSource | undefined;
+
+const sideName = (s: CompareSide): string => (s?.kind === DiffSourceKind.REF ? s.ref : String(s?.kind ?? 0));
 
 /** What the detail fixtures say about a changed file (mock/github.ts FileInit). */
 export interface ChangedFile {
@@ -35,6 +41,8 @@ export interface ChangedFile {
   oldPath?: string;
   binary?: boolean;
   uncommitted?: boolean;
+  added?: number;
+  deleted?: number;
 }
 
 /** A worktree's detail as far as diffs need it. */
@@ -337,7 +345,13 @@ export class MockFiles {
 
   constructor(private readonly detailOf: (path: string) => DetailFiles | undefined) {}
 
+  /** POST /__mock/compare/files?count=N[&first=M]: this many more files in every comparison, for a long list, and M that sort above them all. */
+  extraCompareFiles = 0;
+  firstCompareFiles = 0;
+
   reset(): void {
+    this.extraCompareFiles = 0;
+    this.firstCompareFiles = 0;
     this.links.clear();
     this.disk = fixtures();
     this.refusal = null;
@@ -489,6 +503,40 @@ export class MockFiles {
     this.write(abs, new TextDecoder().decode(req.contents));
     const now = this.onDisk(abs);
     return { resolvedPath: abs, modifiedAt: BigInt(now?.modifiedAt ?? 0), size: BigInt(now?.data.length ?? 0) };
+  }
+
+  /** What a comparison lists: the detail's files, cut down to what the two sources can differ in. */
+  compare(worktree: string, base: CompareSide, head: CompareSide): CompareInit {
+    const detail = this.detailOf(worktree);
+    if (!detail) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
+    this.calls.push(`compare ${worktree} ${sideName(base)} ${sideName(head)}`);
+    const baseRef = detail.baseRef ?? "";
+    const resolved = (s: CompareSide) => {
+      if (s?.kind === DiffSourceKind.REF) return { kind: s.kind, label: s.ref, sha: "ddc0461310bb" };
+      if (s?.kind === DiffSourceKind.STAGED) return { kind: s.kind, label: "Staged" };
+      if (s?.kind === DiffSourceKind.WORKING_TREE) return { kind: s.kind, label: "Working tree" };
+      return { kind: DiffSourceKind.MERGE_BASE, label: baseRef || "HEAD", sha: "c6d3bc2477aa" };
+    };
+    const meta = { base: resolved(base), head: resolved(head), baseRef, mergeBase: baseRef ? "c6d3bc2477aa" : "" };
+    const missing = [base, head].find((s) => s?.kind === DiffSourceKind.REF && s.ref.startsWith("gone/"));
+    if (missing) return { ...meta, error: `${missing.ref} does not name a commit in this checkout` };
+    const committedOnly = head?.kind === DiffSourceKind.REF;
+    const uncommittedOnly = base?.kind === DiffSourceKind.STAGED;
+    const generated = (n: number, name: (i: number) => string) => Array.from({ length: n }, (_, i) => ({ path: name(i), oldPath: "", status: "A", added: 1, deleted: 0, binary: false }));
+    const files = generated(this.firstCompareFiles, (i) => `.first/file-${String(i).padStart(4, "0")}.ts`)
+      .concat((detail.files ?? [])
+      .filter((f) => (committedOnly ? !f.uncommitted : uncommittedOnly ? f.uncommitted : true))
+      .map((f) => ({ path: f.path, oldPath: f.oldPath ?? "", status: f.status, added: f.added ?? 0, deleted: f.deleted ?? 0, binary: f.binary ?? false })))
+      .concat(generated(this.extraCompareFiles, (i) => `generated/file-${String(i).padStart(4, "0")}.ts`));
+    return { ...meta, files, totalFiles: files.length, totalAdded: files.reduce((n, f) => n + f.added, 0), totalDeleted: files.reduce((n, f) => n + f.deleted, 0) };
+  }
+
+  /** One file of a comparison: fileDiff's two sides, a ref on the head side being the branch. */
+  compareFile(worktree: string, base: CompareSide, head: CompareSide, file: string, oldPath: string): CompareFileInit {
+    const missing = [base, head].find((s) => s?.kind === DiffSourceKind.REF && s.ref.startsWith("gone/"));
+    if (missing) return { error: `${missing.ref} does not name a commit in this checkout` };
+    const d = this.fileDiff(worktree, file, oldPath, head?.kind === DiffSourceKind.REF ? DiffScope.BRANCH : DiffScope.WORKING);
+    return { old: d.old, new: d.new, status: d.status, error: d.error };
   }
 
   fileDiff(worktree: string, file: string, oldPath: string, scope: DiffScope): DiffInit {

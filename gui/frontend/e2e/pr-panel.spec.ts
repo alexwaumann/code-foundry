@@ -330,9 +330,9 @@ test("panel state is per selection; a thread or worktree on a PR branch enables 
   await expect(tabs(page)).toHaveText(["#145"]);
   await expect(page.getByTestId("pr-title")).toContainText("resize race");
 
-  // The Projects page has its own panel: a worktree row's Changes tab.
+  // The Projects page has its own panel: a worktree row's Diff tab.
   await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-  await expect(tabs(page)).toHaveText(["Changes · code-foundry · feat/sidebar"]);
+  await expect(tabs(page)).toHaveText(["code-foundry · feat/sidebar vs main"]);
 
   // Back on the Pull Requests page, its panel is as it was.
   await page.getByTestId("nav-pullrequests").click();
