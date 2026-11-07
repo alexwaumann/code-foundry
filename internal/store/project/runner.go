@@ -114,6 +114,21 @@ func gitEnv(base []string) []string {
 	)
 }
 
+// guardedKey marks a context for guarded.
+type guardedKey struct{}
+
+// guarded makes every git command run under ctx start less of what a repository's config
+// names: no fsmonitor hook; no lazy fetch, which would run core.sshCommand and reach the
+// network from a read; and no index write from `git diff`, which GIT_OPTIONAL_LOCKS does
+// not stop and which runs a post-index-change hook. For a read a caller asked for, of a
+// checkout that may not be trusted. A context rather than arguments so that it holds for
+// the commands shared with the rest of the store. Without the refresh `git diff` lists a
+// file whose stat alone changed; parseCompareZ has that case. Filters are not covered;
+// docs/notes/diff-viewer-1.md says why.
+func guarded(ctx context.Context) context.Context {
+	return context.WithValue(ctx, guardedKey{}, true)
+}
+
 // killGroup kills process group pgid. A group that is gone is os.ErrProcessDone, which
 // tells exec.Cmd the process ended by itself. So is EPERM: macOS answers that for a group
 // of zombies, and a group git started is the daemon's own to signal.
@@ -145,9 +160,14 @@ func (r ExecRunner) RunInput(ctx context.Context, dir string, stdin []byte, args
 	if bin == "" {
 		bin = "git"
 	}
+	env := gitEnv(os.Environ())
+	if ctx.Value(guardedKey{}) != nil {
+		args = append([]string{"-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"}, args...)
+		env = append(env, "GIT_NO_LAZY_FETCH=1")
+	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir
-	cmd.Env = gitEnv(os.Environ())
+	cmd.Env = env
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	} // else /dev/null
