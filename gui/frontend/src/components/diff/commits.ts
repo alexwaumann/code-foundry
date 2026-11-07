@@ -25,6 +25,14 @@ export function commitsShown(t: Pick<DiffTarget, "hide" | "paths">): boolean {
   return !t.hide?.length && !t.paths?.length;
 }
 
+/** What stands for a commit's subject when it has no message. */
+export const NO_MESSAGE = "(no message)";
+
+/** A commit's subject as the list and the band show it. */
+export function commitSubject(c: Pick<CompareCommitView, "subject">): string {
+  return c.subject || NO_MESSAGE;
+}
+
 /** The sides the list is of: those the tab had before a commit took them. */
 export function listSides(t: Pick<DiffTarget, "base" | "head" | "commit">): { base: CompareSource; head: CompareSource } {
   return t.commit ? { base: t.commit.base, head: t.commit.head } : { base: t.base, head: t.head };
@@ -46,9 +54,9 @@ export function leaveCommit(c: NonNullable<DiffTarget["commit"]>): Partial<DiffT
   return { base: c.base, head: c.head, file: c.file, oldPath: c.oldPath, commit: undefined };
 }
 
-/** How many rows the open list shows in a tab `height` tall: about two fifths of it in the rail. */
+/** How many rows the open list shows in a tab `height` tall: about a third of it, so a short tab keeps some of the files and the code. */
 export function commitRows(count: number, height: number, rail: boolean): number {
-  const fit = rail ? Math.min(RAIL_ROWS, Math.floor((height * 0.4) / COMMIT_ROW_H)) : TOP_ROWS;
+  const fit = Math.min(rail ? RAIL_ROWS : TOP_ROWS, Math.floor(height / 3 / COMMIT_ROW_H));
   return Math.min(count, Math.max(fit, MIN_ROWS));
 }
 

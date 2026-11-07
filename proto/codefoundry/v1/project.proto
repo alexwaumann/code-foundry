@@ -80,6 +80,10 @@ service ProjectService {
   // newest first: the branch being compared. The working tree and the index count as HEAD.
   // Takes the same sources and refusals as CompareWorktree.
   rpc ListCompareCommits(ListCompareCommitsRequest) returns (ListCompareCommitsResponse) {}
+  // GetCompareCommit returns one commit's message under the subject, at most 8 KiB, for the
+  // one commit on screen: a message can be any size, so the list above carries none.
+  // InvalidArgument for anything but a full sha.
+  rpc GetCompareCommit(GetCompareCommitRequest) returns (GetCompareCommitResponse) {}
   // ListRefs returns the refs a worktree can be based on: local branches and
   // remote-tracking branches (origin/<name>), the branch names by recency, plus the
   // default branch.
@@ -707,10 +711,13 @@ message CompareCommit {
   string short_sha = 2;
   // The first parent, which a merge compares against; empty for a root commit.
   string parent = 3;
+  // At most 1 KiB, and empty for a commit with no message.
   string subject = 4;
-  // The message under the subject, at most 8 KiB.
-  string body = 5;
-  google.protobuf.Timestamp authored_at = 6;
+  // Unset when the commit's date cannot be read.
+  google.protobuf.Timestamp authored_at = 5;
+  // No parent because this clone is shallow: git cannot tell that from a root commit, and
+  // `parent` is empty all the same.
+  bool shallow = 6;
 }
 
 message ListCompareCommitsResponse {
@@ -719,6 +726,20 @@ message ListCompareCommitsResponse {
   int32 total = 2;
   // As CompareWorktreeResponse.error. The list is then empty.
   string error = 3;
+}
+
+message GetCompareCommitRequest {
+  string project_id = 1;
+  string path = 2;
+  // A full sha, as ListCompareCommits gives it.
+  string sha = 3;
+}
+
+message GetCompareCommitResponse {
+  // The message under the subject, at most 8 KiB.
+  string body = 1;
+  // Non-empty when the commit is not in this checkout, as CompareWorktreeResponse.error.
+  string error = 2;
 }
 
 // A worktree compared with its base.

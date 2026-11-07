@@ -32,9 +32,10 @@ type Fake struct {
 	// fileDiff is what WorktreeFileDiff returns (SetFileDiff).
 	fileDiff project.WorktreeFileDiff
 	// compare and compareSides are what CompareWorktree and CompareFile return (SetCompare).
-	compare      project.WorktreeCompare
-	compareSides project.CompareSides
-	compareLog   project.CompareLog
+	compare       project.WorktreeCompare
+	compareSides  project.CompareSides
+	compareLog    project.CompareLog
+	commitMessage project.CompareCommitMessage
 	// refs backs ListRefs; nil until SetRefs.
 	refs map[string]project.Refs
 	// live is the last SetLiveWorktrees (activity.go).

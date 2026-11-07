@@ -174,21 +174,49 @@ func TestListCompareCommitsMaps(t *testing.T) {
 	}
 	id := projecttest.ID("/code/proj")
 	at := time.Unix(1000, 0)
-	fake.SetCompareCommits(project.CompareLog{Total: 7, Commits: []project.CompareCommit{{SHA: "s", ShortSHA: "sh", Parent: "p", Subject: "sub", Body: "b", AuthoredAt: at}}})
+	fake.SetCompareCommits(project.CompareLog{Total: 7, Commits: []project.CompareCommit{{SHA: "s", ShortSHA: "sh", Parent: "p", Subject: "sub", AuthoredAt: at}, {SHA: "t", Shallow: true}}})
 	res, err := c.ListCompareCommits(ctx, connect.NewRequest(&v1.ListCompareCommitsRequest{ProjectId: id, Path: "/code/proj",
 		Base: &v1.DiffSource{Kind: v1.DiffSourceKind_DIFF_SOURCE_KIND_REF, Ref: "main"}}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := res.Msg.GetCommits()[0]
-	if res.Msg.GetTotal() != 7 || m.GetSha() != "s" || m.GetShortSha() != "sh" || m.GetParent() != "p" || m.GetSubject() != "sub" || m.GetBody() != "b" || !m.GetAuthoredAt().AsTime().Equal(at) {
+	if res.Msg.GetTotal() != 7 || m.GetSha() != "s" || m.GetShortSha() != "sh" || m.GetParent() != "p" || m.GetSubject() != "sub" || m.GetShallow() || !m.GetAuthoredAt().AsTime().Equal(at) {
 		t.Errorf("response = %v", res.Msg)
+	}
+	// A date that could not be read is no date, not the year 1.
+	if u := res.Msg.GetCommits()[1]; u.GetAuthoredAt() != nil || !u.GetShallow() {
+		t.Errorf("commit = %v", u)
 	}
 	want := fmt.Sprintf("CompareCommits %s /code/proj %d:main %d:", id, project.SourceRef, project.SourceWorkingTree)
 	if !slices.Contains(fake.Calls, want) {
 		t.Errorf("calls = %q, want %q", fake.Calls, want)
 	}
 	if _, err := c.ListCompareCommits(ctx, connect.NewRequest(&v1.ListCompareCommitsRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("no project: %v", err)
+	}
+}
+
+// One commit's message maps as it is, and a refusal keeps its code.
+func TestGetCompareCommitMaps(t *testing.T) {
+	fake, c := newProjectServer(t)
+	ctx := context.Background()
+	if _, err := c.Register(ctx, connect.NewRequest(&v1.RegisterProjectRequest{Path: "/code/proj"})); err != nil {
+		t.Fatal(err)
+	}
+	id := projecttest.ID("/code/proj")
+	fake.SetCompareCommitBody(project.CompareCommitMessage{Body: "why", Error: "gone"})
+	res, err := c.GetCompareCommit(ctx, connect.NewRequest(&v1.GetCompareCommitRequest{ProjectId: id, Path: "/code/proj", Sha: "abc"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Msg.GetBody() != "why" || res.Msg.GetError() != "gone" {
+		t.Errorf("response = %v", res.Msg)
+	}
+	if want := fmt.Sprintf("CompareCommitBody %s /code/proj abc", id); !slices.Contains(fake.Calls, want) {
+		t.Errorf("calls = %q, want %q", fake.Calls, want)
+	}
+	if _, err := c.GetCompareCommit(ctx, connect.NewRequest(&v1.GetCompareCommitRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("no project: %v", err)
 	}
 }

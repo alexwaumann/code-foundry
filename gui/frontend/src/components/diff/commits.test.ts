@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_BASE, DEFAULT_HEAD, EMPTY_TREE, diffOfTab, diffTab, type DiffTarget } from "@/surfaces/diffTarget";
-import { COMMITS_HEADING_H, COMMIT_ROW_H, commitRows, commitSides, commitUrl, commitsHeight, commitsShown, leaveCommit, listSides, viewCommit } from "./commits";
+import { COMMITS_HEADING_H, COMMIT_ROW_H, NO_MESSAGE, commitRows, commitSides, commitSubject, commitUrl, commitsHeight, commitsShown, leaveCommit, listSides, viewCommit } from "./commits";
 
 const target = (o: Partial<DiffTarget> = {}): DiffTarget => ({ project: "web", worktree: "/w", base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "a.ts", oldPath: "", own: true, ...o });
 
@@ -59,19 +59,28 @@ describe("whether the tab shows Commits", () => {
 });
 
 describe("the section's height", () => {
-  it("in the rail, about two fifths of the tab, never more than eight rows or than there are", () => {
+  it("in the rail, about a third of the tab, never more than eight rows or than there are", () => {
     expect(commitRows(100, 900, true)).toBe(8);
-    expect(commitRows(100, 300, true)).toBe(4);
+    expect(commitRows(100, 450, true)).toBe(5);
+    expect(commitRows(100, 250, true)).toBe(2);
     expect(commitRows(3, 900, true)).toBe(3);
   });
   it("on top, three rows at most, and always two when there are", () => {
     expect(commitRows(100, 900, false)).toBe(3);
+    expect(commitRows(100, 250, false)).toBe(2);
     expect(commitRows(100, 100, true)).toBe(2);
     expect(commitRows(1, 100, true)).toBe(1);
   });
   it("folded is its heading; open adds the rows", () => {
     expect(commitsHeight(100, 900, false, false)).toBe(COMMITS_HEADING_H);
     expect(commitsHeight(100, 900, false, true)).toBe(COMMITS_HEADING_H + 3 * COMMIT_ROW_H);
+  });
+});
+
+describe("commitSubject", () => {
+  it("is the subject, or says there is none", () => {
+    expect(commitSubject({ subject: "Fix it" })).toBe("Fix it");
+    expect(commitSubject({ subject: "" })).toBe(NO_MESSAGE);
   });
 });
 

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { CF, mockPost, openApp, openThreadChanges, resetMock, row } from "./fixtures";
 
 /**
@@ -113,6 +113,83 @@ test("Commits sit at the foot of the list, and a long list scrolls inside itself
   await expect(section).toHaveAttribute("data-open", "true");
   expect(await rows.evaluate((e) => e.clientHeight)).toBeLessThanOrEqual(90);
   expect((await file(page).boundingBox())?.height ?? 0).toBeGreaterThan(180);
+});
+
+/** Sizes the window so the Diff tab is `h` tall: what is around it does not change. */
+async function surfaceHeight(page: Page, h: number): Promise<void> {
+  const surface = page.getByTestId("diff-surface");
+  const now = (await surface.boundingBox())?.height ?? 0;
+  const window = page.viewportSize();
+  await page.setViewportSize({ width: window?.width ?? 1440, height: (window?.height ?? 900) + Math.round(h - now) });
+  await expect.poll(async () => Math.round((await surface.boundingBox())?.height ?? 0)).toBe(h);
+}
+
+/** `inner` lies wholly inside `outer`, so it can be seen and pressed. */
+async function within(inner: Locator, outer: Locator): Promise<void> {
+  const a = await inner.boundingBox();
+  const b = await outer.boundingBox();
+  if (!a || !b) throw new Error("no boxes");
+  expect(a.y).toBeGreaterThanOrEqual(b.y - 1);
+  expect(a.y + a.height).toBeLessThanOrEqual(b.y + b.height + 1);
+}
+
+for (const [layout, width] of [["top", 480], ["rail", 760]] as const) {
+  test(`the Commits toggle stays in reach at every height, ${layout}`, async ({ page }) => {
+    await mockPost("compare/commits?count=20");
+    await openDiff(page, width);
+    await expect(list(page)).toHaveAttribute("data-layout", layout);
+    const surface = page.getByTestId("diff-surface");
+    const toggle = page.getByTestId("diff-commits-toggle");
+    const rows = page.getByTestId("diff-commit-rows");
+    for (const h of [600, 500, 432, 400, 350, 300, 250]) {
+      await surfaceHeight(page, h);
+      await within(toggle, surface);
+      await toggle.click();
+      await expect(rows).toBeVisible();
+      await within(toggle, surface);
+      await within(rows, surface);
+      await toggle.click();
+      await expect(rows).toHaveCount(0);
+      await within(toggle, surface);
+    }
+    // Left open as the panel shrinks, which is what `commits=1` keeps: it can still be folded.
+    await surfaceHeight(page, 600);
+    await toggle.click();
+    for (const h of [500, 400, 300, 250]) {
+      await surfaceHeight(page, h);
+      await within(toggle, surface);
+      await within(rows, surface);
+      await within(file(page), surface);
+      // The file's header and some of its code, and in the rail some of the list.
+      expect((await file(page).boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(70);
+      if (layout === "rail") expect((await page.getByTestId("diff-file-rows").boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(60);
+      if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/commits-open-${layout}-${String(h)}.png` });
+    }
+    await toggle.click();
+    await expect(rows).toHaveCount(0);
+  });
+}
+
+test("a long subject leaves the diff in reach, and the band keeps its share of a short tab", async ({ page }) => {
+  await mockPost("compare/commits?count=3&subject=8000");
+  await openDiff(page, 480);
+  await page.getByTestId("diff-commits-toggle").click();
+  await page.getByTestId("commit-subject").first().click();
+  const band = page.getByTestId("diff-commit");
+  await expect(page.getByTestId("diff-commit-body")).toBeVisible();
+  for (const [layout, width] of [["top", 480], ["rail", 760]] as const) {
+    await panelWidth(page, width);
+    await expect(list(page)).toHaveAttribute("data-layout", layout);
+    for (const h of [800, 400, 250]) {
+      await surfaceHeight(page, h);
+      const box = await band.boundingBox();
+      const subject = await page.getByTestId("diff-commit-subject").boundingBox();
+      expect(subject?.height ?? 999).toBeLessThanOrEqual(44);
+      expect(box?.height ?? 999).toBeLessThanOrEqual(h * 0.4 + 1);
+      await within(file(page), page.getByTestId("diff-surface"));
+      if (h > 250) expect((await file(page).boundingBox())?.height ?? 0).toBeGreaterThan(40);
+    }
+  }
 });
 
 test("a click on a commit keeps the rail and the place in the list, and All changes comes back", async ({ page }) => {

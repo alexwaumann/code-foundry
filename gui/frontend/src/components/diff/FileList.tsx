@@ -63,7 +63,8 @@ const renderRow = (r: FileRow) => <FileLine row={r} />;
  * screenful it offers a filter, which stays for as long as it is filtering. The filter and the
  * fold are the tab's (params), so they outlast it showing something else. `current` is the
  * file on screen when it is listed. The list keeps its place by file through live updates.
- * `foot` goes under it, folding away with it.
+ * `foot` goes under it and stays when the list folds: the Commits section's own height can fold
+ * the list, and must not take the section's toggle with it.
  */
 export function FileList({
   view,
@@ -179,7 +180,7 @@ export function FileList({
           )}
         </div>
       </NavProvider>
-      {open && foot}
+      {foot}
     </div>
   );
 }

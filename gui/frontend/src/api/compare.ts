@@ -77,10 +77,19 @@ export interface CompareCommitView {
   shortSha: string;
   /** The first parent, which a merge compares against; "" for a root commit. */
   parent: string;
+  /** At most 1 KiB, and "" for a commit with no message. */
   subject: string;
+  authoredAtMs: number | null;
+  /** No parent only because this clone stops here: it reads as a root, but is not one. */
+  shallow: boolean;
+}
+
+/** ProjectService.GetCompareCommit: what the list leaves out of the commit on screen. */
+export interface CompareCommitMessageView {
   /** The message under the subject; "" without one. */
   body: string;
-  authoredAtMs: number | null;
+  /** Why it could not be read. */
+  error: string;
 }
 
 /** ProjectService.ListCompareCommits as the Diff tab shows it. */
@@ -154,7 +163,7 @@ export async function compareWorktree(t: CompareTarget, paths: readonly string[]
 
 export function toCompareLog(r: ListCompareCommitsResponse): CompareLogView {
   return {
-    commits: r.commits.map((c) => ({ sha: c.sha, shortSha: c.shortSha, parent: c.parent, subject: c.subject, body: c.body, authoredAtMs: c.authoredAt ? timestampMs(c.authoredAt) : null })),
+    commits: r.commits.map((c) => ({ sha: c.sha, shortSha: c.shortSha, parent: c.parent, subject: c.subject, authoredAtMs: c.authoredAt ? timestampMs(c.authoredAt) : null, shallow: c.shallow })),
     total: r.total,
     error: r.error,
   };
@@ -164,6 +173,16 @@ export async function listCompareCommits(t: CompareTarget, conn: DaemonConnectio
   const c = await conn.client(ProjectService);
   try {
     return toCompareLog(await c.listCompareCommits({ projectId: t.projectId, path: t.worktree, base: toSource(t.base), head: toSource(t.head) }, { signal }));
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}
+
+export async function getCompareCommit(t: Pick<CompareTarget, "projectId" | "worktree">, sha: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<CompareCommitMessageView> {
+  const c = await conn.client(ProjectService);
+  try {
+    const res = await c.getCompareCommit({ projectId: t.projectId, path: t.worktree, sha }, { signal });
+    return { body: res.body, error: res.error };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

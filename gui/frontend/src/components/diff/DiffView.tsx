@@ -167,6 +167,8 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
             target.commit
               ? () => {
                   if (target.commit) go(leaveCommit(target.commit));
+                  // Live updates paused for the commit, and its sides are the list's own, so nothing else reads it.
+                  readLog();
                 }
               : undefined
           }
@@ -185,7 +187,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
         <FileEmptyState icon={TriangleAlert} heading="Cannot compare" detail={listView.error} testId="diff-source-missing">
           {refresh}
         </FileEmptyState>
-      ) : view && !current && view.skippedNames === 0 && !inCommit ? (
+      ) : view && !current && view.skippedNames === 0 && !inCommit && commits.length === 0 ? (
         <FileEmptyState icon={GitCompare} heading="No changes" detail={`${compared}.`} testId="diff-empty">
           {refresh}
         </FileEmptyState>
@@ -226,7 +228,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
             />
           )}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {target.commit && <CommitBand sha={target.commit.sha} commit={shownCommit} slug={slug} />}
+            {target.commit && <CommitBand projectId={project} worktree={worktree} sha={target.commit.sha} commit={shownCommit} slug={slug} />}
             {current ? (
               <DiffFile key={current.key} target={compare} row={current} listed={listed} compared={compared} onRefresh={reload} live={!inCommit} />
             ) : !view ? (

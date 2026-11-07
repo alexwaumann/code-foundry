@@ -479,6 +479,7 @@ function routes(router: ConnectRouter): void {
     compareWorktree: (req) => mockFiles.compare(req.path, req.base, req.head),
     getWorktreeCompareFile: (req) => mockFiles.compareFile(req.path, req.base, req.head, req.file, req.oldPath),
     listCompareCommits: (req) => mockFiles.compareCommits(req.path),
+    getCompareCommit: (req) => mockFiles.compareCommitBody(req.path, req.sha),
     watch: (_req, ctx) => tracked("ProjectService/Watch", world.projectEvents.subscribe(ctx.signal)),
   });
 
@@ -1869,6 +1870,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/compare/commits":
       mockFiles.extraCompareCommits = Number(q.get("count") ?? "0");
+      mockFiles.longCommitSubject = Number(q.get("subject") ?? "0");
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/fs/write":

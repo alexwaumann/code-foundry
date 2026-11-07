@@ -11,16 +11,16 @@ describe("toCompareLog", () => {
     const v = toCompareLog(
       create(ListCompareCommitsResponseSchema, {
         commits: [
-          create(CompareCommitSchema, { sha: "s", shortSha: "sh", parent: "p", subject: "sub", body: "b", authoredAt: timestampFromMs(5000) }),
-          create(CompareCommitSchema, { sha: "r", shortSha: "r", subject: "root" }),
+          create(CompareCommitSchema, { sha: "s", shortSha: "sh", parent: "p", subject: "sub", authoredAt: timestampFromMs(5000) }),
+          create(CompareCommitSchema, { sha: "r", shortSha: "r", subject: "root", shallow: true }),
         ],
         total: 9,
       }),
     );
     expect(v).toEqual({
       commits: [
-        { sha: "s", shortSha: "sh", parent: "p", subject: "sub", body: "b", authoredAtMs: 5000 },
-        { sha: "r", shortSha: "r", parent: "", subject: "root", body: "", authoredAtMs: null },
+        { sha: "s", shortSha: "sh", parent: "p", subject: "sub", authoredAtMs: 5000, shallow: false },
+        { sha: "r", shortSha: "r", parent: "", subject: "root", authoredAtMs: null, shallow: true },
       ],
       total: 9,
       error: "",

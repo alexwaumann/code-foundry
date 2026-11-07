@@ -127,7 +127,9 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     const fresh = diffTab(asked);
     const open = allTabs(getPanel(key)).find((t) => t.id === fresh.id);
     const was = open && !p.thread ? diffOfTab(open) : null;
-    if (open && was) return openDiffInPanel(key, { ...was, own: asked.own, ...(asked.file ? { file: asked.file, oldPath: asked.oldPath } : {}) }, open.title);
+    // The file was found in the sides the tab came from, not in a commit the user was looking at.
+    const back = was?.commit && asked.file ? { base: was.commit.base, head: was.commit.head, commit: undefined } : {};
+    if (open && was) return openDiffInPanel(key, { ...was, ...back, own: asked.own, ...(asked.file ? { file: asked.file, oldPath: asked.oldPath } : {}) }, open.title);
     return openDiffInPanel(key, asked);
   }),
   // view.panel.pr: params slug and number.

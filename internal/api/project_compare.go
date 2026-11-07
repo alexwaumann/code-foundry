@@ -128,7 +128,23 @@ func (h *Project) ListCompareCommits(ctx context.Context, req *connect.Request[v
 	}
 	commits := make([]*v1.CompareCommit, len(l.Commits))
 	for i, c := range l.Commits {
-		commits[i] = &v1.CompareCommit{Sha: c.SHA, ShortSha: c.ShortSHA, Parent: c.Parent, Subject: c.Subject, Body: c.Body, AuthoredAt: timestamppb.New(c.AuthoredAt)}
+		commits[i] = &v1.CompareCommit{Sha: c.SHA, ShortSha: c.ShortSHA, Parent: c.Parent, Subject: c.Subject, Shallow: c.Shallow}
+		if !c.AuthoredAt.IsZero() {
+			commits[i].AuthoredAt = timestamppb.New(c.AuthoredAt)
+		}
 	}
 	return connect.NewResponse(&v1.ListCompareCommitsResponse{Commits: commits, Total: int32(l.Total), Error: l.Error}), nil
+}
+
+// GetCompareCommit returns the message of the one commit on screen.
+func (h *Project) GetCompareCommit(ctx context.Context, req *connect.Request[v1.GetCompareCommitRequest]) (*connect.Response[v1.GetCompareCommitResponse], error) {
+	m := req.Msg
+	if m.GetProjectId() == "" || m.GetPath() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("project_id and path are required"))
+	}
+	c, err := h.store.CompareCommitBody(ctx, project.CompareCommitRequest{ProjectID: m.GetProjectId(), Path: m.GetPath(), SHA: m.GetSha()})
+	if err != nil {
+		return nil, readError(ctx, err)
+	}
+	return connect.NewResponse(&v1.GetCompareCommitResponse{Body: c.Body, Error: c.Error}), nil
 }

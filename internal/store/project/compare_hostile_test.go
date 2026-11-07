@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -546,6 +547,20 @@ func (r *auditRunner) Run(ctx context.Context, dir string, args ...string) ([]by
 	return r.ExecRunner.Run(ctx, dir, args...)
 }
 
+// RunStream audits a stream as Run does a read: otherwise the embedded ExecRunner's would pass
+// unseen.
+func (r *auditRunner) RunStream(ctx context.Context, dir string, stdout io.Writer, args ...string) error {
+	if ctx.Value(auditKey{}) != nil {
+		r.mu.Lock()
+		r.seen++
+		if ctx.Value(guardedKey{}) == nil {
+			r.unguarded = append(r.unguarded, strings.Join(args, " "))
+		}
+		r.mu.Unlock()
+	}
+	return r.ExecRunner.RunStream(ctx, dir, stdout, args...)
+}
+
 // TestCompareEveryCommandGuarded: every git command of the compare path, from the base
 // lookup to a submodule's HEAD, runs guarded.
 func TestCompareEveryCommandGuarded(t *testing.T) {
@@ -569,7 +584,14 @@ func TestCompareEveryCommandGuarded(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if _, err := f.h.store.CompareCommits(ctx, CompareCommitsRequest{ProjectID: f.id, Path: f.path, Base: a, Head: b}); err != nil {
+				t.Fatal(err)
+			}
 		}
+	}
+	sha := strings.TrimSpace(git(t, f.path, "rev-parse", "HEAD"))
+	if _, err := f.h.store.CompareCommitBody(ctx, CompareCommitRequest{ProjectID: f.id, Path: f.path, SHA: sha}); err != nil {
+		t.Fatal(err)
 	}
 	audit.mu.Lock()
 	defer audit.mu.Unlock()

@@ -24,6 +24,9 @@ const api = vi.hoisted(() => ({
   reads: [] as string[],
   log: null as Partial<CompareLogView> | Error | null,
   logs: [] as string[],
+  /** What ProjectService.GetCompareCommit answers, by sha. */
+  bodies: new Map<string, string | Error>(),
+  bodyReads: [] as string[],
   urls: [] as string[],
   width: 900,
   height: 800,
@@ -56,6 +59,11 @@ vi.mock("@/api/compare", () => ({
     api.logs.push(`${sourceParam(t.base)} ${sourceParam(t.head)}`);
     if (api.log instanceof Error) return Promise.reject(api.log);
     return Promise.resolve({ commits: [], total: 0, error: "", ...api.log });
+  },
+  getCompareCommit: (_t: CompareTarget, sha: string) => {
+    api.bodyReads.push(sha);
+    const body = api.bodies.get(sha) ?? "";
+    return body instanceof Error ? Promise.reject(body) : Promise.resolve({ body, error: "" });
   },
   getCompareFile: (_t: CompareTarget, file: string) => {
     api.reads.push(file);
@@ -140,6 +148,8 @@ beforeEach(() => {
   api.reads.length = 0;
   api.log = null;
   api.logs.length = 0;
+  api.bodies.clear();
+  api.bodyReads.length = 0;
   api.urls.length = 0;
   api.width = 900;
   api.height = 800;
@@ -961,9 +971,10 @@ describe("what a thread asked for", () => {
 
 describe("the Commits section", () => {
   const SHA = (c: string) => c.repeat(40);
-  const commit = (c: string, parent: string, o: Partial<CompareCommitView> = {}): CompareCommitView => ({ sha: SHA(c), shortSha: c.repeat(7), parent, subject: `subject ${c}`, body: "", authoredAtMs: 1000, ...o });
+  const commit = (c: string, parent: string, o: Partial<CompareCommitView> = {}): CompareCommitView => ({ sha: SHA(c), shortSha: c.repeat(7), parent, subject: `subject ${c}`, authoredAtMs: 1000, shallow: false, ...o });
   const branch = (o: Partial<CompareLogView> = {}) => {
-    const commits = [commit("c", SHA("b"), { body: "Why it changed.\n\nMore." }), commit("b", SHA("a")), commit("a", "")];
+    const commits = [commit("c", SHA("b")), commit("b", SHA("a")), commit("a", "")];
+    api.bodies.set(SHA("c"), "Why it changed.\n\nMore.");
     api.log = { commits, total: commits.length, ...o };
   };
   const toggle = () => screen.getByTestId("diff-commits-toggle");
@@ -1031,10 +1042,127 @@ describe("the Commits section", () => {
     expect(api.compares.at(-1)).toBe(`ref:${SHA("b")} ref:${SHA("c")}`);
     expect(screen.getByTestId("diff-commit-subject").textContent).toBe("subject c");
     expect(screen.getByTestId("diff-commit-sha").textContent).toBe("ccccccc");
-    expect(screen.getByTestId("diff-commit-body").textContent).toBe("Why it changed.\n\nMore.");
-    // The list stays the branch's, read no more than it was, with the commit marked.
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-commit-body").textContent).toBe("Why it changed.\n\nMore.");
+    });
+    // The message is read for this commit alone; the list stays the branch's, read no more than it was, with the commit marked.
+    expect(api.bodyReads).toEqual([SHA("c")]);
     expect(api.logs).toEqual(["merge-base working"]);
     expect(commitRow("c").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("a message that cannot be read leaves the rest of the band", async () => {
+    list([file("a.ts")]);
+    branch();
+    api.bodies.set(SHA("c"), new Error("outdated"));
+    await open();
+    fireEvent.click(commitRow("c"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-commit-subject").textContent).toBe("subject c");
+    });
+    await settled();
+    expect(screen.queryByTestId("diff-commit-body")).toBeNull();
+  });
+
+  it("a commit with no message says so, in the list and the band, and one with no date shows none", async () => {
+    list([file("a.ts")]);
+    api.log = { commits: [commit("c", SHA("b"), { subject: "", authoredAtMs: null })], total: 1 };
+    await open();
+    expect(screen.getByTestId("commit-subject").textContent).toBe("(no message)");
+    fireEvent.click(commitRow("c"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-commit-subject").textContent).toBe("(no message)");
+    });
+    await settled();
+    expect(screen.getByTestId("diff-commit").textContent).not.toContain("ago");
+  });
+
+  it("a shallow clone's last commit says it is not a root", async () => {
+    list([file("a.ts")]);
+    api.log = { commits: [commit("c", "", { shallow: true }), commit("b", "")], total: 2 };
+    await open();
+    fireEvent.click(commitRow("c"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-commit-shallow").textContent).toContain("every file reads as added");
+    });
+    fireEvent.click(commitRow("b"));
+    await waitFor(() => {
+      expect(tabNow()?.params.commit).toBe(SHA("b"));
+    });
+    await settled();
+    expect(screen.queryByTestId("diff-commit-shallow")).toBeNull();
+  });
+
+  it.each([
+    ["the list on top, folded by its height", 400, 300],
+    ["the list on top, with room", 400, 800],
+    ["the rail", 900, 300],
+  ])("the toggle stays whatever the section's height does to the list: %s", async (_name, width, height) => {
+    list([file("a.ts"), file("b.ts"), file("c.ts")]);
+    branch();
+    api.width = width;
+    api.height = height;
+    await show();
+    fireEvent.click(toggle());
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-commit-rows")).toBeTruthy();
+    });
+    expect(tabNow()?.params.commits).toBe("1");
+    fireEvent.click(toggle());
+    await waitFor(() => {
+      expect(screen.queryByTestId("diff-commit-rows")).toBeNull();
+    });
+    expect(toggle()).toBeTruthy();
+  });
+
+  it("a tab reopened on a short panel with the section open still has it", async () => {
+    list([file("a.ts"), file("b.ts"), file("c.ts")]);
+    branch();
+    api.width = 400;
+    api.height = 300;
+    await open();
+    expect(toggle().getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByTestId("diff-commit-rows")).toBeTruthy();
+  });
+
+  it("a branch that nets to nothing keeps its commits, and the diff's place says so", async () => {
+    list([]);
+    branch();
+    await show();
+    expect(screen.getByTestId("diff-commits-count").textContent).toBe("3");
+    expect(screen.getByTestId("diff-file-list")).toBeTruthy();
+    expect(screen.getByTestId("diff-empty")).toBeTruthy();
+    fireEvent.click(toggle());
+    await waitFor(() => {
+      expect(commitRow("c")).toBeTruthy();
+    });
+    fireEvent.click(commitRow("c"));
+    await waitFor(() => {
+      expect(tabNow()?.params.commit).toBe(SHA("c"));
+    });
+  });
+
+  it("with no commits either, the whole tab says there are no changes", async () => {
+    list([]);
+    await show();
+    expect(screen.getByTestId("diff-empty")).toBeTruthy();
+    expect(screen.queryByTestId("diff-file-list")).toBeNull();
+  });
+
+  it("All changes reads the list again: it paused with the commit", async () => {
+    list([file("a.ts")]);
+    branch();
+    await open();
+    fireEvent.click(commitRow("c"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-all-changes")).toBeTruthy();
+    });
+    await settled();
+    expect(api.logs).toEqual(["merge-base working"]);
+    fireEvent.click(screen.getByTestId("diff-all-changes"));
+    await waitFor(() => {
+      expect(api.logs).toEqual(["merge-base working", "merge-base working"]);
+    });
   });
 
   it("a root commit compares against the empty tree; a commit with no message under the subject shows none", async () => {
@@ -1046,6 +1174,7 @@ describe("the Commits section", () => {
       expect(tabNow()?.params.base).toBe(`ref:${EMPTY_TREE}`);
     });
     await settled();
+    expect(api.bodyReads).toEqual([SHA("a")]);
     expect(screen.queryByTestId("diff-commit-body")).toBeNull();
   });
 
@@ -1189,17 +1318,18 @@ describe("the Commits section", () => {
     });
   });
 
-  it("folds away with the list on top, and takes its height from the code's share", async () => {
+  it("stays when the list on top is folded by hand", async () => {
     api.width = 400;
     api.height = 800;
     list(Array.from({ length: 10 }, (_, i) => file(`f${String(i)}.ts`)));
     branch();
     await show();
-    expect(screen.getByTestId("diff-commits")).toBeTruthy();
+    expect(screen.getByTestId("diff-file-rows")).toBeTruthy();
     fireEvent.click(screen.getByTestId("diff-fold"));
     await waitFor(() => {
-      expect(screen.queryByTestId("diff-commits")).toBeNull();
+      expect(screen.queryByTestId("diff-file-rows")).toBeNull();
     });
+    expect(screen.getByTestId("diff-commits")).toBeTruthy();
   });
 });
 

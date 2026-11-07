@@ -3,17 +3,18 @@ import { ChevronRight } from "lucide-react";
 import type { CompareCommitView, CompareLogView } from "@/api/compare";
 import { Age } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { COMMIT_ROW_H, COMMITS_HEADING_H, commitRows } from "./commits";
+import { COMMIT_ROW_H, COMMITS_HEADING_H, commitRows, commitSubject } from "./commits";
 
 /** A commit: its subject, cut short, then its short sha and age. */
 function CommitLine({ c }: { c: CompareCommitView }) {
   return (
-    <NavRow navKey={`c:${c.sha}`} activateOnClick tip={c.subject} tipWhenTruncated className="flex h-full min-w-0 items-center gap-2 px-1.5 text-body-sm">
+    <NavRow navKey={`c:${c.sha}`} activateOnClick tip={commitSubject(c)} tipWhenTruncated className="flex h-full min-w-0 items-center gap-2 px-1.5 text-body-sm">
       <span className="min-w-0 flex-1 truncate" data-testid="commit-subject">
-        {c.subject}
+        {commitSubject(c)}
       </span>
       <span className="shrink-0 font-mono text-caption-sm" data-testid="commit-sha">
         {c.shortSha}
@@ -49,24 +50,15 @@ export function CommitList({ log, current, open, onOpen, onPick, rail, height }:
   }, [current, setCursor]);
   const rows = commitRows(log.commits.length, height, rail);
   return (
-    <section className="shrink-0 border-t border-cf-divider" data-testid="diff-commits" data-open={open}>
-      <button
-        type="button"
-        aria-expanded={open}
-        className="flex w-full items-center gap-1.5 px-3 text-body-sm hover:bg-cf-control-hover/50"
-        style={{ height: COMMITS_HEADING_H }}
-        data-testid="diff-commits-toggle"
-        onClick={() => {
-          onOpen(!open);
-        }}
-      >
+    <Collapsible open={open} onOpenChange={onOpen} className="shrink-0 border-t border-cf-divider" data-testid="diff-commits" data-open={open}>
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 text-body-sm hover:bg-cf-control-hover/50" style={{ height: COMMITS_HEADING_H }} data-testid="diff-commits-toggle">
         <ChevronRight className={cn("size-3.5 shrink-0 text-cf-text-muted transition-transform", open && "rotate-90")} aria-hidden />
         Commits
         <span className="ml-auto text-caption tabular-nums" data-testid="diff-commits-count">
           {log.total}
         </span>
-      </button>
-      {open && (
+      </CollapsibleTrigger>
+      <CollapsibleContent>
         <NavProvider value={nav.ctx}>
           <div tabIndex={0} role="listbox" aria-label="Commits" aria-activedescendant={nav.activeDescendant} className="px-1.5 pb-1 outline-none" onKeyDown={nav.onKeyDown}>
             <RowList rows={log.commits} rowKey={rowKey} rowHeight={COMMIT_ROW_H} render={renderRow} capped keepPlace maxHeight={rows * COMMIT_ROW_H} testId="diff-commit-rows" />
@@ -77,7 +69,7 @@ export function CommitList({ log, current, open, onOpen, onPick, rail, height }:
             </p>
           )}
         </NavProvider>
-      )}
-    </section>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

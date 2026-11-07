@@ -356,11 +356,14 @@ export class MockFiles {
   firstCompareFiles = 0;
   /** POST /__mock/compare/commits?count=N: this many more commits on every list, older than the worktree's own. */
   extraCompareCommits = 0;
+  /** Characters of the newest commit's subject, past its own, to see a long message (its body grows too). */
+  longCommitSubject = 0;
 
   reset(): void {
     this.extraCompareFiles = 0;
     this.firstCompareFiles = 0;
     this.extraCompareCommits = 0;
+    this.longCommitSubject = 0;
     this.links.clear();
     this.disk = fixtures();
     this.refusal = null;
@@ -543,13 +546,24 @@ export class MockFiles {
 
   /** The commits of a comparison: the worktree's log whatever the sides, each the next one's child; the last is a root. */
   compareCommits(worktree: string): CompareLogInit {
+    const log = this.compareLog(worktree);
+    this.calls.push(`compareCommits ${worktree}`);
+    const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: i === 0 ? `${e.subject ?? ""}${" long".repeat(this.longCommitSubject / 5)}` : e.subject, authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
+    return { commits, total: commits.length };
+  }
+
+  /** The worktree's log and the older commits asked for. */
+  private compareLog(worktree: string) {
     const detail = this.detailOf(worktree);
     if (!detail) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
     const older = Array.from({ length: this.extraCompareCommits }, (_, i) => ({ sha: `e${String(i).padStart(39, "0")}`, shortSha: `e${String(i).padStart(6, "0")}`, subject: `Older commit ${String(i).padStart(4, "0")}`, authoredAt: timestampFromMs(Date.now() - (i + 1) * 3_600_000) }));
-    const log = [...(detail.log ?? []), ...older];
-    this.calls.push(`compareCommits ${worktree}`);
-    const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: e.subject, body: i === 0 ? "Why it changed, in a few words.\n\nA second paragraph." : "", authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
-    return { commits, total: commits.length };
+    return [...(detail.log ?? []), ...older];
+  }
+
+  /** The message under a commit's subject: the newest commit has one. */
+  compareCommitBody(worktree: string, sha: string): { body: string; error: string } {
+    const body = "Why it changed, in a few words.\n\nA second paragraph.";
+    return { body: this.compareLog(worktree)[0]?.sha === sha ? (this.longCommitSubject ? `${body}\n`.repeat(20) : body) : "", error: "" };
   }
 
   /** One file of a comparison: fileDiff's two sides, a ref on the head side being the branch. */

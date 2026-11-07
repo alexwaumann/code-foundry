@@ -326,6 +326,17 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", head: "staged", filter: "go", fold: "1", path: "src/main.go" });
     });
 
+    it("panel.diff picking a file leaves a commit the user was in, and a call with no file does not", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      const own = tabIds("thread:b")[0] ?? "";
+      const inCommit = { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:p1", head: "ref:c1", path: "other.go", commit: "c1", backBase: "merge-base", backHead: "staged", backPath: "was.go", commits: "1" };
+      setPanelTabParams("thread:b", own, inCommit);
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      expect(active("thread:b")?.params).toEqual(inCommit);
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go" });
+      expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", head: "staged", path: "src/main.go", commits: "1" });
+    });
+
     it("panel.diff with no path opens the checkout's tab; without a checkout, nothing", () => {
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       expect(active("thread:b")).toMatchObject({ kind: "diff", params: { project: "web", worktree: WEB_FEAT } });

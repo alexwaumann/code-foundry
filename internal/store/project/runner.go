@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -22,6 +23,50 @@ type Runner interface {
 // InputRunner is a Runner that can feed git's stdin. ExecRunner is one.
 type InputRunner interface {
 	RunInput(ctx context.Context, dir string, stdin []byte, args ...string) ([]byte, error)
+}
+
+// StreamRunner is a Runner that hands git's stdout to a writer as it arrives, for output too
+// big to hold. ExecRunner is one; runFields takes any Runner.
+type StreamRunner interface {
+	RunStream(ctx context.Context, dir string, stdout io.Writer, args ...string) error
+}
+
+// fieldWriter keeps the first max bytes of each NUL-ended field of what it is given, and the
+// NULs. What it holds is bounded by the number of fields, however long one is.
+type fieldWriter struct {
+	buf bytes.Buffer
+	max int
+	n   int // bytes kept of the field being written
+}
+
+// Write implements io.Writer.
+func (w *fieldWriter) Write(p []byte) (int, error) {
+	total := len(p)
+	for len(p) > 0 {
+		field, rest, ended := bytes.Cut(p, []byte{0})
+		keep := min(len(field), w.max-w.n)
+		w.buf.Write(field[:keep])
+		w.n += keep
+		if ended {
+			w.buf.WriteByte(0)
+			w.n = 0
+		}
+		p = rest
+	}
+	return total, nil
+}
+
+// runFields runs `git <args>` in dir through r and returns stdout, each NUL-ended field cut at
+// max bytes as it arrives, so one huge field never sits in the daemon's memory.
+func runFields(ctx context.Context, r Runner, dir string, limit int, args ...string) ([]byte, error) {
+	w := &fieldWriter{max: limit}
+	if sr, ok := r.(StreamRunner); ok {
+		err := sr.RunStream(ctx, dir, w, args...)
+		return w.buf.Bytes(), err
+	}
+	out, err := r.Run(ctx, dir, args...)
+	_, _ = w.Write(out)
+	return w.buf.Bytes(), err
 }
 
 // runInput runs `git <args>` in dir with stdin through r, which must be an InputRunner.
@@ -147,6 +192,21 @@ func (r ExecRunner) Run(ctx context.Context, dir string, args ...string) ([]byte
 
 // RunInput implements InputRunner: Run with stdin (nil means /dev/null).
 func (r ExecRunner) RunInput(ctx context.Context, dir string, stdin []byte, args ...string) ([]byte, error) {
+	var stdout bytes.Buffer
+	err := r.exec(ctx, dir, stdin, &stdout, args...)
+	if err == nil {
+		return stdout.Bytes(), nil
+	}
+	return stdout.Bytes(), err
+}
+
+// RunStream implements StreamRunner.
+func (r ExecRunner) RunStream(ctx context.Context, dir string, stdout io.Writer, args ...string) error {
+	return r.exec(ctx, dir, nil, stdout, args...)
+}
+
+// exec runs `git <args>` in dir, stdout going to stdout as it arrives.
+func (r ExecRunner) exec(ctx context.Context, dir string, stdin []byte, stdout io.Writer, args ...string) error {
 	if _, ok := ctx.Deadline(); !ok {
 		timeout := r.Timeout
 		if timeout <= 0 {
@@ -180,12 +240,12 @@ func (r ExecRunner) RunInput(ctx context.Context, dir string, stdin []byte, args
 	cmd.Cancel = func() error { return killGroup(cmd.Process.Pid) }
 	// Children that left the group can still hold the pipes open.
 	cmd.WaitDelay = 2 * time.Second
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
+	var stderr bytes.Buffer
+	cmd.Stdout = stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err == nil {
-		return stdout.Bytes(), nil
+		return nil
 	}
 	ge := &GitError{Dir: dir, Args: args, ExitCode: -1, Stderr: stderr.String(), Err: err}
 	var exitErr *exec.ExitError
@@ -195,5 +255,5 @@ func (r ExecRunner) RunInput(ctx context.Context, dir string, stdin []byte, args
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		ge.Err = fmt.Errorf("%w: %w", ctxErr, err)
 	}
-	return stdout.Bytes(), ge
+	return ge
 }

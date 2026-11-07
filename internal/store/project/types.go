@@ -372,6 +372,10 @@ type Store interface {
 	// CompareCommits lists the commits a comparison's head has and its base does not, with
 	// CompareWorktree's refusals (compare_commits.go).
 	CompareCommits(ctx context.Context, req CompareCommitsRequest) (CompareLog, error)
+	// CompareCommitBody returns one commit's message under its subject, which the list
+	// leaves out. ErrInvalidArgument for anything but a full sha; a sha that names no commit
+	// here is CompareCommitMessage.Error.
+	CompareCommitBody(ctx context.Context, req CompareCommitRequest) (CompareCommitMessage, error)
 	// InitGit makes a project without git a git repository (`git init -b <default>`
 	// and an empty "chore: initial commit") and refreshes it, returning the git project.
 	// ErrFailedPrecondition when it already is one.
