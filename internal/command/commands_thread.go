@@ -179,7 +179,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				// Past the message's own item: the status of the turn before it (still
 				// "finished" until the new turn's busy is published) does not count.
-				return waitThread(ctx, b, id, "settled", item.GetId(), limit, sent+"; ")
+				return waitThread(ctx, b, id, "settled", item.GetId(), limit, sent+"; ", a.String("by"))
 			},
 		},
 		threadCompact(b, idArg),

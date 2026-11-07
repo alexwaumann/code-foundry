@@ -308,6 +308,8 @@ type Thread struct {
 	// Report is the thread's latest report (Store.Report); the zero value when none.
 	// Persisted.
 	Report Report
+	// Asked is its latest question to its creator (ask.go); nil for none. Not persisted.
+	Asked *ThreadAsked
 	// BudgetUSD is the spending limit (0 = none); BudgetHitUSD the budget value the
 	// budget stop last fired for (0 = armed; budget.go). Persisted.
 	BudgetUSD    float64
@@ -700,6 +702,9 @@ type Store interface {
 	// Report replaces the thread's report (status required; summary and data
 	// validated), stamped with now. Any state.
 	Report(ctx context.Context, id string, r Report) (Thread, error)
+	// Ask sends id's question to the thread that created it, which it does not wait on
+	// (ask.go). It answers the creator and whether the same question was just sent.
+	Ask(ctx context.Context, id, question, assuming string) (Thread, bool, error)
 	// SetBudget sets the thread's spending limit (0 clears it). A budget above the
 	// thread's cost re-arms the budget stop (budget.go). Any state.
 	SetBudget(ctx context.Context, id string, usd float64) (Thread, error)

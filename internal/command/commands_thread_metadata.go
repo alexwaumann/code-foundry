@@ -24,6 +24,7 @@ import (
 type MetadataBackend interface {
 	Label(context.Context, *connect.Request[v1.LabelThreadRequest]) (*connect.Response[v1.LabelThreadResponse], error)
 	Report(context.Context, *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error)
+	Ask(context.Context, *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error)
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
 }
 
@@ -275,6 +276,36 @@ func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 				msg += ": " + s.GetReportSummary()
 			}
 			return Result{Message: msg, JSON: s}, nil
+		},
+	}
+}
+
+func threadAskCmd(b ThreadBackend, idArg ArgSpec) Command {
+	return Command{
+		Name:      "thread.ask",
+		NoPalette: true,
+		Title:     "Ask the Thread That Created This One",
+		Description: "Ask the thread that created this one something and keep working: it gets a wake at once and answers " +
+			"with thread send, which arrives at your next tool call. --assuming says what you do until then. " +
+			"To stop until you have the answer, use your question tool instead.",
+		Category:     "Thread",
+		NoKeybinding: true,
+		Args: []ArgSpec{
+			idArg,
+			{Name: "question", Type: String, Required: true, Positional: true, Description: "What you need to know, in at most 4000 characters"},
+			{Name: "assuming", Type: String, Required: true, Description: "What you do until an answer comes, in at most 4000 characters"},
+		},
+		When: hasThread,
+		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			res, err := b.Ask(ctx, connect.NewRequest(&v1.AskThreadRequest{Id: a.String("id"), Question: a.String("question"), Assuming: a.String("assuming")}))
+			if err != nil {
+				return Result{}, err
+			}
+			msg := "asked thread " + threadLabel(res.Msg.GetCreator()) + "; keep working, its answer arrives at your next tool call"
+			if res.Msg.GetRepeated() {
+				msg = "you just asked thread " + threadLabel(res.Msg.GetCreator()) + " that; nothing was sent"
+			}
+			return Result{Message: msg, JSON: res.Msg.GetCreator()}, nil
 		},
 	}
 }

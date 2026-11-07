@@ -68,7 +68,10 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-found
 const CreatedThreadPrompt = "Another thread created this one. The last message of each of your turns reaches it whole, " +
 	"with your branch, push state and diffstat read from git, so end each turn with what you did and how you checked it, " +
 	"caveats first, and do not repeat the task. If you are blocked or failed, first run " +
-	"`code-foundry thread report blocked \"why\"` (or `failed`)."
+	"`code-foundry thread report blocked \"why\"` (or `failed`). " +
+	"A decision that would change the work and is not yours to make: " +
+	"`code-foundry thread ask \"question\" --assuming \"what you do until an answer comes\"`, then keep working; " +
+	"its answer arrives as a message at your next tool call. Do not ask about what you can settle yourself."
 
 // ownAppend is the part of s's system prompt that is its own: CreatedThreadPrompt for a
 // created thread, then Thread.SystemPromptAppend.

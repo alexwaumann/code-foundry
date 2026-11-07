@@ -117,6 +117,9 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if note != "" {
 		prompt = note + "\n\n" + prompt
 	}
+	if from := m.senderNote(s, msg); from != "" {
+		prompt = from + "\n\n" + prompt
+	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
 		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), note: note, resume: resume, itemID: written, compact: msg.compact}
 	m.nameFromFirstMessage(id, log, o)

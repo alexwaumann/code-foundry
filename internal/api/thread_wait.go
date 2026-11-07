@@ -57,6 +57,7 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 		itemsC = nil
 	}
 	var dropped, itemsDropped uint64
+	by, since := req.Msg.GetByThreadId(), time.Now()
 	for {
 		p := threadToProto(cur)
 		if reacted && threadWaitMet(until, cur) {
@@ -101,12 +102,20 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 				if cur, ok = h.store.Snapshot().Thread(id); !ok {
 					return h.waitGone(id, "was removed")
 				}
+				for _, t := range h.store.Snapshot().Threads {
+					if asked := askedOf(t, by, since); asked != nil {
+						return connect.NewResponse(&v1.WaitThreadResponse{Thread: threadToProto(cur), Asked: asked}), nil
+					}
+				}
 				continue
 			}
 			switch e := ev.(type) {
 			case thread.Updated:
 				if e.Thread.ID == id {
 					cur = e.Thread
+				}
+				if asked := askedOf(e.Thread, by, since); asked != nil {
+					return connect.NewResponse(&v1.WaitThreadResponse{Thread: threadToProto(cur), Asked: asked}), nil
 				}
 			case thread.Removed:
 				if e.ID == id {
@@ -115,6 +124,15 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 			}
 		}
 	}
+}
+
+// askedOf is t's question to by asked after since, nil for none. A wait by t's creator ends
+// on it: the wake is queued behind the very call that waits.
+func askedOf(t thread.Thread, by string, since time.Time) *v1.ThreadAsk {
+	if by == "" || t.CreatedBy != by || t.Asked == nil || !t.Asked.At.After(since) {
+		return nil
+	}
+	return &v1.ThreadAsk{Id: t.ID, Name: t.Name, Question: t.Asked.Question, Assuming: t.Asked.Assuming}
 }
 
 // answeredRequest reports whether t's status is a request that is no longer pending:

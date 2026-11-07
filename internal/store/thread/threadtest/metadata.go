@@ -79,6 +79,18 @@ func (f *Fake) Report(_ context.Context, id string, r thread.Report) (thread.Thr
 	})
 }
 
+// Ask records "Ask <id>" and answers id's creator.
+func (f *Fake) Ask(_ context.Context, id, _, _ string) (thread.Thread, bool, error) {
+	var creator string
+	if _, err := f.mutate("Ask "+id, id, func(s *thread.Thread) error {
+		creator = s.CreatedBy
+		return nil
+	}); err != nil {
+		return thread.Thread{}, false, err
+	}
+	return thread.Thread{ID: creator}, false, nil
+}
+
 // SetBudget records "SetBudget <id> <usd>" and sets BudgetUSD, re-arming the stop
 // (BudgetHitUSD 0) when the budget is 0 or above the thread's cost, like the store.
 func (f *Fake) SetBudget(_ context.Context, id string, usd float64) (thread.Thread, error) {
