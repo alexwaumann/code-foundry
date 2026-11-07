@@ -12,10 +12,10 @@ import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
 /**
  * The File and Diff tabs' header ("header A", docs/notes/file-viewer-3-tabs.md): row one
  * is the file's icon, name and directory (the full path in a tooltip: the row shows it
- * relative, or cut from the left) with the actions at the right; row two is the tab's
- * mode switches and meta. The library's own file header stays off.
+ * relative, or cut from the left) with the actions at the right; row two, when given, is
+ * the tab's mode switches and meta. The library's own file header stays off.
  */
-export function FileHeader({ icon: Icon, name, dir, fullPath, actions, children }: { icon: LucideIcon; name: string; dir: string; fullPath: string; actions: ReactNode; children: ReactNode }) {
+export function FileHeader({ icon: Icon, name, dir, fullPath, actions, children }: { icon: LucideIcon; name: string; dir: string; fullPath: string; actions: ReactNode; children?: ReactNode }) {
   return (
     <header className="flex shrink-0 flex-col gap-1 border-b border-cf-divider px-3 pt-2 pb-1.5" data-testid="file-header">
       <div className="flex h-7 min-w-0 items-center gap-2">
@@ -33,9 +33,11 @@ export function FileHeader({ icon: Icon, name, dir, fullPath, actions, children 
         </Tip>
         <div className="ml-auto flex shrink-0 items-center gap-0.5">{actions}</div>
       </div>
-      <div className="flex h-7 min-w-0 items-center gap-2" data-testid="file-header-bar">
-        {children}
-      </div>
+      {children && (
+        <div className="flex h-7 min-w-0 items-center gap-2" data-testid="file-header-bar">
+          {children}
+        </div>
+      )}
     </header>
   );
 }

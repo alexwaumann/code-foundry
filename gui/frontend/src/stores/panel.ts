@@ -603,6 +603,85 @@ export function migratePanelV4(byKey: Readonly<Record<string, PanelEntry>>): Rec
   return rewriteTabs(byKey, (t) => (t.kind === "pullrequest" ? { ...t, id: pullRequestTabId(t.params.slug ?? "", t.params.number ?? "") } : t));
 }
 
+/** Where a checkout's stored tabs of version 5 land: one Diff tab's params. */
+interface DiffV6 {
+  own: boolean;
+  /** Its Changes tab's title for the strip until the tab first shows ("Changes · web" → "Diff · web"). */
+  title: string;
+  /** The one-file Diff tab that decides what the new tab shows; none with only a Changes tab. */
+  from?: Tab;
+  active: boolean;
+}
+
+const checkoutKey = (project: string, worktree: string) => `${project}\u0000${worktree}`;
+
+/** A version 5 tab's checkout, for the two surfaces that became one; null for any other. */
+function checkoutOfV5(t: Tab): string | null {
+  const { project, worktree, path, scope } = t.params;
+  if (t.kind === "changes") return project && path ? checkoutKey(project, path) : null;
+  // A tab with no scope is already version 6: an older build wrote its own version number over it.
+  if (t.kind === "diff" && scope !== undefined) return project && worktree && path ? checkoutKey(project, worktree) : null;
+  return null;
+}
+
+/**
+ * What each checkout's tabs in a panel become. The file shown is the one a group shows now,
+ * else the last opened. A Changes tab titled plain "Changes" was the thread's own checkout;
+ * one with a project in its title was not, and without a Changes tab the file came from the
+ * thread's own.
+ */
+function diffsOfEntry(e: PanelEntry): Map<string, DiffV6> {
+  const out = new Map<string, DiffV6>();
+  for (const g of e.groups) {
+    for (const t of g.tabs) {
+      const k = checkoutOfV5(t);
+      if (k === null) continue;
+      const d = out.get(k) ?? { own: true, title: "Diff", active: false };
+      if (t.kind === "changes") {
+        d.own = t.title === "Changes";
+        d.title = t.title.replace(/^Changes/, "Diff");
+      }
+      else if (!d.active) {
+        d.from = t;
+        d.active = g.activeTabId === t.id;
+      }
+      out.set(k, d);
+    }
+  }
+  return out;
+}
+
+/** A version 5 tab as version 6 keeps it (migratePanelV5). */
+function tabV6(t: Tab, diffs: ReadonlyMap<string, DiffV6>): Tab | null {
+  const k = checkoutOfV5(t);
+  if (k === null) return t.kind === "changes" || (t.kind === "diff" && t.params.scope !== undefined) ? null : t;
+  const d = diffs.get(k);
+  const project = t.params.project ?? "";
+  const worktree = (t.kind === "changes" ? t.params.path : t.params.worktree) ?? "";
+  const params: Record<string, string> = { project, worktree };
+  const from = d?.from?.params;
+  if (from?.scope === "branch") params.head = "ref:HEAD";
+  if (from?.path) params.path = from.path;
+  if (from?.oldPath) params.oldPath = from.oldPath;
+  if (d?.own) params.own = "1";
+  return { id: tabId("diff", { project, worktree }), kind: "diff", title: d?.title ?? "Diff", params };
+}
+
+/**
+ * Version 5 to 6: the Changes tab and the one-file Diff tabs are one Diff tab per checkout
+ * (surfaces/diffTarget.ts). All of a checkout's tabs in a panel become that tab, where the
+ * first of them stood, showing the file the panel showed, on the same sources. A Changes
+ * tab whose params name no worktree goes. Input repaired by sanitizePanelState first.
+ */
+export function migratePanelV5(byKey: Readonly<Record<string, PanelEntry>>): Record<string, PanelEntry> {
+  const out: Record<string, PanelEntry> = {};
+  for (const [key, e] of Object.entries(byKey)) {
+    const diffs = diffsOfEntry(e);
+    Object.assign(out, rewriteTabs({ [key]: e }, (t) => tabV6(t, diffs)));
+  }
+  return out;
+}
+
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** A stored tab with every field the surface registry needs; anything else is dropped. */
@@ -665,13 +744,15 @@ export const usePanelStore = create<PanelState>()(
     // 3: tab groups; the flat tab list is the first group (migratePanelV2).
     // 4: Worktree tabs are Changes tabs; the removed surfaces' tabs go (migratePanelV3).
     // 5: pull request tabs have lower-case ids (migratePanelV4).
-    version: 5,
+    // 6: Changes and one-file Diff tabs are one Diff tab per checkout (migratePanelV5).
+    version: 6,
     migrate: (persisted, version) => {
       const byKey = ((persisted ?? {}) as { byKey?: Record<string, PanelEntryV2> }).byKey ?? {};
-      if (version >= 5) return { byKey }; // a store from a newer build: merge repairs what it can
+      if (version >= 6) return { byKey }; // a store from a newer build: merge repairs what it can
       const v3 = version >= 3 ? byKey : migratePanelV2(version < 2 ? migratePanelV1(byKey) : byKey);
       const v4 = version >= 4 ? v3 : migratePanelV3(sanitizePanelState(v3));
-      return { byKey: migratePanelV4(sanitizePanelState(v4)) };
+      const v5 = version >= 5 ? v4 : migratePanelV4(sanitizePanelState(v4));
+      return { byKey: migratePanelV5(sanitizePanelState(v5)) };
     },
     // Every rehydrate, migrated or not, goes through sanitizePanelState: a store another
     // build wrote is never trusted as is.

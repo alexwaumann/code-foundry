@@ -143,7 +143,7 @@ describe("ThreadInfoCard: one project", () => {
 
     // Changes opens the cwd's Changes tab, its own title; a pull request its PR tab.
     fireEvent.click(screen.getByTestId("ti-changes"));
-    expect(activePanelTab()).toMatchObject({ kind: "changes", title: "Changes", params: { project: "repo-cf", path: TREE } });
+    expect(activePanelTab()).toMatchObject({ kind: "diff", params: { project: "repo-cf", worktree: TREE, own: "1" } });
     fireEvent.click(prs[0] as HTMLElement);
     expect(activePanelTab()).toMatchObject({ kind: "pullrequest", params: { slug: "alexwaumann/code-foundry", number: "78" } });
 
@@ -329,7 +329,7 @@ describe("ThreadInfoCard: other scenarios", () => {
     expect(screen.getAllByTestId("ti-changes-project")).toHaveLength(4);
     // A project's row opens that checkout's Changes tab, named for the project.
     fireEvent.click(byTest(cardEl(), "ti-changes-project", '[data-project="repo-web"]') as HTMLElement);
-    expect(activePanelTab()).toMatchObject({ kind: "changes", params: { project: "repo-web" } });
+    expect(activePanelTab()).toMatchObject({ kind: "diff", params: { project: "repo-web" } });
     expect(activePanelTab()?.title).toContain("web");
 
     // Diverged: Fix sends the thread its prompt; a double click sends once.

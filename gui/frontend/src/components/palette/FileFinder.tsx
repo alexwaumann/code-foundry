@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
-import { statusColor } from "@/components/changes/files";
+import { statusColor } from "@/components/diff/files";
 import { changeStatuses, emptyGroups, MAX_WORDS, parseFinderQuery, searchRows, type FinderGroup, type FinderRow, type Run } from "@/lib/fileFinder";
 import { useFirstRowSelection } from "@/lib/useFirstRowSelection";
 import { cn } from "@/lib/utils";

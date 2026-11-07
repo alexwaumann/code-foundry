@@ -54,8 +54,8 @@ test("a member's actions (Start here) are hidden at rest and shown on hover", as
 // The Threads table (columns, order, member states, the row menu with Show changes opening the page's
 // panel, the chevron's tooltip, a click and Enter opening the thread), Write instructions (start, show
 // while on its first turn, steer once idle) and an unregistered member opening nothing (a registered
-// one its Changes tab): WorkspacePage.test.tsx. The daemon's focus intent selecting a new thread is
-// src/stores/intents.test.ts's; a Changes tab drawn in a page's panel is e2e/projects.spec.ts's.
+// one its Diff tab): WorkspacePage.test.tsx. The daemon's focus intent selecting a new thread is
+// src/stores/intents.test.ts's; a Diff tab drawn in a page's panel is e2e/projects.spec.ts's.
 
 // The ⋯'s items and what its Open in list runs: WorkspacePage.test.tsx. Left: the split item drawn
 // in a dropdown (not a context menu) hovers as two blocks, the › block the item's last 32px.
