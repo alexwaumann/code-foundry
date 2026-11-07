@@ -830,6 +830,11 @@ export function retitlePanelTab(target: PanelTarget, id: string, title: string):
   update(target, (e) => retitleTab(e, id, title));
 }
 
+/** Replaces a tab's params where it is: nothing activates, opens or takes focus (what the tab itself keeps as it is used). */
+export function setPanelTabParams(target: PanelTarget, id: string, params: Tab["params"]): void {
+  update(target, (e) => withParams(e, id, () => params));
+}
+
 /** Takes `names` out of a tab's params (dropParams). */
 export function dropPanelTabParams(target: PanelTarget, id: string, names: readonly string[]): void {
   update(target, (e) => dropParams(e, id, names));

@@ -10,7 +10,7 @@ export function NavProvider({ value, children }: { value: NavCtx; children: Reac
 /**
  * One navigable row. Click moves the cursor (or activates, with activateOnClick);
  * double-click activates; cmd+click runs onCmdClick when given. The cursor row is
- * highlighted and scrolled into view. A `passive` row has no click (it still tints on hover,
+ * highlighted and scrolled into view when it gets there. A `passive` row has no click (it still tints on hover,
  * so the pointer finds its right-click menu): only the keyboard (and that menu, RowContextMenu)
  * moves the cursor onto it, as on a project page's Checkouts table. `tip` is a hover tooltip for what the row hides (a
  * full path); with `tipWhenTruncated` it opens only while the row's text is cut short. The
@@ -42,8 +42,12 @@ export function NavRow({
   const { cursorKey, setCursor, activate } = useContext(NavContext);
   const selected = cursorKey === navKey;
   const ref = useRef<HTMLDivElement>(null);
+  // When the cursor lands here, not when the row mounts: a virtualized list mounts the cursor's
+  // row as it is scrolled towards, and that must not pull the list back to it.
+  const wasSelected = useRef(selected);
   useEffect(() => {
-    if (selected) ref.current?.scrollIntoView({ block: "nearest" });
+    if (selected && !wasSelected.current) ref.current?.scrollIntoView({ block: "nearest" });
+    wasSelected.current = selected;
   }, [selected]);
   const row = (
     <div

@@ -81,6 +81,70 @@ test("a long list is virtualized and scrolls inside itself, in both layouts", as
   expect((await file(page).boundingBox())?.height ?? 0).toBeGreaterThan(300);
 });
 
+test("a live update keeps the rail on the same file, and the cursor's row never pulls it back", async ({ page }) => {
+  await mockPost("compare/files?count=120");
+  await openDiff(page, 760);
+  const rows = page.getByTestId("diff-file-rows");
+  await expect(rows).toHaveAttribute("data-virtual", "true");
+  await expect.poll(() => rows.evaluate((e) => e.scrollTop)).toBe(0);
+  const topRow = () =>
+    rows.evaluate((e) => {
+      const box = e.getBoundingClientRect();
+      return [...e.querySelectorAll("[data-nav-key]")].find((r) => r.getBoundingClientRect().top >= box.top - 1)?.getAttribute("data-nav-key");
+    });
+  const scrollTo = (y: number) =>
+    rows.evaluate((e, to) => {
+      e.scrollTop = to;
+    }, y);
+
+  // Past the overscan and back to where the cursor's row mounts again, off screen: it stays.
+  await scrollTo(1800);
+  await expect.poll(() => rows.evaluate((e) => e.scrollTop)).toBe(1800);
+  await scrollTo(120);
+  await page.waitForTimeout(200);
+  expect(await rows.evaluate((e) => e.scrollTop)).toBe(120);
+
+  await scrollTo(1800);
+  await expect.poll(topRow).toContain("generated/");
+  const before = await topRow();
+
+  // Ten files sort in above: the same file stays at the top, 300px further down the list.
+  const path = await page.getByTestId("diff-surface").getAttribute("data-path");
+  await mockPost("compare/files?count=120&first=10");
+  await mockPost(`worktree/dirty?path=${encodeURIComponent(path ?? "")}&modified=7`);
+  await expect(page.locator('[data-nav-key="f:.first/file-0000.ts"]')).toHaveCount(0);
+  await expect(page.getByTestId("diff-totals")).toContainText(/1[3-9]\d files/);
+  expect(await topRow()).toBe(before);
+  expect(await rows.evaluate((e) => e.scrollTop)).toBe(2100);
+});
+
+// The list on top, in the sizes it meets: alone in the panel, and a stacked split, where the
+// panel gives it half the height. At 1280x800 a split's tab is 342px, and the list used to leave
+// the code 33 of them. Too short for both, the list folds and the code has the whole tab.
+for (const [name, w, h, stacked, listed, code] of [
+  ["1280x800, alone", 1280, 800, false, true, 400],
+  ["1280x800, a stacked split", 1280, 800, true, false, 200],
+  ["1024x640, a stacked split", 1024, 640, true, false, 130],
+  ["1920x1080, a stacked split", 1920, 1080, true, true, 180],
+] as const) {
+  test(`the list on top leaves the code readable: ${name}`, async ({ page }) => {
+    await mockPost("compare/files?count=40");
+    await page.setViewportSize({ width: w, height: h });
+    await openDiff(page, 480);
+    await expect(list(page)).toHaveAttribute("data-layout", "top");
+    if (stacked) {
+      await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.splitPanel("current"))`);
+      await expect(page.locator('[data-split="true"]').first()).toBeVisible();
+    }
+    await expect(file(page)).toBeVisible();
+    await expect(page.getByTestId("diff-file-rows")).toHaveCount(listed ? 1 : 0);
+    const whole = await file(page).boundingBox();
+    const header = await file(page).getByTestId("file-header").boundingBox();
+    if (!whole || !header) throw new Error("no boxes");
+    expect(whole.y + whole.height - (header.y + header.height)).toBeGreaterThanOrEqual(code);
+  });
+}
+
 for (const scheme of ["dark", "light"] as const) {
   for (const [layout, width] of [["wide", 800], ["narrow", 420]] as const) {
     test(`diff viewer screenshots (${scheme}, ${layout})`, async ({ page }, info) => {
