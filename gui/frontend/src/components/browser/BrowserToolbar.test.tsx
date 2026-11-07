@@ -3,13 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BROWSER_STARTING, type BrowserStateView } from "@/api/browser";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const navigated = vi.hoisted(() => ({ finish: () => {}, fail: (_: unknown) => {} }));
+const navigated = vi.hoisted(() => ({ finish: () => {} }));
 vi.mock("@/api/browser", async (actual) => ({
   ...(await actual<typeof import("@/api/browser")>()),
   navigateBrowser: () =>
-    new Promise<void>((resolve, reject) => {
+    new Promise<void>((resolve) => {
       navigated.finish = resolve;
-      navigated.fail = reject;
     }),
 }));
 
