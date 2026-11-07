@@ -369,7 +369,10 @@ func liveAStateFloodClosesThePusherAndNoNeighbour(t *testing.T, l *live) {
 // A page sent its visitor to another site whose first paint was slow: the page before stayed on
 // screen under the new site's address.
 func liveACommitToAnotherSiteIsCoveredUntilItPaints(t *testing.T, l *live) {
-	l.open("http://"+plainHost+":"+l.port()+"/hostile/lure", "Lure")
+	if _, err := l.s.Navigate(context.Background(), l.key, "http://"+plainHost+":"+l.port()+"/hostile/lure"); err != nil {
+		t.Fatal(err)
+	}
+	// The stylesheet holds the new page's first paint for 3 s, so this sees the commit.
 	st := l.until("the new site", func(st State) bool { return strings.HasSuffix(st.URL, "/hostile/slowpaint") })
 	if !st.AwaitingFrame {
 		t.Fatalf("the lure's last frame stands under %q", st.URL)
@@ -444,14 +447,18 @@ func liveFramesInsideFramesAreNotLeftCounted(t *testing.T, l *live) {
 func liveAPDFIsADownload(t *testing.T, l *live) {
 	l.open(l.srv.URL+"/hostile/pdfs", "PDFs")
 	l.click(40, 30)
-	st := l.until("the download", func(st State) bool { return countState(st, DownloadCompleted) == 1 })
+	// The list may hold what earlier cases downloaded on this surface.
+	landed := func(st State) bool {
+		for _, d := range st.Downloads {
+			if d.Name == "terms.pdf" && d.State == DownloadCompleted && filepath.Base(d.Path) == "terms.pdf" {
+				return true
+			}
+		}
+		return false
+	}
+	st := l.until("the download", landed)
 	if st.URL != l.srv.URL+"/hostile/pdfs" {
 		t.Fatalf("the page went to %q", st.URL)
-	}
-	for _, d := range st.Downloads {
-		if d.State == DownloadCompleted && filepath.Base(d.Path) != "terms.pdf" {
-			t.Fatalf("landed as %q", d.Path)
-		}
 	}
 	var tg struct {
 		TargetInfos []struct {

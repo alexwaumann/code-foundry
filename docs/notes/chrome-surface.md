@@ -83,7 +83,8 @@ It is an experiment: it should stay easy to change or delete. See "How to remove
 - **A strain on Chrome's own process is blamed on a page at work, never on a busy one.** Until round 3,
   when Chrome's own process swelled by 512 MiB in 5 s, or stayed past 150% CPU for 3 s, the busiest
   helper went. A page pushing history with 64 MB states swells it, and the busiest helper was then an
-  animated neighbour with a worker, killed in four runs of four. Now:
+  animated neighbour with a worker: killed in all four of the review's runs, and in the one I ran
+  before the fix. Now:
   - A swell is first the store's to blame (`blameHistory`): each history entry keeps its state in
     Chrome's own process, 50 entries a page, so the page that pushed most in the last 5 s is closed,
     as a flood. Closing the page gives the memory back; killing its renderer gives none back
@@ -122,7 +123,8 @@ It is an experiment: it should stay easy to change or delete. See "How to remove
   over the input: the path shrinks away first, then the host clips from its left, so its end stays
   in view. Every page has a site in the bar, or `Unknown site` where nothing can say (a `data:` page,
   a sandbox, a page whose address could not be read). Until round 3 a page with no address got an
-  empty bar and no mark. An address the origin does not lead (`about:blank`, `blob:`) follows it. Dialogs and choosers lead with the same domain, then the full origin, wrapped and not clipped;
+  empty bar and no mark. An address the origin does not lead (`about:blank`, `blob:`) follows it.
+  Dialogs and choosers lead with the same domain, then the full origin, wrapped and not clipped;
   with nothing to name they say "An unknown site", never a blank.
 - **Not secure, Bad certificate.** Every page not on https says Not secure, loopback included: one
   rule, and a dev server loses nothing by it. `Security.visibleSecurityStateChanged` with
@@ -454,7 +456,7 @@ worker that never rests) beside the flooding page. Input to the still page 4 tim
 
 | Flood | Worst still input | Chrome's group at peak, MB | Chrome's own at peak, MB | What ended it |
 | --- | --- | --- | --- | --- |
-| `pushState` with a 64 MB state, the review's page, four runs | 76 to 637 ms (one sample each; the rest 1 to 160 ms) | 1,824 to 2,854 | 646 to 1,272, then 446 to 704 | The history blame closed the page after 3 to 11 pushes. The busy neighbour was untouched in 4 of 4 (the review: killed in 4 of 4) |
+| `pushState` with a 64 MB state, the review's page, four runs | 43 to 637 ms (worst of each run; the 600 ms ones a single sample, the rest 1 to 160 ms) | 1,824 to 2,854 | 646 to 1,272, then 446 to 704 | The history blame closed the page after 3 to 11 pushes. The busy neighbour was untouched in 4 of 4 (the review: killed in 4 of 4) |
 | `console.log` in a loop, tiny | 713 ms | 2,016 | 595 | The watch, on the page's renderer |
 | The same, 200 byte lines | 269 ms | 1,842 | 528 | The watch |
 | `document.title` of 1 MB | 1 ms | 2,215 | 263 | The watch |
