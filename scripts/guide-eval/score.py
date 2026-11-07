@@ -17,7 +17,7 @@ BYTES_PER_TOKEN = 2.7  # measured on Opus 5.5 for these files in the audit (2.3 
 MIN_RUNS = 3  # a routing change needs this many runs per task: one run is too noisy
 SKILLS_DIR = "/.claude/skills/"
 WAKE_KEYS = ("wakes", "wake_bytes", "wake_cost", "wake_reads", "wake_git", "wake_idle", "wake_acted", "wake_chars",
-             "relay_hits", "relay_total", "child_reports", "parent_reads", "parent_git")
+             "relay_hits", "relay_total", "child_reports", "child_asks", "parent_reads", "parent_git")
 FETCHES = re.compile(r"Monitor|Cron|ScheduleWakeup", re.I)
 FETCH_TOOLS = {"Monitor", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup"}
 # The CLI's error lines: "code-foundry view.inline: ... outside your home directory",
@@ -153,6 +153,7 @@ def score_run(task, root_items, other_items, files):
         verb_ok = False  # the right verb beside the wrong store is still the wrong store
     want = task.get("skill")
     relay_hits, relay_total = relay_score(task, root["text"])
+    asks = sum(c.startswith("thread.ask") for s in rest for c in s["cli"] if not is_help(c))
     root_bash = [inp.get("command", "") for name, inp, _, _ in tool_calls(root_items) if name == "Bash"]
     parent_reads = sum(bool(WAKE_READ.search(c)) for c in root["cli"] if not is_help(c))
     parent_git = sum(bool(WAKE_GIT.search(cmd)) for cmd in root_bash)
@@ -164,7 +165,7 @@ def score_run(task, root_items, other_items, files):
                 guide=sum(s["guide"] for s in every), caps=sum(s["caps"] for s in every), index=sum(s["index"] for s in every),
                 wrong_turns=wrong, guidance_bytes=sum(s["guidance_bytes"] for s in every),
                 cost=round(sum(s["cost"] for s in every), 4), turns=sum(s["turns"] for s in every), threads=len(every),
-                relay_hits=relay_hits, relay_total=relay_total, child_reports=reports, parent_reads=parent_reads, parent_git=parent_git,
+                relay_hits=relay_hits, relay_total=relay_total, child_reports=reports, child_asks=asks, parent_reads=parent_reads, parent_git=parent_git,
                 **score_wakes(root_items))
 
 
@@ -335,7 +336,7 @@ def compare(before, after):
     if a.get("wakes") or b.get("wakes") or a.get("relay_total") or b.get("relay_total"):  # not part of the gate: read them with the runs
         for name, key in (("wakes", "wakes"), ("wake bytes", "wake_bytes"), ("wake-turn cost", "wake_cost"), ("wake turns reading a child", "wake_reads"),
                           ("wake turns checking git", "wake_git"), ("wake turns with no tool", "wake_idle"), ("wake turns that acted", "wake_acted"),
-                          ("wake-turn reply chars", "wake_chars"), ("child report calls", "child_reports"), ("parent reads, whole run", "parent_reads"),
+                          ("wake-turn reply chars", "wake_chars"), ("child report calls", "child_reports"), ("child asks", "child_asks"), ("parent reads, whole run", "parent_reads"),
                           ("parent git calls, whole run", "parent_git"), ("relayed facts", "relay_hits")):
             x, y = a.get(key, 0), b.get(key, 0)
             lines.append(f"{name:28} {x:>8} -> {y:>8}  ({round(y - x, 2):+})")

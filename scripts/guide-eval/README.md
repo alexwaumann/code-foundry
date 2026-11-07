@@ -138,10 +138,13 @@ columns over both sides. They are outside the gate: read them with the runs.
 `w1-audit` (`fixture: audit`) needs 14 function names that a child alone finds, more than one short
 summary holds. `w2-followup` (`fixture: followup`) gets its answer in a follow-up turn, after any
 report the child filed. `w3-ember-audit` is `w1` through Ember, which only ever hears by wake. All
-three are `home` tasks with Sonnet 5.5 low workers. To A/B a wake change:
+three are `home` tasks with Sonnet 5.5 low workers. `w4-ask` (`fixture: ask`) holds back a decision
+from the child: the parent knows it and is told not to pass it on until asked, so the run shows
+whether the child asks, stops or guesses (**child asks**), and the reply says whether the answer
+landed. To A/B a wake change:
 
 ```
-TASKS=t6-orchestrate,t10-overlap,ember-overlap,w1-audit,w2-followup,w3-ember-audit
+TASKS=t6-orchestrate,t10-overlap,ember-overlap,w1-audit,w2-followup,w3-ember-audit,w4-ask
 make guide-eval MODEL=opus TASKS=$TASKS LABEL=wake-before BIN=/path/to/before/bin/code-foundry
 make guide-eval MODEL=opus TASKS=$TASKS LABEL=wake-after
 make guide-eval-compare BEFORE=<dir> AFTER=<dir>

@@ -127,7 +127,11 @@ def audit_fixture():
 # w2-followup's project: the overlap one plus a word only the child reads, in a follow-up turn.
 FOLLOWUP_FIXTURE = {**OVERLAP_FIXTURE, "docs/codeword.txt": "marigold-47\n"}
 
-FIXTURES = {"overlap": OVERLAP_FIXTURE, "audit": audit_fixture(), "followup": FOLLOWUP_FIXTURE}
+# w4-ask's project: a decision the code leaves open and only the user's message settles.
+ASK_FIXTURE = {**OVERLAP_FIXTURE, "README.md": OVERLAP_FIXTURE["README.md"] + "\n## Open question\n\n"
+               "Whether greetings end in an exclamation mark is undecided: the owner has not said. Do not guess silently.\n"}
+
+FIXTURES = {"overlap": OVERLAP_FIXTURE, "audit": audit_fixture(), "followup": FOLLOWUP_FIXTURE, "ask": ASK_FIXTURE}
 
 
 def log(msg):
