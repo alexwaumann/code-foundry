@@ -12,18 +12,19 @@
  * under a sheet (Settings, Themes, Usage), since what they change is the thread's panel,
  * not the screen.
  *
- * The item actions (panel.file, panel.diff, panel.pr) open what their params name; the
- * daemon checked it exists first (internal/command/commands_view_items.go). The one thing
+ * The item actions (panel.file, panel.diff, panel.pr, panel.gallery) open what their params
+ * name; the daemon checked it exists first (internal/command/commands_view_items.go). The one thing
  * here that may take the keyboard is a request to edit a file with --focus: the daemon
  * sends focus=1 only then, and only because the user asked to be taken there. Without it, a
  * request that would replace the editor the user is typing in joins the strip behind it.
  */
 import type { DiffScopeView } from "@/api/fileDiff";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
+import { galleryTab } from "@/surfaces/galleryTarget";
 import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
 import { openDiffInPanel, openFileInPanel } from "./filePanel";
 import { openMcpSurface } from "./mcpPanel";
-import { expandPanel, getPanel, isSplit, keyOf, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
+import { expandPanel, getPanel, isSplit, keyOf, openSurface, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
 import { openPullRequestInPanel } from "./prPanel";
 import { useThreadsStore } from "./threads";
 import type { Selection } from "./ui";
@@ -118,6 +119,11 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     const number = positive(p.number);
     if (!p.slug?.includes("/") || number === undefined) return false;
     return openPullRequestInPanel({ slug: p.slug, number }, key);
+  }),
+  // view.panel.gallery: params title, images (JSON), project and base. The same title is the same tab.
+  "panel.gallery": item((key, p) => {
+    const tab = galleryTab(p);
+    return tab !== null && openSurface(key, tab);
   }),
 };
 

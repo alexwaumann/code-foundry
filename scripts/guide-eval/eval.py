@@ -75,6 +75,8 @@ FIXTURE = {
     "greet_test.go": 'package main\n\nimport "testing"\n\nfunc TestGreeting(t *testing.T) {\n\tif got := Greeting("Ada"); '
                      'got != "Hello, Ada" {\n\t\tt.Fatalf("got %q", got)\n\t}\n}\n',
     "README.md": "# greet\n\nA small CLI that greets someone: `go run . --name Ada`.\n",
+    "before.svg": '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"><rect width="320" height="200" fill="#345"/></svg>\n',
+    "after.svg": '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"><rect width="320" height="200" fill="#3a5"/></svg>\n',
 }
 
 

@@ -5,7 +5,7 @@ the built-in skills, and how many guidance tokens that takes. Any PR that change
 `ThreadPrompt`, a skill or the guide runs it before and after. The baseline is in
 `docs/notes/guide-eval-baseline.md`.
 
-It spends real money, so it is not part of `make check`: 21 tasks, 3 runs, is about $20 on
+It spends real money, so it is not part of `make check`: 22 tasks, 3 runs, is about $20 on
 Opus 5.5. The 19 without the overlap tasks were $6 on Sonnet 5.5. Run the scorer's tests with
 `python3 scripts/guide-eval/score_test.py`.
 

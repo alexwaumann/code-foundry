@@ -154,7 +154,8 @@ func (d ViewDeps) showPageWith(uctx Context, a Args, name string, params map[str
 //     view.panel.pr;
 //   - view.inline (commands_view_inline.go), which shows an HTML page in a thread's
 //     conversation (category Thread), and view.panel.page (commands_view_panel_page.go),
-//     which shows one in its side panel only;
+//     which shows one in its side panel only, and view.panel.gallery
+//     (commands_view_panel_gallery.go), which shows a set of images there;
 //   - composer.history (commands_view_composer.go), the Previous prompts picker, and
 //     composer.stage (commands_composer_stage.go), text in a thread's composer;
 //   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
@@ -303,6 +304,6 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:         show(ViewThreadNext),
 		},
 	}
-	cmds = append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
+	cmds = append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.panelGalleryCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
 	return r.RegisterAll(append(append(cmds, d.threadFindCommands()...), d.terminalFindCommands()...)...)
 }

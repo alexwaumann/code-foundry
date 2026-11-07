@@ -296,7 +296,27 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")).toMatchObject({ params: { slug: "Owner/Web", number: "42" } });
     });
 
+    it("panel.gallery opens a tab for its title and takes no focus", () => {
+      const images = JSON.stringify([{ path: "/tmp/a.png", caption: "Before" }]);
+      showItem("panel.gallery", { title: "Shots", images, project: "web", base: WEB_FEAT });
+      expect(active("thread:b")).toMatchObject({ kind: "gallery", title: "Shots", params: { title: "Shots", images, project: "web", base: WEB_FEAT } });
+      untouched();
+    });
+
+    it("panel.gallery with the same title updates its tab, and another title adds one", () => {
+      const first = JSON.stringify([{ path: "/tmp/a.png" }]);
+      const second = JSON.stringify([{ path: "/tmp/a.png" }, { path: "/tmp/b.png" }]);
+      showItem("panel.gallery", { title: "Shots", images: first });
+      showItem("panel.gallery", { title: "Shots", images: second });
+      expect(tabIds("thread:b")).toHaveLength(1);
+      expect(active("thread:b")?.params.images).toBe(second);
+      showItem("panel.gallery", { title: "Others", images: first });
+      expect(tabIds("thread:b")).toHaveLength(2);
+    });
+
     it.each([
+      ["panel.gallery", { title: "Shots", images: "[]" }],
+      ["panel.gallery", { images: JSON.stringify([{ path: "/tmp/a.png" }]) }],
       ["panel.file", {}],
       ["panel.diff", { project: "web", path: "a.go" }],
       ["panel.pr", { slug: "nope", number: "42" }],

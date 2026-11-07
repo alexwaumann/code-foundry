@@ -44,7 +44,7 @@ var noPalette = []string{
 	"thread.reseed", "thread.respond", "thread.send", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop", "thread.subscribe", "thread.subscriptions",
 	"thread.unsubscribe", "thread.wait", "thread.workspace", "ui.focus.project",
 	"ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence", "usage.show",
-	"view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.page", "view.panel.pr",
+	"view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.page", "view.panel.pr",
 	"workspace.add-project", "workspace.list", "workspace.remove", "workspace.remove-project",
 	"workspace.open.editor", "workspace.set-primary", "worktree.editors",
 }

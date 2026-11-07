@@ -23,6 +23,14 @@ type Files struct {
 	Contents map[string]string
 	// OutsideHome are the Files read as outside the home directory.
 	OutsideHome []string
+	// Mime are a file's MIME types by path (default none).
+	Mime map[string]string
+	// Modified are a file's modification times by path, unix milliseconds (default 0).
+	Modified map[string]int64
+	// Size are a file's sizes by path, over what its contents say.
+	Size map[string]int64
+	// Errs are the paths whose read fails, with how.
+	Errs map[string]error
 }
 
 var _ command.FileReader = (*Files)(nil)
@@ -39,12 +47,19 @@ func (f *Files) ReadFile(_ context.Context, r *connect.Request[v1.ReadFileReques
 		p = filepath.Join(r.Msg.GetBaseDir(), p)
 	}
 	res := &v1.ReadFileResponse{ResolvedPath: filepath.Clean(p)}
+	if err := f.Errs[res.ResolvedPath]; err != nil {
+		return nil, err
+	}
 	switch {
 	case slices.Contains(f.Files, res.ResolvedPath):
 		res.Contents, res.Size = []byte("x"), 1
 		res.OutsideHome = slices.Contains(f.OutsideHome, res.ResolvedPath)
 		if c, ok := f.Contents[res.ResolvedPath]; ok {
 			res.Contents, res.Size = []byte(c), int64(len(c))
+		}
+		res.MimeType, res.ModifiedAt = f.Mime[res.ResolvedPath], f.Modified[res.ResolvedPath]
+		if n, ok := f.Size[res.ResolvedPath]; ok {
+			res.Size = n
 		}
 	case slices.Contains(f.Dirs, res.ResolvedPath):
 		res.IsDir = true
