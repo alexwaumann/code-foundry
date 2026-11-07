@@ -1,3 +1,4 @@
+import { isSlowSubscriber } from "@/api/errors";
 import type { AttachEventView } from "@/api/terminal";
 import { errorMessage, runStream, type Heartbeat, type StreamStatus } from "@/api/stream";
 import type { StreamPriority } from "@/api/streamSlots";
@@ -37,6 +38,12 @@ export const MAX_BEHIND_BYTES = 8 << 20;
  * to parse. The reconnect would meet the same refusal, and each costs the daemon a snapshot.
  */
 export const REFUSED_RETRY_MS = 1000;
+
+/**
+ * How long a reconnect after the daemon's slow-subscriber drop may take to bring a message before
+ * it reads as a lost connection. A hung attempt reports nothing more, so only this can say so.
+ */
+export const DROP_GRACE_MS = 5000;
 
 /**
  * Owns the attach lifecycle for one renderer. At most one terminal is attached at a
@@ -79,6 +86,8 @@ export class AttachController {
   private behind = 0;
   /** Runs once xterm has parsed everything (null: nothing waits). */
   private afterParsed: (() => void) | null = null;
+  /** Set while a reconnect after a slow-subscriber drop has brought nothing: "retrying" says nothing then. */
+  private dropGrace: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     private readonly renderer: TerminalRenderer,
@@ -123,14 +132,34 @@ export class AttachController {
       },
       onStatus: (s: StreamStatus, err) => {
         if (gen !== this.generation) return;
-        if (s === "retrying" && this.state.phase !== "exited") this.setState({ phase: "reconnecting", error: err ?? null });
+        if (s === "open") this.endDropGrace();
+        if (s === "retrying" && this.dropGrace === undefined && this.state.phase !== "exited") this.setState({ phase: "reconnecting", error: err ?? null });
         if (s === "stopped" && err) this.setState({ phase: "error", error: err });
       },
       shouldReconnectOnEnd: () => this.state.phase !== "exited",
       onError: (err) => {
+        // Before the "retrying" that reports err, which carries only its text.
+        if (isSlowSubscriber(err)) this.startDropGrace();
+        else this.endDropGrace();
         this.deps.onStreamError?.(err);
       },
     });
+  }
+
+  /**
+   * The daemon dropped a stream that fell behind: like fallBehind, not a lost connection, so the
+   * phase stays. Only a message ends this, so drops in a row cannot put the deadline off.
+   */
+  private startDropGrace(): void {
+    this.dropGrace ??= setTimeout(() => {
+      this.dropGrace = undefined;
+      if (this.state.phase !== "exited") this.setState({ phase: "reconnecting", error: null });
+    }, DROP_GRACE_MS);
+  }
+
+  private endDropGrace(): void {
+    clearTimeout(this.dropGrace);
+    this.dropGrace = undefined;
   }
 
   detach(): void {
@@ -138,6 +167,7 @@ export class AttachController {
     this.stopStream?.();
     this.stopStream = null;
     clearTimeout(this.resizeTimer);
+    this.endDropGrace();
     this.dropHeld();
     this.afterParsed = null;
     this.snapshots++;
