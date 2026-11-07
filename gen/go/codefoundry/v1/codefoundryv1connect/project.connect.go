@@ -73,6 +73,9 @@ const (
 	// ProjectServiceGetWorktreeCompareFileProcedure is the fully-qualified name of the ProjectService's
 	// GetWorktreeCompareFile RPC.
 	ProjectServiceGetWorktreeCompareFileProcedure = "/codefoundry.v1.ProjectService/GetWorktreeCompareFile"
+	// ProjectServiceListCompareCommitsProcedure is the fully-qualified name of the ProjectService's
+	// ListCompareCommits RPC.
+	ProjectServiceListCompareCommitsProcedure = "/codefoundry.v1.ProjectService/ListCompareCommits"
 	// ProjectServiceListRefsProcedure is the fully-qualified name of the ProjectService's ListRefs RPC.
 	ProjectServiceListRefsProcedure = "/codefoundry.v1.ProjectService/ListRefs"
 	// ProjectServiceInitGitProcedure is the fully-qualified name of the ProjectService's InitGit RPC.
@@ -169,6 +172,10 @@ type ProjectServiceClient interface {
 	// CompareWorktree counted, each side at most 1 MiB, read now. Takes the same sources
 	// and gives the same refusals. A path that is not on a side is simply absent there.
 	GetWorktreeCompareFile(context.Context, *connect.Request[v1.GetWorktreeCompareFileRequest]) (*connect.Response[v1.GetWorktreeCompareFileResponse], error)
+	// ListCompareCommits lists the commits a comparison's head has and its base does not,
+	// newest first: the branch being compared. The working tree and the index count as HEAD.
+	// Takes the same sources and refusals as CompareWorktree.
+	ListCompareCommits(context.Context, *connect.Request[v1.ListCompareCommitsRequest]) (*connect.Response[v1.ListCompareCommitsResponse], error)
 	// ListRefs returns the refs a worktree can be based on: local branches and
 	// remote-tracking branches (origin/<name>), the branch names by recency, plus the
 	// default branch.
@@ -323,6 +330,12 @@ func NewProjectServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(projectServiceMethods.ByName("GetWorktreeCompareFile")),
 			connect.WithClientOptions(opts...),
 		),
+		listCompareCommits: connect.NewClient[v1.ListCompareCommitsRequest, v1.ListCompareCommitsResponse](
+			httpClient,
+			baseURL+ProjectServiceListCompareCommitsProcedure,
+			connect.WithSchema(projectServiceMethods.ByName("ListCompareCommits")),
+			connect.WithClientOptions(opts...),
+		),
 		listRefs: connect.NewClient[v1.ListRefsRequest, v1.ListRefsResponse](
 			httpClient,
 			baseURL+ProjectServiceListRefsProcedure,
@@ -403,6 +416,7 @@ type projectServiceClient struct {
 	getWorktreeFileDiff    *connect.Client[v1.GetWorktreeFileDiffRequest, v1.GetWorktreeFileDiffResponse]
 	compareWorktree        *connect.Client[v1.CompareWorktreeRequest, v1.CompareWorktreeResponse]
 	getWorktreeCompareFile *connect.Client[v1.GetWorktreeCompareFileRequest, v1.GetWorktreeCompareFileResponse]
+	listCompareCommits     *connect.Client[v1.ListCompareCommitsRequest, v1.ListCompareCommitsResponse]
 	listRefs               *connect.Client[v1.ListRefsRequest, v1.ListRefsResponse]
 	initGit                *connect.Client[v1.InitGitRequest, v1.InitGitResponse]
 	rename                 *connect.Client[v1.RenameProjectRequest, v1.RenameProjectResponse]
@@ -488,6 +502,11 @@ func (c *projectServiceClient) CompareWorktree(ctx context.Context, req *connect
 // GetWorktreeCompareFile calls codefoundry.v1.ProjectService.GetWorktreeCompareFile.
 func (c *projectServiceClient) GetWorktreeCompareFile(ctx context.Context, req *connect.Request[v1.GetWorktreeCompareFileRequest]) (*connect.Response[v1.GetWorktreeCompareFileResponse], error) {
 	return c.getWorktreeCompareFile.CallUnary(ctx, req)
+}
+
+// ListCompareCommits calls codefoundry.v1.ProjectService.ListCompareCommits.
+func (c *projectServiceClient) ListCompareCommits(ctx context.Context, req *connect.Request[v1.ListCompareCommitsRequest]) (*connect.Response[v1.ListCompareCommitsResponse], error) {
+	return c.listCompareCommits.CallUnary(ctx, req)
 }
 
 // ListRefs calls codefoundry.v1.ProjectService.ListRefs.
@@ -611,6 +630,10 @@ type ProjectServiceHandler interface {
 	// CompareWorktree counted, each side at most 1 MiB, read now. Takes the same sources
 	// and gives the same refusals. A path that is not on a side is simply absent there.
 	GetWorktreeCompareFile(context.Context, *connect.Request[v1.GetWorktreeCompareFileRequest]) (*connect.Response[v1.GetWorktreeCompareFileResponse], error)
+	// ListCompareCommits lists the commits a comparison's head has and its base does not,
+	// newest first: the branch being compared. The working tree and the index count as HEAD.
+	// Takes the same sources and refusals as CompareWorktree.
+	ListCompareCommits(context.Context, *connect.Request[v1.ListCompareCommitsRequest]) (*connect.Response[v1.ListCompareCommitsResponse], error)
 	// ListRefs returns the refs a worktree can be based on: local branches and
 	// remote-tracking branches (origin/<name>), the branch names by recency, plus the
 	// default branch.
@@ -761,6 +784,12 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 		connect.WithSchema(projectServiceMethods.ByName("GetWorktreeCompareFile")),
 		connect.WithHandlerOptions(opts...),
 	)
+	projectServiceListCompareCommitsHandler := connect.NewUnaryHandler(
+		ProjectServiceListCompareCommitsProcedure,
+		svc.ListCompareCommits,
+		connect.WithSchema(projectServiceMethods.ByName("ListCompareCommits")),
+		connect.WithHandlerOptions(opts...),
+	)
 	projectServiceListRefsHandler := connect.NewUnaryHandler(
 		ProjectServiceListRefsProcedure,
 		svc.ListRefs,
@@ -853,6 +882,8 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 			projectServiceCompareWorktreeHandler.ServeHTTP(w, r)
 		case ProjectServiceGetWorktreeCompareFileProcedure:
 			projectServiceGetWorktreeCompareFileHandler.ServeHTTP(w, r)
+		case ProjectServiceListCompareCommitsProcedure:
+			projectServiceListCompareCommitsHandler.ServeHTTP(w, r)
 		case ProjectServiceListRefsProcedure:
 			projectServiceListRefsHandler.ServeHTTP(w, r)
 		case ProjectServiceInitGitProcedure:
@@ -940,6 +971,10 @@ func (UnimplementedProjectServiceHandler) CompareWorktree(context.Context, *conn
 
 func (UnimplementedProjectServiceHandler) GetWorktreeCompareFile(context.Context, *connect.Request[v1.GetWorktreeCompareFileRequest]) (*connect.Response[v1.GetWorktreeCompareFileResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.GetWorktreeCompareFile is not implemented"))
+}
+
+func (UnimplementedProjectServiceHandler) ListCompareCommits(context.Context, *connect.Request[v1.ListCompareCommitsRequest]) (*connect.Response[v1.ListCompareCommitsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.ListCompareCommits is not implemented"))
 }
 
 func (UnimplementedProjectServiceHandler) ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error) {

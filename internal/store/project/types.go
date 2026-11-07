@@ -369,6 +369,9 @@ type Store interface {
 	// CompareFile returns both sides of one file of a comparison, read now, with
 	// CompareWorktree's refusals.
 	CompareFile(ctx context.Context, req CompareFileRequest) (CompareSides, error)
+	// CompareCommits lists the commits a comparison's head has and its base does not, with
+	// CompareWorktree's refusals (compare_commits.go).
+	CompareCommits(ctx context.Context, req CompareCommitsRequest) (CompareLog, error)
 	// InitGit makes a project without git a git repository (`git init -b <default>`
 	// and an empty "chore: initial commit") and refreshes it, returning the git project.
 	// ErrFailedPrecondition when it already is one.

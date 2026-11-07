@@ -21,6 +21,18 @@ export const DEFAULT_HEAD: CompareSource = { kind: "working" };
 /** What is committed on the branch: the old `branch` scope. */
 export const COMMITTED_HEAD: CompareSource = { kind: "ref", ref: "HEAD" };
 
+/** git's empty tree: what a root commit is compared against. */
+export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+/** One commit shown from the Commits list, and what All changes goes back to. */
+export interface DiffCommit {
+  sha: string;
+  base: CompareSource;
+  head: CompareSource;
+  file: string;
+  oldPath: string;
+}
+
 export interface DiffTarget {
   project: string;
   /** The checkout's path. */
@@ -47,6 +59,10 @@ export interface DiffTarget {
   note?: string;
   /** What a thread took away, which the user can bring back. */
   hide?: readonly DiffPart[];
+  /** The two sides are one commit and its parent, from the Commits list. */
+  commit?: DiffCommit;
+  /** The Commits section is open. */
+  commitsOpen?: boolean;
 }
 
 /** The parts of the tab a thread can hide (view.panel.diff --hide). */
@@ -72,7 +88,7 @@ export function sameSource(a: CompareSource, b: CompareSource): boolean {
   return sourceParam(a) === sourceParam(b);
 }
 
-/** A checkout's Diff tab: params { project, worktree, thread?, base?, head?, path?, oldPath?, own?, filter?, fold?, paths?, title?, note?, hide? }, defaults left out. */
+/** A checkout's Diff tab: params { project, worktree, thread?, base?, head?, path?, oldPath?, own?, filter?, fold?, paths?, title?, note?, hide?, commit?, backBase?, backHead?, backPath?, backOldPath?, commits? }, defaults left out. */
 export function diffTab(t: DiffTarget, title: string = t.heading || (t.thread ? FROM_THREAD : DIFF_TITLE)): Tab {
   const key = { project: t.project, worktree: t.worktree, ...(t.thread ? { thread: t.thread } : {}), ...(t.heading ? { title: t.heading } : {}) };
   const params: Record<string, string> = { ...key };
@@ -86,6 +102,14 @@ export function diffTab(t: DiffTarget, title: string = t.heading || (t.thread ? 
   if (t.paths?.length) params.paths = t.paths.join("\n");
   if (t.note) params.note = t.note;
   if (t.hide?.length) params.hide = t.hide.join(",");
+  if (t.commit) {
+    params.commit = t.commit.sha;
+    params.backBase = sourceParam(t.commit.base);
+    params.backHead = sourceParam(t.commit.head);
+    if (t.commit.file) params.backPath = t.commit.file;
+    if (t.commit.oldPath) params.backOldPath = t.commit.oldPath;
+  }
+  if (t.commitsOpen) params.commits = "1";
   return { id: tabId(DIFF_KIND, key), kind: DIFF_KIND, title, params };
 }
 
@@ -108,5 +132,17 @@ export function diffOfTab(tab: Pick<Tab, "params">): DiffTarget | null {
     heading: tab.params.title ?? "",
     note: tab.params.note ?? "",
     hide: (tab.params.hide ?? "").split(",").filter(isPart),
+    ...(tab.params.commit
+      ? {
+          commit: {
+            sha: tab.params.commit,
+            base: sourceOfParam(tab.params.backBase, DEFAULT_BASE),
+            head: sourceOfParam(tab.params.backHead, DEFAULT_HEAD),
+            file: tab.params.backPath ?? "",
+            oldPath: tab.params.backOldPath ?? "",
+          },
+        }
+      : {}),
+    ...(tab.params.commits === "1" ? { commitsOpen: true } : {}),
   };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from "react";
 import { parseDiffFromFile } from "@pierre/diffs";
 import { FileDiff, FileText, FileX, GitCompare, TriangleAlert } from "lucide-react";
 import { getCompareFile, type CompareFileSidesView, type CompareTarget } from "@/api/compare";
@@ -64,13 +64,17 @@ function Body({ d, error, reload, parsed, row, listed, compared }: { d: CompareF
  * never says less than the row, and when what a side reads from is written: this file on disk,
  * the index. A save that keeps the counts changes nothing else. Refresh reads the list too. `listed` false: the file left
  * the comparison, and it stays on screen saying so, read like any other in case it comes back.
+ * `live` false: nothing moves it but Refresh, for one commit, which does not change.
  */
-export function DiffFile({ target, row, listed, compared, onRefresh }: { target: CompareTarget; row: FileRow; listed: boolean; compared: string; onRefresh: () => void }) {
+export function DiffFile({ target, row, listed, compared, onRefresh, live = true }: { target: CompareTarget; row: FileRow; listed: boolean; compared: string; onRefresh: () => void; live?: boolean }) {
   const { projectId, worktree, base, head } = target;
   const key = [projectId, worktree, sourceParam(base), sourceParam(head), row.path, row.oldPath].join("\u0000");
   const read = useTabRead<CompareFileSidesView>(key, (signal) => getCompareFile(target, row.path, row.oldPath, undefined, signal));
   const { reload } = read;
-  const later = useThrottled(reload, undefined, read.loading);
+  const throttled = useThrottled(reload, undefined, read.loading);
+  const later = useCallback(() => {
+    if (live) throttled();
+  }, [live, throttled]);
   const abs = `${worktree.replace(/\/+$/, "")}/${row.path}`;
   useOnWindowVisible(later);
   useWorktreeChanges(projectId, worktree, later);
