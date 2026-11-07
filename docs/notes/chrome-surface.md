@@ -443,9 +443,13 @@ inside frames were left counted).
 Also: the setting is `UserOnly`, and the browser verbs have page classes (`page_class_test.go`,
 `TestAPageAimingTheBrowserAsksTheUser`). `endpoint.test.ts` finds `BrowserService/Watch` and passes.
 Found on the way: a page closed behind its popup left the surface saying "popup" until something
-else published; it says so at once now (`TestAPopupWhoseOpenerWentIsStillAPopup`).
+else published; it says so at once now (`TestAPopupWhoseOpenerWentIsStillAPopup`). And a popup that
+committed and loaded before its session was set up never got its title or its way back read, since
+no event of either reached it: on a loaded machine `make check` saw a popup with no title, and the
+cases after it failed behind it. Reading a popup's address now reads its history too
+(`TestAPopupThatLoadedBeforeItsSetUpGetsItsTitle`).
 
-Each fix was undone one at a time: 17 changes in Go and 5 in the window, and each failed a test. On
+Each fix was undone one at a time: 18 changes in Go and 5 in the window, and each failed a test. On
 real Chrome, 4 of 7 failed a live case. The three that did not: the old busiest-helper rule, because
 the history blame acts first on that flood (the table test holds the rule); the store not asked
 about a swell, because the flooding page's own renderer then passes its limits and is killed, which

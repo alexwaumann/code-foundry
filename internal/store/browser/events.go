@@ -479,7 +479,9 @@ func (s *Store) readAddress(ctx context.Context, in *instance, t *target) {
 	}
 	t.commit(here[0], chromeOrigin(here[1]))
 	t.surface.publish()
-	s.committed(in, t, 0)
+	// A popup that committed and loaded before its session was set up sent no event for it: its
+	// title and way back are read here or never.
+	s.committed(in, t, jobHistory)
 }
 
 func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {

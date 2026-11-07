@@ -782,3 +782,18 @@ func TestASwellIsBlamedOnThePageThatPushedHistory(t *testing.T) {
 		t.Fatalf("the calm page says %q", st.Notice)
 	}
 }
+
+// A popup that committed and loaded before its session was set up sends no event for either: on a
+// loaded machine its title stayed empty, and nothing would ever read it.
+func TestAPopupThatLoadedBeforeItsSetUpGetsItsTitle(t *testing.T) {
+	f, v, _ := surfaceFixture(t)
+	answerAddress(f.c, "https://popup.example/two", "https://popup.example")
+	f.c.Reply("Page.getNavigationHistory", func(c browsertest.Call) (any, error) {
+		if c.Session == popup {
+			return map[string]any{"currentIndex": 0, "entries": []map[string]any{{"id": 1, "url": "https://popup.example/two", "title": "Two"}}}, nil
+		}
+		return map[string]any{"currentIndex": 0, "entries": []map[string]any{{"id": 1}}}, nil
+	})
+	openPopup(t, f, v)
+	next(t, v, "the popup's title", func(st browser.State) bool { return st.Popup && st.Title == "Two" })
+}
