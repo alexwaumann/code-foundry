@@ -77,7 +77,7 @@ export function BrowserToolbar({ surface, state, onLeave }: { surface: string; s
       </Tip>
       <div className="relative min-w-0 flex-1">
         <input
-          className="h-7 w-full min-w-0 rounded-md bg-cf-surface-sunken px-2.5 text-body-sm text-cf-text-secondary outline-none focus:text-cf-text-primary focus-visible:ring-1 focus-visible:ring-ring"
+          className="h-7 w-full min-w-0 rounded-md bg-cf-surface-sunken px-2.5 text-body-sm text-cf-text-secondary outline-none focus:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus/50"
           aria-label="Address"
           placeholder="Enter an address"
           spellCheck={false}
@@ -105,7 +105,7 @@ export function BrowserToolbar({ surface, state, onLeave }: { surface: string; s
             <button
               type="button"
               aria-label="Discard what was typed"
-              className="absolute top-1.5 right-1.5 grid size-4 place-items-center rounded-sm text-cf-icon-muted hover:text-cf-text-primary"
+              className="absolute top-1.5 right-1.5 grid size-4 place-items-center rounded-sm text-cf-icon-muted hover:text-cf-text"
               onClick={() => {
                 setDraft(null);
               }}

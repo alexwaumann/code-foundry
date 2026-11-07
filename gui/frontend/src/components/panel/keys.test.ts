@@ -120,6 +120,7 @@ describe("surface registry", () => {
       ["changes", undefined],
       ["mcp", undefined],
       ["gallery", undefined],
+      ["browser", "c"],
     ]);
     expect(surfaceOf("diff")?.title).toBe("Diff");
     expect(surfaceOf("changes")?.title).toBe("Changes");

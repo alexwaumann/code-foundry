@@ -81,7 +81,7 @@ export function BrowserSurface() {
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="browser-surface">
       <BrowserToolbar surface={surface} state={state} onLeave={leave} />
-      <div ref={box} className="relative min-h-0 flex-1 overflow-hidden bg-white">
+      <div ref={box} className="relative min-h-0 flex-1 overflow-hidden bg-cf-surface">
         <canvas
           ref={canvas}
           className="absolute inset-0 size-full"

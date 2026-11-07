@@ -32,7 +32,7 @@ function failed(surface: string): (err: unknown) => void {
 
 function Card({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <div className="absolute inset-0 z-10 grid place-items-center bg-black/30 p-4" role="dialog" aria-label={label} data-testid="browser-overlay">
+    <div className="absolute inset-0 z-10 grid place-items-center bg-cf-scrim p-4" role="dialog" aria-label={label} data-testid="browser-overlay">
       <div className="flex max-h-full w-full max-w-sm flex-col gap-3 overflow-auto rounded-lg border border-cf-divider bg-cf-surface p-4 shadow-md">{children}</div>
     </div>
   );
@@ -53,7 +53,7 @@ function PageDialog({ surface, d }: { surface: string; d: BrowserDialogView }) {
       {d.kind === "prompt" && (
         <input
           autoFocus
-          className="h-8 rounded-md bg-cf-surface-sunken px-2.5 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="h-8 rounded-md bg-cf-surface-sunken px-2.5 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-cf-focus/50"
           aria-label="Answer"
           value={text}
           onChange={(e) => {
@@ -165,7 +165,7 @@ function PageSelect({ surface, s, scale }: { surface: string; s: BrowserSelectVi
             <button
               type="button"
               disabled={o.disabled}
-              className={cn("block w-full truncate px-3 py-1 text-left text-body-sm hover:bg-accent disabled:text-cf-text-muted disabled:hover:bg-transparent", i === s.selected && "font-medium")}
+              className={cn("block w-full truncate px-3 py-1 text-left text-body-sm hover:bg-cf-control-hover disabled:text-cf-text-muted disabled:hover:bg-transparent", i === s.selected && "font-medium")}
               onClick={() => {
                 pick(i);
               }}
@@ -186,7 +186,7 @@ function Strip({ children, onClose, tone = "plain" }: { children: ReactNode; onC
       <div className="flex min-w-0 flex-1 items-center gap-2 text-body-sm">{children}</div>
       {onClose && (
         <Tip label="Dismiss">
-          <button type="button" aria-label="Dismiss" className="grid size-5 shrink-0 place-items-center rounded-sm text-cf-icon-muted hover:text-cf-text-primary" onClick={onClose}>
+          <button type="button" aria-label="Dismiss" className="grid size-5 shrink-0 place-items-center rounded-sm text-cf-icon-muted hover:text-cf-text" onClick={onClose}>
             <X className="size-3" />
           </button>
         </Tip>
@@ -324,7 +324,7 @@ export function BrowserOverlays({
         {downloads.length > 0 && finished > cleared && (
           <button
             type="button"
-            className="self-end text-caption text-cf-text-muted hover:text-cf-text-primary"
+            className="self-end text-caption text-cf-text-muted hover:text-cf-text"
             onClick={() => {
               setCleared(finished);
             }}
