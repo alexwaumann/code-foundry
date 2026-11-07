@@ -17,8 +17,8 @@ func TestSafeName(t *testing.T) {
 		{"hidden", ".zshrc", "zshrc"},
 		{"only dots", "...", "download"},
 		{"empty", "", "download"},
-		{"bidi override", "report‮fdp.exe", "reportfdp.exe"},
-		{"zero width", "in​voice.pdf", "invoice.pdf"},
+		{"bidi override", "report\u202Efdp.exe", "reportfdp.exe"},
+		{"zero width", "in\u200Bvoice.pdf", "invoice.pdf"},
 		{"control", "a\x00b\nc.txt", "abc.txt"},
 		{"a mac separator", "a:b.txt", "a_b.txt"},
 	} {
