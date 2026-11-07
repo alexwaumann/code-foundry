@@ -63,7 +63,9 @@ export interface BrowserStateView {
   phase: BrowserPhaseView;
   message: string;
   url: string;
-  /** The domain url is registered under: the part the bar keeps visible. */
+  /** Who the page is, in Chrome's word: a blank page has the one it inherited, and empty is a page nobody can name. */
+  origin: string;
+  /** The domain origin is registered under: the part the bar keeps visible. */
   site: string;
   security: BrowserSecurityView;
   title: string;
@@ -78,7 +80,7 @@ export interface BrowserStateView {
   downloads: readonly BrowserDownloadView[];
   /** Refused downloads the list had no room for. */
   downloadsBlocked: number;
-  /** Goes up when a click left new text on Chrome's own clipboard. */
+  /** Goes up when a click left new text on Chrome's own clipboard, and back to 0 when the page it was left on goes. */
   copied: number;
 }
 
@@ -87,6 +89,7 @@ export const BROWSER_STARTING: BrowserStateView = {
   phase: "starting",
   message: "",
   url: "",
+  origin: "",
   site: "",
   security: "",
   title: "",
@@ -129,6 +132,7 @@ export function toBrowserState(s: BrowserState): BrowserStateView {
     phase: phases[s.phase],
     message: s.message,
     url: s.url,
+    origin: s.origin,
     site: s.site,
     security: toSecurity(s.security),
     title: s.title,

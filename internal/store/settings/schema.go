@@ -417,7 +417,7 @@ var staticFields = []Field{
 	// Advanced › Experimental (docs/notes/chrome-surface.md).
 	{
 		Key: KeyChromeSurface, Group: GroupExperimental, Page: PageAdvanced, Section: "experimental", Type: Bool, Title: "Chrome surface",
-		Description: "Adds a Browser tab to side panels: real sites, in a headless Google Chrome with a profile of its own. Off, nothing shows and nothing runs.",
+		Description: "Adds a Browser tab to side panels: real sites, in a headless Google Chrome with a profile of its own. Any thread can operate this browser: its Claude can read the page, click, type and go anywhere, as you, on every site you sign in to here. Sign-ins stay on disk after you turn this off. To remove them, delete the browser folder in ~/.code-foundry. Off, nothing shows and nothing runs.",
 		Default:     "false",
 		bind:        func(s *Settings) any { return &s.Experimental.ChromeSurface },
 	},

@@ -26,13 +26,17 @@ import { relaunch, setBrowserError } from "@/stores/browser";
  *
  * A page puts these up when it likes, so none of them takes the keyboard by itself: a timed
  * prompt would otherwise pull the user's typing out of the composer and hand it to the page. An
- * overlay gets focus only if the user is already in this surface (surfaceFocus), or clicks it.
+ * overlay gets focus only if the user is already in the page (pageFocus), or clicks it. The toolbar
+ * is outside the page: an address being typed there is the app's, and no page takes it.
  */
 
-/** Gives el the keyboard if it is already in el's surface, and leaves it alone everywhere else. */
-function surfaceFocus(el: HTMLElement | null): void {
-  if (el?.closest("[data-browser-surface]")?.contains(document.activeElement)) el.focus({ preventScroll: true });
+/** Gives el the keyboard if it is already in el's page, and leaves it alone everywhere else. */
+function pageFocus(el: HTMLElement | null): void {
+  if (el?.closest("[data-browser-page]")?.contains(document.activeElement)) el.focus({ preventScroll: true });
 }
+
+/** Who asks, when nothing can say: an overlay always names someone, and never leaves a blank. */
+const UNNAMED = "An unknown site";
 
 /** An overlay that held the keyboard hands it back to the page as it goes, not to the body. */
 function useReturnFocus(root: RefObject<HTMLElement | null>, onLeave: () => void): void {
@@ -74,7 +78,7 @@ function PageDialog({ surface, d, onLeave }: { surface: string; d: BrowserDialog
   const [text, setText] = useState(d.defaultPrompt);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    surfaceFocus(input.current);
+    pageFocus(input.current);
   }, []);
   const answer = (accept: boolean) => {
     answerBrowserDialog(surface, d.id, accept, text).catch(failed(surface));
@@ -83,7 +87,7 @@ function PageDialog({ surface, d, onLeave }: { surface: string; d: BrowserDialog
   return (
     <Card label="The page asks" onLeave={onLeave}>
       <p className="text-caption break-words text-cf-text-muted">
-        <span className="font-medium text-cf-text">{d.site || d.origin || "This page"}</span> says
+        <span className="font-medium text-cf-text">{d.site || d.origin || UNNAMED}</span> says
       </p>
       <AskerOrigin site={d.site} origin={d.origin} />
       <p className="text-body whitespace-pre-wrap break-words" data-testid="browser-dialog-message">
@@ -148,7 +152,7 @@ function PageFileChooser({ surface, f, onLeave }: { surface: string; f: BrowserF
   return (
     <Card label="The page asks for files" onLeave={onLeave}>
       <p className="text-body break-words">
-        <span className="font-medium">{f.site || f.origin || "This page"}</span> asks for {f.multiple ? "files" : "a file"}. What you choose goes to the site.
+        <span className="font-medium">{f.site || f.origin || UNNAMED}</span> asks for {f.multiple ? "files" : "a file"}. What you choose goes to the site.
       </p>
       <AskerOrigin site={f.site} origin={f.origin} />
       {noHost && <p className="text-body-sm text-cf-text-muted">Choosing files needs the app's window.</p>}
@@ -172,7 +176,7 @@ function PageSelect({ surface, s, scale, onLeave }: { surface: string; s: Browse
     answerBrowserSelect(surface, s.id, i).catch(failed(surface));
   };
   useEffect(() => {
-    surfaceFocus(list.current);
+    pageFocus(list.current);
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   }, []);
   return (
@@ -244,7 +248,7 @@ function DownloadLine({ surface, d }: { surface: string; d: BrowserDownloadView 
     return (
       <Strip tone="warn">
         <span className="min-w-0 flex-1 break-words">
-          <span className="font-medium">{d.site || "This page"}</span> wants to download {d.name || "a file"}
+          <span className="font-medium">{d.site || UNNAMED}</span> wants to download {d.name || "a file"}
         </span>
         <button
           type="button"
@@ -397,6 +401,8 @@ export function BrowserOverlays({
   onDismissError: () => void;
 }) {
   const [seenCopied, setSeenCopied] = useState(state.copied);
+  // The daemon drops a page's text with the page, and counts from 0 on the next.
+  if (state.copied < seenCopied) setSeenCopied(state.copied);
   return (
     <>
       <PhaseCover surface={surface} state={state} />
