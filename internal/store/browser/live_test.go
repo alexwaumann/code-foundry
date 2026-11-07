@@ -2,8 +2,10 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -225,6 +228,8 @@ func TestLive(t *testing.T) {
 		{"ResizeReflowsAndCasts", liveResizeReflowsAndCasts},
 		{"NoFramesOnAStillPageAndNoneOnceHidden", liveNoFramesOnAStillPageAndNoneOnceHidden},
 		{"FramesSurviveAMoveToAnotherSite", liveFramesSurviveAMoveToAnotherSite},
+		{"ADeadAddressSaysSo", liveADeadAddressSaysSo},
+		{"DraggingSelectsText", liveDraggingSelectsText},
 		{"SelectIsDrawnByTheGUI", liveSelectIsDrawnByTheGUI},
 		{"DialogsAskTheViewer", liveDialogsAskTheViewer},
 		{"NewWindowsLandInTheSurfaceAndCloseBack", liveNewWindowsLandInTheSurfaceAndCloseBack},
@@ -320,6 +325,41 @@ func liveNoFramesOnAStillPageAndNoneOnceHidden(t *testing.T, l *live) {
 			t.Fatal("a returning view got no frame")
 		}
 	}
+}
+
+func liveADeadAddressSaysSo(t *testing.T, l *live) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead := "http://" + ln.Addr().String() + "/"
+	_ = ln.Close()
+	if _, err := l.s.Navigate(context.Background(), l.key, dead); err != nil {
+		t.Fatal(err)
+	}
+	st := l.until("the notice", func(st State) bool { return st.Notice != "" })
+	if !strings.Contains(st.Notice, "ERR_CONNECTION_REFUSED") {
+		t.Fatalf("notice %q", st.Notice)
+	}
+	// And the next page clears it.
+	if _, err := l.s.Navigate(context.Background(), l.key, l.srv.URL+"/two"); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the page", func(st State) bool { return st.Title == "Two" && st.Notice == "" })
+}
+
+func liveDraggingSelectsText(t *testing.T, l *live) {
+	l.eval(`t.value="select this by dragging";1`, nil)
+	err := l.s.Input(context.Background(), l.key, []InputEvent{
+		{Mouse: &MouseEvent{Type: "mousePressed", Button: "left", X: 24, Y: 90, Buttons: 1, ClickCount: 1}},
+		{Mouse: &MouseEvent{Type: "mouseMoved", Button: "left", X: 90, Y: 90, Buttons: 1}},
+		{Mouse: &MouseEvent{Type: "mouseMoved", Button: "left", X: 160, Y: 90, Buttons: 1}},
+		{Mouse: &MouseEvent{Type: "mouseReleased", Button: "left", X: 160, Y: 90, ClickCount: 1}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.evalUntil("String(t.selectionEnd>t.selectionStart)", eq("true"))
 }
 
 func liveFramesSurviveAMoveToAnotherSite(t *testing.T, l *live) {
@@ -496,6 +536,13 @@ func liveClipboardStaysInChromeUntilTheUserMovesIt(t *testing.T, l *live) {
 		t.Fatalf("copied %q", got)
 	}
 	// Reading happens in a page of our own, and leaves the user's page and focus alone.
+	l.copied.Store("what the Mac holds")
+	if n, err := l.s.Copy(ctx, l.key); err != nil || n != 0 {
+		t.Fatalf("a second cmd+c with nothing new moved %d characters: %v", n, err)
+	}
+	if got := l.copied.Load(); got != "what the Mac holds" {
+		t.Fatalf("the Mac's clipboard became %q", got)
+	}
 	l.evalUntil("document.activeElement.id", eq("t"))
 	l.evalUntil("String(document.hasFocus())", eq("true"))
 
@@ -538,6 +585,24 @@ func TestLiveChromeDiesThenRelaunchReturnsToThePage(t *testing.T) {
 	l.until("the same page", func(st State) bool { return st.Phase == PhaseReady && st.Title == "Live page" })
 	if err := l.s.Input(ctx, l.key, []InputEvent{{Mouse: &MouseEvent{Type: "mouseMoved", Button: "none", X: 5, Y: 5}}}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLiveNothingOutlivesTheStore(t *testing.T) {
+	l := startLive(t)
+	l.s.mu.Lock()
+	p := l.s.chrome.proc.(*process)
+	l.s.mu.Unlock()
+	group := p.cmd.Process.Pid
+	l.s.Close()
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		// Signal 0 to the group: ESRCH once no member is left.
+		if err := syscall.Kill(-group, 0); errors.Is(err, syscall.ESRCH) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("group %d still has members", group)
+		}
 	}
 }
 

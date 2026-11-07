@@ -248,16 +248,17 @@ func (sf *surface) end(err error) {
 // Watch opens a view of the named surface, creating it, and brings it up in the background:
 // the viewer's first state says it is starting. width and height are the view's size. address,
 // when set, is where to go: it comes with the view because an address for a panel nobody sees
-// must start nothing.
+// must start nothing. A refused address does not fail the view, which would end its stream for
+// good: the surface says so instead.
 func (s *Store) Watch(key string, width, height int, address string) (*Viewer, error) {
 	if key == "" || len(key) > maxSurfaceKey {
 		return nil, ErrNoSurface
 	}
-	var first string
+	first, refused := "", ""
 	if address != "" {
 		u, err := NormalizeURL(address)
 		if err != nil {
-			return nil, err
+			refused = err.Error()
 		}
 		first = u
 	}
@@ -278,6 +279,9 @@ func (s *Store) Watch(key string, width, height int, address string) (*Viewer, e
 	sf.setSize(width, height)
 	if first != "" {
 		sf.pending = first
+	}
+	if refused != "" {
+		sf.state.Notice = refused
 	}
 	v := &Viewer{store: s, sf: sf, wake: make(chan struct{}, 1)}
 	sf.viewers[v] = struct{}{}
@@ -369,16 +373,19 @@ func (s *Store) bringUp(sf *surface) {
 	cast := len(sf.viewers) > 0 && !t.casting
 	sf.publish()
 	s.mu.Unlock()
-	if address != "" {
-		if err := s.goTo(ctx, in, t, address); err != nil {
-			s.notice(sf, "Could not open that page.")
-			s.log.Debug("navigate failed", "err", err)
-		}
-	}
 	if cast {
 		if err := s.startCast(ctx, in, t); err != nil {
 			s.log.Debug("screencast did not start", "err", err)
 		}
+	}
+	if address != "" {
+		// Not under the up lock: a slow site must not hold the surface's frames back.
+		go func() {
+			if err := s.goTo(ctx, in, t, address); err != nil {
+				s.notice(sf, "Could not open that page.")
+				s.log.Debug("navigate failed", "err", err)
+			}
+		}()
 	}
 }
 
@@ -574,19 +581,36 @@ func (s *Store) Navigate(ctx context.Context, key, typed string) (string, error)
 	return u, s.goTo(ctx, in, t, u)
 }
 
-// goTo is the one place Page.navigate is called. u has passed NormalizeURL.
+// goTo is the one place Page.navigate is called. u has passed NormalizeURL. It answers once the
+// page starts to load, which a slow site can take a while to do.
 func (s *Store) goTo(ctx context.Context, in *instance, t *target, u string) error {
 	s.clearNotice(t)
 	var res struct {
 		ErrorText string `json:"errorText"`
 	}
-	if err := in.call(ctx, t.session, "Page.navigate", map[string]any{"url": u}, &res); err != nil {
+	ctx, cancel := context.WithTimeout(ctx, navigateTimeout)
+	defer cancel()
+	if err := in.conn.call(ctx, t.session, "Page.navigate", map[string]any{"url": u}, &res); err != nil {
 		return err
 	}
 	if res.ErrorText != "" {
-		s.log.Debug("navigate", "err", res.ErrorText)
+		if words := navigationWords(res.ErrorText); words != "" {
+			s.notice(t.surface, words)
+		}
 	}
 	return nil
+}
+
+// navigationWords says why a navigation failed, in the surface's words when it can do better
+// than Chrome's code.
+func navigationWords(code string) string {
+	switch code {
+	case "net::ERR_ABORTED":
+		return "" // a navigation that became a download
+	case "net::ERR_INVALID_AUTH_CREDENTIALS":
+		return "This site asks for a user name and password, and this surface cannot ask for them yet."
+	}
+	return "Could not open that page: " + clip(code, maxLabel)
 }
 
 func (s *Store) clearNotice(t *target) {

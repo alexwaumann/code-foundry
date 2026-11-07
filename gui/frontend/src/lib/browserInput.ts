@@ -28,6 +28,13 @@ export function buttonName(button: number): BrowserMouseView["button"] {
   return BUTTONS[button] ?? "none";
 }
 
+/** The button held during a move: a drag selects text only when the move names it. */
+export function heldButton(buttons: number): BrowserMouseView["button"] {
+  if (buttons & 1) return "left";
+  if (buttons & 2) return "right";
+  return buttons & 4 ? "middle" : "none";
+}
+
 /** A point in the view as CSS pixels of the page, which may still be the size before a resize. */
 export function toPage(clientX: number, clientY: number, box: { left: number; top: number; width: number; height: number }, page: { width: number; height: number }) {
   const sx = box.width > 0 && page.width > 0 ? page.width / box.width : 1;

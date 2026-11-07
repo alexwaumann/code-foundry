@@ -195,6 +195,11 @@ describe("strips", () => {
     expect(dismiss).toHaveBeenCalledTimes(1);
   });
 
+  it("says when the stream is lost, so a stale frame does not pass for the page", () => {
+    render(<BrowserOverlays surface="thread:t1" state={ready} error="" offline scale={{ x: 1, y: 1 }} onDismissError={vi.fn()} />);
+    expect(screen.getByTestId("browser-strip").textContent).toContain("Reconnecting");
+  });
+
   it("shows the surface's notice", () => {
     show({ ...ready, notice: "This page crashed. Reload to try again." });
     expect(screen.getByTestId("browser-strip").textContent).toContain("crashed");

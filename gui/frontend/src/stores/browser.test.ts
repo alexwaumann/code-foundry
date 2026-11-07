@@ -32,7 +32,7 @@ const browserTabs = (k = key) => allTabs(getPanel(k)).filter((t) => t.kind === "
 beforeEach(() => {
   vi.clearAllMocks();
   usePanelStore.setState({ byKey: {} });
-  useBrowserStore.setState({ states: {}, pending: {}, errors: {} });
+  useBrowserStore.setState({ states: {}, pending: {}, errors: {}, offline: {} });
   useUiStore.setState({ selection: sel });
   useThreadsStore.setState({ byId: { t1: { id: "t1" } as never } });
   setting(true);

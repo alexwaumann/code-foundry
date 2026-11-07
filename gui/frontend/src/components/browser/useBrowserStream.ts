@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { resizeBrowser, watchBrowser, type BrowserEventView, type BrowserFrameView } from "@/api/browser";
 import { isPageVisible, onVisibilityChange, runStream } from "@/api/stream";
-import { setBrowserError, setBrowserState, takeBrowserAddress } from "@/stores/browser";
+import { setBrowserOffline, setBrowserState, takeBrowserAddress } from "@/stores/browser";
 
 /** How long a resize settles before the page reflows: a drag sends its last size, not each. */
 const RESIZE_SETTLE_MS = 120;
@@ -102,11 +102,8 @@ export function useBrowserStream(surface: string, box: RefObject<HTMLElement | n
         page.current = { width: ev.frame.width, height: ev.frame.height };
         paint(ev.frame);
       },
-      onError: (err) => {
-        setBrowserError(surface, err);
-      },
-      onMessage: () => {
-        setBrowserError(surface, null);
+      onStatus: (status) => {
+        setBrowserOffline(surface, status === "retrying");
       },
     });
     // The size goes through Resize below; it must not reopen the stream.

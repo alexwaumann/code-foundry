@@ -186,9 +186,9 @@ func (p *process) drain(r *os.File) {
 	}
 }
 
-// Stop closes the pipe, which Chrome takes as the order to exit, then signals its process
-// group: that group is Chrome and its helpers and nothing else (Setpgid above). It stops only
-// the process it started, never one found by name.
+// Stop closes the pipe, which Chrome takes as the order to exit, then signals its process group
+// if it has to, and in any case sweeps it: that group is Chrome and its helpers and nothing else
+// (Setpgid above). It stops only the process it started, never one found by name.
 func (p *process) Stop() {
 	_ = p.toChrome.Close()
 	if p.wait(stopGrace) {
