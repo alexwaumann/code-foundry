@@ -25,7 +25,8 @@ const SOCKET_CLOSED = 3;
  * empties the socket whether or not the page runs, so these counts are all that stops a daemon
  * filling a page that has stopped (docs/notes/ws-transport.md). Sent only to a daemon whose head
  * asks for them: one from before them, which an update leaves running until `daemon restart`,
- * reads a count as the client closing.
+ * reads a count as the client closing. Mirrored by `countStep` there, which holds a close frame
+ * back from a count: keep them equal (docs/notes/tunnel-close-drain.md).
  */
 const ACK_BYTES = 2 << 20;
 

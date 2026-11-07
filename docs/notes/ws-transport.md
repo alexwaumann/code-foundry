@@ -108,8 +108,9 @@ That held only for the page's own drop. The daemon has one too, and it can come 
 flood, 21 `Attach` tunnels ended `served` and `dropped slow attach subscriber` counted exactly 21. So
 the terminal store's slow-subscriber drop ended them, not `fallBehind`. `internal/api/terminal.go`
 returns `ResourceExhausted` for it, which put `AttachController` in `reconnecting`, so "Reconnecting…"
-flashed until the next snapshot. #595 keeps that drop `live` too, apart from about 5% of them that
-reach the page as a dead socket (`docs/notes/terminal-flood-label.md`). Nothing is lost either way.
+flashed until the next snapshot. #595 keeps that drop `live` too. About 5% of them reached the page as
+a dead socket until the daemon held its close frame back from the last count
+(`docs/notes/tunnel-close-drain.md`). Nothing is lost either way.
 
 ### After xterm's parse loop
 
