@@ -60,7 +60,7 @@ export class MockBrowser {
   }
 
   commands(emit: (i: UiIntentInit) => number) {
-    const when = (_ctx: UiContext | undefined) => this.enabled();
+    const when = () => this.enabled();
     const refused = (name: string, title: string) => ({
       cmd: { name, title, category: "Browser", description: `${title}. Only from the window: refused from the CLI.`, keybindings: [] as string[], args: [] },
       when,

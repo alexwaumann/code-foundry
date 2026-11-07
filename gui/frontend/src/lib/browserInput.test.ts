@@ -80,7 +80,7 @@ describe("ClickCounter", () => {
 describe("keys", () => {
   it("types printable keys and Enter, and sends the rest raw", () => {
     expect(keyDown(key())).toMatchObject({ type: "keyDown", text: "a" });
-    expect(keyDown(key({ key: "Enter", code: "Enter", keyCode: 13 }))).toMatchObject({ type: "keyDown", text: "\r" });
+    expect(keyDown(key({ key: "Enter", code: "Enter" }))).toMatchObject({ type: "keyDown", text: "\r" });
     expect(keyDown(key({ key: "ArrowLeft", code: "ArrowLeft" }))).toMatchObject({ type: "rawKeyDown", text: "" });
     expect(keyDown(key({ metaKey: true }))).toMatchObject({ type: "rawKeyDown", text: "", modifiers: 4 });
     expect(keyDown(key({ ctrlKey: true }))).toMatchObject({ type: "rawKeyDown", text: "" });
