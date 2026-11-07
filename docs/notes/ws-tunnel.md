@@ -63,6 +63,8 @@ the bus's drop rules work as designed.
   counts reads the first one as the client closing, and a new GUI on one reconnected constantly, 19
   Attach sockets in a few seconds, each resending the snapshot. Without the field a stream runs with
   no flow control, as it did on that daemon before.
+- The close frame waits until no count is due, for up to `FinalTimeout`: in WebKit a count crossing it
+  can fail the socket and lose the end of the stream (`docs/notes/tunnel-close-drain.md`).
 - The other way round, a page from before counts on a new daemon never sends one, so a stream that
   passes 8 MiB in its life stalls, ends in `write timeout` and reconnects. Such a page tunnels only
   `WatchBoard`, which takes months of heartbeats to get there.

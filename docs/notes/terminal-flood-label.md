@@ -37,14 +37,11 @@ page's own `fallBehind` does.
 
 ## What is left
 
-- **About 5% of drops still flash: 24 of 503.** The page sees those as a dead socket (close 1006),
-  the same as a killed daemon, so it cannot tell them apart and shows the label for about 350 ms.
-  The tunnel logged `served` for them, so the daemon wrote its end of stream and its 1000. Neither
-  reached the page: the last frame was plain output. In the 270 sockets checked, all 15 dead ones
-  had sent a flow-control count within 8.5 KB of the end, and none of the 62 clean ones that sent
-  a count had done so within 23 KB. So a count crossing the daemon's close loses the end of the
-  stream. A TCP reset from closing with that count unread would fit, but no capture confirms it.
-  The fix belongs in `wstunnel`'s hang-up, which this change leaves alone.
+- **About 5% of drops used to flash, 24 of 503; now none do, 0 of 324.** The page saw those as a
+  dead socket (close 1006), the same as a killed daemon, and showed the label for about 350 ms. A
+  flow-control count crossing the daemon's close frame failed the socket inside WebKit, so the
+  daemon now holds that frame until no count is due (`docs/notes/tunnel-close-drain.md`). It was not
+  the TCP reset this note first suggested.
 - **A hang on an open stream shows nothing, as before.** `SIGSTOP` at a moment with no drop left
   the page `live` with no label for the 9 s it was held: an attempt that has sent no heartbeat is
   not watched, and a flood sends none. `fallBehind`'s reopen has no deadline either (from reading

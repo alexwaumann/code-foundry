@@ -9,13 +9,15 @@
 //	daemon: text    {"status":200,"headers":{...},"counts":true}
 //	daemon: binary  one message per Flush of the handler: Connect's envelopes, unchanged
 //	client: text    "1048576": the body bytes it has taken so far, sent as it goes
-//	daemon: close   1000 once the handler has returned, 1013 if a write failed first
+//	daemon: close   1000 once the handler has returned and no count is due, 1013 if a write failed first
 //
 // Those counts are the flow control: a browser takes everything off the socket whether or not
 // its page is running, so nothing else tells the daemon that a client has stopped reading
 // (docs/notes/ws-transport.md). At most Options.Window bytes go uncounted. The head's "counts"
 // is what lets a client send them: a daemon from before them, which an update leaves running,
-// reads any text past the request as the client's close.
+// reads any text past the request as the client's close. The close frame waits for the last one:
+// in WebKit a send that crosses it can fail the socket and lose what the page has not taken yet
+// (docs/notes/tunnel-close-drain.md).
 //
 // The tunnel owns no RPC: it replays the call as a POST through Options.Next, so a new
 // stream needs nothing here, and the bearer check, its scopes and Connect's framing and
@@ -60,6 +62,11 @@ const (
 	// hold per stream. The client's step must stay smaller (ACK_BYTES in api/wsFetch.ts).
 	defaultWindow = 8 << 20
 
+	// countStep is how often the client counts, ACK_BYTES in api/wsFetch.ts: it sends one as soon
+	// as this much has arrived since the last. Keep them equal. Smaller here, a close waits out
+	// FinalTimeout for a count that is not coming; larger, a close can cross one.
+	countStep = 2 << 20
+
 	defaultFirstFrameTimeout = 5 * time.Second
 	defaultWriteTimeout      = 30 * time.Second
 	defaultFinalTimeout      = time.Second
@@ -89,8 +96,8 @@ type Options struct {
 	// WriteTimeout bounds each message, the wait for room in the window included, so a
 	// client that stopped reading cannot pin a handler. Zero: 30 s.
 	WriteTimeout time.Duration
-	// FinalTimeout bounds the last flush, the close handshake, and any write still blocked
-	// once the handler's context has ended. Zero: 1 s.
+	// FinalTimeout bounds the last flush, the wait for the client's last count, the close
+	// handshake, and any write still blocked once the handler's context has ended. Zero: 1 s.
 	FinalTimeout time.Duration
 	// Window is how many body bytes may be out with no count from the client. A message
 	// goes whole once there is room, so one may pass it. Zero: 8 MiB.
@@ -304,6 +311,8 @@ func (t *Tunnel) serve(r *http.Request, c *websocket.Conn, conn net.Conn, proc, 
 	code := websocket.StatusNormalClosure
 	if w.err != nil {
 		code = websocket.StatusTryAgainLater
+	} else {
+		room.awaitCounts(end.told, t.opts.FinalTimeout)
 	}
 	t.hangUp(c, conn, code, "", stopRead)
 	if reason != "client gone" {
@@ -447,6 +456,31 @@ func (w *window) reserve(ctx context.Context, n int) error {
 		case <-moved:
 		case <-ctx.Done():
 			return fmt.Errorf("wait for the client's count: %w", ctx.Err())
+		}
+	}
+}
+
+// awaitCounts waits until the client has no count left to send, for up to d or until it has gone.
+// Less than countStep uncounted means none is due: the client counts on passing a step past its
+// last count, and that is all a close frame may not cross. A client that has stopped, or never
+// counts, costs d.
+func (w *window) awaitCounts(gone <-chan struct{}, d time.Duration) {
+	limit := time.NewTimer(d)
+	defer limit.Stop()
+	for {
+		w.mu.Lock()
+		due := w.sent-w.acked >= countStep
+		moved := w.moved
+		w.mu.Unlock()
+		if !due {
+			return
+		}
+		select {
+		case <-moved:
+		case <-gone:
+			return
+		case <-limit.C:
+			return
 		}
 	}
 }
