@@ -101,6 +101,35 @@ OVERLAP_FIXTURE = {
 }
 
 
+# w1-audit's project: more exported functions than a 500-character summary can name. The
+# untested ones are what the parent has to pass on (`relay` in tasks.json), and they are found
+# only by the child: the prompt keeps the parent out of the code.
+AUDIT_TESTED = ["ParseLedgerEntry", "FormatLedgerEntry", "SumLedgerEntries", "RoundToCents", "ConvertCurrency",
+                "NormalizeAccountName", "SplitInvoiceLine", "MergeInvoiceLines", "ValidateTaxCode", "ComputeLateFee"]
+AUDIT_UNTESTED = ["ReconcileStatementTotals", "AllocatePartialPayment", "ReverseJournalPosting", "ProrateSubscriptionCharge",
+                  "ConsolidateVendorCredits", "ApplyEarlyPaymentDiscount", "ExpireUnclaimedRefunds", "ReassignOrphanedTransactions",
+                  "RecalculateDeferredRevenue", "EscalateOverdueReceivables", "FreezeClosedPeriodBalances",
+                  "RebuildAgingBucketSummary", "VoidDuplicateRemittance", "CapitalizeQualifyingExpenses"]
+
+
+def audit_fixture():
+    funcs = AUDIT_TESTED + AUDIT_UNTESTED
+    files = {"go.mod": "module example.com/ledger\n\ngo 1.24\n", "README.md": "# ledger\n\nBookkeeping helpers.\n"}
+    for i, part in enumerate(("entries", "invoices", "periods", "payments")):
+        body = "".join(f"// {f} is one of the ledger's helpers.\nfunc {f}(cents int) int {{\n\treturn cents + {n}\n}}\n\n"
+                       for n, f in enumerate(funcs[i::4]))
+        files[f"{part}.go"] = "package ledger\n\n" + body
+    tests = "".join(f"func Test{f}(t *testing.T) {{\n\tif {f}(0) < 0 {{\n\t\tt.Fatal(\"negative\")\n\t}}\n}}\n\n" for f in AUDIT_TESTED)
+    files["ledger_test.go"] = 'package ledger\n\nimport "testing"\n\n' + tests
+    return files
+
+
+# w2-followup's project: the overlap one plus a word only the child reads, in a follow-up turn.
+FOLLOWUP_FIXTURE = {**OVERLAP_FIXTURE, "docs/codeword.txt": "marigold-47\n"}
+
+FIXTURES = {"overlap": OVERLAP_FIXTURE, "audit": audit_fixture(), "followup": FOLLOWUP_FIXTURE}
+
+
 def log(msg):
     print(time.strftime("%H:%M:%S"), msg, flush=True)
 
@@ -184,10 +213,11 @@ class Home:
     def git(self, *args, cwd=None):
         subprocess.run(["git", *args], cwd=cwd or self.repo, env=clean_env(), check=True, capture_output=True)
 
-    def set_up(self, model, effort, own=False):
-        """own: a home task's home, with its project and cheaper workers."""
+    def set_up(self, model, effort, own=False, fixture="overlap"):
+        """own: a home task's home, with its project (`fixture`) and cheaper workers."""
         self.repo.mkdir()
-        for name, text in (OVERLAP_FIXTURE if own else FIXTURE).items():
+        for name, text in (FIXTURES[fixture] if own else FIXTURE).items():
+            (self.repo / name).parent.mkdir(parents=True, exist_ok=True)
             (self.repo / name).write_text(text)
         self.git("init", "--bare", "--initial-branch=main", str(self.origin), cwd=self.dir)
         self.git("init", "--initial-branch=main")
@@ -348,7 +378,7 @@ def run_home_task(root, rnd, task, args, out, stop, homes):
     h = Home(root, f"r{rnd}-{task['id']}", args.bin)
     homes.append(h)
     h.start()
-    h.set_up(MODELS[args.model], args.effort, own=True)
+    h.set_up(MODELS[args.model], args.effort, own=True, fixture=task.get("fixture", "overlap"))
     args.build = h.cf("version").stdout.strip()
     run_task(h, task, rnd, args, out, stop)
     if not (out / "guidance.json").exists():

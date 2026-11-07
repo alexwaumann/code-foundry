@@ -118,6 +118,35 @@ and `ember` on both sides, and score: pairs that conflict (`git.txt`), work in t
 children whose brief lacks the file split, the length of wake turns, cost, and whether it finished.
 The method and the first results are in `docs/notes/guide-orchestrate-ember.md`.
 
+## Wakes
+
+`report.md` has a second table for the tasks whose thread got wakes, and `compare` prints the same
+columns over both sides. They are outside the gate: read them with the runs.
+
+- **wakes, KB**: wake messages the thread under test got, and their size.
+- **wake-turn cost, reply chars**: what the turns they started cost and how much they said.
+- **reads**: wake turns that ran `thread read`, `items`, `get` or `reports`. **git**: wake turns that
+  looked at branches. Both show what a wake left out.
+- **no tool**: wake turns with no tool call. **acted**: wake turns that started, messaged or answered
+  a child. A wake that does neither was a turn for nothing.
+- **child reports**: `thread report` calls by the rest of the tree, `--help` aside.
+- **parent reads, parent git**: the same two over the whole run. A parent on `thread wait` has no
+  wake turn, and on a single child that is what Opus picks.
+- **relay**: of the task's `relay` patterns, how many the final reply has: what a child found and
+  the parent had to pass on.
+
+`w1-audit` (`fixture: audit`) needs 14 function names that a child alone finds, more than one short
+summary holds. `w2-followup` (`fixture: followup`) gets its answer in a follow-up turn, after any
+report the child filed. `w3-ember-audit` is `w1` through Ember, which only ever hears by wake. All
+three are `home` tasks with Sonnet 5.5 low workers. To A/B a wake change:
+
+```
+TASKS=t6-orchestrate,t10-overlap,ember-overlap,w1-audit,w2-followup,w3-ember-audit
+make guide-eval MODEL=opus TASKS=$TASKS LABEL=wake-before BIN=/path/to/before/bin/code-foundry
+make guide-eval MODEL=opus TASKS=$TASKS LABEL=wake-after
+make guide-eval-compare BEFORE=<dir> AFTER=<dir>
+```
+
 ## Limits
 
 - No app window is open:
