@@ -109,6 +109,9 @@ message BrowserState {
   // inherited, whatever its url says. Empty with a url: a page nobody can name, and a client must
   // say so rather than leave the address to speak for it.
   string origin = 18;
+  // The page showing has sent no frame yet: it just became another site's, or came on screen. The
+  // last frame a client drew is another page's, and the client covers it until the next one.
+  bool awaiting_frame = 19;
 }
 
 message BrowserDialog {

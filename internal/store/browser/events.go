@@ -20,10 +20,17 @@ type target struct {
 	// with history.pushState, and a blank page inherits it from whoever made it.
 	origin string
 	// commits counts the main frame's commits, so what was read before one is known to be stale.
-	commits int
+	// documents counts only those that made a new document, not a pushState.
+	commits, documents int
 	// visited is this page having been anything but the blank it started on: a blank that is no
 	// page has nothing on it, and any other blank is what someone wrote into.
-	visited    bool
+	visited bool
+	// popup is a page another one opened. Its blank is never the start of a surface, even once its
+	// opener has gone.
+	popup bool
+	// unpainted is a page that has sent no frame since it became another site's, or came on
+	// screen: what the surface last drew is someone else's, and a viewer covers it.
+	unpainted  bool
 	loading    bool
 	canBack    bool
 	canForward bool
@@ -52,8 +59,16 @@ func (t *target) shownOrigin() string {
 
 // commit takes what the main frame committed. Needs Store.mu.
 func (t *target) commit(address, origin string) {
+	was := t.shownOrigin()
 	t.url, t.origin = address, origin
 	t.commits++
+	t.documents++
+	if now := t.shownOrigin(); now != was || now == "" {
+		t.unpainted = true
+		if t.surface.top() == t {
+			t.surface.dropFrame()
+		}
+	}
 	if address != "about:blank" || origin != "" {
 		t.visited = true
 	}
@@ -167,6 +182,7 @@ func (s *Store) onFrame(in *instance, session string, params json.RawMessage) {
 		ack()
 		return
 	}
+	t.painted()
 	t.surface.frame = f
 	for v := range t.surface.viewers {
 		v.offerFrame(f)
@@ -210,6 +226,9 @@ func onFrameNavigated(s *Store, in *instance, t *target, params json.RawMessage)
 		t.surface.state.Notice = "This surface cannot show PDFs."
 	}
 	t.sel, t.chooser = nil, nil
+	// A new document has none of the old one's frames. Chrome does not always say so for a frame
+	// inside a frame, and one left counted holds a place under maxFrames for good.
+	in.forgetFrames(t)
 	if t.surface.top() == t {
 		t.surface.leftPage()
 	}
@@ -393,7 +412,7 @@ func onTargetCreated(s *Store, in *instance, params json.RawMessage) {
 	if opener == nil || in.targets[info.TargetID] != nil {
 		return
 	}
-	t := &target{id: info.TargetID, surface: opener.surface}
+	t := &target{id: info.TargetID, surface: opener.surface, popup: true}
 	in.targets[t.id] = t
 	go s.showPopup(in, opener, t)
 }
@@ -402,7 +421,12 @@ func onTargetCreated(s *Store, in *instance, params json.RawMessage) {
 func (s *Store) showPopup(in *instance, opener, t *target) {
 	ctx := context.Background()
 	if err := s.adopt(ctx, in, t); err != nil {
-		s.log.Debug("popup not adopted", "err", err)
+		// Half set up, it would run out of sight, unwatched, for as long as Chrome does.
+		s.log.Debug("popup not adopted, so closed", "err", err)
+		s.mu.Lock()
+		in.untrack(t)
+		s.mu.Unlock()
+		_ = in.call(ctx, "", "Target.closeTarget", map[string]any{"targetId": t.id}, nil)
 		return
 	}
 	s.mu.Lock()
@@ -414,6 +438,8 @@ func (s *Store) showPopup(in *instance, opener, t *target) {
 		return
 	}
 	sf.stack = append(sf.stack, t)
+	t.unpainted = true
+	sf.dropFrame()
 	viewed := len(sf.viewers) > 0
 	sf.publish()
 	s.mu.Unlock()
@@ -429,19 +455,18 @@ func (s *Store) showPopup(in *instance, opener, t *target) {
 // readAddress asks what a popup has committed, which may be nothing yet: the address a new target
 // reports is where it is headed, and an opener can write its own page under that while it loads.
 // An event that came meanwhile is newer than the answer, which then says nothing.
+//
+// It asks the page's own document, in the helper's world, where no script of the page's reaches,
+// for its address and origin: a main frame's address is at most 2 MB. Page.getFrameTree would say
+// the same with every frame's address in it, which a page can make past the pipe's limit, and
+// the call then fails. A read that fails leaves the address empty, which a viewer shows as a page
+// nobody can name, and Not secure (surface.security).
 func (s *Store) readAddress(ctx context.Context, in *instance, t *target) {
 	s.mu.Lock()
 	seen := t.commits
 	s.mu.Unlock()
-	var tree struct {
-		FrameTree struct {
-			Frame struct {
-				URL    string `json:"url"`
-				Origin string `json:"securityOrigin"`
-			} `json:"frame"`
-		} `json:"frameTree"`
-	}
-	if err := in.call(ctx, t.session, "Page.getFrameTree", nil, &tree); err != nil {
+	var here []string
+	if _, err := in.helperValue(ctx, t.session, t.id, helperAddress, &here); err != nil || len(here) != 2 {
 		s.log.Debug("popup address", "err", err)
 		return
 	}
@@ -450,7 +475,7 @@ func (s *Store) readAddress(ctx context.Context, in *instance, t *target) {
 	if t.commits != seen {
 		return
 	}
-	t.commit(tree.FrameTree.Frame.URL, chromeOrigin(tree.FrameTree.Frame.Origin))
+	t.commit(here[0], chromeOrigin(here[1]))
 	t.surface.publish()
 	s.committed(in, t, 0)
 }
@@ -466,9 +491,7 @@ func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {
 	if t == nil {
 		return
 	}
-	delete(in.targets, p.TargetID)
-	delete(in.sessions, t.session)
-	in.forgetFrames(t)
+	in.untrack(t)
 	sf := t.surface
 	wasTop := sf.top() == t
 	for i, x := range sf.stack {
@@ -479,6 +502,10 @@ func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {
 	}
 	if !wasTop {
 		return
+	}
+	if next := sf.top(); next != nil {
+		next.unpainted = true
+		sf.dropFrame()
 	}
 	sf.publish()
 	if len(sf.viewers) == 0 {
@@ -492,6 +519,26 @@ func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {
 		}()
 	} else {
 		go s.bringUp(sf)
+	}
+}
+
+// untrack forgets a target and its frames. Needs Store.mu.
+func (in *instance) untrack(t *target) {
+	if in.targets[t.id] == t {
+		delete(in.targets, t.id)
+	}
+	if t.session != "" && in.sessions[t.session] == t {
+		delete(in.sessions, t.session)
+	}
+	in.forgetFrames(t)
+}
+
+// painted is a frame of this page reaching its viewers: what they show is its own again. Needs
+// Store.mu.
+func (t *target) painted() {
+	if t.unpainted {
+		t.unpainted = false
+		t.surface.publish()
 	}
 }
 

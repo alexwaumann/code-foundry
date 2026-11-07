@@ -3,26 +3,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BROWSER_STARTING, type BrowserStateView } from "@/api/browser";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const navigated = vi.hoisted(() => ({ finish: () => {} }));
+const navigated = vi.hoisted(() => ({ finish: () => {}, sent: [] as string[] }));
 vi.mock("@/api/browser", async (actual) => ({
   ...(await actual<typeof import("@/api/browser")>()),
-  navigateBrowser: () =>
-    new Promise<void>((resolve) => {
+  navigateBrowser: (_surface: string, address: string) => {
+    navigated.sent.push(address);
+    return new Promise<void>((resolve) => {
       navigated.finish = resolve;
-    }),
+    });
+  },
 }));
 
 const { BrowserToolbar } = await import("./BrowserToolbar");
 
 const ready: BrowserStateView = { ...BROWSER_STARTING, phase: "ready" };
 
-function show(state: Partial<BrowserStateView>, onLeave = vi.fn()) {
-  return render(
+function bar(state: Partial<BrowserStateView>, onLeave: () => void) {
+  return (
     <TooltipProvider>
       <textarea data-testid="composer" />
       <BrowserToolbar surface="thread:t1" state={{ ...ready, ...state }} onLeave={onLeave} />
-    </TooltipProvider>,
+    </TooltipProvider>
   );
+}
+
+function show(state: Partial<BrowserStateView>, onLeave = vi.fn()) {
+  return render(bar(state, onLeave));
 }
 
 afterEach(cleanup);
@@ -71,6 +77,57 @@ describe("the bar's address", () => {
     show({ url: "data:text/html,hi", security: "insecure" });
     expect(screen.getByTestId("browser-address-site").textContent).toBe("Unknown site");
   });
+
+  // A popup whose address could not be read (its frame tree past the pipe's limit, say) is a page
+  // with a fake sign-in on it, not the blank a surface starts on.
+  it("says it cannot tell who a page with no address is, and marks it", () => {
+    show({ url: "", security: "insecure" });
+    expect(screen.getByTestId("browser-address-site").textContent).toBe("Unknown site");
+    expect(screen.getByTestId("browser-security").textContent).toBe("Not secure");
+  });
+
+  it("is empty with no page at all", () => {
+    show({ url: "" });
+    expect(screen.queryByTestId("browser-address-shown")).toBeNull();
+    expect(screen.queryByTestId("browser-security")).toBeNull();
+  });
+});
+
+describe("what is typed in the bar", () => {
+  beforeEach(() => {
+    navigated.sent = [];
+  });
+
+  const page = { url: "http://a.example/", origin: "http://a.example", site: "a.example", security: "insecure" as const };
+
+  // A page calling history.pushState in a loop changed the address under the typing: the draft
+  // went, and the rest of the word, then Enter, went to the page.
+  it("stays while the bar has the keyboard, whatever the page does to its address", () => {
+    const view = show(page);
+    const input = screen.getByTestId<HTMLInputElement>("browser-address");
+    input.focus();
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "bank.exa" } });
+    view.rerender(bar({ ...page, url: "http://a.example/pushed-1" }, vi.fn()));
+    expect(input.value).toBe("bank.exa");
+    fireEvent.change(input, { target: { value: "bank.example" } });
+    view.rerender(bar({ ...page, url: "http://a.example/pushed-2" }, vi.fn()));
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(navigated.sent).toEqual(["bank.example"]);
+  });
+
+  it("goes when the page moves on while the bar does not have the keyboard", () => {
+    const view = show(page);
+    const input = screen.getByTestId<HTMLInputElement>("browser-address");
+    input.focus();
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "half typed" } });
+    fireEvent.blur(input);
+    view.rerender(bar(page, vi.fn()));
+    expect(input.value).toBe("half typed");
+    view.rerender(bar({ ...page, url: "http://b.example/" }, vi.fn()));
+    expect(input.value).toBe("http://b.example/");
+  });
 });
 
 describe("Enter on an address", () => {
@@ -95,6 +152,20 @@ describe("Enter on an address", () => {
       await Promise.resolve();
     });
     expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  // The second address was going to the page key by key, and the first answer wiped it.
+  it("leaves a new address being typed in the bar alone, keyboard and all", async () => {
+    const onLeave = vi.fn();
+    const input = enter(onLeave);
+    fireEvent.change(input, { target: { value: "second.example/sec" } });
+    await act(async () => {
+      navigated.finish();
+      await Promise.resolve();
+    });
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(input);
+    expect(input.value).toBe("second.example/sec");
   });
 
   it("leaves it alone if the user went elsewhere while the server held the first byte", async () => {

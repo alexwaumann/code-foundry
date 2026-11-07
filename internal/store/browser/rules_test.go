@@ -46,6 +46,20 @@ func committed(c *browsertest.Chrome, session, url string) {
 	c.Emit("Page.frameNavigated", session, map[string]any{"frame": map[string]any{"id": "main", "url": url}})
 }
 
+// addressRead is what the store asks a popup's document for its address and origin, in the
+// helper's world.
+const addressRead = "[location.href, self.origin]"
+
+// answerAddress makes a popup's document say it is at address, with origin.
+func answerAddress(c *browsertest.Chrome, address, origin string) {
+	c.Reply("Runtime.evaluate", func(call browsertest.Call) (any, error) {
+		if call.Params["expression"] == addressRead {
+			return map[string]any{"result": map[string]any{"value": []string{address, origin}}}, nil
+		}
+		return map[string]any{"result": map[string]any{}}, nil
+	})
+}
+
 // openPopup stacks a popup on the page and waits for it to show.
 func openPopup(t *testing.T, f *fixture, v *browser.Viewer) {
 	t.Helper()
@@ -287,9 +301,7 @@ func TestASubframesPushStateIsNotThePagesAddress(t *testing.T) {
 
 func TestAPopupShowsWhatItCommittedNotWhereItIsHeaded(t *testing.T) {
 	f, v, _ := surfaceFixture(t)
-	f.c.Reply("Page.getFrameTree", func(browsertest.Call) (any, error) {
-		return map[string]any{"frameTree": map[string]any{"frame": map[string]any{"url": "about:blank"}}}, nil
-	})
+	answerAddress(f.c, "about:blank", "")
 	openPopup(t, f, v)
 	st := next(t, v, "the committed address", func(st browser.State) bool { return st.Popup && st.URL == "about:blank" })
 	if st.Security != "insecure" {

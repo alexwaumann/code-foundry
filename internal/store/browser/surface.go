@@ -103,6 +103,9 @@ type State struct {
 	CanGoBack              bool
 	CanGoForward           bool
 	Popup                  bool
+	// AwaitingFrame is a page that has sent no frame yet: whatever a viewer last drew is another
+	// page's, and it covers that until the next frame.
+	AwaitingFrame bool
 
 	Dialog      *Dialog
 	FileChooser *FileChooser
@@ -182,6 +185,15 @@ func (v *Viewer) offerFrame(f *Frame) {
 	v.ring()
 }
 
+// dropFrame takes back a frame not yet taken, acking it so Chrome goes on.
+func (v *Viewer) dropFrame() {
+	v.mu.Lock()
+	old := v.frame
+	v.frame = nil
+	v.mu.Unlock()
+	old.Taken()
+}
+
 func (v *Viewer) offerState(st State) {
 	v.mu.Lock()
 	v.state = &st
@@ -251,22 +263,33 @@ func (sf *surface) refresh() {
 	sf.state.CanGoBack = t.canBack || len(sf.stack) > 1
 	sf.state.CanGoForward = t.canForward
 	sf.state.Popup = len(sf.stack) > 1
+	sf.state.AwaitingFrame = t.unpainted
 	sf.state.Dialog, sf.state.FileChooser, sf.state.Select = t.dialog, t.chooser, t.sel
 }
 
 // security reads how a page arrived. Only the blank a surface's own page starts on is no page at
-// all: a popup's is what its opener can write into, and a page sent to about:blank is what whoever
-// sent it can write into. Needs Store.mu.
+// all, before it has been anywhere. A popup's blank is what its opener can write into, whether or
+// not the opener is still there; a page sent to about:blank is what whoever sent it can write into;
+// and a page whose address nothing could read may be anything. Needs Store.mu.
 func (sf *surface) security(t *target) string {
 	switch {
 	case t.badCert:
 		return SecurityCert
-	case t.url == "", t.url == "about:blank" && !t.visited && len(sf.stack) <= 1:
+	case (t.url == "" || t.url == "about:blank") && !t.visited && !t.popup:
 		return ""
 	case strings.HasPrefix(t.url, "https://"):
 		return ""
 	}
 	return SecurityInsecure
+}
+
+// dropFrame forgets the last frame, which is no longer the page's on screen: nobody is sent it
+// again, and a viewer that has not taken it does not get it. Needs Store.mu.
+func (sf *surface) dropFrame() {
+	sf.frame = nil
+	for v := range sf.viewers {
+		v.dropFrame()
+	}
 }
 
 // leftPage is the page on screen becoming another one: what the user did on the last page, and
@@ -634,6 +657,9 @@ func (s *Store) startCast(ctx context.Context, in *instance, t *target) error {
 // firstFrame is what a still page would otherwise never send: a screencast only carries
 // changes, so a view of a page that stopped changing would stay blank or stale.
 func (s *Store) firstFrame(in *instance, t *target, w, h int) {
+	s.mu.Lock()
+	seen := t.documents
+	s.mu.Unlock()
 	var shot struct {
 		Data string `json:"data"`
 	}
@@ -649,9 +675,11 @@ func (s *Store) firstFrame(in *instance, t *target, w, h int) {
 	f := &Frame{JPEG: jpeg, Width: w, Height: h}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if t.surface.top() != t {
+	if t.surface.top() != t || t.documents != seen {
+		// Taken of the page before: it is not this one's to show.
 		return
 	}
+	t.painted()
 	t.surface.frame = f
 	for v := range t.surface.viewers {
 		v.offerFrame(f)

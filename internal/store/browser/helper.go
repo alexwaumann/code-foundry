@@ -23,6 +23,8 @@ const (
 	helperLink  = "__cfOnLink()"
 	// helperOrigin is a page's real origin. In this world a page's script cannot redefine it.
 	helperOrigin = "self.origin"
+	// helperAddress is the document's address and origin, read the same way.
+	helperAddress = "[location.href, self.origin]"
 	// helperFrame is the helper's answer when focus went into a frame: the select is there, if any.
 	helperFrame = "frame"
 )

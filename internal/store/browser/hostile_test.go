@@ -245,10 +245,13 @@ func TestAStaleReadOfAPopupNeverReplacesItsCommit(t *testing.T) {
 	f, v, _ := surfaceFixture(t)
 	release := make(chan struct{})
 	asked := make(chan struct{}, 1)
-	f.c.Reply("Page.getFrameTree", func(browsertest.Call) (any, error) {
+	f.c.Reply("Runtime.evaluate", func(c browsertest.Call) (any, error) {
+		if c.Params["expression"] != addressRead {
+			return map[string]any{"result": map[string]any{}}, nil
+		}
 		asked <- struct{}{}
 		<-release
-		return map[string]any{"frameTree": map[string]any{"frame": map[string]any{"url": ""}}}, nil
+		return map[string]any{"result": map[string]any{"value": []string{"about:blank", "https://opener.example"}}}, nil
 	})
 	f.c.Reply("Target.attachToTarget", func(c browsertest.Call) (any, error) {
 		if c.Params["targetId"] == "popup" {
@@ -540,5 +543,200 @@ func TestASelectReadAcrossANavigationIsDropped(t *testing.T) {
 	next(t, v, "the next page", func(st browser.State) bool { return st.URL == "https://next.example/" })
 	if st := latest(f, v); st.Select != nil {
 		t.Fatalf("a select from the last page: %+v", st.Select)
+	}
+}
+
+// A popup's address read through Page.getFrameTree failed for a page with 20 frames of 2 MB
+// addresses ("message is too long"), and the bar stayed empty, with no site and no mark, over
+// the fake sign-in the opener wrote into it.
+func TestAPopupNobodyCouldReadSaysSoAndIsNotSecure(t *testing.T) {
+	f, v, _ := surfaceFixture(t)
+	secure(f.c, page, "http://evil.test/", "http://evil.test")
+	f.c.Reply("Runtime.evaluate", func(c browsertest.Call) (any, error) {
+		if c.Params["expression"] == addressRead {
+			return nil, errors.New("message is too long")
+		}
+		return map[string]any{"result": map[string]any{}}, nil
+	})
+	openPopup(t, f, v)
+	st := next(t, v, "the popup, read", func(st browser.State) bool { return st.Popup })
+	time.Sleep(50 * time.Millisecond)
+	if last := latest(f, v); last.Popup {
+		st = last
+	}
+	if st.URL != "" || st.Origin != "" || st.Site != "" || st.Security != browser.SecurityInsecure {
+		t.Fatalf("url %q origin %q site %q security %q", st.URL, st.Origin, st.Site, st.Security)
+	}
+	if n := len(f.c.Calls("Page.getFrameTree")); n != 0 {
+		t.Fatalf("Page.getFrameTree called %d times: a page can make its reply too long to read", n)
+	}
+}
+
+// The opener spent its allowance and was closed, leaving its popup alone on the surface: a blank
+// with a fake sign-in and, before, no mark, since the rule counted the stack.
+func TestAPopupWhoseOpenerWentIsStillAPopup(t *testing.T) {
+	f, v, _ := surfaceFixture(t)
+	secure(f.c, page, "http://evil.test/", "http://evil.test")
+	answerAddress(f.c, "about:blank", "://")
+	openPopup(t, f, v)
+	next(t, v, "the popup's address", func(st browser.State) bool { return st.Popup && st.URL == "about:blank" })
+	f.c.Emit("Target.targetDestroyed", "", map[string]any{"targetId": "target-1"})
+	st := next(t, v, "the popup alone", func(st browser.State) bool { return !st.Popup })
+	if st.URL != "about:blank" || st.Security != browser.SecurityInsecure {
+		t.Fatalf("url %q security %q", st.URL, st.Security)
+	}
+}
+
+// A popup whose set-up failed stayed in Chrome, unwatched and tracked, for as long as Chrome ran.
+func TestAPopupThatCannotBeSetUpIsClosed(t *testing.T) {
+	f, v, _ := surfaceFixture(t)
+	f.c.Reply("Target.attachToTarget", func(c browsertest.Call) (any, error) {
+		if c.Params["targetId"] == "popup" {
+			return map[string]string{"sessionId": popup}, nil
+		}
+		return map[string]string{"sessionId": "session-" + c.Params["targetId"].(string)}, nil
+	})
+	f.c.Reply("Page.enable", func(c browsertest.Call) (any, error) {
+		if c.Session == popup {
+			return nil, errors.New("timed out")
+		}
+		return map[string]any{}, nil
+	})
+	f.c.Emit("Target.targetCreated", "", map[string]any{"targetInfo": map[string]any{"targetId": "popup", "type": "page", "openerId": "target-1"}})
+	eventually(t, "the close", func() bool {
+		c := f.c.Calls("Target.closeTarget")
+		return len(c) == 1 && c[0].Params["targetId"] == "popup"
+	})
+	if st := latest(f, v); st.Popup {
+		t.Fatal("it showed")
+	}
+	// Nothing of it is left to route: its events reach no handler.
+	f.c.Emit("Page.javascriptDialogOpening", popup, map[string]any{"url": "https://popup.example/", "message": "hi", "type": "alert"})
+	if st := latest(f, v); st.Dialog != nil {
+		t.Fatalf("its dialog showed: %+v", st.Dialog)
+	}
+}
+
+// Each visit to a page with a frame in a frame left the inner one counted, as Chrome says nothing
+// of a session whose parent session went: after about 31 visits new cross-site frames never ran.
+func TestFramesInsideAFrameGoWithIt(t *testing.T) {
+	f, _, _ := surfaceFixture(t)
+	for i := range 40 {
+		outer, inner := fmt.Sprint("outer", i), fmt.Sprint("inner", i)
+		attachFrame(f, page, outer, "fo"+fmt.Sprint(i))
+		attachFrame(f, outer, inner, "fi"+fmt.Sprint(i))
+		f.c.Emit("Target.detachedFromTarget", page, map[string]any{"sessionId": outer})
+	}
+	// The next visit's frame, and the frame inside it, both run.
+	attachFrame(f, page, "s-late", "f-late")
+	attachFrame(f, "s-late", "s-late-inner", "f-late-inner")
+	eventually(t, "the late frames", func() bool {
+		return slices.Contains(calledOn(f.c, "s-late"), "Runtime.runIfWaitingForDebugger") &&
+			slices.Contains(calledOn(f.c, "s-late-inner"), "Runtime.runIfWaitingForDebugger")
+	})
+}
+
+func TestANewDocumentStartsWithNoFramesCounted(t *testing.T) {
+	f, _, _ := surfaceFixture(t)
+	for i := range 32 {
+		attachFrame(f, page, fmt.Sprint("s", i), fmt.Sprint("f", i))
+	}
+	eventually(t, "the frames", func() bool { return len(f.c.Calls("Runtime.runIfWaitingForDebugger")) == 32 })
+	// Chrome sends no detach for any of them.
+	secure(f.c, page, "https://next.example/", "https://next.example")
+	attachFrame(f, page, "s-next", "f-next")
+	eventually(t, "the new page's frame", func() bool { return slices.Contains(calledOn(f.c, "s-next"), "Runtime.runIfWaitingForDebugger") })
+}
+
+// frameOf takes frames off v until one comes, or says there was none.
+func frameOf(v *browser.Viewer, wait time.Duration) []byte {
+	deadline := time.After(wait)
+	for {
+		select {
+		case <-v.Wake():
+			if _, fr, _ := v.Take(); fr != nil {
+				fr.Taken()
+				return fr.JPEG
+			}
+		case <-deadline:
+			return nil
+		}
+	}
+}
+
+// A page on one site sent its visitor to another whose first paint was slow, or that paints
+// nothing: the last frame stayed on screen under the new site's address.
+func TestACommitToAnotherSiteCoversTheLastFrame(t *testing.T) {
+	f, v, _ := surfaceFixture(t)
+	shots := make(chan struct{})
+	f.c.Reply("Page.captureScreenshot", func(browsertest.Call) (any, error) {
+		<-shots
+		return nil, errors.New("no paint yet")
+	})
+	t.Cleanup(func() { close(shots) })
+	secure(f.c, page, "https://evil.example/", "https://evil.example")
+	f.c.Frame(page, 1, []byte("evil"), 640, 480)
+	if got := frameOf(v, time.Second); string(got) != "evil" {
+		t.Fatalf("frame %q", got)
+	}
+	// The same site keeps its frame: Chrome holds the old paint there itself.
+	secure(f.c, page, "https://evil.example/2", "https://evil.example")
+	if st := next(t, v, "the same site", func(st browser.State) bool { return strings.HasSuffix(st.URL, "/2") }); st.AwaitingFrame {
+		t.Fatal("covered on the same site")
+	}
+	// One more frame of the evil page waits untaken when the commit lands.
+	f.c.Frame(page, 2, []byte("evil, late"), 640, 480)
+	time.Sleep(20 * time.Millisecond)
+	secure(f.c, page, "https://bank.example/", "https://bank.example")
+	st := next(t, v, "the bank", func(st browser.State) bool { return st.Site == "bank.example" })
+	if !st.AwaitingFrame {
+		t.Fatal("the evil page's frame stands under the bank's address")
+	}
+	if got := frameOf(v, 100*time.Millisecond); got != nil {
+		t.Fatalf("a viewer was sent %q after the commit", got)
+	}
+	// A new viewer gets no old frame either.
+	other, err := f.s.Watch("thread:a", 640, 480, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := frameOf(other, 100*time.Millisecond); got != nil {
+		t.Fatalf("a new viewer was sent %q", got)
+	}
+	other.Close()
+	f.c.Frame(page, 3, []byte("bank"), 640, 480)
+	next(t, v, "uncovered", func(st browser.State) bool { return !st.AwaitingFrame })
+}
+
+// A screenshot asked for before a commit and answered after it is the page before.
+func TestAScreenshotAcrossACommitIsNotTheNewPages(t *testing.T) {
+	f, v, _ := surfaceFixture(t)
+	secure(f.c, page, "https://evil.example/", "https://evil.example")
+	next(t, v, "the page", func(st browser.State) bool { return st.Site == "evil.example" && !st.AwaitingFrame })
+	// The fake answers one call at a time: what the commit asked for is answered before a reply
+	// that waits.
+	eventually(t, "the commit's work", func() bool { return len(f.c.Calls("Page.getNavigationHistory")) > 0 })
+	time.Sleep(150 * time.Millisecond)
+	asked := make(chan struct{}, 8)
+	release := make(chan struct{})
+	var shots atomic.Int32
+	f.c.Reply("Page.captureScreenshot", func(browsertest.Call) (any, error) {
+		if shots.Add(1) > 1 {
+			// The bank's own, which has not painted yet.
+			return nil, errors.New("no paint yet")
+		}
+		asked <- struct{}{}
+		<-release
+		return map[string]any{"data": "ZXZpbA=="}, nil // "evil"
+	})
+	// The page finishing its load asks for a picture of it.
+	f.c.Emit("Page.frameStoppedLoading", page, map[string]any{"frameId": "target-1"})
+	<-asked
+	secure(f.c, page, "https://bank.example/", "https://bank.example")
+	next(t, v, "the bank, covered", func(st browser.State) bool { return st.Site == "bank.example" && st.AwaitingFrame })
+	close(release)
+	time.Sleep(50 * time.Millisecond)
+	if st := latest(f, v); st.Site == "bank.example" && !st.AwaitingFrame {
+		t.Fatal("the evil page's screenshot uncovered the bank")
 	}
 }

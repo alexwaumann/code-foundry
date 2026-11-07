@@ -23,6 +23,8 @@ const frameCost = 192 << 10
 // frame is a cross-site iframe. Its fields need Store.mu.
 type frame struct {
 	id, session string
+	// parent is the session it was attached on: its page's, or the frame's it sits in.
+	parent      string
 	owner       *target
 	url, origin string
 }
@@ -36,16 +38,16 @@ func (f *frame) shownOrigin() string {
 }
 
 func onFrameAttached(s *Store, in *instance, t *target, params json.RawMessage) {
-	s.frameAttached(in, t, params)
+	s.frameAttached(in, t, t.session, params)
 }
 
 func onNestedFrameAttached(s *Store, in *instance, f *frame, params json.RawMessage) {
-	s.frameAttached(in, f.owner, params)
+	s.frameAttached(in, f.owner, f.session, params)
 }
 
-// frameAttached takes a new iframe of owner's page, wherever in it. It is paused, and only its
-// set-up resumes it. Needs Store.mu.
-func (s *Store) frameAttached(in *instance, owner *target, params json.RawMessage) {
+// frameAttached takes a new iframe of owner's page, wherever in it, attached on parent's session.
+// It is paused, and only its set-up resumes it. Needs Store.mu.
+func (s *Store) frameAttached(in *instance, owner *target, parent string, params json.RawMessage) {
 	var p struct {
 		Session string     `json:"sessionId"`
 		Info    targetInfo `json:"targetInfo"`
@@ -58,7 +60,7 @@ func (s *Store) frameAttached(in *instance, owner *target, params json.RawMessag
 		return
 	}
 	owner.frames++
-	f := &frame{id: p.Info.TargetID, session: p.Session, owner: owner}
+	f := &frame{id: p.Info.TargetID, session: p.Session, parent: parent, owner: owner}
 	in.frames[p.Session] = f
 	go s.adoptFrame(in, f)
 }
@@ -106,7 +108,8 @@ func onNestedFrameDetached(s *Store, in *instance, _ *frame, params json.RawMess
 	in.frameDetached(params)
 }
 
-// frameDetached forgets an iframe that went. Needs Store.mu.
+// frameDetached forgets an iframe that went, and every frame inside it: Chrome says nothing of
+// those, whose sessions went with their parent's. Needs Store.mu.
 func (in *instance) frameDetached(params json.RawMessage) {
 	var p struct {
 		Session string `json:"sessionId"`
@@ -114,9 +117,21 @@ func (in *instance) frameDetached(params json.RawMessage) {
 	if json.Unmarshal(params, &p) != nil {
 		return
 	}
-	if f := in.frames[p.Session]; f != nil {
-		delete(in.frames, p.Session)
-		f.owner.frames--
+	in.dropFrame(p.Session)
+}
+
+// dropFrame forgets the frame on session and those inside it. Needs Store.mu.
+func (in *instance) dropFrame(session string) {
+	f := in.frames[session]
+	if f == nil {
+		return
+	}
+	delete(in.frames, session)
+	f.owner.frames--
+	for child, c := range in.frames {
+		if c.parent == session {
+			in.dropFrame(child)
+		}
 	}
 }
 

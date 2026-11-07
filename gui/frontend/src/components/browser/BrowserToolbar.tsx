@@ -1,15 +1,25 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, LoaderCircle, RotateCw, TriangleAlert, X } from "lucide-react";
 import { navigateBrowser, type BrowserSecurityView, type BrowserStateView } from "@/api/browser";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
-import { addressParts, type AddressParts } from "@/lib/browserAddress";
+import { addressParts, type AddressParts, UNKNOWN_PAGE } from "@/lib/browserAddress";
 import { cn } from "@/lib/utils";
 import { goBack, goForward, reload, setBrowserError } from "@/stores/browser";
 
 /** The page's address as the bar shows it. The blank page a surface starts on is no page, and has no security mark; any other blank has one, because someone can write into it. */
 function shownAddress(url: string, security: BrowserSecurityView): string {
   return url === "about:blank" && security === "" ? "" : url;
+}
+
+/**
+ * What the bar draws over the input, null for no page at all. A page whose address nobody could
+ * read is still a page, and says so: the daemon marks it, and an empty bar would be the blank
+ * a surface starts on.
+ */
+function shownParts(shown: string, state: BrowserStateView): AddressParts | null {
+  if (shown === "" && state.security !== "") return UNKNOWN_PAGE;
+  return addressParts(shown, state.origin, state.site);
 }
 
 /** Says a page is not private, where nothing a page does can reach. */
@@ -44,27 +54,41 @@ function ShownAddress({ parts }: { parts: AddressParts }) {
 
 /** Back, forward, reload and the address bar. */
 export function BrowserToolbar({ surface, state, onLeave }: { surface: string; state: BrowserStateView; onLeave: () => void }) {
-  // What was typed, on the page it was typed over: moving to another page drops it.
+  // What was typed, on the page it was typed over. While the bar has the keyboard the text is the
+  // user's whatever the page does: a page can change its address as often as it likes, and a draft
+  // tied to it would be dropped mid-word, the rest of the word going to the page. Away from the
+  // bar, the page moving on drops it.
   const [typed, setTyped] = useState<{ text: string; over: string } | null>(null);
-  const draft = typed?.over === state.url ? typed.text : null;
+  const [editing, setEditing] = useState(false);
+  const draft = typed !== null && (editing || typed.over === state.url) ? typed.text : null;
+  // The text as it is now, for an answer that arrives after renders this closure never saw.
+  const latest = useRef<string | null>(null);
+  useEffect(() => {
+    latest.current = draft;
+  });
   const setDraft = (text: string | null) => {
+    latest.current = text;
     setTyped(text === null ? null : { text, over: state.url });
   };
   const shown = shownAddress(state.url, state.security);
   const address = draft ?? shown;
-  const [editing, setEditing] = useState(false);
-  const parts = editing || draft !== null ? null : addressParts(shown, state.origin, state.site);
-  const bar = useRef<HTMLDivElement>(null);
+  const parts = editing || draft !== null ? null : shownParts(shown, state);
+  const input = useRef<HTMLInputElement>(null);
 
   const go = () => {
     if (draft === null || draft.trim() === "") return;
+    const sent = draft;
     setBrowserError(surface, null);
-    navigateBrowser(surface, draft)
+    navigateBrowser(surface, sent)
       .then(() => {
-        setDraft(null);
-        // A slow server answers long after Enter, when the user may be typing somewhere else: only
-        // a keyboard that stayed in this bar goes to the page.
-        if (bar.current?.contains(document.activeElement)) onLeave();
+        // A slow server answers long after Enter, when the user may be typing somewhere else, or a
+        // new address here. Only the address that went, still in the bar with the keyboard on it,
+        // is done with: anything typed since stays, and keeps the keyboard.
+        if (latest.current !== sent) return;
+        const kept = document.activeElement === input.current;
+        setTyped((now) => (now?.text === sent ? null : now));
+        latest.current = null;
+        if (kept) onLeave();
       })
       .catch((err: unknown) => {
         setBrowserError(surface, err);
@@ -73,7 +97,7 @@ export function BrowserToolbar({ surface, state, onLeave }: { surface: string; s
 
   const ready = state.phase === "ready";
   return (
-    <div ref={bar} className="flex h-10 shrink-0 items-center gap-1 border-b border-cf-divider px-2" data-testid="browser-toolbar">
+    <div className="flex h-10 shrink-0 items-center gap-1 border-b border-cf-divider px-2" data-testid="browser-toolbar">
       <Tip label={state.popup ? "Back (closes this window at its first page)" : "Back"}>
         <Button
           variant="ghost"
@@ -116,6 +140,7 @@ export function BrowserToolbar({ surface, state, onLeave }: { surface: string; s
       <SecurityMark security={state.security} />
       <div className="relative min-w-0 flex-1">
         <input
+          ref={input}
           className={cn("h-7 w-full min-w-0 rounded-md bg-cf-surface-sunken px-2.5 text-body-sm text-cf-text-secondary outline-none focus:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus/50", parts && "text-transparent")}
           aria-label="Address"
           placeholder="Enter an address"
@@ -133,6 +158,8 @@ export function BrowserToolbar({ surface, state, onLeave }: { surface: string; s
           }}
           onBlur={() => {
             setEditing(false);
+            // What was typed stays on the page the user left it over.
+            setTyped((now) => (now === null ? null : { text: now.text, over: state.url }));
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") go();

@@ -20,6 +20,9 @@ export interface AddressParts {
 /** What the bar says of a page with no origin to name: a data: page, a sandbox. */
 export const UNKNOWN_SITE = "Unknown site";
 
+/** A page whose address nobody could read: it has a site in the bar too, which says so. */
+export const UNKNOWN_PAGE: AddressParts = { lead: "", site: UNKNOWN_SITE, rest: "", unknown: true };
+
 /** Null only with no address at all. Every page has a site in the bar, or says it cannot tell. */
 export function addressParts(url: string, origin: string, site: string): AddressParts | null {
   if (!url) return null;

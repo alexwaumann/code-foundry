@@ -73,6 +73,8 @@ export interface BrowserStateView {
   canGoBack: boolean;
   canGoForward: boolean;
   popup: boolean;
+  /** The page has sent no frame yet: what the canvas last drew is another page's, and is covered. */
+  awaitingFrame: boolean;
   dialog: BrowserDialogView | null;
   fileChooser: BrowserFileChooserView | null;
   select: BrowserSelectView | null;
@@ -97,6 +99,7 @@ export const BROWSER_STARTING: BrowserStateView = {
   canGoBack: false,
   canGoForward: false,
   popup: false,
+  awaitingFrame: false,
   dialog: null,
   fileChooser: null,
   select: null,
@@ -140,6 +143,7 @@ export function toBrowserState(s: BrowserState): BrowserStateView {
     canGoBack: s.canGoBack,
     canGoForward: s.canGoForward,
     popup: s.popup,
+    awaitingFrame: s.awaitingFrame,
     dialog: s.dialog ? { id: s.dialog.id, kind: s.dialog.kind, message: s.dialog.message, defaultPrompt: s.dialog.defaultPrompt, origin: s.dialog.origin, site: s.dialog.site } : null,
     fileChooser: s.fileChooser ? { id: s.fileChooser.id, multiple: s.fileChooser.multiple, origin: s.fileChooser.origin, site: s.fileChooser.site } : null,
     select: s.select

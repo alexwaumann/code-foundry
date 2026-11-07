@@ -341,7 +341,10 @@ type BrowserState struct {
 	// Who the page is, in Chrome's word: "https://a.example.co.uk". A blank page has the origin it
 	// inherited, whatever its url says. Empty with a url: a page nobody can name, and a client must
 	// say so rather than leave the address to speak for it.
-	Origin        string `protobuf:"bytes,18,opt,name=origin,proto3" json:"origin,omitempty"`
+	Origin string `protobuf:"bytes,18,opt,name=origin,proto3" json:"origin,omitempty"`
+	// The page showing has sent no frame yet: it just became another site's, or came on screen. The
+	// last frame a client drew is another page's, and the client covers it until the next one.
+	AwaitingFrame bool `protobuf:"varint,19,opt,name=awaiting_frame,json=awaitingFrame,proto3" json:"awaiting_frame,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -500,6 +503,13 @@ func (x *BrowserState) GetOrigin() string {
 		return x.Origin
 	}
 	return ""
+}
+
+func (x *BrowserState) GetAwaitingFrame() bool {
+	if x != nil {
+		return x.AwaitingFrame
+	}
+	return false
 }
 
 type BrowserDialog struct {
@@ -2335,7 +2345,7 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\fBrowserFrame\x12\x12\n" +
 	"\x04jpeg\x18\x01 \x01(\fR\x04jpeg\x12\x14\n" +
 	"\x05width\x18\x02 \x01(\rR\x05width\x12\x16\n" +
-	"\x06height\x18\x03 \x01(\rR\x06height\"\x93\x05\n" +
+	"\x06height\x18\x03 \x01(\rR\x06height\"\xba\x05\n" +
 	"\fBrowserState\x122\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1c.codefoundry.v1.BrowserPhaseR\x05phase\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x10\n" +
@@ -2355,7 +2365,8 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\x04site\x18\x0f \x01(\tR\x04site\x12\x1a\n" +
 	"\bsecurity\x18\x10 \x01(\tR\bsecurity\x12+\n" +
 	"\x11downloads_blocked\x18\x11 \x01(\rR\x10downloadsBlocked\x12\x16\n" +
-	"\x06origin\x18\x12 \x01(\tR\x06origin\"\xa0\x01\n" +
+	"\x06origin\x18\x12 \x01(\tR\x06origin\x12%\n" +
+	"\x0eawaiting_frame\x18\x13 \x01(\bR\rawaitingFrame\"\xa0\x01\n" +
 	"\rBrowserDialog\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x18\n" +

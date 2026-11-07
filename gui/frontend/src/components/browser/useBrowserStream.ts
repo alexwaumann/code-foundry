@@ -6,24 +6,36 @@ import { browserAnswered, browserLeft, setBrowserOffline, setBrowserState, takeB
 /** How long a resize settles before the page reflows: a drag sends its last size, not each. */
 const RESIZE_SETTLE_MS = 120;
 
+export interface Painter {
+  /** Draws f, or keeps it to draw next if a frame is decoding. */
+  paint: (f: BrowserFrameView) => void;
+  /** Blanks the canvas and drops what is waiting or decoding: those are another page's. */
+  clear: () => void;
+}
+
 /**
  * Draws the newest frame only: one decodes at a time, and what arrives meanwhile replaces what
  * was waiting. The stream's reader is never held up, so the daemon's window never fills on a
  * page that is merely slow to paint.
  */
-export function newPainter(canvas: HTMLCanvasElement, decode: (jpeg: Uint8Array) => Promise<ImageBitmap> = decodeJpeg): (f: BrowserFrameView) => void {
+export function newPainter(canvas: HTMLCanvasElement, decode: (jpeg: Uint8Array) => Promise<ImageBitmap> = decodeJpeg): Painter {
   const ctx = canvas.getContext("2d");
   let busy = false;
   let waiting: BrowserFrameView | null = null;
+  // Goes up on each clear: a frame decoding across one is not drawn.
+  let page = 0;
   const draw = async (f: BrowserFrameView) => {
     busy = true;
+    const of = page;
     try {
       const image = await decode(f.jpeg);
-      if (canvas.width !== image.width || canvas.height !== image.height) {
-        canvas.width = image.width;
-        canvas.height = image.height;
+      if (of === page) {
+        if (canvas.width !== image.width || canvas.height !== image.height) {
+          canvas.width = image.width;
+          canvas.height = image.height;
+        }
+        ctx?.drawImage(image, 0, 0);
       }
-      ctx?.drawImage(image, 0, 0);
       image.close();
     } catch {
       // A frame that does not decode is skipped; the next one replaces it.
@@ -33,9 +45,16 @@ export function newPainter(canvas: HTMLCanvasElement, decode: (jpeg: Uint8Array)
     waiting = null;
     if (next) void draw(next);
   };
-  return (f) => {
-    if (busy) waiting = f;
-    else void draw(f);
+  return {
+    paint: (f) => {
+      if (busy) waiting = f;
+      else void draw(f);
+    },
+    clear: () => {
+      page++;
+      waiting = null;
+      ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    },
   };
 }
 
@@ -93,7 +112,7 @@ export function useBrowserStream(
 
   useEffect(() => {
     if (!shows || !canvas.current) return;
-    const paint = newPainter(canvas.current);
+    const painter = newPainter(canvas.current);
     const stop = runStream<BrowserEventView>({
       open: (signal) => {
         const { width, height } = sent.current.width > 0 ? sent.current : size;
@@ -102,6 +121,8 @@ export function useBrowserStream(
       },
       onEvent: (ev) => {
         if (ev.kind === "state") {
+          // The daemon sends no frame of the new page before this, and none of the old after it.
+          if (ev.state.awaitingFrame) painter.clear();
           setBrowserState(surface, ev.state);
           browserAnswered(surface);
           return;
@@ -109,7 +130,7 @@ export function useBrowserStream(
         page.current = { width: ev.frame.width, height: ev.frame.height };
         // Only a new size renders: this runs for every frame.
         setShown((p) => (p.width === ev.frame.width && p.height === ev.frame.height ? p : page.current));
-        paint(ev.frame);
+        painter.paint(ev.frame);
       },
       onStatus: (status) => {
         setBrowserOffline(surface, status === "retrying");
