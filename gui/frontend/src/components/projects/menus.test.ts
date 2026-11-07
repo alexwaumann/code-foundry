@@ -6,8 +6,8 @@ const newTerminalIn = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const removeWorktree = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const resumeWorktree = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/stores/projectActions", async (orig) => ({ ...(await orig<typeof import("@/stores/projectActions")>()), unregisterProject, cleanupMergedWorktrees, newTerminalIn, removeWorktree, resumeWorktree }));
-const openChangesTab = vi.hoisted(() => vi.fn(() => true));
-vi.mock("@/stores/changesPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/changesPanel")>()), openChangesTab }));
+const openCheckoutDiff = vi.hoisted(() => vi.fn(() => true));
+vi.mock("@/stores/filePanel", async (orig) => ({ ...(await orig<typeof import("@/stores/filePanel")>()), openCheckoutDiff }));
 const openPullRequestInPanel = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/prPanel")>()), openPullRequestInPanel }));
 const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -186,7 +186,7 @@ describe("checkoutMenu (a checkout's right-click menu on its project page)", () 
     run("checkout-menu-new-terminal");
     expect(newTerminalIn).toHaveBeenCalledWith("p-1", "/u/app.wt/feat");
     run("checkout-menu-changes");
-    expect(openChangesTab).toHaveBeenCalledWith("current", "p-1", "/u/app.wt/feat");
+    expect(openCheckoutDiff).toHaveBeenCalledWith("current", "p-1", "/u/app.wt/feat");
     run("checkout-menu-pr");
     expect(openPullRequestInPanel).toHaveBeenCalledWith({ slug: "o/r", number: 142 });
     run("checkout-menu-copy-path");
@@ -240,7 +240,7 @@ describe("leftoverMenu (a worktree without threads' right-click menu on its proj
     run("leftover-menu-new-terminal");
     expect(newTerminalIn).toHaveBeenCalledWith("p-1", "/u/app.wt/spike");
     run("leftover-menu-changes");
-    expect(openChangesTab).toHaveBeenCalledWith("current", "p-1", "/u/app.wt/spike");
+    expect(openCheckoutDiff).toHaveBeenCalledWith("current", "p-1", "/u/app.wt/spike");
     run("leftover-menu-copy-path");
     run("leftover-menu-copy-branch");
     await Promise.resolve();

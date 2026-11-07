@@ -61,3 +61,30 @@ describe("a mock run's ports", () => {
     expect(() => actions.setPorts({ run: run.id ?? "" }, [1])).toThrow(/already finished/);
   });
 });
+
+describe("a mock reset and run records", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("a reset is a new world: the last run is gone, so the next test's pick is the first action", () => {
+    const { actions } = world();
+    expect(actions.lastRun("repo-cf", "").action?.name).toBe("Dev");
+    const run = actions.run({ action: "a-debug0000000", threadId: "s-1" });
+    actions.finishNow({ run: run.id ?? "" }, 0);
+    expect(actions.lastRun("repo-cf", "").action?.name).toBe("Debug daemon");
+    actions.reset();
+    expect(actions.lastRun("repo-cf", "").action?.name).toBe("Dev");
+  });
+
+  it("a daemon restart keeps them, as the daemon's table does", () => {
+    const { actions } = world();
+    const run = actions.run({ action: "a-debug0000000", threadId: "s-1" });
+    actions.finishNow({ run: run.id ?? "" }, 0);
+    actions.restart();
+    expect(actions.lastRun("repo-cf", "").action?.name).toBe("Debug daemon");
+  });
+});

@@ -53,7 +53,10 @@ function rect(l: Locator) {
   });
 }
 
-/** s-1's panel at `width` with its Changes tab and README.md's diff (README.md active). */
+/** The Diff tab's title: "<branch> vs <base>". */
+const DIFF = / vs /;
+
+/** s-1's panel at `width` with its Diff tab and README.md's File tab (README.md active). */
 async function worktreeAndDiff(page: Page, width = 420): Promise<void> {
   await openApp(page);
   await row(page, "s:s-1").click();
@@ -62,10 +65,10 @@ async function worktreeAndDiff(page: Page, width = 420): Promise<void> {
   await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await setPanelWidth(page, width);
   await openThreadChanges(page);
-  await expect(page.getByTestId("worktree-changes")).toBeVisible();
-  await page.locator('[data-nav-key="f:README.md"]').click();
-  await expect(panel(page).getByRole("tab")).toHaveText(["Changes", "README.md"]);
-  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
+  await expect(page.getByTestId("diff-compare-bar")).toBeVisible();
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: "README.md" })}))`);
+  await expect(panel(page).getByRole("tab")).toHaveText([DIFF, "README.md"]);
+  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
 }
 
 /** The expanded panel's derived width (stores/ui.ts expandedPanelWidth) for the window and sidebar now. */
@@ -104,12 +107,12 @@ test("view.panel.split from the palette splits a stacked panel; it goes side by 
   // 420px: stacked. The active tab (README.md) moved to the new second group, which has focus.
   await expect(split(page)).toHaveAttribute("data-split", "true");
   await expect(split(page)).toHaveAttribute("data-orientation", "stack");
-  await expect(tabsOf(page, 0)).toHaveText(["Changes"]);
+  await expect(tabsOf(page, 0)).toHaveText([DIFF]);
   await expect(tabsOf(page, 1)).toHaveText(["README.md"]);
   await expect(group(page, 1)).toHaveAttribute("data-focused", "true");
   await expect(group(page, 0)).not.toHaveAttribute("data-focused");
-  await expect(group(page, 0).getByTestId("panel-body")).toHaveAttribute("data-surface", "changes");
-  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
+  await expect(group(page, 0).getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
+  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
   await expect.poll(() => region(page)).toBe("panel");
   // The palette ran the local presenter: no daemon call.
   expect((await invocations()).map((i) => i.name)).not.toContain("view.panel.split");
@@ -123,8 +126,8 @@ test("view.panel.split from the palette splits a stacked panel; it goes side by 
   // Stacked: the buttons in the first (top) group's header.
   expect(await controlsGroup(page)).toBe("0");
   // The unfocused group's active tab is tinted lighter than the focused one's.
-  await expect(group(page, 0).locator('[role="presentation"][data-tab-id^="changes"]')).toHaveClass(/bg-cf-control-hover\/40/);
-  await expect(group(page, 1).locator('[role="presentation"][data-tab-id^="diff"]')).toHaveClass(/dark:bg-cf-control-hover\/50/);
+  await expect(group(page, 0).locator('[role="presentation"][data-tab-id^="diff"]')).toHaveClass(/bg-cf-control-hover\/40/);
+  await expect(group(page, 1).locator('[role="presentation"][data-tab-id^="files"]')).toHaveClass(/dark:bg-cf-control-hover\/50/);
 
   // Just under the threshold (two 360px groups and the divider): still stacked. At it: side by side.
   await setPanelWidth(page, 585);
@@ -194,8 +197,8 @@ test("cmd+\\ joins and splits again; the CLI's view.panel.split does too", async
   await expect(split(page)).not.toHaveAttribute("data-split");
   await expect(divider(page)).toHaveCount(0);
   await expect(group(page, 1)).toHaveCount(0);
-  await expect(panel(page).getByRole("tab")).toHaveText(["Changes", "README.md"]);
-  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
+  await expect(panel(page).getByRole("tab")).toHaveText([DIFF, "README.md"]);
+  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
   expect(await controlsGroup(page)).toBe("0");
   // Focus stayed in the panel, so the keys still work.
   await expect.poll(() => region(page)).toBe("panel");
@@ -315,7 +318,7 @@ test("cmd+\\ splits a one-tab panel onto a focused list; cmd+alt+\\ moves betwee
   await page.keyboard.press("Meta+Shift+e");
   await setPanelWidth(page, 420);
   await openThreadChanges(page);
-  await expect(page.getByTestId("worktree-changes")).toBeVisible();
+  await expect(page.getByTestId("diff-compare-bar")).toBeVisible();
   await panel(page).click({ position: { x: 200, y: 300 } });
 
   await page.keyboard.press("Meta+Backslash");
@@ -348,7 +351,7 @@ test("cmd+\\ splits a one-tab panel onto a focused list; cmd+alt+\\ moves betwee
   await page.keyboard.press("Meta+Alt+Backslash");
   await page.keyboard.press("Meta+w");
   await expect(split(page)).not.toHaveAttribute("data-split");
-  await expect(panel(page).getByRole("tab")).toHaveText(["Changes"]);
+  await expect(panel(page).getByRole("tab")).toHaveText([DIFF]);
   await expect.poll(() => region(page)).toBe("panel");
 });
 

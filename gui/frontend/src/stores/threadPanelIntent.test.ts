@@ -275,11 +275,14 @@ describe("a ShowView scoped to a thread", () => {
     });
 
     it.each([
-      ["working", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "working" }],
-      ["branch", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "branch" }],
-    ])("panel.diff opens the file's Diff tab (%s)", (scope, params) => {
+      ["working: the default sources", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "working" }, undefined],
+      ["branch: the merge base against HEAD", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "branch" }, "ref:HEAD"],
+    ])("panel.diff shows the file in the checkout's Diff tab (%s)", (_name, params, head) => {
       showItem("panel.diff", params);
-      expect(active("thread:b")).toMatchObject({ kind: "diff", title: "main.go", params: { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope } });
+      const tab = active("thread:b");
+      expect(tab).toMatchObject({ kind: "diff", params: { project: "web", worktree: WEB_FEAT, path: "src/main.go" } });
+      expect(tab?.params.head).toBe(head);
+      expect(tab?.params.scope).toBeUndefined();
       untouched();
     });
 

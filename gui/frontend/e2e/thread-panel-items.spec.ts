@@ -57,18 +57,19 @@ test("a thread's model opens a file, a diff and a pull request in its own panel;
   // In s-1 the three tabs wait, the last one active.
   await row(page, "s:s-1").click();
   await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
-  await expect(tabs(page)).toHaveText(["README.md", "README.md", "#145"]);
+  // A Diff tab is named by its comparison, and nothing is read until it shows.
+  await expect(tabs(page)).toHaveText(["README.md", "Diff", "#145"]);
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
   await expect(page.getByTestId("pr-title")).toHaveText("fix(terminal): resize race between attach and first output");
   await shot(page, "thread-panel-pr");
 
-  // The file and diff tabs themselves: e2e/file-tabs.spec.ts and src/components/files/DiffTab.test.tsx.
+  // The file and diff tabs themselves: e2e/file-tabs.spec.ts and src/components/diff/DiffView.test.tsx.
   if (shots) {
     await tabs(page).nth(0).click();
     await expect(page.getByTestId("file-tab")).toHaveAttribute("data-path", `${CF}/README.md`);
     await shot(page, "thread-panel-file");
     await tabs(page).nth(1).click();
-    await expect(page.getByTestId("diff-tab").locator('[data-line-type="change-addition"]').first()).toBeVisible();
+    await expect(page.getByTestId("diff-file").locator('[data-line-type="change-addition"]').first()).toBeVisible();
     await shot(page, "thread-panel-diff");
   }
 });

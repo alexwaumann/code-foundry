@@ -10,7 +10,7 @@ import { isWorking } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useWidth } from "@/lib/useWidth";
 import { changedCheckouts, memberCheckoutPath, threadChangesCell, threadPlace, workspaceThreadKey, type ThreadPlace } from "@/lib/workspacePage";
-import { openChangesTab } from "@/stores/changesPanel";
+import { openCheckoutDiff } from "@/stores/filePanel";
 import { findWorktree, useProjectsStore, type ProjectsData } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { StatusDot, SectionHeader } from "./bits";
@@ -141,7 +141,7 @@ function RowMenu({ workspaceId, threadId, members }: { workspaceId: string; thre
   );
   const items: RowMenuEntry<ThreadOpenInPart>[] = changed.map((key): OverflowItem => {
     const [projectId = "", path = "", name = ""] = key.split("\u0001");
-    return { label: `Show changes in ${name}`, testId: "thread-menu-changes", onSelect: () => { openChangesTab("current", projectId, path); } };
+    return { label: `Show changes in ${name}`, testId: "thread-menu-changes", onSelect: () => { openCheckoutDiff("current", projectId, path); } };
   });
   if (items.length > 0) items.push("separator");
   if (place) items.push({ kind: "thread-open-in", testId: "thread-menu-reveal", place, terminal });

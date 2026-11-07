@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { lossFiles, lossLine, uncommittedCount } from "@/lib/leftovers";
 import { tildify } from "@/lib/path";
-import { openChangesTab } from "@/stores/changesPanel";
+import { openCheckoutDiff } from "@/stores/filePanel";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
 import { answerRemoveWorktree, useRemoveWorktreeStore } from "@/stores/removeWorktree";
 import { useResource } from "@/stores/resource";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
 
 /**
- * The uncommitted files that go, from the worktree's detail (the Changes tab's resource):
+ * The uncommitted files that go, from the worktree's detail (what the Diff tab watches for changes):
  * the first three paths, "and N more", and Show diff (the Changes tab; the dialog closes).
  */
 function Loss({ projectId, path, count }: { projectId: string; path: string; count: number }) {
@@ -37,7 +37,7 @@ function Loss({ projectId, path, count }: { projectId: string; path: string; cou
             data-testid="remove-worktree-show-diff"
             onClick={() => {
               answerRemoveWorktree(false);
-              openChangesTab("current", projectId, path);
+              openCheckoutDiff("current", projectId, path);
             }}
           >
             Show diff
