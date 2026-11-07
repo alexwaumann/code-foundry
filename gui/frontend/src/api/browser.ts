@@ -25,12 +25,16 @@ export interface BrowserDialogView {
   message: string;
   defaultPrompt: string;
   origin: string;
+  /** The origin's registrable domain, which has to stay readable. */
+  site: string;
 }
 
 export interface BrowserFileChooserView {
   id: string;
   multiple: boolean;
   origin: string;
+  /** The origin's registrable domain, which has to stay readable. */
+  site: string;
 }
 
 export interface BrowserSelectView {
@@ -46,13 +50,22 @@ export interface BrowserSelectView {
 export interface BrowserDownloadView {
   id: string;
   name: string;
+  /** asking, inProgress, completed, canceled or blocked. */
   state: string;
+  /** Who asked for it; empty when nothing says. */
+  site: string;
 }
+
+/** How a page arrived: "" is fine or no page, else the bar says so. */
+export type BrowserSecurityView = "" | "insecure" | "cert";
 
 export interface BrowserStateView {
   phase: BrowserPhaseView;
   message: string;
   url: string;
+  /** The domain url is registered under: the part the bar keeps visible. */
+  site: string;
+  security: BrowserSecurityView;
   title: string;
   loading: boolean;
   canGoBack: boolean;
@@ -63,6 +76,8 @@ export interface BrowserStateView {
   select: BrowserSelectView | null;
   notice: string;
   downloads: readonly BrowserDownloadView[];
+  /** Refused downloads the list had no room for. */
+  downloadsBlocked: number;
   /** Goes up when a click left new text on Chrome's own clipboard. */
   copied: number;
 }
@@ -72,6 +87,8 @@ export const BROWSER_STARTING: BrowserStateView = {
   phase: "starting",
   message: "",
   url: "",
+  site: "",
+  security: "",
   title: "",
   loading: false,
   canGoBack: false,
@@ -82,6 +99,7 @@ export const BROWSER_STARTING: BrowserStateView = {
   select: null,
   notice: "",
   downloads: [],
+  downloadsBlocked: 0,
   copied: 0,
 };
 
@@ -102,18 +120,24 @@ const phases: Record<BrowserPhase, BrowserPhaseView> = {
   [BrowserPhase.CRASHED]: "crashed",
 };
 
+function toSecurity(s: string): BrowserSecurityView {
+  return s === "insecure" || s === "cert" ? s : "";
+}
+
 export function toBrowserState(s: BrowserState): BrowserStateView {
   return {
     phase: phases[s.phase],
     message: s.message,
     url: s.url,
+    site: s.site,
+    security: toSecurity(s.security),
     title: s.title,
     loading: s.loading,
     canGoBack: s.canGoBack,
     canGoForward: s.canGoForward,
     popup: s.popup,
-    dialog: s.dialog ? { id: s.dialog.id, kind: s.dialog.kind, message: s.dialog.message, defaultPrompt: s.dialog.defaultPrompt, origin: s.dialog.origin } : null,
-    fileChooser: s.fileChooser ? { id: s.fileChooser.id, multiple: s.fileChooser.multiple, origin: s.fileChooser.origin } : null,
+    dialog: s.dialog ? { id: s.dialog.id, kind: s.dialog.kind, message: s.dialog.message, defaultPrompt: s.dialog.defaultPrompt, origin: s.dialog.origin, site: s.dialog.site } : null,
+    fileChooser: s.fileChooser ? { id: s.fileChooser.id, multiple: s.fileChooser.multiple, origin: s.fileChooser.origin, site: s.fileChooser.site } : null,
     select: s.select
       ? {
           id: s.select.id,
@@ -125,7 +149,8 @@ export function toBrowserState(s: BrowserState): BrowserStateView {
         }
       : null,
     notice: s.notice,
-    downloads: s.downloads.map((d) => ({ id: d.id, name: d.name, state: d.state })),
+    downloads: s.downloads.map((d) => ({ id: d.id, name: d.name, state: d.state, site: d.site })),
+    downloadsBlocked: s.downloadsBlocked,
     copied: Number(s.copied),
   };
 }
@@ -246,15 +271,24 @@ export async function answerBrowserSelect(surface: string, id: string, option: n
   await c.answer({ surface, id, answer: { case: "option", value: option } });
 }
 
+/** The user's word on a download the surface asked about. */
+export async function answerBrowserDownload(surface: string, id: string, allow: boolean, conn: DaemonConnection = daemon): Promise<void> {
+  const c = await conn.client(BrowserService);
+  await c.answer({ surface, id, answer: { case: "download", value: allow } });
+}
+
 export async function pasteToBrowser(surface: string, text: string, conn: DaemonConnection = daemon): Promise<void> {
   const c = await conn.client(BrowserService);
   await c.paste({ surface, text });
 }
 
-/** Moves what the page copied to the Mac's clipboard; returns how many characters went. */
-export async function copyFromBrowser(surface: string, conn: DaemonConnection = daemon): Promise<number> {
+/**
+ * Moves the user's copy to the Mac's clipboard and returns how many characters went: what the last
+ * cmd+c changed, or with pageCopy what a click on the page's own Copy button left.
+ */
+export async function copyFromBrowser(surface: string, pageCopy = false, conn: DaemonConnection = daemon): Promise<number> {
   const c = await conn.client(BrowserService);
-  return (await c.copy({ surface })).length;
+  return (await c.copy({ surface, pageCopy })).length;
 }
 
 export async function revealBrowserDownload(surface: string, id: string, conn: DaemonConnection = daemon): Promise<void> {

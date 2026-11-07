@@ -79,7 +79,7 @@ export function BrowserSurface() {
   }, []);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="browser-surface">
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="browser-surface" data-browser-surface="">
       <BrowserToolbar surface={surface} state={state} onLeave={leave} />
       <div ref={box} className="relative min-h-0 flex-1 overflow-hidden bg-cf-surface">
         <canvas
@@ -130,6 +130,7 @@ export function BrowserSurface() {
           error={error}
           offline={offline}
           scale={scale}
+          onLeave={leave}
           onDismissError={() => {
             setBrowserError(surface, null);
           }}

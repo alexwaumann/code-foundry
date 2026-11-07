@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Download, LoaderCircle, TriangleAlert, X } from "lucide-react";
 import {
   answerBrowserDialog,
+  answerBrowserDownload,
   answerBrowserFiles,
   answerBrowserSelect,
   copyFromBrowser,
@@ -22,7 +23,30 @@ import { relaunch, setBrowserError } from "@/stores/browser";
  * What Chrome cannot put in a frame, and what the surface must say out loud. Every word from a
  * page shows as text, and each of these names the origin that asked, inside the page's own
  * rectangle: they are the page speaking, never the app.
+ *
+ * A page puts these up when it likes, so none of them takes the keyboard by itself: a timed
+ * prompt would otherwise pull the user's typing out of the composer and hand it to the page. An
+ * overlay gets focus only if the user is already in this surface (surfaceFocus), or clicks it.
  */
+
+/** Gives el the keyboard if it is already in el's surface, and leaves it alone everywhere else. */
+function surfaceFocus(el: HTMLElement | null): void {
+  if (el?.closest("[data-browser-surface]")?.contains(document.activeElement)) el.focus({ preventScroll: true });
+}
+
+/** An overlay that held the keyboard hands it back to the page as it goes, not to the body. */
+function useReturnFocus(root: RefObject<HTMLElement | null>, onLeave: () => void): void {
+  const leave = useRef(onLeave);
+  useLayoutEffect(() => {
+    leave.current = onLeave;
+  });
+  useLayoutEffect(() => {
+    const el = root.current;
+    return () => {
+      if (el?.contains(document.activeElement)) leave.current();
+    };
+  }, [root]);
+}
 
 function failed(surface: string): (err: unknown) => void {
   return (err) => {
@@ -30,29 +54,44 @@ function failed(surface: string): (err: unknown) => void {
   };
 }
 
-function Card({ children, label }: { children: ReactNode; label: string }) {
+/** Who is asking: the registrable domain, which a long host cannot push out of view, then the origin in full. */
+function AskerOrigin({ site, origin }: { site: string; origin: string }) {
+  if (!site || origin === `https://${site}`) return null;
+  return <p className="text-caption break-all text-cf-text-muted">{origin}</p>;
+}
+
+function Card({ children, label, onLeave }: { children: ReactNode; label: string; onLeave: () => void }) {
+  const root = useRef<HTMLDivElement>(null);
+  useReturnFocus(root, onLeave);
   return (
-    <div className="absolute inset-0 z-10 grid place-items-center bg-cf-scrim p-4" role="dialog" aria-label={label} data-testid="browser-overlay">
+    <div ref={root} className="absolute inset-0 z-10 grid place-items-center bg-cf-scrim p-4" role="dialog" aria-label={label} data-testid="browser-overlay">
       <div className="flex max-h-full w-full max-w-sm flex-col gap-3 overflow-auto rounded-lg border border-cf-divider bg-cf-surface p-4 shadow-md">{children}</div>
     </div>
   );
 }
 
-function PageDialog({ surface, d }: { surface: string; d: BrowserDialogView }) {
+function PageDialog({ surface, d, onLeave }: { surface: string; d: BrowserDialogView; onLeave: () => void }) {
   const [text, setText] = useState(d.defaultPrompt);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    surfaceFocus(input.current);
+  }, []);
   const answer = (accept: boolean) => {
     answerBrowserDialog(surface, d.id, accept, text).catch(failed(surface));
   };
   const leaving = d.kind === "beforeunload";
   return (
-    <Card label="The page asks">
-      <p className="text-caption text-cf-text-muted">{d.origin || "This page"} says</p>
+    <Card label="The page asks" onLeave={onLeave}>
+      <p className="text-caption break-words text-cf-text-muted">
+        <span className="font-medium text-cf-text">{d.site || d.origin || "This page"}</span> says
+      </p>
+      <AskerOrigin site={d.site} origin={d.origin} />
       <p className="text-body whitespace-pre-wrap break-words" data-testid="browser-dialog-message">
         {leaving ? "Leave this page? Changes you made may not be saved." : d.message}
       </p>
       {d.kind === "prompt" && (
         <input
-          autoFocus
+          ref={input}
           className="h-8 rounded-md bg-cf-surface-sunken px-2.5 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-cf-focus/50"
           aria-label="Answer"
           value={text}
@@ -90,7 +129,7 @@ function PageDialog({ surface, d }: { surface: string; d: BrowserDialogView }) {
   );
 }
 
-function PageFileChooser({ surface, f }: { surface: string; f: BrowserFileChooserView }) {
+function PageFileChooser({ surface, f, onLeave }: { surface: string; f: BrowserFileChooserView; onLeave: () => void }) {
   const [noHost, setNoHost] = useState(false);
   const cancel = () => {
     answerBrowserFiles(surface, f.id, []).catch(failed(surface));
@@ -107,10 +146,11 @@ function PageFileChooser({ surface, f }: { surface: string; f: BrowserFileChoose
       .catch(failed(surface));
   };
   return (
-    <Card label="The page asks for files">
+    <Card label="The page asks for files" onLeave={onLeave}>
       <p className="text-body break-words">
-        {f.origin || "This page"} asks for {f.multiple ? "files" : "a file"}. What you choose goes to the site.
+        <span className="font-medium">{f.site || f.origin || "This page"}</span> asks for {f.multiple ? "files" : "a file"}. What you choose goes to the site.
       </p>
+      <AskerOrigin site={f.site} origin={f.origin} />
       {noHost && <p className="text-body-sm text-cf-text-muted">Choosing files needs the app's window.</p>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={cancel}>
@@ -125,13 +165,14 @@ function PageFileChooser({ surface, f }: { surface: string; f: BrowserFileChoose
 }
 
 /** The list a page's <select> would open, placed under the control and kept inside the view. */
-function PageSelect({ surface, s, scale }: { surface: string; s: BrowserSelectView; scale: { x: number; y: number } }) {
+function PageSelect({ surface, s, scale, onLeave }: { surface: string; s: BrowserSelectView; scale: { x: number; y: number }; onLeave: () => void }) {
   const list = useRef<HTMLUListElement>(null);
+  useReturnFocus(list, onLeave);
   const pick = (i: number) => {
     answerBrowserSelect(surface, s.id, i).catch(failed(surface));
   };
   useEffect(() => {
-    list.current?.focus();
+    surfaceFocus(list.current);
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   }, []);
   return (
@@ -196,12 +237,42 @@ function Strip({ children, onClose, tone = "plain" }: { children: ReactNode; onC
 }
 
 function DownloadLine({ surface, d }: { surface: string; d: BrowserDownloadView }) {
+  const answer = (allow: boolean) => {
+    answerBrowserDownload(surface, d.id, allow).catch(failed(surface));
+  };
+  if (d.state === "asking") {
+    return (
+      <Strip tone="warn">
+        <span className="min-w-0 flex-1 break-words">
+          <span className="font-medium">{d.site || "This page"}</span> wants to download {d.name || "a file"}
+        </span>
+        <button
+          type="button"
+          className="shrink-0 text-link"
+          onClick={() => {
+            answer(false);
+          }}
+        >
+          Block
+        </button>
+        <button
+          type="button"
+          className="shrink-0 text-link"
+          onClick={() => {
+            answer(true);
+          }}
+        >
+          Allow
+        </button>
+      </Strip>
+    );
+  }
   const done = d.state === "completed";
   return (
     <Strip>
       {d.state === "inProgress" ? <LoaderCircle className="size-3.5 shrink-0 animate-spin text-cf-icon-muted" /> : <Download className="size-3.5 shrink-0 text-cf-icon-muted" />}
       <span className="truncate">{d.name || "Download"}</span>
-      {d.state === "canceled" && <span className="text-cf-text-muted">canceled</span>}
+      {(d.state === "canceled" || d.state === "blocked") && <span className="shrink-0 text-cf-text-muted">{d.state}</span>}
       {done && (
         <button
           type="button"
@@ -217,6 +288,44 @@ function DownloadLine({ surface, d }: { surface: string; d: BrowserDownloadView 
   );
 }
 
+/** Every download a page made: the list is what tells the user a page tried. */
+function Downloads({ surface, state }: { surface: string; state: BrowserStateView }) {
+  const [cleared, setCleared] = useState<ReadonlySet<string>>(new Set());
+  const [clearedBlocked, setClearedBlocked] = useState(0);
+  const shown = state.downloads.filter((d) => !cleared.has(d.id));
+  const over = (d: BrowserDownloadView) => d.state !== "inProgress" && d.state !== "asking";
+  const blocked = state.downloadsBlocked - clearedBlocked;
+  if (shown.length === 0 && blocked <= 0) return null;
+  return (
+    <>
+      <div className="flex max-h-48 flex-col gap-1 overflow-y-auto" data-testid="browser-downloads">
+        {shown.map((d) => (
+          <DownloadLine key={d.id} surface={surface} d={d} />
+        ))}
+        {blocked > 0 && (
+          <Strip>
+            <span className="truncate text-cf-text-muted">
+              {blocked} more {blocked === 1 ? "download" : "downloads"} blocked
+            </span>
+          </Strip>
+        )}
+      </div>
+      {(blocked > 0 || shown.some(over)) && (
+        <button
+          type="button"
+          className="self-end text-caption text-cf-text-muted hover:text-cf-text"
+          onClick={() => {
+            setCleared(new Set([...cleared, ...state.downloads.filter(over).map((d) => d.id)]));
+            setClearedBlocked(state.downloadsBlocked);
+          }}
+        >
+          Clear
+        </button>
+      )}
+    </>
+  );
+}
+
 /** A page's own Copy button lands on Chrome's clipboard, which only this button can move on. */
 function CopiedLine({ surface, onClose }: { surface: string; onClose: () => void }) {
   return (
@@ -226,7 +335,7 @@ function CopiedLine({ surface, onClose }: { surface: string; onClose: () => void
         type="button"
         className="ml-auto shrink-0 text-link"
         onClick={() => {
-          copyFromBrowser(surface).then(onClose).catch(failed(surface));
+          copyFromBrowser(surface, true).then(onClose).catch(failed(surface));
         }}
       >
         Copy to clipboard
@@ -275,6 +384,7 @@ export function BrowserOverlays({
   error,
   offline = false,
   scale,
+  onLeave,
   onDismissError,
 }: {
   surface: string;
@@ -282,18 +392,17 @@ export function BrowserOverlays({
   error: string;
   offline?: boolean;
   scale: { x: number; y: number };
+  /** Gives the keyboard back to the page. */
+  onLeave: () => void;
   onDismissError: () => void;
 }) {
   const [seenCopied, setSeenCopied] = useState(state.copied);
-  const finished = state.downloads.filter((d) => d.state !== "inProgress").length;
-  const [cleared, setCleared] = useState(0);
-  const downloads = cleared >= finished && state.downloads.every((d) => d.state !== "inProgress") ? [] : state.downloads.slice(-2);
   return (
     <>
       <PhaseCover surface={surface} state={state} />
-      {state.dialog && <PageDialog key={state.dialog.id} surface={surface} d={state.dialog} />}
-      {state.fileChooser && <PageFileChooser key={state.fileChooser.id} surface={surface} f={state.fileChooser} />}
-      {state.select && <PageSelect key={state.select.id} surface={surface} s={state.select} scale={scale} />}
+      {state.dialog && <PageDialog key={state.dialog.id} surface={surface} d={state.dialog} onLeave={onLeave} />}
+      {state.fileChooser && <PageFileChooser key={state.fileChooser.id} surface={surface} f={state.fileChooser} onLeave={onLeave} />}
+      {state.select && <PageSelect key={state.select.id} surface={surface} s={state.select} scale={scale} onLeave={onLeave} />}
       <div className="pointer-events-none absolute inset-x-2 bottom-2 z-10 flex flex-col gap-1 [&>*]:pointer-events-auto">
         {offline && (
           <Strip tone="warn">
@@ -318,20 +427,7 @@ export function BrowserOverlays({
             }}
           />
         )}
-        {downloads.map((d) => (
-          <DownloadLine key={d.id} surface={surface} d={d} />
-        ))}
-        {downloads.length > 0 && finished > cleared && (
-          <button
-            type="button"
-            className="self-end text-caption text-cf-text-muted hover:text-cf-text"
-            onClick={() => {
-              setCleared(finished);
-            }}
-          >
-            Clear
-          </button>
-        )}
+        <Downloads surface={surface} state={state} />
       </div>
     </>
   );

@@ -19,17 +19,28 @@ describe("toBrowserState", () => {
         phase: BrowserPhase.READY,
         url: "https://example.com/",
         copied: 2n,
-        dialog: { id: "1", kind: "prompt", message: "name?", defaultPrompt: "Ada", origin: "https://example.com" },
-        fileChooser: { id: "2", multiple: true, origin: "https://example.com" },
+        site: "example.com",
+        security: "insecure",
+        dialog: { id: "1", kind: "prompt", message: "name?", defaultPrompt: "Ada", origin: "https://example.com", site: "example.com" },
+        fileChooser: { id: "2", multiple: true, origin: "https://example.com", site: "example.com" },
         select: { id: "3", options: [{ label: "one", disabled: true }], selected: 0, x: 1, y: 2, width: 3 },
-        downloads: [{ id: "g", name: "a.txt", state: "completed" }],
+        downloads: [{ id: "g", name: "a.txt", state: "completed", site: "example.com" }],
+        downloadsBlocked: 4,
       }),
     );
     expect(v.copied).toBe(2);
-    expect(v.dialog).toEqual({ id: "1", kind: "prompt", message: "name?", defaultPrompt: "Ada", origin: "https://example.com" });
-    expect(v.fileChooser).toEqual({ id: "2", multiple: true, origin: "https://example.com" });
+    expect(v.site).toBe("example.com");
+    expect(v.security).toBe("insecure");
+    expect(v.downloadsBlocked).toBe(4);
+    expect(v.dialog).toEqual({ id: "1", kind: "prompt", message: "name?", defaultPrompt: "Ada", origin: "https://example.com", site: "example.com" });
+    expect(v.fileChooser).toEqual({ id: "2", multiple: true, origin: "https://example.com", site: "example.com" });
     expect(v.select).toEqual({ id: "3", options: [{ label: "one", disabled: true }], selected: 0, x: 1, y: 2, width: 3 });
-    expect(v.downloads).toEqual([{ id: "g", name: "a.txt", state: "completed" }]);
+    expect(v.downloads).toEqual([{ id: "g", name: "a.txt", state: "completed", site: "example.com" }]);
+  });
+
+  it("reads a security word it does not know as nothing", () => {
+    expect(toBrowserState(create(BrowserStateSchema, { security: "cert" })).security).toBe("cert");
+    expect(toBrowserState(create(BrowserStateSchema, { security: "later" })).security).toBe("");
   });
 
   it("is the starting state with nothing set", () => {
