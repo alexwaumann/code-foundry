@@ -1,0 +1,122 @@
+package api
+
+import (
+	"context"
+	"fmt"
+	"slices"
+	"testing"
+
+	"connectrpc.com/connect"
+
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
+)
+
+func TestCompareWorktreeMaps(t *testing.T) {
+	fake, c := newProjectServer(t)
+	ctx := context.Background()
+	if _, err := c.Register(ctx, connect.NewRequest(&v1.RegisterProjectRequest{Path: "/code/proj"})); err != nil {
+		t.Fatal(err)
+	}
+	id := projecttest.ID("/code/proj")
+	fake.SetCompare(project.WorktreeCompare{
+		Files:      []project.CompareChange{{Path: "b", OldPath: "a", Status: "R", Added: 2, Deleted: 1, Binary: true, Submodule: true}},
+		Truncated:  true,
+		TotalFiles: 3, TotalAdded: 4, TotalDeleted: 5,
+		Base:    project.ResolvedSource{Kind: project.SourceMergeBase, Label: "origin/main", SHA: "aaa"},
+		Head:    project.ResolvedSource{Kind: project.SourceWorkingTree, Label: "Working tree"},
+		BaseRef: "origin/main", MergeBase: "aaa",
+	}, project.CompareSides{Old: project.FileVersion{Present: true, Submodule: true, Contents: []byte("x")}, Status: "D"})
+
+	res, err := c.CompareWorktree(ctx, connect.NewRequest(&v1.CompareWorktreeRequest{ProjectId: id, Path: "/code/proj"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := res.Msg
+	f := m.GetFiles()[0]
+	if f.GetPath() != "b" || f.GetOldPath() != "a" || f.GetStatus() != "R" || f.GetAdded() != 2 || f.GetDeleted() != 1 || !f.GetBinary() || !f.GetSubmodule() {
+		t.Errorf("file = %v", f)
+	}
+	if !m.GetTruncated() || m.GetTotalFiles() != 3 || m.GetTotalAdded() != 4 || m.GetTotalDeleted() != 5 {
+		t.Errorf("totals = %v", m)
+	}
+	if b := m.GetBase(); b.GetKind() != v1.DiffSourceKind_DIFF_SOURCE_KIND_MERGE_BASE || b.GetLabel() != "origin/main" || b.GetSha() != "aaa" {
+		t.Errorf("base = %v", b)
+	}
+	if h := m.GetHead(); h.GetKind() != v1.DiffSourceKind_DIFF_SOURCE_KIND_WORKING_TREE || h.GetLabel() != "Working tree" {
+		t.Errorf("head = %v", h)
+	}
+	side, err := c.GetWorktreeCompareFile(ctx, connect.NewRequest(&v1.GetWorktreeCompareFileRequest{ProjectId: id, Path: "/code/proj", File: "b", OldPath: "a"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o := side.Msg.GetOld(); !o.GetPresent() || !o.GetSubmodule() || string(o.GetContents()) != "x" || side.Msg.GetStatus() != "D" {
+		t.Errorf("sides = %v", side.Msg)
+	}
+}
+
+// TestCompareSidesDefault: an unset side is the Changes list's; a set one reaches the store.
+func TestCompareSidesDefault(t *testing.T) {
+	ref := func(s string) *v1.DiffSource {
+		return &v1.DiffSource{Kind: v1.DiffSourceKind_DIFF_SOURCE_KIND_REF, Ref: s}
+	}
+	staged := &v1.DiffSource{Kind: v1.DiffSourceKind_DIFF_SOURCE_KIND_STAGED}
+	tests := []struct {
+		name       string
+		base, head *v1.DiffSource
+		want       string
+	}{
+		{"unset", nil, nil, "0: 1:"},
+		{"empty messages", &v1.DiffSource{}, &v1.DiffSource{}, "0: 1:"},
+		{"refs", ref("main"), ref("HEAD"), "3:main 3:HEAD"},
+		{"staged to ref", staged, ref("v1"), "2: 3:v1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c := newProjectServer(t)
+			ctx := context.Background()
+			if _, err := c.Register(ctx, connect.NewRequest(&v1.RegisterProjectRequest{Path: "/code/proj"})); err != nil {
+				t.Fatal(err)
+			}
+			id := projecttest.ID("/code/proj")
+			if _, err := c.CompareWorktree(ctx, connect.NewRequest(&v1.CompareWorktreeRequest{ProjectId: id, Path: "/code/proj", Base: tt.base, Head: tt.head, Paths: []string{"a"}})); err != nil {
+				t.Fatal(err)
+			}
+			want := fmt.Sprintf("CompareWorktree %s /code/proj %s [a]", id, tt.want)
+			if !slices.Contains(fake.Calls, want) {
+				t.Errorf("calls = %q, want %q", fake.Calls, want)
+			}
+		})
+	}
+}
+
+func TestCompareRefusalCodes(t *testing.T) {
+	_, c := newProjectServer(t)
+	ctx := context.Background()
+	if _, err := c.Register(ctx, connect.NewRequest(&v1.RegisterProjectRequest{Path: "/code/proj"})); err != nil {
+		t.Fatal(err)
+	}
+	id := projecttest.ID("/code/proj")
+	tests := []struct {
+		name string
+		req  *v1.CompareWorktreeRequest
+		want connect.Code
+	}{
+		{"no project", &v1.CompareWorktreeRequest{Path: "/code/proj"}, connect.CodeInvalidArgument},
+		{"no path", &v1.CompareWorktreeRequest{ProjectId: id}, connect.CodeInvalidArgument},
+		{"an unknown kind", &v1.CompareWorktreeRequest{ProjectId: id, Path: "/code/proj", Base: &v1.DiffSource{Kind: 99}}, connect.CodeInvalidArgument},
+		{"an unknown worktree", &v1.CompareWorktreeRequest{ProjectId: id, Path: "/nope"}, connect.CodeNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := c.CompareWorktree(ctx, connect.NewRequest(tt.req)); connect.CodeOf(err) != tt.want {
+				t.Errorf("CompareWorktree err = %v, want %v", err, tt.want)
+			}
+			file := &v1.GetWorktreeCompareFileRequest{ProjectId: tt.req.GetProjectId(), Path: tt.req.GetPath(), Base: tt.req.GetBase(), File: "a"}
+			if _, err := c.GetWorktreeCompareFile(ctx, connect.NewRequest(file)); connect.CodeOf(err) != tt.want {
+				t.Errorf("GetWorktreeCompareFile err = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}

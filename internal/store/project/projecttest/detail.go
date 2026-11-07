@@ -56,3 +56,33 @@ func (f *Fake) WorktreeFileDiff(_ context.Context, req project.FileDiffRequest) 
 	}
 	return f.fileDiff, nil
 }
+
+// SetCompare sets what CompareWorktree and CompareFile return for a known worktree.
+func (f *Fake) SetCompare(c project.WorktreeCompare, sides project.CompareSides) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.compare, f.compareSides = c, sides
+}
+
+// CompareWorktree implements project.Store: the SetCompare value for a known worktree.
+func (f *Fake) CompareWorktree(_ context.Context, req project.CompareRequest) (project.WorktreeCompare, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, fmt.Sprintf("CompareWorktree %s %s %d:%s %d:%s %v", req.ProjectID, req.Path, req.Base.Kind, req.Base.Ref, req.Head.Kind, req.Head.Ref, req.Paths))
+	if _, ok := f.snap.Worktree(req.ProjectID, req.Path); !ok {
+		return project.WorktreeCompare{}, fmt.Errorf("%w: worktree %q in project %q", project.ErrNotFound, req.Path, req.ProjectID)
+	}
+	return f.compare, nil
+}
+
+// CompareFile implements project.Store: the SetCompare value for any file of a known
+// worktree.
+func (f *Fake) CompareFile(_ context.Context, req project.CompareFileRequest) (project.CompareSides, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, fmt.Sprintf("CompareFile %s %s %s %s", req.ProjectID, req.Path, req.File, req.OldPath))
+	if _, ok := f.snap.Worktree(req.ProjectID, req.Path); !ok {
+		return project.CompareSides{}, fmt.Errorf("%w: worktree %q in project %q", project.ErrNotFound, req.Path, req.ProjectID)
+	}
+	return f.compareSides, nil
+}
