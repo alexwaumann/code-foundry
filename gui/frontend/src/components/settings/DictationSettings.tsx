@@ -23,7 +23,7 @@ import type { EditorProps } from "./editor";
 const CHIP = "rounded-sm bg-cf-surface-sunken px-1.5 py-px text-caption-sm";
 
 function useSnapshot(): DictationView | null {
-  // The section is on screen: it holds the snapshot at core priority.
+  // The section is on screen: it holds the snapshot.
   useHoldDictation(true);
   return useDictationStore((s) => s.snapshot);
 }

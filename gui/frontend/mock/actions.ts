@@ -331,7 +331,7 @@ export class MockActions {
   private actions = new Map<string, MockAction>();
   /** Newest first. */
   private runs: MockRun[] = [];
-  /** Every run's record, newest first; unlike runs they survive a reset of the runs. */
+  /** Every run's record, newest first: a restart keeps them, like the daemon's database; reset() does not. */
   private records: MockRecord[] = [];
   private nextAction = 1;
   private nextRun = 1;

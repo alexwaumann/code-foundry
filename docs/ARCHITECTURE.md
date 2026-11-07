@@ -818,15 +818,18 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 * State discipline: sliced Zustand stores, one per daemon service. Streams update slices;
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
-* Streams: the GUI holds exactly one `EventService.Watch` stream plus one
-  `ThreadService.Watch` per visible thread view (the content pane's thread, a plugin's
-  thread node; one stream when both show the same thread) and one `TerminalService.Attach`
-  per visible terminal view (the bottom panel's active shell, a plugin's terminal node),
-  each only while it is visible. Everything else is unary, except a
-  `ProjectService.Clone` stream while the Add Project dialog clones a repository. Every
-  stream is a WebSocket (`docs/notes/ws-transport.md`), which leaves WebKit's six HTTP/1.1
-  connections per origin to the unary calls, so nothing rations them; being visible is what
-  bounds them (`docs/notes/ws-remove-slots.md`).
+* Streams: the GUI holds one `EventService.Watch` stream, one `ThreadService.WatchThread` per
+  visible thread view (the content pane's thread, a plugin's thread node; one stream when both
+  show the same thread) and one `TerminalService.Attach` per visible terminal view (the bottom
+  panel's active shell, a plugin's terminal node), each only while it is visible. The rest follow
+  what is open: `PluginService.WatchSurface` per open plugin surface, `EmberService.WatchBoard`
+  while Ember is shown, the dictation streams below, `SearchService`'s `Watch` and `WatchRecent`
+  while a search needs them, and `ProjectService.Clone` while the Add Project dialog clones a
+  repository. Everything else is a unary call. Every stream is a WebSocket
+  (`docs/notes/ws-transport.md`), which leaves WebKit's six HTTP/1.1 connections per origin to the
+  unary calls, so nothing rations them. Being visible bounds them, and a plugin view draws each
+  thread or terminal once, so its limits (32 and 16) bound what it can hold
+  (`docs/notes/ws-remove-slots.md`).
 * Dictation (`stores/dictation.ts`, `docs/notes/dictation-4-gui.md`): one shared
   `DictationService.Watch` only while `dictation.enabled` is on (composers hold it) or the
   settings section is on screen, and one `DictationService.Session` while a composer dictates. A phrase lands at the caret of the

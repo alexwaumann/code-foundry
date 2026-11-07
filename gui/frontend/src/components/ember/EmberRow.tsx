@@ -104,7 +104,7 @@ function EmberLine({ threadId }: { threadId: string }) {
  * Ember is on and its thread exists. The flame in its state, "Ember", and a line like a thread row's
  * status line. A click (or Enter from the thread list, whose arrows reach it) opens its
  * chat; its menu opens the board or Ember's settings. Never archived, snoozed or renamed.
- * Holds the board stream (inline) while shown.
+ * Holds the board stream while shown.
  */
 export function EmberRow() {
   const threadId = useShownEmberThreadId();

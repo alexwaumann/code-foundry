@@ -13,21 +13,28 @@ only caused harm: a core view reconnected on a tab switch, and a third plugin no
 - **`LeavingNode` and `useLeavingViewTab`, which the brief did not name.** A node let go of its stream
   while a tab or row choice was in flight, because with six streams open the act hung behind them
   (`docs/notes/plugins-12-renderer-defects.md`, defect 1a). An act no longer waits for a stream, so
-  all this did was blank the node and reopen its stream when the act failed. The detail still dims.
+  all this did was blank the node and reopen its stream when the act failed. It had a second job,
+  though: it showed the act was under way. The detail still dims, and now so do a tabs node's panel
+  and a view's body while a tab act is out (below).
 
 ## What stayed
 
-- `useOnScreen`. CLAUDE.md asks for it: nothing off screen holds a stream. It is also what bounds them.
+- `useOnScreen`. CLAUDE.md asks for it: nothing off screen holds a stream. With the repeat plate
+  below, it is what bounds them.
 - A terminal node showing "Shown in the bottom panel": that avoids two views of one terminal.
 - `MaxDepth`, `MaxElements` and the other view limits, and the 32 live threads and 16 terminals a
   plugin may own. These look tied to the cap but guard the view's size and the plugin's use of real
   processes. They are not stream limits.
 - No degrade-to-panel behaviour existed for the cap. Columns and master-detail collapse for width.
-- `OPEN_SOCKETS_WARNING` (150) in `wsFetch.ts`: a log line that caps nothing. A legal wall can now
-  cross it (below), which reads as a leak when it is not. Left as it is, since it still finds one.
+- `OPEN_SOCKETS_WARNING` (150) in `wsFetch.ts`: a log line that caps nothing. One view now holds at
+  most 48 node streams, so two side by side stay under it and it still finds a leak.
 - The stall workarounds, for PR 6. The daemon's fetch routes.
 
 ## Does anything need a bound?
+
+Yes, for drawing, though not for sockets: see "Repeats and first mount" after this section, which
+changes what these walls can be. This table is from before it, when a repeated terminal id was
+another xterm, and it is why the bound went in.
 
 Measured in real WebKit against `daemon --dev` on a scratch home, through Vite. A scratch plugin drew
 grids of thread and terminal nodes at the smallest legal size (160 x 120 px), with the panel expanded
@@ -53,15 +60,78 @@ each effect twice, so production should do better. That was not measured.
   two. The rest failed with `Insufficient resources`, a plain `TypeError` to `runStream`, so they back
   off and retry. Open streams carried on and ping stayed at 2-5 ms. So one view at the legal maximum
   on a 4K window is about the only way there, and only that view's last nodes would suffer.
-- **The real cost is drawing, and a socket bound would not touch it.** Time grows faster than the node
-  count, and the page is frozen meanwhile. The sample of the WebContent main thread shows style and
-  layout. Each terminal node is its own xterm, which is the likely cause, though nothing here pins it
-  down. A wall of 188 nodes on 3840x2160 had opened no node stream after about 4.5 minutes, when it was
-  stopped. Whether it would have finished is not known. That needs a plugin drawing a hundred or more
-  live nodes on purpose, so no bound went in on a guess. If one ever shows up, stagger the mounts.
+- **The real cost is drawing, and a socket bound would not touch it.** A cap on live nodes would, and
+  so does the plate below, which caps them per id. Time grows faster than the node count, and the page
+  is frozen meanwhile. The sample of the WebContent main thread shows style and layout, and each
+  terminal node was its own xterm. A wall of 188 nodes in a dev build on 3840x2160 had opened no node
+  stream after about 4.5 minutes, when it was stopped. On production React a 190-node wall finished in
+  45 s, frozen nearly all of it.
 - **WebKit keeps 16 WebGL contexts per page.** At 28 terminal nodes 12 were on WebGL and 16 on xterm's
   DOM renderer, and all drew correctly. That is the existing fallback, but a wall can now reach it, and
   the oldest context goes, which may be the bottom panel's shell. It repaints in DOM and keeps working.
+
+## Repeats and first mount
+
+A review found the walls above were not "a plugin drawing a hundred live nodes on purpose": a plugin
+owns at most 16 terminals, so any wall past 16 repeats ids, and that was the whole cost. Legal use was
+fine: 16 distinct terminals with 60k lines each froze 0.8 s, 32 threads 0.3 s. One plugin could still
+make the page unusable with 96 nodes re-keyed every 3 s, and only `plugin disable` from a terminal
+got out.
+
+**A repeat is a plate.** `useRepeated` in `live.ts` finds the first node in the document naming a
+thread or terminal in a view. It keeps the id, and a later node draws "Shown above." with no xterm,
+conversation, stream, title bar or set height. The view still renders rather than being refused, so
+nothing changes for a plugin that repeats an id by mistake.
+
+- Nodes register once drawn, so a first node in a closed tab or a hidden master-detail side does not
+  hide the terminal. Document order, not mount order: "above" stays true when a plugin adds an
+  earlier repeat, at the cost of one remount.
+- Scoped to the view's watch. Two surfaces keep their own views, as they did, so the bound is 16 and
+  32 per view, not per plugin.
+- The plate has no title bar: dropping it saved about 0.5 s at 150 nodes, and the first node has the
+  buttons.
+- "Shown in the bottom panel" wins over the plate, since then no node here shows the terminal.
+- Thread nodes get the same plate. Repeats there share one stream, so sockets cost nothing, but each
+  draws the conversation: 102 live nodes of one thread with 1,200 items froze 1.8 s, 4.7 s in all.
+- Nothing else is live: every other node kind holds no stream.
+
+**A node waits for layout.** A grid inside columns opened 60 streams and 60 xterms and then closed 36.
+`useElementWidth` measures in a layout effect, children first, so the grid read its width while the
+columns around it were still stacked: the full 1200 px, six columns. The columns then went side by
+side, and the grid sat in a quarter of that with six columns of 38 px, until its ResizeObserver's state
+landed after the frame. A wall that short was all on screen, and that frame's IntersectionObserver
+said so. A plain grid never measures the wrong width.
+
+`useOnScreen` now needs a node to stay on screen for `SETTLE_FRAMES` (4) before it counts; leaving is
+at once. Each nesting level settles a frame after the one around it and `ui.MaxDepth` is 4. It counts
+frames rather than time because an observer's report comes with a frame, and a page this busy has few.
+A node a scroll passes opens nothing either. `flushSync` in the ResizeObserver could fix the wrong
+frame too, but a grid changing height there would resize its columns, a shallower element, in the same
+delivery, and that reports `ResizeObserver loop completed` on the window. Not tried.
+
+Production build, `daemon --dev`, real WebKit. Before is the reviewer's run or this one's on the head
+before the fix, on a lighter machine load than the table above.
+
+| Wall | Before | After |
+| --- | --- | --- |
+| 60 nodes, 16 ids, grids in 4 columns, 1512x982 | 60 opened, 36 closed, 6.8 s | 7 opened, 0 closed, 0.4 s |
+| 150 nodes, 16 ids, grids in 4 columns, 2560x1400 | 96 live, 29.5 s | 16 live, 1.4 s |
+| 60 nodes, 16 ids, plain grids, 2560x1400 | 48 live, 4.1 s | 16 live, 0.9 s |
+| 150 nodes, 16 ids, plain grids, 2560x1400 | not run | 16 live, 1.2 s |
+| 96 nodes re-keyed every 3 s, 2560x1400, pings answered | 6 of 25 in 40 s | 78 of 78 |
+| 150 nodes, one thread with 1,200 items, 3840x2160 | 102 live, 1.8 s | 1 live, 0.12 s |
+| Legal: 16 distinct terminals, 2560x1400 | 16 live, 1.0 s | 16 live, 0.8 s, no plate |
+| Legal: 16 distinct terminals in 4 columns, 1512x700 | not run | 16 opened, 0 closed, 1.0 s |
+| Legal: 32 distinct threads in 4 columns, 1512x982 | not run | 16 opened, 0 closed, 0.16 s |
+
+The last bound has a test now: `e2e/plugin-streams.spec.ts` draws grids in columns and asserts the peak
+of live nodes, that scrolling closes a node's stream, and that `Attach` streams equal live nodes. It
+fails with `useOnScreen` forced true and with the frames taken out (peak 24 against 16).
+
+**A tab act shows it is under way.** With `LeavingNode` gone, the old tab's terminal stayed live under the
+new tab's name, taking keys, with no cue. A tabs node's panel and a view's body now dim with `aria-busy`
+until the plugin's next view, as a master-detail's detail always did. The nodes stay live, since an
+act that fails should change nothing. Keys still reach the old terminal meanwhile.
 
 ## The SDK
 
@@ -119,7 +189,11 @@ All for behaviour that is gone:
   Each became the opposite assertion, that a node stays live.
 
 `e2e/plugin-streams.spec.ts` now asserts at least six streams with every node live and acts completing.
-`TestLayoutNumbersMatchTheGUI` lost its one `INLINE_LIVE_MAX` row.
+`TestLayoutNumbersMatchTheGUI` lost its one `INLINE_LIVE_MAX` row. `layoutprobe.test.tsx` repeated a
+thread id by accident, so its third thread has its own id now.
+
+`api/endpoint.test.ts` lists every server-streaming RPC from the generated code and asserts each takes
+the socket, and that only `endpoint.ts` imports connect-web. A new service is covered the day it lands.
 
 ## Verified end to end
 
@@ -145,6 +219,12 @@ Run in that order it failed every time. `reset()` now clears the records.
 - Production-build timings, above.
 - Thread nodes with real history. These threads were empty, so a large snapshot's cost per node is not
   in the table. Terminals printed a line a second.
-- Relaunching with a very large wall open: the tab reopens, so it would likely freeze again, and
-  `plugin disable` from a terminal should be the way out.
+- Relaunching in the Wails app. A reload with a 96-node wall open came back at home with the tab
+  closed and no freeze, so a relaunch should be a way out too.
 - The overlay, a dictation session and a real clone: only their `slot:` lines changed. Unit tests pass.
+
+## Open question
+
+Hiding the window closes no stream, and on return every thread stream reconnects at once
+(`stream.ts`, `thread.ts`). That is old behaviour, now without a ration: 33 watches took 0.29 s, so
+nothing changed here. Worth a look if a user holds far more threads than that.

@@ -36,7 +36,11 @@ const ACK_BYTES = 2 << 20;
  */
 export const MAX_QUEUED_BYTES = 64 << 20;
 
-/** Past this many open sockets something is leaking one: nothing here caps them. */
+/**
+ * Past this many open sockets something is probably leaking one: a plugin's view holds at most
+ * its 32 threads and 16 terminals, and two side by side stay under this. Only a log line: nothing
+ * here caps them.
+ */
 export const OPEN_SOCKETS_WARNING = 150;
 
 let openSockets = 0;
