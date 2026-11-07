@@ -13,20 +13,23 @@ import { CompareBar } from "./CompareBar";
 import { DiffFile } from "./DiffFile";
 import { FileList } from "./FileList";
 import { buildFileRows, diffTitle, listPace, pickRow, sourceLabel, type FileRow } from "./files";
+import { ModelBand } from "./ModelBand";
 import { useIndexChanges, useStatusChanges } from "./useStatusChanges";
 
 /** Below this the panel cannot hold a rail beside a readable diff: the list goes on top. Its real width, not the window's. */
 export const RAIL_MIN = 620;
 
 const NO_REMOTES: readonly string[] = [];
+const NO_PATHS: readonly string[] = [];
 
 function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: string; target: DiffTarget }) {
   const { project, worktree, base, head } = target;
   const compare = useMemo<CompareTarget>(() => ({ projectId: project, worktree, base, head }), [project, worktree, base, head]);
+  const paths = target.paths ?? NO_PATHS;
   const [pace, setPace] = useState(REFRESH_DEBOUNCE_MS);
-  const read = useTabRead<CompareView>([project, worktree, sourceParam(base), sourceParam(head)].join("\u0000"), async (signal) => {
+  const read = useTabRead<CompareView>([project, worktree, sourceParam(base), sourceParam(head), ...paths].join("\u0000"), async (signal) => {
     const start = performance.now();
-    const view = await compareWorktree(compare, [], undefined, signal);
+    const view = await compareWorktree(compare, paths, undefined, signal);
     setPace(listPace(performance.now() - start));
     return view;
   });
@@ -48,7 +51,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   const name = useProjectsStore((s) => s.byId[project]?.name ?? project);
   const branch = useProjectsStore((s) => findWorktree(s, project, worktree)?.branch ?? "");
 
-  const named = view ? diffTitle(view, { branch, remotes, project: name, own: target.own }) : tabTitle;
+  const named = target.heading || (view ? diffTitle(view, { branch, remotes, project: name, own: target.own }) : tabTitle);
   useEffect(() => {
     if (named !== tabTitle) retitlePanelTab("current", tabId, named);
   }, [named, tabTitle, tabId]);
@@ -94,9 +97,21 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
       Refresh
     </Button>
   );
+  const hide = target.hide ?? [];
+  const band = Boolean(target.heading) || Boolean(target.note) || hide.length > 0;
   return (
     <div ref={ref} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="diff-surface" data-project={project} data-path={worktree} data-loading={read.loading || undefined}>
-      <CompareBar projectId={project} base={baseLabel} head={headLabel} baseSource={base} headSource={head} baseLabel={view?.baseRef || "HEAD"} wide={rail} onChange={setSources} />
+      {band && (
+        <ModelBand
+          heading={target.heading ?? ""}
+          note={target.note ?? ""}
+          hidden={hide.length > 0}
+          onReveal={() => {
+            go({ hide: [] });
+          }}
+        />
+      )}
+      {!hide.includes("compare") && <CompareBar projectId={project} base={baseLabel} head={headLabel} baseSource={base} headSource={head} baseLabel={view?.baseRef || "HEAD"} wide={rail} onChange={setSources} />}
       {view && read.error && <NoticeBar testId="diff-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {!view && read.error ? (
         <FileEmptyState icon={TriangleAlert} heading="Cannot compare" detail={read.error} testId="diff-compare-failed">
@@ -116,22 +131,24 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
         </FileEmptyState>
       ) : (
         <div className={rail ? "flex min-h-0 flex-1" : "flex min-h-0 flex-1 flex-col"}>
-          <FileList
-            view={view}
-            rows={rows}
-            current={listed ? current : null}
-            onPick={pick}
-            rail={rail}
-            height={height}
-            query={target.filter ?? ""}
-            onQuery={(filter) => {
-              keep({ filter });
-            }}
-            fold={target.fold}
-            onFold={(fold) => {
-              keep({ fold });
-            }}
-          />
+          {!hide.includes("files") && (
+            <FileList
+              view={view}
+              rows={rows}
+              current={listed ? current : null}
+              onPick={pick}
+              rail={rail}
+              height={height}
+              query={target.filter ?? ""}
+              onQuery={(filter) => {
+                keep({ filter });
+              }}
+              fold={target.fold}
+              onFold={(fold) => {
+                keep({ fold });
+              }}
+            />
+          )}
           {current ? (
             <DiffFile key={current.key} target={compare} row={current} listed={listed} compared={compared} onRefresh={reload} />
           ) : (

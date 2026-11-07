@@ -941,8 +941,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   tab per file; `docs/notes/file-viewer-3-tabs.md`), Diff (two sources of one checkout,
   file by file, with the file list as a rail or on top by the panel's width; one tab per
   checkout; opened from the thread info card's Changes row and per-project sub-rows, a
-  project page's checkout rows into the page's own panel, and `view.panel.diff`;
-  `docs/notes/diff-viewer-2.md`), Pull request, whose menu starts threads about the pull
+  project page's checkout rows into the page's own panel, and `view.panel.diff`, whose
+  `--title`, `--note`, `--path` and `--hide` let a thread frame it; `--hide` is the only way to
+  reduce the controls, and the tab always offers them back;
+  `docs/notes/diff-viewer-2.md`, `docs/notes/diff-viewer-3.md`), Pull request, whose menu starts threads about the pull
   request through `pr.ask`, `pr.explain` and `pr.fix.findings`,
   and MCP (the thread's MCP servers, one card each
   with status, error, tools and Reconnect; opened by the card's MCP row and

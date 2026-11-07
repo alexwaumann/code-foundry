@@ -274,6 +274,18 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params.line).toBe("3");
     });
 
+    it("panel.diff from this daemon: sources, a narrowed list, a title, a note and what to hide", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, base: "ref:v1.2", head: "staged", paths: "a.go\nb.go", title: "Two files", note: "Why", hide: "compare", own: "1" });
+      expect(active("thread:b")).toMatchObject({ kind: "diff", title: "Two files", params: { base: "ref:v1.2", head: "staged", paths: "a.go\nb.go", title: "Two files", note: "Why", hide: "compare", own: "1" } });
+      untouched();
+    });
+
+    it("panel.diff with no path opens the checkout's tab; without a checkout, nothing", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      expect(active("thread:b")).toMatchObject({ kind: "diff", params: { project: "web", worktree: WEB_FEAT } });
+      expect(showThreadView("panel.diff", "b", { project: "web" })).toBe(false);
+    });
+
     it.each([
       ["working: the default sources", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "working" }, undefined],
       ["branch: the merge base against HEAD", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "branch" }, "ref:HEAD"],

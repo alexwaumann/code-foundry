@@ -98,6 +98,9 @@ describe("diffTitle", () => {
   it("another side keeps its own name", () => {
     expect(diffTitle({ ...view, head: { source: { kind: "staged" }, label: "Staged", sha: "" } }, o)).toBe("Staged vs main");
   });
+  it("on the default branch the two sides stay apart", () => {
+    expect(diffTitle(view, { ...o, branch: "main" })).toBe("main vs origin/main");
+  });
   it("another project's checkout says whose, so a thread's checkouts stay apart", () => {
     expect(diffTitle(view, { ...o, own: false })).toBe("web · feat/sidebar vs main");
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, DIFF_KIND, diffOfTab, diffTab, sameSource, sourceOfParam, sourceParam, type DiffTarget } from "./diffTarget";
 
-const target = (o: Partial<DiffTarget> = {}): DiffTarget => ({ project: "web", worktree: "/w", base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "", oldPath: "", own: false, ...o });
+const target = (o: Partial<DiffTarget> = {}): DiffTarget => ({ project: "web", worktree: "/w", base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "", oldPath: "", own: false, paths: [], heading: "", note: "", hide: [], ...o });
 
 describe("sources as tab params", () => {
   it.each([
@@ -32,6 +32,21 @@ describe("diffTab", () => {
     expect(diffTab(target({ worktree: "/other" })).id).not.toBe(id);
     expect(diffTab(target({ project: "api" })).id).not.toBe(id);
     expect(diffTab(target()).kind).toBe(DIFF_KIND);
+  });
+
+  it("a thread's titled tab is its own, never the user's: the same title is the same tab", () => {
+    const mine = diffTab(target()).id;
+    const a = diffTab(target({ heading: "Review" }));
+    expect(a.id).not.toBe(mine);
+    expect(a.title).toBe("Review");
+    expect(diffTab(target({ heading: "Review", file: "x.ts", base: { kind: "staged" } })).id).toBe(a.id);
+    expect(diffTab(target({ heading: "Other" })).id).not.toBe(a.id);
+  });
+
+  it("round-trips what a thread sets; a part it cannot hide is dropped", () => {
+    const t = target({ paths: ["a.ts", "src"], heading: "Review", note: "Why", hide: ["compare", "files"] });
+    expect(diffOfTab(diffTab(t))).toEqual(t);
+    expect(diffOfTab({ params: { project: "web", worktree: "/w", hide: "compare,nonsense" } })?.hide).toEqual(["compare"]);
   });
 
   it("leaves defaults out of the params", () => {

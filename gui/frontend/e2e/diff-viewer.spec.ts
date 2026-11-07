@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, openThreadChanges, resetMock, row } from "./fixtures";
+import { CF, mockPost, openApp, openThreadChanges, resetMock, row } from "./fixtures";
 
 /**
  * The Diff tab where only a real browser can tell (docs/notes/diff-viewer-2.md): the file list
@@ -208,6 +208,23 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(file(page).locator('[data-line-type="change-addition"]').first()).toBeVisible();
       await page.mouse.move(5, 5);
       await page.screenshot({ path: `${shots ?? ""}/diff-${layout}-${scheme}.png` });
+    });
+  }
+}
+
+for (const scheme of ["dark", "light"] as const) {
+  for (const [name, hide, width] of [["framed", [], 700], ["focused", ["compare", "files"], 700], ["framed-narrow", [], 420]] as const) {
+    test(`a thread's framing screenshots (${scheme}, ${name})`, async ({ page }, info) => {
+      const shots = process.env.SHOTS;
+      test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      await page.emulateMedia({ colorScheme: scheme });
+      await openDiff(page, width);
+      const target = { project: "repo-cf", worktree: CF, base: { kind: "merge-base" }, head: { kind: "working" }, file: "README.md", oldPath: "", own: true, paths: ["README.md", "notes/plan.md"], heading: "The two files behind the flake", note: "Row height now comes from one place.", hide };
+      await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openDiffInPanel("current", ${JSON.stringify(target)}))`);
+      await expect(page.getByTestId("diff-model-title")).toBeVisible();
+      await expect(file(page).locator('[data-line-type="change-addition"]').first()).toBeVisible();
+      await page.mouse.move(5, 5);
+      await page.screenshot({ path: `${shots ?? ""}/diff-${name}-${scheme}.png` });
     });
   }
 }

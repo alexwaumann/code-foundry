@@ -18,7 +18,7 @@
  * sends focus=1 only then, and only because the user asked to be taken there. Without it, a
  * request that would replace the editor the user is typing in joins the strip behind it.
  */
-import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD } from "@/surfaces/diffTarget";
+import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, diffOfTab, sourceOfParam } from "@/surfaces/diffTarget";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { galleryTab } from "@/surfaces/galleryTarget";
 import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
@@ -108,10 +108,19 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     if (p.focus === "1") focusEditorLine(fileEditKey(key, tabId), line);
     return true;
   }),
-  // view.panel.diff: params project, worktree, path (worktree-relative) and scope.
+  // view.panel.diff: params project and worktree, then what the call set (commands_view_diff.go).
+  // An older daemon, until it restarts, sends scope and always a path.
   "panel.diff": item((key, p) => {
-    if (!p.project || !p.worktree || !p.path) return false;
-    return openDiffInPanel(key, { project: p.project, worktree: p.worktree, base: DEFAULT_BASE, head: p.scope === "branch" ? COMMITTED_HEAD : DEFAULT_HEAD, file: p.path, oldPath: "", own: true });
+    if (!p.project || !p.worktree) return false;
+    const fromScope = p.scope === "branch" ? COMMITTED_HEAD : DEFAULT_HEAD;
+    const shown = diffOfTab({ params: p });
+    if (!shown) return false;
+    return openDiffInPanel(key, {
+      ...shown,
+      base: sourceOfParam(p.base, DEFAULT_BASE),
+      head: sourceOfParam(p.head, fromScope),
+      own: p.own === "1" || p.scope !== undefined,
+    });
   }),
   // view.panel.pr: params slug and number.
   "panel.pr": item((key, p) => {

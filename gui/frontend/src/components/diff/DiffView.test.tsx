@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   view: null as Partial<CompareView> | null | Error,
   sides: new Map<string, Partial<CompareFileSidesView>>(),
   compares: [] as string[],
+  paths: [] as (readonly string[])[],
   reads: [] as string[],
   width: 900,
   height: 800,
@@ -41,8 +42,9 @@ vi.mock("@/stores/fileStamps", () => ({
 }));
 vi.mock("@/api/files", async (orig) => ({ ...(await orig<typeof import("@/api/files")>()), readFile: () => Promise.resolve(api.dotGit) }));
 vi.mock("@/api/compare", () => ({
-  compareWorktree: (t: CompareTarget) => {
+  compareWorktree: (t: CompareTarget, paths: readonly string[]) => {
     api.compares.push(`${sourceParam(t.base)} ${sourceParam(t.head)}`);
+    api.paths.push(paths);
     if (api.view instanceof Error) return Promise.reject(api.view);
     return Promise.resolve({ ...compareDefaults(), ...api.view });
   },
@@ -118,6 +120,7 @@ beforeEach(() => {
   api.view = null;
   api.sides.clear();
   api.compares.length = 0;
+  api.paths.length = 0;
   api.reads.length = 0;
   api.width = 900;
   api.height = 800;
@@ -818,6 +821,62 @@ describe("rail or list on top", () => {
     fireEvent.click(screen.getByTestId("diff-fold"));
     expect(screen.getByTestId("diff-file-rows")).toBeTruthy();
     expect(tabNow()?.params.fold).toBe("0");
+  });
+});
+
+describe("what a thread asked for", () => {
+  const sawPaths = () => api.paths.at(-1);
+
+  it("narrows the list to its paths", async () => {
+    list([file("a.ts")]);
+    await show(target({ paths: ["a.ts", "src/b.ts"] }));
+    expect(sawPaths()).toEqual(["a.ts", "src/b.ts"]);
+  });
+
+  it("heads the tab with its title and note, as plain text, and keeps that title", async () => {
+    list([file("a.ts")]);
+    await show(target({ heading: "The two files", note: "<b>Row height</b> comes from one place." }));
+    expect(screen.getByTestId("diff-model-title").textContent).toBe("The two files");
+    expect(screen.getByTestId("diff-model-note").textContent).toBe("<b>Row height</b> comes from one place.");
+    expect(tabNow()?.title).toBe("The two files");
+    expect(screen.queryByTestId("diff-reveal")).toBeNull();
+  });
+
+  it("no title, no note, nothing hidden: no band", async () => {
+    list([file("a.ts")]);
+    await show();
+    expect(screen.queryByTestId("diff-model-band")).toBeNull();
+  });
+
+  it.each([
+    ["compare", ["compare"] as const, "diff-compare-bar", "diff-file-list"],
+    ["files", ["files"] as const, "diff-file-list", "diff-compare-bar"],
+  ])("--hide %s takes that part away and leaves the rest", async (_name, hide, gone, kept) => {
+    list([file("a.ts")]);
+    await show(target({ hide }));
+    expect(screen.queryByTestId(gone)).toBeNull();
+    expect(screen.getByTestId(kept)).toBeTruthy();
+    expect(screen.getByTestId("diff-file")).toBeTruthy();
+  });
+
+  it("the user can always bring back what was hidden, and it stays back", async () => {
+    list([file("a.ts")]);
+    await show(target({ heading: "Focused", hide: ["compare", "files"] }));
+    expect(screen.queryByTestId("diff-compare-bar")).toBeNull();
+    fireEvent.click(screen.getByTestId("diff-reveal"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-compare-bar")).toBeTruthy();
+    });
+    expect(screen.getByTestId("diff-file-list")).toBeTruthy();
+    expect(tabNow()?.params.hide).toBeUndefined();
+    expect(screen.queryByTestId("diff-reveal")).toBeNull();
+    expect(screen.getByTestId("diff-model-title").textContent).toBe("Focused");
+  });
+
+  it("everything hidden and no text still leaves the way back", async () => {
+    list([file("a.ts")]);
+    await show(target({ hide: ["compare", "files"] }));
+    expect(screen.getByTestId("diff-reveal")).toBeTruthy();
   });
 });
 
