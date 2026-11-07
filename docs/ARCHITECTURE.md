@@ -138,6 +138,8 @@ internal/
                            resumed download, sha256-pinned), the code-foundry-dictate engine
                            process (stdio JSON), one session at a time, the model kept loaded
                            (docs/notes/dictation-2-daemon.md)
+    browser/               experimental: one headless system Chrome over --remote-debugging-pipe, a
+                           page per side-panel tab (docs/notes/chrome-surface.md)
     search/                the search dialog's history and Agent search's hidden runs
                            (claude over stream-json, not threads), quote-verified hits, Promote
                            (docs/notes/search-5-agent-daemon.md)
@@ -462,6 +464,9 @@ Services (v1):
   search, a hidden claude -p run on the utility model that searches the user's threads with
   the CLI and reports quote-verified hits; Promote continues it as a thread
   (`docs/notes/search-5-agent-daemon.md`).
+* `BrowserService` — experimental, off unless `experimental.chrome_surface`: a side panel's
+  Browser tab, frames out (Watch, newest frame only) and input in. Browser pages only: a call
+  without an allowed Origin is refused (`docs/notes/chrome-surface.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
