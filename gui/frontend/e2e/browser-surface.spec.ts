@@ -45,6 +45,15 @@ test("one stream while it shows, none once it does not", async ({ page }) => {
   expect((await calls()).filter((c) => c.endsWith("https://example.com/"))).toHaveLength(1);
 });
 
+test("a second address reaches a surface that is already showing", async ({ page }) => {
+  await openSurface(page);
+  await expect.poll(async () => (await openStreams())[WATCH]).toBe(1);
+  await expect(page.getByTestId("browser-address")).toHaveValue("https://example.com/");
+  await emit({ showView: { name: "panel.browser", params: { url: "https://example.org/next" } } });
+  await expect(page.getByTestId("browser-address")).toHaveValue("https://example.org/next");
+  expect((await openStreams())[WATCH]).toBe(1);
+});
+
 test("the setting going off takes the tab and the stream at once", async ({ page }) => {
   await openSurface(page);
   await expect.poll(async () => (await openStreams())[WATCH]).toBe(1);
