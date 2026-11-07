@@ -37,7 +37,6 @@ export interface OverlayStreamHandlers {
 export function followOverlaySession(sessionId: string, h: OverlayStreamHandlers): () => void {
   const stopWatch = runStream<DictationView>({
     open: (signal) => watchDictation(signal),
-    slot: { label: "overlay:watch", priority: "core" },
     onEvent: (s) => {
       if (s.session?.id === sessionId && s.session.stopping) h.onStopping();
     },
@@ -45,7 +44,6 @@ export function followOverlaySession(sessionId: string, h: OverlayStreamHandlers
   });
   const stopSession = runStream<DictationSessionEventView>({
     open: (signal) => dictationSession(sessionId, signal),
-    slot: { label: "overlay:session", priority: "core" },
     shouldReconnectOnEnd: () => false,
     onEvent: (ev) => {
       if (ev.kind === "level") h.onLevel(ev.rms);

@@ -581,8 +581,7 @@ type Fieldset struct {
 // Thread renders a plugin-owned Claude thread (permission threads; Host.CreateThread)
 // with the host's rendered thread view and its composer. A thread that is gone (removed,
 // or not the plugin's) shows a muted empty state; an archived one still renders. Each
-// Thread or Terminal node is a live stream the GUI attaches while it is on screen; it
-// keeps at most MaxLiveNodes of them live at once and shows the rest paused, with Attach.
+// Thread or Terminal node is a live stream the GUI attaches while it is on screen.
 type Thread struct {
 	ThreadID string `json:"threadId"`
 	// ReadOnly leaves the composer out: the plugin alone sends (Host.SendThread).
@@ -608,13 +607,6 @@ type Terminal struct {
 	// Actions are up to 2 more buttons beside "Open in bottom panel" (Restart, Stop).
 	Actions []Button `json:"actions,omitempty"`
 }
-
-// MaxLiveNodes is how many thread and terminal nodes the GUI keeps live (attached to
-// their streams) at once, across every plugin view on screen. A node beyond it shows
-// "Paused" and Attach, which takes the oldest live node's place. Not a validation limit:
-// a view may hold more. (Each live node holds one of the six HTTP/1.1 connections the GUI
-// has to the daemon, which the app's own streams and calls share.)
-const MaxLiveNodes = 2
 
 // ColumnsCollapse is how a Columns node degrades when its container is narrower than
 // the columns need (always in the side panel).

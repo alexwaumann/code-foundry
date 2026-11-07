@@ -24,8 +24,7 @@ const INLINE_INSET = 12;
  * modal scope of its own (`inline:<thread>`), apart from the content pane's.
  */
 export function InlineThread({ threadId, readOnly = false, placeholder }: { threadId: string; readOnly?: boolean; placeholder?: string | undefined }) {
-  // An inline holder (api/streamSlots.ts): the content pane's own Watch outranks it.
-  useEffect(() => startThreadWatch(threadId, "inline"), [threadId]);
+  useEffect(() => startThreadWatch(threadId), [threadId]);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
   const [dockRef, dockHeight] = useElementHeight();

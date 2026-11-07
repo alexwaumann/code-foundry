@@ -4,9 +4,8 @@
  */
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Field, ViewNode } from "@/api/plugin";
-import { useStreamSlotsStore } from "@/api/streamSlots";
 import type { ThreadView } from "@/api/threads";
 import { emptyContext } from "@/stores/context";
 import { chooserKeyOf, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
@@ -14,7 +13,6 @@ import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { ViewContext, type ViewCtx } from "./context";
 import { SurfaceHeader } from "./Header";
-import { useInlineLiveStore } from "./live";
 import { NodeList } from "./NodeList";
 
 const ctx: ViewCtx = { watchKey: "w", instance: "showcase/gallery/global", plugin: "showcase", viewTab: "forms", uiContext: emptyContext, inert: false };
@@ -33,15 +31,9 @@ function thread(id: string, archived = false): ThreadView {
 
 const selection = useUiStore.getState().selection;
 
-beforeEach(() => {
-  useInlineLiveStore.setState({ holders: [], waiting: [] });
-});
-
 afterEach(() => {
   cleanup();
   usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {}, choices: {} });
-  useInlineLiveStore.setState({ holders: [], waiting: [] });
-  useStreamSlotsStore.setState({ open: 0, waiting: [] });
   useUiStore.setState({ selection });
   vi.restoreAllMocks();
 });
@@ -233,83 +225,24 @@ describe("thread nodes", () => {
     expect(screen.getByTestId("plugin-thread-archived").textContent).toContain("Archived");
   });
 
-  it("holds at most two live inline streams; Attach on the third pauses the oldest (#1b)", () => {
-    useThreadsStore.setState({ loaded: true, byId: { a: thread("a"), b: thread("b"), c: thread("c") }, order: [], owned: ["a", "b", "c"] });
-    inView(
-      <NodeList
-        nodes={[
-          { key: "ta", thread: { threadId: "a" } },
-          { key: "tb", thread: { threadId: "b" } },
-          { key: "tc", thread: { threadId: "c" } },
-        ]}
-      />,
-    );
-    const live = () => screen.getAllByTestId("plugin-thread").map((n) => n.getAttribute("data-live") === "true");
-    expect(live()).toEqual([true, true, false]);
-    const paused = screen.getByTestId("plugin-live-paused");
-    expect(paused.getAttribute("data-reason")).toBe("budget");
-    // The overlay's z-10 stays inside its node: scrolled under the sticky header, it must
-    // not paint over it (found in the release-readiness run).
-    expect(paused.closest('[data-testid="plugin-thread"]')?.classList.contains("isolate")).toBe(true);
-    fireEvent.click(screen.getByTestId("plugin-live-attach"));
-    expect(live()).toEqual([false, true, true]);
+  it("keeps every node on screen live, with no budget", () => {
+    const ids = ["a", "b", "c", "d", "e", "f", "g", "h"];
+    useThreadsStore.setState({ loaded: true, byId: Object.fromEntries(ids.map((id) => [id, thread(id)])), order: [], owned: ids });
+    inView(<NodeList nodes={ids.map((id) => ({ key: `t${id}`, thread: { threadId: id } }))} />);
+    expect(screen.getAllByTestId("plugin-thread").map((n) => n.getAttribute("data-live"))).toEqual(ids.map(() => "true"));
+    // A thread's chips are z-10 too: the node's isolate keeps them under the sticky header.
+    expect(screen.getAllByTestId("plugin-thread")[0]?.classList.contains("isolate")).toBe(true);
   });
 
-  it("adds no stream for the thread the content pane shows (it shares that Watch)", () => {
-    useThreadsStore.setState({ loaded: true, byId: { a: thread("a"), b: thread("b"), c: thread("c") }, order: [], owned: ["a", "b", "c"] });
-    useUiStore.setState({ selection: { kind: "thread", id: "c" } });
-    inView(
-      <NodeList
-        nodes={[
-          { key: "ta", thread: { threadId: "a" } },
-          { key: "tb", thread: { threadId: "b" } },
-          { key: "tc", thread: { threadId: "c" } },
-        ]}
-      />,
-    );
-    expect(screen.getAllByTestId("plugin-thread").map((n) => n.getAttribute("data-live") === "true")).toEqual([true, true, true]);
-    expect(useInlineLiveStore.getState().holders).toHaveLength(2);
-  });
-
-  it("lets go while the user is leaving the view tab (its choice in flight) (#1a)", () => {
+  it("stays live while the user is leaving the view tab (its choice in flight): nothing waits for its stream", () => {
     useThreadsStore.setState({ loaded: true, byId: { a: thread("a") }, order: [], owned: ["a"] });
     usePluginSurfacesStore.setState({
       watches: { w: { plugin: "showcase", surface: "gallery", instance: ctx.instance, phase: "live", message: "", pluginState: "running", version: 1, hostRendered: false, error: null, view: { nodes: [], tabs: { active: "owned", items: [{ key: "owned", label: "Owned" }, { key: "text", label: "Text" }] } } } },
     });
     inView(<NodeList nodes={[{ key: "ta", thread: { threadId: "a" } }]} />);
-    expect(screen.getByTestId("plugin-thread").getAttribute("data-live")).toBe("true");
     act(() => {
       usePluginSurfacesStore.setState({ choices: { w: { [chooserKeyOf(ctx.instance, "", "")]: { key: "text", seq: 1, version: 1, answered: false } } } });
     });
-    expect(screen.getByTestId("plugin-thread").getAttribute("data-live")).toBeNull();
-    expect(useInlineLiveStore.getState().holders).toEqual([]);
-  });
-
-  it("offers no Attach over the budget while streams wait for a connection (it would pause one that streams) (live 8)", () => {
-    useThreadsStore.setState({ loaded: true, byId: { a: thread("a"), b: thread("b"), c: thread("c") }, order: [], owned: ["a", "b", "c"] });
-    useStreamSlotsStore.setState({ open: 5, waiting: ["thread:b"] });
-    inView(
-      <NodeList
-        nodes={[
-          { key: "ta", thread: { threadId: "a" } },
-          { key: "tb", thread: { threadId: "b" } },
-          { key: "tc", thread: { threadId: "c" } },
-        ]}
-      />,
-    );
-    const paused = screen.getAllByTestId("plugin-live-paused").find((p) => p.getAttribute("data-reason") === "budget");
-    expect(paused).toBeDefined();
-    expect(screen.queryByTestId("plugin-live-attach")).toBeNull();
-    act(() => {
-      useStreamSlotsStore.setState({ open: 4, waiting: [] });
-    });
-    expect(screen.getByTestId("plugin-live-attach")).toBeTruthy();
-  });
-
-  it("says it waits for a connection when the app's stream slots are full (#1c)", () => {
-    useThreadsStore.setState({ loaded: true, byId: { a: thread("a") }, order: [], owned: ["a"] });
-    useStreamSlotsStore.setState({ open: 5, waiting: ["thread:a"] });
-    inView(<NodeList nodes={[{ key: "ta", thread: { threadId: "a" } }]} />);
-    expect(screen.getByTestId("plugin-live-paused").getAttribute("data-reason")).toBe("connections");
+    expect(screen.getByTestId("plugin-thread").getAttribute("data-live")).toBe("true");
   });
 });

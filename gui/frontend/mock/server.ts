@@ -1020,7 +1020,7 @@ async function* filterEvents(src: AsyncGenerator<{ source: EventSource; event: E
   for await (const { source, event } of src) if (want.has(source)) yield event;
 }
 
-/** Long-lived streams currently open, by RPC, for GET /__mock/streams (connection budget tests). */
+/** Long-lived streams currently open, by RPC, for GET /__mock/streams (stream count tests). */
 const openStreams = new Map<string, number>();
 
 function bump(name: string, by: number): void {

@@ -409,7 +409,7 @@ class DemoInstance {
     }
     const shift = this.openedAt - CAPTURED_AT;
     // "stress" (POST /__mock/plugin/demotab?tab=stress; not in the captured views): two
-    // thread nodes and a terminal in one view, more live streams than the GUI's budget.
+    // thread nodes and a terminal in one view.
     const v = shiftTimes(fixture(this.tab === "stress" ? "assistant" : this.tab), shift) as Record<string, unknown>;
     if (this.tab === "stress") {
       (v.tabs as { items: { key: string; label: string }[] }).items.push({ key: "stress", label: "Stress" });

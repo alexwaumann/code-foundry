@@ -22,7 +22,7 @@ export type { GhEventView } from "./gh";
 
 /**
  * One item of the multiplexed EventService stream, tagged by source. The GUI holds
- * exactly one of these streams (HTTP/1.1 allows 6 connections per origin).
+ * exactly one of these streams.
  */
 export type EventView =
   | { source: "project"; event: ProjectEventView }

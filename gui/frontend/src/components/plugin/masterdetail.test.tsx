@@ -10,14 +10,15 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { TerminalView } from "@/api/terminal";
 import { childLists, nodeScope, withChildLists, type ActRequestView, type MasterDetailData, type PluginViewModel, type Row, type ViewNode } from "@/api/plugin";
 import { emptyContext } from "@/stores/context";
 import { applyUpdateToState, draftKeyOf, emptyEntry, formsOf, reconcileDetails, reconcileResets, usePluginSurfacesStore, walkScoped } from "@/stores/pluginSurfaces";
+import { useTerminalsStore } from "@/stores/terminals";
 import { demoView } from "@/test/pluginFixtures";
 import { ViewContext, type ViewCtx } from "./context";
 import { FILL_MIN } from "./height";
 import { MASTER_DETAIL_GAP, MASTER_DETAIL_LIST_WIDTH, MASTER_DETAIL_MIN_DETAIL, masterDetailListWidth, masterDetailWide } from "./layout";
-import { LeavingNode, useLeavingViewTab } from "./live";
 import { NodeList } from "./NodeList";
 import { SurfaceFrame } from "./SurfaceFrame";
 
@@ -398,31 +399,14 @@ describe("master-detail, wide", () => {
   });
 });
 
-function LeavingProbe() {
-  const leaving = useLeavingViewTab("w");
-  return <span data-testid="probe" data-leaving={leaving || undefined} />;
-}
-
 describe("live nodes", () => {
-  it("let go inside a pending selection or tab switch, and an outer leave reaches inner nodes", () => {
+  it("stay attached in a detail whose selection is pending", () => {
     boxes.md = { top: 0, height: 0, width: 900 };
-    const probeNode: ViewNode = { key: "probe-host", text: { content: "x" } };
-    // The probe stands in for a thread node: it reads useLeavingViewTab like one.
-    render(
-      <LeavingNode.Provider value={true}>
-        <LeavingProbe />
-      </LeavingNode.Provider>,
-    );
-    expect(screen.getByTestId("probe").getAttribute("data-leaving")).toBe("true");
-    cleanup();
-    render(<LeavingProbe />);
-    expect(screen.getByTestId("probe").getAttribute("data-leaving")).toBeNull();
-    cleanup();
-    // A terminal in a pending detail shows paused (no stream).
+    useTerminalsStore.setState({ loaded: true, byId: { "t-1": { id: "t-1", state: "running", title: "t" } as unknown as TerminalView }, order: [] });
     usePluginSurfacesStore.setState({ choices: { w: { [DK]: { key: "r2", seq: 1, version: 1, answered: false } } } });
-    inSurface(<NodeList nodes={[mdNode({ selected: "r1" }, [probeNode, { key: "d-term", terminal: { terminalId: "t-1" } }])]} />);
+    inSurface(<NodeList nodes={[mdNode({ selected: "r1" }, [{ key: "d-term", terminal: { terminalId: "t-1" } }])]} />);
     expect(screen.getByTestId("plugin-md-content").getAttribute("data-pending")).toBe("true");
-    expect(document.querySelector('[data-key="d-term"][data-live="true"]')).toBeNull();
+    expect(document.querySelector('[data-key="d-term"][data-live="true"]')).not.toBeNull();
   });
 });
 

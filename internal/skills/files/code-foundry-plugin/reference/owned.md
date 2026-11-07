@@ -20,10 +20,8 @@ at least 240 px) or pixels (120..1600). A view naming
 another owner's thread or terminal is refused; one that is gone (removed, closed) shows a
 muted empty state; an archived thread still renders, composer included, with no archived
 cue (`SendThread` unarchives it), so drop its node when you archive it. Each one holds a
-live stream, so the GUI attaches a node only while it is on screen in the active tab and
-keeps at most 2 live at once (others show "Attach"; fewer when the app's connections
-run out): put one thread or terminal in a view, or let the user pick which, switching
-with tabs or chips rather than stacking them.
+live stream while it is on screen in the active tab, and a view may show as many as it
+needs.
 Check `h.HasCapability("view.node.thread")` (`view.node.terminal`) before relying on
 them; the calls that make them are below.
 

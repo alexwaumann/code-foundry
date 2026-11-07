@@ -113,7 +113,7 @@ export function EmberRow() {
 }
 
 function EmberRowShown({ threadId }: { threadId: string }) {
-  useEffect(() => holdEmberBoard("inline"), []);
+  useEffect(() => holdEmberBoard(), []);
   const flame = useFlameState(threadId);
   const selected = useEmberSelected(threadId);
   const cursor = useUiStore((s) => s.cursorKey === EMBER_ROW_KEY);

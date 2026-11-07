@@ -39,7 +39,6 @@ export function useSearchWatch(id: string | null, seed: SearchEntryView | null, 
         cur = null;
         return watch(id, signal);
       },
-      slot: { label: "search:watch", priority: "core" },
       onEvent: (ev) => {
         const next = reduceSearch(cur, ev);
         if (next === cur) return;
@@ -70,7 +69,6 @@ export function useRecentSearches(on: boolean, watch: WatchRecentFn = watchRecen
     if (!on) return;
     return runStream<SearchEntryView[]>({
       open: (signal) => watch(signal),
-      slot: { label: "search:recent", priority: "inline" },
       onEvent: setList,
       onError: invalidateOnTransportError,
     });

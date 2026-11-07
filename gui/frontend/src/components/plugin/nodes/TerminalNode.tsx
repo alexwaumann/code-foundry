@@ -1,6 +1,5 @@
 import { lazy, Suspense, useRef, useState } from "react";
 import { PanelBottom } from "lucide-react";
-import { useStreamSlotsStore } from "@/api/streamSlots";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { showPluginTerminal, useInVisibleBottom } from "@/stores/pluginTerminals";
@@ -8,10 +7,10 @@ import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { terminalAutoHeight, useNarrowerThan, useNodeHeight } from "../height";
 import { useViewCtx } from "../context";
-import { useLeavingViewTab, useLiveSlot, useOnScreen } from "../live";
+import { useOnScreen } from "../live";
 import { PluginButton } from "../parts";
 import type { NodeProps } from "../registry";
-import { LivePaused } from "./LivePaused";
+import { LiveHidden } from "./LiveHidden";
 import { OwnedGone } from "./OwnedGone";
 
 // Loaded on first use: xterm stays out of what every surface imports.
@@ -23,13 +22,13 @@ const NARROW_PX = 400;
 /**
  * The plugin's own terminal, inline (docs/notes/plugins-6-thread-terminal.md): a title
  * bar with the plugin's buttons and "Open in bottom panel" (icons only on a narrow node),
- * over the terminal view. Its own Attach only while near the screen, its view tab stays the
- * active one and within the inline budget (components/plugin/live.ts). While the bottom
- * panel on screen shows the terminal, this node says so instead of attaching a second
- * view. A terminal the GUI does not know shows a muted empty state.
+ * over the terminal view. Its own Attach only while near the screen
+ * (components/plugin/live.ts). While the bottom panel on screen shows the terminal, this
+ * node says so instead of attaching a second view. A terminal the GUI does not know shows a
+ * muted empty state.
  */
 export function TerminalNode({ node, data }: NodeProps<"terminal">) {
-  const { inert, watchKey } = useViewCtx();
+  const { inert } = useViewCtx();
   const ref = useRef<HTMLDivElement>(null);
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [box, setBox] = useState<HTMLDivElement | null>(null);
@@ -41,11 +40,7 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
   const inBottom = useInVisibleBottom(data.terminalId);
   const narrow = useNarrowerThan(box, NARROW_PX);
   const onScreen = useOnScreen(el);
-  const leaving = useLeavingViewTab(watchKey);
-  const wanted = known && onScreen && !leaving && !inBottom;
-  const slot = useLiveSlot(`terminal\u0000${watchKey}\u0000${node.key}`, wanted);
-  const attached = wanted && slot.live;
-  const waiting = useStreamSlotsStore((s) => attached && s.waiting.includes(`terminal:${data.terminalId}`));
+  const attached = known && onScreen && !inBottom;
   if (!known) {
     return (
       <OwnedGone
@@ -115,12 +110,11 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
           </p>
         ) : attached ? (
           <Suspense fallback={null}>
-            <TerminalHost terminalId={data.terminalId} streamPriority="inline" testId="plugin-terminal-host" />
+            <TerminalHost terminalId={data.terminalId} testId="plugin-terminal-host" />
           </Suspense>
         ) : (
-          <LivePaused kind="terminal" reason={slot.over ? "budget" : "hidden"} onAttach={slot.take} />
+          <LiveHidden />
         )}
-        {waiting && <LivePaused kind="terminal" reason="connections" />}
       </div>
     </div>
   );

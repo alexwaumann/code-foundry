@@ -818,18 +818,18 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 * State discipline: sliced Zustand stores, one per daemon service. Streams update slices;
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
-* Connection budget: the GUI holds exactly one `EventService.Watch` stream plus one
+* Streams: the GUI holds exactly one `EventService.Watch` stream plus one
   `ThreadService.Watch` per visible thread view (the content pane's thread, a plugin's
   thread node; one stream when both show the same thread) and one `TerminalService.Attach`
   per visible terminal view (the bottom panel's active shell, a plugin's terminal node),
-  each only while it is visible: usually two, three or four with a plugin's thread or
-  terminal on screen. Everything else is unary, except a
-  `ProjectService.Clone` stream while the Add Project dialog clones a repository. This keeps
-  the browser's six HTTP/1.1 connections per origin mostly free.
+  each only while it is visible. Everything else is unary, except a
+  `ProjectService.Clone` stream while the Add Project dialog clones a repository. Every
+  stream is a WebSocket (`docs/notes/ws-transport.md`), which leaves WebKit's six HTTP/1.1
+  connections per origin to the unary calls, so nothing rations them; being visible is what
+  bounds them (`docs/notes/ws-remove-slots.md`).
 * Dictation (`stores/dictation.ts`, `docs/notes/dictation-4-gui.md`): one shared
-  `DictationService.Watch` only while `dictation.enabled` is on (composers hold it at
-  "inline" priority) or the settings section is on screen ("core"), and one
-  `DictationService.Session` while a composer dictates. A phrase lands at the caret of the
+  `DictationService.Watch` only while `dictation.enabled` is on (composers hold it) or the
+  settings section is on screen, and one `DictationService.Session` while a composer dictates. A phrase lands at the caret of the
   composer that pressed the mic (every composer: thread, new thread, Ember, the PR panel's
   ask and review), tinted by a ProseMirror decoration, never a mark. The host's hold key
   drives the same session through `dictation.hold`, and the window tells the daemon whether

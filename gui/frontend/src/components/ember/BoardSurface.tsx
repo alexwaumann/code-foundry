@@ -304,7 +304,7 @@ function useFocusedTask(scroller: React.RefObject<HTMLDivElement | null>, tasks:
  * nothing here edits them.
  */
 export function BoardSurface() {
-  useEffect(() => holdEmberBoard("core"), []);
+  useEffect(() => holdEmberBoard(), []);
   const loaded = useEmberStore((s) => s.board !== null);
   const error = useEmberStore((s) => s.error);
   const tasks = useEmberTasks();

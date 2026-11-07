@@ -124,7 +124,7 @@ export function EmberPathPlace({ children }: { children: ReactNode }) {
  * gains are mirrored here by hand (docs/notes/ember-reply-fold.md). Holds the board stream (core) while shown.
  */
 export function EmberBody({ threadId }: { threadId: string }) {
-  useEffect(() => holdEmberBoard("core"), []);
+  useEffect(() => holdEmberBoard(), []);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const flame = useFlameState(threadId);
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking } = useThreadActivity(threadId);

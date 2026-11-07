@@ -8,9 +8,7 @@
  * back. Any writer counts: the thread's Edit or Write, its Bash (`cp` over the file,
  * `touch`, `sed -i`), another thread, the user's editor. The last view to go stops it.
  *
- * A poll, not a stream: WebKit gives the daemon six connections and a stream holds one for
- * its life (docs/notes/plugins-12-renderer-defects.md), and a stat a second of the few
- * files on screen costs nothing.
+ * A poll, not a stream: a stat a second of the few files on screen costs nothing.
  */
 import { statFile, type FileStamp } from "@/api/files";
 import { isPageVisible, onBecameVisible } from "@/api/stream";

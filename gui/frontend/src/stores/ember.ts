@@ -10,7 +10,6 @@ import type { EmberBoardView, EmberTaskView, EmberTimerView } from "@/api/ember"
 import { watchEmberBoard } from "@/api/ember";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream } from "@/api/stream";
-import { resettleStreamSlots, type StreamPriority } from "@/api/streamSlots";
 import {
   blockedTasks,
   boardSections,
@@ -54,23 +53,18 @@ const NO_TIMERS: readonly EmberTimerView[] = [];
 // ---------- the board stream ----------
 
 let holders = 0;
-let coreHolders = 0;
 let stop: (() => void) | null = null;
 
 /**
  * Holds the board stream for a view that shows it, opening it for the first holder and
- * closing it after the last: one WatchBoard however many views show Ember. `priority`:
- * the sidebar row holds it "inline" (a core stream may take its slot; api/streamSlots.ts),
- * the chat and the Board panel "core". Returns the release (harmless twice).
+ * closing it after the last: one WatchBoard however many views show Ember. Returns the
+ * release (harmless twice).
  */
-export function holdEmberBoard(priority: StreamPriority): () => void {
-  const core = priority === "core" ? 1 : 0;
+export function holdEmberBoard(): () => void {
   holders++;
-  coreHolders += core;
   if (stop === null) {
     stop = runStream<EmberBoardView>({
       open: (signal) => watchEmberBoard(signal),
-      slot: { label: "ember:board", priority: () => (coreHolders > 0 ? "core" : "inline") },
       resyncOnVisible: true,
       onEvent: (board) => {
         useEmberStore.setState({ board, error: null });
@@ -80,13 +74,12 @@ export function holdEmberBoard(priority: StreamPriority): () => void {
       },
       onError: invalidateOnTransportError,
     });
-  } else if (core) resettleStreamSlots();
+  }
   let released = false;
   return () => {
     if (released) return;
     released = true;
     holders--;
-    coreHolders -= core;
     if (holders > 0) return;
     stop?.();
     stop = null;
