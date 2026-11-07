@@ -163,8 +163,9 @@ should not make. Agents can also run `settings set experimental.chrome_surface t
 - `Input.dispatchKeyEvent` does nothing for cmd+a or option+left on a Mac unless it names the editing
   command (`keys.go`). Plain arrows and Backspace need none.
 - `Page.navigate` to a download answers `net::ERR_ABORTED`, which is no failure.
-- `make check` runs the live tests when Chrome is installed. Many Chromes at once starve each other,
-  so the cases share one. Chrome's singleton socket does not fit under `t.TempDir` on macOS.
+- `make check` runs the live tests when Chrome is installed, and CI skips them: its macOS runner has
+  Chrome, and three cases timed out there on the first PR run (a page still loading after 15 s),
+  beside an unrelated plugin test. Many Chromes at once starve each other, so the cases share one. Chrome's singleton socket does not fit under `t.TempDir` on macOS.
 - Never let a test reach `pbcopy`: `Options.SetClipboard` is a stand-in in `live_test.go`.
 
 ## How to remove it

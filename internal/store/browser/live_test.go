@@ -19,7 +19,8 @@ import (
 )
 
 // These run the real system Chrome against pages served from this test, never the network.
-// They skip on a Mac without Chrome.
+// They skip on a Mac without Chrome, and in CI: a runner has Chrome, and is starved enough that
+// a page can take 15 s to load, so they would only make it red at random. `make check` runs them.
 
 const livePage = `<!doctype html><title>Live page</title>
 <body style="margin:0;font:16px system-ui;height:3000px">
@@ -55,8 +56,8 @@ type live struct {
 
 func startLive(t *testing.T) *live {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("needs system Chrome")
+	if testing.Short() || os.Getenv("CI") != "" {
+		t.Skip("needs system Chrome and a machine that is not starved")
 	}
 	home, _ := os.UserHomeDir()
 	if _, err := FindChrome(home); err != nil {
