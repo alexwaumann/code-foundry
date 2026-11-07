@@ -219,7 +219,7 @@ for (const scheme of ["dark", "light"] as const) {
       test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
       await page.emulateMedia({ colorScheme: scheme });
       await openDiff(page, width);
-      const target = { project: "repo-cf", worktree: CF, base: { kind: "merge-base" }, head: { kind: "working" }, file: "README.md", oldPath: "", own: true, paths: ["README.md", "notes/plan.md"], heading: "The two files behind the flake", note: "Row height now comes from one place.", hide };
+      const target = { project: "repo-cf", worktree: CF, base: { kind: "merge-base" }, head: { kind: "working" }, file: "README.md", oldPath: "", own: true, thread: "t1", paths: ["README.md", "notes/plan.md"], heading: "The two files behind the flake", note: "Row height now comes from one place.", hide };
       await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openDiffInPanel("current", ${JSON.stringify(target)}))`);
       await expect(page.getByTestId("diff-model-title")).toBeVisible();
       await expect(file(page).locator('[data-line-type="change-addition"]').first()).toBeVisible();

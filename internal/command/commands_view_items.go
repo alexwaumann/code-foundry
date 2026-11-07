@@ -29,7 +29,7 @@ const (
 	// and thread (who asked), and note and focus when they apply.
 	ViewPanelFile = "panel.file"
 	// ViewPanelDiff opens a checkout's Diff tab: params project and worktree, with what
-	// the call set of own, base, head, path, oldPath, paths, title, note and hide
+	// the call set of own, thread, base, head, path, oldPath, paths, title, note and hide
 	// (commands_view_diff.go). An older daemon sends scope instead of base and head.
 	ViewPanelDiff = "panel.diff"
 	// ViewPanelPR opens a pull request's tab: params slug ("owner/name") and number.
@@ -112,13 +112,13 @@ func (d ViewDeps) itemCommands() []Command {
 			Title:     "Show Diff in Side Panel",
 			Description: "Open a Diff tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"any two of the working tree, the index, or a ref, compared file by file, side by side or unified. " +
-				"With no flags, what the branch changed. Narrow it to the files you mean with --path, and say why with --title and --note. " +
+				"With no flags, what the branch changed. Narrow it to the files you mean with --path, and say why with --title and --note: those get a tab of their own, and the checkout's stays the user's. " +
 				"The user can change what it compares; --hide takes the controls away for a focused view, and they can bring them back.",
 			Category:     "View",
 			NoKeybinding: true,
 			When:         func(c Context) bool { return hasWorktreeThreadContext(c) || cliThread(c) },
 			Args:         append(diffArgs(), thread, focus),
-			Run:          item(ViewPanelDiff, d.diffCheck),
+			Run:          d.runPanelDiff,
 		},
 		{
 			Name:      "view.panel.pr",

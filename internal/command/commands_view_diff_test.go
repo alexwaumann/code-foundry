@@ -2,6 +2,7 @@ package command_test
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -26,6 +27,13 @@ func noFiles() *commandtest.FileDiffs {
 	}}
 }
 
+// oneFile is a comparison that lists one file, whatever was asked for.
+func oneFile(path string) *commandtest.FileDiffs {
+	res := noFiles().Res
+	res.Files = []*v1.CompareFile{{Path: path, Status: "M"}}
+	return &commandtest.FileDiffs{Res: res}
+}
+
 // view.panel.diff: the thread must run in a worktree holding its paths, and the sides must
 // differ. What it shows goes to the tab as params; what it asked of the daemon, as sources.
 func TestPanelDiff(t *testing.T) {
@@ -39,6 +47,11 @@ func TestPanelDiff(t *testing.T) {
 		m["project"], m["worktree"], m["own"] = "r1", "/wt", "1"
 		return m
 	}
+	// A tab of the thread's own: the checkout's stays the user's.
+	apart := func(m map[string]string) map[string]string {
+		m["thread"] = "s-aaaaaaaaaaa1"
+		return own(m)
+	}
 	tests := []struct {
 		name       string
 		thread     *v1.Thread
@@ -50,6 +63,7 @@ func TestPanelDiff(t *testing.T) {
 		wantProj   string
 		wantRoot   string
 		wantPaths  []string
+		wantWarn   []string
 		code       connect.Code
 		argErr     string
 		msg        string
@@ -64,11 +78,35 @@ func TestPanelDiff(t *testing.T) {
 
 		// What is new.
 		{name: "no path: the whole checkout", args: map[string]string{}, wantParams: own(map[string]string{})},
-		{name: "two paths narrow the list", args: map[string]string{"path": "/wt/a.go\n/wt/b.go"},
-			wantParams: own(map[string]string{"paths": "a.go\nb.go"}), wantPaths: []string{"a.go", "b.go"}},
-		{name: "a directory narrows the list", args: map[string]string{"path": "/wt/src"},
+		{name: "two paths narrow a tab of its own", args: map[string]string{"path": "/wt/a.go\n/wt/b.go"},
+			wantParams: apart(map[string]string{"paths": "a.go\nb.go"}), wantPaths: []string{"a.go", "b.go"}},
+		{name: "a directory narrows a tab of its own", args: map[string]string{"path": "/wt/src"},
 			diffs:      &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Files: []*v1.CompareFile{{Path: "src/a.go"}}}},
-			wantParams: own(map[string]string{"paths": "src"}), wantPaths: []string{"src"}},
+			wantParams: apart(map[string]string{"paths": "src"}), wantPaths: []string{"src"}},
+		{name: "a note gets a tab of its own", args: map[string]string{"note": "Look here"},
+			wantParams: apart(map[string]string{"note": "Look here"})},
+		{name: "hide gets a tab of its own", args: map[string]string{"hide": "compare"},
+			wantParams: apart(map[string]string{"hide": "compare"})},
+		{name: "a file with a note selects it there", args: map[string]string{"path": "/wt/a.go", "note": "Look here"},
+			wantParams: apart(map[string]string{"path": "a.go", "note": "Look here"}), wantPaths: []string{"a.go"}},
+		{name: "the checkout's root is every file", args: map[string]string{"path": "/wt"}, wantParams: own(map[string]string{})},
+		{name: "the root among paths is still every file", args: map[string]string{"path": "/wt/a.go\n/wt"}, wantParams: own(map[string]string{})},
+		{name: "a sibling's root is its every file", thread: twoCheckouts(), args: map[string]string{"path": "/api"},
+			wantParams: map[string]string{"project": "r2", "worktree": "/api"}, wantProj: "r2", wantRoot: "/api"},
+		{name: "a path with nothing to show is named", args: map[string]string{"path": "/wt/a.go\n/wt/missing.go", "title": "X"},
+			diffs:      oneFile("a.go"),
+			wantParams: apart(map[string]string{"paths": "a.go", "title": "X"}), wantPaths: []string{"a.go", "missing.go"},
+			wantWarn: []string{"missing.go has no changes here (origin/main against Working tree), so it is not listed"}},
+		{name: "a directory matches what is below it, and no more", args: map[string]string{"path": "/wt/src\n/wt/sr"},
+			diffs:      oneFile("src/a.go"),
+			wantParams: apart(map[string]string{"paths": "src"}), wantPaths: []string{"src", "sr"},
+			wantWarn: []string{"sr has no changes here (origin/main against Working tree), so it is not listed"}},
+		{name: "a rename matches by its source", args: map[string]string{"path": "/wt/old.go\n/wt/b.go"},
+			diffs:      &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Files: []*v1.CompareFile{{Path: "new.go", OldPath: "old.go"}, {Path: "b.go"}}}},
+			wantParams: apart(map[string]string{"paths": "old.go\nb.go"}), wantPaths: []string{"old.go", "b.go"}},
+		{name: "a list cut short cannot tell", args: map[string]string{"path": "/wt/a.go\n/wt/b.go"},
+			diffs:      &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Truncated: true, Files: []*v1.CompareFile{{Path: "a.go"}}}},
+			wantParams: apart(map[string]string{"paths": "a.go\nb.go"}), wantPaths: []string{"a.go", "b.go"}},
 		{name: "a rename keeps its source", args: map[string]string{"path": "/wt/new.go"},
 			diffs:      &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Files: []*v1.CompareFile{{Path: "new.go", OldPath: "old.go", Status: "R"}}}},
 			wantParams: own(map[string]string{"path": "new.go", "oldPath": "old.go"}), wantPaths: []string{"new.go"}},
@@ -80,9 +118,9 @@ func TestPanelDiff(t *testing.T) {
 		{name: "the working tree as base", args: map[string]string{"base": "working", "head": "HEAD"},
 			wantParams: own(map[string]string{"base": "working", "head": "ref:HEAD"}), wantBase: &v1.DiffSource{Kind: working}, wantHead: &v1.DiffSource{Kind: ref, Ref: "HEAD"}},
 		{name: "title, note and hide", args: map[string]string{"title": "The two files", "note": "Row height now comes from one place.", "hide": "compare\nfiles"},
-			wantParams: own(map[string]string{"title": "The two files", "note": "Row height now comes from one place.", "hide": "compare,files"})},
+			wantParams: apart(map[string]string{"title": "The two files", "note": "Row height now comes from one place.", "hide": "compare,files"})},
 		{name: "a title and note are plain text", args: map[string]string{"title": "two\n  lines\x07", "note": "a\tb"},
-			wantParams: own(map[string]string{"title": "two lines", "note": "a b"})},
+			wantParams: apart(map[string]string{"title": "two lines", "note": "a b"})},
 
 		// Several checkouts: one tab shows one.
 		{name: "a sibling checkout's file", thread: twoCheckouts(), args: map[string]string{"path": "/api/h.go"},
@@ -95,17 +133,28 @@ func TestPanelDiff(t *testing.T) {
 		{name: "scope with base", args: map[string]string{"scope": "branch", "base": "main"}, argErr: "scope"},
 		{name: "scope with head", args: map[string]string{"scope": "working", "head": "main"}, argErr: "scope"},
 		{name: "a part that cannot be hidden", args: map[string]string{"hide": "everything"}, argErr: "hide"},
+		{name: "a title of nothing but spaces", args: map[string]string{"title": "  \t "}, argErr: "title"},
+		{name: "a title of nothing printable", args: map[string]string{"title": "\u200b\x07"}, argErr: "title"},
+		{name: "an empty title", args: map[string]string{"title": ""}, argErr: "title"},
 		{name: "a title too long", args: map[string]string{"title": strings.Repeat("x", 101)}, argErr: "title"},
 		{name: "a note too long", args: map[string]string{"note": strings.Repeat("x", 501)}, argErr: "note"},
 		{name: "unchanged", args: map[string]string{"path": "/wt/a.go"}, diffs: noFiles(),
 			code: connect.CodeFailedPrecondition, msg: "a.go has no changes in thread s-aaaaaaaaaaa1's worktree (origin/main against the file on disk)"},
 		{name: "unchanged on the branch", args: map[string]string{"path": "/wt/a.go", "scope": "branch"}, diffs: noFiles(),
 			code: connect.CodeFailedPrecondition, msg: "a.go has no changes in thread s-aaaaaaaaaaa1's worktree (origin/main against the last commit)"},
+		{name: "none of several has changes", args: map[string]string{"path": "/wt/a.go\n/wt/b.go"}, diffs: noFiles(),
+			code: connect.CodeFailedPrecondition, msg: "none of a.go, b.go has changes in thread s-aaaaaaaaaaa1's worktree (origin/main against Working tree)"},
 		{name: "nothing differs at all", args: map[string]string{}, diffs: noFiles(),
 			code: connect.CodeFailedPrecondition, msg: "nothing differs between origin/main and Working tree"},
 		{name: "no base to compare", args: map[string]string{"path": "/wt/a.go", "scope": "branch"},
 			diffs: &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Files: []*v1.CompareFile{{Path: "a.go"}}}},
 			code:  connect.CodeFailedPrecondition, msg: "the worktree has no base branch to compare with"},
+		{name: "no base to compare, and no path", args: map[string]string{"scope": "branch"},
+			diffs: &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Files: []*v1.CompareFile{{Path: "a.go"}}}},
+			code:  connect.CodeFailedPrecondition, msg: "cannot diff this checkout (branch): the worktree has no base branch"},
+		{name: "no merge base, and no path", args: map[string]string{"scope": "branch"},
+			diffs: &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{BaseRef: "origin/main", Files: []*v1.CompareFile{{Path: "a.go"}}}},
+			code:  connect.CodeFailedPrecondition, msg: "cannot diff this checkout (branch): HEAD has no merge base"},
 		{name: "no merge base", args: map[string]string{"path": "/wt/a.go", "scope": "branch"},
 			diffs: &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{BaseRef: "origin/main", Files: []*v1.CompareFile{{Path: "a.go"}}}},
 			code:  connect.CodeFailedPrecondition, msg: "HEAD has no merge base with origin/main"},
@@ -115,7 +164,6 @@ func TestPanelDiff(t *testing.T) {
 		{name: "a ref the daemon refuses", args: map[string]string{"base": "--output=x"},
 			diffs: &commandtest.FileDiffs{Err: connect.NewError(connect.CodeInvalidArgument, nil)}, code: connect.CodeInvalidArgument},
 		{name: "outside the worktree", args: map[string]string{"path": "/elsewhere/a.go"}, argErr: "path"},
-		{name: "the worktree itself", args: map[string]string{"path": "/wt"}, argErr: "path"},
 		{name: "a thread in no worktree", thread: &v1.Thread{WorktreePath: "/home"}, args: map[string]string{"path": "/home/a.go"},
 			code: connect.CodeFailedPrecondition, msg: "runs in no project worktree"},
 	}
@@ -129,7 +177,10 @@ func TestPanelDiff(t *testing.T) {
 			}
 			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: tt.thread}, panelDeps{windows: 1, diffs: tt.diffs})
 			inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
-			_, err := reg.Invoke(context.Background(), inThread, "view.panel.diff", tt.args)
+			res, err := reg.Invoke(context.Background(), inThread, "view.panel.diff", tt.args)
+			if !slices.Equal(res.Warnings, tt.wantWarn) {
+				t.Errorf("warnings = %q, want %q", res.Warnings, tt.wantWarn)
+			}
 			if checkItemErr(t, err, tt.code, tt.argErr) {
 				if tt.msg != "" && !strings.Contains(err.Error(), tt.msg) {
 					t.Errorf("err = %v, want %q", err, tt.msg)
@@ -160,6 +211,31 @@ func TestPanelDiff(t *testing.T) {
 			if req.GetProjectId() != proj || req.GetPath() != root || strings.Join(req.GetPaths(), ",") != strings.Join(tt.wantPaths, ",") {
 				t.Errorf("request = %v, want %s %s %v", req, proj, root, tt.wantPaths)
 			}
+		})
+	}
+}
+
+// A tab of its own names the thread that asked, which may not be the one whose panel opens.
+func TestPanelDiffAsker(t *testing.T) {
+	tests := []struct {
+		name string
+		uctx command.Context
+		want string
+	}{
+		{name: "the thread itself", uctx: command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, want: "s-aaaaaaaaaaa1"},
+		{name: "another thread's call", uctx: command.Context{ActiveThreadID: "s-bbbbbbbbbbb2"}, want: "s-bbbbbbbbbbb2"},
+		{name: "the window, which is not asking", uctx: command.Context{ActiveThreadID: "s-bbbbbbbbbbb2", ActiveView: "thread", ActiveProjectID: "r1", ActiveWorktreePath: "/wt"}, want: "s-aaaaaaaaaaa1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 1, diffs: &commandtest.FileDiffs{}})
+			args := map[string]string{"note": "Look here", "thread": "s-aaaaaaaaaaa1"}
+			if _, err := reg.Invoke(context.Background(), tt.uctx, "view.panel.diff", args); err != nil {
+				t.Fatal(err)
+			}
+			sameIntents(t, emit.Intents(), []*v1.UiIntent{showViewWith(command.ViewPanelDiff, "s-aaaaaaaaaaa1", map[string]string{
+				"project": "r1", "worktree": "/wt", "own": "1", "note": "Look here", "thread": tt.want,
+			})})
 		})
 	}
 }

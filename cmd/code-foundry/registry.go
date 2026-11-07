@@ -131,6 +131,9 @@ type argFlag struct {
 func (f *argFlag) String() string { return f.value }
 
 func (f *argFlag) Set(s string) error {
+	if f.spec.GetRepeatable() && strings.Contains(s, "\n") {
+		return fmt.Errorf("--%s cannot hold a newline, which separates its repeated values: %q", f.spec.GetName(), s)
+	}
 	if f.set && f.spec.GetRepeatable() {
 		// A repeatable flag's values travel joined by newlines (thread subscribe --arg).
 		f.value += "\n" + s
