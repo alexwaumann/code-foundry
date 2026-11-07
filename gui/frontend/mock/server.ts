@@ -144,6 +144,7 @@
  *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
  *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
+ *   POST /__mock/compare/commits?count=800         (that many more commits on every comparison's list, older than the rest; reset: none)
  *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
  *   POST /__mock/fs/remove?path=…                 (the file goes)
  *   POST /__mock/fs/link?path=…&real=…            (ReadFile says a link leads from the path to real)
@@ -476,6 +477,7 @@ function routes(router: ConnectRouter): void {
     getWorktreeFileDiff: (req) => mockFiles.fileDiff(req.path, req.file, req.oldPath, req.scope),
     compareWorktree: (req) => mockFiles.compare(req.path, req.base, req.head),
     getWorktreeCompareFile: (req) => mockFiles.compareFile(req.path, req.base, req.head, req.file, req.oldPath),
+    listCompareCommits: (req) => mockFiles.compareCommits(req.path),
     watch: (_req, ctx) => tracked("ProjectService/Watch", world.projectEvents.subscribe(ctx.signal)),
   });
 
@@ -1858,6 +1860,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/compare/files":
       mockFiles.extraCompareFiles = Number(q.get("count") ?? "0");
       mockFiles.firstCompareFiles = Number(q.get("first") ?? "0");
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/compare/commits":
+      mockFiles.extraCompareCommits = Number(q.get("count") ?? "0");
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/fs/write":

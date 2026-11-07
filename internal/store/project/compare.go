@@ -213,6 +213,7 @@ type comparison struct {
 	base, head ResolvedSource
 	baseRef    string
 	mergeBase  string
+	headSHA    string // HEAD now; empty on an unborn branch
 	err        string // a source that names nothing; see WorktreeCompare.Error
 }
 
@@ -233,7 +234,7 @@ func (g *Git) openCompare(ctx context.Context, projectID, path string, base, hea
 	if err != nil {
 		return nil, err
 	}
-	c := &comparison{dir: dir, run: run, baseRef: b.baseRef, mergeBase: b.mergeBase}
+	c := &comparison{dir: dir, run: run, baseRef: b.baseRef, mergeBase: b.mergeBase, headSHA: b.head}
 	// Both, even when the first names nothing: a caller shows each side's label either way.
 	var headWhy string
 	if c.base, c.err, err = c.resolve(base, b); err != nil {
@@ -257,6 +258,10 @@ func (c *comparison) resolve(s DiffSource, b currentBase) (_ ResolvedSource, why
 		r.Label = "Staged"
 	case SourceRef:
 		r.Label = s.Ref
+		if s.Ref == emptyTree { // what a root commit is compared against, and no commit
+			r.SHA, r.Label = emptyTree, "Empty tree"
+			return r, "", nil
+		}
 		// The sha, not the ref, is what every later command gets.
 		out, err := c.run("rev-parse", "--verify", "--quiet", "--end-of-options", s.Ref+"^{commit}")
 		switch {

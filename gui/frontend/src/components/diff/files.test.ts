@@ -86,6 +86,24 @@ describe("shortRef", () => {
   });
 });
 
+describe("topListFit with something under the rows", () => {
+  it("leaves the code its share", () => {
+    expect(topListFit(800, 30, 10, false).rows).toBe(5);
+    expect(topListFit(420, 30, 10, false).rows).toBe(3);
+    expect(topListFit(420, 30, 10, false, 32).rows).toBe(2);
+    expect(topListFit(420, 30, 10, false, 122)).toEqual({ rows: 2, fold: true });
+  });
+});
+
+describe("shortRef of a commit", () => {
+  it("cuts a full sha, and only a full one", () => {
+    expect(shortRef("a".repeat(40), [])).toBe("aaaaaaa");
+    expect(shortRef("b".repeat(64), [])).toBe("bbbbbbb");
+    expect(shortRef("abc123", [])).toBe("abc123");
+    expect(shortRef("Empty tree", [])).toBe("Empty tree");
+  });
+});
+
 describe("a tab's name and band", () => {
   it("another project's name leads, so one title on two checkouts stays two names", () => {
     expect(inProject("Review", { project: "web", own: false })).toBe("web · Review");

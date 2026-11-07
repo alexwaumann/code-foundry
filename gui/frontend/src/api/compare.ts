@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
-import { DiffSourceKind, DiffSourceSchema, ProjectService, type CompareWorktreeResponse, type DiffSource, type FileVersion, type GetWorktreeCompareFileResponse, type ResolvedDiffSource } from "@/gen/codefoundry/v1/project_pb";
+import { timestampMs } from "@bufbuild/protobuf/wkt";
+import { DiffSourceKind, DiffSourceSchema, ProjectService, type CompareWorktreeResponse, type DiffSource, type FileVersion, type GetWorktreeCompareFileResponse, type ListCompareCommitsResponse, type ResolvedDiffSource } from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 
@@ -70,6 +71,28 @@ export interface CompareFileSidesView {
   error: string;
 }
 
+/** One commit of a comparison (ProjectService.ListCompareCommits). */
+export interface CompareCommitView {
+  sha: string;
+  shortSha: string;
+  /** The first parent, which a merge compares against; "" for a root commit. */
+  parent: string;
+  subject: string;
+  /** The message under the subject; "" without one. */
+  body: string;
+  authoredAtMs: number | null;
+}
+
+/** ProjectService.ListCompareCommits as the Diff tab shows it. */
+export interface CompareLogView {
+  /** Newest first, at most 500. */
+  commits: CompareCommitView[];
+  /** All of them, listed or not. */
+  total: number;
+  /** Why a side cannot be compared; the list is then empty. */
+  error: string;
+}
+
 export interface CompareTarget {
   projectId: string;
   /** The checkout's path. */
@@ -124,6 +147,23 @@ export async function compareWorktree(t: CompareTarget, paths: readonly string[]
   try {
     const res = await c.compareWorktree({ projectId: t.projectId, path: t.worktree, base: toSource(t.base), head: toSource(t.head), paths: [...paths] }, { signal });
     return toCompareView(res, t.base, t.head);
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}
+
+export function toCompareLog(r: ListCompareCommitsResponse): CompareLogView {
+  return {
+    commits: r.commits.map((c) => ({ sha: c.sha, shortSha: c.shortSha, parent: c.parent, subject: c.subject, body: c.body, authoredAtMs: c.authoredAt ? timestampMs(c.authoredAt) : null })),
+    total: r.total,
+    error: r.error,
+  };
+}
+
+export async function listCompareCommits(t: CompareTarget, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<CompareLogView> {
+  const c = await conn.client(ProjectService);
+  try {
+    return toCompareLog(await c.listCompareCommits({ projectId: t.projectId, path: t.worktree, base: toSource(t.base), head: toSource(t.head) }, { signal }));
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

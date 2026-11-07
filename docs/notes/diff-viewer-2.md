@@ -94,8 +94,5 @@ read is under 125 ms keep the 250 ms they had. The file's own read is one file a
 
 ## Removed
 
-The Changes tab's commit list has no replacement here: the approved design has no place for it,
-and the thread info card shows only ahead and behind counts. A commit no longer opens on GitHub
-from the side panel. Whether to keep it is still open; `FileList` is a column of sections, so a
-second one fits under the rows. The file list, totals, conflicts first and every empty state
-carried over.
+The Changes tab's commit list had no replacement here, and `docs/notes/diff-commits.md` added one.
+The file list, totals, conflicts first and every empty state carried over.

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -158,5 +159,33 @@ func TestReadErrorHidesGit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The commits of a comparison map as they are, and an unset side is the list's default.
+func TestListCompareCommitsMaps(t *testing.T) {
+	fake, c := newProjectServer(t)
+	ctx := context.Background()
+	if _, err := c.Register(ctx, connect.NewRequest(&v1.RegisterProjectRequest{Path: "/code/proj"})); err != nil {
+		t.Fatal(err)
+	}
+	id := projecttest.ID("/code/proj")
+	at := time.Unix(1000, 0)
+	fake.SetCompareCommits(project.CompareLog{Total: 7, Commits: []project.CompareCommit{{SHA: "s", ShortSHA: "sh", Parent: "p", Subject: "sub", Body: "b", AuthoredAt: at}}})
+	res, err := c.ListCompareCommits(ctx, connect.NewRequest(&v1.ListCompareCommitsRequest{ProjectId: id, Path: "/code/proj",
+		Base: &v1.DiffSource{Kind: v1.DiffSourceKind_DIFF_SOURCE_KIND_REF, Ref: "main"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := res.Msg.GetCommits()[0]
+	if res.Msg.GetTotal() != 7 || m.GetSha() != "s" || m.GetShortSha() != "sh" || m.GetParent() != "p" || m.GetSubject() != "sub" || m.GetBody() != "b" || !m.GetAuthoredAt().AsTime().Equal(at) {
+		t.Errorf("response = %v", res.Msg)
+	}
+	want := fmt.Sprintf("CompareCommits %s /code/proj %d:main %d:", id, project.SourceRef, project.SourceWorkingTree)
+	if !slices.Contains(fake.Calls, want) {
+		t.Errorf("calls = %q, want %q", fake.Calls, want)
+	}
+	if _, err := c.ListCompareCommits(ctx, connect.NewRequest(&v1.ListCompareCommitsRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("no project: %v", err)
 	}
 }

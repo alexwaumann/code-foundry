@@ -1,9 +1,32 @@
 import { create } from "@bufbuild/protobuf";
 import { describe, expect, it } from "vitest";
-import { CompareFileSchema, CompareWorktreeResponseSchema, DiffSourceKind, FileVersionSchema, GetWorktreeCompareFileResponseSchema, ResolvedDiffSourceSchema } from "@/gen/codefoundry/v1/project_pb";
-import { toCompareView, toSidesView } from "./compare";
+import { timestampFromMs } from "@bufbuild/protobuf/wkt";
+import { CompareCommitSchema, CompareFileSchema, CompareWorktreeResponseSchema, DiffSourceKind, FileVersionSchema, GetWorktreeCompareFileResponseSchema, ListCompareCommitsResponseSchema, ResolvedDiffSourceSchema } from "@/gen/codefoundry/v1/project_pb";
+import { toCompareLog, toCompareView, toSidesView } from "./compare";
 
 const enc = new TextEncoder();
+
+describe("toCompareLog", () => {
+  it("maps each commit, a root's empty parent and a missing date included", () => {
+    const v = toCompareLog(
+      create(ListCompareCommitsResponseSchema, {
+        commits: [
+          create(CompareCommitSchema, { sha: "s", shortSha: "sh", parent: "p", subject: "sub", body: "b", authoredAt: timestampFromMs(5000) }),
+          create(CompareCommitSchema, { sha: "r", shortSha: "r", subject: "root" }),
+        ],
+        total: 9,
+      }),
+    );
+    expect(v).toEqual({
+      commits: [
+        { sha: "s", shortSha: "sh", parent: "p", subject: "sub", body: "b", authoredAtMs: 5000 },
+        { sha: "r", shortSha: "r", parent: "", subject: "root", body: "", authoredAtMs: null },
+      ],
+      total: 9,
+      error: "",
+    });
+  });
+});
 
 describe("toCompareView", () => {
   it("maps the list, the totals and each side, keeping the source as asked", () => {

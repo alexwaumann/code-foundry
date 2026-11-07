@@ -15,8 +15,9 @@
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
+import { timestampFromMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import type { PreviewFileResponseSchema, ReadFileResponseSchema, WriteFileRequest, WriteFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
-import { DiffScope, DiffSourceKind, type CompareWorktreeResponseSchema, type DiffSource, type GetWorktreeCompareFileResponseSchema, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
+import { DiffScope, DiffSourceKind, type CompareWorktreeResponseSchema, type DiffSource, type GetWorktreeCompareFileResponseSchema, type GetWorktreeFileDiffResponseSchema, type ListCompareCommitsResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { readFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 import { HOME } from "./filesystem";
@@ -28,6 +29,10 @@ type WriteInit = MessageInitShape<typeof WriteFileResponseSchema>;
 type PreviewInit = MessageInitShape<typeof PreviewFileResponseSchema>;
 type DiffInit = MessageInitShape<typeof GetWorktreeFileDiffResponseSchema>;
 type CompareInit = MessageInitShape<typeof CompareWorktreeResponseSchema>;
+type CompareLogInit = MessageInitShape<typeof ListCompareCommitsResponseSchema>;
+
+/** A side the Commits list set: a full sha. */
+const isCommit = (s: CompareSide): boolean => s?.kind === DiffSourceKind.REF && s.ref.length === 40;
 type CompareFileInit = MessageInitShape<typeof GetWorktreeCompareFileResponseSchema>;
 /** One side of a comparison request; unset is that side's default. */
 type CompareSide = DiffSource | undefined;
@@ -50,6 +55,7 @@ export interface DetailFiles {
   projectId: string;
   baseRef?: string;
   files?: ChangedFile[];
+  log?: { sha?: string; shortSha?: string; subject?: string; authoredAt?: Timestamp }[];
 }
 
 const CF = `${HOME}/src/code-foundry`;
@@ -348,10 +354,13 @@ export class MockFiles {
   /** POST /__mock/compare/files?count=N[&first=M]: this many more files in every comparison, for a long list, and M that sort above them all. */
   extraCompareFiles = 0;
   firstCompareFiles = 0;
+  /** POST /__mock/compare/commits?count=N: this many more commits on every list, older than the worktree's own. */
+  extraCompareCommits = 0;
 
   reset(): void {
     this.extraCompareFiles = 0;
     this.firstCompareFiles = 0;
+    this.extraCompareCommits = 0;
     this.links.clear();
     this.disk = fixtures();
     this.refusal = null;
@@ -520,7 +529,8 @@ export class MockFiles {
     const meta = { base: resolved(base), head: resolved(head), baseRef, mergeBase: baseRef ? "c6d3bc2477aa" : "" };
     const missing = [base, head].find((s) => s?.kind === DiffSourceKind.REF && s.ref.startsWith("gone/"));
     if (missing) return { ...meta, error: `${missing.ref} does not name a commit in this checkout` };
-    const committedOnly = head?.kind === DiffSourceKind.REF;
+    // A commit from the Commits list (a full sha) shows every changed file, for something to look at.
+    const committedOnly = head?.kind === DiffSourceKind.REF && !isCommit(head);
     const uncommittedOnly = base?.kind === DiffSourceKind.STAGED;
     const generated = (n: number, name: (i: number) => string) => Array.from({ length: n }, (_, i) => ({ path: name(i), oldPath: "", status: "A", added: 1, deleted: 0, binary: false }));
     const files = generated(this.firstCompareFiles, (i) => `.first/file-${String(i).padStart(4, "0")}.ts`)
@@ -531,11 +541,22 @@ export class MockFiles {
     return { ...meta, files, totalFiles: files.length, totalAdded: files.reduce((n, f) => n + f.added, 0), totalDeleted: files.reduce((n, f) => n + f.deleted, 0) };
   }
 
+  /** The commits of a comparison: the worktree's log whatever the sides, each the next one's child; the last is a root. */
+  compareCommits(worktree: string): CompareLogInit {
+    const detail = this.detailOf(worktree);
+    if (!detail) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
+    const older = Array.from({ length: this.extraCompareCommits }, (_, i) => ({ sha: `e${String(i).padStart(39, "0")}`, shortSha: `e${String(i).padStart(6, "0")}`, subject: `Older commit ${String(i).padStart(4, "0")}`, authoredAt: timestampFromMs(Date.now() - (i + 1) * 3_600_000) }));
+    const log = [...(detail.log ?? []), ...older];
+    this.calls.push(`compareCommits ${worktree}`);
+    const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: e.subject, body: i === 0 ? "Why it changed, in a few words.\n\nA second paragraph." : "", authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
+    return { commits, total: commits.length };
+  }
+
   /** One file of a comparison: fileDiff's two sides, a ref on the head side being the branch. */
   compareFile(worktree: string, base: CompareSide, head: CompareSide, file: string, oldPath: string): CompareFileInit {
     const missing = [base, head].find((s) => s?.kind === DiffSourceKind.REF && s.ref.startsWith("gone/"));
     if (missing) return { error: `${missing.ref} does not name a commit in this checkout` };
-    const d = this.fileDiff(worktree, file, oldPath, head?.kind === DiffSourceKind.REF ? DiffScope.BRANCH : DiffScope.WORKING);
+    const d = this.fileDiff(worktree, file, oldPath, head?.kind === DiffSourceKind.REF && !isCommit(head) ? DiffScope.BRANCH : DiffScope.WORKING);
     return { old: d.old, new: d.new, status: d.status, error: d.error };
   }
 

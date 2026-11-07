@@ -76,6 +76,10 @@ service ProjectService {
   // CompareWorktree counted, each side at most 1 MiB, read now. Takes the same sources
   // and gives the same refusals. A path that is not on a side is simply absent there.
   rpc GetWorktreeCompareFile(GetWorktreeCompareFileRequest) returns (GetWorktreeCompareFileResponse) {}
+  // ListCompareCommits lists the commits a comparison's head has and its base does not,
+  // newest first: the branch being compared. The working tree and the index count as HEAD.
+  // Takes the same sources and refusals as CompareWorktree.
+  rpc ListCompareCommits(ListCompareCommitsRequest) returns (ListCompareCommitsResponse) {}
   // ListRefs returns the refs a worktree can be based on: local branches and
   // remote-tracking branches (origin/<name>), the branch names by recency, plus the
   // default branch.
@@ -606,7 +610,8 @@ message DiffSource {
 message ResolvedDiffSource {
   DiffSourceKind kind = 1;
   // What to call it: "origin/main", "HEAD" (MERGE_BASE without a base), the ref as given,
-  // "Working tree", "Staged".
+  // "Working tree", "Staged", "Empty tree" (git's empty tree, what a root commit is compared
+  // against, as a REF).
   string label = 2;
   // The commit (or the empty tree); empty for WORKING_TREE and STAGED.
   string sha = 3;
@@ -684,6 +689,33 @@ message GetWorktreeCompareFileResponse {
   string status = 3;
   // As CompareWorktreeResponse.error.
   string error = 4;
+}
+
+message ListCompareCommitsRequest {
+  string project_id = 1;
+  string path = 2;
+  DiffSource base = 3;
+  DiffSource head = 4;
+}
+
+// One commit of a comparison.
+message CompareCommit {
+  string sha = 1;
+  string short_sha = 2;
+  // The first parent, which a merge compares against; empty for a root commit.
+  string parent = 3;
+  string subject = 4;
+  // The message under the subject, at most 8 KiB.
+  string body = 5;
+  google.protobuf.Timestamp authored_at = 6;
+}
+
+message ListCompareCommitsResponse {
+  // Newest first, at most 500; `total` counts them all.
+  repeated CompareCommit commits = 1;
+  int32 total = 2;
+  // As CompareWorktreeResponse.error. The list is then empty.
+  string error = 3;
 }
 
 // A worktree compared with its base.

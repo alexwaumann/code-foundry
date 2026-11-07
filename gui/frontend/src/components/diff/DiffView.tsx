@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GitCompare, TriangleAlert } from "lucide-react";
-import { compareWorktree, type CompareSource, type CompareTarget, type CompareView } from "@/api/compare";
+import { compareWorktree, listCompareCommits, type CompareCommitView, type CompareLogView, type CompareSource, type CompareTarget, type CompareView } from "@/api/compare";
 import { FileEmptyState, FileLoading, NoticeBar } from "@/components/files/states";
 import { REFRESH_DEBOUNCE_MS, useDebounced, useOnWindowVisible, useTabRead, useWorktreeChanges } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,13 @@ import { openDiffInPanel } from "@/stores/filePanel";
 import { retitlePanelTab, setPanelTabParams } from "@/stores/panel";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
 import { diffTab, FROM_THREAD, sameSource, sourceParam, type DiffTarget } from "@/surfaces/diffTarget";
+import { CommitBand } from "./CommitBand";
+import { CommitList } from "./CommitList";
+import { commitsHeight, commitsShown, leaveCommit, listSides, viewCommit } from "./commits";
 import { CompareBar } from "./CompareBar";
 import { DiffFile } from "./DiffFile";
 import { FileList } from "./FileList";
-import { buildFileRows, diffTitle, inProject, listPace, pickRow, sourceLabel, type FileRow } from "./files";
+import { buildFileRows, diffTitle, inProject, listPace, pickRow, shortRef, sourceLabel, type FileRow } from "./files";
 import { ModelBand } from "./ModelBand";
 import { useStatusChanges } from "./useStatusChanges";
 
@@ -21,6 +24,7 @@ export const RAIL_MIN = 620;
 
 const NO_REMOTES: readonly string[] = [];
 const NO_PATHS: readonly string[] = [];
+const NO_COMMITS: readonly CompareCommitView[] = [];
 
 function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: string; target: DiffTarget }) {
   const { project, worktree, base, head } = target;
@@ -33,8 +37,24 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
     setPace(listPace(performance.now() - start));
     return view;
   });
-  const { reload } = read;
-  const later = useDebounced(reload, pace);
+  // The Commits section's list, of the sides the tab had before a commit took them.
+  const showCommits = commitsShown(target);
+  const sides = listSides(target);
+  const log = useTabRead<CompareLogView | null>([project, worktree, sourceParam(sides.base), sourceParam(sides.head), String(showCommits)].join("\u0000"), async (signal) =>
+    showCommits ? listCompareCommits({ projectId: project, worktree, ...sides }, undefined, signal) : null,
+  );
+  const { reload: readList } = read;
+  const { reload: readLog } = log;
+  const reload = useCallback(() => {
+    readList();
+    readLog();
+  }, [readList, readLog]);
+  const debounced = useDebounced(reload, pace);
+  // A commit does not change, so only Refresh reads it again.
+  const inCommit = target.commit !== undefined;
+  const later = useCallback(() => {
+    if (!inCommit) debounced();
+  }, [inCommit, debounced]);
   useOnWindowVisible(later);
   useWorktreeChanges(project, worktree, later);
   useStatusChanges(project, worktree, later);
@@ -43,10 +63,15 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   const height = useHeight(ref);
   const rail = width >= RAIL_MIN;
   const view = read.data;
-  const rows = useMemo(() => buildFileRows(view?.files ?? []), [view]);
-  const current = pickRow(rows, target.file, target.oldPath);
+  // Moving between commits keeps the last list up until the next answers, so the rail and the place in it stay.
+  const [lastView, setLastView] = useState<CompareView | null>(null);
+  if (view && view !== lastView) setLastView(view);
+  const listView = view ?? (inCommit && !read.error ? lastView : null);
+  const rows = useMemo(() => buildFileRows(listView?.files ?? []), [listView]);
+  const current = view ? pickRow(rows, target.file, target.oldPath) : null;
   const listed = current !== null && rows.includes(current);
   const remotes = useProjectsStore((s) => s.byId[project]?.remotes) ?? NO_REMOTES;
+  const slug = useProjectsStore((s) => s.byId[project]?.githubSlug);
   const name = useProjectsStore((s) => s.byId[project]?.name ?? project);
   const branch = useProjectsStore((s) => findWorktree(s, project, worktree)?.branch ?? "");
 
@@ -83,15 +108,22 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   const setSources = (b: CompareSource, h: CompareSource) => {
     // Swapped, a rename runs the other way: the same file, listed under its other name.
     const swapped = current?.oldPath && sameSource(b, head) && sameSource(h, base);
-    go({ base: b, head: h, ...(swapped ? { file: current.oldPath, oldPath: current.path } : {}) });
+    // Picking a side leaves the commit: this is a comparison of the user's own now.
+    go({ base: b, head: h, commit: undefined, ...(swapped ? { file: current.oldPath, oldPath: current.path } : {}) });
   };
+  const pickCommit = useCallback(
+    (c: CompareCommitView) => {
+      if (c.sha !== target.commit?.sha) go(viewCommit(target, c));
+    },
+    [go, target],
+  );
 
   // A side's name does not wait for, or fall with, the other side: only the merge base needs the answer.
   const [baseRef, setBaseRef] = useState("");
   if (view?.baseRef && view.baseRef !== baseRef) setBaseRef(view.baseRef);
   const mergeBase = baseRef || (read.error ? "merge base" : "…");
-  const baseLabel = view?.base.label ?? sourceLabel(base, mergeBase);
-  const headLabel = view?.head.label ?? sourceLabel(head, mergeBase);
+  const baseLabel = shortRef(view?.base.label ?? sourceLabel(base, mergeBase), NO_REMOTES);
+  const headLabel = shortRef(view?.head.label ?? sourceLabel(head, mergeBase), NO_REMOTES);
   const compared = `${headLabel} and ${baseLabel} are the same here`;
   const refresh = (
     <Button variant="outline" size="sm" onClick={reload} data-testid="diff-refresh">
@@ -100,6 +132,9 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   );
   const hide = target.hide ?? [];
   const band = Boolean(target.heading) || Boolean(target.note) || hide.length > 0 || paths.length > 0;
+  const commits = showCommits && log.data ? log.data.commits : NO_COMMITS;
+  const commitsOpen = target.commitsOpen ?? false;
+  const shownCommit = target.commit ? (commits.find((c) => c.sha === target.commit?.sha) ?? null) : null;
   return (
     <div ref={ref} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="diff-surface" data-project={project} data-path={worktree} data-loading={read.loading || undefined}>
       {band && (
@@ -117,7 +152,25 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
           }}
         />
       )}
-      {!hide.includes("compare") && <CompareBar projectId={project} base={baseLabel} head={headLabel} baseSource={base} headSource={head} baseLabel={view?.baseRef || "HEAD"} wide={rail} onChange={setSources} />}
+      {!hide.includes("compare") && (
+        <CompareBar
+          projectId={project}
+          base={baseLabel}
+          head={headLabel}
+          baseSource={base}
+          headSource={head}
+          baseLabel={view?.baseRef || "HEAD"}
+          wide={rail}
+          onChange={setSources}
+          onAllChanges={
+            target.commit
+              ? () => {
+                  if (target.commit) go(leaveCommit(target.commit));
+                }
+              : undefined
+          }
+        />
+      )}
       {view && read.error && <NoticeBar testId="diff-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {!view && read.error ? (
         <FileEmptyState icon={TriangleAlert} heading="Cannot compare" detail={read.error} testId="diff-compare-failed">
@@ -125,13 +178,13 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
             Retry
           </Button>
         </FileEmptyState>
-      ) : !view ? (
+      ) : !listView ? (
         <FileLoading />
-      ) : view.error ? (
-        <FileEmptyState icon={TriangleAlert} heading="Cannot compare" detail={view.error} testId="diff-source-missing">
+      ) : listView.error ? (
+        <FileEmptyState icon={TriangleAlert} heading="Cannot compare" detail={listView.error} testId="diff-source-missing">
           {refresh}
         </FileEmptyState>
-      ) : !current && view.skippedNames === 0 ? (
+      ) : view && !current && view.skippedNames === 0 && !inCommit ? (
         <FileEmptyState icon={GitCompare} heading="No changes" detail={`${compared}.`} testId="diff-empty">
           {refresh}
         </FileEmptyState>
@@ -139,7 +192,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
         <div className={rail ? "flex min-h-0 flex-1" : "flex min-h-0 flex-1 flex-col"}>
           {!hide.includes("files") && (
             <FileList
-              view={view}
+              view={listView}
               rows={rows}
               current={listed ? current : null}
               onPick={pick}
@@ -153,9 +206,36 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
               onFold={(fold) => {
                 keep({ fold });
               }}
+              foot={
+                commits.length > 0 && log.data ? (
+                  <CommitList
+                    log={log.data}
+                    current={target.commit?.sha ?? ""}
+                    open={commitsOpen}
+                    onOpen={(o) => {
+                      keep({ commitsOpen: o });
+                    }}
+                    onPick={pickCommit}
+                    rail={rail}
+                    height={height}
+                  />
+                ) : null
+              }
+              footHeight={commits.length > 0 ? commitsHeight(commits.length, height, rail, commitsOpen) : 0}
             />
           )}
-          {current && <DiffFile key={current.key} target={compare} row={current} listed={listed} compared={compared} onRefresh={reload} />}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {target.commit && <CommitBand sha={target.commit.sha} commit={shownCommit} slug={slug} />}
+            {current ? (
+              <DiffFile key={current.key} target={compare} row={current} listed={listed} compared={compared} onRefresh={reload} live={!inCommit} />
+            ) : !view ? (
+              <FileLoading />
+            ) : view.skippedNames === 0 ? (
+              <FileEmptyState icon={GitCompare} heading="No changes" detail={`${compared}.`} testId="diff-empty">
+                {refresh}
+              </FileEmptyState>
+            ) : null}
+          </div>
         </div>
       )}
     </div>
