@@ -150,7 +150,6 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:           "git.fetch",
-			Page:           PageState,
 			Title:          "Git: Fetch",
 			Description:    "Fetch from the remote and prune deleted branches (git fetch --prune).",
 			Category:       "Git",

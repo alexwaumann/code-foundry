@@ -134,6 +134,7 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 				ArgSpec{Name: "value", Type: String, Description: "A change's new value"},
 				ArgSpec{Name: "values", Type: String, Description: `Form values as a JSON object, e.g. {"name":"Ada","notify":true}`},
 				ArgSpec{Name: "version", Type: Int, Description: "The view version acted on (default: the current one)"},
+				ArgSpec{Name: "asked", Type: String, Description: "Set by the app's question to a page: what the user said yes to. A call that is no longer that runs nothing"},
 				settleArg("500ms", "before printing the view"),
 				ArgSpec{Name: "quiet", Type: Bool, Description: "Print only what happened, not the view after it"},
 			),
@@ -148,16 +149,34 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 	)
 }
 
-// pinToView binds a page's yes to the view it was asked from: the re-invoke carries this
-// version, so a view that changed under the question no longer finds a command to run. A
-// question with its own args or bind stays as it was.
-func pinToView(err error, uctx Context, version uint64) error {
+// pinToView binds a page's yes to what it was asked about: the re-invoke carries the view's
+// version and asked, the actAsked of the question, and a yes to anything else runs nothing
+// (checkAsked). A second stage (a question with args) stays as it was.
+func pinToView(err error, uctx Context, version uint64, asked string) error {
 	var ce *ConfirmError
-	if uctx.Untrusted() && errors.As(err, &ce) && len(ce.Args) == 0 && ce.Bind == nil {
+	if uctx.Untrusted() && errors.As(err, &ce) && len(ce.Args) == 0 {
 		ce.Command = "plugin.act"
-		ce.Bind = map[string]string{"version": strconv.FormatUint(version, 10)}
+		ce.Bind = map[string]string{"version": strconv.FormatUint(version, 10), "asked": asked}
 	}
 	return err
+}
+
+// actAsked names one thing plugin.act can do: a command with its args, or an event with
+// its value. A page's question and the yes to it are compared by this.
+func actAsked(parts ...any) string {
+	js, err := json.Marshal(parts)
+	if err != nil {
+		return ""
+	}
+	return ConfirmDigest(string(js))
+}
+
+// checkAsked refuses an untrusted caller's yes that was not to asked, before anything runs.
+func checkAsked(ctx context.Context, uctx Context, a Args, asked string) error {
+	if uctx.Untrusted() && ConfirmedIn(ctx) && (asked == "" || a.String("asked") != asked) {
+		return Failed(errors.New("plugin.act: this is not what the user agreed to; nothing ran"))
+	}
+	return nil
 }
 
 // actResult is plugin.act's --json: what happened, then the view after it.
@@ -224,6 +243,10 @@ func pluginAct(ctx context.Context, r *Registry, b PluginSurfaceBackend, uctx Co
 				args[k] = argString(v)
 			}
 		}
+		asked := actAsked("command", a.String("name"), a.String("surface"), view.GetVersion(), el.GetKey(), el.GetAction(), args)
+		if err := checkAsked(ctx, uctx, a, asked); err != nil {
+			return Result{}, err
+		}
 		// The plugin chose this command; a page pressing its button stays a page.
 		pressed := uctx
 		if !pressed.Untrusted() {
@@ -231,7 +254,7 @@ func pluginAct(ctx context.Context, r *Registry, b PluginSurfaceBackend, uctx Co
 		}
 		res, err := r.Invoke(ctx, pressed, el.GetAction(), args, Confirmed(ConfirmedIn(ctx)))
 		if err != nil {
-			return Result{}, pinToView(err, pressed, view.GetVersion())
+			return Result{}, pinToView(err, pressed, view.GetVersion(), asked)
 		}
 		out.Command, out.Message = el.GetAction(), res.Message
 		if js, err := res.EncodeJSON(); err == nil && js != "" {
@@ -243,10 +266,17 @@ func pluginAct(ctx context.Context, r *Registry, b PluginSurfaceBackend, uctx Co
 		}
 	} else {
 		what := cmp.Or(req.GetKey(), req.GetAction())
-		// An event runs the plugin's own code, which no command's class covers.
+		// An event runs the plugin's own code, which no command's class covers. The question
+		// pins the view it saw, so that is the version a yes comes back with.
+		event := func(version uint64) string {
+			return actAsked("event", a.String("name"), a.String("surface"), version, req.GetKey(), req.GetAction(), req.Value, a.String("values"))
+		}
 		if uctx.Untrusted() && !ConfirmedIn(ctx) {
 			return Result{}, pinToView(&ConfirmError{Command: "plugin.act", Title: "Act on Plugin Surface", Label: "Allow",
-				Message: fmt.Sprintf("Press %q on the %q surface of plugin %q?", what, a.String("surface"), a.String("name"))}, uctx, view.GetVersion())
+				Message: fmt.Sprintf("Press %q on the %q surface of plugin %q?", what, a.String("surface"), a.String("name"))}, uctx, view.GetVersion(), event(view.GetVersion()))
+		}
+		if err := checkAsked(ctx, uctx, a, event(req.GetVersion())); err != nil {
+			return Result{}, err
 		}
 		res, err := b.Act(ctx, connect.NewRequest(req))
 		if err != nil {

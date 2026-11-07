@@ -10,7 +10,7 @@ Args by name, values after them in plain text; `code-foundry help <verb>` has th
 |---|---|
 | `pr.merge` (asks first) | `repo-slug`, `number`, `method` merge, squash or rebase, `head-sha` the PR's `headSha` |
 | `pr.auto-merge` (asks first) | `repo-slug`, `number`, `method` merge, squash or rebase, or `off` true |
-| `pr.ready`, `pr.draft` (shows the user a dialog) | `repo-slug`, `number` |
+| `pr.ready`, `pr.draft` (no dialog) | `repo-slug`, `number` |
 | `pr.checks` (read) | `repo-slug`, `number`; watch one PR: run it again in `cf.on("gh", …)` |
 | `thread.archive` (asks when busy) | `id`; `archived` false unarchives |
 | `thread.snooze` | `id`, `until` 1h, 3h, tomorrow, next-week, mon…sun or a date; or `save` true (no wake); or `clear` true |
@@ -19,7 +19,7 @@ Args by name, values after them in plain text; `code-foundry help <verb>` has th
 | `settings.get` (read), `settings.set` (shows the user a dialog; user-only settings refused) | `key`; `value` as a string |
 | `usage.show` (read) | `thread` an id, or `all` true |
 | `composer.stage` | `text` goes in the composer for the user to send (never sent); `thread` defaults to this one |
-| `project.add` | no args opens the Add Project dialog; `path` adds a folder without it |
+| `project.add` | no args opens the Add Project dialog; `path` adds a folder without it (shows the user a dialog) |
 | `view.panel.page` | `path` an .html page opens in this thread's side panel only (no card), with this bridge; `title` names its tab |
 | `view.settings` | `page` general, appearance, memory, plugins, skills…; an unknown one lists them |
 | `theme.reset` | `slot` dark or light (default: the one in use) back to the default theme; the user's themes stay |

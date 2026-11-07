@@ -15,10 +15,10 @@ import (
 // asks first. Some ask anyway, through Confirm.
 var pageRuns = []string{
 	"action.add", "action.edit", "action.run", "app.restart", "daemon.restart", "dictation.start",
-	"git.pull", "git.push", "plugin.dev", "plugin.enable", "plugin.install", "plugin.secrets.delete",
-	"plugin.uninstall", "plugin.update", "pr.auto-merge", "pr.checkbox", "pr.comment", "pr.create",
-	"pr.draft", "pr.merge", "pr.ready", "pr.revert", "pr.review", "pr.review.request",
-	"project.branch.delete", "project.clone", "project.delete", "project.git.init",
+	"git.fetch", "git.pull", "git.push", "plugin.dev", "plugin.enable", "plugin.install",
+	"plugin.secrets.delete", "plugin.uninstall", "plugin.update", "pr.auto-merge", "pr.checkbox",
+	"pr.comment", "pr.create", "pr.merge", "pr.revert", "pr.review", "pr.review.request",
+	"project.add-workspace", "project.branch.delete", "project.clone", "project.delete", "project.git.init",
 	"project.github.publish", "project.worktree.cleanup", "project.worktree.new",
 	"project.worktree.remove", "skill.disable", "skill.enable", "skill.install", "skill.remove",
 	"skill.setup", "skill.uninstall", "skill.update", "thread.setup.retry", "workspace.open.editor",
@@ -29,7 +29,7 @@ var pageRuns = []string{
 var pageDrives = []string{
 	"ember.remember", "ember.reseed", "ember.task.add", "ember.task.start", "ember.task.update",
 	"memory.add", "pr.ask", "pr.explain", "pr.fix.findings", "pr.task", "search.agent", "theme.ask",
-	"thread.compact", "thread.interrupt", "thread.mcp", "thread.mcp-reconnect", "thread.move",
+	"thread.ask", "thread.compact", "thread.interrupt", "thread.mcp", "thread.mcp-reconnect", "thread.move",
 	"thread.new", "thread.new-like", "thread.project.add", "thread.project.remove", "thread.reseed",
 	"thread.respond", "thread.restart", "thread.run-in", "thread.send", "thread.set-effort",
 	"thread.set-mode", "thread.set-model", "thread.stop-waiting", "thread.subscribe",
@@ -39,14 +39,15 @@ var pageDrives = []string{
 // pageState is the app's own state: a page runs it freely, or with its own Confirm.
 // settings.set, settings.reset, ember.enable and dictation.download ask a page in Run
 // (pageAsks); plugin.act asks for an event, and a button's command is its own class.
+// pr.ready and pr.draft write to GitHub, but they are reversible and run nothing.
 var pageState = []string{
 	"action.remove", "action.stop", "app.relaunch", "app.update", "app.update.check",
 	"composer.history", "composer.stage", "dictation.allow", "dictation.download",
 	"dictation.download.cancel", "dictation.hold", "dictation.remove", "dictation.stop",
 	"dictation.toggle", "ember.disable", "ember.enable", "ember.task.cancel", "ember.task.done",
-	"file.find", "file.save", "git.fetch", "memory.clear", "memory.remove", "notifications.test",
+	"file.find", "file.save", "memory.clear", "memory.remove", "notifications.test",
 	"plugin.act", "plugin.browse", "plugin.disable", "plugin.reload", "plugin.restart",
-	"plugin.surface", "pr.open", "pr.refresh", "project.add", "project.add-workspace",
+	"plugin.surface", "pr.draft", "pr.open", "pr.ready", "pr.refresh", "project.add",
 	"project.create", "project.refresh", "project.rename", "project.unregister", "search.clear",
 	"search.find", "search.forget", "search.open", "search.open-hit", "search.promote",
 	"search.report", "search.seen", "search.stop", "settings.reset", "settings.reveal",
@@ -71,6 +72,7 @@ var pageState = []string{
 
 // pageAskFlags are the flags that make a pageState verb ask a page.
 var pageAskFlags = map[string][]string{
+	"project.add":  {"path"},
 	"terminal.new": {"argv", "run"},
 }
 

@@ -200,6 +200,11 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		if c.BindConfirm != "" {
 			ce.Bind = map[string]string{c.BindConfirm: ConfirmDigest(msg)}
 		}
+		if eff.Untrusted() {
+			if ce.Message, err = c.pageConfirm(msg, args); err != nil {
+				return Result{}, err
+			}
+		}
 		return Result{}, ce
 	}
 	if !o.confirmed && eff.Untrusted() && c.asksPage(args) {

@@ -285,6 +285,7 @@ func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 func threadAskCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.ask",
+		Page:      PageDrives,
 		NoPalette: true,
 		Title:     "Ask the Thread That Created This One",
 		Description: "Ask the thread that created this one something and keep working: it gets a wake at once and answers " +

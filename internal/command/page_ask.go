@@ -72,10 +72,35 @@ func (c *Command) pageQuestion(ctx context.Context, uctx Context, a Args) error 
 			msg += "\n" + detail
 		}
 	}
+	if err := c.pageAskFits(msg); err != nil {
+		return err
+	}
+	return &ConfirmError{Command: c.Name, Title: c.Title, Message: msg, Label: "Allow"}
+}
+
+// pageConfirm is a Confirm command's question to an untrusted caller: its own words, in
+// which a value that would draw lines of its own shows quoted, and then the call, since
+// the words alone need not say what its flags do.
+func (c *Command) pageConfirm(msg string, a Args) (string, error) {
+	for _, s := range c.Args {
+		v, ok := a.vals[s.Name].(string)
+		if !ok || v == "" {
+			continue
+		}
+		if q := strconv.Quote(v); q[1:len(q)-1] != v {
+			msg = strings.ReplaceAll(msg, v, q)
+		}
+	}
+	msg += "\n" + c.pageCall(a)
+	return msg, c.pageAskFits(msg)
+}
+
+// pageAskFits refuses a question too long to show whole (pageAskMax).
+func (c *Command) pageAskFits(msg string) error {
 	if n := utf8.RuneCountInString(msg); n > pageAskMax {
 		return Failed(fmt.Errorf("%s: this call is too long to show the user (%d characters, at most %d)", c.Name, n, pageAskMax))
 	}
-	return &ConfirmError{Command: c.Name, Title: c.Title, Message: msg, Label: "Allow"}
+	return nil
 }
 
 // pageCall is the call in the CLI's words: the verb and each arg with a value, defaults
@@ -92,6 +117,8 @@ func (c *Command) pageCall(a Args) string {
 		case bool:
 			if x {
 				sb.WriteString(" --" + s.Name)
+			} else {
+				sb.WriteString(" --" + s.Name + "=false")
 			}
 		case int:
 			sb.WriteString(" --" + s.Name + " " + strconv.Itoa(x))

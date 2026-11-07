@@ -53,7 +53,6 @@ func RegisterProjectAddWorkspace(r *Registry, projects FolderBackend, workspaces
 	}
 	return r.Register(Command{
 		Name:  "project.add-workspace",
-		Page:  PageState,
 		Title: "Add Folder as Workspace",
 		Description: "Add a folder of git repositories: every repository directly inside it becomes a project (ones already added are reused), " +
 			"and a workspace named after the folder holds them, with the folder as its root (its CLAUDE.md, AGENTS.md and .claude reach " +

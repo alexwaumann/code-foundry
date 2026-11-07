@@ -27,9 +27,28 @@ app's state now shows the user the call and "Asked by" first, and only a yes run
   daemon does not know counts too. `pageAsks` and `pinToView` use the same test.
 - **`plugin.act` from a page.** A button's command keeps the page's origin, so it meets its
   own class, and the yes to `plugin.act` is the yes to that command. An event runs the
-  plugin's code, which no class covers, so it asks in Run. Both are pinned to the view.
+  plugin's code, which no class covers, so it asks in Run. Both are pinned to the view, and
+  to what was asked: the question binds `asked`, a digest of the branch (command or event),
+  its target and its args, and a yes whose re-invoke comes to anything else runs nothing.
+  Pinning replaces a nested command's own `Bind`; the host never passed that on through
+  `plugin.act`, so nothing changes for that command.
+- **A `Confirm` command from a page** keeps its own words and adds the call under them, with
+  the same limit. A value that would draw lines of its own shows quoted in the words too,
+  in `DynamicConfirm` text as well, since the value is replaced wherever it appears. The
+  digest `BindConfirm` carries stays that of the command's own words, which is what a store
+  compares. A second-stage question from `Run` is as it was.
+- **`ui.palette.open` from a page** opens the palette empty: the palette takes the keyboard
+  and Enter runs its first row, so what fills it is the user's to type.
+  The other verbs that fill a control (`composer.stage`, `thread.new-like`'s composer
+  prompt) lead to a message to Claude, which a page can send anyway.
+- **The dialog.** Each key or pointer press or release restarts the 600 ms wait, so a run of
+  presses never finds Allow on. Once on, a pointer press anywhere but the answers restarts
+  it too. Keys do not, because Tab has to reach Allow. A guarded dialog's colours are plain
+  values in `.cf-guarded` (`index.css`), the same in every theme. They are not slots, so no
+  theme reaches them and the slot guards hold; the palette is the dark one on a light theme too.
 - **The question** is the call in the CLI's words, every value `strconv.Quote`d, so a value
-  cannot draw lines in the dialog and a control character shows as an escape. A call over
+  cannot draw lines in the dialog and a control character shows as an escape; a flag passed
+  as false shows as `--flag=false`. A call over
   800 characters is refused, not cut as `askValue` cuts a setting's value: what runs has to
   be all there, and 800 fits the dialog without scrolling.
 
@@ -42,9 +61,16 @@ app's state now shows the user the call and "Asked by" first, and only a yes run
 - **The unknown caller is decided in `internal/api`, not the registry.** In process, a zero
   `Context` is the daemon's own call. On the wire, nothing from the app or the CLI has
   neither an origin nor a view.
-- **Writes to git and GitHub ask** (`git.pull`, `git.push`, `pr.comment`, `pr.review`,
-  `pr.ready`, `pr.draft` and the like): they leave the app, under the user's name.
-  `git.fetch` does not: it changes no working tree and publishes nothing.
+- **Writes to git and GitHub ask** (`git.pull`, `git.push`, `pr.comment`, `pr.review` and the
+  like): they leave the app, under the user's name.
+- **`pr.ready` and `pr.draft` do not ask**: they are reversible and run nothing, so they are
+  `PageState`.
+- **`git.fetch` asks.** It can run what a repository's config names, and asking was simpler
+  than running it with that config off.
+- **`project.add-workspace` asks, and `project.add` asks when given a `path`** (`PageAsks`):
+  adding a folder reads that repository's config. With no args `project.add` only opens the
+  Add Project dialog, where the user picks. The welcome page's Add Project step uses that
+  form and asks nothing.
 - **`--check` is not told apart.** `plugin.update --check` and `skill.update --check` only
   list, but asking is harmless and a page has little use for them.
 - **`settings.set`, `settings.reset`, `ember.enable` and `dictation.download` are
@@ -67,6 +93,8 @@ against the lists. `welcome.html` asks only where `settings-user-only.md` says.
 
 - Needs a daemon restart.
 - New GUI, old daemon: nothing changes until the restart.
+- `plugin.act` from a page needs the host to pass `asked` on. Every GUI that passes `version`
+  does: it merges all of `Bind`.
 - Old GUI, new daemon: a page sends no origin and no view, so it is an unknown caller and
   gets the strict path, which replaces what `settings-user-only.md` says of this case.
 - New CLI, a daemon with `settings-user-only.md` but not this: `CALL_ORIGIN_CLI` is an
@@ -78,3 +106,24 @@ against the lists. `welcome.html` asks only where `settings-user-only.md` says.
 
 As in `settings-user-only.md`: this stops a page, not a process of the user's that forges a
 caller. The dialog is only as good as its reading: a user who presses Allow agrees.
+
+Verbs that start a thread or send between threads do not ask, by decision, so a page can
+reach Claude whatever this gate does. The gate is defence in depth, not a sealed boundary.
+
+## Open
+
+Known and not done here:
+
+- The presence check while the pointer rests on a page.
+- `dictation.hold`.
+- An event's question does not show what is sent with it.
+- `action.run` and `skill.setup`: what runs is read again after the question.
+- Wide glyphs near the 800 limit.
+- A page holding the focus.
+- The question limit is per frame.
+- `workspace.new --root`.
+- `terminal.close`.
+- `app.relaunch`.
+- `thread.setup.retry`.
+- The classes of `thread.fork` and `search.promote`.
+- `skill.refresh`.

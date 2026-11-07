@@ -1,8 +1,11 @@
 package command_test
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"maps"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -121,6 +124,12 @@ func TestPageCallsToRealVerbs(t *testing.T) {
 		{"terminal with a typed line", "terminal.new", map[string]string{"run": "ls\nrm x"}, `terminal.new --run "ls\nrm x"`},
 		{"a plain shell", "terminal.new", map[string]string{"cwd": "/w"}, ""},
 		{"a worktree", "project.worktree.new", map[string]string{"project": "r", "branch": "b"}, `project.worktree.new --project "r" --branch "b"`},
+		{"a folder to add", "project.add", map[string]string{"path": "/w/repo"}, `project.add --path "/w/repo"`},
+		{"the Add Project dialog", "project.add", nil, ""},
+		{"a folder of repositories", "project.add-workspace", map[string]string{"folder": "/w"}, `project.add-workspace --folder "/w"`},
+		{"a fetch", "git.fetch", map[string]string{"worktree": "/w"}, `git.fetch --worktree "/w"`},
+		{"ready for review", "pr.ready", map[string]string{"repo-slug": "o/r", "number": "1"}, ""},
+		{"back to a draft", "pr.draft", map[string]string{"repo-slug": "o/r", "number": "1"}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -200,6 +209,85 @@ func TestPageQuestionShowsTheCall(t *testing.T) {
 	}
 }
 
+// A false the page passed is part of the call, as a true is.
+func TestPageQuestionShowsAFalseFlag(t *testing.T) {
+	reg, _ := classRegistry(t)
+	_, err := reg.Invoke(context.Background(), fromPage, "x.flag", map[string]string{"line": "ls", "force": "false"})
+	if err == nil || !strings.Contains(err.Error(), `--line "ls" --force=false`) {
+		t.Errorf("err = %v, want the false shown", err)
+	}
+}
+
+// A Confirm command's own words need not say what its flags do, so a page's question adds
+// the call, with the same quoting and the same limit. Other callers see the words alone.
+func TestPageConfirmShowsTheCall(t *testing.T) {
+	var ran int
+	reg := command.NewRegistry()
+	err := reg.RegisterAll(
+		command.Command{Name: "x.remove", Title: "Remove", Category: "X", Page: command.PageState,
+			Confirm: "Remove {path}?", ConfirmLabel: "Remove",
+			Args: []command.ArgSpec{{Name: "path", Type: command.String}, {Name: "force", Type: command.Bool}},
+			Run: func(context.Context, command.Context, command.Args) (command.Result, error) {
+				ran++
+				return command.Result{}, nil
+			}},
+		command.Command{Name: "x.bound", Title: "Bound", Category: "X", Page: command.PageState,
+			Confirm: "Bind this?", BindConfirm: "shown",
+			Args: []command.ArgSpec{{Name: "shown", Type: command.String}},
+			Run: func(context.Context, command.Context, command.Args) (command.Result, error) {
+				return command.Result{}, nil
+			}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name    string
+		ctx     command.Context
+		args    map[string]string
+		want    string
+		refused bool
+	}{
+		{"a flag the words leave out", fromPage, map[string]string{"path": "/w", "force": "true"}, "Remove /w?\nx.remove --path \"/w\" --force", false},
+		{"an unknown caller", fromUnknown, map[string]string{"path": "/w"}, "Remove /w?\nx.remove --path \"/w\"", false},
+		{"a newline in the words", fromPage, map[string]string{"path": "/w\nAsked by the user"},
+			"Remove \"/w\\nAsked by the user\"?\nx.remove --path \"/w\\nAsked by the user\"", false},
+		{"too long to read", fromPage, map[string]string{"path": strings.Repeat("x", 400)}, "too long to show the user", true},
+		{"the app", fromGUI, map[string]string{"path": "/w", "force": "true"}, "Remove /w?", false},
+		{"a thread's CLI", fromThreadCLI, map[string]string{"path": "/w", "force": "true"}, "Remove /w?", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := reg.Invoke(context.Background(), tt.ctx, "x.remove", tt.args)
+			var ce *command.ConfirmError
+			if asked := errors.As(err, &ce); asked == tt.refused {
+				t.Fatalf("asked = %v, err = %v", asked, err)
+			}
+			if tt.refused {
+				if !strings.Contains(err.Error(), tt.want) {
+					t.Errorf("err = %q, want %q", err, tt.want)
+				}
+				return
+			}
+			if ce.Message != tt.want {
+				t.Errorf("message = %q, want %q", ce.Message, tt.want)
+			}
+			if ce.Label != "Remove" {
+				t.Errorf("label = %q", ce.Label)
+			}
+		})
+	}
+	if ran != 0 {
+		t.Errorf("ran %d", ran)
+	}
+	// The digest a store compares is of the command's own words, not of what a page sees.
+	_, err = reg.Invoke(context.Background(), fromPage, "x.bound", nil)
+	var ce *command.ConfirmError
+	if !errors.As(err, &ce) || ce.Bind["shown"] != command.ConfirmDigest("Bind this?") {
+		t.Errorf("err = %v, bind %v", err, ce.Bind)
+	}
+}
+
 // action.run names an action; the question shows its command line.
 func TestPageQuestionShowsAnActionsCommand(t *testing.T) {
 	act := &commandtest.Action{Actions: []*v1.Action{
@@ -268,7 +356,6 @@ func TestPluginActEventFromAPage(t *testing.T) {
 	}{
 		{"page", fromPage, nil, true},
 		{"unknown caller", fromUnknown, nil, true},
-		{"page, confirmed", fromPage, []command.InvokeOption{command.Confirmed(true)}, false},
 		{"GUI", fromGUI, nil, false},
 		{"thread CLI", fromThreadCLI, nil, false},
 		{"plugin", fromPlugin, nil, false},
@@ -301,6 +388,82 @@ func TestPluginActEventFromAPage(t *testing.T) {
 			}
 		})
 	}
+	t.Run("page, confirmed", func(t *testing.T) {
+		before := acted(b)
+		if _, err := reg.Invoke(context.Background(), fromPage, "plugin.act", yes(t, reg, fromPage, args), command.Confirmed(true)); err != nil {
+			t.Fatal(err)
+		}
+		if acted(b) != before+1 {
+			t.Error("the plugin did not hear it")
+		}
+	})
+}
+
+// yes is what the host re-invokes with once the user agrees: args and the question's Bind.
+func yes(t *testing.T, reg *command.Registry, ctx command.Context, args map[string]string) map[string]string {
+	t.Helper()
+	_, err := reg.Invoke(context.Background(), ctx, "plugin.act", args)
+	var ce *command.ConfirmError
+	if !errors.As(err, &ce) {
+		t.Fatalf("err = %v, want a question", err)
+	}
+	out := maps.Clone(args)
+	maps.Copy(out, ce.Bind)
+	return out
+}
+
+// A page's yes covers the one thing it was asked about: when the re-invoke would do anything
+// else, nothing runs, neither the plugin's event nor a button's command.
+func TestPluginActYesCoversWhatWasAsked(t *testing.T) {
+	version := func(n int) map[string]string {
+		return map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true", "version": strconv.Itoa(n)}
+	}
+	current := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true"}
+	tests := []struct {
+		name   string
+		args   map[string]string
+		change func(*v1.GetSurfaceResponse, map[string]string)
+		kind   string
+		ran    int
+		heard  int
+	}{
+		{name: "the question it was asked runs", args: current, ran: 1},
+		{name: "a stale version asks about an event, the yes finds a command", args: version(2)},
+		{name: "the button's command changes", args: current, change: func(g *v1.GetSurfaceResponse, _ map[string]string) {
+			g.Elements[0].Action = "x.drives"
+		}},
+		{name: "the button's args change", args: current, change: func(g *v1.GetSurfaceResponse, _ map[string]string) {
+			g.Elements[0].Args = map[string]string{"line": "other"}
+		}},
+		{name: "the view moves on", args: current, change: func(g *v1.GetSurfaceResponse, _ map[string]string) { g.View.Version = 5 }},
+		{name: "the event it was asked is heard", args: current, kind: "event", heard: 1},
+		{name: "the event's value changes", args: current, kind: "event", change: func(_ *v1.GetSurfaceResponse, a map[string]string) { a["value"] = "other" }},
+		{name: "no record of the question", args: current, change: func(_ *v1.GetSurfaceResponse, a map[string]string) { delete(a, "asked") }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &commandtest.PluginSurface{Got: &v1.GetSurfaceResponse{
+				State:    &v1.SurfaceState{Instance: "hello/demo/thread:s-1", Phase: v1.SurfacePhase_SURFACE_PHASE_LIVE},
+				View:     &v1.SurfaceView{Instance: "hello/demo/thread:s-1", Version: 4, ViewJson: `{"nodes":[]}`},
+				Elements: []*v1.SurfaceElement{{Key: "go", Kind: cmp.Or(tt.kind, "command"), Action: "x.runs", Label: "Go"}},
+			}}
+			reg, ran := classRegistry(t)
+			if err := command.RegisterPluginSurface(reg, b); err != nil {
+				t.Fatal(err)
+			}
+			again := yes(t, reg, fromPage, tt.args)
+			if tt.change != nil {
+				tt.change(b.Got, again)
+			}
+			_, err := reg.Invoke(context.Background(), fromPage, "plugin.act", again, command.Confirmed(true))
+			if tt.ran+tt.heard == 0 && (err == nil || !strings.Contains(err.Error(), "nothing ran")) {
+				t.Errorf("err = %v, want a refusal", err)
+			}
+			if len(*ran) != tt.ran || acted(b) != tt.heard {
+				t.Errorf("ran %v, the plugin heard %d", *ran, acted(b))
+			}
+		})
+	}
 }
 
 // A page pressing a plugin's button gets the question of the verb behind it, and the yes to
@@ -321,7 +484,7 @@ func TestPluginButtonFromAPageAsksForItsCommand(t *testing.T) {
 	if !errors.As(err, &ce) || !strings.Contains(ce.Message, "x.runs") || ce.Bind["version"] != "4" || len(*ran) != 0 {
 		t.Fatalf("err = %v, bind %v, ran %v", err, ce.Bind, *ran)
 	}
-	if _, err := reg.Invoke(context.Background(), fromPage, "plugin.act", args, command.Confirmed(true)); err != nil {
+	if _, err := reg.Invoke(context.Background(), fromPage, "plugin.act", yes(t, reg, fromPage, args), command.Confirmed(true)); err != nil {
 		t.Fatal(err)
 	}
 	if len(*ran) != 1 {

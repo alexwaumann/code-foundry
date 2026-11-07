@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -288,13 +289,13 @@ func TestPluginActPinsAPageYesToItsView(t *testing.T) {
 	args := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true"}
 	_, err := reg.Invoke(context.Background(), page, "plugin.act", args)
 	var ce *command.ConfirmError
-	if !errors.As(err, &ce) || ce.Command != "plugin.act" || ce.Bind["version"] != "4" || ce.Message != "Run the first?" {
+	if !errors.As(err, &ce) || ce.Command != "plugin.act" || ce.Bind["version"] != "4" || ce.Message != "Run the first?\nplugin.hello.first" {
 		t.Fatalf("err = %#v, want the question bound to version 4", err)
 	}
 	// The view changes under the question: the same key now runs something else.
 	b.Got.View.Version = 5
 	b.Got.Elements[0].Action = "plugin.hello.second"
-	again := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true", "version": ce.Bind["version"]}
+	again := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true", "version": ce.Bind["version"], "asked": ce.Bind["asked"]}
 	if _, err := reg.Invoke(context.Background(), page, "plugin.act", again, command.Confirmed(true)); err != nil {
 		t.Logf("the stale act: %v", err)
 	}
@@ -343,6 +344,10 @@ func TestPluginActButtonOrigin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			args := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true"}
 			// A plugin's command asks a page first (page_ask_test.go); the origin is the point here.
+			var ce *command.ConfirmError
+			if _, err := reg.Invoke(context.Background(), tt.ctx, "plugin.act", args); errors.As(err, &ce) {
+				maps.Copy(args, ce.Bind)
+			}
 			if _, err := reg.Invoke(context.Background(), tt.ctx, "plugin.act", args, command.Confirmed(true)); err != nil {
 				t.Fatal(err)
 			}

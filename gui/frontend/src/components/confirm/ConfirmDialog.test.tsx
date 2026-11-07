@@ -82,15 +82,53 @@ describe("ConfirmDialog", () => {
       ["a key", () => fireEvent.keyDown(window, { code: "Space" }), () => fireEvent.keyUp(window, { code: "Space" })],
       ["a pointer", () => fireEvent.pointerDown(window), () => fireEvent.pointerUp(window)],
       ["a press begun in a page, seen only as it moves", () => fireEvent.pointerMove(window, { buttons: 1 }), () => fireEvent.pointerMove(window, { buttons: 0 })],
-    ])("waits for %s held past the wait to be let go, and a moment more", (_name, press, release) => {
+    ])("waits for %s held past the wait to be let go, then the wait again", (_name, press, release) => {
       render(<ConfirmDialog />);
       void ask();
       press();
       wait(CONFIRM_ARM_MS * 3);
       expect(ok().disabled).toBe(true);
       release();
+      wait(CONFIRM_ARM_MS - 1);
       expect(ok().disabled).toBe(true);
-      wait(60);
+      wait(1);
+      expect(ok().disabled).toBe(false);
+    });
+
+    it.each([
+      ["a key", () => fireEvent.keyDown(window, { code: "Space" }), () => fireEvent.keyUp(window, { code: "Space" })],
+      ["a pointer", () => fireEvent.pointerDown(window), () => fireEvent.pointerUp(window)],
+    ])("each press of %s starts the wait again", (_name, press, release) => {
+      render(<ConfirmDialog />);
+      void ask();
+      for (let i = 0; i < 5; i++) {
+        wait(CONFIRM_ARM_MS - 100);
+        press();
+        release();
+      }
+      wait(CONFIRM_ARM_MS - 1);
+      expect(ok().disabled).toBe(true);
+      wait(1);
+      expect(ok().disabled).toBe(false);
+    });
+
+    it("once on, a press elsewhere starts the wait again, and a press on Change does not", () => {
+      render(<ConfirmDialog />);
+      void ask();
+      wait(CONFIRM_ARM_MS);
+      fireEvent.pointerDown(ok());
+      fireEvent.pointerUp(ok());
+      expect(ok().disabled).toBe(false);
+      fireEvent.pointerDown(screen.getByTestId("confirm-dialog"));
+      expect(ok().disabled).toBe(true);
+    });
+
+    it("once on, a key leaves it on, so Tab can reach Change", () => {
+      render(<ConfirmDialog />);
+      void ask();
+      wait(CONFIRM_ARM_MS);
+      fireEvent.keyDown(window, { code: "Tab" });
+      fireEvent.keyUp(window, { code: "Tab" });
       expect(ok().disabled).toBe(false);
     });
 

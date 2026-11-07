@@ -30,6 +30,7 @@ func stateCommands(b GhBackend, slug, number ArgSpec) []Command {
 func draftCommand(b GhBackend, slug, number ArgSpec, draft bool) Command {
 	c := Command{
 		Name:        "pr.ready",
+		Page:        PageState,
 		NoPalette:   true,
 		Title:       "Mark Pull Request Ready for Review",
 		Description: "Mark a draft pull request ready for review (GitHub's Ready for review button).",

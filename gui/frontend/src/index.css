@@ -242,6 +242,34 @@
  * their first property, and font-family/font-size come before font-weight and color, so a
  * role always lands ahead of the single-property utilities (src/design/roles.test.ts).
  * src/design/tokens.ts lists the names too, for cn()'s merge table. */
+/*
+ * A question something other than the user asked (ConfirmDialog, guarded). What asked may be
+ * able to change the theme and the question has to stay readable, so its colours are plain
+ * values: no slot reaches them, and being unlayered they beat every utility on its elements.
+ */
+.cf-guarded {
+    background-color: #1f2328;
+    border-color: #57606a;
+}
+.cf-guarded,
+.cf-guarded * {
+    color: #f0f3f6;
+}
+.cf-guarded svg,
+.cf-guarded svg * {
+    color: #ff9d96;
+}
+.cf-guarded button:hover,
+.cf-guarded button:active {
+    background-color: #32383f;
+}
+.cf-guarded [data-confirm-answer],
+.cf-guarded [data-confirm-answer]:hover,
+.cf-guarded [data-confirm-answer]:active {
+    background-color: #b62324;
+    color: #ffffff;
+}
+
 @utility text-title {
   font-size: 22px;
   line-height: 28px;
