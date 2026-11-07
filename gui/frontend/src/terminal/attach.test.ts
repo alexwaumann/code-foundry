@@ -1,6 +1,7 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AttachEventView } from "@/api/terminal";
-import { AttachController, MAX_BEHIND_BYTES, REFUSED_RETRY_MS, type AttachState } from "./attach";
+import { AttachController, DROP_GRACE_MS, MAX_BEHIND_BYTES, REFUSED_RETRY_MS, type AttachState } from "./attach";
 import { TerminalInput } from "./input";
 import type { Disposable, TermSize, TerminalRenderer } from "./renderer";
 import { XtermRenderer } from "./xterm";
@@ -72,10 +73,10 @@ const enc = (s: string) => new TextEncoder().encode(s);
 function streams() {
   const opened: string[] = [];
   const aborted: string[] = [];
-  const pushers = new Map<string, (ev: AttachEventView | "end") => void>();
+  const pushers = new Map<string, (ev: AttachEventView | "end" | Error) => void>();
   async function* attach(id: string, signal: AbortSignal): AsyncGenerator<AttachEventView> {
     opened.push(id);
-    const queue: (AttachEventView | "end")[] = [];
+    const queue: (AttachEventView | "end" | Error)[] = [];
     let wake: (() => void) | null = null;
     pushers.set(id, (ev) => {
       queue.push(ev);
@@ -88,6 +89,7 @@ function streams() {
     while (!signal.aborted) {
       const ev = queue.shift();
       if (ev === "end") return;
+      if (ev instanceof Error) throw ev;
       if (ev) {
         yield ev;
         continue;
@@ -95,7 +97,7 @@ function streams() {
       await new Promise<void>((r) => (wake = r));
     }
   }
-  return { attach, opened, aborted, push: (id: string, ev: AttachEventView | "end") => pushers.get(id)?.(ev) };
+  return { attach, opened, aborted, push: (id: string, ev: AttachEventView | "end" | Error) => pushers.get(id)?.(ev) };
 }
 
 const flush = async () => {
@@ -303,6 +305,104 @@ describe("AttachController", () => {
       parseAll();
       await flush();
       expect(s.opened).toEqual(["t1"]);
+    });
+  });
+
+  describe("a stream the daemon drops for falling behind", () => {
+    const dropped = new ConnectError("attach subscriber too slow; re-attach for a fresh snapshot", Code.ResourceExhausted);
+    const snapshot = { kind: "snapshot" as const, data: enc("now"), cols: 100, rows: 30, altScreen: false };
+    /** Past any first backoff, so the next attempt has opened. */
+    const BACKOFF_MS = 400;
+    const phases = () => states.map((st) => st.phase);
+    async function live() {
+      ctl.attach("t1");
+      await flush();
+      s.push("t1", snapshot);
+      await flush();
+      expect(ctl.current.phase).toBe("live");
+    }
+
+    it("stays live through the drop and the reconnect, and for good after it", async () => {
+      await live();
+      s.push("t1", dropped);
+      await vi.advanceTimersByTimeAsync(BACKOFF_MS);
+      expect(s.opened).toEqual(["t1", "t1"]);
+      expect(ctl.current.phase).toBe("live");
+
+      s.push("t1", snapshot);
+      await vi.advanceTimersByTimeAsync(DROP_GRACE_MS * 2);
+      expect(phases()).not.toContain("reconnecting");
+    });
+
+    it("shows a reconnect that then fails, at once and with why", async () => {
+      await live();
+      s.push("t1", dropped);
+      await vi.advanceTimersByTimeAsync(BACKOFF_MS);
+      expect(ctl.current.phase).toBe("live");
+      s.push("t1", new TypeError("Load failed"));
+      await flush();
+      expect(ctl.current).toMatchObject({ phase: "reconnecting", error: "Code Foundry's daemon is not reachable." });
+    });
+
+    it("shows a reconnect that hangs, once the grace is over", async () => {
+      await live();
+      s.push("t1", dropped);
+      await vi.advanceTimersByTimeAsync(DROP_GRACE_MS - 1);
+      expect(s.opened).toEqual(["t1", "t1"]);
+      expect(ctl.current.phase).toBe("live");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(ctl.current.phase).toBe("reconnecting");
+
+      s.push("t1", snapshot);
+      await flush();
+      expect(ctl.current.phase).toBe("live");
+    });
+
+    it("does not put the deadline off for drops that bring no message", async () => {
+      await live();
+      s.push("t1", dropped);
+      await vi.advanceTimersByTimeAsync(BACKOFF_MS);
+      s.push("t1", dropped);
+      await flush();
+      expect(ctl.current.phase).toBe("live");
+      await vi.advanceTimersByTimeAsync(DROP_GRACE_MS - BACKOFF_MS);
+      expect(s.opened).toEqual(["t1", "t1", "t1"]);
+      expect(ctl.current.phase).toBe("reconnecting");
+    });
+
+    it("starts the grace over for each drop after a message", async () => {
+      await live();
+      for (let i = 0; i < 3; i++) {
+        s.push("t1", dropped);
+        await vi.advanceTimersByTimeAsync(DROP_GRACE_MS - 1);
+        s.push("t1", snapshot);
+        await flush();
+      }
+      expect(phases()).not.toContain("reconnecting");
+    });
+
+    it("still shows any other error", async () => {
+      await live();
+      s.push("t1", new ConnectError("the store is closed", Code.Unavailable));
+      await flush();
+      expect(ctl.current).toMatchObject({ phase: "reconnecting", error: "the store is closed" });
+    });
+
+    it("still shows a stream that ended cleanly", async () => {
+      await live();
+      s.push("t1", "end");
+      await vi.advanceTimersByTimeAsync(BACKOFF_MS);
+      expect(ctl.current.phase).toBe("reconnecting");
+    });
+
+    it("leaves the next terminal alone when the grace would end after a switch", async () => {
+      await live();
+      s.push("t1", dropped);
+      await flush();
+      ctl.attach("t2");
+      await vi.advanceTimersByTimeAsync(DROP_GRACE_MS * 2);
+      expect(ctl.current).toMatchObject({ terminalId: "t2", phase: "connecting" });
+      expect(phases()).not.toContain("reconnecting");
     });
   });
 

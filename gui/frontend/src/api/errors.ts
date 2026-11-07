@@ -40,3 +40,11 @@ export function isNotFound(err: unknown): boolean {
 export function isFailedPrecondition(err: unknown): boolean {
   return err instanceof ConnectError && err.code === Code.FailedPrecondition;
 }
+
+/**
+ * True for the daemon dropping an Attach stream that fell behind (terminal.ErrSlowSubscriber), the
+ * only ResourceExhausted that RPC returns. The next stream's snapshot has all of it, so nothing failed.
+ */
+export function isSlowSubscriber(err: unknown): boolean {
+  return err instanceof ConnectError && err.code === Code.ResourceExhausted;
+}
