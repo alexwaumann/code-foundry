@@ -34,6 +34,9 @@ const (
 	// the grid's limit but the tab's: the list lives in the tab's params, which the panel
 	// keeps in the window's local storage.
 	maxGalleryImages = 200
+	// maxGalleryPath is the longest path, in bytes: macOS's PATH_MAX. A failed image keeps its
+	// path in the tab's params, so this, with the count, bounds what a tab can store.
+	maxGalleryPath = 1024
 	// maxGalleryCaption is the longest caption, in characters: a line under a tile.
 	maxGalleryCaption = 200
 	// maxGalleryTitle is the longest title, in characters: a tab's name.
@@ -168,11 +171,19 @@ func (d ViewDeps) galleryRead(ctx context.Context, base string, e galleryEntry) 
 		return img, "a directory, not an image", nil
 	case !strings.HasPrefix(f.GetMimeType(), "image/"):
 		return img, "not an image (" + f.GetMimeType() + ")", nil
-	case f.GetSize() > fsx.MaxBinaryReadBytes:
-		return img, "larger than the " + strconv.Itoa(fsx.MaxBinaryReadBytes>>20) + " MiB the tab reads", nil
+	case f.GetSize() > galleryReadLimit(f.GetMimeType()):
+		return img, "larger than the " + strconv.FormatInt(galleryReadLimit(f.GetMimeType())>>20, 10) + " MiB the tab reads", nil
 	}
 	img.Stamp = f.GetModifiedAt()
 	return img, "", nil
+}
+
+// galleryReadLimit is the most of an image the tab can read: ReadFile counts an SVG as text.
+func galleryReadLimit(mime string) int64 {
+	if fsx.TextMIME(mime) {
+		return fsx.MaxReadBytes
+	}
+	return fsx.MaxBinaryReadBytes
 }
 
 // galleryWarnings names the first few images that will not show and counts the rest.
@@ -208,6 +219,9 @@ func parseGalleryImages(raw string) ([]galleryEntry, error) {
 		e.Path = strings.TrimSpace(e.Path)
 		if e.Path == "" {
 			return nil, InvalidArg("images", "image %d has no path: %s", i+1, shape)
+		}
+		if len(e.Path) > maxGalleryPath {
+			return nil, InvalidArg("images", "image %d's path has %d bytes, at most %d", i+1, len(e.Path), maxGalleryPath)
 		}
 		e.Caption = plainNote(e.Caption)
 		if n := utf8.RuneCountInString(e.Caption); n > maxGalleryCaption {

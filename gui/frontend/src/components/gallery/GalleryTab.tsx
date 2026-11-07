@@ -31,6 +31,11 @@ export function GalleryTab({ base, images: raw }: { base: string; images: string
     setSeen(images);
     setOpen(followOpen(seen, images, open));
   }
+  // An image opened by hand ends the last reveal, or a re-open that drops it to the grid would replay that.
+  const openImage = (at: number) => {
+    setReveal(null);
+    setOpen(at);
+  };
   if (images.length === 0) return <FileEmptyState icon={ImageOff} heading="No images" testId="gallery-empty" />;
   if (open !== null) {
     return (
@@ -52,7 +57,7 @@ export function GalleryTab({ base, images: raw }: { base: string; images: string
       <p className="shrink-0 px-3 pt-2 text-caption" data-testid="gallery-count">
         {images.length === 1 ? "1 image" : `${String(images.length)} images`}
       </p>
-      <GalleryGrid images={images} store={store} onOpen={setOpen} offsetRef={offset} reveal={reveal} />
+      <GalleryGrid images={images} store={store} onOpen={openImage} offsetRef={offset} reveal={reveal} />
     </>
   );
 }

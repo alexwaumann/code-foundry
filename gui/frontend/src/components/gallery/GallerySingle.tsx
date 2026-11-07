@@ -58,7 +58,7 @@ function FilmFrame({ image, index, current, store, onPick }: { image: GalleryIma
   const thumb = useThumb(store, image);
   const label = imageLabel(image);
   return (
-    <Tip label={label}>
+    <Tip label={current ? null : label}>
       <button
         type="button"
         className={cn(

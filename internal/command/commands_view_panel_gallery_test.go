@@ -18,11 +18,11 @@ import (
 
 func galleryFiles() *commandtest.Files {
 	return &commandtest.Files{
-		Files:    []string{"/wt/a.png", "/tmp/b.jpg", "/wt/notes.txt", "/wt/huge.png"},
+		Files:    []string{"/wt/a.png", "/tmp/b.jpg", "/wt/notes.txt", "/wt/huge.png", "/wt/big.svg", "/wt/small.svg"},
 		Dirs:     []string{"/wt/shots"},
-		Mime:     map[string]string{"/wt/a.png": "image/png", "/tmp/b.jpg": "image/jpeg", "/wt/notes.txt": "text/plain", "/wt/huge.png": "image/png"},
-		Modified: map[string]int64{"/wt/a.png": 11, "/tmp/b.jpg": 22},
-		Size:     map[string]int64{"/wt/huge.png": 33 << 20},
+		Mime:     map[string]string{"/wt/a.png": "image/png", "/tmp/b.jpg": "image/jpeg", "/wt/notes.txt": "text/plain", "/wt/huge.png": "image/png", "/wt/big.svg": "image/svg+xml", "/wt/small.svg": "image/svg+xml"},
+		Modified: map[string]int64{"/wt/a.png": 11, "/tmp/b.jpg": 22, "/wt/small.svg": 33},
+		Size:     map[string]int64{"/wt/huge.png": 33 << 20, "/wt/big.svg": 2 << 20, "/wt/small.svg": 1 << 20},
 		Errs:     map[string]error{"/etc/c.png": connect.NewError(connect.CodeInvalidArgument, errors.New("invalid argument: /etc/c.png is outside the home directory"))},
 	}
 }
@@ -61,6 +61,10 @@ func TestPanelGallery(t *testing.T) {
 			wantWarnings: []string{"/wt/gone.png: no such file", "/wt/shots: a directory, not an image", "/wt/notes.txt: not an image (text/plain)",
 				"/wt/huge.png: larger than the 32 MiB the tab reads", "/etc/c.png: /etc/c.png is outside the home directory"}},
 		{name: "none can show", args: args(`[{"path":"/wt/gone.png"},{"path":"/wt/shots"}]`), argErr: "images", says: "none of the 2 images can be shown: /wt/gone.png: no such file"},
+		{name: "an SVG reads as text, so its limit is 1 MiB", args: args(`[{"path":"/wt/big.svg"}]`), argErr: "images", says: "none of the 1 images can be shown: /wt/big.svg: larger than the 1 MiB the tab reads"},
+		{name: "an SVG at that limit shows", args: args(`[{"path":"/wt/small.svg"}]`),
+			wantTitle: "Shots", wantImages: `[{"path":"/wt/small.svg","stamp":33}]`, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
+		{name: "a path too long", args: args(`[{"path":"/wt/` + strings.Repeat("x", 1021) + `"}]`), argErr: "images", says: "image 1's path has 1025 bytes, at most 1024"},
 		{name: "a blank title", args: map[string]string{"title": " \n ", "images": `[{"path":"/wt/a.png"}]`}, argErr: "title", says: "needs a title"},
 		{name: "a title too long", args: map[string]string{"title": strings.Repeat("x", 81), "images": `[{"path":"/wt/a.png"}]`}, argErr: "title", says: "at most 80"},
 		{name: "not json", args: args(`/wt/a.png`), argErr: "images", says: "want a JSON array"},

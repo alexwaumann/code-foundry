@@ -39,7 +39,10 @@ File tab's relative path does, and the help says so.
   never pruned. Over the cap is refused rather than cut, so a thread knows.
 - Captions at most 200 characters, titles at most 80. Both are cleaned as model text (`plainNote`
   in Go, `plainLine` in the tab).
-- 32 MiB per image, the File tab's read cap. A larger one is a failed tile, not a broken picture.
+- 32 MiB per image, the File tab's read cap, and 1 MiB for an SVG, which `ReadFile` counts as text.
+  A larger one is a failed tile and a warning, not a broken picture.
+- Paths at most 1,024 bytes. A failed image keeps its path in the tab's params, so without this the
+  count alone would not bound what a tab stores in local storage.
 
 ### What a refusal is
 
@@ -109,3 +112,8 @@ Not built. It would be another caller of `galleryTab`: a tab is only a title and
 The entry skill's "To see…" row names the verb. The help skill points at
 `daemon.capabilities --group panel`, which lists it by itself. `p9-show-images` was added to the
 eval, with `before.svg` and `after.svg` in the fixture.
+
+## Known limit
+
+A read that fails for a moment stays failed on its tile until the tab's body remounts: an identical
+re-open changes no params, so nothing asks again. Leaving the tab and coming back clears it.

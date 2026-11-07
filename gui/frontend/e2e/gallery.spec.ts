@@ -18,6 +18,11 @@ const shots = (n: number) => Array.from({ length: n }, (_, i) => ({ path: `${CF}
 /** view.panel.gallery as the CLI inside thread s-1 runs it, with s-1 on screen. */
 async function show(page: Page, images: { path: string; caption?: string }[]): Promise<void> {
   await row(page, "s:s-1").click();
+  await reopen(page, images);
+}
+
+/** The same call with the keyboard left where it is. */
+async function reopen(page: Page, images: { path: string; caption?: string }[]): Promise<void> {
   const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
@@ -81,6 +86,22 @@ test("the keyboard goes into one image, through the images, and back to the tile
   const left = page.locator('[data-gallery-index="25"]');
   await expect(left).toBeFocused();
   await expect(left).toBeInViewport({ ratio: 1 });
+});
+
+test("a re-open that drops the open image leaves the keyboard in the composer", async ({ page }) => {
+  const all = shots(6);
+  await show(page, all);
+  await tiles(page).nth(1).click();
+  await page.keyboard.press("Escape");
+  await tiles(page).nth(3).click();
+  await expect(single(page)).toBeFocused();
+  const composer = page.getByTestId("composer-input");
+  await composer.click();
+  await reopen(page, all.filter((_, i) => i !== 3));
+  await expect(grid(page)).toBeVisible();
+  // The grid's reveal moves focus two frames after it mounts.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done)))));
+  await expect(composer).toBeFocused();
 });
 
 test("the grid comes back where it was scrolled to", async ({ page }) => {
