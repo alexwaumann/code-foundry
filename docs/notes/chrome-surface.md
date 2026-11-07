@@ -198,7 +198,7 @@ internal/store/settings/schema.go            GroupExperimental; the experimental
                                              its Groups row; KeyChromeSurface; the field
 internal/store/settings/settings.go          Settings.Experimental; the Experimental type
 gui/frontend/src/surfaces/registry.ts        the import; browserSurface in the list
-gui/frontend/src/components/panel/keys.test.ts  the browser row of the pinned surface list
+gui/frontend/src/components/panel/keys.test.ts  the browser row and one "hidden" in the pinned lists
 gui/frontend/src/stores/threadPanelIntent.ts the import; the panel.browser action
 gui/frontend/src/stores/views.ts             the import; the panel.browser case; browserPanelCommand
 gui/frontend/src/keys/bindings.ts            the import; the inPalette line; the four present entries

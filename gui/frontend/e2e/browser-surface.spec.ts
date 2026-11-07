@@ -23,6 +23,8 @@ async function openSurface(page: Page): Promise<void> {
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await emit({ showView: { name: "panel.browser", params: { url: "https://example.com/" } } });
   await expect(surface(page)).toBeVisible();
+  // The cover over a starting surface takes clicks, as it should.
+  await expect(page.getByTestId("browser-starting")).toBeHidden();
 }
 
 test.beforeEach(resetMock);
@@ -69,11 +71,11 @@ test("a click lands where it was made, in the page's pixels, and the keyboard go
   await page.mouse.click(box.x + 40, box.y + 30);
   await expect(page.getByTestId("browser-input")).toBeFocused();
   await page.keyboard.type("hi");
-  await expect.poll(async () => (await calls()).join("\n")).toContain("keyDown:h");
+  await expect.poll(async () => (await calls()).join("\n")).toContain("keyDown:i");
   const log = await calls();
   expect(log.some((c) => c.includes("mousePressed@40,30"))).toBe(true);
   expect(log.some((c) => c.includes("mouseReleased@40,30"))).toBe(true);
-  expect(log.join("\n")).toContain("keyDown:i");
+  expect(log.join("\n")).toContain("keyDown:h");
 });
 
 test("the app's own chords still work with the keyboard in the page", async ({ page }) => {
