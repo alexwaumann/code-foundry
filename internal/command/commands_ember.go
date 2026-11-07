@@ -130,6 +130,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:      "ember.remember",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Ember: Remember",
 			Description: "Keep a fact in Ember's memory now: a dated line under MEMORY.md's Notes, kept across epochs " +
@@ -148,6 +149,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:      "ember.reseed",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Ember: New Epoch",
 			Description: "Start a new epoch now: consolidate Ember's memory (a one-shot claude -p), rebuild its seed and give it a " +
@@ -169,6 +171,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.enable",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Ember: Turn On",
 			Description:  "Turn Ember on (the ember.enabled setting): its thread is made on first use, in ~/.code-foundry/residents/ember. A page asks the user first.",
@@ -183,6 +186,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.disable",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Ember: Turn Off",
 			Description:  "Turn Ember off (the ember.enabled setting): its process stops and its timers go; its thread, memory and board stay.",

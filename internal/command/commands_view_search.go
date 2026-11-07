@@ -16,6 +16,7 @@ const ViewSearch = "search.open"
 func (d ViewDeps) searchOpenCommand() Command {
 	return Command{
 		Name:        "search.open",
+		Page:        PageState,
 		Title:       "Search Threads",
 		Description: "Find threads by name and messages across every thread (archived ones too), with a preview; Enter opens the message in its thread with the find bar on the match.",
 		Category:    "View",

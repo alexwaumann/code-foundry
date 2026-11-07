@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -90,6 +91,29 @@ func canUseActions(c Context) bool {
 
 // noProject is how the action commands refuse a context without a project.
 const noProject = "actions belong to a project: pass --project, select a thread or a worktree, or run inside a registered project"
+
+// actionCommandLines is what action.run's question adds: the command line of every action
+// the name or id can mean (a name is unique only within a project, and the store picks
+// among the thread's). Each is quoted, as the call is.
+func actionCommandLines(ctx context.Context, b ActionBackend, ref string) (string, error) {
+	res, err := b.List(ctx, connect.NewRequest(&v1.ListActionsRequest{}))
+	if err != nil {
+		return "", err
+	}
+	var lines []string
+	for _, x := range res.Msg.GetActions() {
+		if x.GetId() != ref && !strings.EqualFold(x.GetName(), ref) {
+			continue
+		}
+		if line := "Its command line: " + strconv.Quote(x.GetCommand()); !slices.Contains(lines, line) {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) == 0 {
+		return "", Failed(fmt.Errorf("no action %q", ref))
+	}
+	return strings.Join(lines, "\n"), nil
+}
 
 // RegisterAction registers action.list, action.add, action.edit, action.remove,
 // action.run, action.wait, action.runs and action.last.
@@ -230,6 +254,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:           "action.remove",
+			Page:           PageState,
 			NoPalette:      true,
 			Title:          "Remove Action",
 			Description:    "Remove an action from its project. Runs in progress keep going.",
@@ -270,6 +295,9 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			When: canStartShell,
 			WhyUnavailable: func(Context) string {
 				return "an action runs for a thread or a worktree: select one, or from the CLI run inside a registered project"
+			},
+			PageDetail: func(ctx context.Context, _ Context, a Args) (string, error) {
+				return actionCommandLines(ctx, d.Action, a.String("action"))
 			},
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 				mode := v1.ActionRunMode_ACTION_RUN_MODE_UNSPECIFIED
@@ -328,6 +356,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:      "action.stop",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Stop Action Run",
 			Description: "Stop a running action run: a background run gets SIGTERM, then SIGKILL after a few seconds; a terminal run's " +

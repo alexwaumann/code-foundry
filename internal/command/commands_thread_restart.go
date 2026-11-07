@@ -45,6 +45,7 @@ func threadRestartCmd(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
 		Name:    "thread.restart",
+		Page:    PageDrives,
 		NoIndex: true,
 		Title:   "Restart Claude",
 		Description: "Restart a thread's Claude process with the same conversation, so it picks up what changed outside it, " +

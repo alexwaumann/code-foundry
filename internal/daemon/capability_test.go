@@ -65,7 +65,7 @@ func TestScopedTokenOnTheLoopbackAPI(t *testing.T) {
 		return codefoundryv1connect.NewCommandServiceClient(&http.Client{Transport: bearer{token}}, srv.URL)
 	}
 	invoke := func(token, name string, args map[string]string) error {
-		_, err := client(token).Invoke(context.Background(), connect.NewRequest(&v1.InvokeCommandRequest{Name: name, Args: args}))
+		_, err := client(token).Invoke(context.Background(), connect.NewRequest(&v1.InvokeCommandRequest{Name: name, Args: args, Context: &v1.UiContext{Origin: v1.CallOrigin_CALL_ORIGIN_CLI}}))
 		return err
 	}
 	ctx := context.Background()

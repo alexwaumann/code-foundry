@@ -64,6 +64,7 @@ type galleryImage struct {
 func (d ViewDeps) panelGalleryCommand() Command {
 	return Command{
 		Name:      "view.panel.gallery",
+		Page:      PageState,
 		NoPalette: true,
 		Title:     "Show Images in Side Panel",
 		Description: "Open a set of images in a Gallery tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +

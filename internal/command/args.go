@@ -99,6 +99,9 @@ type ArgSpec struct {
 	// by spaces: `memory add always open PRs as drafts` needs no quotes. String
 	// positional args only.
 	Rest bool
+	// PageAsks marks a flag that makes a command safe without it run a program: given,
+	// a page's call asks the user first (PageClass), whatever the command's class.
+	PageAsks bool
 }
 
 // positional is s taking a bare word on the CLI too: `thread archive 8f3a`.

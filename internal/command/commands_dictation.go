@@ -145,6 +145,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:        "dictation.toggle",
+			Page:        PageState,
 			Title:       "Dictate",
 			Description: "Start or stop dictating into the focused composer. Speech is transcribed on this Mac; each phrase lands at the caret.",
 			Category:    dictationCategory,
@@ -164,6 +165,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 		},
 		Command{
 			Name:         "dictation.hold",
+			Page:         PageState,
 			NoPalette:    true,
 			NoKeybinding: true,
 			Title:        "Hold to Dictate",
@@ -188,6 +190,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 		},
 		Command{
 			Name:        "dictation.allow",
+			Page:        PageState,
 			Title:       "Allow the Dictation Hold Key",
 			Description: "Ask macOS to let Code Foundry hear the hold key and paste, and open the list in System Settings where that is turned on.",
 			Category:    dictationCategory,
@@ -234,6 +237,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 		},
 		Command{
 			Name:         "dictation.stop",
+			Page:         PageState,
 			NoPalette:    true,
 			NoKeybinding: true,
 			Title:        "Stop Dictation",
@@ -259,6 +263,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 		},
 		Command{
 			Name:  "dictation.download",
+			Page:  PageState,
 			Title: "Download Dictation Model",
 			Description: "Download the Whisper model dictation uses (about 0.9 GB, once) in the background; an interrupted download resumes. " +
 				"Dictation turns on when it finishes. A page asks the user first.",
@@ -291,6 +296,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 		},
 		Command{
 			Name:        "dictation.download.cancel",
+			Page:        PageState,
 			Title:       "Cancel Dictation Model Download",
 			Description: "Stop downloading the dictation model, keeping what arrived so the next download resumes.",
 			Category:    dictationCategory,
@@ -308,6 +314,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 		},
 		Command{
 			Name:         "dictation.remove",
+			Page:         PageState,
 			Title:        "Remove Dictation Model",
 			Description:  "Delete the dictation model from this Mac, stopping dictation until it is downloaded again.",
 			Category:     dictationCategory,

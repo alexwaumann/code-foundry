@@ -22,6 +22,7 @@ type ShellBackend interface {
 func threadShellStopCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.shell.stop",
+		Page:      PageState,
 		NoIndex:   true,
 		NoPalette: true,
 		Title:     "Stop Background Shell",

@@ -33,6 +33,9 @@ func threadSetupRetry(b ThreadBackend, idArg ArgSpec) Command {
 		NoKeybinding: true,
 		Args:         []ArgSpec{positional(idArg)},
 		When:         hasThread,
+		PageDetail: func(context.Context, Context, Args) (string, error) {
+			return "It runs the actions set to run when a thread's worktree is made.", nil
+		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			res, err := b.RetrySetup(ctx, connect.NewRequest(&v1.RetryThreadSetupRequest{Id: a.String("id")}))
 			if err != nil {
@@ -47,6 +50,7 @@ func threadSetupRetry(b ThreadBackend, idArg ArgSpec) Command {
 func threadSetupCancel(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:         "thread.setup.cancel",
+		Page:         PageState,
 		Title:        "Cancel Setup",
 		Description:  "Stop a thread's running setup and remove what it made. Once Claude is starting it is too late: use thread.interrupt.",
 		Category:     "Thread",
@@ -68,6 +72,7 @@ func threadSetupCancel(b ThreadBackend, idArg ArgSpec) Command {
 func threadSetupDiscard(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:         "thread.setup.discard",
+		Page:         PageState,
 		Title:        "Discard Thread",
 		Description:  "Forget a thread whose setup failed or was cancelled, and what it made, as if it had never been sent. Gives back its draft and messages.",
 		Category:     "Thread",

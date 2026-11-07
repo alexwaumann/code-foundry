@@ -19,6 +19,7 @@ import (
 func threadMove(r *Registry, b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:        "thread.move",
+		Page:        PageDrives,
 		NoPalette:   true,
 		Title:       "Move Thread to Project…",
 		Description: "Move a thread without a project into a project or workspace, placed as thread new places one; it is renamed from its conversation.",

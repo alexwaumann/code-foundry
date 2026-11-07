@@ -27,12 +27,15 @@ const (
 type CallOrigin int32
 
 const (
-	// The GUI's own controls, or a CLI.
+	// The GUI's own controls, which also send a view. With no view the caller is unknown,
+	// and the daemon treats it as a page (docs/notes/page-verb-gate.md).
 	CallOrigin_CALL_ORIGIN_UNSPECIFIED CallOrigin = 0
 	// A page shown in the app. Only the GUI's bridge host sets it, never the page.
 	CallOrigin_CALL_ORIGIN_PAGE CallOrigin = 1
 	// A plugin: host/invoke, or a command button of its panel.
 	CallOrigin_CALL_ORIGIN_PLUGIN CallOrigin = 2
+	// The code-foundry CLI, in a thread or not.
+	CallOrigin_CALL_ORIGIN_CLI CallOrigin = 3
 )
 
 // Enum value maps for CallOrigin.
@@ -41,11 +44,13 @@ var (
 		0: "CALL_ORIGIN_UNSPECIFIED",
 		1: "CALL_ORIGIN_PAGE",
 		2: "CALL_ORIGIN_PLUGIN",
+		3: "CALL_ORIGIN_CLI",
 	}
 	CallOrigin_value = map[string]int32{
 		"CALL_ORIGIN_UNSPECIFIED": 0,
 		"CALL_ORIGIN_PAGE":        1,
 		"CALL_ORIGIN_PLUGIN":      2,
+		"CALL_ORIGIN_CLI":         3,
 	}
 )
 
@@ -1022,12 +1027,13 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\")\n" +
 	"\rCommandFailed\x12\x18\n" +
-	"\acommand\x18\x01 \x01(\tR\acommand*W\n" +
+	"\acommand\x18\x01 \x01(\tR\acommand*l\n" +
 	"\n" +
 	"CallOrigin\x12\x1b\n" +
 	"\x17CALL_ORIGIN_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10CALL_ORIGIN_PAGE\x10\x01\x12\x16\n" +
-	"\x12CALL_ORIGIN_PLUGIN\x10\x02*\x83\x01\n" +
+	"\x12CALL_ORIGIN_PLUGIN\x10\x02\x12\x13\n" +
+	"\x0fCALL_ORIGIN_CLI\x10\x03*\x83\x01\n" +
 	"\aArgType\x12\x18\n" +
 	"\x14ARG_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fARG_TYPE_STRING\x10\x01\x12\x11\n" +

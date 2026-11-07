@@ -43,6 +43,7 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 	return r.RegisterAll(
 		Command{
 			Name:      "plugin.browse",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Browse Plugins",
 			Description: "List the plugins the registries offer (settings plugins.registries; the first registry listing a " +

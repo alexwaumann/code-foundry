@@ -342,7 +342,8 @@ func TestPluginActButtonOrigin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true"}
-			if _, err := reg.Invoke(context.Background(), tt.ctx, "plugin.act", args); err != nil {
+			// A plugin's command asks a page first (page_ask_test.go); the origin is the point here.
+			if _, err := reg.Invoke(context.Background(), tt.ctx, "plugin.act", args, command.Confirmed(true)); err != nil {
 				t.Fatal(err)
 			}
 			if got != tt.want {

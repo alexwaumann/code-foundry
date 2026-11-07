@@ -140,9 +140,9 @@ func TestCommandInvoke(t *testing.T) {
 		wantMsg  string
 		wantJSON string
 	}{
-		{"ok", &v1.InvokeCommandRequest{Name: "terminal.kill", Context: &v1.UiContext{ActiveTerminalId: "t1"}},
+		{"ok", &v1.InvokeCommandRequest{Name: "terminal.kill", Context: &v1.UiContext{ActiveTerminalId: "t1", Origin: v1.CallOrigin_CALL_ORIGIN_CLI}},
 			0, "killed t1", `{"id":"t1"}`},
-		{"explicit arg", &v1.InvokeCommandRequest{Name: "terminal.kill", Args: map[string]string{"id": "t2"}},
+		{"explicit arg", &v1.InvokeCommandRequest{Name: "terminal.kill", Context: &v1.UiContext{Origin: v1.CallOrigin_CALL_ORIGIN_CLI}, Args: map[string]string{"id": "t2"}},
 			0, "killed t2", `{"id":"t2"}`},
 		{"no json", &v1.InvokeCommandRequest{Name: "fake.register", Args: map[string]string{"path": "/r"}}, 0, "", ""},
 		{"unknown", &v1.InvokeCommandRequest{Name: "nope.nope"}, connect.CodeNotFound, "", ""},
@@ -188,6 +188,86 @@ func TestContextOriginCrossesTheAPI(t *testing.T) {
 			}
 			if got := command.UiContextToProto(contextFromProto(tt.ctx)).GetOrigin(); got != tt.want {
 				t.Errorf("back to proto: %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// A call that says who it is keeps it; one with neither an origin nor a view is unknown,
+// which is what makes the registry's strict path the default. contextFromProto's other
+// users (a plugin surface's context, List) only read it.
+func TestCallerContext(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  *v1.UiContext
+		want v1.CallOrigin
+	}{
+		{"no context", nil, command.OriginUnknown},
+		{"no origin and no view", &v1.UiContext{ActiveThreadId: "s-1"}, command.OriginUnknown},
+		{"the app's controls", &v1.UiContext{ActiveView: "thread", ActiveThreadId: "s-1"}, v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED},
+		{"the CLI", &v1.UiContext{Origin: v1.CallOrigin_CALL_ORIGIN_CLI}, command.OriginCLI},
+		{"a thread's CLI", &v1.UiContext{ActiveThreadId: "s-1", Origin: v1.CallOrigin_CALL_ORIGIN_CLI}, command.OriginCLI},
+		{"a page", &v1.UiContext{ActiveThreadId: "s-1", Origin: v1.CallOrigin_CALL_ORIGIN_PAGE}, command.OriginPage},
+		{"a plugin", &v1.UiContext{Origin: v1.CallOrigin_CALL_ORIGIN_PLUGIN}, command.OriginPlugin},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := callerContext(tt.ctx).Origin; got != tt.want {
+				t.Errorf("Origin = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// The rule holds through the API: only a confirmed call from a page runs, and the question
+// reaches the client as ConfirmationRequired. An Invoke with no context is the strict path.
+func TestInvokeAsksAPageThroughTheAPI(t *testing.T) {
+	reg := command.NewRegistry()
+	ran := 0
+	if err := reg.Register(command.Command{Name: "x.runs", Title: "Runs", Category: "X",
+		Run: func(context.Context, command.Context, command.Args) (command.Result, error) {
+			ran++
+			return command.Result{}, nil
+		}}); err != nil {
+		t.Fatal(err)
+	}
+	h := NewCommand(reg)
+	tests := []struct {
+		name      string
+		ctx       *v1.UiContext
+		confirmed bool
+		runs      bool
+	}{
+		{"a page", &v1.UiContext{ActiveThreadId: "s-1", Origin: v1.CallOrigin_CALL_ORIGIN_PAGE}, false, false},
+		{"a page, confirmed", &v1.UiContext{ActiveThreadId: "s-1", Origin: v1.CallOrigin_CALL_ORIGIN_PAGE}, true, true},
+		{"no context", nil, false, false},
+		{"no origin, a thread", &v1.UiContext{ActiveThreadId: "s-1"}, false, false},
+		{"the CLI", &v1.UiContext{ActiveThreadId: "s-1", Origin: v1.CallOrigin_CALL_ORIGIN_CLI}, false, true},
+		{"the app", &v1.UiContext{ActiveView: "thread"}, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ran = 0
+			_, err := h.Invoke(context.Background(), connect.NewRequest(&v1.InvokeCommandRequest{Name: "x.runs", Context: tt.ctx, Confirmed: tt.confirmed}))
+			if tt.runs {
+				if err != nil || ran != 1 {
+					t.Fatalf("err = %v, ran %d", err, ran)
+				}
+				return
+			}
+			if ran != 0 {
+				t.Fatalf("ran %d", ran)
+			}
+			if got := connect.CodeOf(err); got != connect.CodeFailedPrecondition {
+				t.Fatalf("code = %v", got)
+			}
+			var ce *connect.Error
+			if !errors.As(err, &ce) || len(ce.Details()) != 1 {
+				t.Fatalf("err = %v, want a ConfirmationRequired detail", err)
+			}
+			m, derr := ce.Details()[0].Value()
+			if cr, ok := m.(*v1.ConfirmationRequired); derr != nil || !ok || cr.GetConfirmLabel() != "Allow" {
+				t.Errorf("detail = %v (%v)", m, derr)
 			}
 		})
 	}

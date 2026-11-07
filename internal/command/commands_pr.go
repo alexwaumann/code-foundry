@@ -123,6 +123,7 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 		},
 		Command{
 			Name:        "pr.refresh",
+			Page:        PageState,
 			NoPalette:   true,
 			Title:       "Refresh Pull Request",
 			Description: "Fetch a pull request's detail from GitHub now instead of from the daemon's cache.",

@@ -70,7 +70,7 @@ func settingValue(f *v1.SettingField, v string) SettingValue {
 // CLI has a page's context and must not start needing --yes; the ConfirmError comes back
 // from Run like a second stage's, and the re-invoke's ConfirmedIn answers it.
 func pageAsks(ctx context.Context, uctx Context, command, title, label, ask string) error {
-	if uctx.Origin == OriginPage && !ConfirmedIn(ctx) {
+	if uctx.Untrusted() && !ConfirmedIn(ctx) {
 		return &ConfirmError{Command: command, Title: title, Message: ask, Label: label}
 	}
 	return nil
@@ -200,6 +200,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		},
 		Command{
 			Name:         "settings.set",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Change Setting",
 			Description:  "Set one setting. The value is validated against the setting's type and written to the settings file. A page asks the user first; a user-only setting is refused from a page, a plugin or a thread.",
@@ -228,6 +229,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		},
 		Command{
 			Name:         "settings.reset",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Reset Setting",
 			Description:  "Return one setting to its default. A page asks the user first; a user-only setting is refused from a page, a plugin or a thread.",
@@ -272,6 +274,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		},
 		Command{
 			Name:        "settings.reveal",
+			Page:        PageState,
 			Title:       "Open Settings File in Finder",
 			Description: "Show the settings file in Finder.",
 			Category:    "Settings",

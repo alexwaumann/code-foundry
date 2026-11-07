@@ -211,6 +211,9 @@ func TestSettingChangeCallers(t *testing.T) {
 		{name: "a page", ctx: command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}, ordinary: asks, userOnly: refused},
 		{name: "a page, confirmed", ctx: command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}, yes: true, ordinary: ok, userOnly: refused},
 		{name: "a page with a view", ctx: command.Context{ActiveView: "settings", Origin: command.OriginPage}, yes: true, ordinary: ok, userOnly: refused},
+		{name: "an unknown caller", ctx: command.Context{ActiveThreadID: "s-1", Origin: command.OriginUnknown}, ordinary: asks, userOnly: refused},
+		{name: "a thread's CLI, naming itself", ctx: command.Context{ActiveThreadID: "s-1", Origin: command.OriginCLI}, ordinary: ok, userOnly: refused},
+		{name: "a plain CLI, naming itself", ctx: command.Context{Origin: command.OriginCLI}, ordinary: ok, userOnly: ok},
 		{name: "a plugin", ctx: command.Context{Origin: command.OriginPlugin}, ordinary: ok, userOnly: refused},
 		{name: "a plugin with a view", ctx: command.Context{ActiveView: "settings", Origin: command.OriginPlugin}, ordinary: ok, userOnly: refused},
 	}

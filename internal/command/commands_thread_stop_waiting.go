@@ -68,6 +68,7 @@ func threadStopWaitingCmd(b ThreadBackend, idArg ArgSpec) Command {
 	}
 	return Command{
 		Name:    "thread.stop-waiting",
+		Page:    PageDrives,
 		NoIndex: true,
 		Title:   "Stop Waiting",
 		Description: "Remove everything that would wake a thread and stop its background shells. Child threads keep working " +

@@ -13,6 +13,7 @@ import (
 func threadPin(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:        "thread.pin",
+		Page:        PageState,
 		Title:       "Pin or Unpin Thread",
 		Description: "Pin a thread to the top of the thread list, or unpin it. Without pinned, toggles the current pin.",
 		Category:    "Thread",

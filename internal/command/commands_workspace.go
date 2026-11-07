@@ -53,6 +53,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 	return r.RegisterAll(
 		Command{
 			Name:  "workspace.new",
+			Page:  PageState,
 			Title: "New Workspace",
 			Description: "Save a set of projects as a workspace, with a folder of its own for the instructions and skills that span them " +
 				"(with root: links to the root's CLAUDE.md, AGENTS.md and .claude). Nothing else is created.",
@@ -104,6 +105,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.add-project",
+			Page:        PageState,
 			NoPalette:   true,
 			Title:       "Add Project to Workspace",
 			Description: "Add a project to a workspace. Nothing on disk changes.",
@@ -127,6 +129,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.remove-project",
+			Page:        PageState,
 			NoPalette:   true,
 			Title:       "Remove Project from Workspace",
 			Description: "Drop a project from a workspace. Nothing on disk changes; threads keep their projects.",
@@ -156,6 +159,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.rename",
+			Page:        PageState,
 			Title:       "Rename Workspace",
 			Description: "Rename a workspace (names are unique, whatever their case).",
 			Category:    "Workspace",
@@ -177,6 +181,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.set-primary",
+			Page:        PageState,
 			NoPalette:   true,
 			Title:       "Set Workspace Default Primary",
 			Description: "Set where new threads in a workspace start: one of its projects, or workspace (its folder). A project named workspace wins over the keyword.",
@@ -199,6 +204,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.set-root",
+			Page:        PageState,
 			Title:       "Set Workspace Root",
 			Description: "Point a workspace with a root at the folder it moved to; its links are made again.",
 			Category:    "Workspace",
@@ -220,6 +226,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:      "workspace.remove",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Remove Workspace",
 			Description: "Forget a workspace. Its folder goes with its instructions and skills; for a workspace with a root, only the links " +
