@@ -2,13 +2,18 @@
  * The Diff surface's tab (docs/notes/diff-viewer-2.md): two sources of one checkout and the
  * file being looked at. One tab per checkout: the id comes from the project and worktree
  * alone, so opening the checkout again finds its tab and openTab (stores/panel.ts) hands it
- * the new params. Pure.
+ * the new params. That tab is the user's. Whatever a thread frames (a title, a note, a
+ * narrowed list, hidden controls) goes in a tab with the thread in its id, and with the title
+ * when it gave one, so a thread never takes over the user's tab: the same title updates the
+ * same tab, as the next untitled call does the thread's untitled one. Pure.
  */
 import type { CompareSource } from "@/api/compare";
 import { tabId, type Tab } from "@/stores/panel";
 
 export const DIFF_KIND = "diff";
 export const DIFF_TITLE = "Diff";
+/** What a thread's tab with no title of its own says before the comparison's name: it is not the user's. */
+export const FROM_THREAD = "From thread";
 
 /** What a tab compares when nothing was asked for: what the branch changed, on disk. */
 export const DEFAULT_BASE: CompareSource = { kind: "merge-base" };
@@ -32,7 +37,24 @@ export interface DiffTarget {
   filter?: string;
   /** The user folded (true) or unfolded (false) the list on top; absent leaves it to the height. */
   fold?: boolean;
+  /** The list is narrowed to these files and directories (relative to the checkout); empty for every file. */
+  paths?: readonly string[];
+  /** The thread that framed this tab, which makes it a tab of its own; absent on the checkout's own. */
+  thread?: string;
+  /** A thread's name for the tab (plain text); absent for the tab's own "<head> vs <base>". */
+  heading?: string;
+  /** A thread's line about it (plain text). */
+  note?: string;
+  /** What a thread took away, which the user can bring back. */
+  hide?: readonly DiffPart[];
 }
+
+/** The parts of the tab a thread can hide (view.panel.diff --hide). */
+export type DiffPart = "compare" | "files";
+
+const PARTS: readonly string[] = ["compare", "files"] satisfies DiffPart[];
+
+const isPart = (v: string): v is DiffPart => PARTS.includes(v);
 
 /** A source as a tab param: "working", "staged", "merge-base", "ref:<ref>". */
 export function sourceParam(s: CompareSource): string {
@@ -50,9 +72,9 @@ export function sameSource(a: CompareSource, b: CompareSource): boolean {
   return sourceParam(a) === sourceParam(b);
 }
 
-/** A checkout's Diff tab: params { project, worktree, base?, head?, path?, oldPath?, own?, filter?, fold? }, defaults left out. */
-export function diffTab(t: DiffTarget, title: string = DIFF_TITLE): Tab {
-  const key = { project: t.project, worktree: t.worktree };
+/** A checkout's Diff tab: params { project, worktree, thread?, base?, head?, path?, oldPath?, own?, filter?, fold?, paths?, title?, note?, hide? }, defaults left out. */
+export function diffTab(t: DiffTarget, title: string = t.heading || (t.thread ? FROM_THREAD : DIFF_TITLE)): Tab {
+  const key = { project: t.project, worktree: t.worktree, ...(t.thread ? { thread: t.thread } : {}), ...(t.heading ? { title: t.heading } : {}) };
   const params: Record<string, string> = { ...key };
   if (!sameSource(t.base, DEFAULT_BASE)) params.base = sourceParam(t.base);
   if (!sameSource(t.head, DEFAULT_HEAD)) params.head = sourceParam(t.head);
@@ -61,6 +83,9 @@ export function diffTab(t: DiffTarget, title: string = DIFF_TITLE): Tab {
   if (t.own) params.own = "1";
   if (t.filter) params.filter = t.filter;
   if (t.fold !== undefined) params.fold = t.fold ? "1" : "0";
+  if (t.paths?.length) params.paths = t.paths.join("\n");
+  if (t.note) params.note = t.note;
+  if (t.hide?.length) params.hide = t.hide.join(",");
   return { id: tabId(DIFF_KIND, key), kind: DIFF_KIND, title, params };
 }
 
@@ -78,5 +103,10 @@ export function diffOfTab(tab: Pick<Tab, "params">): DiffTarget | null {
     own: tab.params.own === "1",
     ...(tab.params.filter ? { filter: tab.params.filter } : {}),
     ...(tab.params.fold === undefined ? {} : { fold: tab.params.fold === "1" }),
+    paths: tab.params.paths ? tab.params.paths.split("\n") : [],
+    thread: tab.params.thread ?? "",
+    heading: tab.params.title ?? "",
+    note: tab.params.note ?? "",
+    hide: (tab.params.hide ?? "").split(",").filter(isPart),
   };
 }

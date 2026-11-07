@@ -92,6 +92,22 @@ func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {
 	}, nil
 }
 
+// absPaths is absPath for an arg's value: a repeatable path's are joined by newlines.
+func (cl *cli) absPaths(v string, repeatable bool) (string, error) {
+	if !repeatable {
+		return cl.absPath(v)
+	}
+	paths := strings.Split(v, "\n")
+	for i, p := range paths {
+		abs, err := cl.absPath(p)
+		if err != nil {
+			return "", err
+		}
+		paths[i] = abs
+	}
+	return strings.Join(paths, "\n"), nil
+}
+
 // absPath makes a relative path absolute against the CLI's cwd; the daemon's cwd is /.
 // Empty and ~-prefixed paths are passed through (the daemon expands ~).
 func (cl *cli) absPath(p string) (string, error) {
@@ -116,6 +132,9 @@ type argFlag struct {
 func (f *argFlag) String() string { return f.value }
 
 func (f *argFlag) Set(s string) error {
+	if f.spec.GetRepeatable() && strings.Contains(s, "\n") {
+		return fmt.Errorf("--%s cannot hold a newline, which separates its repeated values: %q", f.spec.GetName(), s)
+	}
 	if f.set && f.spec.GetRepeatable() {
 		// A repeatable flag's values travel joined by newlines (thread subscribe --arg).
 		f.value += "\n" + s
@@ -305,7 +324,7 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		}
 		v := f.value
 		if f.spec.GetType() == v1.ArgType_ARG_TYPE_PATH {
-			if v, err = cl.absPath(v); err != nil {
+			if v, err = cl.absPaths(v, f.spec.GetRepeatable()); err != nil {
 				return err
 			}
 		}

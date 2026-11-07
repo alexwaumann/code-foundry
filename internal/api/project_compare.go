@@ -90,7 +90,7 @@ func (h *Project) CompareWorktree(ctx context.Context, req *connect.Request[v1.C
 		Files: files, Truncated: c.Truncated,
 		TotalFiles: int32(c.TotalFiles), TotalAdded: int32(c.TotalAdded), TotalDeleted: int32(c.TotalDeleted),
 		Base: resolvedSourceToProto(c.Base), Head: resolvedSourceToProto(c.Head),
-		BaseRef: c.BaseRef, MergeBase: c.MergeBase, Error: c.Error, SkippedNames: int32(c.SkippedNames),
+		BaseRef: c.BaseRef, MergeBase: c.MergeBase, Error: c.Error, SkippedNames: int32(c.SkippedNames), UnmatchedPaths: c.UnmatchedPaths,
 	}), nil
 }
 

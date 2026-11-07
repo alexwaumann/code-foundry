@@ -18,13 +18,13 @@
  * sends focus=1 only then, and only because the user asked to be taken there. Without it, a
  * request that would replace the editor the user is typing in joins the strip behind it.
  */
-import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD } from "@/surfaces/diffTarget";
+import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, diffOfTab, diffTab, sourceOfParam } from "@/surfaces/diffTarget";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { galleryTab } from "@/surfaces/galleryTarget";
 import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
 import { openDiffInPanel, openFileInPanel } from "./filePanel";
 import { openMcpSurface } from "./mcpPanel";
-import { expandPanel, getPanel, isSplit, keyOf, openSurface, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
+import { allTabs, expandPanel, getPanel, isSplit, keyOf, openSurface, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
 import { openPullRequestInPanel } from "./prPanel";
 import { useThreadsStore } from "./threads";
 import type { Selection } from "./ui";
@@ -108,10 +108,27 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     if (p.focus === "1") focusEditorLine(fileEditKey(key, tabId), line);
     return true;
   }),
-  // view.panel.diff: params project, worktree, path (worktree-relative) and scope.
+  // view.panel.diff: params project and worktree, then what the call set (commands_view_diff.go).
+  // The checkout's own tab is the user's: a call without `thread` only picks its file, and what
+  // they compare, filter and fold stays. The daemon gives a call that names a side a tab of its
+  // own; an older one, until it restarts, sends scope and no thread, which stays a file pick here.
+  // A thread's own tab (thread) is the call's.
   "panel.diff": item((key, p) => {
-    if (!p.project || !p.worktree || !p.path) return false;
-    return openDiffInPanel(key, { project: p.project, worktree: p.worktree, base: DEFAULT_BASE, head: p.scope === "branch" ? COMMITTED_HEAD : DEFAULT_HEAD, file: p.path, oldPath: "", own: true });
+    if (!p.project || !p.worktree) return false;
+    const fromScope = p.scope === "branch" ? COMMITTED_HEAD : DEFAULT_HEAD;
+    const shown = diffOfTab({ params: p });
+    if (!shown) return false;
+    const asked = {
+      ...shown,
+      base: sourceOfParam(p.base, DEFAULT_BASE),
+      head: sourceOfParam(p.head, fromScope),
+      own: p.own === "1" || p.scope !== undefined,
+    };
+    const fresh = diffTab(asked);
+    const open = allTabs(getPanel(key)).find((t) => t.id === fresh.id);
+    const was = open && !p.thread ? diffOfTab(open) : null;
+    if (open && was) return openDiffInPanel(key, { ...was, own: asked.own, ...(asked.file ? { file: asked.file, oldPath: asked.oldPath } : {}) }, open.title);
+    return openDiffInPanel(key, asked);
   }),
   // view.panel.pr: params slug and number.
   "panel.pr": item((key, p) => {

@@ -94,8 +94,8 @@ type ViewDeps struct {
 	Files FileReader
 	// FileEdits backs view.panel.file --edit's check (Filesystem.CheckEdit).
 	FileEdits FileEditChecker
-	// Diffs backs view.panel.diff's check (ProjectService.GetWorktreeFileDiff).
-	Diffs FileDiffer
+	// Diffs backs view.panel.diff's check (ProjectService.CompareWorktree).
+	Diffs WorktreeComparer
 	// Projects finds a thread's project's GitHub repository for view.panel.pr
 	// (ProjectService.List).
 	Projects ProjectLister

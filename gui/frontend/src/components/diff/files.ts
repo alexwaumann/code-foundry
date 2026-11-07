@@ -1,5 +1,6 @@
 import type { CompareFileView, CompareSource, CompareView } from "@/api/compare";
 import { REFRESH_DEBOUNCE_MS } from "@/components/files/useTabRead";
+import { plainPath } from "@/lib/plainText";
 
 /** The most a live update waits: the list stays live on any repository. */
 const LIST_PACE_MAX = 3000;
@@ -145,6 +146,17 @@ export function shortRef(ref: string, remotes: readonly string[]): string {
 /** What the tab's strip calls it: "feat/sidebar vs main", and with another project's name first, so a thread's checkouts stay apart. */
 export function diffTitle(view: Pick<CompareView, "base" | "head">, o: { branch: string; remotes: readonly string[]; project: string; own: boolean }): string {
   const head = view.head.source.kind === "working" && o.branch ? o.branch : shortRef(view.head.label, o.remotes);
-  const title = `${head} vs ${shortRef(view.base.label, o.remotes)}`;
+  const short = shortRef(view.base.label, o.remotes);
+  // On the default branch the two would read the same: "main vs origin/main".
+  return inProject(`${head} vs ${short === head ? view.base.label : short}`, o);
+}
+
+/** A tab's name, with another project's name first: a thread's checkouts often share a branch, and a thread can give two the same title. */
+export function inProject(title: string, o: { project: string; own: boolean }): string {
   return o.own ? title : `${o.project} · ${title}`;
+}
+
+/** What the band says about a narrowed list: one path by name, several by count. */
+export function narrowedTo(paths: readonly string[]): string {
+  return paths.length === 1 ? `Listing only ${plainPath(paths[0] ?? "")}` : `Listing only ${String(paths.length)} paths`;
 }

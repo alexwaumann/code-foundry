@@ -348,54 +348,6 @@ func TestPanelFile(t *testing.T) {
 	}
 }
 
-// view.panel.diff: the thread must run in a worktree holding the path, and the file must
-// have changes in the scope.
-func TestPanelDiff(t *testing.T) {
-	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
-	tests := []struct {
-		name       string
-		thread     *v1.Thread
-		args       map[string]string
-		diffs      *commandtest.FileDiffs
-		wantParams map[string]string
-		wantScope  v1.DiffScope
-		code       connect.Code
-		argErr     string
-		msg        string
-	}{
-		{name: "a changed file", thread: richThread(), args: map[string]string{"path": "/wt/internal/a.go"}, diffs: &commandtest.FileDiffs{},
-			wantParams: map[string]string{"project": "r1", "worktree": "/wt", "path": "internal/a.go", "scope": "working"}, wantScope: v1.DiffScope_DIFF_SCOPE_WORKING},
-		{name: "branch scope", thread: richThread(), args: map[string]string{"path": "/wt/a.go", "scope": "branch"}, diffs: &commandtest.FileDiffs{},
-			wantParams: map[string]string{"project": "r1", "worktree": "/wt", "path": "a.go", "scope": "branch"}, wantScope: v1.DiffScope_DIFF_SCOPE_BRANCH},
-		{name: "unchanged", thread: richThread(), args: map[string]string{"path": "/wt/a.go"}, diffs: &commandtest.FileDiffs{Res: &v1.GetWorktreeFileDiffResponse{BaseRef: "origin/main"}},
-			code: connect.CodeFailedPrecondition, msg: "a.go has no changes in thread s-aaaaaaaaaaa1's worktree (origin/main against the file on disk)"},
-		{name: "no base to compare", thread: richThread(), args: map[string]string{"path": "/wt/a.go", "scope": "branch"},
-			diffs: &commandtest.FileDiffs{Res: &v1.GetWorktreeFileDiffResponse{Error: "no base branch"}}, code: connect.CodeFailedPrecondition, msg: "no base branch"},
-		{name: "outside the worktree", thread: richThread(), args: map[string]string{"path": "/elsewhere/a.go"}, diffs: &commandtest.FileDiffs{}, argErr: "path"},
-		{name: "the worktree itself", thread: richThread(), args: map[string]string{"path": "/wt"}, diffs: &commandtest.FileDiffs{}, argErr: "path"},
-		{name: "a thread in no worktree", thread: &v1.Thread{WorktreePath: "/home"}, args: map[string]string{"path": "/home/a.go"}, diffs: &commandtest.FileDiffs{},
-			code: connect.CodeFailedPrecondition, msg: "runs in no project worktree"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: tt.thread}, panelDeps{windows: 1, diffs: tt.diffs})
-			_, err := reg.Invoke(context.Background(), inThread, "view.panel.diff", tt.args)
-			if checkItemErr(t, err, tt.code, tt.argErr) {
-				if tt.msg != "" && !strings.Contains(err.Error(), tt.msg) {
-					t.Errorf("err = %v, want %q", err, tt.msg)
-				}
-				sameIntents(t, emit.Intents(), nil)
-				return
-			}
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showViewWith(command.ViewPanelDiff, "s-aaaaaaaaaaa1", tt.wantParams)})
-			reqs := tt.diffs.Requests()
-			if req, ok := reqs[len(reqs)-1].(*v1.GetWorktreeFileDiffRequest); !ok || req.GetScope() != tt.wantScope || req.GetFile() != tt.wantParams["path"] {
-				t.Errorf("diff request = %v", reqs)
-			}
-		})
-	}
-}
-
 // view.panel.pr: a number the thread links names that link's repository; otherwise the
 // thread's project's. The gh store must know it.
 func TestPanelPR(t *testing.T) {

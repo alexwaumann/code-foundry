@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,8 +28,9 @@ const (
 	// optional), project and base (the thread's project and checkout). --edit adds edit
 	// and thread (who asked), and note and focus when they apply.
 	ViewPanelFile = "panel.file"
-	// ViewPanelDiff opens a changed file's Diff tab: params project, worktree, path
-	// (worktree-relative) and scope ("working" | "branch").
+	// ViewPanelDiff opens a checkout's Diff tab: params project and worktree, with what
+	// the call set of own, thread, base, head, path, oldPath, paths, title, note and hide
+	// (commands_view_diff.go). An older daemon sends scope instead of base and head.
 	ViewPanelDiff = "panel.diff"
 	// ViewPanelPR opens a pull request's tab: params slug ("owner/name") and number.
 	ViewPanelPR = "panel.pr"
@@ -42,10 +42,10 @@ type FileReader interface {
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 }
 
-// FileDiffer reads one file's diff in a worktree the way the Diff tab does
-// (ProjectService.GetWorktreeFileDiff).
-type FileDiffer interface {
-	GetWorktreeFileDiff(context.Context, *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error)
+// WorktreeComparer reads what differs in a checkout the way the Diff tab does
+// (ProjectService.CompareWorktree).
+type WorktreeComparer interface {
+	CompareWorktree(context.Context, *connect.Request[v1.CompareWorktreeRequest]) (*connect.Response[v1.CompareWorktreeResponse], error)
 }
 
 // FileEditChecker says whether the File tab can edit a file, or make it where nothing is
@@ -61,16 +61,10 @@ type ProjectLister interface {
 }
 
 var (
-	_ FileReader    = codefoundryv1connect.FilesystemServiceHandler(nil)
-	_ FileDiffer    = codefoundryv1connect.ProjectServiceHandler(nil)
-	_ ProjectLister = codefoundryv1connect.ProjectServiceHandler(nil)
+	_ FileReader       = codefoundryv1connect.FilesystemServiceHandler(nil)
+	_ WorktreeComparer = codefoundryv1connect.ProjectServiceHandler(nil)
+	_ ProjectLister    = codefoundryv1connect.ProjectServiceHandler(nil)
 )
-
-// diffScopes are view.panel.diff's --scope values.
-var diffScopes = map[string]v1.DiffScope{
-	"working": v1.DiffScope_DIFF_SCOPE_WORKING,
-	"branch":  v1.DiffScope_DIFF_SCOPE_BRANCH,
-}
 
 // itemCommands are view.panel.file, view.panel.diff and view.panel.pr.
 func (d ViewDeps) itemCommands() []Command {
@@ -118,18 +112,15 @@ func (d ViewDeps) itemCommands() []Command {
 			Page:      PageState,
 			NoPalette: true,
 			Title:     "Show Diff in Side Panel",
-			Description: "Open a changed file's diff in a Diff tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the file against the branch's base, side by side or unified.",
+			Description: "Open a Diff tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
+				"any two of the working tree, the index, or a ref, compared file by file, side by side or unified. " +
+				"With no flags, what the branch changed. Narrow it to the files you mean with --path, and say why with --title and --note: those get a tab of their own, and the checkout's stays the user's. " +
+				"The user can change what it compares; --hide takes the controls away for a focused view, and they can bring them back.",
 			Category:     "View",
 			NoKeybinding: true,
 			When:         func(c Context) bool { return hasWorktreeThreadContext(c) || cliThread(c) },
-			Args: []ArgSpec{
-				{Name: "path", Type: Path, Required: true, Positional: true, Description: "Changed file in the thread's worktree: absolute, or relative to the current directory"},
-				{Name: "scope", Type: Enum, Enum: []string{"working", "branch"}, Default: "working",
-					Description: "working: the base against the file on disk, uncommitted changes included; branch: against the last commit"},
-				thread, focus,
-			},
-			Run: item(ViewPanelDiff, d.diffCheck),
+			Args:         append(diffArgs(), thread, focus),
+			Run:          d.runPanelDiff,
 		},
 		{
 			Name:      "view.panel.pr",
@@ -301,42 +292,6 @@ func (d ViewDeps) readCheck(ctx context.Context, t *v1.Thread, a Args) (params m
 		params["line"] = strconv.Itoa(line)
 	}
 	return params, res.Msg.GetOutsideHome(), nil
-}
-
-// diffCheck is view.panel.diff's check: the thread runs in a project worktree, the path
-// is in it, and the file has changes in the scope (a diff of nothing shows nothing).
-func (d ViewDeps) diffCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
-	if _, err := inWorktree(ctx, t, a); err != nil {
-		return nil, err
-	}
-	wt := t.GetWorktreePath()
-	rel, err := filepath.Rel(wt, a.Path("path"))
-	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, "../") {
-		return nil, InvalidArg("path", "%s is not a file in thread %s's worktree %s", a.Path("path"), t.GetId(), wt)
-	}
-	rel = filepath.ToSlash(rel)
-	scope := a.String("scope")
-	res, err := d.Diffs.GetWorktreeFileDiff(ctx, connect.NewRequest(&v1.GetWorktreeFileDiffRequest{
-		ProjectId: t.GetProjectId(), Path: wt, File: rel, Scope: diffScopes[scope],
-	}))
-	if err != nil {
-		return nil, err
-	}
-	if e := res.Msg.GetError(); e != "" {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("cannot diff %s (%s): %s", rel, scope, e))
-	}
-	if res.Msg.GetStatus() == "" {
-		against := res.Msg.GetBaseRef()
-		if against == "" {
-			against = "HEAD"
-		}
-		what := "the file on disk"
-		if scope == "branch" {
-			what = "the last commit"
-		}
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("%s has no changes in thread %s's worktree (%s against %s)", rel, t.GetId(), against, what))
-	}
-	return map[string]string{"project": t.GetProjectId(), "worktree": wt, "path": rel, "scope": scope}, nil
 }
 
 // prCheck is view.panel.pr's check: the number names a pull request the thread links

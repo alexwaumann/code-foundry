@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CompareFileView } from "@/api/compare";
-import { buildFileRows, CODE_MIN, diffTitle, fileTotals, filterRows, listPace, pickRow, shortRef, sourceLabel, splitPath, stepRow, TOP_ROWS, topListFit } from "./files";
+import { buildFileRows, CODE_MIN, diffTitle, fileTotals, filterRows, inProject, listPace, narrowedTo, pickRow, shortRef, sourceLabel, splitPath, stepRow, TOP_ROWS, topListFit } from "./files";
 import { refChoices, REF_CHOICES_MAX } from "./sources";
 
 const file = (path: string, o: Partial<CompareFileView> = {}): CompareFileView => ({ path, oldPath: "", status: "M", added: 1, deleted: 1, binary: false, submodule: false, ...o });
@@ -86,6 +86,17 @@ describe("shortRef", () => {
   });
 });
 
+describe("a tab's name and band", () => {
+  it("another project's name leads, so one title on two checkouts stays two names", () => {
+    expect(inProject("Review", { project: "web", own: false })).toBe("web · Review");
+    expect(inProject("Review", { project: "web", own: true })).toBe("Review");
+  });
+  it("a narrowed list names one path and counts several", () => {
+    expect(narrowedTo(["src"])).toBe("Listing only src");
+    expect(narrowedTo(["a.go", "b.go", "c.go"])).toBe("Listing only 3 paths");
+  });
+});
+
 describe("diffTitle", () => {
   const view = { base: { source: { kind: "merge-base" as const }, label: "origin/main", sha: "a" }, head: { source: { kind: "working" as const }, label: "Working tree", sha: "" } };
   const o = { branch: "feat/sidebar", remotes: ["origin"], project: "web", own: true };
@@ -97,6 +108,9 @@ describe("diffTitle", () => {
   });
   it("another side keeps its own name", () => {
     expect(diffTitle({ ...view, head: { source: { kind: "staged" }, label: "Staged", sha: "" } }, o)).toBe("Staged vs main");
+  });
+  it("on the default branch the two sides stay apart", () => {
+    expect(diffTitle(view, { ...o, branch: "main" })).toBe("main vs origin/main");
   });
   it("another project's checkout says whose, so a thread's checkouts stay apart", () => {
     expect(diffTitle(view, { ...o, own: false })).toBe("web · feat/sidebar vs main");
