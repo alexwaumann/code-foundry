@@ -128,7 +128,7 @@ describe("surface registry", () => {
     // The removed surfaces' letters open nothing; MCP has none.
     for (const k of ["l", "u", "m", "a", "h", "t"]) expect(surfaceByHotkey(k)).toBeUndefined();
     // s-1 is unknown here: no pull request, not a known thread.
-    // The Board is Ember's chat's only; MCP and Gallery are never listed.
-    expect(surfaces.map((s) => s.available(ctx))).toEqual(["hidden", "disabled", "disabled", "disabled", "hidden", "hidden"]);
+    // The Board is Ember's chat's only; MCP, Gallery and Browser are never listed.
+    expect(surfaces.map((s) => s.available(ctx))).toEqual(["hidden", "disabled", "disabled", "disabled", "hidden", "hidden", "hidden"]);
   });
 });
