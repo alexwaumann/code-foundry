@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
 
@@ -52,6 +53,21 @@ func resolvedSourceToProto(s project.ResolvedSource) *v1.ResolvedDiffSource {
 	return &v1.ResolvedDiffSource{Kind: diffSourceKindsOut[s.Kind], Label: s.Label, Sha: s.SHA}
 }
 
+// readError is projectError for a read a caller, the model among them, sends: a refusal
+// keeps its message, which holds only what the caller sent, and anything else goes to the
+// log, since git's own failure names the command and the directory.
+func readError(ctx context.Context, err error) error {
+	e := projectError(err)
+	switch connect.CodeOf(e) {
+	case connect.CodeNotFound, connect.CodeInvalidArgument, connect.CodeFailedPrecondition:
+		return e
+	case connect.CodeCanceled: // a view moved on
+	default:
+		slog.ErrorContext(ctx, "reading a comparison", "err", err)
+	}
+	return connect.NewError(connect.CodeOf(e), errors.New("git could not read this comparison"))
+}
+
 // CompareWorktree lists what differs between two sources of a worktree.
 func (h *Project) CompareWorktree(ctx context.Context, req *connect.Request[v1.CompareWorktreeRequest]) (*connect.Response[v1.CompareWorktreeResponse], error) {
 	m := req.Msg
@@ -64,7 +80,7 @@ func (h *Project) CompareWorktree(ctx context.Context, req *connect.Request[v1.C
 	}
 	c, err := h.store.CompareWorktree(ctx, project.CompareRequest{ProjectID: m.GetProjectId(), Path: m.GetPath(), Base: base, Head: head, Paths: m.GetPaths()})
 	if err != nil {
-		return nil, projectError(err)
+		return nil, readError(ctx, err)
 	}
 	files := make([]*v1.CompareFile, len(c.Files))
 	for i, f := range c.Files {
@@ -74,7 +90,7 @@ func (h *Project) CompareWorktree(ctx context.Context, req *connect.Request[v1.C
 		Files: files, Truncated: c.Truncated,
 		TotalFiles: int32(c.TotalFiles), TotalAdded: int32(c.TotalAdded), TotalDeleted: int32(c.TotalDeleted),
 		Base: resolvedSourceToProto(c.Base), Head: resolvedSourceToProto(c.Head),
-		BaseRef: c.BaseRef, MergeBase: c.MergeBase, Error: c.Error,
+		BaseRef: c.BaseRef, MergeBase: c.MergeBase, Error: c.Error, SkippedNames: int32(c.SkippedNames),
 	}), nil
 }
 
@@ -90,7 +106,7 @@ func (h *Project) GetWorktreeCompareFile(ctx context.Context, req *connect.Reque
 	}
 	d, err := h.store.CompareFile(ctx, project.CompareFileRequest{ProjectID: m.GetProjectId(), Path: m.GetPath(), Base: base, Head: head, File: m.GetFile(), OldPath: m.GetOldPath()})
 	if err != nil {
-		return nil, projectError(err)
+		return nil, readError(ctx, err)
 	}
 	return connect.NewResponse(&v1.GetWorktreeCompareFileResponse{Old: fileVersionToProto(d.Old), New: fileVersionToProto(d.New), Status: d.Status, Error: d.Error}), nil
 }

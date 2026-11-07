@@ -63,6 +63,11 @@ type compareFixture struct {
 
 func newCompareFixture(t *testing.T) compareFixture {
 	t.Helper()
+	return newCompareFixtureWith(t, Options{})
+}
+
+func newCompareFixtureWith(t *testing.T, opts Options) compareFixture {
+	t.Helper()
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.project, "keep.txt"), "one\ntwo\nthree\n")
 	writeFile(t, filepath.Join(f.project, "old-name.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n")
@@ -71,7 +76,7 @@ func newCompareFixture(t *testing.T) compareFixture {
 	git(t, f.project, "add", ".")
 	git(t, f.project, "commit", "-q", "-m", "base files")
 	git(t, f.project, "push", "-q")
-	h := startHarness(t, "", Options{})
+	h := startHarness(t, "", opts)
 	ctx := ctx20(t)
 	r, err := h.store.Register(ctx, f.project)
 	if err != nil {
@@ -532,6 +537,8 @@ func TestCompareRefusals(t *testing.T) {
 		{"writes a file", "--output=" + canary},
 		{"moves the repository", "--git-dir=/tmp"},
 		{"ends options", "--end-of-options"},
+		{"an exclusion", "^HEAD"},
+		{"an exclusion of a sha", "^0123456789012345678901234567890123456789"},
 		{"a range", "main..HEAD"},
 		{"a symmetric range", "main...HEAD"},
 		{"a path in a tree", "HEAD:README.md"},
