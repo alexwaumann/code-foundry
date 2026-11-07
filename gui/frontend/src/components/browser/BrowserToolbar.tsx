@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, LoaderCircle, RotateCw, TriangleAlert, X } from "lucide-react";
 import { navigateBrowser, type BrowserSecurityView, type BrowserStateView } from "@/api/browser";
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,9 @@ import { addressParts, type AddressParts } from "@/lib/browserAddress";
 import { cn } from "@/lib/utils";
 import { goBack, goForward, reload, setBrowserError } from "@/stores/browser";
 
-/** The page's address as the bar shows it. The blank page a surface starts on has none; a blank popup does, because an opener can write into it. */
-function shownAddress(url: string, popup: boolean): string {
-  return url === "about:blank" && !popup ? "" : url;
+/** The page's address as the bar shows it. The blank page a surface starts on is no page, and has no security mark; any other blank has one, because someone can write into it. */
+function shownAddress(url: string, security: BrowserSecurityView): string {
+  return url === "about:blank" && security === "" ? "" : url;
 }
 
 /** Says a page is not private, where nothing a page does can reach. */
@@ -33,11 +33,11 @@ function ShownAddress({ parts }: { parts: AddressParts }) {
     <div className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2.5 text-body-sm whitespace-pre" aria-hidden="true" data-testid="browser-address-shown">
       <span className="flex min-w-0 justify-end overflow-hidden">
         <span className="shrink-0 text-cf-text-muted">{parts.lead}</span>
-        <span className="shrink-0 font-medium text-cf-text" data-testid="browser-address-site">
+        <span className={cn("shrink-0 font-medium", parts.unknown ? "text-cf-warning-text" : "text-cf-text")} data-testid="browser-address-site">
           {parts.site}
         </span>
       </span>
-      <span className="min-w-0 shrink-[1000] truncate text-cf-text-muted">{parts.rest}</span>
+      <span className="min-w-0 shrink-[1000] truncate whitespace-pre text-cf-text-muted">{parts.rest}</span>
     </div>
   );
 }
@@ -50,9 +50,11 @@ export function BrowserToolbar({ surface, state, onLeave }: { surface: string; s
   const setDraft = (text: string | null) => {
     setTyped(text === null ? null : { text, over: state.url });
   };
-  const address = draft ?? shownAddress(state.url, state.popup);
+  const shown = shownAddress(state.url, state.security);
+  const address = draft ?? shown;
   const [editing, setEditing] = useState(false);
-  const parts = editing || draft !== null ? null : addressParts(state.url, state.site);
+  const parts = editing || draft !== null ? null : addressParts(shown, state.origin, state.site);
+  const bar = useRef<HTMLDivElement>(null);
 
   const go = () => {
     if (draft === null || draft.trim() === "") return;
@@ -60,7 +62,9 @@ export function BrowserToolbar({ surface, state, onLeave }: { surface: string; s
     navigateBrowser(surface, draft)
       .then(() => {
         setDraft(null);
-        onLeave();
+        // A slow server answers long after Enter, when the user may be typing somewhere else: only
+        // a keyboard that stayed in this bar goes to the page.
+        if (bar.current?.contains(document.activeElement)) onLeave();
       })
       .catch((err: unknown) => {
         setBrowserError(surface, err);
@@ -69,7 +73,7 @@ export function BrowserToolbar({ surface, state, onLeave }: { surface: string; s
 
   const ready = state.phase === "ready";
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 border-b border-cf-divider px-2" data-testid="browser-toolbar">
+    <div ref={bar} className="flex h-10 shrink-0 items-center gap-1 border-b border-cf-divider px-2" data-testid="browser-toolbar">
       <Tip label={state.popup ? "Back (closes this window at its first page)" : "Back"}>
         <Button
           variant="ghost"

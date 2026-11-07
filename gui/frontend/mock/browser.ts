@@ -18,6 +18,11 @@ const JPEG = Buffer.from(
 
 type Fields = Partial<Omit<BrowserState, "$typeName" | "$unknown">>;
 
+/** Chrome's word for who a page is, as the daemon sends it. */
+function originOf(url: string): string {
+  return /^https?:\/\/[^/?#]*/.exec(url)?.[0] ?? "";
+}
+
 type Event = { event: { case: "state"; value: Fields } | { case: "frame"; value: { jpeg: Uint8Array; width: number; height: number } } };
 
 export class MockBrowser {
@@ -30,7 +35,7 @@ export class MockBrowser {
   /** The service, for router.service. */
   watch(req: { surface: string; width: number; height: number; url: string }, signal: AbortSignal): AsyncGenerator<Event> {
     this.record(`watch ${req.surface} ${String(req.width)}x${String(req.height)} ${req.url}`.trim());
-    if (req.url) this.state = { ...this.state, url: req.url };
+    if (req.url) this.state = { ...this.state, url: req.url, origin: originOf(req.url) };
     return this.events.subscribe(signal, [{ event: { case: "state", value: this.state } }, this.frame(req.width, req.height)]);
   }
 
@@ -50,7 +55,7 @@ export class MockBrowser {
 
   /** Merges fields into the state and sends it (POST /__mock/browser). */
   update(fields: Fields): void {
-    this.state = { ...this.state, ...fields };
+    this.state = { ...this.state, ...(fields.url === undefined ? {} : { origin: originOf(fields.url) }), ...fields };
     this.events.publish({ event: { case: "state", value: this.state } });
   }
 

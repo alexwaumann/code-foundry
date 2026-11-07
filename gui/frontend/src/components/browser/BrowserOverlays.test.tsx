@@ -218,6 +218,16 @@ describe("strips", () => {
     expect(screen.getByTestId("browser-strip").textContent).toContain("crashed");
   });
 
+  it("shows a page's text no longer once that page has gone, and the next one's after that", () => {
+    const { rerender } = show({ ...ready, copied: 2 });
+    rerender(overlays({ ...ready, copied: 3 }));
+    expect(screen.getByText("The page copied text.")).toBeTruthy();
+    rerender(overlays({ ...ready, copied: 0 }));
+    expect(screen.queryByText("The page copied text.")).toBeNull();
+    rerender(overlays({ ...ready, copied: 1 }));
+    expect(screen.getByText("The page copied text.")).toBeTruthy();
+  });
+
   it("says when a page copied text, and moves it only when asked", async () => {
     const { rerender } = show(ready);
     expect(screen.queryByText("The page copied text.")).toBeNull();
@@ -271,6 +281,23 @@ describe("strips", () => {
   });
 });
 
+describe("who asks, when nothing can say", () => {
+  it("a dialog names no one blank", () => {
+    show({ ...ready, dialog: { id: "1", kind: "alert", message: "hi", defaultPrompt: "", origin: "", site: "" } });
+    expect(screen.getByRole("dialog").textContent).toContain("An unknown site says");
+  });
+
+  it("a file chooser names no one blank", () => {
+    show({ ...ready, fileChooser: { id: "1", multiple: false, origin: "", site: "" } });
+    expect(screen.getByRole("dialog").textContent).toContain("An unknown site asks for a file");
+  });
+
+  it("a download question names no one blank", () => {
+    show({ ...ready, downloads: [{ id: "g", name: "a.bin", state: "asking", site: "" }] });
+    expect(screen.getByTestId("browser-strip").textContent).toContain("An unknown site wants to download");
+  });
+});
+
 describe("focus: a page's overlay never takes the keyboard by itself", () => {
   const prompt = { id: "7", kind: "prompt", message: "", defaultPrompt: "", origin: "https://evil.co", site: "evil.co" };
   const confirm = { ...prompt, kind: "confirm" };
@@ -286,14 +313,17 @@ describe("focus: a page's overlay never takes the keyboard by itself", () => {
     ["download question", { ...ready, downloads: [{ id: "g", name: "a", state: "asking", site: "evil.co" }] }],
   ];
 
-  /** A composer outside the surface, and the page's input sink inside it. */
+  /** A composer outside the surface, the toolbar in it, and the page's input sink under that. */
   function layout(state: BrowserStateView, onLeave = vi.fn()) {
     return (
       <div>
         <textarea data-testid="elsewhere" />
-        <div data-browser-surface="">
-          <textarea data-testid="sink" />
-          {overlays(state, "", onLeave)}
+        <div>
+          <input data-testid="address" />
+          <div data-browser-page="">
+            <textarea data-testid="sink" />
+            {overlays(state, "", onLeave)}
+          </div>
         </div>
       </div>
     );
@@ -305,6 +335,14 @@ describe("focus: a page's overlay never takes the keyboard by itself", () => {
     composer.focus();
     rerender(layout(state));
     expect(document.activeElement).toBe(composer);
+  });
+
+  it.each(cases)("%s leaves it in the address bar, which is the app's and not the page's", (_, state) => {
+    const { rerender } = render(layout(ready));
+    const address = screen.getByTestId("address");
+    address.focus();
+    rerender(layout(state));
+    expect(document.activeElement).toBe(address);
   });
 
   it.each(cases)("%s leaves it alone with nothing focused", (_, state) => {
