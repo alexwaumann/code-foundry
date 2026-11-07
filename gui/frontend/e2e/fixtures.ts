@@ -163,13 +163,13 @@ export async function openWorkspacePage(page: Page, workspaceId: string): Promis
   await expect(page.locator(`[data-testid="projects-page"][data-page="workspace"][data-workspace="${workspaceId}"]`)).toBeVisible();
 }
 
-/** Opens a checkout's Changes tab in the shown page's side panel (stores/changesPanel.ts openChangesTab, what a checkout menu's Show changes runs). */
-async function openChangesTabFor(page: Page, projectId: string, path: string): Promise<void> {
-  await page.evaluate(`__cfModule("/src/stores/changesPanel.ts").then((c) => c.openChangesTab("current", ${JSON.stringify(projectId)}, ${JSON.stringify(path)}))`);
+/** Opens a checkout's Diff tab in the shown page's side panel (stores/filePanel.ts openCheckoutDiff, what a checkout menu's Show changes runs). */
+async function openDiffTabFor(page: Page, projectId: string, path: string): Promise<void> {
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((c) => c.openCheckoutDiff("current", ${JSON.stringify(projectId)}, ${JSON.stringify(path)}))`);
 }
 
 /**
- * Shows a worktree's Changes tab: its project's page with the worktree's tab in the page's
+ * Shows a worktree's Diff tab: its project's page with the worktree's tab in the page's
  * side panel (a checkout row has no click; its menu's Show changes runs the same, and only
  * with changes), or, with `workspaceId`, the workspace's page with the tab in its panel (a
  * member row opens nothing; a thread row's menu shows a changed member's). The page stays
@@ -179,38 +179,38 @@ async function openChangesTabFor(page: Page, projectId: string, path: string): P
 export async function selectWorktree(page: Page, projectId: string, path: string, workspaceId?: string): Promise<void> {
   if (workspaceId) {
     await openWorkspacePage(page, workspaceId);
-    await openChangesTabFor(page, projectId, path);
+    await openDiffTabFor(page, projectId, path);
   } else {
     await openProjectPage(page, projectId);
-    await openChangesTabFor(page, projectId, path);
+    await openDiffTabFor(page, projectId, path);
   }
-  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", path);
+  await expect(page.getByTestId("diff-surface")).toHaveAttribute("data-path", path);
 }
 
-/** Shows a project's main checkout's Changes tab in its page's side panel (opened directly: a checkout row has no click). */
+/** Shows a project's main checkout's Diff tab in its page's side panel (opened directly: a checkout row has no click). */
 export async function selectProject(page: Page, projectId: string): Promise<void> {
   await openProjectPage(page, projectId);
   await page.evaluate(
-    `Promise.all([__cfModule("/src/stores/changesPanel.ts"), __cfModule("/src/stores/projects.ts")]).then(([c, p]) => c.openChangesTab("current", ${JSON.stringify(projectId)}, p.mainWorktreePath(p.useProjectsStore.getState(), ${JSON.stringify(projectId)})))`,
+    `Promise.all([__cfModule("/src/stores/filePanel.ts"), __cfModule("/src/stores/projects.ts")]).then(([c, p]) => c.openCheckoutDiff("current", ${JSON.stringify(projectId)}, p.mainWorktreePath(p.useProjectsStore.getState(), ${JSON.stringify(projectId)})))`,
   );
-  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-project", projectId);
+  await expect(page.getByTestId("diff-surface")).toHaveAttribute("data-project", projectId);
 }
 
 /**
- * Opens the selected thread's own Changes tab in its panel, as the thread info card's
- * Changes row does (stores/changesPanel.ts openChangesTab), without the card: tests of
+ * Opens the selected thread's own Diff tab in its panel, as the thread info card's
+ * Changes row does (stores/filePanel.ts openCheckoutDiff), without the card: tests of
  * the panel's tabs start from it. The panel shows, unfocused.
  */
 export async function openThreadChanges(page: Page): Promise<void> {
-  const path = await page.evaluate(`Promise.all([__cfModule("/src/stores/changesPanel.ts"), __cfModule("/src/stores/threads.ts"), __cfModule("/src/stores/ui.ts")]).then(([c, t, u]) => {
+  const path = await page.evaluate(`Promise.all([__cfModule("/src/stores/filePanel.ts"), __cfModule("/src/stores/threads.ts"), __cfModule("/src/stores/ui.ts")]).then(([c, t, u]) => {
     const sel = u.useUiStore.getState().selection;
     const th = sel.kind === "thread" ? t.useThreadsStore.getState().byId[sel.id] : undefined;
     if (!th) return "";
-    c.openChangesTab("current", th.projectId, th.worktreePath, true);
+    c.openCheckoutDiff("current", th.projectId, th.worktreePath, true);
     return th.worktreePath;
   })`);
   expect(path).not.toBe("");
-  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", String(path));
+  await expect(page.getByTestId("diff-surface")).toHaveAttribute("data-path", String(path));
 }
 
 export function row(page: Page, key: string) {

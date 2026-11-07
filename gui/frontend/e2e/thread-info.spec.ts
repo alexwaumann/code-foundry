@@ -60,7 +60,7 @@ test("one project: the toggle, the usage card's lines, an open fold's background
 
   // At 1280px the side panel leaves the conversation too little room: the card steps aside until it closes.
   await c.getByTestId("ti-changes").click();
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "changes");
+  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
   await expect(page.getByTestId("thread-info")).toHaveCount(0);
   await page.getByTestId("panel-toggle").click();
   await expect(card(page)).toBeVisible();

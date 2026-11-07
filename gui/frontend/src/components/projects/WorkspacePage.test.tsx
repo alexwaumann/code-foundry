@@ -468,7 +468,7 @@ describe("the workspace's Threads table", () => {
     expect(menuEntries(menu)).toEqual(["Show changes in ghostty-playground", "Open in Finder", "Copy path"]);
     fireEvent.click(within(menu).getByText("Show changes in ghostty-playground"));
     await settle();
-    expect(pagePanel(ws.id)).toMatchObject({ open: true, kind: "changes", params: { project: "repo-gp", path: gpPath } });
+    expect(pagePanel(ws.id)).toMatchObject({ open: true, kind: "diff", params: { project: "repo-gp", worktree: gpPath } });
     expect(page().getAttribute("data-page")).toBe("workspace");
     menu = openDropdown(by(d, "thread-more"), "thread-more-menu");
     await pick(menu, "thread-menu-reveal");

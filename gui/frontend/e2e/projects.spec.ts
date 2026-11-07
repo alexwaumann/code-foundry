@@ -125,7 +125,7 @@ test("a checkout menu's Open in Finder hovers as two blocks: text bright with �
 
 // A project's page (title block, checkouts table, the row and title block menus, Details with Copy and
 // Open in) and the kind variants (with Initialize git): ProjectPage.test.tsx; the table's columns and menu parts: CheckoutsTable.test.tsx.
-// A row's Changes tab drawn in the page's own panel is "each page has its own side panel" below.
+// A row's Diff tab drawn in the page's own panel is "each page has its own side panel" below.
 
 // Refresh (fetch then refresh, spinning) and a failed refresh in the title block: unit-tested in src/components/projects/ProjectPage.test.tsx ("Refresh fetches…", "a failed refresh turns…").
 
@@ -151,12 +151,12 @@ test("at 110% zoom the title meta and Details values fit and hovering them opens
   }
 });
 
-test("narrow: with the Changes tab open, Sync and the slug drop and Open in Finder shows its icon only", async ({ page }) => {
+test("narrow: with the Diff tab open, Sync and the slug drop and Open in Finder shows its icon only", async ({ page }) => {
   await openApp(page);
   await openProjectPage(page, "repo-cf");
   await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-compact");
   await pickCheckout(page, FEAT, "checkout-menu-changes");
-  await expect(page.getByTestId("changes-surface")).toBeVisible();
+  await expect(page.getByTestId("diff-surface")).toBeVisible();
   await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(0);
   await expect(page.getByTestId("worktree-sync")).toHaveCount(0);
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-compact", "true");
@@ -213,7 +213,7 @@ test("each page has its own side panel; the sidebar row reopens the last page an
   await openApp(page);
   await openProjectPage(page, "repo-cf");
   await pickCheckout(page, FEAT, "checkout-menu-changes");
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · feat/sidebar");
+  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("code-foundry · feat/sidebar vs main");
 
   // ghostty-playground's page has its own panel: closed, nothing of code-foundry's.
   await openProjectPage(page, "repo-gp");
@@ -224,7 +224,7 @@ test("each page has its own side panel; the sidebar row reopens the last page an
 
   // Back on code-foundry's page: its tab is still there.
   await row(page, "repo-cf").getByTestId("project-name").click();
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · feat/sidebar");
+  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("code-foundry · feat/sidebar vs main");
   expect(await panelKey(page)).toBe("view:projects:project:repo-cf");
 
   // Elsewhere, then the sidebar row: the last Projects page; again: the index.
@@ -292,7 +292,7 @@ test("Worktrees without threads: at the width Show diff leaves, the reason trunc
   const headX = await page.getByTestId("leftover-head").locator("span").nth(1).evaluate((el) => Math.round(el.getBoundingClientRect().x));
   expect(new Set([...reasonsX, headX]).size).toBe(1);
   await leftover(page, COPY).getByTestId("leftover-show-diff").click();
-  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", COPY);
+  await expect(page.getByTestId("diff-surface")).toHaveAttribute("data-path", COPY);
   // A smaller window beside the panel: the page's content about 480px wide.
   const vp = page.viewportSize() ?? { width: 1280, height: 800 };
   await page.setViewportSize({ width: 1140, height: vp.height });

@@ -10,7 +10,8 @@ interface RowListProps<T> {
   rowKey: (row: T) => string;
   render: (row: T) => ReactNode;
   rowHeight: number;
-  maxHeight?: number;
+  /** Pixels, or a CSS length ("100%") when the list fills a box of a definite height. */
+  maxHeight?: number | string;
   /** Short lists scroll inside maxHeight too (a fixed region in a panel); long ones always do. */
   capped?: boolean;
   /**
