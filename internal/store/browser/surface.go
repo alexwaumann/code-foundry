@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -58,7 +57,8 @@ type FileChooser struct {
 	Origin   string
 	Site     string // Origin's registrable domain, which a viewer keeps visible
 
-	node int64
+	node    int64
+	session string // the page's, or an iframe's: whoever asked answers
 }
 
 // SelectOption is one row of a select.
@@ -76,6 +76,7 @@ type Select struct {
 	X, Y, W  float64 // where it sits in the page, CSS pixels
 
 	context int64
+	session string // the page's, or an iframe's
 }
 
 // Download is one download of a surface.
@@ -93,13 +94,15 @@ type State struct {
 	Message string
 
 	URL, Title string
-	// Site is the domain URL is registered under, and Security says what the page came over:
-	// empty, SecurityInsecure or SecurityCert. Both are the daemon's reading, never the page's.
-	Site, Security string
-	Loading        bool
-	CanGoBack      bool
-	CanGoForward   bool
-	Popup          bool
+	// Origin is who the page is, Chrome's word for it: a blank page's is the one it inherited, and
+	// empty is a page nobody can name. Site is that origin's registrable domain, and Security says
+	// what the page came over: empty, SecurityInsecure or SecurityCert. None of these is the page's
+	// to choose.
+	Origin, Site, Security string
+	Loading                bool
+	CanGoBack              bool
+	CanGoForward           bool
+	Popup                  bool
 
 	Dialog      *Dialog
 	FileChooser *FileChooser
@@ -219,6 +222,8 @@ type surface struct {
 	// what a page's own Copy button left, waiting for the user's click on the strip.
 	copyArmed bool
 	copied    string
+	// clicks counts the clicks that may have left text on Chrome's clipboard (noticeCopied).
+	clicks uint64
 
 	up sync.Mutex
 }
@@ -241,25 +246,37 @@ func (sf *surface) refresh() {
 	}
 	// Both are the page's to make as long as it likes: a data: URL can be megabytes.
 	sf.state.URL, sf.state.Title, sf.state.Loading = clip(shownURL(t.url), maxURL), clip(t.title, maxTitle), t.loading
-	sf.state.Site, sf.state.Security = clip(siteOf(t.url), maxLabel), sf.security(t)
+	origin := t.shownOrigin()
+	sf.state.Origin, sf.state.Site, sf.state.Security = clipHost(origin), clipHost(siteOf(origin)), sf.security(t)
 	sf.state.CanGoBack = t.canBack || len(sf.stack) > 1
 	sf.state.CanGoForward = t.canForward
 	sf.state.Popup = len(sf.stack) > 1
 	sf.state.Dialog, sf.state.FileChooser, sf.state.Select = t.dialog, t.chooser, t.sel
 }
 
-// security reads how a page arrived. Only about:blank on the surface's own page is no page at
-// all: in a popup, it is what an opener can write into. Needs Store.mu.
+// security reads how a page arrived. Only the blank a surface's own page starts on is no page at
+// all: a popup's is what its opener can write into, and a page sent to about:blank is what whoever
+// sent it can write into. Needs Store.mu.
 func (sf *surface) security(t *target) string {
 	switch {
 	case t.badCert:
 		return SecurityCert
-	case t.url == "", t.url == "about:blank" && len(sf.stack) <= 1:
+	case t.url == "", t.url == "about:blank" && !t.visited && len(sf.stack) <= 1:
 		return ""
 	case strings.HasPrefix(t.url, "https://"):
 		return ""
 	}
 	return SecurityInsecure
+}
+
+// leftPage is the page on screen becoming another one: what the user did on the last page, and
+// what that page left, does not carry over. Needs Store.mu.
+func (sf *surface) leftPage() {
+	sf.gesture = time.Time{}
+	if sf.copied != "" {
+		sf.copied = ""
+		sf.state.Copied = 0
+	}
 }
 
 // publish tells every viewer. Needs Store.mu.
@@ -286,7 +303,7 @@ func (sf *surface) detach(crashed bool) {
 	t := sf.top()
 	if t != nil && t.url != "" && t.url != "about:blank" {
 		if crashed {
-			sf.state.Notice = crashWords(t.url)
+			sf.state.Notice = crashWords(t.shownOrigin())
 		} else if u, err := CheckURL(t.url); err == nil && sf.pending == "" {
 			sf.pending = u
 		}
@@ -301,7 +318,7 @@ func (sf *surface) detach(crashed bool) {
 // crashWords says what the surface did not go back to.
 func crashWords(address string) string {
 	if site := siteOf(address); site != "" {
-		return "Chrome stopped on " + clip(site, maxLabel) + ", so that page was not opened again."
+		return "Chrome stopped on " + clipHost(site) + ", so that page was not opened again."
 	}
 	return "Chrome stopped on that page, so it was not opened again."
 }
@@ -519,27 +536,53 @@ func (s *Store) adopt(ctx context.Context, in *instance, t *target) error {
 	t.session = attached.SessionID
 	in.sessions[t.session] = t
 	s.mu.Unlock()
-	steps := []struct {
-		method string
-		params any
-	}{
-		{"Page.enable", nil},
-		// Only for the binding below, which does nothing without it (cdp.go).
-		{"Runtime.enable", nil},
+	if err := in.run(ctx, t.session, sessionSteps); err != nil {
+		return err
+	}
+	if err := in.run(ctx, t.session, []step{
 		// What says a certificate failed, on a page the user went on to anyway.
 		{"Security.enable", nil},
-		{"Page.setInterceptFileChooserDialog", map[string]any{"enabled": true}},
 		// A page that thinks it has no focus draws no caret and drops some key handling.
 		{"Emulation.setFocusEmulationEnabled", map[string]any{"enabled": true}},
-		{"Runtime.addBinding", map[string]any{"name": helperBinding, "executionContextName": helperWorld}},
-		{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": helperSource, "worldName": helperWorld, "runImmediately": true}},
+	}); err != nil {
+		return err
 	}
-	for _, step := range steps {
-		if err := in.call(ctx, t.session, step.method, step.params, nil); err != nil {
+	return s.applySize(ctx, in, t)
+}
+
+// step is one protocol call of a session's set-up.
+type step struct {
+	method string
+	params any
+}
+
+// sessionSteps are what every session gets, a page's or an iframe's, and an iframe's before it
+// runs a line: a file input there is the session's to intercept, not its page's.
+//
+// Runtime.enable is not here, and must not be. It sends every console.log of a page through the
+// pipe: Chrome serialises and queues them whether or not anyone reads them, so one page could
+// freeze every surface and grow Chrome past 10 GB.
+var sessionSteps = []step{
+	{"Page.enable", nil},
+	{"Page.setInterceptFileChooserDialog", map[string]any{"enabled": true}},
+	// A virtual environment with no authenticators in it: a page's WebAuthn call reaches neither
+	// the Mac's sheet nor a real key, and fails on its own timeout.
+	{"WebAuthn.enable", map[string]any{"enableUI": false}},
+	{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": helperSource, "worldName": helperWorld, "runImmediately": true}},
+	{"Target.setAutoAttach", map[string]any{
+		"autoAttach": true, "waitForDebuggerOnStart": true, "flatten": true,
+		"filter": []map[string]any{{"type": "iframe"}, {"exclude": true}},
+	}},
+}
+
+// run makes each call in order and stops at the first that fails.
+func (in *instance) run(ctx context.Context, session string, steps []step) error {
+	for _, st := range steps {
+		if err := in.call(ctx, session, st.method, st.params, nil); err != nil {
 			return err
 		}
 	}
-	return s.applySize(ctx, in, t)
+	return nil
 }
 
 // applySize makes the page the panel's size, so it reflows to it.
@@ -904,7 +947,7 @@ func (s *Store) AnswerFile(ctx context.Context, key, id string, paths []string) 
 			return fmt.Errorf("not a file: %s", filepath.Base(p))
 		}
 	}
-	return in.call(ctx, t.session, "DOM.setFileInputFiles", map[string]any{"files": paths, "backendNodeId": fc.node}, nil)
+	return in.call(ctx, fc.session, "DOM.setFileInputFiles", map[string]any{"files": paths, "backendNodeId": fc.node}, nil)
 }
 
 // PickSelect answers an opened <select>: an index of its options, or -1 for none.
@@ -925,7 +968,7 @@ func (s *Store) PickSelect(ctx context.Context, key, id string, index int) error
 	if index < 0 || index >= len(sel.Options) {
 		return nil
 	}
-	return in.call(ctx, t.session, "Runtime.evaluate", map[string]any{
+	return in.call(ctx, sel.session, "Runtime.evaluate", map[string]any{
 		"contextId": sel.context, "expression": fmt.Sprintf("%s(%d)", helperPick, index),
 	}, nil)
 }
@@ -965,12 +1008,3 @@ func (s *Store) RevealDownload(key, id string) error {
 
 // decodeFrame reads a frame's data.
 func decodeFrame(data string) ([]byte, error) { return base64.StdEncoding.DecodeString(data) }
-
-// originOf is what a viewer is told asked: never the path, which may hold tokens.
-func originOf(raw string) string {
-	u, err := url.Parse(shownURL(raw))
-	if err != nil || u.Host == "" {
-		return ""
-	}
-	return u.Scheme + "://" + u.Host
-}

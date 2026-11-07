@@ -94,9 +94,10 @@ message BrowserState {
   BrowserSelect select = 11;
   string notice = 12;
   repeated BrowserDownload downloads = 13;
-  // Goes up when a click left new text on Chrome's clipboard.
+  // Goes up when a click left new text on Chrome's clipboard, and back to 0 when the page it was
+  // left on goes.
   uint64 copied = 14;
-  // The domain the page's address is registered under, which a client keeps visible however
+  // The domain the page's origin is registered under, which a client keeps visible however
   // long the address: "example.co.uk" for a.b.example.co.uk. The host itself when it has none.
   string site = 15;
   // Empty for a page with a good certificate or no page at all; "insecure" for one that came
@@ -104,6 +105,10 @@ message BrowserState {
   string security = 16;
   // Downloads refused that did not fit in downloads.
   uint32 downloads_blocked = 17;
+  // Who the page is, in Chrome's word: "https://a.example.co.uk". A blank page has the origin it
+  // inherited, whatever its url says. Empty with a url: a page nobody can name, and a client must
+  // say so rather than leave the address to speak for it.
+  string origin = 18;
 }
 
 message BrowserDialog {

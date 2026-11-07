@@ -15,6 +15,9 @@ import (
 // maxURL bounds what a surface will navigate to.
 const maxURL = 8 << 10
 
+// maxHost bounds an origin as a viewer gets it.
+const maxHost = 512
+
 // ErrBadURL is every refused address: only http and https reach Chrome.
 var ErrBadURL = errors.New("not an http or https address")
 
@@ -129,15 +132,58 @@ func shownURL(raw string) string {
 	return raw
 }
 
+// authority is raw's scheme and host:port, by hand for the reason above: one pushState to /%zz, or
+// a host with { in it, must not make a page's domain unreadable. Both are empty for anything but
+// http and https.
+func authority(raw string) (head, hostPort string) {
+	shown := shownURL(raw)
+	head = webScheme.FindString(shown)
+	if head == "" {
+		return "", ""
+	}
+	rest := shown[len(head):]
+	if end := strings.IndexAny(rest, `/?#\`); end >= 0 {
+		rest = rest[:end]
+	}
+	return head, rest
+}
+
+// hostOf is the host in a host:port, without the brackets of an IPv6 address.
+func hostOf(hostPort string) string {
+	if strings.HasPrefix(hostPort, "[") {
+		if end := strings.IndexByte(hostPort, ']'); end > 0 {
+			return hostPort[1:end]
+		}
+	}
+	host, _, _ := strings.Cut(hostPort, ":")
+	return host
+}
+
+// originOf is what a viewer is told asked, when Chrome's own word is not there to use: never the
+// path, which may hold tokens.
+func originOf(raw string) string {
+	head, hostPort := authority(raw)
+	if hostPort == "" {
+		return ""
+	}
+	return head + hostPort
+}
+
+// chromeOrigin reads Chrome's securityOrigin: an origin no address can fake, inherited by a blank
+// page from whoever made it. An opaque one, a data: page's or a sandbox's, says nothing.
+func chromeOrigin(origin string) string {
+	if origin == "://" || origin == "null" {
+		return ""
+	}
+	return origin
+}
+
 // siteOf is the domain an address is registered under, which a viewer keeps visible however long
 // the host: "example.co.uk" for https://a.b.example.co.uk/. An IP address or a single-label host
 // has none and is itself; an address with no host has nothing to show.
 func siteOf(raw string) string {
-	u, err := url.Parse(shownURL(raw))
-	if err != nil {
-		return ""
-	}
-	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	_, hostPort := authority(raw)
+	host := strings.TrimSuffix(strings.ToLower(hostOf(hostPort)), ".")
 	if host == "" {
 		return ""
 	}
@@ -148,4 +194,13 @@ func siteOf(raw string) string {
 		return site
 	}
 	return host
+}
+
+// clipHost bounds an origin or a domain from its left: the end of a host is the part a page
+// cannot choose, so that is the part that stays.
+func clipHost(s string) string {
+	if len(s) <= maxHost {
+		return s
+	}
+	return "…" + strings.ToValidUTF8(s[len(s)-maxHost:], "")
 }

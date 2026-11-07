@@ -327,9 +327,10 @@ type BrowserState struct {
 	Select      *BrowserSelect      `protobuf:"bytes,11,opt,name=select,proto3" json:"select,omitempty"`
 	Notice      string              `protobuf:"bytes,12,opt,name=notice,proto3" json:"notice,omitempty"`
 	Downloads   []*BrowserDownload  `protobuf:"bytes,13,rep,name=downloads,proto3" json:"downloads,omitempty"`
-	// Goes up when a click left new text on Chrome's clipboard.
+	// Goes up when a click left new text on Chrome's clipboard, and back to 0 when the page it was
+	// left on goes.
 	Copied uint64 `protobuf:"varint,14,opt,name=copied,proto3" json:"copied,omitempty"`
-	// The domain the page's address is registered under, which a client keeps visible however
+	// The domain the page's origin is registered under, which a client keeps visible however
 	// long the address: "example.co.uk" for a.b.example.co.uk. The host itself when it has none.
 	Site string `protobuf:"bytes,15,opt,name=site,proto3" json:"site,omitempty"`
 	// Empty for a page with a good certificate or no page at all; "insecure" for one that came
@@ -337,8 +338,12 @@ type BrowserState struct {
 	Security string `protobuf:"bytes,16,opt,name=security,proto3" json:"security,omitempty"`
 	// Downloads refused that did not fit in downloads.
 	DownloadsBlocked uint32 `protobuf:"varint,17,opt,name=downloads_blocked,json=downloadsBlocked,proto3" json:"downloads_blocked,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Who the page is, in Chrome's word: "https://a.example.co.uk". A blank page has the origin it
+	// inherited, whatever its url says. Empty with a url: a page nobody can name, and a client must
+	// say so rather than leave the address to speak for it.
+	Origin        string `protobuf:"bytes,18,opt,name=origin,proto3" json:"origin,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BrowserState) Reset() {
@@ -488,6 +493,13 @@ func (x *BrowserState) GetDownloadsBlocked() uint32 {
 		return x.DownloadsBlocked
 	}
 	return 0
+}
+
+func (x *BrowserState) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
 }
 
 type BrowserDialog struct {
@@ -2323,7 +2335,7 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\fBrowserFrame\x12\x12\n" +
 	"\x04jpeg\x18\x01 \x01(\fR\x04jpeg\x12\x14\n" +
 	"\x05width\x18\x02 \x01(\rR\x05width\x12\x16\n" +
-	"\x06height\x18\x03 \x01(\rR\x06height\"\xfb\x04\n" +
+	"\x06height\x18\x03 \x01(\rR\x06height\"\x93\x05\n" +
 	"\fBrowserState\x122\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1c.codefoundry.v1.BrowserPhaseR\x05phase\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x10\n" +
@@ -2342,7 +2354,8 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\x06copied\x18\x0e \x01(\x04R\x06copied\x12\x12\n" +
 	"\x04site\x18\x0f \x01(\tR\x04site\x12\x1a\n" +
 	"\bsecurity\x18\x10 \x01(\tR\bsecurity\x12+\n" +
-	"\x11downloads_blocked\x18\x11 \x01(\rR\x10downloadsBlocked\"\xa0\x01\n" +
+	"\x11downloads_blocked\x18\x11 \x01(\rR\x10downloadsBlocked\x12\x16\n" +
+	"\x06origin\x18\x12 \x01(\tR\x06origin\"\xa0\x01\n" +
 	"\rBrowserDialog\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x18\n" +

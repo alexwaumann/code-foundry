@@ -431,7 +431,7 @@ func TestAPathChromeReportsNeverLeavesOurFolders(t *testing.T) {
 	if err := f.s.Input(context.Background(), "thread:a", []browser.InputEvent{{Mouse: &browser.MouseEvent{Type: "mouseReleased", Button: "left"}}}); err != nil {
 		t.Fatal(err)
 	}
-	f.c.Emit("Browser.downloadWillBegin", "", map[string]any{"frameId": "target-1", "guid": "g", "suggestedFilename": "a.txt"})
+	f.c.Emit("Page.downloadWillBegin", "session-target-1", map[string]any{"frameId": "target-1", "guid": "g", "suggestedFilename": "a.txt"})
 	f.c.Emit("Browser.downloadProgress", "", map[string]any{"guid": "g", "state": "completed", "filePath": "/etc/hosts"})
 	st := next(t, v, "the download", func(st browser.State) bool { return len(st.Downloads) == 1 && st.Downloads[0].State == "canceled" })
 	if st.Downloads[0].Path != "" {

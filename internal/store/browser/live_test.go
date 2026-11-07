@@ -100,6 +100,7 @@ func startLive(t *testing.T) *live {
 		}
 	}
 	mux.HandleFunc("/", html(livePage))
+	mux.HandleFunc("/hostile/", serveHostile)
 	mux.HandleFunc("/two", html(`<title>Two</title><body>second page`))
 	mux.HandleFunc("/paste-top", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -342,6 +343,16 @@ func TestLive(t *testing.T) {
 		{"ACrossSiteFrameCanOnlyAsk", liveACrossSiteFrameCanOnlyAsk},
 		{"ADialogBehindAPopupNeverShows", liveADialogBehindAPopupNeverShows},
 		{"SystemPanelsAreGone", liveSystemPanelsAreGone},
+		{"AFloodClosesThePageAndNoOther", liveAFloodClosesThePageAndNoOther},
+		{"TheSiteSurvivesAnAddressNoParserTakes", liveTheSiteSurvivesAnAddressNoParserTakes},
+		{"APopupCannotBlankItsOpenerUnnoticed", liveAPopupCannotBlankItsOpenerUnnoticed},
+		{"EveryCrossSiteFrameHasASessionOfItsOwn", liveEveryCrossSiteFrameHasASessionOfItsOwn},
+		{"ASelectInACrossSiteFrameOpens", liveASelectInACrossSiteFrameOpens},
+		{"TypingIsNoGestureAndNeitherIsSpace", liveTypingIsNoGestureAndNeitherIsSpace},
+		{"AGestureDoesNotSurviveTheNextPage", liveAGestureDoesNotSurviveTheNextPage},
+		{"APagesCopyDoesNotOutliveThePage", liveAPagesCopyDoesNotOutliveThePage},
+		{"WebAuthnReachesNothingReal", liveWebAuthnReachesNothingReal},
+		{"OnlyTheWebIsReachable", liveOnlyTheWebIsReachable},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			l.t = t
@@ -994,18 +1005,20 @@ func liveAHiddenSurfaceDownloadsNothing(t *testing.T, l *live) {
 // the one the user touched last asks.
 func liveACrossSiteFrameCanOnlyAsk(t *testing.T, l *live) {
 	before := len(filesIn(t, l.s.Downloads()))
-	l.click(5, 5)
-	l.other(t, "thread:nested", l.srv.URL+"/nested-dl")
+	nested := l.other(t, "thread:nested", l.srv.URL+"/nested-dl")
 	named := func(d Download) bool { return d.Name == "nested.txt" }
-	st := l.until("the question", func(st State) bool { return slices.ContainsFunc(st.Downloads, named) })
+	st := nested.until("the question", func(st State) bool { return slices.ContainsFunc(st.Downloads, named) })
 	d := st.Downloads[slices.IndexFunc(st.Downloads, named)]
 	if d.State != DownloadAsking || d.Site != "localhost" {
 		t.Fatalf("%+v", d)
 	}
+	if slices.ContainsFunc(l.now().Downloads, named) {
+		t.Fatal("asked on a surface that was never its page's")
+	}
 	if n := len(filesIn(t, l.s.Downloads())); n != before {
 		t.Fatalf("%d files landed", n-before)
 	}
-	if err := l.s.AnswerDownload(context.Background(), l.key, d.ID, false); err != nil {
+	if err := l.s.AnswerDownload(context.Background(), nested.key, d.ID, false); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1031,12 +1044,25 @@ func liveSystemPanelsAreGone(t *testing.T, l *live) {
 		"window.showOpenFilePicker", "window.showSaveFilePicker", "window.showDirectoryPicker",
 		"window.PublicKeyCredential", "navigator.share", "window.EyeDropper",
 		"navigator.serial", "navigator.usb", "navigator.hid", "navigator.bluetooth",
+		"window.documentPictureInPicture", "window.IdentityCredential",
 	} {
 		var kind string
 		l.eval("typeof "+api, &kind)
 		if kind != "undefined" {
 			t.Errorf("%s is %s", api, kind)
 		}
+	}
+	var video bool
+	l.eval("document.pictureInPictureEnabled", &video)
+	if video {
+		t.Error("a video can leave for a window of its own")
+	}
+	// Untrusted and with no activation, this opens nothing either way. Prevented, a real click
+	// reaches no colour panel.
+	var opened bool
+	l.eval(`(()=>{const i=document.createElement('input');i.type='color';document.body.append(i);const r=i.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));i.remove();return r})()`, &opened)
+	if opened {
+		t.Error("a colour input took its click")
 	}
 	// The flag is the whole browser's, cross-site iframes included.
 	if _, err := l.s.Navigate(context.Background(), l.key, l.srv.URL+"/paste-top"); err != nil {

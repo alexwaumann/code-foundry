@@ -16,6 +16,14 @@ type target struct {
 	// url is the page committed in its main frame and nothing else: not a subframe's, not where
 	// a navigation is headed, which an opener could write under.
 	url, title string
+	// origin is Chrome's securityOrigin for that commit, empty when opaque. A page cannot change it
+	// with history.pushState, and a blank page inherits it from whoever made it.
+	origin string
+	// commits counts the main frame's commits, so what was read before one is known to be stale.
+	commits int
+	// visited is this page having been anything but the blank it started on: a blank that is no
+	// page has nothing on it, and any other blank is what someone wrote into.
+	visited    bool
 	loading    bool
 	canBack    bool
 	canForward bool
@@ -26,6 +34,37 @@ type target struct {
 	chooser *FileChooser
 	sel     *Select
 	cast    sync.Mutex // held across a start or restart of the frames
+	// press is where the user last pressed, for a select in an iframe (select.go).
+	pressX, pressY float64
+	// frames counts the cross-site iframes with a session (frames.go).
+	frames int
+	queue  workQueue
+	budget eventBudget
+}
+
+// shownOrigin is who a page is: Chrome's word, or what its address says while there is none yet.
+func (t *target) shownOrigin() string {
+	if t.origin != "" {
+		return t.origin
+	}
+	return originOf(t.url)
+}
+
+// commit takes what the main frame committed. Needs Store.mu.
+func (t *target) commit(address, origin string) {
+	t.url, t.origin = address, origin
+	t.commits++
+	if address != "about:blank" || origin != "" {
+		t.visited = true
+	}
+}
+
+// committed asks for what a commit leaves to read. Needs Store.mu.
+func (s *Store) committed(in *instance, t *target, j job) {
+	if t.origin == "" {
+		j |= jobOrigin
+	}
+	s.schedule(in, t, j)
 }
 
 // handlers are the events a surface follows, by method. A handler runs on the connection's
@@ -35,6 +74,9 @@ var handlers map[string]func(s *Store, in *instance, t *target, params json.RawM
 
 // browserHandlers are the events of the browser itself, which arrive with no session.
 var browserHandlers map[string]func(s *Store, in *instance, params json.RawMessage)
+
+// frameHandlers are what a cross-site iframe's own session reports (frames.go).
+var frameHandlers map[string]func(s *Store, in *instance, f *frame, params json.RawMessage)
 
 func init() {
 	handlers = map[string]func(s *Store, in *instance, t *target, params json.RawMessage){
@@ -47,13 +89,24 @@ func init() {
 		"Page.javascriptDialogClosed":          onDialogClosed,
 		"Page.fileChooserOpened":               onFileChooser,
 		"Page.downloadWillBegin":               onPageDownload,
-		"Runtime.bindingCalled":                onBinding,
 		"Security.visibleSecurityStateChanged": onSecurityState,
+		"Page.frameStartedNavigating":          onFrameStartedNavigating,
+		"Target.attachedToTarget":              onFrameAttached,
+		"Target.detachedFromTarget":            onFrameDetached,
+	}
+	frameHandlers = map[string]func(s *Store, in *instance, f *frame, params json.RawMessage){
+		"Page.frameNavigated":         onSubframeNavigated,
+		"Page.fileChooserOpened":      onSubframeChooser,
+		"Page.downloadWillBegin":      onSubframeDownload,
+		"Page.frameStartedNavigating": onNestedFrameStartedNavigating,
+		"Target.attachedToTarget":     onNestedFrameAttached,
+		"Target.detachedFromTarget":   onNestedFrameDetached,
 	}
 	browserHandlers = map[string]func(s *Store, in *instance, params json.RawMessage){
 		"Target.targetCreated":      onTargetCreated,
 		"Target.targetDestroyed":    onTargetDestroyed,
 		"Target.targetCrashed":      onTargetCrashed,
+		"Target.targetInfoChanged":  onTargetInfoChanged,
 		"Browser.downloadWillBegin": onBrowserDownload,
 		"Browser.downloadProgress":  onDownloadProgress,
 	}
@@ -74,9 +127,15 @@ func (s *Store) event(in *instance, method, session string, params json.RawMessa
 		}
 		return
 	}
-	if h := handlers[method]; h != nil {
-		if t := in.sessions[session]; t != nil {
+	if t := in.sessions[session]; t != nil {
+		if h := handlers[method]; s.charge(in, t, len(params)) && h != nil {
 			h(s, in, t, params)
+		}
+		return
+	}
+	if f := in.frames[session]; f != nil {
+		if h := frameHandlers[method]; s.charge(in, f.owner, len(params)) && h != nil {
+			h(s, in, f, params)
 		}
 	}
 }
@@ -121,6 +180,7 @@ type frameParams struct {
 		URL         string `json:"url"`
 		Unreachable string `json:"unreachableUrl"`
 		MimeType    string `json:"mimeType"`
+		Origin      string `json:"securityOrigin"`
 	} `json:"frame"`
 }
 
@@ -129,11 +189,12 @@ func onFrameNavigated(s *Store, in *instance, t *target, params json.RawMessage)
 	if json.Unmarshal(params, &p) != nil || p.Frame.ParentID != "" {
 		return
 	}
-	t.url = p.Frame.URL
 	if p.Frame.Unreachable != "" {
 		// On an error page the address is the one that failed, as in any browser, not
 		// chrome-error://chromewebdata/.
-		t.url = p.Frame.Unreachable
+		t.commit(p.Frame.Unreachable, originOf(p.Frame.Unreachable))
+	} else {
+		t.commit(p.Frame.URL, chromeOrigin(p.Frame.Origin))
 	}
 	if !allowedPage(p.Frame.URL) {
 		// Chrome keeps pages off these on its own. If one ever got here it does not stay.
@@ -149,17 +210,13 @@ func onFrameNavigated(s *Store, in *instance, t *target, params json.RawMessage)
 		t.surface.state.Notice = "This surface cannot show PDFs."
 	}
 	t.sel, t.chooser = nil, nil
-	t.surface.publish()
-	go s.refreshHistory(in, t)
-	if t.casting && t.surface.top() == t {
-		// A navigation can move the page to another process, and a cast asked for during
-		// the move is refused ("Not attached to an active page"). This one always lands.
-		go func() {
-			if err := s.startCast(context.Background(), in, t); err != nil {
-				s.log.Debug("screencast after a navigation", "err", err)
-			}
-		}()
+	if t.surface.top() == t {
+		t.surface.leftPage()
 	}
+	t.surface.publish()
+	// A navigation can move the page to another process, and a cast asked for during the move is
+	// refused ("Not attached to an active page"). This one always lands.
+	s.committed(in, t, jobHistory|jobCast)
 }
 
 // onWithinDocument is history.pushState and the like. A subframe can do it too, and its address
@@ -173,8 +230,9 @@ func onWithinDocument(s *Store, in *instance, t *target, params json.RawMessage)
 		return
 	}
 	t.url = p.URL
+	t.commits++
 	t.surface.publish()
-	go s.refreshHistory(in, t)
+	s.schedule(in, t, jobHistory)
 }
 
 // refreshHistory reads whether back and forward have anywhere to go.
@@ -204,11 +262,9 @@ func onLoading(loading bool) func(*Store, *instance, *target, json.RawMessage) {
 		t.loading = loading
 		t.surface.publish()
 		if !loading {
-			go s.refreshHistory(in, t) // the title: target info keeps saying the host
-			if t.casting && t.surface.top() == t {
-				// The page as it finally is, however the cast fared through the load.
-				go s.firstFrame(in, t, t.surface.w, t.surface.h)
-			}
+			// The title, which target info keeps saying is the host, and the page as it finally
+			// is, however the cast fared through the load.
+			s.schedule(in, t, jobHistory|jobShot)
 		}
 	}
 }
@@ -251,7 +307,13 @@ func onDialogOpening(s *Store, in *instance, t *target, params json.RawMessage) 
 		}()
 		return
 	}
-	t.dialog = &Dialog{ID: sf.id(), Kind: p.Type, Message: clip(p.Message, maxDialogText), DefaultPrompt: clip(p.DefaultPrompt, maxDialogText), Origin: originOf(p.URL), Site: clip(siteOf(p.URL), maxLabel)}
+	// Chrome keeps dialogs from cross-origin frames off, so a frame's address has no better word
+	// to say than the page's: a blank frame's says nothing, and the page's origin does.
+	origin := originOf(p.URL)
+	if origin == "" {
+		origin = t.shownOrigin()
+	}
+	t.dialog = &Dialog{ID: sf.id(), Kind: p.Type, Message: clip(p.Message, maxDialogText), DefaultPrompt: clip(p.DefaultPrompt, maxDialogText), Origin: clipHost(origin), Site: clipHost(siteOf(origin))}
 	sf.publish()
 }
 
@@ -276,6 +338,12 @@ func onSecurityState(_ *Store, _ *instance, t *target, params json.RawMessage) {
 }
 
 func onFileChooser(_ *Store, _ *instance, t *target, params json.RawMessage) {
+	t.openChooser(t.session, t.shownOrigin(), params)
+}
+
+// openChooser is a file input of this page or of an iframe in it, whose session has to answer it.
+// Needs Store.mu.
+func (t *target) openChooser(session, origin string, params json.RawMessage) {
 	var p struct {
 		Mode string `json:"mode"`
 		Node int64  `json:"backendNodeId"`
@@ -284,44 +352,7 @@ func onFileChooser(_ *Store, _ *instance, t *target, params json.RawMessage) {
 		return
 	}
 	sf := t.surface
-	t.chooser = &FileChooser{ID: sf.id(), Multiple: p.Mode == "selectMultiple", Origin: originOf(t.url), Site: clip(siteOf(t.url), maxLabel), node: p.Node}
-	sf.publish()
-}
-
-// onBinding reads the isolated world's messages. Only that world holds the binding, so a page's
-// own script cannot call it, but what it reports is still the page's and is treated as such.
-func onBinding(s *Store, _ *instance, t *target, params json.RawMessage) {
-	var p struct {
-		Name    string `json:"name"`
-		Payload string `json:"payload"`
-		Context int64  `json:"executionContextId"`
-	}
-	if json.Unmarshal(params, &p) != nil || p.Name != helperBinding {
-		return
-	}
-	var m struct {
-		Type     string  `json:"t"`
-		X        float64 `json:"x"`
-		Y        float64 `json:"y"`
-		W        float64 `json:"w"`
-		Selected int     `json:"selected"`
-		Options  []struct {
-			Label    string `json:"label"`
-			Disabled bool   `json:"disabled"`
-		} `json:"options"`
-	}
-	if json.Unmarshal([]byte(p.Payload), &m) != nil || m.Type != "select" {
-		return
-	}
-	sf := t.surface
-	sel := &Select{ID: sf.id(), Selected: m.Selected, X: m.X, Y: m.Y, W: m.W, context: p.Context}
-	for i, o := range m.Options {
-		if i == maxOptions {
-			break
-		}
-		sel.Options = append(sel.Options, SelectOption{Label: clip(o.Label, maxLabel), Disabled: o.Disabled})
-	}
-	t.sel = sel
+	t.chooser = &FileChooser{ID: sf.id(), Multiple: p.Mode == "selectMultiple", Origin: clipHost(origin), Site: clipHost(siteOf(origin)), node: p.Node, session: session}
 	sf.publish()
 }
 
@@ -338,6 +369,16 @@ func decodeInfo(params json.RawMessage) (targetInfo, bool) {
 		TargetInfo targetInfo `json:"targetInfo"`
 	}
 	return p.TargetInfo, json.Unmarshal(params, &p) == nil
+}
+
+// onTargetInfoChanged is nothing a surface reads, but a page sends one for every address it pushes,
+// so it pays for them as for the rest.
+func onTargetInfoChanged(s *Store, in *instance, params json.RawMessage) {
+	if info, ok := decodeInfo(params); ok {
+		if t := in.targets[info.TargetID]; t != nil {
+			s.charge(in, t, len(params))
+		}
+	}
 }
 
 // onTargetCreated adopts what a surface's page opens, window.open and target=_blank alike: a
@@ -387,11 +428,16 @@ func (s *Store) showPopup(in *instance, opener, t *target) {
 
 // readAddress asks what a popup has committed, which may be nothing yet: the address a new target
 // reports is where it is headed, and an opener can write its own page under that while it loads.
+// An event that came meanwhile is newer than the answer, which then says nothing.
 func (s *Store) readAddress(ctx context.Context, in *instance, t *target) {
+	s.mu.Lock()
+	seen := t.commits
+	s.mu.Unlock()
 	var tree struct {
 		FrameTree struct {
 			Frame struct {
-				URL string `json:"url"`
+				URL    string `json:"url"`
+				Origin string `json:"securityOrigin"`
 			} `json:"frame"`
 		} `json:"frameTree"`
 	}
@@ -401,8 +447,12 @@ func (s *Store) readAddress(ctx context.Context, in *instance, t *target) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	t.url = tree.FrameTree.Frame.URL
+	if t.commits != seen {
+		return
+	}
+	t.commit(tree.FrameTree.Frame.URL, chromeOrigin(tree.FrameTree.Frame.Origin))
 	t.surface.publish()
+	s.committed(in, t, 0)
 }
 
 func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {
@@ -418,6 +468,7 @@ func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {
 	}
 	delete(in.targets, p.TargetID)
 	delete(in.sessions, t.session)
+	in.forgetFrames(t)
 	sf := t.surface
 	wasTop := sf.top() == t
 	for i, x := range sf.stack {

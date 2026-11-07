@@ -121,6 +121,8 @@ type instance struct {
 	stopping bool
 	targets  map[string]*target // by target id
 	sessions map[string]*target // by session id
+	// frames are the cross-site iframes of those targets, by session.
+	frames map[string]*frame
 	// downloads are the ones not yet over, by Chrome's guid.
 	downloads map[string]*download
 	clip      clipboard
@@ -198,7 +200,7 @@ func (s *Store) launch(_ context.Context) (*instance, error) {
 	if err != nil {
 		return nil, err
 	}
-	in := &instance{proc: proc, targets: map[string]*target{}, sessions: map[string]*target{}, downloads: map[string]*download{}}
+	in := &instance{proc: proc, targets: map[string]*target{}, sessions: map[string]*target{}, frames: map[string]*frame{}, downloads: map[string]*download{}}
 	w, r := proc.Pipes()
 	in.conn = newConn(w, r,
 		func(method, session string, params json.RawMessage) { s.event(in, method, session, params) },
@@ -214,7 +216,9 @@ func (s *Store) launch(_ context.Context) (*instance, error) {
 		s.stop(in)
 		return nil, fmt.Errorf("chrome did not answer over its pipe, so it was stopped: %w%s", err, tailNote(proc))
 	}
-	if err := in.conn.call(ctx, "", "Target.setDiscoverTargets", map[string]any{"discover": true}, nil); err != nil {
+	if err := in.conn.call(ctx, "", "Target.setDiscoverTargets", map[string]any{
+		"discover": true, "filter": []map[string]any{{"type": "page"}, {"exclude": true}},
+	}, nil); err != nil {
 		s.stop(in)
 		return nil, err
 	}

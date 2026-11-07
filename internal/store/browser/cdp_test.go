@@ -95,25 +95,3 @@ func TestReadingAnEndlessMessageHoldsNoMoreThanTheLimit(t *testing.T) {
 		t.Fatalf("the next message: %q, %v", b, err)
 	}
 }
-
-func TestWhatAPageLogsNeverReachesAHandler(t *testing.T) {
-	events := make(chan string, 4)
-	_, pw := pipeConn(t, func(method, _ string, _ json.RawMessage) { events <- method })
-	go func() {
-		for _, m := range []string{
-			`{"method":"Runtime.consoleAPICalled","params":{"type":"log"}}`,
-			`{"method":"Runtime.exceptionThrown","params":{}}`,
-			`{"method":"Page.after","params":{}}`,
-		} {
-			_, _ = pw.Write(append([]byte(m), 0))
-		}
-	}()
-	select {
-	case m := <-events:
-		if m != "Page.after" {
-			t.Fatalf("event %q", m)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("no event")
-	}
-}

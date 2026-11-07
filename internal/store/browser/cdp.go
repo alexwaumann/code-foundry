@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -20,7 +19,7 @@ import (
 // point: nothing else on this Mac can drive a browser that holds the user's logins.
 
 // maxMessage bounds one message from Chrome. A screencast frame is its biggest, a few MB of
-// base64. A page can make far bigger ones (console.log of a long string) and must not end the
+// base64. A page can make far bigger ones (a history of 50 addresses of 2 MB) and must not end the
 // connection by it, so anything past this is read to its end and skipped, and the daemon never
 // holds more of it than this. keepBuffer is how much of such a buffer stays for the next one.
 const (
@@ -41,14 +40,6 @@ var errTooLong = errors.New("chrome's message is too long")
 
 // replyHead reads which call a skipped reply answers: Chrome writes the id first.
 var replyHead = regexp.MustCompile(`^\{"id":(\d+)[,}]`)
-
-// ignored are the events nothing here reads and a page makes as often and as long as it likes.
-// Runtime.enable has to stay on: without it Runtime.addBinding does nothing, and the helper's
-// reports never arrive (measured on Chrome 157, enabling and disabling again included).
-var ignored = [][]byte{
-	[]byte(`{"method":"Runtime.consoleAPICalled"`),
-	[]byte(`{"method":"Runtime.exceptionThrown"`),
-}
 
 // remoteError is an error Chrome answered a call with. Its message may quote a page's
 // URL, so it goes to a viewer and never to the log above debug level.
@@ -135,9 +126,6 @@ func (c *conn) read(r io.Reader) {
 		if err != nil {
 			c.fail(fmt.Errorf("%w: %w", ErrChromeGone, err))
 			return
-		}
-		if slices.ContainsFunc(ignored, func(p []byte) bool { return bytes.HasPrefix(b, p) }) {
-			continue
 		}
 		var m message
 		if err := json.Unmarshal(b, &m); err != nil {

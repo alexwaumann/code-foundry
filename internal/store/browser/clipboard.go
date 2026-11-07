@@ -216,13 +216,25 @@ func (s *Store) Copy(ctx context.Context, key string, fromPage bool) (int, error
 }
 
 // noticeCopied tells a surface when a click left new text on Chrome's clipboard: a page's own
-// Copy button, which would otherwise go nowhere the user can reach.
-func (s *Store) noticeCopied(ctx context.Context, key string) {
-	in, sf, _, err := s.shown(key)
+// Copy button, which would otherwise go nowhere the user can reach. click is which click of the
+// surface this is. Only the latest reads: these wait on the clipboard's lock, and one that goes late
+// takes the next click's text, or what the page left long after any click.
+func (s *Store) noticeCopied(ctx context.Context, key string, click uint64) {
+	in, sf, t, err := s.shown(key)
 	if err != nil {
 		return
 	}
+	s.mu.Lock()
+	seen := t.commits
+	s.mu.Unlock()
 	in.clip.mu.Lock()
+	s.mu.Lock()
+	latest := sf.clicks == click
+	s.mu.Unlock()
+	if !latest {
+		in.clip.mu.Unlock()
+		return
+	}
 	text, err := in.readClipboard(ctx)
 	in.clip.mu.Unlock()
 	if err != nil || text == "" {
@@ -230,6 +242,9 @@ func (s *Store) noticeCopied(ctx context.Context, key string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if sf.top() != t || t.commits != seen {
+		return // what the last page left does not wait on the next one
+	}
 	sf.copied = text
 	sf.state.Copied++
 	sf.publish()

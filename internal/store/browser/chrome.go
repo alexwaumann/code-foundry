@@ -3,6 +3,7 @@ package browser
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -56,20 +57,85 @@ func chromeArgs(profile string) []string {
 		"--no-first-run",
 		"--no-default-browser-check",
 		"--disable-blink-features=" + strings.Join(systemUIFeatures, ","),
+		// Headless Chrome writes every console line of every page to stderr, on its main thread,
+		// and a page can log faster than any pipe takes it: every surface then waits on that write.
+		// A console line is logged at INFO; a launch that fails says why at ERROR.
+		"--log-level=2",
+		// A video in a window of its own, floating over the real desktop.
+		"--blink-settings=pictureInPictureEnabled=false",
+		// A page past this ends its own process and nothing else. Memory outside the heap is
+		// watchMemory's.
+		"--js-flags=--max-old-space-size=" + strconv.Itoa(maxHeapMB),
 		"about:blank",
 	}
 }
+
+// maxHeapMB bounds one renderer's JavaScript heap. Chrome's default is about twice this.
+const maxHeapMB = 2048
 
 // systemUIFeatures are the web APIs that would reach past the surface to the Mac's own panels or
 // sheets, which nobody can answer through a frame and which the file chooser's interception does
 // not cover. Off, a page sees them undefined and takes whatever path it has without them.
 var systemUIFeatures = []string{
 	"FileSystemAccess", "FileSystemAccessLocal", // showOpenFilePicker and friends: a real open panel
-	"WebAuth",       // passkeys: the system's own sheet
-	"WebShare",      // the share sheet
-	"EyeDropperAPI", // a colour picker over the real screen
+	"WebAuth",                     // only hides PublicKeyCredential; WebAuthn.enable is the block (surface.go)
+	"WebShare",                    // the share sheet
+	"EyeDropperAPI",               // a colour picker over the real screen
+	"DocumentPictureInPictureAPI", // a window of the page's own on the real desktop
+	"FedCm",                       // sign-in prompts in a window nobody sees
 	"Serial", "WebUSB", "WebHID", "WebBluetooth",
 	"Presentation",
+}
+
+// profilePrefs are what no flag sets, written into the profile before each launch. No print dialog:
+// it would wait in Chrome's hidden window. And a page reaches only the web: without the allow list,
+// a mailto: or a custom scheme opens the app that handles it, which Chrome does for mailto: without
+// asking. Chrome's error for what is refused is ERR_BLOCKED_BY_ADMINISTRATOR.
+var profilePrefs = map[string]any{
+	"printing": map[string]any{"enabled": false},
+	"policy": map[string]any{
+		"url_blocklist": []string{"*"},
+		"url_allowlist": []string{"http://*", "https://*", "about:*", "blob:*", "data:*"},
+	},
+}
+
+// hardenProfile puts profilePrefs over the profile's Preferences, whatever else they hold. A file
+// that does not parse is left for Chrome to reset, and is replaced by the prefs alone.
+func hardenProfile(profile string) error {
+	path := filepath.Join(profile, "Default", "Preferences")
+	prefs := map[string]any{}
+	if b, err := os.ReadFile(path); err == nil && json.Unmarshal(b, &prefs) != nil {
+		prefs = map[string]any{}
+	}
+	merge(prefs, profilePrefs)
+	b, err := json.Marshal(prefs)
+	if err != nil {
+		return fmt.Errorf("browser profile: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return fmt.Errorf("browser profile: %w", err)
+	}
+	if err := os.WriteFile(path, b, 0o600); err != nil {
+		return fmt.Errorf("browser profile: %w", err)
+	}
+	return nil
+}
+
+// merge sets over's keys in into, table by table.
+func merge(into, over map[string]any) {
+	for k, v := range over {
+		sub, ok := v.(map[string]any)
+		if !ok {
+			into[k] = v
+			continue
+		}
+		have, ok := into[k].(map[string]any)
+		if !ok {
+			have = map[string]any{}
+			into[k] = have
+		}
+		merge(have, sub)
+	}
 }
 
 // chromeEnv is the little Chrome inherits. The daemon's own environment may hold what a
@@ -119,6 +185,9 @@ func ExecLauncher(find func() (string, error), log *slog.Logger) Launcher {
 			return nil, fmt.Errorf("browser profile: %w", err)
 		}
 		reapStale(profile, log)
+		if err := hardenProfile(profile); err != nil {
+			return nil, err
+		}
 		inR, inW, err := os.Pipe()
 		if err != nil {
 			return nil, fmt.Errorf("chrome pipe: %w", err)
@@ -154,6 +223,7 @@ func ExecLauncher(find func() (string, error), log *slog.Logger) Launcher {
 		}
 		p := &process{cmd: cmd, toChrome: inW, fromChrome: outR, done: make(chan struct{}), log: log}
 		go p.drain(errR)
+		go p.watchMemory()
 		go func() {
 			_ = cmd.Wait()
 			close(p.done)
@@ -228,6 +298,112 @@ func (p *process) wait(d time.Duration) bool {
 	case <-time.After(d):
 		return false
 	}
+}
+
+// Memory no flag bounds. A page can fill a few GB of typed arrays in a second, and a page logging
+// in a loop queues its console faster than Chrome's main thread takes it, which every surface then
+// waits behind, and no event says so. So the only sign is size, read from outside. A helper past
+// maxHelperRSS, or past minGrowthRSS and up by maxGrowth in growthPolls seconds, is killed, which to
+// Chrome is a page or a GPU process that crashed. That queue can as well build up in Chrome's own
+// process, where nothing names its page, and it can be a main thread with no time left for anyone:
+// when Chrome swells, or stays past hotCPU for hotPolls seconds, the busiest helper is what is doing
+// it (about 200% each in a console flood, against about 60% for all of Chrome on an animated page).
+// Chrome past maxBrowserRSS, or the whole group past maxGroupRSS, goes, and every surface says so,
+// which is better than taking the Mac along.
+const (
+	memoryPoll    = time.Second
+	growthPolls   = 5
+	maxHelperRSS  = 4 << 20 // KiB, as ps says
+	minGrowthRSS  = 1 << 20
+	maxGrowth     = 512 << 10
+	maxBrowserRSS = 6 << 20
+	maxGroupRSS   = 12 << 20
+	minBusyCPU    = 50.0
+	hotCPU        = 150.0
+	hotPolls      = 3
+)
+
+// watchMemory polls Chrome's process group until it exits.
+func (p *process) watchMemory() {
+	tick := time.NewTicker(memoryPoll)
+	defer tick.Stop()
+	w := memoryWatch{pid: p.cmd.Process.Pid}
+	for {
+		select {
+		case <-p.done:
+			return
+		case <-tick.C:
+		}
+		out, err := exec.Command("/bin/ps", "-A", "-o", "pid=,pgid=,rss=,pcpu=").Output()
+		if err != nil {
+			continue
+		}
+		helpers, browser := w.read(string(out))
+		for _, h := range helpers {
+			p.log.Warn("killed a Chrome process past its memory limit", "pid", h)
+			_ = syscall.Kill(h, syscall.SIGKILL)
+		}
+		if browser {
+			p.log.Warn("killed Chrome: past its memory limit")
+			p.killGroup()
+		}
+	}
+}
+
+// memoryWatch reads ps a poll at a time.
+type memoryWatch struct {
+	pid  int
+	past map[int][]int // each process's last sizes, oldest first
+	hot  int           // polls in a row Chrome's own process has been past hotCPU
+}
+
+// read says which helpers of the group led by pid are to go, and whether pid itself is.
+func (w *memoryWatch) read(ps string) (helpers []int, browser bool) {
+	past := map[int][]int{}
+	grew := func(who, rss int) int {
+		sizes := append(w.past[who], rss)
+		if len(sizes) > growthPolls {
+			sizes = sizes[1:]
+		}
+		past[who] = sizes
+		return rss - sizes[0]
+	}
+	busiest, busy, swelling, total := 0, minBusyCPU, false, 0
+	for line := range strings.Lines(ps) {
+		f := strings.Fields(line)
+		if len(f) != 4 {
+			continue
+		}
+		who, err1 := strconv.Atoi(f[0])
+		group, err2 := strconv.Atoi(f[1])
+		rss, err3 := strconv.Atoi(f[2])
+		cpu, err4 := strconv.ParseFloat(f[3], 64)
+		switch {
+		case err1 != nil || err2 != nil || err3 != nil || err4 != nil || group != w.pid:
+		case who == w.pid:
+			total += rss
+			browser = browser || rss > maxBrowserRSS
+			swelling = grew(who, rss) > maxGrowth
+			if w.hot++; cpu < hotCPU {
+				w.hot = 0
+			}
+		default:
+			total += rss
+			if grown := grew(who, rss); rss > maxHelperRSS || (rss > minGrowthRSS && grown > maxGrowth) {
+				helpers = append(helpers, who)
+			}
+			if cpu >= busy {
+				busiest, busy = who, cpu
+			}
+		}
+	}
+	if (swelling || w.hot >= hotPolls) && len(helpers) == 0 && busiest != 0 {
+		helpers = append(helpers, busiest)
+		delete(past, w.pid) // it will not shrink: the next blame needs new growth
+		w.hot = 0
+	}
+	w.past = past
+	return helpers, browser || total > maxGroupRSS
 }
 
 // killGroup takes any helper that outlived the browser process. The group id stays reserved
