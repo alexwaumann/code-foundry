@@ -99,9 +99,8 @@ in flight or a decline stays on its row while the list updates.
 </script>
 ```
 
-To merge every green one with one button, start every `cf.run` inside that one click:
-`await Promise.allSettled(prs.filter(green).map((pr) => cf.run("pr.merge", {...})))`. The
-app asks once per PR.
+Keep one button per PR: `pr.merge` asks each time, and a page has one question open at a
+time, so a loop over several gets the first asked and the rest refused `invalid`.
 
 ## Something small in plain HTML: one live figure
 

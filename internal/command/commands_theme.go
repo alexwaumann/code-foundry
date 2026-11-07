@@ -224,6 +224,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		title := strings.ToUpper(scheme[:1]) + scheme[1:]
 		return Command{
 			Name:        "theme.set-" + scheme,
+			Page:        PageState,
 			Title:       "Set " + title + " Theme",
 			Description: fmt.Sprintf("Choose the theme used when the scheme is %s (the %s setting): a curated one or one of yours. Run theme list for the ids.", scheme, themeSlotKey[scheme]),
 			Category:    "Settings",
@@ -270,6 +271,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		slotCmd(theme.SchemeLight),
 		Command{
 			Name:  "theme.set-scheme",
+			Page:  PageState,
 			Title: "Set Color Scheme",
 			Description: "Choose whether the app is dark, light, or follows the Mac (system): the appearance.theme setting. " +
 				"Each scheme shows its own theme (theme set-dark, theme set-light).",
@@ -314,6 +316,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		},
 		Command{
 			Name:      "theme.save",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Save Theme File",
 			Description: "Save a theme file as one of your themes. It replaces yours with the same id (the version it replaces is kept for Undo); a curated id is refused. " +
@@ -398,6 +401,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		},
 		Command{
 			Name:  "theme.duplicate",
+			Page:  PageState,
 			Title: "Duplicate Theme",
 			Description: "Copy a theme into your themes, to change it. The copy's id is <id>-copy (then -2, ...) and it records the theme it came from; " +
 				"print its file with theme show and save the changed file with theme save.",
@@ -422,6 +426,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		},
 		Command{
 			Name:      "theme.restore",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Restore Theme Colours",
 			Description: "Put back an earlier version of one of your themes: each save keeps the version it replaces (the last 10). " +

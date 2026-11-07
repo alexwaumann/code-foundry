@@ -265,6 +265,7 @@ func boolCount(b bool) int {
 func threadSubscribe(b ThreadBackend) Command {
 	return Command{
 		Name:      "thread.subscribe",
+		Page:      PageDrives,
 		NoPalette: true,
 		Title:     "Subscribe Thread to Wakes",
 		Description: "Wake a thread with a message when another thread settles, " +
@@ -365,6 +366,7 @@ func threadSubscribe(b ThreadBackend) Command {
 func threadUnsubscribe(b ThreadBackend) Command {
 	return Command{
 		Name:      "thread.unsubscribe",
+		Page:      PageState,
 		NoPalette: true,
 		Title:     "Unsubscribe Thread from Wakes",
 		Description: "Remove a wake subscription by id, or every subscription of a thread (default: the thread this runs in) " +

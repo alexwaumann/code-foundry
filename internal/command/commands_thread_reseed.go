@@ -24,6 +24,7 @@ type ReseedBackend interface {
 func threadReseedCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.reseed",
+		Page:      PageDrives,
 		NoPalette: true,
 		Title:     "Reseed Thread",
 		Description: "Start a thread's next Claude session afresh (no resume) with a seed: a system prompt append and add-dirs " +

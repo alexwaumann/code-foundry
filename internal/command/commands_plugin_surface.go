@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -86,6 +87,7 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 	return r.RegisterAll(
 		Command{
 			Name:      "plugin.surface",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Show Plugin Surface View",
 			Description: "Open a plugin surface for a context (a thread for a thread scoped one: --context-thread) as the " +
@@ -115,6 +117,7 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 		},
 		Command{
 			Name:      "plugin.act",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Act on Plugin Surface",
 			Description: "Act on an element of a plugin surface's current view as a click would: a button, row, chip, tab, a " +
@@ -150,7 +153,7 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 // question with its own args or bind stays as it was.
 func pinToView(err error, uctx Context, version uint64) error {
 	var ce *ConfirmError
-	if uctx.Origin == OriginPage && errors.As(err, &ce) && len(ce.Args) == 0 && ce.Bind == nil {
+	if uctx.Untrusted() && errors.As(err, &ce) && len(ce.Args) == 0 && ce.Bind == nil {
 		ce.Command = "plugin.act"
 		ce.Bind = map[string]string{"version": strconv.FormatUint(version, 10)}
 	}
@@ -223,7 +226,7 @@ func pluginAct(ctx context.Context, r *Registry, b PluginSurfaceBackend, uctx Co
 		}
 		// The plugin chose this command; a page pressing its button stays a page.
 		pressed := uctx
-		if pressed.Origin == v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED {
+		if !pressed.Untrusted() {
 			pressed.Origin = OriginPlugin
 		}
 		res, err := r.Invoke(ctx, pressed, el.GetAction(), args, Confirmed(ConfirmedIn(ctx)))
@@ -239,13 +242,15 @@ func pluginAct(ctx context.Context, r *Registry, b PluginSurfaceBackend, uctx Co
 			msg += ": " + res.Message
 		}
 	} else {
+		what := cmp.Or(req.GetKey(), req.GetAction())
+		// An event runs the plugin's own code, which no command's class covers.
+		if uctx.Untrusted() && !ConfirmedIn(ctx) {
+			return Result{}, pinToView(&ConfirmError{Command: "plugin.act", Title: "Act on Plugin Surface", Label: "Allow",
+				Message: fmt.Sprintf("Press %q on the %q surface of plugin %q?", what, a.String("surface"), a.String("name"))}, uctx, view.GetVersion())
+		}
 		res, err := b.Act(ctx, connect.NewRequest(req))
 		if err != nil {
 			return Result{}, err
-		}
-		what := req.GetKey()
-		if what == "" {
-			what = req.GetAction()
 		}
 		out.Version = res.Msg.GetVersion()
 		msg = fmt.Sprintf("acted on %s (view version %d)", what, res.Msg.GetVersion())

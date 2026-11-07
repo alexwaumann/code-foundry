@@ -25,6 +25,7 @@ import (
 func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.archive",
+		Page:  PageState,
 		Title: "Archive or Unarchive Thread",
 		Description: "Archive a thread: Claude is closed, its terminals removed, and it is unpinned and listed apart. " +
 			"Without archived, toggles. Pinning or sending a message unarchives it too. " +

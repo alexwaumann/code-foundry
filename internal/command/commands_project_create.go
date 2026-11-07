@@ -76,6 +76,7 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:  "project.create",
+			Page:  PageState,
 			Title: "New Project",
 			Description: "Start an empty project in ~/.code-foundry/projects/<name>: git init on the default branch " +
 				"(init.defaultBranch, else main) and an empty initial commit. Refuses when that folder exists.",

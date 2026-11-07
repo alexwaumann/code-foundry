@@ -21,6 +21,7 @@ import (
 func (d ViewDeps) panelPageCommand() Command {
 	return Command{
 		Name:      "view.panel.page",
+		Page:      PageState,
 		NoPalette: true,
 		Title:     "Show HTML Page in Side Panel",
 		Description: "Open an HTML page in a File tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +

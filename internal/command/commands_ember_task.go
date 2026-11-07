@@ -47,6 +47,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:      "ember.task.add",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Ember: Add Task",
 			Description: "Add a task to Ember's board, at the end (state todo unless given). A subtask names its parent " +
@@ -77,6 +78,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:      "ember.task.update",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Ember: Update Task",
 			Description: "Change a task: its title, detail, state, worker thread or outcome. Done stamps its done time; " +
@@ -107,6 +109,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:      "ember.task.done",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Ember: Task Done",
 			Description: "Mark a task done, with its outcome (what came of it: a PR, a finding). With branch, " +
@@ -131,6 +134,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		emberTaskStart(r, d),
 		Command{
 			Name:         "ember.task.cancel",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Ember: Cancel Task",
 			Description:  "Cancel a task, saying why. Its worker thread, if any, is left as it is.",

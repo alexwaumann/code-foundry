@@ -92,6 +92,7 @@ func (d ViewDeps) itemCommands() []Command {
 	return []Command{
 		{
 			Name:      "view.panel.file",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Show File in Side Panel",
 			Description: "Open a file in a File tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
@@ -114,6 +115,7 @@ func (d ViewDeps) itemCommands() []Command {
 		},
 		{
 			Name:      "view.panel.diff",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Show Diff in Side Panel",
 			Description: "Open a changed file's diff in a Diff tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
@@ -131,6 +133,7 @@ func (d ViewDeps) itemCommands() []Command {
 		},
 		{
 			Name:      "view.panel.pr",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Show Pull Request in Side Panel",
 			Description: "Open a pull request in a thread's side panel (from a thread: its own; in the app: the selected one): " +

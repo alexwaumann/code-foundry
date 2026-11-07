@@ -16,12 +16,15 @@ service CommandService {
 // page's call has the context of the CLI inside its thread, and a plugin's has whatever the
 // plugin or its panel gave. A setting's user_only and a page's confirmation read it.
 enum CallOrigin {
-  // The GUI's own controls, or a CLI.
+  // The GUI's own controls, which also send a view. With no view the caller is unknown,
+  // and the daemon treats it as a page (docs/notes/page-verb-gate.md).
   CALL_ORIGIN_UNSPECIFIED = 0;
   // A page shown in the app. Only the GUI's bridge host sets it, never the page.
   CALL_ORIGIN_PAGE = 1;
   // A plugin: host/invoke, or a command button of its panel.
   CALL_ORIGIN_PLUGIN = 2;
+  // The code-foundry CLI, in a thread or not.
+  CALL_ORIGIN_CLI = 3;
 }
 
 // UiContext describes what the caller is looking at. The daemon never guesses it.

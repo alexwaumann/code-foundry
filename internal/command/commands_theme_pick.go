@@ -18,6 +18,7 @@ const ViewThemes = "themes"
 func RegisterThemePick(r *Registry, e Emitter) error {
 	return r.Register(Command{
 		Name:        "theme.pick",
+		Page:        PageState,
 		Title:       "Choose Theme…",
 		Description: "Open the Themes page: preview each theme in a gallery of the app's controls, then apply it to the dark or light slot.",
 		Category:    "Settings",

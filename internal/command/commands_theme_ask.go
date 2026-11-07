@@ -129,6 +129,7 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 	}
 	return r.Register(Command{
 		Name:  "theme.ask",
+		Page:  PageDrives,
 		Title: "Ask the Model for a Theme…",
 		Description: "Start a thread that makes the colour theme you describe: the model saves and applies it, and the thread shows it as a card " +
 			"with Undo and Edit. Keep refining it there. --pair asks for the other scheme's pair of one of your themes.",

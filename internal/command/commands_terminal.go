@@ -93,6 +93,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:  "terminal.new",
+			Page:  PageState,
 			Title: "New Terminal",
 			Description: "Start a shell (or argv) that belongs to the active thread, else to the active worktree, " +
 				"else to the registered worktree containing --cwd (from the CLI: the working directory). " +
@@ -102,8 +103,8 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Keybindings: []string{"cmd+t"},
 			Args: []ArgSpec{
 				{Name: "cwd", Type: Path, Description: "Working directory; without a thread or worktree context, its registered worktree owns the shell"},
-				{Name: "argv", Type: String, Description: `Command line, split like a shell would (e.g. "claude --model opus")`},
-				{Name: "run", Type: String, Description: "A command line typed into the new shell once it has printed its prompt, then Return; " +
+				{Name: "argv", Type: String, PageAsks: true, Description: `Command line, split like a shell would (e.g. "claude --model opus")`},
+				{Name: "run", Type: String, PageAsks: true, Description: "A command line typed into the new shell once it has printed its prompt, then Return; " +
 					"the shell stays open after it. A multi-line value is pasted whole where the shell supports bracketed paste, else typed line by line"},
 				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread, worktree or --cwd, " +
 					"the registered worktree containing it owns the shell, which starts there (CLI default: the working directory)"},
@@ -171,6 +172,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 		},
 		Command{
 			Name:        "terminal.close",
+			Page:        PageState,
 			Title:       "Close Terminal",
 			Description: "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period) and remove it once it has exited.",
 			Category:    "Terminal",
@@ -199,6 +201,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 		},
 		Command{
 			Name:        "terminal.kill",
+			Page:        PageState,
 			Title:       "Kill Terminal",
 			Description: "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period).",
 			Category:    "Terminal",
@@ -215,6 +218,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 		},
 		Command{
 			Name:        "terminal.remove",
+			Page:        PageState,
 			Title:       "Remove Terminal",
 			Description: "Forget an exited terminal.",
 			Category:    "Terminal",

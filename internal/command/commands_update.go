@@ -294,6 +294,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 		},
 		Command{
 			Name:        "app.update.check",
+			Page:        PageState,
 			Title:       "Check for Updates",
 			Description: "Ask GitHub for the latest release now (the daemon also checks every 24 hours).",
 			Category:    "App",
@@ -316,6 +317,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 		},
 		Command{
 			Name:  "app.update",
+			Page:  PageState,
 			Title: "Download Update",
 			Description: "Download the available update in the background. Nothing changes on disk until `app.restart` installs it and restarts; " +
 				"until then the app and daemon keep running the current version.",
@@ -338,6 +340,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 		},
 		Command{
 			Name:        "app.relaunch",
+			Page:        PageState,
 			Title:       "Relaunch App",
 			Description: "Quit and reopen the app window, picking up an installed update. Threads keep running in the daemon.",
 			Category:    "App",

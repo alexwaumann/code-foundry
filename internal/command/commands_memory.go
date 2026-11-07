@@ -131,6 +131,7 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 		},
 		Command{
 			Name:      "memory.add",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Memory: Remember a Preference",
 			Description: "Remember a standing preference (\"always open PRs as drafts\") for every thread in every project, " +
@@ -162,6 +163,7 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 		},
 		Command{
 			Name:      "memory.remove",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Memory: Forget a Preference",
 			Description: "Forget one remembered preference: by its number in `memory show`, its text, its id, or text found in it alone; " +
@@ -204,6 +206,7 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 		},
 		Command{
 			Name:         "memory.clear",
+			Page:         PageState,
 			Title:        "Memory: Forget All Preferences",
 			Description:  "Forget every remembered preference. New threads get none. Refused in a thread another thread started.",
 			Category:     "Settings",
