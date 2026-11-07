@@ -174,7 +174,10 @@ func (m *Manager) threadPart(ctx context.Context, sub Subscription, t Thread, at
 	if items, err := m.Items(ctx, t.ID); err != nil {
 		m.log.Warn("wake detail: read the thread's items", "thread", t.ID, "err", err)
 	} else {
-		d = wakeDetailOf(t, items.Items, kids)
+		d = wakeDetailOf(t, itemsUntil(items.Items, at), kids)
+	}
+	if Meets(CondIdle, t) {
+		d.checkouts = m.wakeCheckouts(ctx, t)
 	}
 	return threadWakePart{sub: sub, t: t, at: at, d: d}
 }
@@ -439,12 +442,14 @@ type wakeThread struct {
 	CreatedBy    string      `json:"created_by"`
 	Labels       []string    `json:"labels"`
 	Report       *wakeReport `json:"report"`
-	// ReportStale: the turn ended and the report does not describe it (none, or filed
-	// before the thread's last message). LastMessage is then the turn's last assistant
-	// text, one line, cut at maxLastMessage runes (a question asked in prose); also with
-	// a current report when the turn said more after filing it (a caveat).
-	ReportStale bool   `json:"report_stale,omitempty"`
+	// LastMessage is the ended turn's last assistant text as it was written, cut only at
+	// maxLastMessage runes. Report is left out when it adds nothing to it: the daemon's
+	// own (ReportFinished), or one filed before the thread's last message.
 	LastMessage string `json:"last_message,omitempty"`
+	// Checkouts is what git says about its checkouts once the turn ended, and
+	// PullRequests the pull requests linked to it: observed, not the thread's claim.
+	Checkouts    []CheckoutFacts `json:"checkouts,omitempty"`
+	PullRequests []string        `json:"pull_requests,omitempty"`
 	// Pending is the request a "permission: …" or "question: …" reason describes.
 	Pending *wakePending `json:"pending,omitempty"`
 	// Children counts the threads it created that are not archived; nil for none.
@@ -533,17 +538,16 @@ var statusNames = map[Status]string{
 // its items hold (wakeDetailOf).
 type wakeDetail struct {
 	children wakeChildren
-	// noReport: the turn ended and the thread has no report; staleReport: its report was
-	// filed before its last message (a follow-up, a wake), so it describes an older turn.
-	noReport, staleReport bool
-	// saidMore: the turn ended with assistant text after its (current) report was
-	// filed, and did real work after it (a tool call) or said more than a closing
-	// paragraph (over maxClosingWords runes): what it said may qualify the report.
-	saidMore bool
-	// lastMessage is the ended turn's last assistant text, when its report does not
-	// describe it (noReport, or staleReport) or it said more after it (saidMore).
+	// staleReport: its report was filed before its last message (a follow-up, a wake), so
+	// it describes an older turn.
+	staleReport bool
+	// silent: the turn ended without a word.
+	silent bool
+	// lastMessage is the ended turn's last assistant text, whole (cutMessage).
 	lastMessage string
-	pending     *wakePending
+	// checkouts is what git says about its checkouts now the turn ended (threadPart).
+	checkouts []CheckoutFacts
+	pending   *wakePending
 	// siblings counts the subscriber's children when the target is one of them; set
 	// when the wake is sent (subscriptions_batch.go).
 	siblings *wakeSiblings
@@ -555,66 +559,70 @@ type wakeDetail struct {
 	startedAt, endedAt time.Time
 }
 
-// Wake detail bounds: the last assistant message (runes, one line) and a pending
-// request's tool input (bytes).
+// Wake detail bounds: the last assistant message (runes) and a pending request's tool
+// input (bytes). 16 Ki runes is over three times the longest final message of 425 a
+// child wrote (docs/notes/wake-final-message.md): the cut is a safety net, not a summary.
 const (
-	maxLastMessage  = 500
+	maxLastMessage  = 16 << 10
 	maxPendingInput = 4 << 10
 )
 
-// maxClosingWords bounds a closing paragraph after a report (runes of assistant text):
-// a sign-off up to it, with no tool call after the report, is not "said more".
-const maxClosingWords = 300
+// cutMessage is s, cut at maxLastMessage runes with a marker saying where the rest is.
+func cutMessage(s string) string {
+	n := utf8.RuneCountInString(s)
+	if n <= maxLastMessage {
+		return s
+	}
+	return string([]rune(s)[:maxLastMessage]) + "… [" + strconv.Itoa(n-maxLastMessage) + " more characters; thread read --full has it all]"
+}
 
-// wakeDetailOf reads a thread wake's detail from t's items: whether the report is
-// missing or older than the last user message (any origin: a follow-up or a wake), or
-// was followed in the ended turn by more assistant text and real work (a tool call, or
-// more than a closing paragraph: maxClosingWords), the turn's last assistant text when
-// so, and the request a "permission: …" or "question: …" reason describes. Subagents'
-// items are skipped.
-func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
-	d := wakeDetail{children: kids}
-	var lastUser, lastAt, turnEnd time.Time
-	var last string
-	// After the report, in the turn: tool calls, and the assistant text's runes.
-	toolAfter, textAfter := false, 0
+// lastTurn is what t's items say about its latest turn: when it started (the last
+// top-level user message of any origin), when it ended (zero while it runs) and its last
+// assistant text. Subagents' items are skipped.
+func lastTurn(items []Item) (started, ended time.Time, text string) {
 	for _, it := range items {
 		if it.ParentToolUseID != "" {
 			continue
 		}
 		switch it.Kind {
 		case KindUserMessage:
-			lastUser, last, lastAt, turnEnd = it.CreatedAt, "", time.Time{}, time.Time{}
-			toolAfter, textAfter = false, 0
+			started, ended, text = it.CreatedAt, time.Time{}, ""
 		case KindAssistantText:
 			if s := strings.TrimSpace(it.Text); s != "" {
-				last, lastAt = s, it.CreatedAt
-				if it.CreatedAt.After(t.Report.At) {
-					textAfter += utf8.RuneCountInString(s)
-				}
+				text = s
 			}
 		case KindTurnEnd:
-			turnEnd = it.CreatedAt
-		case KindToolCall:
-			toolAfter = toolAfter || it.CreatedAt.After(t.Report.At)
+			ended = it.CreatedAt
 		}
 	}
+	return started, ended, text
+}
+
+// itemsUntil is items without the turn a message after the fire started: a wake is built
+// after it fired (the batch window at least), and it is about the turn that ended then.
+func itemsUntil(items []Item, at time.Time) []Item {
+	for i, it := range items {
+		if it.Kind == KindUserMessage && it.ParentToolUseID == "" && it.CreatedAt.After(at) {
+			return items[:i]
+		}
+	}
+	return items
+}
+
+// wakeDetailOf reads a thread wake's detail from t's items: whether the report is older
+// than the last user message (any origin: a follow-up or a wake), the ended turn's last
+// assistant text, and the request a "permission: …" or "question: …" reason describes.
+func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
+	d := wakeDetail{children: kids}
+	lastUser, turnEnd, last := lastTurn(items)
 	d.startedAt = lastUser
 	if Meets(CondIdle, t) && !lastUser.IsZero() && !turnEnd.Before(lastUser) {
 		d.endedAt = turnEnd
 	}
-	hasReport := t.Report.Status != ReportNone
-	d.staleReport = hasReport && t.Report.At.Before(lastUser.Truncate(time.Millisecond))
+	d.staleReport = t.Report.Status != ReportNone && t.Report.At.Before(lastUser.Truncate(time.Millisecond))
 	if Meets(CondIdle, t) {
-		// The turn ended: say when the report does not describe it, or when the turn
-		// went on working after filing it, and what it said last. A short sign-off after
-		// the report is the normal end of a turn, not news.
-		d.noReport = !hasReport
-		d.saidMore = hasReport && !d.staleReport && last != "" && lastAt.After(t.Report.At) &&
-			(toolAfter || textAfter > maxClosingWords)
-		if d.noReport || d.staleReport || d.saidMore {
-			d.lastMessage = oneLine(last, maxLastMessage)
-		}
+		d.lastMessage = cutMessage(last)
+		d.silent = last == "" && !lastUser.IsZero()
 	}
 	if t.Status == StatusNeedsAttention && isRequestReason(t.StatusReason) {
 		d.pending = pendingRequestOf(t, items)
@@ -692,12 +700,14 @@ func threadWakePayload(sub Subscription, t Thread, at time.Time, d wakeDetail) w
 	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Note: sub.Note, Condition: sub.Condition, FiredAt: wakeTime(at), AfterRestart: d.afterRestart, Thread: wakeThread{
 		ID: t.ID, Name: t.Name, State: t.State.String(), Status: statusNames[t.Status], StatusReason: t.StatusReason,
 		ProjectID: t.ProjectID, WorktreePath: t.WorktreePath, CreatedBy: t.CreatedBy, Labels: t.Labels,
-		ReportStale: d.noReport || d.staleReport, LastMessage: d.lastMessage, Pending: d.pending, Siblings: d.siblings,
+		LastMessage: d.lastMessage, Checkouts: d.checkouts, PullRequests: pullRequestURLs(t), Pending: d.pending, Siblings: d.siblings,
 	}}
 	if p.Thread.Labels == nil {
 		p.Thread.Labels = []string{}
 	}
-	p.Thread.Report = wakeReportOf(t.Report)
+	if !d.staleReport {
+		p.Thread.Report = wakeReportOf(t.Report)
+	}
 	if !d.startedAt.IsZero() {
 		end := d.endedAt
 		if end.IsZero() {
@@ -712,9 +722,10 @@ func threadWakePayload(sub Subscription, t Thread, at time.Time, d wakeDetail) w
 	return p
 }
 
-// wakeReportOf is a report in a wake's JSON; nil for none.
+// wakeReportOf is a report in a wake's JSON; nil for none, and for the daemon's own,
+// which is only the head of last_message.
 func wakeReportOf(rep Report) *wakeReport {
-	if rep.Status == ReportNone {
+	if rep.Status == ReportNone || rep.Status == ReportFinished {
 		return nil
 	}
 	r := &wakeReport{Status: rep.Status.String(), Summary: rep.Summary, At: wakeTime(rep.At), Data: json.RawMessage("null")}
@@ -725,14 +736,13 @@ func wakeReportOf(rep Report) *wakeReport {
 }
 
 // threadWakeTitle is a thread wake's header without its prefix, for example
-// `Thread "Fix the login" (s-1) needs attention: finished. Report: done — all good.`,
-// `Thread "Ask" (s-2) needs attention: finished without a report.` or
-// `Thread "Lead" (s-3) is idle: at prompt (report is from before its last message); 2 of
-// its 3 child threads still working.` or `Thread "Docs" (s-4) needs attention: finished,
-// said more after its report. Report: done — typos fixed.` or `Thread "Tests" (s-5)
+// `Thread "Fix the login" (s-1) needs attention: finished.`,
+// `Thread "Ask" (s-2) needs attention: finished. Report: blocked — no access.`,
+// `Thread "Lead" (s-3) is idle: at prompt; 2 of its 3 child threads still working.`,
+// `Thread "Docs" (s-4) needs attention: finished without a word.` or `Thread "Tests" (s-5)
 // crashed: its process died (not stopped by anyone).` The verb is the condition's, or for
 // settled and idle the status's. A report is quoted only while it is current (not
-// staleReport).
+// staleReport) and says what the last message does not (quotedReport).
 func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 	who := "Thread " + t.ID
 	if t.Name != "" {
@@ -766,14 +776,8 @@ func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 		line = who + " crashed: its process died (not stopped by anyone)"
 	case d.appStopped:
 		line = who + " was interrupted when the app stopped"
-	case d.noReport && t.StatusReason == "finished":
-		line += " without a report"
-	case d.noReport:
-		line += " (no report)"
-	case d.staleReport && Meets(CondIdle, t):
-		line += " (report is from before its last message)"
-	case d.saidMore:
-		line += ", said more after its report"
+	case d.silent:
+		line += " without a word"
 	}
 	if k := d.children; k.Working > 0 {
 		if k.Total == 1 {
@@ -783,7 +787,7 @@ func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 		}
 	}
 	line = endSentence(line)
-	if t.Report.Status != ReportNone && !d.staleReport {
+	if quotedReport(t.Report, d) {
 		line += " Report: " + t.Report.Status.String()
 		if sum := oneLine(t.Report.Summary, maxHeaderSummary); sum != "" {
 			line += " — " + sum
@@ -791,6 +795,18 @@ func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 		line = endSentence(line)
 	}
 	return line
+}
+
+// quotedReport reports whether a wake's header quotes rep: a current report that is not
+// the daemon's own, unless it only says done beside the thread's own last message.
+func quotedReport(rep Report, d wakeDetail) bool {
+	switch {
+	case rep.Status == ReportNone || rep.Status == ReportFinished || d.staleReport:
+		return false
+	case rep.Status == ReportDone && d.lastMessage != "":
+		return false
+	}
+	return true
 }
 
 // RunTime is how long a turn ran, to the second: "42s", "2m 22s", "3m", "1h 5m" (whole

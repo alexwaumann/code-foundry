@@ -6,7 +6,7 @@
  */
 import type { EmberTaskDescendantView, EmberTaskStateView, EmberTaskThreadView, EmberTaskView, EmberTimerView } from "@/api/ember";
 import type { ThreadItemView, WakeView } from "@/api/thread";
-import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
+import type { ThreadReportStatusView, ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { statusLine, type StatusTone } from "./statusLine";
 import { threadBadge } from "./thread";
 import { snoozeTimeShort } from "./snooze";
@@ -249,7 +249,7 @@ export interface WorkerRow {
 function workerDot(th: WorkerLike, state: EmberTaskStateView): TaskDot {
   if (workerBusy(th)) return "doing";
   if (workerAsks(th)) return "blocked";
-  if (state === "doing") return th.reportStatus === "done" ? "done" : "open";
+  if (state === "doing") return th.reportStatus === "done" || th.reportStatus === "finished" ? "done" : "open";
   return taskDot(state);
 }
 
@@ -459,15 +459,16 @@ export function unclosed(t: EmberTaskView, tasks: readonly EmberTaskView[]): Unc
   if (pieces.length > 0) return pieces.every((x) => x.state === "done" || x.state === "cancelled") ? "pieces" : null;
   const th = t.thread;
   if (t.state !== "doing" || !th || th.removed) return null;
-  if (th.reportStatus !== "done" && th.reportStatus !== "failed" && th.reportStatus !== "blocked") return null;
+  if (th.reportStatus !== "done" && th.reportStatus !== "finished" && th.reportStatus !== "failed" && th.reportStatus !== "blocked") return null;
   // An archived worker counts as idle: its report still waits on the check.
   const live = { ...th, archived: false };
   const teamWorks = th.descendantsWorking > 0 || th.descendants.some(workerBusy);
   return workerBusy(live) || workerAsks(live) || teamWorks || th.descendantsWaiting > 0 ? null : "report";
 }
 
-/** A worker's report on a task that waits on Ember's check: "reported done" (emerald), "reported failed" (red), "reported blocked" (amber). */
-function reportedWords(status: "done" | "failed" | "blocked" | "progress"): Words {
+/** A worker's report on a task that waits on Ember's check: "reported done" and "finished" (emerald), "reported failed" (red), "reported blocked" (amber). */
+function reportedWords(status: ThreadReportStatusView): Words {
+  if (status === "finished") return { text: "finished", tone: "emerald" };
   return { text: `reported ${status}`, tone: status === "done" ? "emerald" : status === "failed" ? "red" : "amber" };
 }
 
@@ -475,7 +476,7 @@ function reportedWords(status: "done" | "failed" | "blocked" | "progress"): Word
 export function unclosedWords(t: EmberTaskView, tasks: readonly EmberTaskView[]): string {
   switch (unclosed(t, tasks)) {
     case "report":
-      return `Worker reported ${t.thread?.reportStatus ?? "done"}, waiting for Ember to check`;
+      return t.thread?.reportStatus === "finished" ? "Worker finished, waiting for Ember to check" : `Worker reported ${t.thread?.reportStatus ?? "done"}, waiting for Ember to check`;
     case "pieces":
       return "All pieces closed, waiting for Ember to close it";
     case null:

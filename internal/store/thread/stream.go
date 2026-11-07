@@ -540,6 +540,7 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		if last := r.st.proj.last; last.tokens > 0 {
 			r.m.recordContext(r.id, last.tokens, last.model)
 		}
+		r.recordTurnReport(e) // turnreport.go
 		r.putAwayAtTurnEnd(e) // putaway.go
 	case *claudestream.CommandsChanged:
 		r.onSlashCommands(e.Commands, true)

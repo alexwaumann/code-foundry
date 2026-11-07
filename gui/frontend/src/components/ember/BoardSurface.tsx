@@ -161,7 +161,7 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
   const t = card.task;
   const meta = cardMeta(card);
   const check = unclosedWords(t, card.subtasks);
-  const checkTone = unclosed(t, card.subtasks) === "report" && t.thread?.reportStatus !== "done" ? TONE.amber : TONE.emerald;
+  const checkTone = unclosed(t, card.subtasks) === "report" && t.thread?.reportStatus !== "done" && t.thread?.reportStatus !== "finished" ? TONE.amber : TONE.emerald;
   const progress = cardProgress(card);
   const rows = workerRows(card);
   return (

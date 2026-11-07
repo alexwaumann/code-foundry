@@ -62,6 +62,26 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-found
 	"say what you'll do, not command or skill names. " +
 	"Work split up, run in parallel or landed on several branches goes through code-foundry-orchestrate, never hand-made worktrees or branches, nor the Agent tool (read-only research)."
 
+// CreatedThreadPrompt is what a thread another thread created gets after ThreadPrompt: what
+// happens to its last message (turnreport.go). Here, not in its creator's brief, so it
+// holds whatever the brief says.
+const CreatedThreadPrompt = "Another thread created this one. The last message of each of your turns reaches it whole, " +
+	"with your branch, push state and diffstat read from git, so end each turn with what you did and how you checked it, " +
+	"caveats first, and do not repeat the task. If you are blocked or failed, first run " +
+	"`code-foundry thread report blocked \"why\"` (or `failed`)."
+
+// ownAppend is the part of s's system prompt that is its own: CreatedThreadPrompt for a
+// created thread, then Thread.SystemPromptAppend.
+func ownAppend(s Thread) string {
+	if s.CreatedBy == "" {
+		return s.SystemPromptAppend
+	}
+	if s.SystemPromptAppend == "" {
+		return CreatedThreadPrompt
+	}
+	return CreatedThreadPrompt + "\n\n" + s.SystemPromptAppend
+}
+
 // systemPrompt is --append-system-prompt: ThreadPrompt, then a referenced workspace's
 // instructions (workspaceBlock) when there are any, then the app memory's entries
 // (memoryPrompt) when there are any, then the thread's own append.

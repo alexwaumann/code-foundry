@@ -509,6 +509,9 @@ const (
 	ThreadReportStatus_THREAD_REPORT_STATUS_FAILED ThreadReportStatus = 3
 	// Work in progress: an intermediate report.
 	ThreadReportStatus_THREAD_REPORT_STATUS_PROGRESS ThreadReportStatus = 4
+	// The daemon's, not the agent's: a created thread's turn ended normally with no report
+	// of its own for it. The summary is the head of its last message.
+	ThreadReportStatus_THREAD_REPORT_STATUS_FINISHED ThreadReportStatus = 5
 )
 
 // Enum value maps for ThreadReportStatus.
@@ -519,6 +522,7 @@ var (
 		2: "THREAD_REPORT_STATUS_BLOCKED",
 		3: "THREAD_REPORT_STATUS_FAILED",
 		4: "THREAD_REPORT_STATUS_PROGRESS",
+		5: "THREAD_REPORT_STATUS_FINISHED",
 	}
 	ThreadReportStatus_value = map[string]int32{
 		"THREAD_REPORT_STATUS_UNSPECIFIED": 0,
@@ -526,6 +530,7 @@ var (
 		"THREAD_REPORT_STATUS_BLOCKED":     2,
 		"THREAD_REPORT_STATUS_FAILED":      3,
 		"THREAD_REPORT_STATUS_PROGRESS":    4,
+		"THREAD_REPORT_STATUS_FINISHED":    5,
 	}
 )
 
@@ -8061,13 +8066,14 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x0fThreadFlagLevel\x12!\n" +
 	"\x1dTHREAD_FLAG_LEVEL_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bTHREAD_FLAG_LEVEL_ATTENTION\x10\x01\x12\x1b\n" +
-	"\x17THREAD_FLAG_LEVEL_ERROR\x10\x02*\xbf\x01\n" +
+	"\x17THREAD_FLAG_LEVEL_ERROR\x10\x02*\xe2\x01\n" +
 	"\x12ThreadReportStatus\x12$\n" +
 	" THREAD_REPORT_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19THREAD_REPORT_STATUS_DONE\x10\x01\x12 \n" +
 	"\x1cTHREAD_REPORT_STATUS_BLOCKED\x10\x02\x12\x1f\n" +
 	"\x1bTHREAD_REPORT_STATUS_FAILED\x10\x03\x12!\n" +
-	"\x1dTHREAD_REPORT_STATUS_PROGRESS\x10\x04*j\n" +
+	"\x1dTHREAD_REPORT_STATUS_PROGRESS\x10\x04\x12!\n" +
+	"\x1dTHREAD_REPORT_STATUS_FINISHED\x10\x05*j\n" +
 	"\x0eAgentRunStatus\x12 \n" +
 	"\x1cAGENT_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15AGENT_RUN_STATUS_OPEN\x10\x01\x12\x1b\n" +

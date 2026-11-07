@@ -82,13 +82,12 @@ The prompt is all the worker knows. Say:
   report `blocked`, not `done`;
 - to stage only the files it changed (never `git add -A`: build output gets committed),
   commit, push with `git push origin HEAD` (not `-u`; settings name its branch, so never
-  name one: take it from its report), never `git stash`, and open a pull request only if
+  name one: take it from its wake), never `git stash`, and open a pull request only if
   the user asked for one and `origin` is on GitHub;
 - to check `git diff origin/<default> --stat` against what it claims;
-- to finish, as its LAST step, with `code-foundry thread report done "<summary>" --data
-  '{"branch": "...", "files": [...], "caveats": [...]}'` (or `blocked` / `failed`): the
-  summary at most 1000 characters, caveats first, details in `--data`; and again after
-  any later message.
+- when blocked or failed, to run `code-foundry thread report blocked "<why>"` (or `failed`).
+  No closing report: the last message of each of its turns reaches you whole, caveats first,
+  and the app tells it so.
 
 ## Research
 
@@ -96,9 +95,8 @@ A question about code is a piece whose outcome is an answer: the whole request, 
 first piece the build pieces wait on. Start it with `ember task start … --project <id>
 --new-worktree=false --prompt - <<'EOF'`: the project's checkout, no worktree or branch.
 Its prompt gives the question and where to start, and says it touches nothing: no
-edits, commits, pushes or threads, no build unless the question needs one; it ends with
-`code-foundry thread report done "<answer>" --data '{"findings": [...], "files": [...]}'`
-(or `blocked`). On its wake, relay the findings, close it with `code-foundry ember task
+edits, commits, pushes or threads, no build unless the question needs one; its last message
+is the answer, with its findings and the files they are in. On its wake, relay the findings, close it with `code-foundry ember task
 done <task id> "<finding>"` (no `--branch`), then start the pieces that waited on it.
 
 ## Leads
@@ -112,24 +110,25 @@ its `reference/leads.md`, then `ember task start --task <parent id> --project <i
 --new-worktree=false --prompt - <<'EOF'` with
 "You are a lead: use the code-foundry-orchestrate skill and read its
 reference/leads.md first. Start your workers in your first turn; keep each piece whole
-and independent on its own branch unless the user said otherwise; finish with `thread
-report done` listing each worker." Never ask a lead for conflict-free branches.
+and independent on its own branch unless the user said otherwise; end with a last message
+listing each worker." Never ask a lead for conflict-free branches.
 
 ## On a wake
 
 A `[code-foundry wake]` message says a worker
 settled or a timer fired; tasks under its "Unclosed on your board" get steps 2-4 too.
 While siblings still work, a wake turn checks and closes what landed, then ends silently
-or with one line: no analysis of a partial batch, no promised check. A wake with
-`report_stale: true` has `last_message`: the worker may be asking you something in prose;
-read it and answer with `thread send --id <worker>`.
+or with one line: no analysis of a partial batch, no promised check. A wake's
+`last_message` is the worker's whole last message: it may ask you something in prose;
+answer with `thread send --id <worker>`. Its `checkouts` is what git says about the branch.
 
-1. Read what happened: `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD`
-   (one line per worker), `thread read <id>` (details), `ember task list` (the board).
-2. **Check before you believe.** A `done` report is a claim: look at the branch in the
+1. Read what happened: the wake has it; `code-foundry thread reports --created-by
+   $CODE_FOUNDRY_THREAD` (one line per worker), `ember task list` (the board).
+2. **Check before you believe.** A worker's last message is a claim: hold it against
+   `checkouts`, and for what that does not say, look at the branch in the
    worker's worktree (`git -C <worktree> log origin/<branch>`, `git -C <worktree> diff
    origin/main...origin/<branch> --stat`), not in the project's checkout, and read its
-   caveats. A done whose caveats say the goal was not met or checked, or that the
+   caveats. A result whose caveats say the goal was not met or checked, or that the
    branch breaks the app as is, is not done. A report that used another tool version
    or skipped a policy is a caveat for the user, never a recipe for the next prompt.
 3. **Check the combination** when a request's last piece lands, or a piece changed a

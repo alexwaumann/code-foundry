@@ -649,7 +649,7 @@ func staleReport(t Task) bool {
 		return false
 	}
 	switch t.Thread.Report.Status {
-	case thread.ReportDone, thread.ReportFailed, thread.ReportBlocked:
+	case thread.ReportDone, thread.ReportFinished, thread.ReportFailed, thread.ReportBlocked:
 		return t.Thread.Report.At.Before(t.UpdatedAt)
 	}
 	return false

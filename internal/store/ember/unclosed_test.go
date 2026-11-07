@@ -45,6 +45,7 @@ func TestUnclosed(t *testing.T) {
 		words string
 	}{
 		{"reported done, idle", doing(finished(reported(thread.ReportDone))), nil, UnclosedReport, "unclosed: worker reported done, waiting for Ember to check"},
+		{"its turn just ended, no report of its own", doing(finished(reported(thread.ReportFinished))), nil, UnclosedReport, "unclosed: worker reported finished, waiting for Ember to check"},
 		{"reported failed, still doing", doing(finished(reported(thread.ReportFailed))), nil, UnclosedReport, "unclosed: worker reported failed, waiting for Ember to check"},
 		{"stopped after its report", doing(stopped), nil, UnclosedReport, ""},
 		{"a stale waiting reason", doing(staleWaiting), nil, UnclosedReport, ""},

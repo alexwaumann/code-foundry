@@ -693,6 +693,15 @@ describe("idle workers and tasks waiting on Ember", () => {
     expect(unclosed(t, [t])).toBe(want);
   });
 
+  it("a worker whose turn just ended, with no report of its own, waits on Ember too", () => {
+    const finished = task("t-f", { title: "Notes field", state: "doing", threadId: "s-r", thread: { ...reported(), reportStatus: "finished" } });
+    expect(unclosed(finished, [finished])).toBe("report");
+    expect(unclosedWords(finished, [finished])).toBe("Worker finished, waiting for Ember to check");
+    const [card] = boardSections([finished], NOW).inProgress;
+    expect(card && cardMeta(card)).toEqual({ text: "finished", tone: "emerald" });
+    expect((card ? workerRows(card) : []).map((r) => r.dot)).toEqual(["done"]);
+  });
+
   it("words the card, its worker row, the header and a link", () => {
     const [card] = boardSections([toCheck], NOW).inProgress;
     expect(card && cardMeta(card)).toEqual({ text: "reported done", tone: "emerald" });

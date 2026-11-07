@@ -98,6 +98,9 @@ type Options struct {
 	// RefExists reports whether ref exists in the repository at dir; Create uses it
 	// to keep new worktree branches unique. Default: git rev-parse --verify.
 	RefExists func(ctx context.Context, dir, ref string) bool
+	// CheckoutFacts reads what git says about the checkout at dir, against
+	// origin/<defaultBranch>, for a wake (checkoutfacts.go). Default: git.
+	CheckoutFacts func(ctx context.Context, dir, defaultBranch string) (CheckoutFacts, bool)
 	// FetchBranch fetches origin's branch in the repository at dir and reports whether
 	// origin has it; a thread whose cleaned-up worktree is recreated looks there before
 	// making the branch again from its base (recreate.go). Default: git fetch.
@@ -283,6 +286,9 @@ func (o Options) withDefaults() (Options, error) {
 			return o, fmt.Errorf("thread: home directory: %w", err)
 		}
 		o.Home = home
+	}
+	if o.CheckoutFacts == nil {
+		o.CheckoutFacts = gitCheckoutFacts
 	}
 	if o.RefExists == nil {
 		o.RefExists = gitRefExists
@@ -1125,7 +1131,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	mem = memorySpawned(l, s.MemoryHash, entries, memOK)
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
 		allowedTools: allowedTools(append(residentAllow, g.allow...)), disallowedTools: append(residentDeny, g.deny...),
-		appendSystemPrompt: systemPrompt("", entries, s.SystemPromptAppend)}
+		appendSystemPrompt: systemPrompt("", entries, ownAppend(s))}
 	if m.opts.SkillsDir != "" {
 		// First, so the skills load whatever else is added (docs/notes/agent-skills.md).
 		sa.addDirs = append(sa.addDirs, m.opts.SkillsDir)
@@ -1144,7 +1150,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	// read now (workspace.go).
 	ws := m.workspaceSpawn(ctx, s)
 	if ws.prompt != "" {
-		sa.appendSystemPrompt = systemPrompt(ws.prompt, entries, s.SystemPromptAppend)
+		sa.appendSystemPrompt = systemPrompt(ws.prompt, entries, ownAppend(s))
 	}
 	x = m.extras(ctx, spawnInfoOf(s, members, wait))
 	sa.addDirs = append(sa.addDirs, x.AddDirs...)

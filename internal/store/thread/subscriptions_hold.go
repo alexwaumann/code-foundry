@@ -84,7 +84,7 @@ func (m *Manager) kidsLocked() map[string][]Thread {
 func heldLeadWake(p threadWakePart) bool {
 	t := p.t
 	ended := t.Status == StatusIdle || (t.Status == StatusNeedsAttention && t.StatusReason == "finished")
-	final := t.Report.Status != ReportNone && t.Report.Status != ReportProgress && !p.d.staleReport
+	final := t.Report.Status.final() && !p.d.staleReport
 	return p.sub.Condition == CondSettled && ended && !final && p.d.children.Working > 0
 }
 

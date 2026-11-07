@@ -348,7 +348,7 @@ export interface ThreadFlagView {
 }
 
 /** How a thread's task went, as its agent reported it. */
-export type ThreadReportStatusView = "done" | "blocked" | "failed" | "progress";
+export type ThreadReportStatusView = "done" | "blocked" | "failed" | "progress" | "finished";
 
 /** A thread's latest report (thread.report). */
 export interface ThreadReportView {
@@ -655,6 +655,7 @@ export const reportStatusMap: Record<ThreadReportStatus, ThreadReportStatusView 
   [ThreadReportStatus.BLOCKED]: "blocked",
   [ThreadReportStatus.FAILED]: "failed",
   [ThreadReportStatus.PROGRESS]: "progress",
+  [ThreadReportStatus.FINISHED]: "finished",
 };
 
 /** The thread's report, or null when it has none (an unknown status from a newer daemon is none too). */
