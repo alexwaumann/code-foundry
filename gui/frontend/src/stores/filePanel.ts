@@ -1,11 +1,13 @@
 /**
  * Opening files and diffs as side panel tabs (surfaces/files.ts, surfaces/diff.ts). GUI
- * state only: no daemon command. The Changes tab's rows open a Diff tab; the Diff tab's
- * Open file opens a File tab; path chips open File tabs through openFileInPanel too.
+ * state only: no daemon command. The Diff tab's Open file opens a File tab; path chips open
+ * File tabs through openFileInPanel too.
  */
-import { diffTab, fileOfTab, fileTab, type DiffTarget, type FileTarget } from "@/surfaces/fileTarget";
+import { DEFAULT_BASE, DEFAULT_HEAD, DIFF_TITLE, diffTab, type DiffTarget } from "@/surfaces/diffTarget";
+import { fileOfTab, fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { isUnplaced } from "@/lib/threadSetup";
-import { allTabs, expandPanel, getPanel, keyOf, openSurface, panelThreadId, usePanelStore, type PanelTarget, type Tab } from "./panel";
+import { allTabs, expandPanel, getPanel, keyOf, openSurface, panelThreadId, togglePanel, usePanelStore, type PanelTarget, type Tab } from "./panel";
+import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { HOME, PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "./ui";
 
@@ -49,14 +51,25 @@ export function openLooseFile(dir: string, path: string): boolean {
   return true;
 }
 
-/** Opens (or activates) a changed file's Diff tab in a panel; an open one takes the new scope. */
-export function openDiffInPanel(target: PanelTarget, diff: DiffTarget): boolean {
-  return openSurface(target, diffTab(diff));
+/** Opens (or activates) a checkout's Diff tab in a panel; an open one takes the new sources and file. */
+export function openDiffInPanel(target: PanelTarget, diff: DiffTarget, title?: string): boolean {
+  return openSurface(target, diffTab(diff, title));
 }
 
-/** A Changes row as the Diff tab opens it: the working tree when it has uncommitted changes, else the branch. */
-export function diffOfChange(project: string, worktree: string, change: { path: string; oldPath: string; uncommitted: boolean }): DiffTarget {
-  return { project, worktree, path: change.path, oldPath: change.oldPath, scope: change.uncommitted ? "working" : "branch" };
+/**
+ * Opens (or activates) a checkout's Diff tab, keeping what an open one compares and shows,
+ * and shows the panel without focus: the thread info card's Changes rows and the Projects
+ * page's checkout menus. `own`: the thread's cwd checkout, whose title names no project.
+ * False with nothing selected.
+ */
+export function openCheckoutDiff(target: PanelTarget, project: string, worktree: string, own = false): boolean {
+  // Named at once, not when it first reads: a thread's checkouts often share a branch, and two plain "Diff" tabs tell nothing apart.
+  const title = own ? DIFF_TITLE : `${DIFF_TITLE} · ${useProjectsStore.getState().byId[project]?.name ?? project}`;
+  const fresh = diffTab({ project, worktree, base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "", oldPath: "", own }, title);
+  const open = allTabs(getPanel(target)).find((t) => t.id === fresh.id);
+  if (!openSurface(target, open ?? fresh)) return false;
+  togglePanel(target, true, { focus: false });
+  return true;
 }
 
 /**

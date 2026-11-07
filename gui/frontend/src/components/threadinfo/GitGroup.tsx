@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
-import { fileTotals } from "@/components/changes/files";
+import { fileTotals } from "@/components/diff/files";
 import { useLinkedPrViews } from "@/components/sidebar/useLinkedPrs";
 import {
   commits,
@@ -46,7 +46,7 @@ import { copyBranchName, pendingKey, runOnce, sendThreadPrompt, useCardPending, 
 import { threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
-import { openChangesTab } from "@/stores/changesPanel";
+import { openCheckoutDiff } from "@/stores/filePanel";
 import { DiffCounts, Group, HOVER_CARD, Row, RowMore, SubLine } from "./Row";
 import { useMembers } from "./useMembers";
 
@@ -374,7 +374,7 @@ function GitStateRowView({ threadId }: { threadId: string }) {
   }
 }
 
-/** A git member's changes against its base, as the Changes tab's heading counts them. */
+/** A git member's changes against its base, as the Diff tab's list counts them. */
 interface MemberChanges {
   projectId: string;
   path: string;
@@ -384,8 +384,8 @@ interface MemberChanges {
 }
 
 /**
- * Changes: added and deleted lines and files against the base, as the Changes tab counts
- * them (a click opens the cwd's Changes tab, whose list opens each file's Diff tab). With several projects:
+ * Changes: added and deleted lines and files against the base, as the Diff tab counts
+ * them (a click opens the cwd's Diff tab). With several projects:
  * the lines over all, the dirty projects counted, and a fold with a row per dirty project.
  * "No changes" when clean; nothing until every checkout's detail has been read.
  */
@@ -419,7 +419,7 @@ function ChangesRow({ threadId }: { threadId: string }) {
   const deleted = dirty.reduce((n, d) => n + d.deleted, 0);
   const count = dirty.reduce((n, d) => n + d.count, 0);
   const openTab = () => {
-    if (cwd) openChangesTab("current", cwdProjectId, cwd, true);
+    if (cwd) openCheckoutDiff("current", cwdProjectId, cwd, true);
   };
   if (dirty.length === 0) {
     return (
@@ -469,7 +469,7 @@ function ChangesSubRow({ d }: { d: MemberChanges }) {
         </>
       }
       onActivate={() => {
-        openChangesTab("current", d.projectId, d.path);
+        openCheckoutDiff("current", d.projectId, d.path);
       }}
       testId="ti-changes-project"
       data-project={d.projectId}

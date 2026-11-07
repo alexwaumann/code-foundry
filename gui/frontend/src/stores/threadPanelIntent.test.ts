@@ -7,7 +7,7 @@ vi.mock("sonner", () => ({ toast }));
 vi.mock("@/api/app", () => ({ playAlertSound: vi.fn(() => Promise.resolve()) }));
 
 const { applyIntent, clearPendingFocus } = await import("./intents");
-const { getPanel, makeTab, usePanelStore } = await import("./panel");
+const { allTabs, getPanel, makeTab, setPanelTabParams, usePanelStore } = await import("./panel");
 const { useProjectsStore } = await import("./projects");
 const { showThreadView } = await import("./threadPanelIntent");
 const { useThreadsStore } = await import("./threads");
@@ -274,12 +274,54 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params.line).toBe("3");
     });
 
+    it("panel.diff from this daemon: sources, a narrowed list, a title, a note and what to hide", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, base: "ref:v1.2", head: "staged", paths: "a.go\nb.go", thread: "b", title: "Two files", note: "Why", hide: "compare", own: "1" });
+      expect(active("thread:b")).toMatchObject({ kind: "diff", title: "Two files", params: { base: "ref:v1.2", head: "staged", paths: "a.go\nb.go", thread: "b", title: "Two files", note: "Why", hide: "compare", own: "1" } });
+      untouched();
+    });
+
+    it("panel.diff framed with no title leaves the checkout's own tab as the user had it", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go" });
+      const mine = active("thread:b");
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", paths: "a.go\nb.go", note: "Why", thread: "b" });
+      expect(tabIds("thread:b")).toHaveLength(2);
+      expect(active("thread:b")).toMatchObject({ title: "From thread", params: { paths: "a.go\nb.go", note: "Why", thread: "b" } });
+      expect(allTabs(getPanel("thread:b")).find((t) => t.id === mine?.id)).toEqual(mine);
+    });
+
+    it("panel.diff with one path only picks the file in the user's own tab: what it compares, filters and folds stays", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      const id = active("thread:b")?.id ?? "";
+      setPanelTabParams("thread:b", id, { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:v1.2", head: "staged", filter: "go", fold: "1", path: "other.go" });
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go" });
+      expect(tabIds("thread:b")).toHaveLength(1);
+      expect(active("thread:b")?.params).toMatchObject({ base: "ref:v1.2", head: "staged", filter: "go", fold: "1", path: "src/main.go" });
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      expect(active("thread:b")?.params.path).toBe("src/main.go");
+    });
+
+    it("panel.diff with sources sets them, on the user's own tab too", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:v1.2" });
+      expect(tabIds("thread:b")).toHaveLength(1);
+      expect(active("thread:b")?.params.base).toBe("ref:v1.2");
+    });
+
+    it("panel.diff with no path opens the checkout's tab; without a checkout, nothing", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      expect(active("thread:b")).toMatchObject({ kind: "diff", params: { project: "web", worktree: WEB_FEAT } });
+      expect(showThreadView("panel.diff", "b", { project: "web" })).toBe(false);
+    });
+
     it.each([
-      ["working", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "working" }],
-      ["branch", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "branch" }],
-    ])("panel.diff opens the file's Diff tab (%s)", (scope, params) => {
+      ["working: the default sources", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "working" }, undefined],
+      ["branch: the merge base against HEAD", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "branch" }, "ref:HEAD"],
+    ])("panel.diff shows the file in the checkout's Diff tab (%s)", (_name, params, head) => {
       showItem("panel.diff", params);
-      expect(active("thread:b")).toMatchObject({ kind: "diff", title: "main.go", params: { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope } });
+      const tab = active("thread:b");
+      expect(tab).toMatchObject({ kind: "diff", params: { project: "web", worktree: WEB_FEAT, path: "src/main.go" } });
+      expect(tab?.params.head).toBe(head);
+      expect(tab?.params.scope).toBeUndefined();
       untouched();
     });
 

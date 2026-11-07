@@ -5,7 +5,7 @@ import { mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
  * The thread header (docs/notes/thread-header-crumb.md): the crumb (where the thread
  * runs, then its parent) and the title menu on the left, the three toggles on the right,
  * over the mock's POST /__mock/thread-info scenarios; the side panel's "+" without the
- * removed surfaces; the card's Changes row opening the Changes tab.
+ * removed surfaces; the card's Changes row opening the Diff tab.
  */
 
 async function open(page: Page, scenario: string): Promise<string> {
@@ -43,6 +43,6 @@ test("the title menu: a pick gives the keyboard back to the thread's prompt", as
 });
 
 // The side panel's + without the removed surfaces: src/components/panel/SidePanel.test.tsx ("an empty
-// panel's + lists File, Diff and Pull request"). The card's Changes row opening the Changes tab:
+// panel's + lists File, Diff and Pull request"). The card's Changes row opening the Diff tab:
 // ThreadInfoCard.test.tsx ("the git group"); its totals and a file opening its Diff tab:
-// src/components/changes/ChangesView.test.tsx.
+// src/components/diff/DiffView.test.tsx.

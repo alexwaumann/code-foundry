@@ -106,11 +106,11 @@ describe("migratePanelV1", () => {
     expect(got["thread:s-2"]).toEqual(legacy(false, [files, pr], pr.id));
   });
 
-  it("rehydrates a version 1 store through it (and on: its Worktree tab is a Changes tab now)", async () => {
+  it("rehydrates a version 1 store through it (and on: its Worktree tab is a Diff tab now)", async () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 1, state: { byKey: { "thread:s-1": legacy(true, [old], old.id) } } }));
     await usePanelStore.persist.rehydrate();
-    const changes = makeTab("changes", "Changes · web", { project: "web", path: "/src/web" });
-    expect(getPanel("thread:s-1")).toEqual(entry(true, [changes], changes.id));
+    const now = makeTab("diff", "Diff · web", { project: "web", worktree: "/src/web" });
+    expect(getPanel("thread:s-1")).toEqual(entry(true, [now], now.id));
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
   });
@@ -132,11 +132,11 @@ describe("migratePanelV2", () => {
     expect(migratePanelV2({ a: legacy(true, [files], files.id), b: legacy(false, [], null) })).toEqual({ a: entry(true, [files], files.id), b: emptyEntry });
   });
 
-  it("rehydrates a version 2 store through it and saves it as version 5", async () => {
+  it("rehydrates a version 2 store through it and saves it as version 6", async () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 2, state: { byKey: { "thread:s-1": { ...legacy(true, [files, diff], null, files.id), width: 500 } } } }));
     await usePanelStore.persist.rehydrate();
     expect(getPanel("thread:s-1")).toEqual({ ...picking([files, diff], files.id), width: 500 });
-    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 5, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 6, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
   });
@@ -180,11 +180,11 @@ describe("migratePanelV4 (docs/notes/pr-tab-slug-case.md)", () => {
     expect(migratePanelV4({ k: before })).toEqual({ k: want });
   });
 
-  it("rehydrates a version 4 store through it and saves it as version 5", async () => {
+  it("rehydrates a version 4 store through it and saves it as version 6", async () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 4, state: { byKey: { "thread:s-1": entry(true, [mixed, lower], lower.id) } } }));
     await usePanelStore.persist.rehydrate();
     expect(usePanelStore.getState().byKey["thread:s-1"]).toEqual(entry(true, [shown], id));
-    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 5 });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 6 });
   });
 });
 
@@ -220,12 +220,14 @@ describe("migratePanelV3 (docs/notes/thread-header-crumb.md)", () => {
     expect(migratePanelV3({ k: before })).toEqual({ k: want });
   });
 
-  it("rehydrates a version 3 store through it and saves it as version 5", async () => {
+  it("rehydrates a version 3 store through it and saves it as version 6", async () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 3, state: { byKey: { "thread:s-1": entry(true, [usage, wt], usage.id), "view:projects": entry(true, [wt], wt.id) } } }));
     await usePanelStore.persist.rehydrate();
-    expect(getPanel("thread:s-1")).toEqual(entry(true, [changes], changes.id));
-    expect(getPanel("view:projects")).toEqual(entry(true, [changes], changes.id));
-    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 5 });
+    // And on through version 5 to 6: the Changes tab version 4 made is a Diff tab.
+    const now = makeTab("diff", "Diff · web · cf/x", { project: "web", worktree: "/wt/web/cf-x" });
+    expect(getPanel("thread:s-1")).toEqual(entry(true, [now], now.id));
+    expect(getPanel("view:projects")).toEqual(entry(true, [now], now.id));
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 6 });
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
   });

@@ -316,6 +316,10 @@ Services (v1):
   allows when GitHub says) and Publish (`gh repo create --source --remote origin --push`
   for a git project without origin; gh's error verbatim;
   `docs/notes/add-project-4-create.md`).
+  CompareWorktree lists what differs between any two of a checkout's merge base, working
+  tree, index or a ref, GetWorktreeCompareFile reads one file's two sides on demand, and
+  ListCompareCommits lists the commits between them (`docs/notes/diff-commits.md`);
+  refs and paths from callers never reach git as given (`docs/notes/diff-viewer-1.md`).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
   viewer's PR dashboards, six months of stats (`docs/notes/gh-stats-six-months.md`),
   default-branch CI, the viewer's PRs on a branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
@@ -930,18 +934,21 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):
-  File and Diff (one file read from disk as code, rendered markdown or live HTML in a
+  File (one file read from disk as code, rendered markdown or live HTML in a
   sandboxed frame served by the daemon's `/preview/<grant>/` route (`internal/preview`,
   `docs/notes/html-preview-interactive.md`), or
-  an image; one changed file of a worktree against its base, working tree or branch;
-  opened from the Changes tab's rows, the Diff tab's Open file, and path
+  an image; opened from the Diff tab's Open file and path
   chips in Claude's markdown and file tool rows (`docs/notes/file-viewer-4-chips.md`), one
-  tab per file; `docs/notes/file-viewer-3-tabs.md`), Pull request, whose menu starts threads about the pull
-  request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Changes (kind `changes`:
-  one worktree's changed files and commits against its base, each file opening its Diff
-  tab; opened from the thread info card's Changes row and per-project sub-rows, and from
-  a project page's checkout rows into the page's own panel;
-  `docs/notes/thread-header-crumb.md`) and MCP (the thread's MCP servers, one card each
+  tab per file; `docs/notes/file-viewer-3-tabs.md`), Diff (two sources of one checkout,
+  file by file, with the file list as a rail or on top by the panel's width; one tab per
+  checkout; opened from the thread info card's Changes row and per-project sub-rows, a
+  project page's checkout rows into the page's own panel, and `view.panel.diff`, whose
+  `--title`, `--note`, `--path` and `--hide` let a thread frame a tab of its own, the checkout's
+  staying the user's; `--hide` is the only way to reduce the controls, and the tab always offers
+  them back;
+  `docs/notes/diff-viewer-2.md`, `docs/notes/diff-viewer-3.md`), Pull request, whose menu starts threads about the pull
+  request through `pr.ask`, `pr.explain` and `pr.fix.findings`,
+  and MCP (the thread's MCP servers, one card each
   with status, error, tools and Reconnect; opened by the card's MCP row and
   `view.panel.mcp`; `docs/notes/mcp-panel.md`) and Gallery (a set of images a thread shows, a
   grid that opens one over a filmstrip; only `view.panel.gallery` opens it, one tab per title;

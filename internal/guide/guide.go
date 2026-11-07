@@ -211,7 +211,7 @@ func writeCategory(w io.Writer, level, cat string, list []*v1.Command, detailed 
 // skills and `plugin wakes` carry them).
 func guideShowsArg(a *v1.ArgSpec) bool {
 	return !threadIDArg(a) && !threadIDsArg(a) && !setForYouArg(a) &&
-		a.GetName() != "plugin" && a.GetName() != "descendants-of" && a.GetName() != "include-root" && !a.GetRepeatable()
+		a.GetName() != "plugin" && a.GetName() != "arg" && a.GetName() != "descendants-of" && a.GetName() != "include-root"
 }
 
 // setForYouArg: only the GUI or the CLI sets a, so a model has no use for it: the composer's
@@ -238,8 +238,10 @@ func Usage(c *v1.Command) string {
 	parts := []string{c.GetName()}
 	for _, a := range c.GetArgs() {
 		switch {
+		case a.GetPositional() && a.GetRepeatable() && !a.GetRequired():
+			parts = append(parts, "["+guideArg(a)+"]")
 		case a.GetPositional():
-			parts = append(parts, "<"+a.GetName()+">")
+			parts = append(parts, guideArg(a))
 		case threadIDArg(a):
 			parts = append(parts, "[--id]")
 		case threadIDsArg(a):
@@ -263,6 +265,9 @@ func firstSentence(s string) string {
 
 // guideArg is "--until idle|attention", "--wait", "<text>".
 func guideArg(a *v1.ArgSpec) string {
+	if a.GetPositional() && a.GetRepeatable() {
+		return "<" + a.GetName() + ">…"
+	}
 	if a.GetPositional() {
 		return "<" + a.GetName() + ">"
 	}

@@ -59,6 +59,27 @@ service ProjectService {
   // cached); NotFound for an unknown worktree, InvalidArgument for a file path that
   // leaves the worktree, FailedPrecondition for a project without git.
   rpc GetWorktreeFileDiff(GetWorktreeFileDiffRequest) returns (GetWorktreeFileDiffResponse) {}
+  // CompareWorktree lists what differs between two sources of one checkout: the merge
+  // base, the working tree, the index or any commit a ref names, either way round. Only
+  // the file list and its line counts: GetWorktreeCompareFile reads one file's two sides
+  // when it is looked at, so a large comparison stays cheap. Computed on every call.
+  //
+  // A ref and a path come from the caller, the model included, so neither reaches git as
+  // given. A ref is checked (DiffSource.ref) and resolved to a sha behind
+  // --end-of-options; git then only ever sees the sha. Paths are matched here, not by
+  // git. InvalidArgument for a ref that cannot be one, or a path that leaves the checkout
+  // or enters .git; NotFound for an unknown worktree, or one of another project;
+  // FailedPrecondition for a project without git. A ref that names no commit (deleted
+  // since, say) is not a failure: error says so and the list is empty.
+  rpc CompareWorktree(CompareWorktreeRequest) returns (CompareWorktreeResponse) {}
+  // GetWorktreeCompareFile returns both sides of one file of a comparison: what
+  // CompareWorktree counted, each side at most 1 MiB, read now. Takes the same sources
+  // and gives the same refusals. A path that is not on a side is simply absent there.
+  rpc GetWorktreeCompareFile(GetWorktreeCompareFileRequest) returns (GetWorktreeCompareFileResponse) {}
+  // ListCompareCommits lists the commits a comparison's head has and its base does not,
+  // newest first: the branch being compared. The working tree and the index count as HEAD.
+  // Takes the same sources and refusals as CompareWorktree.
+  rpc ListCompareCommits(ListCompareCommitsRequest) returns (ListCompareCommitsResponse) {}
   // ListRefs returns the refs a worktree can be based on: local branches and
   // remote-tracking branches (origin/<name>), the branch names by recency, plus the
   // default branch.
@@ -538,6 +559,9 @@ message FileVersion {
   bool truncated = 3;
   // NUL in the first 8000 bytes.
   bool binary = 4;
+  // A submodule at the path (GetWorktreeCompareFile only; GetWorktreeFileDiff calls it
+  // absent): contents is "Subproject commit <sha>\n", the commit it is on.
+  bool submodule = 5;
 }
 
 message GetWorktreeFileDiffResponse {
@@ -555,6 +579,143 @@ message GetWorktreeFileDiffResponse {
   // Non-empty when the scope cannot be compared: BRANCH on a worktree without a base
   // or without a merge base. The sides are then empty.
   string error = 7;
+}
+
+// A comparison's side.
+enum DiffSourceKind {
+  // A request's base: MERGE_BASE; its head: WORKING_TREE. Unset, CompareWorktree is what
+  // GetWorktreeDetail lists.
+  DIFF_SOURCE_KIND_UNSPECIFIED = 0;
+  // Where HEAD left the checkout's base ref: the merge base GetWorktreeDetail uses. With
+  // no base, or none in common, HEAD; on an unborn branch, the empty tree.
+  DIFF_SOURCE_KIND_MERGE_BASE = 1;
+  // The files on disk, untracked ones included.
+  DIFF_SOURCE_KIND_WORKING_TREE = 2;
+  // The index.
+  DIFF_SOURCE_KIND_STAGED = 3;
+  // The commit `ref` names.
+  DIFF_SOURCE_KIND_REF = 4;
+}
+
+// One side of a comparison.
+message DiffSource {
+  DiffSourceKind kind = 1;
+  // With REF, and only then: a branch, tag, sha or revision (origin/main, v1.2, HEAD~3,
+  // HEAD@{1}), at most 256 bytes. Never an option or a range: no leading "-" or "^", no
+  // "..", ":", whitespace, control character or glob.
+  string ref = 2;
+}
+
+// A comparison's side as resolved.
+message ResolvedDiffSource {
+  DiffSourceKind kind = 1;
+  // What to call it: "origin/main", "HEAD" (MERGE_BASE without a base), the ref as given,
+  // "Working tree", "Staged", "Empty tree" (git's empty tree, what a root commit is compared
+  // against, as a REF).
+  string label = 2;
+  // The commit (or the empty tree); empty for WORKING_TREE and STAGED.
+  string sha = 3;
+}
+
+message CompareWorktreeRequest {
+  string project_id = 1;
+  // The worktree, as GetWorktreeDetail takes it. A thread with several checkouts is
+  // several worktrees: one call each (ThreadService.Checkouts lists them).
+  string path = 2;
+  DiffSource base = 3;
+  DiffSource head = 4;
+  // Limits the list to these checkout-relative paths (forward slashes): a file, or a
+  // directory and all below it. Empty: every file. A rename is kept whole when either of
+  // its paths matches.
+  repeated string paths = 5;
+}
+
+// One file of a comparison, base to head.
+message CompareFile {
+  // An embedded repository not yet added is a directory: `submodule`, with a trailing /.
+  string path = 1;
+  // A rename's or copy's source; else empty.
+  string old_path = 2;
+  // A git letter (A M D R C T), U for an unmerged path, ? for an untracked file. With the
+  // working tree as base, an untracked file is D.
+  string status = 3;
+  // Lines. Zero when binary. An untracked file is counted up to its first 8 MiB, and only
+  // the first 64 MiB of untracked files in a comparison are counted at all.
+  int32 added = 4;
+  int32 deleted = 5;
+  bool binary = 6;
+  // A submodule on either side; the counts then mean nothing.
+  bool submodule = 7;
+}
+
+message CompareWorktreeResponse {
+  // Sorted by path, at most 10000; `truncated` says more differ. The totals count them all.
+  repeated CompareFile files = 1;
+  bool truncated = 2;
+  int32 total_files = 3;
+  int32 total_added = 4;
+  int32 total_deleted = 5;
+  ResolvedDiffSource base = 6;
+  ResolvedDiffSource head = 7;
+  // As in WorktreeDetail, whichever sources were asked for: base_ref empty without one,
+  // merge_base empty without one in common.
+  string base_ref = 8;
+  string merge_base = 9;
+  // Non-empty when a source cannot be resolved (a ref that names no commit, HEAD on an
+  // unborn branch), or a partial clone lacks an object the list needs. The list is then
+  // empty.
+  string error = 10;
+  // Files left out of `files` and the totals: a name that is not UTF-8, possible in a tree,
+  // cannot travel in a response.
+  int32 skipped_names = 11;
+}
+
+message GetWorktreeCompareFileRequest {
+  string project_id = 1;
+  string path = 2;
+  DiffSource base = 3;
+  DiffSource head = 4;
+  // Checkout-relative path (forward slashes) on the head side.
+  string file = 5;
+  // Checkout-relative path on the base side, for a rename or copy (CompareFile.old_path).
+  // Empty: file.
+  string old_path = 6;
+}
+
+message GetWorktreeCompareFileResponse {
+  FileVersion old = 1;
+  FileVersion new = 2;
+  // As GetWorktreeFileDiffResponse.status.
+  string status = 3;
+  // As CompareWorktreeResponse.error.
+  string error = 4;
+}
+
+message ListCompareCommitsRequest {
+  string project_id = 1;
+  string path = 2;
+  DiffSource base = 3;
+  DiffSource head = 4;
+}
+
+// One commit of a comparison.
+message CompareCommit {
+  string sha = 1;
+  string short_sha = 2;
+  // The first parent, which a merge compares against; empty for a root commit.
+  string parent = 3;
+  string subject = 4;
+  // The message under the subject, at most 8 KiB.
+  string body = 5;
+  google.protobuf.Timestamp authored_at = 6;
+}
+
+message ListCompareCommitsResponse {
+  // Newest first, at most 500; `total` counts them all.
+  repeated CompareCommit commits = 1;
+  int32 total = 2;
+  // As CompareWorktreeResponse.error. The list is then empty.
+  string error = 3;
 }
 
 // A worktree compared with its base.

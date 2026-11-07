@@ -32,7 +32,7 @@ func (h *Project) GetWorktreeFileDiff(ctx context.Context, req *connect.Request[
 		ProjectID: m.GetProjectId(), Path: m.GetPath(), File: m.GetFile(), OldPath: m.GetOldPath(), Scope: scope,
 	})
 	if err != nil {
-		return nil, projectError(err)
+		return nil, readError(ctx, err)
 	}
 	return connect.NewResponse(&v1.GetWorktreeFileDiffResponse{
 		Old: fileVersionToProto(d.Old), New: fileVersionToProto(d.New),
@@ -41,5 +41,5 @@ func (h *Project) GetWorktreeFileDiff(ctx context.Context, req *connect.Request[
 }
 
 func fileVersionToProto(v project.FileVersion) *v1.FileVersion {
-	return &v1.FileVersion{Present: v.Present, Contents: v.Contents, Truncated: v.Truncated, Binary: v.Binary}
+	return &v1.FileVersion{Present: v.Present, Contents: v.Contents, Truncated: v.Truncated, Binary: v.Binary, Submodule: v.Submodule}
 }

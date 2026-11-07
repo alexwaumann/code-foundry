@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { copyText } from "@/lib/clipboard";
 import type { ProjectKind, ProjectNextStep } from "@/lib/projects";
 import type { ThreadBadge } from "@/lib/thread";
-import { openChangesTab } from "@/stores/changesPanel";
+import { openCheckoutDiff } from "@/stores/filePanel";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { cleanupMergedWorktrees, initGitIn, newTerminalIn, publishProject, removeWorktree, resumeWorktree, revealProject, unregisterProject } from "@/stores/projectActions";
@@ -138,7 +138,7 @@ export function checkoutMenu(f: CheckoutMenuFacts): RowMenuEntry<CheckoutMenuPar
     { label: "New terminal here", testId: "checkout-menu-new-terminal", onSelect: () => void newTerminalIn(projectId, path) },
   );
   const look: OverflowItem[] = [];
-  if (f.changed) look.push({ label: "Show changes", testId: "checkout-menu-changes", onSelect: () => { openChangesTab("current", projectId, path); } });
+  if (f.changed) look.push({ label: "Show changes", testId: "checkout-menu-changes", onSelect: () => { openCheckoutDiff("current", projectId, path); } });
   const pr = f.pr;
   if (pr) look.push({ label: `Open pull request #${String(pr.number)}`, testId: "checkout-menu-pr", onSelect: () => { openPullRequestInPanel(pr); } });
   if (look.length > 0) items.push("separator", ...look);
@@ -184,7 +184,7 @@ export function leftoverMenu(f: LeftoverMenuFacts): RowMenuEntry<LeftoverMenuPar
     { label: "New thread here", testId: "leftover-menu-new-thread", onSelect: () => { composeIn(projectId, path); } },
     { label: "New terminal here", testId: "leftover-menu-new-terminal", onSelect: () => void newTerminalIn(projectId, path) },
   );
-  if (f.work) items.push("separator", { label: "Show changes", testId: "leftover-menu-changes", onSelect: () => { openChangesTab("current", projectId, path); } });
+  if (f.work) items.push("separator", { label: "Show changes", testId: "leftover-menu-changes", onSelect: () => { openCheckoutDiff("current", projectId, path); } });
   items.push(
     "separator",
     { kind: "open-in", testId: "leftover-menu-open-in", projectId, path },
