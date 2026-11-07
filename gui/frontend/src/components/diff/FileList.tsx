@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import type { CompareView } from "@/api/compare";
 import { HeaderAction } from "@/components/files/FileHeader";
@@ -63,6 +63,8 @@ const renderRow = (r: FileRow) => <FileLine row={r} />;
  * screenful it offers a filter, which stays for as long as it is filtering. The filter and the
  * fold are the tab's (params), so they outlast it showing something else. `current` is the
  * file on screen when it is listed. The list keeps its place by file through live updates.
+ * `foot` goes under it and stays when the list folds: the Commits section's own height can fold
+ * the list, and must not take the section's toggle with it.
  */
 export function FileList({
   view,
@@ -75,6 +77,8 @@ export function FileList({
   onQuery,
   fold,
   onFold,
+  foot,
+  footHeight = 0,
 }: {
   view: CompareView;
   rows: readonly FileRow[];
@@ -88,6 +92,9 @@ export function FileList({
   /** The user's fold of the list on top, if any. */
   fold: boolean | undefined;
   onFold: (folded: boolean) => void;
+  /** What sits at the list's foot (the Commits section), outside its keyboard list, and how tall. */
+  foot?: ReactNode;
+  footHeight?: number;
 }) {
   const shown = useMemo(() => filterRows(rows, query), [rows, query]);
   const items = useMemo<NavItem[]>(
@@ -113,64 +120,67 @@ export function FileList({
   const prev = stepRow(shown, current, -1);
   const next = stepRow(shown, current, 1);
   const filter = query !== "" || rows.length > (rail ? FILTER_OVER.rail : FILTER_OVER.top);
-  const fit = topListFit(height, ROW_H, rows.length, filter);
+  const fit = topListFit(height, ROW_H, rows.length, filter, footHeight);
   const folded = fold ?? fit.fold;
   const open = rail || !folded;
   const list = (
     <RowList rows={shown} rowKey={rowKey} rowHeight={ROW_H} render={renderRow} capped keepPlace virtualize={rows.length > VIRTUALIZE_OVER} maxHeight={rail ? "100%" : fit.rows * ROW_H} testId="diff-file-rows" />
   );
   return (
-    <NavProvider value={nav.ctx}>
-      <div
-        tabIndex={0}
-        role="listbox"
-        aria-label="Changed files"
-        aria-activedescendant={nav.activeDescendant}
-        className={cn("flex min-h-0 flex-col outline-none", rail ? "w-[260px] shrink-0 border-r border-cf-divider" : "shrink-0 border-b border-cf-divider")}
-        data-testid="diff-file-list"
-        data-layout={rail ? "rail" : "top"}
-        onKeyDown={nav.onKeyDown}
-      >
-        <div className="flex h-9 shrink-0 items-center gap-1.5 px-3 text-body-sm tabular-nums" data-testid="diff-totals">
-          <span className="min-w-0 truncate">
-            {view.totalFiles} {view.totalFiles === 1 ? "file" : "files"}
-            {view.totalAdded > 0 && <span className="ml-1.5 text-cf-diff-addition">+{view.totalAdded}</span>}
-            {view.totalDeleted > 0 && <span className="ml-1.5 text-cf-diff-deletion">−{view.totalDeleted}</span>}
-          </span>
-          <span className="ml-auto shrink-0 text-caption" data-testid="diff-position">
-            {at >= 0 ? `${String(at + 1)} of ${String(shown.length)}` : ""}
-          </span>
-          <HeaderAction icon={ChevronLeft} label="Previous file" testId="diff-prev" onClick={() => { if (prev) onPick(prev); }} />
-          <HeaderAction icon={ChevronRight} label="Next file" testId="diff-next" onClick={() => { if (next) onPick(next); }} />
-          {!rail && <HeaderAction icon={folded ? ChevronDown : ChevronUp} label={folded ? "Show files" : "Hide files"} testId="diff-fold" onClick={() => { onFold(!folded); }} />}
-        </div>
-        {open && filter && (
-          <div className="shrink-0 px-2 pb-1">
-            <Input
-              value={query}
-              placeholder="Filter files"
-              aria-label="Filter files"
-              data-testid="diff-filter"
-              className="h-7"
-              onChange={(e) => {
-                onQuery(e.target.value);
-              }}
-            />
+    <div className={cn("flex min-h-0 flex-col", rail ? "w-[260px] shrink-0 border-r border-cf-divider" : "shrink-0 border-b border-cf-divider")} data-testid="diff-list-column">
+      <NavProvider value={nav.ctx}>
+        <div
+          tabIndex={0}
+          role="listbox"
+          aria-label="Changed files"
+          aria-activedescendant={nav.activeDescendant}
+          className="flex min-h-0 flex-1 flex-col outline-none"
+          data-testid="diff-file-list"
+          data-layout={rail ? "rail" : "top"}
+          onKeyDown={nav.onKeyDown}
+        >
+          <div className="flex h-9 shrink-0 items-center gap-1.5 px-3 text-body-sm tabular-nums" data-testid="diff-totals">
+            <span className="min-w-0 truncate">
+              {view.totalFiles} {view.totalFiles === 1 ? "file" : "files"}
+              {view.totalAdded > 0 && <span className="ml-1.5 text-cf-diff-addition">+{view.totalAdded}</span>}
+              {view.totalDeleted > 0 && <span className="ml-1.5 text-cf-diff-deletion">−{view.totalDeleted}</span>}
+            </span>
+            <span className="ml-auto shrink-0 text-caption" data-testid="diff-position">
+              {at >= 0 ? `${String(at + 1)} of ${String(shown.length)}` : ""}
+            </span>
+            <HeaderAction icon={ChevronLeft} label="Previous file" testId="diff-prev" onClick={() => { if (prev) onPick(prev); }} />
+            <HeaderAction icon={ChevronRight} label="Next file" testId="diff-next" onClick={() => { if (next) onPick(next); }} />
+            {!rail && <HeaderAction icon={folded ? ChevronDown : ChevronUp} label={folded ? "Show files" : "Hide files"} testId="diff-fold" onClick={() => { onFold(!folded); }} />}
           </div>
-        )}
-        {open && (rail ? <div className="relative min-h-0 flex-1"><div className="absolute inset-0 px-1.5">{list}</div></div> : <div className="px-1.5 pb-1">{list}</div>)}
-        {open && query && shown.length === 0 && <p className="px-3 py-2 text-caption" data-testid="diff-filter-none">No files match</p>}
-        {open && view.truncated && (
-          <p className="shrink-0 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="diff-truncated-list">
-            First {view.files.length} of {view.totalFiles} files
-          </p>
-        )}
-        {open && view.skippedNames > 0 && (
-          <p className="shrink-0 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="diff-skipped-names">
-            {view.skippedNames === 1 ? "1 more file" : `${String(view.skippedNames)} more files`} not listed: {view.skippedNames === 1 ? "its name is" : "their names are"} not UTF-8
-          </p>
-        )}
-      </div>
-    </NavProvider>
+          {open && filter && (
+            <div className="shrink-0 px-2 pb-1">
+              <Input
+                value={query}
+                placeholder="Filter files"
+                aria-label="Filter files"
+                data-testid="diff-filter"
+                className="h-7"
+                onChange={(e) => {
+                  onQuery(e.target.value);
+                }}
+              />
+            </div>
+          )}
+          {open && (rail ? <div className="relative min-h-0 flex-1"><div className="absolute inset-0 px-1.5">{list}</div></div> : <div className="px-1.5 pb-1">{list}</div>)}
+          {open && query && shown.length === 0 && <p className="px-3 py-2 text-caption" data-testid="diff-filter-none">No files match</p>}
+          {open && view.truncated && (
+            <p className="shrink-0 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="diff-truncated-list">
+              First {view.files.length} of {view.totalFiles} files
+            </p>
+          )}
+          {open && view.skippedNames > 0 && (
+            <p className="shrink-0 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="diff-skipped-names">
+              {view.skippedNames === 1 ? "1 more file" : `${String(view.skippedNames)} more files`} not listed: {view.skippedNames === 1 ? "its name is" : "their names are"} not UTF-8
+            </p>
+          )}
+        </div>
+      </NavProvider>
+      {foot}
+    </div>
   );
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -109,4 +110,41 @@ func (h *Project) GetWorktreeCompareFile(ctx context.Context, req *connect.Reque
 		return nil, readError(ctx, err)
 	}
 	return connect.NewResponse(&v1.GetWorktreeCompareFileResponse{Old: fileVersionToProto(d.Old), New: fileVersionToProto(d.New), Status: d.Status, Error: d.Error}), nil
+}
+
+// ListCompareCommits lists the commits of a comparison.
+func (h *Project) ListCompareCommits(ctx context.Context, req *connect.Request[v1.ListCompareCommitsRequest]) (*connect.Response[v1.ListCompareCommitsResponse], error) {
+	m := req.Msg
+	if m.GetProjectId() == "" || m.GetPath() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("project_id and path are required"))
+	}
+	base, head, err := compareSides(m.GetBase(), m.GetHead())
+	if err != nil {
+		return nil, err
+	}
+	l, err := h.store.CompareCommits(ctx, project.CompareCommitsRequest{ProjectID: m.GetProjectId(), Path: m.GetPath(), Base: base, Head: head})
+	if err != nil {
+		return nil, readError(ctx, err)
+	}
+	commits := make([]*v1.CompareCommit, len(l.Commits))
+	for i, c := range l.Commits {
+		commits[i] = &v1.CompareCommit{Sha: c.SHA, ShortSha: c.ShortSHA, Parent: c.Parent, Subject: c.Subject, Shallow: c.Shallow}
+		if !c.AuthoredAt.IsZero() {
+			commits[i].AuthoredAt = timestamppb.New(c.AuthoredAt)
+		}
+	}
+	return connect.NewResponse(&v1.ListCompareCommitsResponse{Commits: commits, Total: int32(l.Total), Error: l.Error}), nil
+}
+
+// GetCompareCommit returns the message of the one commit on screen.
+func (h *Project) GetCompareCommit(ctx context.Context, req *connect.Request[v1.GetCompareCommitRequest]) (*connect.Response[v1.GetCompareCommitResponse], error) {
+	m := req.Msg
+	if m.GetProjectId() == "" || m.GetPath() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("project_id and path are required"))
+	}
+	c, err := h.store.CompareCommitBody(ctx, project.CompareCommitRequest{ProjectID: m.GetProjectId(), Path: m.GetPath(), SHA: m.GetSha()})
+	if err != nil {
+		return nil, readError(ctx, err)
+	}
+	return connect.NewResponse(&v1.GetCompareCommitResponse{Body: c.Body, Error: c.Error}), nil
 }

@@ -317,7 +317,8 @@ Services (v1):
   for a git project without origin; gh's error verbatim;
   `docs/notes/add-project-4-create.md`).
   CompareWorktree lists what differs between any two of a checkout's merge base, working
-  tree, index or a ref, and GetWorktreeCompareFile reads one file's two sides on demand;
+  tree, index or a ref, GetWorktreeCompareFile reads one file's two sides on demand, and
+  ListCompareCommits lists the commits between them (`docs/notes/diff-commits.md`);
   refs and paths from callers never reach git as given (`docs/notes/diff-viewer-1.md`).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
   viewer's PR dashboards, six months of stats (`docs/notes/gh-stats-six-months.md`),

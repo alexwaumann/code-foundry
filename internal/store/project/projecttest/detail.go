@@ -75,6 +75,42 @@ func (f *Fake) CompareWorktree(_ context.Context, req project.CompareRequest) (p
 	return f.compare, nil
 }
 
+// SetCompareCommits sets what CompareCommits returns for a known worktree.
+func (f *Fake) SetCompareCommits(l project.CompareLog) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.compareLog = l
+}
+
+// CompareCommits implements project.Store: the SetCompareCommits value for a known worktree.
+func (f *Fake) CompareCommits(_ context.Context, req project.CompareCommitsRequest) (project.CompareLog, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, fmt.Sprintf("CompareCommits %s %s %d:%s %d:%s", req.ProjectID, req.Path, req.Base.Kind, req.Base.Ref, req.Head.Kind, req.Head.Ref))
+	if _, ok := f.snap.Worktree(req.ProjectID, req.Path); !ok {
+		return project.CompareLog{}, fmt.Errorf("%w: worktree %q in project %q", project.ErrNotFound, req.Path, req.ProjectID)
+	}
+	return f.compareLog, nil
+}
+
+// SetCompareCommitBody sets what CompareCommitBody returns for a known worktree.
+func (f *Fake) SetCompareCommitBody(m project.CompareCommitMessage) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.commitMessage = m
+}
+
+// CompareCommitBody implements project.Store: the SetCompareCommitBody value for a known worktree.
+func (f *Fake) CompareCommitBody(_ context.Context, req project.CompareCommitRequest) (project.CompareCommitMessage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, fmt.Sprintf("CompareCommitBody %s %s %s", req.ProjectID, req.Path, req.SHA))
+	if _, ok := f.snap.Worktree(req.ProjectID, req.Path); !ok {
+		return project.CompareCommitMessage{}, fmt.Errorf("%w: worktree %q in project %q", project.ErrNotFound, req.Path, req.ProjectID)
+	}
+	return f.commitMessage, nil
+}
+
 // CompareFile implements project.Store: the SetCompare value for any file of a known
 // worktree.
 func (f *Fake) CompareFile(_ context.Context, req project.CompareFileRequest) (project.CompareSides, error) {

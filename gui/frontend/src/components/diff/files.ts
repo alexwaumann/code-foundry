@@ -97,10 +97,10 @@ const TOP_ROWS_MIN = 2;
 /**
  * How the list on top shares a panel `height` tall with the code: as many rows as leave it
  * CODE_MIN, and folded when that is too few to be a list. Folded by hand or not, an open list
- * has the minimum, so opening one always shows it.
+ * has the minimum, so opening one always shows it. `foot` is what sits under the rows.
  */
-export function topListFit(height: number, rowHeight: number, files: number, filter: boolean): { rows: number; fold: boolean } {
-  const spare = height - BAR_H - TOTALS_H - FILE_HEADER_H - CODE_MIN - (filter ? FILTER_H : 0);
+export function topListFit(height: number, rowHeight: number, files: number, filter: boolean, foot = 0): { rows: number; fold: boolean } {
+  const spare = height - BAR_H - TOTALS_H - FILE_HEADER_H - CODE_MIN - (filter ? FILTER_H : 0) - foot;
   const rows = Math.min(TOP_ROWS, Math.floor(spare / rowHeight));
   return { rows: Math.max(rows, TOP_ROWS_MIN), fold: rows < Math.min(files, TOP_ROWS_MIN) };
 }
@@ -133,11 +133,15 @@ export const statusColor: Readonly<Record<string, string>> = {
   "?": "text-cf-text-muted",
 };
 
+const FULL_SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
+
 /**
  * A remote-tracking ref without its remote: "origin/main" → "main" when "origin" is one
- * of the project's remotes; anything else (a local base, "main") as it is.
+ * of the project's remotes; a full sha cut to seven; anything else (a local base, "main") as
+ * it is.
  */
 export function shortRef(ref: string, remotes: readonly string[]): string {
+  if (FULL_SHA.test(ref)) return ref.slice(0, 7);
   const slash = ref.indexOf("/");
   if (slash > 0 && remotes.includes(ref.slice(0, slash))) return ref.slice(slash + 1);
   return ref;

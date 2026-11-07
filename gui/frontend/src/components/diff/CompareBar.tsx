@@ -37,7 +37,7 @@ function StyleMenu() {
 
 /**
  * What the tab compares: the base ← the head, either any source, then the diff's layout
- * (behind ⋯ when narrow). The arrow swaps the sides.
+ * (behind ⋯ when narrow). The arrow swaps the sides. Showing one commit, All changes goes back.
  */
 export function CompareBar({
   projectId,
@@ -48,6 +48,7 @@ export function CompareBar({
   baseLabel,
   wide,
   onChange,
+  onAllChanges,
 }: {
   projectId: string;
   /** The sides' labels. */
@@ -59,6 +60,8 @@ export function CompareBar({
   baseLabel: string;
   wide: boolean;
   onChange: (base: CompareSource, head: CompareSource) => void;
+  /** Showing one commit: goes back to what the tab showed. */
+  onAllChanges?: () => void;
 }) {
   return (
     <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-cf-divider px-3" data-testid="diff-compare-bar">
@@ -90,6 +93,11 @@ export function CompareBar({
           onChange(baseSource, s);
         }}
       />
+      {onAllChanges && (
+        <Button variant="ghost" size="xs" className="shrink-0" onClick={onAllChanges} data-testid="diff-all-changes">
+          All changes
+        </Button>
+      )}
       <span className="flex-1" />
       {wide ? <StyleSwitch /> : <StyleMenu />}
     </div>
