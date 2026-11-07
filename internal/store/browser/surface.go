@@ -8,8 +8,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 // maxSurfaceKey bounds a surface's name, which the GUI makes from its panel's key.
@@ -25,6 +27,8 @@ const (
 	deviceScale     = 2
 	frameQuality    = 80
 	maxDownloadList = 5
+	castTries       = 10
+	castRetry       = 100 * time.Millisecond
 )
 
 // Phase is where a surface is, for what its overlay says.
@@ -217,7 +221,10 @@ func (sf *surface) publish() {
 		sf.state.Popup = len(sf.stack) > 1
 	}
 	for v := range sf.viewers {
-		v.offerState(sf.state)
+		// The rest of State is values or replaced whole; this list is updated in place.
+		st := sf.state
+		st.Downloads = slices.Clone(st.Downloads)
+		v.offerState(st)
 	}
 }
 
@@ -293,7 +300,9 @@ func (s *Store) Watch(key string, width, height int, address string) (*Viewer, e
 	} else if sf.top() == nil {
 		sf.state.Phase, sf.state.Message = PhaseStarting, ""
 	}
-	v.offerState(sf.state)
+	st := sf.state
+	st.Downloads = slices.Clone(st.Downloads)
+	v.offerState(st)
 	if sf.frame != nil {
 		// The last frame, not its ack: a still page sends nothing new, and a stale ack is noise.
 		v.offerFrame(&Frame{JPEG: sf.frame.JPEG, Width: sf.frame.Width, Height: sf.frame.Height})
@@ -478,7 +487,11 @@ func (s *Store) applySize(ctx context.Context, in *instance, t *target) error {
 	}, nil)
 }
 
+// startCast starts a target's frames, or restarts them for a new size or a new process. One at
+// a time per target: a stop and a start from two callers would otherwise leave it stopped.
 func (s *Store) startCast(ctx context.Context, in *instance, t *target) error {
+	t.cast.Lock()
+	defer t.cast.Unlock()
 	s.mu.Lock()
 	w, h := t.surface.w, t.surface.h
 	again := t.casting
@@ -488,9 +501,21 @@ func (s *Store) startCast(ctx context.Context, in *instance, t *target) error {
 		// A second start is refused, and a resize needs one for the new size.
 		_ = in.call(ctx, t.session, "Page.stopScreencast", nil, nil)
 	}
-	err := in.call(ctx, t.session, "Page.startScreencast", map[string]any{
-		"format": "jpeg", "quality": frameQuality, "everyNthFrame": 1, "maxWidth": w * deviceScale, "maxHeight": h * deviceScale,
-	}, nil)
+	var err error
+	for try := 0; try < castTries; try++ {
+		// During a move to another process Chrome answers "Not attached to an active page".
+		err = in.call(ctx, t.session, "Page.startScreencast", map[string]any{
+			"format": "jpeg", "quality": frameQuality, "everyNthFrame": 1, "maxWidth": w * deviceScale, "maxHeight": h * deviceScale,
+		}, nil)
+		if err == nil {
+			break
+		}
+		select {
+		case <-time.After(castRetry):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	if err != nil {
 		return err
 	}
