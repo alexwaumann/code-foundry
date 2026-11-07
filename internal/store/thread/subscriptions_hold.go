@@ -155,6 +155,7 @@ func (s *subscriptions) unholdLocked(target, sub string) {
 // forgetHeldLocked drops the held wakes about thread id, those to it, and those of
 // subscriptions ids. Callers hold m.subs.mu.
 func (s *subscriptions) forgetHeldLocked(id string, ids []string) {
+	s.forgetGroupsLocked(id, ids)
 	delete(s.held, id)
 	for target, h := range s.held {
 		for sid, sub := range h {
@@ -178,7 +179,7 @@ func (m *Manager) releaseHeldLocked(id string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.held) == 0 || m.closed {
+	if (len(s.held) == 0 && len(s.groups) == 0) || m.closed {
 		return
 	}
 	var kids map[string][]Thread
@@ -188,6 +189,7 @@ func (m *Manager) releaseHeldLocked(id string) {
 		if !ok {
 			return
 		}
+		m.releaseGroupsLocked(id)
 		if h := s.held[id]; len(h) > 0 && m.quietLocked(rec) {
 			if kids == nil {
 				kids = m.kidsLocked()

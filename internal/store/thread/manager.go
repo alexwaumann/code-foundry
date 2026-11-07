@@ -735,7 +735,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err := m.applyCreateDefaults(ctx, creatorID, &o); err != nil {
 		return Thread{}, err
 	}
-	if err := m.checkNotify(o.Notify, creatorID); err != nil {
+	if err := m.checkNotify(o.Notify, o.NotifyGroup, creatorID); err != nil {
 		return Thread{}, err
 	}
 	owner, err := checkOwner(o)

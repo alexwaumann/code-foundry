@@ -247,7 +247,7 @@ func (m *Manager) runSetup(j *setupJob) (CreateReport, error) {
 		}
 	}
 	if j.o.Notify {
-		m.notifyCreator(j.ctx, j.creatorID, j.id)
+		m.notifyCreator(j.ctx, j.creatorID, j.id, j.o.NotifyGroup)
 	}
 	if report.ExistingWorktree {
 		if other, ok := m.otherHolder(j.id, p.path); ok {

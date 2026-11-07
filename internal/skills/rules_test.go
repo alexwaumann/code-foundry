@@ -109,6 +109,7 @@ var rules = []rule{
 	{note: "orch-skill-v4", file: orchFile, says: []string{"distinct anchor", `git add -a`, "one line", "from the child's wake"}},
 	{note: "orch-skill-v4", file: wakesFile, says: []string{"without --wait"}},
 	// A child's last message reaches its parent whole, with git's word on the branch.
+	{note: "wake-groups", file: orchFile, says: []string{"--notify-group", "do not feed each"}},
 	{note: "thread-ask", file: wakesFile, says: []string{"thread ask", "say nothing"}},
 	{note: "wake-final-message", file: wakesFile, says: []string{"it said", "from the app, not the thread"}, never: []string{"report_stale", "said more"}},
 	{note: "wake-final-message", file: orchFile, says: []string{"no closing report", "thread report blocked"}, never: []string{"after any later message", "report_stale"}},

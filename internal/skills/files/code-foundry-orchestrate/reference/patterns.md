@@ -75,25 +75,25 @@ user the PR's link. Archive once they are happy with it:
 ## 2. Fan out several children, collect their reports
 
 One thread per independent unit of work, a shared label for the batch, a request id per
-task (a retry after an error then returns the thread made the first time), `--notify`
-on each, then end your turn.
+task (a retry after an error then returns the thread made the first time),
+`--notify-group <batch>` on each (`--notify` if one piece starts another), then end your turn.
 
 ```
 code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --name "Bump the router" \
-  --brief "react-router 7 to 7.4" --labels deps,batch-1018 --notify \
+  --brief "react-router 7 to 7.4" --labels deps,batch-1018 --notify-group batch-1018 \
   --request-id batch-1018-router --budget 5 --prompt "..."
 code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --name "Fix the lint warnings" \
-  --brief "The 23 warnings eslint prints on main" --labels lint,batch-1018 --notify \
+  --brief "The 23 warnings eslint prints on main" --labels lint,batch-1018 --notify-group batch-1018 \
   --request-id batch-1018-lint --budget 5 --prompt "..."
 code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --name "Fix the docs typos" \
-  --brief "Typos the user listed in docs/" --labels docs,batch-1018 --notify \
+  --brief "Typos the user listed in docs/" --labels docs,batch-1018 --notify-group batch-1018 \
   --request-id batch-1018-docs --budget 5 --prompt "..."
 ```
 
-Then end your turn (no `thread wait`). Each settled child sends you a `[code-foundry
-wake]` message, which starts a turn. On each, look at the whole batch rather than only
-the one that woke you, and reply to the user only when the batch is done or a child
-needs them; otherwise end the turn with one short line:
+Then end your turn (no `thread wait`). One `[code-foundry wake]` message comes when they
+all settled, and one at once if a child fails or needs you. On a wake, look at the whole
+batch rather than only the one that woke you, and reply to the user only when the batch is
+done or a child needs them; otherwise end the turn with one short line:
 
 ```
 code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018

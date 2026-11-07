@@ -48,6 +48,10 @@ unasked; raising alone does not resume the child, so resume it as
 
 ## A batch of wakes
 
+Children started with `--notify-group` come as one wake once they all settled; a failure, a
+prompt or a question comes at once, and the others still come when the group settles. Use
+plain `--notify` when one piece starts the next.
+
 On a wake for a batch, look at the whole batch (`thread reports --created-by
 $CODE_FOUNDRY_THREAD --all`; wakes can arrive seconds apart), and talk to the user only
 when something needs them (a question, a failure, a conflict) or the batch is complete;

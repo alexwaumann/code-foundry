@@ -161,6 +161,7 @@ func (m *Manager) fireThreadLocked(r *subRec, t Thread) bool {
 		}
 	}
 	m.subs.unholdLocked(t.ID, r.s.ID) // this fire replaces a held one (subscriptions_hold.go)
+	m.subs.ungroupLocked(r.s)         // and one held for its group (subscriptions_group.go)
 	kids := m.childrenLocked(t.ID)
 	return m.fireLaterLocked(r, t.HandledThrough, func(s Subscription, at time.Time) delivery {
 		return delivery{thread: func(ctx context.Context) threadWakePart { return m.threadPart(ctx, s, t, at, kids) }}

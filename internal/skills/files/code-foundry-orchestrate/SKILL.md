@@ -65,7 +65,9 @@ ones you create stay out of it: they are yours to answer.
      waits the same way (the user cannot reach you meanwhile: for work longer than a
      minute, prefer `--notify`, or run the wait as a background Bash task).
    - End your turn. `--notify` sends you a `[code-foundry wake]` message each time the
-     child settles; best for long work or several children.
+     child settles; best for long work. For several children whose pieces do not feed each
+     other, `--notify-group <name>` in place of it on each: one wake when all of them
+     settled, and at once for a failure, a prompt or a question.
    - For a pull request's CI or review: `code-foundry thread subscribe --pr <owner/name#N>
      --until checks_done --repeat` (or `--until review --repeat`), then end your turn (§4).
 
