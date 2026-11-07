@@ -360,14 +360,16 @@ func TestCompareRunsNoSubmoduleFsmonitor(t *testing.T) {
 	git(t, f.path, "commit", "-q", "-m", "submodule")
 	sub := filepath.Join(f.path, "lib")
 	writeFile(t, filepath.Join(sub, "lib.txt"), "v2\n")
-	// The git in the submodule is a `status` too, so this one logs whatever ran it.
+	// The git in the submodule is a `status` too, so hostileScript's test of its parent cannot
+	// tell the background job from a comparison. The environment can: only a guarded command
+	// sets GIT_NO_LAZY_FETCH, and it reaches what git starts in the submodule.
 	canary := filepath.Join(f.base, "canary")
 	evil := filepath.Join(f.base, "evil")
-	if err := os.WriteFile(evil, []byte("#!/bin/sh\necho ran >> "+canary+"\nexit 1\n"), 0o755); err != nil {
+	body := "#!/bin/sh\n[ -n \"$GIT_NO_LAZY_FETCH\" ] && echo ran >> " + canary + "\nexit 1\n"
+	if err := os.WriteFile(evil, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	git(t, sub, "config", "core.fsmonitor", evil)
-	_ = os.Remove(canary)
 	req := CompareRequest{ProjectID: f.id, Path: f.path, Base: sourceRef("HEAD"), Head: sourceWorking}
 	c, err := f.h.store.CompareWorktree(ctx20(t), req)
 	if err != nil {
