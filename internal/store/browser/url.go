@@ -64,9 +64,7 @@ func NormalizeURL(typed string) (string, error) {
 			return CheckURL(s)
 		}
 	}
-	if strings.HasPrefix(s, "//") {
-		s = s[2:]
-	}
+	s = strings.TrimPrefix(s, "//")
 	if local(s) {
 		return CheckURL("http://" + s)
 	}

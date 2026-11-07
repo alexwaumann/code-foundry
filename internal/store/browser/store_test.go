@@ -123,7 +123,7 @@ func TestNoChromeSaysSo(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := next(t, v, "the refusal", func(st browser.State) bool { return st.Phase == browser.PhaseUnavailable })
-	if st.Message != browser.ErrNoChrome.Error() {
+	if !strings.HasPrefix(st.Message, "No Google Chrome on this Mac") {
 		t.Fatalf("message %q", st.Message)
 	}
 }

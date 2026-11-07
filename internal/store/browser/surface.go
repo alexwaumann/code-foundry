@@ -352,7 +352,7 @@ func (s *Store) bringUp(sf *surface) {
 			} else {
 				sf.state.Phase = PhaseUnavailable
 			}
-			sf.state.Message = err.Error()
+			sf.state.Message = sentence(err)
 			sf.publish()
 		}
 		s.mu.Unlock()
@@ -393,8 +393,17 @@ func (s *Store) bringUp(sf *surface) {
 func (s *Store) fail(sf *surface, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	sf.state.Phase, sf.state.Message = PhaseUnavailable, err.Error()
+	sf.state.Phase, sf.state.Message = PhaseUnavailable, sentence(err)
 	sf.publish()
+}
+
+// sentence is an error as the surface says it.
+func sentence(err error) string {
+	s := err.Error()
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // notice shows one line on the surface.

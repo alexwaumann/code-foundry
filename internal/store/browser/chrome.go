@@ -21,7 +21,7 @@ import (
 const EnvChromeBin = "CODE_FOUNDRY_CHROME_BIN"
 
 // ErrNoChrome is what a surface says when this Mac has no Google Chrome.
-var ErrNoChrome = errors.New("Google Chrome is not installed: this surface drives the Chrome in /Applications")
+var ErrNoChrome = errors.New("no Google Chrome on this Mac: this surface drives the one in /Applications")
 
 // chromeApp is the executable inside the app bundle.
 const chromeApp = "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
