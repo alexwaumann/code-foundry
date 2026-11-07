@@ -37,12 +37,40 @@ It is an experiment: it should stay easy to change or delete. See "How to remove
   (a `data:` page does not get reopened).
 - **A long message ends nothing.** Past 32 MiB a message is read to its NUL and skipped, with its
   first 64 bytes kept to fail the call it answered at once. The daemon holds no more than that and
-  gives the buffer back. Events a page makes at will (`Runtime.consoleAPICalled`,
-  `Runtime.exceptionThrown`) are dropped before they are parsed.
-- **`Runtime.enable` stays.** The finding asked to drop it if nothing needs it. The select helper's
-  binding does: measured on Chrome 157, `Runtime.addBinding` without it does nothing, named or not,
-  and enabling then disabling removes the binding. So a page's console still crosses the pipe, and
-  is skipped as above.
+  gives the buffer back.
+- **No `Runtime.enable`, anywhere.** It sends every console line of a page through the pipe, and
+  Chrome serialises and queues them whether or not anyone reads them: one page made Chrome 11.8 GB
+  and took a calm surface's input from 3 ms to 9.3 s. The select helper's binding needed it, so the
+  helper now only keeps what it saw and the daemon asks after a press (`helper.go`).
+  `Page.createIsolatedWorld` with the helper's world name finds the same world, script and all, and
+  neither it nor `Runtime.evaluate` needs `Runtime.enable` (measured on Chrome 157).
+- **`--log-level=2`.** Dropping `Runtime.enable` was not enough. Headless Chrome writes every console
+  line to stderr on its main thread, and a page logs faster than a pipe takes it: with the domain
+  gone Chrome still reached 2.8 GB and died of it. A console line is logged at INFO. A probe with
+  stderr on `/dev/null` hides all of this, which is how it was found: only the real store showed it.
+- **What a page sends through the pipe is budgeted, and a page that overspends is closed.** Chrome
+  throttles none of it and no event can be refused. `Page.enable` alone lets a page make 6,000 iframes
+  a second, each several events, or push 2 MB addresses, and Chrome's main thread falls behind and
+  every surface waits: 96 pushes made 5.7 GB and a calm input took 4.6 s, with no `Page` handler of
+  ours doing anything. Reading less does not help, because the cost is Chrome's. So `pacing.go` gives
+  each page 8 MiB, earned back at 1 MiB a second, an event costing its size plus 1 KiB, its iframes
+  charged to it, and a subframe leaving for another site 192 KiB, because that is a process. Past that
+  the page gets `Target.closeTarget`, and the surface says which site went. A page loading costs a
+  few hundred KB, but a page with over 40 frames on other sites at once is closed as a flood.
+- **What an event needs done goes on the target's queue.** One goroutine per target, at least 100 ms
+  between rounds, and asking twice is asking once. `document.open()` in a loop made 74,000 goroutines
+  in 15 s when each event started its own. Reading a history of 2 MB addresses is 100 MB, so that
+  read is held to a tenth of the time.
+- **Chrome is watched from outside.** `--js-flags=--max-old-space-size=2048` ends a page past that
+  heap, but typed arrays are outside it (4.7 GB in a second), and a page logging in a loop sends no
+  event at all: its console queues in its own process or in Chrome's, whichever is behind, and
+  Chrome's main thread has no time for anyone. So once a second `watchMemory` reads `ps` for Chrome's
+  process group. A helper past 4 GiB, or past 1 GiB and up by 512 MiB in 5 s, is killed, which Chrome
+  reports as a crashed page. When Chrome's own process swells by that much, or stays past 150% CPU
+  for 3 s, the busiest helper goes: about 200% each in a console flood, against about 60% for the
+  whole group on an animated page. Chrome past 6 GiB, or the group past 12 GiB, goes too, and every
+  surface says so. Only that process group: nothing is found by name. This is a heuristic: a real page that grows that fast, or
+  keeps Chrome's main thread that busy, is killed the same way, and says "This page crashed".
 - **What a page asks belongs to its target**, not to the surface: dialog, file chooser, select. A
   viewer sees only what the page on screen asks, under that page's address, and the answer goes to
   that session. A dialog from a page behind its popup is dismissed there at once, as Chrome does for
@@ -52,17 +80,38 @@ It is an experiment: it should stay easy to change or delete. See "How to remove
   `Page.navigatedWithinDocument` with the main frame's id, `Page.documentOpened`, and nothing from
   `Target.targetInfoChanged`, which reports where a navigation is headed. An error page shows the
   address that failed, not `chrome-error://`. User names and passwords never reach a viewer, however
-  the page got there.
+  the page got there. A read of a popup's address that a commit overtakes is dropped: `commits`
+  counts them.
+- **Who a page is comes from Chrome, not from its address.** `securityOrigin` on the commit, which
+  `history.pushState` cannot change. `url.Parse` and `new URL` both refuse what Chrome accepts, so one
+  `pushState` to `/%zz`, or a host with `{` or a backtick, blanked the domain and the dialog's
+  origin. Nothing here parses an address with a library now: `authority` reads it by hand when
+  Chrome has not said yet. One trap: Chrome's `securityOrigin` is `://` for an `about:blank` that
+  inherited a real origin, in the event and in `Page.getFrameTree` (measured). So a page with no
+  origin is asked `self.origin` in the helper's world, where its script cannot redefine it, and
+  until it answers the bar says `Unknown site`.
 - **The bar is built around the registrable domain.** The daemon reads it (`siteOf`, the public
-  suffix list) so the window needs no list. While nobody edits, the bar draws the address over the
-  input: the path shrinks away first, then the host clips from its left, so its end stays in view.
-  Dialogs and choosers lead with the same domain, then the full origin, wrapped and not clipped.
+  suffix list) so the window needs no list. While nobody edits, the bar draws the origin and address
+  over the input: the path shrinks away first, then the host clips from its left, so its end stays
+  in view. Any page with an address has a site in the bar, or `Unknown site` where nothing can say
+  (a `data:` page, a sandbox). An address the origin does not lead (`about:blank`, `blob:`) follows
+  it. Dialogs and choosers lead with the same domain, then the full origin, wrapped and not clipped;
+  with nothing to name they say "An unknown site", never a blank.
 - **Not secure, Bad certificate.** Every page not on https says Not secure, loopback included: one
   rule, and a dev server loses nothing by it. `Security.visibleSecurityStateChanged` with
-  `insecure-broken` says Bad certificate, which stays on a page the user went on to anyway. A blank
-  popup counts as not secure, and shows `about:blank`: an opener can write into it.
-- **Web APIs that reach for the Mac's own UI are off**, by `--disable-blink-features`: see "Open
-  questions from the security review".
+  `insecure-broken` says Bad certificate, which stays on a page the user went on to anyway. Only the
+  blank a surface's own page starts on is no page. Any other blank is Not secure and shows
+  `about:blank` behind the origin it inherited: a popup's opener can write into it, and a popup
+  can send its opener there and write into that.
+- **Web APIs that reach for the Mac's own UI are off**, by flags, profile prefs and session calls:
+  see "What reaches the Mac's own UI". The prefs go into `<profile>/Default/Preferences` before each
+  launch (`hardenProfile`), merged over what is there.
+- **Every cross-site iframe has a session of its own.** `Page.setInterceptFileChooserDialog`, the
+  helper and a download's session stop at the process boundary, so a file input in such a frame had
+  no interception. `Target.setAutoAttach` on each session, nested ones too, holds a new frame paused
+  until it has the same set-up (`frames.go`). A frame whose set-up fails stays paused, and so does
+  one past 32 per page. `filter` keeps it to iframes, and workers are not attached. It does not
+  attach popups, whichever filter is used (measured): those still come by `Target.targetCreated`.
 - **Frames.** A viewer holds one frame; a newer one replaces it and the old one is acked at once. The
   newest is acked only after `stream.Send` returns, so a client that cannot take frames holds Chrome
   back instead of frames piling up. The client also keeps only the newest, one decode at a time, so
@@ -94,10 +143,11 @@ It is an experiment: it should stay easy to change or delete. See "How to remove
 All of it measured on Chrome 157 against pages served from localhost.
 
 - **`<select>`.** Worse than invisible: nothing appears, and on a Mac the arrow keys open the same
-  menu, so a select is dead. Fixed for same-process frames: a script in an isolated world
-  (`helper.go`) catches the press and the arrow keys and reports the options, the GUI draws the list,
-  and the pick sets the value and fires `input` and `change`. Not handled: a select inside a
-  cross-origin iframe (out of process, no helper there).
+  menu, so a select is dead. Fixed: a script in an isolated world (`helper.go`) catches the press
+  and the arrow keys and keeps the options, the daemon reads them after that press, the GUI draws the
+  list, and the pick sets the value and fires `input` and `change`. Cross-site iframes have the
+  helper too, through their own session, and the list opens where the user pressed, because the
+  frame only knows where it sits in itself. One press reads at most 32 frames.
 - **Date, colour and similar pickers.** The field takes focus and typing. Its popup is the same
   class of problem as a select and is not drawn.
 - **JS dialogs.** Work. An overlay names the origin; alert, confirm, prompt and beforeunload are
@@ -105,7 +155,10 @@ All of it measured on Chrome 157 against pages served from localhost.
   dismisses it first, so a page looping on `alert` can be left. A beforeunload dialog shows our words,
   not the page's.
 - **File choosers.** Work. Intercepted, an overlay names the origin, and the host's open panel picks.
-  Only in the app's window: without a host (a browser dev session) the overlay says so.
+  Only in the app's window: without a host (a browser dev session) the overlay says so. In a
+  cross-site iframe the interception is on the frame's session, and the overlay names the frame, not
+  the page. That was proved by inspecting the sessions, and no file input in a frame was ever
+  clicked: a mistake there would open a real panel.
 - **Clipboard.** Headless Chrome's clipboard is private and in memory. Measured with an empty Mac
   clipboard: `changeCount` did not move on a copy or on `navigator.clipboard.writeText`, and text
   copied in Chrome pasted back in Chrome. So a page cannot read or write the Mac's clipboard at all.
@@ -122,7 +175,9 @@ All of it measured on Chrome 157 against pages served from localhost.
     scratch page of its own (no site gets clipboard permission) and `pbcopy`s it. The window cannot:
     the reply arrives after the key's gesture has ended. A Copy with no such press moves nothing.
   - A page's own Copy button: after each click, text on the clipboard moves to that surface, and a
-    strip says "The page copied text" with a Copy button. It never moves by itself.
+    strip says "The page copied text" with a Copy button. It never moves by itself, and it goes when
+    the page does. Only the surface's latest click reads: these wait on the clipboard's lock, and
+    one that went late took the next click's text.
   - Reads stop at 1 MiB: the scratch field's `maxlength` cuts a paste off, and a text that long is
     dropped, so 70 MB on Chrome's clipboard costs nothing.
 - **`window.open`, `target=_blank`.** Land in the same surface. Every new tab carries `openerId`,
@@ -133,17 +188,21 @@ All of it measured on Chrome 157 against pages served from localhost.
   inert: no name the page chose, nothing Finder shows, swept at each launch. It reaches
   `<home>/browser/downloads`, under a cleaned name that never replaces a file, only on the user's
   word (`downloads.go` has the rule):
-  - A click or Enter on the surface lets one download through, for 5 s. One click, one download.
+  - A click, or Enter on a link, lets one download through, for 5 s, on the page it was made on.
+    One click, one download. Space and typing are no gesture: they come with every word, and a page
+    can have been waiting for any key. Enter on a button is none either, nor Enter inside a
+    cross-site iframe, where the helper in the page cannot see a link: those ask.
   - With no gesture the surface asks: Allow or Block, five at a time, and more are blocked. The file
     waits in incoming meanwhile, up to 256 MiB, because a download cannot be paused or fetched again.
-  - A page nobody can see downloads nothing: no viewer, or behind its popup.
+  - A page nobody can see downloads nothing and asks nobody: no viewer, or behind its popup.
   - 20 files and 4 GiB per surface until the user goes somewhere or reloads. A page navigating
     itself does not reset that.
   - The strip lists every file, scrolling, up to 50, and counts what did not fit.
-  - `Page.downloadWillBegin` names the session, so a subframe's download is its page's. A frame
-    nested inside a cross-site iframe sends only `Browser.downloadWillBegin`, which nothing can tie
-    to a surface: no gesture counts then, and the surface the user touched last asks. With nothing
-    on screen it is blocked.
+  - `Page.downloadWillBegin` names the session, so a subframe's download is its page's. Every
+    cross-site iframe has a session now, nested ones too, so its download is its own page's as well,
+    in the frame's name. No gesture counts for it: the click was on the page, not on what a third
+    party embedded there, so the surface asks. A hidden page's frame asks nobody. A download nothing
+    can place is blocked, and no surface is told.
   - Chrome sets `com.apple.quarantine` on the file itself, and the move keeps it.
 - **Headless detection.** Unchanged, and likely to matter. The user agent says `HeadlessChrome/157`,
   `navigator.webdriver` is `true`, `navigator.userAgentData` brands say Google Chrome. `window.chrome`
@@ -193,6 +252,9 @@ Known not to work, and silent:
   again on the same page.
 - Daemons of my own: SIGTERM left nothing in 0.65 to 6 s, SIGKILL in 4.1 s, and a new daemon started
   right after a SIGKILL came up on the same profile with no forced kill. No page URL at info level.
+- After the second review, a scratch dev daemon with the GUI in WebKit and a stub for Claude, checking
+  where the keyboard was before every key: Enter on an address with a server holding its first byte,
+  `/%zz` with a dialog, a popup rewriting its opener, a timed prompt over the address bar.
 - The real app window (`wails://`, WKWebView), by CLI and window captures only, with no synthetic
   input: the Origin guard takes it, frames are live, and 8 of 8 changes to a still page painted within
   0.9 s. That run found the bug where a second `view.panel.browser --url` did nothing on a showing tab.
@@ -215,61 +277,155 @@ Also:
 
 - Agents can also run `settings set experimental.chrome_surface true`, until the setting is marked
   as the user's alone (see below).
+- Sign-ins stay on disk after the setting is off, in `<home>/browser/profile`. Deleting
+  `<home>/browser` (`~/.code-foundry/browser`) removes them, and the setting's description says so.
 - The profile's cookies use the same "Chrome Safe Storage" Keychain item as your own Chrome.
 - `HeadlessChrome` is in the user agent, so some sites refuse it, and some act differently.
 
 ## The security review
 
-Every finding has a test that fails without its fix (checked by undoing each one), and the
-reviewer's pages were replayed against the real store and Chrome.
+Two rounds. Round 1's table claimed more than it had proved: a re-check broke several rows with
+real pages, so those rows now say what stands. Round 2 is what came of that. In both, each fix has a
+test that fails without it, checked by undoing the fix (round 2: 36 changes undone one at a time, and
+every one failed a test). All pages were local and every Chrome was headless on a mock keychain.
+
+### Round 1, and what stands
+
+| # | Finding | State now | Proved by |
+| --- | --- | --- | --- |
+| 1 | A timed `prompt` stole the keyboard | Holds. Round 2 closed two ways round it: the address bar, and a slow server | `BrowserOverlays.test.tsx`; `browser-surface.spec.ts`; `steal.html` in the real daemon and GUI |
+| 2 | Paste leaked past site isolation | Holds, with the limit under "Accepted for now" | `TestAPasteRunsNoScriptInThePage`, `PasteReachesOnlyTheFocusedFrame`; `paste-top.html` |
+| 3 | The address and origin could mislead | Was not done: `/%zz` and a host with `{` broke it. Round 2 items 3 and 4 | Below |
+| 4 | Unlimited silent downloads | Was too loose: typing counted as a gesture, a gesture outlived its page, and "a hidden page gets nothing" was false for a page whose download no session reported. Round 2 items 7, 9 and 11 | `dl.html` as before, and below |
+| 5 | Stale text reached the Mac | Holds for what it tested. A notice that ran late could take the next click's text, found in round 2. See "Accepted for now" for the one known race | `StaleTextNeverReachesTheMac`, `PasteReachesOnlyTheFocusedFrame` |
+| 6 | Any page could kill the browser | Round 1 stopped one way (a single huge message), and said "only the console could ever kill it", which was false: `pushState` did, and floods froze every surface. Round 2 item 1 | `cdp_test.go`, `APageCannotEndTheConnection`, `TestRelaunchAfterACrashDoesNotGoBackToThePage`, and below |
+| 7 | `Go` panicked on a large negative delta | Holds | `TestGoTakesOneStepOnly` |
+| 8 | Dialog routing | Holds. The test behind it flaked on a real race, round 2 item 12 | `TestADialogOfAPageBehindAPopupIsDismissedThereAndNeverShown`, 100 runs of 100 |
+| 9 | Closing a tab leaked a viewer | Holds | `TestClosingATabCountsItsViewersOutSoTheIdleStopFires`, `TestARelaunchNobodyWatchesStillStopsWhenIdle` |
+| 10 | `CODE_FOUNDRY_CHROME_BIN` in any build | Holds | `TestChromeBinIsADevBuildsAlone` |
+
+### Round 2
 
 | # | Finding | What changed | Proved by |
 | --- | --- | --- | --- |
-| 1 | A timed `prompt` stole the keyboard | No overlay takes focus unless the keyboard is already in its surface; it hands it back as it goes | `BrowserOverlays.test.tsx` for every overlay; `browser-surface.spec.ts` from the composer and the bottom terminal; `steal.html` in the real daemon and GUI: the words stayed in the composer, the page got null |
-| 2 | Paste leaked past site isolation | Through a page of our own, then cmd+v in the focused frame; nothing evaluates in a page | `TestAPasteRunsNoScriptInThePage`, `PasteReachesOnlyTheFocusedFrame`; `paste-top.html`: no `TOP-STOLE-PASTE`, the child got the event and the value |
-| 3 | The address and origin could mislead | Main-frame check, committed address only, no credentials, registrable domain kept in view, Not secure and Bad certificate | `TestWhatTheAddressShows` and neighbours, `browserAddress.test.ts`, the e2e geometry test, `userinfo.html`, a bad certificate on localhost |
-| 4 | Unlimited silent downloads | `downloads.go`, above | The rules in `rules_test.go`, three live cases; `dl.html`: 47 listed, 5 asking, 42 blocked, 0 landed, 170 bytes staged, against 47 files and 76 MB before |
-| 5 | Stale text reached the Mac | Paste marks the clipboard read; Copy takes only what its key press changed, per surface | `StaleTextNeverReachesTheMac`, `PasteReachesOnlyTheFocusedFrame` |
-| 6 | Any page could kill the browser | Long messages skipped; Relaunch opens blank | `cdp_test.go`, `APageCannotEndTheConnection`, `TestRelaunchAfterACrashDoesNotGoBackToThePage`; `kill70`, `killalert`, `killtitle`, `killclip`: Chrome stayed up |
-| 7 | `Go` panicked on a large negative delta | Only -1 and 1 pass | `TestGoTakesOneStepOnly` |
-| 8 | Dialog routing | Per target, above | `TestADialogOfAPageBehindAPopupIsDismissedThereAndNeverShown`, a live case; `opener-dialog.html`: nothing over the popup, the opener got null and was not stuck |
-| 9 | Closing a tab leaked a viewer | `CloseSurface` counts them out and arms the idle clock. So does a Relaunch nobody watches, found on the way | `TestClosingATabCountsItsViewersOutSoTheIdleStopFires`, `TestARelaunchNobodyWatchesStillStopsWhenIdle` |
-| 10 | `CODE_FOUNDRY_CHROME_BIN` in any build | Read only when the version is `dev` | `TestChromeBinIsADevBuildsAlone` |
+| 1 | Any page, no gesture, could freeze every surface and grow Chrome past 10 GB | No `Runtime.enable`, `--log-level=2`, the event budget, the heap cap, the outside watch | `TestNoSessionHandsItsConsoleToThePipe`, `TestAPageThatFloodsThePipeIsClosedAndNoOtherIs`, `TestWhatTheMemoryWatchKills`, `AFloodClosesThePageAndNoOther`; the floods below |
+| 2 | A slow server pulled the keyboard out of the composer | The page gets it only if it is still in the toolbar. No other async path moves focus into the surface: `useReturnFocus` and `pageFocus` run on mount and unmount and check first | `BrowserToolbar.test.tsx`. Real daemon and GUI: Enter on an address held 5 s, on to the composer, "my secret words more" stayed there, the page's server logged no key |
+| 3 | `/%zz` hid the domain and blanked the dialog's origin | Origin from Chrome, no URL library anywhere near it, `Unknown site` and "An unknown site" where nothing can say | `TestWhoAPageIsSurvivesWhatAParserRefuses`, `TestTheAddressReadsChromesOriginAndNotTheAddress`, `browserAddress.test.ts`, `TheSiteSurvivesAnAddressNoParserTakes`. Real GUI: bar `evil.test:18598`, dialog `evil.test says` |
+| 4 | A popup rewrote the page behind it under an empty bar | An `about:blank` that is not the first shows the origin it inherited and Not secure | `TestABlankPageShowsTheOriginItInheritedAndIsNotSecure`, `APopupCannotBlankItsOpenerUnnoticed`. Real GUI: `evil.test:18598 about:blank`, Not secure, over the fake sign-in |
+| 5 | `document.open()` grew goroutines without limit | One goroutine per target, paced; a page keeping it up is closed by the budget | `TestDocumentOpenInALoopStartsOneGoroutine`; the floods below |
+| 6 | WebAuthn was not blocked | `WebAuthn.enable` on every session, with no authenticator: see below | `WebAuthnReachesNothingReal`, `TestEveryIframeIsInterceptedBeforeItRuns` |
+| 7 | A file input in a cross-site iframe had no interception | `Target.setAutoAttach`, a session and the full set-up per frame before it runs | `TestEveryIframeIsInterceptedBeforeItRuns`, `TestAnIframeWhoseSetUpFailedStaysPaused`, `EveryCrossSiteFrameHasASessionOfItsOwn`: nested frames each on a session that reaches their document. No file input in a frame was clicked |
+| 8 | A timed prompt stole the address bar | The gate is the page, and the toolbar is outside it | `BrowserOverlays.test.tsx`. Real GUI: the prompt came up, the keyboard stayed in the bar, its answer stayed empty |
+| 9 | The download gesture was too loose | Only a click, or Enter on a link. A navigation clears it | `TestWhatCountsAsAGesture`, `TypingIsNoGestureAndNeitherIsSpace`, `AGestureDoesNotSurviveTheNextPage` |
+| 10 | A page's copied text outlived it | Cleared on the page's commit, and a read that crosses one is dropped | `APagesCopyDoesNotOutliveThePage`, `BrowserOverlays.test.tsx` |
+| 11 | A hidden page could ask on a visible surface | A download belongs to its page's surface, and what nothing places asks nobody | `TestAHiddenPagesIframeAsksNobody`, `TestADownloadNothingCanPlaceAsksNobody`, `ACrossSiteFrameCanOnlyAsk` |
+| 12 | A stale `readAddress` overwrote a newer commit | `commits`: an answer a commit overtook says nothing | `TestAStaleReadOfAPopupNeverReplacesItsCommit`; `TestADialogOfAPageBehindAPopup…` with `-count=100` |
 
-`Runtime.enable` stays, as said above. `dialog` messages and `document.title` needed no handling:
-Chrome cuts them to 10 KB and 4 KB before they reach the pipe, so only the console could ever kill it.
+The floods, each on a new Chrome with a calm surface on another site beside the flooding one, input
+sent to the calm one 4 times a second for 8 s. Baseline input 2 to 20 ms. The harness kills Chrome at
+6 GB; it never had to.
 
-Not done here, on purpose: marking `experimental.chrome_surface` as settable by the user only.
-Another PR is adding that, and it had not reached main when this was written. Mark it when it does.
+| Flood | Worst calm input | Chrome's group at peak, MB | What ended it |
+| --- | --- | --- | --- |
+| `console.log` in a loop, tiny | 0.64 s | 1,817 | Killed by the watch at about 3 s |
+| The same, 200 byte lines | 0.89 s | 2,565 | The watch |
+| The same, on a tab out of view (`MessageChannel`) | 0.57 s | 2,170 | The watch |
+| The same, from a worker | 64 ms | 1,143 | Still running, harmless |
+| `console.log` of 1 MB, and of 31 MB | 18 ms, 73 ms | 1,155, 1,387 | Still running, harmless |
+| `throw` of 5 MB | 18 ms | 3,319 | The heap cap or the watch |
+| `document.title` of 1 MB | 6 ms | 2,284 | The watch |
+| Heap | 2 ms | 2,509 | The heap cap |
+| Typed arrays | 1 ms | 5,180 | The watch |
+| Canvases of 4000×4000 | **2.3 s** | 1,169 | Still running after 15 s: nothing sees this one |
+| `fetch` of 404s | 6 ms | 2,331 | The watch |
+| Same-process iframes in a loop | 3 ms | 1,702 | Closed by the budget |
+| `document.open()` in a loop | 6 ms | 1,170 | The budget; goroutines peaked at 20, against 74,000 |
+| `location.hash` in a loop | 73 ms | 1,244 | Chrome's own limit of 200 in 10 s |
+| `pushState` of 2 MB, every 20 ms | 2.5 s | 2,232 | The budget |
+| The same, as fast as it will go | 1.3 s | 2,443 | The budget |
+| The same, on a tab out of view | 2.4 s, three runs of three | 2,411 | The budget |
+| `pushState` of 2 MB every 2.5 s | 138 ms | 1,336 | Still running, under the budget |
+| Frames to 40 new sites a second | 74 to 210 ms | 4,058 to 5,931 | The budget; Chrome back to 1.2 GB about 9 s after the close |
+| Frames to new sites, 20 per tick | **2.1 s** | **past 6,268** | **Not proved.** See below |
 
-### Open questions from the security review
+The daemon's goroutines stayed under 30 in all of these but the frame floods, where they reached 82.
+Each run left Chrome answering and the calm surface at 1 ms, except the last.
 
-None of these were run with the API on. Anything that could put a real panel on the Mac's desktop
-was reasoned about, not triggered.
+Three that are not good enough, and stay open:
+
+- **Frames to new sites as fast as a page can.** Each is a renderer, and Chrome spawns about 40 a
+  second. The budget closes the page in about 0.7 s, but Chrome's main thread is behind by then, the
+  close takes over 2 s to land, and meanwhile renderers keep starting. The harness stops any Chrome at
+  6 GB of summed RSS, and every run got there first, so the end of this flood was not seen.
+  `--renderer-process-limit` does not hold (measured: 73 with a limit of 24), because a renderer
+  cannot be shared across sites. The last line is `maxGroupRSS` at 12 GiB, which kills all of Chrome:
+  its unit test passes, it was not seen acting. Before the budget and that limit, one run went to
+  26 GB of summed RSS, because the harness's check sat behind a blocked call. That has a watcher of
+  its own now. Summed RSS counts shared pages once per process, so it overstates real memory.
+- **Canvases.** A calm input waits up to 2.3 s, on the GPU process, for as long as the page goes on.
+  Nothing grows enough for the watch and no event says so.
+- **`pushState` of 2 MB.** A calm input waits 1.3 to 2.5 s for the second or so before the page is
+  closed. One run reached 9.5 s, with the Mac's load at 23 from other work and the baseline itself
+  at 200 ms, and three repeats gave 2.4 s.
+
+Before round 2, on the same machine: the console flood took a calm input from 3 ms to 9.3 s with
+Chrome at 11.8 GB, `Navigate` timed out at 25 s, and `pushState` killed Chrome.
+
+### Accepted for now
+
+- A page writing Chrome's clipboard in a hard loop can land its text between our mark and a cmd+c on
+  another surface: 2 of 872 presses in the review.
+- A key press in an iframe activates its top page, as the HTML spec says, so a paste there hands the
+  top page the activation any key would.
+- A flood of console lines costs a calm surface up to about a second of input lag for the 3 s or so
+  before the watch acts. It sends no event to act on sooner, and no flag stops it.
+- A page can fill memory until the watch sees it: about a second, at up to 4 GB a second.
+- Pages sharing a site share a renderer, so the watch killing one kills the others on that site.
+- A popup runs for a moment before its session is set up, because `Target.setAutoAttach` does not
+  reach popups. Its file input and WebAuthn need its own user activation, which it cannot have yet.
+
+Not done: marking `experimental.chrome_surface` as settable by the user only. The mark had not
+reached main on 2026-11-07 (nothing like it in `settings.Field`), so an agent can still turn this on.
+Use it here when it lands.
+
+### What reaches the Mac's own UI
+
+Nothing here was triggered with the block off. Anything that could put a real panel on the desktop
+was not run.
 
 - **`showOpenFilePicker`, `showSaveFilePicker`, `showDirectoryPicker`.** Blocked. They do not go
   through `Page.setInterceptFileChooserDialog`, which covers `<input type=file>`, so a page with a
   gesture could reach a real panel. `--disable-blink-features=FileSystemAccess,FileSystemAccessLocal`
-  leaves them undefined, in cross-site iframes too.
-- **WebAuthn and passkeys.** Blocked, `WebAuth`: `PublicKeyCredential` is undefined, so a site falls
-  back to its password path or refuses. Otherwise Chrome could reach the system's own sheet. A site
-  that insists on a passkey cannot be signed in to here.
-- **`navigator.share`, `EyeDropper`, Web Serial, USB, HID, Bluetooth, Presentation.** Blocked by the
-  same flag, for the same reason: their sheets and choosers cannot be answered through a frame.
-- **`window.print`.** Not blocked, not run. Print preview is a dialog inside Chrome's own hidden
-  window, so the likely result is a page waiting on something nobody sees, which only harms that
-  page: Back, a new address or closing the tab should leave it. A stub in the main world would not
-  reach cross-site iframes.
-- **External protocol handlers.** Not blocked: no flag or protocol call was found to refuse them
-  with. With a scheme nothing handles, nothing happens and the page stays (run). With a real handler
-  it was not run, because it would open a real app. As Chrome is understood to work, it asks in a
-  dialog in its hidden window, which nobody can answer, so nothing opens; but it does not ask for
-  `mailto:`, `news:` and `snews:`, so a page could open the user's mail app with a draft, once per
-  gesture. Treat that as a known gap.
-- **`<input type=color>`.** Not blocked, not run. On a Mac this may be the system colour panel, a
-  real window. Harmless in itself, and needs the user's click. Check it on a test machine.
+  leaves them undefined, in cross-site iframes too (read, not called).
+- **WebAuthn and passkeys.** `--disable-blink-features=WebAuth` only hides `PublicKeyCredential`:
+  `navigator.credentials.create` still worked. What blocks it is `WebAuthn.enable` on every session,
+  with no authenticator added: a call goes to that empty virtual environment, reaches neither a real
+  key nor the system's sheet, and fails with `NotAllowedError` on its own timeout (run, on a session
+  first shown to be inside the environment). So a passkey cannot be used here, and a site that
+  insists on one cannot be signed in to. `navigator.credentials` itself stays: no flag removes it.
+- **`navigator.share`, `EyeDropper`, Web Serial, USB, HID, Bluetooth, Presentation, FedCM.** Blocked
+  by the same flag, for the same reason: their sheets and choosers cannot be answered through a frame.
+- **Picture-in-picture.** Blocked. `DocumentPictureInPictureAPI` is off, and
+  `--blink-settings=pictureInPictureEnabled=false` makes `document.pictureInPictureEnabled` false.
+  Read, not called.
+- **`window.print`.** The `printing.enabled` pref is false in the profile, and read back as false
+  from `chrome://prefs-internals` in a scratch run. The call itself was not made, so what it does
+  with the pref off is what Chrome says the pref does: nothing.
+- **External protocol handlers, `mailto:` included.** Blocked by `policy.url_blocklist` `*` with an
+  allow list of `http`, `https`, `about`, `blob` and `data`, set as a profile pref. A scheme nothing
+  on this Mac handles answers `net::ERR_BLOCKED_BY_ADMINISTRATOR` (run), and `blob:` and `data:`
+  frames still load (run). `mailto:` itself was not tried, since it would open the mail app. It goes
+  the same way as any scheme, so this is reasoned from that and not proved.
+- **`<input type=color>`.** A real click is cancelled by the helper, in every frame it reaches, so no
+  panel opens from a click, Space or Enter. Proved by an untrusted event, which opens nothing either
+  way, coming back cancelled; a real click was not made. Not blocked: `input.showPicker()` from a
+  page's own click handler. On a Mac that may show the system colour panel, a real window, harmless in
+  itself, and it needs the user's click on the page. No flag removes `showPicker`.
+- **Digital credentials.** `DigitalCredential` stays defined, no flag removes it. It needs a gesture,
+  and any prompt would be in Chrome's hidden window. Not run.
 - **`getDisplayMedia`, `getUserMedia`, notifications, geolocation, payment.** Prompts live in the
-  hidden window or are denied, so they stay unanswered, as said above. No OS sheet is expected.
+  hidden window or are denied, so they stay unanswered, as said above. No OS sheet is expected. Not
+  run.
 - **Fullscreen, `window.moveTo`.** Not run. They act on the hidden window.
 
 ## Gotchas
@@ -293,6 +449,12 @@ was reasoned about, not triggered.
 - `Browser.downloadWillBegin` arrives after `Page.downloadWillBegin`. If Chrome ever swapped them,
   every download would only ask.
 - `Input.dispatchKeyEvent` with `commands` reaches the focused frame, cross-site iframes too.
+- `securityOrigin` is `://` for an `about:blank` with an inherited origin, while the page's
+  `self.origin` is right. See the decision on origins.
+- A probe of Chrome with stderr on `/dev/null` shows a console flood as harmless, and `calm` timings
+  taken in the same breath as a `ps` are about 90 ms too long. Measure on the real store.
+- A page in a background tab has its timers held to one a second, so a flood there looks slow. A
+  `MessageChannel` loop is not held, and `Emulation.setFocusEmulationEnabled` lifts the limit.
 - Our scratch page taking keys can make a focused iframe see another `focus` event. The keyboard
   stays there: typing after a paste reaches the same field.
 
