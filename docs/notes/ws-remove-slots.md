@@ -132,6 +132,13 @@ surface, four thread nodes, four terminal nodes, a bottom shell), all live.
   mounts leaving at once.
 - An act took 11 ms with all of it open.
 
+## Gotcha
+
+`make gui-e2e` failed once on `thread-info.spec.ts:122`, showing `Debug daemon` where it expects `Dev`.
+That is older than this PR and has nothing to do with streams: the mock's `reset()` forgot its runs but
+not their records, so `server-rollup.spec.ts`'s run reached any `thread-info` test later on that worker.
+Run in that order it failed every time. `reset()` now clears the records.
+
 ## Not verified
 
 - The built Wails app and WKWebView. All of this ran in headless WebKit.

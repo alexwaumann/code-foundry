@@ -345,6 +345,7 @@ export class MockActions {
   /** The seeds (repo-cf only); every run is forgotten. Publishes a snapshot. */
   reset(): void {
     this.dropRuns();
+    this.records = [];
     this.actions.clear();
     this.nextAction = 1;
     this.nextRun = 1;
