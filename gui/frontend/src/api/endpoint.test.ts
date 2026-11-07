@@ -1,14 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DictationService } from "@/gen/codefoundry/v1/dictation_pb";
+import type { DescService } from "@bufbuild/protobuf";
 import { EmberService } from "@/gen/codefoundry/v1/ember_pb";
-import { EventService } from "@/gen/codefoundry/v1/events_pb";
 import { HealthService } from "@/gen/codefoundry/v1/health_pb";
-import { PluginService } from "@/gen/codefoundry/v1/plugin_pb";
-import { ProjectService } from "@/gen/codefoundry/v1/project_pb";
-import { SearchService } from "@/gen/codefoundry/v1/search_pb";
 import { TerminalService } from "@/gen/codefoundry/v1/terminal_pb";
-import { ThreadService } from "@/gen/codefoundry/v1/thread_pb";
 import { DaemonConnection, jsonRequested } from "./endpoint";
+
+/** Every server-streaming RPC in the generated code: its procedure, its service, its client method. */
+function serverStreams(): [string, DescService, string][] {
+  const modules = import.meta.glob<Record<string, unknown>>("/src/gen/codefoundry/v1/*_pb.ts", { eager: true });
+  const services = Object.values(modules)
+    .flatMap((m) => Object.values(m))
+    .filter((v): v is DescService => (v as DescService | null)?.kind === "service");
+  return services.flatMap((s) => s.methods.filter((m) => m.methodKind === "server_streaming").map((m): [string, DescService, string] => [`${s.typeName}/${m.name}`, s, m.localName]));
+}
 
 describe("jsonRequested", () => {
   it.each([
@@ -75,20 +79,26 @@ describe("which transport a call takes", () => {
     return { socket, fetch: fetchStub.mock.calls.map(([url]) => url as string) };
   }
 
-  it.each<[string, (conn: DaemonConnection) => Promise<unknown>]>([
-    ["EmberService/WatchBoard", async (conn) => (await conn.client(EmberService)).watchBoard({})[Symbol.asyncIterator]().next()],
-    ["ThreadService/WatchThread", async (conn) => (await conn.client(ThreadService)).watchThread({})[Symbol.asyncIterator]().next()],
-    ["TerminalService/Attach", async (conn) => (await conn.client(TerminalService)).attach({})[Symbol.asyncIterator]().next()],
-    ["PluginService/WatchSurface", async (conn) => (await conn.client(PluginService)).watchSurface({})[Symbol.asyncIterator]().next()],
-    ["EventService/Watch", async (conn) => (await conn.client(EventService)).watch({})[Symbol.asyncIterator]().next()],
-    ["DictationService/Watch", async (conn) => (await conn.client(DictationService)).watch({})[Symbol.asyncIterator]().next()],
-    ["DictationService/Session", async (conn) => (await conn.client(DictationService)).session({})[Symbol.asyncIterator]().next()],
-    ["SearchService/Watch", async (conn) => (await conn.client(SearchService)).watch({})[Symbol.asyncIterator]().next()],
-    ["SearchService/WatchRecent", async (conn) => (await conn.client(SearchService)).watchRecent({})[Symbol.asyncIterator]().next()],
-    ["ProjectService/Clone", async (conn) => (await conn.client(ProjectService)).clone({})[Symbol.asyncIterator]().next()],
-  ])("is the socket for %s", async (procedure, call) => {
-    const got = await reached(call);
-    expect(got).toEqual({ socket: [`ws://127.0.0.1:1/stream/codefoundry.v1.${procedure}`], fetch: [] });
+  // From the generated code, so a new service is checked the day it lands: a stream on fetch
+  // would quietly hold one of WebKit's six connections, and no other test would notice.
+  it.each(serverStreams())("is the socket for %s", async (procedure, service, method) => {
+    const got = await reached(async (conn) => {
+      const client = (await conn.client(service)) as unknown as Record<string, (req: object) => AsyncIterable<unknown>>;
+      return client[method]?.({})[Symbol.asyncIterator]().next();
+    });
+    expect(got).toEqual({ socket: [`ws://127.0.0.1:1/stream/${procedure}`], fetch: [] });
+  });
+
+  it("finds the streams the GUI lives on", () => {
+    const names = serverStreams().map(([procedure]) => procedure);
+    expect(names).toEqual(expect.arrayContaining(["codefoundry.v1.EventService/Watch", "codefoundry.v1.ThreadService/WatchThread", "codefoundry.v1.TerminalService/Attach", "codefoundry.v1.PluginService/WatchSurface"]));
+  });
+
+  it("is built in one place: nothing else can open a stream on another transport", () => {
+    const builders = Object.entries(import.meta.glob<string>(["/src/**/*.{ts,tsx}", "!/src/gen/**", "!/src/**/*.test.{ts,tsx}"], { query: "?raw", import: "default", eager: true }))
+      .filter(([, text]) => text.includes('from "@connectrpc/connect-web"'))
+      .map(([path]) => path);
+    expect(builders).toEqual(["/src/api/endpoint.ts"]);
   });
 
   it("is fetch for a unary call of a service with a stream", async () => {

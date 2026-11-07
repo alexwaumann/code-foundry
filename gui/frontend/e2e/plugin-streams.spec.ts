@@ -2,12 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { mockPost, openApp, openStreams, resetMock, row } from "./fixtures";
 
 /**
- * Plugin thread and terminal nodes within the connection budget
- * (docs/notes/plugins-12-renderer-defects.md). The mock's hello demo "stress" tab shows two
- * thread nodes and a terminal: with the content pane's thread, the event stream and the
- * surface's own stream that was one stream per WebKit connection to the daemon, and every
- * act hung. Now two inline nodes go live, the third offers Attach, the app never holds more
- * than five streams, and acts complete.
+ * Plugin thread and terminal nodes each hold their own stream, with nothing rationing them
+ * (docs/notes/ws-remove-slots.md). The mock's hello demo "stress" tab shows two thread nodes
+ * and a terminal: beside the event stream, the content pane's thread and the surface's own
+ * stream that is six. It was once a stream for each of WebKit's connections to the daemon,
+ * and every act hung behind them. Streams now ride sockets, which leave those connections
+ * to calls, so all of them stay live and acts complete.
  */
 
 const surface = (page: Page) => page.getByTestId("plugin-surface");
@@ -31,46 +31,118 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("two threads and a terminal in one view: two go live, the third offers Attach, and acts still complete", async ({ page }) => {
+test("two threads and a terminal in one view: all live at once, past the old limit, and acts still complete", async ({ page }) => {
   await openStress(page);
   const threads = surface(page).getByTestId("plugin-thread");
   const term = surface(page).getByTestId("plugin-terminal");
   await expect(threads).toHaveCount(2);
   await expect(threads.nth(0)).toHaveAttribute("data-live", "true");
   await expect(threads.nth(1)).toHaveAttribute("data-live", "true");
-  await expect(term.getByTestId("plugin-live-paused")).toHaveAttribute("data-reason", "budget");
-  await expect.poll(totalStreams).toBeLessThanOrEqual(5);
+  await expect(term.getByTestId("plugin-terminal-host")).toHaveAttribute("data-terminal-id", "t-hello-clock");
+  await expect.poll(totalStreams).toBeGreaterThanOrEqual(6);
 
-  // An act goes through (it hung with six streams open).
+  // An act goes through (it hung with six streams open on fetch).
   await surface(page).locator('[data-testid="plugin-button"][data-key="click"]').click();
   await expect(page.getByTestId("plugin-header")).toContainText("1 click");
 
-  // Attach takes the oldest live node's place.
-  await term.getByTestId("plugin-live-attach").click();
-  await expect(term.getByTestId("plugin-terminal-host")).toHaveAttribute("data-terminal-id", "t-hello-clock");
-  await expect(threads.nth(0)).not.toHaveAttribute("data-live", "true");
-  await expect(threads.nth(0).getByTestId("plugin-live-attach")).toBeVisible();
-  await expect.poll(totalStreams).toBeLessThanOrEqual(5);
-  await surface(page).locator('[data-testid="plugin-button"][data-key="click"]').click();
-  await expect(page.getByTestId("plugin-header")).toContainText("2 clicks");
-
-  // Switching the view tab lets the inline streams go at once, so the tab act is not held up.
+  // Leaving the view tab ends the nodes' streams with the view.
+  const before = await openStreams();
   await surface(page).locator('[data-testid="plugin-tab"][data-key="overview"]').click();
   await expect(surface(page).locator('[data-testid="plugin-tab"][data-key="overview"]')).toHaveAttribute("aria-selected", "true");
   await expect(surface(page).getByTestId("plugin-thread")).toHaveCount(0);
+  await expect.poll(async () => (await openStreams())["TerminalService/Attach"] ?? 0).toBe((before["TerminalService/Attach"] ?? 0) - 1);
 });
 
-test("a shell in the bottom panel outranks an inline node; the node says it waits for a connection", async ({ page }) => {
+test("a shell in the bottom panel adds a stream and takes none from a node", async ({ page }) => {
   await openStress(page);
   const threads = surface(page).getByTestId("plugin-thread");
   const term = surface(page).getByTestId("plugin-terminal");
   await expect(threads.nth(1)).toHaveAttribute("data-live", "true");
-  // The bottom panel's Attach is a core stream: the newest inline Watch gives way.
+  await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(3);
   await term.getByTestId("plugin-terminal-open-bottom").click();
   await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-terminal-id", "t-hello-clock");
   await expect(term.getByTestId("plugin-terminal-in-bottom")).toBeVisible();
-  await expect(surface(page).locator('[data-testid="plugin-live-paused"][data-reason="connections"]')).toHaveCount(1);
-  await expect.poll(totalStreams).toBeLessThanOrEqual(5);
+  await expect(threads.nth(0)).toHaveAttribute("data-live", "true");
+  await expect(threads.nth(1)).toHaveAttribute("data-live", "true");
+  expect((await openStreams())["ThreadService/WatchThread"]).toBe(3);
   await surface(page).locator('[data-testid="plugin-button"][data-key="click"]').click();
   await expect(page.getByTestId("plugin-header")).toContainText("1 click");
+});
+
+// A wall four columns wide, each a grid of its own: what only a real layout settles. A grid inside
+// columns first measures them stacked, so for a frame every node is 38 px wide and on screen.
+const WALL_ROWS = 6;
+
+function wallView(): Record<string, unknown> {
+  const rows = Array.from({ length: WALL_ROWS }, (_, r) => r);
+  const items = [0, 1, 2, 3].map((c) => ({
+    key: `c${String(c)}`,
+    children: [
+      {
+        key: `g${String(c)}`,
+        grid: {
+          minWidth: 160,
+          items: rows.map((r) => ({
+            key: `i${String(c)}-${String(r)}`,
+            children: [{ key: `n${String(c)}-${String(r)}`, terminal: { terminalId: `t-wall-${String(c * WALL_ROWS + r)}`, title: "Wall", height: 240 } }],
+          })),
+        },
+      },
+    ],
+  }));
+  return { view: { nodes: [{ key: "cols", columns: { items } }] } };
+}
+
+const liveCount = (page: Page) => surface(page).locator('[data-live="true"]').count();
+const attaches = async () => (await openStreams())["TerminalService/Attach"] ?? 0;
+
+test("a wall holds a stream for what is on screen: never more at first, and scrolling swaps them", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await mockPost(`plugin/terminals?count=${String(4 * WALL_ROWS)}`);
+  await openApp(page);
+  await row(page, "s:s-3").click();
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Show Hello Demo");
+  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
+  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await page.getByTestId("panel-expand").click();
+
+  // The most live nodes at any moment, from before the view lands.
+  await page.evaluate(() => {
+    const w = window as unknown as { __peakLive: number };
+    w.__peakLive = 0;
+    new MutationObserver(() => {
+      w.__peakLive = Math.max(w.__peakLive, document.querySelectorAll('[data-live="true"]').length);
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-live"] });
+  });
+  await mockPost(`plugin/demotab?tab=${encodeURIComponent(`view:${JSON.stringify(wallView())}`)}`);
+  const first = surface(page).locator('[data-testid="plugin-terminal"][data-key="n0-0"]');
+  const last = surface(page).locator(`[data-testid="plugin-terminal"][data-key="n3-${String(WALL_ROWS - 1)}"]`);
+  await expect(first).toHaveAttribute("data-live", "true");
+  await expect(surface(page).getByTestId("plugin-terminal")).toHaveCount(4 * WALL_ROWS);
+  await expect(last.getByTestId("plugin-live-hidden")).toBeAttached();
+
+  const atTop = await liveCount(page);
+  expect(atTop).toBeLessThan(4 * WALL_ROWS);
+  await expect.poll(attaches).toBe(atTop);
+  expect(await page.evaluate(() => (window as unknown as { __peakLive: number }).__peakLive)).toBe(atTop);
+
+  // Scrolled away, a node's stream closes; the ones it reaches open.
+  const scroll = surface(page).getByTestId("plugin-scroll");
+  await scroll.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await expect(last).toHaveAttribute("data-live", "true");
+  await expect(first).not.toHaveAttribute("data-live", "true");
+  await expect(first.getByTestId("plugin-live-hidden")).toBeAttached();
+  await expect.poll(async () => (await attaches()) === (await liveCount(page))).toBe(true);
+  expect(await liveCount(page)).toBeLessThan(4 * WALL_ROWS);
+
+  // And back.
+  await scroll.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await expect(first).toHaveAttribute("data-live", "true");
+  await expect(last).not.toHaveAttribute("data-live", "true");
+  await expect.poll(attaches).toBe(atTop);
 });

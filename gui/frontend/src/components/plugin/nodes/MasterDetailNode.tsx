@@ -1,4 +1,4 @@
-import { useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { nodeScope, type Row } from "@/api/plugin";
 import { VirtualStack, type Reveal } from "@/components/pr/VirtualStack";
@@ -12,7 +12,6 @@ import { useViewCtx, ViewContext } from "../context";
 import { FILL_MIN, useNodeHeight } from "../height";
 import { masterDetailListWidth, masterDetailWide, useElementWidth } from "../layout";
 import { listGap, useInnerList } from "../list";
-import { LeavingNode } from "../live";
 import { NodeList } from "../NodeList";
 import type { NodeProps } from "../registry";
 import { EmptyNode } from "./EmptyNode";
@@ -36,8 +35,8 @@ function chooses(r: Row): boolean {
  * being a row or its resetToken changes. A row without an action sends a `select` act, a
  * row with an event its click; the latest row chosen reads as selected from the click
  * until the plugin's next view (stores/pluginSurfaces chooseElement; a view that does not
- * select it goes back to the list), and the detail on screen dims and lets its live nodes
- * go meanwhile (live.ts LeavingNode). The hidden side is not drawn, so it holds no stream.
+ * select it goes back to the list), and the detail on screen dims meanwhile. The hidden
+ * side is not drawn, so it holds no stream.
  *
  * Focus (narrow): choosing a row focuses Back in the commit that shows the detail; when
  * the list comes back (Back, a refused choice, the plugin moving on) with focus lost, the
@@ -47,7 +46,6 @@ function chooses(r: Row): boolean {
 export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
   const ctx = useViewCtx();
   const inner = useInnerList();
-  const leaving = useContext(LeavingNode);
   const run = useRunAction();
   const ref = useRef<HTMLDivElement>(null);
   const [el, setEl] = useState<HTMLDivElement | null>(null);
@@ -152,11 +150,9 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
       data.emptyDetail ? <EmptyNode node={{ key: `${node.key}-empty` }} data={data.emptyDetail} /> : null
     ) : (
       <ViewContext.Provider value={inside}>
-        <LeavingNode.Provider value={leaving || pending}>
-          <div className={cn("flex min-w-0 flex-col transition-opacity", pending && "opacity-60")} aria-busy={pending || undefined} data-testid="plugin-md-content" data-pending={pending || undefined}>
-            <NodeList nodes={data.detail} inner={inner} />
-          </div>
-        </LeavingNode.Provider>
+        <div className={cn("flex min-w-0 flex-col transition-opacity", pending && "opacity-60")} aria-busy={pending || undefined} data-testid="plugin-md-content" data-pending={pending || undefined}>
+          <NodeList nodes={data.detail} inner={inner} />
+        </div>
       </ViewContext.Provider>
     );
   const detailLabel = shownRow?.title;

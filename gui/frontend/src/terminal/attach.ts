@@ -1,7 +1,6 @@
 import { isSlowSubscriber } from "@/api/errors";
 import type { AttachEventView } from "@/api/terminal";
 import { errorMessage, runStream, type Heartbeat, type StreamStatus } from "@/api/stream";
-import type { StreamPriority } from "@/api/streamSlots";
 import type { TerminalInput } from "./input";
 import type { Disposable, TerminalRenderer } from "./renderer";
 
@@ -21,8 +20,6 @@ export interface AttachDeps {
   input: TerminalInput;
   resize: (id: string, cols: number, rows: number) => Promise<void>;
   onStreamError?: (err: unknown) => void;
-  /** The Attach stream's priority (api/streamSlots.ts): "inline" for a plugin's terminal node. Default core. */
-  priority?: StreamPriority;
 }
 
 /**
@@ -126,7 +123,6 @@ export class AttachController {
   private open(id: string, gen: number): void {
     this.stopStream = runStream<AttachEventView>({
       open: (signal) => this.deps.attach(id, signal),
-      slot: { label: `terminal:${id}`, priority: this.deps.priority ?? "core" },
       onEvent: (ev) => {
         if (gen === this.generation) this.handle(ev);
       },

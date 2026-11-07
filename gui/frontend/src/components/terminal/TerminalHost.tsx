@@ -1,7 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { CircleX, Loader2, RefreshCw } from "lucide-react";
 import { invalidateOnTransportError } from "@/api/endpoint";
-import type { StreamPriority } from "@/api/streamSlots";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
 import { isGlobalChord } from "@/keys/bindings";
 import { cn } from "@/lib/utils";
@@ -106,7 +105,6 @@ export function TerminalHost({
   terminalId,
   hidden = false,
   exitOverlay = true,
-  streamPriority = "core",
   testId,
 }: {
   ref?: Ref<TerminalHostHandle>;
@@ -114,8 +112,6 @@ export function TerminalHost({
   hidden?: boolean;
   /** Show "Process exited with code N" over an exited terminal (an action tab has its status line instead). */
   exitOverlay?: boolean;
-  /** The Attach stream's priority (api/streamSlots.ts): "inline" in a plugin's terminal node. Read once, at mount. */
-  streamPriority?: StreamPriority;
   testId: string;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -134,7 +130,6 @@ export function TerminalHost({
   // StrictMode's effect replay (dev) creates a second renderer in one host's life, right
   // after the parent may have focused the first.
   const refocus = useRef(false);
-  const priority = useRef(streamPriority);
   // The terminal the renderer's results are of (null: none attached).
   const attached = useRef(terminalId);
   // null while the terminal's find is closed.
@@ -160,7 +155,6 @@ export function TerminalHost({
         input: terminalInput,
         resize: (id, cols, rows) => resizeTerminal(id, cols, rows),
         onStreamError: invalidateOnTransportError,
-        priority: priority.current,
       },
       setState,
     );

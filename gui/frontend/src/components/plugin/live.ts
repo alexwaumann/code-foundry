@@ -1,135 +1,128 @@
 /**
- * When a plugin's thread or terminal node holds a live stream
- * (docs/notes/plugins-12-renderer-defects.md). Each such node opens its own server stream
- * (WatchThread, Attach) and the daemon's origin allows only so many (api/streamSlots.ts),
- * so a node attaches only while it is near the screen and its view tab stays the active
- * one, and at most INLINE_LIVE_MAX of them hold a stream at once: a node beyond the budget
- * shows "Attach", which takes the oldest holder's place.
+ * When a plugin's thread or terminal node holds a live stream: each opens its own server
+ * stream (WatchThread, Attach), only while it is near the screen and layout has settled, and
+ * only the first node of a view naming that thread or terminal
+ * (docs/notes/ws-remove-slots.md).
  */
-import { createContext, useContext, useEffect, useState } from "react";
-import { create } from "zustand";
-import { chooserKeyOf, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
-
-/** Inline live streams (thread and terminal nodes) held at once, across every surface (pluginsdk/ui MaxLiveNodes). */
-export const INLINE_LIVE_MAX = 2;
-
-export interface InlineLiveState {
-  /** Nodes holding a live slot, oldest first. */
-  holders: readonly string[];
-  /** Nodes that want one (on screen) but the budget is full, in the order they asked. */
-  waiting: readonly string[];
-}
-
-const EMPTY: InlineLiveState = { holders: [], waiting: [] };
-
-export const useInlineLiveStore = create<InlineLiveState>()(() => EMPTY);
-
-// ---------------------------------------------------------------------------------------
-// Pure reducers
-
-/** A node asks for a slot: granted while there is room, else it waits. */
-export function want(s: InlineLiveState, id: string, max = INLINE_LIVE_MAX): InlineLiveState {
-  if (s.holders.includes(id) || s.waiting.includes(id)) return s;
-  return s.holders.length < max ? { ...s, holders: [...s.holders, id] } : { ...s, waiting: [...s.waiting, id] };
-}
-
-/** A node lets go (scrolled away, unmounted): the first waiting node takes its slot. */
-export function drop(s: InlineLiveState, id: string, max = INLINE_LIVE_MAX): InlineLiveState {
-  if (!s.holders.includes(id) && !s.waiting.includes(id)) return s;
-  let holders = s.holders.filter((h) => h !== id);
-  let waiting = s.waiting.filter((w) => w !== id);
-  while (holders.length < max && waiting.length > 0) {
-    holders = [...holders, waiting[0] as string];
-    waiting = waiting.slice(1);
-  }
-  return { holders, waiting };
-}
-
-/** "Attach" on a waiting node: it takes the oldest holder's slot; that one waits instead. */
-export function take(s: InlineLiveState, id: string, max = INLINE_LIVE_MAX): InlineLiveState {
-  if (s.holders.includes(id)) return s;
-  const waiting = s.waiting.filter((w) => w !== id);
-  if (s.holders.length < max) return { holders: [...s.holders, id], waiting };
-  const [oldest, ...rest] = s.holders;
-  return { holders: [...rest, id], waiting: oldest === undefined ? waiting : [...waiting, oldest] };
-}
-
-// ---------------------------------------------------------------------------------------
-// Hooks
-
-/**
- * Holds an inline live slot for `id` while `wanted`. `live`: the node may open its
- * stream; `over`: it wants one but the budget is full (show Attach, which calls `take`).
- */
-export function useLiveSlot(id: string, wanted: boolean): { live: boolean; over: boolean; take: () => void } {
-  useEffect(() => {
-    if (!wanted) return;
-    useInlineLiveStore.setState((s) => want(s, id));
-    return () => {
-      useInlineLiveStore.setState((s) => drop(s, id));
-    };
-  }, [id, wanted]);
-  const live = useInlineLiveStore((s) => s.holders.includes(id));
-  const over = useInlineLiveStore((s) => s.waiting.includes(id));
-  return {
-    live: wanted && live,
-    over: wanted && over,
-    take: () => {
-      useInlineLiveStore.setState((s) => take(s, id));
-    },
-  };
-}
+import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 
 /** How far outside the panel's visible box a node still counts as on screen. */
 const ON_SCREEN_MARGIN = "160px 0px";
 
 /**
+ * The frames a node must stay on screen before it counts. A grid or columns measures its own
+ * width (layout.ts useElementWidth), and one inside columns first measures them stacked: a
+ * frame later it still has six columns in a quarter of the width, so a whole wall sits on
+ * screen in 38 px nodes. Each level of nesting settles a frame after the one around it, and a
+ * view is at most ui.MaxDepth (4) deep. A node a scroll passes opens nothing either.
+ */
+export const SETTLE_FRAMES = 4;
+
+/**
  * Whether the element is on screen (or within ON_SCREEN_MARGIN of it) in its scroll box
- * (the side panel's [data-scroll-root]). False until the first observation; true where
- * there is no IntersectionObserver (unit tests).
+ * (the side panel's [data-scroll-root]) and has been for SETTLE_FRAMES. False until then;
+ * leaving is at once. True where there is no IntersectionObserver (unit tests).
  */
 export function useOnScreen(el: HTMLElement | null): boolean {
   const [on, setOn] = useState(() => typeof IntersectionObserver === "undefined");
   useEffect(() => {
     if (!el || typeof IntersectionObserver === "undefined") return;
     const root = el.parentElement?.closest<HTMLElement>("[data-scroll-root]") ?? null;
+    let frame = 0;
+    const settle = (left: number) => {
+      frame = requestAnimationFrame(() => {
+        if (left > 1) settle(left - 1);
+        else setOn(true);
+      });
+    };
     const io = new IntersectionObserver(
       (entries) => {
         const last = entries.at(-1);
-        if (last) setOn(last.isIntersecting);
+        if (!last) return;
+        cancelAnimationFrame(frame);
+        if (last.isIntersecting) settle(SETTLE_FRAMES);
+        else setOn(false);
       },
       { root, rootMargin: ON_SCREEN_MARGIN },
     );
     io.observe(el);
     return () => {
       io.disconnect();
+      cancelAnimationFrame(frame);
     };
   }, [el]);
   return on;
 }
 
-/**
- * Whether the nodes drawn here are leaving the screen with a node's act in flight: a tabs
- * node switching to another tab, a master-detail selecting another row
- * (docs/notes/plugins-layout-4-master-detail.md). Their live nodes let go as an inactive
- * view tab's do.
- */
-export const LeavingNode = createContext(false);
+/** The nodes drawn now that name one thread or terminal in one view, and who follows the first. */
+interface Named {
+  nodes: Set<HTMLElement>;
+  first: HTMLElement | null;
+  listeners: Set<() => void>;
+}
+
+const named = new Map<string, Named>();
+
+function namedOf(key: string): Named {
+  let n = named.get(key);
+  if (!n) {
+    n = { nodes: new Set(), first: null, listeners: new Set() };
+    named.set(key, n);
+  }
+  return n;
+}
+
+function forget(key: string, n: Named): void {
+  if (n.nodes.size === 0 && n.listeners.size === 0) named.delete(key);
+}
+
+/** The node earliest in the document; only nodes drawn count, so never one in a hidden tab or side. */
+function earliest(nodes: Set<HTMLElement>): HTMLElement | null {
+  let first: HTMLElement | null = null;
+  for (const el of nodes) {
+    if (!first || first.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING) first = el;
+  }
+  return first;
+}
+
+function refresh(n: Named): void {
+  const first = earliest(n.nodes);
+  if (first === n.first) return;
+  n.first = first;
+  for (const l of n.listeners) l();
+}
 
 /**
- * Whether the surface is leaving the view tab on screen: the user clicked another of the
- * plugin's tabs and the plugin's view does not show it yet (stores/pluginSurfaces chooseElement). The old view stays drawn until the plugin's next
- * view, but its live nodes let go now (their streams must not hold up the act). Inside a
- * tabs node or a master-detail's detail the same holds for their own switch (LeavingNode).
+ * Whether an earlier node of this view already shows the same thread or terminal (`id`). A
+ * view may name one in any number of nodes, and each would be a whole xterm or conversation,
+ * so a repeat draws ShownAbove and holds nothing. The plugin's limits (32 threads, 16
+ * terminals) then bound what a view draws. `scope` is the view's watch: two surfaces keep
+ * their own views.
  */
-export function useLeavingViewTab(watchKey: string): boolean {
-  const node = useContext(LeavingNode);
-  const view = usePluginSurfacesStore((s) => {
-    const e = s.watches[watchKey];
-    const tabs = e?.view?.tabs;
-    if (!e || !tabs) return false;
-    const choice = s.choices[watchKey]?.[chooserKeyOf(e.instance, "", "")]?.key;
-    return choice !== undefined && choice !== tabs.active && tabs.items.some((t) => t.key === choice);
-  });
-  return node || view;
+export function useRepeated(scope: string, id: string, el: HTMLElement | null): boolean {
+  const key = `${scope}\n${id}`;
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      const n = namedOf(key);
+      n.listeners.add(listener);
+      return () => {
+        n.listeners.delete(listener);
+        forget(key, n);
+      };
+    },
+    [key],
+  );
+  const first = useSyncExternalStore(subscribe, () => named.get(key)?.first ?? null);
+  useLayoutEffect(() => {
+    if (!el) return;
+    const n = namedOf(key);
+    n.nodes.add(el);
+    refresh(n);
+    return () => {
+      n.nodes.delete(el);
+      refresh(n);
+      forget(key, n);
+    };
+  }, [key, el]);
+  return first !== null && first !== el;
 }

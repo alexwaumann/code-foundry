@@ -277,10 +277,8 @@ grows to match.
   of its columns node and a grid item of its grid, not a level; a group is no level.
 - Columns, grid items, group items and the toolbar's and footer's nodes count as
   elements toward the view's 400.
-- Thread and terminal nodes inside panes and columns are live streams like any others: the
-  app keeps at most 2 live at once across plugin views (`owned.md`), so a layout with three threads shows the third paused with Attach. The app's
-  other streams (a terminal in the bottom panel, a second panel) can leave fewer live: a
-  node then says it is waiting for a connection, and Attach is not offered meanwhile.
+- Thread and terminal nodes inside panes and columns are live while on screen, like any
+  others (`owned.md`).
 
 ## Patterns
 

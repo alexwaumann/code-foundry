@@ -4,8 +4,8 @@
 `EmberService.WatchBoard`. PR 3 moved the heavy streams: `ThreadService.WatchThread`,
 `TerminalService.Attach` and `PluginService.WatchSurface`. PR 4 moved the rest, `EventService.Watch`
 last, so every GUI stream is on the tunnel and none has a fetch path. Every unary call stays on
-fetch, terminal input included. The stream slots and the plugin cap stay until PR 5, so each stream
-still claims a slot.
+fetch, terminal input included. PR 5 removed the stream slots and the plugin cap
+(`docs/notes/ws-remove-slots.md`).
 
 ## Shape
 
@@ -104,6 +104,13 @@ about one reconnect every 1.5 s with nothing open between them, and Ctrl-C shows
 Nothing is lost: the snapshot has the screen and scrollback. Input keeps working through this, so the
 phase stays `live`. A snapshot always waits for xterm to finish before `reset()`.
 
+That held only for the page's own drop. The daemon has one too, and it can come first: under a `seq`
+flood, 21 `Attach` tunnels ended `served` and `dropped slow attach subscriber` counted exactly 21. So
+the terminal store's slow-subscriber drop ended them, not `fallBehind`. `internal/api/terminal.go`
+returns `ResourceExhausted` for it, which put `AttachController` in `reconnecting`, so "Reconnecting…"
+flashed until the next snapshot. #595 keeps that drop `live` too, apart from about 5% of them that
+reach the page as a dead socket (`docs/notes/terminal-flood-label.md`). Nothing is lost either way.
+
 ### After xterm's parse loop
 
 `XtermRenderer.write` runs `parsed` as a microtask, so nothing the controller does can reach xterm's
@@ -161,8 +168,8 @@ was REP: one line with a huge count made xterm's allocation throw. `XtermRendere
   the timeline's `onScroll`: two scrolls before a render left `atBottom` false at the bottom, and the
   Jump to bottom chip stayed up. It failed 11 of 30 runs of one e2e test on the tunnel, and 0 of 18
   on fetch. The list was at the bottom in every failure.
-- At five streams, a new Attach takes the slot of an inline holder for a moment, so a board with no
-  core view reconnects on each tab switch. That ends with the slots in PR 5.
+- At five streams, a new Attach took the slot of an inline holder for a moment, so a board with no
+  core view reconnected on each tab switch. That ended with the slots in PR 5.
 
 ## Managed Mac milestone
 
@@ -191,7 +198,7 @@ grep '"path":"/codefoundry.v1.EventService/Watch"' "$L" | grep '"method":"POST"'
 
 | `reason` | Meaning |
 | --- | --- |
-| `served` | The handler returned first: a terminal that exited, a daemon shutting down. |
+| `served` | The handler returned first: a terminal that exited, a daemon shutting down, or a slow `Attach` subscriber the terminal store dropped. |
 | `client closed` | The client sent a close, or data that is not a count: a tab switch, a resync, the watchdog, `AttachController` dropping a stream. The end of stream then fails to write; that failure is not news. |
 | `client gone` | The connection died with no close frame: the app quit, a crashed page, a killed Networking process. `err` says what failed; `EOF` is a page that went away (milestone 3). |
 | `write timeout` | The client was connected and took nothing for 30 s: a window that never reopened, or a write that never finished. A daemon shutting down cuts that wait to a second. |
@@ -245,13 +252,24 @@ What to expect:
    flooding a terminal while the page was stalled. Note what the Mac was doing. On an idle tunnel it
    means a daemon that stopped hearing counts, which is the result to report.
 4. `client gone` should be rare outside a crash or a force quit.
-5. Live views: threads stream and terminals type with no `Reconnecting…` that lasts. A long `yes`
-   shows jumps rather than every line, and `tunnel open` about every 1.5 s while it runs. That is
-   the flood path working.
+5. Live views: threads stream and terminals type with no `Reconnecting…` that lasts. A long `seq 1
+   100000000` shows jumps in its numbers rather than every line, and `tunnel open` about every 1.5 s
+   while it runs. That is the flood path working. Use `seq`, not `yes`: every line of `yes` looks the
+   same, so a jump cannot be seen. A brief `Reconnecting…` is the few drops
+   `docs/notes/terminal-flood-label.md` leaves.
 6. WebContent's memory in Activity Monitor stays in the hundreds of MB through a noisy build.
 
 To back out at the time: remove the stream's entry from `TUNNELLED_STREAMS`, which PR 4 removed.
 The `AttachController` limit applies on either transport, so it stays.
+
+### Result
+
+On a managed Mac, 79 closes over a 5-hour log window: 77 `client closed` and 2 `served`. No `tunnel
+refused`, `client gone`, `write timeout` or slow attach. The most `top` showed for WebContent was
+956 MB, a figure shared with any other WebKit page. The run lasted 13-14 hours, but its overnight part
+was not in the log, so overnight idle is still unshown here. A `yes` flood showed nothing useful,
+because its lines all look alike. A `seq` flood showed the daemon's drop ending the streams
+(`A reader that falls behind`).
 
 ## Why `client gone` was 30 of 141
 
@@ -306,6 +324,10 @@ grep -c '"path":"/codefoundry.v1.EventService/Watch"' "$L"
 
 To back out, revert this PR: the daemon's routes for fetch streams never went away.
 
+Result, on a managed Mac: dictation, a clone and the update flow all worked. No `tunnel refused`, no
+`EventService/Watch` call from an old window, and no `client gone` or `write timeout`. The log held only
+28 minutes, and it showed no lid sleep.
+
 ### What a window does on each update path
 
 The daemon still serves every stream over fetch, so a window older than this PR works on any daemon.
@@ -350,8 +372,7 @@ The first stream with no heartbeats, and nothing on the way kills a quiet one: `
 have no timer, `runStream` is not involved, the daemon's `ReadHeaderTimeout` ends at the upgrade, and the
 tunnel's write timeout only runs while something is being written. In WKWebView, through a fake `gh`, two
 clones held 3m20s in silence and ended `served`, one of them with no head at all until the end. Aborting
-a third closed its socket: `client closed`, `clone cancelled`, the partial directory gone. A
-slot is still claimed in `addProject.ts` until PR 5.
+a third closed its socket: `client closed`, `clone cancelled`, the partial directory gone.
 
 ### The overlay
 
@@ -392,8 +413,8 @@ Mac.
 For PR 3, on a built app with a scratch home unless noted, with the same temporary telemetry:
 
 - One app with a thread streaming, a shell, a plugin surface and the board: all four on the tunnel
-  from `wails://localhost`, plus Events on fetch. That is five, the slot limit, so more than four
-  tunnelled views at once needs PR 5.
+  from `wails://localhost`, plus Events on fetch. That is five, the slot limit then, so more than
+  four tunnelled views at once needed PR 5.
 - Six tab switches between two shells: one Attach live at the end, every close `client closed`.
 - Hiding and showing the window: the thread and the board logged `client closed` and reopened in
   11-14 ms. The shell's Attach stayed.

@@ -171,8 +171,7 @@ func TestSDKPin(t *testing.T) {
 // row.
 func TestViewLimitsNameEveryLimit(t *testing.T) {
 	notLimits := map[string]bool{
-		"MaxProblems":  true, // how many problems Validate names
-		"MaxLiveNodes": true, // the GUI's live-stream budget, not a view limit (ui-layout.md)
+		"MaxProblems": true, // how many problems Validate names
 	}
 	fset := token.NewFileSet()
 	uiFiles, err := filepath.Glob(filepath.Join("..", "..", "pluginsdk", "ui", "*.go"))

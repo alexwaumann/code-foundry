@@ -12,7 +12,6 @@ import type { ThreadView } from "@/api/threads";
 import { applySurfaceUpdate, draftKeyOf, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { useThreadsStore } from "@/stores/threads";
 import { geo, INSTANCE, installGeometry, pushView, resetSurfaceStore, resize, Surface } from "@/test/layoutHarness";
-import { useInlineLiveStore } from "./live";
 import { renderers } from "./nodes/index";
 
 const acts = vi.hoisted(() => ({ calls: [] as ActRequestView[], settle: [] as ((ok: boolean) => void)[] }));
@@ -35,10 +34,9 @@ beforeEach(() => {
   acts.calls = [];
   acts.settle = [];
   resetSurfaceStore();
-  useInlineLiveStore.setState({ holders: [], waiting: [] });
   useThreadsStore.setState({
     loaded: true,
-    byId: Object.fromEntries(["a", "b", "c"].map((id) => [id, { id, owner: "plugin:fuzz", worktreePath: "/h", state: "disconnected", status: "idle", archivedAtMs: null } as unknown as ThreadView])),
+    byId: Object.fromEntries(["a", "b", "c", "d"].map((id) => [id, { id, owner: "plugin:fuzz", worktreePath: "/h", state: "disconnected", status: "idle", archivedAtMs: null } as unknown as ThreadView])),
     order: [],
   });
 });
@@ -413,8 +411,10 @@ describe("renders", () => {
   });
 });
 
-describe("live budget", () => {
-  it("threads in a narrow detail and in node tabs hold slots only while drawn, never more than two", async () => {
+describe("live nodes", () => {
+  const liveKeys = () => [...document.querySelectorAll<HTMLElement>('[data-testid="plugin-thread"][data-live="true"]')].map((n) => n.dataset.key);
+
+  it("threads in a narrow detail and in node tabs are live while drawn, all at once", async () => {
     geo.width = 360;
     const v = (tab: string): PluginViewModel =>
       view(
@@ -422,33 +422,20 @@ describe("live budget", () => {
           { key: "t-detail", thread: { threadId: "a", height: 200 } },
           { key: "tb", tabs: { items: [{ key: "ta", label: "A" }, { key: "tbb", label: "B" }], active: tab, children: [{ key: `t-${tab}`, thread: { threadId: tab === "ta" ? "b" : "c", height: 200 } }] } },
         ]),
-        { key: "t-top", thread: { threadId: "c", height: 200 } },
+        { key: "t-top", thread: { threadId: "d", height: 200 } },
       );
     mount(v("ta"));
-    expect(useInlineLiveStore.getState().holders).toEqual(["thread\u0000w\u0000t-top"]);
+    expect(liveKeys()).toEqual(["t-top"]);
     fireEvent.click(row("r1") as HTMLElement);
-    const live = () => useInlineLiveStore.getState();
-    expect(live().holders.length).toBe(2);
-    expect(live().waiting.length).toBe(1);
-    // A node tab switch in flight lets the old tab's thread go.
+    expect(liveKeys().sort()).toEqual(["t-detail", "t-ta", "t-top"]);
+    // A node tab switch in flight keeps the old tab's thread: nothing waits for its stream.
     fireEvent.click(document.querySelector('[data-testid="plugin-node-tab"][data-key="tbb"]') as HTMLElement);
-    expect([...live().holders, ...live().waiting]).not.toContain("thread\u0000w\u0000t-ta");
+    expect(liveKeys()).toContain("t-ta");
     await settle(true);
     pushView(v("tbb"));
-    expect(live().holders.length).toBeLessThanOrEqual(2);
+    expect(liveKeys().sort()).toEqual(["t-detail", "t-tbb", "t-top"]);
     fireEvent.click(screen.getByTestId("plugin-md-back"));
-    expect(live().holders).toEqual(["thread\u0000w\u0000t-top"]);
-    expect(live().waiting).toEqual([]);
-  });
-
-  it("Attach on a paused node pauses the oldest; when the taker goes, the paused one gets its slot back", () => {
-    geo.width = 360;
-    mount(view({ key: "t1", thread: { threadId: "a", height: 200 } }, { key: "t2", thread: { threadId: "b", height: 200 } }, md({ selected: "r1" }, [{ key: "t3", thread: { threadId: "c", height: 200 } }])));
-    fireEvent.click(row("r1") as HTMLElement);
-    fireEvent.click(screen.getByTestId("plugin-live-attach"));
-    expect(useInlineLiveStore.getState().holders).toEqual(["thread\u0000w\u0000t2", "thread\u0000w\u0000t3"]);
-    fireEvent.click(screen.getByTestId("plugin-md-back"));
-    expect(useInlineLiveStore.getState().holders).toEqual(["thread\u0000w\u0000t2", "thread\u0000w\u0000t1"]);
+    expect(liveKeys()).toEqual(["t-top"]);
   });
 });
 

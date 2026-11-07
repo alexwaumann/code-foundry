@@ -18,7 +18,7 @@ function composer(clientId: string, primary = true) {
 
 async function hold(snap = dictationSnap()) {
   fakeDictation.publish(snap);
-  release = holdDictation("core");
+  release = holdDictation();
   await vi.waitFor(() => {
     expect(useDictationStore.getState().snapshot).toBe(snap);
   });

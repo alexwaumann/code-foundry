@@ -17,7 +17,6 @@ import { useThreadsStore } from "@/stores/threads";
 import { ViewContext, type ViewCtx } from "./context";
 import { FILL_BOTTOM, FILL_MIN, fillBoxOf, fillHeight } from "./height";
 import { COLUMN_GAP, COLUMN_MIN_WIDTH, columnStyle, columnsMinWidth, columnWeight, shownColumns, sideBySide } from "./layout";
-import { useInlineLiveStore } from "./live";
 import { NodeList } from "./NodeList";
 import { SurfaceFrame } from "./SurfaceFrame";
 
@@ -65,14 +64,12 @@ beforeEach(() => {
       }
     },
   );
-  useInlineLiveStore.setState({ holders: [], waiting: [] });
 });
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  useInlineLiveStore.setState({ holders: [], waiting: [] });
 });
 
 /** The nodes inside the surface's scroll area, as the panel draws them. */

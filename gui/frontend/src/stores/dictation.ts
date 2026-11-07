@@ -14,7 +14,6 @@ import { create } from "zustand";
 import { dictationSession, reportComposerTarget, startDictation, stopDictation, watchDictation, type DictationSessionEventView, type DictationView } from "@/api/dictation";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { errorMessage, runStream } from "@/api/stream";
-import { resettleStreamSlots, type StreamPriority } from "@/api/streamSlots";
 import { useSettingsStore } from "./settings";
 
 /** The setting that turns dictation on. */
@@ -51,34 +50,28 @@ export const useDictationStore = create<DictationSlice>()(() => ({ snapshot: nul
 // ---------- the Watch stream ----------
 
 let holders = 0;
-let coreHolders = 0;
 let stopWatch: (() => void) | null = null;
 
 /**
  * Holds the Watch stream for a view that needs the snapshot (a composer while dictation
  * is on, the settings section), opening it for the first holder and closing it after the
- * last. `priority`: composers hold it "inline" (a core stream may take its slot; the mic
- * then hides until it has one again), the settings section "core". Returns the release.
+ * last. Returns the release.
  */
-export function holdDictation(priority: StreamPriority): () => void {
-  const core = priority === "core" ? 1 : 0;
+export function holdDictation(): () => void {
   holders++;
-  coreHolders += core;
   if (stopWatch === null) {
     stopWatch = runStream<DictationView>({
       open: (signal) => watchDictation(signal),
-      slot: { label: "dictation:watch", priority: () => (coreHolders > 0 ? "core" : "inline") },
       resyncOnVisible: true,
       onEvent: applySnapshot,
       onError: invalidateOnTransportError,
     });
-  } else if (core) resettleStreamSlots();
+  }
   let released = false;
   return () => {
     if (released) return;
     released = true;
     holders--;
-    coreHolders -= core;
     if (holders > 0) return;
     stopWatch?.();
     stopWatch = null;
@@ -86,8 +79,8 @@ export function holdDictation(priority: StreamPriority): () => void {
 }
 
 /** Holds the Watch stream while mounted and `on` (useEffect around holdDictation). */
-export function useHoldDictation(on: boolean, priority: StreamPriority): void {
-  useEffect(() => (on ? holdDictation(priority) : undefined), [on, priority]);
+export function useHoldDictation(on: boolean): void {
+  useEffect(() => (on ? holdDictation() : undefined), [on]);
 }
 
 function applySnapshot(s: DictationView): void {
@@ -252,7 +245,6 @@ function onSessionEvent(clientId: string, ev: DictationSessionEventView): void {
 function openSession(clientId: string, sessionId: string): void {
   stopSession = runStream<DictationSessionEventView>({
     open: (signal) => dictationSession(sessionId, signal),
-    slot: { label: "dictation:session", priority: "core" },
     shouldReconnectOnEnd: () => false,
     onEvent: (ev) => {
       onSessionEvent(clientId, ev);

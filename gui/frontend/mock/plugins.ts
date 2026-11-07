@@ -17,7 +17,8 @@
  * (the plugin goes down or comes back; its open surfaces follow), POST /__mock/plugin/toast?text=…
  * (a view/toast without an instance: a Notify intent), POST /__mock/plugin/invoke?command=…
  * (a host/invoke with confirm "ask": an InvokeCommand intent), POST /__mock/plugin/demotab?tab=…
- * (the demo shows a tab, "stress" included: two threads and a terminal), GET /__mock/plugin/acts.
+ * (the demo shows a tab, "stress" included: two threads and a terminal), POST
+ * /__mock/plugin/terminals?count=N (the plugin owns terminals t-wall-0..), GET /__mock/plugin/acts.
  */
 import { readFileSync } from "node:fs";
 import type { MessageInitShape } from "@bufbuild/protobuf";
@@ -409,7 +410,7 @@ class DemoInstance {
     }
     const shift = this.openedAt - CAPTURED_AT;
     // "stress" (POST /__mock/plugin/demotab?tab=stress; not in the captured views): two
-    // thread nodes and a terminal in one view, more live streams than the GUI's budget.
+    // thread nodes and a terminal in one view.
     const v = shiftTimes(fixture(this.tab === "stress" ? "assistant" : this.tab), shift) as Record<string, unknown>;
     if (this.tab === "stress") {
       (v.tabs as { items: { key: string; label: string }[] }).items.push({ key: "stress", label: "Stress" });

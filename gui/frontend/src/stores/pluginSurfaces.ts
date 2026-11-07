@@ -506,7 +506,6 @@ export function startSurfaceWatch(watchKey: string, ref: SurfaceRefView): () => 
   usePluginSurfacesStore.setState((s) => ({ watches: { ...s.watches, [watchKey]: { ...(s.watches[watchKey] ?? emptyEntry(ref)), context: ref.context } } }));
   const stop = runStream<SurfaceUpdateView>({
     open: (signal) => watchSurface(ref, signal),
-    slot: { label: `surface:${ref.plugin}.${ref.surface}`, priority: "core" },
     onEvent: (u) => {
       onUpdate(watchKey, u);
     },

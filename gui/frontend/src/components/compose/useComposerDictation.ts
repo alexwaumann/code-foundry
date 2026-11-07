@@ -48,7 +48,7 @@ export function useComposerDictation({
   const id = useId();
   const clientId = `${draftKey}@${id}`;
   const on = useDictationSettingOn();
-  useHoldDictation(on, "inline");
+  useHoldDictation(on);
   const availability = useDictationStore((s) => (on ? micAvailability(s.snapshot) : "hidden"));
   const phase = useDictationStore((s) => (s.active?.clientId === clientId ? s.active.phase : null));
   const cb = useRef({ insert, setMarker });

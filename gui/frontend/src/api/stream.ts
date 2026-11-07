@@ -1,5 +1,4 @@
 import { Code, ConnectError } from "@connectrpc/connect";
-import { claimStreamSlot, type StreamPriority } from "./streamSlots";
 
 /** Lifecycle of a long-lived server stream, for the daemon status row and tests. */
 export type StreamStatus = "connecting" | "open" | "retrying" | "stopped";
@@ -199,12 +198,6 @@ export interface StreamHandlers<T> {
    * whose first message is a snapshot that replaces the client's state.
    */
   resyncOnVisible?: boolean;
-  /**
-   * The stream's slot (api/streamSlots.ts): every attempt claims one before it opens and
-   * waits while MAX_OPEN_STREAMS are open. Default: label "stream", priority "core". An
-   * inline attempt whose slot a core stream takes reconnects at once (and waits again).
-   */
-  slot?: { label: string; priority: StreamPriority | (() => StreamPriority) };
 }
 
 function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -278,21 +271,7 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
           ctl.abort(new StreamSilentError(liveness));
         }, liveness);
       };
-      const ticket = claimStreamSlot(h.slot?.label ?? "stream", h.slot?.priority ?? "core", resync);
       try {
-        if (!ticket.granted()) {
-          // Wait for a slot; a stop or resync gives up the wait.
-          const giveUp = () => {
-            ticket.release();
-          };
-          ctl.signal.addEventListener("abort", giveUp);
-          try {
-            await ticket.ready;
-          } finally {
-            ctl.signal.removeEventListener("abort", giveUp);
-          }
-          if (ctl.signal.aborted) throw ctl.signal.reason;
-        }
         let buffering = h.onConnect !== undefined;
         const buffer: T[] = [];
         // The attempt counts as working once the stream brought a message and any resync
@@ -344,7 +323,6 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         // The attempt is over however it ended: a consumer that threw left the stream open,
         // and nothing else closes it (connect-web's iterator has no return).
         ctl.abort();
-        ticket.release();
         clearTimeout(watchdog);
         outer.signal.removeEventListener("abort", onAbort);
         wake.signal.removeEventListener("abort", onAbort);

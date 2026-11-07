@@ -321,8 +321,8 @@ func TestLayoutJSON(t *testing.T) {
 	}
 }
 
-// The GUI draws columns, grids, spacers, groups and the live budget with the numbers the
-// SDK documents (gui/frontend/src/components/plugin/layout.ts, live.ts).
+// The GUI draws columns, grids, spacers and groups with the numbers the
+// SDK documents (gui/frontend/src/components/plugin/layout.ts).
 func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 	read := func(name string) string {
 		b, err := os.ReadFile("../../gui/frontend/src/components/plugin/" + name)
@@ -334,14 +334,13 @@ func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 		}
 		return string(b)
 	}
-	layout, live := read("layout.ts"), read("live.ts")
+	layout := read("layout.ts")
 	for _, c := range []struct {
 		src, name string
 		want      int
 	}{
 		{layout, "COLUMN_MIN_WIDTH", ColumnMinWidth},
 		{layout, "COLUMN_GAP", ColumnGap},
-		{live, "INLINE_LIVE_MAX", MaxLiveNodes},
 		{layout, "GRID_MIN_WIDTH", GridMinWidth},
 		{layout, "GRID_MAX_COLUMNS", MaxGridColumns},
 		{layout, "GRID_GAP", GridGap},

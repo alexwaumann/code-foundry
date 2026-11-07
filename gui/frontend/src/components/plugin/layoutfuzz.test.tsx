@@ -3,11 +3,10 @@
  * kind and both strips, nested to the depth limit (src/test/layoutFuzzGen.ts), rendered in
  * a surface frame at the widths the layout thresholds sit at (and random ones) through a
  * fake ResizeObserver, then re-rendered as the plugin's next views (mutations) while the
- * user clicks rows, Back, node tabs, section toggles and Attach and acts settle or fail.
+ * user clicks rows, Back, node tabs and section toggles and acts settle or fail.
  * Every step asserts: nothing throws, the console stays clean (React key warnings, act
- * warnings, nested-button warnings), keyed test ids are unique, the inline live budget
- * holds (never more than INLINE_LIVE_MAX holders, every holder mounted), and after the
- * last unmount every ResizeObserver is disconnected and no slot is held. A failure names
+ * warnings, nested-button warnings), keyed test ids are unique, and after the last unmount
+ * every ResizeObserver is disconnected. A failure names
  * its seed: FUZZ_SEED=<n> reruns one, FUZZ_SEEDS=<n> runs more (default 300), FUZZ_START the first, FUZZ_STEPS the steps a seed (12).
  */
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
@@ -20,7 +19,6 @@ import { useTerminalsStore } from "@/stores/terminals";
 import { useThreadsStore } from "@/stores/threads";
 import { duplicateKeys, FUZZ_TERMINALS, FUZZ_THREADS, FUZZ_WIDTHS, Gen, mutateView, rng } from "@/test/layoutFuzzGen";
 import { geo, installGeometry, pushView, resetSurfaceStore, resize, Surface } from "@/test/layoutHarness";
-import { INLINE_LIVE_MAX, useInlineLiveStore } from "./live";
 
 const acts = vi.hoisted(() => ({ calls: [] as ActRequestView[], settle: [] as ((ok: boolean) => void)[] }));
 vi.mock("@/api/plugin", async (importOriginal) => ({
@@ -56,7 +54,6 @@ beforeEach(() => {
     order: [],
   });
   useTerminalsStore.setState({ loaded: true, byId: Object.fromEntries(FUZZ_TERMINALS.map((id) => [id, { id, state: "running", title: id } as unknown as TerminalView])), order: [] });
-  useInlineLiveStore.setState({ holders: [], waiting: [] });
   resetSurfaceStore();
 });
 
@@ -88,7 +85,6 @@ function domProblems(): string[] {
   count("columns row", document.querySelectorAll('[data-testid="plugin-columns"][data-layout="row"]').length);
   count("grid >1 col", document.querySelectorAll('[data-testid="plugin-grid"]:not([data-columns="1"])').length);
   count("live attached", document.querySelectorAll('[data-live="true"]').length);
-  count("live paused", document.querySelectorAll('[data-testid="plugin-live-paused"]').length);
   count("tabs switching", document.querySelectorAll('[data-testid="plugin-tabs-node"][data-switching]').length);
   count("md pending", document.querySelectorAll('[data-testid="plugin-md-content"][data-pending]').length);
   count("flex spacer", document.querySelectorAll('[data-testid="plugin-spacer"][data-flex]').length);
@@ -111,16 +107,6 @@ function domProblems(): string[] {
     if (showing === "detail" && !back) out.push(`md ${md.dataset.key ?? ""} shows its detail without Back`);
     if (showing !== "detail" && back) out.push(`md ${md.dataset.key ?? ""} has Back while showing ${showing ?? ""}`);
   }
-  // The live budget.
-  const live = useInlineLiveStore.getState();
-  if (live.holders.length > INLINE_LIVE_MAX) out.push(`${String(live.holders.length)} live holders`);
-  for (const h of live.holders) if (live.waiting.includes(h)) out.push(`${h} both holds and waits`);
-  for (const id of [...live.holders, ...live.waiting]) {
-    const [kind, , key] = id.split("\u0000");
-    if (!document.querySelector(`[data-testid="plugin-${kind ?? ""}"][data-key="${key ?? ""}"]`)) out.push(`slot ${kind ?? ""}/${key ?? ""} held by an unmounted node`);
-  }
-  const attached = document.querySelectorAll('[data-testid="plugin-thread"][data-live="true"], [data-testid="plugin-terminal"][data-live="true"]').length;
-  if (attached > INLINE_LIVE_MAX) out.push(`${String(attached)} nodes attached`);
   return out;
 }
 
@@ -158,12 +144,6 @@ async function poke(g: Gen): Promise<string> {
       if (el) {
         fireEvent.click(el);
         what = "toggle";
-      }
-    } else if (r < 0.63) {
-      const el = pickEl('[data-testid="plugin-live-attach"]');
-      if (el) {
-        fireEvent.click(el);
-        what = "attach";
       }
     } else if (r < 0.72) {
       const el = pickEl('[data-testid="plugin-input"]');
@@ -268,13 +248,10 @@ async function runSeed(seed: number, steps: number): Promise<void> {
     check();
     cleanup();
     if (geo.observed !== 0) fail(`${String(geo.observed)} ResizeObservers still observing after unmount`);
-    const live = useInlineLiveStore.getState();
-    if (live.holders.length + live.waiting.length > 0) fail(`live slots left after unmount: ${JSON.stringify(live)}`);
     if (con.messages.length > 0) fail(con.messages.join("\n"));
   } finally {
     con.restore();
     cleanup();
-    useInlineLiveStore.setState({ holders: [], waiting: [] });
     resetSurfaceStore();
     acts.settle = [];
   }
