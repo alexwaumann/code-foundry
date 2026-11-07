@@ -181,7 +181,7 @@ workspace came from a folder; `rootMissing` when that folder is gone), `defaultP
 
 `values`: every setting's key (appearance.font_size) to its value as a string ("14",
 "true"); `revision`; `loadError`; `issues` (each `key`, `message`); `restartPending`:
-keys waiting for a restart. The settings.set verb changes one.
+keys waiting for a restart. The settings.set verb changes one, after asking the user.
 
 ## update
 

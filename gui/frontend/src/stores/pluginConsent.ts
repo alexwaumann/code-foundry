@@ -6,7 +6,7 @@
  * generic one: registered here as their confirm presenter.
  */
 import { create } from "zustand";
-import { registerConfirmPresenter, type ConfirmRequest } from "./confirm";
+import { registerConfirmPresenter, registerOwnDialog, type ConfirmRequest } from "./confirm";
 
 export interface ConsentRequest {
   /** The daemon's consent text (plugin.ConsentText). */
@@ -45,3 +45,4 @@ function present(req: ConfirmRequest): Promise<boolean> {
 
 registerConfirmPresenter("plugin.enable", present);
 registerConfirmPresenter("plugin.dev", present);
+registerOwnDialog(useConsentStore, (s) => s.pending !== null);

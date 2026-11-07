@@ -256,3 +256,98 @@ func TestPullRequestChecks(t *testing.T) {
 		})
 	}
 }
+
+// A button's command is the plugin's choice, so it runs as the plugin's; pressed from a page
+// it stays the page's, which asks more of it.
+// A page's yes to a button's question holds for the view it was asked from: the re-invoke
+// carries that view's version, and a newer view's command does not run on it.
+func TestPluginActPinsAPageYesToItsView(t *testing.T) {
+	b := &commandtest.PluginSurface{Got: &v1.GetSurfaceResponse{
+		State:    &v1.SurfaceState{Instance: "hello/demo/thread:s-1", Phase: v1.SurfacePhase_SURFACE_PHASE_LIVE},
+		View:     &v1.SurfaceView{Instance: "hello/demo/thread:s-1", Version: 4, ViewJson: `{"nodes":[]}`},
+		Elements: []*v1.SurfaceElement{{Key: "go", Kind: "command", Action: "plugin.hello.first", Label: "Go"}},
+	}}
+	reg := command.NewRegistry()
+	if err := command.RegisterPluginSurface(reg, b); err != nil {
+		t.Fatal(err)
+	}
+	var ran []string
+	record := func(name string) func(context.Context, command.Context, command.Args) (command.Result, error) {
+		return func(context.Context, command.Context, command.Args) (command.Result, error) {
+			ran = append(ran, name)
+			return command.Result{}, nil
+		}
+	}
+	if err := reg.RegisterAll(
+		command.Command{Name: "plugin.hello.first", Title: "First", Category: "Hello", Confirm: "Run the first?", Run: record("first")},
+		command.Command{Name: "plugin.hello.second", Title: "Second", Category: "Hello", Confirm: "Run the second?", Run: record("second")},
+	); err != nil {
+		t.Fatal(err)
+	}
+	page := command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}
+	args := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true"}
+	_, err := reg.Invoke(context.Background(), page, "plugin.act", args)
+	var ce *command.ConfirmError
+	if !errors.As(err, &ce) || ce.Command != "plugin.act" || ce.Bind["version"] != "4" || ce.Message != "Run the first?" {
+		t.Fatalf("err = %#v, want the question bound to version 4", err)
+	}
+	// The view changes under the question: the same key now runs something else.
+	b.Got.View.Version = 5
+	b.Got.Elements[0].Action = "plugin.hello.second"
+	again := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true", "version": ce.Bind["version"]}
+	if _, err := reg.Invoke(context.Background(), page, "plugin.act", again, command.Confirmed(true)); err != nil {
+		t.Logf("the stale act: %v", err)
+	}
+	if len(ran) != 0 {
+		t.Errorf("ran %v on a yes to another view", ran)
+	}
+	// Unchanged, the yes runs it.
+	b.Got.View.Version = 4
+	b.Got.Elements[0].Action = "plugin.hello.first"
+	if _, err := reg.Invoke(context.Background(), page, "plugin.act", again, command.Confirmed(true)); err != nil {
+		t.Fatal(err)
+	}
+	if len(ran) != 1 || ran[0] != "first" {
+		t.Errorf("ran %v, want first", ran)
+	}
+}
+
+func TestPluginActButtonOrigin(t *testing.T) {
+	b := &commandtest.PluginSurface{Got: &v1.GetSurfaceResponse{
+		State:    &v1.SurfaceState{Instance: "hello/demo/thread:s-1", Phase: v1.SurfacePhase_SURFACE_PHASE_LIVE},
+		View:     &v1.SurfaceView{Instance: "hello/demo/thread:s-1", Version: 4, ViewJson: `{"nodes":[]}`},
+		Elements: []*v1.SurfaceElement{{Key: "go", Kind: "command", Action: "plugin.hello.go", Label: "Go"}},
+	}}
+	reg := command.NewRegistry()
+	if err := command.RegisterPluginSurface(reg, b); err != nil {
+		t.Fatal(err)
+	}
+	var got v1.CallOrigin
+	if err := reg.Register(command.Command{Name: "plugin.hello.go", Title: "Go", Category: "Hello",
+		Run: func(_ context.Context, uctx command.Context, _ command.Args) (command.Result, error) {
+			got = uctx.Origin
+			return command.Result{}, nil
+		}}); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		ctx  command.Context
+		want v1.CallOrigin
+	}{
+		{"the CLI", command.Context{}, command.OriginPlugin},
+		{"the app", command.Context{ActiveView: "thread"}, command.OriginPlugin},
+		{"a page", command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}, command.OriginPage},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := map[string]string{"name": "hello", "surface": "demo", "key": "go", "quiet": "true"}
+			if _, err := reg.Invoke(context.Background(), tt.ctx, "plugin.act", args); err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("Origin = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

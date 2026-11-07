@@ -106,6 +106,9 @@ message SettingField {
   // depends_on's row, only while that field has this value. The search still finds it,
   // dimmed. Empty for none.
   string depends_on_value = 20;
+  // Only the user may change it: the settings.* commands refuse a page, a plugin and a
+  // thread's CLI, whatever they confirm. The Settings page shows nothing for it.
+  bool user_only = 21;
 }
 
 // SettingGroup is a table of the settings file ([threads], [github], ...).

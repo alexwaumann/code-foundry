@@ -45,6 +45,9 @@ func WriteSettings(w io.Writer, groups []*v1.SettingGroup, fields []*v1.SettingF
 			if f.GetRestartRequired() {
 				fmt.Fprint(w, " Applies after a daemon restart.")
 			}
+			if f.GetUserOnly() {
+				fmt.Fprint(w, " User-only: refused from a thread; the user changes it in Settings.")
+			}
 			fmt.Fprintln(w)
 		}
 	}

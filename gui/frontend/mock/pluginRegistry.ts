@@ -356,7 +356,7 @@ export class MockRegistry {
         when: always,
         run: (_c: UiContext | undefined, a) => {
           const b = this.browse(a.refresh === "true");
-          if (b.registries?.length === 0) return "no plugin registry is configured; add one with: code-foundry settings set plugins.registries https://github.com/<owner>/<repo>";
+          if (b.registries?.length === 0) return "no plugin registry is configured; add one in Settings → Plugins → Registries";
           return b.entries?.map((e) => `${e.name ?? ""} ${e.version ?? ""}`).join("\n") ?? "";
         },
       },

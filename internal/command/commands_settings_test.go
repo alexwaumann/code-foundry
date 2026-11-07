@@ -183,3 +183,161 @@ func TestSettingsWarnings(t *testing.T) {
 		})
 	}
 }
+
+// Who may change what. A user-only setting is the user's alone; a page asks first for any
+// other; a thread's CLI and everyone else change an ordinary setting as they always did.
+func TestSettingChangeCallers(t *testing.T) {
+	exe := filepath.Join(t.TempDir(), "claude")
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const (
+		ok = iota
+		asks
+		refused
+	)
+	callers := []struct {
+		name string
+		ctx  command.Context
+		yes  bool // the Invoke is confirmed
+		// What happens to an ordinary and to a user-only setting.
+		ordinary, userOnly int
+	}{
+		{name: "the app", ctx: command.Context{ActiveView: "settings"}, ordinary: ok, userOnly: ok},
+		{name: "the app, a thread selected", ctx: command.Context{ActiveView: "thread", ActiveThreadID: "s-1"}, ordinary: ok, userOnly: ok},
+		{name: "a plain CLI", ctx: command.Context{}, ordinary: ok, userOnly: ok},
+		{name: "a thread's CLI", ctx: command.Context{ActiveThreadID: "s-1"}, ordinary: ok, userOnly: refused},
+		{name: "a thread's CLI with --yes", ctx: command.Context{ActiveThreadID: "s-1"}, yes: true, ordinary: ok, userOnly: refused},
+		{name: "a page", ctx: command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}, ordinary: asks, userOnly: refused},
+		{name: "a page, confirmed", ctx: command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}, yes: true, ordinary: ok, userOnly: refused},
+		{name: "a page with a view", ctx: command.Context{ActiveView: "settings", Origin: command.OriginPage}, yes: true, ordinary: ok, userOnly: refused},
+		{name: "a plugin", ctx: command.Context{Origin: command.OriginPlugin}, ordinary: ok, userOnly: refused},
+		{name: "a plugin with a view", ctx: command.Context{ActiveView: "settings", Origin: command.OriginPlugin}, ordinary: ok, userOnly: refused},
+	}
+	settings := []struct {
+		name     string
+		cmd      string
+		key      string
+		value    string // set's; reset's is the default
+		userOnly bool
+		want     string // what a page's dialog says
+		label    string
+	}{
+		{name: "set", cmd: "settings.set", key: "appearance.font_size", value: "15", want: `Change appearance.font_size to "15"?`, label: "Change"},
+		{name: "reset", cmd: "settings.reset", key: "appearance.font_size", want: `Reset appearance.font_size to its default, "13"?`, label: "Reset"},
+		{name: "set the claude path", cmd: "settings.set", key: "advanced.claude_path", value: exe, userOnly: true},
+		{name: "reset the claude path", cmd: "settings.reset", key: "advanced.claude_path", userOnly: true},
+		{name: "set the gh path", cmd: "settings.set", key: "advanced.gh_path", value: exe, userOnly: true},
+		{name: "set the editor", cmd: "settings.set", key: "gitops.editor_command", value: "other {path}", userOnly: true},
+		{name: "reset the editor", cmd: "settings.reset", key: "gitops.editor_command", userOnly: true},
+		{name: "set the registries", cmd: "settings.set", key: "plugins.registries", value: "https://github.com/o/r", userOnly: true},
+		{name: "set the channel", cmd: "settings.set", key: "update.channel", value: "tip", userOnly: true},
+	}
+	for _, c := range callers {
+		for _, s := range settings {
+			t.Run(c.name+"/"+s.name, func(t *testing.T) {
+				reg, _, store, _ := newSettingsRegistry(t)
+				// A value to reset from, and the file as it stood.
+				seed := map[string]string{"appearance.font_size": "20", "advanced.claude_path": exe, "gitops.editor_command": "code"}
+				if _, err := store.Update(context.Background(), seed); err != nil {
+					t.Fatal(err)
+				}
+				before := store.Snapshot().Values[s.key]
+				args := map[string]string{"key": s.key}
+				if s.cmd == "settings.set" {
+					args["value"] = s.value
+				}
+				_, err := reg.Invoke(context.Background(), c.ctx, s.cmd, args, command.Confirmed(c.yes))
+				after := store.Snapshot().Values[s.key]
+
+				want := c.ordinary
+				if s.userOnly {
+					want = c.userOnly
+				}
+				var ce *command.ConfirmError
+				switch want {
+				case ok:
+					if err != nil {
+						t.Fatalf("refused: %v", err)
+					}
+					if s.cmd == "settings.set" && after != s.value {
+						t.Errorf("value = %q, want %q", after, s.value)
+					}
+				case asks:
+					if !errors.As(err, &ce) || ce.Command != s.cmd || ce.Message != s.want || ce.Label != s.label || len(ce.Args) != 0 {
+						t.Fatalf("err = %#v, want the confirmation %q", err, s.want)
+					}
+					if after != before {
+						t.Errorf("changed before the answer: %q -> %q", before, after)
+					}
+				case refused:
+					want := s.key + " can only be changed by the user; they can change it in Settings"
+					if errors.As(err, &ce) {
+						t.Fatalf("asked %q: a user-only setting is refused, not asked", ce.Message)
+					}
+					if !command.IsFailed(err) || err.Error() != want {
+						t.Fatalf("err = %v, want %q", err, want)
+					}
+					if after != before {
+						t.Errorf("changed: %q -> %q", before, after)
+					}
+				}
+			})
+		}
+	}
+}
+
+// A dialog shows the start of a long value and says how much it left out.
+func TestSettingChangeDialogCapsTheValue(t *testing.T) {
+	page := command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}
+	for _, tc := range []struct {
+		name, value, want string
+	}{
+		{"at the cap", strings.Repeat("a", 200), `"` + strings.Repeat("a", 200) + `"?`},
+		{"past it", strings.Repeat("a", 6085), `"` + strings.Repeat("a", 200) + `"… (5885 more characters not shown)?`},
+		{"counted in characters", strings.Repeat("é", 201), `"` + strings.Repeat("é", 200) + `"… (1 more characters not shown)?`},
+		{"spaces too", strings.Repeat(" ", 3000), `"` + strings.Repeat(" ", 200) + `"… (2800 more characters not shown)?`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, _, _, _ := newSettingsRegistry(t)
+			_, err := reg.Invoke(context.Background(), page, "settings.set", map[string]string{"key": "projects.branch_prefix", "value": tc.value})
+			var ce *command.ConfirmError
+			if !errors.As(err, &ce) || !strings.HasSuffix(ce.Message, tc.want) {
+				t.Errorf("err = %#v, want a message ending %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// A page's dialog quotes the value, so a value cannot draw lines of its own in it, and a
+// mistyped key is the page's error, not a question to the user.
+func TestSettingChangeDialog(t *testing.T) {
+	page := command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}
+	reg, _, _, _ := newSettingsRegistry(t)
+	_, err := reg.Invoke(context.Background(), page, "settings.set", map[string]string{"key": "projects.branch_prefix", "value": "x\n\nsecond line"})
+	var ce *command.ConfirmError
+	if !errors.As(err, &ce) || strings.Contains(ce.Message, "\n") || !strings.Contains(ce.Message, `"x\n\nsecond line"`) {
+		t.Errorf("err = %#v", err)
+	}
+	_, err = reg.Invoke(context.Background(), page, "settings.set", map[string]string{"key": "nope.nope", "value": "1"})
+	if errors.As(err, &ce) || !errors.Is(err, command.ErrInvalidArgs) {
+		t.Errorf("unknown key: %v", err)
+	}
+}
+
+// settings.get says which settings are the user's, and asking does not need --yes.
+func TestSettingUserOnlyListed(t *testing.T) {
+	reg, _, _, _ := newSettingsRegistry(t)
+	res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-1"}, "settings.get", map[string]string{"key": "advanced.claude_path"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if js, _ := res.EncodeJSON(); !strings.Contains(js, `"userOnly":true`) {
+		t.Errorf("json %s", js)
+	}
+	for _, name := range []string{"settings.set", "settings.reset"} {
+		if c, ok := reg.Get(name); !ok || c.Confirm != "" {
+			t.Errorf("%s has a Confirm: its --yes would reach every agent's help", name)
+		}
+	}
+}

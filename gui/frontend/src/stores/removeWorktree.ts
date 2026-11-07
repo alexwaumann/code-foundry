@@ -13,7 +13,7 @@
  */
 import { create } from "zustand";
 import { uncommittedCount } from "@/lib/leftovers";
-import { registerConfirmPresenter, registerSecondStagePresenter, requestConfirm, type ConfirmRequest } from "./confirm";
+import { registerConfirmPresenter, registerOwnDialog, registerSecondStagePresenter, requestConfirm, type ConfirmRequest } from "./confirm";
 import { useProjectsStore } from "./projects";
 
 export const REMOVE_WORKTREE_COMMAND = "project.worktree.remove";
@@ -87,4 +87,5 @@ function presentSecond(req: ConfirmRequest): Promise<boolean> {
 }
 
 registerConfirmPresenter(REMOVE_WORKTREE_COMMAND, present);
+registerOwnDialog(useRemoveWorktreeStore, (s) => s.pending !== null);
 registerSecondStagePresenter(REMOVE_WORKTREE_COMMAND, presentSecond);

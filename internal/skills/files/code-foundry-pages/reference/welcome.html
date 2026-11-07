@@ -108,7 +108,7 @@
         cf.run("dictation.download", {}).then((r) => { setNote(r.text); refresh(); }).catch(say);
         return;
       }
-      cf.run("settings.set", { key: "dictation.enabled", value: String(next) }).then(() => { if (next) onOn(); refresh(); }).catch(say);
+      cf.run("settings.set", { key: "dictation.enabled", value: String(next) }).then(() => { if (next) onOn(); refresh(); }).catch((e) => { if (e?.code !== "declined") say(e); });
     };
     return (
       <div>

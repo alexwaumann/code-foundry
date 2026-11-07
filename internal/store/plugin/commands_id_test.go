@@ -55,6 +55,10 @@ func TestContextArgsResolveIDs(t *testing.T) {
 		if got := <-e.sent; got != tt.want {
 			t.Errorf("%s: thread.send got %q, want %q", tt.name, got, tt.want)
 		}
+		// host/invoke is the plugin's, whatever view it names (Context.FromUser).
+		if got := e.origin.Load(); got != int32(command.OriginPlugin) {
+			t.Errorf("%s: Origin = %d, want the plugin's", tt.name, got)
+		}
 	}
 	if _, err := e.invoke("plugin.hello.send", map[string]string{"text": "hi", "thread": "9999"}, command.Context{}); err == nil {
 		t.Error("an unknown suffix passed")

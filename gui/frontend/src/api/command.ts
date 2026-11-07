@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
   ArgType,
+  CallOrigin,
   CommandService,
   ConfirmationRequiredSchema,
   UiContextSchema,
@@ -84,6 +85,8 @@ export interface UiContextView {
   activeView: string;
   /** The workspace that owns the active thread (or the composer's workspace); "" otherwise. */
   activeWorkspaceId: string;
+  /** What asked, when not the app's own controls (CallOrigin): a page, or a plugin's panel. */
+  origin?: "page" | "plugin";
 }
 
 export interface InvokeResultView {
@@ -159,6 +162,7 @@ export function toUiContext(ctx: UiContextView): UiContext {
     activeWorktreePath: ctx.activeWorktreePath,
     activeView: ctx.activeView,
     activeWorkspaceId: ctx.activeWorkspaceId,
+    origin: ctx.origin === "page" ? CallOrigin.PAGE : ctx.origin === "plugin" ? CallOrigin.PLUGIN : CallOrigin.UNSPECIFIED,
   });
 }
 

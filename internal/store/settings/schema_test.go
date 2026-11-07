@@ -699,3 +699,20 @@ func TestBranchPrefix(t *testing.T) {
 		})
 	}
 }
+
+// The settings a page, a plugin or a thread may not change. A new one that names a program,
+// a command or where code comes from belongs here (docs/notes/settings-user-only.md).
+func TestUserOnlyFields(t *testing.T) {
+	want := []string{KeyClaudePath, KeyGhPath, KeyEditorCommand, KeyPluginRegistries, KeyUpdateChannel}
+	var got []string
+	for _, f := range staticFields {
+		if f.UserOnly {
+			got = append(got, f.Key)
+		}
+	}
+	slices.Sort(want)
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		t.Errorf("user-only fields = %v, want %v", got, want)
+	}
+}

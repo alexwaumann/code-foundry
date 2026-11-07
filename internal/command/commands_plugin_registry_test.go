@@ -49,7 +49,7 @@ func TestPluginRegistryCommands(t *testing.T) {
 					InstalledFrom: "127.0.0.1:8765/index.json"}}},
 			wantMsg: []string{"acme  2.0.0    1.0.0 (installed from 127.0.0.1:8765/index.json)  -"}},
 		{name: "browse with no registry configured", cmd: "plugin.browse", browse: &v1.BrowsePluginsResponse{Platform: "darwin/arm64"},
-			wantMsg: []string{"no plugin registry is configured; add one with: code-foundry settings set plugins.registries https://github.com/<owner>/<repo>"}},
+			wantMsg: []string{"no plugin registry is configured; add one in Settings → Plugins → Registries"}},
 		{name: "browse an empty registry", cmd: "plugin.browse",
 			browse:  &v1.BrowsePluginsResponse{Platform: "darwin/arm64", Registries: []*v1.PluginRegistry{{Url: "https://github.com/o/reg"}}},
 			wantMsg: []string{"no plugins in the registries\nregistry https://github.com/o/reg: 0 plugin(s)"}},

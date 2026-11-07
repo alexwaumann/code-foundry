@@ -12,6 +12,18 @@ service CommandService {
   rpc Invoke(InvokeCommandRequest) returns (InvokeCommandResponse) {}
 }
 
+// CallOrigin says what asked for a command when it is not what the context looks like. A
+// page's call has the context of the CLI inside its thread, and a plugin's has whatever the
+// plugin or its panel gave. A setting's user_only and a page's confirmation read it.
+enum CallOrigin {
+  // The GUI's own controls, or a CLI.
+  CALL_ORIGIN_UNSPECIFIED = 0;
+  // A page shown in the app. Only the GUI's bridge host sets it, never the page.
+  CALL_ORIGIN_PAGE = 1;
+  // A plugin: host/invoke, or a command button of its panel.
+  CALL_ORIGIN_PLUGIN = 2;
+}
+
 // UiContext describes what the caller is looking at. The daemon never guesses it.
 message UiContext {
   string active_terminal_id = 1;
@@ -28,6 +40,7 @@ message UiContext {
   // 7 was active_session_rendered until 2026-10-12 (every thread is rendered now).
   reserved 7;
   reserved "active_session_rendered";
+  CallOrigin origin = 8;
 }
 
 enum ArgType {

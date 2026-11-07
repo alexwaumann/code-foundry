@@ -22,9 +22,14 @@
  * is refused `invalid`. A page that gives up on a run (`cf:cancel`) aborts its Invoke, so a
  * daemon-side wait (thread.wait, action.wait) ends with it.
  *
- * A run that has to ask the user tells the page (`cf:pending`) as its question is queued,
- * so the page's clock stops until the answer (`cf:resume`); a page that gives up
+ * A verb that is not read-only runs only while the user is in the frame
+ * (BridgeFrame.userPresent), whatever the page's script checked: past that it answers
+ * `gesture`. A run that has to ask the user tells the page (`cf:pending`) as its question
+ * is queued, so the page's clock stops until the answer (`cf:resume`); a page that gives up
  * (`cf:cancel`), or goes, takes its question with it, declined, and the command never runs.
+ * A question is guarded (stores/confirm.ts). A frame has one open at a time, the next waits
+ * PAGE_ASKS.gapMs after the last one ended, and PAGE_ASKS.perMinute is the most it opens:
+ * past those a call is refused `invalid`. These last across its documents.
  *
  * A `cf:fetch` (docs/notes/bridge-fetch.md) goes to ThreadService.ProxyFetch under the
  * page's thread: the daemon makes the request, so the API's CORS rules do not apply. It
@@ -66,7 +71,7 @@ import { REPORTED_CODES, type PageError } from "@/lib/pageErrors";
 import { publishedTheme } from "@/lib/theme";
 import { bridgeSources } from "./bridgeSources";
 import { invokeConfirmed } from "./commands";
-import { answerConfirm, useConfirmStore } from "./confirm";
+import { requestConfirm, withdrawConfirm, type ConfirmRequest } from "./confirm";
 import { isAbort } from "@/api/stream";
 import { emptyContext } from "./context";
 import { useThreadsStore } from "./threads";
@@ -88,12 +93,28 @@ const dev = import.meta.env.DEV ? (window.__cfBridge ??= { hosts: 0, subscriptio
 export const BRIDGE_DEBOUNCE_MS = 50;
 
 /**
+ * How often a frame may ask the user. The gap outlasts the press that answered the last
+ * question, so that press does not count for the next one.
+ */
+export const PAGE_ASKS = { gapMs: 5000, perMinute: 3 };
+
+/** The longest name a question quotes. */
+const QUOTED_NAME_CHARS = 80;
+
+/** A name the page can choose, quoted and short, so it cannot pass for the dialog's own words. */
+function quotedName(name: string): string {
+  return JSON.stringify(name.length > QUOTED_NAME_CHARS ? `${name.slice(0, QUOTED_NAME_CHARS)}…` : name);
+}
+
+/**
  * What a page's call runs in: its thread and nothing else, which is what the CLI inside
- * that thread sends (UiContext.active_view's proto comment; docs/notes/bridge-1-daemon.md).
- * A verb on a worktree or terminal takes it in its args, as from the CLI.
+ * that thread sends (UiContext.active_view's proto comment; docs/notes/bridge-1-daemon.md),
+ * and the origin that tells the two apart (docs/notes/settings-user-only.md). The page
+ * cannot change it: the host builds this. A verb on a worktree or terminal takes it in its
+ * args, as from the CLI.
  */
 export function pageContext(threadId: string): UiContextView {
-  return { ...emptyContext, activeView: "", activeThreadId: threadId };
+  return { ...emptyContext, activeView: "", activeThreadId: threadId, origin: "page" };
 }
 
 /** The codes of a fetch's answer the strip reports: not `unavailable` (no thread, which the page shows itself). */
@@ -128,8 +149,10 @@ export interface BridgeHost {
 export interface BridgeFrame {
   /** The owning thread; null when the page is not shown in one. */
   threadId: string | null;
-  /** The page's file name, for "Asked by" in a confirmation. */
+  /** The page's file name, quoted under "Asked by" in a confirmation. */
   pageName: string;
+  /** Whether the user is in this frame now (lib/frameAttention.ts). */
+  userPresent: () => boolean;
   /** Posts to the frame's window. */
   post: (msg: HostMessage) => void;
   /**
@@ -146,12 +169,10 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   let disposed = false;
   const subs = new Map<CallId, () => void>();
   let commands: Promise<readonly CommandView[]> | null = null;
-  /** Confirmations wait for the one before (one dialog per frame at a time). */
-  let confirms: Promise<unknown> = Promise.resolve();
-  /** The confirmation this frame has open, to cancel on dispose. */
-  let open: unknown = null;
+  /** The frame's questions so far, in all its documents: PAGE_ASKS holds them to. */
+  const asks = { open: false, endedAt: Number.NEGATIVE_INFINITY, opened: [] as number[] };
   /** The runs whose question is open or queued, by call id: cancel declines it. */
-  const asking = new Map<CallId, { cancelled: boolean; dialog: unknown }>();
+  const asking = new Map<CallId, { cancelled: boolean; req: ConfirmRequest }>();
   /** The document's runs in flight, by call id: cancel and a new document abort them. */
   const running = new Map<CallId, AbortController>();
   /** Whether a document said hello since the frame's last load. */
@@ -233,15 +254,14 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     );
   };
 
-  /** Aborts the document's runs, stops its subscriptions and cancels a confirmation it has open. */
+  /** Aborts the document's runs, stops its subscriptions and takes back its questions. */
   const stopAll = () => {
     for (const c of running.values()) c.abort();
     running.clear();
     for (const stop of subs.values()) stop();
     if (dev) dev.subscriptions -= subs.size;
     subs.clear();
-    if (open !== null && useConfirmStore.getState().pending === open) answerConfirm(false);
-    open = null;
+    for (const call of asking.values()) withdrawConfirm(call.req);
     asking.clear();
   };
 
@@ -251,34 +271,33 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     const call = asking.get(id);
     if (!call) return;
     call.cancelled = true;
-    if (call.dialog !== null && useConfirmStore.getState().pending === call.dialog) answerConfirm(false);
+    withdrawConfirm(call.req);
   };
 
-  /**
-   * Runs ask after this frame's earlier confirmations; never once its document is gone or
-   * the page gave up on the call.
-   */
-  const queued = (forDoc: number, id: CallId, ask: () => Promise<boolean>): Promise<boolean> => {
-    const call = { cancelled: false, dialog: null as unknown };
+  /** Why this frame may not open a new question now, or null. */
+  const askRefusal = (): string | null => {
+    const now = Date.now();
+    asks.opened = asks.opened.filter((at) => now - at < 60_000);
+    if (asks.open) return "this page already has a question open; wait for the answer";
+    if (now - asks.endedAt < PAGE_ASKS.gapMs || asks.opened.length >= PAGE_ASKS.perMinute) return "this page is asking too often; ask again later";
+    return null;
+  };
+
+  /** Puts a question to the user: the answer, a no if the page gave up on it first. */
+  const question = async (forDoc: number, id: CallId, req: ConfirmRequest): Promise<boolean> => {
+    const call = { cancelled: false, req };
     asking.set(id, call);
+    asks.open = true;
+    asks.opened.push(Date.now());
     post(forDoc, { type: "cf:pending", id, reason: "confirm" });
-    const next = confirms.then(async () => {
-      if (disposed || forDoc !== doc || call.cancelled) return false;
-      const answer = ask();
-      // requestConfirm opens its dialog at once; a command's own presenter may not use it.
-      const mine = useConfirmStore.getState().pending;
-      open = mine;
-      call.dialog = mine;
-      try {
-        const yes = await answer;
-        return yes && !call.cancelled;
-      } finally {
-        if (open === mine) open = null;
-        if (asking.get(id) === call) asking.delete(id);
-      }
-    });
-    confirms = next.catch(() => undefined);
-    return next;
+    try {
+      const yes = await requestConfirm(req);
+      return yes && !call.cancelled;
+    } finally {
+      asks.open = false;
+      asks.endedAt = Date.now();
+      if (asking.get(id) === call) asking.delete(id);
+    }
   };
 
   /** Why a call in flight cannot start now (a duplicate id, past the cap), or null. */
@@ -288,7 +307,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     return null;
   };
 
-  const run = async (forDoc: number, id: CallId, verb: string, args: Record<string, string>) => {
+  const run = async (forDoc: number, id: CallId, verb: string, args: Record<string, string>, present: boolean) => {
     if (threadId === null) {
       fail(forDoc, id, verb, NO_THREAD);
       return;
@@ -300,25 +319,38 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     }
     const abort = new AbortController();
     running.set(id, abort);
-    const asked = { declined: false };
+    const asked = { declined: false, refused: null as BridgeError | null, started: false };
     try {
       const spec = await listed().then(
         (cmds) => cmds.find((c) => c.name === verb),
         () => undefined,
       );
+      if (!present && !spec?.readOnly) {
+        fail(forDoc, id, verb, { code: "gesture", message: `${verb} changes something, so it runs only from a click or key press in the page` });
+        return;
+      }
       const cwd = useThreadsStore.getState().byId[threadId]?.worktreePath ?? "";
       const callArgs = spec ? fillPageArgs(args, spec.args, { threadId, cwd }) : args;
       if (abort.signal.aborted) return;
-      const res = await invokeConfirmed(verb, callArgs, pageContext(threadId), `${frame.pageName}, a page in ${useThreadsStore.getState().byId[threadId]?.name || threadId}`, {
+      const res = await invokeConfirmed(verb, callArgs, pageContext(threadId), undefined, {
         signal: abort.signal,
-        around: async (ask) => {
-          const yes = await queued(forDoc, id, ask);
+        ask: async (req) => {
+          // A later stage of a run is the same question going on, not a new one.
+          const why = asked.started ? null : askRefusal();
+          if (why !== null) {
+            asked.refused = { code: "invalid", message: why };
+            return false;
+          }
+          asked.started = true;
+          const thread = useThreadsStore.getState().byId[threadId]?.name || threadId;
+          const yes = await question(forDoc, id, { ...req, guarded: true, caller: "a page", callerDetail: `Page ${quotedName(frame.pageName)} in thread ${quotedName(thread)}` });
           if (!yes) asked.declined = true;
           else post(forDoc, { type: "cf:resume", id });
           return yes;
         },
       });
-      if (asked.declined) fail(forDoc, id, verb, { code: "declined", message: "the user declined" }, res);
+      if (asked.refused) fail(forDoc, id, verb, asked.refused);
+      else if (asked.declined) fail(forDoc, id, verb, { code: "declined", message: "the user declined" }, res);
       else post(forDoc, okResult(id, res ?? { message: "", resultJson: "" }));
     } catch (err) {
       // An aborted call's page gave up on it, or is gone: nobody to answer.
@@ -441,7 +473,8 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       const forDoc = doc;
       switch (m.kind) {
         case "run":
-          void run(forDoc, m.id, m.verb, m.args);
+          // Now, not after the await for the verb's spec.
+          void run(forDoc, m.id, m.verb, m.args, frame.userPresent());
           return;
         case "on":
           on(forDoc, m.id, m.source);

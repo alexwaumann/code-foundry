@@ -12,7 +12,8 @@ show `e.message` where it happened (that row, that button):
   - `gesture`: called outside a click or key press: move the call into the handler.
   - `declined`: the user said no: not an error. Button back, at most a muted "Not merged".
   - `unavailable`: no such verb, no thread, or (from `cf.on`) a source the app lacks now.
-  - `invalid`: a wrong or missing arg: fix the call (`code-foundry help <verb>`).
+  - `invalid`: a wrong or missing arg: fix the call (`code-foundry help <verb>`). Also a second
+    question while one is open, or too soon after it: ask once per press.
   - `failed`: the command ran and failed: show the message, keep the rest working.
   - `timeout`: no answer in 60 s (`{timeout: ms}` as a third arg, 0 waits): offer a retry.
 

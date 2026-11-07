@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
 // Command is one user-facing action.
@@ -117,6 +119,23 @@ type Context struct {
 	// or the GUI's active thread. Invoke sets it for ConfirmIf, DynamicConfirm and Run;
 	// When does not see it.
 	CallerThreadID string
+	// Origin is what asked, when that is not what the rest of the context looks like: a
+	// page has the context of the CLI in its thread, and a plugin chooses its own.
+	Origin v1.CallOrigin
+}
+
+// The Origins a call can have besides the unset one (the GUI's own controls, a CLI).
+const (
+	OriginPage   = v1.CallOrigin_CALL_ORIGIN_PAGE
+	OriginPlugin = v1.CallOrigin_CALL_ORIGIN_PLUGIN
+)
+
+// FromUser reports whether the user asked in person: from the app's own controls or a
+// CLI outside a thread, not a page, a plugin or a thread's CLI (ActiveView is empty only
+// from a CLI or a page). It is what the caller says, not proof
+// (docs/notes/settings-user-only.md). Only Run sees CallerThreadID.
+func (c Context) FromUser() bool {
+	return c.Origin == v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED && (c.ActiveView != "" || c.CallerThreadID == "")
 }
 
 // ContextField names a Context field an argument can default from.

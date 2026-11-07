@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -37,6 +38,7 @@ func UiContextToProto(c Context) *v1.UiContext {
 	return &v1.UiContext{
 		ActiveTerminalId: c.ActiveTerminalID, ActiveThreadId: c.ActiveThreadID, ActiveProjectId: c.ActiveProjectID,
 		ActiveWorktreePath: c.ActiveWorktreePath, ActiveView: c.ActiveView, ActiveWorkspaceId: c.ActiveWorkspaceID,
+		Origin: c.Origin,
 	}
 }
 
@@ -143,6 +145,18 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 	)
 }
 
+// pinToView binds a page's yes to the view it was asked from: the re-invoke carries this
+// version, so a view that changed under the question no longer finds a command to run. A
+// question with its own args or bind stays as it was.
+func pinToView(err error, uctx Context, version uint64) error {
+	var ce *ConfirmError
+	if uctx.Origin == OriginPage && errors.As(err, &ce) && len(ce.Args) == 0 && ce.Bind == nil {
+		ce.Command = "plugin.act"
+		ce.Bind = map[string]string{"version": strconv.FormatUint(version, 10)}
+	}
+	return err
+}
+
 // actResult is plugin.act's --json: what happened, then the view after it.
 type actResult struct {
 	// Version is the view version an event acted on.
@@ -207,9 +221,14 @@ func pluginAct(ctx context.Context, r *Registry, b PluginSurfaceBackend, uctx Co
 				args[k] = argString(v)
 			}
 		}
-		res, err := r.Invoke(ctx, uctx, el.GetAction(), args, Confirmed(ConfirmedIn(ctx)))
+		// The plugin chose this command; a page pressing its button stays a page.
+		pressed := uctx
+		if pressed.Origin == v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED {
+			pressed.Origin = OriginPlugin
+		}
+		res, err := r.Invoke(ctx, pressed, el.GetAction(), args, Confirmed(ConfirmedIn(ctx)))
 		if err != nil {
-			return Result{}, err
+			return Result{}, pinToView(err, pressed, view.GetVersion())
 		}
 		out.Command, out.Message = el.GetAction(), res.Message
 		if js, err := res.EncodeJSON(); err == nil && js != "" {

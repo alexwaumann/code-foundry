@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { LoaderCircle } from "lucide-react";
 import { createBridgeHost, type BridgeHost } from "@/stores/bridgeHost";
+import { watchFrameAttention } from "@/lib/frameAttention";
 import { frameNonce, nonceMatches, withNonce } from "@/lib/bridge";
 import { addPageError, type PageError } from "@/lib/pageErrors";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
@@ -194,11 +195,13 @@ export function HtmlFrame({
     nameRef.current = name;
   });
   useEffect(() => {
+    const attention = watchFrameAttention(() => frameRef.current);
     const h = createBridgeHost({
       threadId: thread,
       get pageName() {
         return nameRef.current;
       },
+      userPresent: attention.present,
       post: (msg) => {
         const win = frameRef.current?.contentWindow;
         if (win && target) win.postMessage(msg, target);
@@ -210,6 +213,7 @@ export function HtmlFrame({
     host.current = h;
     return () => {
       h.dispose();
+      attention.stop();
       if (host.current === h) host.current = null;
     };
   }, [thread, target, report]);

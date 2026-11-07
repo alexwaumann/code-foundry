@@ -468,7 +468,7 @@ function requireGit(project: MockProject, what = "this"): void {
 
 export interface Invocation {
   name: string;
-  context: Omit<UiContext, "$typeName" | "$unknown"> | null;
+  context: Omit<UiContext, "$typeName" | "$unknown" | "origin"> | null;
   args: Record<string, string>;
   confirmed: boolean;
   at: string;

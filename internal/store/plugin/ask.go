@@ -31,6 +31,7 @@ func (a *actor) askUser(err error, p pluginsdk.InvokeParams) (pluginsdk.CommandR
 		Context: &v1.UiContext{
 			ActiveThreadId: p.Context.ThreadID, ActiveProjectId: p.Context.ProjectID, ActiveWorktreePath: p.Context.WorktreePath,
 			ActiveTerminalId: p.Context.TerminalID, ActiveWorkspaceId: p.Context.WorkspaceID, ActiveView: p.Context.View,
+			Origin: command.OriginPlugin,
 		},
 	}}})
 	a.hostLog("host/invoke %s: handed to the GUI to confirm (%d window(s))", p.Command, windows)

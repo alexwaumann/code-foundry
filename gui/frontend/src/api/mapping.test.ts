@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
-import { ArgType, CommandSchema } from "@/gen/codefoundry/v1/command_pb";
+import { ArgType, CallOrigin, CommandSchema } from "@/gen/codefoundry/v1/command_pb";
 import { EventSchema } from "@/gen/codefoundry/v1/events_pb";
 import {
   ActivityStatsSchema,
@@ -26,7 +26,7 @@ import { AgentRunStatus, ThreadKind, ThreadListEventSchema, ThreadSchema, Thread
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
 import { WorkspaceEventSchema } from "@/gen/codefoundry/v1/workspace_pb";
-import { toCommandView } from "./command";
+import { toCommandView, toUiContext } from "./command";
 import { overrideEndpoint, type DaemonConnection } from "./endpoint";
 import { toEventView } from "./events";
 import { getDashboard, statsMonth, toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView, toStatsView } from "./gh";
@@ -129,6 +129,13 @@ describe("project mapping", () => {
 });
 
 describe("command mapping", () => {
+  it("sends a call's origin, and none for the app's own controls", () => {
+    const ctx = { activeTerminalId: "", activeThreadId: "t-1", activeProjectId: "", activeWorktreePath: "", activeView: "", activeWorkspaceId: "" };
+    expect(toUiContext({ ...ctx, origin: "page" }).origin).toBe(CallOrigin.PAGE);
+    expect(toUiContext({ ...ctx, origin: "plugin" }).origin).toBe(CallOrigin.PLUGIN);
+    expect(toUiContext(ctx).origin).toBe(CallOrigin.UNSPECIFIED);
+  });
+
   it("maps arg types and fills defaults", () => {
     const c = toCommandView(
       create(CommandSchema, {
@@ -197,6 +204,13 @@ describe("ui intent mapping", () => {
     [{ case: "stageComposer" as const, value: { threadId: "s1", text: "Add a project" } }, { kind: "stageComposer", threadId: "s1", text: "Add a project" }],
   ])("maps %#", (intent, want) => {
     expect(toUiIntentView(create(UiIntentSchema, { intent }))).toEqual(want);
+  });
+
+  it("keeps a plugin's origin on the command it hands the GUI, and adds none of its own", () => {
+    const intent = (origin: CallOrigin) => toUiIntentView(create(UiIntentSchema, { intent: { case: "invokeCommand", value: { name: "x", caller: "plugin:p", context: { origin } } } }));
+    expect(intent(CallOrigin.PLUGIN)).toMatchObject({ context: { origin: "plugin" } });
+    const none = intent(CallOrigin.UNSPECIFIED);
+    expect(none?.kind === "invokeCommand" && none.context).not.toHaveProperty("origin");
   });
 });
 
