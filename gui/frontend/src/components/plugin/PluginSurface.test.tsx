@@ -133,7 +133,13 @@ describe("PluginSurface", () => {
     expect(surfaces.acts.at(-1)).toMatchObject({ instance: INSTANCE, version: 1, key: "log" });
     // Read as active while the choice is pending.
     expect(byKey("plugin-tab", "log").getAttribute("aria-selected")).toBe("true");
+    // The old tab's nodes are still on screen, and still live: the body says so.
+    const body = () => screen.getByTestId("plugin-body");
+    expect(body().getAttribute("aria-busy")).toBe("true");
+    expect(body().className).toContain("opacity-60");
     await send({ kind: "view", instance: INSTANCE, version: 2, view: demoView("log"), hostRendered: false });
+    expect(body().getAttribute("aria-busy")).toBeNull();
+    expect(body().className).not.toContain("opacity-60");
     const lint = screen.getAllByTestId("plugin-log")[1] as HTMLElement;
     expect(lint.querySelector('[data-tone="attention"]')?.textContent).toBe("warning: unused variable x");
     expect(lint.querySelector('[data-tone="error"]')?.textContent).toBe("error: missing return");

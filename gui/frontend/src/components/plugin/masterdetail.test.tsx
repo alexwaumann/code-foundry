@@ -443,6 +443,8 @@ describe("tabs node", () => {
     expect(acts.calls.map((c) => c.key)).toEqual(["tl"]);
     expect(log()?.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("plugin-tabs-node").getAttribute("data-switching")).toBe("tl");
+    expect(screen.getByTestId("plugin-tabs-panel").getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByTestId("plugin-tabs-panel").className).toContain("opacity-60");
     await settle(false);
     expect(log()?.getAttribute("aria-selected")).toBe("false");
   });

@@ -13,7 +13,8 @@ import { tabElementId } from "../tabIds";
  * A node's own tab strip over the active tab's nodes (docs/notes/plugins-layout-4-master-detail.md):
  * the view's tab strip one step smaller, in the list (not pinned). A click sends a `tab`
  * act on the tab's key (the daemon names this node in it); the clicked tab reads as
- * active from the click until the plugin's next view (stores/pluginSurfaces chooseElement).
+ * active from the click until the plugin's next view (stores/pluginSurfaces chooseElement),
+ * and the tab on screen dims meanwhile: its nodes are still the old tab's, and still live.
  * Its nodes are laid out like the list around it; their form drafts
  * are kept per tab (api/plugin.ts nodeScope).
  */
@@ -46,7 +47,9 @@ export function TabsNode({ node, data }: NodeProps<"tabs">) {
       />
       <ViewContext.Provider value={inside}>
         <div
-          className="flex min-w-0 flex-col"
+          className={cn("flex min-w-0 flex-col transition-opacity", switching !== undefined && "opacity-60")}
+          aria-busy={switching !== undefined || undefined}
+          data-pending={switching !== undefined || undefined}
           id={panelId}
           role="tabpanel"
           aria-labelledby={data.items.some((t) => t.key === shownTab) ? tabElementId(idBase, shownTab) : undefined}

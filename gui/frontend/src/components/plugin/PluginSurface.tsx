@@ -8,7 +8,7 @@ import { runCommand } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { retitlePanelTab, useCurrentPanelKey, type Tab } from "@/stores/panel";
 import { surfaceManifestOf, usePluginsStore } from "@/stores/plugins";
-import { startSurfaceWatch, useSurfaceEntry, watchKeyOf } from "@/stores/pluginSurfaces";
+import { chooserKeyOf, startSurfaceWatch, useChoice, useSurfaceEntry, watchKeyOf } from "@/stores/pluginSurfaces";
 import { useUiStore } from "@/stores/ui";
 import { useShowState } from "@/surfaces/plugin";
 import { ViewContext, type ViewCtx } from "./context";
@@ -125,6 +125,9 @@ export function PluginSurface({ tab }: { tab: Tab }) {
   }, [panelKey, tab.id, tabTitle]);
 
   const viewTab = view?.tabs?.active ?? "";
+  // A view tab clicked, while the plugin's view is still the old tab's: its nodes stay live, so the body dims.
+  const tabChoice = useChoice(watchKey, chooserKeyOf(instance, "", ""));
+  const switching = tabChoice !== undefined && tabChoice !== viewTab && (view?.tabs?.items.some((t) => t.key === tabChoice) ?? false);
   const down = phase === "plugin-down" || phase === "not-responding" || phase === "failed";
   const inert = down || error !== null;
   const ctx = useMemo<ViewCtx>(() => ({ watchKey, instance, plugin, viewTab, uiContext, inert }), [watchKey, instance, plugin, viewTab, uiContext, inert]);
@@ -203,7 +206,13 @@ export function PluginSurface({ tab }: { tab: Tab }) {
           {banner}
           {view ? (
             // grow: the body's list is the scroll area's box (a flex spacer reaches its bottom).
-            <div className={cn("flex grow flex-col px-4 pt-3 @max-[340px]:px-3", down && "opacity-60 [&_.animate-spin]:animate-none")} data-testid="plugin-body" data-stale={down || undefined}>
+            <div
+              className={cn("flex grow flex-col px-4 pt-3 transition-opacity @max-[340px]:px-3", (down || switching) && "opacity-60", down && "[&_.animate-spin]:animate-none")}
+              aria-busy={switching || undefined}
+              data-testid="plugin-body"
+              data-stale={down || undefined}
+              data-pending={switching || undefined}
+            >
               <NodeList nodes={view.nodes} box />
             </div>
           ) : show !== "unavailable" && !down && error === null ? (
