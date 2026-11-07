@@ -170,7 +170,7 @@ func TestRestartWakeMessage(t *testing.T) {
 			if msg.WakeTitle != tt.title {
 				t.Errorf("title:\n got %s\nwant %s", msg.WakeTitle, tt.title)
 			}
-			if !strings.HasPrefix(msg.Text, wakePrefix+tt.title+"\n```json\n") || msg.Origin != OriginWake {
+			if !strings.HasPrefix(msg.Text, wakePrefix+tt.title) || msg.Origin != OriginWake {
 				t.Errorf("text = %q", msg.Text)
 			}
 			var p struct {

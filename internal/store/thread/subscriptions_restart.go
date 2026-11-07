@@ -394,5 +394,5 @@ func restartWake(n restartNotice, parts []threadWakePart) Message {
 	for _, p := range parts {
 		wakes = append(wakes, threadWakePayload(p.sub, p.t, p.at, p.d))
 	}
-	return wakeMessage(restartLine(n)+" "+head, wakeBatchPayload{Kind: "batch", Wakes: wakes})
+	return wakeTextMessage(restartLine(n)+" "+head, wakeBatchPayload{Kind: "batch", Wakes: wakes}, batchBody(parts))
 }

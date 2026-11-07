@@ -109,9 +109,9 @@ var rules = []rule{
 	{note: "orch-skill-v4", file: orchFile, says: []string{"distinct anchor", `git add -a`, "one line", "from the child's wake"}},
 	{note: "orch-skill-v4", file: wakesFile, says: []string{"without --wait"}},
 	// A child's last message reaches its parent whole, with git's word on the branch.
-	{note: "wake-final-message", file: wakesFile, says: []string{"last_message", "checkouts"}, never: []string{"report_stale", "said more"}},
+	{note: "wake-final-message", file: wakesFile, says: []string{"it said", "from the app, not the thread"}, never: []string{"report_stale", "said more"}},
 	{note: "wake-final-message", file: orchFile, says: []string{"no closing report", "thread report blocked"}, never: []string{"after any later message", "report_stale"}},
-	{note: "wake-final-message", file: emberFile, says: []string{"no closing report", "checkouts"}, never: []string{"after any later message", "report_stale"}},
+	{note: "wake-final-message", file: emberFile, says: []string{"no closing report", "what git says"}, never: []string{"after any later message", "report_stale"}},
 	{note: "orch-skill-v4", file: leadsFile, says: []string{"thread report progress"}},
 	// Ember stopped loading the orchestrate skill each epoch: what it took from there lives here.
 	{note: "orch-skill-v4", file: emberFile, says: []string{"distinct anchor", "only as many spots", `git add -a`, `git diff origin/<default> --stat`, "one line", "take it from its wake"}},

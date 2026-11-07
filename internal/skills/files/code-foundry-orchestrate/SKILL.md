@@ -73,9 +73,9 @@ ones you create stay out of it: they are yours to answer.
    you twice. `thread send` prints the message's ordinal; a plain `thread wait` after it
    waits for the answer to that message (`--after <ordinal>`). A timed-out wait exits 1.
 
-   A wake carries the child's state, its last message whole (`last_message`), what git says
-   about its branch (`checkouts`), and when it needs you, a `pending` permission prompt or
-   question. While siblings still
+   A wake says the child's state, quotes its last message whole, gives what git says about
+   its branch, and when it needs you, the pending permission prompt or question with the
+   command that answers it. While siblings still
    work, a wake turn ends silently or with one line: no analysis, no promised check. Before
    you act on a wake, read `reference/wakes.md`: pending prompts, stale reports, batches,
    restarts, interrupts, and following up from a wake turn (never `send --wait` there).
