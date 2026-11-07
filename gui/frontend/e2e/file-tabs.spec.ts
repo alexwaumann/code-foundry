@@ -12,16 +12,16 @@ import { CF, openApp, openThreadChanges, resetMock, row } from "./fixtures";
 const panel = (page: Page) => page.getByTestId("side-panel");
 const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
 const activeTab = (page: Page) => page.getByTestId("panel-tabs").locator('[role="tab"][aria-selected="true"]');
-const diff = (page: Page) => page.getByTestId("diff-tab");
+const diff = (page: Page) => page.getByTestId("diff-file");
 const file = (page: Page) => page.getByTestId("file-tab");
 
-/** Selects a thread and opens its own Changes tab in its panel (the card's Changes row). */
+/** Selects a thread and opens its own Diff tab in its panel (the card's Changes row). */
 async function worktreeTab(page: Page, threadId: string): Promise<void> {
   await row(page, `s:${threadId}`).click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await openThreadChanges(page);
   await expect(panel(page)).toHaveAttribute("data-panel-key", `thread:${threadId}`);
-  await expect(page.getByTestId("worktree-changes")).toBeVisible();
+  await expect(page.getByTestId("diff-file-list")).toBeVisible();
 }
 
 /** Opens a File tab in the current panel the way path chips will (stores/filePanel.ts). */
@@ -36,25 +36,20 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-// The Diff tab's header, Unified ↔ Split, the scope switch and No changes: src/components/files/DiffTab.test.tsx;
-// a row opening its tab on the row's scope: src/components/changes/ChangesView.test.tsx; the same row
-// again re-activating its tab and resetting the scope: src/stores/filePanel.test.ts. Left here: the
+// The list, the sources, the file states and Open file: src/components/diff/DiffView.test.tsx. Left here: the
 // library drawing the diff (its shadow root).
-test("a Changes row opens its Diff tab, and @pierre/diffs draws its lines", async ({ page }) => {
+test("a row shows its file in the tab, and @pierre/diffs draws its lines", async ({ page }) => {
   await openApp(page);
   await worktreeTab(page, "s-1");
   await changeRow(page, "README.md").click();
-  await expect(tabs(page)).toHaveText(["Changes", "README.md"]);
+  await expect(tabs(page)).toHaveCount(1);
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
+  await expect(diff(page)).toHaveAttribute("data-path", "README.md");
   // The library renders into its shadow root; CSS locators pierce it.
   await expect(diff(page).locator('[data-line-type="change-addition"]').first()).toBeVisible();
 });
 
-// Committed changes opening on the branch (a rename, a deletion, a binary): src/components/changes/ChangesView.test.tsx
-// (scope branch, the old path) and src/components/files/DiffTab.test.tsx (R, D with nothing to open, Binary file); the
-// tab titles are src/surfaces/files.test.ts's. Deleted lines are drawn by the same library as the added ones above.
-
-// Open file to the File tab: DiffTab.test.tsx; Rendered ↔ Source, the meta, the wrap toggle and the remembered mode:
+// Open file to the File tab: DiffView.test.tsx; Rendered ↔ Source, the meta, the wrap toggle and the remembered mode:
 // src/components/files/FileTab.test.tsx; the File and Diff entries and their letters: src/surfaces/files.test.ts and
 // src/components/panel/SidePanel.test.tsx. Left here: a local image decoding, and the library marking the line.
 test("Open file goes to the File tab: a markdown image decodes; Source marks the first change in the code view", async ({ page }) => {

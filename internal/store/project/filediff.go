@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -54,6 +55,9 @@ type FileVersion struct {
 	Contents  []byte // at most FileDiffMax
 	Truncated bool
 	Binary    bool
+	// Submodule: a submodule at the path, in a comparison (compare.go); Contents is then
+	// "Subproject commit <sha>\n". WorktreeFileDiff calls it absent.
+	Submodule bool
 }
 
 // WorktreeFileDiff is both sides of one file.
@@ -69,47 +73,26 @@ type WorktreeFileDiff struct {
 
 // WorktreeFileDiff implements Store.
 func (g *Git) WorktreeFileDiff(ctx context.Context, req FileDiffRequest) (WorktreeFileDiff, error) {
-	file, err := worktreeRelative(req.File)
+	file, err := comparePath(req.File)
 	if err != nil {
 		return WorktreeFileDiff{}, err
 	}
 	oldPath := file
 	if req.OldPath != "" {
-		if oldPath, err = worktreeRelative(req.OldPath); err != nil {
+		if oldPath, err = comparePath(req.OldPath); err != nil {
 			return WorktreeFileDiff{}, err
 		}
 	}
-	path := filepath.Clean(req.Path)
-	if real, err := filepath.EvalSymlinks(path); err == nil {
-		path = real
-	}
-	st, slot := g.project(req.ProjectID), g.slot(req.ProjectID, path)
-	if st == nil || slot == nil {
-		return WorktreeFileDiff{}, fmt.Errorf("%w: worktree %q in project %q", ErrNotFound, path, req.ProjectID)
-	}
-	if err := requireGit(st.meta.Load()); err != nil {
+	st, slot, path, err := g.gitWorktree(req.ProjectID, req.Path)
+	if err != nil {
 		return WorktreeFileDiff{}, err
 	}
 	run := func(args ...string) ([]byte, error) { return g.runner.Run(ctx, path, args...) }
-
-	// HEAD now, not the snapshot's: a commit the status job has not seen yet would
-	// otherwise pair a fresh working tree with a stale merge base.
-	wt := *slot.cur.Load()
-	out, err := run("rev-parse", "--verify", "--quiet", "HEAD^{commit}")
-	switch {
-	case err == nil:
-		wt.Head = string(trimNL(out))
-	case isExit(err, 1): // unborn branch
-		wt.Head = ""
-	default:
+	b, err := g.currentBase(ctx, st, slot, req.ProjectID, path, run)
+	if err != nil {
 		return WorktreeFileDiff{}, err
 	}
-	d := WorktreeFileDiff{Head: wt.Head}
-	var baseSHA string
-	d.BaseRef, baseSHA = g.detailBase(ctx, st, wt)
-	if d.MergeBase, err = g.mergeBaseOf(wtKey{req.ProjectID, path}, headKey{head: wt.Head, baseRef: d.BaseRef, baseSHA: baseSHA}, run); err != nil {
-		return WorktreeFileDiff{}, err
-	}
+	d := WorktreeFileDiff{Head: b.head, BaseRef: b.baseRef, MergeBase: b.mergeBase}
 
 	var oldRev string
 	switch req.Scope {
@@ -142,6 +125,49 @@ func (g *Git) WorktreeFileDiff(ctx context.Context, req FileDiffRequest) (Worktr
 	}
 	d.Status = diffStatus(d.Old, d.New, oldPath != file)
 	return d, nil
+}
+
+// gitWorktree finds the git worktree at path, symlinks resolved: its project, its slot
+// and its real path. NotFound for an unknown worktree, or one of another project.
+func (g *Git) gitWorktree(projectID, path string) (*projectState, *wtSlot, string, error) {
+	path = filepath.Clean(path)
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
+	st, slot := g.project(projectID), g.slot(projectID, path)
+	if st == nil || slot == nil {
+		return nil, nil, "", fmt.Errorf("%w: worktree %q in project %q", ErrNotFound, path, projectID)
+	}
+	if err := requireGit(st.meta.Load()); err != nil {
+		return nil, nil, "", err
+	}
+	return st, slot, path, nil
+}
+
+// currentBase is a worktree's HEAD and base as they are now.
+type currentBase struct{ head, baseRef, mergeBase string }
+
+// currentBase reads them: HEAD now, not the snapshot's, as a commit the status job has
+// not seen yet would otherwise pair a fresh working tree with a stale merge base. The
+// base and merge base are the detail's (detailBase, mergeBaseOf).
+func (g *Git) currentBase(ctx context.Context, st *projectState, slot *wtSlot, projectID, path string, run func(...string) ([]byte, error)) (currentBase, error) {
+	wt := *slot.cur.Load()
+	out, err := run("rev-parse", "--verify", "--quiet", "HEAD^{commit}")
+	switch {
+	case err == nil:
+		wt.Head = string(trimNL(out))
+	case isExit(err, 1): // unborn branch
+		wt.Head = ""
+	default:
+		return currentBase{}, err
+	}
+	b := currentBase{head: wt.Head}
+	var baseSHA string
+	b.baseRef, baseSHA = g.detailBase(ctx, st, wt)
+	if b.mergeBase, err = g.mergeBaseOf(wtKey{projectID, path}, headKey{head: wt.Head, baseRef: b.baseRef, baseSHA: baseSHA}, run); err != nil {
+		return currentBase{}, err
+	}
+	return b, nil
 }
 
 // mergeBaseOf returns key's merge base: the worktree's cached head part's when its key
@@ -192,10 +218,15 @@ func (g *Git) readBlob(ctx context.Context, dir, rev, file string) (FileVersion,
 	if err != nil {
 		return FileVersion{}, err
 	}
-	oid, size, ok := parseLsTreeBlob(out, file)
-	if !ok {
+	e, ok := parseLsTree(out, file)
+	if !ok || e.kind != "blob" {
 		return FileVersion{}, nil
 	}
+	return g.readObject(ctx, dir, e.oid, e.size)
+}
+
+// readObject reads a blob of the given size, up to FileDiffMax of it.
+func (g *Git) readObject(ctx context.Context, dir, oid string, size int64) (FileVersion, error) {
 	v := FileVersion{Present: true, Truncated: size > FileDiffMax}
 	if size > blobReadMax {
 		return v, nil
@@ -211,71 +242,133 @@ func (g *Git) readBlob(ctx context.Context, dir, rev, file string) (FileVersion,
 	return v, nil
 }
 
-// parseLsTreeBlob finds file's entry in `git ls-tree -z --long` output ("<mode> <type>
-// <oid> <size>\t<path>\0") and returns its oid and size when it is a blob.
-func parseLsTreeBlob(out []byte, file string) (oid string, size int64, ok bool) {
+// lsTreeEntry is one record of `git ls-tree --long`.
+type lsTreeEntry struct {
+	kind, oid string // kind: blob, tree, commit
+	size      int64  // a blob's
+}
+
+// parseLsTree finds file's entry in `git ls-tree -z --long` output ("<mode> <type> <oid>
+// <size>\t<path>\0", the size "-" for all but a blob, "BAD" for a blob a partial clone
+// lacks and may not fetch; that entry has no size, and reading it says what is wrong).
+func parseLsTree(out []byte, file string) (lsTreeEntry, bool) {
 	for _, rec := range splitZ(out) {
 		meta, path, found := strings.Cut(rec, "\t")
 		if !found || path != file {
 			continue
 		}
 		f := strings.Fields(meta)
-		if len(f) != 4 || f[1] != "blob" {
-			return "", 0, false
+		if len(f) != 4 {
+			return lsTreeEntry{}, false
 		}
-		n, err := strconv.ParseInt(f[3], 10, 64)
-		if err != nil {
-			return "", 0, false
+		e := lsTreeEntry{kind: f[1], oid: f[2]}
+		if e.kind == "blob" && f[3] != "BAD" {
+			n, err := strconv.ParseInt(f[3], 10, 64)
+			if err != nil {
+				return lsTreeEntry{}, false
+			}
+			e.size = n
 		}
-		return f[2], n, true
+		return e, true
 	}
-	return "", 0, false
+	return lsTreeEntry{}, false
 }
 
-// readWorktreeFile reads file from the worktree at dir as git would store it: a
-// regular file's contents, a symlink's target. Missing, a directory, or under a
-// symlinked directory that leaves the worktree: not present.
+// maxLinkHops is how many links one path may pass through (macOS's MAXSYMLINKS).
+const maxLinkHops = 32
+
+// followParents follows the links in file's directories under root, as an open would, and
+// returns where that lands, with no link left but perhaps the last part, which a read
+// takes as its target. ok is false for a path that does not lead anywhere: gone, under a
+// file, through a link that leaves root, or through too many.
+func followParents(root *os.Root, file string) (rel string, ok bool, err error) {
+	var done []string
+	todo := strings.Split(file, "/")
+	for hops := 0; len(todo) > 0; {
+		part := todo[0]
+		todo = todo[1:]
+		switch part {
+		case "", ".":
+			continue
+		case "..":
+			if len(done) == 0 {
+				return "", false, nil
+			}
+			done = done[:len(done)-1]
+			continue
+		}
+		done = append(done, part)
+		here := path.Join(done...)
+		if len(todo) == 0 {
+			return here, true, nil
+		}
+		fi, err := root.Lstat(filepath.FromSlash(here))
+		switch {
+		case errors.Is(err, fs.ErrPermission):
+			return "", false, err
+		case err != nil:
+			return "", false, nil
+		case fi.Mode()&fs.ModeSymlink == 0:
+			continue
+		}
+		target, err := root.Readlink(filepath.FromSlash(here))
+		if hops++; err != nil || hops > maxLinkHops || filepath.IsAbs(target) {
+			return "", false, nil
+		}
+		done = done[:len(done)-1]
+		todo = append(strings.Split(filepath.ToSlash(target), "/"), todo...)
+	}
+	return "", false, nil
+}
+
+// readWorktreeFile reads file from the worktree at dir as git would store it: a regular
+// file's contents, a symlink's target. Missing, a directory, or beyond a link that leaves
+// the worktree: not present. Beyond a link into .git, which comparePath cannot see in the
+// path as written: refused. os.Root would follow that one, since it stays inside.
+// Everything goes through an os.Root at the worktree, which no link leaves, and the file
+// is opened as what it was seen to be (openRegular), so nothing here can block.
 func readWorktreeFile(dir, file string) (FileVersion, error) {
-	full := filepath.Join(dir, filepath.FromSlash(file))
-	parent, err := filepath.EvalSymlinks(filepath.Dir(full))
-	if errors.Is(err, fs.ErrNotExist) {
-		return FileVersion{}, nil
-	}
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		return FileVersion{}, fmt.Errorf("project: read %s: %w", full, err)
+		return FileVersion{}, fmt.Errorf("project: read %s: %w", dir, err)
 	}
-	if !fsx.Within(dir, parent) {
-		return FileVersion{}, nil // git does not follow a symlinked directory either
-	}
-	full = filepath.Join(parent, filepath.Base(full))
-	fi, err := os.Lstat(full)
-	if errors.Is(err, fs.ErrNotExist) {
-		return FileVersion{}, nil
-	}
-	if err != nil {
-		return FileVersion{}, fmt.Errorf("project: read %s: %w", full, err)
-	}
+	defer func() { _ = root.Close() }()
+	real, ok, err := followParents(root, file)
 	switch {
+	case err != nil:
+		return FileVersion{}, fmt.Errorf("project: read %s: %w", file, err)
+	case !ok:
+		return FileVersion{}, nil
+	case insideGit(real):
+		return FileVersion{}, fmt.Errorf("%w: file %q is inside .git", ErrInvalidArgument, file)
+	}
+	rel := filepath.FromSlash(real)
+	fi, err := root.Lstat(rel)
+	switch {
+	case errors.Is(err, fs.ErrPermission):
+		return FileVersion{}, fmt.Errorf("project: read %s: %w", file, err)
+	case err != nil: // gone, under a file, or beyond a link that leaves
+		return FileVersion{}, nil
 	case fi.Mode()&fs.ModeSymlink != 0:
-		target, err := os.Readlink(full)
+		target, err := root.Readlink(rel)
 		if err != nil {
-			return FileVersion{}, fmt.Errorf("project: read %s: %w", full, err)
+			return FileVersion{}, fmt.Errorf("project: read %s: %w", file, err)
 		}
 		return FileVersion{Present: true, Contents: []byte(target)}, nil
 	case !fi.Mode().IsRegular():
 		return FileVersion{}, nil
 	}
-	f, err := os.Open(full)
-	if errors.Is(err, fs.ErrNotExist) {
-		return FileVersion{}, nil
-	}
+	f, err := openRegular(root, rel)
 	if err != nil {
-		return FileVersion{}, fmt.Errorf("project: read %s: %w", full, err)
+		return FileVersion{}, fmt.Errorf("project: read %s: %w", file, err)
+	}
+	if f == nil {
+		return FileVersion{}, nil
 	}
 	defer func() { _ = f.Close() }()
 	b, err := io.ReadAll(io.LimitReader(f, FileDiffMax+1))
 	if err != nil {
-		return FileVersion{}, fmt.Errorf("project: read %s: %w", full, err)
+		return FileVersion{}, fmt.Errorf("project: read %s: %w", file, err)
 	}
 	v := FileVersion{Present: true}
 	if len(b) > FileDiffMax {

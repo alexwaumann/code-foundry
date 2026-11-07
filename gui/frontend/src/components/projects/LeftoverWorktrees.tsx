@@ -7,7 +7,7 @@ import { NavRow } from "@/lib/NavRow";
 import { threadLabel } from "@/lib/prompt";
 import { projectWorktreeKey, terminalHolds } from "@/lib/projects";
 import { cn } from "@/lib/utils";
-import { openChangesTab } from "@/stores/changesPanel";
+import { openCheckoutDiff } from "@/stores/filePanel";
 import { cleanupMergedWorktrees, removeWorktree } from "@/stores/projectActions";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
 import { useTerminalsStore } from "@/stores/terminals";
@@ -78,7 +78,7 @@ function LeftoverRow({ projectId, path }: { projectId: string; path: string }) {
           </Tip>
           <span className="flex items-center justify-end gap-1">
             {work ? (
-              <RowAction label="Show diff" testId="leftover-show-diff" onClick={() => { openChangesTab("current", projectId, path); }}>
+              <RowAction label="Show diff" testId="leftover-show-diff" onClick={() => { openCheckoutDiff("current", projectId, path); }}>
                 <FileDiff />
               </RowAction>
             ) : (

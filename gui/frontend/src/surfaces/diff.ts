@@ -1,29 +1,29 @@
 import { createElement } from "react";
 import { FileDiff } from "lucide-react";
-import { DiffTab } from "@/components/files/DiffTab";
+import { DiffView } from "@/components/diff/DiffView";
 import { lastTabOf } from "@/stores/filePanel";
 import { usePanelStore } from "@/stores/panel";
-import { DIFF_KIND, diffOfTab } from "./fileTarget";
+import { DIFF_KIND, DIFF_TITLE, diffOfTab } from "./diffTarget";
 import { NO_PROJECT_WATCHES, noProjectNow } from "./noProject";
 import type { SurfaceSpec } from "./types";
 
 /**
- * Diff: one changed file of a worktree against its base (components/files/DiffTab.tsx),
- * working tree or branch. Tabs are opened from the Changes tab's rows
- * (stores/filePanel.ts), one per file: params { project, worktree, path, oldPath?, scope }
- * (surfaces/fileTarget.ts). D (and the list) bring back the panel's last Diff tab, so the
- * entry is live only while the panel has one; dimmed otherwise, hidden without a project.
+ * Diff: two sources of one checkout, compared file by file (components/diff/DiffView.tsx).
+ * One tab per checkout (surfaces/diffTarget.ts), opened from the thread info card's Changes
+ * row and its per-project rows, the Projects page's checkout menus, and view.panel.diff
+ * (stores/filePanel.ts). D (and the list) bring back the panel's last Diff tab, so the entry
+ * is live only while the panel has one; dimmed otherwise, hidden without a project.
  */
 export const diffSurface: SurfaceSpec = {
   kind: DIFF_KIND,
-  title: "Diff",
+  title: DIFF_TITLE,
   icon: FileDiff,
   hotkey: "d",
   available: (ctx) => (noProjectNow(ctx.selection) ? "hidden" : lastTabOf(DIFF_KIND, ctx.panelKey) ? "enabled" : "disabled"),
   watches: [...NO_PROJECT_WATCHES, usePanelStore],
   render: (tab) => {
     const target = diffOfTab(tab);
-    return target ? createElement(DiffTab, { target }) : null;
+    return target ? createElement(DiffView, { tabId: tab.id, tabTitle: tab.title, target }) : null;
   },
   openDefault: (ctx) => lastTabOf(DIFF_KIND, ctx.panelKey),
 };

@@ -2,8 +2,6 @@ import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
 import { ReadFileResponseSchema, WriteFileResponseSchema } from "@/gen/codefoundry/v1/filesystem_pb";
-import { DiffScope, FileVersionSchema, GetWorktreeFileDiffResponseSchema } from "@/gen/codefoundry/v1/project_pb";
-import { toFileDiffView } from "./fileDiff";
 import type { DaemonConnection } from "./endpoint";
 import { blankFile, canEdit, isImageMime, readFile, READ_MAX_BYTES, toFileReadView, writeFile, type FileReadView } from "./files";
 
@@ -169,41 +167,5 @@ describe("writeFile", () => {
   it("a refusal stays an error with its message", async () => {
     const { conn } = connected(() => Promise.reject(new ConnectError("the file is read-only", Code.FailedPrecondition)));
     await expect(writeFile("/x", "a", "b", version, {}, conn)).rejects.toThrow("the file is read-only");
-  });
-});
-
-describe("toFileDiffView", () => {
-  it("maps both sides, the base and the status", () => {
-    const v = toFileDiffView(
-      create(GetWorktreeFileDiffResponseSchema, {
-        old: create(FileVersionSchema, { present: true, contents: enc.encode("hello\n") }),
-        new: create(FileVersionSchema, { present: true, contents: enc.encode("hello\nworld\n"), truncated: true }),
-        baseRef: "origin/main",
-        mergeBase: "c6d3bc2477",
-        head: "ddc0461310",
-        status: "M",
-      }),
-    );
-    expect(v).toEqual({
-      old: { present: true, text: "hello\n", truncated: false, binary: false },
-      new: { present: true, text: "hello\nworld\n", truncated: true, binary: false },
-      baseRef: "origin/main",
-      mergeBase: "c6d3bc2477",
-      head: "ddc0461310",
-      status: "M",
-      error: "",
-    });
-  });
-
-  it("an absent side, a binary side, and an error with no sides", () => {
-    const added = toFileDiffView(create(GetWorktreeFileDiffResponseSchema, { new: create(FileVersionSchema, { present: true, binary: true, contents: new Uint8Array([0x89, 0]) }), status: "A" }));
-    expect(added.old).toEqual({ present: false, text: "", truncated: false, binary: false });
-    expect(added.new).toEqual({ present: true, text: "", truncated: false, binary: true });
-    const err = toFileDiffView(create(GetWorktreeFileDiffResponseSchema, { error: "the worktree has no base branch to compare with" }));
-    expect([err.old.present, err.new.present, err.error]).toEqual([false, false, "the worktree has no base branch to compare with"]);
-  });
-
-  it("DiffScope values the request uses exist", () => {
-    expect([DiffScope.WORKING, DiffScope.BRANCH]).toEqual([1, 2]);
   });
 });
