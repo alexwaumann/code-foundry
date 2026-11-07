@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // mainCheckoutFixture is a registered project's own checkout, where .git is a directory.
@@ -435,6 +439,66 @@ func TestCompareNoLazyFetch(t *testing.T) {
 	}
 }
 
+// TestCompareTreelessClone: a clone without trees stops where one without blobs does, with
+// other words: `git diff` says "unable to read tree" or "bad tree object", and ls-tree says
+// "not a tree object" or, a directory down, "Could not read".
+func TestCompareTreelessClone(t *testing.T) {
+	for _, filter := range []string{"tree:0", "tree:1"} {
+		t.Run(filter, func(t *testing.T) {
+			f := newFixture(t)
+			if err := os.Mkdir(filepath.Join(f.project, "d"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writeFile(t, filepath.Join(f.project, "d", "a.txt"), "one\n")
+			git(t, f.project, "add", ".")
+			git(t, f.project, "commit", "-q", "-m", "one")
+			writeFile(t, filepath.Join(f.project, "d", "a.txt"), "two\n")
+			git(t, f.project, "commit", "-q", "-am", "two")
+			git(t, f.project, "push", "-q")
+			origin := strings.TrimSpace(git(t, f.project, "remote", "get-url", "origin"))
+			git(t, origin, "config", "uploadpack.allowFilter", "true")
+			git(t, origin, "config", "uploadpack.allowAnySHA1InWant", "true")
+			clone := filepath.Join(f.base, "partial")
+			git(t, f.base, "-c", "protocol.file.allow=always", "clone", "-q", "--filter="+filter, "file://"+origin, clone)
+			h := startHarness(t, "", Options{})
+			ctx := ctx20(t)
+			r, err := h.store.Register(ctx, clone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p, err := filepath.EvalSymlinks(clone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			git(t, p, "config", "remote.origin.url", "ssh://git@127.0.0.1:1/x.git")
+			old := sourceRef("HEAD~1")
+			for _, side := range []DiffSource{sourceRef("HEAD"), sourceWorking, sourceStaged} {
+				for _, s := range [][2]DiffSource{{old, side}, {side, old}} {
+					c, err := h.store.CompareWorktree(ctx, CompareRequest{ProjectID: r.ID, Path: p, Base: s[0], Head: s[1]})
+					if err != nil {
+						t.Fatalf("list %+v: %v", s, err)
+					}
+					if c.Error != objectsMissing {
+						t.Errorf("list %+v: error %q, files %v", s, c.Error, rows(c.Files))
+					}
+					d, err := h.store.CompareFile(ctx, CompareFileRequest{ProjectID: r.ID, Path: p, Base: s[0], Head: s[1], File: "d/a.txt"})
+					if err != nil {
+						t.Fatalf("read %+v: %v", s, err)
+					}
+					if d.Error != objectsMissing {
+						t.Errorf("read %+v: %+v", s, d)
+					}
+				}
+			}
+			// What the clone has still compares.
+			c, err := h.store.CompareWorktree(ctx, CompareRequest{ProjectID: r.ID, Path: p, Base: sourceRef("HEAD"), Head: sourceWorking})
+			if err != nil || c.Error != "" {
+				t.Errorf("err %v, error %q", err, c.Error)
+			}
+		})
+	}
+}
+
 // TestCompareCleanFilterStays: why filters are not turned off. A working tree holds what a
 // clean filter turns into the stored bytes (LFS, git-crypt), so without it every such file
 // would differ from its own commit.
@@ -460,6 +524,7 @@ type auditRunner struct {
 	mu        sync.Mutex
 	seen      int
 	unguarded []string
+	diffs     [][]string
 }
 
 type auditKey struct{}
@@ -470,6 +535,9 @@ func (r *auditRunner) Run(ctx context.Context, dir string, args ...string) ([]by
 		r.seen++
 		if ctx.Value(guardedKey{}) == nil {
 			r.unguarded = append(r.unguarded, strings.Join(args, " "))
+		}
+		if slices.Contains(args, "diff") {
+			r.diffs = append(r.diffs, args)
 		}
 		r.mu.Unlock()
 	}
@@ -506,6 +574,242 @@ func TestCompareEveryCommandGuarded(t *testing.T) {
 	if audit.seen == 0 || len(audit.unguarded) != 0 {
 		t.Errorf("%d commands, unguarded: %q", audit.seen, audit.unguarded)
 	}
+	// A user's diff.submodule never decides a format, or what git starts for it.
+	if len(audit.diffs) == 0 {
+		t.Error("no git diff seen")
+	}
+	for _, args := range audit.diffs {
+		if !slices.Contains(args, "--submodule=short") || !slices.Contains(args, "--no-ext-diff") {
+			t.Errorf("git %q", args)
+		}
+	}
+}
+
+// TestCompareSubmoduleFormatIgnoresConfig: under diff.submodule=log a dirty submodule's diff
+// is a sentence without "-dirty", and under diff it also starts a diff inside the
+// submodule, where --no-ext-diff does not reach, so the submodule's diff.external ran.
+func TestCompareSubmoduleFormatIgnoresConfig(t *testing.T) {
+	for _, format := range []string{"short", "log", "diff"} {
+		t.Run(format, func(t *testing.T) {
+			f := mainCheckoutFixture(t)
+			lib := filepath.Join(f.base, "lib")
+			git(t, f.base, "init", "-q", "-b", "main", lib)
+			writeFile(t, filepath.Join(lib, "lib.txt"), "v1\n")
+			git(t, lib, "add", ".")
+			git(t, lib, "commit", "-q", "-m", "one")
+			sha := strings.TrimSpace(git(t, lib, "rev-parse", "HEAD"))
+			git(t, f.path, "-c", "protocol.file.allow=always", "submodule", "--quiet", "add", lib, "lib")
+			git(t, f.path, "commit", "-q", "-m", "submodule")
+			sub := filepath.Join(f.path, "lib")
+			writeFile(t, filepath.Join(sub, "lib.txt"), "v2\n")
+			canary := filepath.Join(f.base, "canary")
+			git(t, sub, "config", "diff.external", hostileScript(t, f.base, canary))
+			git(t, f.path, "config", "diff.submodule", format)
+
+			c := f.compare(t, sourceRef("HEAD"), sourceWorking, "lib")
+			if got := rows(c.Files); !slices.Equal(got, []string{"M lib +0 -0 submodule"}) {
+				t.Errorf("list: %v", got)
+			}
+			d := f.sides(t, sourceRef("HEAD"), sourceWorking, "lib", "")
+			want := "Subproject commit " + sha + "-dirty\n"
+			if got := string(d.New.Contents); got != want {
+				t.Errorf("working side %q, want %q", got, want)
+			}
+			if d.Status != "M" {
+				t.Errorf("status %q", d.Status)
+			}
+			if got, err := os.ReadFile(canary); err == nil {
+				t.Errorf("diff.external ran:\n%s", got)
+			}
+		})
+	}
+}
+
+// statDirtyRepo is a repository with no store around it, so no background `git diff` can
+// refresh what a test touched, with a post-index-change hook that counts its runs in the
+// file it returns. Every file is committed and its stat in the index is out of date: its
+// bytes are what is stored, and git has to read them to know.
+func statDirtyRepo(t *testing.T) (dir, hookRuns string) {
+	t.Helper()
+	base := t.TempDir()
+	dir = filepath.Join(base, "r")
+	git(t, base, "init", "-q", "-b", "main", dir)
+	git(t, dir, "config", "user.email", "t@example.com")
+	git(t, dir, "config", "user.name", "t")
+	writeFile(t, filepath.Join(dir, ".gitattributes"), "*.up filter=up\n")
+	git(t, dir, "config", "filter.up.clean", "tr a-z A-Z")
+	files := map[string]string{"t.txt": "hello\n", "-dash.txt": "dash\n", "empty.txt": "", "b.bin": "bin\x00ary", "-b.bin": "bin\x00ary2", "f.up": "bin\x00ary\n"}
+	for name, body := range files {
+		writeFile(t, filepath.Join(dir, name), body)
+	}
+	git(t, dir, "add", "--", ".")
+	git(t, dir, "commit", "-q", "-m", "one")
+	hookRuns = filepath.Join(base, "hook-runs")
+	hook := filepath.Join(dir, ".git", "hooks", "post-index-change")
+	if err := os.MkdirAll(filepath.Dir(hook), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\necho ran >> "+hookRuns+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	later := time.Now().Add(time.Hour)
+	for name := range files {
+		if err := os.Chtimes(filepath.Join(dir, name), later, later); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir, hookRuns
+}
+
+func runsIn(t *testing.T, file string) int {
+	t.Helper()
+	b, err := os.ReadFile(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Count(string(b), "ran\n")
+}
+
+// TestGuardedDiffWritesNoIndex: a `git diff` that finds a file whose stat alone changed
+// refreshes the index, GIT_OPTIONAL_LOCKS or not, and that write runs post-index-change.
+func TestGuardedDiffWritesNoIndex(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  context.Context
+		want int
+	}{
+		{"plain", context.Background(), 1},
+		{"guarded", guarded(context.Background()), 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, hookRuns := statDirtyRepo(t)
+			index, err := os.Stat(filepath.Join(dir, ".git", "index"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := (ExecRunner{}).Run(tt.ctx, dir, "diff", "--raw"); err != nil {
+				t.Fatal(err)
+			}
+			if got := runsIn(t, hookRuns); got != tt.want {
+				t.Errorf("post-index-change ran %d times, want %d", got, tt.want)
+			}
+			after, err := os.Stat(filepath.Join(dir, ".git", "index"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if written := !after.ModTime().Equal(index.ModTime()); written != (tt.want > 0) {
+				t.Errorf("index written: %v", written)
+			}
+		})
+	}
+}
+
+// TestCompareStatDirtyFiles: the list a refresh would have given, without the refresh, on
+// every form with the working tree as a side. Only git can say a file is unchanged here,
+// so each form runs with no store around it.
+func TestCompareStatDirtyFiles(t *testing.T) {
+	type sides struct {
+		base, head func(sha string) ResolvedSource
+	}
+	working := func(string) ResolvedSource { return ResolvedSource{Kind: SourceWorkingTree} }
+	staged := func(string) ResolvedSource { return ResolvedSource{Kind: SourceStaged} }
+	commit := func(sha string) ResolvedSource { return ResolvedSource{Kind: SourceRef, SHA: sha} }
+	forms := map[string]sides{
+		"commit to working tree": {commit, working},
+		"working tree to commit": {working, commit},
+		"staged to working tree": {staged, working},
+		"working tree to staged": {working, staged},
+	}
+	for name, form := range forms {
+		t.Run(name, func(t *testing.T) {
+			dir, hookRuns := statDirtyRepo(t)
+			ctx := guarded(ctx20(t))
+			var hashed []string
+			c := &comparison{dir: dir, run: func(args ...string) ([]byte, error) {
+				if args[0] == "hash-object" {
+					hashed = append(hashed, args[2:]...)
+				}
+				return ExecRunner{}.Run(ctx, dir, args...)
+			}}
+			sha := strings.TrimSpace(git(t, dir, "rev-parse", "HEAD"))
+			c.base, c.head = form.base(sha), form.head(sha)
+			list, err := c.changes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := rows(list); len(got) != 0 {
+				t.Errorf("unchanged files listed: %v", got)
+			}
+			if got := runsIn(t, hookRuns); got != 0 {
+				t.Errorf("post-index-change ran %d times", got)
+			}
+
+			// A real change beside them is still one, whatever else matches: this one
+			// keeps its size, and a mode change has no counts at all.
+			writeFile(t, filepath.Join(dir, "b.bin"), "bin\x00arz")
+			writeFile(t, filepath.Join(dir, "t.txt"), "HELLO\n")
+			if err := os.Chmod(filepath.Join(dir, "empty.txt"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if list, err = c.changes(); err != nil {
+				t.Fatal(err)
+			}
+			slices.SortFunc(list, func(a, b CompareChange) int { return strings.Compare(a.Path, b.Path) })
+			want := []string{"M b.bin +0 -0 binary", "M empty.txt +0 -0", "M t.txt +1 -1"}
+			if got := rows(list); !slices.Equal(got, want) {
+				t.Errorf("= %q, want %q", got, want)
+			}
+			// Only binary files git could not settle, not every edit.
+			if i := slices.IndexFunc(hashed, func(p string) bool { return strings.HasSuffix(p, ".txt") }); i >= 0 {
+				t.Errorf("hashed %q", hashed[i])
+			}
+		})
+	}
+}
+
+// TestDropUnchangedKeepsWhatItCannotHash: a file that went between the diff and the hash
+// stays listed, and the others in its batch with it, rather than failing the list.
+func TestDropUnchangedKeepsWhatItCannotHash(t *testing.T) {
+	dir, _ := statDirtyRepo(t)
+	ctx := guarded(ctx20(t))
+	c := &comparison{dir: dir, run: func(args ...string) ([]byte, error) { return ExecRunner{}.Run(ctx, dir, args...) }}
+	oid := git(t, dir, "rev-parse", "HEAD:b.bin")
+	list := []CompareChange{{Path: "gone.bin", Status: "M", Binary: true, unread: oid}, {Path: "b.bin", Status: "M", Binary: true, unread: oid}}
+	if got := rows(c.dropUnchanged(list)); len(got) != 2 {
+		t.Errorf("= %v", got)
+	}
+}
+
+// TestDropUnchangedBatches: more paths than one command names, the last batch short.
+func TestDropUnchangedBatches(t *testing.T) {
+	dir := t.TempDir()
+	git(t, dir, "init", "-q", "-b", "main", ".")
+	oid := gitStdin(t, dir, "bin\x00ary", "hash-object", "--stdin")
+	var list []CompareChange
+	for i := range hashBatch + 3 {
+		name := fmt.Sprintf("f%d.bin", i)
+		body := "bin\x00ary"
+		if i%2 == 1 {
+			body = "bin\x00arz"
+		}
+		writeFile(t, filepath.Join(dir, name), body)
+		list = append(list, CompareChange{Path: name, Status: "M", Binary: true, unread: strings.TrimSpace(oid)})
+	}
+	ctx := guarded(ctx20(t))
+	c := &comparison{dir: dir, run: func(args ...string) ([]byte, error) { return ExecRunner{}.Run(ctx, dir, args...) }}
+	got := c.dropUnchanged(list)
+	if len(got) != (hashBatch+3)/2 {
+		t.Fatalf("%d rows", len(got))
+	}
+	for _, f := range got {
+		if n, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(f.Path, "f"), ".bin")); n%2 != 1 {
+			t.Errorf("%s dropped the wrong way", f.Path)
+		}
+	}
 }
 
 // TestGuardedCommand: what guarded does to a command, seen from the git it starts.
@@ -521,7 +825,7 @@ func TestGuardedCommand(t *testing.T) {
 		want string
 	}{
 		{"plain", context.Background(), "lazy= diff\n"},
-		{"guarded", guarded(context.Background()), "lazy=1 -c core.fsmonitor=false diff\n"},
+		{"guarded", guarded(context.Background()), "lazy=1 -c core.fsmonitor=false -c diff.autoRefreshIndex=false diff\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

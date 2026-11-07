@@ -43,6 +43,9 @@ const (
 	// untrackedCountMax bounds what one comparison reads to count untracked files' lines.
 	// Files past it are listed with no counts.
 	untrackedCountMax = 64 << 20
+	// hashBatch is how many paths one `git hash-object` names: 256 of comparePathMax stays
+	// well under a command line's limit.
+	hashBatch = 256
 	// submoduleMode is a gitlink's mode, in `git diff --raw` and `git ls-files -s`.
 	submoduleMode = "160000"
 	// objectsMissing is the answer for a partial clone without an object it needs: guarded
@@ -114,6 +117,9 @@ type CompareChange struct {
 	Added, Deleted int
 	Binary         bool
 	Submodule      bool
+	// unread is the stored oid of a row git listed without reading the file: only its
+	// stat changed, perhaps nothing else. dropUnchanged settles it.
+	unread string
 }
 
 // WorktreeCompare is what differs between two sources.
@@ -304,14 +310,24 @@ func isMissingObject(err error) bool {
 		return false
 	}
 	msg := strings.TrimSpace(ge.Stderr)
-	return strings.Contains(msg, "from promisor remote") || strings.HasSuffix(msg, ": bad file") ||
-		strings.Contains(msg, "could not get object info")
+	return strings.HasSuffix(msg, ": bad file") || slices.ContainsFunc(missingObjectMessages, func(m string) bool {
+		return strings.Contains(msg, m)
+	})
+}
+
+// missingObjectMessages are what git says at a blob ("from promisor remote", "could not
+// get object info") or a tree a partial clone lacks: --filter=tree:0 fails `git diff` with
+// the middle two and ls-tree with "not a tree object", --filter=tree:1 fails ls-tree with
+// the last.
+var missingObjectMessages = []string{
+	"from promisor remote", "could not get object info",
+	"bad tree object", "unable to read tree", "not a tree object", "error: Could not read ",
 }
 
 // compareArgs is the `git diff` between two sources, whichever way round. Git has no
 // form with the working tree or index as the old side, so those are reversed (-R).
 func compareArgs(base, head ResolvedSource) []string {
-	args := []string{"--raw", "--numstat", "--no-abbrev", "--no-textconv", "--ignore-submodules=none"}
+	args := []string{"--raw", "--numstat", "--no-abbrev", "--no-textconv", "--ignore-submodules=none", "--submodule=short"}
 	switch {
 	case base.SHA != "" && head.SHA != "":
 		args = append(args, base.SHA, head.SHA)
@@ -336,6 +352,10 @@ func sameSource(a, b ResolvedSource) bool { return a.Kind == b.Kind && a.SHA == 
 // (":<mode> <mode> <oid> <oid> <status>\0<path>\0", renames and copies with "<old>\0<new>\0"),
 // then numstat records (parseNumstatZ's). During a merge the index-side diffs list an
 // unmerged path twice: U, then M. It stays U, with the counts that are not zero.
+//
+// Guarded, a file whose stat changed is listed though its bytes did not (statOnlyOID). Text
+// like that has no counts, and is left out here. Binary reads "-" either way, so it stays,
+// with unread set, for dropUnchanged.
 func parseCompareZ(out []byte) []CompareChange {
 	toks := splitZ(out)
 	byPath := map[string]*CompareChange{}
@@ -348,7 +368,7 @@ func parseCompareZ(out []byte) []CompareChange {
 				i++
 				continue
 			}
-			c := CompareChange{Status: f[4][:1], Path: toks[i+1], Submodule: f[0] == ":"+submoduleMode || f[1] == submoduleMode}
+			c := CompareChange{Status: f[4][:1], Path: toks[i+1], Submodule: f[0] == ":"+submoduleMode || f[1] == submoduleMode, unread: statOnlyOID(f)}
 			i += 2
 			if (c.Status == "R" || c.Status == "C") && i < len(toks) {
 				c.OldPath, c.Path = c.Path, toks[i]
@@ -387,11 +407,33 @@ func parseCompareZ(out []byte) []CompareChange {
 		deleted, _ := strconv.Atoi(fields[1])
 		c.Added, c.Deleted = max(c.Added, added), max(c.Deleted, deleted)
 	}
-	res := make([]CompareChange, len(order))
-	for i, c := range order {
-		res[i] = *c
+	res := make([]CompareChange, 0, len(order))
+	for _, c := range order {
+		if c.unread == "" || c.Binary || c.Added > 0 || c.Deleted > 0 {
+			if !c.Binary {
+				c.unread = ""
+			}
+			res = append(res, *c)
+		}
 	}
 	return res
+}
+
+// statOnlyOID is the stored oid of a raw record's fields when git did not read the file:
+// M, the same mode on both sides, and zeros for the side on disk. That is every edited file
+// too; only the file's bytes tell them apart. Anything else is "".
+func statOnlyOID(raw []string) string {
+	mode, a, b := raw[1], raw[2], raw[3]
+	if raw[4] != "M" || raw[0] != ":"+mode || mode == submoduleMode {
+		return ""
+	}
+	switch {
+	case strings.Trim(a, "0") == "":
+		return b
+	case strings.Trim(b, "0") == "":
+		return a
+	}
+	return ""
 }
 
 // parseUnmergedZ parses `git ls-files --unmerged -z` ("<mode> <oid> <stage>\t<path>\0",
@@ -416,7 +458,7 @@ func (c *comparison) changes() ([]CompareChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	list := parseCompareZ(out)
+	list := c.dropUnchanged(parseCompareZ(out))
 	touchesIndex := c.base.SHA == "" || c.head.SHA == "" // the working tree reads through it too
 	if touchesIndex {
 		if out, err = c.run("ls-files", "--unmerged", "-z"); err != nil {
@@ -431,6 +473,33 @@ func (c *comparison) changes() ([]CompareChange, error) {
 		return nil, err
 	}
 	return addUntracked(c.dir, list, splitZ(out), c.base.Kind == SourceWorkingTree), nil
+}
+
+// dropUnchanged leaves out the binary rows whose file hashes to what is stored. `git diff`
+// drops these itself only with diff.autoRefreshIndex on, and then writes the index (see
+// guarded). Nothing is hashed unless such a row is there, and a row hashing fails on stays:
+// it is a file that moved in the meantime, and the next read settles it.
+func (c *comparison) dropUnchanged(list []CompareChange) []CompareChange {
+	var paths, oids []string
+	for _, f := range list {
+		if f.unread != "" {
+			paths, oids = append(paths, f.Path), append(oids, f.unread)
+		}
+	}
+	same := map[string]bool{}
+	for start := 0; start < len(paths); start += hashBatch {
+		end := min(start+hashBatch, len(paths))
+		out, err := c.run(append([]string{"hash-object", "--"}, paths[start:end]...)...)
+		if err != nil {
+			continue
+		}
+		for i, oid := range strings.Fields(string(out)) {
+			if start+i < end && oid == oids[start+i] {
+				same[paths[start+i]] = true
+			}
+		}
+	}
+	return slices.DeleteFunc(list, func(f CompareChange) bool { return same[f.Path] })
 }
 
 // markUnmerged makes each path U, adding one the diff left out: `git diff <commit>` lists
@@ -693,7 +762,7 @@ func (g *Git) readWorkingSide(ctx context.Context, dir, file string) (FileVersio
 	if !tracked {
 		return submoduleVersion(head), nil
 	}
-	out, err := g.runner.Run(ctx, dir, "--literal-pathspecs", "diff", "--no-ext-diff", "--no-color", "--no-textconv", "--ignore-submodules=none", "--", file)
+	out, err := g.runner.Run(ctx, dir, "--literal-pathspecs", "diff", "--no-ext-diff", "--no-color", "--no-textconv", "--ignore-submodules=none", "--submodule=short", "--", file)
 	if err != nil {
 		return FileVersion{}, err
 	}

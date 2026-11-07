@@ -16,8 +16,10 @@
   this branch changed" as main moves on, while a ref a caller names has to mean that commit,
   as `git diff A B` does. A flag would be one more thing for every caller to get right.
 - **One `git diff --raw --numstat -z`.** One rename pass instead of two, and `--raw` gives the
-  modes, which is how a submodule is told apart. `--no-textconv`, `--no-ext-diff` and
-  `--ignore-submodules=none` are explicit so user config cannot change the answer.
+  modes, which is how a submodule is told apart. `--no-textconv`, `--no-ext-diff`,
+  `--submodule=short` and `--ignore-submodules=none` are explicit so user config cannot change
+  the answer. That goes for the one other `git diff`, the working side of a submodule, where
+  `diff.submodule=log` printed a sentence with no `-dirty` in it.
 - **The list holds what the detail holds.** The info card counts the detail's files, so a row
   missing here was "No changes" beside a count. A dirty submodule is listed (`none`, not
   `dirty`, and its working side reads `<sha>-dirty`, git's own form), and so is an embedded
@@ -62,26 +64,41 @@ Refs and paths come from callers, the model among them.
 
 `guarded` (`runner.go`) covers every git command of `CompareWorktree` and `CompareFile`,
 through the context so it holds for the commands shared with the rest of the store: `-c
-core.fsmonitor=false` and `GIT_NO_LAZY_FETCH=1`. Both reach the `git status` that `git diff` runs
-inside a dirty submodule.
+core.fsmonitor=false`, `-c diff.autoRefreshIndex=false` and `GIT_NO_LAZY_FETCH=1`. The first and
+the last reach the `git status` that `git diff` runs inside a dirty submodule.
 
-**Clean filters still run.** `filter.<name>.clean` and `filter.<name>.process`, for a path whose
-attributes name that filter, on the `git diff` forms with the working tree as a side (`git diff
-<sha>`, `git diff` and both with `-R`), and with the submodule's own config inside a submodule
-that is checked for changes. Forms with no working tree side (`--cached`, two shas) and the
-other commands run none. They stay because the diff needs them: a file on disk is what a clean
-filter turns into the stored bytes (LFS, git-crypt), so without one every such file differs
-from its own commit (`TestCompareCleanFilterStays`). Git has no switch for all filters, only
-per name, and `--attr-source` would drop `text` and `eol` as well.
+**No hook runs.** `git diff` that finds a file whose stat alone changed refreshes the index, and
+`GIT_OPTIONAL_LOCKS=0` does not stop it: it writes, and `post-index-change` runs. With the refresh
+off no command here writes the index (`TestGuardedDiffWritesNoIndex`: 0 runs, 1 unguarded). The
+price is in the gotchas.
+
+**Clean filters run, and nothing else does.** `filter.<name>.clean` and `filter.<name>.process`,
+for a path whose attributes name that filter, in three places:
+
+- the `git diff` forms with the working tree as a side (`git diff <sha>`, `git diff` and both
+  with `-R`);
+- `git hash-object`, on those same forms, for a binary file whose stat alone changed;
+- the `git status` inside a submodule that is checked for changes, with the submodule's own
+  config. That is the only git started inside one: `--submodule=short` is what keeps a child
+  `git diff` out, which ran the submodule's `diff.external` under `diff.submodule=diff`, past
+  `--no-ext-diff`.
+
+Forms with no working tree side (`--cached`, two shas) and the other commands (`rev-parse`,
+`merge-base`, `ls-files`, `ls-tree`, `cat-file`) run none. Filters stay because the diff needs
+them: a file on disk is what a clean filter turns into the stored bytes (LFS, git-crypt), so
+without one every such file differs from its own commit (`TestCompareCleanFilterStays`). Git has
+no switch for all filters, only per name, and `--attr-source` would drop `text` and `eol` as well.
 
 `git status` and the detail's numstat have the same exposure today, plus `core.fsmonitor` for
-status. Neither is changed here. `GetWorktreeFileDiff` is not guarded either: it keeps lazy
+status and `post-index-change` for the numstat, which still refreshes the index. Neither is
+changed here. `GetWorktreeFileDiff` is not guarded either: it keeps lazy
 fetch, and nothing in the GUI calls it after diff viewer 2.
 
 **A partial clone without an object gets an answer, not a fetch.** The list and the read both
 say so in `error` (`objectsMissing`), where the Changes list would have fetched. `ls-tree
---long` does not fail here, it prints the size as `BAD`, so that entry goes on to the read,
-which does. What the clone has still compares.
+--long` does not fail on a missing blob, it prints the size as `BAD`, so that entry goes on to the
+read, which does. A missing tree fails where it is met, in other words (`--filter=tree:0` and
+`tree:1`, `missingObjectMessages`). What the clone has still compares.
 
 ## Gotchas
 
@@ -98,6 +115,14 @@ which does. What the clone has still compares.
   with no counts.
 - `os.Root` gives no exported error for "path escapes", so any lstat failure but a permission
   one reads as absent.
+
+- With `diff.autoRefreshIndex` off, `git diff` lists a file whose stat alone changed: M, the same
+  modes, zeros for the side on disk, which is also how every edit looks. Numstat tells most of
+  them apart. Text unchanged has no record at all, and is left out (`parseCompareZ`). Binary
+  reads `-` either way, so those few rows are hashed and compared with the stored oid
+  (`dropUnchanged`, one `git hash-object` per 256 paths, filters included). With no refresh a
+  touched file is read again on every list until something refreshes the index: the detail's
+  numstat when it next runs, or a person's own `git status`.
 
 ## Several checkouts
 

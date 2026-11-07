@@ -727,6 +727,11 @@ func TestParseCompareZ(t *testing.T) {
 		{"a path that looks like a record", raw("100644", "100644", "M") + ":100644 odd\x001\t0\t:100644 odd\x00", []string{"M :100644 odd +1 -0"}},
 		{"a path with a tab", raw("100644", "100644", "M") + "a\tb\x001\t0\ta\tb\x00", []string{"M a\tb +1 -0"}},
 		{"cut short after a raw header", raw("100644", "100644", "M"), []string{}},
+		{"only the stat changed: no numstat record", raw("100644", "100644", "M") + "t.txt\x00", []string{}},
+		{"only the stat changed, reversed", ":100644 100644 " + z40 + " " + a40 + " M\x00t.txt\x00", []string{}},
+		{"a mode change has no counts either", raw("100644", "100755", "M") + "run.sh\x000\t0\trun.sh\x00", []string{"M run.sh +0 -0"}},
+		{"a submodule with zeros stays", raw("160000", "160000", "M") + "sub\x00", []string{"M sub +0 -0 submodule"}},
+		{"both oids known, no counts", ":100644 100644 " + a40 + " " + a40 + " M\x00t.txt\x00", []string{"M t.txt +0 -0"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
