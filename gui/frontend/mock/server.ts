@@ -143,7 +143,7 @@
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
  *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
- *   POST /__mock/compare/files?count=500          (that many more files in every comparison; reset: none)
+ *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
  *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
  *   POST /__mock/fs/remove?path=…                 (the file goes)
  *   POST /__mock/fs/link?path=…&real=…            (ReadFile says a link leads from the path to real)
@@ -1857,6 +1857,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/compare/files":
       mockFiles.extraCompareFiles = Number(q.get("count") ?? "0");
+      mockFiles.firstCompareFiles = Number(q.get("first") ?? "0");
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/fs/write":

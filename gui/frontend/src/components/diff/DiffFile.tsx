@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef } from "react";
 import { parseDiffFromFile } from "@pierre/diffs";
 import { FileDiff, FileText, FileX, GitCompare, TriangleAlert } from "lucide-react";
 import { getCompareFile, type CompareFileSidesView, type CompareTarget } from "@/api/compare";
@@ -14,6 +14,7 @@ import { openFileInPanel } from "@/stores/filePanel";
 import { useCodeViewStore } from "@/stores/codeView";
 import { sourceParam } from "@/surfaces/diffTarget";
 import type { FileRow } from "./files";
+import { useStatusChanges } from "./useStatusChanges";
 
 /** The sides' parse (for the first change and its length) and what CodeDiff takes. */
 function useParsed(d: CompareFileSidesView | null, name: string, oldName: string) {
@@ -28,7 +29,7 @@ function useParsed(d: CompareFileSidesView | null, name: string, oldName: string
   }, [d, name, oldName]);
 }
 
-function Body({ d, error, reload, parsed, row, compared }: { d: CompareFileSidesView | null; error: string | null; reload: () => void; parsed: ReturnType<typeof useParsed>; row: FileRow; compared: string }) {
+function Body({ d, error, reload, parsed, row, listed, compared }: { d: CompareFileSidesView | null; error: string | null; reload: () => void; parsed: ReturnType<typeof useParsed>; row: FileRow; listed: boolean; compared: string }) {
   if (!d && error)
     return (
       <FileEmptyState icon={TriangleAlert} heading="Cannot read the diff" detail={error} testId="diff-error">
@@ -41,6 +42,7 @@ function Body({ d, error, reload, parsed, row, compared }: { d: CompareFileSides
   if (d.error) return <FileEmptyState icon={TriangleAlert} heading="Cannot compare" detail={d.error} testId="diff-unavailable" />;
   if (d.old.binary || d.new.binary) return <FileEmptyState icon={FileX} heading="Binary file" detail={d.status === "A" ? "Added" : d.status === "D" ? "Deleted" : "Changed"} testId="diff-binary" />;
   if (d.status === "R" && parsed?.lines === 0) return <FileEmptyState icon={GitCompare} heading="Renamed" detail={`From ${row.oldPath}; the contents are the same.`} testId="diff-renamed" />;
+  if ((!parsed || !d.status || parsed.lines === 0) && !listed) return <FileEmptyState icon={GitCompare} heading="No changes" detail={`${row.path} is no longer in this comparison.`} testId="diff-unlisted" />;
   if (!parsed || !d.status || parsed.lines === 0) return <FileEmptyState icon={GitCompare} heading="No changes in the contents" detail={`${compared}.`} testId="diff-none" />;
   const diff = <CodeDiff oldFile={parsed.oldFile} newFile={parsed.newFile} />;
   return parsed.lines > VIRTUALIZE_LINES ? (
@@ -57,9 +59,12 @@ function Body({ d, error, reload, parsed, row, compared }: { d: CompareFileSides
 /**
  * One file of the comparison: its two sides, read when it is shown and not before
  * (ProjectService.GetWorktreeCompareFile), whole, so the library's hunk separators expand
- * into the rest of the file. Read again like the File tab (useTabRead).
+ * into the rest of the file. Read again like the File tab (useTabRead), when git's status moves
+ * (the index, which the detail does not follow), and when the list's row for it changes, so the
+ * code never says less than the row. Refresh reads the list too. `listed` false: the file left
+ * the comparison, and it stays on screen saying so, read like any other in case it comes back.
  */
-export function DiffFile({ target, row, compared }: { target: CompareTarget; row: FileRow; compared: string }) {
+export function DiffFile({ target, row, listed, compared, onRefresh }: { target: CompareTarget; row: FileRow; listed: boolean; compared: string; onRefresh: () => void }) {
   const { projectId, worktree, base, head } = target;
   const key = [projectId, worktree, sourceParam(base), sourceParam(head), row.path, row.oldPath].join("\u0000");
   const read = useTabRead<CompareFileSidesView>(key, (signal) => getCompareFile(target, row.path, row.oldPath, undefined, signal));
@@ -68,7 +73,16 @@ export function DiffFile({ target, row, compared }: { target: CompareTarget; row
   const abs = `${worktree.replace(/\/+$/, "")}/${row.path}`;
   useOnWindowVisible(later);
   useWorktreeChanges(projectId, worktree, later);
+  useStatusChanges(projectId, worktree, later);
   useToolEdits(abs, later);
+  const stamp = `${row.status}|${String(row.added)}|${String(row.deleted)}`;
+  const seen = useRef(stamp);
+  const again = useEffectEvent(later);
+  useEffect(() => {
+    if (seen.current === stamp) return;
+    seen.current = stamp;
+    again();
+  }, [stamp]);
 
   const d = read.data;
   const parsed = useParsed(d, row.path, row.oldPath || row.path);
@@ -81,7 +95,10 @@ export function DiffFile({ target, row, compared }: { target: CompareTarget; row
       <FileActions
         place={place}
         line={line}
-        onRefresh={reload}
+        onRefresh={() => {
+          reload();
+          onRefresh();
+        }}
         extra={
           d?.new.present && !d.new.submodule ? (
             <HeaderAction
@@ -102,7 +119,7 @@ export function DiffFile({ target, row, compared }: { target: CompareTarget; row
       <FileHeader icon={FileDiff} name={row.name} dir={row.dir} fullPath={row.oldPath ? `${abs}\nrenamed from ${row.oldPath}` : abs} actions={actions} />
       {d && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {d && (d.old.truncated || d.new.truncated) && <NoticeBar testId="diff-truncated">Over 1 MiB: the diff covers the first MiB of each side</NoticeBar>}
-      <Body d={d} error={read.error} reload={reload} parsed={parsed} row={row} compared={compared} />
+      <Body d={d} error={read.error} reload={reload} parsed={parsed} row={row} listed={listed} compared={compared} />
     </div>
   );
 }

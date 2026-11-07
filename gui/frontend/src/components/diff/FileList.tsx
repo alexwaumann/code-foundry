@@ -1,19 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import type { CompareView } from "@/api/compare";
 import { HeaderAction } from "@/components/files/FileHeader";
-import { RowList } from "@/components/prs/RowList";
+import { RowList, VIRTUALIZE_OVER } from "@/components/prs/RowList";
 import { Input } from "@/components/ui/input";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { filterRows, stepRow, statusColor, type FileRow } from "./files";
+import { filterRows, stepRow, statusColor, TOP_ROWS, topListFit, type FileRow } from "./files";
 
 export const ROW_H = 30;
-/** The list on top shows this many rows, then scrolls inside itself. */
-const NARROW_ROWS = 5;
 /** More files than this and the list offers a filter: as many as fit without scrolling. */
-const FILTER_OVER = { rail: 20, top: NARROW_ROWS } as const;
+const FILTER_OVER = { rail: 20, top: TOP_ROWS } as const;
 
 /** A file: status letter, name, directory (cut from the left), lines added and deleted. The tooltip is what the row hides. */
 function FileLine({ row }: { row: FileRow }) {
@@ -54,15 +52,43 @@ function FileLine({ row }: { row: FileRow }) {
   );
 }
 
+const rowKey = (r: FileRow): string => r.key;
+const renderRow = (r: FileRow) => <FileLine row={r} />;
+
 /**
  * The comparison's files: counts and "3 of 8" with previous and next, then the rows,
  * virtualized past RowList's limit. Clicking one shows that file; arrows and Enter do too
- * while the list has focus. As a rail it takes the height it is given; on top it holds
- * NARROW_ROWS rows and folds away. Past a screenful it offers a filter.
+ * while the list has focus. As a rail it takes the height it is given; on top it fits what
+ * the code leaves it (topListFit) and folds away, by itself when that is too little. Past a
+ * screenful it offers a filter, which stays for as long as it is filtering. The filter and the
+ * fold are the tab's (params), so they outlast it showing something else. `current` is the
+ * file on screen when it is listed. The list keeps its place by file through live updates.
  */
-export function FileList({ view, rows, current, onPick, rail }: { view: CompareView; rows: readonly FileRow[]; current: FileRow | null; onPick: (r: FileRow) => void; rail: boolean }) {
-  const [query, setQuery] = useState("");
-  const [folded, setFolded] = useState(false);
+export function FileList({
+  view,
+  rows,
+  current,
+  onPick,
+  rail,
+  height,
+  query,
+  onQuery,
+  fold,
+  onFold,
+}: {
+  view: CompareView;
+  rows: readonly FileRow[];
+  current: FileRow | null;
+  onPick: (r: FileRow) => void;
+  rail: boolean;
+  /** The Diff tab's height, which the list on top is fitted to. */
+  height: number;
+  query: string;
+  onQuery: (q: string) => void;
+  /** The user's fold of the list on top, if any. */
+  fold: boolean | undefined;
+  onFold: (folded: boolean) => void;
+}) {
   const shown = useMemo(() => filterRows(rows, query), [rows, query]);
   const items = useMemo<NavItem[]>(
     () =>
@@ -77,16 +103,20 @@ export function FileList({ view, rows, current, onPick, rail }: { view: CompareV
   const nav = useNav(items);
   const { setCursor } = nav;
   const currentKey = current?.key ?? null;
+  // When the file on screen changes, not when the list does: the cursor is the reader's.
   useEffect(() => {
     if (currentKey !== null) setCursor(currentKey);
-  }, [currentKey, setCursor, shown]);
+  }, [currentKey, setCursor]);
 
   const at = current ? rows.findIndex((r) => r.key === current.key) : -1;
   const prev = stepRow(rows, current, -1);
   const next = stepRow(rows, current, 1);
+  const filter = query !== "" || rows.length > (rail ? FILTER_OVER.rail : FILTER_OVER.top);
+  const fit = topListFit(height, ROW_H, rows.length, filter);
+  const folded = fold ?? fit.fold;
   const open = rail || !folded;
   const list = (
-    <RowList rows={shown} rowKey={(r) => r.key} rowHeight={ROW_H} render={(r) => <FileLine row={r} />} capped maxHeight={rail ? "100%" : NARROW_ROWS * ROW_H} testId="diff-file-rows" />
+    <RowList rows={shown} rowKey={rowKey} rowHeight={ROW_H} render={renderRow} capped keepPlace virtualize={rows.length > VIRTUALIZE_OVER} maxHeight={rail ? "100%" : fit.rows * ROW_H} testId="diff-file-rows" />
   );
   return (
     <NavProvider value={nav.ctx}>
@@ -111,9 +141,9 @@ export function FileList({ view, rows, current, onPick, rail }: { view: CompareV
           </span>
           <HeaderAction icon={ChevronLeft} label="Previous file" testId="diff-prev" onClick={() => { if (prev) onPick(prev); }} />
           <HeaderAction icon={ChevronRight} label="Next file" testId="diff-next" onClick={() => { if (next) onPick(next); }} />
-          {!rail && <HeaderAction icon={folded ? ChevronDown : ChevronUp} label={folded ? "Show files" : "Hide files"} testId="diff-fold" onClick={() => { setFolded((f) => !f); }} />}
+          {!rail && <HeaderAction icon={folded ? ChevronDown : ChevronUp} label={folded ? "Show files" : "Hide files"} testId="diff-fold" onClick={() => { onFold(!folded); }} />}
         </div>
-        {open && rows.length > (rail ? FILTER_OVER.rail : FILTER_OVER.top) && (
+        {open && filter && (
           <div className="shrink-0 px-2 pb-1">
             <Input
               value={query}
@@ -122,7 +152,7 @@ export function FileList({ view, rows, current, onPick, rail }: { view: CompareV
               data-testid="diff-filter"
               className="h-7"
               onChange={(e) => {
-                setQuery(e.target.value);
+                onQuery(e.target.value);
               }}
             />
           </div>
@@ -132,6 +162,11 @@ export function FileList({ view, rows, current, onPick, rail }: { view: CompareV
         {open && view.truncated && (
           <p className="shrink-0 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="diff-truncated-list">
             First {view.files.length} of {view.totalFiles} files
+          </p>
+        )}
+        {open && view.skippedNames > 0 && (
+          <p className="shrink-0 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="diff-skipped-names">
+            {view.skippedNames === 1 ? "1 more file" : `${String(view.skippedNames)} more files`} not listed: {view.skippedNames === 1 ? "its name is" : "their names are"} not UTF-8
           </p>
         )}
       </div>

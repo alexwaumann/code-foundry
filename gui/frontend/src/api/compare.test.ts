@@ -17,6 +17,7 @@ describe("toCompareView", () => {
         base: create(ResolvedDiffSourceSchema, { kind: DiffSourceKind.MERGE_BASE, label: "origin/main", sha: "abc" }),
         head: create(ResolvedDiffSourceSchema, { kind: DiffSourceKind.WORKING_TREE, label: "Working tree" }),
         baseRef: "origin/main",
+        skippedNames: 2,
       }),
       { kind: "merge-base" },
       { kind: "working" },
@@ -31,6 +32,7 @@ describe("toCompareView", () => {
       head: { source: { kind: "working" }, label: "Working tree", sha: "" },
       baseRef: "origin/main",
       error: "",
+      skippedNames: 2,
     });
   });
 });
