@@ -260,12 +260,12 @@ was reasoned about, not triggered.
   window, so the likely result is a page waiting on something nobody sees, which only harms that
   page: Back, a new address or closing the tab should leave it. A stub in the main world would not
   reach cross-site iframes.
-- **External protocol handlers.** Not blocked: there is nothing in the protocol to refuse them with,
-  no flag, and `Fetch` never sees them. Run with a scheme nothing handles, nothing happens and the page stays. With a
-  real handler it was not run, because it would open a real app. From what is known of Chrome: it
-  asks in a dialog in its hidden window, which nobody can answer, so nothing opens; but it does not
-  ask for `mailto:`, `news:` and `snews:`, so a page could open the user's mail app with a draft,
-  once per gesture. Treat that as a known gap.
+- **External protocol handlers.** Not blocked: no flag or protocol call was found to refuse them
+  with. With a scheme nothing handles, nothing happens and the page stays (run). With a real handler
+  it was not run, because it would open a real app. As Chrome is understood to work, it asks in a
+  dialog in its hidden window, which nobody can answer, so nothing opens; but it does not ask for
+  `mailto:`, `news:` and `snews:`, so a page could open the user's mail app with a draft, once per
+  gesture. Treat that as a known gap.
 - **`<input type=color>`.** Not blocked, not run. On a Mac this may be the system colour panel, a
   real window. Harmless in itself, and needs the user's click. Check it on a test machine.
 - **`getDisplayMedia`, `getUserMedia`, notifications, geolocation, payment.** Prompts live in the
@@ -293,6 +293,8 @@ was reasoned about, not triggered.
 - `Browser.downloadWillBegin` arrives after `Page.downloadWillBegin`. If Chrome ever swapped them,
   every download would only ask.
 - `Input.dispatchKeyEvent` with `commands` reaches the focused frame, cross-site iframes too.
+- Our scratch page taking keys can make a focused iframe see another `focus` event. The keyboard
+  stays there: typing after a paste reaches the same field.
 
 ## How to remove it
 
