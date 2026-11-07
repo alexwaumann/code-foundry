@@ -62,6 +62,7 @@ func RegisterUI(r *Registry, e Emitter) error {
 	return r.RegisterAll(
 		Command{
 			Name:         "ui.palette.open",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Open Command Palette",
 			Description:  "Open the command palette in every connected window.",
@@ -70,16 +71,23 @@ func RegisterUI(r *Registry, e Emitter) error {
 			// No keybinding: in the GUI, cmd+k is a reserved view action that opens the
 			// palette locally (gui/frontend/src/keys/bindings.ts).
 			Args: []ArgSpec{
-				{Name: "query", Type: String, Description: "Text to pre-fill"},
+				{Name: "query", Type: String, Description: "Text to pre-fill (not from a page)"},
 			},
-			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
+			Run: func(_ context.Context, uctx Context, a Args) (Result, error) {
+				// The palette takes the keyboard and Enter runs its first row, so what fills it
+				// is the user's to type when the caller is not the user.
+				query := a.String("query")
+				if uctx.Untrusted() {
+					query = ""
+				}
 				return emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{
-					OpenPalette: &v1.UiIntent_OpenPalette{Query: a.String("query")},
+					OpenPalette: &v1.UiIntent_OpenPalette{Query: query},
 				}}), nil
 			},
 		},
 		Command{
 			Name:         "ui.notify",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Show Notification",
 			Description:  "Show a notification in every connected window.",
@@ -100,6 +108,7 @@ func RegisterUI(r *Registry, e Emitter) error {
 		},
 		Command{
 			Name:         "ui.focus.terminal",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Focus Terminal",
 			Description:  "Show a terminal in every connected window.",
@@ -119,6 +128,7 @@ func RegisterUI(r *Registry, e Emitter) error {
 		},
 		Command{
 			Name:         "ui.focus.project",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Focus Project",
 			Description:  "Show a project's worktree (default: its main one) in the Projects page's side panel in every connected window.",

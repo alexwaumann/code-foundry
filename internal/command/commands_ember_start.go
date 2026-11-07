@@ -36,6 +36,7 @@ type EmberStartView struct {
 func emberTaskStart(r *Registry, d EmberDeps) Command {
 	return Command{
 		Name:      "ember.task.start",
+		Page:      PageDrives,
 		NoPalette: true,
 		Title:     "Ember: Start Task",
 		Description: "Start a worker thread for a task in one call: thread.new with a new worktree, labels ember,<task id>, " +

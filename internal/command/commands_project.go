@@ -111,6 +111,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 		},
 		Command{
 			Name:        "project.unregister",
+			Page:        PageState,
 			Title:       "Remove Project",
 			Description: "Stop tracking a project. The worktrees Code Foundry made for it that no thread uses and that are clean are removed (never a branch); nothing else on disk is touched.",
 			Category:    "Project",
@@ -205,6 +206,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 		},
 		Command{
 			Name:        "project.refresh",
+			Page:        PageState,
 			Title:       "Refresh Project Status",
 			Description: "Re-read git status now, for one project or all of them.",
 			Category:    "Project",

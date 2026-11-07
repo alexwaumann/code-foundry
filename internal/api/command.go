@@ -49,7 +49,7 @@ func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeComm
 			return nil, connect.NewError(connect.CodePermissionDenied, err)
 		}
 	}
-	res, err := h.reg.Invoke(ctx, contextFromProto(req.Msg.GetContext()), req.Msg.GetName(), req.Msg.GetArgs(),
+	res, err := h.reg.Invoke(ctx, callerContext(req.Msg.GetContext()), req.Msg.GetName(), req.Msg.GetArgs(),
 		command.Confirmed(req.Msg.GetConfirmed()))
 	if err != nil {
 		return nil, commandError(req.Msg.GetName(), err)
@@ -115,6 +115,17 @@ func commandError(name string, err error) error {
 	default:
 		return connect.NewError(connect.CodeUnknown, err)
 	}
+}
+
+// callerContext is an Invoke's context. The app's controls always send a view and a CLI
+// says it is one, so a call with neither is from something that did not say who it is
+// (a page in a GUI older than the origin field), and gets the strict path.
+func callerContext(c *v1.UiContext) command.Context {
+	uctx := contextFromProto(c)
+	if uctx.Origin == v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED && uctx.ActiveView == "" {
+		uctx.Origin = command.OriginUnknown
+	}
+	return uctx
 }
 
 func contextFromProto(c *v1.UiContext) command.Context {

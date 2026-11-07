@@ -28,6 +28,7 @@ type ThemeReset struct {
 func themeResetCommand(d ThemeDeps, values func(context.Context) (map[string]string, error), set func() theme.Set) Command {
 	return Command{
 		Name:  "theme.reset",
+		Page:  PageState,
 		Title: "Reset Theme to Default",
 		Description: "Make the dark or light slot use the built-in default theme again (the slot in use without --slot). " +
 			"Your own themes are kept.",

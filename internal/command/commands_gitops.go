@@ -213,6 +213,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		},
 		Command{
 			Name:           "pr.open",
+			Page:           PageState,
 			Title:          "Open Pull Request in Browser",
 			Description:    "Open the current branch's pull request on GitHub.",
 			Category:       "Pull Request",
@@ -263,6 +264,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		},
 		Command{
 			Name:        "worktree.reveal",
+			Page:        PageState,
 			Title:       "Open Worktree in Finder",
 			Description: "Show the worktree folder, or one file of it, in Finder.",
 			Category:    "Worktree",
@@ -275,6 +277,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		},
 		Command{
 			Name:         "view.open.url",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Open URL in Browser",
 			Description:  "Open an http(s) URL in the default browser.",

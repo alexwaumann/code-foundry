@@ -45,6 +45,7 @@ func (d ViewDeps) settingsPageIDs(ctx context.Context) ([]string, error) {
 func (d ViewDeps) settingsCommand() Command {
 	return Command{
 		Name:        "view.settings",
+		Page:        PageState,
 		Title:       "Settings",
 		Description: "Show the settings page in every app window; --page opens it on one page (memory, plugins, skills, appearance, …).",
 		Category:    "View",

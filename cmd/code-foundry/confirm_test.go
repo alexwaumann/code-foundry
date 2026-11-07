@@ -21,6 +21,9 @@ import (
 // work) with args to merge. On a terminal the user is asked twice and the second yes
 // adds --force; --yes (or no terminal) never answers the second question: the command's
 // declined result stands when it has one, else it fails pointing at --force.
+// fromCLI is the context every CLI call sends (uiContext).
+var fromCLI = &v1.UiContext{Origin: v1.CallOrigin_CALL_ORIGIN_CLI}
+
 func TestInvokeSecondStage(t *testing.T) {
 	var forced []string // the commands that ran with force
 	reg := command.NewRegistry()
@@ -90,7 +93,7 @@ func TestInvokeSecondStage(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			cl := &cli{stdout: &stdout, stderr: &stderr, connect: func(context.Context) (*client.Client, error) { return c, nil },
 				stdin: strings.NewReader(tt.stdin), interactive: func() bool { return tt.interactive }}
-			res, err := cl.invoke(context.Background(), &v1.Command{Name: tt.cmd}, nil, map[string]string{"path": "/wt/d"}, tt.yes)
+			res, err := cl.invoke(context.Background(), &v1.Command{Name: tt.cmd}, fromCLI, map[string]string{"path": "/wt/d"}, tt.yes)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v\nstderr: %s", err, tt.wantErr, stderr.String())
 			}
@@ -156,7 +159,7 @@ func TestInvokeBindConfirm(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			cl := &cli{stdout: &stdout, stderr: &stderr, connect: func(context.Context) (*client.Client, error) { return c, nil },
 				stdin: strings.NewReader("y\n"), interactive: func() bool { return tt.interactive }}
-			_, err := cl.invoke(context.Background(), &v1.Command{Name: "x.enable"}, nil, map[string]string{"name": "hello"}, tt.yes)
+			_, err := cl.invoke(context.Background(), &v1.Command{Name: "x.enable"}, fromCLI, map[string]string{"name": "hello"}, tt.yes)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v\nstderr: %s", err, tt.wantErr, stderr.String())
 			}

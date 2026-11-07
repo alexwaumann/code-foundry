@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -71,6 +72,7 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:      "skill.browse",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Browse Skills",
 			Description: "Search the plugins and skills of the marketplaces Claude Code has (claude plugin marketplace list): " +
@@ -235,6 +237,13 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 				"of the active thread or worktree; when it exits 0 the skill no longer needs setup.",
 			Category: "Skill",
 			Args:     []ArgSpec{{Name: "name", Type: String, Required: true, Positional: true, Description: "The skill's name"}},
+			PageDetail: func(ctx context.Context, _ Context, a Args) (string, error) {
+				plan, err := d.Skills.Setup(ctx, a.String("name"))
+				if err != nil {
+					return "", skillErr(err)
+				}
+				return "It runs " + strconv.Quote(strings.Join(plan.Argv, " ")) + " in " + strconv.Quote(plan.Dir), nil
+			},
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 				o, err := setupOwner(ctx, d, c)
 				if err != nil {
@@ -256,6 +265,7 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 		},
 		Command{
 			Name:  "skill.refresh",
+			Page:  PageState,
 			Title: "Refresh Skill Marketplaces",
 			Description: "Update every marketplace Claude Code has (claude plugin marketplace update) and read them again. " +
 				"It also runs every hour.",

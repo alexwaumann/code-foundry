@@ -127,6 +127,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 	return r.RegisterAll(
 		Command{
 			Name:      "thread.send",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Send to Thread",
 			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
@@ -185,6 +186,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		threadCompact(b, idArg),
 		Command{
 			Name:      "thread.respond",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Answer Thread Request",
 			Description: "Answer a thread's pending permission request or question (default: the oldest pending one). " +
@@ -259,6 +261,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		},
 		Command{
 			Name:        "thread.interrupt",
+			Page:        PageDrives,
 			Title:       "Interrupt Thread",
 			Description: "Stop a thread's running turn. Pending requests are withdrawn.",
 			Category:    "Thread",
@@ -305,6 +308,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		},
 		Command{
 			Name:        "thread.set-model",
+			Page:        PageDrives,
 			Title:       "Set Thread Model",
 			Description: "Switch a thread's model from its next request.",
 			Category:    "Thread",
@@ -324,6 +328,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		},
 		Command{
 			Name:        "thread.set-mode",
+			Page:        PageDrives,
 			Title:       "Set Thread Permissions",
 			Description: "Switch a thread's permission mode (thread.new's permission): supervised, accept-edits, or auto.",
 			Category:    "Thread",
@@ -345,6 +350,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		},
 		Command{
 			Name:  "thread.set-effort",
+			Page:  PageDrives,
 			Title: "Set Thread Effort",
 			Description: "Change a thread's effort level. A running Claude restarts with it (resuming the " +
 				"conversation) once idle; a stopped one gets it at its next start.",

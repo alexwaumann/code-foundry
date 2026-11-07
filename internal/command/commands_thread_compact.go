@@ -14,6 +14,7 @@ import (
 func threadCompact(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:        "thread.compact",
+		Page:        PageDrives,
 		Title:       "Compact Thread",
 		Description: "Send /compact to a thread; a stopped one starts with it. Refused mid-turn.",
 		Category:    "Thread",

@@ -66,12 +66,13 @@ func RegisterProjectAdd(r *Registry, projects ProjectBackend, clone CloneFunc, d
 	return r.RegisterAll(
 		Command{
 			Name:  "project.add",
+			Page:  PageState,
 			Title: "Add Project",
 			Description: "Add a project: start a new one, add a folder on this Mac, or clone a repository from GitHub. " +
 				"Opens the Add Project dialog in the app.",
 			Category: "Project",
 			Args: []ArgSpec{
-				{Name: "path", Type: Path, Positional: true,
+				{Name: "path", Type: Path, Positional: true, PageAsks: true,
 					Description: "Project folder to add without the dialog (a git repository or any folder under home)"},
 			},
 			// The GUI presents it (the dialog, which calls ProjectService.Register itself) and

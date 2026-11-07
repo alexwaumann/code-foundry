@@ -54,6 +54,13 @@ type Command struct {
 	// is listed; nothing else needs editing. The CLI, --help and daemon.capabilities still
 	// have it (index_test.go keeps the list).
 	NoIndex bool
+	// Page is what a page's call may do without asking the user (PageClass). Unset, it
+	// asks, so a new verb does until it is classified (page_class_test.go keeps the lists).
+	// ReadOnly commands never ask, whatever this says.
+	Page PageClass
+	// PageDetail, when set, adds what the call alone does not show to a page's question,
+	// such as the command line of the action it names. Its error is the call's.
+	PageDetail func(ctx context.Context, uctx Context, args Args) (string, error)
 	// ReadOnly marks a command that only reads: it creates, changes, sends, runs, opens
 	// or writes nothing, and moves no window (view.* and ui.* are not read-only). A page's
 	// bridge runs a read-only verb freely and any other only from a user gesture in the
@@ -124,10 +131,16 @@ type Context struct {
 	Origin v1.CallOrigin
 }
 
-// The Origins a call can have besides the unset one (the GUI's own controls, a CLI).
+// The Origins a call can have besides the unset one, which is the app's own controls.
 const (
 	OriginPage   = v1.CallOrigin_CALL_ORIGIN_PAGE
 	OriginPlugin = v1.CallOrigin_CALL_ORIGIN_PLUGIN
+	OriginCLI    = v1.CallOrigin_CALL_ORIGIN_CLI
+	// OriginUnknown is never on the wire: internal/api gives it to a call that names no
+	// origin and no view, so such a call is not taken for the app or a CLI.
+	OriginUnknown v1.CallOrigin = -1
+
+	originApp = v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED
 )
 
 // FromUser reports whether the user asked in person: from the app's own controls or a
@@ -135,7 +148,7 @@ const (
 // from a CLI or a page). It is what the caller says, not proof
 // (docs/notes/settings-user-only.md). Only Run sees CallerThreadID.
 func (c Context) FromUser() bool {
-	return c.Origin == v1.CallOrigin_CALL_ORIGIN_UNSPECIFIED && (c.ActiveView != "" || c.CallerThreadID == "")
+	return (c.Origin == originApp || c.Origin == OriginCLI) && (c.ActiveView != "" || c.CallerThreadID == "")
 }
 
 // ContextField names a Context field an argument can default from.

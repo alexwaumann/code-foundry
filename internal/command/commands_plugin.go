@@ -106,6 +106,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		},
 		Command{
 			Name:        "plugin.disable",
+			Page:        PageState,
 			NoPalette:   true,
 			Title:       "Disable Plugin",
 			Description: "Stop a plugin and remove its commands. Its secrets and the consent given stay.",
@@ -121,6 +122,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		},
 		Command{
 			Name:        "plugin.restart",
+			Page:        PageState,
 			NoPalette:   true,
 			Title:       "Restart Plugin",
 			Description: "Re-read a plugin's manifest and start it afresh, also after it failed.",
@@ -136,6 +138,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		},
 		Command{
 			Name:         "plugin.reload",
+			Page:         PageState,
 			Title:        "Reload Plugins",
 			Description:  "Rescan ~/.code-foundry/plugins for added, changed and removed plugins.",
 			Category:     "Plugin",

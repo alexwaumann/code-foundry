@@ -60,8 +60,17 @@ const ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/overlay/scope.ts", match: 'ctx.shadowColor = "rgba(0,0,0,.28)"', why: "the plate's shadow falls on other apps' windows, not on a theme surface; the approved design's value" },
 ];
 
+const GUARDED = "a guarded question's colours are fixed, out of any theme's reach";
+
 /** Literal colours kept in component stylesheets. `match` must appear in the line. */
 const CSS_ALLOW: { file: string; match: string; why: string }[] = [
+  { file: "/src/index.css", match: "background-color: #1f2328", why: GUARDED },
+  { file: "/src/index.css", match: "border-color: #57606a", why: GUARDED },
+  { file: "/src/index.css", match: "color: #f0f3f6", why: GUARDED },
+  { file: "/src/index.css", match: "color: #ff9d96", why: GUARDED },
+  { file: "/src/index.css", match: "background-color: #32383f", why: GUARDED },
+  { file: "/src/index.css", match: "background-color: #b62324", why: GUARDED },
+  { file: "/src/index.css", match: "color: #ffffff", why: GUARDED },
   { file: "/src/components/thread/thread.css", match: "box-shadow: 0 1px 3px oklch(0 0 0 /", why: "a shadow is black in every theme" },
   { file: "/src/components/thread/thread.css", match: "box-shadow: 0 1px 2px oklch(0 0 0 /", why: "a shadow is black in every theme" },
   { file: "/src/components/ember/ember.css", match: "--cf-flame-", why: "Ember's flame is a mascot drawn in its own fixed colours, the same in every theme (docs/notes/ember-3-gui.md)" },

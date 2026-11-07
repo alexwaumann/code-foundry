@@ -146,6 +146,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.new",
+			Page:  PageDrives,
 			Title: "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active project's main worktree, else where the thread this runs in runs), or in a new worktree. " +
 				"Inside a thread it copies that thread's projects, branch and mode. " +
@@ -284,6 +285,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		threadNewLike(r, b, e),
 		Command{
 			Name:         "thread.focus",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Focus Thread",
 			Description:  "Show a thread in every connected window.",
@@ -300,6 +302,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "thread.rename",
+			Page:        PageState,
 			Title:       "Rename Thread",
 			Description: "Set the thread's name. Turns off automatic naming.",
 			Category:    "Thread",
@@ -316,6 +319,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "thread.regenerate-name",
+			Page:        PageState,
 			NoIndex:     true,
 			Title:       "Regenerate Thread Name",
 			Description: "Name the thread again from its most recent turns.",
@@ -332,6 +336,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "thread.fork",
+			Page:        PageState,
 			Title:       "Fork Thread",
 			Description: "Start a new thread that continues this thread's conversation.",
 			Category:    "Thread",
@@ -349,6 +354,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "thread.remove",
+			Page:        PageState,
 			Title:       "Remove Thread",
 			Description: "Forget a thread, stopping Claude first if it runs.",
 			Category:    "Thread",

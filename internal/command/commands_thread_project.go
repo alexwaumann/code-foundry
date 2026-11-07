@@ -57,6 +57,7 @@ func threadWorkspaceOf(ctx context.Context, b ThreadBackend, id string) string {
 func threadProjectAdd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:        "thread.project.add",
+		Page:        PageDrives,
 		NoPalette:   true,
 		Title:       "Add Project to Thread",
 		Description: "Add a project to a thread (in worktree mode a worktree on its branch). It leaves its workspace; Claude restarts when idle.",
@@ -85,6 +86,7 @@ func threadProjectAdd(b ThreadBackend, idArg ArgSpec) Command {
 func threadProjectRemove(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:        "thread.project.remove",
+		Page:        PageDrives,
 		NoPalette:   true,
 		Title:       "Remove Project from Thread",
 		Description: "Remove a project (not the cwd's) from a thread; its checkout stays. As add, it leaves its workspace.",

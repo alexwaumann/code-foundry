@@ -219,6 +219,7 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.label",
+		Page:      PageState,
 		NoPalette: true,
 		Title:     "Label Thread",
 		Description: "Add or remove a thread's labels (a-z, 0-9, -, _, . and /; up to 40 characters each). " +
@@ -247,6 +248,7 @@ func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.report",
+		Page:      PageState,
 		NoPalette: true,
 		Title:     "Report on Thread",
 		Description: "Record how a thread's task went: done, blocked, failed or progress, " +
@@ -283,6 +285,7 @@ func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 func threadAskCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.ask",
+		Page:      PageDrives,
 		NoPalette: true,
 		Title:     "Ask the Thread That Created This One",
 		Description: "Ask the thread that created this one something and keep working: it gets a wake at once and answers " +
@@ -313,6 +316,7 @@ func threadAskCmd(b ThreadBackend, idArg ArgSpec) Command {
 func threadBudgetCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:      "thread.budget",
+		Page:      PageState,
 		NoPalette: true,
 		Title:     "Set Thread Budget",
 		Description: "Set a thread's spending limit in USD at Claude API rates (0 removes it). Reaching it while Claude works " +

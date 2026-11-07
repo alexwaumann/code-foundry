@@ -106,6 +106,7 @@ func threadFlagClearCmd(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
 		Name:         "thread.flag.clear",
+		Page:         PageState,
 		NoPalette:    true,
 		Title:        "Clear Thread Flags",
 		Description:  "Remove the flags plugins raised on a thread: one plugin's with --plugin, else every one.",

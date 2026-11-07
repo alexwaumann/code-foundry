@@ -37,7 +37,8 @@ func TestCommandInvokeConfirm(t *testing.T) {
 		t.Fatalf("listed = %v, want requires_confirmation and a positional arg", c)
 	}
 
-	_, err = h.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "thread.remove", Args: map[string]string{"id": "s1"}}))
+	_, err = h.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "thread.remove", Args: map[string]string{"id": "s1"},
+		Context: &v1.UiContext{Origin: v1.CallOrigin_CALL_ORIGIN_CLI}}))
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition {
 		t.Fatalf("err = %v, want FailedPrecondition", err)
