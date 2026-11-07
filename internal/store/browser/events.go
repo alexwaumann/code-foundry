@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 )
 
 // target is one page in Chrome: a surface's own, or a popup it opened. Its fields need
@@ -16,6 +17,7 @@ type target struct {
 	canBack     bool
 	canForward  bool
 	casting     bool
+	cast        sync.Mutex // held across a start or restart of the frames
 }
 
 // handlers are the events a surface follows, by method. A handler runs on the connection's
@@ -184,6 +186,10 @@ func onLoading(loading bool) func(*Store, *instance, *target, json.RawMessage) {
 		t.surface.publish()
 		if !loading {
 			go s.refreshHistory(in, t) // the title: target info keeps saying the host
+			if t.casting && t.surface.top() == t {
+				// The page as it finally is, however the cast fared through the load.
+				go s.firstFrame(in, t, t.surface.w, t.surface.h)
+			}
 		}
 	}
 }
