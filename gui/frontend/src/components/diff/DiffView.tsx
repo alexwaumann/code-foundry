@@ -8,11 +8,11 @@ import { useHeight, useWidth } from "@/lib/useWidth";
 import { openDiffInPanel } from "@/stores/filePanel";
 import { retitlePanelTab, setPanelTabParams } from "@/stores/panel";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
-import { diffTab, sameSource, sourceParam, type DiffTarget } from "@/surfaces/diffTarget";
+import { diffTab, FROM_THREAD, sameSource, sourceParam, type DiffTarget } from "@/surfaces/diffTarget";
 import { CompareBar } from "./CompareBar";
 import { DiffFile } from "./DiffFile";
 import { FileList } from "./FileList";
-import { buildFileRows, diffTitle, listPace, pickRow, sourceLabel, type FileRow } from "./files";
+import { buildFileRows, diffTitle, inProject, listPace, pickRow, sourceLabel, type FileRow } from "./files";
 import { ModelBand } from "./ModelBand";
 import { useStatusChanges } from "./useStatusChanges";
 
@@ -50,7 +50,9 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   const name = useProjectsStore((s) => s.byId[project]?.name ?? project);
   const branch = useProjectsStore((s) => findWorktree(s, project, worktree)?.branch ?? "");
 
-  const named = target.heading || (view ? diffTitle(view, { branch, remotes, project: name, own: target.own }) : tabTitle);
+  const place = { project: name, own: target.own };
+  const compareName = view ? diffTitle(view, { branch, remotes, ...place }) : "";
+  const named = target.heading ? inProject(target.heading, place) : !view ? tabTitle : target.thread ? `${FROM_THREAD} · ${compareName}` : compareName;
   useEffect(() => {
     if (named !== tabTitle) retitlePanelTab("current", tabId, named);
   }, [named, tabTitle, tabId]);
@@ -97,16 +99,21 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
     </Button>
   );
   const hide = target.hide ?? [];
-  const band = Boolean(target.heading) || Boolean(target.note) || hide.length > 0;
+  const band = Boolean(target.heading) || Boolean(target.note) || hide.length > 0 || paths.length > 0;
   return (
     <div ref={ref} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="diff-surface" data-project={project} data-path={worktree} data-loading={read.loading || undefined}>
       {band && (
         <ModelBand
+          thread={target.thread ?? ""}
           heading={target.heading ?? ""}
           note={target.note ?? ""}
+          paths={paths}
           hidden={hide.length > 0}
           onReveal={() => {
-            go({ hide: [] });
+            go({ hide: [], paths: [] });
+          }}
+          onDismiss={() => {
+            keep({ note: "" });
           }}
         />
       )}

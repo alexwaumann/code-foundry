@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -167,6 +169,37 @@ func TestAssignPositionalsRepeatable(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Repeated values travel joined by newlines, so one holding a newline would become two paths.
+func TestRepeatableValueRefusesNewline(t *testing.T) {
+	spec := &v1.ArgSpec{Name: "path", Type: v1.ArgType_ARG_TYPE_PATH, Positional: true, Repeatable: true}
+	t.Run("a flag", func(t *testing.T) {
+		f := &argFlag{spec: spec}
+		if err := f.Set("line\nbreak.go"); err == nil || !strings.Contains(err.Error(), "cannot hold a newline") {
+			t.Errorf("err = %v", err)
+		}
+		if f.set {
+			t.Error("the value was kept")
+		}
+	})
+	t.Run("a word", func(t *testing.T) {
+		var stderr bytes.Buffer
+		cl := &cli{stderr: &stderr}
+		f := &argFlag{spec: spec}
+		if err := cl.assignPositionals(cl.newFlagSet("x"), []*argFlag{f}, []string{"a.go", "line\nbreak.go"}); !errors.Is(err, errUsage) {
+			t.Fatalf("err = %v", err)
+		}
+		if !strings.Contains(stderr.String(), "cannot hold a newline") {
+			t.Errorf("stderr = %q", stderr.String())
+		}
+	})
+	t.Run("a flag that is not repeatable keeps it", func(t *testing.T) {
+		f := &argFlag{spec: &v1.ArgSpec{Name: "note", Type: v1.ArgType_ARG_TYPE_STRING}}
+		if err := f.Set("two\nlines"); err != nil || f.value != "two\nlines" {
+			t.Errorf("value %q, err %v", f.value, err)
+		}
+	})
 }
 
 // Each of a repeatable path's values resolves against the CLI's cwd; a single path, with a

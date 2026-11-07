@@ -250,7 +250,10 @@ func (cl *cli) assignPositionals(fs *flag.FlagSet, flags []*argFlag, words []str
 		}
 		if f.spec.GetPositional() && f.spec.GetRepeatable() {
 			for _, w := range words {
-				_ = f.Set(w)
+				if err := f.Set(w); err != nil {
+					fmt.Fprintf(cl.stderr, "%s: %v\n", fs.Name(), err)
+					return errUsage
+				}
 			}
 			words = nil
 			took = append(took, f)

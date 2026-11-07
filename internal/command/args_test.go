@@ -146,16 +146,21 @@ func TestParseArgsRepeatablePath(t *testing.T) {
 		raw     string
 		want    string
 		wantErr bool
+		wantMsg string
 	}{
 		{name: "one", raw: "/a/b.go", want: "/a/b.go"},
 		{name: "several, each expanded and cleaned", raw: "~/x.go\n/a/./b.go", want: "/Users/me/x.go\n/a/b.go"},
-		{name: "a relative one among them", raw: "/a/b.go\nrelative.go", wantErr: true},
+		{name: "a newline in a path says so", raw: "/a/line\nbreak.go", wantErr: true, wantMsg: "cannot hold a newline"},
+		{name: "one path has no newline to blame", raw: "relative.go", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a, _, err := parseArgs(specs, map[string]string{"path": tt.raw}, Context{})
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, want error %t", err, tt.wantErr)
+			}
+			if err != nil && (tt.wantMsg != "") != strings.Contains(err.Error(), "newline") {
+				t.Errorf("err = %v, want message %q", err, tt.wantMsg)
 			}
 			if err == nil && a.Path("path") != tt.want {
 				t.Errorf("path = %q, want %q", a.Path("path"), tt.want)

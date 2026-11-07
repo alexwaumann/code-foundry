@@ -112,7 +112,8 @@ func writeCommonFlags(tw io.Writer, confirm bool) {
 	fmt.Fprintln(tw, "  --context-workspace id\tactive workspace")
 }
 
-// PositionalUsage is " <key> [<value>]" for a command's positional args.
+// PositionalUsage is " <key> [<value>]" for a command's positional args, "[<path>…]" for one
+// that takes several.
 func PositionalUsage(cmd *v1.Command) string {
 	var sb strings.Builder
 	for _, a := range cmd.GetArgs() {
@@ -120,9 +121,9 @@ func PositionalUsage(cmd *v1.Command) string {
 			continue
 		}
 		if a.GetRequired() {
-			fmt.Fprintf(&sb, " <%s>", a.GetName())
+			fmt.Fprintf(&sb, " %s", guideArg(a))
 		} else {
-			fmt.Fprintf(&sb, " [<%s>]", a.GetName())
+			fmt.Fprintf(&sb, " [%s]", guideArg(a))
 		}
 	}
 	return sb.String()

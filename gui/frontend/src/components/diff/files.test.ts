@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CompareFileView } from "@/api/compare";
-import { buildFileRows, CODE_MIN, diffTitle, fileTotals, filterRows, listPace, pickRow, shortRef, sourceLabel, splitPath, stepRow, TOP_ROWS, topListFit } from "./files";
+import { buildFileRows, CODE_MIN, diffTitle, fileTotals, filterRows, inProject, listPace, narrowedTo, pickRow, shortRef, sourceLabel, splitPath, stepRow, TOP_ROWS, topListFit } from "./files";
 import { refChoices, REF_CHOICES_MAX } from "./sources";
 
 const file = (path: string, o: Partial<CompareFileView> = {}): CompareFileView => ({ path, oldPath: "", status: "M", added: 1, deleted: 1, binary: false, submodule: false, ...o });
@@ -83,6 +83,17 @@ describe("shortRef", () => {
     ["main", ["origin"], "main"],
   ])("%s", (ref, remotes, want) => {
     expect(shortRef(ref, remotes)).toBe(want);
+  });
+});
+
+describe("a tab's name and band", () => {
+  it("another project's name leads, so one title on two checkouts stays two names", () => {
+    expect(inProject("Review", { project: "web", own: false })).toBe("web · Review");
+    expect(inProject("Review", { project: "web", own: true })).toBe("Review");
+  });
+  it("a narrowed list names one path and counts several", () => {
+    expect(narrowedTo(["src"])).toBe("Listing only src");
+    expect(narrowedTo(["a.go", "b.go", "c.go"])).toBe("Listing only 3 paths");
   });
 });
 

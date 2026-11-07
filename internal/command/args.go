@@ -348,6 +348,9 @@ func (s ArgSpec) parse(v string) (any, error) {
 		paths := strings.Split(v, "\n")
 		for i, p := range paths {
 			e, err := ExpandPath(p)
+			if err != nil && len(paths) > 1 {
+				return nil, fmt.Errorf("a path cannot hold a newline, which separates repeated paths: %w", err)
+			}
 			if err != nil {
 				return nil, err
 			}

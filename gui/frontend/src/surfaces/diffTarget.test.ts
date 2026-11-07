@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, DIFF_KIND, diffOfTab, diffTab, sameSource, sourceOfParam, sourceParam, type DiffTarget } from "./diffTarget";
 
-const target = (o: Partial<DiffTarget> = {}): DiffTarget => ({ project: "web", worktree: "/w", base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "", oldPath: "", own: false, paths: [], heading: "", note: "", hide: [], ...o });
+const target = (o: Partial<DiffTarget> = {}): DiffTarget => ({ project: "web", worktree: "/w", base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "", oldPath: "", own: false, paths: [], thread: "", heading: "", note: "", hide: [], ...o });
 
 describe("sources as tab params", () => {
   it.each([
@@ -43,8 +43,18 @@ describe("diffTab", () => {
     expect(diffTab(target({ heading: "Other" })).id).not.toBe(a.id);
   });
 
+  it("a tab a thread framed is never the checkout's own, and the next call finds it", () => {
+    const mine = diffTab(target()).id;
+    const framed = diffTab(target({ thread: "s1", paths: ["a.ts", "b.ts"] }));
+    expect(framed.id).not.toBe(mine);
+    expect(framed.title).toBe("From thread");
+    expect(diffTab(target({ thread: "s1", note: "Why", hide: ["compare"] })).id).toBe(framed.id);
+    expect(diffTab(target({ thread: "s2" })).id).not.toBe(framed.id);
+    expect(diffTab(target({ thread: "s1", heading: "Review" })).id).not.toBe(framed.id);
+  });
+
   it("round-trips what a thread sets; a part it cannot hide is dropped", () => {
-    const t = target({ paths: ["a.ts", "src"], heading: "Review", note: "Why", hide: ["compare", "files"] });
+    const t = target({ thread: "s1", paths: ["a.ts", "src"], heading: "Review", note: "Why", hide: ["compare", "files"] });
     expect(diffOfTab(diffTab(t))).toEqual(t);
     expect(diffOfTab({ params: { project: "web", worktree: "/w", hide: "compare,nonsense" } })?.hide).toEqual(["compare"]);
   });

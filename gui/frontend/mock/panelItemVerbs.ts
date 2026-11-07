@@ -140,10 +140,13 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           const source = (v: string | undefined) => (!v ? undefined : ["working", "staged", "merge-base"].includes(v) ? v : `ref:${v}`);
           const head = args.scope === "branch" ? "ref:HEAD" : source(args.head);
           const base = source(args.base);
+          // Like the daemon: anything but choosing a file gets a tab of its own, the checkout's being the user's.
+          const framed = rels.length > 1 || args.title || args.note || args.hide;
           return {
             project: t.projectId,
             worktree: t.worktreePath,
             own: "1",
+            ...(framed ? { thread: id } : {}),
             ...(base ? { base } : {}),
             ...(head ? { head } : {}),
             ...(rels.length === 1 ? { path: rels[0] ?? "" } : rels.length > 1 ? { paths: rels.join("\n") } : {}),

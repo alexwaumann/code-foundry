@@ -8,12 +8,35 @@
 - **There is no `--lock`.** `--hide compare` or `--hide files` are the only ways to reduce the
   controls, and `ModelBand` always offers Show controls, which stays shown once pressed. With
   everything hidden and no title or note the band still shows, so the way back never goes.
+- **The checkout's own tab is the user's.** A thread may pick a file there, nothing more. Any
+  call with a title, a note, `--hide`, several paths or a directory gets a tab of its own: the
+  daemon sends a `thread` param, the asking thread, and the id includes it. The next untitled call
+  updates that tab, and the same title updates its tab, as Gallery's does. A review found the
+  first version writing `paths` to the own tab: "2 files" under the normal title, in a checkout
+  with 7 changed.
+- **A call with no sources only picks a file.** The intent keeps what the own tab compares,
+  filters and folds, or a one-path call would have reset them. `--base` and `--head` still set
+  the sides on the own tab, untitled: the compare bar shows them and the user can change them,
+  and `--scope branch` calls have always done that.
+- **A tab says what happened and has a way back.** The band names the thread, and a narrowed list
+  says "Listing only 2 paths" (the count: the list's totals are only of what was asked for).
+  Show controls, or Show all files with nothing hidden, gives back the controls and the list; the
+  note stays, with its own Dismiss, because pressing one should not lose what the other kept.
+- **Model text never passes for the app.** As in `FileRequestBand`: the thread is named, the title
+  sits inside that sentence in quotes, the note is a blockquote, all through `plainLine`.
 - **One path keeps today's meaning:** that file, in the whole list. Two or more, or a directory,
   narrow the list. Nothing changes for an existing one-path call. A file that later leaves the
   list stays on screen and says so, as any file does (`docs/notes/diff-viewer-2.md`).
-- **A titled tab has its own id.** A thread can never take over the tab the user is working in,
-  and the same title updates the same tab, as Gallery's does. Without a title the checkout's
-  own tab is used.
+- **The checkout's root is every file.** `view.panel.diff .` lists everything, and among other
+  paths it wins: narrowing to everything is no narrowing.
+- **A path with nothing to show is a warning, and all of them a refusal.** Each one that matches
+  no listed file is named on stderr and left out of `paths`, so "2 paths" stays true. The tab is
+  still decided by what was asked: `a.go missing.go` is a narrowed list of one, not one file picked
+  in the whole list. A list cut by the cap or by a name it could not list says nothing, as it cannot
+  tell. A `--title` that cleans down to nothing (or `--title ""`) is refused: it meant a tab of its
+  own, and would have landed on the user's.
+- **A title leads with the project on another checkout,** as untitled tabs do, so one title on two
+  checkouts is two names. The band keeps the plain title.
 - **The check is the tab's own read.** It moved from `GetWorktreeFileDiff` to `CompareWorktree`,
   so a call that would show nothing fails, with the old messages for the old calls. A rename's
   source now comes with it, which the old verb never passed.
@@ -36,16 +59,27 @@ against its cwd) and in the daemon (`parse`, `ExpandPath`). They travel joined b
 repeatable values always have. Live testing found the bare-word case: without that, a second
 word was "unexpected arguments".
 
+So a value cannot hold a newline. The CLI refuses one by name (`argFlag.Set`, for any repeatable
+flag or word). Another caller's value is split like any list, and a part that is no absolute path
+is refused saying why. A repeatable positional has to be the last one (`Command.validate`).
+
 ## Skills
 
-The routing row says `view.panel.diff [<path>…]` and names `--base` and `--head`, because `<path>`
-alone read as one required file. The rest is in the verb's `--help`.
+The routing row says `view.panel.diff [<path>…]`, names `--base` and `--head`, and points at the
+verb's `--help` for `--title`, `--note` and `--hide`, because `<path>` alone read as one required
+file. The rest is in that `--help`, which now shows `[<path>…]`. The generated guide had lost
+`<path>` and `--hide`: `guideShowsArg` dropped every repeatable arg, which was meant for a plugin's
+`--arg`, so it now drops that by name.
 
 `make guide-eval MODEL=opus TASKS=p4-show-file,p9-show-images MAX_COST=3`, the two tasks on that
 row: 6 of 6 chose the right verb, no invalid runs, $1.13 by the daemon's count ($0.86 in the runs).
 The three wrong turns are `view.panel.gallery --help`, which the row itself points at. Neither task
-asks for a diff, so this shows the row still routes, not that agents find `--base`. No budget or
-pin changed.
+asks for a diff, so `p10-show-diff` was added to measure that.
+
+`make guide-eval MODEL=opus TASKS=p10-show-diff MAX_COST=3`: 3 of 3 ran `view.panel.diff` with
+`--title` and `--note`, no invalid runs, $0.73 by the daemon's count ($0.46 in the runs). All three
+read the verb's `--help` first, as the row says, which is the 3 wrong turns the report counts, and
+none needed a second try. No budget or pin changed.
 
 ## Not done here
 
