@@ -40,6 +40,7 @@ export const groups: GroupInit[] = [
   { id: "ember", title: "Ember", description: "The resident agent: whether it runs, its models, and when it starts a fresh session." },
   { id: "dictation", title: "Dictation", description: "Voice dictation into the composers, transcribed on this Mac." },
   { id: "advanced", title: "Advanced", description: "Executables and logging." },
+  { id: "experimental", title: "Experimental", description: "These may change or go without notice." },
 ];
 
 const S = SettingType;
@@ -116,6 +117,7 @@ export const staticPages: PageInit[] = [
     sections: [
       { id: "executables", title: "Executables" },
       { id: "logging", title: "Logging" },
+      { id: "experimental", title: "Experimental", description: "These may change or go without notice." },
     ],
   },
   {
@@ -308,6 +310,7 @@ const staticFields: FieldInit[] = [
   { key: "advanced.claude_path", group: "advanced", page: "advanced", section: "executables", type: S.PATH, title: "claude executable", description: "Path to claude. Empty finds it on PATH.", defaultValue: "", placeholder: "claude (from PATH)", restartRequired: true },
   { key: "advanced.gh_path", group: "advanced", page: "advanced", section: "executables", type: S.PATH, title: "gh executable", description: "Path to gh. Empty finds it on PATH or where Homebrew installs it.", defaultValue: "", placeholder: "gh (from PATH)", restartRequired: true },
   { key: "plugins.registries", group: "plugins", page: "plugins", section: "registries", type: S.STRING, title: "Plugin registries", description: 'Where Browse and plugin install look for plugins, in order; the first registry listing a name wins. Each is a GitHub repository URL (private ones work through your gh login) or an https URL of an index.json, separated by commas. Empty means no registry: Browse lists nothing and install needs a release or a folder.', defaultValue: "", placeholder: "https://github.com/<owner>/<repo>" },
+  { key: "experimental.chrome_surface", group: "experimental", page: "advanced", section: "experimental", type: S.BOOL, title: "Chrome surface", description: "Adds a Browser tab to side panels: real sites, in a headless Google Chrome with a profile of its own. Off, nothing shows and nothing runs.", defaultValue: "false" },
   { key: "advanced.log_level", group: "advanced", page: "advanced", section: "logging", type: S.ENUM, title: "Log level", description: "Lowest level written to logs/daemon.log.", enumValues: ["debug", "info", "warn", "error"], enumLabels: ["Debug", "Info", "Warn", "Error"], defaultValue: "info" },
 ];
 
