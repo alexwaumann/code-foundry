@@ -138,6 +138,8 @@ const (
 	GroupEmber       = "ember"
 	GroupDictation   = "dictation"
 	GroupAdvanced    = "advanced"
+	// GroupExperimental holds what may change or go without notice.
+	GroupExperimental = "experimental"
 )
 
 // Page ids.
@@ -186,6 +188,7 @@ var Pages = []Page{
 	{ID: PageAdvanced, Title: "Advanced", Sections: []Section{
 		{ID: "executables", Title: "Executables"},
 		{ID: "logging", Title: "Logging"},
+		{ID: "experimental", Title: "Experimental", Description: "These may change or go without notice."},
 	}},
 	{ID: PagePlugins, Title: "Plugins", Description: "Programs that add commands, panels and thread options to Code Foundry.",
 		Sections: []Section{{ID: "registries", Title: "Registries", Description: "Where Browse finds plugins to install."}}},
@@ -206,6 +209,7 @@ var Groups = []Group{
 	{GroupPlugins, "Plugins", "Where plugins are installed from."},
 	{GroupEmber, "Ember", "The resident agent: whether it runs, its models, and when it starts a fresh session."},
 	{GroupAdvanced, "Advanced", "Executables and logging."},
+	{GroupExperimental, "Experimental", "These may change or go without notice."},
 }
 
 // Keys of the static fields that have consumers in the daemon or GUI.
@@ -264,6 +268,7 @@ const (
 	KeyEmberWorkerEffort         = "ember.worker_effort"
 	KeyEmberEpochTokens          = "ember.epoch_context_tokens"
 	KeyEmberEpochHours           = "ember.epoch_max_hours"
+	KeyChromeSurface             = "experimental.chrome_surface"
 	keybindingKeyPrefix          = GroupKeybindings + "."
 	defaultFontFamily            = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
 	defaultScrollback            = 30000
@@ -408,6 +413,13 @@ var staticFields = []Field{
 		Description: "How long a closing thread waits for Claude to exit before it is force-quit.",
 		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
 		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },
+	},
+	// Advanced › Experimental (docs/notes/chrome-surface.md).
+	{
+		Key: KeyChromeSurface, Group: GroupExperimental, Page: PageAdvanced, Section: "experimental", Type: Bool, Title: "Chrome surface",
+		Description: "Adds a Browser tab to side panels: real sites, in a headless Google Chrome with a profile of its own. Off, nothing shows and nothing runs.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Experimental.ChromeSurface },
 	},
 	// General › Dictation. The rest of the section is the dictation store's state
 	// (DictationService.Watch): the model, its download, this Mac.
