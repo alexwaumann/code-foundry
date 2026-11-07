@@ -30,6 +30,7 @@ MODELS = {"opus": "claude-opus-5-5[1m]", "sonnet": "claude-sonnet-5-5[1m]"}
 OTHER_MODEL = {"opus": "Sonnet 5.5", "sonnet": "Opus 5.5"}
 ROOT_PREFIX = ".cf-guide-eval-"
 THREAD_BUDGET = "4.00"  # per thread, in USD: the daemon interrupts Claude at it
+WORKER_MODEL, WORKER_EFFORT = MODELS["sonnet"], "low"  # the workers of a home task: its brief is what is tested
 SETTLE_POLLS, POLL_SECONDS = 3, 10  # a run is over after this many quiet polls in a row
 # p5 searches for this thread. Its home is the one the task runs in; were it to land in
 # Claude's memory files, p5 would answer from them and never search (run_round removes them).
@@ -74,6 +75,27 @@ FIXTURE = {
     "greet_test.go": 'package main\n\nimport "testing"\n\nfunc TestGreeting(t *testing.T) {\n\tif got := Greeting("Ada"); '
                      'got != "Hello, Ada" {\n\t\tt.Fatalf("got %q", got)\n\t}\n}\n',
     "README.md": "# greet\n\nA small CLI that greets someone: `go run . --name Ada`.\n",
+}
+
+
+# A home task's project. The switch has three spots for four new cases, and the usage line, the
+# README's list and the changelog are one spot each: briefs that name no owner or anchor conflict.
+OVERLAP_FIXTURE = {
+    "go.mod": FIXTURE["go.mod"],
+    "main.go": 'package main\n\nimport (\n\t"fmt"\n\t"os"\n)\n\nconst usage = "usage: greet <hello|bye> [name]"\n\n'
+               'func main() {\n\tif len(os.Args) < 2 {\n\t\tfmt.Fprintln(os.Stderr, usage)\n\t\tos.Exit(2)\n\t}\n'
+               '\tname := "world"\n\tif len(os.Args) > 2 {\n\t\tname = os.Args[2]\n\t}\n\tswitch os.Args[1] {\n'
+               '\tcase "hello":\n\t\tfmt.Println(Greeting(name))\n\tcase "bye":\n\t\tfmt.Println(Farewell(name))\n'
+               '\tdefault:\n\t\tfmt.Fprintln(os.Stderr, usage)\n\t\tos.Exit(2)\n\t}\n}\n',
+    "greet.go": 'package main\n\nimport "fmt"\n\n// Greeting is the line greet hello prints.\nfunc Greeting(name string) string '
+                '{\n\treturn fmt.Sprintf("Hello, %s", name)\n}\n\n// Farewell is the line greet bye prints.\n'
+                'func Farewell(name string) string {\n\treturn fmt.Sprintf("Bye, %s", name)\n}\n',
+    "greet_test.go": 'package main\n\nimport "testing"\n\nfunc TestGreeting(t *testing.T) {\n\tif got := Greeting("Ada"); '
+                     'got != "Hello, Ada" {\n\t\tt.Fatalf("got %q", got)\n\t}\n}\n\nfunc TestFarewell(t *testing.T) {\n'
+                     '\tif got := Farewell("Ada"); got != "Bye, Ada" {\n\t\tt.Fatalf("got %q", got)\n\t}\n}\n',
+    "README.md": "# greet\n\nA small CLI that greets someone.\n\n## Commands\n\n- `greet hello [name]`: says hello\n"
+                 "- `greet bye [name]`: says goodbye\n",
+    "CHANGELOG.md": "# Changelog\n\n## Unreleased\n\n- `hello` and `bye`\n",
 }
 
 
@@ -160,9 +182,10 @@ class Home:
     def git(self, *args, cwd=None):
         subprocess.run(["git", *args], cwd=cwd or self.repo, env=clean_env(), check=True, capture_output=True)
 
-    def set_up(self, model, effort):
+    def set_up(self, model, effort, own=False):
+        """own: a home task's home, with its project and cheaper workers."""
         self.repo.mkdir()
-        for name, text in FIXTURE.items():
+        for name, text in (OVERLAP_FIXTURE if own else FIXTURE).items():
             (self.repo / name).write_text(text)
         self.git("init", "--bare", "--initial-branch=main", str(self.origin), cwd=self.dir)
         self.git("init", "--initial-branch=main")
@@ -176,15 +199,19 @@ class Home:
                     "projects.branch_naming": "prefix", "github.dashboards_enabled": "false",
                     "notifications.dock_badge": "false", "notifications.bounce": "false",
                     "ember.model": model, "ember.effort": effort, "ember.worker_models": model, "ember.worker_effort": effort}
+        if own:  # the thread under test gets its model by flag, so only the workers change
+            settings.update({"threads.default_model": WORKER_MODEL, "threads.default_effort": WORKER_EFFORT,
+                             "ember.worker_models": WORKER_MODEL, "ember.worker_effort": WORKER_EFFORT})
         for key, value in settings.items():
             r = self.cf("settings", "set", key, value)
             if r.returncode != 0:
                 raise RuntimeError(f"settings set {key}: {r.stderr or r.stdout}")
         self.project = self.cf_json("project", "add", "--path", str(self.repo))["id"]
 
-    def new_thread(self, name, prompt, model, effort, workspace=""):
+    def new_thread(self, name, prompt, model, effort, workspace="", worktree=True):
         place = ["--workspace", workspace] if workspace else ["--project", self.project]
-        t = self.cf_json("thread", "new", *place, "--new-worktree", "--created-by=", "--focus=false",
+        place += ["--new-worktree"] if worktree else []
+        t = self.cf_json("thread", "new", *place, "--created-by=", "--focus=false",
                          "--model", model, "--effort", effort, "--name", name, "--budget", THREAD_BUDGET,
                          "--prompt", prompt, timeout=180)
         return t["id"]
@@ -253,7 +280,7 @@ def run_task(h, task, rnd, args, out, stop):
         else:
             # Only this task's thread gets a workspace: made here, it changes no other run.
             workspace = h.cf_json("workspace", "new", task["id"], "--projects", h.project)["id"] if task.get("workspace") else ""
-            root = h.new_thread(task["id"], prompt, MODELS[args.model], args.effort, workspace)
+            root = h.new_thread(task["id"], prompt, MODELS[args.model], args.effort, workspace, task.get("checkout") != "project")
         rec["root"] = root
         rec["settled"], rec["wait"] = wait_quiet(h, root, args.task_timeout, stop)
         ts = h.threads()
@@ -285,11 +312,69 @@ def snapshot_guidance(h, out):
                                                    "files": files, "spawn_argv": [a[:200] for a in argv]}, indent=1))
 
 
+def record_git(h, path):
+    """What the threads left in git, for a hand reading: the scratch folders go at the end.
+    The origin's branches, every pair's merge, and the state of the project's own checkout."""
+    def git(*args, cwd=h.origin):
+        return subprocess.run(["git", *args], cwd=cwd, env=clean_env(), capture_output=True, text=True)
+
+    heads = sorted(r.split("refs/heads/")[1] for r in git("for-each-ref", "--format=%(refname)", "refs/heads").stdout.split())
+    branches = [b for b in heads if b != "main"]
+    lines = [f"origin main: {git('log', '--oneline', 'main').stdout.strip()}", "", "branches:"]
+    for b in branches:
+        files = git("diff", "--name-only", f"main...{b}").stdout.split()
+        lines.append(f"  {b}: {git('rev-list', '--count', f'main..{b}').stdout.strip()} commits, {' '.join(files)}")
+    lines += ["", "pairs:"]
+    for i, a in enumerate(branches):
+        for b in branches[i + 1:]:
+            r = git("merge-tree", "--write-tree", "--name-only", a, b)
+            hit = r.stdout.split("\n\n")[0].split("\n")[1:]
+            lines.append(f"  {a} + {b}: {'clean' if r.returncode == 0 else 'CONFLICT ' + ' '.join(hit)}")
+    lines += ["", "project checkout:"]
+    for args in (("status", "-sb"), ("log", "--oneline", "-5"), ("reflog", "-10"), ("branch", "-a"), ("stash", "list"), ("worktree", "list")):
+        lines += [f"$ git {' '.join(args)}", git(*args, cwd=h.repo).stdout.rstrip()]
+    path.write_text("\n".join(lines) + "\n")
+
+
 def live_cost(h):
     return sum(float(t.get("costUsd") or 0) for t in h.threads())
 
 
+def run_home_task(root, rnd, task, args, out, stop, homes):
+    """A task with `home` gets one to itself: Ember is one thread per home, and neither its
+    project nor its workers' model may reach the other tasks, whose reports stay comparable."""
+    h = Home(root, f"r{rnd}-{task['id']}", args.bin)
+    homes.append(h)
+    h.start()
+    h.set_up(MODELS[args.model], args.effort, own=True)
+    args.build = h.cf("version").stdout.strip()
+    run_task(h, task, rnd, args, out, stop)
+    if not (out / "guidance.json").exists():
+        snapshot_guidance(h, out)
+    record_git(h, out / "runs" / f"{task['id']}.r{rnd}" / "git.txt")
+    cost = live_cost(h)
+    stop_home(h)
+    return cost
+
+
 def run_round(root, rnd, tasks, args, out, spent, stop, homes):
+    own = [t for t in tasks if t.get("home")]
+    cost = run_shared_home(root, rnd, [t for t in tasks if not t.get("home")], args, out, spent, stop, homes) if len(own) < len(tasks) else 0.0
+
+    def launch(t):
+        if stop.is_set() or spent + cost >= args.max_cost:
+            log(f"r{rnd} {t['id']}: skipped, spend reached MAX_COST ${args.max_cost}")
+            stop.set()
+            return 0.0
+        return run_home_task(root, rnd, t, args, out, stop, homes)
+
+    with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
+        cost += sum(pool.map(launch, own))
+    (out / f"round{rnd}.json").write_text(json.dumps({"daemon_total_usd": cost}))
+    return cost
+
+
+def run_shared_home(root, rnd, tasks, args, out, spent, stop, homes):
     h = Home(root, f"r{rnd}", args.bin)
     homes.append(h)
     h.start()
@@ -318,7 +403,7 @@ def run_round(root, rnd, tasks, args, out, spent, stop, homes):
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
         list(pool.map(launch, [t for t in tasks if t.get("last")]))
     cost = live_cost(h)
-    (out / f"round{rnd}.json").write_text(json.dumps({"seed": seed, "daemon_total_usd": cost}))
+    record_git(h, out / f"git-r{rnd}.txt")
     stop_home(h)
     denied = h.dir / "gh-denied.log"
     if denied.exists():
@@ -428,7 +513,7 @@ def main():
     p.add_argument("--tasks", default="", help="comma-separated task ids (default: all)")
     p.add_argument("--jobs", type=int, default=6)
     p.add_argument("--task-timeout", type=int, default=1200, help="seconds per run")
-    p.add_argument("--max-cost", type=float, default=18, help="stop launching runs at this spend, in USD")
+    p.add_argument("--max-cost", type=float, default=24, help="stop launching runs at this spend, in USD")
     p.add_argument("--label", default="eval")
     p.add_argument("--out", type=Path, help="results folder (default: under ~/.cache/code-foundry/guide-eval)")
     args = p.parse_args()

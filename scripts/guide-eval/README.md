@@ -5,8 +5,8 @@ the built-in skills, and how many guidance tokens that takes. Any PR that change
 `ThreadPrompt`, a skill or the guide runs it before and after. The baseline is in
 `docs/notes/guide-eval-baseline.md`.
 
-It spends real money, so it is not part of `make check`: 19 tasks, 3 runs, is about $16 on
-Opus 5.5 and $6 on Sonnet 5.5. Run the scorer's tests with
+It spends real money, so it is not part of `make check`: 21 tasks, 3 runs, is about $20 on
+Opus 5.5. The 19 without the overlap tasks were $6 on Sonnet 5.5. Run the scorer's tests with
 `python3 scripts/guide-eval/score_test.py`.
 
 ## Run
@@ -22,7 +22,7 @@ make guide-eval-compare BEFORE=<dir> AFTER=<dir>
 - `BIN` is the build under test; the skills and guide are embedded in it.
 - `TASKS=t1-setting,p4-show-file` runs a subset. A subset cannot pass the gate against a full
   report.
-- `MAX_COST` (USD, default 18, just above a full Opus side) stops launching runs once spent.
+- `MAX_COST` (USD, default 24, above a full Opus side) stops launching runs once spent.
   The runs in flight finish, and each thread also has a $4 budget the daemon enforces.
 - `eval.py --heavy-runs N` runs the heavy tasks fewer times; `--first-round N --out <dir>`
   adds rounds to an existing report.
@@ -82,6 +82,13 @@ Each round gets its own scratch home, daemon, project and local bare origin unde
    thread's whole tree has been quiet for 30 seconds.
 3. `t2` and `ember` run last: `t2`'s app memory reaches every thread started after it.
 
+4. `t10-overlap` and `ember-overlap` (`home` in `tasks.json`) each run alone in a home of their own,
+   with `OVERLAP_FIXTURE` and Sonnet 5.5 low workers. Ember is one thread per home, and neither
+   the project nor the workers' model may reach the other tasks. `t10` starts in the project's
+   own checkout (`checkout`), so working in it is a mistake a run can make. Each writes `git.txt`
+   into its run; the shared home writes `git-r<n>.txt` beside the report: the origin's branches,
+   every pair's `git merge-tree`, and the state of the project's checkout.
+
 `s1` runs in a workspace made for it (`workspace` in `tasks.json`), so `thread checkouts` has a folder
 to name. `p7` asks for the other model, so the switch is real on either side. Ember is one thread per
 home, one more reason for a home per round.
@@ -101,6 +108,16 @@ home, one more reason for a home per round.
   run's unique path on their command line. Then it removes the scratch root and Claude's
   `~/.claude/projects` folders for it. SIGKILL is the exception: remove the folder by hand.
 
+## Reading a run by hand
+
+The gate counts routing, and for the orchestrate and Ember skills that proves little: a thread
+got started. `t10-overlap` and `ember-overlap` are for what it cannot see. Their four pieces want
+more spots in the switch than it has, and the usage line, the README's list and the changelog are
+one spot each, so a brief that names no owner or anchor conflicts. Read every run of these, `t6`
+and `ember` on both sides, and score: pairs that conflict (`git.txt`), work in the shared checkout,
+children whose brief lacks the file split, the length of wake turns, cost, and whether it finished.
+The method and the first results are in `docs/notes/guide-orchestrate-ember.md`.
+
 ## Limits
 
 - No app window is open:
@@ -114,8 +131,9 @@ home, one more reason for a home per round.
   compare only when they come from the same machine and setup.
 - A run is a first turn on a fresh thread. It says nothing about a long thread's routing.
 - `t4` and `p2` read real pull requests. `octocat/Hello-World#4` is closed with no checks, so
-  declining to subscribe is a fair answer that scores as a miss. Should `cli/cli#14957` merge,
-  `p2` changes meaning too: pick another open PR, on both sides of a comparison.
+  declining to subscribe is a fair answer that scores as a miss. Should `cli/cli#13505` merge,
+  `p2` changes meaning too: pick another open PR, on both sides of a comparison. `#14957`, its
+  first PR, merged between two sides on 2026-11-06, and every run rightly set no reminder.
 - Claude Code adds each scratch folder to `projects` in `~/.claude.json`, about two entries a
   run. The harness leaves them: other sessions write that file at the same time. They are
   harmless and name folders that no longer exist.
