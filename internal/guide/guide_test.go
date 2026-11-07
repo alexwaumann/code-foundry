@@ -119,6 +119,26 @@ func TestGuide(t *testing.T) {
 	}
 }
 
+// A repeatable arg is a line of its verb like any other; only a plugin's --arg stays out.
+func TestRepeatableArgsAreListed(t *testing.T) {
+	cmds := registryCommands(t)
+	var view, thread bytes.Buffer
+	if err := WriteTopic(&view, cmds, "View"); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteTopic(&thread, cmds, "thread"); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"`view.panel.diff [<path>…]`", "- `<path>…`: A changed file", "- `--hide string`: Take away a part of the tab"} {
+		if !strings.Contains(view.String(), want) {
+			t.Errorf("the View topic has no %q", want)
+		}
+	}
+	if strings.Contains(thread.String(), "`--arg ") {
+		t.Error("the thread topic lists a plugin's --arg")
+	}
+}
+
 // A new verb needs a registry entry and nothing else: the index and its topic pick it up,
 // and only the registry's mark keeps one out.
 func TestIndexFollowsTheRegistry(t *testing.T) {

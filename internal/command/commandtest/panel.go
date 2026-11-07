@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
@@ -69,23 +68,34 @@ func (f *Files) ReadFile(_ context.Context, r *connect.Request[v1.ReadFileReques
 	return connect.NewResponse(res), nil
 }
 
-// FileDiffs is a fake command.FileDiffer answering Res (default: a modified file).
+// FileDiffs is a fake command.WorktreeComparer answering Res (default: each path asked for
+// changed, or one file without any).
 type FileDiffs struct {
 	Calls
 	Err error
-	Res *v1.GetWorktreeFileDiffResponse
+	Res *v1.CompareWorktreeResponse
 }
 
-var _ command.FileDiffer = (*FileDiffs)(nil)
+var _ command.WorktreeComparer = (*FileDiffs)(nil)
 
-// GetWorktreeFileDiff returns Res.
-func (f *FileDiffs) GetWorktreeFileDiff(_ context.Context, r *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error) {
+// CompareWorktree returns Res.
+func (f *FileDiffs) CompareWorktree(_ context.Context, r *connect.Request[v1.CompareWorktreeRequest]) (*connect.Response[v1.CompareWorktreeResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
 		return nil, f.Err
 	}
-	if f.Res == nil {
-		return connect.NewResponse(&v1.GetWorktreeFileDiffResponse{Status: "M", BaseRef: "origin/main"}), nil
+	if f.Res != nil {
+		return connect.NewResponse(f.Res), nil
 	}
-	return connect.NewResponse(proto.CloneOf(f.Res)), nil
+	res := &v1.CompareWorktreeResponse{
+		BaseRef: "origin/main", MergeBase: "abc",
+		Base: &v1.ResolvedDiffSource{Label: "origin/main"}, Head: &v1.ResolvedDiffSource{Label: "Working tree"},
+	}
+	for _, p := range r.Msg.GetPaths() {
+		res.Files = append(res.Files, &v1.CompareFile{Path: p, Status: "M"})
+	}
+	if len(res.Files) == 0 {
+		res.Files = []*v1.CompareFile{{Path: "a.go", Status: "M"}}
+	}
+	return connect.NewResponse(res), nil
 }

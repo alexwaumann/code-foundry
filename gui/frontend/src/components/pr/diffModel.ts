@@ -5,7 +5,7 @@
  */
 import { parsePatchFiles, SPLIT_WITH_NEWLINES, type FileDiffContentsLoader, type FileDiffLoadedFiles, type FileDiffMetadata } from "@pierre/diffs";
 import type { PullRequestFileView } from "@/api/prDiff";
-import { splitPath } from "@/components/changes/files";
+import { splitPath } from "@/components/diff/files";
 
 export type PrFileStatus = "A" | "M" | "D" | "R";
 

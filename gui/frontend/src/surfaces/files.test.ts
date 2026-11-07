@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { diffOfChange, lastTabOf, openDiffInPanel, openFileInPanel } from "@/stores/filePanel";
+import { lastTabOf, openDiffInPanel, openFileInPanel } from "@/stores/filePanel";
 import { getPanel, makeTab, usePanelStore } from "@/stores/panel";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { diffSurface } from "./diff";
-import { DIFF_KIND, diffOfTab, diffTab, FILE_KIND, fileOfTab, fileTab } from "./fileTarget";
+import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, type DiffTarget } from "./diffTarget";
+import { FILE_KIND, fileOfTab, fileTab } from "./fileTarget";
 import { filesSurface } from "./files";
 import type { SurfaceContext } from "./types";
 
@@ -61,35 +62,19 @@ describe("fileTab", () => {
   });
 });
 
-describe("diffTab", () => {
-  it("keys by project, worktree and path; scope and oldPath are params only", () => {
-    const t = diffTab({ project: "web", worktree: "/w", path: "docs/new.md", oldPath: "docs/old.md", scope: "branch" });
-    expect(t.kind).toBe(DIFF_KIND);
-    expect(t.title).toBe("new.md");
-    expect(t.id).toBe(diffTab({ project: "web", worktree: "/w", path: "docs/new.md", oldPath: "", scope: "working" }).id);
-    expect(t.params).toEqual({ project: "web", worktree: "/w", path: "docs/new.md", oldPath: "docs/old.md", scope: "branch" });
-    expect(diffOfTab(t)).toEqual({ project: "web", worktree: "/w", path: "docs/new.md", oldPath: "docs/old.md", scope: "branch" });
-    expect(diffOfTab({ params: { project: "web", worktree: "/w", path: "a", scope: "?" } })?.scope).toBe("working");
-    expect(diffOfTab({ params: { project: "web", path: "a" } })).toBeNull();
-  });
-
-  it("diffOfChange: uncommitted opens the working tree, else the branch", () => {
-    expect(diffOfChange("web", "/w", { path: "a.ts", oldPath: "", uncommitted: true }).scope).toBe("working");
-    expect(diffOfChange("web", "/w", { path: "a.ts", oldPath: "", uncommitted: false }).scope).toBe("branch");
-  });
-});
+const diff: DiffTarget = { project: "web", worktree: "/w", base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "b.ts", oldPath: "", own: true };
 
 describe("opening and the surfaces' availability", () => {
-  it("opening the same file again activates its tab with the new line; a scope switch keeps the diff's tab", () => {
+  it("opening the same file again activates its tab with the new line; new sources keep the diff's tab", () => {
     openFileInPanel(KEY, { project: "web", base: "/w", path: "a.ts", line: 3 });
-    openDiffInPanel(KEY, { project: "web", worktree: "/w", path: "b.ts", oldPath: "", scope: "working" });
+    openDiffInPanel(KEY, diff, "b vs main");
     openFileInPanel(KEY, { project: "web", base: "/w", path: "/w/a.ts", line: 9 });
     const e = getPanel(KEY);
-    expect(e.groups[0]?.tabs.map((t) => t.title)).toEqual(["a.ts", "b.ts"]);
+    expect(e.groups[0]?.tabs.map((t) => t.title)).toEqual(["a.ts", "b vs main"]);
     expect(e.groups[0]?.tabs[0]?.params.line).toBe("9");
     expect(e.groups[0]?.activeTabId).toBe(e.groups[0]?.tabs[0]?.id);
-    openDiffInPanel(KEY, { project: "web", worktree: "/w", path: "b.ts", oldPath: "", scope: "branch" });
-    expect(getPanel(KEY).groups[0]?.tabs.map((t) => t.params.scope ?? "")).toEqual(["", "branch"]);
+    openDiffInPanel(KEY, { ...diff, head: COMMITTED_HEAD });
+    expect(getPanel(KEY).groups[0]?.tabs.map((t) => t.params.head ?? "")).toEqual(["", "ref:HEAD"]);
   });
 
   it("File and Diff are dimmed until the panel has such a tab; then F and D bring back the last one", () => {

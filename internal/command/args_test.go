@@ -136,3 +136,57 @@ func TestArgsGiven(t *testing.T) {
 		t.Error("NewArgs: every value counts as given")
 	}
 }
+
+// Each of a repeatable path's values expands on its own; a bad one fails the whole arg.
+func TestParseArgsRepeatablePath(t *testing.T) {
+	t.Setenv("HOME", "/Users/me")
+	specs := []ArgSpec{{Name: "path", Type: Path, Repeatable: true, Positional: true}}
+	tests := []struct {
+		name    string
+		raw     string
+		want    string
+		wantErr bool
+		wantMsg string
+	}{
+		{name: "one", raw: "/a/b.go", want: "/a/b.go"},
+		{name: "several, each expanded and cleaned", raw: "~/x.go\n/a/./b.go", want: "/Users/me/x.go\n/a/b.go"},
+		{name: "a newline in a path says so", raw: "/a/line\nbreak.go", wantErr: true, wantMsg: "cannot hold a newline"},
+		{name: "one path has no newline to blame", raw: "relative.go", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a, _, err := parseArgs(specs, map[string]string{"path": tt.raw}, Context{})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, want error %t", err, tt.wantErr)
+			}
+			if err != nil && (tt.wantMsg != "") != strings.Contains(err.Error(), "newline") {
+				t.Errorf("err = %v, want message %q", err, tt.wantMsg)
+			}
+			if err == nil && a.Path("path") != tt.want {
+				t.Errorf("path = %q, want %q", a.Path("path"), tt.want)
+			}
+		})
+	}
+}
+
+func TestRepeatableArgValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		spec ArgSpec
+		ok   bool
+	}{
+		{"a string flag", ArgSpec{Name: "a", Type: String, Repeatable: true}, true},
+		{"a path flag", ArgSpec{Name: "a", Type: Path, Repeatable: true}, true},
+		{"a positional path", ArgSpec{Name: "a", Type: Path, Repeatable: true, Positional: true}, true},
+		{"a positional string stays refused", ArgSpec{Name: "a", Type: String, Repeatable: true, Positional: true}, false},
+		{"an int", ArgSpec{Name: "a", Type: Int, Repeatable: true}, false},
+		{"with a context", ArgSpec{Name: "a", Type: Path, Repeatable: true, Context: ContextWorktree}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.spec.validate(); (err == nil) != tt.ok {
+				t.Errorf("validate = %v, want ok %t", err, tt.ok)
+			}
+		})
+	}
+}

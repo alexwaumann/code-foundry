@@ -110,10 +110,10 @@ type Deps struct {
 	// FileEdits checks a file the File tab is to edit (Filesystem.CheckEdit), for
 	// view.panel.file --edit. Nil makes it fail with Unimplemented.
 	FileEdits command.FileEditChecker
-	// FileDiffs reads a worktree file's diff as the Diff tab does
-	// (ProjectService.GetWorktreeFileDiff), for view.panel.diff. Nil makes it fail with
+	// FileDiffs reads what differs in a checkout as the Diff tab does
+	// (ProjectService.CompareWorktree), for view.panel.diff. Nil makes it fail with
 	// Unimplemented.
-	FileDiffs command.FileDiffer
+	FileDiffs command.WorktreeComparer
 	// ShippedSkills lists the skills the daemon ships to every thread (skills.Shipped),
 	// for daemon.capabilities, which also reads Daemon, Settings, Memory, Plugin, Skills
 	// and Presence. Nil: none listed.

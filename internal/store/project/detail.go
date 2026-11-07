@@ -1,12 +1,9 @@
 package project
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -522,28 +519,8 @@ func countLines(path string) (lines int, binary bool) {
 		return 0, false
 	}
 	defer func() { _ = f.Close() }()
-	buf := make([]byte, 64<<10)
-	var read int
-	last := byte('\n')
-	for read < untrackedReadMax {
-		n, err := f.Read(buf)
-		if n > 0 {
-			chunk := buf[:n]
-			if read < binarySniff && bytes.IndexByte(chunk[:min(n, binarySniff-read)], 0) >= 0 {
-				return 0, true
-			}
-			lines += bytes.Count(chunk, []byte{'\n'})
-			last = chunk[n-1]
-			read += n
-		}
-		if errors.Is(err, io.EOF) || err != nil {
-			break
-		}
-	}
-	if read > 0 && last != '\n' {
-		lines++
-	}
-	return lines, false
+	lines, binary, _ = countReader(f, untrackedReadMax)
+	return lines, binary
 }
 
 func sameDetail(a, b WorktreeDetail) bool {

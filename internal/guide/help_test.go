@@ -41,6 +41,13 @@ func TestWriteHelp(t *testing.T) {
 			not: []string{"Asks for confirmation"},
 		},
 		{
+			// Repeatable: the usage shows it takes several, and its flag says so too.
+			name: "a repeatable positional", cmd: &v1.Command{Name: "view.panel.diff", Title: "Show Diff", Args: []*v1.ArgSpec{
+				{Name: "path", Type: v1.ArgType_ARG_TYPE_PATH, Positional: true, Repeatable: true, Description: "A file"},
+			}},
+			want: []string{"  code-foundry view.panel.diff [<path>…] [flags]\n", "A file (repeatable)"},
+		},
+		{
 			name: "without the common flags", style: HelpReference, cmd: cmd,
 			want: []string{"Flags:", "Asks for confirmation: --yes confirms"},
 			not:  []string{"Common flags:", "--context-thread"},

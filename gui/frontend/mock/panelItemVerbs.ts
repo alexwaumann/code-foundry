@@ -120,18 +120,40 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
         description: `Open a changed file's diff in a Diff tab ${lead}the file against the branch's base, side by side or unified.`,
         keybindings: [],
         args: [
-          { name: "path", type: ArgType.PATH, required: true, description: "Changed file in the thread's worktree: absolute, or relative to the current directory" },
+          { name: "path", type: ArgType.PATH, required: false, description: "Changed file in the thread's worktree: absolute, or relative to the current directory" },
           { name: "scope", type: ArgType.ENUM, required: false, description: "working: the base against the file on disk, uncommitted changes included; branch: against the last commit" },
+          { name: "base", type: ArgType.STRING, required: false, description: "The older side" },
+          { name: "head", type: ArgType.STRING, required: false, description: "The newer side" },
+          { name: "title", type: ArgType.STRING, required: false, description: "The tab's name" },
+          { name: "note", type: ArgType.STRING, required: false, description: "A line under the title" },
+          { name: "hide", type: ArgType.STRING, required: false, description: "compare or files" },
           ...panelThreadArgs,
         ],
       },
       when,
       run: (ctx, args) =>
         show(ctx, args, "panel.diff", (t, id) => {
-          const path = args.path ?? "";
           if (!t.projectId) throw new CommandError("unavailable", `thread ${id} runs in no project worktree`);
-          if (!path.startsWith(t.worktreePath + "/")) throw new CommandError("invalid", `${path} is not a file in thread ${id}'s worktree ${t.worktreePath}`);
-          return { project: t.projectId, worktree: t.worktreePath, path: path.slice(t.worktreePath.length + 1), scope: args.scope === "branch" ? "branch" : "working" };
+          const paths = (args.path ?? "").split("\n").filter(Boolean);
+          for (const p of paths) if (!p.startsWith(t.worktreePath + "/")) throw new CommandError("invalid", `${p} is not a file in thread ${id}'s worktree ${t.worktreePath}`);
+          const rels = paths.map((p) => p.slice(t.worktreePath.length + 1));
+          const source = (v: string | undefined) => (!v ? undefined : ["working", "staged", "merge-base"].includes(v) ? v : `ref:${v}`);
+          const head = args.scope === "branch" ? "ref:HEAD" : source(args.head);
+          const base = source(args.base);
+          // Like the daemon: anything but choosing a file gets a tab of its own, the checkout's being the user's.
+          const framed = rels.length > 1 || args.title || args.note || args.hide;
+          return {
+            project: t.projectId,
+            worktree: t.worktreePath,
+            own: "1",
+            ...(framed ? { thread: id } : {}),
+            ...(base ? { base } : {}),
+            ...(head ? { head } : {}),
+            ...(rels.length === 1 ? { path: rels[0] ?? "" } : rels.length > 1 ? { paths: rels.join("\n") } : {}),
+            ...(args.title ? { title: args.title } : {}),
+            ...(args.note ? { note: args.note } : {}),
+            ...(args.hide ? { hide: args.hide.split("\n").join(",") } : {}),
+          };
         }),
     },
     {
