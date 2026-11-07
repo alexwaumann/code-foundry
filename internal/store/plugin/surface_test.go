@@ -705,6 +705,10 @@ func TestInvokeAskAndToasts(t *testing.T) {
 	if ask == nil || ask.GetName() != "thread.archive" || ask.GetCaller() != "plugin:surf" || ask.GetContext().GetActiveThreadId() != "s-1" {
 		t.Errorf("intent %v", ask)
 	}
+	// The GUI re-invokes on this context: the question stays a plugin's.
+	if got := ask.GetContext().GetOrigin(); got != command.OriginPlugin {
+		t.Errorf("origin = %v, want the plugin's", got)
+	}
 	// The plugin returns the host's result as is: windows and receivers counted apart.
 	if want := `{"asked":true,"windows":1,"receivers":1,"delivered":1}`; mustJSON(t, r) != want {
 		t.Errorf("ask JSON = %s, want %s", mustJSON(t, r), want)

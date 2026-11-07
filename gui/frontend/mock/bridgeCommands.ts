@@ -1,6 +1,6 @@
 /**
  * Mock-only commands a page's bridge test reads (docs/notes/bridge-2-gui.md): the daemon's
- * `thread.list` (read-only), with its JSON result.
+ * `thread.list` (read-only), with its JSON result, and `thread.wait` for its listing.
  */
 import { ArgType } from "../src/gen/codefoundry/v1/command_pb";
 import { CommandError } from "./errors";
@@ -33,6 +33,12 @@ export function bridgeCommands(threads: () => ListedThread[]) {
           resultJson: JSON.stringify({ threads: list.map((t) => ({ id: t.id, name: t.name, archived: t.archivedAt !== null })) }),
         });
       },
+    },
+    // Listed for the bridge's read-only check; server.ts holds the call itself (holdWait).
+    {
+      cmd: { name: "thread.wait", noPalette: true, title: "Wait for Thread", category: "Thread", description: "Wait for a thread to settle", keybindings: [], readOnly: true, args: [] },
+      when: () => true,
+      run: () => Promise.resolve({ message: "", resultJson: "" }),
     },
   ];
 }

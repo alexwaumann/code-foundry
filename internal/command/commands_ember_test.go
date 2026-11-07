@@ -85,6 +85,34 @@ func (f *emberFixture) invoke(t *testing.T, name string, args map[string]string)
 	return res
 }
 
+// Turning Ember on from a page is a setting's change: the user answers first. Anyone else
+// turns it on as before, and turning it off never asks.
+func TestEmberEnableFromAPage(t *testing.T) {
+	page := command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}
+	f := newEmberFixture(t)
+	_, err := f.reg.Invoke(context.Background(), page, "ember.enable", nil)
+	var ce *command.ConfirmError
+	if !errors.As(err, &ce) || ce.Command != "ember.enable" || ce.Label != "Turn On" {
+		t.Fatalf("err = %#v, want the question", err)
+	}
+	if len(f.settings.updates) != 0 {
+		t.Fatalf("changed before the answer: %v", f.settings.updates)
+	}
+	if _, err := f.reg.Invoke(context.Background(), page, "ember.enable", nil, command.Confirmed(true)); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.settings.updates) != 1 {
+		t.Errorf("after a yes: %v", f.settings.updates)
+	}
+	if _, err := f.reg.Invoke(context.Background(), page, "ember.disable", nil); err != nil {
+		t.Errorf("ember.disable: %v", err)
+	}
+	thread := command.Context{ActiveThreadID: "s-1"}
+	if _, err := f.reg.Invoke(context.Background(), thread, "ember.enable", nil); err != nil {
+		t.Errorf("a thread's CLI: %v", err)
+	}
+}
+
 func TestEmberCommands(t *testing.T) {
 	f := newEmberFixture(t)
 	if res := f.invoke(t, "ember.status", nil); !strings.Contains(res.Message, "Ember: off") || !strings.Contains(res.Message, "thread: none yet") {

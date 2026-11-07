@@ -4,7 +4,7 @@ import { confirmationOf, confirmButtonLabel, invokeCommand, listCommands, type C
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
-import { confirmPresenter, requestConfirm, secondStagePresenter } from "./confirm";
+import { confirmPresenter, requestConfirm, secondStagePresenter, type ConfirmPresenter } from "./confirm";
 import { contextKey, getUiContext } from "./context";
 import { useProjectsStore } from "./projects";
 import { useSubagentViewStore } from "./subagentView";
@@ -98,15 +98,17 @@ const MAX_CONFIRM_STAGES = 3;
  * (the digest of the consent text shown) are merged too. Resolves null when the
  * user declines (or a declined second stage's result: what the command already did);
  * other errors reject. `caller` names who asked for it (a plugin's InvokeCommand
- * intent), shown in the dialog. `around` runs each question (a page's bridge queues them
- * per frame and learns the answer: stores/bridgeHost.ts); `signal` aborts the call.
+ * intent), shown in the dialog. `ask` takes every question instead of the dialogs above: a
+ * page's (stores/bridgeHost.ts) gets the guarded confirm dialog and no command's own
+ * presenter, so what it asks never counts on what the app's own dialogs accepted. `signal`
+ * aborts the call.
  */
 export async function invokeConfirmed(
   name: string,
   args: Record<string, string> = {},
   ctx: UiContextView = getUiContext(),
   caller?: string,
-  opts: { around?: (ask: () => Promise<boolean>) => Promise<boolean>; signal?: AbortSignal } = {},
+  opts: { ask?: ConfirmPresenter; signal?: AbortSignal } = {},
 ): Promise<Awaited<ReturnType<typeof invokeCommand>> | null> {
   let callArgs = args;
   let confirmed = false;
@@ -120,10 +122,10 @@ export async function invokeConfirmed(
       // A second stage applies only to the command invoked (not one plugin.act ran for it).
       if (confirm.args && confirm.command !== name) throw err;
       const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
-      const ask = (confirm.args ? secondStagePresenter(name) : confirmPresenter(name)) ?? requestConfirm;
+      const ask = opts.ask ?? (confirm.args ? secondStagePresenter(name) : confirmPresenter(name)) ?? requestConfirm;
       const confirmLabel = confirmButtonLabel(title, confirm.confirmLabel);
       const req = { title, message: confirm.message, confirmLabel, command: name, args: callArgs, ...(caller ? { caller } : {}) };
-      const yes = await (opts.around ? opts.around(() => ask(req)) : ask(req));
+      const yes = await ask(req);
       if (!yes) return confirm.declined ?? null;
       confirmed = true;
       if (confirm.args) callArgs = { ...callArgs, ...confirm.args };

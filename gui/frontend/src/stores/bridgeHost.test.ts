@@ -2,7 +2,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView, ConfirmationView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
-import { answerConfirm, useConfirmStore } from "./confirm";
+import { answerConfirm, registerConfirmPresenter, requestConfirm, useConfirmStore } from "./confirm";
 import { useThreadsStore } from "./threads";
 
 const invokeCommand = vi.hoisted(() => vi.fn());
@@ -34,7 +34,7 @@ vi.mock("@/api/pageStorage", () => ({
 // The daemon's ProxyFetch: what each call asked, answered by the test.
 const proxyFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/api/proxyFetch", () => ({ proxyFetch }));
-const { createBridgeHost, BRIDGE_DEBOUNCE_MS } = await import("./bridgeHost");
+const { createBridgeHost, BRIDGE_DEBOUNCE_MS, PAGE_ASKS } = await import("./bridgeHost");
 const { EMBER_OFF_SCREEN } = await import("./bridgeSources");
 
 const cmd = (name: string, over: Partial<CommandView> = {}): CommandView => ({ name, title: name, description: "", category: "Thread", args: [], keybindings: [], available: true, ...over });
@@ -57,11 +57,16 @@ const thread = (id: string, name: string): ThreadView => ({ id, name, projectId:
 function host(threadId: string | null = "t-1") {
   const posts: Record<string, unknown>[] = [];
   const errors: { call: string; code: string; message: string }[] = [];
-  const h = createBridgeHost({ threadId, pageName: "page.html", post: (m) => posts.push(m as unknown as Record<string, unknown>), onError: (e) => errors.push(e) });
-  return { h, posts, errors };
+  const attention = { present: true };
+  const h = createBridgeHost({ threadId, pageName: "page.html", userPresent: () => attention.present, post: (m) => posts.push(m as unknown as Record<string, unknown>), onError: (e) => errors.push(e) });
+  return { h, posts, errors, attention };
 }
 
 const run = (id: string, verb: string, args: Record<string, string> = {}) => ({ cf: 1, type: "cf:run", id, verb, args });
+/** Moves the host's clock on; timers stay real. */
+const later = (ms: number) => {
+  vi.setSystemTime(Date.now() + ms);
+};
 const hello = { cf: 1, type: "cf:hello" };
 /** invokeCommand's last two args for a page's call: the default connection and the call's abort signal. */
 const signalled: unknown[] = [undefined, expect.objectContaining({ signal: expect.any(AbortSignal) as unknown })];
@@ -192,12 +197,13 @@ describe("bridge host", () => {
     const { h, posts } = host();
     h.receive(run("a", "thread.archive"));
     await vi.waitFor(() => {
-      expect(useConfirmStore.getState().pending?.caller).toBe("page.html, a page in Fix stale badge");
+      expect(useConfirmStore.getState().pending).toMatchObject({ guarded: true, caller: "a page", callerDetail: 'Page "page.html" in thread "Fix stale badge"' });
     });
     answerConfirm(false);
     await vi.waitFor(() => {
       expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: false, error: { code: "declined" } });
     });
+    later(PAGE_ASKS.gapMs);
     h.receive(run("b", "thread.archive"));
     await vi.waitFor(() => {
       expect(useConfirmStore.getState().pending).not.toBeNull();
@@ -208,33 +214,182 @@ describe("bridge host", () => {
     });
   });
 
-  it("asks one question at a time per frame", async () => {
+  it("quotes a thread's name, which a page can set, apart from the app's words", async () => {
+    invokeCommand.mockRejectedValue(archiveConfirm);
+    useThreadsStore.setState({ byId: { "t-1": thread("t-1", `Settings"\nAsked by Code Foundry ${"x".repeat(200)}`) } });
+    const { h } = host();
+    h.receive(run("a", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).not.toBeNull();
+    });
+    const shown = useConfirmStore.getState().pending;
+    expect(shown?.caller).toBe("a page");
+    expect(shown?.callerDetail).toContain('\\"\\nAsked by');
+    expect(shown?.callerDetail?.length).toBeLessThan(140);
+  });
+
+  it("refuses a verb that changes something while the user is not in the frame, whatever the page's script said", async () => {
+    invokeCommand.mockResolvedValue({ message: "ok", resultJson: "" });
+    const { h, posts, errors, attention } = host();
+    attention.present = false;
+    h.receive(run("a", "ui.notify"));
+    h.receive(run("b", "nope.nope"));
+    h.receive(run("c", "thread.list"));
+    await vi.waitFor(() => {
+      expect(posts.filter((p) => p.type === "cf:result").map((p) => [p.id, p.ok])).toEqual(expect.arrayContaining([["a", false], ["b", false], ["c", true]]));
+    });
+    expect(posts.find((p) => p.id === "a")).toMatchObject({ error: { code: "gesture" } });
+    expect(invokeCommand.mock.calls.map((c) => c[0] as string)).toEqual(["thread.list"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("judges the user's presence when the call arrives, not after it looked the verb up", async () => {
+    invokeCommand.mockResolvedValue({ message: "ok", resultJson: "" });
+    const { h, posts, attention } = host();
+    h.receive(run("a", "ui.notify"));
+    attention.present = false;
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: true });
+    });
+  });
+
+  it("has one question open per frame: another call is refused, not queued", async () => {
     invokeCommand.mockImplementation((_n: string, _c: unknown, _a: unknown, _conn: unknown, opts?: { confirmed?: boolean }) =>
       opts?.confirmed ? Promise.resolve({ message: "ok", resultJson: "" }) : Promise.reject(archiveConfirm),
     );
-    const { h, posts } = host();
+    const { h, posts, errors } = host();
     h.receive(run("a", "thread.archive"));
-    h.receive(run("b", "thread.archive"));
     await vi.waitFor(() => {
       expect(useConfirmStore.getState().pending).not.toBeNull();
     });
     const first = useConfirmStore.getState().pending;
+    h.receive(run("b", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "b", ok: false, error: { code: "invalid", message: expect.stringMatching(/already has a question open/) as unknown } });
+    });
+    expect(errors.map((e) => e.code)).toEqual(["invalid"]);
+    expect(useConfirmStore.getState().pending).toBe(first);
     answerConfirm(true);
     await vi.waitFor(() => {
-      expect(posts.filter((p) => p.type === "cf:result").map((p) => p.id)).toEqual(["a"]);
+      expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: true });
     });
-    // The second asks only after the first was answered (requestConfirm would have cancelled it).
+    expect(useConfirmStore.getState().pending).toBeNull();
+  });
+
+  it("holds a frame's next question back after the last, however it ended, past a reload too", async () => {
+    invokeCommand.mockRejectedValue(archiveConfirm);
+    const { h, posts } = host();
+    const refused = async (id: string) => {
+      h.receive(run(id, "thread.archive"));
+      await vi.waitFor(() => {
+        expect(posts.find((p) => p.id === id && p.type === "cf:result")).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringMatching(/asking too often/) as unknown } });
+      });
+      expect(useConfirmStore.getState().pending).toBeNull();
+    };
+    const opens = async (id: string) => {
+      h.receive(run(id, "thread.archive"));
+      await vi.waitFor(() => {
+        expect(useConfirmStore.getState().pending).not.toBeNull();
+      });
+    };
+    await opens("a");
+    answerConfirm(false);
     await vi.waitFor(() => {
-      expect(useConfirmStore.getState().pending).not.toBe(first);
-      expect(useConfirmStore.getState().pending).not.toBeNull();
+      expect(posts.at(-1)).toMatchObject({ id: "a", error: { code: "declined" } });
+    });
+    await refused("b");
+    later(PAGE_ASKS.gapMs);
+    await opens("c");
+    h.receive({ cf: 1, type: "cf:cancel", id: "c" });
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ id: "c", ok: false });
+    });
+    await refused("d");
+    h.receive(hello);
+    await refused("e");
+    later(PAGE_ASKS.gapMs);
+    await opens("f");
+    answerConfirm(false);
+    await vi.waitFor(() => {
+      expect(posts.find((p) => p.id === "f" && p.type === "cf:result")).toMatchObject({ error: { code: "declined" } });
+    });
+    // Three in the minute: the gap alone no longer lets a fourth through.
+    later(PAGE_ASKS.gapMs);
+    await refused("g");
+    later(60_000);
+    await opens("h");
+  });
+
+  it("does not hold back a later stage of the same call", async () => {
+    invokeCommand.mockImplementation((_n: string, _c: unknown, a: Record<string, string>, _conn: unknown, opts?: { confirmed?: boolean }) => {
+      if (!opts?.confirmed) return Promise.reject(archiveConfirm);
+      if (a.force !== "true") return Promise.reject(new NeedsConfirm({ command: "thread.archive", title: "Force", message: "Really?", args: { force: "true" } }));
+      return Promise.resolve({ message: "ok", resultJson: "" });
+    });
+    const { h, posts } = host();
+    h.receive(run("a", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending?.message).toBe(archiveConfirm.confirm.message);
     });
     answerConfirm(true);
     await vi.waitFor(() => {
-      expect(posts.filter((p) => p.type === "cf:result").map((p) => [p.id, p.ok])).toEqual([
-        ["a", true],
-        ["b", true],
-      ]);
+      expect(useConfirmStore.getState().pending?.message).toBe("Really?");
     });
+    answerConfirm(true);
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: true });
+    });
+  });
+
+  it("uses the guarded dialog, not a command's own presenter", async () => {
+    invokeCommand.mockRejectedValue(archiveConfirm);
+    const own = vi.fn(() => Promise.resolve(true));
+    const stop = registerConfirmPresenter("thread.archive", own);
+    const { h } = host();
+    h.receive(run("a", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending?.guarded).toBe(true);
+    });
+    expect(own).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("waits behind the app's open dialog, leaves it unanswered, and takes back only its own question", async () => {
+    invokeCommand.mockRejectedValue(archiveConfirm);
+    const heard = vi.fn();
+    void requestConfirm({ title: "Remove Worktree", message: "Remove it?", confirmLabel: "Remove" }).then(heard);
+    const shown = useConfirmStore.getState().pending;
+    const one = host();
+    one.h.receive(run("a", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(one.posts).toEqual([{ type: "cf:pending", id: "a", reason: "confirm" }]);
+    });
+    expect(useConfirmStore.getState().pending).toBe(shown);
+    // Giving up, and going, leave the app's dialog alone.
+    one.h.receive({ cf: 1, type: "cf:cancel", id: "a" });
+    await vi.waitFor(() => {
+      expect(one.posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: false });
+    });
+    const two = host();
+    two.h.receive(run("b", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(two.posts).toEqual([{ type: "cf:pending", id: "b", reason: "confirm" }]);
+    });
+    two.h.dispose();
+    expect(useConfirmStore.getState().pending).toBe(shown);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(heard).not.toHaveBeenCalled();
+    // A third, still waiting when the app's dialog is answered, opens then.
+    const three = host();
+    three.h.receive(run("c", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(three.posts).toEqual([{ type: "cf:pending", id: "c", reason: "confirm" }]);
+    });
+    answerConfirm(true);
+    await vi.waitFor(() => {
+      expect(heard).toHaveBeenCalledWith(true);
+    });
+    expect(useConfirmStore.getState().pending?.guarded).toBe(true);
   });
 
   it("cancels its open question and drops every answer once disposed", async () => {
@@ -250,19 +405,14 @@ describe("bridge host", () => {
     expect(posts).toEqual([{ type: "cf:pending", id: "a", reason: "confirm" }]);
   });
 
-  it("tells the page a call waits on the user, open or queued, and when it was answered", async () => {
+  it("tells the page a call waits on the user, and when it was answered", async () => {
     invokeCommand.mockImplementation((_n: string, _c: unknown, _a: unknown, _conn: unknown, opts?: { confirmed?: boolean }) =>
       opts?.confirmed ? Promise.resolve({ message: "ok", resultJson: "" }) : Promise.reject(archiveConfirm),
     );
     const { h, posts } = host();
     h.receive(run("a", "thread.archive"));
-    h.receive(run("b", "thread.archive"));
-    // Both pending at once: a's dialog is open, b's is queued behind it.
     await vi.waitFor(() => {
-      expect(posts.filter((p) => p.type === "cf:pending")).toEqual([
-        { type: "cf:pending", id: "a", reason: "confirm" },
-        { type: "cf:pending", id: "b", reason: "confirm" },
-      ]);
+      expect(posts).toEqual([{ type: "cf:pending", id: "a", reason: "confirm" }]);
     });
     answerConfirm(true);
     await vi.waitFor(() => {
@@ -273,34 +423,21 @@ describe("bridge host", () => {
     });
   });
 
-  it("declines a question the page gave up on, open or queued, and never runs its command", async () => {
+  it("declines a question the page gave up on and never runs its command", async () => {
     invokeCommand.mockImplementation((_n: string, _c: unknown, _a: unknown, _conn: unknown, opts?: { confirmed?: boolean }) =>
       opts?.confirmed ? Promise.resolve({ message: "ok", resultJson: "" }) : Promise.reject(archiveConfirm),
     );
     const { h, posts } = host();
     h.receive(run("a", "thread.archive", { id: "x" }));
-    h.receive(run("b", "thread.archive", { id: "y" }));
-    h.receive(run("c", "thread.archive", { id: "z" }));
     await vi.waitFor(() => {
       expect(useConfirmStore.getState().pending?.args).toMatchObject({ id: "x" });
     });
-    // b gives up while queued, then a while its dialog is open.
-    h.receive({ cf: 1, type: "cf:cancel", id: "b" });
     h.receive({ cf: 1, type: "cf:cancel", id: "a" });
-    // a's dialog went; b is skipped; c asks.
     await vi.waitFor(() => {
-      expect(useConfirmStore.getState().pending?.args).toMatchObject({ id: "z" });
+      expect(posts.filter((p) => p.type === "cf:result").map((p) => [p.id, p.ok])).toEqual([["a", false]]);
     });
-    answerConfirm(true);
-    await vi.waitFor(() => {
-      expect(posts.filter((p) => p.type === "cf:result").map((p) => [p.id, p.ok])).toEqual([
-        ["a", false],
-        ["b", false],
-        ["c", true],
-      ]);
-    });
-    const confirmed = invokeCommand.mock.calls.filter((c) => (c[4] as { confirmed?: boolean } | undefined)?.confirmed).map((c) => (c[2] as Record<string, string>).id);
-    expect(confirmed).toEqual(["z"]);
+    expect(useConfirmStore.getState().pending).toBeNull();
+    expect(invokeCommand.mock.calls.filter((c) => (c[4] as { confirmed?: boolean } | undefined)?.confirmed)).toEqual([]);
   });
 
   it("hands a page its thread's storage in ready and writes through, telling the thread's other frames", async () => {

@@ -6,7 +6,7 @@
  */
 import type { BridgeErrorCode } from "./bridge";
 
-/** The codes a page's strip reports: the page's own mistakes and the app's failures. Not `declined` (the user said no) nor `gesture` (page-side). */
+/** The codes a page's strip reports: the page's own mistakes and the app's failures. Not `declined` (the user said no) nor `gesture` (no press in the page). */
 export const REPORTED_CODES: ReadonlySet<BridgeErrorCode> = new Set(["invalid", "unavailable", "failed", "timeout"]);
 
 /** How many distinct errors a frame keeps (the latest). */

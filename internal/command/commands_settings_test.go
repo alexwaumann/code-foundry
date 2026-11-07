@@ -287,6 +287,28 @@ func TestSettingChangeCallers(t *testing.T) {
 	}
 }
 
+// A dialog shows the start of a long value and says how much it left out.
+func TestSettingChangeDialogCapsTheValue(t *testing.T) {
+	page := command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}
+	for _, tc := range []struct {
+		name, value, want string
+	}{
+		{"at the cap", strings.Repeat("a", 200), `"` + strings.Repeat("a", 200) + `"?`},
+		{"past it", strings.Repeat("a", 6085), `"` + strings.Repeat("a", 200) + `"… (5885 more characters not shown)?`},
+		{"counted in characters", strings.Repeat("é", 201), `"` + strings.Repeat("é", 200) + `"… (1 more characters not shown)?`},
+		{"spaces too", strings.Repeat(" ", 3000), `"` + strings.Repeat(" ", 200) + `"… (2800 more characters not shown)?`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, _, _, _ := newSettingsRegistry(t)
+			_, err := reg.Invoke(context.Background(), page, "settings.set", map[string]string{"key": "projects.branch_prefix", "value": tc.value})
+			var ce *command.ConfirmError
+			if !errors.As(err, &ce) || !strings.HasSuffix(ce.Message, tc.want) {
+				t.Errorf("err = %#v, want a message ending %q", err, tc.want)
+			}
+		})
+	}
+}
+
 // A page's dialog quotes the value, so a value cannot draw lines of its own in it, and a
 // mistyped key is the page's error, not a question to the user.
 func TestSettingChangeDialog(t *testing.T) {

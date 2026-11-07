@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -144,6 +145,18 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 	)
 }
 
+// pinToView binds a page's yes to the view it was asked from: the re-invoke carries this
+// version, so a view that changed under the question no longer finds a command to run. A
+// question with its own args or bind stays as it was.
+func pinToView(err error, uctx Context, version uint64) error {
+	var ce *ConfirmError
+	if uctx.Origin == OriginPage && errors.As(err, &ce) && len(ce.Args) == 0 && ce.Bind == nil {
+		ce.Command = "plugin.act"
+		ce.Bind = map[string]string{"version": strconv.FormatUint(version, 10)}
+	}
+	return err
+}
+
 // actResult is plugin.act's --json: what happened, then the view after it.
 type actResult struct {
 	// Version is the view version an event acted on.
@@ -215,7 +228,7 @@ func pluginAct(ctx context.Context, r *Registry, b PluginSurfaceBackend, uctx Co
 		}
 		res, err := r.Invoke(ctx, pressed, el.GetAction(), args, Confirmed(ConfirmedIn(ctx)))
 		if err != nil {
-			return Result{}, err
+			return Result{}, pinToView(err, pressed, view.GetVersion())
 		}
 		out.Command, out.Message = el.GetAction(), res.Message
 		if js, err := res.EncodeJSON(); err == nil && js != "" {

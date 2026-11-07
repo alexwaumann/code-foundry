@@ -119,6 +119,32 @@ func TestDictationCommands(t *testing.T) {
 	}
 }
 
+// The download is large and turns dictation on: from a page the user answers first.
+func TestDictationDownloadFromAPage(t *testing.T) {
+	page := command.Context{ActiveThreadID: "s-1", Origin: command.OriginPage}
+	snap := dictationSnapshot(v1.DictationState_DICTATION_STATE_DISABLED, func(s *v1.DictationSnapshot) { s.Model.Downloaded = false })
+	b := &commandtest.Dictation{Snapshot: snap}
+	reg := newDictationRegistry(t, b, snap, &commandtest.Emitter{})
+	_, err := reg.Invoke(context.Background(), page, "dictation.download", nil)
+	var ce *command.ConfirmError
+	if !errors.As(err, &ce) || ce.Command != "dictation.download" || !strings.Contains(ce.Message, "0.9 GB") {
+		t.Fatalf("err = %#v, want the question", err)
+	}
+	if reqs := b.Requests(); len(reqs) != 0 {
+		t.Fatalf("started before the answer: %v", reqs)
+	}
+	if _, err := reg.Invoke(context.Background(), page, "dictation.download", nil, command.Confirmed(true)); err != nil {
+		t.Fatal(err)
+	}
+	if reqs := b.Requests(); len(reqs) != 1 {
+		t.Errorf("after a yes: %v", reqs)
+	}
+	thread := command.Context{ActiveThreadID: "s-1"}
+	if _, err := reg.Invoke(context.Background(), thread, "dictation.download", nil); err != nil {
+		t.Errorf("a thread's CLI: %v", err)
+	}
+}
+
 func TestDictationStatus(t *testing.T) {
 	for _, tc := range []struct {
 		name string

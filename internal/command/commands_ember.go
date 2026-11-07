@@ -171,10 +171,15 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 			Name:         "ember.enable",
 			NoPalette:    true,
 			Title:        "Ember: Turn On",
-			Description:  "Turn Ember on (the ember.enabled setting): its thread is made on first use, in ~/.code-foundry/residents/ember.",
+			Description:  "Turn Ember on (the ember.enabled setting): its thread is made on first use, in ~/.code-foundry/residents/ember. A page asks the user first.",
 			Category:     emberCategory,
 			NoKeybinding: true,
-			Run:          func(ctx context.Context, _ Context, _ Args) (Result, error) { return setEnabled(ctx, true) },
+			Run: func(ctx context.Context, uctx Context, _ Args) (Result, error) {
+				if err := pageAsks(ctx, uctx, "ember.enable", "Ember: Turn On", "Turn On", "Turn on Ember? It starts a thread of its own, which uses tokens."); err != nil {
+					return Result{}, err
+				}
+				return setEnabled(ctx, true)
+			},
 		},
 		Command{
 			Name:         "ember.disable",

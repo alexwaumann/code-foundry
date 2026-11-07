@@ -205,6 +205,13 @@ describe("ui intent mapping", () => {
   ])("maps %#", (intent, want) => {
     expect(toUiIntentView(create(UiIntentSchema, { intent }))).toEqual(want);
   });
+
+  it("keeps a plugin's origin on the command it hands the GUI, and adds none of its own", () => {
+    const intent = (origin: CallOrigin) => toUiIntentView(create(UiIntentSchema, { intent: { case: "invokeCommand", value: { name: "x", caller: "plugin:p", context: { origin } } } }));
+    expect(intent(CallOrigin.PLUGIN)).toMatchObject({ context: { origin: "plugin" } });
+    const none = intent(CallOrigin.UNSPECIFIED);
+    expect(none?.kind === "invokeCommand" && none.context).not.toHaveProperty("origin");
+  });
 });
 
 describe("gh mapping", () => {

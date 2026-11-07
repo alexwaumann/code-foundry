@@ -79,7 +79,7 @@ test("SHOTS: a verb that asks opens the app's confirm dialog", async ({ page }) 
   await openBridgeThread(page);
   await doc(page).locator("#archive").click();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog.getByTestId("confirm-caller")).toContainText("Bridge check, a page in");
+  await expect(dialog.getByTestId("confirm-caller-detail")).toContainText("Bridge check");
   await page.screenshot({ path: `${String(shots)}/bridge-confirm.png` });
   await dialog.getByTestId("confirm-cancel").click();
 });
@@ -103,7 +103,7 @@ test("a subscription delivers the snapshot, then every change; closing the card 
   expect((await bridgeCounters(page)).posts).toBe(posts);
 });
 
-// A call waiting on the app's confirm dialog, open or queued, not timing out: src/lib/cfBridgeScript.test.ts ("stops a run's clock while the app asks the user…", "settles a run that was waiting on the user…") and src/stores/bridgeHost.test.ts ("tells the page a call waits on the user, open or queued…", "asks one question at a time per frame").
+// A call waiting on the app's confirm dialog, open or queued, not timing out: src/lib/cfBridgeScript.test.ts ("stops a run's clock while the app asks the user…", "settles a run that was waiting on the user…") and src/stores/bridgeHost.test.ts ("tells the page a call waits on the user…" and "has one question open per frame…").
 
 test("a page that goes while its question is open takes the question with it, and the command never runs", async ({ page }) => {
   await openBridgeThread(page);
@@ -199,7 +199,7 @@ test("the panel copy names the page by its title and counts its errors too", asy
   await expect(inner.locator("body")).toHaveAttribute("data-ready", "1");
   await inner.locator("#archive").click();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog.getByTestId("confirm-caller")).toContainText("Bridge check, a page in");
+  await expect(dialog.getByTestId("confirm-caller-detail")).toContainText("Bridge check");
   await dialog.getByTestId("confirm-cancel").click();
   await expect(dialog).toHaveCount(0);
   await inner.locator("#invalid").click();

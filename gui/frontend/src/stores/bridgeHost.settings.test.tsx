@@ -39,13 +39,13 @@ afterEach(() => {
 
 function page() {
   const posts: Record<string, unknown>[] = [];
-  const h = createBridgeHost({ threadId: "t-1", pageName: "page.html", post: (m) => posts.push(m as unknown as Record<string, unknown>) });
+  const h = createBridgeHost({ threadId: "t-1", pageName: "page.html", userPresent: () => true, post: (m) => posts.push(m as unknown as Record<string, unknown>) });
   h.receive({ cf: 1, type: "cf:run", id: "a", verb: "settings.set", args });
   return posts;
 }
 
 describe("a page changing a setting", () => {
-  it("says it is a page, which is how the daemon tells it from the CLI in its thread", async () => {
+  it("says it is a page", async () => {
     page();
     await vi.waitFor(() => {
       expect(invokeCommand).toHaveBeenCalled();
@@ -57,9 +57,17 @@ describe("a page changing a setting", () => {
     render(<ConfirmDialog />);
     const posts = page();
     expect((await screen.findByTestId("confirm-dialog")).textContent).toContain('Change appearance.font_size to "15"?');
-    expect(screen.getByTestId("confirm-caller").textContent).toBe("Asked by page.html, a page in Fix stale badge");
+    expect(screen.getByTestId("confirm-caller").textContent).toBe("Asked by a page");
+    expect(screen.getByTestId("confirm-caller-detail").textContent).toBe('Page "page.html" in thread "Fix stale badge"');
     expect(invokeCommand.mock.calls.filter((c) => (c[4] as { confirmed?: boolean } | undefined)?.confirmed)).toEqual([]);
-    fireEvent.click(screen.getByTestId("confirm-ok"));
+    const ok = screen.getByTestId<HTMLButtonElement>("confirm-ok");
+    await vi.waitFor(
+      () => {
+        expect(ok.disabled).toBe(false);
+      },
+      { timeout: 2000 },
+    );
+    fireEvent.click(ok);
     await vi.waitFor(() => {
       expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: true, result: { text: 'appearance.font_size = "15"' } });
     });

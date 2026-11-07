@@ -1,4 +1,5 @@
 import { UiIntent_Notify_Level, UiService, type UiIntent } from "@/gen/codefoundry/v1/ui_pb";
+import { CallOrigin } from "@/gen/codefoundry/v1/command_pb";
 import type { UiContextView } from "./command";
 import { daemon, invalidateOnTransportError, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
@@ -156,6 +157,7 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
               activeWorktreePath: c.activeWorktreePath,
               activeView: c.activeView,
               activeWorkspaceId: c.activeWorkspaceId,
+              ...(c.origin === CallOrigin.PLUGIN ? { origin: "plugin" as const } : c.origin === CallOrigin.PAGE ? { origin: "page" as const } : {}),
             }
           : null,
         caller: e.value.caller,

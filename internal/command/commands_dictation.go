@@ -261,7 +261,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 			Name:  "dictation.download",
 			Title: "Download Dictation Model",
 			Description: "Download the Whisper model dictation uses (about 0.9 GB, once) in the background; an interrupted download resumes. " +
-				"Dictation turns on when it finishes.",
+				"Dictation turns on when it finishes. A page asks the user first.",
 			Category: dictationCategory,
 			When: func(Context) bool {
 				s := status()
@@ -273,7 +273,10 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 				}
 				return "the model is downloading"
 			},
-			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, _ Args) (Result, error) {
+				if err := pageAsks(ctx, uctx, "dictation.download", "Download Dictation Model", "Download", "Download the dictation model (about 0.9 GB) and turn dictation on?"); err != nil {
+					return Result{}, err
+				}
 				res, err := d.Dictation.Download(ctx, connect.NewRequest(&v1.DownloadDictationModelRequest{}))
 				if err != nil {
 					return Result{}, err
