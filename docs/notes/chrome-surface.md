@@ -445,11 +445,15 @@ Also: the setting is `UserOnly`, and the browser verbs have page classes (`page_
 Found on the way: a page closed behind its popup left the surface saying "popup" until something
 else published; it says so at once now (`TestAPopupWhoseOpenerWentIsStillAPopup`).
 
-Each fix was undone one at a time: 16 changes in Go and 5 in the window, and each failed a test. On
-real Chrome, 5 of 7 failed a live case. The two that did not: the old busiest-helper rule, because
-the history blame acts first on that flood (the table test holds the rule); and dropping a frame's
-children alone, because a main-frame commit also clears the count (each has a fake test, and
-undoing both fails the live case).
+Each fix was undone one at a time: 17 changes in Go and 5 in the window, and each failed a test. On
+real Chrome, 4 of 7 failed a live case. The three that did not: the old busiest-helper rule, because
+the history blame acts first on that flood (the table test holds the rule); the store not asked
+about a swell, because the flooding page's own renderer then passes its limits and is killed, which
+the live case also accepts, with the neighbour untouched either way (the fake's `Swell` holds the
+wiring); and dropping a frame's children alone, because a main-frame commit also clears the count
+(each has a fake test, and undoing both fails the live case). The live state flood pushes 32 MB
+states until it is closed; in six runs alone it was closed for its history every time, the group
+under 2.9 GB. With 64 MB states, four of six ended with the renderer killed instead, near 3.9 GB.
 
 The floods of round 3, each on a new Chrome, with a still page and a busy one (an animation and a
 worker that never rests) beside the flooding page. Input to the still page 4 times a second.

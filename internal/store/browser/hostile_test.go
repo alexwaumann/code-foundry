@@ -759,7 +759,7 @@ func TestASwellIsBlamedOnThePageThatPushedHistory(t *testing.T) {
 	const calmPage = "session-target-2"
 	secure(f.c, calmPage, "https://calm.example/", "https://calm.example")
 	next(t, calm, "the calm site", func(st browser.State) bool { return st.Site == "calm.example" })
-	if f.s.BlameHistory() {
+	if f.c.Swell() {
 		t.Fatal("blamed with no history pushed")
 	}
 	for i := range 11 {
@@ -770,7 +770,7 @@ func TestASwellIsBlamedOnThePageThatPushedHistory(t *testing.T) {
 	next(t, evil, "the pushes", func(st browser.State) bool { return st.URL == "https://evil.example/s10" })
 	next(t, calm, "the calm push", func(st browser.State) bool { return st.URL == "https://calm.example/next" })
 	f.c.Emit("Page.navigatedWithinDocument", calmPage, map[string]any{"frameId": "target-2", "url": "https://calm.example/next"})
-	if !f.s.BlameHistory() {
+	if !f.c.Swell() {
 		t.Fatal("nobody blamed")
 	}
 	eventually(t, "the close", func() bool { return len(f.c.Calls("Target.closeTarget")) == 1 })

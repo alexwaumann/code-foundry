@@ -31,6 +31,7 @@ type Chrome struct {
 	launches int
 	failure  error
 	silent   bool
+	blame    func() bool
 
 	proc *process
 }
@@ -235,3 +236,19 @@ func (p *process) Pipes() (io.WriteCloser, io.Reader) { return p.toChrome, p.fro
 func (p *process) Done() <-chan struct{}              { return p.done }
 func (p *process) Stop()                              { p.exit() }
 func (p *process) Tail() string                       { return "" }
+
+// BlameWith keeps what the store answers a swell with (browser.Blamer).
+func (p *process) BlameWith(f func() bool) {
+	p.c.mu.Lock()
+	defer p.c.mu.Unlock()
+	p.c.blame = f
+}
+
+// Swell is Chrome's own process growing, as the memory watch would see it: it asks the store,
+// and reports whether a page was closed. False with no store wired to the process.
+func (c *Chrome) Swell() bool {
+	c.mu.Lock()
+	f := c.blame
+	c.mu.Unlock()
+	return f != nil && f()
+}

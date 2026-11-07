@@ -169,6 +169,12 @@ type Process interface {
 	Tail() string
 }
 
+// Blamer is a Process whose watch asks the store about a swell of Chrome's own process
+// (memoryWatch.blame). The store calls BlameWith once, after the launch.
+type Blamer interface {
+	BlameWith(blame func() bool)
+}
+
 // Launcher starts Chrome on a profile. Tests give a fake (browsertest).
 type Launcher func(ctx context.Context, profile string) (Process, error)
 
@@ -254,9 +260,12 @@ type process struct {
 	blame atomic.Pointer[func() bool]
 }
 
-// blameWith sets who is asked when Chrome's own process swells: the store, which knows which page
+// BlameWith sets who is asked when Chrome's own process swells: the store, which knows which page
 // was pushing history. It reports whether it closed one.
-func (p *process) blameWith(f func() bool) { p.blame.Store(&f) }
+func (p *process) BlameWith(f func() bool) { p.blame.Store(&f) }
+
+// The real Chrome's watch asks the store: a process that stopped being a Blamer would ask nobody.
+var _ Blamer = (*process)(nil)
 
 func (p *process) Pipes() (io.WriteCloser, io.Reader) { return p.toChrome, p.fromChrome }
 func (p *process) Done() <-chan struct{}              { return p.done }

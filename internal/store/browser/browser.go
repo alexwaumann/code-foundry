@@ -201,9 +201,9 @@ func (s *Store) launch(_ context.Context) (*instance, error) {
 		return nil, err
 	}
 	in := &instance{proc: proc, targets: map[string]*target{}, sessions: map[string]*target{}, frames: map[string]*frame{}, downloads: map[string]*download{}}
-	if p, ok := proc.(interface{ blameWith(func() bool) }); ok {
+	if b, ok := proc.(Blamer); ok {
 		// A swell of Chrome's own process is a page's history before it is anyone else's.
-		p.blameWith(func() bool { return s.blameHistory(in) })
+		b.BlameWith(func() bool { return s.blameHistory(in) })
 	}
 	w, r := proc.Pipes()
 	in.conn = newConn(w, r,
