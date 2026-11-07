@@ -8,6 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
+	"slices"
+	"strconv"
 	"sync"
 	"sync/atomic"
 )
@@ -17,8 +20,14 @@ import (
 // point: nothing else on this Mac can drive a browser that holds the user's logins.
 
 // maxMessage bounds one message from Chrome. A screencast frame is its biggest, a few MB of
-// base64; anything past this is a broken pipe, not a frame.
-const maxMessage = 64 << 20
+// base64. A page can make far bigger ones (console.log of a long string) and must not end the
+// connection by it, so anything past this is read to its end and skipped, and the daemon never
+// holds more of it than this. keepBuffer is how much of such a buffer stays for the next one.
+const (
+	maxMessage = 32 << 20
+	keepBuffer = 2 << 20
+	headBytes  = 64
+)
 
 // writeQueue is how many messages may wait for the pipe. Calls wait for room under their own
 // context; a frame's ack that finds no room is dropped, and Chrome only sends fewer frames.
@@ -26,6 +35,20 @@ const writeQueue = 256
 
 // ErrChromeGone is the error of a call whose Chrome has stopped.
 var ErrChromeGone = errors.New("chrome has stopped")
+
+// errTooLong is a message past maxMessage, and the error of a call whose reply was one.
+var errTooLong = errors.New("chrome's message is too long")
+
+// replyHead reads which call a skipped reply answers: Chrome writes the id first.
+var replyHead = regexp.MustCompile(`^\{"id":(\d+)[,}]`)
+
+// ignored are the events nothing here reads and a page makes as often and as long as it likes.
+// Runtime.enable has to stay on: without it Runtime.addBinding does nothing, and the helper's
+// reports never arrive (measured on Chrome 157, enabling and disabling again included).
+var ignored = [][]byte{
+	[]byte(`{"method":"Runtime.consoleAPICalled"`),
+	[]byte(`{"method":"Runtime.exceptionThrown"`),
+}
 
 // remoteError is an error Chrome answered a call with. Its message may quote a page's
 // URL, so it goes to a viewer and never to the log above debug level.
@@ -101,10 +124,20 @@ func (c *conn) read(r io.Reader) {
 	br := bufio.NewReaderSize(r, 1<<20)
 	var long bytes.Buffer
 	for {
+		if long.Cap() > keepBuffer {
+			long = bytes.Buffer{}
+		}
 		b, err := readMessage(br, &long)
+		if errors.Is(err, errTooLong) {
+			c.skip(long.Bytes())
+			continue
+		}
 		if err != nil {
 			c.fail(fmt.Errorf("%w: %w", ErrChromeGone, err))
 			return
+		}
+		if slices.ContainsFunc(ignored, func(p []byte) bool { return bytes.HasPrefix(b, p) }) {
+			continue
 		}
 		var m message
 		if err := json.Unmarshal(b, &m); err != nil {
@@ -120,7 +153,9 @@ func (c *conn) read(r io.Reader) {
 	}
 }
 
-// readMessage reads up to the next NUL, without it. The slice is valid until the next call.
+// readMessage reads up to the next NUL, without it. The slice is valid until the next call. A
+// message past maxMessage is read to its NUL and dropped: the answer is errTooLong, and long
+// keeps its first bytes.
 func readMessage(br *bufio.Reader, long *bytes.Buffer) ([]byte, error) {
 	long.Reset()
 	for {
@@ -130,7 +165,8 @@ func readMessage(br *bufio.Reader, long *bytes.Buffer) ([]byte, error) {
 		}
 		long.Write(part)
 		if long.Len() > maxMessage {
-			return nil, errors.New("message too long")
+			long.Truncate(headBytes)
+			return nil, discard(br, err)
 		}
 		if err == nil {
 			return long.Bytes()[:long.Len()-1], nil
@@ -138,6 +174,37 @@ func readMessage(br *bufio.Reader, long *bytes.Buffer) ([]byte, error) {
 		if !errors.Is(err, bufio.ErrBufferFull) {
 			return nil, err
 		}
+	}
+}
+
+// discard reads past the next NUL; err is how the last read ended.
+func discard(br *bufio.Reader, err error) error {
+	for errors.Is(err, bufio.ErrBufferFull) {
+		_, err = br.ReadSlice(0)
+	}
+	if err != nil {
+		return err
+	}
+	return errTooLong
+}
+
+// skip deals with a message nobody will read. A reply fails its call at once rather than leave
+// it to time out; an event is just gone.
+func (c *conn) skip(head []byte) {
+	m := replyHead.FindSubmatch(head)
+	if m == nil {
+		return
+	}
+	id, err := strconv.ParseInt(string(m[1]), 10, 64)
+	if err != nil {
+		return
+	}
+	c.mu.Lock()
+	ch := c.waiting[id]
+	delete(c.waiting, id)
+	c.mu.Unlock()
+	if ch != nil {
+		ch <- reply{err: errTooLong}
 	}
 }
 

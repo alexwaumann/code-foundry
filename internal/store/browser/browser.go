@@ -83,6 +83,8 @@ type Store struct {
 	surfaces map[string]*surface
 	viewers  int
 	idle     *time.Timer
+
+	moving sync.Mutex // held while a download takes its name in the downloads folder
 }
 
 // New returns a Store. Nothing runs until a surface is opened.
@@ -119,7 +121,9 @@ type instance struct {
 	stopping bool
 	targets  map[string]*target // by target id
 	sessions map[string]*target // by session id
-	clip     clipboard
+	// downloads are the ones not yet over, by Chrome's guid.
+	downloads map[string]*download
+	clip      clipboard
 }
 
 // call is a protocol call bounded by callTimeout.
@@ -187,11 +191,14 @@ func (s *Store) running(ctx context.Context) (*instance, error) {
 func (s *Store) launch(_ context.Context) (*instance, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.StartTimeout)
 	defer cancel()
+	if err := s.prepareDownloads(); err != nil {
+		return nil, err
+	}
 	proc, err := s.opts.Launch(ctx, s.Profile())
 	if err != nil {
 		return nil, err
 	}
-	in := &instance{proc: proc, targets: map[string]*target{}, sessions: map[string]*target{}}
+	in := &instance{proc: proc, targets: map[string]*target{}, sessions: map[string]*target{}, downloads: map[string]*download{}}
 	w, r := proc.Pipes()
 	in.conn = newConn(w, r,
 		func(method, session string, params json.RawMessage) { s.event(in, method, session, params) },
@@ -211,8 +218,9 @@ func (s *Store) launch(_ context.Context) (*instance, error) {
 		s.stop(in)
 		return nil, err
 	}
+	// Under guids in a folder of ours: see downloads.go.
 	if err := in.conn.call(ctx, "", "Browser.setDownloadBehavior", map[string]any{
-		"behavior": "allow", "downloadPath": s.Downloads(), "eventsEnabled": true,
+		"behavior": "allowAndName", "downloadPath": s.incoming(), "eventsEnabled": true,
 	}, nil); err != nil {
 		s.stop(in)
 		return nil, err
@@ -255,7 +263,7 @@ func (s *Store) gone(in *instance, cause error) {
 		s.chrome = nil
 	}
 	for _, sf := range s.surfaces {
-		sf.detach()
+		sf.detach(!expected)
 		if !expected {
 			sf.state.Phase = PhaseCrashed
 			sf.state.Message = "Chrome stopped unexpectedly."
@@ -293,8 +301,9 @@ func (s *Store) ConfigChanged() {
 	}
 }
 
-// Relaunch is the way back from a crash: Chrome starts again and each surface shown returns
-// to its last page.
+// Relaunch is the way back from a crash: Chrome starts again and each surface shown opens, blank
+// and saying what it was on (surface.detach). With nothing shown it starts the idle clock, or
+// that Chrome would stay for good.
 func (s *Store) Relaunch(ctx context.Context) error {
 	if !s.opts.Enabled() {
 		return ErrDisabled
@@ -313,6 +322,11 @@ func (s *Store) Relaunch(ctx context.Context) error {
 	if _, err := s.running(ctx); err != nil {
 		return err
 	}
+	s.mu.Lock()
+	if s.viewers == 0 && !s.closed {
+		s.startIdleTimer()
+	}
+	s.mu.Unlock()
 	for _, sf := range shown {
 		go s.bringUp(sf)
 	}

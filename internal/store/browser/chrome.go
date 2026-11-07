@@ -15,9 +15,13 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
-// EnvChromeBin overrides where Chrome is found (development: a Beta or a stand-in).
+// EnvChromeBin overrides where Chrome is found, in a dev build only (a Beta or a stand-in). It
+// decides which program gets the pipe and the profile with the user's sign-ins, so a build the
+// user installed never reads it.
 const EnvChromeBin = "CODE_FOUNDRY_CHROME_BIN"
 
 // ErrNoChrome is what a surface says when this Mac has no Google Chrome.
@@ -26,10 +30,10 @@ var ErrNoChrome = errors.New("no Google Chrome on this Mac: this surface drives 
 // chromeApp is the executable inside the app bundle.
 const chromeApp = "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
-// FindChrome is the system Chrome: $CODE_FOUNDRY_CHROME_BIN, else /Applications, else
-// ~/Applications. Never the PATH: this is the program that gets the user's logins.
+// FindChrome is the system Chrome: /Applications, else ~/Applications, and in a dev build
+// $CODE_FOUNDRY_CHROME_BIN first. Never the PATH: this is the program that gets the user's logins.
 func FindChrome(home string) (string, error) {
-	if p := os.Getenv(EnvChromeBin); p != "" {
+	if p := os.Getenv(EnvChromeBin); p != "" && version.Version == "dev" {
 		return p, nil
 	}
 	for _, p := range []string{"/" + chromeApp, filepath.Join(home, chromeApp)} {
@@ -51,8 +55,21 @@ func chromeArgs(profile string) []string {
 		"--user-data-dir=" + profile,
 		"--no-first-run",
 		"--no-default-browser-check",
+		"--disable-blink-features=" + strings.Join(systemUIFeatures, ","),
 		"about:blank",
 	}
+}
+
+// systemUIFeatures are the web APIs that would reach past the surface to the Mac's own panels or
+// sheets, which nobody can answer through a frame and which the file chooser's interception does
+// not cover. Off, a page sees them undefined and takes whatever path it has without them.
+var systemUIFeatures = []string{
+	"FileSystemAccess", "FileSystemAccessLocal", // showOpenFilePicker and friends: a real open panel
+	"WebAuth",       // passkeys: the system's own sheet
+	"WebShare",      // the share sheet
+	"EyeDropperAPI", // a colour picker over the real screen
+	"Serial", "WebUSB", "WebHID", "WebBluetooth",
+	"Presentation",
 }
 
 // chromeEnv is the little Chrome inherits. The daemon's own environment may hold what a
@@ -227,9 +244,10 @@ func (p *process) signal(sig syscall.Signal) {
 const staleWait = 3 * time.Second
 
 // reapStale deals with the Chrome of a daemon that just died, still holding the profile. It
-// exits by itself within a second of the pipe closing; a new one started before that would
-// hand over to it and exit. So this waits, and only a Chrome that does not go is signalled,
-// and only after its own command line has been read back and names this profile.
+// exits by itself within a second of the pipe closing; a new one started before that finds the
+// profile in use and exits with status 21, with nothing handed to anyone. So this waits, and only
+// a Chrome that does not go is signalled, and only after its own command line has been read back
+// and names this profile.
 func reapStale(profile string, log *slog.Logger) {
 	pid := lockHolder(profile)
 	if pid == 0 {

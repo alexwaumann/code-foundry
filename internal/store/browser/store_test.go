@@ -424,13 +424,19 @@ func TestAnAnswerMustMatchWhatIsAsked(t *testing.T) {
 	}
 }
 
-func TestRevealStaysInTheDownloadsFolder(t *testing.T) {
+func TestAPathChromeReportsNeverLeavesOurFolders(t *testing.T) {
 	f := newFixture(t, time.Hour)
 	v, _ := f.s.Watch("thread:a", 640, 480, "")
 	next(t, v, "ready", ready)
+	if err := f.s.Input(context.Background(), "thread:a", []browser.InputEvent{{Mouse: &browser.MouseEvent{Type: "mouseReleased", Button: "left"}}}); err != nil {
+		t.Fatal(err)
+	}
 	f.c.Emit("Browser.downloadWillBegin", "", map[string]any{"frameId": "target-1", "guid": "g", "suggestedFilename": "a.txt"})
 	f.c.Emit("Browser.downloadProgress", "", map[string]any{"guid": "g", "state": "completed", "filePath": "/etc/hosts"})
-	next(t, v, "the download", func(st browser.State) bool { return len(st.Downloads) == 1 && st.Downloads[0].State == "completed" })
+	st := next(t, v, "the download", func(st browser.State) bool { return len(st.Downloads) == 1 && st.Downloads[0].State == "canceled" })
+	if st.Downloads[0].Path != "" {
+		t.Fatalf("path %q", st.Downloads[0].Path)
+	}
 	if err := f.s.RevealDownload("thread:a", "g"); !errors.Is(err, browser.ErrNotPending) {
 		t.Fatalf("revealed outside the folder: %v", err)
 	}

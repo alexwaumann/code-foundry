@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -12,12 +13,19 @@ import (
 type target struct {
 	id, session string
 	surface     *surface
-	url, title  string
-	loading     bool
-	canBack     bool
-	canForward  bool
-	casting     bool
-	cast        sync.Mutex // held across a start or restart of the frames
+	// url is the page committed in its main frame and nothing else: not a subframe's, not where
+	// a navigation is headed, which an opener could write under.
+	url, title string
+	loading    bool
+	canBack    bool
+	canForward bool
+	casting    bool
+	badCert    bool
+	// What this page is asking. A viewer sees it only while this page shows (surface.refresh).
+	dialog  *Dialog
+	chooser *FileChooser
+	sel     *Select
+	cast    sync.Mutex // held across a start or restart of the frames
 }
 
 // handlers are the events a surface follows, by method. A handler runs on the connection's
@@ -30,21 +38,23 @@ var browserHandlers map[string]func(s *Store, in *instance, params json.RawMessa
 
 func init() {
 	handlers = map[string]func(s *Store, in *instance, t *target, params json.RawMessage){
-		"Page.frameNavigated":          onFrameNavigated,
-		"Page.navigatedWithinDocument": onWithinDocument,
-		"Page.frameStartedLoading":     onLoading(true),
-		"Page.frameStoppedLoading":     onLoading(false),
-		"Page.javascriptDialogOpening": onDialogOpening,
-		"Page.javascriptDialogClosed":  onDialogClosed,
-		"Page.fileChooserOpened":       onFileChooser,
-		"Runtime.bindingCalled":        onBinding,
+		"Page.frameNavigated":                  onFrameNavigated,
+		"Page.documentOpened":                  onFrameNavigated,
+		"Page.navigatedWithinDocument":         onWithinDocument,
+		"Page.frameStartedLoading":             onLoading(true),
+		"Page.frameStoppedLoading":             onLoading(false),
+		"Page.javascriptDialogOpening":         onDialogOpening,
+		"Page.javascriptDialogClosed":          onDialogClosed,
+		"Page.fileChooserOpened":               onFileChooser,
+		"Page.downloadWillBegin":               onPageDownload,
+		"Runtime.bindingCalled":                onBinding,
+		"Security.visibleSecurityStateChanged": onSecurityState,
 	}
 	browserHandlers = map[string]func(s *Store, in *instance, params json.RawMessage){
 		"Target.targetCreated":      onTargetCreated,
-		"Target.targetInfoChanged":  onTargetChanged,
 		"Target.targetDestroyed":    onTargetDestroyed,
 		"Target.targetCrashed":      onTargetCrashed,
-		"Browser.downloadWillBegin": onDownloadBegin,
+		"Browser.downloadWillBegin": onBrowserDownload,
 		"Browser.downloadProgress":  onDownloadProgress,
 	}
 }
@@ -106,10 +116,11 @@ func (s *Store) onFrame(in *instance, session string, params json.RawMessage) {
 
 type frameParams struct {
 	Frame struct {
-		ID       string `json:"id"`
-		ParentID string `json:"parentId"`
-		URL      string `json:"url"`
-		MimeType string `json:"mimeType"`
+		ID          string `json:"id"`
+		ParentID    string `json:"parentId"`
+		URL         string `json:"url"`
+		Unreachable string `json:"unreachableUrl"`
+		MimeType    string `json:"mimeType"`
 	} `json:"frame"`
 }
 
@@ -119,7 +130,12 @@ func onFrameNavigated(s *Store, in *instance, t *target, params json.RawMessage)
 		return
 	}
 	t.url = p.Frame.URL
-	if !allowedPage(t.url) {
+	if p.Frame.Unreachable != "" {
+		// On an error page the address is the one that failed, as in any browser, not
+		// chrome-error://chromewebdata/.
+		t.url = p.Frame.Unreachable
+	}
+	if !allowedPage(p.Frame.URL) {
 		// Chrome keeps pages off these on its own. If one ever got here it does not stay.
 		t.surface.state.Notice = "That page is not allowed here."
 		s.log.Warn("left a page a surface may not show")
@@ -132,7 +148,7 @@ func onFrameNavigated(s *Store, in *instance, t *target, params json.RawMessage)
 		// the new address.
 		t.surface.state.Notice = "This surface cannot show PDFs."
 	}
-	t.surface.state.Select = nil
+	t.sel, t.chooser = nil, nil
 	t.surface.publish()
 	go s.refreshHistory(in, t)
 	if t.casting && t.surface.top() == t {
@@ -146,11 +162,14 @@ func onFrameNavigated(s *Store, in *instance, t *target, params json.RawMessage)
 	}
 }
 
+// onWithinDocument is history.pushState and the like. A subframe can do it too, and its address
+// is not the page's; a target's main frame has the target's id.
 func onWithinDocument(s *Store, in *instance, t *target, params json.RawMessage) {
 	var p struct {
-		URL string `json:"url"`
+		FrameID string `json:"frameId"`
+		URL     string `json:"url"`
 	}
-	if json.Unmarshal(params, &p) != nil {
+	if json.Unmarshal(params, &p) != nil || p.FrameID != t.id {
 		return
 	}
 	t.url = p.URL
@@ -209,7 +228,11 @@ func clip(s string, n int) string {
 	return strings.ToValidUTF8(s[:n], "") + "…"
 }
 
-func onDialogOpening(_ *Store, _ *instance, t *target, params json.RawMessage) {
+// onDialogOpening keeps what a page asks on that page. A page behind its popup is not on screen
+// and cannot be answered, and held open it would stop the popup too when they share a process,
+// so it is dismissed, as Chrome does for a tab in the background. A popup still being attached
+// is about to show: its dialog waits.
+func onDialogOpening(s *Store, in *instance, t *target, params json.RawMessage) {
 	var p struct {
 		URL           string `json:"url"`
 		Message       string `json:"message"`
@@ -220,12 +243,35 @@ func onDialogOpening(_ *Store, _ *instance, t *target, params json.RawMessage) {
 		return
 	}
 	sf := t.surface
-	sf.state.Dialog = &Dialog{ID: sf.id(), Kind: p.Type, Message: clip(p.Message, maxDialogText), DefaultPrompt: clip(p.DefaultPrompt, maxDialogText), Origin: originOf(p.URL)}
+	if sf.top() != t && slices.Contains(sf.stack, t) {
+		go func() {
+			if err := in.call(context.Background(), t.session, "Page.handleJavaScriptDialog", map[string]any{"accept": false}, nil); err != nil {
+				s.log.Debug("dismiss a dialog behind a popup", "err", err)
+			}
+		}()
+		return
+	}
+	t.dialog = &Dialog{ID: sf.id(), Kind: p.Type, Message: clip(p.Message, maxDialogText), DefaultPrompt: clip(p.DefaultPrompt, maxDialogText), Origin: originOf(p.URL), Site: clip(siteOf(p.URL), maxLabel)}
 	sf.publish()
 }
 
 func onDialogClosed(_ *Store, _ *instance, t *target, _ json.RawMessage) {
-	t.surface.state.Dialog = nil
+	t.dialog = nil
+	t.surface.publish()
+}
+
+// onSecurityState follows what Chrome says of the page: a failed certificate stays failed on a
+// page the user went on to anyway, which the scheme alone would show as https.
+func onSecurityState(_ *Store, _ *instance, t *target, params json.RawMessage) {
+	var p struct {
+		State struct {
+			Security string `json:"securityState"`
+		} `json:"visibleSecurityState"`
+	}
+	if json.Unmarshal(params, &p) != nil {
+		return
+	}
+	t.badCert = p.State.Security == "insecure-broken"
 	t.surface.publish()
 }
 
@@ -238,7 +284,7 @@ func onFileChooser(_ *Store, _ *instance, t *target, params json.RawMessage) {
 		return
 	}
 	sf := t.surface
-	sf.state.FileChooser = &FileChooser{ID: sf.id(), Multiple: p.Mode == "selectMultiple", Origin: originOf(t.url), node: p.Node, tgt: t}
+	t.chooser = &FileChooser{ID: sf.id(), Multiple: p.Mode == "selectMultiple", Origin: originOf(t.url), Site: clip(siteOf(t.url), maxLabel), node: p.Node}
 	sf.publish()
 }
 
@@ -268,14 +314,14 @@ func onBinding(s *Store, _ *instance, t *target, params json.RawMessage) {
 		return
 	}
 	sf := t.surface
-	sel := &Select{ID: sf.id(), Selected: m.Selected, X: m.X, Y: m.Y, W: m.W, context: p.Context, tgt: t}
+	sel := &Select{ID: sf.id(), Selected: m.Selected, X: m.X, Y: m.Y, W: m.W, context: p.Context}
 	for i, o := range m.Options {
 		if i == maxOptions {
 			break
 		}
 		sel.Options = append(sel.Options, SelectOption{Label: clip(o.Label, maxLabel), Disabled: o.Disabled})
 	}
-	sf.state.Select = sel
+	t.sel = sel
 	sf.publish()
 }
 
@@ -306,7 +352,7 @@ func onTargetCreated(s *Store, in *instance, params json.RawMessage) {
 	if opener == nil || in.targets[info.TargetID] != nil {
 		return
 	}
-	t := &target{id: info.TargetID, surface: opener.surface, url: info.URL}
+	t := &target{id: info.TargetID, surface: opener.surface}
 	in.targets[t.id] = t
 	go s.showPopup(in, opener, t)
 }
@@ -330,6 +376,7 @@ func (s *Store) showPopup(in *instance, opener, t *target) {
 	viewed := len(sf.viewers) > 0
 	sf.publish()
 	s.mu.Unlock()
+	s.readAddress(ctx, in, t)
 	if viewed {
 		_ = in.call(ctx, opener.session, "Page.stopScreencast", nil, nil)
 		if err := s.startCast(ctx, in, t); err != nil {
@@ -338,17 +385,24 @@ func (s *Store) showPopup(in *instance, opener, t *target) {
 	}
 }
 
-func onTargetChanged(_ *Store, in *instance, params json.RawMessage) {
-	info, ok := decodeInfo(params)
-	if !ok {
+// readAddress asks what a popup has committed, which may be nothing yet: the address a new target
+// reports is where it is headed, and an opener can write its own page under that while it loads.
+func (s *Store) readAddress(ctx context.Context, in *instance, t *target) {
+	var tree struct {
+		FrameTree struct {
+			Frame struct {
+				URL string `json:"url"`
+			} `json:"frame"`
+		} `json:"frameTree"`
+	}
+	if err := in.call(ctx, t.session, "Page.getFrameTree", nil, &tree); err != nil {
+		s.log.Debug("popup address", "err", err)
 		return
 	}
-	if t := in.targets[info.TargetID]; t != nil {
-		if info.URL != "" {
-			t.url = info.URL
-		}
-		t.surface.publish()
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t.url = tree.FrameTree.Frame.URL
+	t.surface.publish()
 }
 
 func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {
@@ -375,7 +429,6 @@ func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {
 	if !wasTop {
 		return
 	}
-	sf.state.Dialog, sf.state.FileChooser, sf.state.Select = nil, nil, nil
 	sf.publish()
 	if len(sf.viewers) == 0 {
 		return
@@ -401,47 +454,5 @@ func onTargetCrashed(_ *Store, in *instance, params json.RawMessage) {
 	if t := in.targets[p.TargetID]; t != nil {
 		t.surface.state.Notice = "This page crashed. Reload to try again."
 		t.surface.publish()
-	}
-}
-
-func onDownloadBegin(_ *Store, in *instance, params json.RawMessage) {
-	var p struct {
-		FrameID string `json:"frameId"`
-		GUID    string `json:"guid"`
-		Name    string `json:"suggestedFilename"`
-	}
-	if json.Unmarshal(params, &p) != nil {
-		return
-	}
-	t := in.targets[p.FrameID]
-	if t == nil {
-		return // a subframe's: the surface says nothing, and it still lands in the folder
-	}
-	sf := t.surface
-	sf.state.Downloads = append(sf.state.Downloads, Download{ID: p.GUID, Name: clip(p.Name, maxLabel), State: "inProgress"})
-	if n := len(sf.state.Downloads); n > maxDownloadList {
-		sf.state.Downloads = sf.state.Downloads[n-maxDownloadList:]
-	}
-	sf.publish()
-}
-
-func onDownloadProgress(_ *Store, in *instance, params json.RawMessage) {
-	var p struct {
-		GUID     string `json:"guid"`
-		State    string `json:"state"`
-		FilePath string `json:"filePath"`
-	}
-	if json.Unmarshal(params, &p) != nil || p.State == "inProgress" {
-		return
-	}
-	for _, t := range in.targets {
-		ds := t.surface.state.Downloads
-		for i := range ds {
-			if ds[i].ID == p.GUID {
-				ds[i].State, ds[i].Path = p.State, p.FilePath
-				t.surface.publish()
-				return
-			}
-		}
 	}
 }

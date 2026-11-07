@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/browser.proto.
  */
 export const file_codefoundry_v1_browser: GenFile = /*@__PURE__*/
-  fileDesc("Chxjb2RlZm91bmRyeS92MS9icm93c2VyLnByb3RvEg5jb2RlZm91bmRyeS52MSJSChNXYXRjaEJyb3dzZXJSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkSDQoFd2lkdGgYAiABKA0SDgoGaGVpZ2h0GAMgASgNEgsKA3VybBgEIAEoCSKrAQoMQnJvd3NlckV2ZW50Ei0KBXN0YXRlGAEgASgLMhwuY29kZWZvdW5kcnkudjEuQnJvd3NlclN0YXRlSAASLQoFZnJhbWUYAiABKAsyHC5jb2RlZm91bmRyeS52MS5Ccm93c2VyRnJhbWVIABI0CgloZWFydGJlYXQYAyABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIAEIHCgVldmVudCI7CgxCcm93c2VyRnJhbWUSDAoEanBlZxgBIAEoDBINCgV3aWR0aBgCIAEoDRIOCgZoZWlnaHQYAyABKA0ioQMKDEJyb3dzZXJTdGF0ZRIrCgVwaGFzZRgBIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJQaGFzZRIPCgdtZXNzYWdlGAIgASgJEgsKA3VybBgDIAEoCRINCgV0aXRsZRgEIAEoCRIPCgdsb2FkaW5nGAUgASgIEhMKC2Nhbl9nb19iYWNrGAYgASgIEhYKDmNhbl9nb19mb3J3YXJkGAcgASgIEg0KBXBvcHVwGAggASgIEi0KBmRpYWxvZxgJIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJEaWFsb2cSOAoMZmlsZV9jaG9vc2VyGAogASgLMiIuY29kZWZvdW5kcnkudjEuQnJvd3NlckZpbGVDaG9vc2VyEi0KBnNlbGVjdBgLIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJTZWxlY3QSDgoGbm90aWNlGAwgASgJEjIKCWRvd25sb2FkcxgNIAMoCzIfLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJEb3dubG9hZBIOCgZjb3BpZWQYDiABKAQiYgoNQnJvd3NlckRpYWxvZxIKCgJpZBgBIAEoCRIMCgRraW5kGAIgASgJEg8KB21lc3NhZ2UYAyABKAkSFgoOZGVmYXVsdF9wcm9tcHQYBCABKAkSDgoGb3JpZ2luGAUgASgJIkIKEkJyb3dzZXJGaWxlQ2hvb3NlchIKCgJpZBgBIAEoCRIQCghtdWx0aXBsZRgCIAEoCBIOCgZvcmlnaW4YAyABKAkiNgoTQnJvd3NlclNlbGVjdE9wdGlvbhINCgVsYWJlbBgBIAEoCRIQCghkaXNhYmxlZBgCIAEoCCKIAQoNQnJvd3NlclNlbGVjdBIKCgJpZBgBIAEoCRI0CgdvcHRpb25zGAIgAygLMiMuY29kZWZvdW5kcnkudjEuQnJvd3NlclNlbGVjdE9wdGlvbhIQCghzZWxlY3RlZBgDIAEoBRIJCgF4GAQgASgBEgkKAXkYBSABKAESDQoFd2lkdGgYBiABKAEiOgoPQnJvd3NlckRvd25sb2FkEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFc3RhdGUYAyABKAkiNgoWTmF2aWdhdGVCcm93c2VyUmVxdWVzdBIPCgdzdXJmYWNlGAEgASgJEgsKA3VybBgCIAEoCSImChdOYXZpZ2F0ZUJyb3dzZXJSZXNwb25zZRILCgN1cmwYASABKAkiMgoQR29Ccm93c2VyUmVxdWVzdBIPCgdzdXJmYWNlGAEgASgJEg0KBWRlbHRhGAIgASgRIhMKEUdvQnJvd3NlclJlc3BvbnNlIicKFFJlbG9hZEJyb3dzZXJSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkiFwoVUmVsb2FkQnJvd3NlclJlc3BvbnNlIqIBChFCcm93c2VyTW91c2VFdmVudBIMCgR0eXBlGAEgASgJEg4KBmJ1dHRvbhgCIAEoCRIJCgF4GAMgASgBEgkKAXkYBCABKAESDwoHYnV0dG9ucxgFIAEoDRITCgtjbGlja19jb3VudBgGIAEoDRIRCgltb2RpZmllcnMYByABKA0SDwoHZGVsdGFfeBgIIAEoARIPCgdkZWx0YV95GAkgASgBIpQBCg9Ccm93c2VyS2V5RXZlbnQSDAoEdHlwZRgBIAEoCRILCgNrZXkYAiABKAkSDAoEY29kZRgDIAEoCRIMCgR0ZXh0GAQgASgJEhAKCGtleV9jb2RlGAUgASgNEhEKCW1vZGlmaWVycxgGIAEoDRIQCghsb2NhdGlvbhgHIAEoDRITCgthdXRvX3JlcGVhdBgIIAEoCCKQAQoRQnJvd3NlcklucHV0RXZlbnQSMgoFbW91c2UYASABKAsyIS5jb2RlZm91bmRyeS52MS5Ccm93c2VyTW91c2VFdmVudEgAEi4KA2tleRgCIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJLZXlFdmVudEgAEg4KBHRleHQYAyABKAlIAEIHCgVldmVudCJZChNCcm93c2VySW5wdXRSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkSMQoGZXZlbnRzGAIgAygLMiEuY29kZWZvdW5kcnkudjEuQnJvd3NlcklucHV0RXZlbnQiFgoUQnJvd3NlcklucHV0UmVzcG9uc2UiRgoUUmVzaXplQnJvd3NlclJlcXVlc3QSDwoHc3VyZmFjZRgBIAEoCRINCgV3aWR0aBgCIAEoDRIOCgZoZWlnaHQYAyABKA0iFwoVUmVzaXplQnJvd3NlclJlc3BvbnNlIrsBChRBbnN3ZXJCcm93c2VyUmVxdWVzdBIPCgdzdXJmYWNlGAEgASgJEgoKAmlkGAIgASgJEjUKBmRpYWxvZxgDIAEoCzIjLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJEaWFsb2dBbnN3ZXJIABIzCgVmaWxlcxgEIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJGaWxlc0Fuc3dlckgAEhAKBm9wdGlvbhgFIAEoEUgAQggKBmFuc3dlciIzChNCcm93c2VyRGlhbG9nQW5zd2VyEg4KBmFjY2VwdBgBIAEoCBIMCgR0ZXh0GAIgASgJIiMKEkJyb3dzZXJGaWxlc0Fuc3dlchINCgVwYXRocxgBIAMoCSIXChVBbnN3ZXJCcm93c2VyUmVzcG9uc2UiNAoTUGFzdGVCcm93c2VyUmVxdWVzdBIPCgdzdXJmYWNlGAEgASgJEgwKBHRleHQYAiABKAkiFgoUUGFzdGVCcm93c2VyUmVzcG9uc2UiJQoSQ29weUJyb3dzZXJSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkiJQoTQ29weUJyb3dzZXJSZXNwb25zZRIOCgZsZW5ndGgYASABKA0iOwocUmV2ZWFsQnJvd3NlckRvd25sb2FkUmVxdWVzdBIPCgdzdXJmYWNlGAEgASgJEgoKAmlkGAIgASgJIh8KHVJldmVhbEJyb3dzZXJEb3dubG9hZFJlc3BvbnNlIhgKFlJlbGF1bmNoQnJvd3NlclJlcXVlc3QiGQoXUmVsYXVuY2hCcm93c2VyUmVzcG9uc2UiJgoTQ2xvc2VCcm93c2VyUmVxdWVzdBIPCgdzdXJmYWNlGAEgASgJIhYKFENsb3NlQnJvd3NlclJlc3BvbnNlKpwBCgxCcm93c2VyUGhhc2USHQoZQlJPV1NFUl9QSEFTRV9VTlNQRUNJRklFRBAAEhoKFkJST1dTRVJfUEhBU0VfU1RBUlRJTkcQARIXChNCUk9XU0VSX1BIQVNFX1JFQURZEAISHQoZQlJPV1NFUl9QSEFTRV9VTkFWQUlMQUJMRRADEhkKFUJST1dTRVJfUEhBU0VfQ1JBU0hFRBAEMrQICg5Ccm93c2VyU2VydmljZRJOCgVXYXRjaBIjLmNvZGVmb3VuZHJ5LnYxLldhdGNoQnJvd3NlclJlcXVlc3QaHC5jb2RlZm91bmRyeS52MS5Ccm93c2VyRXZlbnQiADABEl0KCE5hdmlnYXRlEiYuY29kZWZvdW5kcnkudjEuTmF2aWdhdGVCcm93c2VyUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLk5hdmlnYXRlQnJvd3NlclJlc3BvbnNlIgASSwoCR28SIC5jb2RlZm91bmRyeS52MS5Hb0Jyb3dzZXJSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuR29Ccm93c2VyUmVzcG9uc2UiABJXCgZSZWxvYWQSJC5jb2RlZm91bmRyeS52MS5SZWxvYWRCcm93c2VyUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLlJlbG9hZEJyb3dzZXJSZXNwb25zZSIAElQKBUlucHV0EiMuY29kZWZvdW5kcnkudjEuQnJvd3NlcklucHV0UmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJJbnB1dFJlc3BvbnNlIgASVwoGUmVzaXplEiQuY29kZWZvdW5kcnkudjEuUmVzaXplQnJvd3NlclJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5SZXNpemVCcm93c2VyUmVzcG9uc2UiABJXCgZBbnN3ZXISJC5jb2RlZm91bmRyeS52MS5BbnN3ZXJCcm93c2VyUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkFuc3dlckJyb3dzZXJSZXNwb25zZSIAElQKBVBhc3RlEiMuY29kZWZvdW5kcnkudjEuUGFzdGVCcm93c2VyUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLlBhc3RlQnJvd3NlclJlc3BvbnNlIgASUQoEQ29weRIiLmNvZGVmb3VuZHJ5LnYxLkNvcHlCcm93c2VyUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLkNvcHlCcm93c2VyUmVzcG9uc2UiABJnCgZSZXZlYWwSLC5jb2RlZm91bmRyeS52MS5SZXZlYWxCcm93c2VyRG93bmxvYWRSZXF1ZXN0Gi0uY29kZWZvdW5kcnkudjEuUmV2ZWFsQnJvd3NlckRvd25sb2FkUmVzcG9uc2UiABJdCghSZWxhdW5jaBImLmNvZGVmb3VuZHJ5LnYxLlJlbGF1bmNoQnJvd3NlclJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5SZWxhdW5jaEJyb3dzZXJSZXNwb25zZSIAElQKBUNsb3NlEiMuY29kZWZvdW5kcnkudjEuQ2xvc2VCcm93c2VyUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkNsb3NlQnJvd3NlclJlc3BvbnNlIgBCxAEKEmNvbS5jb2RlZm91bmRyeS52MUIMQnJvd3NlclByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_heartbeat]);
+  fileDesc("Chxjb2RlZm91bmRyeS92MS9icm93c2VyLnByb3RvEg5jb2RlZm91bmRyeS52MSJSChNXYXRjaEJyb3dzZXJSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkSDQoFd2lkdGgYAiABKA0SDgoGaGVpZ2h0GAMgASgNEgsKA3VybBgEIAEoCSKrAQoMQnJvd3NlckV2ZW50Ei0KBXN0YXRlGAEgASgLMhwuY29kZWZvdW5kcnkudjEuQnJvd3NlclN0YXRlSAASLQoFZnJhbWUYAiABKAsyHC5jb2RlZm91bmRyeS52MS5Ccm93c2VyRnJhbWVIABI0CgloZWFydGJlYXQYAyABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIAEIHCgVldmVudCI7CgxCcm93c2VyRnJhbWUSDAoEanBlZxgBIAEoDBINCgV3aWR0aBgCIAEoDRIOCgZoZWlnaHQYAyABKA0i3AMKDEJyb3dzZXJTdGF0ZRIrCgVwaGFzZRgBIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJQaGFzZRIPCgdtZXNzYWdlGAIgASgJEgsKA3VybBgDIAEoCRINCgV0aXRsZRgEIAEoCRIPCgdsb2FkaW5nGAUgASgIEhMKC2Nhbl9nb19iYWNrGAYgASgIEhYKDmNhbl9nb19mb3J3YXJkGAcgASgIEg0KBXBvcHVwGAggASgIEi0KBmRpYWxvZxgJIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJEaWFsb2cSOAoMZmlsZV9jaG9vc2VyGAogASgLMiIuY29kZWZvdW5kcnkudjEuQnJvd3NlckZpbGVDaG9vc2VyEi0KBnNlbGVjdBgLIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJTZWxlY3QSDgoGbm90aWNlGAwgASgJEjIKCWRvd25sb2FkcxgNIAMoCzIfLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJEb3dubG9hZBIOCgZjb3BpZWQYDiABKAQSDAoEc2l0ZRgPIAEoCRIQCghzZWN1cml0eRgQIAEoCRIZChFkb3dubG9hZHNfYmxvY2tlZBgRIAEoDSJwCg1Ccm93c2VyRGlhbG9nEgoKAmlkGAEgASgJEgwKBGtpbmQYAiABKAkSDwoHbWVzc2FnZRgDIAEoCRIWCg5kZWZhdWx0X3Byb21wdBgEIAEoCRIOCgZvcmlnaW4YBSABKAkSDAoEc2l0ZRgGIAEoCSJQChJCcm93c2VyRmlsZUNob29zZXISCgoCaWQYASABKAkSEAoIbXVsdGlwbGUYAiABKAgSDgoGb3JpZ2luGAMgASgJEgwKBHNpdGUYBCABKAkiNgoTQnJvd3NlclNlbGVjdE9wdGlvbhINCgVsYWJlbBgBIAEoCRIQCghkaXNhYmxlZBgCIAEoCCKIAQoNQnJvd3NlclNlbGVjdBIKCgJpZBgBIAEoCRI0CgdvcHRpb25zGAIgAygLMiMuY29kZWZvdW5kcnkudjEuQnJvd3NlclNlbGVjdE9wdGlvbhIQCghzZWxlY3RlZBgDIAEoBRIJCgF4GAQgASgBEgkKAXkYBSABKAESDQoFd2lkdGgYBiABKAEiSAoPQnJvd3NlckRvd25sb2FkEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFc3RhdGUYAyABKAkSDAoEc2l0ZRgEIAEoCSI2ChZOYXZpZ2F0ZUJyb3dzZXJSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkSCwoDdXJsGAIgASgJIiYKF05hdmlnYXRlQnJvd3NlclJlc3BvbnNlEgsKA3VybBgBIAEoCSIyChBHb0Jyb3dzZXJSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkSDQoFZGVsdGEYAiABKBEiEwoRR29Ccm93c2VyUmVzcG9uc2UiJwoUUmVsb2FkQnJvd3NlclJlcXVlc3QSDwoHc3VyZmFjZRgBIAEoCSIXChVSZWxvYWRCcm93c2VyUmVzcG9uc2UiogEKEUJyb3dzZXJNb3VzZUV2ZW50EgwKBHR5cGUYASABKAkSDgoGYnV0dG9uGAIgASgJEgkKAXgYAyABKAESCQoBeRgEIAEoARIPCgdidXR0b25zGAUgASgNEhMKC2NsaWNrX2NvdW50GAYgASgNEhEKCW1vZGlmaWVycxgHIAEoDRIPCgdkZWx0YV94GAggASgBEg8KB2RlbHRhX3kYCSABKAEilAEKD0Jyb3dzZXJLZXlFdmVudBIMCgR0eXBlGAEgASgJEgsKA2tleRgCIAEoCRIMCgRjb2RlGAMgASgJEgwKBHRleHQYBCABKAkSEAoIa2V5X2NvZGUYBSABKA0SEQoJbW9kaWZpZXJzGAYgASgNEhAKCGxvY2F0aW9uGAcgASgNEhMKC2F1dG9fcmVwZWF0GAggASgIIpABChFCcm93c2VySW5wdXRFdmVudBIyCgVtb3VzZRgBIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJNb3VzZUV2ZW50SAASLgoDa2V5GAIgASgLMh8uY29kZWZvdW5kcnkudjEuQnJvd3NlcktleUV2ZW50SAASDgoEdGV4dBgDIAEoCUgAQgcKBWV2ZW50IlkKE0Jyb3dzZXJJbnB1dFJlcXVlc3QSDwoHc3VyZmFjZRgBIAEoCRIxCgZldmVudHMYAiADKAsyIS5jb2RlZm91bmRyeS52MS5Ccm93c2VySW5wdXRFdmVudCIWChRCcm93c2VySW5wdXRSZXNwb25zZSJGChRSZXNpemVCcm93c2VyUmVxdWVzdBIPCgdzdXJmYWNlGAEgASgJEg0KBXdpZHRoGAIgASgNEg4KBmhlaWdodBgDIAEoDSIXChVSZXNpemVCcm93c2VyUmVzcG9uc2UizwEKFEFuc3dlckJyb3dzZXJSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkSCgoCaWQYAiABKAkSNQoGZGlhbG9nGAMgASgLMiMuY29kZWZvdW5kcnkudjEuQnJvd3NlckRpYWxvZ0Fuc3dlckgAEjMKBWZpbGVzGAQgASgLMiIuY29kZWZvdW5kcnkudjEuQnJvd3NlckZpbGVzQW5zd2VySAASEAoGb3B0aW9uGAUgASgRSAASEgoIZG93bmxvYWQYBiABKAhIAEIICgZhbnN3ZXIiMwoTQnJvd3NlckRpYWxvZ0Fuc3dlchIOCgZhY2NlcHQYASABKAgSDAoEdGV4dBgCIAEoCSIjChJCcm93c2VyRmlsZXNBbnN3ZXISDQoFcGF0aHMYASADKAkiFwoVQW5zd2VyQnJvd3NlclJlc3BvbnNlIjQKE1Bhc3RlQnJvd3NlclJlcXVlc3QSDwoHc3VyZmFjZRgBIAEoCRIMCgR0ZXh0GAIgASgJIhYKFFBhc3RlQnJvd3NlclJlc3BvbnNlIjgKEkNvcHlCcm93c2VyUmVxdWVzdBIPCgdzdXJmYWNlGAEgASgJEhEKCXBhZ2VfY29weRgCIAEoCCIlChNDb3B5QnJvd3NlclJlc3BvbnNlEg4KBmxlbmd0aBgBIAEoDSI7ChxSZXZlYWxCcm93c2VyRG93bmxvYWRSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkSCgoCaWQYAiABKAkiHwodUmV2ZWFsQnJvd3NlckRvd25sb2FkUmVzcG9uc2UiGAoWUmVsYXVuY2hCcm93c2VyUmVxdWVzdCIZChdSZWxhdW5jaEJyb3dzZXJSZXNwb25zZSImChNDbG9zZUJyb3dzZXJSZXF1ZXN0Eg8KB3N1cmZhY2UYASABKAkiFgoUQ2xvc2VCcm93c2VyUmVzcG9uc2UqnAEKDEJyb3dzZXJQaGFzZRIdChlCUk9XU0VSX1BIQVNFX1VOU1BFQ0lGSUVEEAASGgoWQlJPV1NFUl9QSEFTRV9TVEFSVElORxABEhcKE0JST1dTRVJfUEhBU0VfUkVBRFkQAhIdChlCUk9XU0VSX1BIQVNFX1VOQVZBSUxBQkxFEAMSGQoVQlJPV1NFUl9QSEFTRV9DUkFTSEVEEAQytAgKDkJyb3dzZXJTZXJ2aWNlEk4KBVdhdGNoEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hCcm93c2VyUmVxdWVzdBocLmNvZGVmb3VuZHJ5LnYxLkJyb3dzZXJFdmVudCIAMAESXQoITmF2aWdhdGUSJi5jb2RlZm91bmRyeS52MS5OYXZpZ2F0ZUJyb3dzZXJSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuTmF2aWdhdGVCcm93c2VyUmVzcG9uc2UiABJLCgJHbxIgLmNvZGVmb3VuZHJ5LnYxLkdvQnJvd3NlclJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5Hb0Jyb3dzZXJSZXNwb25zZSIAElcKBlJlbG9hZBIkLmNvZGVmb3VuZHJ5LnYxLlJlbG9hZEJyb3dzZXJSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVsb2FkQnJvd3NlclJlc3BvbnNlIgASVAoFSW5wdXQSIy5jb2RlZm91bmRyeS52MS5Ccm93c2VySW5wdXRSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuQnJvd3NlcklucHV0UmVzcG9uc2UiABJXCgZSZXNpemUSJC5jb2RlZm91bmRyeS52MS5SZXNpemVCcm93c2VyUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLlJlc2l6ZUJyb3dzZXJSZXNwb25zZSIAElcKBkFuc3dlchIkLmNvZGVmb3VuZHJ5LnYxLkFuc3dlckJyb3dzZXJSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuQW5zd2VyQnJvd3NlclJlc3BvbnNlIgASVAoFUGFzdGUSIy5jb2RlZm91bmRyeS52MS5QYXN0ZUJyb3dzZXJSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuUGFzdGVCcm93c2VyUmVzcG9uc2UiABJRCgRDb3B5EiIuY29kZWZvdW5kcnkudjEuQ29weUJyb3dzZXJSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuQ29weUJyb3dzZXJSZXNwb25zZSIAEmcKBlJldmVhbBIsLmNvZGVmb3VuZHJ5LnYxLlJldmVhbEJyb3dzZXJEb3dubG9hZFJlcXVlc3QaLS5jb2RlZm91bmRyeS52MS5SZXZlYWxCcm93c2VyRG93bmxvYWRSZXNwb25zZSIAEl0KCFJlbGF1bmNoEiYuY29kZWZvdW5kcnkudjEuUmVsYXVuY2hCcm93c2VyUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlJlbGF1bmNoQnJvd3NlclJlc3BvbnNlIgASVAoFQ2xvc2USIy5jb2RlZm91bmRyeS52MS5DbG9zZUJyb3dzZXJSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuQ2xvc2VCcm93c2VyUmVzcG9uc2UiAELEAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgxCcm93c2VyUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_heartbeat]);
 
 /**
  * @generated from message codefoundry.v1.WatchBrowserRequest
@@ -198,6 +198,29 @@ export type BrowserState = Message<"codefoundry.v1.BrowserState"> & {
    * @generated from field: uint64 copied = 14;
    */
   copied: bigint;
+
+  /**
+   * The domain the page's address is registered under, which a client keeps visible however
+   * long the address: "example.co.uk" for a.b.example.co.uk. The host itself when it has none.
+   *
+   * @generated from field: string site = 15;
+   */
+  site: string;
+
+  /**
+   * Empty for a page with a good certificate or no page at all; "insecure" for one that came
+   * over no encryption; "cert" for one whose certificate failed.
+   *
+   * @generated from field: string security = 16;
+   */
+  security: string;
+
+  /**
+   * Downloads refused that did not fit in downloads.
+   *
+   * @generated from field: uint32 downloads_blocked = 17;
+   */
+  downloadsBlocked: number;
 };
 
 /**
@@ -237,6 +260,13 @@ export type BrowserDialog = Message<"codefoundry.v1.BrowserDialog"> & {
    * @generated from field: string origin = 5;
    */
   origin: string;
+
+  /**
+   * The origin's registrable domain: see BrowserState.site.
+   *
+   * @generated from field: string site = 6;
+   */
+  site: string;
 };
 
 /**
@@ -264,6 +294,13 @@ export type BrowserFileChooser = Message<"codefoundry.v1.BrowserFileChooser"> & 
    * @generated from field: string origin = 3;
    */
   origin: string;
+
+  /**
+   * The origin's registrable domain: see BrowserState.site.
+   *
+   * @generated from field: string site = 4;
+   */
+  site: string;
 };
 
 /**
@@ -354,11 +391,19 @@ export type BrowserDownload = Message<"codefoundry.v1.BrowserDownload"> & {
   name: string;
 
   /**
-   * inProgress, completed or canceled.
+   * asking (a download nobody clicked for, waiting for the user), inProgress, completed,
+   * canceled or blocked.
    *
    * @generated from field: string state = 3;
    */
   state: string;
+
+  /**
+   * Who asked for it, as a registrable domain; empty when nothing says.
+   *
+   * @generated from field: string site = 4;
+   */
+  site: string;
 };
 
 /**
@@ -713,7 +758,7 @@ export type AnswerBrowserRequest = Message<"codefoundry.v1.AnswerBrowserRequest"
   surface: string;
 
   /**
-   * The dialog's, chooser's or select's id.
+   * The dialog's, chooser's, select's or download's id.
    *
    * @generated from field: string id = 2;
    */
@@ -742,6 +787,14 @@ export type AnswerBrowserRequest = Message<"codefoundry.v1.AnswerBrowserRequest"
      */
     value: number;
     case: "option";
+  } | {
+    /**
+     * Whether a download in the asking state may land.
+     *
+     * @generated from field: bool download = 6;
+     */
+    value: boolean;
+    case: "download";
   } | { case: undefined; value?: undefined };
 };
 
@@ -849,6 +902,13 @@ export type CopyBrowserRequest = Message<"codefoundry.v1.CopyBrowserRequest"> & 
    * @generated from field: string surface = 1;
    */
   surface: string;
+
+  /**
+   * Take what a click on the page's own Copy button left, not what a cmd+c changed.
+   *
+   * @generated from field: bool page_copy = 2;
+   */
+  pageCopy: boolean;
 };
 
 /**
@@ -863,7 +923,7 @@ export const CopyBrowserRequestSchema: GenMessage<CopyBrowserRequest> = /*@__PUR
  */
 export type CopyBrowserResponse = Message<"codefoundry.v1.CopyBrowserResponse"> & {
   /**
-   * How many characters went; 0 when Chrome's clipboard had no text.
+   * How many characters went; 0 when there was nothing new to take.
    *
    * @generated from field: uint32 length = 1;
    */
@@ -1101,8 +1161,9 @@ export const BrowserService: GenService<{
     output: typeof PasteBrowserResponseSchema;
   },
   /**
-   * Copy puts what the page last copied to Chrome's own clipboard on the Mac's. Only ever the
-   * user's doing: a page has no way to the Mac's clipboard but this.
+   * Copy puts what the user copied on the Mac's clipboard: what the last cmd+c or cmd+x of this
+   * surface changed, or what a click on the page's own Copy button left. Only ever the user's
+   * doing: a page has no way to the Mac's clipboard but this.
    *
    * @generated from rpc codefoundry.v1.BrowserService.Copy
    */
@@ -1122,7 +1183,8 @@ export const BrowserService: GenService<{
     output: typeof RevealBrowserDownloadResponseSchema;
   },
   /**
-   * Relaunch starts Chrome again after it died; each shown surface returns to its page.
+   * Relaunch starts Chrome again after it died. Surfaces open blank and say what they were on:
+   * going straight back to the page that ended Chrome would end it again.
    *
    * @generated from rpc codefoundry.v1.BrowserService.Relaunch
    */

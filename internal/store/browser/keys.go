@@ -153,7 +153,7 @@ func (s *Store) Input(ctx context.Context, key string, events []InputEvent) erro
 		return err
 	}
 	s.mu.Lock()
-	held := sf.state.Dialog != nil
+	held := t.dialog != nil
 	s.mu.Unlock()
 	if held {
 		return nil
@@ -164,6 +164,17 @@ func (s *Store) Input(ctx context.Context, key string, events []InputEvent) erro
 		if err != nil {
 			return err
 		}
+		// Before the event goes: the page's answer to it is what a download comes from.
+		if e.gesture() {
+			s.mu.Lock()
+			sf.gesture = time.Now()
+			s.mu.Unlock()
+		}
+		if e.copies() {
+			if err := s.armCopy(ctx, in, sf); err != nil {
+				return err
+			}
+		}
 		if err := in.call(ctx, t.session, method, params, nil); err != nil {
 			return err
 		}
@@ -173,6 +184,27 @@ func (s *Store) Input(ctx context.Context, key string, events []InputEvent) erro
 		time.AfterFunc(copySettle, func() { s.noticeCopied(context.Background(), key) })
 	}
 	return nil
+}
+
+// gesture is a click or an Enter: what a person does to mean "do that", where a page can have
+// been waiting for any key at all. Space presses a focused button or link too.
+func (e InputEvent) gesture() bool {
+	if m := e.Mouse; m != nil {
+		return m.Type == "mouseReleased" && m.Button == "left"
+	}
+	if k := e.Key; k != nil {
+		return k.Type != "keyUp" && (k.Key == "Enter" || k.Key == " ")
+	}
+	return false
+}
+
+// copies is a cmd+c or cmd+x going to the page.
+func (e InputEvent) copies() bool {
+	if e.Key == nil {
+		return false
+	}
+	c := commandsFor(e.Key)
+	return slices.Contains(c, "copy") || slices.Contains(c, "cut")
 }
 
 func (e InputEvent) encode() (string, map[string]any, error) {

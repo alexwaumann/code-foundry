@@ -328,9 +328,17 @@ type BrowserState struct {
 	Notice      string              `protobuf:"bytes,12,opt,name=notice,proto3" json:"notice,omitempty"`
 	Downloads   []*BrowserDownload  `protobuf:"bytes,13,rep,name=downloads,proto3" json:"downloads,omitempty"`
 	// Goes up when a click left new text on Chrome's clipboard.
-	Copied        uint64 `protobuf:"varint,14,opt,name=copied,proto3" json:"copied,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Copied uint64 `protobuf:"varint,14,opt,name=copied,proto3" json:"copied,omitempty"`
+	// The domain the page's address is registered under, which a client keeps visible however
+	// long the address: "example.co.uk" for a.b.example.co.uk. The host itself when it has none.
+	Site string `protobuf:"bytes,15,opt,name=site,proto3" json:"site,omitempty"`
+	// Empty for a page with a good certificate or no page at all; "insecure" for one that came
+	// over no encryption; "cert" for one whose certificate failed.
+	Security string `protobuf:"bytes,16,opt,name=security,proto3" json:"security,omitempty"`
+	// Downloads refused that did not fit in downloads.
+	DownloadsBlocked uint32 `protobuf:"varint,17,opt,name=downloads_blocked,json=downloadsBlocked,proto3" json:"downloads_blocked,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *BrowserState) Reset() {
@@ -461,6 +469,27 @@ func (x *BrowserState) GetCopied() uint64 {
 	return 0
 }
 
+func (x *BrowserState) GetSite() string {
+	if x != nil {
+		return x.Site
+	}
+	return ""
+}
+
+func (x *BrowserState) GetSecurity() string {
+	if x != nil {
+		return x.Security
+	}
+	return ""
+}
+
+func (x *BrowserState) GetDownloadsBlocked() uint32 {
+	if x != nil {
+		return x.DownloadsBlocked
+	}
+	return 0
+}
+
 type BrowserDialog struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -469,6 +498,8 @@ type BrowserDialog struct {
 	Message       string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	DefaultPrompt string `protobuf:"bytes,4,opt,name=default_prompt,json=defaultPrompt,proto3" json:"default_prompt,omitempty"`
 	Origin        string `protobuf:"bytes,5,opt,name=origin,proto3" json:"origin,omitempty"`
+	// The origin's registrable domain: see BrowserState.site.
+	Site          string `protobuf:"bytes,6,opt,name=site,proto3" json:"site,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -538,11 +569,20 @@ func (x *BrowserDialog) GetOrigin() string {
 	return ""
 }
 
+func (x *BrowserDialog) GetSite() string {
+	if x != nil {
+		return x.Site
+	}
+	return ""
+}
+
 type BrowserFileChooser struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Multiple      bool                   `protobuf:"varint,2,opt,name=multiple,proto3" json:"multiple,omitempty"`
-	Origin        string                 `protobuf:"bytes,3,opt,name=origin,proto3" json:"origin,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Multiple bool                   `protobuf:"varint,2,opt,name=multiple,proto3" json:"multiple,omitempty"`
+	Origin   string                 `protobuf:"bytes,3,opt,name=origin,proto3" json:"origin,omitempty"`
+	// The origin's registrable domain: see BrowserState.site.
+	Site          string `protobuf:"bytes,4,opt,name=site,proto3" json:"site,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -594,6 +634,13 @@ func (x *BrowserFileChooser) GetMultiple() bool {
 func (x *BrowserFileChooser) GetOrigin() string {
 	if x != nil {
 		return x.Origin
+	}
+	return ""
+}
+
+func (x *BrowserFileChooser) GetSite() string {
+	if x != nil {
+		return x.Site
 	}
 	return ""
 }
@@ -739,8 +786,11 @@ type BrowserDownload struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	// inProgress, completed or canceled.
-	State         string `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	// asking (a download nobody clicked for, waiting for the user), inProgress, completed,
+	// canceled or blocked.
+	State string `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	// Who asked for it, as a registrable domain; empty when nothing says.
+	Site          string `protobuf:"bytes,4,opt,name=site,proto3" json:"site,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -792,6 +842,13 @@ func (x *BrowserDownload) GetName() string {
 func (x *BrowserDownload) GetState() string {
 	if x != nil {
 		return x.State
+	}
+	return ""
+}
+
+func (x *BrowserDownload) GetSite() string {
+	if x != nil {
+		return x.Site
 	}
 	return ""
 }
@@ -1559,13 +1616,14 @@ func (*ResizeBrowserResponse) Descriptor() ([]byte, []int) {
 type AnswerBrowserRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Surface string                 `protobuf:"bytes,1,opt,name=surface,proto3" json:"surface,omitempty"`
-	// The dialog's, chooser's or select's id.
+	// The dialog's, chooser's, select's or download's id.
 	Id string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
 	// Types that are valid to be assigned to Answer:
 	//
 	//	*AnswerBrowserRequest_Dialog
 	//	*AnswerBrowserRequest_Files
 	//	*AnswerBrowserRequest_Option
+	//	*AnswerBrowserRequest_Download
 	Answer        isAnswerBrowserRequest_Answer `protobuf_oneof:"answer"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1649,6 +1707,15 @@ func (x *AnswerBrowserRequest) GetOption() int32 {
 	return 0
 }
 
+func (x *AnswerBrowserRequest) GetDownload() bool {
+	if x != nil {
+		if x, ok := x.Answer.(*AnswerBrowserRequest_Download); ok {
+			return x.Download
+		}
+	}
+	return false
+}
+
 type isAnswerBrowserRequest_Answer interface {
 	isAnswerBrowserRequest_Answer()
 }
@@ -1666,11 +1733,18 @@ type AnswerBrowserRequest_Option struct {
 	Option int32 `protobuf:"zigzag32,5,opt,name=option,proto3,oneof"`
 }
 
+type AnswerBrowserRequest_Download struct {
+	// Whether a download in the asking state may land.
+	Download bool `protobuf:"varint,6,opt,name=download,proto3,oneof"`
+}
+
 func (*AnswerBrowserRequest_Dialog) isAnswerBrowserRequest_Answer() {}
 
 func (*AnswerBrowserRequest_Files) isAnswerBrowserRequest_Answer() {}
 
 func (*AnswerBrowserRequest_Option) isAnswerBrowserRequest_Answer() {}
+
+func (*AnswerBrowserRequest_Download) isAnswerBrowserRequest_Answer() {}
 
 type BrowserDialogAnswer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1894,8 +1968,10 @@ func (*PasteBrowserResponse) Descriptor() ([]byte, []int) {
 }
 
 type CopyBrowserRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Surface       string                 `protobuf:"bytes,1,opt,name=surface,proto3" json:"surface,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Surface string                 `protobuf:"bytes,1,opt,name=surface,proto3" json:"surface,omitempty"`
+	// Take what a click on the page's own Copy button left, not what a cmd+c changed.
+	PageCopy      bool `protobuf:"varint,2,opt,name=page_copy,json=pageCopy,proto3" json:"page_copy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1937,9 +2013,16 @@ func (x *CopyBrowserRequest) GetSurface() string {
 	return ""
 }
 
+func (x *CopyBrowserRequest) GetPageCopy() bool {
+	if x != nil {
+		return x.PageCopy
+	}
+	return false
+}
+
 type CopyBrowserResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// How many characters went; 0 when Chrome's clipboard had no text.
+	// How many characters went; 0 when there was nothing new to take.
 	Length        uint32 `protobuf:"varint,1,opt,name=length,proto3" json:"length,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2240,7 +2323,7 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\fBrowserFrame\x12\x12\n" +
 	"\x04jpeg\x18\x01 \x01(\fR\x04jpeg\x12\x14\n" +
 	"\x05width\x18\x02 \x01(\rR\x05width\x12\x16\n" +
-	"\x06height\x18\x03 \x01(\rR\x06height\"\x9e\x04\n" +
+	"\x06height\x18\x03 \x01(\rR\x06height\"\xfb\x04\n" +
 	"\fBrowserState\x122\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1c.codefoundry.v1.BrowserPhaseR\x05phase\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x10\n" +
@@ -2256,17 +2339,22 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\x06select\x18\v \x01(\v2\x1d.codefoundry.v1.BrowserSelectR\x06select\x12\x16\n" +
 	"\x06notice\x18\f \x01(\tR\x06notice\x12=\n" +
 	"\tdownloads\x18\r \x03(\v2\x1f.codefoundry.v1.BrowserDownloadR\tdownloads\x12\x16\n" +
-	"\x06copied\x18\x0e \x01(\x04R\x06copied\"\x8c\x01\n" +
+	"\x06copied\x18\x0e \x01(\x04R\x06copied\x12\x12\n" +
+	"\x04site\x18\x0f \x01(\tR\x04site\x12\x1a\n" +
+	"\bsecurity\x18\x10 \x01(\tR\bsecurity\x12+\n" +
+	"\x11downloads_blocked\x18\x11 \x01(\rR\x10downloadsBlocked\"\xa0\x01\n" +
 	"\rBrowserDialog\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12%\n" +
 	"\x0edefault_prompt\x18\x04 \x01(\tR\rdefaultPrompt\x12\x16\n" +
-	"\x06origin\x18\x05 \x01(\tR\x06origin\"X\n" +
+	"\x06origin\x18\x05 \x01(\tR\x06origin\x12\x12\n" +
+	"\x04site\x18\x06 \x01(\tR\x04site\"l\n" +
 	"\x12BrowserFileChooser\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bmultiple\x18\x02 \x01(\bR\bmultiple\x12\x16\n" +
-	"\x06origin\x18\x03 \x01(\tR\x06origin\"G\n" +
+	"\x06origin\x18\x03 \x01(\tR\x06origin\x12\x12\n" +
+	"\x04site\x18\x04 \x01(\tR\x04site\"G\n" +
 	"\x13BrowserSelectOption\x12\x14\n" +
 	"\x05label\x18\x01 \x01(\tR\x05label\x12\x1a\n" +
 	"\bdisabled\x18\x02 \x01(\bR\bdisabled\"\xac\x01\n" +
@@ -2276,11 +2364,12 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\bselected\x18\x03 \x01(\x05R\bselected\x12\f\n" +
 	"\x01x\x18\x04 \x01(\x01R\x01x\x12\f\n" +
 	"\x01y\x18\x05 \x01(\x01R\x01y\x12\x14\n" +
-	"\x05width\x18\x06 \x01(\x01R\x05width\"K\n" +
+	"\x05width\x18\x06 \x01(\x01R\x05width\"_\n" +
 	"\x0fBrowserDownload\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
-	"\x05state\x18\x03 \x01(\tR\x05state\"D\n" +
+	"\x05state\x18\x03 \x01(\tR\x05state\x12\x12\n" +
+	"\x04site\x18\x04 \x01(\tR\x04site\"D\n" +
 	"\x16NavigateBrowserRequest\x12\x18\n" +
 	"\asurface\x18\x01 \x01(\tR\asurface\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\"+\n" +
@@ -2327,13 +2416,14 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\asurface\x18\x01 \x01(\tR\asurface\x12\x14\n" +
 	"\x05width\x18\x02 \x01(\rR\x05width\x12\x16\n" +
 	"\x06height\x18\x03 \x01(\rR\x06height\"\x17\n" +
-	"\x15ResizeBrowserResponse\"\xdf\x01\n" +
+	"\x15ResizeBrowserResponse\"\xfd\x01\n" +
 	"\x14AnswerBrowserRequest\x12\x18\n" +
 	"\asurface\x18\x01 \x01(\tR\asurface\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12=\n" +
 	"\x06dialog\x18\x03 \x01(\v2#.codefoundry.v1.BrowserDialogAnswerH\x00R\x06dialog\x12:\n" +
 	"\x05files\x18\x04 \x01(\v2\".codefoundry.v1.BrowserFilesAnswerH\x00R\x05files\x12\x18\n" +
-	"\x06option\x18\x05 \x01(\x11H\x00R\x06optionB\b\n" +
+	"\x06option\x18\x05 \x01(\x11H\x00R\x06option\x12\x1c\n" +
+	"\bdownload\x18\x06 \x01(\bH\x00R\bdownloadB\b\n" +
 	"\x06answer\"A\n" +
 	"\x13BrowserDialogAnswer\x12\x16\n" +
 	"\x06accept\x18\x01 \x01(\bR\x06accept\x12\x12\n" +
@@ -2344,9 +2434,10 @@ const file_codefoundry_v1_browser_proto_rawDesc = "" +
 	"\x13PasteBrowserRequest\x12\x18\n" +
 	"\asurface\x18\x01 \x01(\tR\asurface\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\"\x16\n" +
-	"\x14PasteBrowserResponse\".\n" +
+	"\x14PasteBrowserResponse\"K\n" +
 	"\x12CopyBrowserRequest\x12\x18\n" +
-	"\asurface\x18\x01 \x01(\tR\asurface\"-\n" +
+	"\asurface\x18\x01 \x01(\tR\asurface\x12\x1b\n" +
+	"\tpage_copy\x18\x02 \x01(\bR\bpageCopy\"-\n" +
 	"\x13CopyBrowserResponse\x12\x16\n" +
 	"\x06length\x18\x01 \x01(\rR\x06length\"H\n" +
 	"\x1cRevealBrowserDownloadRequest\x12\x18\n" +
@@ -2499,6 +2590,7 @@ func file_codefoundry_v1_browser_proto_init() {
 		(*AnswerBrowserRequest_Dialog)(nil),
 		(*AnswerBrowserRequest_Files)(nil),
 		(*AnswerBrowserRequest_Option)(nil),
+		(*AnswerBrowserRequest_Download)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
