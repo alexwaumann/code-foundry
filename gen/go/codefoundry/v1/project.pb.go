@@ -3072,8 +3072,8 @@ type DiffSource struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Kind  DiffSourceKind         `protobuf:"varint,1,opt,name=kind,proto3,enum=codefoundry.v1.DiffSourceKind" json:"kind,omitempty"`
 	// With REF, and only then: a branch, tag, sha or revision (origin/main, v1.2, HEAD~3,
-	// HEAD@{1}), at most 256 bytes. Never an option or a range: no leading "-", no "..",
-	// ":", whitespace, control character or glob.
+	// HEAD@{1}), at most 256 bytes. Never an option or a range: no leading "-" or "^", no
+	// "..", ":", whitespace, control character or glob.
 	Ref           string `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3271,7 +3271,8 @@ func (x *CompareWorktreeRequest) GetPaths() []string {
 // One file of a comparison, base to head.
 type CompareFile struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Path  string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	// An embedded repository not yet added is a directory: `submodule`, with a trailing /.
+	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	// A rename's or copy's source; else empty.
 	OldPath string `protobuf:"bytes,2,opt,name=old_path,json=oldPath,proto3" json:"old_path,omitempty"`
 	// A git letter (A M D R C T), U for an unmerged path, ? for an untracked file. With the
@@ -3382,8 +3383,12 @@ type CompareWorktreeResponse struct {
 	BaseRef   string `protobuf:"bytes,8,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	MergeBase string `protobuf:"bytes,9,opt,name=merge_base,json=mergeBase,proto3" json:"merge_base,omitempty"`
 	// Non-empty when a source cannot be resolved (a ref that names no commit, HEAD on an
-	// unborn branch). The list is then empty.
-	Error         string `protobuf:"bytes,10,opt,name=error,proto3" json:"error,omitempty"`
+	// unborn branch), or a partial clone lacks an object the list needs. The list is then
+	// empty.
+	Error string `protobuf:"bytes,10,opt,name=error,proto3" json:"error,omitempty"`
+	// Files left out of `files` and the totals: a name that is not UTF-8, possible in a tree,
+	// cannot travel in a response.
+	SkippedNames  int32 `protobuf:"varint,11,opt,name=skipped_names,json=skippedNames,proto3" json:"skipped_names,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3486,6 +3491,13 @@ func (x *CompareWorktreeResponse) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *CompareWorktreeResponse) GetSkippedNames() int32 {
+	if x != nil {
+		return x.SkippedNames
+	}
+	return 0
 }
 
 type GetWorktreeCompareFileRequest struct {
@@ -5222,7 +5234,7 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\x05added\x18\x04 \x01(\x05R\x05added\x12\x18\n" +
 	"\adeleted\x18\x05 \x01(\x05R\adeleted\x12\x16\n" +
 	"\x06binary\x18\x06 \x01(\bR\x06binary\x12\x1c\n" +
-	"\tsubmodule\x18\a \x01(\bR\tsubmodule\"\x91\x03\n" +
+	"\tsubmodule\x18\a \x01(\bR\tsubmodule\"\xb6\x03\n" +
 	"\x17CompareWorktreeResponse\x121\n" +
 	"\x05files\x18\x01 \x03(\v2\x1b.codefoundry.v1.CompareFileR\x05files\x12\x1c\n" +
 	"\ttruncated\x18\x02 \x01(\bR\ttruncated\x12\x1f\n" +
@@ -5237,7 +5249,8 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\n" +
 	"merge_base\x18\t \x01(\tR\tmergeBase\x12\x14\n" +
 	"\x05error\x18\n" +
-	" \x01(\tR\x05error\"\xe1\x01\n" +
+	" \x01(\tR\x05error\x12#\n" +
+	"\rskipped_names\x18\v \x01(\x05R\fskippedNames\"\xe1\x01\n" +
 	"\x1dGetWorktreeCompareFileRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +

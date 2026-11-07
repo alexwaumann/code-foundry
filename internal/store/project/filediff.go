@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -72,13 +73,13 @@ type WorktreeFileDiff struct {
 
 // WorktreeFileDiff implements Store.
 func (g *Git) WorktreeFileDiff(ctx context.Context, req FileDiffRequest) (WorktreeFileDiff, error) {
-	file, err := worktreeRelative(req.File)
+	file, err := comparePath(req.File)
 	if err != nil {
 		return WorktreeFileDiff{}, err
 	}
 	oldPath := file
 	if req.OldPath != "" {
-		if oldPath, err = worktreeRelative(req.OldPath); err != nil {
+		if oldPath, err = comparePath(req.OldPath); err != nil {
 			return WorktreeFileDiff{}, err
 		}
 	}
@@ -248,7 +249,8 @@ type lsTreeEntry struct {
 }
 
 // parseLsTree finds file's entry in `git ls-tree -z --long` output ("<mode> <type> <oid>
-// <size>\t<path>\0", the size "-" for all but a blob).
+// <size>\t<path>\0", the size "-" for all but a blob, "BAD" for a blob a partial clone
+// lacks and may not fetch; that entry has no size, and reading it says what is wrong).
 func parseLsTree(out []byte, file string) (lsTreeEntry, bool) {
 	for _, rec := range splitZ(out) {
 		meta, path, found := strings.Cut(rec, "\t")
@@ -260,7 +262,7 @@ func parseLsTree(out []byte, file string) (lsTreeEntry, bool) {
 			return lsTreeEntry{}, false
 		}
 		e := lsTreeEntry{kind: f[1], oid: f[2]}
-		if e.kind == "blob" {
+		if e.kind == "blob" && f[3] != "BAD" {
 			n, err := strconv.ParseInt(f[3], 10, 64)
 			if err != nil {
 				return lsTreeEntry{}, false
@@ -272,18 +274,75 @@ func parseLsTree(out []byte, file string) (lsTreeEntry, bool) {
 	return lsTreeEntry{}, false
 }
 
+// maxLinkHops is how many links one path may pass through (macOS's MAXSYMLINKS).
+const maxLinkHops = 32
+
+// followParents follows the links in file's directories under root, as an open would, and
+// returns where that lands, with no link left but perhaps the last part, which a read
+// takes as its target. ok is false for a path that does not lead anywhere: gone, under a
+// file, through a link that leaves root, or through too many.
+func followParents(root *os.Root, file string) (rel string, ok bool, err error) {
+	var done []string
+	todo := strings.Split(file, "/")
+	for hops := 0; len(todo) > 0; {
+		part := todo[0]
+		todo = todo[1:]
+		switch part {
+		case "", ".":
+			continue
+		case "..":
+			if len(done) == 0 {
+				return "", false, nil
+			}
+			done = done[:len(done)-1]
+			continue
+		}
+		done = append(done, part)
+		here := path.Join(done...)
+		if len(todo) == 0 {
+			return here, true, nil
+		}
+		fi, err := root.Lstat(filepath.FromSlash(here))
+		switch {
+		case errors.Is(err, fs.ErrPermission):
+			return "", false, err
+		case err != nil:
+			return "", false, nil
+		case fi.Mode()&fs.ModeSymlink == 0:
+			continue
+		}
+		target, err := root.Readlink(filepath.FromSlash(here))
+		if hops++; err != nil || hops > maxLinkHops || filepath.IsAbs(target) {
+			return "", false, nil
+		}
+		done = done[:len(done)-1]
+		todo = append(strings.Split(filepath.ToSlash(target), "/"), todo...)
+	}
+	return "", false, nil
+}
+
 // readWorktreeFile reads file from the worktree at dir as git would store it: a regular
 // file's contents, a symlink's target. Missing, a directory, or beyond a link that leaves
-// the worktree: not present. Everything goes through an os.Root at the worktree, which no
-// link leaves, and the file is opened as what it was seen to be (openRegular), so nothing
-// swapped in since can lead elsewhere, and nothing here can block.
+// the worktree: not present. Beyond a link into .git, which comparePath cannot see in the
+// path as written: refused. os.Root would follow that one, since it stays inside.
+// Everything goes through an os.Root at the worktree, which no link leaves, and the file
+// is opened as what it was seen to be (openRegular), so nothing here can block.
 func readWorktreeFile(dir, file string) (FileVersion, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return FileVersion{}, fmt.Errorf("project: read %s: %w", dir, err)
 	}
 	defer func() { _ = root.Close() }()
-	rel := filepath.FromSlash(file)
+	real, ok, err := followParents(root, file)
+	switch {
+	case err != nil:
+		return FileVersion{}, fmt.Errorf("project: read %s: %w", file, err)
+	case !ok:
+		return FileVersion{}, nil
+	case insideGit(real):
+		return FileVersion{}, fmt.Errorf("%w: file %q is inside .git", ErrInvalidArgument, file)
+	}
+	rel := filepath.FromSlash(real)
 	fi, err := root.Lstat(rel)
 	switch {
 	case errors.Is(err, fs.ErrPermission):

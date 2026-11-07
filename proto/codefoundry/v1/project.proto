@@ -597,8 +597,8 @@ enum DiffSourceKind {
 message DiffSource {
   DiffSourceKind kind = 1;
   // With REF, and only then: a branch, tag, sha or revision (origin/main, v1.2, HEAD~3,
-  // HEAD@{1}), at most 256 bytes. Never an option or a range: no leading "-", no "..",
-  // ":", whitespace, control character or glob.
+  // HEAD@{1}), at most 256 bytes. Never an option or a range: no leading "-" or "^", no
+  // "..", ":", whitespace, control character or glob.
   string ref = 2;
 }
 
@@ -627,6 +627,7 @@ message CompareWorktreeRequest {
 
 // One file of a comparison, base to head.
 message CompareFile {
+  // An embedded repository not yet added is a directory: `submodule`, with a trailing /.
   string path = 1;
   // A rename's or copy's source; else empty.
   string old_path = 2;
@@ -656,8 +657,12 @@ message CompareWorktreeResponse {
   string base_ref = 8;
   string merge_base = 9;
   // Non-empty when a source cannot be resolved (a ref that names no commit, HEAD on an
-  // unborn branch). The list is then empty.
+  // unborn branch), or a partial clone lacks an object the list needs. The list is then
+  // empty.
   string error = 10;
+  // Files left out of `files` and the totals: a name that is not UTF-8, possible in a tree,
+  // cannot travel in a response.
+  int32 skipped_names = 11;
 }
 
 message GetWorktreeCompareFileRequest {
