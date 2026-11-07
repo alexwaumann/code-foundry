@@ -15,6 +15,7 @@ import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
 import { presentPromptHistory } from "@/stores/historyComposers";
+import { browserInFront, presentBrowserCommand } from "@/stores/browser";
 import { canSaveFile } from "@/stores/fileEdit";
 import { presentFileSave } from "@/stores/fileRequest";
 import { presentFileFinder } from "@/stores/fileFinder";
@@ -176,6 +177,8 @@ export function inPalette(c: CommandView): boolean {
   if (c.name === "thread.move.open" && !canMoveThread(getUiContext().activeThreadId)) return false;
   // file.save: only with a File tab editing in front of it.
   if (c.name === "file.save" && !canSaveFile()) return false;
+  // browser.*: only with a Browser tab in front of it.
+  if (c.name.startsWith("browser.") && !browserInFront()) return false;
   return isStartable(c) && !c.noPalette;
 }
 
@@ -468,6 +471,12 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
   // Window-local, and only here: saves the File tab in front (stores/fileEdit.ts). The daemon
   // refuses every other caller, so an agent cannot save a user's half-typed draft.
   "file.save": () => presentFileSave(),
+  // Window-local, and only here: the Browser tab in front (stores/browser.ts). The daemon
+  // refuses every other caller, so an agent cannot drive a logged-in page.
+  "browser.back": () => presentBrowserCommand("browser.back"),
+  "browser.forward": () => presentBrowserCommand("browser.forward"),
+  "browser.reload": () => presentBrowserCommand("browser.reload"),
+  "browser.relaunch": () => presentBrowserCommand("browser.relaunch"),
   // Window-local: the find bar of the thread in the content pane, or a step through its
   // matches (stores/threadFind.ts). The CLI's reach every window through ShowView.
   "thread.find": () => presentThreadFind("open") || true,

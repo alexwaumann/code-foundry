@@ -19,6 +19,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/backdrop"
+	"github.com/alexwaumann/code-foundry/internal/store/browser"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/dictation"
 	"github.com/alexwaumann/code-foundry/internal/store/ember"
@@ -84,6 +85,8 @@ type stores struct {
 	themes *usertheme.Store
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
+	// browser owns the experimental Chrome surface's one Chrome (browser.go).
+	browser *browser.Store
 	// dictation owns the dictation model and engine process (dictation.go); closed
 	// early, stopping the engine.
 	dictation *dictation.Store
@@ -361,6 +364,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
 	s.dictation = openDictation(log.With("store", "dictation"), p, s.bus, s.settings)
+	s.browser = openBrowser(log.With("store", "browser"), p, s.home, s.settings)
 	if s.skills, err = newSkillStore(p, s.db, s.bus, s.settings, log.With("store", "skill")); err != nil {
 		return nil, err
 	}
@@ -428,6 +432,9 @@ func (s *stores) close() error {
 	}
 	if s.dictation != nil {
 		s.dictation.Close()
+	}
+	if s.browser != nil {
+		s.browser.Close()
 	}
 	if s.stopShells != nil {
 		s.stopShells()

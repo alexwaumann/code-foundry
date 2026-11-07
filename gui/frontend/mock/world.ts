@@ -34,6 +34,7 @@ import { agentCounts, agentsCommands, listRuns, type AgentRunInit } from "./agen
 import { backgroundRun, waitingReason } from "./liveCount";
 import { isSetupStopped, SETUP_BRANCH, SETUP_PROMPT, setupMessage, setupRowState, setupScript, type SetupHold, type SetupMessage } from "./setup";
 import { shellCommands } from "./shells";
+import { MockBrowser } from "./browser";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
@@ -854,6 +855,7 @@ export class World {
     promote: (question, firstMessage) => this.createThread("", HOME, "opus", "", { name: "", autoNamed: true, nameIn: 2, pendingName: question.slice(0, 40), firstMessage: { text: firstMessage, attachments: [], composerText: "" } }).id,
   });
   /** Dictation (mock/dictation.ts; DictationService): enabled is dictation.enabled, the rest scripted. */
+  readonly browser = new MockBrowser(() => this.settings.value("experimental.chrome_surface") === "true");
   readonly dictation = new MockDictation({
     enabled: () => this.settings.value("dictation.enabled") === "true",
     setEnabled: (on) => {
@@ -1007,6 +1009,7 @@ export class World {
     this.attachments.clear();
     this.attachmentBytes.clear();
     this.logs.reset();
+    this.browser.reset();
     this.worktreeDelayMs = 700;
     this.nextSetup = "";
     this.refuseRetry = "";
@@ -4036,6 +4039,7 @@ export class World {
       ...bridgeCommands(() => [...this.threads.values()]),
       ...this.logs.commands(),
       ...mcpCommands(this.logs, (i) => this.emit(i)),
+      ...this.browser.commands((i) => this.emit(i)),
       ...panelItemCommands((id) => {
         const t = this.threads.get(id);
         return t ? { projectId: t.projectId, worktreePath: t.worktreePath, githubSlug: this.projects.get(t.projectId)?.githubSlug ?? "" } : undefined;

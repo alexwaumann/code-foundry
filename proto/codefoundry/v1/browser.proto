@@ -1,0 +1,291 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "codefoundry/v1/heartbeat.proto";
+
+// BrowserService is the experimental Chrome surface (docs/notes/chrome-surface.md): one
+// headless system Chrome, a page per side-panel tab, frames out and input in. Off unless the
+// experimental.chrome_surface setting is on, when every call is FAILED_PRECONDITION. It serves
+// browser pages only (a request without an allowed Origin is refused): no CLI verb reaches it,
+// and the one verb for agents, view.panel.browser, only asks the window to show a URL.
+service BrowserService {
+  // Watch streams one surface to one view: its state, then again on every change, and its
+  // frames, newest only: a frame the client has not taken is replaced. Opening it starts
+  // Chrome if needed; cancelling it stops the frames. Only a visible view should hold one.
+  rpc Watch(WatchBrowserRequest) returns (stream BrowserEvent) {}
+  // Navigate goes to an address, as typed: only http and https pass.
+  rpc Navigate(NavigateBrowserRequest) returns (NavigateBrowserResponse) {}
+  // Go moves through the surface's history.
+  rpc Go(GoBrowserRequest) returns (GoBrowserResponse) {}
+  // Reload reloads the page showing.
+  rpc Reload(ReloadBrowserRequest) returns (ReloadBrowserResponse) {}
+  // Input sends mouse, wheel, key and text events to the page, in order.
+  rpc Input(BrowserInputRequest) returns (BrowserInputResponse) {}
+  // Resize sets the page's size in CSS pixels; the page reflows to it.
+  rpc Resize(ResizeBrowserRequest) returns (ResizeBrowserResponse) {}
+  // Answer answers what the state says a page is asking.
+  rpc Answer(AnswerBrowserRequest) returns (AnswerBrowserResponse) {}
+  // Paste puts the user's text in the page as a paste.
+  rpc Paste(PasteBrowserRequest) returns (PasteBrowserResponse) {}
+  // Copy puts what the user copied on the Mac's clipboard: what the last cmd+c or cmd+x of this
+  // surface changed, or what a click on the page's own Copy button left. Only ever the user's
+  // doing: a page has no way to the Mac's clipboard but this.
+  rpc Copy(CopyBrowserRequest) returns (CopyBrowserResponse) {}
+  // Reveal shows a finished download in Finder.
+  rpc Reveal(RevealBrowserDownloadRequest) returns (RevealBrowserDownloadResponse) {}
+  // Relaunch starts Chrome again after it died. Surfaces open blank and say what they were on:
+  // going straight back to the page that ended Chrome would end it again.
+  rpc Relaunch(RelaunchBrowserRequest) returns (RelaunchBrowserResponse) {}
+  // Close closes a surface's page.
+  rpc Close(CloseBrowserRequest) returns (CloseBrowserResponse) {}
+}
+
+message WatchBrowserRequest {
+  // The surface: the GUI's panel key.
+  string surface = 1;
+  // The view's size in CSS pixels.
+  uint32 width = 2;
+  uint32 height = 3;
+  // Where to go once there is a page; empty stays.
+  string url = 4;
+}
+
+message BrowserEvent {
+  oneof event {
+    BrowserState state = 1;
+    BrowserFrame frame = 2;
+    StreamHeartbeat heartbeat = 3;
+  }
+}
+
+// BrowserFrame is one JPEG of the page.
+message BrowserFrame {
+  bytes jpeg = 1;
+  // The page's size in CSS pixels, which input coordinates use.
+  uint32 width = 2;
+  uint32 height = 3;
+}
+
+enum BrowserPhase {
+  BROWSER_PHASE_UNSPECIFIED = 0;
+  BROWSER_PHASE_STARTING = 1;
+  BROWSER_PHASE_READY = 2;
+  // Chrome cannot run; message says why.
+  BROWSER_PHASE_UNAVAILABLE = 3;
+  // Chrome died; Relaunch brings it back.
+  BROWSER_PHASE_CRASHED = 4;
+}
+
+// BrowserState is what a surface shows around its frames. Every string that came from a page
+// is the page's: a client shows it as text.
+message BrowserState {
+  BrowserPhase phase = 1;
+  string message = 2;
+  string url = 3;
+  string title = 4;
+  bool loading = 5;
+  bool can_go_back = 6;
+  bool can_go_forward = 7;
+  // The page showing is a popup: going back from its first page closes it.
+  bool popup = 8;
+  BrowserDialog dialog = 9;
+  BrowserFileChooser file_chooser = 10;
+  BrowserSelect select = 11;
+  string notice = 12;
+  repeated BrowserDownload downloads = 13;
+  // Goes up when a click left new text on Chrome's clipboard, and back to 0 when the page it was
+  // left on goes.
+  uint64 copied = 14;
+  // The domain the page's origin is registered under, which a client keeps visible however
+  // long the address: "example.co.uk" for a.b.example.co.uk. The host itself when it has none.
+  string site = 15;
+  // Empty for a page with a good certificate or no page at all; "insecure" for one that came
+  // over no encryption; "cert" for one whose certificate failed.
+  string security = 16;
+  // Downloads refused that did not fit in downloads.
+  uint32 downloads_blocked = 17;
+  // Who the page is, in Chrome's word: "https://a.example.co.uk". A blank page has the origin it
+  // inherited, whatever its url says. Empty with a url: a page nobody can name, and a client must
+  // say so rather than leave the address to speak for it.
+  string origin = 18;
+}
+
+message BrowserDialog {
+  string id = 1;
+  // alert, confirm, prompt or beforeunload.
+  string kind = 2;
+  string message = 3;
+  string default_prompt = 4;
+  string origin = 5;
+  // The origin's registrable domain: see BrowserState.site.
+  string site = 6;
+}
+
+message BrowserFileChooser {
+  string id = 1;
+  bool multiple = 2;
+  string origin = 3;
+  // The origin's registrable domain: see BrowserState.site.
+  string site = 4;
+}
+
+message BrowserSelectOption {
+  string label = 1;
+  bool disabled = 2;
+}
+
+message BrowserSelect {
+  string id = 1;
+  repeated BrowserSelectOption options = 2;
+  int32 selected = 3;
+  // Where the control sits in the page, CSS pixels.
+  double x = 4;
+  double y = 5;
+  double width = 6;
+}
+
+message BrowserDownload {
+  string id = 1;
+  string name = 2;
+  // asking (a download nobody clicked for, waiting for the user), inProgress, completed,
+  // canceled or blocked.
+  string state = 3;
+  // Who asked for it, as a registrable domain; empty when nothing says.
+  string site = 4;
+}
+
+message NavigateBrowserRequest {
+  string surface = 1;
+  string url = 2;
+}
+
+message NavigateBrowserResponse {
+  // The address as it went to Chrome.
+  string url = 1;
+}
+
+message GoBrowserRequest {
+  string surface = 1;
+  // -1 back, 1 forward.
+  sint32 delta = 2;
+}
+
+message GoBrowserResponse {}
+
+message ReloadBrowserRequest {
+  string surface = 1;
+}
+
+message ReloadBrowserResponse {}
+
+message BrowserMouseEvent {
+  // mousePressed, mouseReleased, mouseMoved or mouseWheel.
+  string type = 1;
+  // none, left, middle, right, back or forward.
+  string button = 2;
+  double x = 3;
+  double y = 4;
+  uint32 buttons = 5;
+  uint32 click_count = 6;
+  uint32 modifiers = 7;
+  double delta_x = 8;
+  double delta_y = 9;
+}
+
+message BrowserKeyEvent {
+  // keyDown, rawKeyDown or keyUp.
+  string type = 1;
+  string key = 2;
+  string code = 3;
+  string text = 4;
+  uint32 key_code = 5;
+  uint32 modifiers = 6;
+  uint32 location = 7;
+  bool auto_repeat = 8;
+}
+
+message BrowserInputEvent {
+  oneof event {
+    BrowserMouseEvent mouse = 1;
+    BrowserKeyEvent key = 2;
+    // Text a composition or a dead key finished.
+    string text = 3;
+  }
+}
+
+message BrowserInputRequest {
+  string surface = 1;
+  repeated BrowserInputEvent events = 2;
+}
+
+message BrowserInputResponse {}
+
+message ResizeBrowserRequest {
+  string surface = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+}
+
+message ResizeBrowserResponse {}
+
+message AnswerBrowserRequest {
+  string surface = 1;
+  // The dialog's, chooser's, select's or download's id.
+  string id = 2;
+  oneof answer {
+    BrowserDialogAnswer dialog = 3;
+    BrowserFilesAnswer files = 4;
+    // The option's index, -1 for none.
+    sint32 option = 5;
+    // Whether a download in the asking state may land.
+    bool download = 6;
+  }
+}
+
+message BrowserDialogAnswer {
+  bool accept = 1;
+  string text = 2;
+}
+
+message BrowserFilesAnswer {
+  // Absolute paths the user picked; none cancels.
+  repeated string paths = 1;
+}
+
+message AnswerBrowserResponse {}
+
+message PasteBrowserRequest {
+  string surface = 1;
+  string text = 2;
+}
+
+message PasteBrowserResponse {}
+
+message CopyBrowserRequest {
+  string surface = 1;
+  // Take what a click on the page's own Copy button left, not what a cmd+c changed.
+  bool page_copy = 2;
+}
+
+message CopyBrowserResponse {
+  // How many characters went; 0 when there was nothing new to take.
+  uint32 length = 1;
+}
+
+message RevealBrowserDownloadRequest {
+  string surface = 1;
+  string id = 2;
+}
+
+message RevealBrowserDownloadResponse {}
+
+message RelaunchBrowserRequest {}
+
+message RelaunchBrowserResponse {}
+
+message CloseBrowserRequest {
+  string surface = 1;
+}
+
+message CloseBrowserResponse {}

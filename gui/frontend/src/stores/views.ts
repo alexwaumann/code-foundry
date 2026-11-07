@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPanel";
 import { expandPanel, getPanel, isSplit, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
 import { projectPage, useUiStore, viewNames, workspacePage, type FocusRegion, type Selection } from "./ui";
+import { openBrowserSurface } from "./browser";
 import { openMcpSurface } from "./mcpPanel";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
@@ -172,6 +173,9 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
       // view.panel.mcp: the MCP surface in the current thread's panel.
       mcpPanelCommand();
       return true;
+    case "panel.browser":
+      // view.panel.browser: the Browser surface in the current selection's panel, at url.
+      return browserPanelCommand(params?.url ?? "");
     case "bottom.toggle":
       // view.bottom.toggle: the current selection's bottom terminal panel.
       toggleBottomCommand();
@@ -422,6 +426,19 @@ export function splitPanelCommand(): boolean {
  */
 export function mcpPanelCommand(): boolean {
   const key = openMcpSurface();
+  if (key === null) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  togglePanel(key, true, { focus: !inPalette });
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
+}
+
+/**
+ * view.panel.browser for the current selection, like mcpPanelCommand: opens (or activates) the
+ * Browser tab and shows the panel. A no-op with the setting off.
+ */
+export function browserPanelCommand(url: string): boolean {
+  const key = openBrowserSurface(useUiStore.getState().selection, url);
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
   togglePanel(key, true, { focus: !inPalette });
