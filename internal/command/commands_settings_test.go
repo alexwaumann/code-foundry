@@ -235,6 +235,7 @@ func TestSettingChangeCallers(t *testing.T) {
 		{name: "reset the editor", cmd: "settings.reset", key: "gitops.editor_command", userOnly: true},
 		{name: "set the registries", cmd: "settings.set", key: "plugins.registries", value: "https://github.com/o/r", userOnly: true},
 		{name: "set the channel", cmd: "settings.set", key: "update.channel", value: "tip", userOnly: true},
+		{name: "turn on the Chrome surface", cmd: "settings.set", key: "experimental.chrome_surface", value: "true", userOnly: true},
 	}
 	for _, c := range callers {
 		for _, s := range settings {

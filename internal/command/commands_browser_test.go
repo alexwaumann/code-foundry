@@ -111,3 +111,42 @@ func TestBrowserCommandsStayOutOfTheAgentIndex(t *testing.T) {
 		}
 	}
 }
+
+// A page in the app can aim a browser that may be signed in as the user only with the user's yes;
+// showing the tab, or a thread's CLI aiming it, asks nothing (docs/notes/page-verb-gate.md).
+func TestAPageAimingTheBrowserAsksTheUser(t *testing.T) {
+	page := command.Context{ActiveThreadID: "s1", Origin: command.OriginPage}
+	for _, tc := range []struct {
+		name string
+		uctx command.Context
+		args map[string]string
+		asks bool
+	}{
+		{"a page with an address", page, map[string]string{"url": "https://bank.example"}, true},
+		{"a page showing the tab", page, nil, false},
+		{"an unknown caller with an address", command.Context{ActiveThreadID: "s1", Origin: command.OriginUnknown}, map[string]string{"url": "https://bank.example"}, true},
+		{"a thread's CLI with an address", command.Context{ActiveThreadID: "s1", Origin: command.OriginCLI}, map[string]string{"url": "https://bank.example"}, false},
+		{"the app with an address", command.Context{ActiveView: "thread", ActiveThreadID: "s1"}, map[string]string{"url": "https://bank.example"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, emit, _ := browserRegistry(t, true)
+			_, err := reg.Invoke(context.Background(), tc.uctx, "view.panel.browser", tc.args)
+			var ce *command.ConfirmError
+			if asked := errors.As(err, &ce); asked != tc.asks {
+				t.Fatalf("asked = %v, want %v (err %v)", asked, tc.asks, err)
+			}
+			if tc.asks && len(emit.Intents()) != 0 {
+				t.Fatalf("reached a window before the answer: %v", emit.Intents())
+			}
+			if !tc.asks && err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	// The controls refuse a page as they refuse everyone, after asking: they fail closed.
+	reg, _, _ := browserRegistry(t, true)
+	var ce *command.ConfirmError
+	if _, err := reg.Invoke(context.Background(), page, "browser.reload", nil); !errors.As(err, &ce) {
+		t.Fatalf("a page's browser.reload: %v", err)
+	}
+}

@@ -701,9 +701,9 @@ func TestBranchPrefix(t *testing.T) {
 }
 
 // The settings a page, a plugin or a thread may not change. A new one that names a program,
-// a command or where code comes from belongs here (docs/notes/settings-user-only.md).
+// a command or where code comes from, or that starts a browser with the user's sign-ins, belongs here (docs/notes/settings-user-only.md).
 func TestUserOnlyFields(t *testing.T) {
-	want := []string{KeyClaudePath, KeyGhPath, KeyEditorCommand, KeyPluginRegistries, KeyUpdateChannel}
+	want := []string{KeyClaudePath, KeyGhPath, KeyEditorCommand, KeyPluginRegistries, KeyUpdateChannel, KeyChromeSurface}
 	var got []string
 	for _, f := range staticFields {
 		if f.UserOnly {

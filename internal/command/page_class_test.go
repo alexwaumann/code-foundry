@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 )
 
 // Every command is one of four things to a page (docs/notes/page-verb-gate.md). Adding a
@@ -23,6 +24,8 @@ var pageRuns = []string{
 	"project.worktree.remove", "skill.disable", "skill.enable", "skill.install", "skill.remove",
 	"skill.setup", "skill.uninstall", "skill.update", "thread.setup.retry", "workspace.open.editor",
 	"worktree.open.editor",
+	// The Browser tab's controls (BrowserCommands): they refuse every caller but the window.
+	"browser.back", "browser.forward", "browser.reload", "browser.relaunch",
 }
 
 // pageDrives drives a Claude thread: a page runs it as the CLI in its thread would.
@@ -63,7 +66,7 @@ var pageState = []string{
 	"thread.unsubscribe", "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open",
 	"view.back", "view.bottom.toggle", "view.forward", "view.help", "view.inline", "view.open.url",
 	"view.panel.diff", "view.panel.expand", "view.panel.file", "view.panel.gallery", "view.panel.mcp",
-	"view.panel.new-tab", "view.panel.page", "view.panel.pr", "view.panel.split", "view.panel.toggle",
+	"view.panel.browser", "view.panel.new-tab", "view.panel.page", "view.panel.pr", "view.panel.split", "view.panel.toggle",
 	"view.projects", "view.pullrequests", "view.settings", "view.thread-info", "view.usage",
 	"workspace.add-project", "workspace.new", "workspace.remove", "workspace.remove-project",
 	"workspace.rename", "workspace.reveal", "workspace.set-primary", "workspace.set-root",
@@ -72,12 +75,17 @@ var pageState = []string{
 
 // pageAskFlags are the flags that make a pageState verb ask a page.
 var pageAskFlags = map[string][]string{
-	"project.add":  {"path"},
-	"terminal.new": {"argv", "run"},
+	"project.add":        {"path"},
+	"terminal.new":       {"argv", "run"},
+	"view.panel.browser": {"url"},
 }
 
 func TestEveryCommandHasAPageClass(t *testing.T) {
 	f := newFixture(t)
+	// The Chrome surface's verbs exist only while its setting is on (commands_browser.go).
+	if err := f.reg.Toggle(true, command.BrowserCommands(&commandtest.Thread{}, f.emit)...); err != nil {
+		t.Fatal(err)
+	}
 	class := map[string]command.PageClass{}
 	for list, c := range map[*[]string]command.PageClass{&pageRuns: command.PageRuns, &pageDrives: command.PageDrives, &pageState: command.PageState} {
 		for _, name := range *list {

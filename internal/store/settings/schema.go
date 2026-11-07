@@ -97,9 +97,10 @@ type Field struct {
 	// Row groups fields of one section into a single row (model and effort); the
 	// first field's description goes under the row.
 	Row string
-	// UserOnly marks a setting that names a program or command the daemon runs, or decides
-	// where code comes from. Only the user may change it: settings.set and settings.reset
-	// refuse a page, a plugin and a thread's CLI (docs/notes/settings-user-only.md).
+	// UserOnly marks a setting that names a program or command the daemon runs, decides
+	// where code comes from, or puts a signed-in browser within reach. Only the user may
+	// change it: settings.set and settings.reset refuse a page, a plugin and a thread's CLI
+	// (docs/notes/settings-user-only.md).
 	UserOnly bool
 
 	// bind returns a pointer into s (*string, *int, or *bool) for static fields.
@@ -419,6 +420,7 @@ var staticFields = []Field{
 		Key: KeyChromeSurface, Group: GroupExperimental, Page: PageAdvanced, Section: "experimental", Type: Bool, Title: "Chrome surface",
 		Description: "Adds a Browser tab to side panels: real sites, in a headless Google Chrome with a profile of its own. Any thread can operate this browser: its Claude can read the page, click, type and go anywhere, as you, on every site you sign in to here. Sign-ins stay on disk after you turn this off. To remove them, delete the browser folder in ~/.code-foundry. Off, nothing shows and nothing runs.",
 		Default:     "false",
+		UserOnly:    true,
 		bind:        func(s *Settings) any { return &s.Experimental.ChromeSurface },
 	},
 	// General › Dictation. The rest of the section is the dictation store's state

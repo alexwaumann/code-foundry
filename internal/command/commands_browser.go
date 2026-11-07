@@ -17,6 +17,10 @@ import (
 // click or script a page, and the surface's own controls below are the window's. They exist
 // for the palette and answer every other caller with a refusal, like file.save, because the
 // page behind them can be logged in as the user.
+//
+// To a page shown in the app (docs/notes/page-verb-gate.md): --url aims a browser that may be
+// signed in as the user, so it asks; showing the tab alone does not. The controls ask too, which
+// fails closed: they refuse every caller but the window anyway.
 
 // ViewPanelBrowser is the ShowView name that opens the Browser surface in a side panel, with
 // the param "url" when it names where to go.
@@ -43,8 +47,9 @@ func BrowserCommands(t ThreadGetter, e Emitter) []Command {
 		Category:     "View",
 		NoKeybinding: true,
 		NoIndex:      true,
+		Page:         PageState,
 		Args: append([]ArgSpec{
-			{Name: "url", Type: String, Description: "Where to go: http or https only"},
+			{Name: "url", Type: String, PageAsks: true, Description: "Where to go: http or https only"},
 		}, panelThreadArgs()...),
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			var params map[string]string
@@ -70,7 +75,7 @@ func BrowserCommands(t ThreadGetter, e Emitter) []Command {
 	for _, v := range browserWindowVerbs {
 		cmds = append(cmds, Command{
 			Name: v.name, Title: v.title, Description: v.what + " Only from the window: refused from the CLI.",
-			Category: "Browser", NoKeybinding: true, NoIndex: true,
+			Category: "Browser", NoKeybinding: true, NoIndex: true, Page: PageRuns,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return Result{}, fmt.Errorf("%s: %w: only the user can do this, from the window", v.name, ErrUnavailable)
 			},
