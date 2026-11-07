@@ -332,6 +332,10 @@ func finished(t *testing.T, c *browsertest.Chrome, dir, guid string) {
 
 func click(t *testing.T, f *fixture) {
 	t.Helper()
+	// A commit already sent would take the gesture with it: this call's reply comes after it.
+	if err := f.s.Input(context.Background(), "thread:a", []browser.InputEvent{{Mouse: &browser.MouseEvent{Type: "mouseMoved", Button: "none"}}}); err != nil {
+		t.Fatal(err)
+	}
 	err := f.s.Input(context.Background(), "thread:a", []browser.InputEvent{
 		{Mouse: &browser.MouseEvent{Type: "mouseReleased", Button: "left", X: 1, Y: 1}},
 	})
