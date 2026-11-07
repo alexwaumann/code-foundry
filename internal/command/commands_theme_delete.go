@@ -43,6 +43,7 @@ func themeDeleteCommand(d ThemeDeps, values func(context.Context) (map[string]st
 	}
 	return Command{
 		Name:  "theme.delete",
+		Page:  PageState,
 		Title: "Delete Theme",
 		Description: "Delete one of your themes. A slot that used it shows the theme it was copied from, else the default. " +
 			"--file removes a file of the themes directory that did not load (theme list names them).",

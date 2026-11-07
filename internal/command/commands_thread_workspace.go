@@ -20,6 +20,7 @@ type WorkspaceRefBackend interface {
 func threadWorkspaceCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:        "thread.workspace",
+		Page:        PageDrives,
 		NoIndex:     true,
 		NoPalette:   true,
 		Title:       "Set Thread Workspace",

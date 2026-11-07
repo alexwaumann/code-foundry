@@ -152,8 +152,8 @@ func (r *Registry) Get(name string) (Command, bool) {
 // anything else comes from Run. Checks run in this order: name, arg syntax, id
 // suffixes (resolve.go), availability (with explicit context-bound args overlaid,
 // resolved), required args, confirmation (*ConfirmError unless Confirmed(true) for a command with Confirm whose
-// ConfirmIf, if any, says this call needs it). Run
-// sees the overlaid context.
+// ConfirmIf, if any, says this call needs it, and for a call an untrusted caller may not
+// make unasked: PageClass). Run sees the overlaid context.
 func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw map[string]string, opts ...InvokeOption) (Result, error) {
 	var o invokeOptions
 	for _, opt := range opts {
@@ -201,6 +201,9 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 			ce.Bind = map[string]string{c.BindConfirm: ConfirmDigest(msg)}
 		}
 		return Result{}, ce
+	}
+	if !o.confirmed && eff.Untrusted() && c.asksPage(args) {
+		return Result{}, c.pageQuestion(ctx, eff, args)
 	}
 	if o.confirmed {
 		ctx = context.WithValue(ctx, confirmedKey{}, true)

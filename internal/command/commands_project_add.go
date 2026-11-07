@@ -66,6 +66,7 @@ func RegisterProjectAdd(r *Registry, projects ProjectBackend, clone CloneFunc, d
 	return r.RegisterAll(
 		Command{
 			Name:  "project.add",
+			Page:  PageState,
 			Title: "Add Project",
 			Description: "Add a project: start a new one, add a folder on this Mac, or clone a repository from GitHub. " +
 				"Opens the Add Project dialog in the app.",

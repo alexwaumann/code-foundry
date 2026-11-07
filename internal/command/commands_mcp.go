@@ -43,6 +43,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 	return r.RegisterAll(
 		Command{
 			Name:      "thread.mcp",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Show Thread MCP Servers",
 			Description: "Print a thread's MCP servers as Claude last reported them (checked at the start of every turn): " +
@@ -66,6 +67,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 		},
 		Command{
 			Name:      "thread.mcp-reconnect",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Reconnect Thread MCP Server",
 			Description: "Reconnect one of a thread's MCP servers (starting Claude if it is not running), then check them again. " +
@@ -97,6 +99,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 		},
 		Command{
 			Name:  "view.panel.mcp",
+			Page:  PageState,
 			Title: "Show MCP Servers",
 			Description: "Open the MCP surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the thread's MCP servers with status, errors and tools, and Reconnect.",

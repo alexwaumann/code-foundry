@@ -47,6 +47,7 @@ func soundVolume(ctx context.Context, b SettingsBackend, a Args) (int, error) {
 func RegisterNotifications(r *Registry, b SettingsBackend, e Emitter) error {
 	return r.Register(Command{
 		Name:        "notifications.test",
+		Page:        PageState,
 		Title:       "Notifications: Play Alert Sound",
 		Description: "Play the alert sound at the current volume.",
 		Category:    "Settings",

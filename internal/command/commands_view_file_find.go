@@ -25,6 +25,7 @@ func canFindFiles(c Context) bool {
 func (d ViewDeps) fileFindCommand() Command {
 	return Command{
 		Name:        "file.find",
+		Page:        PageState,
 		Title:       "Go to File…",
 		Description: "Find a file in the thread's checkouts by name and open it in the thread's side panel (⌥⏎ puts it in the prompt as an @ file instead).",
 		Category:    "View",

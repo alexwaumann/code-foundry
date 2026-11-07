@@ -66,6 +66,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:      "search.agent",
+			Page:      PageDrives,
 			NoPalette: true,
 			Title:     "Agent Search",
 			Description: "Ask a question about your earlier threads in your own words: a hidden run on the utility model searches them " +
@@ -92,6 +93,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 		},
 		Command{
 			Name:         "search.stop",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Stop Agent Search",
 			Description:  "Stop a running agent search; it keeps the hits it reported.",
@@ -141,6 +143,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 		},
 		Command{
 			Name:         "search.open-hit",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Mark Search Hit Opened",
 			Description:  "Mark an agent search's hit opened (the search dialog does when you follow its link).",
@@ -157,6 +160,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 		},
 		Command{
 			Name:         "search.seen",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Mark Search Seen",
 			Description:  "Mark a finished agent search's result seen (the search dialog does when it shows it).",
@@ -173,6 +177,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 		},
 		Command{
 			Name:         "search.find",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Record Find Search",
 			Description:  "Record a Find search in the history (the search dialog does when you open one of its results); the same query again moves it to the top.",
@@ -192,6 +197,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 		},
 		Command{
 			Name:         "search.forget",
+			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Forget Search",
 			Description:  "Remove a search from the history; an agent search is stopped first and its run's transcript deleted.",
@@ -207,6 +213,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 		},
 		Command{
 			Name:         "search.clear",
+			Page:         PageState,
 			Title:        "Clear Search History",
 			Description:  "Forget every search of the history; running agent searches are stopped and their transcripts deleted.",
 			Category:     searchCategory,
@@ -223,6 +230,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 		},
 		Command{
 			Name:      "search.promote",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Continue Search as Thread",
 			Description: "Continue a finished agent search as a thread without a project: it keeps everything the search read, " +
@@ -240,6 +248,7 @@ func RegisterSearch(r *Registry, d SearchDeps) error {
 		},
 		Command{
 			Name:      "search.report",
+			Page:      PageState,
 			NoPalette: true,
 			Title:     "Report Search Hit",
 			Description: "Agent search's own verb: report a message that answers the question, with an exact quote from it. " +

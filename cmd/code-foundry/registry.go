@@ -88,6 +88,7 @@ func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {
 		ActiveProjectId:    cf.project,
 		ActiveWorktreePath: wt,
 		ActiveWorkspaceId:  cf.workspace,
+		Origin:             v1.CallOrigin_CALL_ORIGIN_CLI,
 	}, nil
 }
 

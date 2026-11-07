@@ -23,6 +23,7 @@ import (
 func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.snooze",
+		Page:  PageState,
 		Title: "Snooze or Unsnooze Thread",
 		Description: "Snooze a thread until a time: Claude is closed, its terminals removed, it is unpinned and " +
 			"listed apart; then it returns needing attention (\"snooze ended\"). " +

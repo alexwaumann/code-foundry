@@ -14,6 +14,7 @@ const ViewComposerHistory = "composer.history"
 func (d ViewDeps) composerHistoryCommand() Command {
 	return Command{
 		Name:        "composer.history",
+		Page:        PageState,
 		NoIndex:     true,
 		Title:       "Previous Prompts",
 		Description: "Show the prompts you sent, to put one back in the composer: above the focused composer, else in the command palette.",

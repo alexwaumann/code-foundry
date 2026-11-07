@@ -15,6 +15,7 @@ func renameCommand(b ProjectBackend, projectArg ArgSpec) Command {
 	projectArg.Positional = true
 	return Command{
 		Name:  "project.rename",
+		Page:  PageState,
 		Title: "Rename Project",
 		Description: "Rename a project. Only its name in Code Foundry changes: the folder, worktrees and branches stay. " +
 			"Names are unique among projects, whatever their case, and may not contain / or ,.",

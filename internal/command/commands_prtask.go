@@ -72,6 +72,7 @@ type PRTaskResult struct {
 func prTaskCommand(d PullRequestThreadDeps, slug, number, worktree, model, effort ArgSpec) Command {
 	return Command{
 		Name:      "pr.task",
+		Page:      PageDrives,
 		NoPalette: true,
 		Title:     "Hand Pull Request Task to Thread",
 		Description: "Have a thread handle one of a pull request's open items: fix failing checks, address requested changes " +

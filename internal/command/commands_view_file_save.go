@@ -16,6 +16,7 @@ import (
 func (d ViewDeps) fileSaveCommand() Command {
 	return Command{
 		Name:        "file.save",
+		Page:        PageState,
 		Title:       "Save File",
 		Description: "Save the file being edited in the focused File tab. Only from the window: refused from the CLI.",
 		Category:    "View",

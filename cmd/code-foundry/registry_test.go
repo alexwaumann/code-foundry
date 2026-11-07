@@ -62,3 +62,18 @@ func TestInvokeFailed(t *testing.T) {
 		})
 	}
 }
+
+// The daemon gives a call with no origin and no view the strict path, so every call the CLI
+// makes has to say what it is, from a thread or not.
+func TestUiContextSaysItIsTheCLI(t *testing.T) {
+	cl := &cli{}
+	for _, cf := range []*contextFlags{{}, {thread: "s-1"}} {
+		got, err := cl.uiContext(cf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.GetOrigin() != v1.CallOrigin_CALL_ORIGIN_CLI {
+			t.Errorf("thread %q: Origin = %v", cf.thread, got.GetOrigin())
+		}
+	}
+}
