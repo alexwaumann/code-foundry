@@ -18,6 +18,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { PreviewFileResponseSchema, ReadFileResponseSchema, WriteFileRequest, WriteFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { DiffScope, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { readFileSync } from "node:fs";
+import { crc32, deflateSync } from "node:zlib";
 import { HOME } from "./filesystem";
 import { pagelibPages } from "./pagelib";
 import { testPdf } from "./pdf";
@@ -62,6 +63,26 @@ const BIG_PNG = (() => {
   b.set(PNG);
   return b;
 })();
+
+/** A width by height PNG of one colour: large in pixels and small on disk, as a screenshot of nothing is. */
+function solidPng(width: number, height: number): Uint8Array {
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+    const out = Buffer.alloc(body.length + 8);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(crc32(body), body.length + 4);
+    return out;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2], 8); // 8 bits, RGB
+  const row = Buffer.alloc(1 + width * 3, 0x60);
+  row[0] = 0; // no filter
+  const rows = Buffer.concat(Array.from({ length: height }, () => row));
+  return Uint8Array.from(Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", header), chunk("IDAT", deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]));
+}
 
 const README_OLD = `# code-foundry
 
@@ -281,6 +302,10 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
     // Over 1 MiB, so they come back whole only because the File tab asks for more.
     [`${CF}/docs/photo.png`, { data: BIG_PNG, mime: "image/png", binary: true }],
+    // A gallery's worth (e2e/gallery.spec.ts), and one that is no picture whatever its name says.
+    ...Array.from({ length: 60 }, (_, i): [string, Entry] => [`${CF}/docs/shots/shot-${String(i + 1)}.png`, { data: PNG, mime: "image/png", binary: true }]),
+    [`${CF}/docs/shots/large.png`, { data: solidPng(1600, 1000), mime: "image/png", binary: true }],
+    [`${CF}/docs/shots/broken.png`, { data: enc.encode("not a picture"), mime: "image/png", binary: true }],
     [`${CF}/docs/spec.pdf`, { data: Uint8Array.from(testPdf(3, Math.round(1.2 * MiB))), mime: "application/pdf", binary: true }],
     // Over 32 MiB: only the first bytes would come back (the data stands in for them).
     [`${CF}/docs/huge.png`, { data: PNG, mime: "image/png", binary: true, size: 50_000_000 }],

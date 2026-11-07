@@ -1,6 +1,7 @@
 /**
- * view.panel.file, view.panel.diff, view.panel.pr and view.panel.page in the mock daemon,
- * like the daemon's (internal/command/commands_view_items.go, commands_view_panel_page.go):
+ * view.panel.file, view.panel.diff, view.panel.pr, view.panel.page and view.panel.gallery in
+ * the mock daemon, like the daemon's (internal/command/commands_view_items.go,
+ * commands_view_panel_page.go, commands_view_panel_gallery.go):
  * always scoped to a thread (the
  * app's selection, or --thread), a ShowView with the item in its params, and --focus an
  * explicit FocusThread first. The mock checks only what it knows: the thread, a path in
@@ -30,7 +31,7 @@ type Command = {
 
 const lead = "in a thread's side panel (from a thread: its own; in the app: the selected one): ";
 
-/** The four item verbs over `lookup`, emitting through `emit`. */
+/** The item verbs over `lookup`, emitting through `emit`. */
 export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, emit: (i: UiIntentInit) => number): Command[] {
   const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   const show = (ctx: UiContext | undefined, args: Record<string, string>, name: string, params: (t: ItemThread, id: string) => Record<string, string>): string => {
@@ -94,6 +95,22 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           const title = (args.title ?? "").trim();
           return { path, project: t.projectId, base: t.worktreePath, page: "1", ...(title ? { title } : {}) };
         }),
+    },
+    {
+      cmd: {
+        name: "view.panel.gallery", noPalette: true,
+        title: "Show Images in Side Panel",
+        category: "View",
+        description: `Open a set of images in a Gallery tab ${lead}a grid of captioned images, each opening large over a filmstrip.`,
+        keybindings: [],
+        args: [
+          { name: "title", type: ArgType.STRING, required: true, description: "The tab's title; the same title updates the same tab" },
+          { name: "images", type: ArgType.STRING, required: true, description: "The images in order, a JSON array of path and caption" },
+          ...panelThreadArgs,
+        ],
+      },
+      when,
+      run: (ctx, args) => show(ctx, args, "panel.gallery", (t) => ({ title: args.title ?? "", images: args.images ?? "", project: t.projectId, base: t.worktreePath })),
     },
     {
       cmd: {
