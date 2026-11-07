@@ -108,6 +108,9 @@ All of it measured on Chrome 157 against pages served from localhost.
   | Still, hidden | 0.2% | 0.0% | 0 |
 
   A hidden page keeps running: the cast stops, the page's own work does not, until the idle stop.
+  In the real app window, the same animated page: Chrome 65.8%, daemon 3.9%, and about 34% for
+  WKWebView's WebContent process (one `ps` reading). The machine's load average was about 55 from
+  other work, so read these as rough.
 
 Found on the way, also handled so the surface does not sit silently:
 
@@ -125,6 +128,23 @@ Known not to work, and silent:
 - The right-click menu and `title` tooltips do not exist. The cursor does not change over links.
 - Client certificates and Kerberos sign-in are untested, and either could matter on a managed Mac.
 - A hidden page's audio keeps playing.
+
+## What was exercised, and how
+
+- Real dev daemon, real Chrome, the GUI in Playwright's WebKit, local pages: click, typing, Enter,
+  scroll, resize, reload, select, alert, popup, history, download, chooser overlay, refused addresses,
+  Chrome killed and relaunched, the setting off and on.
+- The real idle stop: Chrome went at 10 minutes to the second, and reopening the panel started it
+  again on the same page.
+- Daemons of my own: SIGTERM left nothing in 0.65 to 6 s, SIGKILL in 4.1 s, and a new daemon started
+  right after a SIGKILL came up on the same profile with no forced kill. No page URL at info level.
+- The real app window (`wails://`, WKWebView), by CLI and window captures only, with no synthetic
+  input: the Origin guard takes it, frames are live, and 8 of 8 changes to a still page painted within
+  0.9 s. That run found the bug where a second `view.panel.browser --url` did nothing on a showing tab.
+
+Not exercised: input of any kind in the real window, so cmd+v, cmd+c to the Mac's clipboard, dead
+keys and IME composition, the host's file picker, and the system clipboard's write through `pbcopy`
+(tests use a stand-in). No real site has been opened.
 
 ## What this does not stop
 
