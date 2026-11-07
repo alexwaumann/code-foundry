@@ -345,11 +345,13 @@ export class MockFiles {
 
   constructor(private readonly detailOf: (path: string) => DetailFiles | undefined) {}
 
-  /** POST /__mock/compare/files?count=N: this many more files in every comparison, for a long list. */
+  /** POST /__mock/compare/files?count=N[&first=M]: this many more files in every comparison, for a long list, and M that sort above them all. */
   extraCompareFiles = 0;
+  firstCompareFiles = 0;
 
   reset(): void {
     this.extraCompareFiles = 0;
+    this.firstCompareFiles = 0;
     this.links.clear();
     this.disk = fixtures();
     this.refusal = null;
@@ -520,10 +522,12 @@ export class MockFiles {
     if (missing) return { ...meta, error: `${missing.ref} does not name a commit in this checkout` };
     const committedOnly = head?.kind === DiffSourceKind.REF;
     const uncommittedOnly = base?.kind === DiffSourceKind.STAGED;
-    const files = (detail.files ?? [])
+    const generated = (n: number, name: (i: number) => string) => Array.from({ length: n }, (_, i) => ({ path: name(i), oldPath: "", status: "A", added: 1, deleted: 0, binary: false }));
+    const files = generated(this.firstCompareFiles, (i) => `.first/file-${String(i).padStart(4, "0")}.ts`)
+      .concat((detail.files ?? [])
       .filter((f) => (committedOnly ? !f.uncommitted : uncommittedOnly ? f.uncommitted : true))
-      .map((f) => ({ path: f.path, oldPath: f.oldPath ?? "", status: f.status, added: f.added ?? 0, deleted: f.deleted ?? 0, binary: f.binary ?? false }))
-      .concat(Array.from({ length: this.extraCompareFiles }, (_, i) => ({ path: `generated/file-${String(i).padStart(4, "0")}.ts`, oldPath: "", status: "A", added: 1, deleted: 0, binary: false })));
+      .map((f) => ({ path: f.path, oldPath: f.oldPath ?? "", status: f.status, added: f.added ?? 0, deleted: f.deleted ?? 0, binary: f.binary ?? false })))
+      .concat(generated(this.extraCompareFiles, (i) => `generated/file-${String(i).padStart(4, "0")}.ts`));
     return { ...meta, files, totalFiles: files.length, totalAdded: files.reduce((n, f) => n + f.added, 0), totalDeleted: files.reduce((n, f) => n + f.deleted, 0) };
   }
 

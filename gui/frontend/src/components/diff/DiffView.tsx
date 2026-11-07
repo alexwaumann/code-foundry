@@ -1,58 +1,48 @@
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { GitCompare, TriangleAlert } from "lucide-react";
 import { compareWorktree, type CompareSource, type CompareTarget, type CompareView } from "@/api/compare";
 import { FileEmptyState, FileLoading, NoticeBar } from "@/components/files/states";
-import { useDebounced, useOnWindowVisible, useTabRead, useWorktreeChanges } from "@/components/files/useTabRead";
+import { REFRESH_DEBOUNCE_MS, useDebounced, useOnWindowVisible, useTabRead, useWorktreeChanges } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
-import { useWidth } from "@/lib/useWidth";
+import { useHeight, useWidth } from "@/lib/useWidth";
 import { openDiffInPanel } from "@/stores/filePanel";
-import { retitlePanelTab } from "@/stores/panel";
+import { retitlePanelTab, setPanelTabParams } from "@/stores/panel";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
-import { sourceParam, type DiffTarget } from "@/surfaces/diffTarget";
+import { diffTab, sameSource, sourceParam, type DiffTarget } from "@/surfaces/diffTarget";
 import { CompareBar } from "./CompareBar";
 import { DiffFile } from "./DiffFile";
 import { FileList } from "./FileList";
-import { buildFileRows, diffTitle, pickRow, type FileRow } from "./files";
+import { buildFileRows, diffTitle, listPace, pickRow, sourceLabel, type FileRow } from "./files";
+import { useStatusChanges } from "./useStatusChanges";
 
 /** Below this the panel cannot hold a rail beside a readable diff: the list goes on top. Its real width, not the window's. */
 export const RAIL_MIN = 620;
-
-/**
- * What git's status says of a checkout: staged, modified, untracked and HEAD. A staged change
- * can leave the detail the same (useWorktreeChanges sees nothing), and a comparison of the
- * index still has to follow it.
- */
-function useStatusChanges(projectId: string, worktree: string, onChange: () => void): void {
-  const stamp = useProjectsStore((s) => {
-    const wt = findWorktree(s, projectId, worktree);
-    return wt ? `${wt.head}|${String(wt.status.staged)}|${String(wt.status.modified)}|${String(wt.status.untracked)}` : "";
-  });
-  const seen = useRef(stamp);
-  const fire = useEffectEvent(onChange);
-  useEffect(() => {
-    if (seen.current === stamp) return;
-    seen.current = stamp;
-    fire();
-  }, [stamp]);
-}
 
 const NO_REMOTES: readonly string[] = [];
 
 function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: string; target: DiffTarget }) {
   const { project, worktree, base, head } = target;
   const compare = useMemo<CompareTarget>(() => ({ projectId: project, worktree, base, head }), [project, worktree, base, head]);
-  const read = useTabRead<CompareView>([project, worktree, sourceParam(base), sourceParam(head)].join("\u0000"), (signal) => compareWorktree(compare, [], undefined, signal));
+  const [pace, setPace] = useState(REFRESH_DEBOUNCE_MS);
+  const read = useTabRead<CompareView>([project, worktree, sourceParam(base), sourceParam(head)].join("\u0000"), async (signal) => {
+    const start = performance.now();
+    const view = await compareWorktree(compare, [], undefined, signal);
+    setPace(listPace(performance.now() - start));
+    return view;
+  });
   const { reload } = read;
-  const later = useDebounced(reload);
+  const later = useDebounced(reload, pace);
   useOnWindowVisible(later);
   useWorktreeChanges(project, worktree, later);
   useStatusChanges(project, worktree, later);
 
   const [ref, width] = useWidth(RAIL_MIN);
+  const height = useHeight(ref);
   const rail = width >= RAIL_MIN;
   const view = read.data;
   const rows = useMemo(() => buildFileRows(view?.files ?? []), [view]);
-  const current = pickRow(rows, target.file);
+  const current = pickRow(rows, target.file, target.oldPath);
+  const listed = current !== null && rows.includes(current);
   const remotes = useProjectsStore((s) => s.byId[project]?.remotes) ?? NO_REMOTES;
   const name = useProjectsStore((s) => s.byId[project]?.name ?? project);
   const branch = useProjectsStore((s) => findWorktree(s, project, worktree)?.branch ?? "");
@@ -68,6 +58,17 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
     },
     [target, named],
   );
+  // What the tab keeps as it is used: nothing about that opens or activates it.
+  const keep = useCallback(
+    (t: Partial<DiffTarget>) => {
+      setPanelTabParams("current", tabId, diffTab({ ...target, ...t }).params);
+    },
+    [target, tabId],
+  );
+  // The first file shown is the tab's from here on, or the next one to sort above it takes over.
+  useEffect(() => {
+    if (!target.file && current) keep({ file: current.path, oldPath: current.oldPath });
+  }, [target.file, current, keep]);
   const pick = useCallback(
     (r: FileRow) => {
       go({ file: r.path, oldPath: r.oldPath });
@@ -75,12 +76,23 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
     [go],
   );
   const setSources = (b: CompareSource, h: CompareSource) => {
-    go({ base: b, head: h });
+    // Swapped, a rename runs the other way: the same file, listed under its other name.
+    const swapped = current?.oldPath && sameSource(b, head) && sameSource(h, base);
+    go({ base: b, head: h, ...(swapped ? { file: current.oldPath, oldPath: current.path } : {}) });
   };
 
-  const baseLabel = view?.base.label ?? "…";
-  const headLabel = view?.head.label ?? "…";
+  // A side's name does not wait for, or fall with, the other side: only the merge base needs the answer.
+  const [baseRef, setBaseRef] = useState("");
+  if (view?.baseRef && view.baseRef !== baseRef) setBaseRef(view.baseRef);
+  const mergeBase = baseRef || (read.error ? "merge base" : "…");
+  const baseLabel = view?.base.label ?? sourceLabel(base, mergeBase);
+  const headLabel = view?.head.label ?? sourceLabel(head, mergeBase);
   const compared = `${headLabel} and ${baseLabel} are the same here`;
+  const refresh = (
+    <Button variant="outline" size="sm" onClick={reload} data-testid="diff-refresh">
+      Refresh
+    </Button>
+  );
   return (
     <div ref={ref} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="diff-surface" data-project={project} data-path={worktree} data-loading={read.loading || undefined}>
       <CompareBar projectId={project} base={baseLabel} head={headLabel} baseSource={base} headSource={head} baseLabel={view?.baseRef || "HEAD"} wide={rail} onChange={setSources} />
@@ -94,13 +106,32 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
       ) : !view ? (
         <FileLoading />
       ) : view.error ? (
-        <FileEmptyState icon={TriangleAlert} heading="Cannot compare" detail={view.error} testId="diff-source-missing" />
-      ) : rows.length === 0 ? (
-        <FileEmptyState icon={GitCompare} heading="No changes" detail={`${compared}.`} testId="diff-empty" />
+        <FileEmptyState icon={TriangleAlert} heading="Cannot compare" detail={view.error} testId="diff-source-missing">
+          {refresh}
+        </FileEmptyState>
+      ) : !current && view.skippedNames === 0 ? (
+        <FileEmptyState icon={GitCompare} heading="No changes" detail={`${compared}.`} testId="diff-empty">
+          {refresh}
+        </FileEmptyState>
       ) : (
         <div className={rail ? "flex min-h-0 flex-1" : "flex min-h-0 flex-1 flex-col"}>
-          <FileList view={view} rows={rows} current={current} onPick={pick} rail={rail} />
-          {current && <DiffFile key={current.key} target={compare} row={current} compared={compared} />}
+          <FileList
+            view={view}
+            rows={rows}
+            current={listed ? current : null}
+            onPick={pick}
+            rail={rail}
+            height={height}
+            query={target.filter ?? ""}
+            onQuery={(filter) => {
+              keep({ filter });
+            }}
+            fold={target.fold}
+            onFold={(fold) => {
+              keep({ fold });
+            }}
+          />
+          {current && <DiffFile key={current.key} target={compare} row={current} listed={listed} compared={compared} onRefresh={reload} />}
         </div>
       )}
     </div>

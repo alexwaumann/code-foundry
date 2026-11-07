@@ -12,7 +12,7 @@ import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
 
 /**
  * The uncommitted files that go, from the worktree's detail (what the Diff tab watches for changes):
- * the first three paths, "and N more", and Show diff (the Changes tab; the dialog closes).
+ * the first three paths, "and N more", and Show diff (the Diff tab; the dialog closes).
  */
 function Loss({ projectId, path, count }: { projectId: string; path: string; count: number }) {
   const entry = useResource(worktreeDetailResource, detailKey(projectId, path));

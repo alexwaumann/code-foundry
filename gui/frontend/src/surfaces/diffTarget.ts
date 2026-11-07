@@ -22,12 +22,16 @@ export interface DiffTarget {
   worktree: string;
   base: CompareSource;
   head: CompareSource;
-  /** The file shown, relative to the checkout; "" until one is picked (the first is shown). */
+  /** The file shown, relative to the checkout; "" until the tab has shown one, when it takes the first and keeps it. */
   file: string;
   /** A rename's source of that file; "" otherwise. */
   oldPath: string;
   /** The thread's own checkout: its title needs no project name to tell it from the others. */
   own: boolean;
+  /** What the file list is filtered by. */
+  filter?: string;
+  /** The user folded (true) or unfolded (false) the list on top; absent leaves it to the height. */
+  fold?: boolean;
 }
 
 /** A source as a tab param: "working", "staged", "merge-base", "ref:<ref>". */
@@ -46,7 +50,7 @@ export function sameSource(a: CompareSource, b: CompareSource): boolean {
   return sourceParam(a) === sourceParam(b);
 }
 
-/** A checkout's Diff tab: params { project, worktree, base?, head?, path?, oldPath?, own? }, defaults left out. */
+/** A checkout's Diff tab: params { project, worktree, base?, head?, path?, oldPath?, own?, filter?, fold? }, defaults left out. */
 export function diffTab(t: DiffTarget, title: string = DIFF_TITLE): Tab {
   const key = { project: t.project, worktree: t.worktree };
   const params: Record<string, string> = { ...key };
@@ -55,6 +59,8 @@ export function diffTab(t: DiffTarget, title: string = DIFF_TITLE): Tab {
   if (t.file) params.path = t.file;
   if (t.file && t.oldPath && t.oldPath !== t.file) params.oldPath = t.oldPath;
   if (t.own) params.own = "1";
+  if (t.filter) params.filter = t.filter;
+  if (t.fold !== undefined) params.fold = t.fold ? "1" : "0";
   return { id: tabId(DIFF_KIND, key), kind: DIFF_KIND, title, params };
 }
 
@@ -70,5 +76,7 @@ export function diffOfTab(tab: Pick<Tab, "params">): DiffTarget | null {
     file: path,
     oldPath: path ? oldPath : "",
     own: tab.params.own === "1",
+    ...(tab.params.filter ? { filter: tab.params.filter } : {}),
+    ...(tab.params.fold === undefined ? {} : { fold: tab.params.fold === "1" }),
   };
 }

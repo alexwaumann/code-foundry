@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
 import type { CompareFileView } from "@/api/compare";
-import { buildFileRows, diffTitle, fileTotals, filterRows, pickRow, shortRef, splitPath, stepRow } from "./files";
+import { buildFileRows, CODE_MIN, diffTitle, fileTotals, filterRows, listPace, pickRow, shortRef, sourceLabel, splitPath, stepRow, TOP_ROWS, topListFit } from "./files";
 import { refChoices, REF_CHOICES_MAX } from "./sources";
 
 const file = (path: string, o: Partial<CompareFileView> = {}): CompareFileView => ({ path, oldPath: "", status: "M", added: 1, deleted: 1, binary: false, submodule: false, ...o });
+
+describe("listPace", () => {
+  it.each([
+    [0, 250],
+    [60, 250],
+    [125, 250],
+    [130, 500],
+    [500, 1000],
+    [1400, 3000],
+    [60000, 3000],
+  ])("a read of %ims waits %ims", (took, want) => {
+    expect(listPace(took)).toBe(want);
+  });
+});
 
 describe("splitPath", () => {
   it.each([
@@ -44,11 +58,14 @@ describe("filterRows", () => {
 
 describe("pickRow and stepRow", () => {
   const rows = buildFileRows([file("a"), file("b"), file("c")]);
-  it("the tab's file while it is listed, else the first; nothing in an empty list", () => {
+  it("the tab's file, listed or not; the first only without one; nothing with neither", () => {
     expect(pickRow(rows, "b")?.path).toBe("b");
-    expect(pickRow(rows, "gone")?.path).toBe("a");
     expect(pickRow(rows, "")?.path).toBe("a");
-    expect(pickRow([], "a")).toBeNull();
+    const gone = pickRow(rows, "x/gone.ts", "x/was.ts");
+    expect(gone).toMatchObject({ path: "x/gone.ts", oldPath: "x/was.ts", dir: "x/", name: "gone.ts", status: "" });
+    expect(rows.includes(gone as never)).toBe(false);
+    expect(pickRow([], "")).toBeNull();
+    expect(pickRow([], "a")?.path).toBe("a");
   });
   it("steps, and stops at the ends", () => {
     expect(stepRow(rows, rows[1] ?? null, 1)?.path).toBe("c");
@@ -97,5 +114,65 @@ describe("refChoices", () => {
   });
   it("never lists more than it can show", () => {
     expect(refChoices(Array.from({ length: 5000 }, (_, i) => `b${String(i)}`), "")).toHaveLength(REF_CHOICES_MAX);
+  });
+});
+
+describe("listPace", () => {
+  it.each([
+    [0, 250],
+    [60, 250],
+    [125, 250],
+    [130, 500],
+    [500, 1000],
+    [1400, 3000],
+    [60000, 3000],
+  ])("a read of %ims waits %ims", (took, want) => {
+    expect(listPace(took)).toBe(want);
+  });
+});
+
+describe("splitPath", () => {
+  it.each([
+    ["a.ts", "", "a.ts"],
+    ["a/b/c.ts", "a/b/", "c.ts"],
+    ["emb/", "", "emb/"],
+    ["a/emb/", "a/", "emb/"],
+  ])("%s", (path, dir, name) => {
+    expect(splitPath(path)).toEqual([dir, name]);
+  });
+});
+
+describe("sourceLabel", () => {
+  it.each([
+    [{ kind: "ref", ref: "v1" } as const, "v1"],
+    [{ kind: "working" } as const, "Working tree"],
+    [{ kind: "staged" } as const, "Staged"],
+    [{ kind: "merge-base" } as const, "origin/main"],
+  ])("%j", (s, want) => {
+    expect(sourceLabel(s, "origin/main")).toBe(want);
+  });
+});
+
+describe("topListFit", () => {
+  const ROW = 30;
+  const CHROME = 44 + 36 + 48;
+  it.each([
+    // height, files, filter, rows, fold
+    ["tall: the most it shows", 900, 8, true, TOP_ROWS, false],
+    ["a stacked group at 1280x800", 386, 8, true, 2, true],
+    ["the same, without a filter", 386, 4, false, 2, false],
+    ["short", 300, 8, true, 2, true],
+    ["short, one file that still fits", 340, 1, false, 2, false],
+    ["no room even for that", 200, 1, false, 2, true],
+  ])("%s", (_name, height, files, filter, rows, fold) => {
+    expect(topListFit(height, ROW, files, filter)).toEqual({ rows, fold });
+  });
+
+  it("an unfolded list never leaves the code less than CODE_MIN when it fits by itself", () => {
+    for (let height = 200; height < 1000; height += 7) {
+      const filter = true;
+      const fit = topListFit(height, ROW, 100, filter);
+      if (!fit.fold) expect(height - CHROME - 32 - fit.rows * ROW).toBeGreaterThanOrEqual(CODE_MIN);
+    }
   });
 });

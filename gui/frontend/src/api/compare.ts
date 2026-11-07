@@ -45,6 +45,8 @@ export interface CompareView {
   baseRef: string;
   /** Why a side cannot be compared (a ref deleted since); the list is then empty. */
   error: string;
+  /** Files left out of the list and the totals: their names are not UTF-8. */
+  skippedNames: number;
 }
 
 /** One side of a file. */
@@ -109,6 +111,7 @@ export function toCompareView(r: CompareWorktreeResponse, base: CompareSource, h
     head: toResolved(r.head, head),
     baseRef: r.baseRef,
     error: r.error,
+    skippedNames: r.skippedNames,
   };
 }
 

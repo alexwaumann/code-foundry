@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
   compares: [] as string[],
   reads: [] as string[],
   width: 900,
+  height: 800,
 }));
 vi.mock("@/api/compare", () => ({
   compareWorktree: (t: CompareTarget) => {
@@ -34,7 +35,7 @@ vi.mock("@/api/compare", () => ({
   },
 }));
 vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), listRefs: () => Promise.resolve({ refs: ["main", "origin/main", "v1.2"], defaultRef: "origin/main", branches: [], defaultBranch: "main" }) }));
-vi.mock("@/lib/useWidth", () => ({ useWidth: () => [{ current: null }, api.width] }));
+vi.mock("@/lib/useWidth", () => ({ useWidth: () => [{ current: null }, api.width], useHeight: () => api.height }));
 vi.mock("@/components/code/CodeDiff", () => ({
   CodeDiff: ({ oldFile, newFile }: { oldFile: { name: string } | null; newFile: { name: string } }) => <div data-testid="code-diff" data-old={oldFile?.name ?? ""} data-new={newFile.name} />,
   CodeScroll: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -57,6 +58,7 @@ function compareDefaults(): CompareView {
     head: { source: DEFAULT_HEAD, label: "Working tree", sha: "" },
     baseRef: "origin/main",
     error: "",
+    skippedNames: 0,
   };
 }
 const file = (path: string, o: Partial<CompareFileView> = {}): CompareFileView => ({ path, oldPath: "", status: "M", added: 2, deleted: 1, binary: false, submodule: false, ...o });
@@ -98,6 +100,7 @@ beforeEach(() => {
   api.compares.length = 0;
   api.reads.length = 0;
   api.width = 900;
+  api.height = 800;
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
   useCodeViewStore.setState({ diffStyle: "unified" });
   world();
@@ -173,7 +176,7 @@ describe("file by file", () => {
     list([file("a.ts"), file("b.ts")]);
     await show();
     fireEvent.click(screen.getByTestId("diff-prev"));
-    expect(tabNow()?.params.path).toBeUndefined();
+    expect(tabNow()?.params.path).toBe("a.ts");
     fireEvent.click(screen.getByTestId("diff-next"));
     await waitFor(() => {
       expect(screen.getByTestId("diff-position").textContent).toBe("2 of 2");
@@ -182,11 +185,15 @@ describe("file by file", () => {
     expect(tabNow()?.params.path).toBe("b.ts");
   });
 
-  it("a file that left the list falls back to the first, without losing the tab", async () => {
+  it("a tab opened on a file that is not listed stays on it and says so", async () => {
     list([file("a.ts")]);
+    api.sides.set("committed-since.ts", { old: side({ text: "same\n" }), new: side({ text: "same\n" }), status: "" });
     await show(target({ file: "committed-since.ts" }));
-    expect(screen.getByTestId("diff-file").getAttribute("data-path")).toBe("a.ts");
-    expect(tabNow()?.params.path).toBe("committed-since.ts");
+    expect(screen.getByTestId("diff-file").getAttribute("data-path")).toBe("committed-since.ts");
+    expect(screen.getByTestId("diff-unlisted").textContent).toContain("committed-since.ts is no longer in this comparison");
+    expect(api.reads).toEqual(["committed-since.ts"]);
+    expect(screen.getByTestId("diff-position").textContent).toBe("");
+    expect(rowOf("a.ts").getAttribute("aria-selected")).toBe("false");
   });
 
   it("keyboard: arrows move in the list and Enter shows the file", async () => {
@@ -197,6 +204,159 @@ describe("file by file", () => {
     fireEvent.keyDown(l, { key: "Enter" });
     await waitFor(() => {
       expect(tabNow()?.params.path).toBe("b.ts");
+    });
+  });
+});
+
+/** Answers the list again, as a live update does. */
+async function again(files: CompareFileView[]): Promise<void> {
+  list(files);
+  vi.useFakeTimers();
+  act(() => {
+    world({ modified: (useProjectsStore.getState().byId.web?.worktrees[0]?.status.modified ?? 0) + 1 });
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(300);
+  });
+  vi.useRealTimers();
+}
+const onScreen = () => screen.getByTestId("diff-file").getAttribute("data-path");
+
+describe("the file being read stays until the reader moves", () => {
+  it("with none picked, a new file sorting first does not take the pane", async () => {
+    list([file("m.ts")]);
+    api.sides.set("m.ts", changed());
+    await show();
+    expect(onScreen()).toBe("m.ts");
+    await waitFor(() => {
+      expect(tabNow()?.params.path).toBe("m.ts");
+    });
+    await again([file("a-new.ts", { status: "?" }), file("m.ts")]);
+    expect(onScreen()).toBe("m.ts");
+    expect(screen.getByTestId("diff-position").textContent).toBe("2 of 2");
+  });
+
+  it("the first file shown goes in the tab without opening or activating anything", async () => {
+    list([file("a.ts")]);
+    const seq = useUiStore.getState().panelFocusSeq;
+    await show();
+    await waitFor(() => {
+      expect(tabNow()?.params.path).toBe("a.ts");
+    });
+    expect(useUiStore.getState().panelFocusSeq).toBe(seq);
+  });
+
+  it("a picked file that goes stays on screen and says so, and comes back without moving", async () => {
+    list([file("a.ts"), file("new.txt", { status: "?" }), file("z.ts")]);
+    api.sides.set("new.txt", { old: side({ present: false }), new: side({ text: "n\n" }), status: "A" });
+    await show(target({ file: "new.txt" }));
+    expect(screen.getByTestId("code-diff")).toBeTruthy();
+
+    api.sides.set("new.txt", { old: side({ present: false }), new: side({ present: false }), status: "" });
+    await again([file("a.ts"), file("z.ts")]);
+    expect(onScreen()).toBe("new.txt");
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-unlisted").textContent).toContain("new.txt is no longer in this comparison");
+    });
+    expect(tabNow()?.params.path).toBe("new.txt");
+
+    api.sides.set("new.txt", { old: side({ present: false }), new: side({ text: "n\n" }), status: "A" });
+    await again([file("a-first.ts"), file("a.ts"), file("new.txt", { status: "?" }), file("z.ts")]);
+    expect(onScreen()).toBe("new.txt");
+    await waitFor(() => {
+      expect(screen.getByTestId("code-diff")).toBeTruthy();
+    });
+    expect(screen.getByTestId("diff-position").textContent).toBe("3 of 4");
+  });
+
+  it("the last file going leaves it on screen too, not the empty state", async () => {
+    list([file("a.ts")]);
+    await show(target({ file: "a.ts" }));
+    api.sides.set("a.ts", { old: side({ present: false }), new: side({ present: false }), status: "" });
+    await again([]);
+    expect(onScreen()).toBe("a.ts");
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-unlisted")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("diff-empty")).toBeNull();
+    expect(screen.getByTestId("diff-totals").textContent).toContain("0 files");
+  });
+
+  it("moving on from an unlisted file goes to the list", async () => {
+    list([file("a.ts"), file("b.ts")]);
+    await show(target({ file: "gone.ts" }));
+    fireEvent.click(screen.getByTestId("diff-next"));
+    await waitFor(() => {
+      expect(onScreen()).toBe("a.ts");
+    });
+  });
+});
+
+describe("the open file follows the list", () => {
+  it("under Staged, git add reads the file again, as the status moved", async () => {
+    list([file("a.ts")]);
+    await show(target({ head: { kind: "staged" }, file: "a.ts" }));
+    expect(api.reads).toEqual(["a.ts"]);
+    vi.useFakeTimers();
+    act(() => {
+      world({ staged: 1 });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(api.reads).toEqual(["a.ts", "a.ts"]);
+  });
+
+  it("the row's counts changing reads the file again, whatever said so", async () => {
+    list([file("a.ts", { added: 1 })]);
+    await show(target({ file: "a.ts" }));
+    list([file("a.ts", { added: 2 })]);
+    fireEvent.click(screen.getByTestId("file-refresh"));
+    await waitFor(() => {
+      expect(rowOf("a.ts").textContent).toContain("+2");
+    });
+    const reads = api.reads.length;
+    await waitFor(
+      () => {
+        expect(api.reads.length).toBe(reads + 1);
+      },
+      { timeout: 1000 },
+    );
+  });
+
+  it("Refresh reads the list as well as the file", async () => {
+    list([file("a.ts")]);
+    await show(target({ file: "a.ts" }));
+    list([file("a.ts"), file("b.ts")]);
+    const compares = api.compares.length;
+    fireEvent.click(screen.getByTestId("file-refresh"));
+    await waitFor(() => {
+      expect(rowKeys()).toEqual(["f:a.ts", "f:b.ts"]);
+    });
+    expect(api.compares.length).toBe(compares + 1);
+    expect(api.reads).toEqual(["a.ts", "a.ts"]);
+  });
+});
+
+describe("the list keeps the reader's place", () => {
+  it("a live update leaves the keyboard cursor on its file, not the file on screen", async () => {
+    list([file("f1.ts"), file("f2.ts"), file("f3.ts")]);
+    await show(target({ file: "f1.ts" }));
+    const l = screen.getByTestId("diff-file-list");
+    fireEvent.keyDown(l, { key: "ArrowDown" });
+    fireEvent.keyDown(l, { key: "ArrowDown" });
+    expect(rowOf("f3.ts").getAttribute("aria-selected")).toBe("true");
+    await again([file("f0.ts"), file("f1.ts"), file("f2.ts"), file("f3.ts")]);
+    expect(rowOf("f3.ts").getAttribute("aria-selected")).toBe("true");
+    expect(rowOf("f1.ts").getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("the cursor still follows the file on screen when that changes", async () => {
+    list([file("a.ts"), file("b.ts")]);
+    await show(target({ file: "a.ts" }));
+    fireEvent.click(screen.getByTestId("diff-next"));
+    await waitFor(() => {
+      expect(rowOf("b.ts").getAttribute("aria-selected")).toBe("true");
     });
   });
 });
@@ -237,11 +397,34 @@ describe("the file's states", () => {
 });
 
 describe("the comparison's states", () => {
-  it("nothing differs", async () => {
+  it("nothing differs, and Refresh reads again", async () => {
     list([]);
     await show();
     expect(screen.getByTestId("diff-empty")).toBeTruthy();
     expect(api.reads).toEqual([]);
+    list([file("a.ts")]);
+    fireEvent.click(screen.getByTestId("diff-refresh"));
+    await waitFor(() => {
+      expect(rowKeys()).toEqual(["f:a.ts"]);
+    });
+  });
+
+  it("files left out for their names are never \"No changes\"", async () => {
+    list([], { skippedNames: 1 });
+    await show();
+    expect(screen.queryByTestId("diff-empty")).toBeNull();
+    expect(screen.getByTestId("diff-skipped-names").textContent).toBe("1 more file not listed: its name is not UTF-8");
+    cleanup();
+    list([file("a.ts")], { skippedNames: 3 });
+    await show();
+    expect(screen.getByTestId("diff-skipped-names").textContent).toBe("3 more files not listed: their names are not UTF-8");
+  });
+
+  it("an embedded repository is one row, with its slash", async () => {
+    list([file("vendor/emb/", { status: "?", submodule: true, added: 0, deleted: 0 })]);
+    await show();
+    expect(within(rowOf("vendor/emb/")).getByTestId("file-name").textContent).toBe("emb/");
+    expect(rowOf("vendor/emb/").textContent).toContain("sub");
   });
 
   it("a ref deleted since keeps the bar, so the user can pick another", async () => {
@@ -249,6 +432,30 @@ describe("the comparison's states", () => {
     await show(target({ base: { kind: "ref", ref: "soon-gone" } }));
     expect(screen.getByTestId("diff-source-missing").textContent).toContain("soon-gone does not name a commit");
     expect(screen.getByTestId("diff-base").textContent).toContain("soon-gone");
+  });
+
+  it("a side that cannot be read leaves both sides' names on the bar", async () => {
+    list([file("a.ts")]);
+    await show();
+    api.view = new Error("ref \"^x\" cannot start with ^");
+    fireEvent.click(screen.getByTestId("diff-head"));
+    fireEvent.change(await screen.findByTestId("diff-head-input"), { target: { value: "^x" } });
+    fireEvent.click(await screen.findByTestId("diff-source-ref:^x"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-compare-failed")).toBeTruthy();
+    });
+    expect(screen.getByTestId("diff-head").textContent).toBe("^x");
+    expect(screen.getByTestId("diff-base").textContent).toBe("origin/main");
+  });
+
+  it.each([
+    ["a ref", { kind: "ref", ref: "nope" } as const, "nope", "merge base"],
+    ["the index", { kind: "staged" } as const, "Staged", "merge base"],
+  ])("opened on a failing read, %s keeps its name and the merge base says what it is", async (_name, head, headText, baseText) => {
+    api.view = new Error("boom");
+    await show(target({ head }));
+    expect(screen.getByTestId("diff-head").textContent).toBe(headText);
+    expect(screen.getByTestId("diff-base").textContent).toBe(baseText);
   });
 
   it("a failed read offers Retry; a failed refresh keeps the list", async () => {
@@ -320,6 +527,37 @@ describe("the compare bar", () => {
     expect(tabNow()?.params).toMatchObject({ base: "working", head: "merge-base" });
   });
 
+  it("a swap keeps a rename's file, under its other name", async () => {
+    list([file("new.ts", { status: "R", oldPath: "old.ts" }), file("z.ts")]);
+    await show(target({ file: "new.ts", oldPath: "old.ts" }));
+    list([file("old.ts", { status: "R", oldPath: "new.ts" }), file("z.ts")]);
+    fireEvent.click(screen.getByTestId("diff-swap"));
+    await waitFor(() => {
+      expect(onScreen()).toBe("old.ts");
+    });
+    expect(tabNow()?.params).toMatchObject({ path: "old.ts", oldPath: "new.ts" });
+    expect(screen.queryByTestId("diff-unlisted")).toBeNull();
+  });
+
+  it("a swap leaves any other file as it is, and any other source change leaves a rename", async () => {
+    list([file("a.ts")]);
+    await show(target({ file: "a.ts" }));
+    fireEvent.click(screen.getByTestId("diff-swap"));
+    await waitFor(() => {
+      expect(tabNow()?.params.base).toBe("working");
+    });
+    expect(tabNow()?.params.path).toBe("a.ts");
+    cleanup();
+    list([file("new.ts", { status: "R", oldPath: "old.ts" })]);
+    await show(target({ file: "new.ts", oldPath: "old.ts" }));
+    fireEvent.click(screen.getByTestId("diff-head"));
+    fireEvent.click(await screen.findByTestId("diff-source-staged"));
+    await waitFor(() => {
+      expect(tabNow()?.params.head).toBe("staged");
+    });
+    expect(tabNow()?.params).toMatchObject({ path: "new.ts", oldPath: "old.ts" });
+  });
+
   it("Unified | Split shows wide; narrow it hides behind ⋯", async () => {
     list([file("a.ts")]);
     api.width = RAIL_MIN - 1;
@@ -368,6 +606,69 @@ describe("rail or list on top", () => {
     expect(rowKeys()).toEqual(["f:f3.ts"]);
     fireEvent.change(screen.getByTestId("diff-filter"), { target: { value: "nope" } });
     expect(screen.getByTestId("diff-filter-none")).toBeTruthy();
+  });
+
+  const many = (n: number) => Array.from({ length: n }, (_, i) => file(`f${String(i)}.ts`));
+
+  it("the filter box stays while it is filtering, when the list shrinks under it", async () => {
+    api.width = 400;
+    list(many(6));
+    await show();
+    fireEvent.change(screen.getByTestId("diff-filter"), { target: { value: "nope" } });
+    expect(screen.getByTestId("diff-filter-none")).toBeTruthy();
+    await again(many(3));
+    const box = screen.getByTestId("diff-filter") as HTMLInputElement;
+    expect(box.value).toBe("nope");
+    fireEvent.change(box, { target: { value: "" } });
+    expect(rowKeys()).toHaveLength(3);
+    expect(screen.queryByTestId("diff-filter")).toBeNull();
+  });
+
+  it("the filter box stays through a source with a shorter list", async () => {
+    api.width = 400;
+    list(many(6));
+    await show();
+    fireEvent.change(screen.getByTestId("diff-filter"), { target: { value: "f9" } });
+    list(many(2));
+    fireEvent.click(screen.getByTestId("diff-swap"));
+    await waitFor(() => {
+      expect(api.compares.at(-1)).toBe("working merge-base");
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-filter-none")).toBeTruthy();
+    });
+    expect(screen.getByTestId("diff-filter")).toHaveProperty("value", "f9");
+  });
+
+  it("the filter and the fold outlast the tab showing something else", async () => {
+    api.width = 400;
+    list(many(6));
+    await show();
+    fireEvent.change(screen.getByTestId("diff-filter"), { target: { value: "f3" } });
+    fireEvent.click(screen.getByTestId("diff-fold"));
+    expect(tabNow()?.params).toMatchObject({ filter: "f3", fold: "1" });
+    cleanup();
+    render(<Live />);
+    await act(async () => {
+      for (let i = 0; i < 4; i++) await Promise.resolve();
+    });
+    expect(screen.queryByTestId("diff-file-rows")).toBeNull();
+    fireEvent.click(screen.getByTestId("diff-fold"));
+    expect(rowKeys()).toEqual(["f:f3.ts"]);
+    expect(tabNow()?.params.fold).toBe("0");
+  });
+
+  it("a panel too short for a list and the code folds the list; opening it is the user's to keep", async () => {
+    api.width = 400;
+    api.height = 300;
+    list(many(8));
+    await show();
+    expect(screen.queryByTestId("diff-file-rows")).toBeNull();
+    expect(screen.getByTestId("diff-totals")).toBeTruthy();
+    expect(screen.getByTestId("diff-file")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("diff-fold"));
+    expect(screen.getByTestId("diff-file-rows")).toBeTruthy();
+    expect(tabNow()?.params.fold).toBe("0");
   });
 });
 

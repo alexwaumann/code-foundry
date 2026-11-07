@@ -44,6 +44,15 @@ describe("diffTab", () => {
     expect(diffOfTab(diffTab(t))).toEqual(t);
   });
 
+  it("keeps the filter and the fold, and an unset fold stays unset", () => {
+    const t = target({ filter: "src/", fold: false });
+    expect(diffTab(t).params).toMatchObject({ filter: "src/", fold: "0" });
+    expect(diffOfTab(diffTab(t))).toEqual(t);
+    expect(diffOfTab(diffTab(target({ fold: true })))?.fold).toBe(true);
+    expect(diffTab(target()).params.fold).toBeUndefined();
+    expect(diffOfTab(diffTab(target()))?.fold).toBeUndefined();
+  });
+
   it("a rename's source means nothing without a file, or equal to it", () => {
     expect(diffTab(target({ oldPath: "x" })).params.oldPath).toBeUndefined();
     expect(diffTab(target({ file: "x", oldPath: "x" })).params.oldPath).toBeUndefined();
