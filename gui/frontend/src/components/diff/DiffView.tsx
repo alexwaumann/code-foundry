@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GitCompare, TriangleAlert } from "lucide-react";
 import { compareWorktree, type CompareSource, type CompareTarget, type CompareView } from "@/api/compare";
 import { FileEmptyState, FileLoading, NoticeBar } from "@/components/files/states";
-import { REFRESH_DEBOUNCE_MS, useDebounced, useOnWindowVisible, useTabRead, useWorktreeChanges } from "@/components/files/useTabRead";
+import { REFRESH_DEBOUNCE_MS, useOnWindowVisible, useTabRead, useThrottled, useWorktreeChanges } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
 import { useHeight, useWidth } from "@/lib/useWidth";
 import { openDiffInPanel } from "@/stores/filePanel";
@@ -13,7 +13,7 @@ import { CompareBar } from "./CompareBar";
 import { DiffFile } from "./DiffFile";
 import { FileList } from "./FileList";
 import { buildFileRows, diffTitle, listPace, pickRow, sourceLabel, type FileRow } from "./files";
-import { useStatusChanges } from "./useStatusChanges";
+import { useIndexChanges, useStatusChanges } from "./useStatusChanges";
 
 /** Below this the panel cannot hold a rail beside a readable diff: the list goes on top. Its real width, not the window's. */
 export const RAIL_MIN = 620;
@@ -31,10 +31,11 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
     return view;
   });
   const { reload } = read;
-  const later = useDebounced(reload, pace);
+  const later = useThrottled(reload, pace, read.loading);
   useOnWindowVisible(later);
   useWorktreeChanges(project, worktree, later);
   useStatusChanges(project, worktree, later);
+  useIndexChanges(base.kind === "staged" || head.kind === "staged" ? worktree : "", later);
 
   const [ref, width] = useWidth(RAIL_MIN);
   const height = useHeight(ref);
@@ -131,7 +132,11 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
               keep({ fold });
             }}
           />
-          {current && <DiffFile key={current.key} target={compare} row={current} listed={listed} compared={compared} onRefresh={reload} />}
+          {current ? (
+            <DiffFile key={current.key} target={compare} row={current} listed={listed} compared={compared} onRefresh={reload} />
+          ) : (
+            <FileEmptyState icon={GitCompare} heading="Nothing to show" detail={view.skippedNames === 1 ? "The one file that differs has a name that is not UTF-8." : `The ${String(view.skippedNames)} files that differ have names that are not UTF-8.`} testId="diff-only-skipped" />
+          )}
         </div>
       )}
     </div>

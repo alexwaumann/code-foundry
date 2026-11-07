@@ -22,7 +22,24 @@ const api = vi.hoisted(() => ({
   reads: [] as string[],
   width: 900,
   height: 800,
+  /** What the file watcher watches, each with its listeners. */
+  watched: new Map<string, Set<() => void>>(),
+  dotGit: { isDir: true, path: "", text: null } as { isDir: boolean; path: string; text: string | null },
 }));
+vi.mock("@/stores/fileStamps", () => ({
+  fileWatcher: {
+    watch: (path: string, onChange: () => void) => {
+      const listeners = api.watched.get(path) ?? new Set();
+      api.watched.set(path, listeners.add(onChange));
+      return () => {
+        listeners.delete(onChange);
+        if (listeners.size === 0) api.watched.delete(path);
+      };
+    },
+    check: () => undefined,
+  },
+}));
+vi.mock("@/api/files", async (orig) => ({ ...(await orig<typeof import("@/api/files")>()), readFile: () => Promise.resolve(api.dotGit) }));
 vi.mock("@/api/compare", () => ({
   compareWorktree: (t: CompareTarget) => {
     api.compares.push(`${sourceParam(t.base)} ${sourceParam(t.head)}`);
@@ -43,6 +60,8 @@ vi.mock("@/components/code/CodeDiff", () => ({
 vi.mock("@pierre/diffs", async (orig) => ({ ...(await orig<typeof import("@pierre/diffs")>()) }));
 
 const { DiffView, RAIL_MIN } = await import("./DiffView");
+
+const intoView = vi.fn<(this: Element) => void>();
 
 function side(o: Partial<CompareSideView> = {}): CompareSideView {
   return { present: true, text: "", truncated: false, binary: false, submodule: false, ...o };
@@ -94,13 +113,16 @@ const rowOf = (path: string) => screen.getByTestId("diff-file-list").querySelect
 const rowKeys = () => [...screen.getByTestId("diff-file-list").querySelectorAll("[data-nav-key]")].map((e) => e.getAttribute("data-nav-key"));
 
 beforeEach(() => {
-  Element.prototype.scrollIntoView = vi.fn();
+  intoView.mockClear();
+  Element.prototype.scrollIntoView = intoView;
   api.view = null;
   api.sides.clear();
   api.compares.length = 0;
   api.reads.length = 0;
   api.width = 900;
   api.height = 800;
+  api.watched.clear();
+  api.dotGit = { isDir: true, path: `${W}/.git`, text: null };
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
   useCodeViewStore.setState({ diffStyle: "unified" });
   world();
@@ -185,6 +207,28 @@ describe("file by file", () => {
     expect(tabNow()?.params.path).toBe("b.ts");
   });
 
+  it("previous and next walk what the filter leaves, folded away or not", async () => {
+    api.width = 400;
+    const rows = Array.from({ length: 8 }, (_, i) => file(i % 2 ? `odd${String(i)}.ts` : `even${String(i)}.ts`));
+    list(rows);
+    await show(target({ file: "odd1.ts", filter: "odd" }));
+    expect(screen.getByTestId("diff-position").textContent).toBe("1 of 4");
+    fireEvent.click(screen.getByTestId("diff-next"));
+    expect(tabNow()?.params.path).toBe("odd3.ts");
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-position").textContent).toBe("2 of 4");
+    });
+    fireEvent.click(screen.getByTestId("diff-fold"));
+    expect(screen.queryByTestId("diff-filter")).toBeNull();
+    fireEvent.click(screen.getByTestId("diff-next"));
+    expect(tabNow()?.params.path).toBe("odd5.ts");
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-position").textContent).toBe("3 of 4");
+    });
+    fireEvent.click(screen.getByTestId("diff-prev"));
+    expect(tabNow()?.params.path).toBe("odd3.ts");
+  });
+
   it("a tab opened on a file that is not listed stays on it and says so", async () => {
     list([file("a.ts")]);
     api.sides.set("committed-since.ts", { old: side({ text: "same\n" }), new: side({ text: "same\n" }), status: "" });
@@ -215,9 +259,12 @@ async function again(files: CompareFileView[]): Promise<void> {
   act(() => {
     world({ modified: (useProjectsStore.getState().byId.web?.worktrees[0]?.status.modified ?? 0) + 1 });
   });
-  await act(async () => {
-    await vi.advanceTimersByTimeAsync(300);
-  });
+  // Twice: the row's own change starts a wait as the list's answer commits, at the end of an act.
+  for (let i = 0; i < 2; i++) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+  }
   vi.useRealTimers();
 }
 const onScreen = () => screen.getByTestId("diff-file").getAttribute("data-path");
@@ -307,6 +354,57 @@ describe("the open file follows the list", () => {
     expect(api.reads).toEqual(["a.ts", "a.ts"]);
   });
 
+  /** The file watcher saw `path` written. */
+  async function written(path: string): Promise<void> {
+    vi.useFakeTimers();
+    act(() => {
+      api.watched.get(path)?.forEach((f) => {
+        f();
+      });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+  }
+
+  it("a save that keeps the counts reads the file again, and only that file is watched", async () => {
+    list([file("a.ts"), file("b.ts")]);
+    await show(target({ file: "a.ts" }));
+    expect([...api.watched.keys()]).toEqual([`${W}/a.ts`]);
+    await written(`${W}/a.ts`);
+    expect(api.reads).toEqual(["a.ts", "a.ts"]);
+    expect(api.compares).toHaveLength(1);
+  });
+
+  it("under Staged, a write of the index reads the file and the list, and a save does not", async () => {
+    list([file("a.ts")]);
+    await show(target({ head: { kind: "staged" }, file: "a.ts" }));
+    await waitFor(() => {
+      expect([...api.watched.keys()]).toEqual([`${W}/.git/index`]);
+    });
+    await written(`${W}/.git/index`);
+    expect(api.reads).toEqual(["a.ts", "a.ts"]);
+    expect(api.compares).toHaveLength(2);
+  });
+
+  it.each([
+    ["an absolute gitdir", "gitdir: /src/web/.git/worktrees/feat\n", "/src/web/.git/worktrees/feat/index"],
+    ["a relative one", "gitdir: ../web/.git/worktrees/feat\n", `${W}/../web/.git/worktrees/feat/index`],
+  ])("a linked worktree's index is where its .git file says: %s", async (_name, text, index) => {
+    api.dotGit = { isDir: false, path: `${W}/.git`, text };
+    list([file("a.ts")]);
+    await show(target({ base: { kind: "staged" }, file: "a.ts" }));
+    await waitFor(() => {
+      expect([...api.watched.keys()]).toContain(index);
+    });
+  });
+
+  it("two commits watch nothing: neither a save nor an index write changes them", async () => {
+    list([file("a.ts")]);
+    await show(target({ base: { kind: "ref", ref: "main" }, head: { kind: "ref", ref: "HEAD" }, file: "a.ts" }));
+    expect([...api.watched.keys()]).toEqual([]);
+  });
+
   it("the row's counts changing reads the file again, whatever said so", async () => {
     list([file("a.ts", { added: 1 })]);
     await show(target({ file: "a.ts" }));
@@ -349,6 +447,51 @@ describe("the list keeps the reader's place", () => {
     await again([file("f0.ts"), file("f1.ts"), file("f2.ts"), file("f3.ts")]);
     expect(rowOf("f3.ts").getAttribute("aria-selected")).toBe("true");
     expect(rowOf("f1.ts").getAttribute("aria-selected")).toBe("false");
+  });
+
+  const scrolled = () => intoView.mock.contexts.map((e) => e.getAttribute("data-nav-key"));
+
+  it("a live update scrolls nothing, the row of a file coming back included", async () => {
+    list([file("a.ts"), file("b.ts")]);
+    await show(target({ file: "b.ts" }));
+    intoView.mockClear();
+    await again([file("a.ts")]);
+    await again([file("0.ts"), file("a.ts"), file("b.ts")]);
+    expect(rowOf("b.ts").getAttribute("aria-selected")).toBe("true");
+    expect(scrolled()).toEqual([]);
+  });
+
+  it("the keyboard's moves and the file on screen's bring their row into view", async () => {
+    list([file("a.ts"), file("b.ts"), file("c.ts")]);
+    await show(target({ file: "a.ts" }));
+    intoView.mockClear();
+    fireEvent.keyDown(screen.getByTestId("diff-file-list"), { key: "End" });
+    expect(scrolled()).toEqual(["f:c.ts"]);
+    fireEvent.click(screen.getByTestId("diff-next"));
+    await waitFor(() => {
+      expect(scrolled()).toEqual(["f:c.ts", "f:b.ts"]);
+    });
+  });
+
+  it("the list on top opening again shows the current row, a fold of its own or the panel's", async () => {
+    api.width = 400;
+    list(Array.from({ length: 30 }, (_, i) => file(`f${String(i)}.ts`)));
+    await show(target({ file: "f24.ts" }));
+    fireEvent.click(screen.getByTestId("diff-fold"));
+    intoView.mockClear();
+    fireEvent.click(screen.getByTestId("diff-fold"));
+    await waitFor(() => {
+      expect(scrolled()).toEqual(["f:f24.ts"]);
+    });
+    cleanup();
+    api.height = 300;
+    await show(target({ file: "f24.ts" }));
+    expect(screen.queryByTestId("diff-file-rows")).toBeNull();
+    intoView.mockClear();
+    fireEvent.click(screen.getByTestId("diff-fold"));
+    await waitFor(() => {
+      expect(scrolled()).toEqual(["f:f24.ts"]);
+    });
   });
 
   it("the cursor still follows the file on screen when that changes", async () => {
@@ -414,10 +557,16 @@ describe("the comparison's states", () => {
     await show();
     expect(screen.queryByTestId("diff-empty")).toBeNull();
     expect(screen.getByTestId("diff-skipped-names").textContent).toBe("1 more file not listed: its name is not UTF-8");
+    expect(screen.getByTestId("diff-only-skipped").textContent).toContain("The one file that differs has a name that is not UTF-8.");
+    cleanup();
+    list([], { skippedNames: 2 });
+    await show();
+    expect(screen.getByTestId("diff-only-skipped").textContent).toContain("The 2 files that differ have names that are not UTF-8.");
     cleanup();
     list([file("a.ts")], { skippedNames: 3 });
     await show();
     expect(screen.getByTestId("diff-skipped-names").textContent).toBe("3 more files not listed: their names are not UTF-8");
+    expect(screen.queryByTestId("diff-only-skipped")).toBeNull();
   });
 
   it("an embedded repository is one row, with its slash", async () => {
@@ -685,6 +834,22 @@ describe("live updates", () => {
       await vi.advanceTimersByTimeAsync(300);
     });
     expect(api.compares.length).toBe(before + 1);
+  });
+
+  it("events that never stop still read: each waits out the pace, it does not start it over", async () => {
+    list([file("a.ts")]);
+    await show();
+    const before = api.compares.length;
+    vi.useFakeTimers();
+    for (let i = 1; i <= 20; i++) {
+      act(() => {
+        world({ modified: i });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+    }
+    expect(api.compares.length - before).toBeGreaterThanOrEqual(5);
   });
 
   it("nothing to see, nothing read: mounting does not read twice", async () => {

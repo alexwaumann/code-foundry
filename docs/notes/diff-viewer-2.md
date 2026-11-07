@@ -23,12 +23,21 @@ one-file Diff tab are gone, with their files and store.
   file is listed under its other name.
 - **The open file follows the list.** It reads again on what the list reads on (`useStatusChanges`
   too, for the index), and when its row's letter or counts change, whatever said so, so the code
-  never says less than the row. Refresh reads both. The empty and "Cannot compare" states have
+  never says less than the row. It also follows what its sides read from, as a save that keeps
+  the counts moves nothing else: the file's own stamp with the working tree as a side
+  (`useFileChanges`), the index's with Staged as one (`useIndexChanges`). A comparison of two
+  commits watches neither. Refresh reads both. The empty and "Cannot compare" states have
   their own.
 - **The list keeps its place by file.** The cursor moves with the file on screen, not with the
-  list, and `RowList`'s `keepPlace` goes back to the row at the top after an update. Neither
-  `VirtualRows` nor `NavRow` scrolls on a list change or a row mounting any more, for any list:
-  both only on the cursor moving. The virtualized list used to scroll to the cursor on every
+  list, and `RowList`'s `keepPlace` goes back to the row at the top after an update.
+- **A row scrolls into view when it is owed one** (`NavCtx.reveal`), for every list, and what
+  decides is who moved the cursor, not whether the row is new. `End` on a long list lands on a row
+  not mounted yet: it mounts selected, and has to scroll the page around the list too. A list
+  scrolled towards the cursor's row mounts it the same way, and a live update can, and those must
+  leave the list alone. So a move owes a scroll, the row pays it when it shows, and a row merely
+  selected pays nothing. A file coming back to the list owes none, as the cursor did not move. A
+  `RowList` opening with the cursor in it owes one as well: a list folded away, or moved between
+  rail and top, comes back at the top. The virtualized list used to scroll to the cursor on every
   render (its deps held an inline `rowKey`).
 - **The list on top is fitted to the tab's height** (`topListFit`, `useHeight`): up to five rows,
   never leaving the code under `CODE_MIN` (180), and folded when that is fewer than two. At
@@ -38,6 +47,10 @@ one-file Diff tab are gone, with their files and store.
 - **The filter box shows for as long as it is filtering,** whatever the list's length. The filter
   and the user's fold are tab params, as cheap as anything else a tab keeps, so they outlast a
   tab switch, and an automatic fold stays automatic until the user touches it.
+- **Previous and next walk what the filter leaves,** and "3 of 8" counts it, folded away or not.
+  With the file on screen filtered out there is no position, and either goes to the first row left.
+- **Only files with names that are not UTF-8 is its own state** beside the list: the notice in the
+  list folds away with it, and a blank pane says nothing.
 - **A side's label needs only its own source.** A failed read shows both, and only the merge base
   needs an answer: the last `baseRef`, else "merge base".
 - **The base picker keeps two `origin/main` rows on purpose.** "merge base" is what the branch
@@ -73,12 +86,18 @@ still works: `panel.diff` maps `scope` to sources.
 - `useWorktreeChanges` only fires when the detail changes, and `git add` of an edit leaves the
   detail the same (the merge base to the working tree did not move). A comparison of the index
   would go stale, so `useStatusChanges` also watches HEAD and the staged, modified and untracked
-  counts. A second `git add` on an already staged file changes none of those: that one waits for
-  the next event, a window focus or Refresh.
+  counts. A second `git add` on an already staged file changes none of those, nor does one more
+  hunk, so a comparison of the index also stats the index once a second (`useIndexChanges`, through
+  the file watcher). That is `.git/index`, or for a linked worktree under what its `.git` file
+  names; a stamp, because the status moves on every save and most saves are of other files.
 - `RowList`'s `maxHeight` takes `"100%"` for the rail. It needs a definite parent, hence the
   `relative` and `absolute inset-0` pair around it.
 - `SourcePicker` turns cmdk's filter off and lists at most 100 refs, as a repository can have
   thousands.
+
+- A virtualized file's scroll jumps when it is read again: an added file of 5000 lines, scrolled to
+  1000, was at 3850 after an edit. Main's one-file Diff tab does exactly the same at the same size,
+  so it comes from `CodeScroll`'s `Virtualizer` in `@pierre/diffs`, not from this tab. Left alone.
 
 ## Cost of a list read
 
@@ -91,6 +110,12 @@ roughly doubles the git work per change. It runs off the UI thread, so nothing s
 busy thread it would run back to back. So the wait before a live update's read is twice the last
 read (`listPace`), 250 ms to 3 s, which caps it at about a third of the time. Repositories where a
 read is under 125 ms keep the 250 ms they had. The file's own read is one file and is not paced.
+
+The wait is a throttle (`useThrottled`), not a debounce. A debounce starts over on each event, so
+events closer together than the wait meant no read at all: at reads of +500 ms, none in 12 s, 86
+files shown with 106 on disk. While a read is out the wait goes on, because the next read would
+abort it, and with reads slower than the wait none would ever answer or even set the pace. The File
+tab keeps its debounce: it has the same stall under events closer than 250 ms, on main too.
 
 ## Removed
 

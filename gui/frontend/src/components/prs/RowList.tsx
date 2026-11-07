@@ -1,6 +1,6 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useNavCursor } from "@/lib/nav";
+import { NavContext } from "@/lib/nav";
 
 /** Lists longer than this are virtualized inside a scroll box of `maxHeight`. */
 export const VIRTUALIZE_OVER = 60;
@@ -48,6 +48,21 @@ function useKeepPlace<T>(on: boolean, rows: readonly T[], rowKey: (row: T) => st
 }
 
 /**
+ * A list opening with the cursor in it shows the cursor's row, as a list folded away and back
+ * does: it comes back at the top. Set here, before the rows' effects run, and only for a row
+ * of this list, as nothing else would answer.
+ */
+function useOpenOnCursor<T>(rows: readonly T[], rowKey: (row: T) => string): void {
+  const { cursorKey, reveal } = useContext(NavContext);
+  const open = useEffectEvent(() => {
+    if (cursorKey !== null && rows.some((r) => rowKey(r) === cursorKey)) reveal.owe(cursorKey);
+  });
+  useLayoutEffect(() => {
+    open();
+  }, []);
+}
+
+/**
  * Renders rows directly when short, virtualized (fixed row height) when long. When the
  * page's keyboard cursor moves to a row that is not mounted, it scrolls to it first.
  */
@@ -58,6 +73,7 @@ export function RowList<T>({ rows, rowKey, render, rowHeight, maxHeight = 520, c
 
 function PlainRows<T>({ rows, rowKey, render, rowHeight, maxHeight, capped, keepPlace, testId }: Required<Omit<RowListProps<T>, "testId" | "virtualize">> & { testId?: string }) {
   const [scrollRef, onScroll] = useKeepPlace(keepPlace, rows, rowKey, rowHeight);
+  useOpenOnCursor(rows, rowKey);
   return (
     <div ref={scrollRef} className={capped ? "overflow-y-auto" : undefined} style={capped ? { maxHeight } : undefined} data-testid={testId} data-virtual="false" onScroll={onScroll}>
       {rows.map((r) => (
@@ -71,17 +87,19 @@ function PlainRows<T>({ rows, rowKey, render, rowHeight, maxHeight, capped, keep
 
 function VirtualRows<T>({ rows, rowKey, render, rowHeight, maxHeight, keepPlace, testId }: Required<Omit<RowListProps<T>, "testId" | "capped" | "virtualize">> & { testId?: string }) {
   const [scrollRef, onScroll] = useKeepPlace(keepPlace, rows, rowKey, rowHeight);
-  const cursor = useNavCursor();
+  useOpenOnCursor(rows, rowKey);
+  const { cursorKey: cursor, reveal } = useContext(NavContext);
   // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const v = useVirtualizer({ count: rows.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowHeight, overscan: 12 });
-  // When the cursor moves, and only then: new rows under a list being read must not scroll it.
-  const reveal = useEffectEvent((key: string) => {
+  // Only for a row owed it: new rows under a list being read must not scroll it. The row, once
+  // mounted, settles the debt, and scrolls whatever is around this box.
+  const mount = useEffectEvent((key: string) => {
     const i = rows.findIndex((r) => rowKey(r) === key);
     if (i >= 0) v.scrollToIndex(i, { align: "auto" });
   });
   useEffect(() => {
-    if (cursor !== null) reveal(cursor);
-  }, [cursor]);
+    if (cursor !== null && reveal.owes(cursor)) mount(cursor);
+  }, [cursor, reveal]);
   return (
     <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight }} data-testid={testId} data-virtual="true" onScroll={onScroll}>
       <div style={{ height: v.getTotalSize(), position: "relative" }}>

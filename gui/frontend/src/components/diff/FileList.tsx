@@ -108,9 +108,10 @@ export function FileList({
     if (currentKey !== null) setCursor(currentKey);
   }, [currentKey, setCursor]);
 
-  const at = current ? rows.findIndex((r) => r.key === current.key) : -1;
-  const prev = stepRow(rows, current, -1);
-  const next = stepRow(rows, current, 1);
+  // A filter holds for these too, folded away or not: it is what the reader asked to walk.
+  const at = current ? shown.findIndex((r) => r.key === current.key) : -1;
+  const prev = stepRow(shown, current, -1);
+  const next = stepRow(shown, current, 1);
   const filter = query !== "" || rows.length > (rail ? FILTER_OVER.rail : FILTER_OVER.top);
   const fit = topListFit(height, ROW_H, rows.length, filter);
   const folded = fold ?? fit.fold;
@@ -137,7 +138,7 @@ export function FileList({
             {view.totalDeleted > 0 && <span className="ml-1.5 text-cf-diff-deletion">−{view.totalDeleted}</span>}
           </span>
           <span className="ml-auto shrink-0 text-caption" data-testid="diff-position">
-            {at >= 0 ? `${String(at + 1)} of ${String(rows.length)}` : ""}
+            {at >= 0 ? `${String(at + 1)} of ${String(shown.length)}` : ""}
           </span>
           <HeaderAction icon={ChevronLeft} label="Previous file" testId="diff-prev" onClick={() => { if (prev) onPick(prev); }} />
           <HeaderAction icon={ChevronRight} label="Next file" testId="diff-next" onClick={() => { if (next) onPick(next); }} />

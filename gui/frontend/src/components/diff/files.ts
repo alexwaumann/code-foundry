@@ -112,7 +112,7 @@ export function stepRow(rows: readonly FileRow[], from: FileRow | null, by: 1 | 
 }
 
 /**
- * How long a live update waits for more, after a list read took `tookMs`: twice that, in steps
+ * How long a live update waits before reading, after a list read took `tookMs`: twice that, in steps
  * so a read's small changes re-render nothing. A read costs what git costs, a large repository's
  * half a second, so it may not take more than about a third of the time however much is going on.
  */

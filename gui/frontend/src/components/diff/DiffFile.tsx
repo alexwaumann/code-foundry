@@ -8,13 +8,13 @@ import type { FilePlace } from "@/components/files/fileActions";
 import { FileActions, FileHeader, HeaderAction, WrapToggle } from "@/components/files/FileHeader";
 import { firstChangeLine } from "@/components/files/fileKind";
 import { FileEmptyState, FileLoading, NoticeBar } from "@/components/files/states";
-import { useDebounced, useOnWindowVisible, useTabRead, useToolEdits, useWorktreeChanges } from "@/components/files/useTabRead";
+import { useFileChanges, useOnWindowVisible, useTabRead, useThrottled, useWorktreeChanges } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
 import { openFileInPanel } from "@/stores/filePanel";
 import { useCodeViewStore } from "@/stores/codeView";
 import { sourceParam } from "@/surfaces/diffTarget";
 import type { FileRow } from "./files";
-import { useStatusChanges } from "./useStatusChanges";
+import { useIndexChanges, useStatusChanges } from "./useStatusChanges";
 
 /** The sides' parse (for the first change and its length) and what CodeDiff takes. */
 function useParsed(d: CompareFileSidesView | null, name: string, oldName: string) {
@@ -60,8 +60,9 @@ function Body({ d, error, reload, parsed, row, listed, compared }: { d: CompareF
  * One file of the comparison: its two sides, read when it is shown and not before
  * (ProjectService.GetWorktreeCompareFile), whole, so the library's hunk separators expand
  * into the rest of the file. Read again like the File tab (useTabRead), when git's status moves
- * (the index, which the detail does not follow), and when the list's row for it changes, so the
- * code never says less than the row. Refresh reads the list too. `listed` false: the file left
+ * (the index, which the detail does not follow), when the list's row for it changes, so the code
+ * never says less than the row, and when what a side reads from is written: this file on disk,
+ * the index. A save that keeps the counts changes nothing else. Refresh reads the list too. `listed` false: the file left
  * the comparison, and it stays on screen saying so, read like any other in case it comes back.
  */
 export function DiffFile({ target, row, listed, compared, onRefresh }: { target: CompareTarget; row: FileRow; listed: boolean; compared: string; onRefresh: () => void }) {
@@ -69,12 +70,13 @@ export function DiffFile({ target, row, listed, compared, onRefresh }: { target:
   const key = [projectId, worktree, sourceParam(base), sourceParam(head), row.path, row.oldPath].join("\u0000");
   const read = useTabRead<CompareFileSidesView>(key, (signal) => getCompareFile(target, row.path, row.oldPath, undefined, signal));
   const { reload } = read;
-  const later = useDebounced(reload);
+  const later = useThrottled(reload, undefined, read.loading);
   const abs = `${worktree.replace(/\/+$/, "")}/${row.path}`;
   useOnWindowVisible(later);
   useWorktreeChanges(projectId, worktree, later);
   useStatusChanges(projectId, worktree, later);
-  useToolEdits(abs, later);
+  useFileChanges(base.kind === "working" || head.kind === "working" ? abs : "", later);
+  useIndexChanges(base.kind === "staged" || head.kind === "staged" ? worktree : "", later);
   const stamp = `${row.status}|${String(row.added)}|${String(row.deleted)}`;
   const seen = useRef(stamp);
   const again = useEffectEvent(later);

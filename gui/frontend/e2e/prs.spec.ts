@@ -21,6 +21,39 @@ test.beforeEach(async () => {
 });
 
 test.describe("Pull Requests page", () => {
+  // A list past RowList's limit, under the sections above it: the keyboard's row is not mounted
+  // and not in the window, so the list and the page around it both have to move.
+  test("End and Home bring a virtualized list's cursor row into view", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await mockPost("gh/many-prs?count=150");
+    await openApp(page);
+    await page.getByTestId("nav-pullrequests").click();
+    const listBox = page.getByTestId("prs-list");
+    await expect(listBox.locator('[data-virtual="true"]').first()).toBeVisible();
+    const inView = () =>
+      page.evaluate(() => {
+        const row = document.querySelector('[aria-selected="true"][data-nav-key]');
+        if (!row) return false;
+        const r = row.getBoundingClientRect();
+        for (let p = row.parentElement; p; p = p.parentElement) {
+          if (!/auto|scroll/.test(getComputedStyle(p).overflowY)) continue;
+          const b = p.getBoundingClientRect();
+          if (r.top < b.top - 1 || r.bottom > b.bottom + 1) return false;
+        }
+        return r.top >= 0 && r.bottom <= innerHeight;
+      });
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>("[aria-activedescendant], [data-testid=\"prs-list\"]")?.focus();
+    });
+    await page.keyboard.press("End");
+    await expect(page.locator('[aria-selected="true"][data-nav-key]')).toHaveCount(1);
+    await expect.poll(inView).toBe(true);
+    await page.keyboard.press("Home");
+    await expect.poll(inView).toBe(true);
+    // The window's own place is the list's parent, and the row is that far in: not left where End put it.
+    await expect.poll(() => page.locator('[aria-selected="true"][data-nav-key]').evaluate((e) => e.getAttribute("data-nav-key"))).toMatch(/^review:/);
+  });
+
   // The sections, cards, filter, inbox zero, caps and the header's freshness:
   // src/components/prs/PullRequestsPage.test.tsx and pageModel.test.ts.
   test("page and inbox zero (screenshots)", async ({ page }) => {

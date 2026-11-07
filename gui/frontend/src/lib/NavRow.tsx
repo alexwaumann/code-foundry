@@ -10,7 +10,7 @@ export function NavProvider({ value, children }: { value: NavCtx; children: Reac
 /**
  * One navigable row. Click moves the cursor (or activates, with activateOnClick);
  * double-click activates; cmd+click runs onCmdClick when given. The cursor row is
- * highlighted and scrolled into view when it gets there. A `passive` row has no click (it still tints on hover,
+ * highlighted, and scrolled into view when the cursor was moved there (NavCtx.reveal). A `passive` row has no click (it still tints on hover,
  * so the pointer finds its right-click menu): only the keyboard (and that menu, RowContextMenu)
  * moves the cursor onto it, as on a project page's Checkouts table. `tip` is a hover tooltip for what the row hides (a
  * full path); with `tipWhenTruncated` it opens only while the row's text is cut short. The
@@ -39,16 +39,14 @@ export function NavRow({
   onPointerEnter?: PointerEventHandler<HTMLElement>;
   onPointerLeave?: PointerEventHandler<HTMLElement>;
 }) {
-  const { cursorKey, setCursor, activate } = useContext(NavContext);
+  const { cursorKey, setCursor, activate, reveal } = useContext(NavContext);
   const selected = cursorKey === navKey;
   const ref = useRef<HTMLDivElement>(null);
-  // When the cursor lands here, not when the row mounts: a virtualized list mounts the cursor's
-  // row as it is scrolled towards, and that must not pull the list back to it.
-  const wasSelected = useRef(selected);
+  // A virtualized list mounts the cursor's row as it is scrolled towards, and that must not pull
+  // the list back; a move to a row not mounted yet still has to end with it on screen.
   useEffect(() => {
-    if (selected && !wasSelected.current) ref.current?.scrollIntoView({ block: "nearest" });
-    wasSelected.current = selected;
-  }, [selected]);
+    if (selected && reveal.pay(navKey)) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [selected, navKey, reveal]);
   const row = (
     <div
       ref={ref}

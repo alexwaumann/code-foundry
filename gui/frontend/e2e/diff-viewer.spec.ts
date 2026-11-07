@@ -118,6 +118,58 @@ test("a live update keeps the rail on the same file, and the cursor's row never 
   expect(await rows.evaluate((e) => e.scrollTop)).toBe(2100);
 });
 
+/** The cursor's row is inside every box that scrolls around it, and the window. */
+const cursorInView = (page: Page) =>
+  page.evaluate(() => {
+    const row = document.querySelector('[aria-selected="true"][data-nav-key]');
+    if (!row) return false;
+    const r = row.getBoundingClientRect();
+    for (let p = row.parentElement; p; p = p.parentElement) {
+      if (!/auto|scroll/.test(getComputedStyle(p).overflowY)) continue;
+      const box = p.getBoundingClientRect();
+      if (r.top < box.top - 1 || r.bottom > box.bottom + 1) return false;
+    }
+    return r.top >= 0 && r.bottom <= innerHeight;
+  });
+
+test("the keyboard brings its row into view in a virtualized list, past what is mounted", async ({ page }) => {
+  await mockPost("compare/files?count=120");
+  await openDiff(page, 760);
+  const rows = page.getByTestId("diff-file-rows");
+  await expect(rows).toHaveAttribute("data-virtual", "true");
+  await list(page).focus();
+  await page.keyboard.press("End");
+  await expect(page.locator('[aria-selected="true"][data-nav-key]')).toHaveAttribute("data-nav-key", /file-0119/);
+  await expect.poll(() => cursorInView(page)).toBe(true);
+  await page.keyboard.press("Home");
+  await expect.poll(() => rows.evaluate((e) => e.scrollTop)).toBe(0);
+  await expect.poll(() => cursorInView(page)).toBe(true);
+});
+
+test("the list on top comes back on the current row, not at the top", async ({ page }) => {
+  await mockPost("compare/files?count=30");
+  await openDiff(page, 480);
+  await expect(list(page)).toHaveAttribute("data-layout", "top");
+  const rows = page.getByTestId("diff-file-rows");
+  await page.locator('[data-nav-key="f:generated/file-0024.ts"]').scrollIntoViewIfNeeded();
+  await page.locator('[data-nav-key="f:generated/file-0024.ts"]').click();
+  await expect(file(page)).toHaveAttribute("data-path", "generated/file-0024.ts");
+  await page.getByTestId("diff-fold").click();
+  await expect(rows).toHaveCount(0);
+  await page.getByTestId("diff-fold").click();
+  await expect(rows).toBeVisible();
+  await expect.poll(() => rows.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(() => cursorInView(page)).toBe(true);
+
+  // The width takes the list away and brings it back too.
+  await panelWidth(page, 760);
+  await expect(list(page)).toHaveAttribute("data-layout", "rail");
+  await expect.poll(() => cursorInView(page)).toBe(true);
+  await panelWidth(page, 480);
+  await expect(list(page)).toHaveAttribute("data-layout", "top");
+  await expect.poll(() => cursorInView(page)).toBe(true);
+});
+
 // The list on top, in the sizes it meets: alone in the panel, and a stacked split, where the
 // panel gives it half the height. At 1280x800 a split's tab is 342px, and the list used to leave
 // the code 33 of them. Too short for both, the list folds and the code has the whole tab.
