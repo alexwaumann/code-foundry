@@ -12,6 +12,20 @@ export function enumLabel(f: SettingFieldView, v: string): string {
   return v === "" ? "Default" : enumOptionLabel(f, v);
 }
 
+/** An enum option that says what it does (the schema's enumDescriptions). */
+export interface ExplainedOption {
+  value: string;
+  label: string;
+  description: string;
+  example: string;
+}
+
+/** A field's explained options; none when its options explain themselves. */
+export function explainedOptions(f: SettingFieldView): ExplainedOption[] {
+  if (f.enumDescriptions.length === 0) return [];
+  return f.enumValues.map((value, i) => ({ value, label: enumLabel(f, value), description: f.enumDescriptions[i] ?? "", example: f.enumExamples[i] ?? "" }));
+}
+
 /** A value as the reset tooltip and the saved toast name it. */
 export function displayValue(f: SettingFieldView, v: string): string {
   if (f.type === "keybinding") return v === "none" ? "unbound" : v ? formatChord(v) : "unbound";
@@ -29,11 +43,21 @@ export function queryWords(q: string): string[] {
   return q.toLowerCase().split(/\s+/).filter(Boolean);
 }
 
-/** Whether a field matches every word, in its title, description or key. No words match everything. */
+const ownText = (f: SettingFieldView) => `${f.title} ${f.description} ${f.key}`.toLowerCase();
+const optionText = (o: ExplainedOption) => `${o.label} ${o.description}`.toLowerCase();
+
+/** Whether a field matches every word, in its title, description, key or explained options. No words match everything. */
 export function matchField(f: SettingFieldView, words: readonly string[]): boolean {
   if (words.length === 0) return true;
-  const hay = `${f.title} ${f.description} ${f.key}`.toLowerCase();
+  const hay = `${ownText(f)} ${explainedOptions(f).map(optionText).join(" ")}`;
   return words.every((w) => hay.includes(w));
+}
+
+/** The explained options a search found the field by: those with a word the field's own text lacks. */
+export function matchedOptions(f: SettingFieldView, words: readonly string[]): ExplainedOption[] {
+  const own = ownText(f);
+  const rest = words.filter((w) => !own.includes(w));
+  return explainedOptions(f).filter((o) => rest.some((w) => optionText(o).includes(w)));
 }
 
 /** Text cut into runs, `hit` where one of the words occurs (case-insensitive); overlapping words merge. */
@@ -87,6 +111,8 @@ export function fieldRows(fields: readonly SettingFieldView[]): SettingFieldView
 
 export interface SearchHit {
   field: SettingFieldView;
+  /** The field `field` depends on, when it has one. */
+  parent: SettingFieldView | undefined;
   page: SettingPageView;
   section: SettingSectionView | undefined;
 }
@@ -108,7 +134,7 @@ export function searchSettings(schema: SettingsSchemaView, words: readonly strin
     // Section order first (fields keep their order within one).
     const order = new Map(page.sections.map((s, i) => [s.id, i]));
     fields.sort((a, b) => (order.get(a.section) ?? Infinity) - (order.get(b.section) ?? Infinity));
-    for (const field of fields) hits.push({ field, page, section: sections.get(field.section) });
+    for (const field of fields) hits.push({ field, parent: schema.fields.find((f) => f.key === field.dependsOn), page, section: sections.get(field.section) });
     counts[page.id] = fields.length;
   }
   return { hits, counts };

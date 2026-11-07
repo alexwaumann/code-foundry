@@ -30,6 +30,8 @@ const field: SettingFieldView = {
   type: "string",
   enumValues: [],
   enumLabels: [],
+  enumDescriptions: [],
+  enumExamples: [],
   defaultValue: "claude-opus-4-7[1m],claude-opus-4-8[1m]",
   restartRequired: false,
   min: 0,
@@ -39,6 +41,7 @@ const field: SettingFieldView = {
   section: "",
   unit: "",
   dependsOn: "",
+  dependsOnValue: "",
   row: "",
 };
 const schema: SettingsSchemaView = { groups: [], fields: [field], pages: [{ id: "ember", title: "Ember", description: "", sections: [{ id: "", title: "", description: "" }] }] };

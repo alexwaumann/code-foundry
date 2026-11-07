@@ -18,6 +18,8 @@ const base: Omit<SettingFieldView, "key" | "title" | "type"> = {
   group: "g",
   enumValues: [],
   enumLabels: [],
+  enumDescriptions: [],
+  enumExamples: [],
   defaultValue: "",
   restartRequired: false,
   min: 0,
@@ -27,6 +29,7 @@ const base: Omit<SettingFieldView, "key" | "title" | "type"> = {
   section: "",
   unit: "",
   dependsOn: "",
+  dependsOnValue: "",
   row: "",
 };
 const bool: SettingFieldView = { ...base, key: "threads.auto_name", title: "Auto name", type: "bool", defaultValue: "true" };
@@ -80,6 +83,80 @@ describe("SettingRow editors", () => {
     const trigger = screen.getByRole("combobox", { name: "Theme" });
     expect(trigger.getAttribute("data-value")).toBe("");
     expect(trigger.textContent).toBe("Default");
+  });
+
+  describe("an explained enum", () => {
+    const naming: SettingFieldView = {
+      ...base,
+      key: "projects.branch_naming",
+      title: "Branch names",
+      description: "How a new worktree's branch is named.",
+      type: "enum",
+      enumValues: ["semantic", "prefix", "custom"],
+      enumLabels: ["Semantic", "Prefix", "Custom instructions"],
+      enumDescriptions: ["A type, then a slug.", "Your word, then a slug.", "You tell the model."],
+      enumExamples: ["feat/add-filter", "cf/add-filter", ""],
+      defaultValue: "semantic",
+    };
+    const words = () => document.querySelector('[data-setting="projects.branch_naming"] p')?.textContent;
+
+    it("the list explains each option; the trigger shows the name alone, and a pick saves", () => {
+      setValues({ [naming.key]: "semantic", "projects.branch_prefix": "cf" });
+      render(<SettingRow field={naming} />);
+      const trigger = screen.getByRole("combobox", { name: "Branch names" });
+      fireEvent.keyDown(trigger, { key: "Enter" });
+      expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Semantic (default)feat/add-filterA type, then a slug.", "Prefixcf/add-filterYour word, then a slug.", "Custom instructionsYou tell the model."]);
+      fireEvent.click(screen.getByRole("option", { name: /^Prefix/ }));
+      expect(save.fn).toHaveBeenCalledExactlyOnceWith({ [naming.key]: "prefix" });
+    });
+
+    it.each([
+      ["semantic", "cf", "A type, then a slug. For example feat/add-filter."],
+      ["prefix", "cf", "Your word, then a slug. For example cf/add-filter."],
+      ["prefix", "wip/me/", "Your word, then a slug. For example wip/me/add-filter."],
+      ["prefix", "none", "Your word, then a slug. For example add-filter."],
+      ["custom", "cf", "You tell the model."],
+    ])("the row says what %s does with prefix %s", (mode, prefix, want) => {
+      setValues({ [naming.key]: mode, "projects.branch_prefix": prefix });
+      render(<SettingRow field={naming} />);
+      expect(words()).toBe(want);
+    });
+
+    it("the list's example follows the prefix too", () => {
+      setValues({ [naming.key]: "semantic", "projects.branch_prefix": "wip" });
+      render(<SettingRow field={naming} />);
+      fireEvent.keyDown(screen.getByRole("combobox", { name: "Branch names" }), { key: "Enter" });
+      expect(screen.getByRole("option", { name: /^Prefix/ }).textContent).toContain("wip/add-filter");
+    });
+
+    it.each([
+      ["semantic", "true", ""],
+      ["semantic", "false", " With automatic naming off, branches are named cf/<thread id>."],
+      ["prefix", "false", " With automatic naming off, the slug comes from the thread's name."],
+    ])("%s with automatic naming %s", (mode, autoName, tail) => {
+      setValues({ [naming.key]: mode, "projects.branch_prefix": "cf", "threads.auto_name": autoName });
+      render(<SettingRow field={naming} />);
+      expect(words()?.endsWith(`.${tail}`)).toBe(true);
+    });
+
+    it("an old daemon's field (no sentences) keeps its own description and its own caveat", () => {
+      setValues({ [naming.key]: "semantic", "threads.auto_name": "false" });
+      render(<SettingRow field={{ ...naming, description: "Old words.", enumDescriptions: [], enumExamples: [] }} />);
+      expect(words()).toBe("Old words.");
+    });
+
+    it("a value outside the options keeps the field's description", () => {
+      setValues({ [naming.key]: "gone", "projects.branch_prefix": "cf" });
+      render(<SettingRow field={naming} />);
+      expect(words()).toBe("How a new worktree's branch is named.");
+    });
+
+    it("in the search: the field's description and the option found, marked", () => {
+      setValues({ [naming.key]: "semantic", "projects.branch_prefix": "cf" });
+      render(<SettingRow field={naming} words={["prefix"]} />);
+      expect(words()).toBe("How a new worktree's branch is named. Prefix: your word, then a slug.");
+      expect(document.querySelector("mark")?.textContent).toBe("Prefix");
+    });
   });
 
   it("a text input commits on Enter and Escape puts the saved value back", () => {

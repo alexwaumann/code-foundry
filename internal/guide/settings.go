@@ -39,6 +39,9 @@ func WriteSettings(w io.Writer, groups []*v1.SettingGroup, fields []*v1.SettingF
 				fmt.Fprintf(w, ": %s", d)
 			}
 			fmt.Fprintf(w, "\n  Type: %s. Default: %s.", settingType(f), settingDefault(f))
+			if v := f.GetDependsOnValue(); v != "" {
+				fmt.Fprintf(w, " Used when `%s` is `%s`.", f.GetDependsOn(), v)
+			}
 			if f.GetRestartRequired() {
 				fmt.Fprint(w, " Applies after a daemon restart.")
 			}
@@ -61,14 +64,14 @@ func SettingTypeName(t v1.SettingType) string {
 	return strings.ToLower(strings.TrimPrefix(t.String(), "SETTING_TYPE_"))
 }
 
-// settingType is the type with what it accepts: an enum's values (with their labels),
-// an int's bounds and unit.
+// settingType is the type with what it accepts: an enum's values (with their labels and
+// what each does), an int's bounds and unit.
 func settingType(f *v1.SettingField) string {
 	name := SettingTypeName(f.GetType())
 	switch f.GetType() {
 	case v1.SettingType_SETTING_TYPE_ENUM:
 		vals := make([]string, 0, len(f.GetEnumValues()))
-		labels := f.GetEnumLabels()
+		labels, descriptions := f.GetEnumLabels(), f.GetEnumDescriptions()
 		for i, v := range f.GetEnumValues() {
 			s := "`" + v + "`"
 			if v == "" {
@@ -76,6 +79,9 @@ func settingType(f *v1.SettingField) string {
 			}
 			if i < len(labels) && labels[i] != "" && labels[i] != v {
 				s += " (" + labels[i] + ")"
+			}
+			if i < len(descriptions) && descriptions[i] != "" {
+				s += ": " + descriptions[i]
 			}
 			vals = append(vals, s)
 		}

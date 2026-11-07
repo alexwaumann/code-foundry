@@ -1,5 +1,7 @@
 import type { ComponentType } from "react";
+import type { SettingFieldView } from "@/api/settings";
 import { BackdropEditor } from "./BackdropEditor";
+import { BranchNamingOff } from "./BranchNamingOff";
 import { DictationMicrophoneDescription, DictationMicrophoneEditor, DictationNeedsModel, DictationStateChip, DictationToggleEditor } from "./DictationSettings";
 import type { SettingEditor } from "./editor";
 import { ThemeDarkEditor, ThemeLightEditor } from "./ThemeSlotEditor";
@@ -29,8 +31,9 @@ export const keyTitleChips: Readonly<Partial<Record<string, ComponentType>>> = {
 };
 
 /** Words after a setting's description, by key, that depend on state ("Needs the model below."). */
-export const keyDescriptionTails: Readonly<Partial<Record<string, ComponentType>>> = {
+export const keyDescriptionTails: Readonly<Partial<Record<string, ComponentType<{ field: SettingFieldView }>>>> = {
   "dictation.enabled": DictationNeedsModel,
+  "projects.branch_naming": BranchNamingOff,
 };
 
 /** A description that depends on state, by key, in place of the setting's own (its `fallback`). The search still shows and marks the setting's own. */

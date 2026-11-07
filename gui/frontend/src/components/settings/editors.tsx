@@ -7,7 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import type { EditorProps } from "./editor";
-import { enumLabel } from "./model";
+import { EnumOptionItem } from "./EnumOptions";
+import { enumLabel, explainedOptions } from "./model";
 
 export function BoolEditor({ field, value, pending, commit }: EditorProps) {
   const on = value === "true";
@@ -34,10 +35,13 @@ const EMPTY_ENUM = "__cf_default__";
  * trigger, where the reset arrow already marks a changed value. The theme slot rows turn it off.
  * `hide` leaves values out of the list (the backdrop row's Custom while there is no image);
  * the caller keeps `value` out of it, or the trigger shows nothing.
+ * Options that explain themselves (enumDescriptions) get a wider list, ending at the
+ * trigger's right edge, so each sentence fits on one line.
  */
 export function EnumEditor({ field, value, pending, invalid, commit, markDefault = true, hide }: EditorProps & { markDefault?: boolean; hide?: readonly string[] }) {
   const values = hide ? field.enumValues.filter((v) => !hide.includes(v)) : field.enumValues;
   const toItem = (v: string) => (v === "" ? EMPTY_ENUM : v);
+  const explained = explainedOptions(field);
   return (
     <Select
       value={toItem(value)}
@@ -49,16 +53,28 @@ export function EnumEditor({ field, value, pending, invalid, commit, markDefault
       <SelectTrigger className="w-full" aria-label={field.title} aria-invalid={invalid || undefined} data-value={value}>
         <SelectValue />
       </SelectTrigger>
-      <SelectContent>
-        {values.map((v) => (
-          <SelectItem key={v} value={toItem(v)}>
-            {enumLabel(field, v)}
-            {markDefault && v === field.defaultValue && v !== "" && (
-              // Only in the list: the trigger (the item's text copied into select-value) shows the name alone.
-              <span className="[[data-slot=select-value]_&]:hidden"> (default)</span>
-            )}
-          </SelectItem>
-        ))}
+      <SelectContent {...(explained.length > 0 && { align: "end", className: "w-[25rem]" })}>
+        {values.map((v) => {
+          const name = (
+            <>
+              {enumLabel(field, v)}
+              {markDefault && v === field.defaultValue && v !== "" && (
+                // Only in the list: the trigger (the item's text copied into select-value) shows the name alone.
+                <span className="[[data-slot=select-value]_&]:hidden"> (default)</span>
+              )}
+            </>
+          );
+          const option = explained.find((o) => o.value === v);
+          return option ? (
+            <EnumOptionItem key={v} field={field} option={option} value={toItem(v)}>
+              {name}
+            </EnumOptionItem>
+          ) : (
+            <SelectItem key={v} value={toItem(v)}>
+              {name}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

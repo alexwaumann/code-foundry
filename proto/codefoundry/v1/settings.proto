@@ -87,13 +87,25 @@ message SettingField {
   string section = 14;
   // Unit shown as a suffix inside a number input ("s", "pt", "%"); empty for none.
   string unit = 15;
-  // Key of a SETTING_TYPE_BOOL field this one depends on: while that field is false,
-  // this one renders indented and dimmed. Empty for none.
+  // Key of the field this one depends on, empty for none. A SETTING_TYPE_BOOL: while it
+  // is false, this one renders indented and dimmed. A SETTING_TYPE_ENUM: see
+  // depends_on_value.
   string depends_on = 16;
   // Fields of a section sharing a non-empty row id render side by side in one row
   // (model and effort), each under its own title, with the first field's description
   // under the row.
   string row = 17;
+  // One sentence per enum value saying what it does, parallel to enum_values; empty when
+  // the options explain themselves. The field's dropdown, its row and the settings search
+  // show them.
+  repeated string enum_descriptions = 18;
+  // A sample value per enum value ("feat/add-filter"), parallel to enum_values; "" for an
+  // option without one. Empty when enum_descriptions is.
+  repeated string enum_examples = 19;
+  // The depends_on value this field is used with: the settings page shows it, right under
+  // depends_on's row, only while that field has this value. The search still finds it,
+  // dimmed. Empty for none.
+  string depends_on_value = 20;
 }
 
 // SettingGroup is a table of the settings file ([threads], [github], ...).

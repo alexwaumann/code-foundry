@@ -22,6 +22,10 @@ export interface SettingFieldView {
   enumValues: string[];
   /** Display names parallel to enumValues; empty when the values are shown as they are. */
   enumLabels: string[];
+  /** A sentence per option, parallel to enumValues; empty when the options explain themselves. */
+  enumDescriptions: string[];
+  /** A sample value per option ("" for none), parallel to enumValues; empty when enumDescriptions is. */
+  enumExamples: string[];
   defaultValue: string;
   restartRequired: boolean;
   min: number;
@@ -33,8 +37,10 @@ export interface SettingFieldView {
   section: string;
   /** Suffix inside a number input ("s", "pt", "%"); "" for none. */
   unit: string;
-  /** Key of a bool field; while it is false this field renders indented and dimmed. "" for none. */
+  /** Key of a bool field; while it is false this field renders indented and dimmed. With dependsOnValue, an enum field's. "" for none. */
   dependsOn: string;
+  /** The dependsOn value this field is used with: the page shows it only then, the search dims it otherwise. "" for none. */
+  dependsOnValue: string;
   /** Fields of a section sharing a non-empty row render side by side; the first one's description goes under the row. */
   row: string;
 }
@@ -115,6 +121,8 @@ export function toSettingFieldView(f: SettingField): SettingFieldView {
     type: typeMap[f.type],
     enumValues: [...f.enumValues],
     enumLabels: f.enumLabels.length === f.enumValues.length ? [...f.enumLabels] : [],
+    enumDescriptions: f.enumDescriptions.length === f.enumValues.length ? [...f.enumDescriptions] : [],
+    enumExamples: f.enumExamples.length === f.enumValues.length ? [...f.enumExamples] : [],
     defaultValue: f.defaultValue,
     restartRequired: f.restartRequired,
     min: Number(f.min),
@@ -124,6 +132,7 @@ export function toSettingFieldView(f: SettingField): SettingFieldView {
     section: f.section,
     unit: f.unit,
     dependsOn: f.dependsOn,
+    dependsOnValue: f.dependsOnValue,
     row: f.row,
   };
 }

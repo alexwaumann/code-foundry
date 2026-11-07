@@ -144,7 +144,7 @@ export function SettingsPage() {
 
   const words = useMemo(() => queryWords(query), [query]);
   const searching = words.length > 0;
-  const hidden = useHiddenFields(schema?.fields ?? NO_FIELDS);
+  const hidden = useHiddenFields(schema?.fields ?? NO_FIELDS, "search");
   const result = useMemo(() => (schema && searching ? searchSettings(schema, words, hidden) : null), [schema, searching, words, hidden]);
   // A GUI page may also be a schema page (Plugins: its settings section): the schema's wins, drawn by the GUI's component.
   const pages = useMemo(() => (schema ? [...schema.pages, ...guiPages.map((g) => g.page).filter((g) => !schema.pages.some((p) => p.id === g.id))] : []), [schema]);

@@ -43,9 +43,9 @@ func (h *Settings) GetSchema(context.Context, *connect.Request[v1.GetSettingsSch
 	for i, f := range fields {
 		out[i] = &v1.SettingField{
 			Key: f.Key, Title: f.Title, Description: f.Description, Group: f.Group, Type: settingTypes[f.Type],
-			EnumValues: f.Enum, EnumLabels: f.EnumLabels, DefaultValue: f.Default, RestartRequired: f.Restart,
+			EnumValues: f.Enum, EnumLabels: f.EnumLabels, EnumDescriptions: f.EnumDescriptions, EnumExamples: f.EnumExamples, DefaultValue: f.Default, RestartRequired: f.Restart,
 			Min: int64(f.Min), Max: int64(f.Max), Placeholder: f.Placeholder,
-			Page: f.Page, Section: f.Section, Unit: f.Unit, DependsOn: f.DependsOn, Row: f.Row,
+			Page: f.Page, Section: f.Section, Unit: f.Unit, DependsOn: f.DependsOn, DependsOnValue: f.DependsOnValue, Row: f.Row,
 		}
 	}
 	pages := h.store.Pages()

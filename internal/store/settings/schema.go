@@ -75,6 +75,10 @@ type Field struct {
 	Enum          []string
 	// EnumLabels, when set, names each Enum value for display (parallel to Enum).
 	EnumLabels []string
+	// EnumDescriptions, when set, says in a sentence what each Enum value does (parallel
+	// to Enum): the dropdown, the row and the settings search show it. EnumExamples is a
+	// sample value for each, "" for none.
+	EnumDescriptions, EnumExamples []string
 	// Default is the string-encoded value used when the file does not set the key.
 	Default string
 	// Restart means the daemon reads the value only at start.
@@ -85,8 +89,11 @@ type Field struct {
 	// Unit is the suffix shown inside a number input ("s", "pt", "%").
 	Unit string
 	// DependsOn is the key of a Bool field; while it is false the settings page shows
-	// this field indented and dimmed.
+	// this field indented and dimmed. With DependsOnValue it is an Enum field's.
 	DependsOn string
+	// DependsOnValue is the DependsOn value this field is used with: the settings page
+	// shows it only then, and the search finds it dimmed otherwise.
+	DependsOnValue string
 	// Row groups fields of one section into a single row (model and effort); the
 	// first field's description goes under the row.
 	Row string
@@ -601,24 +608,29 @@ var staticFields = []Field{
 		// Read by the thread store at every new worktree or workspace
 		// (internal/store/thread/branchname.go), live.
 		Key: KeyBranchNaming, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Enum, Title: "Branch names",
-		Description: "How a new worktree's branch is named. Type and slug: the utility model picks a type like feat or fix and a short slug. " +
-			"Prefix and slug: your branch prefix and a slug. Custom: the utility model follows your instructions. " +
-			"With automatic naming off, prefix mode uses the thread's name and the others use cf/<thread id>.",
-		Enum:       []string{BranchNamingSemantic, BranchNamingPrefix, BranchNamingCustom},
-		EnumLabels: []string{"Type and slug (feat/add-filter)", "Prefix and slug (cf/add-filter)", "Custom instructions"},
-		Default:    BranchNamingSemantic,
-		bind:       func(s *Settings) any { return &s.Projects.BranchNaming },
+		Description: "How a new worktree's branch is named.",
+		Enum:        []string{BranchNamingSemantic, BranchNamingPrefix, BranchNamingCustom},
+		EnumLabels:  []string{"Semantic", "Prefix", "Custom instructions"},
+		EnumDescriptions: []string{
+			"The model picks a type like feat or fix, then a short slug.",
+			"Your own word first, then a short slug from the model.",
+			"You tell the model how to write the whole name.",
+		},
+		EnumExamples: []string{"feat/add-filter", "cf/add-filter", ""},
+		Default:      BranchNamingSemantic,
+		bind:         func(s *Settings) any { return &s.Projects.BranchNaming },
 	},
 	{
 		Key: KeyBranchPrefix, Group: GroupProjects, Page: PageSource, Section: "projects", Type: String, Title: "Branch prefix",
-		Description: "For Prefix and slug: the part before the slash. " + BranchPrefixNone + " gives a bare slug.",
-		Default:     "cf", Placeholder: "cf", check: checkBranchPrefix,
+		Description: "The part before the slash. " + BranchPrefixNone + " gives a bare slug.",
+		DependsOn:   KeyBranchNaming, DependsOnValue: BranchNamingPrefix,
+		Default: "cf", Placeholder: "cf", check: checkBranchPrefix,
 		bind: func(s *Settings) any { return &s.Projects.BranchPrefix },
 	},
 	{
 		Key: KeyBranchInstructions, Group: GroupProjects, Page: PageSource, Section: "projects", Type: String, Title: "Branch instructions",
-		Description: "For Custom: how the utility model should write the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". " +
-			"Spaces become dashes; a name git refuses falls back to cf/<thread id>.",
+		Description: "Your custom instructions to the utility model. Spaces become dashes; a name git refuses falls back to cf/<thread id>.",
+		DependsOn:   KeyBranchNaming, DependsOnValue: BranchNamingCustom,
 		Placeholder: "ab/<slug of 2 to 4 words>",
 		bind:        func(s *Settings) any { return &s.Projects.BranchInstructions },
 	},

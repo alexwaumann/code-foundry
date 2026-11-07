@@ -177,6 +177,35 @@ func TestEnumLabels(t *testing.T) {
 	}
 }
 
+// TestEnumOptions: what the settings page reads parallel to Enum, and the parent value a
+// dependent is shown for, must line up with the fields they name.
+func TestEnumOptions(t *testing.T) {
+	for _, f := range staticFields {
+		if len(f.EnumDescriptions) > 0 && (len(f.EnumDescriptions) != len(f.Enum) || len(f.EnumExamples) != len(f.Enum)) {
+			t.Errorf("%s: %d values, %d descriptions, %d examples", f.Key, len(f.Enum), len(f.EnumDescriptions), len(f.EnumExamples))
+		}
+		if f.DependsOnValue != "" && !slices.Contains(field(t, f.DependsOn).Enum, f.DependsOnValue) {
+			t.Errorf("%s: depends on %s being %q, not one of its values", f.Key, f.DependsOn, f.DependsOnValue)
+		}
+	}
+}
+
+func TestBranchNamingOptions(t *testing.T) {
+	f := field(t, KeyBranchNaming)
+	if !slices.Equal(f.EnumLabels, []string{"Semantic", "Prefix", "Custom instructions"}) {
+		t.Errorf("labels = %v", f.EnumLabels)
+	}
+	tests := []struct{ key, value string }{
+		{KeyBranchPrefix, BranchNamingPrefix},
+		{KeyBranchInstructions, BranchNamingCustom},
+	}
+	for _, tt := range tests {
+		if d := field(t, tt.key); d.DependsOn != KeyBranchNaming || d.DependsOnValue != tt.value {
+			t.Errorf("%s depends on %s = %q", tt.key, d.DependsOn, d.DependsOnValue)
+		}
+	}
+}
+
 // TestNewThreadDefaults pins the defaults a fresh install starts from (Alex,
 // 2026-10-17): Sonnet 5 at medium effort, Sonnet 4.6 naming, the project folder
 // itself, comfortable density.
@@ -390,8 +419,12 @@ func TestPages(t *testing.T) {
 		}
 		prevRow = f.Row
 		if f.DependsOn != "" {
-			if d, ok := byKey[f.DependsOn]; !ok || d.Type != Bool || d.DependsOn != "" {
-				t.Errorf("%s: depends on %q, want a top-level Bool field", f.Key, f.DependsOn)
+			want := Bool
+			if f.DependsOnValue != "" {
+				want = Enum
+			}
+			if d, ok := byKey[f.DependsOn]; !ok || d.Type != want || d.DependsOn != "" {
+				t.Errorf("%s: depends on %q, want a top-level field of type %v", f.Key, f.DependsOn, want)
 			}
 		}
 		if f.Unit != "" && f.Type != Int {

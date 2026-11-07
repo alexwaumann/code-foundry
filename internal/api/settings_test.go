@@ -70,6 +70,9 @@ func TestSettingsService(t *testing.T) {
 	if f := byKey["models.utility"]; f.GetDependsOn() != "" || f.GetSection() != "textgen" || f.GetGroup() != "models" {
 		t.Errorf("utility model field = %v", f)
 	}
+	if n, p := byKey["projects.branch_naming"], byKey["projects.branch_prefix"]; len(n.GetEnumDescriptions()) != 3 || len(n.GetEnumExamples()) != 3 || p.GetDependsOn() != n.GetKey() || p.GetDependsOnValue() != "prefix" {
+		t.Errorf("branch naming field = %v, prefix = %v", n, p)
+	}
 	if m, e := byKey["threads.default_model"], byKey["threads.default_effort"]; m.GetRow() != "model" || e.GetRow() != "model" {
 		t.Errorf("model row = %q, effort row = %q", m.GetRow(), e.GetRow())
 	}

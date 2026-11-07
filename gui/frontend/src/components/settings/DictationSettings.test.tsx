@@ -38,6 +38,8 @@ const field: SettingFieldView = {
   group: "dictation",
   enumValues: [],
   enumLabels: [],
+  enumDescriptions: [],
+  enumExamples: [],
   defaultValue: "false",
   restartRequired: false,
   min: 0,
@@ -47,6 +49,7 @@ const field: SettingFieldView = {
   section: "dictation",
   unit: "",
   dependsOn: "",
+  dependsOnValue: "",
   row: "",
 };
 const anywhere: SettingFieldView = { ...field, key: "dictation.anywhere", title: "Dictate anywhere" };

@@ -31,6 +31,8 @@ const field: SettingFieldView = {
   type: "int",
   enumValues: [],
   enumLabels: [],
+  enumDescriptions: [],
+  enumExamples: [],
   defaultValue: "50",
   restartRequired: false,
   min: 0,
@@ -40,6 +42,7 @@ const field: SettingFieldView = {
   section: "",
   unit: "",
   dependsOn: "",
+  dependsOnValue: "",
   row: "",
 };
 

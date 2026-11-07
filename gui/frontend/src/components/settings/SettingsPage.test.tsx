@@ -29,6 +29,8 @@ const base: Omit<SettingFieldView, "key" | "title" | "type" | "page" | "section"
   group: "g",
   enumValues: [],
   enumLabels: [],
+  enumDescriptions: [],
+  enumExamples: [],
   defaultValue: "",
   restartRequired: false,
   min: 0,
@@ -36,6 +38,7 @@ const base: Omit<SettingFieldView, "key" | "title" | "type" | "page" | "section"
   placeholder: "",
   unit: "",
   dependsOn: "",
+  dependsOnValue: "",
   row: "",
 };
 const f = (key: string, title: string, type: SettingFieldView["type"], page: string, section: string, extra: Partial<SettingFieldView> = {}): SettingFieldView => ({ ...base, key, title, type, page, section, ...extra });
@@ -67,6 +70,16 @@ const fields: SettingFieldView[] = [
   f("notifications.sound_volume", "Volume", "int", "notifications", "alerts", { defaultValue: "50", min: 0, max: 100, dependsOn: "notifications.sound" }),
   f("github.poll_interval_seconds", "Poll interval", "int", "source", "github", { defaultValue: "60", min: 30, max: 3600 }),
   f("projects.fetch_interval_seconds", "Fetch interval", "int", "source", "projects", { defaultValue: "300", min: 60, max: 3600 }),
+  f("projects.branch_naming", "Branch names", "enum", "source", "projects", {
+    description: "How a new worktree's branch is named.",
+    enumValues: ["semantic", "prefix", "custom"],
+    enumLabels: ["Semantic", "Prefix", "Custom instructions"],
+    enumDescriptions: ["A type, then a slug.", "Your word, then a slug.", "You tell the model."],
+    enumExamples: ["feat/add-filter", "cf/add-filter", ""],
+    defaultValue: "semantic",
+  }),
+  f("projects.branch_prefix", "Branch prefix", "string", "source", "projects", { description: "Before the slash.", defaultValue: "cf", dependsOn: "projects.branch_naming", dependsOnValue: "prefix" }),
+  f("projects.branch_instructions", "Branch instructions", "string", "source", "projects", { description: "Your custom instructions.", dependsOn: "projects.branch_naming", dependsOnValue: "custom" }),
   f("logging.level", "Log level", "enum", "advanced", "logging", { enumValues: ["info", "debug"], defaultValue: "info" }),
   f("keybindings.thread.new", "New Thread", "keybinding", "keybindings", "thread", { defaultValue: "cmd+n", description: "Start a thread." }),
   f("keybindings.thread.archive", "Archive Thread", "keybinding", "keybindings", "thread"),
@@ -224,6 +237,23 @@ describe("the settings page", () => {
     expect(row("notifications.sound_volume").textContent).not.toContain("Not used while");
     fireEvent.click(within(row("notifications.sound")).getByRole("switch"));
     expect(row("notifications.sound_volume").dataset.dimmed).toBeUndefined();
+  });
+
+  it.each([
+    ["semantic", false, false],
+    ["prefix", true, false],
+    ["custom", false, true],
+  ])("Branch names %s shows only its own setting, right under it", (mode, prefix, instructions) => {
+    setValues({ "projects.branch_naming": mode, "projects.branch_prefix": "cf", "projects.branch_instructions": "" });
+    open("source");
+    expect(has("projects.branch_prefix")).toBe(prefix);
+    expect(has("projects.branch_instructions")).toBe(instructions);
+    const shown = prefix ? "projects.branch_prefix" : instructions ? "projects.branch_instructions" : null;
+    if (shown) {
+      expect(row("projects.branch_naming").nextElementSibling).toBe(row(shown));
+      expect(row(shown).className).toContain("pl-10");
+      expect(row(shown).dataset.dimmed).toBeUndefined();
+    }
   });
 
   it("a bool saves and says so; a number out of range is refused inline; the restart badge shows once changed", async () => {
@@ -399,6 +429,32 @@ describe("Keybindings", () => {
 });
 
 describe("search", () => {
+  it.each([
+    ["prefix", ["projects.branch_naming", "projects.branch_prefix"], "Branch prefix"],
+    ["custom instruction", ["projects.branch_naming", "projects.branch_instructions"], "Branch instructions"],
+    ["semantic", ["projects.branch_naming"], null],
+  ])("“%s” finds the option and the setting its mode hides, dimmed and still editable", (query, want, dimmed) => {
+    setValues({ "projects.branch_naming": "semantic", "projects.branch_prefix": "cf", "projects.branch_instructions": "" });
+    open("source");
+    fireEvent.change(search(), { target: { value: query } });
+    const hits = [...screen.getByTestId("settings-results").querySelectorAll<HTMLElement>("[data-setting]")];
+    expect(hits.map((h) => h.dataset.setting)).toEqual(want);
+    expect(hits[0]?.dataset.dimmed).toBeUndefined();
+    if (dimmed) {
+      expect(hits[1]?.dataset.dimmed).toBe("true");
+      expect(hits[1]?.textContent).toContain("Not used while Branch names is Semantic.");
+      expect(within(hits[1] as HTMLElement).getByRole<HTMLInputElement>("textbox", { name: dimmed }).disabled).toBe(false);
+    }
+  });
+
+  it("a hidden setting of the mode in use is an ordinary hit", () => {
+    setValues({ "projects.branch_naming": "prefix", "projects.branch_prefix": "cf", "projects.branch_instructions": "" });
+    open("source");
+    fireEvent.change(search(), { target: { value: "branch prefix" } });
+    expect(row("projects.branch_prefix").dataset.dimmed).toBeUndefined();
+    expect(row("projects.branch_prefix").textContent).not.toContain("Not used while");
+  });
+
   it("lists matches from every page under page and section, keys marked, the nav counting per page", () => {
     open();
     fireEvent.change(search(), { target: { value: "interval" } });
