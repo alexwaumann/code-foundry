@@ -25,6 +25,8 @@
   "prompt":"Keep an eye on what this thread costs and tell me every hour."},
  {"id":"p4-show-file","verb":"^view\\.panel\\.file\\b",
   "prompt":"Show me README.md."},
+ {"id":"p9-show-images","verb":"^view\\.panel\\.gallery\\b",
+  "prompt":"Show me before.svg and after.svg together, captioned Before and After."},
  {"id":"p5-earlier","skill":"code-foundry","verb":"^thread\\.search\\b",
   "prompt":"Where did we decide how the --shout flag should behave? I think it was in an earlier thread."},
  {"id":"p6-chart","heavy":true,"skill":"code-foundry-pages","verb":"^view\\.inline\\b",

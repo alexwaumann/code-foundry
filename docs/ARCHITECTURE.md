@@ -940,7 +940,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   a project page's checkout rows into the page's own panel;
   `docs/notes/thread-header-crumb.md`) and MCP (the thread's MCP servers, one card each
   with status, error, tools and Reconnect; opened by the card's MCP row and
-  `view.panel.mcp`; `docs/notes/mcp-panel.md`). The Worktree, Workspace, Linked PRs,
+  `view.panel.mcp`; `docs/notes/mcp-panel.md`) and Gallery (a set of images a thread shows, a
+  grid that opens one over a filmstrip; only `view.panel.gallery` opens it, one tab per title;
+  `docs/notes/gallery-surface.md`). The Worktree, Workspace, Linked PRs,
   Usage, Agents and Threads surfaces and their `view.panel.*` verbs are gone: the thread
   info card shows what they did (`docs/notes/thread-info-card.md`). A depth-1 subagent row
   or a strip name above the composer (background runs) shows that run read-only in the
