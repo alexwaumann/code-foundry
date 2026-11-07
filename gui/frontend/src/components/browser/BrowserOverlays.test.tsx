@@ -50,8 +50,8 @@ describe("phases", () => {
   });
 
   it("says plainly that there is no Chrome, with nothing to press", () => {
-    show({ ...ready, phase: "unavailable", message: "Google Chrome is not installed" });
-    expect(screen.getByTestId("browser-stopped").textContent).toContain("Google Chrome is not installed");
+    show({ ...ready, phase: "unavailable", message: "No Google Chrome on this Mac" });
+    expect(screen.getByTestId("browser-stopped").textContent).toContain("No Google Chrome on this Mac");
     expect(screen.queryByRole("button", { name: "Relaunch Chrome" })).toBeNull();
   });
 

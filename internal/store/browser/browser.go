@@ -43,7 +43,7 @@ var ErrDisabled = errors.New("the Chrome surface is off (experimental.chrome_sur
 var ErrClosed = errors.New("the browser store is closed")
 
 // ErrCrashed is a surface's state after Chrome died under it, until the user relaunches.
-var ErrCrashed = errors.New("Chrome stopped unexpectedly")
+var ErrCrashed = errors.New("chrome stopped unexpectedly")
 
 // ErrNoSurface is a call for a surface nothing has opened.
 var ErrNoSurface = errors.New("no such browser surface")
@@ -205,7 +205,7 @@ func (s *Store) launch(_ context.Context) (*instance, error) {
 	}
 	if err := in.conn.call(ctx, "", "Browser.getVersion", nil, &version); err != nil {
 		s.stop(in)
-		return nil, fmt.Errorf("Chrome did not answer over its pipe, so it was stopped: %w%s", err, tailNote(proc))
+		return nil, fmt.Errorf("chrome did not answer over its pipe, so it was stopped: %w%s", err, tailNote(proc))
 	}
 	if err := in.conn.call(ctx, "", "Target.setDiscoverTargets", map[string]any{"discover": true}, nil); err != nil {
 		s.stop(in)
