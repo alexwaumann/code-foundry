@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BROWSER_STARTING } from "@/api/browser";
 
-const api = vi.hoisted(() => ({ go: vi.fn(() => Promise.resolve()), reload: vi.fn(() => Promise.resolve()), relaunch: vi.fn(() => Promise.resolve()), close: vi.fn(() => Promise.resolve()) }));
+const api = vi.hoisted(() => ({ navigate: vi.fn(() => Promise.resolve("")), go: vi.fn(() => Promise.resolve()), reload: vi.fn(() => Promise.resolve()), relaunch: vi.fn(() => Promise.resolve()), close: vi.fn(() => Promise.resolve()) }));
 vi.mock("@/api/browser", async (orig) => ({
   ...(await orig<typeof import("@/api/browser")>()),
   browserGo: api.go,
+  navigateBrowser: api.navigate,
   reloadBrowser: api.reload,
   relaunchBrowser: api.relaunch,
   closeBrowser: api.close,
 }));
 
-const { browserEnabled, browserInFront, closeBrowserSurface, openBrowserSurface, presentBrowserCommand, setBrowserState, takeBrowserAddress, useBrowserStore } = await import("./browser");
+const { browserAnswered, browserEnabled, browserInFront, browserLeft, closeBrowserSurface, openBrowserSurface, presentBrowserCommand, setBrowserState, takeBrowserAddress, useBrowserStore } = await import("./browser");
 const { getPanel, allTabs, togglePanel, usePanelStore } = await import("./panel");
 const { applySettingsSnapshot, useSettingsStore } = await import("./settings");
 const { useUiStore } = await import("./ui");
@@ -88,6 +89,36 @@ describe("opening", () => {
     expect(browserTabs()).toHaveLength(1);
     expect(takeBrowserAddress(key)).toBe("https://example.com/b");
     expect(takeBrowserAddress(key)).toBe("");
+  });
+
+  it("goes at once on a surface that is showing, and to the same tab", () => {
+    browserAnswered(key);
+    openBrowserSurface(sel, "https://example.com/a");
+    openBrowserSurface(sel, "https://example.com/b");
+    expect(api.navigate.mock.calls).toEqual([
+      [key, "https://example.com/a"],
+      [key, "https://example.com/b"],
+    ]);
+    expect(useBrowserStore.getState().pending).toEqual({});
+    expect(browserTabs()).toHaveLength(1);
+    browserLeft(key);
+  });
+
+  it("waits again once the surface has left the screen", () => {
+    browserAnswered(key);
+    browserLeft(key);
+    openBrowserSurface(sel, "https://example.com/a");
+    expect(api.navigate).not.toHaveBeenCalled();
+    expect(useBrowserStore.getState().pending[key]).toBe("https://example.com/a");
+  });
+
+  it("sends an address that came while the stream connected, once it is answered", () => {
+    openBrowserSurface(sel, "https://example.com/a");
+    browserAnswered(key);
+    browserAnswered(key);
+    expect(api.navigate.mock.calls).toEqual([[key, "https://example.com/a"]]);
+    expect(takeBrowserAddress(key)).toBe("");
+    browserLeft(key);
   });
 
   it("the window's verb shows the panel, and a thread's verb leaves the selection alone", () => {

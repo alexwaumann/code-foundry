@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { resizeBrowser, watchBrowser, type BrowserEventView, type BrowserFrameView } from "@/api/browser";
 import { isPageVisible, onVisibilityChange, runStream } from "@/api/stream";
-import { setBrowserOffline, setBrowserState, takeBrowserAddress } from "@/stores/browser";
+import { browserAnswered, browserLeft, setBrowserOffline, setBrowserState, takeBrowserAddress } from "@/stores/browser";
 
 /** How long a resize settles before the page reflows: a drag sends its last size, not each. */
 const RESIZE_SETTLE_MS = 120;
@@ -88,7 +88,7 @@ export function useBrowserStream(surface: string, box: RefObject<HTMLElement | n
   useEffect(() => {
     if (!shows || !canvas.current) return;
     const paint = newPainter(canvas.current);
-    return runStream<BrowserEventView>({
+    const stop = runStream<BrowserEventView>({
       open: (signal) => {
         const { width, height } = sent.current.width > 0 ? sent.current : size;
         sent.current = { width, height };
@@ -97,6 +97,7 @@ export function useBrowserStream(surface: string, box: RefObject<HTMLElement | n
       onEvent: (ev) => {
         if (ev.kind === "state") {
           setBrowserState(surface, ev.state);
+          browserAnswered(surface);
           return;
         }
         page.current = { width: ev.frame.width, height: ev.frame.height };
@@ -104,8 +105,13 @@ export function useBrowserStream(surface: string, box: RefObject<HTMLElement | n
       },
       onStatus: (status) => {
         setBrowserOffline(surface, status === "retrying");
+        if (status === "retrying") browserLeft(surface);
       },
     });
+    return () => {
+      stop();
+      browserLeft(surface);
+    };
     // The size goes through Resize below; it must not reopen the stream.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [surface, shows, canvas]);

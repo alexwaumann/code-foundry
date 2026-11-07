@@ -7,7 +7,7 @@
  * any tab left over, so nothing a window remembered outlives the setting.
  */
 import { create } from "zustand";
-import { BROWSER_STARTING, browserGo, closeBrowser, reloadBrowser, relaunchBrowser, type BrowserStateView } from "@/api/browser";
+import { BROWSER_STARTING, browserGo, closeBrowser, navigateBrowser, reloadBrowser, relaunchBrowser, type BrowserStateView } from "@/api/browser";
 import { errorMessage } from "@/api/stream";
 import { BROWSER_KIND, browserTab } from "@/surfaces/browserTarget";
 import { activeTab, allTabs, closePanelTab, getPanel, keyOf, openSurface, usePanelStore } from "./panel";
@@ -62,15 +62,36 @@ export function takeBrowserAddress(surface: string): string {
   return url;
 }
 
+/** The surfaces with a live stream the daemon has answered: an address for one can go at once. */
+const watching = new Set<string>();
+
+/** The stream of a surface was answered. An address that came while it connected goes now. */
+export function browserAnswered(surface: string): void {
+  if (watching.has(surface)) return;
+  watching.add(surface);
+  const late = takeBrowserAddress(surface);
+  if (late) goTo(surface, late);
+}
+
+/** The stream of a surface ended. */
+export function browserLeft(surface: string): void {
+  watching.delete(surface);
+}
+
+function goTo(surface: string, url: string): void {
+  act(surface, () => navigateBrowser(surface, url));
+}
+
 /**
- * Opens (or activates) the Browser tab in the selection's panel, with an address to go to when
- * it shows. Returns that panel's key, or null with the setting off or no panel. It does not
- * request focus.
+ * Opens (or activates) the Browser tab in the selection's panel, and goes to an address: at once
+ * on a surface that is showing, else when it shows, so one nobody sees starts nothing. Returns
+ * that panel's key, or null with the setting off or no panel. It does not request focus.
  */
 export function openBrowserSurface(sel: Selection = useUiStore.getState().selection, url = ""): string | null {
   const key = keyOf(sel);
   if (key === null || !browserEnabled()) return null;
-  if (url) useBrowserStore.setState((s) => ({ pending: { ...s.pending, [key]: url } }));
+  if (url && watching.has(key)) goTo(key, url);
+  else if (url) useBrowserStore.setState((s) => ({ pending: { ...s.pending, [key]: url } }));
   return openSurface(key, browserTab()) ? key : null;
 }
 
