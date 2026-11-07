@@ -32,6 +32,14 @@ of your turn (the child still asks with its own question tool; a blocking questi
 in YOUR turn holds back your other children). Supervised children:
 `reference/patterns.md` §5.
 
+## A child asks while it works
+
+"asks you something and keeps working" is a child's `thread ask`: it did not stop, and goes on
+with the assumption the wake quotes. If that assumption is right, say nothing. If not, answer at
+once with `thread send --id <child> "..."`, without `--wait`: it reads that at its next tool
+call. Only if you cannot answer, relay it to the user. A `thread wait` ends early for it and
+prints the same; wait again after you answered.
+
 ## Budget stops
 
 A budget stop is not finished work: tell the user and never raise a budget they set

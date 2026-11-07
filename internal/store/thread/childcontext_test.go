@@ -12,6 +12,7 @@ import (
 func TestAllowedTools(t *testing.T) {
 	protocol := []string{
 		"Bash(code-foundry thread report:*)",
+		"Bash(code-foundry thread ask:*)",
 		"Bash(code-foundry thread reports:*)",
 		"Bash(code-foundry thread get:*)",
 		"Bash(code-foundry thread list:*)",

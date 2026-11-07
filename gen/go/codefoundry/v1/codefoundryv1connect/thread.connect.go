@@ -97,6 +97,8 @@ const (
 	ThreadServiceLabelProcedure = "/codefoundry.v1.ThreadService/Label"
 	// ThreadServiceReportProcedure is the fully-qualified name of the ThreadService's Report RPC.
 	ThreadServiceReportProcedure = "/codefoundry.v1.ThreadService/Report"
+	// ThreadServiceAskProcedure is the fully-qualified name of the ThreadService's Ask RPC.
+	ThreadServiceAskProcedure = "/codefoundry.v1.ThreadService/Ask"
 	// ThreadServiceSetBudgetProcedure is the fully-qualified name of the ThreadService's SetBudget RPC.
 	ThreadServiceSetBudgetProcedure = "/codefoundry.v1.ThreadService/SetBudget"
 	// ThreadServiceClearFlagsProcedure is the fully-qualified name of the ThreadService's ClearFlags
@@ -332,6 +334,9 @@ type ThreadServiceClient interface {
 	// Report records the thread's report (status, summary, JSON data), replacing the
 	// previous one, stamped report_at. Any state. Persisted.
 	Report(context.Context, *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error)
+	// A created thread asks its creator something and keeps working: the creator gets a
+	// wake (docs/notes/thread-ask.md), and answers with Send.
+	Ask(context.Context, *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error)
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
@@ -685,6 +690,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Report")),
 			connect.WithClientOptions(opts...),
 		),
+		ask: connect.NewClient[v1.AskThreadRequest, v1.AskThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceAskProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Ask")),
+			connect.WithClientOptions(opts...),
+		),
 		setBudget: connect.NewClient[v1.SetThreadBudgetRequest, v1.SetThreadBudgetResponse](
 			httpClient,
 			baseURL+ThreadServiceSetBudgetProcedure,
@@ -909,6 +920,7 @@ type threadServiceClient struct {
 	snooze            *connect.Client[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse]
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
 	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
+	ask               *connect.Client[v1.AskThreadRequest, v1.AskThreadResponse]
 	setBudget         *connect.Client[v1.SetThreadBudgetRequest, v1.SetThreadBudgetResponse]
 	clearFlags        *connect.Client[v1.ClearThreadFlagsRequest, v1.ClearThreadFlagsResponse]
 	subscribe         *connect.Client[v1.SubscribeThreadRequest, v1.SubscribeThreadResponse]
@@ -1076,6 +1088,11 @@ func (c *threadServiceClient) Label(ctx context.Context, req *connect.Request[v1
 // Report calls codefoundry.v1.ThreadService.Report.
 func (c *threadServiceClient) Report(ctx context.Context, req *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error) {
 	return c.report.CallUnary(ctx, req)
+}
+
+// Ask calls codefoundry.v1.ThreadService.Ask.
+func (c *threadServiceClient) Ask(ctx context.Context, req *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error) {
+	return c.ask.CallUnary(ctx, req)
 }
 
 // SetBudget calls codefoundry.v1.ThreadService.SetBudget.
@@ -1393,6 +1410,9 @@ type ThreadServiceHandler interface {
 	// Report records the thread's report (status, summary, JSON data), replacing the
 	// previous one, stamped report_at. Any state. Persisted.
 	Report(context.Context, *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error)
+	// A created thread asks its creator something and keeps working: the creator gets a
+	// wake (docs/notes/thread-ask.md), and answers with Send.
+	Ask(context.Context, *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error)
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
@@ -1742,6 +1762,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Report")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceAskHandler := connect.NewUnaryHandler(
+		ThreadServiceAskProcedure,
+		svc.Ask,
+		connect.WithSchema(threadServiceMethods.ByName("Ask")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceSetBudgetHandler := connect.NewUnaryHandler(
 		ThreadServiceSetBudgetProcedure,
 		svc.SetBudget,
@@ -1990,6 +2016,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceLabelHandler.ServeHTTP(w, r)
 		case ThreadServiceReportProcedure:
 			threadServiceReportHandler.ServeHTTP(w, r)
+		case ThreadServiceAskProcedure:
+			threadServiceAskHandler.ServeHTTP(w, r)
 		case ThreadServiceSetBudgetProcedure:
 			threadServiceSetBudgetHandler.ServeHTTP(w, r)
 		case ThreadServiceClearFlagsProcedure:
@@ -2169,6 +2197,10 @@ func (UnimplementedThreadServiceHandler) Label(context.Context, *connect.Request
 
 func (UnimplementedThreadServiceHandler) Report(context.Context, *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Report is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Ask(context.Context, *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Ask is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error) {

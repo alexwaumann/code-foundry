@@ -39,6 +39,16 @@ func (h *Thread) Label(ctx context.Context, req *connect.Request[v1.LabelThreadR
 }
 
 // Report records a thread's report, replacing the previous one.
+// Ask sends a created thread's question to its creator.
+func (h *Thread) Ask(ctx context.Context, req *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error) {
+	m := req.Msg
+	creator, repeated, err := h.store.Ask(ctx, m.GetId(), m.GetQuestion(), m.GetAssuming())
+	if err != nil {
+		return nil, threadError(err)
+	}
+	return connect.NewResponse(&v1.AskThreadResponse{Creator: threadToProto(creator), Repeated: repeated}), nil
+}
+
 func (h *Thread) Report(ctx context.Context, req *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error) {
 	m := req.Msg
 	s, err := h.store.Report(ctx, m.GetId(), thread.Report{

@@ -171,6 +171,9 @@ service ThreadService {
   // Report records the thread's report (status, summary, JSON data), replacing the
   // previous one, stamped report_at. Any state. Persisted.
   rpc Report(ReportThreadRequest) returns (ReportThreadResponse) {}
+  // A created thread asks its creator something and keeps working: the creator gets a
+  // wake (docs/notes/thread-ask.md), and answers with Send.
+  rpc Ask(AskThreadRequest) returns (AskThreadResponse) {}
   // SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
   // budget above the thread's cost re-arms the budget stop. Any state. Persisted.
   rpc SetBudget(SetThreadBudgetRequest) returns (SetThreadBudgetResponse) {}

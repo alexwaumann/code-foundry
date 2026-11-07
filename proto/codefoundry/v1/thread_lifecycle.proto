@@ -1071,6 +1071,17 @@ message WaitThreadRequest {
   // user message (a wake message included), so a wait right after a send is race-free;
   // no check for a thread with no message.
   string after = 4;
+  // The thread waiting, when a thread is. A thread it created that asks it something
+  // (Ask) while it waits ends the wait: its wake would queue behind this very call.
+  string by_thread_id = 5;
+}
+
+// ThreadAsk is what a thread asked its creator, and which thread.
+message ThreadAsk {
+  string id = 1;
+  string name = 2;
+  string question = 3;
+  string assuming = 4;
 }
 
 message WaitThreadResponse {
@@ -1081,6 +1092,9 @@ message WaitThreadResponse {
   // The thread was removed, before the wait or while it waited (a thread being removed
   // meets no condition): thread is unset and this is what is known of it.
   RemovedThread removed = 3;
+  // A thread by_thread_id created asked it something: the wait ended early, and thread
+  // is the waited-on thread as it is now, its condition not met.
+  ThreadAsk asked = 4;
 }
 
 message RenameThreadRequest {
@@ -1402,6 +1416,22 @@ message LabelThreadRequest {
 
 message LabelThreadResponse {
   Thread thread = 1;
+}
+
+message AskThreadRequest {
+  // The thread that asks; it needs a creator.
+  string id = 1;
+  // Required; at most 4000 characters.
+  string question = 2;
+  // Required: what it goes on doing until an answer comes, at most 4000 characters.
+  string assuming = 3;
+}
+
+message AskThreadResponse {
+  // The thread it asked.
+  Thread creator = 1;
+  // The same question moments ago: nothing was sent.
+  bool repeated = 2;
 }
 
 message ReportThreadRequest {
