@@ -58,6 +58,8 @@ type threadWakePart struct {
 	t   Thread
 	at  time.Time
 	d   wakeDetail
+	// released: its group let it go (subscriptions_group.go).
+	released bool
 }
 
 // wakeSiblings counts the subscriber's live children (created_by it, not archived) for
@@ -195,6 +197,14 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 			continue
 		}
 		p := d.thread(ctx)
+		if groupHolds(p) {
+			m.mu.Lock()
+			held := m.holdGroupLocked(p)
+			m.mu.Unlock()
+			if held {
+				continue
+			}
+		}
 		if heldLeadWake(p) {
 			m.mu.Lock()
 			n, held := m.holdLocked(p)

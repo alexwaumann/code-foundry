@@ -211,6 +211,9 @@ type SubscribeOptions struct {
 	Args        map[string]string
 	Condition   Condition
 	Repeat      bool
+	// Group, on a settled thread target, holds its plain wakes until the group's threads
+	// all settled (subscriptions_group.go).
+	Group string
 	// Note says why (at most MaxNote characters, kept on one line): the wake carries
 	// it, the listings show it. Subscribing again with a note replaces the note.
 	Note string
@@ -301,6 +304,9 @@ type subscriptions struct {
 	// held are leads' settled wakes held while their children work, by lead, then
 	// subscription id (subscriptions_hold.go). In memory only.
 	held map[string]map[string]Subscription
+	// groups are wakes held for their group, by subscriber, group, then subscription id
+	// (subscriptions_group.go). In memory only.
+	groups map[string]map[string]map[string]groupWake
 }
 
 // subRec is a subscription, whether its target met the condition when last seen, and
@@ -572,6 +578,14 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 			_, status := pw.Describe(target)
 			warning = pluginWarning(target, status)
 		}
+	}
+	if group, err := checkGroup(o.Group); err != nil {
+		return SubscribeResult{}, err
+	} else if group != "" {
+		if kind != TargetThread || cond != CondSettled {
+			return SubscribeResult{}, fmt.Errorf("%w: a wake group takes a thread and the settled condition", ErrInvalidArgument)
+		}
+		args = map[string]string{groupArg: group}
 	}
 	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
 	repeat := o.Repeat && kind != TargetActionRun
@@ -1099,9 +1113,14 @@ func statusWords(t Thread) string {
 
 // checkNotify validates CreateOptions.Notify for Create, before anything is made: it
 // needs a creator, which must not be archived.
-func (m *Manager) checkNotify(notify bool, creator string) error {
+func (m *Manager) checkNotify(notify bool, group, creator string) error {
 	if !notify {
 		return nil
+	}
+	// Here, not only in Subscribe: that runs once the thread exists and can only log, so a
+	// bad name would leave a child nobody hears from.
+	if _, err := checkGroup(group); err != nil {
+		return err
 	}
 	if creator == "" {
 		return fmt.Errorf("%w: notify needs created-by (the thread to wake)", ErrInvalidArgument)
@@ -1116,8 +1135,8 @@ func (m *Manager) checkNotify(notify bool, creator string) error {
 
 // notifyCreator subscribes creator to the new thread child (CreateOptions.Notify):
 // settled, repeat. The thread exists by now, so a failure is logged, not returned.
-func (m *Manager) notifyCreator(ctx context.Context, creator, child string) {
-	res, err := m.Subscribe(ctx, SubscribeOptions{SubscriberID: creator, TargetThreadID: child, Condition: CondSettled, Repeat: true})
+func (m *Manager) notifyCreator(ctx context.Context, creator, child, group string) {
+	res, err := m.Subscribe(ctx, SubscribeOptions{SubscriberID: creator, TargetThreadID: child, Condition: CondSettled, Repeat: true, Group: group})
 	if err != nil {
 		m.log.Warn("subscribe the creator to its new thread", "thread", child, "created_by", creator, "err", err)
 		return

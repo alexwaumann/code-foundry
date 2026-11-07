@@ -526,6 +526,9 @@ type CreateOptions struct {
 	// Notify, with CreatedBy, also subscribes the creator to the new thread: condition
 	// settled, repeat (subscriptions.go). ErrInvalidArgument without CreatedBy.
 	Notify bool
+	// NotifyGroup, with Notify, puts the subscription in a group: one wake when all of its
+	// threads settled (subscriptions_group.go).
+	NotifyGroup string
 	// Owner makes the thread someone else's than the user's ("plugin:<name>"; owner.go):
 	// hidden from the user's lists. Exclusive with CreatedBy.
 	Owner string

@@ -2700,6 +2700,9 @@ type CreateThreadRequest struct {
 	// thread settles. INVALID_ARGUMENT without created_by. See
 	// docs/notes/agents-4-wake.md.
 	Notify bool `protobuf:"varint,19,opt,name=notify,proto3" json:"notify,omitempty"`
+	// Implies notify: the creator's wake waits until every thread of this group settled, and
+	// comes at once for one that failed or needs it (docs/notes/wake-groups.md).
+	NotifyGroup string `protobuf:"bytes,31,opt,name=notify_group,json=notifyGroup,proto3" json:"notify_group,omitempty"`
 	// An idempotency key (at most 128 characters): a Create with a key its creator
 	// (created_by, or the user when empty) already used within the last 24 hours returns
 	// the thread that first Create made (CreateThreadResponse.reused) and starts nothing;
@@ -2901,6 +2904,13 @@ func (x *CreateThreadRequest) GetNotify() bool {
 		return x.Notify
 	}
 	return false
+}
+
+func (x *CreateThreadRequest) GetNotifyGroup() string {
+	if x != nil {
+		return x.NotifyGroup
+	}
+	return ""
 }
 
 func (x *CreateThreadRequest) GetRequestId() string {
@@ -7885,7 +7895,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\x8b\b\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xae\b\n" +
 	"\x13CreateThreadRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
@@ -7908,7 +7918,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x06labels\x18\x11 \x03(\tR\x06labels\x12\x1d\n" +
 	"\n" +
 	"budget_usd\x18\x12 \x01(\x01R\tbudgetUsd\x12\x16\n" +
-	"\x06notify\x18\x13 \x01(\bR\x06notify\x12\x1d\n" +
+	"\x06notify\x18\x13 \x01(\bR\x06notify\x12!\n" +
+	"\fnotify_group\x18\x1f \x01(\tR\vnotifyGroup\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x14 \x01(\tR\trequestId\x12'\n" +
 	"\x0fmodel_defaulted\x18\x16 \x01(\bR\x0emodelDefaulted\x12)\n" +

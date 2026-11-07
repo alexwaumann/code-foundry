@@ -714,6 +714,9 @@ message CreateThreadRequest {
   // thread settles. INVALID_ARGUMENT without created_by. See
   // docs/notes/agents-4-wake.md.
   bool notify = 19;
+  // Implies notify: the creator's wake waits until every thread of this group settled, and
+  // comes at once for one that failed or needs it (docs/notes/wake-groups.md).
+  string notify_group = 31;
   // An idempotency key (at most 128 characters): a Create with a key its creator
   // (created_by, or the user when empty) already used within the last 24 hours returns
   // the thread that first Create made (CreateThreadResponse.reused) and starts nothing;

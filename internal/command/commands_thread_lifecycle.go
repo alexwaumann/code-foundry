@@ -179,6 +179,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "labels", Type: String, Description: "Comma-separated labels (lowercase letters, digits, -, _, . and /)"},
 				{Name: "budget", Type: String, Description: "Spending limit in USD at Claude API rates, e.g. 5.00: Claude is interrupted when the thread's cost reaches it"},
 				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message each time the new thread settles (a repeat thread.subscribe)"},
+				{Name: "notify-group", Type: String, Description: "Like notify, but one wake for the group: its threads' wakes wait until all of them settled, and come at once for a failure, a prompt or a question"},
 				createdFocusArg,
 				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
 					"in the last 24 hours prints the thread made then and starts nothing"},
@@ -201,7 +202,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
 					ProjectIds: projects, LikeThreadId: a.String("like"), NewBranch: a.Bool("new-branch"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
-					Notify: a.Bool("notify"), RequestId: a.String("request-id"),
+					Notify: a.Bool("notify") || a.String("notify-group") != "", NotifyGroup: a.String("notify-group"), RequestId: a.String("request-id"),
 					BackgroundSetup: a.Bool("background-setup"), DraftJson: a.String("draft-json"),
 					// A model or effort from the settings' default, not chosen: a resident's
 					// worker defaults may replace it (docs/notes/ember-2-store.md).
