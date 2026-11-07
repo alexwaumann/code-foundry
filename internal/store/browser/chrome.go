@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -88,11 +89,16 @@ var systemUIFeatures = []string{
 }
 
 // profilePrefs are what no flag sets, written into the profile before each launch. No print dialog:
-// it would wait in Chrome's hidden window. And a page reaches only the web: without the allow list,
+// it would wait in Chrome's hidden window. A page reaches only the web: without the allow list,
 // a mailto: or a custom scheme opens the app that handles it, which Chrome does for mailto: without
-// asking. Chrome's error for what is refused is ERR_BLOCKED_BY_ADMINISTRATOR.
+// asking. Chrome's error for what is refused is ERR_BLOCKED_BY_ADMINISTRATOR. And a PDF downloads,
+// under the same rule as any download, instead of opening Chrome's viewer: that is an extension
+// page with Download and Print buttons of its own, which none of this was built around. Nothing
+// downloaded is opened by Chrome, a PDF in the Mac's own reader least of all.
 var profilePrefs = map[string]any{
 	"printing": map[string]any{"enabled": false},
+	"plugins":  map[string]any{"always_open_pdf_externally": true},
+	"download": map[string]any{"open_pdf_in_system_reader": false, "extensions_to_open": ""},
 	"policy": map[string]any{
 		"url_blocklist": []string{"*"},
 		"url_allowlist": []string{"http://*", "https://*", "about:*", "blob:*", "data:*"},
@@ -244,7 +250,13 @@ type process struct {
 
 	mu   sync.Mutex
 	tail []byte
+	// blame is the store's word on a swell of Chrome's own process (memoryWatch.blame).
+	blame atomic.Pointer[func() bool]
 }
+
+// blameWith sets who is asked when Chrome's own process swells: the store, which knows which page
+// was pushing history. It reports whether it closed one.
+func (p *process) blameWith(f func() bool) { p.blame.Store(&f) }
 
 func (p *process) Pipes() (io.WriteCloser, io.Reader) { return p.toChrome, p.fromChrome }
 func (p *process) Done() <-chan struct{}              { return p.done }
@@ -304,30 +316,45 @@ func (p *process) wait(d time.Duration) bool {
 // in a loop queues its console faster than Chrome's main thread takes it, which every surface then
 // waits behind, and no event says so. So the only sign is size, read from outside. A helper past
 // maxHelperRSS, or past minGrowthRSS and up by maxGrowth in growthPolls seconds, is killed, which to
-// Chrome is a page or a GPU process that crashed. That queue can as well build up in Chrome's own
-// process, where nothing names its page, and it can be a main thread with no time left for anyone:
-// when Chrome swells, or stays past hotCPU for hotPolls seconds, the busiest helper is what is doing
-// it (about 200% each in a console flood, against about 60% for all of Chrome on an animated page).
+// Chrome is a page or a GPU process that crashed.
+//
+// Chrome's own process can swell too, where nothing names a page, and its main thread can have no
+// time left for anyone. Two things do that. history.pushState keeps each entry's state in Chrome's
+// process, up to 50 entries a page: eleven of 64 MB took it from 250 MB to 1.3 GB, and killing the
+// page's renderer gave none of it back, while closing the page did. So a swell is first the store's
+// to blame, on a page that pushed history in the window, which it closes. Past heavyBrowserRSS a
+// smaller growth counts, so a page pushing slowly is caught too. Otherwise, as for a console flood,
+// it is a helper that is itself hot or growing: about 200% each in a console flood. A helper that is
+// merely busy is not blamed: an animated page with a worker takes 80% or more and grows nothing,
+// and an earlier rule that took the busiest helper killed such a neighbour of a pushState flood.
+//
 // Chrome past maxBrowserRSS, or the whole group past maxGroupRSS, goes, and every surface says so,
 // which is better than taking the Mac along.
 const (
-	memoryPoll    = time.Second
-	growthPolls   = 5
-	maxHelperRSS  = 4 << 20 // KiB, as ps says
-	minGrowthRSS  = 1 << 20
-	maxGrowth     = 512 << 10
-	maxBrowserRSS = 6 << 20
-	maxGroupRSS   = 12 << 20
-	minBusyCPU    = 50.0
-	hotCPU        = 150.0
-	hotPolls      = 3
+	memoryPoll      = time.Second
+	growthPolls     = 5
+	maxHelperRSS    = 4 << 20 // KiB, as ps says
+	minGrowthRSS    = 1 << 20
+	maxGrowth       = 512 << 10
+	heavyBrowserRSS = 2 << 20
+	heavyGrowth     = 64 << 10
+	helperGrowth    = 256 << 10
+	maxBrowserRSS   = 6 << 20
+	maxGroupRSS     = 12 << 20
+	hotCPU          = 150.0
+	hotPolls        = 3
 )
 
 // watchMemory polls Chrome's process group until it exits.
 func (p *process) watchMemory() {
 	tick := time.NewTicker(memoryPoll)
 	defer tick.Stop()
-	w := memoryWatch{pid: p.cmd.Process.Pid}
+	w := memoryWatch{pid: p.cmd.Process.Pid, blame: func() bool {
+		if f := p.blame.Load(); f != nil {
+			return (*f)()
+		}
+		return false
+	}}
 	for {
 		select {
 		case <-p.done:
@@ -355,6 +382,9 @@ type memoryWatch struct {
 	pid  int
 	past map[int][]int // each process's last sizes, oldest first
 	hot  int           // polls in a row Chrome's own process has been past hotCPU
+	// blame asks the store about a swell of Chrome's own process, and reports whether it closed
+	// the page doing it. Nil asks nobody.
+	blame func() bool
 }
 
 // read says which helpers of the group led by pid are to go, and whether pid itself is.
@@ -368,7 +398,9 @@ func (w *memoryWatch) read(ps string) (helpers []int, browser bool) {
 		past[who] = sizes
 		return rss - sizes[0]
 	}
-	busiest, busy, swelling, total := 0, minBusyCPU, false, 0
+	// culprit is the busiest helper that is itself hot or growing, the only kind a strain of
+	// Chrome's own process is blamed on.
+	culprit, busy, swelling, heavy, total := 0, 0.0, false, false, 0
 	for line := range strings.Lines(ps) {
 		f := strings.Fields(line)
 		if len(f) != 4 {
@@ -383,26 +415,38 @@ func (w *memoryWatch) read(ps string) (helpers []int, browser bool) {
 		case who == w.pid:
 			total += rss
 			browser = browser || rss > maxBrowserRSS
-			swelling = grew(who, rss) > maxGrowth
+			grown := grew(who, rss)
+			swelling = grown > maxGrowth
+			heavy = rss > heavyBrowserRSS && grown > heavyGrowth
 			if w.hot++; cpu < hotCPU {
 				w.hot = 0
 			}
 		default:
 			total += rss
-			if grown := grew(who, rss); rss > maxHelperRSS || (rss > minGrowthRSS && grown > maxGrowth) {
+			grown := grew(who, rss)
+			if rss > maxHelperRSS || (rss > minGrowthRSS && grown > maxGrowth) {
 				helpers = append(helpers, who)
 			}
-			if cpu >= busy {
-				busiest, busy = who, cpu
+			if (cpu >= hotCPU || grown > helperGrowth) && cpu >= busy {
+				culprit, busy = who, cpu
 			}
 		}
 	}
-	if (swelling || w.hot >= hotPolls) && len(helpers) == 0 && busiest != 0 {
-		helpers = append(helpers, busiest)
-		delete(past, w.pid) // it will not shrink: the next blame needs new growth
-		w.hot = 0
-	}
 	w.past = past
+	hot := w.hot >= hotPolls
+	if len(helpers) > 0 || !(swelling || heavy || hot) {
+		return helpers, browser || total > maxGroupRSS
+	}
+	switch {
+	case (swelling || heavy) && w.blame != nil && w.blame():
+	case (swelling || hot) && culprit != 0:
+		helpers = append(helpers, culprit)
+	default:
+		// Nobody to blame: the limits on Chrome and the group stay the last line.
+		return helpers, browser || total > maxGroupRSS
+	}
+	delete(w.past, w.pid) // it will not shrink: the next blame needs new growth
+	w.hot = 0
 	return helpers, browser || total > maxGroupRSS
 }
 

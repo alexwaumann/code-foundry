@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 // target is one page in Chrome: a surface's own, or a popup it opened. Its fields need
@@ -47,6 +48,9 @@ type target struct {
 	frames int
 	queue  workQueue
 	budget eventBudget
+	// history counts the entries this page pushed lately: the state of each one is kept in
+	// Chrome's own process (pacing.go, blameHistory).
+	history historyPushes
 }
 
 // shownOrigin is who a page is: Chrome's word, or what its address says while there is none yet.
@@ -212,18 +216,15 @@ func onFrameNavigated(s *Store, in *instance, t *target, params json.RawMessage)
 	} else {
 		t.commit(p.Frame.URL, chromeOrigin(p.Frame.Origin))
 	}
-	if !allowedPage(p.Frame.URL) {
-		// Chrome keeps pages off these on its own. If one ever got here it does not stay.
+	if !allowedPage(p.Frame.URL) || p.Frame.MimeType == "application/pdf" {
+		// Chrome keeps pages off these on its own, and makes a PDF a download
+		// (plugins.always_open_pdf_externally). If one ever got here it does not stay: a PDF would
+		// be Chrome's viewer, with Download and Print buttons of its own.
 		t.surface.state.Notice = "That page is not allowed here."
 		s.log.Warn("left a page a surface may not show")
 		go func() {
 			_ = in.call(context.Background(), t.session, "Page.navigate", map[string]any{"url": "about:blank"}, nil)
 		}()
-	}
-	if p.Frame.MimeType == "application/pdf" {
-		// Headless Chrome paints nothing for a PDF, so the last frame would stay up under
-		// the new address.
-		t.surface.state.Notice = "This surface cannot show PDFs."
 	}
 	t.sel, t.chooser = nil, nil
 	// A new document has none of the old one's frames. Chrome does not always say so for a frame
@@ -250,6 +251,7 @@ func onWithinDocument(s *Store, in *instance, t *target, params json.RawMessage)
 	}
 	t.url = p.URL
 	t.commits++
+	t.history.push(time.Now())
 	t.surface.publish()
 	s.schedule(in, t, jobHistory)
 }
@@ -501,6 +503,8 @@ func onTargetDestroyed(s *Store, in *instance, params json.RawMessage) {
 		}
 	}
 	if !wasTop {
+		// The page on screen is the same, but whether it is a popup, and has a way back, may not be.
+		sf.publish()
 		return
 	}
 	if next := sf.top(); next != nil {

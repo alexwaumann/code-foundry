@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -24,6 +25,25 @@ var hostilePages = map[string]string{
 const s='/'+'p'.repeat(2000000);let i=0;const c=new MessageChannel();
 c.port1.onmessage=()=>{try{history.pushState(0,'',s+(i++))}catch(e){};c.port2.postMessage(0)};c.port2.postMessage(0)</script>`,
 	"plain": `<!doctype html><title>Plain</title><body>plain`,
+	// Eight history entries whose state is a 64 MB typed array: Chrome's own process keeps each one.
+	"stateflood": `<!doctype html><title>State flood</title><script>
+const big=new Uint8Array(64<<20);for(let i=0;i<big.length;i+=4096)big[i]=i&255;let n=0;
+function step(){big[0]=n;history.pushState(big,'','/hostile/stateflood?'+n);if(++n<8)setTimeout(step,120)}
+setTimeout(step,300)</script>`,
+	// A neighbour as busy as a game: an animation and a worker that never rests, and no growth.
+	"busy": `<!doctype html><title>Busy</title><body style="margin:0"><div id=d style="width:50px;height:50px;background:red;position:absolute"></div><script>
+let x=0;function f(){const e=performance.now()+13;while(performance.now()<e);x=(x+3)%500;d.style.left=x+'px';requestAnimationFrame(f)}f();
+new Worker(URL.createObjectURL(new Blob(['for(;;);'],{type:'text/javascript'})))</script>`,
+	// A page that sends its visitor to another site, whose first paint waits on a stylesheet.
+	"lure": `<!doctype html><title>Lure</title><body style="background:#c00;color:#fff;font:40px sans-serif">CALL 555-0100<script>
+setTimeout(()=>{location='http://localhost:$PORT/hostile/slowpaint'},300)</script>`,
+	"slowpaint": `<!doctype html><title>Slow paint</title><link rel=stylesheet href="/hang.css"><body>the real page`,
+	// A popup whose frame tree is past the pipe's limit: 20 frames of 2 MB addresses.
+	"tree": `<!doctype html><title>Tree</title><body style="margin:0"><button id=b style="position:fixed;left:0;top:0;width:200px;height:60px">go</button><script>
+b.onclick=()=>{const w=open('about:blank','x','width=300,height=300');const d=w.document;d.body.innerHTML='<h1>Sign in to your bank</h1>';
+const pad='a'.repeat(2000000);for(let i=0;i<20;i++){const f=d.createElement('iframe');f.style.display='none';f.src='about:blank#'+i+pad;d.body.append(f)}}</script>`,
+	"pdfs": `<!doctype html><title>PDFs</title><body style="margin:0"><a id=a href="/terms.pdf" style="position:fixed;left:0;top:0;font-size:60px">terms</a>
+<embed src="/terms.pdf" type="application/pdf" style="position:fixed;left:0;top:100px;width:300px;height:200px">`,
 	"popup": `<!doctype html><title>Opener</title><body style="margin:0">
 <button id=b onclick="window.open('/hostile/rewrite','x','width=300,height=300')" style="position:fixed;left:0;top:0;width:200px;height:60px">go</button>`,
 	"rewrite": `<!doctype html><title>Rewrite</title><script>
@@ -320,5 +340,135 @@ func liveOnlyTheWebIsReachable(t *testing.T, l *live) {
 	}
 	if !slices.Equal(got, []string{"blob", "data"}) {
 		t.Fatalf("frames %v", got)
+	}
+}
+
+// history.pushState with a 64 MB state, eight times, swelled Chrome's own process by about 800 MB.
+// The watch took the busiest helper for it, which was a busy neighbour: it is the page that
+// pushed that has to go, and closing it is what gives the memory back.
+func liveAStateFloodClosesThePusherAndNoNeighbour(t *testing.T, l *live) {
+	busy := l.other(t, "thread:busy", "http://"+plainHost+":"+l.port()+"/hostile/busy")
+	flood := l.other(t, "thread:stateflood", "http://localhost:"+l.port()+"/hostile/stateflood")
+	st := flood.until("the pusher closed", func(st State) bool { return strings.Contains(st.Notice, "flooding") })
+	if !strings.Contains(st.Notice, "localhost") {
+		t.Fatalf("notice %q", st.Notice)
+	}
+	if st := busy.now(); st.Notice != "" {
+		t.Fatalf("the busy neighbour: %q", st.Notice)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := l.s.Input(ctx, busy.key, []InputEvent{{Mouse: &MouseEvent{Type: "mouseMoved", Button: "none", X: 5, Y: 5}}}); err != nil {
+		t.Fatalf("the busy neighbour: %v", err)
+	}
+	if !l.s.Running() {
+		t.Fatal("Chrome went with the page")
+	}
+}
+
+// A page sent its visitor to another site whose first paint was slow: the page before stayed on
+// screen under the new site's address.
+func liveACommitToAnotherSiteIsCoveredUntilItPaints(t *testing.T, l *live) {
+	l.open("http://"+plainHost+":"+l.port()+"/hostile/lure", "Lure")
+	st := l.until("the new site", func(st State) bool { return strings.HasSuffix(st.URL, "/hostile/slowpaint") })
+	if !st.AwaitingFrame {
+		t.Fatalf("the lure's last frame stands under %q", st.URL)
+	}
+	sent := l.count.Load()
+	time.Sleep(time.Second)
+	if st := l.now(); st.AwaitingFrame && l.count.Load() != sent {
+		t.Fatal("a frame came while the page still waited to paint")
+	}
+	l.until("its first frame", func(st State) bool { return !st.AwaitingFrame })
+	if l.count.Load() == sent {
+		t.Fatal("uncovered with no frame")
+	}
+}
+
+// A popup whose frame tree was too long to read, by Page.getFrameTree, showed an empty bar with no
+// site and no mark over a fake sign-in.
+func liveAPopupWithAHugeFrameTreeIsNamedAndMarked(t *testing.T, l *live) {
+	origin := "http://" + plainHost + ":" + l.port()
+	l.open(origin+"/hostile/tree", "Tree")
+	l.click(20, 20)
+	st := l.until("the popup", func(st State) bool { return st.Popup && st.URL != "" })
+	if st.URL != "about:blank" || st.Origin != origin || st.Security != SecurityInsecure {
+		t.Fatalf("url %q origin %q security %q", st.URL, st.Origin, st.Security)
+	}
+	if err := l.s.Go(context.Background(), l.key, -1); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the opener", func(st State) bool { return !st.Popup })
+}
+
+// Chrome says nothing of a frame inside a frame when the outer one goes, or when the page does:
+// counted for good, they used up the page's frames.
+func liveFramesInsideFramesAreNotLeftCounted(t *testing.T, l *live) {
+	counted := func() int {
+		l.s.mu.Lock()
+		defer l.s.mu.Unlock()
+		in := l.s.chrome
+		t := l.s.surfaces[l.key].top()
+		n := 0
+		for _, f := range in.frames {
+			if f.owner == t {
+				n++
+			}
+		}
+		return n + 1000*t.frames
+	}
+	nested := func() {
+		l.open(l.srv.URL+"/hostile/nest", "Nest")
+		for deadline := time.Now().Add(10 * time.Second); counted() != 2002; time.Sleep(20 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatalf("frames %d", counted())
+			}
+		}
+	}
+	nested()
+	l.eval(`document.querySelector('iframe').remove();1`, nil)
+	for deadline := time.Now().Add(5 * time.Second); counted() != 0; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the frame inside the removed one: %d", counted())
+		}
+	}
+	nested()
+	l.open(l.srv.URL+"/hostile/plain", "Plain")
+	if n := counted(); n != 0 {
+		t.Fatalf("after the page went: %d", n)
+	}
+}
+
+// Chrome's PDF viewer has Download and Print buttons of its own. A PDF downloads instead, under
+// the rule for any download; an embedded one shows Chrome's placeholder.
+func liveAPDFIsADownload(t *testing.T, l *live) {
+	l.open(l.srv.URL+"/hostile/pdfs", "PDFs")
+	l.click(40, 30)
+	st := l.until("the download", func(st State) bool { return countState(st, DownloadCompleted) == 1 })
+	if st.URL != l.srv.URL+"/hostile/pdfs" {
+		t.Fatalf("the page went to %q", st.URL)
+	}
+	for _, d := range st.Downloads {
+		if d.State == DownloadCompleted && filepath.Base(d.Path) != "terms.pdf" {
+			t.Fatalf("landed as %q", d.Path)
+		}
+	}
+	var tg struct {
+		TargetInfos []struct {
+			URL string `json:"url"`
+		} `json:"targetInfos"`
+	}
+	in, _, _, err := l.s.shown(l.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := in.call(context.Background(), "", "Target.getTargets", map[string]any{"filter": []map[string]any{{}}}, &tg); err != nil {
+		t.Fatal(err)
+	}
+	for _, x := range tg.TargetInfos {
+		// The viewer's extension.
+		if strings.Contains(x.URL, "mhjfbmdgcfjbbpaeojofohoefgiehjai") {
+			t.Fatalf("Chrome's PDF viewer is up: %s", x.URL)
+		}
 	}
 }

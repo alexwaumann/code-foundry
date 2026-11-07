@@ -338,12 +338,18 @@ func TestPageLandingOnAForbiddenSchemeIsSentAway(t *testing.T) {
 	})
 }
 
-func TestWhatCannotShowSaysSo(t *testing.T) {
+// A PDF is a download (the profile's plugins.always_open_pdf_externally). One that shows anyway is
+// Chrome's viewer, with Download and Print buttons of its own, and does not stay.
+func TestAPDFThatShowsAnywayIsLeft(t *testing.T) {
 	f := newFixture(t, time.Hour)
 	v, _ := f.s.Watch("thread:a", 640, 480, "")
 	next(t, v, "ready", ready)
 	f.c.Emit("Page.frameNavigated", "session-target-1", map[string]any{"frame": map[string]any{"url": "https://example.com/a.pdf", "mimeType": "application/pdf"}})
-	next(t, v, "the notice", func(st browser.State) bool { return strings.Contains(st.Notice, "PDF") })
+	next(t, v, "the notice", func(st browser.State) bool { return strings.Contains(st.Notice, "not allowed") })
+	eventually(t, "the way out", func() bool {
+		calls := f.c.Calls("Page.navigate")
+		return len(calls) == 1 && calls[0].Params["url"] == "about:blank"
+	})
 }
 
 func TestAFailedNavigationSaysWhy(t *testing.T) {

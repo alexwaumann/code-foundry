@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
@@ -100,6 +101,12 @@ func TestTheProfileRefusesWhatLeavesTheWeb(t *testing.T) {
 		if got["printing"].(map[string]any)["enabled"] != false {
 			t.Fatalf("printing %v", got["printing"])
 		}
+		if got["plugins"].(map[string]any)["always_open_pdf_externally"] != true {
+			t.Fatalf("PDFs open in Chrome's viewer: %v", got["plugins"])
+		}
+		if d := got["download"].(map[string]any); d["open_pdf_in_system_reader"] != false || d["extensions_to_open"] != "" {
+			t.Fatalf("downloads open by themselves: %v", d)
+		}
 		policy := got["policy"].(map[string]any)
 		if b := policy["url_blocklist"].([]any); len(b) != 1 || b[0] != "*" {
 			t.Fatalf("blocklist %v", b)
@@ -113,7 +120,7 @@ func TestTheProfileRefusesWhatLeavesTheWeb(t *testing.T) {
 	}
 	for _, tt := range []struct{ name, before string }{
 		{"a new profile", ""},
-		{"one a user has used", `{"printing":{"enabled":true,"x":1},"session":{"restore_on_startup":1}}`},
+		{"one a user has used", `{"printing":{"enabled":true,"x":1},"session":{"restore_on_startup":1},"download":{"extensions_to_open":"pdf:sh","default_directory":"/x"}}`},
 		{"one that does not parse", `{"printing`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -190,6 +197,28 @@ func TestWhatTheMemoryWatchKills(t *testing.T) {
 		}()}, nil, true},
 		{"Chrome out of time for a moment", []string{hot, hot}, nil, false},
 		{"Chrome out of time, but not in a row", []string{hot, hot, ps(100, 100, gib/4) + busy(101, 100, gib/4, 195), hot, hot}, nil, false},
+		// A pushState flood swelled Chrome's own process, and the rule took the busiest helper:
+		// an animated neighbour with a worker, every time.
+		{
+			"Chrome swelling, a neighbour busy and the same size",
+			[]string{ps(100, 100, gib/4) + busy(101, 100, gib/10, 180) + busy(102, 100, gib/10, 5), ps(100, 100, gib) + busy(101, 100, gib/10, 140) + busy(102, 100, gib/10, 30)},
+			nil, false,
+		},
+		{
+			"Chrome swelling, a page growing with it",
+			[]string{ps(100, 100, gib/4) + busy(101, 100, gib/10, 120) + busy(102, 100, gib/10, 5), ps(100, 100, gib) + busy(101, 100, gib/10, 120) + busy(102, 100, gib/2, 40)},
+			[]int{102}, false,
+		},
+		{
+			"Chrome heavy and growing a little, with a page growing",
+			[]string{ps(100, 100, 3*gib) + busy(101, 100, gib/10, 5), ps(100, 100, 3*gib+gib/8) + busy(101, 100, gib/2, 40)},
+			nil, false,
+		},
+		{
+			"Chrome out of time, a neighbour busy and the same size",
+			[]string{ps(100, 100, gib/4) + busy(101, 100, gib/4, 120), busy(100, 100, gib/4, 160) + busy(101, 100, gib/4, 120), busy(100, 100, gib/4, 160) + busy(101, 100, gib/4, 120), busy(100, 100, gib/4, 160) + busy(101, 100, gib/4, 120)},
+			nil, false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,5 +248,60 @@ func TestOneSwellIsBlamedOnOnePage(t *testing.T) {
 	}
 	if got := poll(gib); got != nil {
 		t.Fatalf("Chrome's size alone blamed another: %v", got)
+	}
+}
+
+// A swell of Chrome's own process is the store's to blame first: a page that pushed history, which
+// it closes. Only a swell asks, and only when the store has nobody does a helper go.
+func TestTheStoreIsAskedAboutASwellFirst(t *testing.T) {
+	gib := 1 << 20
+	line := func(pid, rss int, cpu float64) string { return fmt.Sprintf("%d 100 %d %.1f\n", pid, rss, cpu) }
+	calm := line(100, gib/4, 5) + line(101, gib/4, 195)
+	swell := line(100, gib, 5) + line(101, gib/4, 195)
+	heavy := []string{line(100, 3*gib, 5) + line(101, gib/4, 195), line(100, 3*gib+gib/8, 5) + line(101, gib/4, 195)}
+	hot := line(100, gib/4, 160) + line(101, gib/4, 195)
+	tests := []struct {
+		name    string
+		polls   []string
+		closes  bool
+		asked   int
+		helpers []int
+	}{
+		{"a swell, a page closed", []string{calm, swell}, true, 1, nil},
+		{"a swell, no page to close", []string{calm, swell}, false, 1, []int{101}},
+		{"heavy and growing, a page closed", heavy, true, 1, nil},
+		{"heavy and growing, no page to close", heavy, false, 1, nil},
+		{"out of time: a console, not history", []string{hot, hot, hot}, true, 0, []int{101}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asked := 0
+			w := memoryWatch{pid: 100, blame: func() bool { asked++; return tt.closes }}
+			var helpers []int
+			for _, poll := range tt.polls {
+				helpers, _ = w.read(poll)
+			}
+			if asked != tt.asked || !slices.Equal(helpers, tt.helpers) {
+				t.Fatalf("asked %d, killed %v", asked, helpers)
+			}
+		})
+	}
+}
+
+func TestHistoryPushesCountOnlyLately(t *testing.T) {
+	var h historyPushes
+	start := time.Unix(1000, 0)
+	for i := range 11 {
+		h.push(start.Add(time.Duration(i) * 120 * time.Millisecond))
+	}
+	if n := h.recent(start.Add(2 * time.Second)); n != 11 {
+		t.Fatalf("recent %d", n)
+	}
+	if n := h.recent(start.Add(historyWindow + 2*time.Second)); n != 0 {
+		t.Fatalf("long after: %d", n)
+	}
+	h.push(start.Add(time.Minute))
+	if n := h.recent(start.Add(time.Minute)); n != 1 {
+		t.Fatalf("a push a minute later counts %d", n)
 	}
 }

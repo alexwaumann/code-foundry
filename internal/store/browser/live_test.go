@@ -101,6 +101,17 @@ func startLive(t *testing.T) *live {
 	}
 	mux.HandleFunc("/", html(livePage))
 	mux.HandleFunc("/hostile/", serveHostile)
+	mux.HandleFunc("/hang.css", func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(3 * time.Second):
+		case <-r.Context().Done():
+		}
+		w.Header().Set("Content-Type", "text/css")
+	})
+	mux.HandleFunc("/terms.pdf", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/pdf")
+		fmt.Fprint(w, "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n")
+	})
 	mux.HandleFunc("/two", html(`<title>Two</title><body>second page`))
 	mux.HandleFunc("/paste-top", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -344,6 +355,11 @@ func TestLive(t *testing.T) {
 		{"ADialogBehindAPopupNeverShows", liveADialogBehindAPopupNeverShows},
 		{"SystemPanelsAreGone", liveSystemPanelsAreGone},
 		{"AFloodClosesThePageAndNoOther", liveAFloodClosesThePageAndNoOther},
+		{"AStateFloodClosesThePusherAndNoNeighbour", liveAStateFloodClosesThePusherAndNoNeighbour},
+		{"ACommitToAnotherSiteIsCoveredUntilItPaints", liveACommitToAnotherSiteIsCoveredUntilItPaints},
+		{"APopupWithAHugeFrameTreeIsNamedAndMarked", liveAPopupWithAHugeFrameTreeIsNamedAndMarked},
+		{"FramesInsideFramesAreNotLeftCounted", liveFramesInsideFramesAreNotLeftCounted},
+		{"APDFIsADownload", liveAPDFIsADownload},
 		{"TheSiteSurvivesAnAddressNoParserTakes", liveTheSiteSurvivesAnAddressNoParserTakes},
 		{"APopupCannotBlankItsOpenerUnnoticed", liveAPopupCannotBlankItsOpenerUnnoticed},
 		{"EveryCrossSiteFrameHasASessionOfItsOwn", liveEveryCrossSiteFrameHasASessionOfItsOwn},

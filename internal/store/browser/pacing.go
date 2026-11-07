@@ -126,17 +126,70 @@ func (s *Store) charge(in *instance, t *target, n int) bool {
 	if b.spent <= allowance {
 		return true
 	}
-	b.over = true
+	s.closeFlooding(in, t, "events")
+	return false
+}
+
+// closeFlooding closes a page that was flooding the browser, and says so on its surface. What
+// it still sends goes unread. Needs Store.mu.
+func (s *Store) closeFlooding(in *instance, t *target, with string) {
+	t.budget.over = true
 	sf := t.surface
 	sf.state.Notice = floodWords(t.shownOrigin())
 	sf.publish()
-	s.log.Warn("closed a page that flooded the browser")
+	s.log.Warn("closed a page that flooded the browser", "with", with)
 	go func() {
 		if err := in.call(context.Background(), "", "Target.closeTarget", map[string]any{"targetId": t.id}, nil); err != nil {
 			s.log.Debug("close a flooding page", "err", err)
 		}
 	}()
-	return false
+}
+
+// historyWindow is how long a page's history pushes count against it: the memory watch's window.
+const historyWindow = growthPolls * memoryPoll
+
+// historyPushes counts a page's history entries in the last historyWindow, give or take one.
+// Its fields need Store.mu.
+type historyPushes struct {
+	since, last time.Time
+	n           int
+}
+
+func (h *historyPushes) push(now time.Time) {
+	if now.Sub(h.since) > historyWindow {
+		h.since, h.n = now, 0
+	}
+	h.n++
+	h.last = now
+}
+
+// recent is how many entries the page pushed lately, 0 for none.
+func (h *historyPushes) recent(now time.Time) int {
+	if now.Sub(h.last) > historyWindow {
+		return 0
+	}
+	return h.n
+}
+
+// blameHistory answers the memory watch when Chrome's own process swells. A page's history
+// entries keep their state there, and a page can push 50 entries of 64 MB or more: only closing
+// the page gives that back. The page that pushed most lately is closed, if any did, and it reports
+// whether one was.
+func (s *Store) blameHistory(in *instance) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	var worst *target
+	for _, t := range in.targets {
+		if n := t.history.recent(now); n > 0 && !t.budget.over && (worst == nil || n > worst.history.recent(now)) {
+			worst = t
+		}
+	}
+	if worst == nil {
+		return false
+	}
+	s.closeFlooding(in, worst, "history")
+	return true
 }
 
 // floodWords says what became of a page.

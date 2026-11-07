@@ -580,8 +580,13 @@ func TestAPopupWhoseOpenerWentIsStillAPopup(t *testing.T) {
 	answerAddress(f.c, "about:blank", "://")
 	openPopup(t, f, v)
 	next(t, v, "the popup's address", func(st browser.State) bool { return st.Popup && st.URL == "about:blank" })
+	latest(f, v)
 	f.c.Emit("Target.targetDestroyed", "", map[string]any{"targetId": "target-1"})
-	st := next(t, v, "the popup alone", func(st browser.State) bool { return !st.Popup })
+	// Said at once: nothing else need happen for the surface to say it has no way back.
+	st := latest(f, v)
+	if st.Popup || st.CanGoBack {
+		t.Fatalf("popup %v, back %v, with the opener gone", st.Popup, st.CanGoBack)
+	}
 	if st.URL != "about:blank" || st.Security != browser.SecurityInsecure {
 		t.Fatalf("url %q security %q", st.URL, st.Security)
 	}
@@ -738,5 +743,42 @@ func TestAScreenshotAcrossACommitIsNotTheNewPages(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if st := latest(f, v); st.Site == "bank.example" && !st.AwaitingFrame {
 		t.Fatal("the evil page's screenshot uncovered the bank")
+	}
+}
+
+// history.pushState with 64 MB states swelled Chrome's own process to 2.4 GB, where nothing names
+// a page. The page that pushed is the one closed; a busy neighbour is not touched.
+func TestASwellIsBlamedOnThePageThatPushedHistory(t *testing.T) {
+	f, evil, _ := surfaceFixture(t)
+	secure(f.c, page, "https://evil.example/", "https://evil.example")
+	calm, err := f.s.Watch("thread:calm", 640, 480, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	next(t, calm, "the calm page", ready)
+	const calmPage = "session-target-2"
+	secure(f.c, calmPage, "https://calm.example/", "https://calm.example")
+	next(t, calm, "the calm site", func(st browser.State) bool { return st.Site == "calm.example" })
+	if f.s.BlameHistory() {
+		t.Fatal("blamed with no history pushed")
+	}
+	for i := range 11 {
+		pushed(f.c, page, fmt.Sprint("https://evil.example/s", i))
+	}
+	// A pushState of the calm page's own, once, is not the most.
+	f.c.Emit("Page.navigatedWithinDocument", calmPage, map[string]any{"frameId": "target-2", "url": "https://calm.example/next"})
+	next(t, evil, "the pushes", func(st browser.State) bool { return st.URL == "https://evil.example/s10" })
+	next(t, calm, "the calm push", func(st browser.State) bool { return st.URL == "https://calm.example/next" })
+	f.c.Emit("Page.navigatedWithinDocument", calmPage, map[string]any{"frameId": "target-2", "url": "https://calm.example/next"})
+	if !f.s.BlameHistory() {
+		t.Fatal("nobody blamed")
+	}
+	eventually(t, "the close", func() bool { return len(f.c.Calls("Target.closeTarget")) == 1 })
+	if c := f.c.Calls("Target.closeTarget")[0]; c.Params["targetId"] != "target-1" {
+		t.Fatalf("closed %v", c.Params["targetId"])
+	}
+	next(t, evil, "the notice", func(st browser.State) bool { return strings.Contains(st.Notice, "evil.example was closed") })
+	if st := latest(f, calm); st.Notice != "" {
+		t.Fatalf("the calm page says %q", st.Notice)
 	}
 }
