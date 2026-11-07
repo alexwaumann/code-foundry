@@ -753,6 +753,18 @@ func liveStaleTextNeverReachesTheMac(t *testing.T, l *live) {
 	if got := l.copied.Load(); got != "what the Mac holds" {
 		t.Fatalf("the Mac's clipboard became %q", got)
 	}
+	// Nor is text a page left where no click looked for it, on a key press of its own.
+	l.eval(`addEventListener('keydown',()=>navigator.clipboard.writeText('planted'));t.focus();1`, nil)
+	l.typeText("x")
+	time.Sleep(200 * time.Millisecond)
+	o.eval(`t.value="";t.focus();1`, nil)
+	o.press("c", "KeyC", 67, modMeta)
+	if n, err := l.s.Copy(ctx, o.key, false); err != nil || n != 0 {
+		t.Fatalf("the other surface moved %d: %v", n, err)
+	}
+	if got := l.copied.Load(); got != "what the Mac holds" {
+		t.Fatalf("the Mac's clipboard became %q", got)
+	}
 	o.eval(`t.value="selected here";t.focus();t.select();1`, nil)
 	o.press("c", "KeyC", 67, modMeta)
 	if n, err := l.s.Copy(ctx, o.key, false); err != nil || n == 0 {
