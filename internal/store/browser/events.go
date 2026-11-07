@@ -459,7 +459,7 @@ func (s *Store) showPopup(in *instance, opener, t *target) {
 // An event that came meanwhile is newer than the answer, which then says nothing.
 //
 // It asks the page's own document, in the helper's world, where no script of the page's reaches,
-// for its address and origin: a main frame's address is at most 2 MB. Page.getFrameTree would say
+// for its address and origin: Chrome caps an address at 2 MB. Page.getFrameTree would say
 // the same with every frame's address in it, which a page can make past the pipe's limit, and
 // the call then fails. A read that fails leaves the address empty, which a viewer shows as a page
 // nobody can name, and Not secure (surface.security).

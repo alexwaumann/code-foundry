@@ -72,6 +72,22 @@ test("the setting going off takes the tab and the stream at once", async ({ page
   await expect.poll(async () => (await openStreams())[WATCH] ?? 0).toBe(0);
 });
 
+// A page sent its visitor to another site whose first paint was slow: the page before stayed on
+// the canvas under the new site's address. The daemon says the page has not painted yet.
+test("a page that has not painted yet shows nothing of the page before", async ({ page }) => {
+  await openSurface(page);
+  const painted = () =>
+    canvas(page).evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext("2d")?.getImageData(0, 0, c.width, c.height).data ?? [];
+      let n = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+      return n;
+    });
+  await expect.poll(painted).toBeGreaterThan(0);
+  await pageDoes({ url: "https://bank.example/", awaitingFrame: true });
+  await expect.poll(painted).toBe(0);
+});
+
 test("a click lands where it was made, in the page's pixels, and the keyboard goes to the page", async ({ page }) => {
   await openSurface(page);
   const box = await canvas(page).boundingBox();
